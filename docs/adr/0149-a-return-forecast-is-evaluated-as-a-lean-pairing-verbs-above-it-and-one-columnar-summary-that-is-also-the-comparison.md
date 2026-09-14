@@ -243,9 +243,14 @@ Calibration**. Example `7_putting_it_together/07_Forecast_Evaluation.jl` is the 
 reading order.
 
 Two members rarely share an evaluation grid — a member that is refit warms up, one that publishes
-its history does not — so the summary refuses them, correctly, and aligning two forecasts is today
-a hand-written blank through the bare method. The map named it as a fresh effort;
-[#1073](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1073) seeds it.
+its history does not — so the summary refuses them, correctly, and aligning two forecasts was a
+hand-written blank through the bare method. The map named it as a fresh effort, and
+[#1073](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1073) paid it:
+`forecast_evaluation_align` rebuilds each Result on the grid the set shares, `max(lo):step:min(hi)`,
+with its pair, universe and parameters untouched, and `forecast_evaluation_summary` takes
+`align = true` to call it, so the comparison the map exists for is one call at the Estimator layer.
+The grid is anchored at the later start, which is what the blank did, and it also ends at the
+earlier finish, which the blank did not.
 
 The review that wrote this ADR found three places where the code at the head read less than the
 reference and the tickets did not say so, and all three are paid. `forecast_coverage` divided by

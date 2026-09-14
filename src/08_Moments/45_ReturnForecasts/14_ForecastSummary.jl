@@ -70,24 +70,26 @@ function forecast_summary_same_target(a::AbstractForecastTarget, b::AbstractFore
     return true
 end
 """
-    forecast_summary_assert_comparable(fes::AbstractVector{<:ForecastEvaluationResult})
+    forecast_summary_assert_same_question(fes::AbstractVector{<:ForecastEvaluationResult})
 
-Refuse a set of evaluations whose rows would not mean the same thing, naming the field that differs.
+Refuse a set of evaluations that do not answer one question, naming the field that differs.
 
-A summary puts one row per forecast beside the others and invites the reader to compare them, so the rows must be answers to one question. Seven of the fields a [`ForecastEvaluationResult`](@ref) carries change what a row means: the forward target changes the quantity scored, `horizon` and `lag` change the window it is scored over, `step` and `dates` change the sample, `min_count` changes which cross-sections entered it, and `ppy` changes the units the annualised columns are reported in. A difference in any of them is refused here rather than reported as a difference in skill.
+A summary puts one row per forecast beside the others and invites the reader to compare them, so the rows must be answers to one question. Six of the fields a [`ForecastEvaluationResult`](@ref) carries change what the question is: the forward target changes the quantity scored, `horizon` and `lag` change the window it is scored over, `step` changes the stride of the sample, `min_count` changes which cross-sections enter it, and `ppy` changes the units the annualised columns are reported in. A difference in any of them is refused here rather than reported as a difference in skill.
 
 The universe is checked with them, because two forecasts over different universes are two different questions however their parameters agree: the asset axis must agree, and so must `umsk`, which is the denominator every coverage column of the summary is read against. `alpha` and `y` are not compared: a summary of two members of one panel is exactly the case where the forecasts differ, and that is what the summary is for.
+
+The evaluation `dates` are not checked here either. Two evaluations that answer one question on two grids are still one question, and [`forecast_evaluation_align`](@ref) is what puts them on one grid; the summary asks for the grid as well, through [`forecast_summary_assert_comparable`](@ref).
 
 The reference implementation checks none of this.
 
 # Arguments
 
-  - `fes`: The evaluations to summarise, at least one.
+  - `fes`: The evaluations to compare, at least one.
 
 # Validation
 
   - `!isempty(fes)`. Raises an [`IsEmptyError`](@ref).
-  - Every evaluation agrees with the first on `target`, `horizon`, `lag`, `step`, `min_count`, `ppy`, `dates`, the number of assets and `umsk`. Raises a [`ConflictingArgumentError`](@ref) naming the field.
+  - Every evaluation agrees with the first on `target`, `horizon`, `lag`, `step`, `min_count`, `ppy`, the number of assets and `umsk`. Raises a [`ConflictingArgumentError`](@ref) naming the field.
 
 # Returns
 
@@ -95,11 +97,12 @@ The reference implementation checks none of this.
 
 # Related
 
-  - [`forecast_evaluation_summary`](@ref)
+  - [`forecast_summary_assert_comparable`](@ref)
+  - [`forecast_evaluation_align`](@ref)
   - [`forecast_summary_same_target`](@ref)
   - [`ForecastEvaluationResult`](@ref)
 """
-function forecast_summary_assert_comparable(fes::AbstractVector{<:ForecastEvaluationResult})
+function forecast_summary_assert_same_question(fes::AbstractVector{<:ForecastEvaluationResult})
     @argcheck(!isempty(fes), IsEmptyError("fes cannot be empty"))
     a = first(fes)
     for k in 2:length(fes)
@@ -116,14 +119,119 @@ function forecast_summary_assert_comparable(fes::AbstractVector{<:ForecastEvalua
                   ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `min_count`: $(b.min_count) against $(a.min_count)"))
         @argcheck(a.ppy == b.ppy,
                   ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `ppy`: $(b.ppy) against $(a.ppy)"))
-        @argcheck(a.dates == b.dates,
-                  ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `dates`: $(length(b.dates)) date(s) against $(length(a.dates))"))
         @argcheck(size(a.alpha, 2) == size(b.alpha, 2),
                   ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on the asset axis: $(size(b.alpha, 2)) against $(size(a.alpha, 2))"))
         @argcheck(a.umsk == b.umsk,
                   ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `umsk`: the two universes differ $(size(a.umsk) == size(b.umsk) ? "at $(count(a.umsk .!= b.umsk)) cell(s)" : "in shape, $(size(b.umsk)) against $(size(a.umsk))")"))
     end
     return nothing
+end
+"""
+    forecast_summary_assert_comparable(fes::AbstractVector{<:ForecastEvaluationResult})
+
+Refuse a set of evaluations whose rows would not mean the same thing, naming the field that differs.
+
+Two evaluations are comparable where they answer one question, which [`forecast_summary_assert_same_question`](@ref) checks, and where they answer it on one sample: a row taken over eighty-seven dates beside a row taken over seventy-four compares nothing, so the evaluation `dates` must agree as well. A set that answers one question on two grids is refused here, and [`forecast_evaluation_align`](@ref) is what puts it on one.
+
+# Arguments
+
+  - `fes`: The evaluations to summarise, at least one.
+
+# Validation
+
+  - The rules of [`forecast_summary_assert_same_question`](@ref).
+  - Every evaluation agrees with the first on `dates`. Raises a [`ConflictingArgumentError`](@ref) naming the field.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`forecast_evaluation_summary`](@ref)
+  - [`forecast_summary_assert_same_question`](@ref)
+  - [`forecast_evaluation_align`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+"""
+function forecast_summary_assert_comparable(fes::AbstractVector{<:ForecastEvaluationResult})
+    forecast_summary_assert_same_question(fes)
+    a = first(fes)
+    for k in 2:length(fes)
+        b = fes[k]
+        @argcheck(a.dates == b.dates,
+                  ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `dates`: $(length(b.dates)) date(s) against $(length(a.dates))"))
+    end
+    return nothing
+end
+"""
+    forecast_evaluation_align(fes::AbstractVector{<:ForecastEvaluationResult}) -> Vector{ForecastEvaluationResult}
+
+Put a set of Return Forecast evaluations on the evaluation grid they share.
+
+Two members of the Return Forecast family rarely share a grid. A member that publishes its history is scorable from the block's first row, and a member that is refit along the grid warms up first, so the two start at different observations and [`forecast_evaluation_summary`](@ref) refuses them on `dates`. Before this verb, a caller who wanted the comparison read `alpha` and `y` off the two Results, blanked the rows before the later warm-up and drove the bare method of [`forecast_evaluation`](@ref) again for each, which was the one place the library made a caller drop from the Estimator layer to the bare one to do an ordinary thing.
+
+The verb does what that blank did, in one call, and without touching the pair. Every evaluation's dates are `lo:step:hi` on the block's observation axis, so under one `step` the grid they share is `max(lo):step:min(hi)`: it starts where the last member becomes scorable and ends where the first one stops. The grid is anchored at that later start, so a member whose own grid started earlier and off its phase is re-anchored onto it. Its dates move; its `alpha`, `y` and `umsk` do not, so no statistic of the aligned Result is taken over a value the caller did not hand in. A date of the common grid that some member cannot score is kept, as [`forecast_evaluation_dates`](@ref) keeps one, and that member's statistics are `NaN` there.
+
+# Algorithm
+
+ 1. Refuse a set that does not answer one question, with [`forecast_summary_assert_same_question`](@ref).
+ 2. Take the latest first date and the earliest last date over the set, and refuse a set whose grids do not overlap.
+ 3. Rebuild each [`ForecastEvaluationResult`](@ref) on `max(lo):step:min(hi)`, carrying its own pair, universe and parameters.
+
+# Arguments
+
+  - `fes`: The evaluations to align, at least one, from [`forecast_evaluation`](@ref).
+
+# Validation
+
+  - The rules of [`forecast_summary_assert_same_question`](@ref).
+  - The grids overlap: the latest first date is no later than the earliest last date. Raises an [`IsEmptyError`](@ref).
+
+# Returns
+
+  - `afes::Vector{ForecastEvaluationResult}`: One evaluation per input, in the order they were given, every one carrying the same `dates`.
+
+# Examples
+
+```jldoctest
+julia> alpha = [1.0 2.0 4.0 8.0; 2.0 3.0 5.0 40.0; 1.0 5.0 2.0 3.0; 3.0 1.0 2.0 6.0];
+
+julia> y = PortfolioOptimisers.forward_mean_returns(alpha, 1, 1);
+
+julia> late = copy(alpha);
+       late[1, :] .= NaN;
+
+julia> fes = [forecast_evaluation(alpha, y), forecast_evaluation(late, y)];
+
+julia> [fe.dates for fe in fes]
+2-element Vector{Vector{Int64}}:
+ [1, 2, 3]
+ [2, 3]
+
+julia> [fe.dates for fe in forecast_evaluation_align(fes)]
+2-element Vector{Vector{Int64}}:
+ [2, 3]
+ [2, 3]
+```
+
+# Related
+
+  - [`forecast_evaluation_summary`](@ref)
+  - [`forecast_evaluation`](@ref)
+  - [`forecast_evaluation_dates`](@ref)
+  - [`forecast_summary_assert_same_question`](@ref)
+  - [`forecast_summary_assert_comparable`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+"""
+function forecast_evaluation_align(fes::AbstractVector{<:ForecastEvaluationResult})
+    forecast_summary_assert_same_question(fes)
+    lo = maximum(first(fe.dates) for fe in fes)
+    hi = minimum(last(fe.dates) for fe in fes)
+    @argcheck(lo <= hi,
+              IsEmptyError("the evaluations share no date: the latest first date is $(lo) and the earliest last date is $(hi)"))
+    dates = collect(lo:(first(fes).step):hi)
+    return [ForecastEvaluationResult(fe.alpha, fe.y, fe.umsk, dates, fe.target, fe.horizon,
+                                     fe.lag, fe.step, fe.min_count, fe.ppy) for fe in fes]
 end
 """
     forecast_summary_scored(fe::ForecastEvaluationResult, u::MatNum) -> Vector{<:Real}
@@ -533,8 +641,8 @@ keyword constructor, and the type validates nothing of its own.
 end
 """
     forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationResult},
-                                w::Option{<:MatNum} = nothing; names = nothing,
-                                bins::Integer = 10,
+                                w::Option{<:MatNum} = nothing; align::Bool = false,
+                                names = nothing, bins::Integer = 10,
                                 quantiles = nothing) -> ForecastSummaryResult
     forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationResult},
                                 csfm::CrossSectionalFactorModel;
@@ -551,17 +659,18 @@ Summarise one or more Return Forecast evaluations as a [`ForecastSummaryResult`]
 
 This is the top of the evaluation hierarchy, and it is also the comparison. It calls one level-2 verb per block and computes no statistic of its own beyond collecting each block onto the forecast axis, which is how [`factor_model_summary`](@ref) is built. A single evaluation is the length-1 case and has the same type and the same columns as a comparison of four, so a caller who starts with one member and later wants a table of four changes the argument and nothing else.
 
-The vector method **refuses evaluations that are not comparable**, naming the field that differs, because a table invites a comparison its rows would not support. The reference implementation checks none of this.
+The vector method **refuses evaluations that are not comparable**, naming the field that differs, because a table invites a comparison its rows would not support. The reference implementation checks none of this. Two members that answer one question on two grids — the ordinary case, because a member that is refit warms up and a member that publishes its history does not — are refused on `dates` unless `align = true`, which puts them on the grid they share through [`forecast_evaluation_align`](@ref) before anything is read.
 
 A weighting reaches the summary the way it reaches every other block-aware statistic of this map: as a bare weight history positionally, or as the cross-sectional factor model whose [`AbstractOrthogonalityMetric`](@ref) resolves one. The Result carries no block, so the metric cannot be read off it.
 
 # Algorithm
 
- 1. Refuse a set of evaluations that are not comparable, with [`forecast_summary_assert_comparable`](@ref).
- 2. Resolve the names axis with [`forecast_summary_names`](@ref).
- 3. Read the thirty core figures of each evaluation with [`forecast_summary_row`](@ref).
- 4. Read the quantile-spread block with [`forecast_summary_spreads`](@ref), which answers `nothing` where no quantile was asked for.
- 5. Collect the rows into columns and build a [`ForecastSummaryResult`](@ref), carrying the `ppy` the evaluations agree on.
+ 1. Under `align = true`, put the evaluations on the grid they share with [`forecast_evaluation_align`](@ref).
+ 2. Refuse a set of evaluations that are not comparable, with [`forecast_summary_assert_comparable`](@ref).
+ 3. Resolve the names axis with [`forecast_summary_names`](@ref).
+ 4. Read the thirty core figures of each evaluation with [`forecast_summary_row`](@ref).
+ 5. Read the quantile-spread block with [`forecast_summary_spreads`](@ref), which answers `nothing` where no quantile was asked for.
+ 6. Collect the rows into columns and build a [`ForecastSummaryResult`](@ref), carrying the `ppy` the evaluations agree on.
 
 # Arguments
 
@@ -569,6 +678,7 @@ A weighting reaches the summary the way it reaches every other block-aware stati
   - `fe`: One evaluation. It is summarised as the length-1 case.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecasts, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
+  - `align`: Whether to put the evaluations on the grid they share before the summary reads them. Under `false` a set whose `dates` differ is refused.
   - `names`: One name per evaluation, or `nothing` to number them.
   - `bins`: Number of quantile bins the calibration curve cuts.
   - `quantiles`: Tail fractions the quantile spreads are cut at, each in `(0, 0.5]`, or `nothing` for none.
@@ -576,6 +686,7 @@ A weighting reaches the summary the way it reaches every other block-aware stati
 
 # Validation
 
+  - The rules of [`forecast_evaluation_align`](@ref) under `align = true`.
   - The rules of [`forecast_summary_assert_comparable`](@ref), [`forecast_summary_names`](@ref), [`forecast_summary_row`](@ref) and [`forecast_summary_spreads`](@ref).
 
 # Returns
@@ -586,23 +697,25 @@ A weighting reaches the summary the way it reaches every other block-aware stati
 
   - [`ForecastSummaryResult`](@ref)
   - [`forecast_evaluation`](@ref)
+  - [`forecast_evaluation_align`](@ref)
   - [`forecast_summary_row`](@ref)
   - [`forecast_summary_spreads`](@ref)
   - [`forecast_summary_assert_comparable`](@ref)
   - [`factor_model_summary`](@ref)
 """
 function forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationResult},
-                                     w::Option{<:MatNum} = nothing; names = nothing,
-                                     bins::Integer = 10,
+                                     w::Option{<:MatNum} = nothing; align::Bool = false,
+                                     names = nothing, bins::Integer = 10,
                                      quantiles = nothing)::ForecastSummaryResult
-    forecast_summary_assert_comparable(fes)
-    nm = forecast_summary_names(names, length(fes))
-    # The element is asserted rather than taken from the iterator: `fes` is an
+    afes = align ? forecast_evaluation_align(fes) : fes
+    forecast_summary_assert_comparable(afes)
+    nm = forecast_summary_names(names, length(afes))
+    # The element is asserted rather than taken from the iterator: `afes` is an
     # `AbstractVector` of an abstract element type, so without the assertion every read
     # inside the row is analysed against an unknown carrier.
-    rows = [forecast_summary_row(fes[i]::ForecastEvaluationResult, w, bins)
-            for i in eachindex(fes)]
-    q, sm, sv, si, sh = forecast_summary_spreads(fes, quantiles)
+    rows = [forecast_summary_row(afes[i]::ForecastEvaluationResult, w, bins)
+            for i in eachindex(afes)]
+    q, sm, sv, si, sh = forecast_summary_spreads(afes, quantiles)
     return ForecastSummaryResult(nm, [r.spearman_mean_ic for r in rows],
                                  [r.spearman_std_ic for r in rows],
                                  [r.spearman_ic_ir for r in rows],
@@ -630,7 +743,7 @@ function forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationRes
                                  [r.min_coverage for r in rows],
                                  [r.mean_n_scored for r in rows],
                                  [r.min_n_scored for r in rows], q, sm, sv, si, sh,
-                                 first(fes).ppy)
+                                 first(afes).ppy)
 end
 function forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationResult},
                                      csfm::CrossSectionalFactorModel;
@@ -650,4 +763,4 @@ function forecast_evaluation_summary(fe::ForecastEvaluationResult,
     return forecast_evaluation_summary([fe], csfm; kwargs...)
 end
 
-export ForecastSummaryResult, forecast_evaluation_summary
+export ForecastSummaryResult, forecast_evaluation_align, forecast_evaluation_summary

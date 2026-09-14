@@ -208,34 +208,21 @@ regression that calibrates itself needs a warm-up before its first fit means any
 forecasts therefore start at different observations, and a comparison of statistics taken over
 different samples is not a comparison.
 
-The fix is to cut both forecasts to the sample they share. Because the Result carries the
-forecast and the target as plain matrices, that is a read and a blank rather than a re-fit: the
-**bare** method of [`forecast_evaluation`](@ref) takes the two matrices directly, which is the
-bottom of the `bare arrays → Result → Estimator` hierarchy the whole family is built on. The
-Result also carries the estimation mask the pairing read off the panel, and the bare method
-takes it as `umsk`, so the re-pairing scores the same universe and its coverage divides by it.
+The fix is to cut both forecasts to the sample they share, and
+[`forecast_evaluation_align`](@ref) is the verb that does it. Every evaluation's dates run
+`lo:step:hi` on the block's rows, so the grid two of them share starts where the later one becomes
+scorable and ends where the earlier one stops, and the verb rebuilds each Result on that grid with
+its own forecast, target and universe untouched: no re-pairing, no refit, no blank. It refuses a
+pair that does not answer one question — a different target, horizon, lag, step, threshold, `ppy`
+or universe — exactly as the summary would, because a common grid does not make two questions one.
 =#
 
-first_scorable(h) = findfirst(t -> any(isfinite, view(h, t, :)), axes(h, 1))
-start = max(first_scorable(raw_signal.alpha), first_scorable(raw_trait.alpha))
+fe_signal, fe_trait = forecast_evaluation_align([raw_signal, raw_trait])
 
-## The forward target is the same for both: same block, same `horizon`, same `lag`.
-y = raw_signal.y
-function align(h)
-    return [t >= start ? h[t, i] : convert(eltype(h), NaN)
-            for t in axes(h, 1), i in axes(h, 2)]
-end
-
-fe_signal = forecast_evaluation(align(raw_signal.alpha), y; umsk = raw_signal.umsk,
-                                horizon = horizon, lag = lag, step = step,
-                                min_count = min_count, ppy = ppy)
-fe_trait = forecast_evaluation(align(raw_trait.alpha), y; umsk = raw_trait.umsk,
-                               horizon = horizon, lag = lag, step = step,
-                               min_count = min_count, ppy = ppy)
-
-pretty_table(DataFrame("Common first row" => start,
+pretty_table(DataFrame("Common first row" => first(fe_signal.dates),
                        "Evaluation dates" => length(fe_signal.dates),
-                       "Dates agree" => fe_signal.dates == fe_trait.dates);
+                       "Dates agree" => fe_signal.dates == fe_trait.dates,
+                       "Forecast untouched" => fe_signal.alpha === raw_signal.alpha);
              title = "Aligned")
 
 #=
@@ -464,9 +451,11 @@ really a size bet reads a large number in the size column.
 The statistic looks nowhere forward, so it is read on **every observation** of the forecast
 rather than on the evaluation grid: the grid keeps the forward windows of the coefficient from
 overlapping, and a same-date correlation has no window. The signal composite therefore scores on
-every row from `start`; the trait regression carries a forecast on its grid only, so its column
-is `NaN` between two refits and the mean below reads the rows it was fitted on. A caller who
-wants the correlations beside the coefficients of the same dates passes `dates = fe.dates`.
+every row of the block, the rows before the common grid of §2 included, because the alignment
+moved its dates and not its forecast; the trait regression carries a forecast on its grid only, so
+its column is `NaN` between two refits and the mean below reads the rows it was fitted on. A
+caller who wants the correlations beside the coefficients of the same dates passes
+`dates = fe.dates`.
 =#
 
 fc_signal = forecast_factor_correlation(fe_signal, csfm)
@@ -509,7 +498,9 @@ forecasts.
 It computes nothing of its own. Every column is one of the verbs above, read on the same dates
 under the same parameters, which is why §2's alignment had to happen first: the summary refuses a
 set of evaluations that disagree on `target`, `horizon`, `lag`, `step`, `min_count`, `ppy` or
-their dates, rather than quietly reporting statistics taken over different samples.
+their dates, rather than quietly reporting statistics taken over different samples. A caller who
+holds the raw evaluations passes `align = true` instead, and the summary runs §2's verb before it
+reads anything.
 =#
 
 fs = forecast_evaluation_summary([fe_signal, fe_trait], csfm;
@@ -623,10 +614,10 @@ plot_forecast_rolling_ic(fe_signal, csfm; title = "Signal composite: rolling IC"
 #src    NOT. Measured on this page's fixture: the signal composite is scorable from block row 1
 #src    and carries 87 evaluation dates, while the trait regression's refit warms up and starts
 #src    at row 66 with 74. `forecast_summary_assert_comparable` reds on `dates`, which is
-#src    correct and is the reason §2 aligns through the bare method. This is the first place in
-#src    the library where a caller MUST drop from the Estimator layer to the bare one to do an
-#src    ordinary thing, and it is worth a look at whether a future ticket should offer an
-#src    alignment verb.
+#src    correct and is the reason §2 aligns. This was the first place in the library where a
+#src    caller had to drop from the Estimator layer to the bare one to do an ordinary thing;
+#src    #1073 shipped `forecast_evaluation_align` and the summary's `align = true`, and §2 now
+#src    calls the verb.
 #src 2. `forecast_target_history` IS NOT EXPORTED, so an example cannot build `y` directly. It
 #src    is read off `raw_signal.y` instead, which is better anyway: the Result carries the
 #src    target already cut to the block, so no second pairing is built.

@@ -2414,6 +2414,143 @@ end
     end
 end
 
+@testset "Two evaluations on two grids are aligned onto the grid they share" begin
+    # Issue #1073. A member that publishes its history is scorable from the block's first
+    # row and a member that is refit warms up, so the two rarely share a grid and the
+    # summary refuses them on `dates`. The verb rebuilds each Result on
+    # `max(lo):step:min(hi)` and touches nothing else, which is what the example's
+    # hand-written blank through the bare method did, and the summary's `align = true`
+    # calls it. The pair is asserted UNTOUCHED by identity, not by equality.
+    PO = PortfolioOptimisers
+    y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
+    early = forecast_evaluation(IC_ALPHA, y)
+    late_alpha = copy(IC_ALPHA)
+    late_alpha[1, :] .= NaN
+    late = forecast_evaluation(late_alpha, y)
+
+    @testset "The common grid starts at the later start, and the pair is untouched" begin
+        @test early.dates == [1, 2, 3]
+        @test late.dates == [2, 3]
+        a, b = forecast_evaluation_align([early, late])
+        @test a.dates == [2, 3]
+        @test b.dates == [2, 3]
+        @test a.alpha === early.alpha
+        @test a.y === early.y
+        @test a.umsk === early.umsk
+        @test b.alpha === late.alpha
+        for f in (:target, :horizon, :lag, :step, :min_count, :ppy)
+            @test getfield(a, f) === getfield(early, f)
+            @test getfield(b, f) === getfield(late, f)
+        end
+        @test isa(forecast_evaluation_align([early, late]),
+                  Vector{<:ForecastEvaluationResult})
+    end
+
+    @testset "The common grid ends at the earlier finish, which the blank did not do" begin
+        short_alpha = copy(IC_ALPHA)
+        short_alpha[3, :] .= NaN
+        short = forecast_evaluation(short_alpha, y)
+        @test short.dates == [1, 2]
+        a, b = forecast_evaluation_align([late, short])
+        @test a.dates == [2]
+        @test b.dates == [2]
+    end
+
+    @testset "The grid is anchored at the later start, so an off-phase member is re-anchored" begin
+        # Under `step = 2` the early member's own grid is [1, 3] and the late one's is [2];
+        # the intersection as sets is empty, and the common grid is [2]. That is what the
+        # blank did too: it blanked the early member before row 2 and found its dates
+        # again, at 2:2:3.
+        e2 = forecast_evaluation(IC_ALPHA, y; step = 2)
+        l2 = forecast_evaluation(late_alpha, y; step = 2)
+        @test e2.dates == [1, 3]
+        @test l2.dates == [2]
+        a, b = forecast_evaluation_align([e2, l2])
+        @test a.dates == [2]
+        @test b.dates == [2]
+    end
+
+    @testset "A set already on one grid is handed back on it, and a singleton is itself" begin
+        a, b = forecast_evaluation_align([early, early])
+        @test a.dates == early.dates
+        @test b.dates == early.dates
+        @test only(forecast_evaluation_align([late])).dates == late.dates
+    end
+
+    @testset "Two grids that do not overlap are refused" begin
+        tail_alpha = copy(IC_ALPHA)
+        tail_alpha[1:2, :] .= NaN
+        head_alpha = copy(IC_ALPHA)
+        head_alpha[3, :] .= NaN
+        tail = forecast_evaluation(tail_alpha, y)
+        head = forecast_evaluation(head_alpha, y)
+        @test tail.dates == [3]
+        @test head.dates == [1, 2]
+        @test_throws PO.IsEmptyError forecast_evaluation_align([tail, head])
+        @test_throws PO.IsEmptyError forecast_evaluation_align(ForecastEvaluationResult[])
+    end
+
+    @testset "A set that does not answer one question is refused before it is aligned" begin
+        for (nm, other) in (("horizon", forecast_evaluation(late_alpha, y; horizon = 2)),
+                            ("step", forecast_evaluation(late_alpha, y; step = 2)),
+                            ("ppy", forecast_evaluation(late_alpha, y; ppy = 252)))
+            err = try
+                forecast_evaluation_align([early, other])
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, PO.ConflictingArgumentError)
+            @test occursin("`$(nm)`", err.msg)
+        end
+        umsk = trues(size(IC_ALPHA))
+        umsk[2, 4] = false
+        err = try
+            forecast_evaluation_align([early,
+                                       forecast_evaluation(late_alpha, y; umsk = umsk)])
+            nothing
+        catch e
+            e
+        end
+        @test isa(err, PO.ConflictingArgumentError)
+        @test occursin("`umsk`", err.msg)
+    end
+
+    @testset "The summary aligns under the keyword and refuses without it" begin
+        err = try
+            forecast_evaluation_summary([early, late])
+            nothing
+        catch e
+            e
+        end
+        @test isa(err, PO.ConflictingArgumentError)
+        @test occursin("`dates`", err.msg)
+        fs = forecast_evaluation_summary([early, late]; align = true, names = ["e", "l"],
+                                         quantiles = (0.5,))
+        by_hand = forecast_evaluation_summary(forecast_evaluation_align([early, late]);
+                                              names = ["e", "l"], quantiles = (0.5,))
+        @test fs.names == ["e", "l"]
+        for f in FS_CORE
+            @test isequal(getfield(fs, f), getfield(by_hand, f))
+        end
+        for f in FS_SPREAD
+            @test isequal(getfield(fs, f), getfield(by_hand, f))
+        end
+        # The aligned early member is the early member scored on rows 2 and 3, which is
+        # what the bare blank answered, so the two roads agree to the digit.
+        blank = copy(IC_ALPHA)
+        blank[1, :] .= NaN
+        blanked = forecast_evaluation_summary(forecast_evaluation(blank, y);
+                                              quantiles = (0.5,))
+        for f in FS_CORE
+            @test isequal(getfield(fs, f)[1], getfield(blanked, f)[1])
+        end
+        # The single-evaluation method carries the keyword too, and it changes nothing.
+        @test isequal(forecast_evaluation_summary(late; align = true).spearman_mean_ic,
+                      forecast_evaluation_summary(late).spearman_mean_ic)
+    end
+end
+
 @testset "The quantile block is absent unless a quantile is asked for" begin
     PO = PortfolioOptimisers
     fe = forecast_evaluation(IC_ALPHA, PO.forward_mean_returns(IC_ALPHA, 1, 1))
@@ -2550,5 +2687,35 @@ end
         @test wf.pearson_mean_ic != fs.pearson_mean_ic
         @test forecast_evaluation_summary(fes[1], px.csfm).pearson_mean_ic[1] ==
               fs.pearson_mean_ic[1]
+    end
+
+    @testset "Two members on two grids are compared in one call at the Estimator layer" begin
+        # Issue #1073. The two members above happen to share a grid; a member whose
+        # published history starts late does not, and the comparison is then one call
+        # with `align = true` rather than a blank through the bare method. The late
+        # member is the fixed-weighted Result with the first five rows of its published
+        # history withheld, scored through the Result layer.
+        rfr = return_forecast(fw, px.rd, px.csfm)
+        hist = copy(rfr.hist)
+        hist[1:5, :] .= NaN
+        late = forecast_evaluation(FixedWeightedReturnForecastResult(; mu = rfr.mu,
+                                                                     hist = hist,
+                                                                     weights = rfr.weights),
+                                   px.rd, px.csfm; horizon = 2, lag = 1, step = 1,
+                                   ppy = 252)
+        @test first(late.dates) == 6
+        @test first(fes[2].dates) == 1
+        @test_throws PO.ConflictingArgumentError forecast_evaluation_summary([late, fes[2]])
+        fa = forecast_evaluation_summary([late, fes[2]], px.csfm; align = true,
+                                         names = ["late fixed weighted", "target"])
+        @test fa.names == ["late fixed weighted", "target"]
+        al = forecast_evaluation_align([late, fes[2]])
+        @test al[1].dates == al[2].dates == late.dates
+        @test fa.spearman_mean_ic[1] ==
+              forecast_evaluation_summary(late, px.csfm).spearman_mean_ic[1]
+        @test fa.spearman_mean_ic[2] !=
+              forecast_evaluation_summary(fes[2], px.csfm).spearman_mean_ic[1]
+        @test fa.spearman_mean_ic[2] ==
+              forecast_evaluation_summary(al[2], px.csfm).spearman_mean_ic[1]
     end
 end
