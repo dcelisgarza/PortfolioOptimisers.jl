@@ -234,12 +234,25 @@
                               "port")
 
     #=
-    A path that names an artefact CI builds and never commits, so no tracked file can
-    satisfy it. `CLAUDE.md` § Editing cites this one to say: do not edit it, edit its source.
+    A path that names an artefact the docs build writes and git ignores, so no tracked file
+    can satisfy it. `CLAUDE.md` § Editing cites these to say: do not edit it, edit its
+    source (ADR 0151).
     =#
     generated_paths = Dict("examples/**/*.ipynb" =>
-                               "rendered by CI from " *
-                               "`examples/**/*.jl`; never committed")
+                               "rendered by the docs build from " *
+                               "`examples/**/*.jl`; never committed",
+                           "docs/src/examples/**" =>
+                               "rendered by the docs build from " *
+                               "`examples/**/*.jl`; untracked since ADR 0151",
+                           "docs/src/user_guide/**" =>
+                               "rendered by the docs build from " *
+                               "`user_guide/*.jl`; untracked since ADR 0151",
+                           "docs/src/capability_catalogue.md" =>
+                               "written by the docs build from " *
+                               "`docs/capability_catalogue.jl`; untracked since ADR 0151",
+                           "docs/src/api/*_TypeHierarchy.md" =>
+                               "written by the docs build by " *
+                               "`docs/generate_type_hierarchy.jl`; untracked since ADR 0151")
 
     # ----------------------------------------------------------------- the span reader
 

@@ -55,6 +55,9 @@ jobs:
   #       run: pip install pre-commit
   #     - name: Run pre-commit
   #       run: SKIP=no-commit-to-branch pre-commit run -a
+  # The generated docs pages (`docs/src/user_guide/**`, `docs/src/examples/**`, the capability
+  # catalogue and the type hierarchy) are untracked, so lychee never sees them. The Docs build
+  # writes them and fails on a local link they carry to a page that does not exist. ADR 0151.
   link-checker:
     runs-on: ubuntu-latest
     steps:
