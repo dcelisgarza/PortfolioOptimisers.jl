@@ -410,7 +410,7 @@ function _optimise(ga::GreedyAllocation, fai::FiniteAllocationInput; kwargs...)
     w, p, cash, pcash, T, fees = fai.w, fai.prices, fai.cash, fai.prev_cash, fai.horizon,
                                  fai.fees
     bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, cash)
-    lsf, ssf = allocation_side_fees(fees, fai.imsk, T, pcash, lidx, sidx)
+    lsf, ssf = allocation_side_fees(fees, T, pcash, lidx, sidx)
     sshares, scost, sw, scash, sfee = finite_sub_allocation!(-view(w, sidx), view(p, sidx),
                                                              scash, sbgt, ssf, ga)
     lcash = adjust_long_cash(bgt, lcash, scash)

@@ -103,6 +103,45 @@ The reduced `Fees` therefore carries two axes: the investable one for the five p
 and the complement for the two carriers. The fold reads it as the result carries it and views it
 no second time, which is what #892 fixed.
 
+### A reduced `Fees` records the mask it was reduced on, and the door reads it before it acts
+
+A caller states the two carriers over the full universe, and a result carries them on the
+complement of its mask. Width cannot tell the two apart — with eight assets and four dead, both
+are four long — and the same `nothing` arm of the value-level door serves both, because an
+all-investable prior derives no mask and neither does a result's reduced prior.
+[#1067](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1067) found what that
+costs: `investable_reduction(::Nothing, pr, w, fees, strict)` passed the fee through, so
+`expected_return(ArithmeticReturn(), w, pr, fees)` on an all-investable prior charged a caller's
+full-universe carrier as a forced exit of the whole previous book, on every period, though nothing
+left. Stripping in that arm is the fix that reads naturally, and it breaks `expected_risk(r, res)`
+on a masked result, which hands the same arm the result's reduced fee beside the result's reduced
+prior and relies on the pass-through to charge the exit.
+
+`Fees` therefore gains a tenth field, `imsk::Option{<:BitVector}`, defaulting to `nothing`.
+`investable_fees_view` is the one verb that writes it, and it reads it before it acts, so the door
+is idempotent: an unmarked fee is a caller's statement and takes the arm the mask names — the
+carriers dropped under `nothing`, the two-axis view and the mark under a `BitVector`; a fee marked
+with the door's own mask, or marked and meeting a `nothing` mask, is returned as it is; a fee marked
+with another mask is refused with an `ArgumentError` naming both, because its carriers were sliced
+to the complement of its own mask and hold no rate for an asset the other reduction kept, and
+charging nothing for it would understate the return. Every arm of `investable_reduction` at the
+value-level door now takes the fee through this verb, the bare-matrix and `ReturnsResult` arms
+under a `nothing` mask, so the door of
+[ADR 0118](0118-a-fold-zeroes-a-held-gap-once-and-a-value-level-verb-reduces-to-the-investable-mask.md)
+and the fit sites are one door for the fee.
+
+The generic `port_opt_view(fees, i, X)` marks nothing. A cluster of a nested optimiser takes the
+same slice, and its inner fit must still strip the carriers it is handed under its own `nothing`
+mask, so a mark written by the view would make an inner fit read a cluster's complement as the
+assets that left. `strip_liquidation_carriers` reads no mark either: the hierarchical fits call it
+on a fee the door has already reduced, to price a cluster's risk with no exit, and the mark is
+carried through so the fee stays reduced with its carriers gone. `lift_fees` takes the fee alone
+and lifts at the mask it carries, so the fee is the one source of the axes it is on, and
+`FiniteAllocationInput` reconciles its own `imsk` with the fee's through `mark_fees`: a stated mask
+marks an unmarked fee, a marked fee supplies a missing mask, and a pair that disagrees is refused.
+`show` hides the field while it is `nothing`, so a fee a caller wrote renders as it did before the
+field existed.
+
 ### A fit charges the liquidation at its outer level only
 
 A non-investable asset cannot be clustered, because its column is `NaN`, so no cluster holds it.
@@ -175,8 +214,14 @@ are zero for the exit, so nothing else is owed.
 - **The mask travels through the view**, `port_opt_view(opt, idx, X, imsk)`, and a view with no
   mask empties the carriers. Refused: six view methods learn a fourth argument, the resolution of
   a departed name still needs its own fix, and a view with no mask silently empties the carriers.
-- **The reduced `Fees` carries the mask**, and the carriers stay on the full universe. Refused: a
-  derived mask stored on a constraint object, which no constraint object does.
+- **The reduced `Fees` carries the mask**, and the carriers stay on the full universe. Refused as
+  first named: a derived mask stored on a constraint object, which no constraint object did, and
+  carriers that every charging site would have had to mask at charge time. The build of #1067 took
+  half of it: the carriers stay on the complement, where every charging site already reads them,
+  and the reduced `Fees` records the mask because a door with no record cannot tell a caller's
+  full-universe carrier from a result's reduced one, and the two routes that avoid the record —
+  the result-taking arities bypassing the door, or a value-level contract of "complement only" —
+  each leave a `Fees` meaning two things at two doors.
 - **The per-asset split excludes the charge, or spreads it pro rata.** Refused: the first breaks
   the identity between the split and the total, the second puts a number on an asset that did not
   cause it.
@@ -187,7 +232,12 @@ are zero for the exit, so nothing else is owed.
   charge of each exit. That is the released number moving, and it moves towards the truth.
 - `Fees` and `FeesEstimator` gain two fields, so every constructor call that spells the positional
   form changes, and the docstrings of both, of `Turnover`, of `calc_fees`, of `calc_asset_fees`,
-  of `calc_net_asset_returns` and of `predict` state the rule.
+  of `calc_net_asset_returns` and of `predict` state the rule. `Fees` alone gains a third, `imsk`,
+  last and defaulting to `nothing`, which a door writes and a caller never does.
+- A value-level figure on an all-investable prior under a fee that states a carrier moves: it
+  charged the whole book as a forced exit and now charges nothing, which is the released number
+  moving towards the truth. A value-level figure on a masked prior, and every figure on a result,
+  is unchanged.
 - The seven fit sites that resolve a fee — the shared JuMP prelude, the two `HierarchicalRiskParity`
   methods, `HierarchicalEqualRiskContribution`, `NestedClustered`, `Stacking` and
   `SubsetResampling` — hoist their `fees_constraints` call above the door and gain one

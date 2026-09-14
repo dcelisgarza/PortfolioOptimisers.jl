@@ -121,7 +121,17 @@ through a third method of `investable_reduction` that takes the prior, the weigh
 Every block of the prior is reduced together by the `port_opt_view` method the prior's owner
 already writes, so a new block or a new measure cannot be forgotten, and the reduced `pr.X` has no
 dead column, so nothing of a non-investable asset reaches the funnel. A bare returns matrix entry is
-unchanged.
+unchanged for the prior and the weights.
+
+The fee takes `investable_fees_view` in every arm, the fit sites' door of
+[ADR 0121](0121-a-forced-liquidation-is-charged-through-two-fee-carriers-on-the-complement-of-the-investable-mask.md),
+so a caller's full-universe liquidation carrier is dropped when the prior derives no mask and split
+to the complement when it derives one, and a result's fee — marked with the mask it was reduced on
+— passes the door untouched. Before
+[#1067](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1067) the `nothing` arm passed
+the fee through, and an all-investable prior charged the caller's carrier as a forced exit of the
+whole book. The bare-matrix and `ReturnsResult` arms take the fee through the same verb under a
+`nothing` mask.
 
 ### A series the caller holds is documented, not checked
 

@@ -530,6 +530,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :dfs => "`dfs`: Default short fixed fee.",#
                                  :fa_fees => "`fa`: Fee amortisation algorithm, and the clock the two fixed fee terms fall on. `nothing` and a [`FirstObservationFees`](@ref) charge them one time, on the first observation of a return series. An [`AmortisedFees`](@ref) spreads them evenly over the observation count the charging site hands in. It reaches no other term, because `l`, `s` and `tn` are rates per period.",#
                                  :kwargs_fee => "`kwargs`: Named tuple of keyword arguments for fee computation.",#
+                                 :imsk_fees => "`imsk`: The Investable Mask this fee was reduced on, or `nothing` when it is a caller's statement over the full universe. A door writes it, [`investable_fees_view`](@ref), and a caller never does. When it is set, `tn`, `l`, `s`, `fl` and `fs` are on `findall(imsk)` and `lq`, `flq` on its complement; a door that meets the fee a second time then passes it through, where it would drop or re-slice a caller's carriers.",#
                                  # Optimisation results.
                                  :pa => "`pa`: Processed optimisation attributes.",#
                                  :retcode => "`retcode`: Optimisation return code.",#

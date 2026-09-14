@@ -72,7 +72,7 @@ Problem data fed to a finite allocation optimiser.
 
 It subtypes [`AbstractEstimator`](@ref) rather than the [`FiniteAllocationOptimisationResult`](@ref) tree: it is the *input* to an allocation, not a computed output, and is deliberately kept clear of the `OptimisationResult` dispatch surface (plotting, result `factory`) that its fields cannot honour. See ADR 0017.
 
-`imsk` is what lets a reduced optimisation be allocated. ADR 0115 reduces an optimisation to its Investable Mask and expands the solved weights back to the caller's universe, so a result pairs a **full-length** `w` with a fee on two **reduced** axes. The mask records that reduction, and [`allocation_side_fees`](@ref) lifts the fee back onto the axis `w` and `prices` already live on with [`lift_fees`](@ref), so the forced exit of a delisted asset is charged on the money it traded.
+`imsk` is what lets a reduced optimisation be allocated. ADR 0115 reduces an optimisation to its Investable Mask and expands the solved weights back to the caller's universe, so a result pairs a **full-length** `w` with a fee on two **reduced** axes. The mask records that reduction, and [`allocation_side_fees`](@ref) lifts the fee back onto the axis `w` and `prices` already live on with [`lift_fees`](@ref), so the forced exit of a delisted asset is charged on the money it traded. The fee carries the mask it was reduced on in its own `imsk`, and the lift reads that, so the constructor reconciles the two through [`mark_fees`](@ref): a stated `imsk` marks an unmarked fee, a marked fee supplies a missing `imsk`, and a pair that disagrees is refused.
 
 # Fields
 
@@ -117,7 +117,8 @@ Reads from a fitted optimisation everything an allocation can take from it, so a
   - `cash > 0`.
   - `prev_cash >= 0`.
   - `horizon` must not be `nothing` when `fees` is provided.
-  - `imsk`, when stated: `length(imsk) == length(w)` and `any(imsk)`.
+  - `fees` and `imsk` are reconciled through [`mark_fees`](@ref), which refuses a marked fee beside a different `imsk`.
+  - `imsk`, when stated or read off the fee: `length(imsk) == length(w)` and `any(imsk)`.
 
 # Examples
 
@@ -143,6 +144,7 @@ FiniteAllocationInput
   - [`allocation_side_fees`](@ref)
   - [`extract_fees`](@ref)
   - [`lift_fees`](@ref)
+  - [`mark_fees`](@ref)
   - [`result_investable_mask`](@ref)
   - [`setup_alloc_optim`](@ref)
   - [`optimise`](@ref)
@@ -169,11 +171,11 @@ FiniteAllocationInput
     """
     horizon
     """
-    Optional fees to charge against the allocation over `horizon`. A fee an optimisation reduced to its Investable Mask spans two axes, and `imsk` is what puts it back on the axis `w` lives on.
+    Optional fees to charge against the allocation over `horizon`. A fee an optimisation reduced to its Investable Mask spans two axes and carries that mask in its own `imsk`, which is what puts it back on the axis `w` lives on.
     """
     fees
     """
-    Optional Investable Mask the optimisation `w` came from reduced on, `true` at every asset it traded. `nothing` says the weights and the fees are on the full universe already, which is what an unreduced optimisation answers.
+    Optional Investable Mask the optimisation `w` came from reduced on, `true` at every asset it traded. `nothing` says the weights and the fees are on the full universe already, which is what an unreduced optimisation answers. The constructor reconciles it with the fee's own mark through [`mark_fees`](@ref).
     """
     imsk
     function FiniteAllocationInput(w::VecNum, prices::VecNum, cash::Number,
@@ -190,6 +192,7 @@ FiniteAllocationInput
             @argcheck(!isnothing(horizon),
                       IsNothingError("horizon cannot be nothing when fees are provided"))
         end
+        fees, imsk = mark_fees(fees, imsk)
         if !isnothing(imsk)
             @argcheck(length(imsk) == length(w),
                       DimensionMismatch("imsk ($(length(imsk))) must match w ($(length(w)))"))
@@ -418,22 +421,20 @@ function allocation_liquidation_fee(fees::Fees, T::Number, prev_cash::Number)
     return fee
 end
 """
-    allocation_side_fees(::Nothing, ::Any, ::Option{<:Number}, ::Number, ::Any, ::Any)
-    allocation_side_fees(fees::Fees, imsk::Option{<:BitVector}, T::Number,
-                         prev_cash::Number, lidx, sidx)
+    allocation_side_fees(::Nothing, ::Option{<:Number}, ::Number, ::Any, ::Any)
+    allocation_side_fees(fees::Fees, T::Number, prev_cash::Number, lidx, sidx)
 
 Split a fee into the long side's charge and the short side's charge.
 
 Each sub-problem charges its own side. The long side takes `l` and `fl`, the short side takes `s` and `fs`, and both take the turnover rate and the money they held before the trade. A rate that is a vector is viewed to the side, and a rate that is a scalar is carried through, which is what [`nothing_scalar_array_view`](@ref) does.
 
-`lidx` and `sidx` are masks of the **full** universe, because they are derived from the weights an optimisation expanded back to it. A fee that same optimisation reduced to its Investable Mask is on a shorter axis, so this verb lifts it with [`lift_fees`](@ref) before it takes a single view. A `nothing` `imsk` lifts nothing, which is the fee a caller wrote by hand and the fee of an optimisation that reduced on nothing.
+`lidx` and `sidx` are masks of the **full** universe, because they are derived from the weights an optimisation expanded back to it. A fee that same optimisation reduced to its Investable Mask is on a shorter axis, and carries that mask in `imsk`, so this verb lifts it with [`lift_fees`](@ref) before it takes a single view. An unmarked fee lifts nothing, which is the fee a caller wrote by hand and the fee of an optimisation that reduced on nothing.
 
 The forced exit of [`allocation_liquidation_fee`](@ref) is a constant of the whole allocation rather than of one side, and it rides on the long side's charge as `liq`. The short side carries a zero in that slot, so both charges read alike.
 
 # Arguments
 
   - `fees`: The fee to split, or `nothing` when the caller states none.
-  - `imsk`: The Investable Mask the fee was reduced on, or `nothing`.
   - `T`: Horizon, in periods.
   - `prev_cash::Number`: Cash held in the portfolio before the trade.
   - `lidx`: Mask of the long side.
@@ -455,13 +456,12 @@ Each charge is a named tuple of `T`, `prop`, `fixed`, `tn_val`, `prev_money` and
   - [`setup_alloc_optim`](@ref)
   - [`Fees`](@ref)
 """
-function allocation_side_fees(::Nothing, ::Any, ::Option{<:Number}, ::Number, ::Any, ::Any)
+function allocation_side_fees(::Nothing, ::Option{<:Number}, ::Number, ::Any, ::Any)
     return nothing, nothing
 end
-function allocation_side_fees(fees::Fees, imsk::Option{<:BitVector}, T::Number,
-                              prev_cash::Number, lidx, sidx)
+function allocation_side_fees(fees::Fees, T::Number, prev_cash::Number, lidx, sidx)
     # `lidx` and `sidx` index the full universe, so the fee comes onto that axis first.
-    fees = lift_fees(fees, imsk)
+    fees = lift_fees(fees)
     ltn_val, lprev = allocation_turnover_money(fees.tn, prev_cash, lidx, false)
     stn_val, sprev = allocation_turnover_money(fees.tn, prev_cash, sidx, true)
     liq = allocation_liquidation_fee(fees, T, prev_cash)

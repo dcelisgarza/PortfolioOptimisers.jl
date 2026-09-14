@@ -302,17 +302,19 @@ This is ADR 0115's rule at the **value-level** door. An optimiser reduces once a
 
 Every block of the prior is reduced together by the [`port_opt_view`](@ref) method the prior's owner already writes, so a new block cannot be forgotten, and the reduced `pr.X` carries no dead column. The fees travel with the weights, because a [`Fees`](@ref) whose rates are one number per asset is indexed by the same axis and would otherwise meet a shorter weight vector.
 
+The fee takes the same door the fit sites take, [`investable_fees_view`](@ref), under every carrier. A caller states the two liquidation carriers of a [`Fees`](@ref) over the full universe, so on a prior with no mask nothing left and the carriers are dropped; a result's fee is marked with the mask it was reduced on, so it passes the door untouched and the exit it carries is charged. Without the door, an all-investable prior charged a caller's full-universe carrier as a forced exit of the whole book on every period, which is the defect of #1067.
+
 A held non-investable asset is a holding the prior cannot value. It takes the library's strictness policy through [`strict_diagnostic`](@ref): a warning names the assets and their weights are dropped, or an `ArgumentError` names them under `strict`.
 
-A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask exists to derive and they pass through. That is what lets one door state the reduction once and dispatch decide whether it happens.
+A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask exists to derive and they pass through, the fee alone taking its door under a `nothing` mask. That is what lets one door state the reduction once and dispatch decide whether it happens.
 
 # Algorithm
 
- 1. Return `nothing` and the three arguments unchanged when the carrier is a matrix or a returns result.
+ 1. Return `nothing`, the carrier and the weights unchanged, and the fee through [`investable_fees_view`](@ref) under a `nothing` mask, when the carrier is a matrix or a returns result.
  2. Derive the Investable Mask once with [`investable_mask`](@ref).
- 3. Return `nothing` and the three arguments unchanged when every asset is investable.
+ 3. Return the same when every asset is investable.
  4. Otherwise report the held non-investable assets through [`strict_diagnostic`](@ref).
- 5. Return the mask, a [`port_opt_view`](@ref) of the prior and of the fees at `findall(imsk)`, and the view of the weights at the mask.
+ 5. Return the mask, a [`port_opt_view`](@ref) of the prior at `findall(imsk)`, the view of the weights at the mask, and the fee through [`investable_fees_view`](@ref) at the mask and the prior's unreduced `pr.X`.
 
 # Arguments
 
@@ -327,25 +329,26 @@ A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask
 
 # Returns
 
-  - `(imsk, pr, w, fees)`: The Investable Mask and the three reduced to it, or `nothing` and the three unchanged.
+  - `(imsk, pr, w, fees)`: The Investable Mask and the three reduced to it, or `nothing`, the carrier and the weights unchanged, and the fee on the axes a `nothing` mask leaves.
 
 # Related
 
   - [`investable_mask`](@ref)
   - [`held_non_investable`](@ref)
   - [`investable_weights_view`](@ref)
+  - [`investable_fees_view`](@ref)
   - [`expand_investable_weights`](@ref)
   - [`port_opt_view`](@ref)
   - [`strict_diagnostic`](@ref)
 """
 function investable_reduction(X::MatNum, w::Union{<:VecNum, <:VecVecNum, <:MatNum},
                               fees::Option{<:Fees}, ::Bool)
-    return nothing, X, w, fees
+    return nothing, X, w, investable_fees_view(fees, nothing, X)
 end
 function investable_reduction(rd::AbstractReturnsResult,
                               w::Union{<:VecNum, <:VecVecNum, <:MatNum},
                               fees::Option{<:Fees}, ::Bool)
-    return nothing, rd, w, fees
+    return nothing, rd, w, investable_fees_view(fees, nothing, rd.X)
 end
 function investable_reduction(pr::AbstractPriorResult,
                               w::Union{<:VecNum, <:VecVecNum, <:MatNum},
@@ -355,7 +358,7 @@ end
 function investable_reduction(::Nothing, pr::AbstractPriorResult,
                               w::Union{<:VecNum, <:VecVecNum, <:MatNum},
                               fees::Option{<:Fees}, ::Bool)
-    return nothing, pr, w, fees
+    return nothing, pr, w, investable_fees_view(fees, nothing, pr.X)
 end
 function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
                               w::Union{<:VecNum, <:VecVecNum, <:MatNum},
@@ -365,12 +368,11 @@ function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
         strict_diagnostic("a value-level verb cannot score a holding the prior could not estimate. Assets $(held) are not investable, and the weights hold them. Their weights are dropped, so the figure describes the portfolio without them. Pass `strict = true` to refuse instead, reduce the weights to the investable universe, or refit the prior over a history that covers these assets.",
                           strict)
     end
-    idx = findall(imsk)
     # The fee is viewed at `pr.X`, the prior's **unreduced** returns matrix, because its two
     # liquidation carriers live on the complement of the mask and the view derives that
     # complement from the full width. Every other argument here takes the index alone.
-    return imsk, port_opt_view(pr, idx), investable_weights_view(imsk, w),
-           port_opt_view(fees, idx, pr.X)
+    return imsk, port_opt_view(pr, findall(imsk)), investable_weights_view(imsk, w),
+           investable_fees_view(fees, imsk, pr.X)
 end
 """
     investable_returns_view(imsk::Nothing, rd::AbstractReturnsResult)

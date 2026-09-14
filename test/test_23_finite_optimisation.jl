@@ -152,7 +152,7 @@ end
     # `252 * 2_000` turnover and `2 * 5.0` fixed. The deleted price-carrying family
     # charged `rate * dot(w, p)`, which is `1.5` and `0.3` per period.
     fmoney = Fees(; l = 0.01, fl = 5.0, tn = Turnover(; w = [0.0, 0.0], val = 0.002))
-    lsf, _ = PO.allocation_side_fees(fmoney, nothing, 252, 1e6, [true, true], Float64[])
+    lsf, _ = PO.allocation_side_fees(fmoney, 252, 1e6, [true, true], Float64[])
     @test PO.allocation_fee(lsf, [100.0, 200.0], [5000.0, 2500.0]) ==
           252 * 0.01 * 1e6 + 252 * 0.002 * 1e6 + 10.0
     # A side that states no fee is charged nothing, whatever it holds.
@@ -185,7 +185,7 @@ end
         @test isapprox(sum(cost) + r.cash + r.fees, cash)
         @test r.cash >= 0
         # The same book, priced by the shared verb, is the number the result reports.
-        lsf2, _ = PO.allocation_side_fees(fee, nothing, T, cash, [true, true], Float64[])
+        lsf2, _ = PO.allocation_side_fees(fee, T, cash, [true, true], Float64[])
         @test isapprox(r.fees, PO.allocation_fee(lsf2, p, shares))
     end
 
@@ -295,12 +295,15 @@ end
                                   val = [0.011, 0.012, 0.013, 0.014]),
                     flq = Turnover(; w = [0.1, 0.2, 0.3, 0.4],
                                    val = [9.0, 10.0, 11.0, 12.0]))
-        red = PO.port_opt_view(full, i, Xf)
-        # The view reduces the five holding fields to the mask and the two carriers to its
-        # complement, which is the pair of lengths #914 reported at the allocator's door.
+        red = PO.investable_fees_view(full, imsk, Xf)
+        # The door reduces the five holding fields to the mask and the two carriers to its
+        # complement, which is the pair of lengths #914 reported at the allocator's door,
+        # and marks the fee with the mask it lifts at (#1067).
         @test length(red.l) == 3
         @test length(red.lq.w) == 1
-        lift = PO.lift_fees(red, imsk)
+        @test red.imsk == imsk
+        lift = PO.lift_fees(red)
+        @test isnothing(lift.imsk)
         # Every per-asset field comes back at the full width, zero where it says nothing.
         @test lift.l == [0.01, 0.0, 0.03, 0.04]
         @test lift.s == [0.05, 0.0, 0.07, 0.08]
@@ -323,11 +326,12 @@ end
         # cash promote to.
         @test iszero(PO.allocation_liquidation_fee(nothing, 2, 1e4))
         @test iszero(PO.allocation_liquidation_fee(Fees(; l = 0.01), 2, 1e4))
-        # A `nothing` on either side lifts nothing, and a scalar rate carries through.
-        @test PO.lift_fees(full, nothing) === full
-        @test isnothing(PO.lift_fees(nothing, imsk))
-        @test PO.lift_fees(Fees(; l = 0.01), imsk).l == 0.01
-        @test isnothing(PO.lift_fees(Fees(; l = 0.01), imsk).lq)
+        # An unmarked fee is on the full universe already, so it lifts nothing, and so
+        # does a `nothing` fee. A scalar rate carries through a lift.
+        @test PO.lift_fees(full) === full
+        @test isnothing(PO.lift_fees(nothing))
+        @test PO.lift_fees(Fees(; l = 0.01, imsk = imsk)).l == 0.01
+        @test isnothing(PO.lift_fees(Fees(; l = 0.01, imsk = imsk)).lq)
     end
 
     # The reproduction of #914, in shape. `w` is on the full universe with a zero at the
@@ -410,8 +414,26 @@ end
         @test FiniteAllocationInput(res; prices = prices, cash = cash, horizon = 7).horizon ==
               7
         @test FiniteAllocationInput(res; prices = prices, cash = cash, w = w).w == w
-        @test FiniteAllocationInput(res; prices = prices, cash = cash, horizon = T,
-                                    fees = fees, imsk = imsk).fees === fees
+        faif = FiniteAllocationInput(res; prices = prices, cash = cash, horizon = T,
+                                     fees = fees, imsk = imsk)
+        # A caller's reduced fee is theirs, marked with the mask they state (#1067).
+        @test faif.fees.l === fees.l && faif.fees.lq === fees.lq
+        @test faif.fees.imsk == imsk == faif.imsk
+        # A marked fee supplies the mask the caller leaves out, and a marked fee beside a
+        # different mask is refused, so the fee is the one source of the axes it is on.
+        marked = faif.fees
+        faim = FiniteAllocationInput(; w = faif.w, prices = prices, cash = cash,
+                                     horizon = T, fees = marked)
+        @test faim.fees === marked && faim.imsk == imsk
+        @test_throws ArgumentError FiniteAllocationInput(; w = w, prices = prices,
+                                                         cash = cash, horizon = T,
+                                                         fees = marked,
+                                                         imsk = BitVector([1, 1, 0, 1]))
+        @test PO.mark_fees(nothing, imsk) == (nothing, imsk)
+        @test PO.mark_fees(fees, nothing) == (fees, nothing)
+        @test PO.mark_fees(marked, imsk) == (marked, imsk)
+        # A marked fee allocates as the hand-built input does.
+        @test optimise(ga, faim).fees == optimise(ga, faif).fees
         # A result carrying no prior at all derives no horizon, and the input then takes
         # the caller's — and only a fee needs one.
         res0 = PO.NaiveOptimisationResult(; pr = nothing, wb = nothing,

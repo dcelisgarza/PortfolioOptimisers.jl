@@ -23,9 +23,12 @@
         @test findfirst(==(:flq), fn_r) == findfirst(==(:lq), fn_r) + 1
         @test findfirst(==(:lq), fn_e) == findfirst(==(:fs), fn_e) + 1
         @test findfirst(==(:flq), fn_e) == findfirst(==(:lq), fn_e) + 1
-        # The result keeps its clock and its `isapprox` keywords last on both types.
-        @test fn_r[(end - 1):end] == (:fa, :kwargs)
+        # Both types keep their clock and their `isapprox` keywords together after the
+        # carriers. The result alone carries the mark of the mask a door reduced it on,
+        # last, because an estimator is never reduced (#1067).
+        @test fn_r[(end - 2):end] == (:fa, :kwargs, :imsk)
         @test fn_e[(end - 1):end] == (:fa, :kwargs)
+        @test :imsk ∉ fn_e
     end
 
     @testset "Both default to nothing, so a caller that states none is unchanged" begin
@@ -564,5 +567,119 @@
 
         # The charge is not lost, it is deferred: the result carries it on the complement.
         @test optimise(HierarchicalRiskParity(; opt = opt_c), rd).fees.lq.val == 0.01
+    end
+
+    @testset "A value-level door tells a caller's carrier from a result's (#1067)" begin
+        using StableRNGs, Clarabel
+
+        # A caller states `lq` and `flq` over the full universe. A result carries them on
+        # the complement of its mask. Width cannot tell the two apart, and the same
+        # `nothing` arm of the value-level door serves both: an all-investable prior
+        # derives no mask, and so does a result's reduced prior. Before #1067 the arm
+        # passed the fee through, so `expected_return(ar, w, pr, fees)` on an
+        # all-investable prior charged the whole previous book as a forced exit on every
+        # period. The door now writes the mask it reduced on into `fees.imsk`, and reads it
+        # before it acts.
+        rng = StableRNG(1)
+        X = randn(rng, 100, 4) ./ 100
+        nx = ["a", "b", "c", "d"]
+        pr = prior(EmpiricalPrior(), ReturnsResult(; nx = nx, X = X))
+        @test isnothing(PortfolioOptimisers.investable_mask(pr))
+        w = fill(0.25, 4)
+        fees = Fees(; lq = Turnover(; w = fill(0.25, 4), val = 0.01),
+                    flq = Turnover(; w = fill(0.25, 4), val = 5.0))
+        @test isnothing(fees.imsk)
+
+        # The repro of the ticket: nothing left, so the carriers charge nothing, at every
+        # value-level verb and under every carrier the door can be handed.
+        @test expected_return(ArithmeticReturn(), w, pr, fees) ==
+              expected_return(ArithmeticReturn(), w, pr)
+        @test expected_risk(Variance(), w, pr, fees) == expected_risk(Variance(), w, pr)
+        @test expected_risk(ConditionalValueatRisk(), w, pr, fees) ==
+              expected_risk(ConditionalValueatRisk(), w, pr)
+        @test risk_contribution(Variance(), w, pr, fees) ==
+              risk_contribution(Variance(), w, pr)
+        @test risk_contribution(ConditionalValueatRisk(), w, pr.X, fees) ==
+              risk_contribution(ConditionalValueatRisk(), w, pr.X)
+        @test risk_contribution(ConditionalValueatRisk(), w,
+                                ReturnsResult(; nx = nx, X = X), fees) ==
+              risk_contribution(ConditionalValueatRisk(), w, pr.X)
+
+        # The door itself: an unmarked fee under a `nothing` mask loses both carriers and
+        # keeps every other field; a fee with neither carrier is the same object.
+        d = PortfolioOptimisers.investable_fees_view(fees, nothing, X)
+        @test isnothing(d.lq) && isnothing(d.flq) && isnothing(d.imsk)
+        plain = Fees(; l = 0.001)
+        @test PortfolioOptimisers.investable_fees_view(plain, nothing, X) === plain
+        @test isnothing(PortfolioOptimisers.investable_fees_view(nothing, nothing, X))
+
+        # A masked prior: the same fee is split at the door and marked with the mask.
+        X2 = copy(X)
+        X2[:, 3] .= NaN
+        pr2 = prior(EmpiricalPrior(), ReturnsResult(; nx = nx, X = X2))
+        imsk = PortfolioOptimisers.investable_mask(pr2)
+        @test imsk == BitVector([1, 1, 0, 1])
+        red = PortfolioOptimisers.investable_fees_view(fees, imsk, X2)
+        @test red.imsk == imsk
+        @test red.lq.w == [0.25] && red.flq.w == [0.25]
+        # The exit is charged: `0.01 * 0.25` per period on `lq`, and `5.0 * 1` once on
+        # `flq`, spread over the 100 observations of the arithmetic mean.
+        w2 = [1 / 3, 1 / 3, 0.0, 1 / 3]
+        @test isapprox(expected_return(ArithmeticReturn(), w2, pr2) -
+                       expected_return(ArithmeticReturn(), w2, pr2, fees),
+                       0.01 * 0.25 + 5.0 / 100)
+
+        # The door is idempotent on the fee it returned: the same mask passes it through
+        # as the same object, and a `nothing` mask — a result's reduced prior derives
+        # none — leaves the carriers in place rather than stripping them.
+        @test PortfolioOptimisers.investable_fees_view(red, imsk, X2) === red
+        @test PortfolioOptimisers.investable_fees_view(red, nothing, X2) === red
+        # Another mask is refused: the carriers hold no rate for an asset the other
+        # reduction kept, and charging nothing for it would understate the return.
+        @test_throws ArgumentError PortfolioOptimisers.investable_fees_view(red,
+                                                                            BitVector([1, 0,
+                                                                                       1,
+                                                                                       1]),
+                                                                            X2)
+
+        # The generic view marks nothing, because a cluster of a nested optimiser takes
+        # the same slice and its inner fit must still strip the carriers it is handed.
+        @test isnothing(PortfolioOptimisers.port_opt_view(fees, findall(imsk), X2).imsk)
+        @test isnothing(PortfolioOptimisers.port_opt_view(red, [1, 2]).imsk)
+        # The strip, the amortisation override and the fold's previous-weight factory
+        # carry the mark through.
+        @test PortfolioOptimisers.strip_liquidation_carriers(red, nothing).imsk == imsk
+        @test PortfolioOptimisers.override_fee_amortisation(red, AmortisedFees()).imsk ==
+              imsk
+        @test factory(red, [0.5, 0.5, 0.5]).imsk == imsk
+
+        # A result's reduced fee meets the value-level door beside the result's reduced
+        # prior, whose mask is `nothing`, and the exit it carries must survive: this is
+        # the call the strip-on-`nothing` fix would have broken. The result-taking arity
+        # and the hand-passed reduced objects agree, and both charge the exit.
+        slv = Solver(; name = :c, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = "verbose" => false)
+        res = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr2, slv = slv, fees = fees)),
+                       ReturnsResult(; nx = nx, X = X2))
+        @test res.fees.imsk == imsk
+        @test isnothing(PortfolioOptimisers.investable_mask(PortfolioOptimisers.extract_pr(res)))
+        wr = PortfolioOptimisers.investable_weights_view(imsk, res.w)
+        prr = PortfolioOptimisers.extract_pr(res)
+        r_res = expected_risk(ConditionalValueatRisk(), res)
+        @test r_res == expected_risk(ConditionalValueatRisk(), wr, prr, res.fees)
+        @test r_res != expected_risk(ConditionalValueatRisk(), wr, prr)
+        @test isapprox(expected_return(ArithmeticReturn(), wr, prr) -
+                       expected_return(ArithmeticReturn(), wr, prr, res.fees),
+                       0.01 * 0.25 + 5.0 / 100)
+
+        # `show` hides the mark on a caller's fee and prints it on a door's, so a fee a
+        # caller wrote renders as it did before the field existed.
+        @test !occursin("imsk", sprint(show, MIME("text/plain"), fees))
+        @test occursin("imsk", sprint(show, MIME("text/plain"), red))
+        @test PortfolioOptimisers.show_fields(fees) ==
+              (:tn, :l, :s, :fl, :fs, :lq, :flq, :fa, :kwargs)
+        @test PortfolioOptimisers.show_fields(red) ==
+              (:tn, :l, :s, :fl, :fs, :lq, :flq, :fa, :kwargs, :imsk)
     end
 end
