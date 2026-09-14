@@ -114,6 +114,7 @@ The container of aligned, time-indexed price-level series: the prices-level mirr
 
 **Feature Matrix**
 The assets × features matrix a Feature Distance measures, or its time-varying form, observations × assets × features. It is built at the point of use from the Panel Fields a Feature Selector names: a numeric field gives one column, a categorical field one 0/1 column per level, a tensor field one column per label, and an observed mask one 0/1 column. Each column carries a label, which is the Feature Selector entry that selects exactly that column. It is always finite.
+The time-varying form holds the observation rows its consumer reads, not every row of the panel: a Feature Distance stacks the rows its collapse algorithm names, so under the default `LastObservation` the kernel's matrix is the last observation alone, 1 × assets × features, and a lifted static field is read once. A matrix stacked by hand from the panel holds every row unless `rows` says otherwise.
 *Avoid*: reading it as a stored quantity. No carrier holds a Feature Matrix; an Asset Panel holds Panel Fields, and the matrix is derived from them. Also Characteristic (see **Characteristic Vector**, §3.9); and reading "feature" as *factor*, which is a return series.
 
 **Feature Selector**

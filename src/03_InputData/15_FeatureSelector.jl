@@ -435,21 +435,24 @@ function panel_column_label(pnl::AssetPanel, col::Tuple{Int, Int, Symbol})
     end
 end
 """
-    panel_field_value_column!(zc::AbstractArray, f::NumericPanelField, l::Integer) -> nothing
-    panel_field_value_column!(zc::AbstractArray, f::CategoricalPanelField, l::Integer) -> nothing
-    panel_field_value_column!(zc::AbstractArray, f::TensorPanelField, l::Integer) -> nothing
+    panel_field_value_column!(zc::AbstractArray, f::NumericPanelField, l::Integer, rows) -> nothing
+    panel_field_value_column!(zc::AbstractArray, f::CategoricalPanelField, l::Integer, rows) -> nothing
+    panel_field_value_column!(zc::AbstractArray, f::TensorPanelField, l::Integer, rows) -> nothing
 
 Write one Panel Field's value column into a Feature Matrix under construction.
 
+The column is cut to `rows` along its leading axis before it is written, so a stack of one observation reads one row of the Panel Field, and a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), is read once rather than once per observation. The cut is a `selectdim` along the leading axis, so `Colon()` is the whole field. A static panel's leading axis is its asset axis, so a static panel is only ever cut by `Colon()`: [`stacked_axes`](@ref) refuses every other value before a column is written.
+
 # Algorithm
 
-The method that Julia selects is the algorithm. A numeric Panel Field writes its values, a categorical Panel Field writes the `0`/`1` indicator of one level, and a tensor Panel Field writes one label slice of its values.
+The method that Julia selects is the algorithm. A numeric Panel Field writes its values, a categorical Panel Field writes the `0`/`1` indicator of one level, and a tensor Panel Field writes one label slice of its values, each cut to `rows`.
 
 # Arguments
 
-  - `zc`: The column of the Feature Matrix, a view over the panel's observation and asset axes.
+  - `zc`: The column of the Feature Matrix, a view over the stacked observation rows and the panel's asset axis.
   - `f`: The Panel Field.
   - `l`: The position of the level or the label, and `0` for a numeric Panel Field.
+  - $(arg_dict[:fdrows])
 
 # Returns
 
@@ -458,47 +461,50 @@ The method that Julia selects is the algorithm. A numeric Panel Field writes its
 # Related
 
   - [`feature_matrix`](@ref)
+  - [`stacked_axes`](@ref)
   - [`select_fields`](@ref)
   - [`AbstractPanelField`](@ref)
+  - [`RepeatedLeading`](@ref)
 """
-function panel_field_value_column!(zc::AbstractArray, f::NumericPanelField,
-                                   ::Integer)::Nothing
-    zc .= f.vals
+function panel_field_value_column!(zc::AbstractArray, f::NumericPanelField, ::Integer,
+                                   rows)::Nothing
+    zc .= selectdim(f.vals, 1, rows)
     return nothing
 end
-function panel_field_value_column!(zc::AbstractArray, f::CategoricalPanelField,
-                                   l::Integer)::Nothing
-    zc .= f.codes .== l
+function panel_field_value_column!(zc::AbstractArray, f::CategoricalPanelField, l::Integer,
+                                   rows)::Nothing
+    zc .= selectdim(f.codes, 1, rows) .== l
     return nothing
 end
-function panel_field_value_column!(zc::AbstractArray, f::TensorPanelField,
-                                   l::Integer)::Nothing
-    zc .= selectdim(f.vals, ndims(f.vals), l)
+function panel_field_value_column!(zc::AbstractArray, f::TensorPanelField, l::Integer,
+                                   rows)::Nothing
+    zc .= selectdim(selectdim(f.vals, ndims(f.vals), l), 1, rows)
     return nothing
 end
 """
-    panel_field_observed_column!(zc::AbstractArray, f::NumericPanelField) -> nothing
-    panel_field_observed_column!(zc::AbstractArray, f::CategoricalPanelField) -> nothing
-    panel_field_observed_column!(zc::AbstractArray, f::TensorPanelField) -> nothing
+    panel_field_observed_column!(zc::AbstractArray, f::NumericPanelField, rows) -> nothing
+    panel_field_observed_column!(zc::AbstractArray, f::CategoricalPanelField, rows) -> nothing
+    panel_field_observed_column!(zc::AbstractArray, f::TensorPanelField, rows) -> nothing
 
 Write one Panel Field's observed mask into a Feature Matrix under construction, as a `0`/`1` column.
 
 A Panel Field contributes **one** mask column, whatever its kind and however many value columns it contributes. The column says whether the cell that Panel Field describes was observed for that asset, so a tensor Panel Field, whose mask carries a label axis of its own, holds where every label of that asset was observed.
 
-A Panel Field that carries no mask gives a column of ones: `omsk === nothing` means that the Panel Field cannot blank, so every cell was observed.
+A Panel Field that carries no mask gives a column of ones: `omsk === nothing` means that the Panel Field cannot blank, so every cell was observed. A mask is cut to `rows` along its leading axis before it is written, as [`panel_field_value_column!`](@ref) cuts a value column; a column of ones is the same whatever `rows` holds.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. Write ones when the Panel Field carries no mask.
- 2. A numeric or a categorical Panel Field writes its mask, which already has the column's shape.
- 3. A tensor Panel Field reduces its mask over the label axis with `all`, and writes that.
+ 2. A numeric or a categorical Panel Field writes its mask, cut to `rows`.
+ 3. A tensor Panel Field cuts its mask to `rows`, reduces it over the label axis with `all`, and writes that.
 
 # Arguments
 
-  - `zc`: The column of the Feature Matrix, a view over the panel's observation and asset axes.
+  - `zc`: The column of the Feature Matrix, a view over the stacked observation rows and the panel's asset axis.
   - `f`: The Panel Field.
+  - $(arg_dict[:fdrows])
 
 # Returns
 
@@ -507,29 +513,76 @@ The method that Julia selects is the algorithm.
 # Related
 
   - [`feature_matrix`](@ref)
+  - [`panel_field_value_column!`](@ref)
   - [`select_fields`](@ref)
   - [`AbstractPanelField`](@ref)
 """
-function panel_field_observed_column!(zc::AbstractArray, f::NumericPanelField)::Nothing
-    zc .= isnothing(f.omsk) ? true : f.omsk
+function panel_field_observed_column!(zc::AbstractArray, f::NumericPanelField,
+                                      rows)::Nothing
+    zc .= isnothing(f.omsk) ? true : selectdim(f.omsk, 1, rows)
     return nothing
 end
-function panel_field_observed_column!(zc::AbstractArray, f::CategoricalPanelField)::Nothing
-    zc .= isnothing(f.omsk) ? true : f.omsk
+function panel_field_observed_column!(zc::AbstractArray, f::CategoricalPanelField,
+                                      rows)::Nothing
+    zc .= isnothing(f.omsk) ? true : selectdim(f.omsk, 1, rows)
     return nothing
 end
-function panel_field_observed_column!(zc::AbstractArray, f::TensorPanelField)::Nothing
+function panel_field_observed_column!(zc::AbstractArray, f::TensorPanelField, rows)::Nothing
     omsk = f.omsk
     if isnothing(omsk)
         zc .= true
     else
         d = ndims(omsk)
-        zc .= dropdims(all(omsk; dims = d); dims = d)
+        zc .= dropdims(all(selectdim(omsk, 1, rows); dims = d); dims = d)
     end
     return nothing
 end
 """
-    feature_matrix(pnl::AssetPanel, sel = nothing; strict::Bool = false) -> Array
+    stacked_axes(ax::Tuple, rows) -> Tuple
+
+Cut the observation axis of an Asset Panel's axes to the rows a Feature Matrix stacks.
+
+A time-varying panel is stated on `(observations, assets)`, and its Feature Matrix stacks the observation rows `rows` names, so the matrix is stated on `(length(rows), assets)`. `Colon()` is every row, and answers the axes unchanged, on a static panel too. A static panel is stated on `(assets,)` alone: it has no observation axis to cut, so any other `rows` is refused rather than cutting the asset axis by mistake.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `Colon()`: answer `ax` unchanged.
+ 2. A vector of row positions: check that `ax` carries an observation axis and that every position lies on it, and answer `(length(rows), ax[2])`.
+
+# Arguments
+
+  - `ax`: The panel's axes, as [`panel_axes`](@ref) reads them.
+  - $(arg_dict[:fdrows])
+
+# Validation
+
+  - `length(ax) == 2` when `rows` is not `Colon()`. Raises an `ArgumentError`.
+  - Every entry of `rows` lies in `1:ax[1]`. Raises an `ArgumentError`.
+
+# Returns
+
+  - `ax::Tuple`: `(assets,)` for a static panel, and `(length(rows), assets)` for a time-varying one.
+
+# Related
+
+  - [`feature_matrix`](@ref)
+  - [`panel_axes`](@ref)
+  - [`collapse_rows`](@ref)
+"""
+function stacked_axes(ax::Tuple, ::Colon)::Tuple
+    return ax
+end
+function stacked_axes(ax::Tuple, rows::AbstractVector{<:Integer})::Tuple
+    @argcheck(length(ax) == 2,
+              ArgumentError("rows cuts the observation axis, and a static Asset Panel has none. Pass rows = Colon() on a static panel."))
+    @argcheck(checkbounds(Bool, 1:ax[1], rows),
+              ArgumentError("every entry of rows must lie on the observation axis 1:$(ax[1]). Got\nrows => $(rows)."))
+    return (length(rows), ax[2])
+end
+"""
+    feature_matrix(pnl::AssetPanel, sel = nothing; strict::Bool = false, rows = Colon()) -> Array
 
 Stack the Panel Fields a Feature Selector names into the Feature Matrix a distance measures.
 
@@ -537,22 +590,26 @@ Nothing stores the result. The Asset Panel is the data, and the Feature Matrix i
 
 A static panel gives an `assets × features` matrix, and a time-varying one an `observations × assets × features` array. A numeric Panel Field gives one column, a categorical Panel Field one `0`/`1` column per level, a tensor Panel Field one column per label, and an observed mask one `0`/`1` column. The order of `sel` is the column order.
 
+A time-varying panel stacks every observation unless `rows` names the rows to stack, and then it stacks those alone, `length(rows) × assets × features`. That is how a consumer that reads one row stacks one row: a [`FeatureDistance`](@ref) under [`LastObservation`](@ref) passes the last row through [`collapse_rows`](@ref), so a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), is read once rather than copied once per observation. The stack keeps its observation axis whatever `rows` holds, so a one-row stack is a window of one observation, on which every collapse algorithm agrees. A static panel has no observation axis, so it takes `Colon()` alone.
+
 # Algorithm
 
  1. Resolve `sel` against the panel with [`select_fields`](@ref).
  2. Derive the element type, as the promotion over the Panel Fields whose **value** columns were resolved. An observed-mask column is a `0`/`1` column that every type carries, so it contributes nothing, and neither does an indicator. A selection of mask and indicator columns alone stacks in the panel's own type, the promotion over every Panel Field's values, so a `Float32` panel's one-hot block is `Float32`; a panel with no numeric or tensor Panel Field at all stacks in `Float64`. See [`panel_value_eltype`](@ref).
- 3. Allocate the matrix as zeros, over the panel's own observation and asset axes and the resolved column count.
- 4. Write each column, with [`panel_field_value_column!`](@ref) or [`panel_field_observed_column!`](@ref).
+ 3. Allocate the matrix as zeros, over the observation rows `rows` names, the panel's asset axis and the resolved column count. See [`stacked_axes`](@ref).
+ 4. Write each column, cut to `rows`, with [`panel_field_value_column!`](@ref) or [`panel_field_observed_column!`](@ref).
 
 # Arguments
 
   - `pnl`: The Asset Panel.
   - $(field_dict[:fdsel])
   - $(field_dict[:fdstrict])
+  - $(field_dict[:fdrows])
 
 # Validation
 
   - The panel holds a Panel Field, and `sel` resolves to at least one column. See [`select_fields`](@ref).
+  - `rows` is `Colon()` on a static panel, and indexes the observation axis of a time-varying one. See [`stacked_axes`](@ref).
 
 # Returns
 
@@ -563,23 +620,26 @@ A static panel gives an `assets × features` matrix, and a time-varying one an `
   - [`AssetPanel`](@ref)
   - [`feature_labels`](@ref)
   - [`select_fields`](@ref)
+  - [`stacked_axes`](@ref)
   - [`panel_value_eltype`](@ref)
   - [`FeatureDistance`](@ref)
+  - [`collapse_rows`](@ref)
 """
-function feature_matrix(pnl::AssetPanel, sel = nothing; strict::Bool = false)
+function feature_matrix(pnl::AssetPanel, sel = nothing; strict::Bool = false,
+                        rows::Union{Colon, AbstractVector{<:Integer}} = Colon())
     cols = select_fields(pnl, sel, strict)
     T = mapreduce(promote_type, cols; init = Union{}) do col
         return col[3] === :observed ? Union{} : panel_value_eltype(pnl.pf[col[1]])
     end
-    Z = zeros(T === Union{} ? panel_value_eltype(pnl.pf) : T, panel_axes(pnl)...,
-              length(cols))
+    Z = zeros(T === Union{} ? panel_value_eltype(pnl.pf) : T,
+              stacked_axes(panel_axes(pnl), rows)..., length(cols))
     for (c, col) in pairs(cols)
         k, l, part = col
         zc = selectdim(Z, ndims(Z), c)
         if part === :observed
-            panel_field_observed_column!(zc, pnl.pf[k])
+            panel_field_observed_column!(zc, pnl.pf[k], rows)
         else
-            panel_field_value_column!(zc, pnl.pf[k], l)
+            panel_field_value_column!(zc, pnl.pf[k], l, rows)
         end
     end
     return Z

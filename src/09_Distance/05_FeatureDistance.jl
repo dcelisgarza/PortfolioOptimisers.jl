@@ -203,7 +203,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Discards the window and measures the last observation's feature matrix alone.
 
-The cheapest member of the family and its default, because it is the only one whose result depends on no aggregation choice.
+The cheapest member of the family and its default, because it is the only one whose result depends on no aggregation choice. It is also the one member that names its rows before the stack exists: [`collapse_rows`](@ref) answers the last row, so the kernel stacks a window of one observation from an Asset Panel rather than every observation the collapse then discards.
 
 # Algorithm
 
@@ -216,6 +216,7 @@ The cheapest member of the family and its default, because it is the only one wh
   - [`AggregateFeatures`](@ref)
   - [`AggregateDistances`](@ref)
   - [`StackObservations`](@ref)
+  - [`collapse_rows`](@ref)
 """
 struct LastObservation <: AbstractFeatureCollapseAlgorithm end
 """
@@ -1077,16 +1078,58 @@ function cor_and_dist(de::FeatureDistance, Z::Arr3Num; dims::Int = 1, kwargs...)
     return distance_to_similarity(de.sim; D = D), D
 end
 """
+    collapse_rows(alg::AbstractFeatureCollapseAlgorithm, pnl::AssetPanel)
+
+Name the observation rows a collapse algorithm reads, so the kernel stacks those rows alone.
+
+A time-varying Feature Matrix is stacked from an Asset Panel and then collapsed along its observation axis, and a collapse that reads one row has no use for the others. [`LastObservation`](@ref) reads the last row, so it names it, and the stack it is handed is a window of one observation: a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), is then read once rather than once per observation, and the kernel's cost under the default collapse is the `assets × features` slice it measures. Every other member answers `Colon()`, every row. The two aggregates resolve their weights against the stacked window itself (see [`collapse_weights`](@ref)), so a window they could cut is not known before the stack exists, and [`StackObservations`](@ref) reads the whole stack by definition.
+
+A static panel has no observation axis, so every member answers `Colon()` on one, [`LastObservation`](@ref) included.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. [`LastObservation`](@ref) on a time-varying panel: the last observation, `nobs:nobs`, where `nobs` is the observation count [`panel_axes`](@ref) reads.
+ 2. Every other case: `Colon()`.
+
+# Arguments
+
+  - `alg`: The collapse algorithm.
+  - `pnl`: The Asset Panel the Feature Matrix is stacked from.
+
+# Returns
+
+  - `rows`: A one-observation range, or `Colon()`. The `rows` keyword of [`feature_matrix`](@ref).
+
+# Related
+
+  - [`AbstractFeatureCollapseAlgorithm`](@ref)
+  - [`LastObservation`](@ref)
+  - [`feature_matrix`](@ref)
+  - [`stacked_axes`](@ref)
+  - [`panel_axes`](@ref)
+"""
+function collapse_rows(::AbstractFeatureCollapseAlgorithm, ::AssetPanel)
+    return Colon()
+end
+function collapse_rows(::LastObservation, pnl::AssetPanel)
+    ax = panel_axes(pnl)
+    return length(ax) == 2 ? (ax[1]:ax[1]) : Colon()
+end
+"""
     feature_matrix(de::FeatureDistance, pr, rd, X) -> AbstractArray{<:Number}
 
 Stack the Feature Matrix a [`FeatureDistance`](@ref) measures, from the panel its `ape` slot resolves.
 
-The resolution has **one** site. `asset_panel(de.ape, pr, rd, X)` answers the carrier's panel under a `nothing` producer and builds one otherwise, and [`feature_matrix`](@ref)'s panel method then stacks the columns `de.sel` names. The kernel calls this, and a caller who asks what a clustering measured calls [`feature_labels`](@ref) with the arguments the optimiser received, so the caller's rebuild is the kernel's measurement by construction.
+The resolution has **one** site. `asset_panel(de.ape, pr, rd, X)` answers the carrier's panel under a `nothing` producer and builds one otherwise, and [`feature_matrix`](@ref)'s panel method then stacks the columns `de.sel` names, over the observation rows `de.alg` reads. The kernel calls this, and a caller who asks what a clustering measured calls [`feature_labels`](@ref) with the arguments the optimiser received, so the caller's rebuild is the kernel's measurement by construction.
+
+The rows are the collapse algorithm's, read through [`collapse_rows`](@ref): under [`LastObservation`](@ref) a time-varying panel stacks its last observation alone, `1 × assets × features`, which is the slice that collapse measures and the whole of what a caller asking what was measured is answered with. Every other collapse stacks every observation.
 
 # Algorithm
 
  1. Resolve the panel with [`asset_panel`](@ref).
- 2. Stack it with [`feature_matrix`](@ref), reading `de.sel` and `de.strict`.
+ 2. Stack it with [`feature_matrix`](@ref), reading `de.sel` and `de.strict`, over the rows [`collapse_rows`](@ref) names for `de.alg`.
 
 # Arguments
 
@@ -1097,18 +1140,21 @@ The resolution has **one** site. `asset_panel(de.ape, pr, rd, X)` answers the ca
 
 # Returns
 
-  - The Feature Matrix, `assets × features` or `observations × assets × features`.
+  - The Feature Matrix, `assets × features` or `observations × assets × features`, where the observation count is the one `de.alg` reads.
 
 # Related
 
   - [`FeatureDistance`](@ref)
   - [`feature_labels`](@ref)
+  - [`collapse_rows`](@ref)
   - [`asset_panel`](@ref)
   - [`AssetPanel`](@ref)
   - [`cor_and_dist`](@ref)
 """
 function feature_matrix(de::FeatureDistance, pr, rd, X)
-    return feature_matrix(asset_panel(de.ape, pr, rd, X), de.sel; strict = de.strict)
+    pnl = asset_panel(de.ape, pr, rd, X)
+    return feature_matrix(pnl, de.sel; strict = de.strict,
+                          rows = collapse_rows(de.alg, pnl))
 end
 """
     feature_labels(de::FeatureDistance, pr, rd, X) -> Vector
@@ -1159,7 +1205,7 @@ The two carriers ride the keyword tail as `pr` and `rd`, and [`feature_matrix`](
 
 # Algorithm
 
- 1. Stack the Feature Matrix with [`feature_matrix`](@ref), which resolves the panel and cuts it to `de.sel`.
+ 1. Stack the Feature Matrix with [`feature_matrix`](@ref), which resolves the panel and cuts it to `de.sel` and to the observation rows `de.alg` reads.
  2. Call the matching two-argument entry point on it, at `dims = 1`.
 
 # Arguments

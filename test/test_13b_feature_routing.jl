@@ -419,6 +419,63 @@ const PO = PortfolioOptimisers
             @test feature_matrix(rd.pnl, ["z$i" for i in k]) == Zd[:, k]
         end
 
+        @testset "the kernel stacks the rows its collapse reads (#1064)" begin
+            # A time-varying panel with one Panel Field of each kind, two of them
+            # blanking, and a lifted static classification, so every column writer is
+            # cut to `rows` at least once.
+            Tt, Nt = 7, 3
+            rng = StableRNG(1064)
+            tv = NumericPanelField(; name = "mcap", vals = abs.(randn(rng, Tt, Nt)) .+ 1,
+                                   omsk = rand(rng, Bool, Tt, Nt))
+            tt = TensorPanelField(; name = "beta", axis = "factor", labels = ["mkt", "smb"],
+                                  vals = randn(rng, Tt, Nt, 2),
+                                  omsk = rand(rng, Bool, Tt, Nt, 2))
+            tc = PortfolioOptimisers.panel_field_lift(gcat, Tt)
+            tpnl = AssetPanel(; pf = [tv, tt, tc], amsk = trues(Tt, Nt),
+                              emsk = trues(Tt, Nt))
+            @test isa(tc.codes, PortfolioOptimisers.RepeatedLeading)
+            sel = ["mcap", "mcap" => :observed, "beta", "beta" => :observed, "sector"]
+            Zt = feature_matrix(tpnl, sel)
+            @test size(Zt) == (Tt, Nt, 7)
+            # `rows` cuts the observation axis alone, keeps it, and every writer agrees
+            # with the full stack row for row.
+            @test feature_matrix(tpnl, sel; rows = Tt:Tt) == Zt[Tt:Tt, :, :]
+            @test feature_matrix(tpnl, sel; rows = [2, 5]) == Zt[[2, 5], :, :]
+            @test feature_matrix(tpnl, sel; rows = 3:5) == Zt[3:5, :, :]
+            @test eltype(feature_matrix(tpnl, sel; rows = Tt:Tt)) == eltype(Zt)
+            # The rows must lie on the observation axis, and a static panel has none.
+            @test_throws ArgumentError feature_matrix(tpnl, sel; rows = [0, 2])
+            @test_throws ArgumentError feature_matrix(tpnl, sel; rows = 1:(Tt + 1))
+            @test_throws ArgumentError feature_matrix(gpnl; rows = 1:1)
+            @test feature_matrix(gpnl; rows = Colon()) == feature_matrix(gpnl)
+            @test PortfolioOptimisers.stacked_axes((Tt, Nt), Colon()) == (Tt, Nt)
+            @test PortfolioOptimisers.stacked_axes((Nt,), Colon()) == (Nt,)
+            @test PortfolioOptimisers.stacked_axes((Tt, Nt), 2:3) == (2, Nt)
+            # Only LastObservation names its rows, and only on a time-varying panel.
+            @test PortfolioOptimisers.collapse_rows(LastObservation(), tpnl) == Tt:Tt
+            @test PortfolioOptimisers.collapse_rows(LastObservation(), gpnl) === Colon()
+            for alg in (AggregateFeatures(), AggregateDistances(), StackObservations())
+                @test PortfolioOptimisers.collapse_rows(alg, tpnl) === Colon()
+            end
+            # The routed entry stacks what its collapse reads, and the distance it
+            # measures is the one the full stack gives.
+            trd = ReturnsResult(; nx = ["a", "b", "c"], X = randn(rng, Tt, Nt), pnl = tpnl)
+            for alg in (LastObservation(), AggregateFeatures(), AggregateDistances(),
+                        StackObservations())
+                de_r = FeatureDistance(; sel = sel, alg = alg)
+                Zr = feature_matrix(de_r, nothing, trd, trd.X)
+                @test size(Zr, 1) == (alg isa LastObservation ? 1 : Tt)
+                @test Zr == Zt[(alg isa LastObservation ? (Tt:Tt) : (1:Tt)), :, :]
+                @test distance(de_r, nothing, trd.X; rd = trd) == distance(de_r, Zt)
+            end
+            # The labels are untouched by the rows: the rebuild is the measurement
+            # column for column.
+            de_l = FeatureDistance(; sel = sel)
+            @test feature_labels(de_l, nothing, trd, trd.X) == feature_labels(tpnl, sel)
+            @test feature_matrix(tpnl, feature_labels(tpnl, sel); rows = Tt:Tt) ==
+                  feature_matrix(de_l, nothing, trd, trd.X)
+        end
+
         @testset "an unresolvable field, level or label warns and drops, or throws" begin
             @test (@test_logs (:warn,) feature_matrix(rd.pnl, ["z1", "z2", "nope"])) ==
                   Zd[:, 1:2]

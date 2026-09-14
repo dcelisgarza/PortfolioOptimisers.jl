@@ -16,6 +16,11 @@ assets, and `HierarchicalRiskParity` consumes the dendrogram's *leaf ordering* r
 its merges, so it can return byte-identical weights from a wrong matrix. Every end-to-end
 test below therefore asserts on the matrix that reached the kernel, through the same
 `RecordingDistance` instrument `test_13c_feature_views.jl` uses, and not on the weights.
+
+The kernel stacks the observation rows its collapse reads (#1064), so under the default
+`LastObservation` it would be handed the seam's last row alone. Every recorder below wraps
+`StackObservations`, the collapse that reads the whole window, so the matrix it records
+is the whole panel the seam collapsed. `test_13b` pins the row rule itself.
 =#
 mutable struct RecordingDistance{T} <: PO.AbstractDistanceEstimator
     de::T
@@ -308,7 +313,7 @@ end
         for (mk, weights_of) in ((mk_st, stacked_wi), (mk_nco, clustered_wi))
             for (rd, Zsrc, sq) in
                 ((rd_r, Zr, false), (rd_sq, Zsq, true), (rd_3d, Z3, false))
-                ro = RecordingDistance(FeatureDistance())
+                ro = RecordingDistance(FeatureDistance(; alg = StackObservations()))
                 res = optimise(mk(ro), rd)
                 @test isapprox(sum(res.w), 1)
                 @test length(ro.seen) == 1
@@ -344,7 +349,7 @@ end
                                      cv = cvopt, ex = seq)
         for mk in (mk_st, mk_nco)
             for (rd, nfeat) in ((rd_r, K), (rd_3d, K))
-                ro = RecordingDistance(FeatureDistance())
+                ro = RecordingDistance(FeatureDistance(; alg = StackObservations()))
                 res = optimise(mk(ro), rd)
                 @test isapprox(sum(res.w), 1)
                 Zo = ro.seen[1]
@@ -356,7 +361,7 @@ end
 
             # A static source is constant within each fold and changes at the boundaries:
             # one distinct feature row per fold, per synthetic asset.
-            ro = RecordingDistance(FeatureDistance())
+            ro = RecordingDistance(FeatureDistance(; alg = StackObservations()))
             optimise(mk(ro), rd_r)
             Zo = ro.seen[1]
             for i in axes(Zo, 2)
@@ -380,7 +385,7 @@ end
         it is a deliberate behaviour change from `T x N x nassets`.
         =#
         cvopt = OptimisationCrossValidation(; cv = KFold(; n = 3))
-        ro = RecordingDistance(FeatureDistance())
+        ro = RecordingDistance(FeatureDistance(; alg = StackObservations()))
         st = Stacking(;
                       opti = [plain_hrp(),
                               HierarchicalEqualRiskContribution(;
@@ -404,7 +409,7 @@ end
         feature axis per cluster and there was nothing to stack them against. The seam has
         the full universe legitimately in scope, so it never faces that mismatch.
         =#
-        rn = RecordingDistance(FeatureDistance())
+        rn = RecordingDistance(FeatureDistance(; alg = StackObservations()))
         nco = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
                               opti = plain_hrp(),
                               opto = HierarchicalRiskParity(; opt = hopt(rn)), cv = cvopt,
@@ -427,7 +432,7 @@ end
         end
         rd_3dsq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts,
                                 pnl = sqpanel(nx, Z3sq))
-        r3 = RecordingDistance(FeatureDistance())
+        r3 = RecordingDistance(FeatureDistance(; alg = StackObservations()))
         nco3 = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
                                opti = plain_hrp(),
                                opto = HierarchicalRiskParity(; opt = hopt(r3)), cv = cvopt,

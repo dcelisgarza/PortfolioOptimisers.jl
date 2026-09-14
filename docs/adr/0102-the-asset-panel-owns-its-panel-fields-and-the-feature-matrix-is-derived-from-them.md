@@ -40,10 +40,17 @@ Three facts decided the reworked shape.
     each with its own array and element type, a categorical as integer codes over labels, and two
     boolean masks. It has no verb that stacks fields into one matrix, and no distance or
     clustering consumer, so it never needed one.
- 3. **The distance already allocates.** A time-varying Feature Matrix collapses along the
-    observation axis before the metric runs (ADR 0045, decision 7), so the distance builds a
-    small `assets × features` matrix per call in either layout. Stacking selected fields into that
-    matrix costs the same allocation.
+ 3. **The distance already allocates, and the stack is cut to what the collapse reads.** A
+    time-varying Feature Matrix collapses along the observation axis before the metric runs
+    (ADR 0045, decision 7), so the distance builds a small `assets × features` matrix per call in
+    either layout. Stacking selected fields into that matrix costs the same allocation *only when
+    the stack holds the rows the collapse reads*: the default `LastObservation` reads one row, and
+    a stack of every row costs `T` times the slice it measures, with a lifted static field copied
+    `T` times for one read. So the kernel reads its collapse algorithm before it stacks —
+    `collapse_rows(de.alg, pnl)` names the rows, `feature_matrix(pnl, sel; rows)` stacks those
+    alone, and `LastObservation` alone names fewer than every row, because the two aggregates
+    resolve their weights against the stacked window and `StackObservations` reads it whole
+    ([issue #1064](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1064)).
 
 ## Decision
 
@@ -123,6 +130,18 @@ received, so the resolution has one site. No clustering or phylogeny result reco
 the panel: [issue #816](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/816) decided that against
 ADR 0045, because the estimator and the carrier derive them with no distance computed, so there is
 nothing a lazy store would save.
+
+The panel verb takes one more keyword, `rows = Colon()`, the observation rows a time-varying panel
+stacks; a static panel has no observation axis and refuses any other value. The distance verb
+reads `de.alg` and passes `collapse_rows(de.alg, pnl)`, so under `LastObservation` it answers the
+last row alone, `1 × assets × features`, and under every other collapse every row. That is the
+one place the two verbs differ from a hand-stacked matrix: a caller who stacks the panel by hand
+gets every row unless they say otherwise, and the distance verb answers exactly what its collapse
+reads, so the caller's rebuild stays the kernel's measurement. The labels are the same under
+every `rows`. [Issue #1064](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1064)
+decided the read site: the alternative, cutting the rows inside `distance(de, ::Any, X)` alone
+and leaving `feature_matrix(de, pr, rd, X)` at every row, keeps every witness of the full window
+but makes the rebuild and the measurement disagree by rows.
 
 `panel_feature_matrix(pnl)` stacks the panel **whole** — every field's values and every observed
 mask — and returns the labels beside the matrix. The selector build moved every consumer that reads

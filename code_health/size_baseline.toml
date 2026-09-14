@@ -10,7 +10,7 @@ commit = "483d19ebf1"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2888, doc = 0, comment = 216, blank = 47, total = 3151 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1133, doc = 113, comment = 125, blank = 43, total = 1414 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1134, doc = 113, comment = 125, blank = 43, total = 1415 }
 "src/01_Base/02_TypeRoots.jl" = { code = 18, doc = 241, comment = 0, blank = 115, total = 374 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -41,7 +41,7 @@ commit = "483d19ebf1"
 "src/03_InputData/12_TrainTestSplit.jl" = { code = 72, doc = 154, comment = 0, blank = 78, total = 304 }
 "src/03_InputData/13_AssetSelection.jl" = { code = 39, doc = 119, comment = 0, blank = 66, total = 224 }
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { code = 478, doc = 732, comment = 0, blank = 346, total = 1556 }
-"src/03_InputData/15_FeatureSelector.jl" = { code = 191, doc = 282, comment = 0, blank = 143, total = 616 }
+"src/03_InputData/15_FeatureSelector.jl" = { code = 208, doc = 315, comment = 0, blank = 158, total = 681 }
 "src/03_InputData/16_PanelDataFrame.jl" = { code = 140, doc = 219, comment = 0, blank = 100, total = 459 }
 "src/03_InputData/17_ReturnsBufferState.jl" = { code = 214, doc = 280, comment = 3, blank = 135, total = 632 }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { code = 307, doc = 236, comment = 6, blank = 103, total = 652 }
@@ -131,7 +131,7 @@ commit = "483d19ebf1"
 "src/09_Distance/02_Distance.jl" = { code = 158, doc = 350, comment = 0, blank = 157, total = 665 }
 "src/09_Distance/03_DistanceDistance.jl" = { code = 37, doc = 132, comment = 0, blank = 58, total = 227 }
 "src/09_Distance/04_Similarity.jl" = { code = 61, doc = 354, comment = 0, blank = 159, total = 574 }
-"src/09_Distance/05_FeatureDistance.jl" = { code = 225, doc = 665, comment = 2, blank = 308, total = 1200 }
+"src/09_Distance/05_FeatureDistance.jl" = { code = 234, doc = 689, comment = 2, blank = 321, total = 1246 }
 "src/10_JuMPModelOptimisation.jl" = { code = 91, doc = 206, comment = 2, blank = 92, total = 391 }
 "src/11_Phylogeny/01_Base_Phylogeny.jl" = { code = 121, doc = 585, comment = 10, blank = 278, total = 994 }
 "src/11_Phylogeny/02_Clusters.jl" = { code = 107, doc = 456, comment = 0, blank = 180, total = 743 }

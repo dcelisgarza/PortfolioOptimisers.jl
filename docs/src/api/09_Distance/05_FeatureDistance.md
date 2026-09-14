@@ -19,6 +19,7 @@ feature_distance
 collapse_features
 stack_observations
 collapse_weights
+collapse_rows
 feature_matrix
 feature_labels
 ```

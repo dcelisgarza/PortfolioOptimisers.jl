@@ -296,6 +296,7 @@ PortfolioOptimisers.panel_key_column!
 PortfolioOptimisers.panel_column_label
 PortfolioOptimisers.panel_field_value_column!
 PortfolioOptimisers.panel_field_observed_column!
+PortfolioOptimisers.stacked_axes
 PortfolioOptimisers.select_fields
 PortfolioOptimisers.select_fields_push!
 PortfolioOptimisers.panel_selector_msg

@@ -40,7 +40,7 @@ commit = "f3e6153ec2"
 "src/03_InputData/12_TrainTestSplit.jl" = { cyc = 6, cog = 6, arg = 4, cyc_sum = 16, cog_sum = 8, arg_sum = 16, macros = [] }
 "src/03_InputData/13_AssetSelection.jl" = { cyc = 4, cog = 4, arg = 2, cyc_sum = 8, cog_sum = 5, arg_sum = 6, macros = [] }
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { cyc = 6, cog = 11, arg = 8, cyc_sum = 98, cog_sum = 99, arg_sum = 75, macros = [] }
-"src/03_InputData/15_FeatureSelector.jl" = { cyc = 10, cog = 10, arg = 3, cyc_sum = 56, cog_sum = 50, arg_sum = 19, macros = [] }
+"src/03_InputData/15_FeatureSelector.jl" = { cyc = 10, cog = 10, arg = 4, cyc_sum = 59, cog_sum = 50, arg_sum = 23, macros = [] }
 "src/03_InputData/16_PanelDataFrame.jl" = { cyc = 7, cog = 9, arg = 7, cyc_sum = 37, cog_sum = 35, arg_sum = 47, macros = [] }
 "src/03_InputData/17_ReturnsBufferState.jl" = { cyc = 9, cog = 15, arg = 4, cyc_sum = 63, cog_sum = 59, arg_sum = 42, macros = [] }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { cyc = 6, cog = 10, arg = 6, cyc_sum = 74, cog_sum = 69, arg_sum = 57, macros = [] }
@@ -130,7 +130,7 @@ commit = "f3e6153ec2"
 "src/09_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
 "src/09_Distance/03_DistanceDistance.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 5, arg_sum = 19, macros = [] }
 "src/09_Distance/04_Similarity.jl" = { cyc = 1, cog = 1, arg = 3, cyc_sum = 11, cog_sum = 1, arg_sum = 17, macros = [] }
-"src/09_Distance/05_FeatureDistance.jl" = { cyc = 9, cog = 11, arg = 6, cyc_sum = 58, cog_sum = 44, arg_sum = 80, macros = ["@propagatable"] }
+"src/09_Distance/05_FeatureDistance.jl" = { cyc = 9, cog = 11, arg = 6, cyc_sum = 61, cog_sum = 46, arg_sum = 84, macros = ["@propagatable"] }
 "src/10_JuMPModelOptimisation.jl" = { cyc = 5, cog = 7, arg = 2, cyc_sum = 17, cog_sum = 16, arg_sum = 2, macros = [] }
 "src/11_Phylogeny/01_Base_Phylogeny.jl" = { cyc = 5, cog = 5, arg = 1, cyc_sum = 27, cog_sum = 13, arg_sum = 4, macros = [] }
 "src/11_Phylogeny/02_Clusters.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 17, cog_sum = 9, arg_sum = 20, macros = ["@propagatable"] }

@@ -153,8 +153,10 @@ end
         @test isapprox(sum(res_re.w), 1)
 
         # A rectangular carrier commutes with the asset view: only the asset axis moves,
-        # and a time-varying one keeps every observation this arity never indexes.
-        ri_3 = RecordingDistance(FeatureDistance())
+        # and a time-varying one keeps every observation this arity never indexes. The
+        # kernel stacks the rows its collapse reads (#1064), so a whole-window collapse
+        # witnesses the whole window and the default witnesses the last row alone.
+        ri_3 = RecordingDistance(FeatureDistance(; alg = StackObservations()))
         nco_3 = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
                                 opti = HierarchicalRiskParity(; opt = hopt(ri_3)),
                                 opto = plain_hrp(), ex = seq)
@@ -163,6 +165,12 @@ end
         cls3 = [findall(==(i), idx3) for i in 1:(res_3.clr.k)]
         @test all(size(z) == (T, length(cls3[i]), K) for (i, z) in pairs(ri_3.seen))
         @test all(ri_3.seen[i] == Z3[:, cls3[i], :] for i in eachindex(cls3))
+        ri_l = RecordingDistance(FeatureDistance())
+        nco_l = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
+                                opti = HierarchicalRiskParity(; opt = hopt(ri_l)),
+                                opto = plain_hrp(), ex = seq)
+        optimise(nco_l, rd_3d)
+        @test all(ri_l.seen[i] == Z3[T:T, cls3[i], :] for i in eachindex(cls3))
     end
 
     @testset "SubsetResampling subsets both axes, and so does a Stacking nested in it" begin
@@ -234,7 +242,7 @@ end
         # slice it gives `X`. A static carrier has no observation axis and passes through.
         for cv in (KFold(; n = 4), IndexWalkForward(80, 40),
                    CombinatorialCrossValidation(; n_folds = 5, n_test_folds = 2))
-            ri = RecordingDistance(FeatureDistance())
+            ri = RecordingDistance(FeatureDistance(; alg = StackObservations()))
             pred = cross_val_predict(HierarchicalRiskParity(; opt = hopt(ri)), rd_3d, cv;
                                      ex = seq)
             sp = split(cv, rd_3d)
@@ -242,6 +250,11 @@ end
             @test all(ri.seen[i] == Z3[sp.train_idx[i], :, :]
                       for i in eachindex(sp.train_idx))
             @test all(size(z, 1) == length(sp.train_idx[i]) for (i, z) in pairs(ri.seen))
+            # The default collapse stacks the fold's last row alone (#1064).
+            rl = RecordingDistance(FeatureDistance())
+            cross_val_predict(HierarchicalRiskParity(; opt = hopt(rl)), rd_3d, cv; ex = seq)
+            @test all(rl.seen[i] == Z3[sp.train_idx[i][end:end], :, :]
+                      for i in eachindex(sp.train_idx))
 
             rs = RecordingDistance(FeatureDistance())
             cross_val_predict(HierarchicalRiskParity(; opt = hopt(rs)), rd_sq, cv; ex = seq)
@@ -260,11 +273,15 @@ end
         cv = MultipleRandomised(IndexWalkForward(80, 40); rng = StableRNG(11), seed = 7,
                                 n_subsets = 2, subset_size = 5)
         # Time-varying: rows by fold, columns by draw, feature axis untouched.
-        ri = RecordingDistance(FeatureDistance())
+        ri = RecordingDistance(FeatureDistance(; alg = StackObservations()))
         cross_val_predict(HierarchicalRiskParity(; opt = hopt(ri)), rd_3d, cv; ex = seq)
         s3 = split(cv, rd_3d)
         @test length(ri.seen) == length(s3.train_idx)
         @test all(ri.seen[i] == Z3[s3.train_idx[i], s3.asset_idx[i], :]
+                  for i in eachindex(s3.train_idx))
+        rl = RecordingDistance(FeatureDistance())
+        cross_val_predict(HierarchicalRiskParity(; opt = hopt(rl)), rd_3d, cv; ex = seq)
+        @test all(rl.seen[i] == Z3[s3.train_idx[i][end:end], s3.asset_idx[i], :]
                   for i in eachindex(s3.train_idx))
 
         # Square: the replication's asset draw moves BOTH axes. This is the same
@@ -288,7 +305,7 @@ end
         # Price-level cross-validation: each fold converts its own window, losing the row
         # the percentage change consumes -- and `Z` must lose exactly that row too.
         prc = PricesResult(; X = TimeArray(tsp, Pv, nx), pnl = matrix_panel(nf, Z3p))
-        ri = RecordingDistance(FeatureDistance())
+        ri = RecordingDistance(FeatureDistance(; alg = StackObservations()))
         pipe = Pipeline(;
                         steps = (PricesToReturns(),
                                  HierarchicalRiskParity(; opt = hopt(ri))))
@@ -299,6 +316,13 @@ end
         @test all(ri.seen[i] == Z3p[sp.train_idx[i][2:end], :, :]
                   for i in eachindex(sp.train_idx))
         @test all(size(z, 1) == length(sp.train_idx[i]) - 1 for (i, z) in pairs(ri.seen))
+        rl = RecordingDistance(FeatureDistance())
+        pipel = Pipeline(;
+                         steps = (PricesToReturns(),
+                                  HierarchicalRiskParity(; opt = hopt(rl))))
+        cross_val_predict(pipel, prc, cv; ex = seq)
+        @test all(rl.seen[i] == Z3p[sp.train_idx[i][end:end], :, :]
+                  for i in eachindex(sp.train_idx))
 
         # Stateful preprocessing inside the fold: `MissingDataFilter` drops an asset at
         # price level, and a square carrier must lose that asset on both axes.
