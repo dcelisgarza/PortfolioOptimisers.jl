@@ -2702,10 +2702,29 @@ function plot_factor_cumulative_returns end
         min_count::Integer = fe.min_count,
         kwargs...
     ) -> Plot
+    plot_forecast_cumulative_ic(
+        fes::AbstractVector{<:ForecastEvaluationResult},
+        w::Option{<:MatNum} = nothing;
+        names = nothing,
+        rank::Bool = true,
+        kwargs...
+    ) -> Plot
+    plot_forecast_cumulative_ic(
+        fes::AbstractVector{<:ForecastEvaluationResult},
+        csfm::CrossSectionalFactorModel;
+        weighting = IdentityMetric(),
+        names = nothing,
+        rank::Bool = true,
+        kwargs...
+    ) -> Plot
 
-Plot the running sum of both information coefficients of a Return Forecast, one series each.
+Plot the running sum of the information coefficient of a Return Forecast: both coefficients of one forecast, or one coefficient of several forecasts overlaid.
 
 The figure draws the running sum of what [`forecast_ic`](@ref) returns and computes nothing else of its own. A series that rises through the sample is a forecast that ordered the cross-section, a flat series is one that carried no ordering, and a falling series is one whose ordering had the opposite sign. An evaluation date that carries no coefficient contributes nothing to the running sum, so one thin cross-section breaks no series.
+
+# The vector method is the comparison
+
+A mean hides whether an edge was continuous or came from three dates, and a comparison of two means hides it twice. The vector method draws **one series per evaluation** on the dates the evaluations share, with a zero reference line, so the reader sees where in the sample each forecast earned its coefficient. It is the figure the length-2 [`ForecastSummaryResult`](@ref) is the table of, and it refuses evaluations that are not comparable with [`forecast_summary_assert_comparable`](@ref), exactly as [`forecast_evaluation_summary`](@ref) does: two forecasts on different dates overlay nothing. One coefficient is drawn, named by `rank`, so that a figure of four forecasts carries four series and not eight. The threshold is each evaluation's own, for the reason [`forecast_summary_row`](@ref) states, and the comparability check makes it one number.
 
 # The figure takes the evaluation and not the block
 
@@ -2714,15 +2733,19 @@ Every figure of this group takes the [`ForecastEvaluationResult`](@ref), where t
 # Arguments
 
   - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
+  - `fes`: The evaluations to overlay, at least one, from [`forecast_evaluation`](@ref).
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
   - `min_count`: Least number of assets a cross-section needs before a coefficient of it is reported.
+  - `names`: One name per evaluation, or `nothing` to number them.
+  - `rank`: Overlay the Spearman coefficient when `true`, and the Pearson coefficient otherwise.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation
 
   - The rules of [`forecast_ic`](@ref).
+  - The vector method: the rules of [`forecast_summary_assert_comparable`](@ref) and [`forecast_summary_names`](@ref).
 
 # Returns
 
@@ -2734,7 +2757,11 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
   - [`forecast_ic`](@ref)
   - [`forecast_ic_summary`](@ref)
+  - [`forecast_summary_assert_comparable`](@ref)
+  - [`forecast_summary_names`](@ref)
   - [`plot_forecast_rolling_ic`](@ref)
+  - [`plot_forecast_cumulative_returns`](@ref)
+  - [`plot_forecast_evaluation_summary`](@ref)
   - [`plot_cumulative_exposure_ic`](@ref)
   - [`ForecastEvaluationResult`](@ref)
 """
@@ -2800,23 +2827,36 @@ function plot_forecast_rolling_ic end
         compound::Bool = false,
         kwargs...
     ) -> Plot
+    plot_forecast_cumulative_returns(
+        fes::AbstractVector{<:ForecastEvaluationResult};
+        names = nothing,
+        kind::Symbol = :rank,
+        compound::Bool = false,
+        kwargs...
+    ) -> Plot
 
-Plot the cumulative return of the books a Return Forecast states on its own, one series each.
+Plot the cumulative return of the books a Return Forecast states on its own: both books of one forecast, or one book of several forecasts overlaid.
 
 The figure draws the running sum of the return series of [`forecast_portfolio`](@ref) and computes nothing else of its own. Both books are centred and rescaled to the same gross exposure, so the two series are read against each other and against the same series of another forecast. An evaluation date whose cross-section carried no book is held flat, which is what [`plot_factor_cumulative_returns`](@ref) does to an absent factor return.
+
+The vector method is the comparison, for the reason [`plot_forecast_cumulative_ic`](@ref) states: one series per evaluation on the dates the evaluations share, a zero reference line, and a refusal of evaluations that are not comparable with [`forecast_summary_assert_comparable`](@ref). One book is drawn, named by `kind`, so that a figure of four forecasts carries four series and not eight.
 
 The figure takes the evaluation and not the block, for the reason [`plot_forecast_cumulative_ic`](@ref) states.
 
 # Arguments
 
   - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
+  - `fes`: The evaluations to overlay, at least one, from [`forecast_evaluation`](@ref).
   - `kinds`: The books to draw, each `:rank` or `:zscore`, as [`forecast_portfolio_weights`](@ref) names them.
+  - `kind`: The one book to overlay, `:rank` or `:zscore`.
+  - `names`: One name per evaluation, or `nothing` to number them.
   - `compound`: Whether the cumulative series compounds.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation
 
   - The rules of [`forecast_portfolio`](@ref).
+  - The vector method: the rules of [`forecast_summary_assert_comparable`](@ref) and [`forecast_summary_names`](@ref).
 
 # Returns
 
@@ -2828,8 +2868,12 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
   - [`forecast_portfolio`](@ref)
   - [`forecast_portfolio_weights`](@ref)
+  - [`forecast_summary_assert_comparable`](@ref)
+  - [`forecast_summary_names`](@ref)
   - [`cumulative_returns`](@ref)
+  - [`plot_forecast_cumulative_ic`](@ref)
   - [`plot_forecast_quantile_returns`](@ref)
+  - [`plot_forecast_evaluation_summary`](@ref)
   - [`ForecastEvaluationResult`](@ref)
 """
 function plot_forecast_cumulative_returns end

@@ -2893,6 +2893,56 @@ function PortfolioOptimisers.plot_forecast_cumulative_ic(fe::PortfolioOptimisers
                                                                                                      csfm);
                                                            min_count = min_count, kwargs...)
 end
+# The comparison overlays. Each draws one series per evaluation on the dates the
+# evaluations share, which `forecast_summary_assert_comparable` makes one axis, and reads the
+# same verb the single-forecast figure reads. The threshold is each evaluation's own, for the
+# reason `forecast_summary_row` states: the check makes it one number, and a keyword here
+# would let the overlay be drawn under a threshold the books were not.
+function forecast_overlay_series(fes::AbstractVector{<:PortfolioOptimisers.ForecastEvaluationResult},
+                                 names, f, title::AbstractString, ylabel::AbstractString;
+                                 kwargs...)
+    PortfolioOptimisers.forecast_summary_assert_comparable(fes)
+    labels = PortfolioOptimisers.forecast_summary_names(names, length(fes))
+    dates::AbstractVector{<:Integer} = first(fes).dates
+    # The element is asserted rather than taken from the iterator, for the reason
+    # `forecast_evaluation_summary` states.
+    series = [f(fes[k]::PortfolioOptimisers.ForecastEvaluationResult)
+              for k in eachindex(fes)]
+    Tf = promote_type(map(eltype, series)...)
+    vals = Matrix{Tf}(undef, length(dates), length(series))
+    for k in eachindex(series)
+        vals[:, k] = series[k]
+    end
+    plt = forecast_plot_series(dates, vals, labels, title, "Observation", ylabel; kwargs...)
+    return idio_diagnostic_reference!(plt, 0.0)
+end
+function forecast_overlay_ic(fe::PortfolioOptimisers.ForecastEvaluationResult, w,
+                             col::Integer)
+    return cumulative_exposure_ic(PortfolioOptimisers.forecast_ic(fe, w))[:, col]
+end
+function forecast_overlay_book(fe::PortfolioOptimisers.ForecastEvaluationResult,
+                               kind::Symbol, compound::Bool)
+    ret = PortfolioOptimisers.forecast_portfolio(fe; kind = kind).ret
+    return forecast_cumulative_book(ret, compound)
+end
+function PortfolioOptimisers.plot_forecast_cumulative_ic(fes::AbstractVector{<:PortfolioOptimisers.ForecastEvaluationResult},
+                                                         w::Option{<:MatNum} = nothing;
+                                                         names = nothing, rank::Bool = true,
+                                                         kwargs...)
+    col = rank ? 1 : 2
+    return forecast_overlay_series(fes, names, fe -> forecast_overlay_ic(fe, w, col),
+                                   "Cumulative Forecast IC ($(FORECAST_IC_LABELS[col]))",
+                                   "Cumulative IC"; kwargs...)
+end
+function PortfolioOptimisers.plot_forecast_cumulative_ic(fes::AbstractVector{<:PortfolioOptimisers.ForecastEvaluationResult},
+                                                         csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                         weighting = PortfolioOptimisers.IdentityMetric(),
+                                                         kwargs...)
+    return PortfolioOptimisers.plot_forecast_cumulative_ic(fes,
+                                                           PortfolioOptimisers.cs_diagnostic_weights(weighting,
+                                                                                                     csfm);
+                                                           kwargs...)
+end
 function PortfolioOptimisers.plot_forecast_rolling_ic(fe::PortfolioOptimisers.ForecastEvaluationResult,
                                                       w::Option{<:MatNum} = nothing;
                                                       rolling::Integer = 0,
@@ -2944,6 +2994,18 @@ function PortfolioOptimisers.plot_forecast_cumulative_returns(fe::PortfolioOptim
     return forecast_plot_series(dates, cum, labels,
                                 "Forecast Book Cumulative Returns ($kind)", "Observation",
                                 "Cumulative Return"; kwargs...)
+end
+function PortfolioOptimisers.plot_forecast_cumulative_returns(fes::AbstractVector{<:PortfolioOptimisers.ForecastEvaluationResult};
+                                                              names = nothing,
+                                                              kind::Symbol = :rank,
+                                                              compound::Bool = false,
+                                                              kwargs...)
+    book = forecast_book_label(kind)
+    comp = compound ? "Compounded" : "Uncompounded"
+    return forecast_overlay_series(fes, names,
+                                   fe -> forecast_overlay_book(fe, kind, compound),
+                                   "Forecast $(book) Book Cumulative Returns ($comp)",
+                                   "Cumulative Return"; kwargs...)
 end
 function PortfolioOptimisers.plot_forecast_quantile_returns(fe::PortfolioOptimisers.ForecastEvaluationResult;
                                                             quantiles = (0.1,),

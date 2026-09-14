@@ -737,6 +737,65 @@
         @test length(plot_forecast_cumulative_returns(fe_fp; kinds = (:zscore,)).series_list) ==
               1
 
+        # ── the two comparison overlays (#1072) ───────────────────────────────
+        # The vector method is the comparison: one series per evaluation on the dates the
+        # evaluations share, a zero reference line, and the labels are the names. A second
+        # forecast over the same target is the sign-flipped first, so its series is the
+        # negative of the first's and the overlay is read off the values, not the count.
+        fe2_fp = forecast_evaluation(-alpha_fp, y_fp; ppy = 252)
+        p_oic = plot_forecast_cumulative_ic([fe_fp, fe2_fp]; names = ["a", "b"])
+        @test is_plot(p_oic)
+        # Two series and the reference line.
+        @test length(p_oic.series_list) == 3
+        @test p_oic[1][:title] == "Cumulative Forecast IC (Spearman)"
+        @test [s[:label] for s in p_oic.series_list[1:2]] == ["a", "b"]
+        @test p_oic.series_list[1][:y] ≈ p_cic.series_list[1][:y]
+        @test p_oic.series_list[2][:y] ≈ -p_cic.series_list[1][:y]
+        # `hline!` draws a `:straightline` at the value, and it carries no label.
+        @test p_oic.series_list[3][:seriestype] == :straightline
+        @test all(iszero, p_oic.series_list[3][:y])
+        @test p_oic.series_list[3][:label] == ""
+        # `rank = false` overlays the Pearson coefficient.
+        p_opc = plot_forecast_cumulative_ic([fe_fp, fe2_fp]; rank = false)
+        @test p_opc[1][:title] == "Cumulative Forecast IC (Pearson)"
+        @test p_opc.series_list[1][:y] ≈ p_cic.series_list[2][:y]
+        # An absent name numbers the forecasts, and a length-1 vector is the one-forecast
+        # case.
+        @test [s[:label] for s in p_opc.series_list[1:2]] == ["Forecast 1", "Forecast 2"]
+        @test length(plot_forecast_cumulative_ic([fe_fp]).series_list) == 2
+        # The block arity resolves the weighting the same way the single-forecast one does.
+        p_oicw = plot_forecast_cumulative_ic([fe_fp, fe2_fp], csfm_fp;
+                                             weighting = RegressionWeightMetric(),
+                                             names = ["a", "b"])
+        @test p_oicw.series_list[1][:y] ≈ plot_forecast_cumulative_ic(fe_fp, csfm_fp;
+                                                                      weighting = RegressionWeightMetric()).series_list[1][:y]
+        p_ocr = plot_forecast_cumulative_returns([fe_fp, fe2_fp]; names = ["a", "b"])
+        @test is_plot(p_ocr)
+        @test length(p_ocr.series_list) == 3
+        @test p_ocr[1][:title] == "Forecast Rank Book Cumulative Returns (Uncompounded)"
+        @test [s[:label] for s in p_ocr.series_list[1:2]] == ["a", "b"]
+        @test p_ocr.series_list[1][:y] ≈ p_cr.series_list[1][:y]
+        @test p_ocr.series_list[2][:y] ≈ -p_cr.series_list[1][:y]
+        @test p_ocr.series_list[3][:seriestype] == :straightline
+        @test all(iszero, p_ocr.series_list[3][:y])
+        p_ozr = plot_forecast_cumulative_returns([fe_fp, fe2_fp]; kind = :zscore,
+                                                 compound = true)
+        @test p_ozr[1][:title] == "Forecast Z-Score Book Cumulative Returns (Compounded)"
+        @test p_ozr.series_list[1][:y] ≈
+              plot_forecast_cumulative_returns(fe_fp; kinds = (:zscore,), compound = true).series_list[1][:y]
+        # Two forecasts on different dates overlay nothing, and a name per forecast is
+        # owed: the overlay refuses what the summary refuses. The last row of the target
+        # is not scorable, so the shorter panel loses two dates and not one.
+        fe3_fp = forecast_evaluation(alpha_fp[1:(T_fp - 2), :], y_fp[1:(T_fp - 2), :];
+                                     ppy = 252)
+        @test_throws PortfolioOptimisers.ConflictingArgumentError plot_forecast_cumulative_ic([fe_fp,
+                                                                                               fe3_fp])
+        @test_throws PortfolioOptimisers.ConflictingArgumentError plot_forecast_cumulative_returns([fe_fp,
+                                                                                                    fe3_fp])
+        @test_throws DimensionMismatch plot_forecast_cumulative_ic([fe_fp, fe2_fp];
+                                                                   names = ["a"])
+        @test_throws PortfolioOptimisers.IsEmptyError plot_forecast_cumulative_returns(ForecastEvaluationResult[])
+
         s_fp = forecast_quantile_spread(fe_fp; quantiles = (0.1, 0.3))
         p_qr = plot_forecast_quantile_returns(fe_fp; quantiles = (0.1, 0.3))
         @test is_plot(p_qr)

@@ -543,6 +543,26 @@ left to the table above.
 plot_forecast_evaluation_summary(fs; size = (900, 500))
 
 #=
+A bar is a mean, and §3 said a mean hides whether the edge was continuous or came from three
+dates. The comparison has two figures of its own for that: the same running sums §3 and §4 drew
+for one forecast, overlaid one series per forecast on the dates the evaluations share. The vector
+method refuses the pairs the summary refuses, so the two lines are always over one sample.
+=#
+
+plot_forecast_cumulative_ic([fe_signal, fe_trait], csfm;
+                            names = ["signal composite", "trait regression"],
+                            title = "Cumulative Spearman IC, both forecasts")
+
+#=
+The book overlay reads the same way. One book is drawn per forecast — the rank book by default,
+`kind = :zscore` for the other — so a figure of four forecasts carries four lines and not eight.
+=#
+
+plot_forecast_cumulative_returns([fe_signal, fe_trait];
+                                 names = ["signal composite", "trait regression"],
+                                 title = "Rank book cumulative returns, both forecasts")
+
+#=
 Three parts of an evaluation are deliberately **not** columns, each because its axis is not the
 forecast: the drawdown family, which is of a compressed return path and would set two forecasts
 beside each other over two different paths; the holding-period and decay tables, whose axis is the
@@ -553,10 +573,10 @@ of §6.
 #=
 ## 8. The other figures
 
-Four figures appear above. Seven more ship, each answering a question this page raised, and all
-eleven take the [`ForecastEvaluationResult`](@ref) — the caller pairs once and every figure reads
-that pairing, because building `alpha` can cost a rolling refit and no figure should pay for it
-twice.
+Six figures appear above. Seven more ship, each answering a question this page raised, and all
+eleven take the [`ForecastEvaluationResult`](@ref) — one of them or, for the two overlays of §7, a
+vector of them — because the caller pairs once and every figure reads that pairing: building
+`alpha` can cost a rolling refit and no figure should pay for it twice.
 
 | Figure | What it answers |
 |:---|:---|

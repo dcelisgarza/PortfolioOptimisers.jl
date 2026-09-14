@@ -9,7 +9,7 @@ julia_syntax = "1.0.2"
 commit = "483d19ebf1"
 
 [file]
-"ext/PortfolioOptimisersPlotsExt.jl" = { code = 2889, doc = 0, comment = 216, blank = 47, total = 3152 }
+"ext/PortfolioOptimisersPlotsExt.jl" = { code = 2996, doc = 0, comment = 238, blank = 48, total = 3282 }
 "src/01_Base/01_DocstringDictionaries.jl" = { code = 1135, doc = 113, comment = 125, blank = 43, total = 1416 }
 "src/01_Base/02_TypeRoots.jl" = { code = 18, doc = 241, comment = 0, blank = 115, total = 374 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
