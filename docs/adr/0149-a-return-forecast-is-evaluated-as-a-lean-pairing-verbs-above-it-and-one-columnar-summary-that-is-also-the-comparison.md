@@ -43,9 +43,9 @@ not fitted on.
 ### The Result is lean, and every statistic is a verb over it
 
 `ForecastEvaluationResult` carries the forecast history `alpha`, the **Forward Target** `y`, the
-evaluation `dates`, and the parameters that produced them (`target`, `horizon`, `lag`, `step`,
-`min_count`, `ppy`). It computes no statistic. `forecast_ic`, `forecast_coverage`,
-`forecast_portfolio`, `forecast_quantile_spread`, `forecast_calibration`,
+universe mask `umsk`, the evaluation `dates`, and the parameters that produced them (`target`,
+`horizon`, `lag`, `step`, `min_count`, `ppy`). It computes no statistic. `forecast_ic`,
+`forecast_coverage`, `forecast_portfolio`, `forecast_quantile_spread`, `forecast_calibration`,
 `forecast_factor_correlation`, `forecast_holding_period` and `forecast_decay` are verbs over it,
 each re-parameterisable without a re-pairing; `min_count` and `ppy` are *carried* by the pairing
 and *applied* by the verbs. The reason is cost: producing `alpha` can be a rolling refit, so the
@@ -53,6 +53,21 @@ pairing is computed once and everything above it — the plots included — read
 than the block. This is the one place the map departs from the shape of map #643, whose plots take
 the block and call the verb themselves because every verb there reads a block that is already
 fitted.
+
+The universe is carried for the same reason the pairing is. `forecast_coverage` divides the
+assets that carry a finite pair at a date by the estimation universe of that date, which is the
+reference's denominator (`n_valid / eligible_count`), and the coverage is read at the Result
+layer, where no carrier is in hand. So the pairing cuts the Asset Panel's estimation mask to the
+block's rows once, into `umsk`, and every consumer — the coverage, the summary's four coverage
+columns, the window tables' `mean_coverage` — reads that one universe; the bare method takes it as
+a keyword and defaults it to every asset, and the summary refuses two evaluations whose masks
+differ. On a point-in-time panel the mask moves with the listings, so an asset that has not
+listed yet, or has delisted, is outside the universe rather than a missed one, and a share of one
+means every asset the panel admitted was scored, however few. The count the summary reports
+beside the share is what says how few. The alternative — the block-taking method of the coverage
+intersecting the weight history with the mask, and the bare and weight-taking methods keeping
+every asset — was rejected because it leaves the Result-layer answer wrong by default and grows an
+`rd` on every consumer (#1070).
 
 ### The evaluation dates bound the sample; they do not filter it
 
@@ -185,12 +200,12 @@ its history does not — so the summary refuses them, correctly, and aligning tw
 a hand-written blank through the bare method. The map named it as a fresh effort;
 [#1073](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1073) seeds it.
 
-The review that wrote this ADR found three places where the code at the head reads less than the
-reference and the tickets did not say so. They are the maintainer's to rule on, and this ADR is
-rewritten in place when they are: `forecast_coverage` divides by every asset on the panel rather
-than by the estimation mask's count at the date
-([#1070](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1070));
-`forecast_factor_correlation` reads the evaluation dates only, where a contemporaneous statistic
+The review that wrote this ADR found three places where the code at the head read less than the
+reference and the tickets did not say so. One is paid: `forecast_coverage` divided by every asset
+on the panel rather than by the estimation mask's count at the date
+([#1070](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1070)), and the Result now
+carries the universe, as the decision above states. Two are the maintainer's to rule on, and this
+ADR is rewritten in place when they are: `forecast_factor_correlation` reads the evaluation dates only, where a contemporaneous statistic
 can read every observation
 ([#1071](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1071)); and the reference's
 two comparison overlays — several forecasts' cumulative coefficient and cumulative book return on

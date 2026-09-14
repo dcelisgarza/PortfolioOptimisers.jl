@@ -812,6 +812,55 @@ end
         @test PO.forecast_ic_weights(gap, nothing) == ones(4, 4)
         @test PO.forecast_ic_weights(gap, IC_W) === IC_W
     end
+
+    @testset "The universe mask is the denominator, and the bare method defaults it to every asset" begin
+        # #1070. The gapped fixture's two `NaN` cells are outside this mask, so the share is
+        # one at both dates: a cell the panel does not admit is not a missed one. The
+        # numerator the summary reports is counted inside the same mask.
+        @test fg.umsk == trues(size(gap))
+        umsk = [true true true true; true false true false; true false true true;
+                true true true true]
+        fm = forecast_evaluation(gap, PO.forward_mean_returns(gap, 1, 1); umsk = umsk,
+                                 min_count = 2)
+        @test fm.umsk === umsk
+        @test forecast_coverage(fm) == [0.75, 1.0, 1.0]
+        @test PO.forecast_summary_scored(fm, PO.forecast_ic_weights(gap, nothing)) ==
+              [3.0, 2.0, 3.0]
+        # A weight history narrows the universe further, never widens it.
+        u = [1.0 1.0 1.0 1.0; 1.0 1.0 0.0 1.0; 1.0 1.0 1.0 1.0; 1.0 1.0 1.0 1.0]
+        @test forecast_coverage(fm, u) == [0.75, 1.0, 1.0]
+        @test PO.forecast_summary_scored(fm, u) == [3.0, 1.0, 3.0]
+        @test_throws DimensionMismatch forecast_evaluation(gap,
+                                                           PO.forward_mean_returns(gap, 1,
+                                                                                   1);
+                                                           umsk = trues(4, 3))
+    end
+
+    @testset "On a point-in-time panel the universe is the estimation mask, so a late lister is not a lost Descriptor" begin
+        # #1070. The planted fixture lists assets late, and its block's listed count runs
+        # from 10 to 19 over the evaluation dates. Every listed asset is scored at every date,
+        # so the share is one throughout and the count is what moves. Divided by every asset
+        # the panel ever held, the same dates read as low as one half, which is the port's
+        # defect the reference does not share.
+        px = evaluation_fixture(; planted = true)
+        fw = FixedWeightedReturnForecast(; scores = px.scores, scale = 1.0,
+                                         weights = [0.4, 0.6])
+        fe = forecast_evaluation(fw, px.rd, px.csfm; horizon = 2, lag = 1)
+        @test fe.umsk == px.rd.pnl.emsk[px.rows, :]
+        listed = [count(view(fe.umsk, t, :)) for t in fe.dates]
+        @test first(listed) < last(listed)
+        @test all(==(1), forecast_coverage(fe))
+        n = PO.forecast_summary_scored(fe, PO.forecast_ic_weights(fe.alpha, nothing))
+        @test n == listed
+        @test minimum(n ./ px.N) < 0.6
+        cv = PO.forecast_summary_coverage(fe, nothing)
+        @test cv.mean_coverage == 1
+        @test cv.min_coverage == 1
+        @test cv.min_n_scored == first(listed)
+        # The window tables inherit the same universe.
+        h = forecast_holding_period(fe, px.rd, px.csfm; n = 2)
+        @test h.mean_coverage[1] == 1
+    end
 end
 
 @testset "The exposure summary gained the same t-statistic" begin
@@ -844,8 +893,9 @@ end
         @test s.spearman.t_stat > 20
         @test s.spearman.hit_rate > 0.9
         @test s.pearson.mean_ic > 0.5
-        # The panel lists and delists assets and drops 8% of its cells, so the universe is
-        # never wholly scored and the coverage is what says so.
+        # The panel drops 8% of its cells, so a refit member that needs both Descriptors
+        # scores fewer assets than the estimation mask admits on some dates, and the coverage
+        # is what says so. Its listings move the universe itself, not the coverage (#1070).
         cv = forecast_coverage(fe)
         @test all(x -> 0.4 < x <= 1, cv)
         @test sum(cv) / length(cv) > 0.75
@@ -1473,8 +1523,8 @@ end
     fe = forecast_evaluation(alpha, y; step = 1)
     h = forecast_holding_period(fe, alpha; n = 3)
     d = forecast_decay(fe, alpha; n = 3)
-    fb = PO.ForecastEvaluationResult(alpha, y, h.dates, fe.target, fe.horizon, fe.lag,
-                                     fe.step, fe.min_count, fe.ppy)
+    fb = PO.ForecastEvaluationResult(alpha, y, fe.umsk, h.dates, fe.target, fe.horizon,
+                                     fe.lag, fe.step, fe.min_count, fe.ppy)
     ic = forecast_ic_summary(forecast_ic(fb))
     rk = forecast_portfolio(fb; kind = :rank)
     zs = forecast_portfolio(fb; kind = :zscore)
@@ -2124,6 +2174,20 @@ end
         end
         @test isa(e2, PO.ConflictingArgumentError)
         @test occursin("asset axis", e2.msg)
+
+        # Two evaluations on the same asset axis over two universe masks are two different
+        # denominators for every coverage column, so the mask is compared cell for cell.
+        umsk = trues(size(IC_ALPHA))
+        umsk[2, 4] = false
+        e3 = try
+            forecast_evaluation_summary([fe, forecast_evaluation(IC_ALPHA, y; umsk = umsk)])
+            nothing
+        catch e
+            e
+        end
+        @test isa(e3, PO.ConflictingArgumentError)
+        @test occursin("`umsk`", e3.msg)
+        @test occursin("1 cell(s)", e3.msg)
     end
 
     @testset "A Panel Field target is the same target only where it names the same field" begin

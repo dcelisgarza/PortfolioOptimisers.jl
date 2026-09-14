@@ -193,6 +193,7 @@ The unit a Return Forecast Estimator's descriptors forecast in: the idiosyncrati
 
 **Forecast Evaluation**
 The out-of-sample reading of a Return Forecast before an optimiser sees it: the forecast's history is paired once with the Forward Target it is answerable for, at the evaluation dates that bound the sample and stride by a step, into a lean Result (`ForecastEvaluationResult`) that carries the pair, the dates and the parameters and computes no statistic of its own. Every statistic is a verb over that Result — the two information coefficients and their coverage, the two alpha portfolios and the quantile spread, the Forecast Calibration, the holding-period and decay tables, the contemporaneous factor correlations — and one columnar summary (`ForecastSummaryResult`) sits on top with one entry per forecast, so its length-2 case is the comparison of two forecasts.
+The Result also carries the universe the coverage divides by (`umsk`): the Asset Panel's estimation mask cut to the block's rows, so on a point-in-time panel an asset that has not listed yet is outside the universe rather than missed by it, and a coverage of one means every admitted asset was scored, however few. See #1070.
 *Avoid*: Covariance Forecast Evaluation, which calibrates a covariance forecast through a walk-forward; Factor Model Diagnostic, which is measured in sample on the fitted block; alpha evaluation, backtest.
 
 **Forward Target**

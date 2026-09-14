@@ -76,7 +76,7 @@ Refuse a set of evaluations whose rows would not mean the same thing, naming the
 
 A summary puts one row per forecast beside the others and invites the reader to compare them, so the rows must be answers to one question. Seven of the fields a [`ForecastEvaluationResult`](@ref) carries change what a row means: the forward target changes the quantity scored, `horizon` and `lag` change the window it is scored over, `step` and `dates` change the sample, `min_count` changes which cross-sections entered it, and `ppy` changes the units the annualised columns are reported in. A difference in any of them is refused here rather than reported as a difference in skill.
 
-The asset axis is checked with them, because two forecasts over different universes are two different questions however their parameters agree. `alpha` and `y` are not compared: a summary of two members of one panel is exactly the case where the forecasts differ, and that is what the summary is for.
+The universe is checked with them, because two forecasts over different universes are two different questions however their parameters agree: the asset axis must agree, and so must `umsk`, which is the denominator every coverage column of the summary is read against. `alpha` and `y` are not compared: a summary of two members of one panel is exactly the case where the forecasts differ, and that is what the summary is for.
 
 The reference implementation checks none of this.
 
@@ -87,7 +87,7 @@ The reference implementation checks none of this.
 # Validation
 
   - `!isempty(fes)`. Raises an [`IsEmptyError`](@ref).
-  - Every evaluation agrees with the first on `target`, `horizon`, `lag`, `step`, `min_count`, `ppy`, `dates` and the number of assets. Raises a [`ConflictingArgumentError`](@ref) naming the field.
+  - Every evaluation agrees with the first on `target`, `horizon`, `lag`, `step`, `min_count`, `ppy`, `dates`, the number of assets and `umsk`. Raises a [`ConflictingArgumentError`](@ref) naming the field.
 
 # Returns
 
@@ -120,6 +120,8 @@ function forecast_summary_assert_comparable(fes::AbstractVector{<:ForecastEvalua
                   ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `dates`: $(length(b.dates)) date(s) against $(length(a.dates))"))
         @argcheck(size(a.alpha, 2) == size(b.alpha, 2),
                   ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on the asset axis: $(size(b.alpha, 2)) against $(size(a.alpha, 2))"))
+        @argcheck(a.umsk == b.umsk,
+                  ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `umsk`: the two universes differ $(size(a.umsk) == size(b.umsk) ? "at $(count(a.umsk .!= b.umsk)) cell(s)" : "in shape, $(size(b.umsk)) against $(size(a.umsk))")"))
     end
     return nothing
 end
@@ -130,7 +132,7 @@ Return the number of assets an evaluation scored, one entry per evaluation date.
 
 This is the numerator [`forecast_coverage`](@ref) divides by the universe, and a summary reports it beside the share because the two say different things: a coverage of one half over forty assets is a cross-section a statistic can be believed on, and the same share over six assets is not.
 
-An asset is counted where it carries a positive weight, a finite forecast and a finite target, which is the rule the coverage applies.
+An asset is counted where it is in the universe the evaluation carries in `umsk`, carries a positive weight, a finite forecast and a finite target, which is the rule the coverage applies. On a point-in-time panel this count moves with the listings while the share stays at `1`, which is why the two are reported side by side.
 
 # Arguments
 
@@ -150,13 +152,14 @@ An asset is counted where it carries a positive weight, a finite forecast and a 
 function forecast_summary_scored(fe::ForecastEvaluationResult, u::MatNum)
     alpha::MatNum = fe.alpha
     y::MatNum = fe.y
+    umsk::AbstractMatrix{Bool} = fe.umsk
     dates::AbstractVector{<:Integer} = fe.dates
     Tf = promote_type(real(eltype(alpha)), real(eltype(y)), real(eltype(u)))
     n = Vector{Tf}(undef, length(dates))
     for (j, t) in enumerate(dates)
         s = 0
         for i in axes(alpha, 2)
-            s += u[t, i] > 0 && isfinite(alpha[t, i]) && isfinite(y[t, i])
+            s += umsk[t, i] && u[t, i] > 0 && isfinite(alpha[t, i]) && isfinite(y[t, i])
         end
         n[j] = Tf(s)
     end
@@ -493,7 +496,7 @@ keyword constructor, and the type validates nothing of its own.
     """
     n_bins
     """
-    Mean share of the universe the evaluation scored, one entry per forecast.
+    Mean share of the universe the evaluation scored, one entry per forecast. The universe is the estimation mask the evaluation carries in `umsk`, so a late lister lowers the count and not the share.
     """
     mean_coverage
     """

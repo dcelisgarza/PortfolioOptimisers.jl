@@ -202,32 +202,38 @@ Return the share of the universe an evaluation scored, one entry per evaluation 
 
 An asset is scored at a date when it carries both a finite forecast and a finite target there, and the coverage is the share of the universe that did. It is the denominator every other statistic of the evaluation is read against: a date whose coverage has collapsed reports an information coefficient over a handful of assets, and a run of such dates says the forecast lost its Descriptors rather than its skill.
 
+The universe of a date is the estimation universe the evaluation carries in `umsk`, narrowed to the assets of positive weight. On a point-in-time panel the estimation mask moves with the listings, so an asset that has not listed yet, or has delisted, is outside the universe rather than a missed one: a late lister is not a lost Descriptor. The share is therefore `1` at a date where every asset the panel admits was scored, however few they are, and [`forecast_summary_scored`](@ref) is the count that says how few.
+
 The threshold [`forecast_ic`](@ref) applies is deliberately **not** applied here. A date under it carries no coefficient, and the coverage is what says why, so silencing the coverage at the same threshold would answer nothing where the answer is most wanted.
 
 # Mathematical definition
 
 ```math
 c_{j} = \\frac{\\left| \\left\\{ i \\in \\mathcal{U}_{t_{j}} : \\alpha_{t_{j} i} \\text{ and } y_{t_{j} i} \\text{ are finite} \\right\\} \\right|}{\\left| \\mathcal{U}_{t_{j}} \\right|}
+\\qquad
+\\mathcal{U}_{t} = \\left\\{ i : m_{ti} \\text{ and } u_{ti} > 0 \\right\\}
 ```
 
 Where:
 
   - ``\\alpha_{ti}``: Return Forecast of asset ``i`` at observation ``t``.
   - ``y_{ti}``: Forward target of asset ``i`` at observation ``t``.
-  - ``\\mathcal{U}_{t}``: Universe of observation ``t``, the assets of positive weight.
+  - ``m_{ti}``: Universe mask of asset ``i`` at observation ``t``, `true` where the asset is in the estimation universe.
+  - ``u_{ti}``: Cross-sectional weight of asset ``i`` at observation ``t``.
+  - ``\\mathcal{U}_{t}``: Universe of observation ``t``, the assets in the mask that carry a positive weight.
   - ``t_{j}``: The ``j``-th evaluation date.
 
 # Algorithm
 
  1. Resolve the weight history with [`forecast_ic_weights`](@ref).
- 2. At each evaluation date, count the universe and the assets of it that carry a finite pair, and divide.
+ 2. At each evaluation date, count the assets in `fe.umsk` of positive weight, and the assets of those that carry a finite pair, and divide.
 
 # Arguments
 
-  - `fe`: The evaluation, from [`forecast_evaluation`](@ref).
-  - `w`: Cross-sectional weight history `observations × assets`, on the axis of `fe.alpha`, or `nothing` for every asset.
+  - `fe`: The evaluation, from [`forecast_evaluation`](@ref). Its `umsk` is the universe the share is taken over.
+  - `w`: Cross-sectional weight history `observations × assets`, on the axis of `fe.alpha`, or `nothing` for every asset of the universe.
   - `csfm`: The fitted factor-model block the evaluation was built on. It supplies the weight history the metric names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the universe is read off, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the universe is narrowed by, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
 
 # Validation
 
@@ -251,16 +257,36 @@ julia> forecast_coverage(forecast_evaluation(alpha, y; min_count = 2))
  0.75
 ```
 
+A universe that excludes the cells the panel does not admit, the way a point-in-time panel's estimation mask does, leaves the share at `1` where every admitted asset was scored:
+
+```jldoctest
+julia> alpha = [1.0 2.0 4.0 8.0; 2.0 3.0 5.0 NaN; 1.0 NaN 2.0 3.0; 3.0 1.0 2.0 6.0];
+
+julia> y = PortfolioOptimisers.forward_mean_returns(alpha, 1, 1);
+
+julia> umsk = trues(4, 4);
+       umsk[2, 2] = umsk[2, 4] = umsk[3, 2] = false;
+
+julia> forecast_coverage(forecast_evaluation(alpha, y; umsk = umsk, min_count = 2))
+3-element Vector{Float64}:
+ 0.75
+ 1.0
+ 1.0
+```
+
 # Related
 
   - [`forecast_ic`](@ref)
   - [`forecast_ic_summary`](@ref)
+  - [`forecast_summary_scored`](@ref)
   - [`forecast_evaluation`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
   - [`exposure_coverage`](@ref)
 """
 function forecast_coverage(fe::ForecastEvaluationResult, w::Option{<:MatNum} = nothing)
     alpha::MatNum = fe.alpha
     y::MatNum = fe.y
+    umsk::AbstractMatrix{Bool} = fe.umsk
     dates::AbstractVector{<:Integer} = fe.dates
     u = forecast_ic_weights(alpha, w)
     Tf = promote_type(real(eltype(alpha)), real(eltype(y)), real(eltype(u)))
@@ -269,7 +295,7 @@ function forecast_coverage(fe::ForecastEvaluationResult, w::Option{<:MatNum} = n
         ne = 0
         nc = 0
         for i in axes(alpha, 2)
-            if u[t, i] > 0
+            if umsk[t, i] && u[t, i] > 0
                 ne += 1
                 nc += isfinite(alpha[t, i]) && isfinite(y[t, i])
             end

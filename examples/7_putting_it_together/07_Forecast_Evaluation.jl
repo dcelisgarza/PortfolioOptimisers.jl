@@ -272,10 +272,11 @@ would produce. **A reader who only wanted to know whether the trait regression i
 can stop here**, and the sections below are what the signal composite has earned the right to.
 
 A coefficient is only as believable as the cross-section it was taken over, so
-[`forecast_coverage`](@ref) says what share of the investable universe carried both a finite
-forecast and a finite target at each date. It deliberately applies **no** `min_count`: the
-coverage is what explains why a date carries no coefficient, so it must answer where the
-coefficient does not.
+[`forecast_coverage`](@ref) says what share of the estimation universe carried both a finite
+forecast and a finite target at each date. The universe is the panel's estimation mask at that
+date, which the evaluation carries in `umsk`, so an asset that has not listed yet is outside it
+rather than missed by it. It deliberately applies **no** `min_count`: the coverage is what
+explains why a date carries no coefficient, so it must answer where the coefficient does not.
 =#
 
 cov_signal = forecast_coverage(fe_signal, csfm)

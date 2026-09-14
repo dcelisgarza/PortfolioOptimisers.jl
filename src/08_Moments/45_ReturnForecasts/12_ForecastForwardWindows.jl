@@ -213,12 +213,12 @@ This is the kernel both [`forecast_holding_period`](@ref) and [`forecast_decay`]
 
  1. Build each window's forward target from `X` with [`forward_mean_returns`](@ref).
  2. Intersect the base evaluation's dates across the whole grid with [`forecast_common_dates`](@ref).
- 3. For each window, rebuild a [`ForecastEvaluationResult`](@ref) carrying `fe.alpha`, that window's target, the common dates and that window's own `horizon` and `lag`, and read its row with [`forecast_window_row`](@ref).
+ 3. For each window, rebuild a [`ForecastEvaluationResult`](@ref) carrying `fe.alpha` and `fe.umsk`, that window's target, the common dates and that window's own `horizon` and `lag`, and read its row with [`forecast_window_row`](@ref).
  4. Transpose the rows into columns, one entry per period.
 
 # Arguments
 
-  - `fe`: The base evaluation, from [`forecast_evaluation`](@ref). Its `alpha`, `target`, `dates`, `step` and `ppy` are carried into every window.
+  - `fe`: The base evaluation, from [`forecast_evaluation`](@ref). Its `alpha`, `umsk`, `target`, `dates`, `step` and `ppy` are carried into every window.
   - `X`: The target history `observations × assets` the forward windows are taken over, on the axis of `fe.alpha`. It is what [`forecast_target_history`](@ref) answers for `fe.target`.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights.
   - `grid`: One `(horizon, lag)` pair per period, from [`forecast_window_grid`](@ref).
@@ -251,10 +251,10 @@ function forecast_window_table(fe::ForecastEvaluationResult, X::MatNum, w::Optio
     @argcheck(!isempty(grid), IsEmptyError("grid cannot be empty"))
     ys = [forward_mean_returns(X, h, l) for (h, l) in grid]
     common = forecast_common_dates(alpha, ys, fe.dates, min_count)
-    rows = [forecast_window_row(ForecastEvaluationResult(alpha, ys[p], common, fe.target,
-                                                         grid[p][1], grid[p][2], fe.step,
-                                                         min_count, fe.ppy), w, min_count)
-            for p in eachindex(grid)]
+    rows = [forecast_window_row(ForecastEvaluationResult(alpha, ys[p], fe.umsk, common,
+                                                         fe.target, grid[p][1], grid[p][2],
+                                                         fe.step, min_count, fe.ppy), w,
+                                min_count) for p in eachindex(grid)]
     return (; period = collect(eachindex(grid)), horizon = [g[1] for g in grid],
             lag = [g[2] for g in grid], dates = common,
             spearman_mean_ic = [r.spearman_mean_ic for r in rows],

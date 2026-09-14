@@ -285,6 +285,10 @@ Producing `alpha` can cost a rolling refit, so the Result stores it rather than 
 
 `dates` indexes the rows of `alpha` and `y`, which live on the observation axis of the factor-model block rather than on that of the carrier. A caller who wants timestamps reads them off the carrier's `ts` at the block's rows, through [`return_forecast_rows`](@ref).
 
+# The universe is carried, not re-read
+
+`umsk` is the estimation mask of the Asset Panel, cut to the block's rows, and it is what [`forecast_coverage`](@ref) divides by. It is carried on the Result because the coverage is read at the Result layer, where no carrier is in hand, and because every consumer of the evaluation — the summary, the window tables, the plots — must read the same universe. On a point-in-time panel it is what keeps an asset that has not listed yet, or has delisted, out of the denominator: a late lister is not a lost Descriptor. The bare method of [`forecast_evaluation`](@ref) takes it as a keyword and defaults it to every asset.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -292,7 +296,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ForecastEvaluationResult(
-        alpha, y, dates, target, horizon, lag, step, min_count, ppy
+        alpha, y, umsk, dates, target, horizon, lag, step, min_count, ppy
     ) -> ForecastEvaluationResult
 
 Arguments correspond to the struct's fields, in the order they are declared. The type is a
@@ -315,6 +319,10 @@ keyword constructor, and the type validates nothing of its own.
     Forward target `observations × assets`, on the same axis as `alpha`.
     """
     y
+    """
+    Universe mask `observations × assets`, on the same axis as `alpha`: `true` where the asset is in the estimation universe of the observation. It is the denominator of [`forecast_coverage`](@ref).
+    """
+    umsk
     """
     Row indices of the observations the evaluation scores, in increasing order.
     """
@@ -354,7 +362,7 @@ end
 
 Pair a Return Forecast history with the forward target built from a carrier and a block.
 
-The two methods of [`forecast_evaluation`](@ref) that take a carrier and a block differ only in where the history comes from — a fitted Result publishes one, an Estimator is asked for one through [`forecast_history`](@ref) — so the target is built once, here, and the axis check that catches a carrier the forecast was not fitted on is stated once with it.
+The two methods of [`forecast_evaluation`](@ref) that take a carrier and a block differ only in where the history comes from — a fitted Result publishes one, an Estimator is asked for one through [`forecast_history`](@ref) — so the target is built once, here, and the axis check that catches a carrier the forecast was not fitted on is stated once with it. The universe the coverage divides by is read here too: it is the estimation mask of the Asset Panel, cut to the block's rows through [`return_forecast_rows`](@ref), because the block is a suffix of the carrier and the mask lives on the carrier's axis.
 
 # Arguments
 
@@ -371,17 +379,18 @@ The two methods of [`forecast_evaluation`](@ref) that take a carrier and a block
 # Validation
 
   - The target history has the shape of `alpha`. Raises a `DimensionMismatch`.
-  - The rules of [`forecast_target_history`](@ref) and of [`forecast_evaluation`](@ref).
+  - The rules of [`forecast_target_history`](@ref), [`return_forecast_rows`](@ref) and [`forecast_evaluation`](@ref).
 
 # Returns
 
-  - `fe::ForecastEvaluationResult`: The pairing and the parameters that produced it.
+  - `fe::ForecastEvaluationResult`: The pairing, the universe and the parameters that produced them.
 
 # Related
 
   - [`forecast_evaluation`](@ref)
   - [`forecast_target_history`](@ref)
   - [`forward_mean_returns`](@ref)
+  - [`return_forecast_rows`](@ref)
 """
 function forecast_evaluation_pairing(alpha::MatNum, rd::ReturnsResult,
                                      csfm::CrossSectionalFactorModel;
@@ -393,11 +402,13 @@ function forecast_evaluation_pairing(alpha::MatNum, rd::ReturnsResult,
     @argcheck(size(X, 1) == size(alpha, 1) && size(X, 2) == size(alpha, 2),
               DimensionMismatch("the target history ($(size(X, 1))×$(size(X, 2))) must match the Return Forecast history ($(size(alpha, 1))×$(size(alpha, 2))). Hand the carrier and the block the forecast was fitted on."))
     y = forward_mean_returns(X, horizon, lag)
-    return forecast_evaluation(alpha, y; target = target, horizon = horizon, lag = lag,
-                               step = step, min_count = min_count, ppy = ppy)
+    umsk = descriptor_asset_panel(rd).emsk[return_forecast_rows(rd, csfm), :]
+    return forecast_evaluation(alpha, y; umsk = umsk, target = target, horizon = horizon,
+                               lag = lag, step = step, min_count = min_count, ppy = ppy)
 end
 """
     forecast_evaluation(alpha::MatNum, y::MatNum;
+                        umsk::AbstractMatrix{Bool} = trues(size(alpha)),
                         target::AbstractForecastTarget = IdiosyncraticTarget(),
                         horizon::Integer = 1, lag::Integer = 1, step::Integer = horizon,
                         min_count::Integer = 3, ppy::Number = 1) -> ForecastEvaluationResult
@@ -414,19 +425,20 @@ end
 
 Pair a Return Forecast with the forward target it is answerable for, out of sample.
 
-This is the bottom of the evaluation hierarchy. The bare method takes the two matrices and computes nothing but the evaluation dates, so every statistic above it is testable without a fit, and a caller scores a forecast the library did not produce. The Result method reads the forecast history off a fitted member and builds the target from the carrier and the block, so a caller who holds a Result writes one call. The Estimator method asks [`forecast_history`](@ref) for the history instead, which refits a member that publishes none, so every member the family ships is evaluable through it.
+This is the bottom of the evaluation hierarchy. The bare method takes the two matrices and computes nothing but the evaluation dates, so every statistic above it is testable without a fit, and a caller scores a forecast the library did not produce; it takes the universe as a keyword, and defaults it to every asset. The Result method reads the forecast history off a fitted member and builds the target from the carrier and the block, so a caller who holds a Result writes one call. The Estimator method asks [`forecast_history`](@ref) for the history instead, which refits a member that publishes none, so every member the family ships is evaluable through it.
 
 # Algorithm
 
  1. For the Result method, read `hist` through [`forecast_evaluation_history`](@ref), which refuses a member that carries none. For the Estimator method, build the history through [`forecast_history`](@ref) at the evaluation's own `step`, so a refit lands on every date the evaluation scores.
- 2. For both, build the target history through [`forecast_target_history`](@ref) and take its forward mean with [`forward_mean_returns`](@ref), in [`forecast_evaluation_pairing`](@ref).
+ 2. For both, build the target history through [`forecast_target_history`](@ref) and take its forward mean with [`forward_mean_returns`](@ref), and cut the estimation mask of the Asset Panel to the block's rows, in [`forecast_evaluation_pairing`](@ref).
  3. Find the evaluation dates with [`forecast_evaluation_dates`](@ref).
- 4. Collect the pair, the dates and the parameters into a [`ForecastEvaluationResult`](@ref).
+ 4. Collect the pair, the universe, the dates and the parameters into a [`ForecastEvaluationResult`](@ref).
 
 # Arguments
 
   - `alpha`: Return Forecast history `observations × assets`, in return units.
   - `y`: Forward target `observations × assets`, on the same axis as `alpha`. The bare method takes it already matured, and records `horizon` and `lag` as the parameters that matured it.
+  - `umsk`: Universe mask `observations × assets`, on the same axis as `alpha`, `true` where the asset is in the estimation universe of the observation. It is the denominator of [`forecast_coverage`](@ref). The bare method takes it, and defaults it to every asset; the two others read it off the Asset Panel's estimation mask, cut to the block's rows.
   - `rfr`: A fitted Return Forecast Result.
   - `rfe`: A Return Forecast Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
@@ -441,7 +453,7 @@ This is the bottom of the evaluation hierarchy. The bare method takes the two ma
 # Validation
 
   - `!isempty(alpha)`. Raises an [`IsEmptyError`](@ref).
-  - `size(alpha) == size(y)`. Raises a `DimensionMismatch`.
+  - `size(alpha) == size(y)` and `size(alpha) == size(umsk)`. Raise a `DimensionMismatch`.
   - `horizon >= 1`, `lag >= 0`, `step >= 1`, `min_count >= 1` and `ppy > 0`. Raise a `DomainError`.
   - The rules of [`forecast_evaluation_dates`](@ref).
   - For the Result method, the rules of [`forecast_evaluation_history`](@ref) and of [`forecast_evaluation_pairing`](@ref).
@@ -449,7 +461,7 @@ This is the bottom of the evaluation hierarchy. The bare method takes the two ma
 
 # Returns
 
-  - `fe::ForecastEvaluationResult`: The pairing and the parameters that produced it.
+  - `fe::ForecastEvaluationResult`: The pairing, the universe and the parameters that produced them.
 
 # Examples
 
@@ -478,6 +490,7 @@ julia> fe.dates
   - [`forward_mean_returns`](@ref)
 """
 function forecast_evaluation(alpha::MatNum, y::MatNum;
+                             umsk::AbstractMatrix{Bool} = trues(size(alpha)),
                              target::AbstractForecastTarget = IdiosyncraticTarget(),
                              horizon::Integer = 1, lag::Integer = 1,
                              step::Integer = horizon, min_count::Integer = 3,
@@ -485,14 +498,16 @@ function forecast_evaluation(alpha::MatNum, y::MatNum;
     @argcheck(!isempty(alpha), IsEmptyError("alpha cannot be empty"))
     @argcheck(size(alpha, 1) == size(y, 1) && size(alpha, 2) == size(y, 2),
               DimensionMismatch("y ($(size(y, 1))×$(size(y, 2))) must match alpha ($(size(alpha, 1))×$(size(alpha, 2)))"))
+    @argcheck(size(alpha, 1) == size(umsk, 1) && size(alpha, 2) == size(umsk, 2),
+              DimensionMismatch("umsk ($(size(umsk, 1))×$(size(umsk, 2))) must match alpha ($(size(alpha, 1))×$(size(alpha, 2)))"))
     @argcheck(horizon >= one(horizon), DomainError(horizon, "horizon must be >= 1"))
     @argcheck(lag >= zero(lag), DomainError(lag, "lag must be >= 0"))
     @argcheck(step >= one(step), DomainError(step, "step must be >= 1"))
     @argcheck(min_count >= one(min_count), DomainError(min_count, "min_count must be >= 1"))
     @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
     dates = forecast_evaluation_dates(alpha, y, step)
-    return ForecastEvaluationResult(alpha, y, dates, target, horizon, lag, step, min_count,
-                                    ppy)
+    return ForecastEvaluationResult(alpha, y, umsk, dates, target, horizon, lag, step,
+                                    min_count, ppy)
 end
 function forecast_evaluation(rfr::AbstractReturnForecastResult, rd::ReturnsResult,
                              csfm::CrossSectionalFactorModel;
