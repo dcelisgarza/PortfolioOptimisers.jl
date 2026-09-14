@@ -89,7 +89,9 @@ the shape, so it moves under the root that names what it is.
 - A new state struct owes exactly two methods, `merge_states` and `Base.copy`, and the interface
   section of the `AbstractPartialFitState` docstring states both. The merge is the fold when the
   statistic is a sum of blocks, and a refusal naming the reason when it is not. ADR 0107 owns the
-  `copy` rule and the verbs that call it.
+  `copy` rule and the verbs that call it. `test/test_62_partial_fit_state_interface_census.jl`
+  walks `subtypes(AbstractPartialFitState)` and reds on a state that owns either method below
+  the root, so the seventeenth state pays what the first sixteen paid by hand.
 - The exception is closed. A field of any other Result type on an Estimator is still refused, and
   the type bound is what refuses it. Widening the bound is what a reviewer looks for.
 - `RegimeAdjustedVarianceState` changes supertype. It is unexported and no doctest renders its

@@ -130,10 +130,15 @@ reads it again.
   `AbstractPartialFitState` docstring states both. ADR 0106 is amended to match.
 - The `cache` field of every propagatable estimator of the seam carries `@fprop @vprop`. A new
   estimator that forgets the tags carries a state through a view, which is the defect this decision
-  removes, so the tags are what a reviewer looks for.
+  removes. `test/test_62_partial_fit_state_interface_census.jl` reads the `port_opt_view` method of
+  every estimator that carries a `cache`, tagged or hand-written, and reds when the cache passes
+  through unsliced; an estimator that takes the surface identity is on that file's list with its
+  reason, or reds.
 - A family that adds a state and no `port_opt_view` method for it reaches the universal
   `port_opt_view` fallback and carries the state unchanged. The rule is that such a family writes
-  the method or writes the `nothing` refusal, and the field text states it.
+  the method or writes the `nothing` refusal, and the field text states it. The same census walks
+  `subtypes(AbstractPartialFitState)` and reds on a state that owns no `port_opt_view`, unless the
+  state is paired there with a host no view reaches, which the census asserts.
 - `arg_dict[:pfcache]` states the channel rule for every estimator of the seam, in one place. It no
   longer says that a restricted estimator must be fitted again, because a restricted estimator is
   now either sliced exactly or refused.
