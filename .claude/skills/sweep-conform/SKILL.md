@@ -38,8 +38,8 @@ They are `CLAUDE.md` § *Functionality you add*, and ADR 0084 is the decision be
 
 1. **The manifest row.** Every tracked `.jl` file under `src/` and `ext/` carries one row in
    `code_health/sweep_manifest.toml`. A new file needs a new row with `swept = false`. A file that gained a
-   documented unit needs its `units` corrected. `test/test_45_sweep_census.jl` reds the build on
-   both.
+   documented unit needs its `units` corrected, and a swept file whose unit set changed needs its
+   `bindings` list corrected too. `test/test_45_sweep_census.jl` reds the build on all three.
 2. **Coverage.** A new file enters with every line covered, or with a named Coverage Exemption in
    `code_health/rulings.toml`. ADR 0082 owns that rule.
 3. **Reopen the child map** that owns the file, and reopen the umbrella, issue #404.
@@ -59,6 +59,11 @@ The check prints the candidates and you choose by subject.
 aimed at — a type or a function added to an *existing* file, which already has a row — so record
 the new count *and* take steps 3 and 4 for that file. A unit is a docstring that attaches to a
 binding. A field docstring inside a struct body is not one.
+
+**`the unit set moved under a swept row`.** The count held and the names did not: a unit was
+replaced one for one, which is the case of ADR 0148. The sweep passed a text the file no longer
+holds, so paste the printed line — it carries the new `bindings` list and keeps `swept = true` —
+and take steps 3 and 4 for the rewritten units, as you would for an addition.
 
 **`src/PortfolioOptimisers.jl` holds 0 `include` line(s) for it.** Add the `include` in the load
 order the file needs. `test/test_47_alias_and_module_census.jl` demands exactly one.

@@ -471,19 +471,71 @@ function documented_units(path::AbstractString; root = REPO_ROOT)
 end
 
 """
-    row_line(f, m, u, s; algorithm) -> String
+    documented_bindings(path; root = REPO_ROOT) -> Vector{String}
 
-The `code_health/sweep_manifest.toml` line a person pastes back. A swept row also carries the `algorithm` key
-that `test/test_26_docs.jl` ratchets, so the printer takes it: a line pasted without that key would
-delete the ratchet's floor, and the deletion would read as a correction. An unswept row has no such
-key, and a file that has no row at all is never swept.
+The name of the binding each documented unit of the file attaches to, sorted, one entry per unit.
+It is the `bindings` key of a swept `code_health/sweep_manifest.toml` row, and its length is the
+row's `units`.
 
-`test/test_45_sweep_census.jl` and `code_health/sweep_check.jl` both print this line, before the
-commit and after it, so the two printers are one printer.
+**This is the one definition.** A unit is what [`documented_units`](@ref) counts, and this walks
+the same macrocalls. The name is [`unit_name`](@ref)'s, so a method docstring names its function
+and a Declaration Macro names the type it declares. A documented method appears once per
+docstring, so a function with three documented methods is listed three times: the list is a
+multiset, not a set.
+
+The count alone cannot see a unit REPLACED one for one, which is issue #1065: a file's estimator
+and entry points were rewritten while its count stood still, and its `swept = true` row survived
+untouched. The names see it, and `test/test_45_sweep_census.jl` compares them.
 """
-function row_line(f, m, u, s; algorithm = nothing)
+function documented_bindings(path::AbstractString; root = REPO_ROOT)
+    names = String[]
+    walk_ast(parse_file(path; root)) do node
+        if isdocstring(node)
+            push!(names, unit_name(node.args[end]))
+        end
+        return nothing
+    end
+    return sort!(names)
+end
+
+"""
+    unit_name(e) -> String
+
+The binding a documented unit's definition declares, for [`documented_bindings`](@ref). It is
+[`definition_name`](@ref) with one more case, a `module`, which that resolver leaves unnamed so
+that a coverage row never attributes a module's lines to the module. It never answers `""`: a
+docstring whose target names nothing a reader would call is recorded as `<anonymous>`, so a row's
+`bindings` always holds one entry per unit.
+"""
+function unit_name(e)
+    if Meta.isexpr(e, :module) && length(e.args) >= 2
+        return defname(e.args[2])
+    end
+    n = definition_name(e)
+    return isempty(n) ? "<anonymous>" : n
+end
+
+"""
+    row_line(f, m, u, s; algorithm, bindings) -> String
+
+The `code_health/sweep_manifest.toml` line a person pastes back. A swept row also carries the
+`algorithm` key that `test/test_26_docs.jl` ratchets and the `bindings` list that
+`test/test_45_sweep_census.jl` compares, so the printer takes both: a line pasted without the key
+would delete the ratchet's floor, a line pasted without the list would delete the record of the
+swept text, and either deletion would read as a correction. An unswept row has neither, and a file
+that has no row at all is never swept.
+
+`test/test_45_sweep_census.jl`, `test/test_26_docs.jl` and `code_health/sweep_check.jl` all print
+this line, before the commit and after it, so the three printers are one printer.
+"""
+function row_line(f, m, u, s; algorithm = nothing, bindings = nothing)
     a = isnothing(algorithm) ? "" : string(", algorithm = ", algorithm)
-    return string("\"", f, "\" = { map = ", m, ", units = ", u, a, ", swept = ", s, " }")
+    b = if isnothing(bindings)
+        ""
+    else
+        string(", bindings = [", join((string("\"", n, "\"") for n in bindings), ", "), "]")
+    end
+    return string("\"", f, "\" = { map = ", m, ", units = ", u, a, ", swept = ", s, b, " }")
 end
 
 """

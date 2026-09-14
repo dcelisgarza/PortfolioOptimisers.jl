@@ -13,7 +13,7 @@ module SweepCensusHealth
 include(joinpath(@__DIR__, "..", "code_health", "CodeHealth.jl"))
 end
 
-@testset "Sweep census: every source file carries a row, and its unit count holds" begin
+@testset "Sweep census: every source file carries a row, its unit count holds, and a swept file's unit names hold" begin
     using Test, TOML
 
     CH = SweepCensusHealth.CodeHealth
@@ -110,17 +110,21 @@ end
     commit.
 
       - `count_units` counts the documented units of one file.
+      - `count_bindings` names them, sorted, one entry per unit. Check 4 states why.
       - `row_line` prints the manifest row a person pastes back. A swept row also carries
-        the `algorithm` key that `test_26_docs.jl` ratchets, so the printer takes it: a
-        line pasted without it would delete the ratchet's floor and the deletion would read
-        as a correction. An unswept row has no such key, and a file that has no row at all
-        is never swept.
+        the `algorithm` key that `test_26_docs.jl` ratchets and the `bindings` list check 4
+        compares, so the printer takes both: a line pasted without either would delete a
+        record and the deletion would read as a correction. An unswept row has neither, and
+        a file that has no row at all is never swept.
       - `candidate_maps` lists the child maps a file's own directory already uses, because
         the map a file belongs to is NOT derivable from its path. A person chooses by
         subject. #428 measured why the numeric prefix does not rescue the lookup.
     =#
     count_units(path::AbstractString) = CH.documented_units(path)
-    row_line(f, m, u, s; algorithm = nothing) = CH.row_line(f, m, u, s; algorithm)
+    count_bindings(path::AbstractString) = CH.documented_bindings(path)
+    function row_line(f, m, u, s; algorithm = nothing, bindings = nothing)
+        return CH.row_line(f, m, u, s; algorithm, bindings)
+    end
     candidate_maps(f) = CH.candidate_maps(rows, map_names, f)
 
     # The printer below runs only when the census is already red, so these two hold it to
@@ -187,7 +191,117 @@ end
                     map_names[string(row["map"])], "]")
             println("    ",
                     row_line(f, row["map"], now, row["swept"];
-                             algorithm = get(row, "algorithm", nothing)))
+                             algorithm = get(row, "algorithm", nothing),
+                             bindings = if row["swept"]
+                                 count_bindings(joinpath(root, f))
+                             else
+                                 nothing
+                             end))
+        end
+    end
+
+    # ------------------------------------------- 4. a swept file's unit set drifted
+
+    #=
+    Check 3 sees an addition and a deletion. It cannot see a REPLACEMENT: a unit deleted and a
+    unit added in one change leave the count where it was. Issue #1065 is the case.
+    `src/09_Distance/05_FeatureDistance.jl` was swept, and map #802 then rewrote its
+    estimator and its entry points -- two units deleted, two added -- while the count held
+    at 24 and the row kept `swept = true`. Nothing red. The swept flag then vouched for text
+    the sweep had never read.
+
+    So a swept row also records the NAMES: the binding each unit attaches to, one entry per
+    unit, sorted. `CodeHealth.documented_bindings` is that list, and it walks the same
+    macrocalls the count does, so its length is `units`. A documented method names its
+    function, and a function with three documented methods is listed three times. The
+    names are stable under a reformat for the same reason the count is.
+
+    An unswept row carries no list. The file has not passed the sweep, so there is no swept
+    text to record, and a list on such a row would be a stale claim the moment the file
+    changed. The session that flips `swept` writes the list in the same edit, as it writes
+    `algorithm`, and the printer below hands it the line.
+
+    What the failure asks for is the same as check 3's: join the change to the child map,
+    and record the new row. A swept file whose unit set changes owes the map a sub-issue for
+    the rewritten units, as it would owe one for an addition, and keeps its `swept` flag:
+    the flag arms the swept standard in `test/test_26_docs.jl`, and a rewrite must still meet
+    it. The blind spot that remains is a unit rewritten UNDER its own name -- a method whose
+    signature changed but whose function did not -- and that is accepted: the names gate the
+    set, and the sweep gates the text.
+    =#
+    swept_rows = sort([f for (f, r) in rows if r["swept"] === true])
+    unswept_rows = sort([f for (f, r) in rows if r["swept"] !== true])
+
+    # The key is demanded of a swept row and refused on an unswept one, so a row that flips
+    # either way is edited in full.
+    no_bindings = filter(f -> !haskey(rows[f], "bindings"), swept_rows)
+    @test isempty(no_bindings)
+    if !isempty(no_bindings)
+        println("Rows marked `swept = true` in `code_health/sweep_manifest.toml` that carry no ",
+                "`bindings` list. A swept row records the name of the binding each documented ",
+                "unit attaches to. Paste the line:")
+        for f in no_bindings
+            row = rows[f]
+            println("  ",
+                    row_line(f, row["map"], row["units"], true;
+                             algorithm = get(row, "algorithm", nothing),
+                             bindings = count_bindings(joinpath(root, f))))
+        end
+    end
+
+    stale_bindings = filter(f -> haskey(rows[f], "bindings"), unswept_rows)
+    @test isempty(stale_bindings)
+    if !isempty(stale_bindings)
+        println("Rows marked `swept = false` in `code_health/sweep_manifest.toml` that carry a ",
+                "`bindings` list. Only a swept row records one. Drop the key:")
+        for f in stale_bindings
+            row = rows[f]
+            println("  ", row_line(f, row["map"], row["units"], false))
+        end
+    end
+
+    @test all(f -> !haskey(rows[f], "bindings") || (rows[f]["bindings"] isa Vector &&
+                                                    all(x -> x isa String, rows[f]["bindings"])),
+              swept_rows)
+
+    renamed = Tuple{String, Vector{String}, Vector{String}}[]
+    for f in swept_rows
+        haskey(rows[f], "bindings") || continue
+        f in expected || continue
+        recorded = sort(String.(rows[f]["bindings"]))
+        measured = count_bindings(joinpath(root, f))
+        measured == recorded || push!(renamed, (f, recorded, measured))
+    end
+
+    @test isempty(renamed)
+    if !isempty(renamed)
+        println("Swept files whose documented units are no longer the ones ",
+                "`code_health/sweep_manifest.toml` records. The sweep passed a text these files ",
+                "no longer hold. Join the change to the file's child map of #404 as an ",
+                "addition -- reopen the map if it is closed, and open a sub-issue for the ",
+                "rewritten units -- then record the new list:")
+        for (f, recorded, measured) in renamed
+            row = rows[f]
+            # A multiset difference: a method docstring added to a function that already has
+            # one is one more entry under the same name, so a `setdiff` would miss it.
+            added = copy(measured)
+            for n in recorded
+                i = findfirst(==(n), added)
+                i === nothing || deleteat!(added, i)
+            end
+            removed = copy(recorded)
+            for n in measured
+                i = findfirst(==(n), removed)
+                i === nothing || deleteat!(removed, i)
+            end
+            println("  ", f, "   [map ", row["map"], ": ", map_names[string(row["map"])],
+                    "]")
+            isempty(added) || println("    added:   ", join(added, ", "))
+            isempty(removed) || println("    removed: ", join(removed, ", "))
+            println("    ",
+                    row_line(f, row["map"], length(measured), true;
+                             algorithm = get(row, "algorithm", nothing),
+                             bindings = measured))
         end
     end
 

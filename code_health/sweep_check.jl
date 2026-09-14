@@ -19,7 +19,8 @@
 # It is a convenience, never an Authority. Every rule it reports is owned elsewhere, and the report
 # names the owner on every line:
 #
-#   the row, the unit count, the child map  `test/test_45_sweep_census.jl`
+#   the row, the unit count, the unit names
+#   of a swept row, the child map          `test/test_45_sweep_census.jl`
 #   the coverage entry                      ADR 0082, `code_health/coverage.jl`
 #   the `include` line                      `test/test_47_alias_and_module_census.jl`
 #   the `algorithm` floor of a swept row    `test/test_26_docs.jl`
@@ -204,9 +205,11 @@ Every duty the sweep places on one file, in the order a person meets them.
  1. The row exists. Without it `test/test_45_sweep_census.jl` reds the build, and the whole rest of
     the check has nothing to read.
  2. The row's `units` matches the file. This is the check that catches the case the rule is really
-    aimed at: a type or a function added to an EXISTING file, which already has a row.
+    aimed at: a type or a function added to an EXISTING file, which already has a row. On a swept
+    row the `bindings` list must match too, which catches a unit REPLACED one for one (#1065).
  3. The row's `map` is a child map that `[map]` lists, and the `swept` flag is a Bool.
- 4. A swept row carries `algorithm`, which `test/test_26_docs.jl` holds as a floor.
+ 4. A swept row carries `algorithm`, which `test/test_26_docs.jl` holds as a floor, and `bindings`,
+    which `test/test_45_sweep_census.jl` compares. An unswept row carries neither.
  5. The file has a coverage row, or it is new and enters under ADR 0082's rule.
  6. A file under `src/` is `include`d by `src/PortfolioOptimisers.jl` exactly once.
  7. The child map is open, and a sub-issue names the path. Both need the tracker.
@@ -240,13 +243,27 @@ function check_file(path, rows, map_names, coverage, entry, tracker, exempted, s
         return fs
     end
 
+    bindings = CodeHealth.documented_bindings(joinpath(CodeHealth.REPO_ROOT, path))
+    swept = row["swept"] === true
     if !(row["units"] == measured)
         push!(fs,
               Finding(:fail,
                       "the unit count moved: $(row["units"]) -> $measured. Record it:",
                       [row_line(path, row["map"], measured, row["swept"];
-                                algorithm = get(row, "algorithm", nothing)),
+                                algorithm = get(row, "algorithm", nothing),
+                                bindings = swept ? bindings : nothing),
                        "A documented unit joined this file, so it joins the file's child map too."]))
+    elseif swept && haskey(row, "bindings") && !(sort(String.(row["bindings"])) == bindings)
+        # The count sees an addition and a deletion, and not a REPLACEMENT: issue #1065. The
+        # names do, and `test/test_45_sweep_census.jl` compares them on a swept row.
+        push!(fs,
+              Finding(:fail,
+                      "the unit set moved under a swept row: $measured unit(s), and not the ones " *
+                      "the row records. Record the new list:",
+                      [row_line(path, row["map"], measured, true;
+                                algorithm = get(row, "algorithm", nothing), bindings),
+                       "The sweep passed a text this file no longer holds, so the rewritten units",
+                       "join the file's child map as an addition would: open a sub-issue for them."]))
     else
         push!(fs, Finding(:ok, "the row is current: $measured unit(s), map $(row["map"])."))
     end
@@ -261,11 +278,22 @@ function check_file(path, rows, map_names, coverage, entry, tracker, exempted, s
         push!(fs,
               Finding(:fail, "`swept` is not a Bool, so a later gate reads it as true."))
     end
-    if row["swept"] === true && !(haskey(row, "algorithm"))
+    if swept && !(haskey(row, "algorithm"))
         push!(fs,
               Finding(:fail, "the row reads `swept = true` and carries no `algorithm` key.",
                       ["`test/test_26_docs.jl` holds that count as a floor and demands the key."]))
-    elseif row["swept"] === true
+    elseif swept && !(haskey(row, "bindings"))
+        push!(fs,
+              Finding(:fail, "the row reads `swept = true` and carries no `bindings` list.",
+                      ["`test/test_45_sweep_census.jl` compares that list and demands it:",
+                       row_line(path, row["map"], measured, true;
+                                algorithm = row["algorithm"], bindings)]))
+    elseif !swept && haskey(row, "bindings")
+        push!(fs,
+              Finding(:fail, "the row reads `swept = false` and carries a `bindings` list.",
+                      ["Only a swept row records one. `test/test_45_sweep_census.jl` refuses it:",
+                       row_line(path, row["map"], measured, false)]))
+    elseif swept
         push!(fs,
               Finding(:note,
                       "this file is SWEPT, so the addition meets the swept standard now.",

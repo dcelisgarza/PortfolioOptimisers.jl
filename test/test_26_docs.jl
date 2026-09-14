@@ -896,9 +896,12 @@ in the sense of `STANDARDS.md`.
             for (f, was, now) in fallen
                 row = rows[f]
                 println("  ", f, "  ", was, " -> ", now)
-                println("    \"", f, "\" = { map = ", row["map"], ", units = ",
-                        row["units"], ", algorithm = ", now, ", swept = ", row["swept"],
-                        " }")
+                # `CodeHealth.row_line` is the one printer of a manifest row, so a swept row's
+                # `bindings` list travels with the line rather than being dropped by a paste.
+                println("    ",
+                        CH.row_line(f, row["map"], row["units"], row["swept"];
+                                    algorithm = now,
+                                    bindings = get(row, "bindings", nothing)))
             end
         end
     end

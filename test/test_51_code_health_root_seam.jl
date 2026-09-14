@@ -146,6 +146,22 @@ quietly(f) = withenv(f, "GITHUB_ACTIONS" => nothing, "GITHUB_STEP_SUMMARY" => no
             @test CH.documented_units("src/Fixture.jl"; root = dir) == 2
             @test CH.documented_units("src/Quiet.jl"; root = dir) == 0
 
+            # The names beside the count, sorted, one per unit: the short form with a return
+            # type is a definition here as it is for the coverage row (issue #521).
+            @test CH.documented_bindings("src/Fixture.jl"; root = dir) ==
+                  ["dropped", "kept"]
+            @test CH.documented_bindings("src/Quiet.jl"; root = dir) == String[]
+            # A second documented method is a second entry under the same name, a `module`
+            # names itself, and a target that names nothing still takes one entry. The file
+            # sits under `docs/`, outside the measured roots, so the tracked-file test
+            # below still sees the four scoped files and no more.
+            write(joinpath(dir, "docs", "Twice.jl"),
+                  join(["\"\"\"a\"\"\"", "module Fixture", "\"\"\"b\"\"\"", "f(x) = x",
+                        "\"\"\"c\"\"\"", "f(x, y) = x", "\"\"\"d\"\"\"", "(1, 2)", "end"],
+                       "\n") * "\n")
+            @test CH.documented_bindings("docs/Twice.jl"; root = dir) ==
+                  ["<anonymous>", "Fixture", "f", "f"]
+
             # `declaring` is a parameter for the same reason `root` is: a fixture tree holds no
             # `src/01_Base.jl`, so a hard-coded list would admit the live checkout alone.
             @test CH.declared_macros("src/Declares.jl"; root = dir) ==
@@ -166,7 +182,7 @@ quietly(f) = withenv(f, "GITHUB_ACTIONS" => nothing, "GITHUB_STEP_SUMMARY" => no
             run(pipeline(`git init -q $dir`; stdout = devnull, stderr = devnull))
             run(pipeline(`git -C $dir add -A`; stdout = devnull, stderr = devnull))
             @test CH.tracked_jl_files(; root = dir) ==
-                  vcat(["docs/notes.jl"], FIXTURE_SCOPED)
+                  vcat(["docs/Twice.jl", "docs/notes.jl"], FIXTURE_SCOPED)
             @test CH.source_files(; root = dir) == FIXTURE_SCOPED
 
             # The fixture has no commit, so the reader gives its own answer rather than the live
