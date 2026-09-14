@@ -6,15 +6,15 @@ status: accepted
 
 ## Context
 
-Three prior estimators reweight observations: [`EntropyPoolingPrior`](../../src/13_Prior/12_EntropyPoolingPrior.jl),
-[`MeucciEntropyPoolingPrior`](../../src/13_Prior/11_MeucciEntropyPoolingPrior.jl) and
-[`OpinionPoolingPrior`](../../src/13_Prior/13_OpinionPoolingPrior.jl). Each one fits a nested prior
+Three prior estimators reweight observations: [`EntropyPoolingPrior`](../../src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior.jl),
+[`MeucciEntropyPoolingPrior`](../../src/10_Prior/06_EntropyPooling/02_MeucciEntropyPoolingPrior.jl) and
+[`OpinionPoolingPrior`](../../src/10_Prior/07_OpinionPoolingPrior.jl). Each one fits a nested prior
 and pools a probability vector over the scenarios that fit produced.
 
 Every one of them built its probability vector over the rows of the matrix it was **handed**, and
 [ADR 0114](0114-the-asset-panel-travels-as-the-third-positional-argument-of-the-returns-matrix-prior-method.md)
 left that as the second, untaken decision of the composition contract.
-[`CrossSectionalFactorPrior`](../../src/13_Prior/17_CrossSectionalFactorPrior.jl) answers on fewer
+[`CrossSectionalFactorPrior`](../../src/10_Prior/11_CrossSectionalFactorPrior.jl) answers on fewer
 rows than it is given: it drops the observations its Descriptors warm up over, and the observations
 its exposure lag consumes. Its scenarios are the window the fit is defined on, and that is by
 design.
@@ -71,7 +71,7 @@ if !isnothing(pe.w)
 end
 ```
 
-`ep_prior_probabilities`, in [`10_Base_EntropyPoolingPrior.jl`](../../src/13_Prior/10_Base_EntropyPoolingPrior.jl),
+`ep_prior_probabilities`, in [`10_Base_EntropyPoolingPrior.jl`](../../src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior.jl),
 holds the one rule for all four `ep_prior` bodies. It reads three sources in order:
 
 1. **`pe.w`**, the caller's own tilt, which no fit can state. Its length must equal

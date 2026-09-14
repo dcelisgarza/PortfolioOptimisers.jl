@@ -1,5 +1,5 @@
 #=
-Check `src/08_Moments/39_CrossSectionalWeights.jl` against the mathematics its docstrings
+Check `src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl` against the mathematics its docstrings
 state, and against the reference implementation the map of issue #643 ports. Issue #681.
 
 THREE FACTS SHAPE THE PROBES.

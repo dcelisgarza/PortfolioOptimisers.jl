@@ -532,7 +532,7 @@ loadings.
     points" is a statement about a factor, not about 500 assets. Expressing it
     once and letting the loadings distribute it keeps the scenario auditable,
     and it uses the factor machinery the library already has in
-    `src/08_Moments/21_Base_Regression.jl` and the factor priors.
+    `src/05_Moments/20_Base_Regression.jl` and the factor priors.
 """
 function factor_shock(X::AbstractMatrix{<:Real}, loadings::AbstractMatrix{<:Real},
                       shock::AbstractVector{<:Real})

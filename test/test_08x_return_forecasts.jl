@@ -1,5 +1,5 @@
 #=
-Check `src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl`, `02_DescriptorScores.jl`,
+Check `src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/01_Base_ReturnForecast.jl`, `02_DescriptorScores.jl`,
 `03_CustomValueReturnForecast.jl` and `04_FixedWeightedReturnForecast.jl` against the contract
 their docstrings state, and against the reference implementation the map of issue #643 ports.
 Issue #737.

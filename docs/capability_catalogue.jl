@@ -125,7 +125,7 @@ of the hand-maintained page this one replaced.
   - `:internal` -- exported for extension authors, not for callers.
 """
 const NOT_A_FEATURE = Dict{Symbol, Symbol}(
-                                           # Alias constructors (`src/27_Aliases.jl`).
+                                           # Alias constructors (`src/23_Aliases.jl`).
                                            :DnCov => :alias, :DtCov => :alias,
                                            :ECM => :alias, :ELM => :alias, :FLM => :alias,
                                            :FTCM => :alias, :FTLM => :alias, :KT => :alias,

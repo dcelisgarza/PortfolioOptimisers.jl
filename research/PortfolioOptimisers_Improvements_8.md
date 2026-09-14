@@ -125,10 +125,10 @@ These gaps are closed already. The evidence is in the code.
 | :--- | :--- | :--- |
 | "Add a backtest engine" | 2, 5, 6 | `WalkForward`, `PredictionCV`, `SearchCrossValidation`, `MultiPeriodPredictionResult`, `PopulationPredictionResult` all exist. |
 | "Add a performance tearsheet" | 5, 6 | The **plot** exists. The **numbers** do not. See recommendation 6. |
-| "Add attribution" | 2, 4 | `brinson_attribution` is at `src/21_ExpectedReturns.jl:556`. Factor risk contribution is at `src/20_Optimisation/12_FactorRiskContribution.jl`. |
-| "Add regime-aware moments" | 2, 7 | `src/08_Moments/36_*` and `37_*` hold them. |
-| "Add pre-selection" | 1, 3 | `src/24_Preselection.jl` and the Asset Selector family hold it. |
-| "Add graph constraints" | 3, 6 | `src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl`. |
+| "Add attribution" | 2, 4 | `brinson_attribution` is at `src/18_ExpectedReturns.jl:556`. Factor risk contribution is at `src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl`. |
+| "Add regime-aware moments" | 2, 7 | `src/05_Moments/36_*` and `37_*` hold them. |
+| "Add pre-selection" | 1, 3 | `src/20_AssetSelection.jl` and the Asset Selector family hold it. |
+| "Add graph constraints" | 3, 6 | `src/09_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl`. |
 | "Add ESG constraints" | 5, 6 | A linear constraint on a score is already expressible. `UniverseSets` plus `LinearConstraintGeneration` covers it. An ESG type would be sugar. |
 
 Report 4 is the only one of the seven that checked before it recommended. Its corrections are
@@ -148,7 +148,7 @@ match the implementation. It does not. See section 5.2.
 
 A Prior asserts a distribution over returns. Nothing in `src/` draws from it. The only calls to
 `StatsBase.sample` are inside cross-validation, at
-`src/20_Optimisation/02_CrossValidation/05_MultipleRandomised.jl:347` and
+`src/17_Optimisation/02_CrossValidation/05_MultipleRandomised.jl:347` and
 `:11_RandomisedSearchCrossValidation.jl:29`. Both resample *indices*, not returns. The word `copula`
 appears nowhere in `src/`.
 
@@ -239,7 +239,7 @@ vine copulas, and it is the one place where it is clearly ahead.
 
 The uncertainty-set family has four members: Delta, Normal, Bootstrap and L1. None of them is an
 ambiguity set. Wasserstein machinery exists only inside two risk measures, at
-`src/19_RiskMeasures/07_ConditionalXatRisk.jl` and its constraint file.
+`src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl` and its constraint file.
 
 #### The mathematics
 
@@ -285,13 +285,13 @@ $$
 
 The last identity says that a distributionally robust mean-variance problem is the plain problem
 plus $\delta \lVert w \rVert_2$. The library builds that term today.
-`src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl:347` documents it:
+`src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl:347` documents it:
 
 > `l2::L2Regularisation{<:Any, <:SOCRiskExpr}`: Introduces `t_l2_i`, constrains `[t_l2_i; w] in SecondOrderCone` so that `t_l2_i >= norm(w, 2)`, and penalises `val * t_l2_i`.
 
 So `L2Reg(; val = delta)` beside a `StandardDeviation` measure **is** the distributionally robust
 problem. Note that `SOCRiskExpr` is the **default** algorithm of `L2Regularisation`, at
-`src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl:272`, so a caller who writes
+`src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl:272`, so a caller who writes
 `L2Reg(; val = 0.01)` already gets the robust form and not the squared one. Nothing tells them that.
 Nothing calibrates `val`.
 
@@ -318,13 +318,13 @@ supplies the grid's centre, never its answer.
 
 #### The docstring defect
 
-The DR-CVaR docstring at `src/19_RiskMeasures/07_ConditionalXatRisk.jl:126` states:
+The DR-CVaR docstring at `src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl:126` states:
 
 $$
 \mathrm{DR\text{-}CVaR}_{\alpha,l,r}(x) = \mathrm{CVaR}_\alpha(x) + l \cdot r
 $$
 
-The implementation at `src/20_Optimisation/20_RiskMeasureConstraints/07_ConditionalXatRiskConstraints.jl:195`
+The implementation at `src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/02_ConditionalXatRiskConstraints.jl:195`
 does something else. It builds the Mohajerin Esfahani and Kuhn conic program for the two-piece
 loss $\ell(\xi) = -w'\xi + l[\tau + \alpha^{-1}(-w'\xi-\tau)_+]$, with
 
@@ -369,7 +369,7 @@ attaining measure equals the radius.
 #### The gap
 
 `PopulationPredictionResult` is at
-`src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl:625`, with `sort_by_measure` and
+`src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl:625`, with `sort_by_measure` and
 `quantile_by_measure` beside it. Its members are **cross-validation paths**. A population whose
 members are **models** does not exist.
 
@@ -541,7 +541,7 @@ L(\lambda) = \log Z(\lambda), \qquad
 $$
 
 **One scalar convex problem answers a question about the stability of the whole optimisation.** The
-library already solves the forward version of it in `src/13_Prior/10_EntropyPoolingPrior.jl`.
+library already solves the forward version of it in `src/10_Prior/10_EntropyPoolingPrior.jl`.
 
 #### Making a nat readable
 
@@ -666,7 +666,7 @@ I would refuse these, whatever reports 1 to 7 say.
 **Multi-period deserves its own paragraph, because it is the one genuinely valuable item on this
 list.** cvxportfolio does it well, and Boyd and co-authors (2017) is the right reference. I would
 still keep it out of the core. The reason is structural: `w` is one vector in every constraint file
-in `src/20_Optimisation/09_JuMPConstraints/`. A horizon index would break all thirteen of them, plus
+in `src/17_Optimisation/05_JuMP/02_JuMPConstraints/`. A horizon index would break all thirteen of them, plus
 every risk-measure constraint file. That is not a feature. That is a rewrite. The design note in
 `research/NOTRACK_AlgoTrader.jl_README.md` already puts the loop in the companion package, and
 treats `optimise` as a pure function called inside it. **I agree with that split**, and I think it

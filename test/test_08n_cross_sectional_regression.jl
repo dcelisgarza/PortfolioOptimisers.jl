@@ -1,5 +1,5 @@
 #=
-Check `src/08_Moments/38_CrossSectionalRegression.jl` against the mathematics its docstrings
+Check `src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl` against the mathematics its docstrings
 state, and against the reference implementation the map of issue #643 ports. Issue #679.
 
 THREE FACTS SHAPE THE PROBES.

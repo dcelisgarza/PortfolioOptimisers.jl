@@ -1,12 +1,12 @@
 #=
-Check `src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl`,
-`src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl` and
-`src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl`,
-`src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl`,
-`src/08_Moments/45_ReturnForecasts/11_ForecastFactorCorrelation.jl`,
-`src/08_Moments/45_ReturnForecasts/12_ForecastForwardWindows.jl`,
-`src/08_Moments/45_ReturnForecasts/13_ForecastCalibration.jl` and
-`src/08_Moments/45_ReturnForecasts/14_ForecastSummary.jl` against the contract their
+Check `src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/07_ForecastEvaluation.jl`,
+`src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/08_ForecastHistory.jl` and
+`src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/09_ForecastInformationCoefficient.jl`,
+`src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/10_ForecastPortfolios.jl`,
+`src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/11_ForecastFactorCorrelation.jl`,
+`src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl`,
+`src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl` and
+`src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl` against the contract their
 docstrings state, and against the reference implementation the map of issue #931 ports.
 Issues #934, #935, #936, #937, #938, #939, #940 and #941.
 

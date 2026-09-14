@@ -246,7 +246,7 @@ All optimisers and optimisation components should subtype `AbstractOptimisationE
 
 `AbstractOptimisationEstimator` declares no method of its own. It carries the default [`port_opt_view`](@ref), which returns the estimator unchanged, and it splits into two halves. Subtype [`BaseOptimisationEstimator`](@ref) for a configuration an optimiser holds, and [`OptimisationEstimator`](@ref) for an estimator [`optimise`](@ref) runs.
 
-The root stands here rather than beside the optimisers it heads because a field bound earlier in the load order names it. `VarianceFraction.w0` admits a [`NonFiniteAllocationOptimisationEstimator`](@ref) as its reference portfolio, and it is declared in `src/14_UncertaintySets/`, which loads a hundred includes before `src/20_Optimisation/`. A bound is the enforcement the library prefers over a runtime check, so the chain the bound names is hoisted rather than the check weakened. [`CrossValidationEstimator`](@ref) stands here for the same reason.
+The root stands here rather than beside the optimisers it heads because a field bound earlier in the load order names it. `VarianceFraction.w0` admits a [`NonFiniteAllocationOptimisationEstimator`](@ref) as its reference portfolio, and it is declared in `src/11_UncertaintySets/`, which loads a hundred includes before `src/17_Optimisation/`. A bound is the enforcement the library prefers over a runtime check, so the chain the bound names is hoisted rather than the check weakened. [`CrossValidationEstimator`](@ref) stands here for the same reason.
 
 # Related
 

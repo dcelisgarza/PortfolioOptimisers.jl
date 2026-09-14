@@ -6,8 +6,8 @@ status: accepted
 
 ## Context
 
-[06_SmythBrobyCovariance.jl](../../src/08_Moments/06_SmythBrobyCovariance.jl) and
-[35_GerberIQCovariance.jl](../../src/08_Moments/35_GerberIQCovariance.jl) implemented the
+[06_SmythBrobyCovariance.jl](../../src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl) and
+[35_GerberIQCovariance.jl](../../src/05_Moments/05_Gerber/03_GerberIQCovariance.jl) implemented the
 Gerber / Smyth–Broby family of comovement covariances as roughly a dozen concrete "marker" types —
 `Gerber0/1/2`, `SmythBroby0/1/2`, `SmythBrobyGerber0/1/2`, `SmythBrobyCount0/1/2` — each with its
 own full pairwise-accumulation loop. The types encode two orthogonal axes:
@@ -67,9 +67,9 @@ be replicated a dozen times. (This is the refactor flagged speculatively as "arc
 
 ## Amendment (2026-08-17): the fold now reaches `05_GerberCovariance.jl`
 
-The Context above names only [06_SmythBrobyCovariance.jl](../../src/08_Moments/06_SmythBrobyCovariance.jl)
-and [35_GerberIQCovariance.jl](../../src/08_Moments/35_GerberIQCovariance.jl). The plain Gerber
-estimator in [05_GerberCovariance.jl](../../src/08_Moments/05_GerberCovariance.jl) kept its own three
+The Context above names only [06_SmythBrobyCovariance.jl](../../src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl)
+and [35_GerberIQCovariance.jl](../../src/05_Moments/05_Gerber/03_GerberIQCovariance.jl). The plain Gerber
+estimator in [05_GerberCovariance.jl](../../src/05_Moments/05_Gerber/01_GerberCovariance.jl) kept its own three
 loops, so `Gerber0`, `Gerber1` and `Gerber2` were members of the `GerberComovementZero/One/Two`
 unions that nothing in their own file ever dispatched on. The fold was incomplete, not superseded.
 

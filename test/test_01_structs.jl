@@ -2514,7 +2514,7 @@
     end
 end
 
-# `src/18_Tracking.jl`, swept under issue #547. `factory(tr::WeightsTracking, w)` and
+# `src/15_Tracking.jl`, swept under issue #547. `factory(tr::WeightsTracking, w)` and
 # `needs_previous_weights(tr::VecTr)` were the file's six coverage misses; the rest of the
 # testset is the condition-2 measurement the ticket asked for.
 @testset "Tracking" begin

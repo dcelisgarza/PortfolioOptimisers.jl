@@ -3,7 +3,7 @@
 Research ticket #627 of wayfinder map #304. Written 2026-09-03.
 
 Sources are the constraint body in
-`src/20_Optimisation/20_RiskMeasureConstraints/07_ConditionalXatRiskConstraints.jl`
+`src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/02_ConditionalXatRiskConstraints.jl`
 (`set_dr_conditional_risk_constraints!`, at the tip of `dev`, `e6c7840bc2`), Mohajerin
 Esfahani and Kuhn (2018), Mathematical Programming 171, cited as `drcvar` in
 `docs/src/References.bib`, the JuMP and MathOptInterface documentation on conic duality, and

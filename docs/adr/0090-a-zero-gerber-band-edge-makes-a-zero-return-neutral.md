@@ -9,7 +9,7 @@ status: accepted
 [#491](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/491), a child of
 [#417](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/417), opened on a raise from
 the sweep of [#454](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/454).
-[`GerberCovariance`](../../src/08_Moments/05_GerberCovariance.jl) answered a matrix whose diagonal
+[`GerberCovariance`](../../src/05_Moments/05_Gerber/01_GerberCovariance.jl) answered a matrix whose diagonal
 is not one, so it was not a correlation matrix:
 
 ```julia
@@ -48,7 +48,7 @@ synthetic data and from a caller who centres the data themselves.
 [#498](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/498), opened on a raise from
 the documentation ticket [#456](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/456),
 found the same edge in
-[`GerberIQCovariance`](../../src/08_Moments/35_GerberIQCovariance.jl):
+[`GerberIQCovariance`](../../src/05_Moments/05_Gerber/03_GerberIQCovariance.jl):
 
 ```julia
 X = [1.0 2.0; 0.0 0.0; -1.0 3.0; 2.0 -1.0; 0.0 1.0; -2.0 -2.0]
@@ -90,7 +90,7 @@ different matrices.
 
 [#499](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/499), opened while #498 was
 fixed, found the same edge in
-[`SmythBrobyCovariance`](../../src/08_Moments/06_SmythBrobyCovariance.jl):
+[`SmythBrobyCovariance`](../../src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl):
 
 ```julia
 # The column means are exactly zero, so rows 3 and 4 carry an exactly zero centred return

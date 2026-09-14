@@ -139,7 +139,7 @@ different verbs. They step a value and coerce nothing, so this rule does not rea
 **Derive from the operation when the operation widens.** A mean, a variance, a correlation and a
 regression coefficient all divide, and a division of two integers lands in a float. Take the type
 from the division rather than from the arguments, as `cross_sectional_regression` in
-[`src/08_Moments/38_CrossSectionalRegression.jl`](../../src/08_Moments/38_CrossSectionalRegression.jl)
+[`src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl`](../../src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl)
 does. The result is wider than `float`, not narrower: an integer panel still regresses in
 `Float64`, a `Float32` panel stays in `Float32`, and an exact type stays exact.
 
@@ -254,6 +254,7 @@ already carries the shape and names the symbol the caller passed.
 ## Code Organization
 
 - **File naming**: Source files are prefixed numerically to indicate load order (e.g., `src/01_Base/01_DocstringDictionaries.jl`). A prefix is unique within its directory, and the `include` list of `src/PortfolioOptimisers.jl` is the listing of `src/` sorted by prefix, so the number on a file is the order it loads in. A new file takes the next free number of its directory, or renumbers the files that load after it. `docs/src/api/` is numbered the same way, to read beside `src/`. `test/test_47_alias_and_module_census.jl` gates both claims (ADR 0147).
+- **Directories**: A family of files under one subject is a directory, numbered as one entry of its parent, and its files are numbered inside it: `src/05_Moments/05_Gerber/` holds the three Gerber-family covariances, `src/17_Optimisation/05_JuMP/` everything that builds the JuMP model. A file whose subject already has a directory goes into it. A family of two or more files at the top of a directory that reads as one subject takes a directory of its own (ADR 0150). `docs/src/api/` carries one page per source file at the same path, so a directory in `src/` is a directory of pages.
 - **Module structure**: Each submodule focuses on a specific domain (moments, risk, priors, etc.).
 - **Type hierarchy**: Subtype the appropriate abstract type (`AbstractEstimator`, `AbstractAlgorithm`, `AbstractResult`).
 - **Exports**: Every source file ends with an `export` line listing all public symbols it defines. Do not export internal helpers.

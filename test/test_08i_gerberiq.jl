@@ -1,5 +1,5 @@
 #=
-Check `src/08_Moments/35_GerberIQCovariance.jl` against the mathematics its docstrings
+Check `src/05_Moments/05_Gerber/03_GerberIQCovariance.jl` against the mathematics its docstrings
 state. Issue #457 of child map 3 (#417) under the map of maps (#404).
 
 Coverage was one line short of terminal when this file was written: the `else zro`

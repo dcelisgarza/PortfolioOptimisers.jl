@@ -48,7 +48,7 @@ earlier step.
 
 The optimiser decides which of its fields a target lands in. The Pipeline calls blind. The
 two halves live where their knowledge lives:
-[`20_Optimisation/01_Base_Optimisation.jl`](../../src/20_Optimisation/01_Base_Optimisation.jl)
+[`20_Optimisation/01_Base_Optimisation.jl`](../../src/17_Optimisation/01_Base_Optimisation.jl)
 declares the generics; each optimiser file declares its own behaviour.
 
 `inject_config` and `inject_sigma_ucs` are **deleted**. `inject_context` survives as the

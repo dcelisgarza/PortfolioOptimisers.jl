@@ -11,7 +11,7 @@ ADR 0070 widened twelve slots so that a radius could be computed rather than pas
 `Number` with exactly one rule family and a plain `Function`. A rule of another family is
 refused at construction, and no guard method is written for the mismatch.
 
-Three slots of [`JuMPOptimiser`](../../src/20_Optimisation/10_JuMPOptimiser.jl) were left as
+Three slots of [`JuMPOptimiser`](../../src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl) were left as
 bare numbers by both decisions: `l2c`, `lpc` and `linfc`. They read as if they belonged to
 the widened set, because they are spelled beside `l1` and `linf` and are read against the
 same norms. They do not.

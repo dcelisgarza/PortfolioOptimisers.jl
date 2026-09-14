@@ -7,10 +7,10 @@ status: accepted
 ## Context
 
 Four estimators carry an `rf` field and run a Black-Litterman update:
-[`BlackLittermanPrior`](../../src/13_Prior/06_BlackLittermanPrior.jl),
-[`BayesianBlackLittermanPrior`](../../src/13_Prior/07_BayesianBlackLittermanPrior.jl),
-[`FactorBlackLittermanPrior`](../../src/13_Prior/08_FactorBlackLittermanPrior.jl) and
-[`AugmentedBlackLittermanPrior`](../../src/13_Prior/09_AugmentedBlackLittermanPrior.jl). All
+[`BlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl),
+[`BayesianBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/03_BayesianBlackLittermanPrior.jl),
+[`FactorBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/04_FactorBlackLittermanPrior.jl) and
+[`AugmentedBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/05_AugmentedBlackLittermanPrior.jl). All
 four documented the field with one line: "`rf`: Risk-free rate."
 
 A Black-Litterman update is written in **excess** returns. The view returns in `Q` are excess

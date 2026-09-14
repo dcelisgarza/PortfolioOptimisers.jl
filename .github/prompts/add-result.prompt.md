@@ -13,7 +13,7 @@ This prompt carries the **order of the work**, and no rule of its own. Every rul
 - [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) — type roles, constructors, validation, dispatch, exports.
 - [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) — the Authority for every docstring section named below.
 - [`.github/instructions/julia-return-types.instructions.md`](../instructions/julia-return-types.instructions.md) — when to annotate a return type.
-- `LowOrderPrior` in [`src/13_Prior/01_Base_Prior.jl`](../../src/13_Prior/01_Base_Prior.jl) as a reference result type.
+- `LowOrderPrior` in [`src/10_Prior/01_Base_Prior.jl`](../../src/10_Prior/01_Base_Prior.jl) as a reference result type.
 
 ## Key rules for result types
 

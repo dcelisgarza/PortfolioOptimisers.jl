@@ -144,7 +144,7 @@ using JuMP: JuMP
         @test isapprox(expected_risk(factory(ExpectedReturnRiskRatio(; rf = rf), pr), res.w,
                                      pr, fes[1]), srf)
     end
-    # Issue #545, condition 2: the reference-weight vocabulary of `src/15_Turnover.jl`,
+    # Issue #545, condition 2: the reference-weight vocabulary of `src/12_Turnover.jl`,
     # checked with numbers rather than read.
     @testset "Turnover reference weights, name resolution and views" begin
         w0 = [0.2, 0.3, 0.5]
@@ -219,7 +219,7 @@ using JuMP: JuMP
         @test collect(ve.w) == w0[[1, 3]]
         @test ve.val === tnf.val
     end
-    # Issue #546, condition 2: the fee arithmetic of `src/16_Fees.jl`, checked with
+    # Issue #546, condition 2: the fee arithmetic of `src/13_Fees.jl`, checked with
     # numbers rather than read.
     @testset "Fee terms, the per-asset identity and name resolution" begin
         wf = [0.6, -0.4, 0.0, 0.25]
@@ -568,7 +568,7 @@ using JuMP: JuMP
     end
 end
 
-# The net-returns pair of `src/17_NetReturnsDrawdowns.jl`, swept under issue #547.
+# The net-returns pair of `src/14_NetReturnsDrawdowns.jl`, swept under issue #547.
 @testset "Net returns" begin
     using PortfolioOptimisers, Test
 
@@ -612,7 +612,7 @@ end
         # It must not charge a zero fee through the `Fees` method.
         m = which(calc_net_returns, (typeof(wn), typeof(Xn), Nothing))
         @test m.file ==
-              Symbol(joinpath(dirname(@__DIR__), "src", "17_NetReturnsDrawdowns.jl"))
+              Symbol(joinpath(dirname(@__DIR__), "src", "14_NetReturnsDrawdowns.jl"))
         @test calc_net_returns(wn, Xn, nothing) == Xn * wn
         @test calc_net_asset_returns(wn, Xn, nothing) == Xn .* transpose(wn)
     end
@@ -656,7 +656,7 @@ end
         # A `nothing` fee reaches the `args...` method here too, and charges nothing.
         m = which(calc_net_asset_returns, (typeof(U), typeof(Xn), Nothing))
         @test m.file ==
-              Symbol(joinpath(dirname(@__DIR__), "src", "17_NetReturnsDrawdowns.jl"))
+              Symbol(joinpath(dirname(@__DIR__), "src", "14_NetReturnsDrawdowns.jl"))
 
         # A path that is not the shape of the window is a caller error the broadcast names.
         @test_throws DimensionMismatch calc_net_asset_returns(view(U, 1:2, :), Xn, fn)
@@ -692,7 +692,7 @@ end
         # A `nothing` fee reaches the `args...` method and charges nothing.
         m = which(calc_net_returns, (typeof(U), typeof(Xn), Nothing))
         @test m.file ==
-              Symbol(joinpath(dirname(@__DIR__), "src", "17_NetReturnsDrawdowns.jl"))
+              Symbol(joinpath(dirname(@__DIR__), "src", "14_NetReturnsDrawdowns.jl"))
         @test calc_net_returns(Uc, Xn, nothing) ≈ Xn * wn
 
         # A row count that is not the window's is a caller error the broadcast names, on

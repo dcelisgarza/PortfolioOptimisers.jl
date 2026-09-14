@@ -10,9 +10,9 @@ Every uncertainty-set estimator implements a triple: `ucs` (returns the μ and �
 pair), `mu_ucs` (μ only), and `sigma_ucs` (Σ only). Each `ucs` body was literally its
 `mu_ucs` body concatenated with its `sigma_ucs` body — the Wishart/bootstrap quantile loops
 and the ellipsoid-fitting tail were re-encoded across
-[02_Delta](../../src/14_UncertaintySets/02_DeltaUncertaintySets.jl),
-[03_Normal](../../src/14_UncertaintySets/03_NormalUncertaintySets.jl), and
-[04_Bootstrap](../../src/14_UncertaintySets/04_BootstrapUncertaintySets.jl). The copies had
+[02_Delta](../../src/11_UncertaintySets/02_DeltaUncertaintySets.jl),
+[03_Normal](../../src/11_UncertaintySets/03_NormalUncertaintySets.jl), and
+[04_Bootstrap](../../src/11_UncertaintySets/04_BootstrapUncertaintySets.jl). The copies had
 drifted twice in eleven days (a shipped posdef bug on the Normal-box μ half, then a cosmetic
 `eltype(sigma)`/`N` vs `eltype(sigma_mu)`/`size(pr.X,2)` divergence on the same μ lower bound).
 The 2026-07-18 maintainability review flagged this and proposed extracting per-estimator
@@ -39,7 +39,7 @@ Keep `prior`, seeding, and sampling inside each public `ucs` / `mu_ucs` / `sigma
 **pure post-sampling construction** into shared helpers:
 
 - `ellipsoidal_set(diagonal, method, q, samples, cov, class)` in
-  [01_Base](../../src/14_UncertaintySets/01_Base_UncertaintySets.jl) — the diagonalise + fit-`k`
+  [01_Base](../../src/11_UncertaintySets/01_Base_UncertaintySets.jl) — the diagonalise + fit-`k`
   - tag tail, shared by every ellipsoidal variant across Normal and ARCH (~13 sites). Works
   uniformly because `k_ucs` already absorbs unused trailing arguments, so `samples` is whatever
   the variant already passed (`X_mu`/`X_sigma`, a `1:n_sim` range, or `nothing`).

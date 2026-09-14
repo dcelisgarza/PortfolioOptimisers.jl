@@ -10,13 +10,13 @@ Report 9 asked for three ambiguity families — Wasserstein (the data moves), Ge
 are wrong), and divergence (the probabilities are wrong) — and shipped a prototype for each. Issue
 [#311](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/311) asked whether they become a
 type family, and where they live beside
-[`src/14_UncertaintySets/`](../../src/14_UncertaintySets/), whose five files hold Base, Delta,
+[`src/14_UncertaintySets/`](../../src/11_UncertaintySets/), whose five files hold Base, Delta,
 Normal, Bootstrap and L1.
 
 **All three collapse onto machinery that already exists.**
 
 `L2Regularisation(; val, alg = SOCRiskExpr())` penalises `val * norm(w, 2)`
-([`12_RegularisationConstraints.jl`](../../src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl)),
+([`12_RegularisationConstraints.jl`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl)),
 and `SOCRiskExpr` is the default. Blanchet, Chen and Zhou (2022) give
 `sup{W2 <= delta} sd(w'xi) = sqrt(w'Sigma w) + delta * norm(w, 2)`, so that estimator is the
 Wasserstein robust counterpart today.
@@ -28,7 +28,7 @@ result". The mean half is an l2 ball on `mu`, which `EllipsoidalUncertaintySet` 
 shape already expresses.
 
 The divergence family ships **twice over**.
-[`EntropicValueatRisk`](../../src/19_RiskMeasures/08_EntropicXatRisk.jl) is the Kullback-Leibler ball
+[`EntropicValueatRisk`](../../src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl) is the Kullback-Leibler ball
 at radius `-log(alpha)`: its functor is the scalar minimisation `ERM(x, slv, alpha, w)` and its
 constraint form is the exponential cone. `RelativisticValueatRisk` is the Renyi counterpart.
 
@@ -39,7 +39,7 @@ the sample it was chosen for, and Cross-Validation refits per fold while a meta-
 subproblem. So the radius is stated for the whole universe while every other input is re-derived.
 
 The mechanism for fixing that also already existed, confined to one family.
-[`01_Base_UncertaintySets.jl`](../../src/14_UncertaintySets/01_Base_UncertaintySets.jl) carries
+[`01_Base_UncertaintySets.jl`](../../src/11_UncertaintySets/01_Base_UncertaintySets.jl) carries
 `AbstractUncertaintyKAlgorithm`, the alias `Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm,
 <:Number}`, a member that computes a radius from a chi-squared quantile and the data, and the
 pass-through `k_ucs(type::Number, args...) = type`. `AbstractUncertaintyEpsAlgorithm` and
@@ -209,7 +209,7 @@ mechanism, and three statements above are now out of date. ADR 0095 records the 
 **The re-parenting has not shipped.** `AbstractUncertaintyKAlgorithm` and
 `AbstractUncertaintyEpsAlgorithm` still subtype `AbstractAlgorithm` directly.
 `AbstractCalibrationAlgorithm` lives in
-[`src/19_RiskMeasures/01_Base_RiskMeasures.jl`](../../src/19_RiskMeasures/01_Base_RiskMeasures.jl),
+[`src/19_RiskMeasures/01_Base_RiskMeasures.jl`](../../src/16_RiskMeasures/01_Base_RiskMeasures.jl),
 beside `resolve_slot` and the mechanism that reads it, and re-parenting the two families needs the
 root in [`src/01_Base/02_TypeRoots.jl`](../../src/01_Base/02_TypeRoots.jl) first. So "the abstract hierarchy breaks" describes
 a break that has not happened, and `Num_UcSK` and `Num_UcSEps` are unrelated to the calibration
@@ -258,7 +258,7 @@ that resolve an `l` slot resolve the level first and state it in the context.
 ## Amendment (2026-09-01) — the calibration family has its own file
 
 **`AbstractCalibrationAlgorithm` moved.** It lives in
-[`src/14_UncertaintySets/06_CalibrationRules.jl`](../../src/14_UncertaintySets/06_CalibrationRules.jl),
+[`src/14_UncertaintySets/06_CalibrationRules.jl`](../../src/11_UncertaintySets/06_CalibrationRules.jl),
 with the whole Calibration Rule and Role family beside it. The amendment of 2026-08-28 states
 that the root lives in `src/19_RiskMeasures/01_Base_RiskMeasures.jl` beside `resolve_slot`, and
 that statement is now out of date. The move is structural: no type, no bound and no verb

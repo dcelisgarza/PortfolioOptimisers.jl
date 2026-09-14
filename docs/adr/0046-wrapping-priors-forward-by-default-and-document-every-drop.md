@@ -6,11 +6,11 @@ status: accepted
 
 ## Context
 
-Most prior estimators wrap another one. [`BlackLittermanPrior`](../../src/13_Prior/06_BlackLittermanPrior.jl)
+Most prior estimators wrap another one. [`BlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl)
 takes a `pe`, fits it, and returns a carrier built from the result; so do
-[`BayesianBlackLittermanPrior`](../../src/13_Prior/07_BayesianBlackLittermanPrior.jl),
-[`EntropyPoolingPrior`](../../src/13_Prior/12_EntropyPoolingPrior.jl),
-[`OpinionPoolingPrior`](../../src/13_Prior/13_OpinionPoolingPrior.jl) and
+[`BayesianBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/03_BayesianBlackLittermanPrior.jl),
+[`EntropyPoolingPrior`](../../src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior.jl),
+[`OpinionPoolingPrior`](../../src/10_Prior/07_OpinionPoolingPrior.jl) and
 [`FeaturePrior`](../../src/13_Prior/15_FeaturePrior.jl). Each one decides, field by field, which of
 the wrapped carrier's thirteen fields to carry across — and each one decided independently, by
 writing out a `LowOrderPrior(; …)` call with whichever keywords its author thought applied.
@@ -25,7 +25,7 @@ way through a wrapper, with a plausible number coming out the other end:
 - `BlackLittermanPrior(; pe = EntropyPoolingPrior(…))` dropped `w`, so the pooling posterior weights
   never reached the 28 `@pprop w` sites and the optimisation ran unweighted.
 - The same drop took `ens` with it.
-  [`choose_scaling_parameter`](../../src/14_UncertaintySets/03_NormalUncertaintySets.jl) falls back to
+  [`choose_scaling_parameter`](../../src/11_UncertaintySets/03_NormalUncertaintySets.jl) falls back to
   `size(pr.X, 1)` when `ens` is `nothing`, so every uncertainty set was sized off a sample count
   measured at `ens = 225.9` against `T = 250` — about 10% too large.
 - `FactorPrior(; pe = EntropyPoolingPrior(…))` forwarded `w` but not `ens` or `kld`, so the same
@@ -47,7 +47,7 @@ is **not** an acceptable way to buy that consistency: where a drop is genuinely 
 documented rather than silent.
 
 The rule gets teeth in code as well as in prose, because prose alone is what the library already had.
-[`forward_prior`](../../src/13_Prior/01_Base_Prior.jl) forwards the whole wrapped carrier and takes
+[`forward_prior`](../../src/10_Prior/01_Base_Prior.jl) forwards the whole wrapped carrier and takes
 the deviations as keywords:
 
 ```julia
@@ -70,9 +70,9 @@ must pass either a rebuilt value or `nothing`.
 
 **`chol` is bound to `sigma`.** This is not a caching nicety. `chol` *takes precedence over* `sigma`
 at every consumer:
-[`02_VarianceConstraints.jl`](../../src/20_Optimisation/20_RiskMeasureConstraints/02_VarianceConstraints.jl)
+[`02_VarianceConstraints.jl`](../../src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl)
 reads `G = isnothing(pr.chol) ? LinearAlgebra.cholesky(pr.sigma).U : pr.chol`, and `@pprop chol`
-selects it into [`Variance`](../../src/19_RiskMeasures/02_Variance.jl), `StandardDeviation` and
+selects it into [`Variance`](../../src/16_RiskMeasures/02_Variance.jl), `StandardDeviation` and
 `DistributionValueatRisk`. A forwarded stale `chol` therefore makes the optimisation use the *prior*
 covariance and silently ignore the posterior — the worst available failure mode, since the objective
 is quietly built from the wrong matrix. Note that `chol` is not merely a cache: a prior may compute
@@ -98,7 +98,7 @@ supplied together or not at all, and `w`, `chol` and `Z` are re-checked against 
 
 The rule's third clause is not decoration. A drop that is correct is still a surprise to a caller who
 computed the dropped value, so each wrapping estimator's docstring lists the fields it drops and why,
-and [`LowOrderPrior`](../../src/13_Prior/01_Base_Prior.jl) carries the rule itself so there is one
+and [`LowOrderPrior`](../../src/10_Prior/01_Base_Prior.jl) carries the rule itself so there is one
 place to read it. Two drops need a docstring *warning* rather than a list entry, because they hand
 back a carrier that is internally inconsistent by design:
 
@@ -134,7 +134,7 @@ The split that makes this work is between the field **list** and the constructor
 `ConstructionBase.setproperties` was the first choice and is **rejected**, which is worth recording
 because it looks like the obvious fit. It refuses any type whose `propertynames` differs from its
 `fieldnames`, since it cannot tell which properties are settable — and
-[`HighOrderPrior`](../../src/13_Prior/01_Base_Prior.jl) forwards the whole of its `pr`, so `mu` and
+[`HighOrderPrior`](../../src/10_Prior/01_Base_Prior.jl) forwards the whole of its `pr`, so `mu` and
 `sigma` are properties of it without being fields. It therefore errors out on the *carrier* rather
 than on any mistake the caller made, and the carrier redesign that gives `LowOrderPrior` a
 `@forward_properties` block of its own would extend that to both carriers. Working around it means
@@ -153,12 +153,12 @@ through `pr`.
 Three estimators are not forwarding a single wrapped result along its own axis, and are not forced
 through the helper:
 
-- [`FactorPrior`](../../src/13_Prior/03_FactorPrior.jl) and
-  [`FactorBlackLittermanPrior`](../../src/13_Prior/08_FactorBlackLittermanPrior.jl) **lift** a
+- [`FactorPrior`](../../src/10_Prior/03_FactorPrior.jl) and
+  [`FactorBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/04_FactorBlackLittermanPrior.jl) **lift** a
   factor-axis prior into an asset-axis result, reconstructing `X` as `F * transpose(M) .+
   transpose(b)`. Almost every field changes meaning across that hop, so there is nothing to forward
   by default.
-- [`AugmentedBlackLittermanPrior`](../../src/13_Prior/09_AugmentedBlackLittermanPrior.jl) **merges
+- [`AugmentedBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/05_AugmentedBlackLittermanPrior.jl) **merges
   two** priors and has to choose a source for each field.
 
 The rule still governs them — it is a rule about correctness, not about a function call — and
@@ -264,9 +264,9 @@ now landed. This records what changed and what it fixed.
 Two sites became a `forward_prior` call, because they wrap one prior along its own axis and change
 only the asset moments:
 
-- [`BlackLittermanPrior`](../../src/13_Prior/06_BlackLittermanPrior.jl) — was forwarding `X`, `mu`,
+- [`BlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl) — was forwarding `X`, `mu`,
   `sigma` and `Z`, and dropping the other seven fields. Now `chol` is its only drop.
-- [`BayesianBlackLittermanPrior`](../../src/13_Prior/07_BayesianBlackLittermanPrior.jl) — same, and
+- [`BayesianBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/03_BayesianBlackLittermanPrior.jl) — same, and
   it was already forwarding `rr` and the factor block.
 
 [`FeaturePrior`](../../src/13_Prior/15_FeaturePrior.jl) also collapses to one, with `Z` as the single
@@ -276,10 +276,10 @@ can no longer drift from the carrier's field list.
 Three sites keep a direct constructor call, as the Decision section says they should, and gained the
 diagnostics that were missing from the `w` they already forwarded:
 
-- [`FactorPrior`](../../src/13_Prior/03_FactorPrior.jl) and
-  [`FactorBlackLittermanPrior`](../../src/13_Prior/08_FactorBlackLittermanPrior.jl) — `w =
+- [`FactorPrior`](../../src/10_Prior/03_FactorPrior.jl) and
+  [`FactorBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/04_FactorBlackLittermanPrior.jl) — `w =
   f_prior.w` was correct and stays; `ens`/`kld`/`ow` now travel with it.
-- [`AugmentedBlackLittermanPrior`](../../src/13_Prior/09_AugmentedBlackLittermanPrior.jl) — the asset
+- [`AugmentedBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/05_AugmentedBlackLittermanPrior.jl) — the asset
   slot takes `a_prior`'s `w` and diagnostics, the factor block is `f_prior` whole, so the two
   weightings stay distinguishable. `chol` is dropped.
 
@@ -368,13 +368,13 @@ reported in their place. That is the same defect class this ADR exists to close 
 and silently not carried — arriving from the opposite direction, so the rule applies and both now
 report the posterior block.
 
-- [`BayesianBlackLittermanPrior`](../../src/13_Prior/07_BayesianBlackLittermanPrior.jl) builds
+- [`BayesianBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/03_BayesianBlackLittermanPrior.jl) builds
   `mu_hat` and `sigma_hat` — the posterior factor mean and *precision* — uses them to reach the
   assets, and previously forwarded the wrapped prior's factor block untouched. It now forwards
   `mu_hat` and `inv(sigma_hat)`. The estimator gains an **`f_mp` field**, defaulting to
   `MatrixProcessing()`, mirroring `FactorBlackLittermanPrior`: the factor posterior covariance is a
   new matrix and wants its own processing, and `pe.mp` runs on the asset block.
-- [`AugmentedBlackLittermanPrior`](../../src/13_Prior/09_AugmentedBlackLittermanPrior.jl) solves one
+- [`AugmentedBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/05_AugmentedBlackLittermanPrior.jl) solves one
   augmented system over `[assets; factors]` and truncated it to the asset half, discarding a factor
   half that *is* the posterior factor distribution. It now reports that half. No second processing
   pass: `aug_posterior_sigma` is processed as a whole, and a principal submatrix of the result is
@@ -616,7 +616,7 @@ three chances to drift, and one had already drifted.
 
 ### The lift is now two functions
 
-The lift splits where [`FactorBlackLittermanPrior`](../../src/13_Prior/08_FactorBlackLittermanPrior.jl)
+The lift splits where [`FactorBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/04_FactorBlackLittermanPrior.jl)
 needs it to split. Its views land on the *factor* distribution, so it must reconstruct `X` before it
 has the moments to project.
 
@@ -624,17 +624,17 @@ has the moments to project.
   transpose(b))`. All three sites call it.
 - `factor_lift(mp, ve, rsd, rr, f_mu, f_sigma, X, posterior_X; kwargs...)` projects the moments,
   processes the covariance, adds the residual block when `rsd` is `true`, and returns
-  `(; mu, sigma, chol)`. [`FactorPrior`](../../src/13_Prior/03_FactorPrior.jl) and
+  `(; mu, sigma, chol)`. [`FactorPrior`](../../src/10_Prior/03_FactorPrior.jl) and
   `FactorBlackLittermanPrior` call it. Which factor moments arrive is the only thing that differs
   between them: the wrapped prior's, or the Black-Litterman posterior's.
 
-[`AugmentedBlackLittermanPrior`](../../src/13_Prior/09_AugmentedBlackLittermanPrior.jl) calls the
+[`AugmentedBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/05_AugmentedBlackLittermanPrior.jl) calls the
 first and not the second. Its asset moments come out of the augmented system, not out of a
 projection, which is the same reason it merges rather than forwards.
 
 ### `factor_residual_config` replaces a reach past a type bound
 
-[`HighOrderFactorPriorEstimator`](../../src/13_Prior/14_HighOrderFactorPriorEstimator.jl) needs the
+[`HighOrderFactorPriorEstimator`](../../src/10_Prior/08_HighOrderFactorPriorEstimator.jl) needs the
 *systematic* covariance for its residual cokurtosis correction, so a residual block the wrapped
 estimator added has to come back off. It used to read `pe.pe.ve` and `pe.pe.mp.pdm` directly. Its
 `pe` slot is bounded `AbstractLowOrderPriorEstimator_F_AF`, and only `FactorPrior` and

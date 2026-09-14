@@ -1,5 +1,5 @@
 #=
-Check `src/08_Moments/42_FactorExposures/06_EWBetaDescriptors.jl`, the residual half of
+Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors.jl`, the residual half of
 `05_EWVolatilityDescriptors.jl`, and the market-return builder and beta recursion they share
 in `01_Base_Descriptor.jl`, against the contract their docstrings state and against the
 reference implementation. Issue #719, map #643.

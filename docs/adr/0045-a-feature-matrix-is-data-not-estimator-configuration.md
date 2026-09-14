@@ -7,8 +7,8 @@ status: accepted
 ## Context
 
 Every distance the clustering and network stack consumes is derived from the returns themselves.
-[`Distance`](../../src/09_Distance/02_Distance.jl) turns a correlation into a distance;
-[`DistanceDistance`](../../src/09_Distance/03_DistanceDistance.jl) turns that distance into a
+[`Distance`](../../src/06_Distance/02_Distance.jl) turns a correlation into a distance;
+[`DistanceDistance`](../../src/06_Distance/03_DistanceDistance.jl) turns that distance into a
 distance of distances. A hierarchy built this way can only ever express relationships that the
 return series already encode.
 
@@ -23,7 +23,7 @@ everything after it: *where does the matrix live?*
 
 The obvious answer — a field on the distance estimator, the same way `Distance` holds its `alg` — is
 wrong here, and wrong **silently**. The clustering stack subsets assets constantly:
-[`NestedClustered`](../../src/20_Optimisation/17_NestedClustered.jl) optimises each cluster as its
+[`NestedClustered`](../../src/17_Optimisation/06_Meta/02_NestedClustered.jl) optimises each cluster as its
 own subproblem, `SubsetResampling` draws asset subsets, and every cross-validation fold slices both
 observations and assets. All of that subsetting happens through `port_opt_view`, which walks the
 **data** — `ReturnsResult`, prior results — and slices the asset axis, while treating estimators as
@@ -66,7 +66,7 @@ The symbol is `Z`. `F` and `nf` are taken by factor returns; `Z` follows the exi
 single-capital rhythm and is the asset-pricing literature's own symbol for a matrix of asset
 characteristics. Feature names are `nz`, matching `nx`/`nf`/`nb`.
 
-The estimator is [`FeatureDistance`](../../src/09_Distance/05_FeatureDistance.jl) `<:
+The estimator is [`FeatureDistance`](../../src/06_Distance/05_FeatureDistance.jl) `<:
 AbstractDistanceEstimator`. Not `AdjacencyDistance`: every sibling algorithm is named for what it
 computes *from*, and "adjacency" implies a square `0`/`1` graph while the type accepts rectangular,
 unbounded, signed reals.

@@ -320,7 +320,7 @@ pr_all58 = price_ingestion(PriceIngestion(; span = all_listed58), Pta58)
 
     @testset "the walk-forward runs, on the layer's carrier and on a bare one" begin
         # The universe no longer moves between the train and the test window, so the fit/apply
-        # contract at `src/25_Pipeline/03_Pipeline.jl:794` has nothing to catch.
+        # contract at `src/21_Pipeline/03_Pipeline.jl:794` has nothing to catch.
         for pr in (pr58, PricesResult(; X = Pta58))
             @test length(cross_val_predict(pipe_price58, pr, iwf58).pred) == 3
         end

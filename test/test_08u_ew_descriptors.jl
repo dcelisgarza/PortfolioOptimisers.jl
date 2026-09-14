@@ -1,5 +1,5 @@
 #=
-Check `src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl` and
+Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl` and
 `05_EWVolatilityDescriptors.jl` against the contract their docstrings state, and against the
 reference implementation. Issue #718, map #643.
 

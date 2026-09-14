@@ -18,7 +18,7 @@ end
     and `panel_write!(Z, kind, vals, cols)`. Neither `AbstractPanelFieldKind` nor
     `panel_write!` existed at the head: both left with #803's rework of the panel (ADR 0102),
     which replaced them by `panel_input_is_static`, `panel_resolve` and `panel_input_field`.
-    A `panel_input_kind` did exist, in `12_ConstraintGeneration/06_AssetSetsMatrix.jl`, with
+    A `panel_input_kind` did exist, in `09_ConstraintGeneration/06_AssetSetsMatrix.jl`, with
     a different signature and a different job, which is how the stale name survived a name
     search. A reader implementing a new input type from the docstring would have written two
     methods nothing calls and missed one the builder needs.

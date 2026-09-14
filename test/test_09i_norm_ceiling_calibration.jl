@@ -485,8 +485,9 @@ and ADR 0095 grants none.
     bound = [relpath(f, root) for f in srcfiles
              for l in eachline(f) if occursin("::Num_AmbRadNormCeilCal", l)]
     @test length(bound) == 3
-    @test unique(bound) == [joinpath("src", "20_Optimisation", "09_JuMPConstraints",
-                                     "12_RegularisationConstraints.jl")]
+    @test unique(bound) ==
+          [joinpath("src", "17_Optimisation", "05_JuMP", "02_JuMPConstraints",
+                    "12_RegularisationConstraints.jl")]
 
     # -- Both entry points, and no third path. Each builder is called from one site, and
     # each site wraps the term in its own route's verb, so no term reaches a builder

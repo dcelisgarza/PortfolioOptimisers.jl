@@ -37,7 +37,7 @@ obligation — a resolved answer, including a "no", from *every* consumer that r
 ### 1. Truncation and decay are two knobs, and only one of them cuts
 
 `AbstractSeparationDecayAlgorithm` in
-[`src/11_Phylogeny/01_Base_Phylogeny.jl`](../../src/11_Phylogeny/01_Base_Phylogeny.jl) turns a
+[`src/11_Phylogeny/01_Base_Phylogeny.jl`](../../src/08_Phylogeny/01_Base_Phylogeny.jl) turns a
 separation into a score, applied by `separation_decay(dk, d, dmax)`. Members: `LinearDecay` (the
 default, `dmax + 1 - d`), `ExponentialDecay(; rate)`, `ReciprocalDecay(; power)`, `NoDecay`.
 
@@ -124,7 +124,7 @@ similarities. Re-weighting either with the other quantity would weight a structu
 that did not select it. The result carries **no polarity tag and no result type** — the polarity is
 recoverable by dispatch on `nte.alg`.
 
-The construction in [`src/11_Phylogeny/06_Phylogeny.jl`](../../src/11_Phylogeny/06_Phylogeny.jl) is a
+The construction in [`src/11_Phylogeny/06_Phylogeny.jl`](../../src/08_Phylogeny/05_Phylogeny.jl) is a
 strict chain:
 
 | name                            | what it is                                          |

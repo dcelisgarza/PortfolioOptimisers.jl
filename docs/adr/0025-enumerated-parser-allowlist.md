@@ -8,7 +8,7 @@ status: accepted
 
 Constraint equations, Black-Litterman view strings, entropy-pooling view strings and asset-set
 names are untrusted input: a config file, spreadsheet, or UI feeds them into a caller, and they all
-funnel through the exported [`parse_equation`](../../src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl).
+funnel through the exported [`parse_equation`](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration.jl).
 That parser calls `Meta.parse` on the caller string and then evaluates the numeric parts of the
 resulting expression in `eval_numeric_functions` — so `eval_numeric_functions` *is* the library's
 trust boundary for string input.
@@ -77,7 +77,7 @@ the single source of truth for what may be called, and handle `:prior` structura
   raw errors — out of scope for this change.
 - The same log-hygiene fix (finding 4) reworded the "variable not found" / "row dropped" warnings in
   both `get_linear_constraints` and the drifted copy in
-  [Black-Litterman views generation](../../src/13_Prior/05_BlackLittermanViewsGeneration.jl) to name a
+  [Black-Litterman views generation](../../src/10_Prior/05_BlackLitterman/01_BlackLittermanViewsGeneration.jl) to name a
   variable/equation and an asset count rather than dumping the whole universe or `ParsingResult`
   struct into logs.
 - **Internal only** — no public signature changes; `parse_equation`'s contract is unchanged except
@@ -89,7 +89,7 @@ the single source of truth for what may be called, and handle `:prior` structura
 
 The original enumeration named four boundaries that all funnel through `parse_equation`. A later
 review found a fifth, independent string→AST boundary the enumeration omitted:
-[`parse_lens`/`expr_to_lens_chain`](../../src/20_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl),
+[`parse_lens`/`expr_to_lens_chain`](../../src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl),
 which turns grid-/randomised-search hyperparameter key strings (e.g. `"opt.pe.ce"`) into
 `Accessors.jl` lenses via `Meta.parse`. It does **not** share the `parse_equation` path — it is a
 separate parser with a separate sink (`getproperty`/`set` on the estimator tree).

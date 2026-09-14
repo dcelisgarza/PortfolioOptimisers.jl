@@ -480,7 +480,7 @@ first testset in this file already uses -- answers for it directly. It also answ
 right question rather than a widened one, and what the one file holds is why:
 
   - `ext/PortfolioOptimisersPlotsExt.jl` defines 171 methods of 34 functions, and every one
-    of the 34 is declared as a bare `function ... end` stub in `src/26_Plotting.jl`, which
+    of the 34 is declared as a bare `function ... end` stub in `src/22_Plotting.jl`, which
     carries its docstring. Beyond those methods it declares four module-local `const`s
     holding error-message text, and nothing else.
 
@@ -498,16 +498,16 @@ not two.
     declared in `src/` is documented by that declaration. The tree holds no `@recipe` block
     today, and the rule settles one if it ever appears: `@recipe` declares no binding a
     caller can reach, so it never enters `names`, and the reachable name is the `plot_*`
-    function it serves, which `src/26_Plotting.jl` declares.
+    function it serves, which `src/22_Plotting.jl` declares.
  2. `ext/` NAMES DO NOT ENTER THE CAPABILITY CATALOGUE on their own account. The 34 `plot_*`
-    functions are exported by `src/26_Plotting.jl` and are catalogued there already, which
+    functions are exported by `src/22_Plotting.jl` and are catalogued there already, which
     is why `every exported function is accounted for` is green today. ADR 0040 owns the
     catalogue and needs no amendment. An extension that declared a user-facing name of its
     own would be the smell, not the case to cater for: the declaration belongs in `src/` as
     a stub, which is the pattern the extension already follows.
  3. AN `ext/` DOCSTRING MAY CITE, by the same rule as a `src/` one, and the API page that
     renders that docstring carries the bibliography block. Under rule 1 the page is always
-    the page of the `src/` declaration -- `docs/src/api/26_Plotting.md` for the plotting
+    the page of the `src/` declaration -- `docs/src/api/22_Plotting.md` for the plotting
     family -- so an extension needs neither a page nor a block of its own. This matters:
     `an API page carries a bibliography block iff it cites` resolves each `@docs` entry
     against `PortfolioOptimisers`, so a name declared inside an extension resolves to
@@ -649,10 +649,10 @@ ticket can raise it to a presence rule without moving the manifest key.
 A docstring does not always sit on the method that registers the row. Two shapes exist in
 the tree and the attribution must read both.
 
-  - `src/20_Optimisation/09_JuMPConstraints/04_WeightConstraints.jl` documents
+  - `src/17_Optimisation/05_JuMP/02_JuMPConstraints/04_WeightConstraints.jl` documents
     `set_weight_constraints!(args...)`, a dispatch-error stub that registers nothing. The
     methods that register `w_lb` and `w_ub` follow it and carry no docstring of their own.
-  - `src/20_Optimisation/20_RiskMeasureConstraints/06_XatRiskConstraints.jl` documents five
+  - `src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/01_XatRiskConstraints.jl` documents five
     separate methods of `set_risk_constraints!`, each immediately above the method it
     describes, and each of the five registers its own rows.
 
@@ -749,7 +749,7 @@ in the sense of `STANDARDS.md`.
     a caller reads the entry back by that name. THAT IS NOT A PROPERTY OF A ROW.
     `model[:sc]`, `model[:w]`, `model[:ret]` and `model[:risk]` are each a variable or an
     expression, `src/` reads a model key back by name in 51 places over 16 distinct keys, and
-    `08_Base_JuMPOptimisation.jl` wraps nine of those keys in an accessor that raises a named
+    `01_Base_JuMPOptimisation.jl` wraps nine of those keys in an accessor that raises a named
     `ArgumentError` when its builder has not run. A row name is public, and so is every one
     of those.
 
@@ -763,7 +763,7 @@ in the sense of `STANDARDS.md`.
     trigger that same decision wrote.
 
     `@objective` is IN. A formulation is variables, constraints and an objective, and the
-    third was missing. `owa_l_moment_crm_sumsq_obj` in `src/19_RiskMeasures/` is two methods
+    third was missing. `owa_l_moment_crm_sumsq_obj` in `src/16_RiskMeasures/` is two methods
     that differ in `Min so * t` against `Min so * t^2` AND IN NOTHING ELSE, so the objective
     line is the only text that can tell them apart.
 
@@ -1011,7 +1011,7 @@ in the sense of `STANDARDS.md`.
         only the unions would have missed 66 of the 249.
 
     The kind is read from the parse, not from a name. An acronym and a factory are scoped to
-    `src/27_Aliases.jl`, which is where both live and is itself part of the rule. Without
+    `src/23_Aliases.jl`, which is where both live and is itself part of the rule. Without
     that scope `const PROP_TAG_MACRO_NAMES = ...` in `src/02_Tools.jl` reads as an acronym
     alias, and it is a computed constant.
 
@@ -1032,7 +1032,7 @@ in the sense of `STANDARDS.md`.
         # alias. `Expr(:curly, ...)` is a type expression and `Expr(:call, ...)` is a value,
         # which is what keeps `const allowed_functions = Dict{Symbol, Function}(...)` out.
         function alias_kind(d, path)
-            in_aliases = endswith(path, "27_Aliases.jl")
+            in_aliases = endswith(path, "23_Aliases.jl")
             if Meta.isexpr(d, :function) ||
                (Meta.isexpr(d, :(=)) && Meta.isexpr(d.args[1], :call))
                 return in_aliases ? :factory : nothing
@@ -1191,7 +1191,7 @@ in the sense of `STANDARDS.md`.
     A glyph is not owned by a key. `\boldsymbol{w}` is `math_dict[:w_port]`, the portfolio
     weights vector, inside a risk measure; it is the observation weights in
     `src/02_Tools.jl` and the OWA weight vector in
-    `src/19_RiskMeasures/10_OWARiskMeasures.jl`. Matching on the symbol alone reported 149
+    `src/16_RiskMeasures/07_OWARiskMeasures.jl`. Matching on the symbol alone reported 149
     sites, and the great majority of them define a different quantity that the key would
     state wrongly -- `src/02_Tools.jl` among them, the one such site inside a swept file.
     Matching the whole bullet against the whole value reports only a COPY of the dictionary

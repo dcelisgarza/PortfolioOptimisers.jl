@@ -115,7 +115,7 @@ artifact from any green run of `Test.yml` and point `COVERAGE_LCOV` at it. ADR 0
 for a child map's own files, and names the definitions that still hold an uncovered line.
 
 ```bash
-COVERAGE_LCOV=path/to/lcov.info julia --project=code_health code_health/coverage.jl terminal src/08_Moments/
+COVERAGE_LCOV=path/to/lcov.info julia --project=code_health code_health/coverage.jl terminal src/05_Moments/
 ```
 
 !!! warning "There is no fast inner loop for JET"
@@ -301,8 +301,8 @@ It is the queue telling you, and everyone else, that a file is genuinely hard.
 
 ## A worked example
 
-The two halves come from two files. The JET half is `src/08_Moments/01_Base_Moments.jl`, and it has
-already been through the loop. The complexity half is `src/20_Optimisation/10_JuMPOptimiser.jl`,
+The two halves come from two files. The JET half is `src/05_Moments/01_Base_Moments.jl`, and it has
+already been through the loop. The complexity half is `src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl`,
 which is still a candidate.
 
 ### The JET half
@@ -340,7 +340,7 @@ Two details of this case are worth carrying to the next one.
 ### The complexity half
 
 The clearest complexity case is in another file. `JuMPOptimiser`, in
-`src/20_Optimisation/10_JuMPOptimiser.jl`, breaches all three metrics at once.
+`src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl`, breaches all three metrics at once.
 
 | metric | value | threshold | ratio |
 | --- | --- | --- | --- |

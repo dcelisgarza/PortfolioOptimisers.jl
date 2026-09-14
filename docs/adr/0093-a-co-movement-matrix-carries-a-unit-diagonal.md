@@ -59,7 +59,7 @@ zero diagonal entry divides to zero rather than to `NaN`, and the zero survives.
 ## Decision
 
 **A co-movement matrix carries a unit diagonal, in every sample.** A new function,
-[`comovement_unit_diagonal!`](../../src/08_Moments/06_SmythBrobyCovariance.jl), writes it:
+[`comovement_unit_diagonal!`](../../src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl), writes it:
 
 ```julia
 function comovement_unit_diagonal!(rho::AbstractMatrix)
@@ -74,7 +74,7 @@ end
 ```
 
 Five sites call it, each after the reduction and before `posdef!`: the three `gerber` methods of
-[`GerberCovariance`](../../src/08_Moments/05_GerberCovariance.jl), `smythbroby`, and `gerber_IQ`.
+[`GerberCovariance`](../../src/05_Moments/05_Gerber/01_GerberCovariance.jl), `smythbroby`, and `gerber_IQ`.
 
 **Reading 1, not reading 2.** A zero row is the honest reading of a sample in which one asset never
 moved, and the caller who asked for a correlation matrix gets one. Reading 2 rejects a sample that

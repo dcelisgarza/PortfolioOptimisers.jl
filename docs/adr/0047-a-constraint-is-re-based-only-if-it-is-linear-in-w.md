@@ -22,10 +22,10 @@ wrong: the loadings are refit per fold, and rows computed once against a full-sa
 factor exposure the fold's model does not have.
 
 The library also already contained an unresolved ambiguity about what "my factors" means.
-[`FactorBlackLittermanPrior`](../../src/13_Prior/08_FactorBlackLittermanPrior.jl),
-[`BayesianBlackLittermanPrior`](../../src/13_Prior/07_BayesianBlackLittermanPrior.jl),
-[`AugmentedBlackLittermanPrior`](../../src/13_Prior/09_AugmentedBlackLittermanPrior.jl) and
-[`FactorRiskBudgeting`](../../src/20_Optimisation/14_RiskBudgeting.jl) each take an `AssetSets` whose
+[`FactorBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/04_FactorBlackLittermanPrior.jl),
+[`BayesianBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/03_BayesianBlackLittermanPrior.jl),
+[`AugmentedBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/05_AugmentedBlackLittermanPrior.jl) and
+[`FactorRiskBudgeting`](../../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl) each take an `AssetSets` whose
 *asset* key holds factor names, validated against `size(F, 2)`. The type says assets; the contents
 are factors; only the length check knows the difference.
 
@@ -105,13 +105,13 @@ lands here without a new struct.
 
 `rr.M` is the loadings over the *named original* factors. `rr.L` is the same information in the
 reduced basis: under
-[`DimensionReductionRegression`](../../src/08_Moments/23_DimensionReductionRegression.jl) the two are
+[`DimensionReductionRegression`](../../src/05_Moments/21_TimeSeriesRegression/02_DimensionReductionRegression.jl) the two are
 the two sides of one projection, `M = Vp * β_pc ⊘ σ` and `L = pinv(Vp) * (M ⊙ σ)`, so each is
 recoverable from the other.
 
 Which one a consumer wants is therefore not a matter of taste but of what it is doing.
-[`FactorRiskContribution`](../../src/20_Optimisation/12_FactorRiskContribution.jl),
-[`FactorRiskBudgeting`](../../src/20_Optimisation/14_RiskBudgeting.jl) and
+[`FactorRiskContribution`](../../src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl),
+[`FactorRiskBudgeting`](../../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl) and
 [`RegressionFeatures`](../../src/13_Prior/15_FeaturePrior.jl) want **`L`**, because risk must be
 attributed in the basis its covariance was actually estimated in — the orthogonal reduced one. A
 constraint wants **`M`**, because a constraint is *written*, and only `M`'s columns carry names a
@@ -142,7 +142,7 @@ with a warning and the rest of the problem is still the problem the caller descr
 regression is not that. It makes **every** factor row unbuildable, and dropping them silently
 produces a feasible, plausible-looking portfolio carrying none of the requested exposure — the same
 failure class ADR 0046 was written about. So it throws either way, reusing
-[`prior_regression_remedy`](../../src/13_Prior/01_Base_Prior.jl) so the diagnosis and its remedy
+[`prior_regression_remedy`](../../src/10_Prior/01_Base_Prior.jl) so the diagnosis and its remedy
 match the rest of the library.
 
 ## Consequences
@@ -188,7 +188,7 @@ missed a case. Each is corrected here; the decision itself stands.
 `JuMPOptimiser` get factor exposure constraints without knowing they exist" is true of the
 projection — nothing downstream needs a factor concept — but it overstated what NOC does with a
 linear constraint.
-[`UnconstrainedNearOptimalCentering`](../../src/20_Optimisation/13_NearOptimalCentering.jl), which
+[`UnconstrainedNearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl), which
 is the **default**, builds its centering model with weight bounds, budget, risk and return only. It
 never calls `set_linear_weight_constraints!`, so `lcsr` is dropped from the model whose solution is
 returned. This is by design, is long-standing, and applies to an asset-space linear constraint
@@ -203,7 +203,7 @@ together.
 as unconditional. As written that throws a `KeyError` on the common case: every factor-prior run
 that declares no factor axis has an `rd.nf` and no `sets.dict[fkey]`, and the factor axis is
 *optional* by the decision two paragraphs above it.
-[`assert_universe_axis_order`](../../src/20_Optimisation/10_JuMPOptimiser.jl) therefore skips an
+[`assert_universe_axis_order`](../../src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl) therefore skips an
 axis when **either** side is absent, and checks the pair only when both are declared. It also runs
 *before* the prior is fitted, so a misaligned universe is reported without paying for a regression
 first.
@@ -255,7 +255,7 @@ one.
 This is not a new restriction — the pre-migration shape had the same arithmetic and simply failed
 further down, at the bare `length(rb) == N` check, with a message about two numbers. What the
 migration changes is where it is diagnosed:
-[`risk_budget_universe_key`](../../src/20_Optimisation/14_RiskBudgeting.jl) checks the declared axis
+[`risk_budget_universe_key`](../../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl) checks the declared axis
 against `size(rr.L, 2)` through the shared `factor_universe`, so the message names `rr.L`, the axis
 key, and the two lengths. Reading the axis off `M` instead would accept a budget of the wrong length
 and mis-attribute it silently, which is the failure this ADR exists to prevent one level up.
@@ -279,7 +279,7 @@ thresholds), or it is a per-asset box (weight bounds). Turnover, tracking error 
 exhaustive.
 
 The boundary is a property of the **mechanism**, not only of the constraint.
-[`ExposureConstraintEstimator`](../../src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl)
+[`ExposureConstraintEstimator`](../../src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl)
 re-bases by rewriting a row and leaving the model untouched, so it is valid exactly when the
 constraint *is* that row: a linear form in `w`. A constraint that reaches the model through its own
 variables is outside the mechanism even where a change of basis is perfectly well defined for the
@@ -287,7 +287,7 @@ quantity it constrains. Restating the rule as "linear in `w`" was always right; 
 an incomplete enumeration of the ways a constraint fails it.
 
 **Turnover is a norm form.**
-[`_set_turnover_constraints!`](../../src/20_Optimisation/09_JuMPConstraints/09_TurnoverConstraints.jl)
+[`_set_turnover_constraints!`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/09_TurnoverConstraints.jl)
 declares an auxiliary variable per asset and one `MOI.NormOneCone` per asset to realise
 `|w - w₀|`. The factor quantity `|Mᵀ(w - w₀)|` is meaningful — the turnover of the exposures — and it
 is not equal to any asset-space turnover, so this is a genuine absence rather than a redundancy. It
@@ -297,7 +297,7 @@ could not draw, and it makes a factor turnover norm a different feature rather t
 space attached.
 
 **Tracking error is one norm form, and its benchmark is a return series.**
-[`set_tracking_error_constraints!`](../../src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl)
+[`set_tracking_error_constraints!`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/11_TrackingErrorConstraints.jl)
 constrains `‖Xw − b‖` in a cone chosen by the norm algorithm, where `b = tracking_benchmark(tr.tr,
 X)`. Both tracking algorithms reach it through that one call, so the norm itself is no more re-basable
 than turnover's. The asset axis enters only through the *benchmark*: `WeightsTracking` holds an
@@ -305,7 +305,7 @@ asset-length weight vector and computes `b = calc_net_returns(wₐ, X, fees)`, w
 any fees it carries.
 
 **And `ReturnsTracking` already tracks a factor, with no re-basis at all.** It stores the benchmark
-return series itself ([`18_Tracking.jl`](../../src/18_Tracking.jl), `field_dict[:w_bm_ret]`), and a
+return series itself ([`18_Tracking.jl`](../../src/15_Tracking.jl), `field_dict[:w_bm_ret]`), and a
 factor's return series is a column of `F`. Passing that column as the benchmark tracks the factor
 directly: the benchmark is already in the factor's own units, and the quantity compared against it is
 a portfolio return either way. The re-basis is *unnecessary* here rather than unavailable — a third
@@ -314,10 +314,10 @@ and documents nowhere, which is why it is recorded in an ADR amendment.
 
 **Fees have no factor referent at all.** Every field of `Fees` is priced against something that is
 per-asset by construction. In
-[`set_non_fixed_fees!`](../../src/20_Optimisation/09_JuMPConstraints/10_FeesConstraints.jl) the
+[`set_non_fixed_fees!`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/10_FeesConstraints.jl) the
 proportional rates `l` and `s` are contracted with the long/short split variables `lw`/`sw`, and `tn`
 is turnover; in
-[`set_fixed_fees!`](../../src/20_Optimisation/09_JuMPConstraints/10_FeesConstraints.jl) the fixed
+[`set_fixed_fees!`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/10_FeesConstraints.jl) the fixed
 charges `fl` and `fs` are contracted with the MIP long and short indicator bits. Every coefficient
 is priced per *traded position*, and there is no `M` that carries a rate into factor coordinates,
 because a factor is not a thing that is traded. This is neither the box case nor the indicator case,
@@ -354,7 +354,7 @@ rather than on `ExposureConstraintEstimator` or on the prior, so that a future m
 it needs without changing anything else.
 
 **The shape is not invented here.** `FactorRiskContribution` already holds `re::TD{<:RegE_Reg}`, and
-[`resolve_factor_regression`](../../src/19_RiskMeasures/28_ExpectedRisk.jl) already fixes the
+[`resolve_factor_regression`](../../src/16_RiskMeasures/24_ExpectedRisk.jl) already fixes the
 precedence: a precomputed `Regression` wins, then the prior's own `rr`, then a refit from the
 returns. `FactorSpace` takes the same slot and the same precedence, so `re === nothing` reproduces
 the previous behaviour exactly and every constraint written before the field is unaffected.

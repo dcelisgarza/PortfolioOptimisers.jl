@@ -1,5 +1,5 @@
 #=
-Check `src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl` against the contract its
+Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_RollingDescriptors.jl` against the contract its
 docstrings state, and against the reference implementation's own rolling descriptors.
 Issue #720, map #643.
 

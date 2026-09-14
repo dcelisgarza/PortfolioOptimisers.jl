@@ -1392,7 +1392,7 @@
     Issue #462, under child map #417 of the map of maps #404.
 
     Every claim these tests pin is a sentence of one of the nine docstrings of
-    `src/08_Moments/19_Coskewness.jl` and `src/08_Moments/20_Cokurtosis.jl`. The comoments
+    `src/05_Moments/18_Coskewness.jl` and `src/05_Moments/19_Cokurtosis.jl`. The comoments
     are hand-built from explicit loops rather than taken from a stored fixture, so a claim
     and its check read side by side. The sample has 11 observations and 3 assets, so a
     transposed index cannot hide behind a square shape.
@@ -1923,7 +1923,7 @@
     end
     @testset "The distance-of-distances sweep of #449" begin
         #=
-        Every claim `src/09_Distance/03_DistanceDistance.jl` makes, pinned by running it:
+        Every claim `src/06_Distance/03_DistanceDistance.jl` makes, pinned by running it:
         both entry points against the two steps computed by hand, the agreement of
         `cor_and_dist` with `distance`, the `CanonicalDistance` redirect inside step 1, the
         `power = 1` identity, and the `args`/`kwargs` fields that no test had reached.
@@ -2926,7 +2926,7 @@ end
           [0.1 0.2 0.3 0.4]
     @test_throws DimensionMismatch mean(CustomValueExpectedReturns(; val = [0.1, 0.2]), X)
     @testset "The shrunk expected returns sweep of #460" begin
-        # Every claim of `src/08_Moments/16_ShrunkExpectedReturns.jl` is checked by running
+        # Every claim of `src/05_Moments/15_ShrunkExpectedReturns.jl` is checked by running
         # it. The three targets are checked against a hand-computed vector, the three
         # intensities against their own closed form, and the degeneracies the docstrings
         # name are pinned so that a later change cannot turn a documented `NaN` into a

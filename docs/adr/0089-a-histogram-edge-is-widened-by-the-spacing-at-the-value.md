@@ -9,7 +9,7 @@ status: accepted
 [#493](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/493), a child of
 [#417](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/417), opened on a raise from the
 sweep of [#459](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/459).
-[`calc_hist_data`](../../src/08_Moments/10_Histogram.jl) widened both histogram edges by
+[`calc_hist_data`](../../src/05_Moments/09_Histogram.jl) widened both histogram edges by
 `eps(eltype(x))`:
 
 ```julia
@@ -110,13 +110,13 @@ below it.
   change. The direction is one way: an observation that was dropped is now counted, so an entropy
   can only rise or stay.
 - **A constant column now has an entropy of zero rather than `NaN`.** The change reaches
-  [`mutual_info`](../../src/08_Moments/10_Histogram.jl),
-  [`variation_info`](../../src/08_Moments/10_Histogram.jl) and `mutual_variation_info`, and through
-  `variation_info` it reaches [`VariationInfoDistance`](../../src/09_Distance/02_Distance.jl) and
+  [`mutual_info`](../../src/05_Moments/09_Histogram.jl),
+  [`variation_info`](../../src/05_Moments/09_Histogram.jl) and `mutual_variation_info`, and through
+  `variation_info` it reaches [`VariationInfoDistance`](../../src/06_Distance/02_Distance.jl) and
   the clustering and hierarchical optimisers below it.
 - **The fix does not make the estimate correct, only unbiased at the edge.** A histogram estimate of
   mutual information stays biased by its bin count, which is what
-  [`HacineGharbiRavier`](../../src/08_Moments/10_Histogram.jl) and the three width rules address.
+  [`HacineGharbiRavier`](../../src/05_Moments/09_Histogram.jl) and the three width rules address.
 - **`test_08_moments.jl` holds the contract.** It pins that the maximum of a column is binned in at
   a magnitude where the shipped widening rounded away, that a constant column has a finite entropy,
   and that the returns of the test data answer the same numbers as before.

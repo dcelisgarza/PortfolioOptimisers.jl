@@ -9,7 +9,7 @@ status: accepted
 [#496](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/496), a child of
 [#417](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/417), opened on a raise from
 the sweep of [#455](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/455).
-[`SmythBrobyCovariance`](../../src/08_Moments/06_SmythBrobyCovariance.jl) has four numeric fields
+[`SmythBrobyCovariance`](../../src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl) has four numeric fields
 and guarded three of them. `n` was read by no guard at all, and a negative `n` answered a matrix
 whose diagonal is zero:
 
@@ -63,7 +63,7 @@ passing today, and neither value is wrong.
 three thresholds are read on the scale of the data. An infinite threshold admits no observation at
 all, so `assert_nonempty_nonneg_finite_val` is right for them. `n` is an exponent, and its infinite
 limit is a statistic rather than an empty one. The `# Validation` section of
-[`SmythBrobyCovariance`](../../src/08_Moments/06_SmythBrobyCovariance.jl) states that difference,
+[`SmythBrobyCovariance`](../../src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl) states that difference,
 so a reader does not read the two guards as an inconsistency.
 
 **`sb_delta` itself is not guarded.** It is an inner kernel called once per admitted observation of
@@ -85,7 +85,7 @@ are well-defined admission rules, and neither answers a matrix that is not a cor
   and `test_08h_smythbroby.jl` pinned that before this ADR.
 - **No shipped number moves.** The default is `n = 2`, and the guard does not touch the kernel.
 - **`val_dict[:sbn]` states the range once.** It reads ``0 <= n``, and the
-  [`SmythBrobyCovariance`](../../src/08_Moments/06_SmythBrobyCovariance.jl) docstring interpolates
+  [`SmythBrobyCovariance`](../../src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl) docstring interpolates
   it beside the three thresholds.
 - **`test_08h_smythbroby.jl` holds the contract.** The testset
   `the constructor guards, and the severity exponent (#496, ADR 0091)` pins that `-2`, `-1e-9` and

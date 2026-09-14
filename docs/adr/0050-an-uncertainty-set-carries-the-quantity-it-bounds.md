@@ -7,7 +7,7 @@ status: accepted
 ## Context
 
 An uncertainty set is a **neighbourhood of a specific quantity**.
-[`L1UncertaintySet`](../../src/14_UncertaintySets/05_L1UncertaintySets.jl) says so in its own
+[`L1UncertaintySet`](../../src/11_UncertaintySets/05_L1UncertaintySets.jl) says so in its own
 docstring: the set is `{mu_hat + e : ‖e ⊘ sd‖₁ <= eps}`. A radius without its centre is not that
 object. The same holds of every other shape in the family — a box is `mu_hat ± delta`, an
 ellipsoid is `(mu - mu_hat)' Σ⁻¹ (mu - mu_hat) <= k²`.
@@ -16,7 +16,7 @@ The library calibrated the radius on one fit and applied it to a different one. 
 it.**
 
 On the mean axis,
-[`set_return_constraints!`](../../src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl)
+[`set_return_constraints!`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl)
 took the centre from the outer prior:
 
 ```julia
@@ -29,7 +29,7 @@ two fits are independent, and nothing refused a configuration in which they name
 quantities.
 
 On the covariance axis,
-[`set_risk_constraints!`](../../src/20_Optimisation/20_RiskMeasureConstraints/02_VarianceConstraints.jl)
+[`set_risk_constraints!`](../../src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl)
 had the identical shape: it bounded `pr.sigma` with an ellipsoid whose shape matrix came from
 `ue.pe`.
 

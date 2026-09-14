@@ -181,11 +181,42 @@ for page in (HOME_PAGE, REFERENCES_PAGE, CATALOGUE_PAGE)
         true
     end
 end
-api_pages = [item for item in walkdir(joinpath(@__DIR__, "src/api"))]
+# Display labels for the API groups whose directory name does not read as a title once its
+# numeric prefix is dropped and its CamelCase is split on the lower-to-upper boundaries.
+const API_GROUP_LABELS = Dict("InputData" => "Input Data",
+                              "TimeSeriesRegression" => "Time-series Regression",
+                              "CrossSectionalFactorModel" => "Cross-sectional Factor Model",
+                              "DBHT" => "DBHT", "BlackLitterman" => "Black-Litterman",
+                              "XatRisk" => "X-at-Risk", "JuMP" => "JuMP",
+                              "JuMPConstraints" => "JuMP Constraints")
+
+function api_group_label(dir)
+    name = replace(dir, r"^\d+_" => "")
+    return get(API_GROUP_LABELS, name, replace(name, r"(?<=[a-z])(?=[A-Z])" => " "))
+end
+
+# The API page tree mirrors `src/`: one page per source file at the same path, and a
+# directory of pages for every directory of files (ADR 0150). Files and directories share
+# one numbering at each level, so the listing sorted by name is the load order of `src/`,
+# and a directory becomes a nested group labelled by its name. Nothing here is positional:
+# a directory added under `docs/src/api/` appears where its number puts it.
+function api_pages(dir::String, rel::String)
+    pages = Any[]
+    for entry in sort(readdir(dir))
+        path = joinpath(dir, entry)
+        if isdir(path)
+            group = api_pages(path, joinpath(rel, entry))
+            isempty(group) || push!(pages, api_group_label(entry) => group)
+        elseif endswith(entry, ".md")
+            push!(pages, joinpath(rel, entry))
+        end
+    end
+    return pages
+end
+api = api_pages(joinpath(@__DIR__, "src/api"), "api")
 contribute = [joinpath("contribute", file)
               for file in readdir(joinpath(@__DIR__, "src/contribute"))
               if splitext(file)[2] == ".md"]
-idx1 = findfirst("api", api_pages[1][1])[1]
 
 # The base URL of the deployed site. `Documenter.HTML` writes it into every page's
 # `<link rel="canonical">`, and `generate_sitemap` roots every sitemap entry at it.
@@ -229,26 +260,7 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                   "Capability Catalogue" => CATALOGUE_PAGE;
                   "User Guide" => user_guide;
                   "Examples" => examples;
-                  "API" => [joinpath.(api_pages[1][1][idx1:end], api_pages[1][3]);
-                            "Moments" => [joinpath.(api_pages[2][1][idx1:end], api_pages[2][3])
-                                          joinpath.(api_pages[3][1][idx1:end], api_pages[3][3])
-                                          joinpath.(api_pages[4][1][idx1:end], api_pages[4][3])]
-                            "Distance" => joinpath.(api_pages[5][1][idx1:end], api_pages[5][3])
-                            "Phylogeny" => joinpath.(api_pages[6][1][idx1:end], api_pages[6][3])
-                            "Constraint Generation" =>
-                                joinpath.(api_pages[7][1][idx1:end], api_pages[7][3])
-                            "Prior" => joinpath.(api_pages[8][1][idx1:end], api_pages[8][3]);
-                            "Uncertainty Sets" =>
-                                joinpath.(api_pages[9][1][idx1:end], api_pages[9][3])
-                            "Risk Measures" =>
-                                joinpath.(api_pages[10][1][idx1:end], api_pages[10][3])
-                            "Optimisation" =>
-                                [joinpath.(api_pages[11][1][idx1:end], api_pages[11][3])
-                                 joinpath.(api_pages[12][1][idx1:end], api_pages[12][3])
-                                 joinpath.(api_pages[13][1][idx1:end], api_pages[13][3])
-                                 joinpath.(api_pages[14][1][idx1:end], api_pages[14][3])]
-                            "Pipeline" =>
-                                joinpath.(api_pages[15][1][idx1:end], api_pages[15][3])];
+                  "API" => api;
                   "Contribute" => contribute;
                   "References" => REFERENCES_PAGE],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
@@ -261,11 +273,6 @@ generate_sitemap(joinpath(@__DIR__, "build"), CANONICAL_URL)
 
 deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl", target = "build",
            devbranch = "main", branch = "gh-pages", push_preview = true)
-
-# allpages = String[]
-# for page in api_pages
-#     append!(allpages, joinpath.(page[1][idx1:end], page[3]))
-# end
 
 # ---------------------------------------------------------------------------------------
 # Viewing the docs locally

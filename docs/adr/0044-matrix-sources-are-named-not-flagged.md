@@ -6,11 +6,11 @@ status: accepted
 
 ## Context
 
-Three optimisers — [`JuMPOptimiser`](../../src/20_Optimisation/10_JuMPOptimiser.jl),
-[`HierarchicalOptimiser`](../../src/20_Optimisation/04_Base_ClusteringOptimisation.jl) and
-[`NestedClustered`](../../src/20_Optimisation/17_NestedClustered.jl) — carried a field
+Three optimisers — [`JuMPOptimiser`](../../src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl),
+[`HierarchicalOptimiser`](../../src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl) and
+[`NestedClustered`](../../src/17_Optimisation/06_Meta/02_NestedClustered.jl) — carried a field
 `cle_pr::Bool = true`, forwarded as a keyword argument into the prior-layer bridge in
-[`01_Base_Prior.jl`](../../src/13_Prior/01_Base_Prior.jl), where eight sites spelled the same line:
+[`01_Base_Prior.jl`](../../src/10_Prior/01_Base_Prior.jl), where eight sites spelled the same line:
 
 ```julia
 X = isnothing(rd) || cle_pr ? pr.X : rd.X

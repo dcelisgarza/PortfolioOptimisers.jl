@@ -411,7 +411,7 @@ end
     ------------------------------------------------------------------ sweep #465
 
     The four testsets below were added when this file was swept. Each pins a claim that
-    a docstring in `src/08_Moments/24_ImpliedVolatility.jl` now makes, so a reader who
+    a docstring in `src/05_Moments/22_ImpliedVolatility.jl` now makes, so a reader who
     doubts the prose can run the number instead.
     =#
 

@@ -1,5 +1,5 @@
 #=
-Check `src/08_Moments/06_SmythBrobyCovariance.jl` against the mathematics its docstrings
+Check `src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl` against the mathematics its docstrings
 state, and against the source itself. Issue #455 of child map 3 (#417) under the map of maps
 (#404).
 

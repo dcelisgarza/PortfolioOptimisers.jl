@@ -42,7 +42,7 @@ end
     `test/test_26_docs.jl` reads it to key a docstring by the name it binds. A second copy
     stood in `test_26_docs.jl` until it was removed: it took the LEFT side of every `::`, so
     it named a functor method after its receiver variable and collapsed 11 documented
-    functors of `src/14_UncertaintySets/06_CalibrationRules.jl` onto the key `alg`. This
+    functors of `src/11_UncertaintySets/06_CalibrationRules.jl` onto the key `alg`. This
     file is the differential oracle over the one that remains.
 
     The fix is `is_signature`, which separates a signature from an assignment. The

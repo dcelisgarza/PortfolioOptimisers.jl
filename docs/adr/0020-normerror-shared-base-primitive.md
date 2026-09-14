@@ -7,7 +7,7 @@ status: accepted
 ## Context
 
 The norm-based error formulations — L1, L2, squared-L2, general-Lp and L∞ — lived in
-[18_Tracking.jl](../../src/18_Tracking.jl) as `L1Tracking`, `L2Tracking`, `SquaredL2Tracking`,
+[18_Tracking.jl](../../src/15_Tracking.jl) as `L1Tracking`, `L2Tracking`, `SquaredL2Tracking`,
 `LpTracking`, `LInfTracking`. Their names and location said "these are how you measure *tracking
 error*." But a norm on a residual vector is not tracking-specific: it is the same primitive
 whether the residual is `w − w_ref` (tracking), a risk-measure target, or the gap between a set of

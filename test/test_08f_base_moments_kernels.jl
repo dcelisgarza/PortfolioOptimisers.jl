@@ -1,5 +1,5 @@
 #=
-Check and cover `src/08_Moments/01_Base_Moments.jl` and the five `Windowed*` files, issue
+Check and cover `src/05_Moments/01_Base_Moments.jl` and the five `Windowed*` files, issue
 #452 of child map 3 (#417) under the map of maps (#404).
 
 The file's own tests already drive the `@windowed_estimator` machinery -- the parsers, the

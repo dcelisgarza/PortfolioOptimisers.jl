@@ -1,5 +1,5 @@
 #=
-Check `src/08_Moments/41_CrossSectionalFactorModel.jl` against the contract its docstrings
+Check `src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl` against the contract its docstrings
 state, and against the reference implementation the map of issue #643 ports. Issue #706.
 
 THREE FACTS SHAPE THE PROBES.

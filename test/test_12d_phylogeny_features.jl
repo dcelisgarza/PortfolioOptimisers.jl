@@ -249,7 +249,7 @@ end
     @test occursin("Asset Panel", res.value.msg)
 end
 
-# The separation family. Like the decay family it lives in `11_Phylogeny/01_Base_Phylogeny.jl`
+# The separation family. Like the decay family it lives in `08_Phylogeny/01_Base_Phylogeny.jl`
 # for include order -- `NetworkEstimator` carries it as a field -- so its tests live beside
 # the consumer that grades what it measures.
 @testset "HopCount carries the budget the network estimator used to" begin
@@ -284,7 +284,7 @@ end
     @test separation_budget(HopCount(; n = 7), NTE, zeros(Int, 2, 2)) == 7
 end
 
-# The separation decay family. It lives in `11_Phylogeny/01_Base_Phylogeny.jl` for include
+# The separation decay family. It lives in `08_Phylogeny/01_Base_Phylogeny.jl` for include
 # order rather than for ownership -- `Proximity` is its only consumer -- so its
 # tests live beside that consumer.
 @testset "The decay members honour the contract they are held to" begin

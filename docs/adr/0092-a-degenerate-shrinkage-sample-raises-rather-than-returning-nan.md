@@ -10,7 +10,7 @@ status: accepted
 [#417](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/417), opened on a question the
 sweep of [#460](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/460) raised. Three
 legal inputs made
-[`ShrunkExpectedReturns`](../../src/08_Moments/16_ShrunkExpectedReturns.jl) answer `NaN` or `Inf`
+[`ShrunkExpectedReturns`](../../src/05_Moments/15_ShrunkExpectedReturns.jl) answer `NaN` or `Inf`
 rather than a number or a raise:
 
 ```julia
@@ -35,8 +35,8 @@ disagreement.
 
 | # | Site | Cause |
 | ---: | --- | --- |
-| 1 | the `alpha` assignment of the [`JamesStein`](../../src/08_Moments/16_ShrunkExpectedReturns.jl) method | `alpha` divides by `T * dot(mb, mb)`. `GrandMean` and `VolatilityWeighted` both reduce to the sample mean at `N == 1`, so `mb` is the zero vector and the denominator is exactly zero. `alpha` is `-Inf`, and `(1 - alpha) * mu + alpha * b` with `mu == b` is `Inf - Inf`. `MeanSquaredError` never reads the sample mean, so it stays finite. |
-| 2 | the `alpha /= u * v - w^2` line of the [`BodnarOkhrinParolya`](../../src/08_Moments/16_ShrunkExpectedReturns.jl) method | `u * v - w^2` is a Cauchy-Schwarz gap in the inner product that `inv(sigma)` induces, so it vanishes exactly when the target is a multiple of the sample mean. At `N == 1` every vector is such a multiple, so the gap is exactly zero under all three targets and `alpha` is `0 / 0`. |
+| 1 | the `alpha` assignment of the [`JamesStein`](../../src/05_Moments/15_ShrunkExpectedReturns.jl) method | `alpha` divides by `T * dot(mb, mb)`. `GrandMean` and `VolatilityWeighted` both reduce to the sample mean at `N == 1`, so `mb` is the zero vector and the denominator is exactly zero. `alpha` is `-Inf`, and `(1 - alpha) * mu + alpha * b` with `mu == b` is `Inf - Inf`. `MeanSquaredError` never reads the sample mean, so it stays finite. |
+| 2 | the `alpha /= u * v - w^2` line of the [`BodnarOkhrinParolya`](../../src/05_Moments/15_ShrunkExpectedReturns.jl) method | `u * v - w^2` is a Cauchy-Schwarz gap in the inner product that `inv(sigma)` induces, so it vanishes exactly when the target is a multiple of the sample mean. At `N == 1` every vector is such a multiple, so the gap is exactly zero under all three targets and `alpha` is `0 / 0`. |
 | 3 | the `N / (T - N)` term of the same line | Undefined at `T == N`. The term is positive for `T > N` and negative for `T < N`, so a wide returns matrix silently flips its sign. |
 
 ### The two readings

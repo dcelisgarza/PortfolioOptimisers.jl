@@ -93,7 +93,7 @@ end
 end
 
 #=
-Issue #549, conditions 2 and 3. `src/21_ExpectedReturns.jl` held 49 of child map 8's 66
+Issue #549, conditions 2 and 3. `src/18_ExpectedReturns.jl` held 49 of child map 8's 66
 misses, and `brinson_attribution` had no test in the whole suite. Every check below was run
 with real numbers in the REPL first, and each quoted number is the one the REPL returned.
 =#

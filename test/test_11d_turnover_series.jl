@@ -1,5 +1,5 @@
 #=
-Check `calc_turnover` in `src/17_NetReturnsDrawdowns.jl`. Issue #937.
+Check `calc_turnover` in `src/14_NetReturnsDrawdowns.jl`. Issue #937.
 
 The verb is the library's first value-level turnover. `plot_turnover`
 (`ext/PortfolioOptimisersPlotsExt.jl`) computed the same sum inline, which made it the one

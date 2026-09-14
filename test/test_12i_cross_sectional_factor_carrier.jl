@@ -177,7 +177,7 @@ end
         rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = pr_csfm_reb.X,
                            nf = ["mkt", "size", "value"], F = F_deg)
 
-        # 1. `RegressionPanel`, at `13_Prior/15_AssetPanelEstimators.jl`. The producer
+        # 1. `RegressionPanel`, at `10_Prior/09_AssetPanelEstimators.jl`. The producer
         #    reads `pr.rr.L` for both regression results with one method.
         loadings(pr) = PO.panel_field(PO.asset_panel(RegressionPanel(), pr, rd, rd.X),
                                       "loadings").vals
@@ -191,7 +191,7 @@ end
         @test labels(pr_csfm_flat) == [string(k) for k in 1:size(M, 2)]
         @test labels(pr_reg_reb) == [string(k) for k in 1:size(L, 2)]
 
-        # 2. `factor_risk_contribution`, at `19_RiskMeasures/28_ExpectedRisk.jl`.
+        # 2. `factor_risk_contribution`, at `16_RiskMeasures/24_ExpectedRisk.jl`.
         w = [0.4, 0.1, 0.3, 0.2]
         rc_csfm = factor_risk_contribution(Variance(), w, pr_csfm_reb; rd = rd)
         rc_reg = factor_risk_contribution(Variance(), w, pr_reg_reb; rd = rd)
@@ -199,7 +199,7 @@ end
         @test length(rc_csfm) == size(L, 2) + 1
 
         # 3. `set_factor_risk_contribution_constraints!`, at
-        #    `20_Optimisation/12_FactorRiskContribution.jl`.
+        #    `17_Optimisation/05_JuMP/05_FactorRiskContribution.jl`.
         b1_c, rr_c = PO.set_factor_risk_contribution_constraints!(PO.JuMP.Model(),
                                                                   StepwiseRegression(), rd,
                                                                   pr_csfm_reb, true,
@@ -212,12 +212,12 @@ end
         @test rr_r === reg_reb
 
         # 4. The expression `set_relaxed_risk_budgeting_constraints!` forms from that `rr`,
-        #    at `20_Optimisation/15_RelaxedRiskBudgeting.jl`. It is built here on the `rr`
+        #    at `17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl`. It is built here on the `rr`
         #    step 3 returned, so it is the same read on the same object.
         @test Matrix(LinearAlgebra.Symmetric(rr_c.L \ pr_csfm_reb.sigma * b1_c)) ==
               Matrix(LinearAlgebra.Symmetric(rr_r.L \ pr_reg_reb.sigma * b1_r))
 
-        # 5. The factor budget axis, at `20_Optimisation/14_RiskBudgeting.jl`. The caller
+        # 5. The factor budget axis, at `17_Optimisation/05_JuMP/07_RiskBudgeting.jl`. The caller
         #    passes `size(rr.L, 2)`, so the reduced basis is what the names must match.
         @test size(rr_c.L, 2) == size(rr_r.L, 2) == 2
         rba = FactorRiskBudgeting(; rkb = RiskBudgetEstimator(; val = ["r1" => 0.5]),
@@ -243,7 +243,7 @@ end
                                         "cyclical" => ["size", "value"]))
 
         # 1. `FactorSpace`'s axis check, at
-        #    `12_ConstraintGeneration/08_ExposureConstraintGeneration.jl`.
+        #    `09_ConstraintGeneration/08_ExposureConstraintGeneration.jl`.
         rr_c, key_c = PO.constraint_space_basis(FactorSpace(), sets, csfm_reb)
         rr_r, key_r = PO.constraint_space_basis(FactorSpace(), sets, reg_reb)
         @test rr_c === csfm_reb
@@ -270,7 +270,7 @@ end
         @test_throws KeyError PO.constraint_space_basis(FactorSpace(), ts_only, csfm_reb)
 
         # 2. `constraint_row_term`, at
-        #    `12_ConstraintGeneration/02_LinearConstraintGeneration.jl`.
+        #    `09_ConstraintGeneration/02_LinearConstraintGeneration.jl`.
         Ai = [true, false, true]
         @test PO.constraint_row_term(csfm_reb, Ai, 2.0) ==
               PO.constraint_row_term(reg_reb, Ai, 2.0) ==

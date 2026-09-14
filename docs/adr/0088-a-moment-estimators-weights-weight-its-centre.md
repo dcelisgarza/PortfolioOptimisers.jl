@@ -9,7 +9,7 @@ status: accepted
 [#490](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/490), a child of
 [#417](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/417), opened on a raise from the
 sweep of [#453](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/453). One
-[`SimpleVariance`](../../src/08_Moments/04_SimpleVariance.jl) answered the same data with two
+[`SimpleVariance`](../../src/05_Moments/04_SimpleVariance.jl) answered the same data with two
 numbers:
 
 ```julia
@@ -46,9 +46,9 @@ The vector method passed `mean` through to `Statistics`, which centres a weighte
 `Statistics.mean(me, X)` method of the library takes a `MatNum`. The vector path therefore had no
 `me` to read, and the split was a property of the estimator rather than of the data.
 
-[`Covariance`](../../src/08_Moments/03_Covariance.jl),
-[`Coskewness`](../../src/08_Moments/19_Coskewness.jl) and
-[`Cokurtosis`](../../src/08_Moments/20_Cokurtosis.jl) resolve `mu` from their own `me` in that same
+[`Covariance`](../../src/05_Moments/03_Covariance.jl),
+[`Coskewness`](../../src/05_Moments/18_Coskewness.jl) and
+[`Cokurtosis`](../../src/05_Moments/19_Cokurtosis.jl) resolve `mu` from their own `me` in that same
 one line, so each carried the same split.
 
 ### The two readings
@@ -106,10 +106,10 @@ argument on.
 ## Decision
 
 **A moment estimator's observation weights weight its centre.** The rule holds for
-[`SimpleVariance`](../../src/08_Moments/04_SimpleVariance.jl),
-[`Covariance`](../../src/08_Moments/03_Covariance.jl),
-[`Coskewness`](../../src/08_Moments/19_Coskewness.jl) and
-[`Cokurtosis`](../../src/08_Moments/20_Cokurtosis.jl).
+[`SimpleVariance`](../../src/05_Moments/04_SimpleVariance.jl),
+[`Covariance`](../../src/05_Moments/03_Covariance.jl),
+[`Coskewness`](../../src/05_Moments/18_Coskewness.jl) and
+[`Cokurtosis`](../../src/05_Moments/19_Cokurtosis.jl).
 
 `simple_variance_kernel` resolves the centre through `factory(me, ve.w)` when the caller supplies no
 `mean`:
@@ -178,7 +178,7 @@ weights do not describe passes it.
 - **`Covariance` gains an `obs_weights_view` method.** The `obs` channel is gated by `@wprop`, so
   before this change `obs_weights_view` returned a `Covariance` unchanged and left the weights
   inside `me` and `ce` at their full length.
-  [`ImpliedVolatility`](../../src/08_Moments/24_ImpliedVolatility.jl) is the one caller, and it
+  [`ImpliedVolatility`](../../src/05_Moments/22_ImpliedVolatility.jl) is the one caller, and it
   measures a block of rows, so a weighted `Covariance` reached it with the weights of the whole
   sample. The generated method now indexes `me`, `ce` and `w` to the block.
 - **Weights buried inside `ce` alone still centre on the unweighted mean.**
@@ -205,7 +205,7 @@ weights do not describe passes it.
 The decision above says which quantities a moment estimator's `w` reaches. It does not say **how**
 `w` enters one, because the four estimators it names all enter it the same way: an observation's
 weight scales that observation's contribution to a sum, and the sum is normalised by the weights it
-carries. [`DistanceCovariance`](../../src/08_Moments/07_DistanceCovariance.jl) entered it a second
+carries. [`DistanceCovariance`](../../src/05_Moments/06_DistanceCovariance.jl) entered it a second
 way, and
 [#851](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/851) measured the consequence.
 
@@ -232,7 +232,7 @@ was invisible through the correlation route and visible through the covariance r
 contribution to a sum, and the sum is normalised by the weights it carries. It never multiplies the
 observation before a verb measures it.
 
-The kernel of [`DistanceCovariance`](../../src/08_Moments/07_DistanceCovariance.jl) splits into
+The kernel of [`DistanceCovariance`](../../src/05_Moments/06_DistanceCovariance.jl) splits into
 three verbs, and only the last two read `w`:
 
 - `calc_pairwise_dists` takes the metric over the data the caller gave, and takes no weights.

@@ -71,7 +71,7 @@ end
 
       - A file whose types are declared by a Declaration Macro measures ZERO, because the
         macro writes the docstring and the calling file's text holds none. The five
-        `Windowed*` files under `src/08_Moments/` are the case, and `code_health`'s
+        `Windowed*` files under `src/05_Moments/` are the case, and `code_health`'s
         complexity baseline records the same five as structural zeros (ADR 0072). Adding a
         sixth windowed estimator to one of those files stays green. Adding a new FILE does
         not.
@@ -205,7 +205,7 @@ end
     #=
     Check 3 sees an addition and a deletion. It cannot see a REPLACEMENT: a unit deleted and a
     unit added in one change leave the count where it was. Issue #1065 is the case.
-    `src/09_Distance/05_FeatureDistance.jl` was swept, and map #802 then rewrote its
+    `src/06_Distance/05_FeatureDistance.jl` was swept, and map #802 then rewrote its
     estimator and its entry points -- two units deleted, two added -- while the count held
     at 24 and the row kept `swept = true`. Nothing red. The swept flag then vouched for text
     the sweep had never read.

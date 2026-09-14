@@ -1,5 +1,5 @@
 #=
-Check `src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl`,
+Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl`,
 `02_PanelFieldDescriptors.jl` and `03_LagDescriptors.jl` against the contract their docstrings
 state, and against the reference implementation's own descriptor tests. Issue #717, map #643.
 

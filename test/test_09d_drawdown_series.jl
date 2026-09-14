@@ -112,7 +112,7 @@
     end
 end
 
-# The drawdown half of `src/17_NetReturnsDrawdowns.jl`, swept under issue #547. The
+# The drawdown half of `src/14_NetReturnsDrawdowns.jl`, swept under issue #547. The
 # running-peak convention, the `cX` short circuit and the `dims` axis are checked with
 # numbers rather than read off the source.
 @testset "The drawdown conventions" begin

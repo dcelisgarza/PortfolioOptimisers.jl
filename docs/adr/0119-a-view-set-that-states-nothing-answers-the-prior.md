@@ -8,14 +8,14 @@ status: accepted
 
 `strict = false` is the documented "warn and continue" path of every view family. A view row that
 names no asset in the universe is reported by `strict_diagnostic` and dropped, and
-[`get_linear_constraints`](../../src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl)
+[`get_linear_constraints`](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration.jl)
 answers `nothing` when **every** row of a group is dropped that way.
 
 Five view verbs read a block off that answer without checking it: `ep_mu_views!`,
 `ep_var_views!`, `ep_sigma_views!`, `ep_sk_views!` and `ep_kt_views!`, all in
-[`10_Base_EntropyPoolingPrior.jl`](../../src/13_Prior/10_Base_EntropyPoolingPrior.jl), together with
+[`10_Base_EntropyPoolingPrior.jl`](../../src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior.jl), together with
 `ep_cvar_views_setup` in
-[`11_MeucciEntropyPoolingPrior.jl`](../../src/13_Prior/11_MeucciEntropyPoolingPrior.jl). The fit
+[`11_MeucciEntropyPoolingPrior.jl`](../../src/10_Prior/06_EntropyPooling/02_MeucciEntropyPoolingPrior.jl). The fit
 therefore raised `FieldError: type Nothing has no field ineq`, one call after the warning that
 already named the cause. Issue
 [#852](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/852) holds the reproduction: a

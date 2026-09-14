@@ -104,7 +104,7 @@ end
 
     #=
     Two defects that issue #517 found while it swept
-    `src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl`.
+    `src/09_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl`.
 
       1. An infinite scalar bound lost its sign. `weight_bounds_constraints_side(wb::Number,
          N, val)` filled with `val` whenever `isinf(wb)`, and `val` is the free bound of the

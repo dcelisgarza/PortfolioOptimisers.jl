@@ -162,7 +162,7 @@ whose coverage the test job discards, so the test process allocates the line no 
 `CoverageTools` then reads the line as code and writes a synthetic `0` over it while it converts \
 the `.cov` files into `lcov.info`, and the gate reads that `0` as a miss. No test can move it. \
 Measured by the review of PR #625, piece P11, on the two `Union{map(c -> Val{c}, …)...}` \
-constants of `src/08_Moments/21_Base_Regression.jl`. A targeted run of \
+constants of `src/05_Moments/20_Base_Regression.jl`. A targeted run of \
 `test_08j_base_regression.jl` under `--code-coverage` hits all 68 executable lines of the file and \
 leaves no zero, and lines 649 and 667 carry a bare `-`. `CoverageTools.process_file` over the same \
 source answers `0` on exactly those two lines and `nothing` on the three neighbouring constants, \
@@ -194,7 +194,7 @@ carries one branch per key of `PREFERENCE_KEYS`."""
 #
 # The seventeen below are issue #356's, written before the scheduled job first runs. They name
 # every constructor standing above the argument-count threshold of 10, not only the one that drives
-# its file, because `src/20_Optimisation/10_JuMPOptimiser.jl` holds a second at 19. Nineteen
+# its file, because `src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl` holds a second at 19. Nineteen
 # definitions sit over seventeen keys, because the key holds no line.
 
 [[exemption]]
@@ -238,103 +238,103 @@ metric = "arg"
 rationale = "a-definition-a-file-split-moved-unchanged"
 
 [[exemption]]
-path = "src/08_Moments/35_GerberIQCovariance.jl"
+path = "src/05_Moments/05_Gerber/03_GerberIQCovariance.jl"
 definition = "FullGerberIQ"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/08_Moments/35_GerberIQCovariance.jl"
+path = "src/05_Moments/05_Gerber/03_GerberIQCovariance.jl"
 definition = "PartialGerberIQ"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl"
+path = "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/06_TargetReturnForecast.jl"
 definition = "TargetReturnForecast"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/13_Prior/01_Base_Prior.jl"
+path = "src/10_Prior/01_Base_Prior.jl"
 definition = "LowOrderPrior"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/13_Prior/08_FactorBlackLittermanPrior.jl"
+path = "src/10_Prior/05_BlackLitterman/04_FactorBlackLittermanPrior.jl"
 definition = "FactorBlackLittermanPrior"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/13_Prior/09_AugmentedBlackLittermanPrior.jl"
+path = "src/10_Prior/05_BlackLitterman/05_AugmentedBlackLittermanPrior.jl"
 definition = "AugmentedBlackLittermanPrior"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/13_Prior/11_MeucciEntropyPoolingPrior.jl"
+path = "src/10_Prior/06_EntropyPooling/02_MeucciEntropyPoolingPrior.jl"
 definition = "MeucciEntropyPoolingPrior"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/13_Prior/12_EntropyPoolingPrior.jl"
+path = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior.jl"
 definition = "EntropyPoolingPrior"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/14_UncertaintySets/04_BootstrapUncertaintySets.jl"
+path = "src/11_UncertaintySets/04_BootstrapUncertaintySets.jl"
 definition = "ARCHUncertaintySet"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/20_Optimisation/04_Base_ClusteringOptimisation.jl"
+path = "src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl"
 definition = "HierarchicalOptimiser"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/20_Optimisation/10_JuMPOptimiser.jl"
+path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl"
 definition = "JuMPOptimiser"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/20_Optimisation/10_JuMPOptimiser.jl"
+path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl"
 definition = "ProcessedJuMPOptimiserAttributes"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/20_Optimisation/13_NearOptimalCentering.jl"
+path = "src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl"
 definition = "NearOptimalCentering"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/20_Optimisation/13_NearOptimalCentering.jl"
+path = "src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl"
 definition = "NearOptimalSetup"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/20_Optimisation/17_NestedClustered.jl"
+path = "src/17_Optimisation/06_Meta/02_NestedClustered.jl"
 definition = "NestedClustered"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/20_Optimisation/18_Stacking.jl"
+path = "src/17_Optimisation/06_Meta/03_Stacking.jl"
 definition = "Stacking"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/20_Optimisation/19_SubsetResampling.jl"
+path = "src/17_Optimisation/06_Meta/04_SubsetResampling.jl"
 definition = "SubsetResampling"
 metric = "arg"
 rationale = "keyword-constructor-arity"
@@ -343,7 +343,7 @@ rationale = "keyword-constructor-arity"
 # fields, so its constructor takes twelve arguments under the same house style.
 
 [[exemption]]
-path = "src/08_Moments/41_CrossSectionalFactorModel.jl"
+path = "src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl"
 definition = "CrossSectionalFactorModel"
 metric = "arg"
 rationale = "keyword-constructor-arity"
@@ -353,7 +353,7 @@ rationale = "keyword-constructor-arity"
 # implementation's own public parameters, one per configuration choice the prior offers.
 
 [[exemption]]
-path = "src/13_Prior/17_CrossSectionalFactorPrior.jl"
+path = "src/10_Prior/11_CrossSectionalFactorPrior.jl"
 definition = "CrossSectionalFactorPrior"
 metric = "arg"
 rationale = "keyword-constructor-arity"
@@ -416,13 +416,13 @@ rationale = "a-definition-a-file-split-moved-unchanged"
 # the test. ADR 0082, issue #411.
 
 [[coverage_exemption]]
-path = "src/11_Phylogeny/03_Hierarchical.jl"
+path = "src/08_Phylogeny/03_Hierarchical.jl"
 definition = "optimal_number_clusters"
 misses = 1
 rationale = "a-cut-into-one-cluster-is-always-valid"
 
 [[coverage_exemption]]
-path = "src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl"
+path = "src/09_ConstraintGeneration/02_LinearConstraintGeneration.jl"
 definition = "LinearConstraint"
 misses = 1
 rationale = "a-signature-line-counter-the-test-job-cannot-reach"
@@ -430,13 +430,13 @@ rationale = "a-signature-line-counter-the-test-job-cannot-reach"
 # Two constants of one shape, one row each. The `const` line of each holds the `map` closure that
 # builds the union, and the count of 1 is the synthetic zero that the line draws.
 [[coverage_exemption]]
-path = "src/08_Moments/21_Base_Regression.jl"
+path = "src/05_Moments/20_Base_Regression.jl"
 definition = "MinValStepwiseRegressionCriterion"
 misses = 1
 rationale = "a-closure-inside-a-top-level-const"
 
 [[coverage_exemption]]
-path = "src/08_Moments/21_Base_Regression.jl"
+path = "src/05_Moments/20_Base_Regression.jl"
 definition = "MaxValStepwiseRegressionCriterion"
 misses = 1
 rationale = "a-closure-inside-a-top-level-const"

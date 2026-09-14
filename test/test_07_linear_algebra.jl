@@ -365,7 +365,7 @@ end
 end
 
 #=
-The three structure matrices and the block vectorisation of `src/13_Prior/04_HighOrderPrior.jl`.
+The three structure matrices and the block vectorisation of `src/10_Prior/04_HighOrderPrior.jl`.
 Sweep ticket #534: no test in the suite named `duplication_matrix`, `elimination_matrix` or
 `summation_matrix` on the identity each is defined by — they were reached only through the high
 order prior, so every property they are supposed to have was untested. These check the identities

@@ -835,7 +835,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :strict_opt => "`strict`: Whether to strictly enforce weight bounds.",#
                                  :strict_conv => "`strict`: Whether to raise an error if convergence is not achieved.",#
                                  :schalg => "`alg`: Schur complement algorithm variant.",#
-                                 # Preselection. `24_Preselection.jl` pairs two redundancy
+                                 # Preselection. `20_AssetSelection.jl` pairs two redundancy
                                  # algorithms over one correlation matrix, and two selection
                                  # rules over one taken set, so each of the five descriptions
                                  # below is shared by two fields of that file.
@@ -1163,8 +1163,8 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :te_linf => "``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm error, the largest absolute deviation.",#
                        # The Range convention (ADR 0057).
                        :negated_upper_tail => "The upper tail is the base measure applied to the negated returns ``-\\boldsymbol{x}``, so both tails are reported on the same sign convention and the range is their sum, not their difference.",#
-                       # The Gerber family. `05_GerberCovariance.jl` states the statistic,
-                       # and `06_SmythBrobyCovariance.jl` and `35_GerberIQCovariance.jl`
+                       # The Gerber family. `01_GerberCovariance.jl` states the statistic,
+                       # and `02_SmythBrobyCovariance.jl` and `03_GerberIQCovariance.jl`
                        # build on the same symbols.
                        :x_ti_ret => "``x_{t,\\,i}``: Return of asset ``i`` at observation ``t``.",#
                        :t_threshold => "``t``: Threshold parameter, read as a standalone symbol; a subscript ``t`` is the observation index. An asset crosses at an observation when its return is at least ``t`` of its own standard deviations away from zero, and a return of exactly zero never crosses.",#
@@ -1180,7 +1180,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :nc_gerber => "``n_{c}``: Concordant count of a pair, the observations on which both assets crossed their thresholds in the same direction.",#
                        :nd_gerber => "``n_{d}``: Discordant count of a pair, the observations on which both assets crossed their thresholds in opposite directions.",#
                        :nn_gerber => "``n_{n}``: Neutral count of a pair, the observations on which exactly one of the two assets crossed its threshold.",#
-                       # The Smyth-Broby family. `06_SmythBrobyCovariance.jl` states the
+                       # The Smyth-Broby family. `02_SmythBrobyCovariance.jl` states the
                        # statistic, and it shares the Gerber symbols above.
                        :r_tilde_sb => "``\\tilde{r}_{t,\\,i} = (x_{t,\\,i} - \\mu_i) / \\sigma_i``: Centred, standardised return of asset ``i`` at observation ``t``.",#
                        :c1_sb => "``c_1``: Confusion-zone threshold. It is read against the **raw, uncentred** return, and it rejects an observation only when both assets fall inside it.",#
@@ -1195,7 +1195,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :poscount_sb => "``c^{+}``, ``c^{-}``, ``c^{0}``: Observation counts of a pair over ``C``, ``D`` and ``N``.",#
                        :pqu_sb => "``p``, ``q``, ``u``: Concordant, discordant and neutral scores of a pair, chosen from the sums and the counts by the marker prefix.",#
                        :h_ij_sb => "``h_{i,\\,j} = p - q``: Net score of the pair, before any normalisation.",#
-                       # The higher comoments. `19_Coskewness.jl` and `20_Cokurtosis.jl`
+                       # The higher comoments. `18_Coskewness.jl` and `19_Cokurtosis.jl`
                        # build both matrices from one deviation matrix and one pairwise
                        # expansion of it, so the two files share these four symbols.
                        :Y_dev => "``\\mathbf{Y}``: ``T \\times N`` deviation matrix. `FullMoment` takes the centred returns, and `SemiMoment` clips every positive entry of them to zero.",#
@@ -1209,7 +1209,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :d_sep => "``d``: Separation between two assets.",#
                        # Network centrality. The eight members of
                        # `AbstractCentralityAlgorithm` each state a closed form over the
-                       # same network, so `14_Centrality.jl` shares these symbols between
+                       # same network, so `01_Centrality.jl` shares these symbols between
                        # eight Units.
                        :A_network => "``\\mathbf{A}``: Adjacency matrix of the network. It is binary on the unweighted route, and carries the edge weights of its own branch where the algorithm declares a polarity.",#
                        :n_network => "``n``: Number of assets, which is the number of vertices of the network.",#
@@ -1222,7 +1222,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # the same candidate counts, so `02_Clusters.jl` shares this symbol
                        # between two Units.
                        :c_star_clusters => "``c^{\\star}``: Selected number of clusters.",#
-                       # Preselection. `24_Preselection.jl` states the admitted set of every
+                       # Preselection. `20_AssetSelection.jl` states the admitted set of every
                        # selection rule and of every redundancy algorithm, so the four
                        # symbols below are each shared by two or more Units of that file.
                        :s_i_score => "``s_{i}``: Score of asset ``i``, the risk measure evaluated on that asset's own return series.",#

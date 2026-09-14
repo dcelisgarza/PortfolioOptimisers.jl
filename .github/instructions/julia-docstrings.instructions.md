@@ -481,8 +481,8 @@ Three kinds of alias exist, and the sections differ by kind.
 
 | Kind | Declaration | Lives in | Header line | Sections it carries |
 | --- | --- | --- | --- | --- |
-| **Acronym alias** | `const HRP = HierarchicalRiskParity` | `src/27_Aliases.jl` only | the alias name alone | none |
-| **Factory alias** | `MAD(; kwargs...)::LowOrderMoment` | `src/27_Aliases.jl` only | the signature, ending `-> T` | `# Validation`, and only when its own body raises |
+| **Acronym alias** | `const HRP = HierarchicalRiskParity` | `src/23_Aliases.jl` only | the alias name alone | none |
+| **Factory alias** | `MAD(; kwargs...)::LowOrderMoment` | `src/23_Aliases.jl` only | the signature, ending `-> T` | `# Validation`, and only when its own body raises |
 | **Dispatch alias** | `const RhoDistanceAlgorithm = Union{...}` | any file under `src/` | the declaration, `const NAME = <type expression>` | `# Related`, and `# References` when the grouping itself is published |
 
 A **dispatch alias** is a `const` bound to a type expression rather than to a bare name. A `Union`, a container such as `AbstractVector{<:LinearConstraint}`, and a parametrised form such as `const RMCVaR{T} = Union{...}` are all one kind, because a caller meets all three the same way: as the type a method signature dispatches on.
@@ -490,7 +490,7 @@ A **dispatch alias** is a `const` bound to a type expression rather than to a ba
 ### The summary paragraph
 
 - An **acronym alias** carries exactly one sentence, `Alias for [`Canonical`](@ref).` and nothing more. The alias and its target are the same object, so a second sentence describes the target and belongs on the target.
-- A **factory alias** carries one sentence naming what it builds. That sentence `@ref`s every type the factory composes. A later sentence is permitted, and only for a choice the composition fixes that a reader would otherwise get wrong. Read `ZeroVarianceFilter` in [`src/27_Aliases.jl`](../../src/27_Aliases.jl), which states why it scores with `SCM()` and not with `Variance`.
+- A **factory alias** carries one sentence naming what it builds. That sentence `@ref`s every type the factory composes. A later sentence is permitted, and only for a choice the composition fixes that a reader would otherwise get wrong. Read `ZeroVarianceFilter` in [`src/23_Aliases.jl`](../../src/23_Aliases.jl), which states why it scores with `SCM()` and not with `Variance`.
 - A **dispatch alias** carries what the alias groups and why the group exists. The *why* is the load-bearing half: a reader who sees only the member list learns nothing the declaration did not already show.
 
 ### Why an alias carries so little
@@ -594,7 +594,7 @@ The section states the mathematics and nothing else. It **names no identifier fr
 
 `# Algorithm` carries the reverse rule — *do not restate a closed form as a step*. The two rules bound one border from opposite sides, so a fact that fails this rule usually already stands as a step, and the fix is to delete it here rather than to move it.
 
-**Example.** Read against `ShrunkDenoise` in [`src/05_Denoise.jl`](../../src/05_Denoise.jl):
+**Example.** Read against `ShrunkDenoise` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl):
 
 - CUT — *the eigenvalues sorted ascending*. The sort is the body's choice, and it is already an `# Algorithm` step.
 - CUT — *the diagonal is pinned to one afterwards to shed the eigendecomposition round-off*. That is an `# Algorithm` step too.
@@ -714,7 +714,7 @@ Rules:
 - Do not restate a closed form as a step. The formula belongs in `# Mathematical definition`, and the step that applies it names it.
 - A **selector tag** — a type whose only job is to name the branch that a caller takes — is never *forced* to carry either section. Its summary sentence states which branch it selects, and a tag that names nothing further stops there. Most subtypes of `AbstractAlgorithm` are selector tags, so the rule must never force numbered steps onto a marker type. A tag whose branch *is* a closed form does state it: the form under `# Mathematical definition`, and the steps of that branch under `# Algorithm`. `SpectralDenoise` is the reference for that shape, and the row below points at it.
 
-**Example.** The following is the algorithm of `denoise!(dn::Denoise, X::MatNum, q::Number)` in `src/05_Denoise.jl`:
+**Example.** The following is the algorithm of `denoise!(dn::Denoise, X::MatNum, q::Number)` in `src/04_MatrixProcessing/02_Denoise.jl`:
 
 ````julia
 """
@@ -783,7 +783,7 @@ Open the subsection with `$(val_dict[:relax])`, so that the opening cannot drift
 
 **A bound does not have to sit in a row.** `BrownianDistanceVariance` relaxes inside an expression, and the `Max` and log-sum-exp scalarisers put an upper bound in `model[:risk]` that is tight only while a minimising objective pulls on it.
 
-**Example.** The following is the formulation of `set_gross_budget_constraints!` in `src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl`:
+**Example.** The following is the formulation of `set_gross_budget_constraints!` in `src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl`:
 
 ````julia
 """
@@ -807,7 +807,7 @@ Where:
 """
 ````
 
-**Example that registers no row.** The following is the formulation of `set_model_scales!` in `src/20_Optimisation/08_Base_JuMPOptimisation.jl`. It registers two expressions and nothing else, so it carries one subsection:
+**Example that registers no row.** The following is the formulation of `set_model_scales!` in `src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation.jl`. It registers two expressions and nothing else, so it carries one subsection:
 
 ````julia
 """
@@ -833,11 +833,11 @@ Read a real docstring, not a copy of one. Each row names a Unit whose file is ma
 
 | Kind | Unit | File |
 | --- | --- | --- |
-| Abstract type | `AbstractDenoiseAlgorithm` | [`src/05_Denoise.jl`](../../src/05_Denoise.jl) |
-| Selector tag | `SpectralDenoise` | [`src/05_Denoise.jl`](../../src/05_Denoise.jl) |
-| Struct with fields | `ShrunkDenoise` | [`src/05_Denoise.jl`](../../src/05_Denoise.jl) |
-| Public function | `denoise!` | [`src/05_Denoise.jl`](../../src/05_Denoise.jl) |
-| Private function | `_denoise!` | [`src/05_Denoise.jl`](../../src/05_Denoise.jl) |
-| Dispatch alias | `RhoDistanceAlgorithm` | [`src/09_Distance/02_Distance.jl`](../../src/09_Distance/02_Distance.jl) |
+| Abstract type | `AbstractDenoiseAlgorithm` | [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) |
+| Selector tag | `SpectralDenoise` | [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) |
+| Struct with fields | `ShrunkDenoise` | [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) |
+| Public function | `denoise!` | [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) |
+| Private function | `_denoise!` | [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) |
+| Dispatch alias | `RhoDistanceAlgorithm` | [`src/06_Distance/02_Distance.jl`](../../src/06_Distance/02_Distance.jl) |
 
 The table above carries no row for `# JuMP formulation`. Every file that calls a `JuMP` macro is unswept, so no Gate holds a pointer into one. The row is added when the first such file is swept.

@@ -167,6 +167,6 @@ plot_risk_contribution(rv, res_hrp, rd)
 #src   throws a cryptic `MethodError: no method matching *(::Nothing, ::SubArray...)` from
 #src   `dot(w, sigma, w)` deep in `expected_risk`, rather than a contextual message telling
 #src   the user to populate sigma via `factory(Variance(), prior)`. A `@argcheck`/`isnothing`
-#src   guard in the Variance functor (src/19_RiskMeasures/02_Variance.jl:297) would mirror the
+#src   guard in the Variance functor (src/16_RiskMeasures/02_Variance.jl:297) would mirror the
 #src   friendly error already added for factor risk contribution. Worked around here with
 #src   `factory`.

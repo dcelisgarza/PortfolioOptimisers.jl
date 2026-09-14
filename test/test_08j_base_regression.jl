@@ -1,5 +1,5 @@
 #=
-Check `src/08_Moments/21_Base_Regression.jl` against the mathematics its docstrings state.
+Check `src/05_Moments/20_Base_Regression.jl` against the mathematics its docstrings state.
 Issue #463 of child map 3 (#417) under the map of maps (#404).
 
 #404's condition 2 is "checked with real numbers. Not read -- run". Every testset below pins

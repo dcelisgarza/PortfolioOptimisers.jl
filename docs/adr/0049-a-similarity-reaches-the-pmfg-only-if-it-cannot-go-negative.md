@@ -7,28 +7,28 @@ status: accepted
 ## Context
 
 `NetworkEstimator(; alg = AngularSimilarity())` threw. The error came from
-[`PMFG_T2s`](../../src/11_Phylogeny/04_DBHT.jl)'s own non-negativity check, one transformation
+[`PMFG_T2s`](../../src/08_Phylogeny/06_DBHT/01_DBHT.jl)'s own non-negativity check, one transformation
 after the mistake was made, and it named `W` rather than the configuration that produced it. That
 was [#239](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/239).
 
 The blast radius is wider than the report. Four call sites hand `distance_to_similarity` output
-straight to `PMFG_T2s`: [`calc_adjacency`](../../src/11_Phylogeny/06_Phylogeny.jl),
-[`clusterise`](../../src/11_Phylogeny/06_Phylogeny.jl),
-[`DBHTs`](../../src/11_Phylogeny/04_DBHT.jl) and `logo!`. None of them guarded the sign, so
+straight to `PMFG_T2s`: [`calc_adjacency`](../../src/08_Phylogeny/05_Phylogeny.jl),
+[`clusterise`](../../src/08_Phylogeny/05_Phylogeny.jl),
+[`DBHTs`](../../src/08_Phylogeny/06_DBHT/01_DBHT.jl) and `logo!`. None of them guarded the sign, so
 `DBHT(; sim = AngularSimilarity())` and `LoGo(; sim = AngularSimilarity())` failed the same way.
 Three estimators, one defect.
 
 The negative number is a symptom. The disease is a **mismatched pairing**.
-[`AngularSimilarity`](../../src/09_Distance/04_Similarity.jl) is `cos(pi * D)`, the honest inverse
-of an angular distance and of nothing else. [`SimpleDistance`](../../src/09_Distance/02_Distance.jl)
+[`AngularSimilarity`](../../src/06_Distance/04_Similarity.jl) is `cos(pi * D)`, the honest inverse
+of an angular distance and of nothing else. [`SimpleDistance`](../../src/06_Distance/02_Distance.jl)
 is `sqrt((1 - rho) / 2)`, and it shares `AngularDist`'s `[0, 1]` range exactly. The two are
 **indistinguishable by range**, so `cos(pi * D)` type-checks for both while being correct for only
 one. Under `SimpleDistance` the similarity turns negative wherever `rho < 0.5`, not where
 `rho < 0`. The measured `D = 0.706` in #239 is a correlation of `0.003`, and `cos(pi * 0.706)` is
 `-0.618`.
 
-[`default_similarity`](../../src/09_Distance/04_Similarity.jl) already pairs a metric with its
-inverse, and [`FeatureDistance`](../../src/09_Distance/05_FeatureDistance.jl) uses it.
+[`default_similarity`](../../src/06_Distance/04_Similarity.jl) already pairs a metric with its
+inverse, and [`FeatureDistance`](../../src/06_Distance/05_FeatureDistance.jl) uses it.
 `NetworkEstimator.alg`, `DBHT.sim` and `LoGo.sim` took any member, with no reference to the distance
 estimator that produced `D`.
 
@@ -220,7 +220,7 @@ cross-validation folds shifts every row of the feature matrix.
 
 ### The domain precondition is interface-scoped, not member-wide
 
-[`assert_similarity_domain(sim, de, D)`](../../src/09_Distance/04_Similarity.jl) runs at the five
+[`assert_similarity_domain(sim, de, D)`](../../src/06_Distance/04_Similarity.jl) runs at the five
 PMFG entry points and nowhere else. It is deliberately **not** called inside
 `distance_to_similarity`, which stays a pure transformation with no domain of its own.
 

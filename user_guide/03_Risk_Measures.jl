@@ -353,7 +353,7 @@ plot_histogram(w, rd)
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
 #src - Closes card 9 of the 2026-07-19 ergonomics review: the ~57-measure family was reachable
-#src   only from src/19_RiskMeasures + src/27_Aliases.jl, and the `LowOrderMoment(alg = …) ≡ MAD()`
+#src   only from src/16_RiskMeasures + src/23_Aliases.jl, and the `LowOrderMoment(alg = …) ≡ MAD()`
 #src   decoding had to be done by hand.
 #src - Every table is generated: alias column reverse-maps the exported alias layer, `Optimisers`
 #src   column comes from the ADR 0018 trait, `Expands to` is read off constructed objects. The

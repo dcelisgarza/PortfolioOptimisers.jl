@@ -80,8 +80,8 @@ const MEASURED_ROOTS = ("src/", "ext/")
 The four files that declare a Declaration Macro, per ADR 0072.
 """
 const DECLARING_FILES = ("src/01_Base/03_PrettyShow.jl", "src/02_Tools.jl",
-                         "src/08_Moments/01_Base_Moments.jl",
-                         "src/20_Optimisation/01_Base_Optimisation.jl")
+                         "src/05_Moments/01_Base_Moments.jl",
+                         "src/17_Optimisation/01_Base_Optimisation.jl")
 
 in_scope(path::AbstractString) = any(r -> startswith(path, r), MEASURED_ROOTS)
 

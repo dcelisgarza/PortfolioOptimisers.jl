@@ -49,7 +49,7 @@
     end
     @testset "The similarity sweep of #449" begin
         #=
-        Each of the five closed forms of `src/09_Distance/04_Similarity.jl` computed by
+        Each of the five closed forms of `src/06_Distance/04_Similarity.jl` computed by
         hand and compared, rather than read. The testset above already pins the two the
         library shipped first; this one covers all five, the element type every branch
         carries through, the sign that excludes `AngularSimilarity` from the non-negative
@@ -112,7 +112,7 @@
                                                                      [0.0 Inf; Inf 0.0]))
         #=
         `default_similarity` speaks for both of its methods. The `AngularDist` method is
-        declared in `src/09_Distance/05_FeatureDistance.jl`, beside the metric; the
+        declared in `src/06_Distance/05_FeatureDistance.jl`, beside the metric; the
         docstring lives in `04_Similarity.jl` and states the branch.
         =#
         @test PortfolioOptimisers.default_similarity(AngularDist()) === AngularSimilarity()
@@ -1675,7 +1675,7 @@
     end
     # The three defects that the documentation sweep of the DBHT family, issue #469, found on
     # the `EqualRoot` path: #507, #508 and #509. That path is now
-    # `src/11_Phylogeny/09_CliqueHierarchy.jl`. The reference implementation
+    # `src/08_Phylogeny/06_DBHT/04_CliqueHierarchy.jl`. The reference implementation
     # is `DBHTs.m`, MATLAB Central File Exchange submission 46750 by Won-Min Song and Tomaso
     # Aste, and it carries all three. The papers it cites are Song, Di Matteo and Aste,
     # *Nested hierarchies in planar graphs*, Discrete Applied Mathematics 159 (2011)
@@ -3058,7 +3058,7 @@ end
     @test k == clr.k
 end
 
-# The claims `src/11_Phylogeny/02_Clusters.jl` makes about the two selection scores, about the
+# The claims `src/08_Phylogeny/02_Clusters.jl` makes about the two selection scores, about the
 # `linkage` symbol and about the `Clusters` constructor. Defined at top level because a
 # `@testset` body becomes a function, and the sweep of #467 reads these numbers.
 @testset "The clustering vocabulary states what it does (#467)" begin
@@ -3139,8 +3139,8 @@ function PortfolioOptimisers.get_node_property(::PreorderTreeByLabel,
                                                a::PortfolioOptimisers.ClusterNode)
     return string("asset_", a.id)
 end
-# The claims `src/11_Phylogeny/03_Hierarchical.jl` and
-# `src/11_Phylogeny/05_NonHierarchicalClustering.jl` make about the tree, about the search
+# The claims `src/08_Phylogeny/03_Hierarchical.jl` and
+# `src/08_Phylogeny/04_NonHierarchicalClustering.jl` make about the tree, about the search
 # that replaces an invalid cut, and about the flat partition. Defined at top level because a
 # `@testset` body becomes a function, and the sweep of #468 reads these numbers.
 @testset "The dendrogram search and its rejection path (#468)" begin
@@ -3354,7 +3354,7 @@ end
     end
 end
 
-# The numbers that the DBHT files of `src/11_Phylogeny/` claim, run rather than read. This is
+# The numbers that the DBHT files of `src/08_Phylogeny/` claim, run rather than read. This is
 # condition 2 of the sweep of #470, under child map #418 of the map of maps #404. The file is
 # a port, so the check that carries weight is a number from a hand-computed answer set beside
 # the number the code returns. The sources are `DBHTs.m`, MATLAB Central File Exchange
@@ -3725,7 +3725,7 @@ end
     end
 end
 
-# The four branches of the DBHT files of `src/11_Phylogeny/` that the suite left uncovered
+# The four branches of the DBHT files of `src/08_Phylogeny/` that the suite left uncovered
 # when #470 measured them, and the input that reaches each. Condition 3 of the sweep. Defined at top
 # level because a `@testset` body becomes a function.
 @testset "The DBHT branches the suite did not reach (#470)" begin
@@ -3836,7 +3836,7 @@ end
 
 #=
 Condition 2 of the sweep of the phylogeny family, issue #472. The eight centrality algorithms
-now live in `src/11_Phylogeny/14_Centrality.jl`. The file that held them was
+now live in `src/08_Phylogeny/09_Centrality/01_Centrality.jl`. The file that held them was
 coverage terminal before this testset was written -- 319 executable lines, 0 misses -- and
 every check below exists because the line it covers was already executed and asserted
 nothing about the value it produced.

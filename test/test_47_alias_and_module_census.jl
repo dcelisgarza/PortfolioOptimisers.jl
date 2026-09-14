@@ -13,11 +13,11 @@ module AliasCensusHealth
 include(joinpath(@__DIR__, "..", "code_health", "CodeHealth.jl"))
 end
 
-@testset "Alias census: every alias of src/27_Aliases.jl keeps its claim" begin
+@testset "Alias census: every alias of src/23_Aliases.jl keeps its claim" begin
     using Test, TOML
 
     #=
-    `src/27_Aliases.jl` is 132 units and 43 executable lines, and it is the only file under
+    `src/23_Aliases.jl` is 132 units and 43 executable lines, and it is the only file under
     `src/` that holds an ACRONYM alias or a FACTORY alias. ADR 0086 (issue #436) scopes both
     kinds to this file, and `test_26_docs.jl` gates the sections each kind may carry.
 
@@ -47,7 +47,7 @@ end
 
     PO = PortfolioOptimisers
     ROOT = normpath(joinpath(@__DIR__, ".."))
-    ALIAS_FILE = joinpath(ROOT, "src", "27_Aliases.jl")
+    ALIAS_FILE = joinpath(ROOT, "src", "23_Aliases.jl")
 
     # The two kinds this file holds. A new alias must land in one of them.
     ACRONYM_TOTAL = 111
@@ -119,7 +119,7 @@ end
         census green while the two records disagree. `docs/adr/` is outside the citation
         census's scope, so the ADR stays a prose copy. =#
         manifest = TOML.parsefile(joinpath(ROOT, "code_health", "sweep_manifest.toml"))["file"]
-        @test ACRONYM_TOTAL + FACTORY_TOTAL == manifest["src/27_Aliases.jl"]["units"]
+        @test ACRONYM_TOTAL + FACTORY_TOTAL == manifest["src/23_Aliases.jl"]["units"]
 
         # A third kind would be a dispatch alias, which ADR 0086 permits in any file. It
         # carries `# Related`, and this file's sweep recorded none, so one arriving here
@@ -188,7 +188,7 @@ end
             append!(offenders, acronym_offences(name, target, text))
         end
         if !isempty(offenders)
-            @warn """$(length(offenders)) acronym alias claim(s) in `src/27_Aliases.jl` do not
+            @warn """$(length(offenders)) acronym alias claim(s) in `src/23_Aliases.jl` do not
                      hold. An acronym alias and its target are the SAME object, and its
                      docstring is one sentence naming that object (ADR 0086). Correct the
                      `const`, or correct the sentence:\n  $(join(offenders, "\n  "))"""
@@ -221,7 +221,7 @@ end
         end
         if !isempty(offenders)
             @warn """$(length(offenders)) factory alias summary sentence(s) in
-                     `src/27_Aliases.jl` omit a type the factory composes. The composition IS
+                     `src/23_Aliases.jl` omit a type the factory composes. The composition IS
                      the claim, so the sentence `@ref`s every type it builds (ADR
                      0086):\n  $(join(offenders, "\n  "))"""
         end

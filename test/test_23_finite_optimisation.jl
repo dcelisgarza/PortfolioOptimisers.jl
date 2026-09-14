@@ -87,7 +87,7 @@
 
     # `DiscreteAllocation` defaults `fb` to a `GreedyAllocation`, so every allocation
     # above goes through the generic `optimise` and its fallback chain. Only `fb =
-    # nothing` reaches the shortcut method in `22_DiscreteFiniteAllocation.jl`, which
+    # nothing` reaches the shortcut method in `02_DiscreteFiniteAllocation.jl`, which
     # calls `_optimise` directly. The shortcut must agree with the generic exactly: for a
     # fallback-less estimator the chain runs `_optimise` once and returns it unwrapped.
     da_nofb = DiscreteAllocation(; slv = mip_slv, fb = nothing)

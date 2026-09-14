@@ -1,5 +1,5 @@
 #=
-Check `src/08_Moments/42_FactorExposures/08_Base_Exposure.jl`, `09_CompositeExposure.jl`,
+Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/08_Base_Exposure.jl`, `09_CompositeExposure.jl`,
 `10_DerivedExposure.jl`, `11_OneHotExposure.jl` and `12_ConstantExposure.jl` against the
 contract their docstrings state, and against the reference implementation the map of issue
 #643 ports. Issue #721.

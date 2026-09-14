@@ -1,6 +1,6 @@
 #=
-Check `src/08_Moments/22_StepwiseRegression.jl` and
-`src/08_Moments/23_DimensionReductionRegression.jl` against the mathematics and the procedures
+Check `src/05_Moments/21_TimeSeriesRegression/01_StepwiseRegression.jl` and
+`src/05_Moments/21_TimeSeriesRegression/02_DimensionReductionRegression.jl` against the mathematics and the procedures
 their docstrings state. Issue #464 of child map 3 (#417) under the map of maps (#404).
 
 #404's condition 2 is "checked with real numbers. Not read -- run". Every testset below pins a

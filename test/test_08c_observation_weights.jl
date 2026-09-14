@@ -160,7 +160,7 @@ const PO = PortfolioOptimisers
         @test isnothing(w)
     end
 
-    @testset "08_Moments estimators" begin
+    @testset "05_Moments estimators" begin
         vw = VectorOnlyObsWeights()
         cw = CompleteObsWeights(10)
 
@@ -191,7 +191,7 @@ const PO = PortfolioOptimisers
         @test isa(mean(SimpleExpectedReturns(), X), AbstractArray)
     end
 
-    @testset "19_RiskMeasures resolve-then-rebuild" begin
+    @testset "16_RiskMeasures resolve-then-rebuild" begin
         # These measures dispatch on the weights type, resolve, then rebuild themselves and
         # re-dispatch. A `nothing` resolution used to rebuild as an unweighted measure and
         # silently re-dispatch to the unweighted method - the same defect, one layer deeper.

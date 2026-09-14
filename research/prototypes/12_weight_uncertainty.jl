@@ -307,7 +307,7 @@ bound gives coverage of at least `1 - alpha`.
   - The fix is to make the score volatility-adjusted: divide the residual by a
     conditional volatility forecast before taking the quantile. The library
     already has the estimator for that, in
-    `src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl`. That is the
+    `src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl`. That is the
     natural next step and it is not implemented here.
 """
 function conformal_return_interval(w::AbstractVector{<:Real},

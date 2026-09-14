@@ -7,9 +7,9 @@ status: accepted
 ## Context
 
 A risk measure that carries a prior-derived field took a **value** or `nothing`.
-[`Variance`](../../src/19_RiskMeasures/02_Variance.jl) took a covariance matrix,
-[`Kurtosis`](../../src/19_RiskMeasures/04_Kurtosis.jl) a cokurtosis tensor,
-[`ArithmeticReturn`](../../src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl)
+[`Variance`](../../src/16_RiskMeasures/02_Variance.jl) took a covariance matrix,
+[`Kurtosis`](../../src/16_RiskMeasures/04_Kurtosis.jl) a cokurtosis tensor,
+[`ArithmeticReturn`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl)
 an expected-returns vector. `nothing` meant "take the optimisation's own prior"; a value meant
 "use this one".
 
@@ -26,7 +26,7 @@ Estimator is a description of how to compute for whatever input it is given, so 
 the slot survives a refit precisely because it holds no numbers.
 
 The library already had two precedents.
-[`MedianAbsoluteDeviation`](../../src/19_RiskMeasures/25_MedianAbsoluteDeviationRisk.jl)'s `mu`
+[`MedianAbsoluteDeviation`](../../src/16_RiskMeasures/21_MedianAbsoluteDeviationRisk.jl)'s `mu`
 admitted a value or a centring strategy, resolved by `calc_moment_target` at the point of use.
 ADR 0048's `HopCount.n` and `PathLength.dmax` admit an integer or a **rule** called at the point
 of use, with refusal methods in the kernel.

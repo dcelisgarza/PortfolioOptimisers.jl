@@ -2163,9 +2163,9 @@ end
     # ADR 0063 as amended: every member reads the field exactly once, through `apply_rf`,
     # and nothing subtracts it. The two with no equilibrium branch add it to the posterior
     # asset mean; the two with one convert the equilibrium mean before the update.
-    for file in ["06_BlackLittermanPrior.jl", "07_BayesianBlackLittermanPrior.jl",
-                 "08_FactorBlackLittermanPrior.jl", "09_AugmentedBlackLittermanPrior.jl"]
-        lines = code_lines(joinpath(src, "13_Prior", file))
+    for file in ["02_BlackLittermanPrior.jl", "03_BayesianBlackLittermanPrior.jl",
+                 "04_FactorBlackLittermanPrior.jl", "05_AugmentedBlackLittermanPrior.jl"]
+        lines = code_lines(joinpath(src, "10_Prior", "05_BlackLitterman", file))
         reads = filter(l -> occursin("pe.rf", l), lines)
         @test length(reads) == 1
         # The one read goes through the verb; none is hand-written arithmetic.
@@ -2176,10 +2176,12 @@ end
     # The intercept is applied once too, and `AugmentedBlackLittermanPrior` is where it was
     # applied twice (#570). It goes into the prior stack now, so the only `rr.b` the body
     # reads is the one the equilibrium branch adds.
-    aug = code_lines(joinpath(src, "13_Prior", "09_AugmentedBlackLittermanPrior.jl"))
+    aug = code_lines(joinpath(src, "10_Prior", "05_BlackLitterman",
+                              "05_AugmentedBlackLittermanPrior.jl"))
     @test count(l -> occursin(r"\bb\b", l) && occursin("vcat(b,", l), aug) == 1
     # The kernel carries no rate of its own.
-    kernel = code_lines(joinpath(src, "13_Prior", "06_BlackLittermanPrior.jl"))
+    kernel = code_lines(joinpath(src, "10_Prior", "05_BlackLitterman",
+                                 "02_BlackLittermanPrior.jl"))
     decl = only(filter(l -> occursin("function vanilla_posteriors(", l), kernel))
     @test !occursin("rf", decl)
     # The one verb is declared once, in the file that owns the family's kernel, and the
@@ -2187,7 +2189,7 @@ end
     @test count(l -> occursin("function apply_rf(", l), kernel) == 1
     @test !isdefined(PortfolioOptimisers, :remove_rf)
     # `equilibrium_mu` owns `l * sigma * w` and its equal-weight fallback.
-    owner = code_lines(joinpath(src, "08_Moments", "17_EquilibriumExpectedReturns.jl"))
+    owner = code_lines(joinpath(src, "05_Moments", "16_EquilibriumExpectedReturns.jl"))
     @test count(l -> occursin("function equilibrium_mu(", l), owner) == 2
 end
 
@@ -2317,7 +2319,7 @@ end
 end
 
 #=
-The residual comoments of `src/13_Prior/14_HighOrderFactorPriorEstimator.jl`, checked against
+The residual comoments of `src/10_Prior/08_HighOrderFactorPriorEstimator.jl`, checked against
 hand-built matrices rather than read. Sweep ticket #534. Riskfolio-Lib carries the reference
 implementation of both, and this library's branch chain matches it entry for entry; what differs
 is that the reference builds the systematic covariance itself from the loadings, while this

@@ -33,20 +33,20 @@ If no suitable abstract type exists, define a new abstract algorithm type first.
 
 An abstract type is **not exported** unless the maintainer says so. [`CLAUDE.md`](../../CLAUDE.md) § *Design rules* owns that rule, and `test/test_43_exported_abstract_type_census.jl` holds it.
 
-Read `AbstractDenoiseAlgorithm` in [`src/05_Denoise.jl`](../../src/05_Denoise.jl) for a real abstract-type docstring. The § *Reference docstrings* table names it, and a Gate holds it.
+Read `AbstractDenoiseAlgorithm` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) for a real abstract-type docstring. The § *Reference docstrings* table names it, and a Gate holds it.
 
 ## Step 2 — Define the algorithm struct
 
 An algorithm is often a parameterless selector tag, and sometimes it carries parameters.
 
-- A **selector tag** is a bare `struct MyAlgorithm <: AbstractMyAlgorithm end`. Read `SpectralDenoise` in [`src/05_Denoise.jl`](../../src/05_Denoise.jl) for its docstring.
-- A **parameterised algorithm** is a `@concrete struct` with an inner constructor that validates and an outer keyword constructor that carries the defaults. [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *Constructor Pattern* owns the shape, and § *Input Validation* owns the checks. Read `ShrunkDenoise` in [`src/05_Denoise.jl`](../../src/05_Denoise.jl) for its docstring.
+- A **selector tag** is a bare `struct MyAlgorithm <: AbstractMyAlgorithm end`. Read `SpectralDenoise` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) for its docstring.
+- A **parameterised algorithm** is a `@concrete struct` with an inner constructor that validates and an outer keyword constructor that carries the defaults. [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *Constructor Pattern* owns the shape, and § *Input Validation* owns the checks. Read `ShrunkDenoise` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) for its docstring.
 
 Both kinds are documented as [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Concrete struct types* states, and each field carries an inline description as § *Inline field docstrings* states.
 
 ## Step 3 — Implement the dispatch and interface methods
 
-Write the method that the estimator calls internally when it holds this algorithm, and document it as [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Section Structure for Functions* states. Read `denoise!` and `_denoise!` in [`src/05_Denoise.jl`](../../src/05_Denoise.jl) for a public and a private function docstring.
+Write the method that the estimator calls internally when it holds this algorithm, and document it as [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Section Structure for Functions* states. Read `denoise!` and `_denoise!` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) for a public and a private function docstring.
 
 Common interface methods to implement include:
 

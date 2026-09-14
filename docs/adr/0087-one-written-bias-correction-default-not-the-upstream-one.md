@@ -54,7 +54,7 @@ there is no single upstream default to track.
 
 ### What the written value already buys
 
-[`GeneralCovariance`](../../src/08_Moments/03_Covariance.jl) writes
+[`GeneralCovariance`](../../src/05_Moments/03_Covariance.jl) writes
 `StatsBase.SimpleCovariance(; corrected = true)`. That written `true` is what makes the covariance
 path agree with the variance path, and it is a deliberate departure from `SimpleCovariance`'s own
 `false`. The library is consistent on both branches today. The sentinel proposal broke the weighted

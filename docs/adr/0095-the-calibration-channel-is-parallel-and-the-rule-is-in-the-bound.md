@@ -42,9 +42,9 @@ validate.
 ### The channel is parallel, and a rule stays out of the `DeferredQuantity` union
 
 Five verbs are new. Each names its counterpart in
-[`src/19_RiskMeasures/01_Base_RiskMeasures.jl`](../../src/19_RiskMeasures/01_Base_RiskMeasures.jl),
+[`src/19_RiskMeasures/01_Base_RiskMeasures.jl`](../../src/16_RiskMeasures/01_Base_RiskMeasures.jl),
 and the calibration half of each pair lives in
-[`src/14_UncertaintySets/06_CalibrationRules.jl`](../../src/14_UncertaintySets/06_CalibrationRules.jl).
+[`src/14_UncertaintySets/06_CalibrationRules.jl`](../../src/11_UncertaintySets/06_CalibrationRules.jl).
 
 | Calibration | Deferred Quantity | What it does |
 | :--- | :--- | :--- |
