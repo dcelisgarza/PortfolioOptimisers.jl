@@ -11,7 +11,8 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Arr3Num, Option, VecNum_VecV
                             Scalariser, SumScalariser, measure_label, extract_pr,
                             relevant_assets, extract_fees, OptimisationResult,
                             finite_magnitudes, finite_symmetric_clim, finite_columns,
-                            investable_plot_view
+                            investable_plot_view, result_investable_mask,
+                            investable_weights_view, fold_factor_returns
 
 ## plot_portfolio_cumulative_returns
 function PortfolioOptimisers.plot_portfolio_cumulative_returns(net_ret::VecNum_VecVecNum;
@@ -379,11 +380,15 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseR
                                                                            <:HeldWeightsResult},
                                                     fees::Option{<:Fees} = nothing;
                                                     kwargs...)
-    hw = pred.hw
-    fees = extract_fees(pred.res, fees)
-    nx = isnothing(pred.rd.nx) ? (1:size(hw.X, 2)) : pred.rd.nx
-    return PortfolioOptimisers.plot_risk_contribution(r, pred.res.w, hw.X, fees; nx = nx,
-                                                      kwargs...)
+    # The record is on the caller's universe and the fee on the investable one, so the
+    # fold views the weights and the returns at the mask, as `risk_contribution` does on a
+    # fold; the fold's own `nx` is the reduced axis already.
+    imsk = result_investable_mask(pred.res)
+    w = investable_weights_view(imsk, pred.res.w)
+    X = investable_weights_view(imsk, pred.hw.X)
+    nx = isnothing(pred.rd.nx) ? (1:length(w)) : pred.rd.nx
+    return PortfolioOptimisers.plot_risk_contribution(r, w, X, extract_fees(pred.res, fees);
+                                                      nx = nx, kwargs...)
 end
 function PortfolioOptimisers.plot_risk_contribution(::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                     ::PredictionResult{<:Any, <:Any,
@@ -409,12 +414,19 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
                                                                                   <:Any,
                                                                                   <:HeldWeightsResult},
                                                            fees::Option{<:Fees} = nothing;
+                                                           rd::Option{<:ReturnsResult} = nothing,
                                                            kwargs...)
-    hw = pred.hw
+    # The same view at the mask as `factor_risk_contribution` takes on a fold, and the
+    # same resolution of `rd`: a caller's is viewed, and `nothing` is built from the fold.
+    imsk = result_investable_mask(pred.res)
+    w = investable_weights_view(imsk, pred.res.w)
+    X = investable_weights_view(imsk, pred.hw.X)
     fees = extract_fees(pred.res, fees)
-    rd = ReturnsResult(; nx = pred.rd.nx, X = hw.X, nf = pred.rd.nf, F = pred.rd.F)
-    return PortfolioOptimisers.plot_factor_risk_contribution(r, pred.res.w, hw.X, fees;
-                                                             rd = rd, kwargs...)
+    return PortfolioOptimisers.plot_factor_risk_contribution(r, w, X, fees;
+                                                             rd = fold_factor_returns(imsk,
+                                                                                      rd,
+                                                                                      pred),
+                                                             kwargs...)
 end
 function PortfolioOptimisers.plot_factor_risk_contribution(::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                            ::PredictionResult{<:Any, <:Any,

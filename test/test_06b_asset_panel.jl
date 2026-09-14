@@ -637,12 +637,14 @@ end
     @test eltype(feature_matrix(pcat)) === Float64
     @test eltype(panel_feature_matrix(pcat)[2]) === Float64
 
-    # A selection that names only a mask column derives nothing either.
+    # A selection that names only a mask column derives nothing from the columns it
+    # stacks, so it takes the panel's own type: the fallback is the panel's, and it falls
+    # to Float64 only on a panel with no numeric or tensor field at all (Q6, #802).
     pmsk = asset_panel([NumericPanelInput(; name = "a",
                                           vals = Union{Missing, Float32}[1, missing, 3],
                                           alg = ConstantPanelFill(; val = 0.0f0))])
     @test eltype(feature_matrix(pmsk)) === Float32
-    @test eltype(feature_matrix(pmsk, ["a" => :observed])) === Float64
+    @test eltype(feature_matrix(pmsk, ["a" => :observed])) === Float32
 
     # The Panel Field kinds report the type they contribute.
     @test PortfolioOptimisers.panel_value_eltype(PortfolioOptimisers.panel_field(p32, "a")) ===

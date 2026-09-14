@@ -52,6 +52,7 @@ threads_weights
 fold_solved
 held_weight_members
 held_start_weights
+fold_factor_returns
 collapse_benchmark(B::Nothing, w::VecNum_VecVecNum, hw)
 ruined_retcodes
 mark_ruined_members

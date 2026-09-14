@@ -81,8 +81,10 @@ mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
 #=
 Two schemes, identical but for the first switch. [`SelfFinancingDrift`](@ref) is the one Weight
 Drift the library ships: every position grows at its own return, the implicit cash position
-`1 - sum(w)` earns nothing, and the weights are renormalised by the wealth of the moment, so they
-still sum to what they summed to at the start.
+`1 - sum(w)` earns nothing, and the weights are quoted against the wealth of the moment, so the
+held weights and the deflated cash position sum to one at every observation. A fully invested
+book, which is what `MeanRisk` builds by default, holds no cash, so its rows keep summing to one;
+a partly invested book's rows drift with its cash share, and only the sum with the cash holds.
 
 `store_weight_path = true` asks the drifted scheme to keep the path it computes. A reader who does
 not ask for it rebuilds the path from the record instead, and the rebuild is bit-identical, so the
@@ -167,8 +169,8 @@ size(U)
 
 #=
 The first row of the path *is* the target weight vector: the fold starts by holding exactly what it
-chose. Every row sums to what the first row sums to, because the drift renormalises by the wealth
-of the moment rather than letting the book inflate.
+chose. Every row of this fully invested book sums to one, because the drift quotes the positions
+against the wealth of the moment rather than letting the book inflate.
 =#
 
 DataFrame(:row => ["first", "last"], Symbol("sums to") => [sum(U[1, :]), sum(U[end, :])],

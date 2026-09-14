@@ -378,6 +378,32 @@
         @test is_plot(plot_risk_contribution(r_cvr, pred))
         @test is_plot(plot_factor_risk_contribution(r_cvr, pred))
         @test is_plot(plot_risk_contribution(r_cvr, pred; percentage = false))
+
+        # A fold whose result carries an Investable Mask: the record comes back on the
+        # caller's universe and the fee stays on the investable one, so both figures view
+        # the weights and the returns at the mask before they draw.
+        Nm = size(rd.X, 2)
+        km = 3
+        mu = collect(pr.mu)
+        sigma = collect(pr.sigma)
+        Xn = collect(pr.X)
+        mu[km] = NaN
+        sigma[km, :] .= NaN
+        sigma[:, km] .= NaN
+        Xn[:, km] .= NaN
+        prn = LowOrderPrior(; X = Xn, mu = mu, sigma = sigma)
+        fees_m = Fees(; tn = Turnover(; w = fill(1 / Nm, Nm), val = fill(0.001, Nm)))
+        res_m = optimise(MeanRisk(; r = r_cvr,
+                                  opt = JuMPOptimiser(; pe = prn, slv = slv, fees = fees_m)),
+                         rd)
+        Xm = copy(rd.X)
+        Xm[:, km] .= NaN
+        pred_m = predict(res_m, ReturnsResult(; nx = rd.nx, X = Xm, nf = rd.nf, F = rd.F),
+                         collect((size(rd.X, 1) - 30):size(rd.X, 1));
+                         wd = SelfFinancingDrift())
+        @test PortfolioOptimisers.result_investable_mask(res_m)[km] == false
+        @test is_plot(plot_risk_contribution(r_cvr, pred_m))
+        @test is_plot(plot_factor_risk_contribution(r_cvr, pred_m))
     end
     @testset "Cross-sectional regression diagnostics (#798)" begin
         # Each figure draws one level-2 verb. The block is built by hand rather than fitted,

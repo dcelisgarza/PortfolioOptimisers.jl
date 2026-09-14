@@ -1972,7 +1972,7 @@ end
 
 Take the view of the weights at the Investable Mask.
 
-A weight vector is one cross-section, so the mask selects its entries. A weight path is one row of weights per observation, so the mask selects its columns and every row keeps its own observation. A population is reduced member by member.
+A weight vector is one cross-section, so the mask selects its entries. A weight path is one row of weights per observation, so the mask selects its columns and every row keeps its own observation. A population is reduced member by member. A fold's asset-return history has the shape of a path, observations × assets, and the fold-taking consumers of a [`HeldWeightsResult`](@ref) take the same view of it, so the one column selection is stated once.
 
 Both `nothing` sentinels answer the argument they were handed. `imsk` of `nothing` is the all-investable universe, so there is nothing to select and the weights come back untouched. `w` of `nothing` is a caller who stated no weights at all — [`equilibrium_mu`](@ref) falls back to equal weights over whatever axis it is handed — so there is nothing to reduce, and reducing it would have to invent a length. Both are dispatch, so a caller holding neither pays nothing.
 

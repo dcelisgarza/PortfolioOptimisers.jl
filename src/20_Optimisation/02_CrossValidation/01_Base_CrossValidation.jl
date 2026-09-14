@@ -882,7 +882,9 @@ end
 
 Decompose a fold's risk over its assets.
 
-The fold-taking method of [`risk_contribution`](@ref). It resolves the fold's **target** weights, its asset returns and its fee, and hands them to the free function unchanged, so the figures are the free function's own.
+The fold-taking method of [`risk_contribution`](@ref). It resolves the fold's **target** weights, its asset returns and its fee, and hands them to the free function, so the figures are the free function's own.
+
+The three do not sit on one universe. The Held Weights record came back on the caller's universe through [`expand_held_weights`](@ref), and so did the target weights (ADR 0115), while the result's fee stayed on the universe it solved on. The method therefore views the weights and the asset returns at the result's Investable Mask before the finite difference, exactly as [`investable_reduction`](@ref) does at the value-level door, and expands the per asset answer back with a zero at every non-investable asset. A result whose mask is `nothing` views nothing.
 
 Under a Weight Drift the figures are exact to **first order in the drift** only, for the reason the free function states: the drifted series is not linear in the target weights, so the contributions sum to the fold's realised risk approximately rather than exactly. The target weights are still what a contribution is reported against, because they are the decision the finite difference perturbs.
 
@@ -901,7 +903,7 @@ A fold that carries no Held Weights record raises, because `pred.rd.X` is the po
 
 # Returns
 
-  - `Vector`: Risk contributions (or marginal risks) for each asset.
+  - `Vector`: Risk contributions (or marginal risks) for each asset of the caller's universe, exactly `0` at a non-investable one.
 
 # Related
 
@@ -909,12 +911,20 @@ A fold that carries no Held Weights record raises, because `pred.rd.X` is the po
   - [`factor_risk_contribution`](@ref)
   - [`HeldWeightsResult`](@ref)
   - [`PredictionResult`](@ref)
+  - [`expand_held_weights`](@ref)
+  - [`investable_weights_view`](@ref)
 """
 function risk_contribution(r::BaseRM_VecBaseRM,
                            pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
                            fees::Option{<:Fees} = nothing; kwargs...)
-    hw = pred.hw
-    return risk_contribution(r, pred.res.w, hw.X, extract_fees(pred.res, fees); kwargs...)
+    # The record and the target weights are on the caller's universe, and the result's
+    # fee is on the investable one, so the fold views the first two at the mask before
+    # the finite difference and expands the answer back, as the value-level door does.
+    imsk = result_investable_mask(pred.res)
+    rc = risk_contribution(r, investable_weights_view(imsk, pred.res.w),
+                           investable_weights_view(imsk, pred.hw.X),
+                           extract_fees(pred.res, fees); kwargs...)
+    return expand_investable_weights(imsk, rc)
 end
 function risk_contribution(::BaseRM_VecBaseRM, ::PredictionResult{<:Any, <:Any, Nothing},
                            args...; kwargs...)
@@ -926,7 +936,9 @@ end
 
 Decompose a fold's risk over its factors.
 
-The fold-taking method of [`factor_risk_contribution`](@ref), and the twin of the [`risk_contribution`](@ref) method above. It resolves the fold's target weights, its asset returns and its fee the same way, and it builds the `rd` the loadings are fitted from out of the fold itself: the fold's asset returns beside the factor block [`reconstruct_rd`](@ref) carried through. A caller who wants other loadings passes its own `rd`, or a precomputed [`Regression`](@ref) as `re`.
+The fold-taking method of [`factor_risk_contribution`](@ref), and the twin of the [`risk_contribution`](@ref) method above. It resolves the fold's target weights, its asset returns and its fee the same way, views the weights and the returns at the result's Investable Mask the same way, and it builds the `rd` the loadings are fitted from out of the fold itself: the fold's asset returns beside the factor block [`reconstruct_rd`](@ref) carried through. A caller who wants other loadings passes its own `rd`, or a precomputed [`Regression`](@ref) as `re`.
+
+A caller's `rd` is stated on the caller's universe, and [`fold_factor_returns`](@ref) views it at the mask beside the weights and the returns, so the regression is fitted over the live assets alone. With no `rd` the same verb builds one from the fold, already on the live assets, because the fold's own `nx` is the reduced axis.
 
 The first-order caveat of the [`risk_contribution`](@ref) method above holds here unchanged, and a fold that carries no Held Weights record raises for the same reason.
 
@@ -939,7 +951,7 @@ The first-order caveat of the [`risk_contribution`](@ref) method above holds her
 
 # Keyword Arguments
 
-  - `rd::ReturnsResult`: Returns result the loadings are fitted from. Defaults to the fold's own asset returns and factor block.
+  - `rd::Option{<:ReturnsResult} = nothing`: Returns result the loadings are fitted from, on the caller's universe, or `nothing` for the fold's own asset returns and factor block.
 
 # Validation
 
@@ -955,18 +967,51 @@ The first-order caveat of the [`risk_contribution`](@ref) method above holds her
   - [`risk_contribution`](@ref)
   - [`HeldWeightsResult`](@ref)
   - [`PredictionResult`](@ref)
+  - [`fold_factor_returns`](@ref)
 """
 function factor_risk_contribution(r::BaseRM_VecBaseRM,
                                   pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
                                   fees::Option{<:Fees} = nothing;
-                                  rd::ReturnsResult = ReturnsResult(; nx = pred.rd.nx,
-                                                                    X = pred.hw.X,
-                                                                    nf = pred.rd.nf,
-                                                                    F = pred.rd.F),
-                                  kwargs...)
-    hw = pred.hw
-    return factor_risk_contribution(r, pred.res.w, hw.X, extract_fees(pred.res, fees);
-                                    rd = rd, kwargs...)
+                                  rd::Option{<:ReturnsResult} = nothing, kwargs...)
+    # The same view at the mask as the `risk_contribution` method above, and `rd` takes
+    # it too, so the loadings are fitted over the live assets the weights are scored on.
+    imsk = result_investable_mask(pred.res)
+    return factor_risk_contribution(r, investable_weights_view(imsk, pred.res.w),
+                                    investable_weights_view(imsk, pred.hw.X),
+                                    extract_fees(pred.res, fees);
+                                    rd = fold_factor_returns(imsk, rd, pred), kwargs...)
+end
+"""
+    fold_factor_returns(imsk, rd::Nothing, pred::PredictionResult)
+    fold_factor_returns(imsk, rd::ReturnsResult, pred::PredictionResult)
+
+Resolve the returns result a fold's factor loadings are fitted from, on the live assets of the fold.
+
+The fold-taking [`factor_risk_contribution`](@ref) reads `rd` by dispatch. A caller's `rd` is stated on the caller's universe, as it is at the value-level door, and is viewed at the result's Investable Mask through [`investable_returns_view`](@ref). `nothing` builds one from the fold itself: the fold's asset returns viewed at the same mask, beside the factor block [`reconstruct_rd`](@ref) carried through and the fold's own `nx`, which is the reduced axis already.
+
+# Arguments
+
+  - `imsk`: The result's Investable Mask, or `nothing`.
+  - `rd`: Returns result on the caller's universe, or `nothing`.
+  - `pred`: Single-fold prediction result carrying a [`HeldWeightsResult`](@ref).
+
+# Returns
+
+  - `rd::ReturnsResult`: The returns result on the live assets.
+
+# Related
+
+  - [`factor_risk_contribution`](@ref)
+  - [`investable_returns_view`](@ref)
+  - [`investable_weights_view`](@ref)
+  - [`HeldWeightsResult`](@ref)
+"""
+function fold_factor_returns(imsk, ::Nothing, pred::PredictionResult)
+    X = investable_weights_view(imsk, pred.hw.X)
+    return ReturnsResult(; nx = pred.rd.nx, X = X, nf = pred.rd.nf, F = pred.rd.F)
+end
+function fold_factor_returns(imsk, rd::ReturnsResult, ::PredictionResult)
+    return investable_returns_view(imsk, rd)
 end
 function factor_risk_contribution(::BaseRM_VecBaseRM,
                                   ::PredictionResult{<:Any, <:Any, Nothing}, args...;

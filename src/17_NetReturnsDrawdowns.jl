@@ -5,7 +5,7 @@
 
 Compute the net portfolio returns. If `fees` is not `nothing`, it deducts the computed fees from the gross returns.
 
-The fee is one scalar and it is charged in **every** period. [`calc_fees`](@ref) contracts the whole weight vector into a single number, and that number is subtracted from every row of ``\\mathbf{X}\\boldsymbol{w}``, so a `T`-row matrix charges it `T` times. On a three-period matrix with ``\\boldsymbol{w} = [0.6,\\, -0.4,\\, 0,\\, 0.25]`` and `l = 0.002`, `s = 0.003`, `fl = 0.01`, `fs = 0.02`, the fee measured `0.0429`, and each of the three net returns sat `0.0429` below its gross value. That is why the [`Fees`](@ref) rates must be stated per period of `X`.
+The fee is two scalars on two clocks. [`calc_fees`](@ref) contracts the whole weight vector into a per period number and a one-time number: the first is subtracted from every row of ``\\mathbf{X}\\boldsymbol{w}``, so a `T`-row matrix charges it `T` times, and the second lands on the clock `fees.fa` names, the first row by default. On a three-period matrix with ``\\boldsymbol{w} = [0.6,\\, -0.4,\\, 0,\\, 0.25]`` and `l = 0.002`, `s = 0.003`, `fl = 0.01`, `fs = 0.02`, the per period fee measured `0.0029` and the one-time fee `0.04`, so the first net return sat `0.0429` below its gross value and the other two `0.0029` below theirs. That is why the [`Fees`](@ref) rates must be stated per period of `X`, and the two fixed amounts for the whole holding period.
 
 The per asset returns sum to this series. `vec(sum(calc_net_asset_returns(w, X, fees); dims = 2))` reproduces `calc_net_returns(w, X, fees)`, because [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar. The two sides add in a different order, so the identity holds to rounding and not to `==`: on the weights above the largest difference measured `6.9e-18`.
 
@@ -61,7 +61,7 @@ julia> calc_net_returns([0.5, 0.5], [0.01 0.02; 0.03 0.04])
   - [`VecVecNum`](@ref)
   - [`MatNum`](@ref)
   - [`calc_net_asset_returns`](@ref): The per asset split of this series. Its rows sum to this one.
-  - [`calc_fees`](@ref): Computes the one scalar that step 3 subtracts.
+  - [`calc_fees`](@ref): Computes the two scalars step 3 subtracts, the per period one and the one-time one.
   - [`Fees`](@ref)
 """
 function calc_net_returns(w::VecNum, X::MatNum, args...)
@@ -600,7 +600,7 @@ Compute the per asset net portfolio returns. If `fees` is not `nothing`, it dedu
 
 The rows sum to the portfolio series. `vec(sum(calc_net_asset_returns(w, X, fees); dims = 2))` reproduces [`calc_net_returns(w, X, fees)`](@ref), because [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar. The two sides add in a different order, so the identity holds to rounding and not to `==`: on ``\\boldsymbol{w} = [0.6,\\, -0.4,\\, 0,\\, 0.25]`` with all four rate fields set, the largest difference measured `6.9e-18`.
 
-Each per asset fee is charged in **every** period, as it is for [`calc_net_returns`](@ref). The `N × 1` fee vector is subtracted from every row of ``\\mathbf{X} \\odot \\boldsymbol{w}^{\\intercal}``, so a `T`-row matrix charges it `T` times.
+Each per asset fee is two vectors on two clocks, as it is for [`calc_net_returns`](@ref). The `N × 1` per period vector is subtracted from every row of ``\\mathbf{X} \\odot \\boldsymbol{w}^{\\intercal}``, so a `T`-row matrix charges it `T` times, and the `N × 1` one-time vector lands on the clock `fees.fa` names, the first row by default.
 
 These are the constant-weight methods: the one vector `w` weighs every observation. The `w::MatNum` methods below read a weight path instead, one row of weights per observation, which is what a fold scored under a Weight Drift held.
 
@@ -676,7 +676,7 @@ Compute the per asset net portfolio returns of a weight path.
 
 The rows sum to the portfolio series of that same path. The wealth ratio of an observation is the weights held through it contracted with that observation's asset returns, so `vec(sum(calc_net_asset_returns(U, X, fees); dims = 2))` reproduces the series [`calc_net_returns`](@ref) forms from the same fold under the same drift. The two sides add in a different order, so the identity holds to rounding and not to `==`.
 
-The fee is charged from the **first** row of the path. That row is the target weights, because nothing has drifted when the window opens, and it is the vector the portfolio series charges its own fee from. The same `N × 1` vector is therefore subtracted from every row here as there.
+The fee is charged from the **first** row of the path. That row is the target weights, because nothing has drifted when the window opens, and it is the vector the portfolio series charges its own fee from. The same two `N × 1` vectors are therefore subtracted here as there: the per period one from every row, and the one-time one on the clock `fees.fa` names.
 
 # Mathematical definition
 
@@ -1329,7 +1329,7 @@ end
 
 Compute the net portfolio returns of a window, reading the weight drift `wd`.
 
-A `nothing` `wd` scores every observation against the same weight vector and reproduces [`calc_net_returns(w::VecNum, X::MatNum, args...)`](@ref) exactly. An [`AbstractWeightDrift`](@ref) lets each position grow at its own return, and the series becomes the wealth ratio of the drifted holdings. The fee is charged as it is on the undrifted series: [`calc_fees`](@ref) contracts the target weights into one scalar, and that scalar is subtracted from every observation.
+A `nothing` `wd` scores every observation against the same weight vector and reproduces [`calc_net_returns(w::VecNum, X::MatNum, args...)`](@ref) exactly. An [`AbstractWeightDrift`](@ref) lets each position grow at its own return, and the series becomes the wealth ratio of the drifted holdings. The fee is charged as it is on the undrifted series, through [`charge_fees`](@ref): [`calc_fees`](@ref) contracts the target weights into a per period scalar, subtracted from every observation, and a one-time scalar, which lands on the clock `fees.fa` names.
 
 A vector of weight vectors is a population, and a ruined member does not stop the run. The member's series is filled with `NaN`, one warning names every member that fell, and the run raises only when no member survives. A single weight vector is a population of one, so it raises.
 
@@ -1358,7 +1358,7 @@ Where:
  2. On an [`AbstractWeightDrift`](@ref), give a `NaN` series when `w` is not finite: a failed solve has no weights to drift, and its series is `NaN` as the undrifted one is, with no fee charged.
  3. Otherwise compute the position values with [`drift_position_values`](@ref) and the wealth with [`drift_wealth`](@ref).
  4. Check the wealth with [`assert_positive_wealth`](@ref).
- 5. Read the wealth as a return series with [`drift_returns`](@ref), and subtract the one fee scalar from every observation.
+ 5. Read the wealth as a return series with [`drift_returns`](@ref), and charge the fee through [`charge_fees`](@ref), on the target weights.
  6. On a population, run steps 2 to 5 for each member. A non-finite member's series is `NaN` and the member is not ruined. Fill a ruined member's series with `NaN`, warn once naming every member that fell, and raise when every member fell.
 
 # Arguments

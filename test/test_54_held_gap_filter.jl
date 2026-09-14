@@ -384,6 +384,57 @@ end
     @test PO.weight_path(pred.hw, res.w) == pred.hw.U
 end
 
+@testset "The fold-taking consumers read the expanded record at the result's mask" begin
+    # The record and `res.w` come back on the caller's universe, and `res.fees` stays on the
+    # investable one (ADR 0115), so a consumer that hands the three to a value-level verb
+    # unviewed meets a `DimensionMismatch` on the fee, or pairs the fold's reduced `nx` with
+    # a full-width matrix. The oracle is the same fold solved on the hand-reduced universe.
+    Xc = copy(X)
+    Xc[:, k] .= NaN
+    rdc = ReturnsResult(; nx = nx, X = Xc)
+    rdk = ReturnsResult(; nx = nx[keep], X = X[:, keep])
+    test_idx = collect(150:T)
+    rate = [0.001, 0.002, 0.010, 0.003, 0.004]
+    fees = Fees(; tn = Turnover(; w = fill(0.2, N), val = rate), l = 0.001)
+    fees_keep = Fees(; tn = Turnover(; w = fill(0.2, 4), val = rate[keep]), l = 0.001)
+    res = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = prn, slv = slv, fees = fees)), rd)
+    resk = optimise(MeanRisk(;
+                             opt = JuMPOptimiser(; pe = prk, slv = slv, fees = fees_keep)),
+                    rdk)
+    pred = @test_logs min_level=Logging.Warn predict(res, rdc, test_idx;
+                                                     wd = SelfFinancingDrift())
+    predk = predict(resk, rdk, test_idx; wd = SelfFinancingDrift())
+    @test isapprox(res.w[keep], resk.w; atol = 1e-6)
+    r = LowOrderMoment(; alg = SecondMoment())
+    # The per asset split is on the caller's universe, with a zero column at the dead asset,
+    # and its rows still sum to the fold's series.
+    nar = calc_net_asset_returns(pred)
+    @test size(nar, 2) == N
+    @test all(iszero, view(nar, :, k))
+    @test isapprox(vec(sum(nar; dims = 2)), pred.rd.X)
+    # The risk contributions expand, and the dead asset reports exactly zero.
+    rc = risk_contribution(r, pred)
+    @test length(rc) == N
+    @test rc[k] == 0
+    @test isapprox(rc[keep], risk_contribution(r, predk); rtol = 1e-4)
+    mrc = risk_contribution(r, pred; marginal = true)
+    @test length(mrc) == N
+    @test mrc[k] == 0
+    # The factor contributions fit the loadings over the live assets alone, from the fold's
+    # own block and from a caller's `rd` on the full universe alike.
+    F = X[:, keep] * [0.5, 0.3, 0.1, 0.1] .+ 0.001 .* randn(StableRNG(54), T)
+    rdf = ReturnsResult(; nx = nx, X = Xc, nf = ["f"], F = reshape(F, :, 1))
+    rdfk = ReturnsResult(; nx = nx[keep], X = X[:, keep], nf = ["f"], F = reshape(F, :, 1))
+    predf = @test_logs min_level=Logging.Warn predict(res, rdf, test_idx;
+                                                      wd = SelfFinancingDrift())
+    predfk = predict(resk, rdfk, test_idx; wd = SelfFinancingDrift())
+    frc = factor_risk_contribution(r, predf)
+    @test length(frc) == 2
+    @test isapprox(frc, factor_risk_contribution(r, predfk); rtol = 1e-4)
+    @test isapprox(factor_risk_contribution(r, predf; rd = rdf),
+                   factor_risk_contribution(r, predfk; rd = rdfk); rtol = 1e-4)
+end
+
 @testset "The fold charges the fees the result carries, and views them no second time" begin
     # A result carries its `Fees` on the universe it solved on (ADR 0115), so the fold must not
     # view them again at the mask: a per-asset rate indexed by full-universe positions is a
