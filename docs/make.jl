@@ -174,7 +174,8 @@ generate_capability_catalogue()
 const HOME_PAGE = "index.md"
 const REFERENCES_PAGE = "99_references.md"
 const CATALOGUE_PAGE = "capability_catalogue.md"
-for page in (HOME_PAGE, REFERENCES_PAGE, CATALOGUE_PAGE)
+const MIGRATION_PAGE = "migration.md"
+for page in (HOME_PAGE, REFERENCES_PAGE, CATALOGUE_PAGE, MIGRATION_PAGE)
     if !(isfile(joinpath(@__DIR__, "src", page)))
         error("docs/make.jl: expected root page `$page` is missing.")
     else
@@ -262,6 +263,7 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                   "Examples" => examples;
                   "API" => api;
                   "Contribute" => contribute;
+                  "Migration guide" => MIGRATION_PAGE;
                   "References" => REFERENCES_PAGE],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric), CodeBlocks(), LandingPage()])

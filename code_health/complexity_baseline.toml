@@ -5,10 +5,10 @@
 julia = "1.13.0"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "f3e6153ec2"
+commit = "6fbaf7f97b"
 
 [file]
-"ext/PortfolioOptimisersPlotsExt.jl" = { cyc = 10, cog = 15, arg = 16, cyc_sum = 509, cog_sum = 422, arg_sum = 1175, macros = [] }
+"ext/PortfolioOptimisersPlotsExt.jl" = { cyc = 10, cog = 15, arg = 16, cyc_sum = 523, cog_sum = 435, arg_sum = 1226, macros = [] }
 "src/01_Base/01_DocstringDictionaries.jl" = { cyc = 3, cog = 3, arg = 2, cyc_sum = 3, cog_sum = 3, arg_sum = 2, macros = [] }
 "src/01_Base/02_TypeRoots.jl" = { cyc = 2, cog = 2, arg = 2, cyc_sum = 4, cog_sum = 4, arg_sum = 4, macros = [] }
 "src/01_Base/03_PrettyShow.jl" = { cyc = 27, cog = 50, arg = 2, cyc_sum = 39, cog_sum = 62, arg_sum = 8, macros = ["@define_pretty_show"] }
@@ -22,24 +22,24 @@ commit = "f3e6153ec2"
 "src/01_Base/11_VecScalar.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 2, cog_sum = 1, arg_sum = 4, macros = [] }
 "src/01_Base/12_NormError.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 28, cog_sum = 6, arg_sum = 52, macros = [] }
 "src/01_Base/13_KappaLog.jl" = { cyc = 1, cog = 0, arg = 2, cyc_sum = 1, cog_sum = 0, arg_sum = 2, macros = [] }
-"src/01_Base/14_PartialFit.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 17, cog_sum = 8, arg_sum = 26, macros = [] }
-"src/01_Base/15_Online.jl" = { cyc = 6, cog = 6, arg = 6, cyc_sum = 93, cog_sum = 53, arg_sum = 115, macros = [] }
+"src/01_Base/14_PartialFit.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 16, cog_sum = 7, arg_sum = 26, macros = [] }
+"src/01_Base/15_Online.jl" = { cyc = 6, cog = 6, arg = 6, cyc_sum = 100, cog_sum = 59, arg_sum = 120, macros = [] }
 "src/01_Base/16_CoveragePolicy.jl" = { cyc = 8, cog = 15, arg = 5, cyc_sum = 57, cog_sum = 53, arg_sum = 55, macros = [] }
 "src/02_Tools.jl" = { cyc = 45, cog = 96, arg = 6, cyc_sum = 238, cog_sum = 233, arg_sum = 262, macros = ["@propagatable"] }
-"src/03_InputData/01_AssetPanel.jl" = { cyc = 7, cog = 9, arg = 6, cyc_sum = 109, cog_sum = 67, arg_sum = 107, macros = [] }
-"src/03_InputData/02_AssetPanelBuilder.jl" = { cyc = 7, cog = 10, arg = 6, cyc_sum = 67, cog_sum = 55, arg_sum = 56, macros = [] }
+"src/03_InputData/01_AssetPanel.jl" = { cyc = 7, cog = 9, arg = 6, cyc_sum = 110, cog_sum = 66, arg_sum = 113, macros = [] }
+"src/03_InputData/02_AssetPanelBuilder.jl" = { cyc = 7, cog = 10, arg = 6, cyc_sum = 70, cog_sum = 55, arg_sum = 56, macros = [] }
 "src/03_InputData/03_ListingSpan.jl" = { cyc = 5, cog = 8, arg = 3, cyc_sum = 21, cog_sum = 15, arg_sum = 20, macros = [] }
 "src/03_InputData/04_Preprocessing.jl" = { cyc = 3, cog = 2, arg = 2, cyc_sum = 5, cog_sum = 2, arg_sum = 4, macros = [] }
 "src/03_InputData/05_CarrierViews.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 11, cog_sum = 5, arg_sum = 20, macros = [] }
 "src/03_InputData/06_PricesResult.jl" = { cyc = 7, cog = 7, arg = 7, cyc_sum = 26, cog_sum = 26, arg_sum = 19, macros = [] }
-"src/03_InputData/07_PriceIngestion.jl" = { cyc = 8, cog = 11, arg = 4, cyc_sum = 55, cog_sum = 33, arg_sum = 52, macros = [] }
+"src/03_InputData/07_PriceIngestion.jl" = { cyc = 8, cog = 11, arg = 4, cyc_sum = 62, cog_sum = 40, arg_sum = 52, macros = [] }
 "src/03_InputData/08_PriceGapFill.jl" = { cyc = 5, cog = 9, arg = 6, cyc_sum = 24, cog_sum = 21, arg_sum = 27, macros = [] }
 "src/03_InputData/09_PriceFilters.jl" = { cyc = 6, cog = 10, arg = 3, cyc_sum = 9, cog_sum = 11, arg_sum = 3, macros = [] }
 "src/03_InputData/10_ReturnsResult.jl" = { cyc = 18, cog = 25, arg = 10, cyc_sum = 50, cog_sum = 60, arg_sum = 44, macros = [] }
-"src/03_InputData/11_PricesToReturns.jl" = { cyc = 9, cog = 15, arg = 4, cyc_sum = 34, cog_sum = 34, arg_sum = 28, macros = [] }
+"src/03_InputData/11_PricesToReturns.jl" = { cyc = 9, cog = 15, arg = 4, cyc_sum = 34, cog_sum = 34, arg_sum = 29, macros = [] }
 "src/03_InputData/12_TrainTestSplit.jl" = { cyc = 6, cog = 6, arg = 4, cyc_sum = 16, cog_sum = 8, arg_sum = 16, macros = [] }
 "src/03_InputData/13_Base_AssetSelection.jl" = { cyc = 4, cog = 4, arg = 2, cyc_sum = 8, cog_sum = 5, arg_sum = 6, macros = [] }
-"src/03_InputData/14_CrossSectionalTransforms.jl" = { cyc = 6, cog = 11, arg = 8, cyc_sum = 98, cog_sum = 99, arg_sum = 75, macros = [] }
+"src/03_InputData/14_CrossSectionalTransforms.jl" = { cyc = 6, cog = 11, arg = 8, cyc_sum = 102, cog_sum = 102, arg_sum = 75, macros = [] }
 "src/03_InputData/15_FeatureSelector.jl" = { cyc = 10, cog = 10, arg = 4, cyc_sum = 59, cog_sum = 50, arg_sum = 23, macros = [] }
 "src/03_InputData/16_PanelDataFrame.jl" = { cyc = 7, cog = 9, arg = 7, cyc_sum = 37, cog_sum = 35, arg_sum = 47, macros = [] }
 "src/03_InputData/17_ReturnsBufferState.jl" = { cyc = 9, cog = 15, arg = 4, cyc_sum = 63, cog_sum = 59, arg_sum = 42, macros = [] }
@@ -84,11 +84,11 @@ commit = "f3e6153ec2"
 "src/05_Moments/27_MedianExpectedReturns.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 5, cog_sum = 2, arg_sum = 9, macros = ["@propagatable"] }
 "src/05_Moments/28_CustomValueExpectedReturns.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 8, cog_sum = 2, arg_sum = 13, macros = [] }
 "src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { cyc = 5, cog = 7, arg = 6, cyc_sum = 25, cog_sum = 20, arg_sum = 48, macros = [] }
-"src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 37, cog_sum = 33, arg_sum = 74, macros = [] }
-"src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 41, cog_sum = 34, arg_sum = 85, macros = [] }
-"src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { cyc = 13, cog = 19, arg = 10, cyc_sum = 67, cog_sum = 63, arg_sum = 110, macros = [] }
-"src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance.jl" = { cyc = 12, cog = 26, arg = 12, cyc_sum = 112, cog_sum = 106, arg_sum = 174, macros = [] }
-"src/05_Moments/31_HigherMomentPartialFit.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 32, cog_sum = 12, arg_sum = 66, macros = [] }
+"src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 37, cog_sum = 32, arg_sum = 74, macros = [] }
+"src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 41, cog_sum = 33, arg_sum = 85, macros = [] }
+"src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { cyc = 13, cog = 19, arg = 10, cyc_sum = 67, cog_sum = 62, arg_sum = 110, macros = [] }
+"src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance.jl" = { cyc = 12, cog = 25, arg = 12, cyc_sum = 112, cog_sum = 105, arg_sum = 174, macros = [] }
+"src/05_Moments/31_HigherMomentPartialFit.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 32, cog_sum = 12, arg_sum = 70, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { cyc = 6, cog = 10, arg = 5, cyc_sum = 40, cog_sum = 33, arg_sum = 36, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { cyc = 5, cog = 5, arg = 4, cyc_sum = 24, cog_sum = 18, arg_sum = 5, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl" = { cyc = 8, cog = 15, arg = 14, cyc_sum = 37, cog_sum = 21, arg_sum = 32, macros = ["@forward_properties"] }
@@ -113,16 +113,16 @@ commit = "f3e6153ec2"
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { cyc = 4, cog = 6, arg = 5, cyc_sum = 15, cog_sum = 10, arg_sum = 8, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/05_ExpWeightedReturnForecast.jl" = { cyc = 5, cog = 5, arg = 9, cyc_sum = 27, cog_sum = 24, arg_sum = 20, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/06_TargetReturnForecast.jl" = { cyc = 9, cog = 12, arg = 13, cyc_sum = 50, cog_sum = 39, arg_sum = 36, macros = [] }
-"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/07_ForecastEvaluation.jl" = { cyc = 7, cog = 12, arg = 1, cyc_sum = 19, cog_sum = 15, arg_sum = 2, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/07_ForecastEvaluation.jl" = { cyc = 7, cog = 12, arg = 1, cyc_sum = 25, cog_sum = 22, arg_sum = 2, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/08_ForecastHistory.jl" = { cyc = 8, cog = 15, arg = 4, cyc_sum = 14, cog_sum = 20, arg_sum = 4, macros = [] }
-"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { cyc = 6, cog = 10, arg = 4, cyc_sum = 15, cog_sum = 15, arg_sum = 17, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { cyc = 7, cog = 11, arg = 4, cyc_sum = 16, cog_sum = 16, arg_sum = 17, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/10_ForecastPortfolios.jl" = { cyc = 8, cog = 15, arg = 5, cyc_sum = 41, cog_sum = 67, arg_sum = 24, macros = [] }
-"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/11_ForecastFactorCorrelation.jl" = { cyc = 3, cog = 4, arg = 5, cyc_sum = 6, cog_sum = 6, arg_sum = 12, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/11_ForecastFactorCorrelation.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 6, cog_sum = 6, arg_sum = 14, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 18, cog_sum = 20, arg_sum = 38, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { cyc = 5, cog = 8, arg = 4, cyc_sum = 19, cog_sum = 21, arg_sum = 20, macros = [] }
-"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { cyc = 5, cog = 8, arg = 3, cyc_sum = 27, cog_sum = 23, arg_sum = 18, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { cyc = 6, cog = 8, arg = 3, cyc_sum = 33, cog_sum = 29, arg_sum = 20, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { cyc = 7, cog = 14, arg = 5, cyc_sum = 122, cog_sum = 128, arg_sum = 112, macros = [] }
-"src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { cyc = 10, cog = 13, arg = 5, cyc_sum = 105, cog_sum = 119, arg_sum = 102, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { cyc = 11, cog = 15, arg = 5, cyc_sum = 106, cog_sum = 121, arg_sum = 102, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 55, cog_sum = 54, arg_sum = 45, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { cyc = 6, cog = 8, arg = 3, cyc_sum = 58, cog_sum = 61, arg_sum = 49, macros = [] }
 "src/05_Moments/33_CoverageUniverse.jl" = { cyc = 7, cog = 12, arg = 8, cyc_sum = 106, cog_sum = 70, arg_sum = 209, macros = [] }
@@ -164,7 +164,7 @@ commit = "f3e6153ec2"
 "src/09_ConstraintGeneration/06_AssetSetsMatrix.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 23, cog_sum = 15, arg_sum = 53, macros = [] }
 "src/09_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 8, cog_sum = 4, arg_sum = 3, macros = ["@propagatable"] }
 "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 20, cog_sum = 15, arg_sum = 26, macros = [] }
-"src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { cyc = 5, cog = 6, arg = 3, cyc_sum = 12, cog_sum = 8, arg_sum = 8, macros = [] }
+"src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { cyc = 5, cog = 6, arg = 3, cyc_sum = 14, cog_sum = 9, arg_sum = 8, macros = [] }
 "src/10_Prior/01_Base_Prior.jl" = { cyc = 10, cog = 11, arg = 11, cyc_sum = 135, cog_sum = 100, arg_sum = 159, macros = ["@forward_properties"] }
 "src/10_Prior/02_EmpiricalPrior.jl" = { cyc = 4, cog = 3, arg = 7, cyc_sum = 12, cog_sum = 7, arg_sum = 26, macros = ["@propagatable"] }
 "src/10_Prior/03_FactorPrior.jl" = { cyc = 3, cog = 2, arg = 9, cyc_sum = 12, cog_sum = 5, arg_sum = 28, macros = ["@forward_properties", "@propagatable"] }
@@ -179,22 +179,22 @@ commit = "f3e6153ec2"
 "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior.jl" = { cyc = 20, cog = 24, arg = 16, cyc_sum = 205, cog_sum = 167, arg_sum = 432, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/07_OpinionPoolingPrior.jl" = { cyc = 5, cog = 8, arg = 8, cyc_sum = 15, cog_sum = 12, arg_sum = 28, macros = ["@propagatable"] }
 "src/10_Prior/08_HighOrderFactorPriorEstimator.jl" = { cyc = 22, cog = 37, arg = 6, cyc_sum = 48, cog_sum = 65, arg_sum = 20, macros = ["@forward_properties", "@propagatable"] }
-"src/10_Prior/09_AssetPanelEstimators.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 21, cog_sum = 8, arg_sum = 21, macros = ["@propagatable"] }
+"src/10_Prior/09_AssetPanelEstimators.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 26, cog_sum = 11, arg_sum = 27, macros = ["@propagatable"] }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { cyc = 10, cog = 14, arg = 8, cyc_sum = 97, cog_sum = 82, arg_sum = 88, macros = [] }
-"src/10_Prior/11_CrossSectionalFactorPrior.jl" = { cyc = 5, cog = 8, arg = 19, cyc_sum = 12, cog_sum = 11, arg_sum = 35, macros = ["@propagatable"] }
+"src/10_Prior/11_CrossSectionalFactorPrior.jl" = { cyc = 5, cog = 8, arg = 19, cyc_sum = 14, cog_sum = 13, arg_sum = 38, macros = ["@propagatable"] }
 "src/10_Prior/12_PriorPartialFit.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 50, cog_sum = 36, arg_sum = 96, macros = [] }
-"src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 54, cog_sum = 27, arg_sum = 81, macros = [] }
+"src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 63, cog_sum = 30, arg_sum = 92, macros = [] }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 11, cog_sum = 4, arg_sum = 34, macros = [] }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 33, cog_sum = 8, arg_sum = 114, macros = [] }
 "src/11_UncertaintySets/04_BootstrapUncertaintySets.jl" = { cyc = 3, cog = 4, arg = 11, cyc_sum = 36, cog_sum = 23, arg_sum = 83, macros = [] }
 "src/11_UncertaintySets/05_L1UncertaintySets.jl" = { cyc = 6, cog = 6, arg = 5, cyc_sum = 58, cog_sum = 51, arg_sum = 58, macros = [] }
 "src/11_UncertaintySets/06_CalibrationRules.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 89, cog_sum = 50, arg_sum = 160, macros = [] }
-"src/11_UncertaintySets/07_CompactUncertaintySets.jl" = { cyc = 3, cog = 2, arg = 4, cyc_sum = 9, cog_sum = 5, arg_sum = 8, macros = [] }
-"src/11_UncertaintySets/08_NormBallUncertaintySets.jl" = { cyc = 4, cog = 3, arg = 6, cyc_sum = 24, cog_sum = 11, arg_sum = 34, macros = [] }
+"src/11_UncertaintySets/07_CompactUncertaintySets.jl" = { cyc = 3, cog = 2, arg = 4, cyc_sum = 10, cog_sum = 5, arg_sum = 8, macros = [] }
+"src/11_UncertaintySets/08_NormBallUncertaintySets.jl" = { cyc = 4, cog = 3, arg = 6, cyc_sum = 26, cog_sum = 11, arg_sum = 34, macros = [] }
 "src/11_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { cyc = 4, cog = 5, arg = 6, cyc_sum = 35, cog_sum = 16, arg_sum = 72, macros = [] }
 "src/11_UncertaintySets/10_CompactRadiusRules.jl" = { cyc = 4, cog = 5, arg = 8, cyc_sum = 22, cog_sum = 13, arg_sum = 41, macros = [] }
 "src/12_Turnover.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 17, cog_sum = 11, arg_sum = 9, macros = ["@propagatable"] }
-"src/13_Fees.jl" = { cyc = 3, cog = 5, arg = 4, cyc_sum = 80, cog_sum = 24, arg_sum = 147, macros = ["@propagatable"] }
+"src/13_Fees.jl" = { cyc = 3, cog = 5, arg = 4, cyc_sum = 92, cog_sum = 31, arg_sum = 160, macros = ["@propagatable"] }
 "src/14_NetReturnsDrawdowns.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 136, cog_sum = 81, arg_sum = 227, macros = [] }
 "src/15_Tracking.jl" = { cyc = 2, cog = 3, arg = 3, cyc_sum = 14, cog_sum = 7, arg_sum = 16, macros = ["@propagatable"] }
 "src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { cyc = 6, cog = 12, arg = 4, cyc_sum = 128, cog_sum = 60, arg_sum = 175, macros = [] }
@@ -226,8 +226,8 @@ commit = "f3e6153ec2"
 "src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { cyc = 1, cog = 0, arg = 3, cyc_sum = 5, cog_sum = 0, arg_sum = 15, macros = [] }
 "src/16_RiskMeasures/24_ExpectedRisk.jl" = { cyc = 5, cog = 4, arg = 10, cyc_sum = 57, cog_sum = 32, arg_sum = 201, macros = [] }
 "src/16_RiskMeasures/25_RiskMeasureTools.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 22, cog_sum = 2, arg_sum = 33, macros = [] }
-"src/17_Optimisation/01_Base_Optimisation.jl" = { cyc = 9, cog = 10, arg = 7, cyc_sum = 221, cog_sum = 152, arg_sum = 232, macros = [] }
-"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { cyc = 21, cog = 30, arg = 12, cyc_sum = 139, cog_sum = 99, arg_sum = 244, macros = ["@forward_properties"] }
+"src/17_Optimisation/01_Base_Optimisation.jl" = { cyc = 9, cog = 10, arg = 7, cyc_sum = 233, cog_sum = 156, arg_sum = 267, macros = [] }
+"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { cyc = 21, cog = 30, arg = 12, cyc_sum = 145, cog_sum = 101, arg_sum = 260, macros = ["@forward_properties"] }
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { cyc = 6, cog = 9, arg = 7, cyc_sum = 12, cog_sum = 11, arg_sum = 14, macros = [] }
 "src/17_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { cyc = 11, cog = 21, arg = 9, cyc_sum = 43, cog_sum = 43, arg_sum = 49, macros = [] }
 "src/17_Optimisation/02_CrossValidation/04_WalkForward.jl" = { cyc = 8, cog = 15, arg = 15, cyc_sum = 59, cog_sum = 69, arg_sum = 96, macros = [] }
@@ -235,11 +235,11 @@ commit = "f3e6153ec2"
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 3, cog_sum = 1, arg_sum = 9, macros = [] }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 3, cog_sum = 1, arg_sum = 6, macros = [] }
 "src/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 2, cog_sum = 1, arg_sum = 2, macros = [] }
-"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { cyc = 9, cog = 14, arg = 10, cyc_sum = 46, cog_sum = 48, arg_sum = 62, macros = [] }
-"src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { cyc = 7, cog = 11, arg = 3, cyc_sum = 17, cog_sum = 23, arg_sum = 9, macros = [] }
+"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { cyc = 9, cog = 14, arg = 10, cyc_sum = 54, cog_sum = 53, arg_sum = 74, macros = [] }
+"src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { cyc = 7, cog = 11, arg = 3, cyc_sum = 15, cog_sum = 18, arg_sum = 9, macros = [] }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 6, cog_sum = 6, arg_sum = 16, macros = [] }
-"src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { cyc = 4, cog = 5, arg = 11, cyc_sum = 10, cog_sum = 6, arg_sum = 30, macros = [] }
-"src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { cyc = 7, cog = 11, arg = 7, cyc_sum = 61, cog_sum = 32, arg_sum = 129, macros = [] }
+"src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { cyc = 3, cog = 3, arg = 11, cyc_sum = 10, cog_sum = 6, arg_sum = 37, macros = [] }
+"src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { cyc = 7, cog = 11, arg = 7, cyc_sum = 63, cog_sum = 35, arg_sum = 130, macros = [] }
 "src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { cyc = 4, cog = 5, arg = 4, cyc_sum = 11, cog_sum = 9, arg_sum = 14, macros = [] }
 "src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { cyc = 4, cog = 5, arg = 9, cyc_sum = 34, cog_sum = 16, arg_sum = 43, macros = [] }
 "src/17_Optimisation/03_NaiveOptimisation.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 50, cog_sum = 26, arg_sum = 57, macros = ["@propagatable"] }
@@ -293,11 +293,11 @@ commit = "f3e6153ec2"
 "src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { cyc = 9, cog = 8, arg = 15, cyc_sum = 76, cog_sum = 42, arg_sum = 70, macros = ["@propagatable"] }
 "src/17_Optimisation/06_Meta/03_Stacking.jl" = { cyc = 9, cog = 11, arg = 14, cyc_sum = 48, cog_sum = 34, arg_sum = 49, macros = ["@propagatable"] }
 "src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { cyc = 6, cog = 7, arg = 16, cyc_sum = 44, cog_sum = 32, arg_sum = 66, macros = ["@propagatable"] }
-"src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 34, cog_sum = 23, arg_sum = 52, macros = [] }
+"src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 34, cog_sum = 23, arg_sum = 50, macros = [] }
 "src/17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl" = { cyc = 6, cog = 9, arg = 11, cyc_sum = 28, cog_sum = 24, arg_sum = 61, macros = [] }
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { cyc = 9, cog = 14, arg = 7, cyc_sum = 23, cog_sum = 20, arg_sum = 38, macros = [] }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { cyc = 2, cog = 2, arg = 2, cyc_sum = 15, cog_sum = 6, arg_sum = 15, macros = [] }
-"src/17_Optimisation/09_OnlineOptimisation.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 55, cog_sum = 24, arg_sum = 70, macros = [] }
+"src/17_Optimisation/09_OnlineOptimisation.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 60, cog_sum = 26, arg_sum = 75, macros = [] }
 "src/18_ExpectedReturns.jl" = { cyc = 6, cog = 10, arg = 9, cyc_sum = 54, cog_sum = 41, arg_sum = 123, macros = ["@propagatable"] }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { cyc = 3, cog = 6, arg = 6, cyc_sum = 60, cog_sum = 18, arg_sum = 72, macros = [] }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { cyc = 4, cog = 5, arg = 9, cyc_sum = 85, cog_sum = 29, arg_sum = 177, macros = [] }
@@ -306,7 +306,7 @@ commit = "f3e6153ec2"
 "src/21_Pipeline/02_StepExecution.jl" = { cyc = 5, cog = 9, arg = 3, cyc_sum = 52, cog_sum = 28, arg_sum = 54, macros = [] }
 "src/21_Pipeline/03_Pipeline.jl" = { cyc = 11, cog = 16, arg = 11, cyc_sum = 123, cog_sum = 93, arg_sum = 121, macros = ["@forward_properties"] }
 "src/21_Pipeline/04_PredictionCV.jl" = { cyc = 4, cog = 5, arg = 12, cyc_sum = 40, cog_sum = 19, arg_sum = 67, macros = [] }
-"src/21_Pipeline/05_SearchCrossValidation.jl" = { cyc = 9, cog = 16, arg = 5, cyc_sum = 42, cog_sum = 44, arg_sum = 46, macros = [] }
+"src/21_Pipeline/05_SearchCrossValidation.jl" = { cyc = 8, cog = 15, arg = 3, cyc_sum = 34, cog_sum = 30, arg_sum = 36, macros = [] }
 "src/21_Pipeline/06_OnlinePipeline.jl" = { cyc = 6, cog = 7, arg = 5, cyc_sum = 118, cog_sum = 71, arg_sum = 149, macros = [] }
 "src/22_Plotting.jl" = { cyc = 4, cog = 7, arg = 4, cyc_sum = 89, cog_sum = 20, arg_sum = 25, macros = [] }
 "src/23_Aliases.jl" = { cyc = 1, cog = 0, arg = 8, cyc_sum = 21, cog_sum = 0, arg_sum = 30, macros = [] }

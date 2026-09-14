@@ -103,7 +103,7 @@ supported_risk_measures(HierarchicalRiskParity)           # OptimisationRiskMeas
 The curated one-liner for each measure, its alias, and its class — grouped by what the measure
 *looks at* rather than by source file. Every name below is exported and documented: the full
 signature, fields, and references live under
-[API → Risk Measures](../api/19_RiskMeasures/01_Base_RiskMeasures.md), and `?ConditionalValueatRisk`
+[API → Risk Measures](../api/16_RiskMeasures/01_Base_RiskMeasures.md), and `?ConditionalValueatRisk`
 in the REPL gets you there without leaving the terminal.
 
 ````@example 03_Risk_Measures

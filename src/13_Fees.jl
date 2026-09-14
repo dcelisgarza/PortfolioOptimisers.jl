@@ -1255,7 +1255,7 @@ end
 
 Compute the proportional fees for portfolio weights.
 
-This is one term of the total fee, not the whole fee. [`calc_fees(w::VecNum, fees::Fees)`](@ref) calls it twice, under `.>=` for the long side and under `.<` for the short side, and negates the short call. [`Fees`](@ref) states the closed form as ``F_{\\text{p}}``.
+This is one term of the total fee, not the whole fee. [`calc_periodic_fees`](@ref) calls it twice, under `.>=` for the long side and under `.<` for the short side, and negates the short call. [`Fees`](@ref) states the closed form as ``F_{\\text{p}}``.
 
 # Algorithm
 
@@ -1683,7 +1683,7 @@ end
 
 Compute total per asset fees for portfolio weights.
 
-Sums proportional, fixed, and turnover fees for all assets. The entries sum to the number [`calc_fees(w::VecNum, fees::Fees)`](@ref) returns, up to the order of summation.
+Sums proportional, fixed, and turnover fees for all assets. Each half sums to the matching half of the pair [`calc_fees(w::VecNum, T::Number, fees::Fees)`](@ref) returns, up to the order of summation.
 
 The verb returns a pair, `(amortised, one_time)`, and **each half is itself a pair**, one entry per axis of a reduced [`Fees`](@ref): the charge of the assets that stayed, and the charge of the assets that left. `l`, `s` and `tn` are rates per period and land in `amortised`, as `lq` does on the other axis. `fl` and `fs` are currency amounts charged one time for the whole holding period, so `fees.fa` decides where they land, as it does for `flq`: a `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero. The doctest below shows all four vectors.
 
