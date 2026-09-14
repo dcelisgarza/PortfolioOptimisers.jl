@@ -503,7 +503,7 @@ The emitted clock is the asset table's under the default join, so `timestamp(pr.
   - `B`: Optional benchmark prices, one column or one per asset.
   - `iv`: Optional implied volatilities, one column per asset, on any clock: aligned to the emitted one and padded `NaN` where silent.
   - `ivpa`: Optional implied volatility adjustment.
-  - `pnl`: Optional [`AssetPanel`](@ref) of Panel Fields the caller already holds.
+  - `pnl`: Optional [`AssetPanel`](@ref) of Panel Fields the caller already holds. Its Panel Fields are kept; its masks are not read, because a time-varying panel carries an `amsk` by construction, so the field cannot carry a declaration. A listing statement is `span`.
   - `pr`: A [`PricesResult`](@ref), for the second form, whose series are re-ingested. A span the carrier states is kept unless `est.span` overrides it; the Span Rule runs only where neither states one.
 
 # Validation
@@ -1006,7 +1006,7 @@ Put the two universe masks onto the [`AssetPanel`](@ref) the returns carrier hol
 
 The layer emits **one carrier**, and the masks ride on it: a [`Pipeline`](@ref) step has one out-slot, and mask emission cannot leave [`PricesToReturns`](@ref) without landing on the price clock, where the masks are not stated. Carrying them makes [`port_opt_view`](@ref) slice the universe in step with the returns for free.
 
-A caller's Panel Fields are kept. Only the masks are the layer's to state: an estimation mask is a statement about the *data* rather than about the instruments, so it is re-derived in every case and `emsk ⊆ amsk` holds by construction rather than by refusal.
+A caller's Panel Fields are kept. Both masks are the layer's to state. The active mask is not a declaration a panel can carry to the door: a time-varying panel holds an `amsk` by construction, and [`asset_panel`](@ref) writes an all-true one when the caller states none, so an all-true `amsk` beside a time-varying Panel Field cannot be told from a declared all-listed calendar. The one door for a listing statement is `span` on [`PriceIngestion`](@ref). The estimation mask is a statement about the *data* rather than about the instruments, so it is re-derived in every case and `emsk ⊆ amsk` holds by construction rather than by refusal.
 
 # Algorithm
 
@@ -1014,7 +1014,7 @@ The method that Julia selects is the algorithm.
 
  1. No masks: return the panel unchanged. The carrier states no universe, so `pnl === nothing` keeps its one meaning — the carrier was not built by the layer.
  2. Masks and no panel: return an [`AssetPanel`](@ref) of the two masks and no Panel Field. This is the layer's common case: a caller holding only prices has no feature data.
- 3. Masks and a panel: keep its Panel Fields and replace its masks. A static panel's fields carry no observation axis, so they are lifted onto the masks' clock with [`panel_field_lift`](@ref) first.
+ 3. Masks and a panel: keep its Panel Fields and replace both its masks. A static panel's fields carry no observation axis, so they are lifted onto the masks' clock with [`panel_field_lift`](@ref) first.
 
 # Arguments
 
@@ -1029,6 +1029,8 @@ The method that Julia selects is the algorithm.
 # Related
 
   - [`AssetPanel`](@ref)
+  - [`asset_panel`](@ref): writes the all-true `amsk` a time-varying build carries when none is stated.
+  - [`PriceIngestion`](@ref): its `span` is the door for a listing statement.
   - [`returns_universe_masks`](@ref)
   - [`panel_field_lift`](@ref)
   - [`prices_to_returns`](@ref)

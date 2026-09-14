@@ -119,18 +119,36 @@ algorithm". The snapshot is taken **after** the conversion, so a Gap Return algo
 already in the returns the mask reads. What the snapshot refuses is tracking values that change
 after the layer has spoken.
 
-### A caller owns the active mask; the estimation mask is never theirs to state
+### A panel at the door states Panel Fields; both masks are the layer's
 
-A caller who hands the layer an `AssetPanel` of their own keeps their Panel Fields and their
-`amsk`. A listing calendar, or a constituency that leaves and rejoins, is a fact about the
-instruments, and ADR 0129 already gave it the same entry point and the same `AbstractMatrix{Bool}`
-bound as the derived span.
+A caller who hands the layer an `AssetPanel` of their own keeps their Panel Fields. Both masks are
+replaced: `amsk` by the Listing Span projected onto the returns clock, and `emsk` by
+`amsk .& isfinite.(X)`. The one door for a listing calendar, or a constituency that leaves and
+rejoins, is `span`, which ADR 0129 gave the same `AbstractMatrix{Bool}` bound as the derived span.
 
-`emsk` is re-derived regardless, as `amsk .& isfinite.(X)`. It is a statement about the *data*, not
+`amsk` cannot be a declaration at the door, because a time-varying panel carries one by
+construction. `panel_is_static` is `isnothing(pnl.amsk)`, so a panel holding a time-varying Panel
+Field holds an `amsk` whether or not the caller stated one, and `asset_panel` writes `trues` there
+when they did not. A caller handing in a time-varying market capitalisation and no listing
+statement therefore arrives with an all-true `amsk` that is indistinguishable from a declared
+all-listed calendar. Reading it as one would override the Span Rule for every such caller, the
+opposite failure of the one it means to prevent; refusing a time-varying panel that carries masks
+would refuse every time-varying panel; and refusing only a mask that is not all-true reads intent
+off a value. A field the builder fills as a placeholder is not a field a caller can declare
+through, so the layer treats it as the shape coupling it is, and ADR 0129's rule that a declaration
+is never second-guessed is kept at the door that takes one.
+
+`emsk` is re-derived for a second reason of its own. It is a statement about the *data*, not
 about the instruments: a declared `emsk` marking a cell true where the return is not finite would
 put a `NaN` into a cross-sectional fit, and `assert_panel_masks` would not catch it — it checks
 `emsk ⊆ amsk`, not finiteness. Re-deriving makes the subset invariant hold by construction rather
 than by refusal, and removes the one way a declaration can produce an incoherent panel.
+
+The reference implementation has no door of this kind: its panel's active mask is the caller's,
+all-true when unstated, and its only data-driven adjustment is a caller-invoked trim of an asset's
+leading inactive entries. The layer keeps parity — a caller's own calendar still enters, as `span`
+— and improves on it, since an unstated calendar is derived from the prices at both ends rather
+than assumed all-true.
 
 ### The alignment guarantee splits in two
 
@@ -184,7 +202,9 @@ docstring's two remedies go: on the layer's path there is nothing to remedy.
 `CONTEXT.md`'s **Asset Panel** entry is amended. `nothing` masks read as *static, or hand-built*,
 and never as *gapless* — a panel the ingestion layer emits always carries both.
 
-A caller's declared `AssetPanel` keeps its Panel Fields and its `amsk`; its `emsk` is re-derived.
+A caller's declared `AssetPanel` keeps its Panel Fields; both its masks are re-derived, because a
+time-varying panel's `amsk` is a placeholder the builder writes, not a statement, and the one door
+for a listing statement is `span` (#1069).
 
 What remains unsettled, and is not settled here: how the `AssetPanel`'s Panel Fields are
 subselected now that the masks are its defining content, and what a square tensor Panel Field's

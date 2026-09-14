@@ -544,15 +544,36 @@ end
         @test Matrix(rds.pnl.amsk) == Matrix(rd.pnl.amsk)
         @test !PortfolioOptimisers.panel_is_static(rds.pnl)
 
-        # A time-varying panel keeps its fields, and its masks are replaced rather than kept:
-        # a declared estimation mask marking a non-finite return estimable cannot survive.
+        # A time-varying panel keeps its fields, and both its masks are replaced rather than
+        # kept. The active mask cannot be a declaration at the door: a time-varying panel
+        # carries one by construction, and `asset_panel` writes an all-true one when none is
+        # stated, so an all-true `amsk` beside a time-varying field is indistinguishable from
+        # a declared all-listed calendar (#1069). The estimation mask cannot survive either:
+        # one marking a non-finite return estimable would put a `NaN` into a fit.
         tv = AssetPanel(; pf = [NumericPanelField(; name = "mcap", vals = ones(T59, N59))],
                         amsk = trues(T59, N59), emsk = trues(T59, N59))
         prt = price_ingestion(PriceIngestion(), X59; pnl = tv)
         rdt = prices_to_returns(ptr59, prt)
         @test length(rdt.pnl.pf) == 1
+        @test !all(rdt.pnl.amsk)
+        @test Matrix(rdt.pnl.amsk) == Matrix(rd.pnl.amsk)
         @test !all(rdt.pnl.emsk)
         @test Matrix(rdt.pnl.emsk) == Matrix(rd.pnl.emsk)
+        # The builder's placeholder is the same all-true `amsk`, and it meets the same door.
+        tvb = asset_panel([NumericPanelInput(; name = "mcap", vals = ones(T59, N59))])
+        @test all(tvb.amsk)
+        rdb = prices_to_returns(ptr59, price_ingestion(PriceIngestion(), X59; pnl = tvb))
+        @test Matrix(rdb.pnl.amsk) == Matrix(rd.pnl.amsk)
+        # A listing statement enters as `span`, and the panel's Panel Fields ride beside it.
+        cal = trues(T59, N59)
+        cal[1:8, 2] .= false
+        cal[33:40, 3] .= false
+        cal[:, 4] .= false            # `d` is declared never listed, which no gap says
+        prc = price_ingestion(PriceIngestion(; span = cal), X59; pnl = tv)
+        rdc = prices_to_returns(ptr59, prc)
+        @test length(rdc.pnl.pf) == 1
+        @test !any(view(Matrix(rdc.pnl.amsk), :, 4))
+        @test Matrix(rdc.pnl.amsk)[:, 1:3] == Matrix(rd.pnl.amsk)[:, 1:3]
     end
 end
 
