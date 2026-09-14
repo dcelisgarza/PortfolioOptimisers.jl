@@ -200,7 +200,7 @@ The surviving columns are emitted in *fitted* order, not in the window's own col
 
 # Validation
 
-  - Every fitted asset name must be present in the window; a missing one throws rather than silently shrinking the universe.
+  - Every fitted asset name must be present in the window; a missing one throws rather than silently shrinking the universe. The message names the missing asset and the window's size through [`unknown_variable_msg`](@ref), never a whole universe.
 
 # Returns
 
@@ -216,7 +216,8 @@ function apply_preprocessing(res::AssetSelectorResult, rd::AbstractReturnsResult
     for (k, name) in pairs(res.nx)
         j = findfirst(==(name), rd.nx)
         @argcheck(!isnothing(j),
-                  ArgumentError("the fitted asset \"$name\" is absent from the data window, whose assets are $(collect(rd.nx)); the window must contain the whole fitted universe $(res.nx)"))
+                  ArgumentError(unknown_variable_msg(name, rd.nx, :nx;
+                                                     consequence = "the window must contain the whole fitted universe")))
         idx[k] = j
     end
     return port_opt_view(rd, idx)

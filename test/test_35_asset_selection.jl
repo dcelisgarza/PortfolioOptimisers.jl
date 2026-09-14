@@ -144,6 +144,18 @@ struct UnimplementedSelector <: PortfolioOptimisers.AbstractAssetSelector end
         # a fitted asset absent from the window throws rather than shrinking the universe
         partial = ReturnsResult(; nx = ["A", "B"], X = XZ[:, 1:2])
         @test_throws ArgumentError apply_preprocessing(res, partial)
+        # the message names the missing asset and the window's size, never a whole universe (#1038)
+        err = try
+            apply_preprocessing(res, partial)
+        catch e
+            e
+        end
+        @test err.msg == PO.unknown_variable_msg("C", partial.nx, :nx;
+                                                 consequence = "the window must contain the whole fitted universe")
+        @test occursin("`C`", err.msg)
+        @test occursin("2 assets", err.msg)
+        @test !occursin(r"\bA\b", err.msg)
+        @test !occursin(r"\bB\b", err.msg)
 
         # extra assets in the window are simply not selected
         extra = ReturnsResult(; nx = ["A", "B", "C", "D", "E"],
