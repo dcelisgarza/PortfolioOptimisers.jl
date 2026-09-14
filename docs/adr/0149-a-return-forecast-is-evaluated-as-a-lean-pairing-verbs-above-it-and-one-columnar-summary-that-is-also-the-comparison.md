@@ -1,0 +1,203 @@
+---
+status: accepted
+---
+
+# A Return Forecast is evaluated as a lean pairing, verbs above it, and one columnar summary that is also the comparison
+
+## Context
+
+[Map #931](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/931) built the
+out-of-sample evaluation of a **Return Forecast**: the reading a caller performs *before* an
+optimiser sees the forecast, which asks whether the forecast ranks the cross-section, whether the
+ranking pays as a book, whether the magnitude is right, how long the edge lasts, and what the
+forecast is made of. The map closed on 2026-09-09 with its destination met, through eleven tickets
+([#932](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/932) to
+[#942](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/942) and
+[#965](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/965)), and recorded its
+decisions in the tickets' resolution comments alone. This ADR states them in one place, as the
+sibling maps of the same release did, so that the code is checked against a document rather than
+against a thread. It was written by the PR 625 review of the map (piece Q10, 2026-09-14) and
+adds no decision the tickets did not take.
+
+The reference implementation ships the same reading as one entry point of fifteen parameters that
+fits the estimator, computes every statistic eagerly, and answers two Result classes — an
+evaluation and a comparison — over about twenty-five private helpers, with a free-form parameter
+bag and a name on each. The library already held three of its pieces before the map opened:
+`forward_mean_returns` (the forward window), the cross-sectional correlation kernels
+(`cs_spearman_correlation`, `cs_weighted_correlation`) and the exposure diagnostics
+(`exposure_ic`, `exposure_ic_summary`, `exposure_coverage`) of
+[map #643](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/643). Two of the four
+shipped Return Forecast members publish a history (`hist`) and two do not.
+
+## Decision
+
+### The evaluation is a three-layer hierarchy, bare arrays first
+
+`forecast_evaluation` takes two matrices, then a fitted Result with a carrier and a block, then an
+Estimator with the same. The bare layer makes every statistic testable without a fit and scores a
+forecast the library did not produce; the Result layer reads `hist` off a fitted member; the
+Estimator layer asks `forecast_history` for one. The two carrier-taking layers share one pairing,
+`forecast_evaluation_pairing`, which builds the target once and refuses a carrier the forecast was
+not fitted on.
+
+### The Result is lean, and every statistic is a verb over it
+
+`ForecastEvaluationResult` carries the forecast history `alpha`, the **Forward Target** `y`, the
+evaluation `dates`, and the parameters that produced them (`target`, `horizon`, `lag`, `step`,
+`min_count`, `ppy`). It computes no statistic. `forecast_ic`, `forecast_coverage`,
+`forecast_portfolio`, `forecast_quantile_spread`, `forecast_calibration`,
+`forecast_factor_correlation`, `forecast_holding_period` and `forecast_decay` are verbs over it,
+each re-parameterisable without a re-pairing; `min_count` and `ppy` are *carried* by the pairing
+and *applied* by the verbs. The reason is cost: producing `alpha` can be a rolling refit, so the
+pairing is computed once and everything above it — the plots included — reads that pairing rather
+than the block. This is the one place the map departs from the shape of map #643, whose plots take
+the block and call the verb themselves because every verb there reads a block that is already
+fitted.
+
+### The evaluation dates bound the sample; they do not filter it
+
+An observation is scorable when some asset carries a finite forecast and a finite target there.
+The first and the last such observation bound the evaluation, the dates run between them in
+strides of `step`, and a stride of the horizon (the default) gives forward windows that do not
+overlap. An unscorable observation inside the bounds is **kept**, with `NaN` statistics, so that
+`step` means the same thing everywhere in the sample. The reference drops such a date. The one
+statistic this moves is the hit rate of the coefficients, which counts against every date and reads
+a silenced date as a miss; that convention is `exposure_ic_factor_summary`'s, which the coefficient
+summary shares with map #643's exposure summary so the two never diverge.
+
+### A member that publishes no history is refit along the evaluation grid
+
+`forecast_history` fits the member once and reads its own Result: a `hist` that is given is
+returned, and one that is `nothing` is built by refitting the member at every row of a grid
+anchored at the block's first observation and striding by `step`. Which path runs is read off the
+Result, not off the type, so a member added later needs no method. A refit at observation `tb`
+sees the carrier through the row the block's `tb` sits on and the block through its own row `tb`,
+cut by `forecast_history_block`, so it reads nothing after the observation it answers for.
+`CustomValueReturnForecast` states one cross-section rather than fitting one, so no refit can give
+it a path; it is the one permanent refusal, and a caller pairs its stated values through the bare
+method. The Estimator layer passes the evaluation's own `step` down, which is what makes every
+evaluation date a row that was fitted.
+
+### The Forward Target is a typed family, and the idiosyncratic return is the default
+
+`AbstractForecastTarget` names which history the forward window is taken over:
+`IdiosyncraticTarget` (the default — the component a fitted member forecasts inside
+`CrossSectionalFactorPrior`), `AssetReturnTarget`, and `PanelFieldTarget(name)`.
+`forecast_target_history` is the family's one seam and the one place the two observation axes are
+reconciled: the idiosyncratic history lives on the block's rows, the asset returns and the Panel
+Fields on the carrier's, and the block is a suffix of the carrier. The horizon and the lag are the
+evaluation's parameters, not the target's. The Forecast Unit is not an evaluation parameter,
+because every member answers in return units.
+
+### The portfolios reuse `performance_summary`; the spreads do not
+
+`forecast_portfolio` builds the rank-weighted (`:rank`) or z-score-weighted (`:zscore`) book from
+the forecast alone — centred and rescaled to 200 % gross by `forecast_centred_weights!`, so every
+date is dollar neutral whatever the spread of the forecast — and its return series *is* a
+portfolio, so it earns the whole of `performance_summary` (a Sharpe ratio and its standard error,
+Sortino, Calmar, the maximum drawdown and the CVaR), which the reference does not report. The gaps
+below `min_count` are dropped before that call, as its Precomputed-returns contract prescribes, so
+**`max_drawdown` and `calmar` are of the compressed path**; the docstring carries the caveat and no
+guard is applied. A quantile spread is a difference of two means and not a book, so it gets the
+three annualisation figures and a hit rate through `forecast_series_summary`. The turnover of the
+book is `calc_turnover`, which landed in `src/17_NetReturnsDrawdowns.jl` beside `calc_net_returns`
+because a caller who holds a weight path wants its turnover whether a forecast produced it or not;
+its first observation is `NaN`, because a path cannot say whether it opened from cash.
+
+### The calibration is pooled, has no intercept, and reads no threshold
+
+`forecast_calibration` is the one reading of a forecast that a rescaling moves. The slope is a
+weighted regression of the target on the forecast through the origin, pooled over every scorable
+pair of every evaluation date; the intercept is refused rather than fitted, because the
+cross-sectional mean of the target is what the factor model is for. The curve and the pooled
+moments read every pair alike; the weights reach the slope alone. There is no cross-sectional
+count to threshold, so the verb takes no `min_count`.
+
+### A forward-window table is read on the common dates of its whole grid
+
+`forecast_holding_period` (cumulative windows, `p · h` ahead) and `forecast_decay` (disjoint
+windows, `h` ahead at lag `l + (p − 1) h`) rebuild a `ForecastEvaluationResult` per window and read
+its row with the coefficient, book and coverage verbs, so no statistic is written twice. A deeper
+window matures later, so the dates are intersected across the **whole grid** before any statistic
+is taken: a fall down a column is the forecast decaying, not the sample changing under it. The
+consequence is that a table read at one depth `n` is internally comparable and is **not**
+comparable to a table read at another, and that shortening `n` does not leave the rows that remain.
+The table's book columns are annualised at `fe.ppy`, where the reference reports them per period.
+
+### One columnar summary is also the comparison
+
+`forecast_evaluation_summary` answers `ForecastSummaryResult`, thirty columns whose axis is the
+forecast — the ten coefficient figures, the five annualised figures of each book, the six
+calibration figures and the four coverage figures, plus the quantile block on request — so a single
+evaluation is its length-1 case and the length-2 case *is* the comparison. The reference's
+comparison class is not carried. The vector method refuses evaluations that are not comparable (a
+different target, horizon, lag, step, threshold, annualisation, date set or asset axis), which the
+reference does not check. The column names are those of the forward-window tables, so a row of a
+table and a row of a summary read on the same terms. Three parts of an evaluation are deliberately
+**not** columns, each because its axis is not the forecast: the drawdown family (of the compressed
+path), the forward-window tables (axis: the window) and the factor correlations (axis: the factor).
+
+The five hit rates of the summary are taken against **two denominators**, kept apart and named
+apart: the coefficient hit rates count against every date, because a date the forecast could not
+rank is a miss; the book and spread hit rates count against the dates that scored, because a date
+that traded nothing is not a loss. Unifying them would edit `exposure_ic_factor_summary`, which
+is the released surface of map #643.
+
+### Every figure takes the Result, never the block
+
+The eleven figures of the StatsPlots extension take a `ForecastEvaluationResult` (or the summary),
+because the pairing may have cost a refit and every figure must read the same one. The summary
+figure draws ten of the thirty columns, leaving out the counts that would dwarf a ratio on one
+axis, and draws the quantile block only when it was asked for.
+
+### Two parameters of the reference have a documented absence
+
+Its free-form parameter bag has no home: every parameter is a typed field and a `@concrete` Result
+prints them. Its per-evaluation `name` is not a parameter of the evaluation: the names axis lives
+on `ForecastSummaryResult` and is supplied to `forecast_evaluation_summary`. Every other one of its
+fifteen parameters has a home, tabulated in #932's resolution.
+
+### What was rejected
+
+- **A comparison class of its own.** Collapsed into the columnar summary (above).
+- **Recomputing per plot, as map #643 does.** Refused because `alpha` may cost a rolling refit.
+- **A `min_count` keyword on the summary.** It would have reached the coefficients only, because
+  the book and the spread read the threshold off the Result, so a row would print under two
+  thresholds. The summary reads `min_count` and `ppy` off the Result.
+- **A Forecast Unit parameter on the evaluation.** The unit is a fitting detail.
+- **Reconciling the two hit-rate denominators.** It would move map #643's released surface.
+- **A stored oracle for the books.** They are pinned by their invariants (dollar neutral, 200 %
+  gross, a perfect forecast earns a positive mean and its negation the exact opposite), and the
+  coefficients, calibration, tables and summary are pinned bit for bit against the reference's own
+  methods on two small matrices.
+
+## Consequences
+
+Seventeen names are exported from `src/08_Moments/45_ReturnForecasts/07`–`14`: the three targets,
+the two Results, `forecast_evaluation`, `forecast_history`, and the ten level-2 verbs and
+summaries; eleven `plot_forecast_*` figures from the extension. `AbstractForecastTarget` is not
+exported. `CONTEXT.md` defines **Forecast Evaluation**, **Forward Target** and **Forecast
+Calibration**. Example `7_putting_it_together/07_Forecast_Evaluation.jl` is the page that walks the
+reading order.
+
+Two members rarely share an evaluation grid — a member that is refit warms up, one that publishes
+its history does not — so the summary refuses them, correctly, and aligning two forecasts is today
+a hand-written blank through the bare method. The map named it as a fresh effort;
+[#1073](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1073) seeds it.
+
+The review that wrote this ADR found three places where the code at the head reads less than the
+reference and the tickets did not say so. They are the maintainer's to rule on, and this ADR is
+rewritten in place when they are: `forecast_coverage` divides by every asset on the panel rather
+than by the estimation mask's count at the date
+([#1070](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1070));
+`forecast_factor_correlation` reads the evaluation dates only, where a contemporaneous statistic
+can read every observation
+([#1071](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1071)); and the reference's
+two comparison overlays — several forecasts' cumulative coefficient and cumulative book return on
+one axis — have no vector method
+([#1072](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1072)).
+
+A Neutralisation does not decorrelate a forecast from its target, because both Neutralisation
+sites fit a cross-sectional regression with no intercept; that is
+[#950](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/950)'s, settled by letting a
+caller override the regression estimator, and the factor-correlation figure states it.

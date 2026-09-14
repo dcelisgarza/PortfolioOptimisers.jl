@@ -449,10 +449,32 @@ end
     end
 
     @testset "A refit reads nothing after the observation it answers for" begin
+        # Causality is proved by perturbation, not by recomputing the loop's own call: every
+        # row after the block's row `tb` -- the carrier's returns, every numeric Panel Field,
+        # and the block's residual, variance and exposure histories -- is overwritten with
+        # noise, and the rows through `tb` must come back bit for bit. A row after `tb` must
+        # move, or the perturbation reached nothing.
         tgt = TargetReturnForecast(; scores = scores, horizon = 2, lag = 1,
                                    calibrate = false)
         hist = forecast_history(tgt, rd, csfm)
         tb = 30
+        rng = StableRNG(1)
+        rdp = deepcopy(rd)
+        csfmp = deepcopy(csfm)
+        r_after = (rows[tb] + 1):fx.T
+        rdp.X[r_after, :] .= 10 .* randn(rng, length(r_after), fx.N)
+        for f in rdp.pnl.pf
+            if f isa PO.NumericPanelField
+                f.vals[r_after, :] .= 100 .* rand(rng, length(r_after), fx.N)
+            end
+        end
+        b_after = (tb + 1):fx.Tb
+        csfmp.csr.eps[b_after, :] .= 5 .* randn(rng, length(b_after), fx.N)
+        csfmp.vs[b_after, :] .= 9.0
+        csfmp.Ms[b_after, :, :] .= randn(rng, length(b_after), fx.N, size(csfm.Ms, 3))
+        histp = forecast_history(tgt, rdp, csfmp)
+        @test isequal(view(histp, 1:tb, :), view(hist, 1:tb, :))
+        @test !isequal(view(histp, tb + 1, :), view(hist, tb + 1, :))
         short = return_forecast(tgt, PO.port_opt_view(rd, 1:rows[tb], :),
                                 PO.forecast_history_block(csfm, tb))
         @test isequal(view(hist, tb, :), short.mu)
