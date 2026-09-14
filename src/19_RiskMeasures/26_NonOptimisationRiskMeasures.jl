@@ -484,7 +484,7 @@ function moment_risk(r::ThirdCentralMoment{<:Any, <:Option{<:StatsBase.AbstractW
     val .= val .^ 3
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
-# Evaluation entry points — see `MomentRiskMeasures` in `28_RiskMeasureTools.jl`.
+# Evaluation entry points — see `MomentRiskMeasures` in `29_RiskMeasureTools.jl`.
 
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::MeanReturn) = NetReturnsInput()

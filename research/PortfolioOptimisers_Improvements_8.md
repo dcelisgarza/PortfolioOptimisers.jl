@@ -127,7 +127,7 @@ These gaps are closed already. The evidence is in the code.
 | "Add a performance tearsheet" | 5, 6 | The **plot** exists. The **numbers** do not. See recommendation 6. |
 | "Add attribution" | 2, 4 | `brinson_attribution` is at `src/21_ExpectedReturns.jl:556`. Factor risk contribution is at `src/20_Optimisation/12_FactorRiskContribution.jl`. |
 | "Add regime-aware moments" | 2, 7 | `src/08_Moments/36_*` and `37_*` hold them. |
-| "Add pre-selection" | 1, 3 | `src/22_Preselection.jl` and the Asset Selector family hold it. |
+| "Add pre-selection" | 1, 3 | `src/24_Preselection.jl` and the Asset Selector family hold it. |
 | "Add graph constraints" | 3, 6 | `src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl`. |
 | "Add ESG constraints" | 5, 6 | A linear constraint on a score is already expressible. `UniverseSets` plus `LinearConstraintGeneration` covers it. An ESG type would be sugar. |
 

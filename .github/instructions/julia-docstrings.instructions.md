@@ -481,8 +481,8 @@ Three kinds of alias exist, and the sections differ by kind.
 
 | Kind | Declaration | Lives in | Header line | Sections it carries |
 | --- | --- | --- | --- | --- |
-| **Acronym alias** | `const HRP = HierarchicalRiskParity` | `src/25_Aliases.jl` only | the alias name alone | none |
-| **Factory alias** | `MAD(; kwargs...)::LowOrderMoment` | `src/25_Aliases.jl` only | the signature, ending `-> T` | `# Validation`, and only when its own body raises |
+| **Acronym alias** | `const HRP = HierarchicalRiskParity` | `src/27_Aliases.jl` only | the alias name alone | none |
+| **Factory alias** | `MAD(; kwargs...)::LowOrderMoment` | `src/27_Aliases.jl` only | the signature, ending `-> T` | `# Validation`, and only when its own body raises |
 | **Dispatch alias** | `const RhoDistanceAlgorithm = Union{...}` | any file under `src/` | the declaration, `const NAME = <type expression>` | `# Related`, and `# References` when the grouping itself is published |
 
 A **dispatch alias** is a `const` bound to a type expression rather than to a bare name. A `Union`, a container such as `AbstractVector{<:LinearConstraint}`, and a parametrised form such as `const RMCVaR{T} = Union{...}` are all one kind, because a caller meets all three the same way: as the type a method signature dispatches on.
@@ -490,7 +490,7 @@ A **dispatch alias** is a `const` bound to a type expression rather than to a ba
 ### The summary paragraph
 
 - An **acronym alias** carries exactly one sentence, `Alias for [`Canonical`](@ref).` and nothing more. The alias and its target are the same object, so a second sentence describes the target and belongs on the target.
-- A **factory alias** carries one sentence naming what it builds. That sentence `@ref`s every type the factory composes. A later sentence is permitted, and only for a choice the composition fixes that a reader would otherwise get wrong. Read `ZeroVarianceFilter` in [`src/25_Aliases.jl`](../../src/25_Aliases.jl), which states why it scores with `SCM()` and not with `Variance`.
+- A **factory alias** carries one sentence naming what it builds. That sentence `@ref`s every type the factory composes. A later sentence is permitted, and only for a choice the composition fixes that a reader would otherwise get wrong. Read `ZeroVarianceFilter` in [`src/27_Aliases.jl`](../../src/27_Aliases.jl), which states why it scores with `SCM()` and not with `Variance`.
 - A **dispatch alias** carries what the alias groups and why the group exists. The *why* is the load-bearing half: a reader who sees only the member list learns nothing the declaration did not already show.
 
 ### Why an alias carries so little

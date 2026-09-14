@@ -366,7 +366,7 @@ function moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
-# Evaluation entry points — see `MomentRiskMeasures` in `28_RiskMeasureTools.jl`.
+# Evaluation entry points — see `MomentRiskMeasures` in `29_RiskMeasureTools.jl`.
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

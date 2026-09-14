@@ -833,7 +833,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :strict_opt => "`strict`: Whether to strictly enforce weight bounds.",#
                                  :strict_conv => "`strict`: Whether to raise an error if convergence is not achieved.",#
                                  :schalg => "`alg`: Schur complement algorithm variant.",#
-                                 # Preselection. `22_Preselection.jl` pairs two redundancy
+                                 # Preselection. `24_Preselection.jl` pairs two redundancy
                                  # algorithms over one correlation matrix, and two selection
                                  # rules over one taken set, so each of the five descriptions
                                  # below is shared by two fields of that file.
@@ -1220,7 +1220,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # the same candidate counts, so `02_Clusters.jl` shares this symbol
                        # between two Units.
                        :c_star_clusters => "``c^{\\star}``: Selected number of clusters.",#
-                       # Preselection. `22_Preselection.jl` states the admitted set of every
+                       # Preselection. `24_Preselection.jl` states the admitted set of every
                        # selection rule and of every redundancy algorithm, so the four
                        # symbols below are each shared by two or more Units of that file.
                        :s_i_score => "``s_{i}``: Score of asset ``i``, the risk measure evaluated on that asset's own return series.",#

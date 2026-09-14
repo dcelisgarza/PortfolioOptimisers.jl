@@ -354,7 +354,7 @@ rather than on `ExposureConstraintEstimator` or on the prior, so that a future m
 it needs without changing anything else.
 
 **The shape is not invented here.** `FactorRiskContribution` already holds `re::TD{<:RegE_Reg}`, and
-[`resolve_factor_regression`](../../src/19_RiskMeasures/27_ExpectedRisk.jl) already fixes the
+[`resolve_factor_regression`](../../src/19_RiskMeasures/28_ExpectedRisk.jl) already fixes the
 precedence: a precomputed `Regression` wins, then the prior's own `rr`, then a refit from the
 returns. `FactorSpace` takes the same slot and the same precedence, so `re === nothing` reproduces
 the previous behaviour exactly and every constraint written before the field is unaffected.

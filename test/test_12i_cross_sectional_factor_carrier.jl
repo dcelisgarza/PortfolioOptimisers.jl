@@ -191,7 +191,7 @@ end
         @test labels(pr_csfm_flat) == [string(k) for k in 1:size(M, 2)]
         @test labels(pr_reg_reb) == [string(k) for k in 1:size(L, 2)]
 
-        # 2. `factor_risk_contribution`, at `19_RiskMeasures/27_ExpectedRisk.jl`.
+        # 2. `factor_risk_contribution`, at `19_RiskMeasures/28_ExpectedRisk.jl`.
         w = [0.4, 0.1, 0.3, 0.2]
         rc_csfm = factor_risk_contribution(Variance(), w, pr_csfm_reb; rd = rd)
         rc_reg = factor_risk_contribution(Variance(), w, pr_reg_reb; rd = rd)

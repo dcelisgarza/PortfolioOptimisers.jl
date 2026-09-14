@@ -13,11 +13,11 @@ module AliasCensusHealth
 include(joinpath(@__DIR__, "..", "code_health", "CodeHealth.jl"))
 end
 
-@testset "Alias census: every alias of src/25_Aliases.jl keeps its claim" begin
+@testset "Alias census: every alias of src/27_Aliases.jl keeps its claim" begin
     using Test, TOML
 
     #=
-    `src/25_Aliases.jl` is 132 units and 43 executable lines, and it is the only file under
+    `src/27_Aliases.jl` is 132 units and 43 executable lines, and it is the only file under
     `src/` that holds an ACRONYM alias or a FACTORY alias. ADR 0086 (issue #436) scopes both
     kinds to this file, and `test_26_docs.jl` gates the sections each kind may carry.
 
@@ -47,7 +47,7 @@ end
 
     PO = PortfolioOptimisers
     ROOT = normpath(joinpath(@__DIR__, ".."))
-    ALIAS_FILE = joinpath(ROOT, "src", "25_Aliases.jl")
+    ALIAS_FILE = joinpath(ROOT, "src", "27_Aliases.jl")
 
     # The two kinds this file holds. A new alias must land in one of them.
     ACRONYM_TOTAL = 111
@@ -119,7 +119,7 @@ end
         census green while the two records disagree. `docs/adr/` is outside the citation
         census's scope, so the ADR stays a prose copy. =#
         manifest = TOML.parsefile(joinpath(ROOT, "code_health", "sweep_manifest.toml"))["file"]
-        @test ACRONYM_TOTAL + FACTORY_TOTAL == manifest["src/25_Aliases.jl"]["units"]
+        @test ACRONYM_TOTAL + FACTORY_TOTAL == manifest["src/27_Aliases.jl"]["units"]
 
         # A third kind would be a dispatch alias, which ADR 0086 permits in any file. It
         # carries `# Related`, and this file's sweep recorded none, so one arriving here
@@ -188,7 +188,7 @@ end
             append!(offenders, acronym_offences(name, target, text))
         end
         if !isempty(offenders)
-            @warn """$(length(offenders)) acronym alias claim(s) in `src/25_Aliases.jl` do not
+            @warn """$(length(offenders)) acronym alias claim(s) in `src/27_Aliases.jl` do not
                      hold. An acronym alias and its target are the SAME object, and its
                      docstring is one sentence naming that object (ADR 0086). Correct the
                      `const`, or correct the sentence:\n  $(join(offenders, "\n  "))"""
@@ -221,7 +221,7 @@ end
         end
         if !isempty(offenders)
             @warn """$(length(offenders)) factory alias summary sentence(s) in
-                     `src/25_Aliases.jl` omit a type the factory composes. The composition IS
+                     `src/27_Aliases.jl` omit a type the factory composes. The composition IS
                      the claim, so the sentence `@ref`s every type it builds (ADR
                      0086):\n  $(join(offenders, "\n  "))"""
         end
@@ -390,7 +390,7 @@ end
     sweeps. It carries ONE documented unit, the module docstring, and ZERO executable lines,
     so it is coverage terminal by construction and its `# Algorithm` count is zero.
 
-    Its claim is its include list. 193 `include` calls put every other file under `src/` into
+    Its claim is its include list. 301 `include` calls put every other file under `src/` into
     the module, in the order the declarations need, and NOTHING checked that list. A file
     added to `src/` and not included is dead: it carries a manifest row, so
     `test_45_sweep_census.jl` stays green; its types are never declared, so no other test can
@@ -456,6 +456,75 @@ end
             @warn "File(s) `include`d more than once: $(join(duplicated, ", "))"
         end
         @test isempty(duplicated)
+    end
+
+    #=
+    `.github/instructions/julia-source-code.instructions.md` § *Code Organization* states that
+    a source file's numeric prefix is its load order. Two files under one number state no
+    order, and the `include` list above loads them anyway, so nothing red when
+    `21_FactorAttribution.jl` joined `21_ExpectedReturns.jl` at #782, and nothing red on the
+    two `16_` pairs under `19_RiskMeasures/` and `20_RiskMeasureConstraints/` before it. Issue
+    #1060 renumbered all three. This is the census that keeps them: every entry of every
+    directory carries a distinct prefix, and the `include` list is the listing sorted by that
+    prefix, so the number on the file IS the order the module loads it in.
+
+    `docs/src/api/` mirrors `src/` and is numbered the same way; `docs/generate_type_hierarchy.jl`
+    numbers its own page past the largest prefix there, so that tree is held to the first
+    claim too. `ext/` carries no prefixes today and is walked so a numbered file entering it
+    is held to the rule on the day it arrives.
+    =#
+    @testset "a prefix is unique in its directory, and the include list is the prefix order" begin
+        # `(number, name)` per path component: the number orders, and the name breaks a tie
+        # that the first claim says cannot happen. An unnumbered entry sorts last.
+        function prefix_key(entry)
+            m = match(r"^(\d+)_", entry)
+            return (m === nothing ? typemax(Int) : parse(Int, m.captures[1]), entry)
+        end
+        sort_key(path) = Tuple(prefix_key.(splitpath(path)))
+
+        collisions = String[]
+        for top in (SRC, joinpath(ROOT, "ext"), joinpath(ROOT, "docs", "src", "api"))
+            for (root, dirs, files) in walkdir(top)
+                by_number = Dict{Int, Vector{String}}()
+                for entry in vcat(dirs, files)
+                    m = match(r"^(\d+)_", entry)
+                    m === nothing && continue
+                    push!(get!(by_number, parse(Int, m.captures[1]), String[]), entry)
+                end
+                for (number, entries) in by_number
+                    length(entries) > 1 || continue
+                    push!(collisions,
+                          string(relpath(root, ROOT), ": ", lpad(number, 2, '0'), "_ on ",
+                                 join(sort(entries), ", ")))
+                end
+            end
+        end
+        if !isempty(collisions)
+            @warn """$(length(collisions)) directory prefix collision(s). Two entries under one
+                     number state no load order between them. Renumber the entries that follow
+                     the one that loads first, and move every reference the census of
+                     `test_45_sweep_census.jl` and the baselines under `code_health/`
+                     carry:\n  $(join(sort(collisions), "\n  "))"""
+        end
+        @test isempty(collisions)
+
+        # The include list, read from the parse above, against the listing sorted by prefix.
+        # An entry included out of its numbered order is named with the position it holds and
+        # the one its number gives it.
+        expected = sort(on_disk; by = sort_key)
+        out_of_order = String[]
+        for (i, path) in enumerate(included)
+            j = findfirst(==(path), expected)
+            j === nothing && continue
+            j == i || push!(out_of_order,
+                            string(path, " is included at ", i, " and its prefix orders it at ", j))
+        end
+        if !isempty(out_of_order)
+            @warn """$(length(out_of_order)) `include` call(s) out of prefix order. The number on
+                     a file is its load order, so renumber the file or move the
+                     call:\n  $(join(out_of_order, "\n  "))"""
+        end
+        @test isempty(out_of_order)
     end
 
     @testset "the module docstring is the README" begin

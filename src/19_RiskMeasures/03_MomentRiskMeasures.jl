@@ -1429,7 +1429,7 @@ function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeig
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
     return res / sigma^2
 end
-# Evaluation entry points — see `MomentRiskMeasures` in `28_RiskMeasureTools.jl`.
+# Evaluation entry points — see `MomentRiskMeasures` in `29_RiskMeasureTools.jl`.
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

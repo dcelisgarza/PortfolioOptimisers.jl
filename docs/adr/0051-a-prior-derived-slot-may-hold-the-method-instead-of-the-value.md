@@ -26,7 +26,7 @@ Estimator is a description of how to compute for whatever input it is given, so 
 the slot survives a refit precisely because it holds no numbers.
 
 The library already had two precedents.
-[`MedianAbsoluteDeviation`](../../src/19_RiskMeasures/24_MedianAbsoluteDeviationRisk.jl)'s `mu`
+[`MedianAbsoluteDeviation`](../../src/19_RiskMeasures/25_MedianAbsoluteDeviationRisk.jl)'s `mu`
 admitted a value or a centring strategy, resolved by `calc_moment_target` at the point of use.
 ADR 0048's `HopCount.n` and `PathLength.dmax` admit an integer or a **rule** called at the point
 of use, with refusal methods in the kernel.

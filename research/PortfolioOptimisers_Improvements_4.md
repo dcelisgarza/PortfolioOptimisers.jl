@@ -9,7 +9,7 @@ This report has been revised after a closer inspection of the current `dev` bran
 
 The important correction is that several items from the previous report were **already implemented** in PortfolioOptimisers.jl and should not have been presented as gaps. In particular:
 
-- pre-selection is already a substantial module in `src/22_Preselection.jl`;
+- pre-selection is already a substantial module in `src/24_Preselection.jl`;
 - higher moments, including coskewness/cokurtosis and higher-moment risk machinery, are already present;
 - factor/asset risk contribution machinery is already present;
 - graph/network/phylogeny constraint generation is already present;
@@ -89,7 +89,7 @@ These were incorrectly identified as gaps in the previous report.
 
 ## 2.1 Pre-selection — already implemented
 
-`src/22_Preselection.jl` is a large, dedicated implementation rather than a placeholder. It includes correlation-based redundancy selection and clustering-based selection, with feature-matrix support and integration into the pipeline/data flow. citeturn4view0turn5view2
+`src/24_Preselection.jl` is a large, dedicated implementation rather than a placeholder. It includes correlation-based redundancy selection and clustering-based selection, with feature-matrix support and integration into the pipeline/data flow. citeturn4view0turn5view2
 
 Therefore:
 
@@ -1668,9 +1668,9 @@ That is the direction most likely to turn the existing breadth of PortfolioOptim
 - Priors: <https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/dev/src/13_Prior>
 - Uncertainty sets: <https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/dev/src/14_UncertaintySets>
 - Constraint generation: <https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/dev/src/12_ConstraintGeneration>
-- Pre-selection: <https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/dev/src/22_Preselection.jl>
+- Pre-selection: <https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/dev/src/24_Preselection.jl>
 - Risk measures: <https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/dev/src/19_RiskMeasures>
-- Pipeline: <https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/dev/src/23_Pipeline>
+- Pipeline: <https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/dev/src/25_Pipeline>
 
 ## skfolio
 

@@ -48,7 +48,7 @@
     `range_tails`. The reason is written per entry, because "it throws" is not a reason.
 
       - `Range` writes `wr_risk - br_risk` directly in
-        `20_RiskMeasureConstraints/16_RangeConstraints.jl:47`. It never reaches
+        `20_RiskMeasureConstraints/17_RangeConstraints.jl:47`. It never reaches
         `set_range_risk_constraints!`, so there is no pair to state.
       - `ValueatRiskRange` under `DistributionValueatRisk` is parametric: the two tails are
         two quantiles of one fitted distribution, not two separate measures.
@@ -121,7 +121,7 @@
             with ONE documented exception. `GenericValueatRiskRange` is the range whose
             tails are GIVEN rather than derived: the caller states both measures, and the
             constructor keeps their `ub` on purpose, "so a caller can bound one tail"
-            (`21_GenericValueatRiskRange.jl:151`). Its default tails carry no bound, so the
+            (`22_GenericValueatRiskRange.jl:151`). Its default tails carry no bound, so the
             assertion below still bites on the shipped value; what it must not do is forbid
             a bound the design admits.
             =#
