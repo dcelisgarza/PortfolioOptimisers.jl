@@ -61,7 +61,10 @@ anything today.
 a history `rd_T` and its extension `rd_{T+k}`, `vcat(old.pred, new.pred)` equals
 `cross_val_predict(mr, rd_{T+k}, cv).pred` fold for fold, at ADR 0137's tolerances for the
 weights and exactly for the carrier the read-out rebuilds — a capped run included. Deployment of
-a resumed state is one hand step, `partial_fit!(res.opt, rows)`; the library offers no
+a resumed state is one hand step in the value form, `partial_fit(res.opt, rows)`, which folds a
+copy of every state the estimator carries and leaves the Result resumable; the bang form writes
+the held timestamps in place and a later `Resume(res)` is refused, which is the seam's contract
+for a kept estimator ([ADR 0107](0107-the-update-seam-has-two-verbs-and-a-view-slices-by-asset-and-drops-by-observation.md)). The library offers no
 `refit_last`, because a state folded through purge and test rows equals no fold of any run and
 cannot be unfolded, while from the last training end the caller reaches the end of the data in
 one call.

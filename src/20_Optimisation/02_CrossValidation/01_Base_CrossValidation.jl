@@ -1065,7 +1065,7 @@ A feature matrix is **not** among them. It is not carried through the folds at a
 
 $(DocStringExtensions.FIELDS)
 
-An online run's Result also carries the estimator the fold loop threaded, in `opt`, folded through the last training end `last(train_idx[end])` (ADR 0144). A batch run writes `nothing`. [`Resume`](@ref) hands the Result back to the loop over a longer history, and the loop continues from the fold after the last one held; a hand step, `partial_fit!(res.opt, rows)`, deploys the state from the last training end.
+An online run's Result also carries the estimator the fold loop threaded, in `opt`, folded through the last training end `last(train_idx[end])` (ADR 0144). A batch run writes `nothing`. [`Resume`](@ref) hands the Result back to the loop over a longer history, and the loop continues from the fold after the last one held; a hand step in the value form, `partial_fit(res.opt, rows)`, deploys the state from the last training end and leaves the Result resumable. The bang form, `partial_fit!(res.opt, rows)`, writes the state's arrays in place — the held timestamps among them — so the Result it came from then names a row no fold ends at, and `Resume` refuses it; that is the seam's contract for a kept estimator, stated at [`partial_fit!`](@ref).
 
 # Constructors
 

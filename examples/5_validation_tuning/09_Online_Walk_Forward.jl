@@ -327,8 +327,11 @@ stacked = vcat(res_1, res_2)
 
 #=
 `res_1` is never written — `Resume` copies every state at entry — so one Result resumes any
-number of times. Deployment of a resumed state is one hand step, `partial_fit!(res.opt,
-rows)` from the last training end, and there is no `refit_last`: a state folded through the
+number of times. Deployment of a resumed state is one hand step from the last training end,
+in the value form: `partial_fit(res.opt, rows)` folds a copy of every state and leaves
+`res` resumable, where the bang form `partial_fit!` writes the held timestamps in place and
+`Resume(res)` then refuses the Result — the seam's contract for a kept estimator. There is no
+`refit_last`: a state folded through the
 purge and test rows equals no fold of any run and cannot be unfolded.
 
 ## 8. The moment seam on its own: the advertised benefit and the real one

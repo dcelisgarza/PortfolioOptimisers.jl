@@ -26,7 +26,7 @@ The Pipeline path and a direct path would then emit different shapes for the sam
 
 ### What the carried universe changes about alignment
 
-`assert_universe_aligned` (`src/23_Pipeline/03_Pipeline.jl`) is one comparison, `rd.nx ==
+`assert_universe_aligned` (`src/25_Pipeline/03_Pipeline.jl`) is one comparison, `rd.nx ==
 train.nx`, called from both `predict` methods. It exists because a fold's universe was per-window
 inference: a stateless conversion that deleted an all-gap column produced a different asset set in
 train and test, and the terminal weights, indexed by the training universe, would misalign against

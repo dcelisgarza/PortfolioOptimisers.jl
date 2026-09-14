@@ -278,7 +278,7 @@ Four facts, found on the way and recorded here rather than left to be found agai
 - `CONTEXT.md`: *Pipeline* states its online form, *Fold Context* names the Pipeline as a holder,
   and *Sample Buffer* names the input-carrier buffer `Online(pipe)` seeds.
 - Built by [#1022](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1022) in
-  `src/03_InputData/18_PreprocessingPartialFit.jl` and `src/23_Pipeline/06_OnlinePipeline.jl`,
+  `src/03_InputData/18_PreprocessingPartialFit.jl` and `src/25_Pipeline/06_OnlinePipeline.jl`,
   tested in `test/test_24f_pipeline_partial_fit.jl`; the Pipeline's search door lifted its
   refusal in the same build, [#1020](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1020)
   having landed the optimiser's.

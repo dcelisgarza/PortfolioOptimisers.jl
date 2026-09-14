@@ -96,7 +96,8 @@ re-derive them:
     @testset "Every `Pr_RR` method declares `rd`, or is excused by name" begin
         excused = Dict(:returns_matrix_picker => "takes `rd` positionally; it *is* the picker",
                        :expected_risk => "reads `pr.X` and the moments; no feature matrix",
-                       :calc_net_returns => "reads a returns matrix and fees; no feature matrix")
+                       :calc_net_returns => "reads a returns matrix and fees; no feature matrix",
+                       :result_investable_carrier => "views a caller's carrier at the result's Investable Mask through the `port_opt_view` its owner writes; it reads no feature matrix of its own")
 
         carrier_methods = Tuple{Symbol, Method}[]
         for n in names(PO; all = true)

@@ -185,6 +185,28 @@ assets is what keeps the JuMP families cheap.
         same_weights(vcat(old, cross_val_predict(Resume(old), rd, online_cv)), one, tn)
     end
 
+    @testset "A deployment step in the value form leaves the Result resumable" begin
+        # ADR 0144 names the deployment of a resumed state as one hand step from the last
+        # training end. The value form folds a copy of every state, so the Result it came
+        # from still holds its timestamps and resumes; the bang form writes the held
+        # timestamps in place, which is the seam's contract for a kept estimator, and the
+        # Result then names a row no fold of the scheme ends at.
+        old = cross_val_predict(hrp, rd_T, online_cv)
+        held = copy(po.held_timestamps(old.opt))
+        last_end = last(split(online_cv, rd_T).train_idx[end])
+        clean = cross_val_predict(Resume(old), rd, online_cv)
+        deployed = po.partial_fit(old.opt, rows(rd_T, (last_end + 1):T0))
+        @test po.held_timestamps(deployed) == rd_T.ts
+        @test po.held_timestamps(old.opt) == held
+        @test po.returns_result(old.opt).X == rows(rd_T, 1:last_end).X
+        again = cross_val_predict(Resume(old), rd, online_cv)
+        @test weights(again) == weights(clean)
+        _ = po.partial_fit!(old.opt, rows(rd_T, (last_end + 1):T0))
+        @test po.held_timestamps(old.opt) == rd_T.ts
+        @test occursin("no fold of the scheme",
+                       msg(() -> cross_val_predict(Resume(old), rd, online_cv)))
+    end
+
     @testset "The re-entry refusals, each by name" begin
         old = cross_val_predict(mr, rd_T, online_cv)
         # A batch Result, and a population.

@@ -31,7 +31,7 @@ which a set estimator is fitted today, and there are five:
    `20_Optimisation/20_RiskMeasureConstraints/02_VarianceConstraints.jl`.
 3. The near-optimal-centering pre-fit, `ucs_risk_measure(noc.r, rd)` in
    `20_Optimisation/13_NearOptimalCentering.jl`, which runs **before** any prior exists.
-4. The Pipeline step, `run_uncertainty_step` in `23_Pipeline/02_StepExecution.jl`, which reads the
+4. The Pipeline step, `run_uncertainty_step` in `25_Pipeline/02_StepExecution.jl`, which reads the
    `:returns` slot.
 5. The hierarchical route, where `port_opt_view` carries an estimator across a cluster boundary
    unchanged and the cluster's own sub-optimiser fits it.
