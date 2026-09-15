@@ -312,6 +312,19 @@ Structural axes: **low-order** is mean plus covariance, **high-order** adds cosk
 - **EntropyPoolingPrior**: re-weights scenario probabilities to satisfy views with minimal relative entropy.
 - **MeucciEntropyPoolingPrior**: the earlier entropy pooling estimator, whose CVaR route root-finds the Value at Risk level rather than writing a formulation.
 - **OpinionPoolingPrior**: consensus across several priors — `LinearOpinionPooling`, `LogarithmicOpinionPooling`.
+- **SyntheticDataPrior**: moments of a panel drawn from a fitted Synthetic-Data Generator, optionally under a Stress Statement; the vine copula is the first generator.
+
+**Synthetic-Data Generator**
+A model of the joint distribution of asset returns that is fitted to a panel and then drawn from. Its estimator carries every knob of the fit, including any conditioning it can honour; its Result is the fitted model, and `simulate(rng, result, n)` draws `n` scenarios from it, returning the observations × assets matrix beside a **Simulation Result** (below). The vine copula is the first generator; a bootstrap or a path-simulating model joins the family with its own estimator and no change to the prior that wraps it. A conditioning that the fitted model can honour lives on the Result the fit produced, so re-conditioning a fitted generator is a field change on the Result, never a refit. ADR 0153.
+*Avoid*: reading the generator as a Prior; it produces scenarios, and a **Synthetic-Data Prior** (below) turns them into moments.
+
+**Synthetic-Data Prior**
+The Prior Estimator that wraps a Synthetic-Data Generator: it fits the generator when handed the estimator, or takes the fitted Result as it stands, draws `n_sim` scenarios under its own `rng`/`seed`, repairs any constant column, fits an inner low-order Prior Estimator on the synthetic panel, and returns that Result whole with the draw's Simulation Result beside it. Its `X` is the synthetic panel and its Original Returns Matrix is `nothing`, because the caller's panel is not over the same observations. **Fit once, stress many** is: fit the generator once, change the conditioning on its Result, wrap it again. ADR 0153.
+*Avoid*: reading `ens` as the count the generator was fitted over; it is whatever the inner estimator stated over the synthetic rows, and the fitted count lives on the generator's Result.
+
+**Simulation Result**
+The read of how a draw ran: the route the sampler took (exact, rejection or importance), the acceptance rate, the draws it took, and the mask of columns the constant-column repair touched. It is returned beside the matrix by `simulate` and carried on the Prior Result under `sim`, where a reweighting wrapper dispatches on it to refit the inner moments on the drawn panel rather than draw again. ADR 0153.
+*Avoid*: reading it as importance weights; a weighted draw states its weights on the Prior Result's `w` and their Kish count on `ens`, and the default importance route resamples so both stay `nothing`.
 
 **Group Pair View**
 An entropy pooling correlation or covariance view whose two sides are groups rather than single assets, `"(gA, gB) == 0.35"`. The two groups must be of equal length, and the view **spans** one asset pair per position: it emits one constraint row per pair, and a `prior(gA, gB)` reference inside it resolves to that pair's own prior value. See ADR 0079.
