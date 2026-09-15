@@ -26,8 +26,12 @@
     # Every `partial_fit!` method whose first argument is a concrete estimator carrying a
     # `cache` field. A state-first method carries no `cache`, and the generic buffering
     # method's first argument is a `Union` rather than a struct, so both fall out here.
+    # The census reads the library's methods alone. A test file that runs earlier in the same
+    # process may define its own `partial_fit!` on a probe estimator whose `cache` field is
+    # unbounded, and that probe is the test's business, not the library's.
     checked = Tuple{Method, Any, Int}[]
     for m in methods(partial_fit!)
+        m.module === po || continue
         sig = Base.unwrap_unionall(m.sig)
         length(sig.parameters) >= 2 || continue
         T = sig.parameters[2]
