@@ -4,7 +4,7 @@
 # Purpose
 #   Reports 2, 3, 4 and 7 all name this gap. The library models fees and
 #   turnover, and `BudgetMarketImpact` in
-#   `src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl` is the only
+#   `src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl` is the only
 #   place impact appears. Fees and impact are different things:
 #
 #     * A **fee** is proportional to the value traded. Trading twice as much
@@ -165,7 +165,7 @@ The total cost exponent is `1 + delta`.
   - The cost is convex whenever `delta >= 0`, and it is **conic representable
     for rational `delta`** through a chain of power cones, which JuMP supports
     directly with `MOI.PowerCone`. The library already uses that cone in
-    `src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl`, so
+    `src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl`, so
     the machinery is present.
 """
 struct PowerLawImpact <: AbstractImpactModel

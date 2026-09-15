@@ -195,7 +195,7 @@ A `NamedTuple` with `turnover` (against the drifted holdings), `by_asset`, and
     than the naive figure says; one that drifted away trades more. Both errors
     are real money, and both are invisible to a calculation that never sees the
     holdings.
-  - The library's turnover machinery in `src/15_Turnover.jl` takes a previous
+  - The library's turnover machinery in `src/12_Turnover.jl` takes a previous
     weight vector, so it is *capable* of this. What is absent is the state
     object that makes the drifted vector the natural thing to pass.
 """

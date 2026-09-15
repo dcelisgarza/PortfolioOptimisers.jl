@@ -41,9 +41,9 @@ julia> Pkg.add(PackageSpec(; name = "PortfolioOptimisers"))
 
 ## Roadmap
 
-- For a roadmap of planned and desired features in no particular order please refer to Issue [#37](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/37).
+- The [Issues](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/) page is used as a tracker for bugs, feature requests, plans, and works in progress.
 
-- Some docstrings are incomplete and/or outdated, please refer to Issue [#58](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/58) for details on what docstrings have been completed in the `dev` branch.
+- The [dev](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/dev) branch is used as a staging ground before merging into `main`.
 
 ## Quick-start
 
@@ -56,7 +56,7 @@ First we import the packages we will need for the example.
 - `CSV`, `TimeSeries` and `DataFrames` for loading and preprocessing price data.
 - `PrettyTables` for displaying the results.
 
-We use the S&P 500 sample dataset shipped in [`examples/SP500.csv.gz`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/src/examples): daily adjusted close prices for 20 large-cap stocks. To keep things quick, we only use the most recent year.
+We use the S&P 500 sample dataset shipped in [`examples/SP500.csv.gz`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples): daily adjusted close prices for 20 large-cap stocks. To keep things quick, we only use the most recent year.
 
 ```julia
 # Import module and plotting extension.
@@ -153,7 +153,7 @@ plot_portfolio_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
 # Furthermore, we can also plot the risk contribution per asset. For this, we must provide an instance of the risk measure we want to use with the appropriate statistics/parameters. We can do this by using the `factory` function (recommended when doing so programmatically), or manually set the quantities ourselves.
 plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx, erc = false)
 
-# This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
+# This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples).
 ```
 
 ![Fig. 2](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/src/assets/readme_2.svg)

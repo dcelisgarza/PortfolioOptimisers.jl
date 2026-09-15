@@ -160,7 +160,7 @@ whole component — which is exactly the hazard below.
     optimises successfully and returns a single-asset portfolio (§3.1). State a numeric `dmax` to
     select anything narrower.
 
-The same `sep` is also read by [`PhylogenyFeatures`](@ref), which builds a feature matrix rather
+The same `sep` is also read by [`PhylogenyPanel`](@ref), which builds an Asset Panel rather
 than a constraint. There the budget *shapes* a fall-off instead of selecting pairs — a second knob,
 [`Proximity`](@ref)'s `decay`, says how strongly — so the bare default is the natural choice on
 that path and the trap above on this one. The two knobs live on two different objects and neither
@@ -554,9 +554,9 @@ one dial. The last one is a single block: that is what "relate everything" looks
 #src   The ADR 0048 Consequences bullet carried the same wrong four and its enumeration also
 #src   missed EigenvectorCentrality on the similarity branch — corrected in an appended amendment,
 #src   not rewritten.
-#src - SCOPE: the two knobs (sep vs Proximity.decay) and the data-dependent dmax hazard on `Z` are
-#src   named here in one paragraph but NOT worked — PhylogenyFeatures has no page, and its page is
-#src   #185's (map #160, all four feature-matrix producers). Requirement recorded on #185.
+#src - SCOPE: the two knobs (sep vs Proximity.decay) and the data-dependent dmax hazard on the
+#src   proximity field are named here in one paragraph but NOT worked — they are worked in
+#src   `3_optimisers/16_Feature_Distance_Clustering.jl` §4, the producers' own page (map #802).
 #src - FINDING (→ group issue): SemiDefinitePhylogenyEstimator `p` is INERT for MinimumRisk here —
 #src   p=0.0 and p=5.0 give byte-identical weights; the SDP coupling drives the result, not the
 #src   penalty p. Did NOT author a p-sweep (would be a flat, misleading table). Worth checking

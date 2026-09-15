@@ -16,7 +16,7 @@ reusable Wasserstein ambiguity primitive
 
 `DistributionallyRobustConditionalValueatRisk` (and its Range/CDaR siblings) are **not** a toy
 closed-form bound — the JuMP constraint builder in
-`src/20_Optimisation/20_RiskMeasureConstraints/07_ConditionalXatRiskConstraints.jl` implements a
+`src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/02_ConditionalXatRiskConstraints.jl` implements a
 genuine tractable reformulation of the Wasserstein-ball worst-case CVaR: a dual multiplier `lb`
 (λ), per-sample epigraph slacks `s`, and per-sample dual variables `u`/`v` constrained via
 `JuMP.MOI.NormInfinityCone`. Structurally this matches the Mohajerin Esfahani & Kuhn (2018)
@@ -32,7 +32,7 @@ Three gaps found while reading it closely:
 
 ### 1. Docstring math doesn't match the code
 
-`src/19_RiskMeasures/07_ConditionalXatRisk.jl` documents the "Mathematical definition" of DR-CVaR
+`src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl` documents the "Mathematical definition" of DR-CVaR
 as the closed form:
 
 ```text
@@ -50,7 +50,7 @@ infinity-norm cone constraints (see lines ~195–297 of the constraints file). E
 
 ### 2. No citation
 
-Neither `07_ConditionalXatRisk.jl` nor `07_ConditionalXatRiskConstraints.jl` cites Mohajerin
+Neither `07_ConditionalXatRisk.jl` nor `02_ConditionalXatRiskConstraints.jl` cites Mohajerin
 Esfahani & Kuhn (2018), *"Data-driven distributionally robust optimization using the Wasserstein
 metric: performance guarantees and tractable reformulations"* (Mathematical Programming), which
 appears to be the source of the reformulation. The `@cite` machinery is already used elsewhere in
@@ -67,7 +67,7 @@ with the paper's authors walking through it).
 
 ### 3. Wasserstein ambiguity isn't a reusable `UncertaintySet`
 
-`src/14_UncertaintySets/` has a clean, composable `Box`/`Ellipse` × `Delta`/`Normal`/
+`src/11_UncertaintySets/` has a clean, composable `Box`/`Ellipse` × `Delta`/`Normal`/
 `ARCH-bootstrap` hierarchy (plus a cross-polytope ℓ1 set), usable by any optimizer that accepts
 mean/covariance uncertainty. Wasserstein ambiguity, by contrast, is hard-coded into three specific
 risk-measure structs, each carrying its own bespoke LP encoding. There's no `WassersteinUncertaintySet`

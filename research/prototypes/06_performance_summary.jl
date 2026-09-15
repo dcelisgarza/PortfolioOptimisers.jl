@@ -123,7 +123,7 @@ Return the cumulative wealth path implied by a periodic return series.
 The two conventions disagree, and the disagreement grows with the horizon. The
 compounded path is what an investor experiences. The additive path is what a
 constant-notional strategy experiences. The library's `cumulative_returns` in
-`src/17_NetReturnsDrawdowns.jl` carries the same flag, and this prototype
+`src/14_NetReturnsDrawdowns.jl` carries the same flag, and this prototype
 matches its meaning.
 """
 function cumulative_returns(r::AbstractVector{<:Real}; compound::Bool = false)

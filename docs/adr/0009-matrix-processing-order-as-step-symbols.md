@@ -6,7 +6,7 @@ status: accepted
 
 ## Context
 
-`MatrixProcessing` ([src/07_MatrixProcessing.jl](../../src/07_MatrixProcessing.jl))
+`MatrixProcessing` ([src/07_MatrixProcessing.jl](../../src/04_MatrixProcessing/04_MatrixProcessing.jl))
 applied four steps to a covariance/correlation matrix — `posdef!` (always first), then
 denoising, detoning, and an optional custom algorithm — in a configurable order. The order
 was encoded in the type system: an empty marker struct per permutation of the three
@@ -26,7 +26,7 @@ printed-trees and `order = …` keyword arguments in
 The first design sketched here was more aggressive: collapse `pdm`/`dn`/`dt`/`alg`/`order` into
 a *single* field holding an ordered tuple of the estimators themselves. Building it surfaced a
 blocker the static read missed: **`mp.pdm` is read externally in ~24 sites** — Black-Litterman
-and factor priors and (mostly) [NormalUncertaintySets.jl](../../src/14_UncertaintySets/03_NormalUncertaintySets.jl)
+and factor priors and (mostly) [NormalUncertaintySets.jl](../../src/11_UncertaintySets/03_NormalUncertaintySets.jl)
 do `posdef!(pe.mp.pdm, sigma)` / `posdef!(ue.pe.ce.mp.pdm, …)` to reuse the matrix-processing
 estimator's posdef projector on *other* matrices (posterior covariances, uncertainty-set
 sigmas). Collapsing the four fields would have broken every one of those sites, forcing either a

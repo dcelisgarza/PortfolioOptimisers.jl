@@ -176,3 +176,23 @@ low-risk — but they must be done, or the new overrides leak.
   the set to watch.
 - **Introspection/tab-completion now expose forwarded properties** on the converted types —
   the intended improvement, and the resolution of the ADR 0012 gap.
+
+## Amendment (2026-08-24)
+
+The `hasfield` guard inside `@define_pretty_show` is **removed**, not kept.
+
+The Consequences above predicted that the guard "becomes always-true". It did, and an
+always-true guard is dead code: `fields` is `fieldnames(typeof(obj))`, so
+`hasfield(typeof(obj), field)` holds for every element of it. Its `continue` arm was
+unreachable, and the `# Algorithm` of the macro stated a behaviour — a field the object does
+not have is skipped — that no input can produce. Both are gone. The loop reads
+`val = getproperty(obj, field)` directly.
+
+The decision of this ADR is unchanged. `@define_pretty_show` still iterates `fieldnames`, so
+the flattened forwarded surface still stays out of `show`. Reading the value through
+`getproperty` rather than `getfield` is also unchanged, and it is what makes a `swap` rule
+visible: `@forward_properties` emits its `swap` branches ahead of the own-field check, so a
+rule that swaps a real field name prints the swapped value.
+
+Found by #439, the condition 2 and 3 sweep of `src/01_Base.jl`, which needed every line of the
+macro to be reachable from a test.

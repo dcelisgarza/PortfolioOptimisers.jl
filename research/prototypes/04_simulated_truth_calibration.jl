@@ -201,7 +201,7 @@ sample barely moves.
 # Notes
 
   - The library already ships this family. See
-    `src/08_Moments/03_Covariance.jl` and the `CovarianceEstimation` package it
+    `src/05_Moments/03_Covariance.jl` and the `CovarianceEstimation` package it
     interoperates with. The estimator is reproduced here so the prototype
     stays standalone, not because it is absent.
 """
@@ -255,7 +255,7 @@ less each one should be trusted.**
 # Notes
 
   - The library has this family too, as `ShrunkExpectedReturns` in
-    `src/08_Moments/16_ShrunkExpectedReturns.jl`.
+    `src/05_Moments/15_ShrunkExpectedReturns.jl`.
 """
 function bayes_stein_mean(X::AbstractMatrix{<:Real})
     T, N = size(X)

@@ -174,7 +174,7 @@ pretty_table(DataFrame(; :assets => rd.nx, Symbol("Log ERC risk") => rc_eq,
 #src   *estimator* requires `rd` at `optimise` (it fits the regression from `rd.X`/`rd.F`),
 #src   whereas a precomputed `Regression` *result* needs none. This used to throw a cryptic
 #src   `IsNothingError` deep inside `regression`; added a contextual `@argcheck` in
-#src   `set_factor_risk_contribution_constraints!` (src/20_Optimisation/12_FactorRiskContribution.jl)
+#src   `set_factor_risk_contribution_constraints!` (src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl)
 #src   that explains the estimator-vs-result contract and points to both fixes. Still worth a
 #src   regression test asserting the friendly error fires.
 #src - PLOT GAP: there is no single plot that overlays target-vs-realised risk contributions
@@ -189,7 +189,7 @@ factor prior so we should use use a [`EmpiricalPrior`](@ref).
 =#
 
 F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
-rdf = prices_to_returns(X, F)
+rdf = prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))
 prf = prior(EmpiricalPrior(), rdf)
 optf = JuMPOptimiser(; pe = prf, slv = slv)
 Nf = length(rdf.nf)

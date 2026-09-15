@@ -3,7 +3,7 @@
 #
 # Purpose
 #   Reports 2, 4 and 7 all ask for regimes. The library already has
-#   *regime-adjusted* moments, in `src/08_Moments/36_*` and `37_*`. What it
+#   *regime-adjusted* moments, in `src/05_Moments/36_*` and `37_*`. What it
 #   does not have is a **regime model**: an object that infers the state, gives
 #   the probability of being in each state, and lets every downstream quantity
 #   be conditioned on it.

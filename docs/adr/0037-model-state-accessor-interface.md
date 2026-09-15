@@ -35,7 +35,7 @@ broke `IndependentVariableTracking` (the OWA / PowerNorm / Turnover / DR-CDaR ga
 ### 1. One memoise combinator, not per-key accessors
 
 Model State grows five operations in
-[08_Base_JuMPOptimisation.jl](../../src/20_Optimisation/08_Base_JuMPOptimisation.jl):
+[08_Base_JuMPOptimisation.jl](../../src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation.jl):
 `state_key`, `state_set!`, `state_has`, `state_get`, `state_build!`, plus `nested_prefix`.
 
 `state_build!(f, model, prefix, name)` is the load-bearing one: it is the
@@ -127,7 +127,7 @@ the *outer* flag. Prefixing that read would silently re-add the penalty under tr
   found, which is the expected outcome — the value is that the classification is now
   *enforced* rather than merely true.
 - A dead `#=` block (~130 lines, lines ~197–330 of
-  [02_Returns_and_ObjectiveFunctions.jl](../../src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl))
+  [02_Returns_and_ObjectiveFunctions.jl](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl))
   was deleted. It targeted an older `port` API (`Sharpe`, `AKelly`, `calc_variance_risk` —
   none of which exist), and it was the only source of `:variance_risk`, `:dev`, `:scale_obj`
   and `:scale_constr`. Keeping it would have meant carrying four dead names in a

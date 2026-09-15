@@ -59,11 +59,14 @@ ts = Date.(["2021-12-29", "2021-12-30", "2021-12-31", "2022-01-03", "2022-01-04"
             "2022-12-27", "2022-12-28"])
 iv = TimeArray(ts, rand(StableRNG(123), 252, 20))
 ivpa = rand(StableRNG(123), 20)
-rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                 timestamp = :Date)[(end - 252):end];
-                       B = TimeArray(CSV.File(joinpath(@__DIR__,
-                                                       "./assets/SP500_idx.csv.gz"));
-                                     timestamp = :Date), iv = iv, ivpa = ivpa)
+rd = prices_to_returns(price_ingestion(PriceIngestion(),
+                                       TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                   "./assets/SP500.csv.gz"));
+                                                 timestamp = :Date)[(end - 252):end];
+                                       B = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                       "./assets/SP500_idx.csv.gz"));
+                                                     timestamp = :Date)[(end - 252):end],
+                                       iv = iv, ivpa = ivpa))
 slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
               check_sol = (; allow_local = true, allow_almost = true),
               settings = "verbose" => false),

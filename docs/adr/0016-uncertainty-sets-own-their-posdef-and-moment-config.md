@@ -6,11 +6,11 @@ status: accepted
 
 ## Context
 
-[NormalUncertaintySets.jl](../../src/14_UncertaintySets/03_NormalUncertaintySets.jl) reached
+[NormalUncertaintySets.jl](../../src/11_UncertaintySets/03_NormalUncertaintySets.jl) reached
 four levels into its prior estimator to borrow a posdef projector: all 21 posdef calls were
 `posdef!(ue.pe.ce.mp.pdm, sigma)`, cleaning the uncertainty set's own simulated (Wishart)
 matrices with whatever `Posdef` estimator happened to sit inside the prior's covariance's
-matrix-processing. [BootstrapUncertaintySets.jl](../../src/14_UncertaintySets/04_BootstrapUncertaintySets.jl)
+matrix-processing. [BootstrapUncertaintySets.jl](../../src/11_UncertaintySets/04_BootstrapUncertaintySets.jl)
 (`ARCHUncertaintySet`) reached the prior instance too — `Statistics.mean(ue.pe.me, Xi)` and
 `Statistics.cov(ue.pe.ce, Xi)` to recompute per-bootstrap-sample moments, and
 `Statistics.cov(ue.pe.ce, X_mu)` for the ellipsoid deviation covariances (where the posdef runs

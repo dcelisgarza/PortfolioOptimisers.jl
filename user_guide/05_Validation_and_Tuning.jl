@@ -42,7 +42,9 @@ cv_risk = expected_risk(LowOrderMoment(; alg = SecondMoment()), pred)
 #=
 For a more exhaustive evaluation, [`CombinatorialCrossValidation`](@ref) scores every
 train/test fold combination — heavier, but a fuller picture. See
-[Cross Validation](../examples/5_validation_tuning/01_Cross_Validation.md).
+[Cross Validation](../examples/5_validation_tuning/01_Cross_Validation.md). A walk-forward
+can also *step* one estimator from fold to fold instead of refitting each fold, with
+`ff = OnlineStep()`; see [The online walk-forward](09_Online_Walk_Forward.md).
 
 ## 2. Hyperparameter tuning
 

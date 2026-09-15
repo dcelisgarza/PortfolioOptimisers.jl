@@ -64,7 +64,7 @@ number.
 ### 1. One declaration per windowed estimator
 
 `@windowed_estimator`, defined in
-[01_Base_Moments.jl](../../src/08_Moments/01_Base_Moments.jl) beside its only collaborator
+[01_Base_Moments.jl](../../src/05_Moments/01_Base_Moments.jl) beside its only collaborator
 `windowed_preamble`, emits the whole family member from one block: the `@propagatable`
 `@concrete` struct, both constructors with their validation, one forwarding method per
 `forward` entry, the `export`, and every docstring.

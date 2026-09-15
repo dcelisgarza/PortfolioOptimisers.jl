@@ -99,9 +99,9 @@ julia> Pkg.add(PackageSpec(; name = "PortfolioOptimisers"))
 
 ## Roadmap
 
-- For a roadmap of planned and desired features in no particular order please refer to Issue [#37](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/37).
+- The [Issues](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/) page is used as a tracker for bugs, feature requests, plans, and works in progress.
 
-- Some docstrings are incomplete and/or outdated, please refer to Issue [#58](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/58) for details on what docstrings have been completed in the `dev` branch.
+- The [dev](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/dev) branch is used as a staging ground before merging into `main`.
 
 ## Quick-start
 
@@ -278,4 +278,4 @@ We can also plot the compounded or uncompounded drawdowns.
 plot_drawdowns(mip_res.w, rd.X; slv = slv, ts = rd.ts, compound = true)
 ```
 
-There are many other types of plotting functionality in `PortfolioOptimisers.jl`, check out the [Plotting](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/24_Plotting) page of the documentation.
+There are many other types of plotting functionality in `PortfolioOptimisers.jl`, check out the [Plotting](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/22_Plotting) page of the documentation.

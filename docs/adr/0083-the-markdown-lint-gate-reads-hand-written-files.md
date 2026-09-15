@@ -68,3 +68,12 @@ that admits the amendment rule, so the rule keeps its remaining reach.
 `markdownlint` over every tracked `.md` file reported 166 errors before the change and 0 after it.
 `pre-commit run markdownlint-fix -a` passes and modifies no file. The seven ADRs whose text changed
 differ from their committed content by padding and by a fence language alone.
+
+## Amendment (2026-09-15): the generated pages are untracked
+
+The Context section above says the four generated paths are written by CI and overwritten on
+every build. No workflow ever wrote them back to the tree; the committed copies were whatever the
+last local docs build committed. [ADR 0151](0151-the-generated-docs-pages-are-untracked-and-the-docs-build-checks-their-links.md)
+deletes the copies and ignores the paths. `.markdownlintignore` keeps its four entries, because a
+local docs build still writes the pages into the tree, and the hook would otherwise read them. The
+scope this ADR decided is unchanged.

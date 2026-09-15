@@ -7,7 +7,7 @@ status: accepted
 ## Context
 
 An uncertainty set is a **neighbourhood of a specific quantity**.
-[`L1UncertaintySet`](../../src/14_UncertaintySets/05_L1UncertaintySets.jl) says so in its own
+[`L1UncertaintySet`](../../src/11_UncertaintySets/05_L1UncertaintySets.jl) says so in its own
 docstring: the set is `{mu_hat + e : ‖e ⊘ sd‖₁ <= eps}`. A radius without its centre is not that
 object. The same holds of every other shape in the family — a box is `mu_hat ± delta`, an
 ellipsoid is `(mu - mu_hat)' Σ⁻¹ (mu - mu_hat) <= k²`.
@@ -16,7 +16,7 @@ The library calibrated the radius on one fit and applied it to a different one. 
 it.**
 
 On the mean axis,
-[`set_return_constraints!`](../../src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl)
+[`set_return_constraints!`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl)
 took the centre from the outer prior:
 
 ```julia
@@ -29,7 +29,7 @@ two fits are independent, and nothing refused a configuration in which they name
 quantities.
 
 On the covariance axis,
-[`set_risk_constraints!`](../../src/20_Optimisation/20_RiskMeasureConstraints/02_VarianceConstraints.jl)
+[`set_risk_constraints!`](../../src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl)
 had the identical shape: it bounded `pr.sigma` with an ellipsoid whose shape matrix came from
 `ue.pe`.
 
@@ -116,3 +116,13 @@ uses one. That is the whole argument for the field.
   the Prior is the fallback. Rewritten in the same change.
 - This is a fix to the **single**-characteristic case. It is a prerequisite for multiplicity
   ([#265](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/265)), not part of it.
+
+## Amendment (2026-09-11)
+
+[ADR 0138](0138-an-uncertainty-set-with-no-prior-of-its-own-is-calibrated-on-the-prior-result-it-is-handed-and-a-scenario-cap-states-its-count.md)
+gives the four returns-data estimators an opt-in `pe = nothing`, under which the set is calibrated
+on the prior result it is handed — inside an optimiser, the prior the optimiser is solving on. For
+such a set "the carried quantity wins" and "the set is centred on the objective's own prior" are
+the same statement, so the two fits this ADR found independent agree by construction, with no
+side effect on the other consumers of `pr.mu`, which is what example 11 had to arrange by hand.
+The default `pe = EmpiricalPrior()` is unchanged, and so is the precedence this ADR fixed.

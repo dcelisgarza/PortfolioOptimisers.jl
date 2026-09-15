@@ -10,7 +10,7 @@
     # positional, so each site re-encodes "`fb` is type parameter k" by hand, and the
     # count is invisible to the reader.
     #
-    # `22_DiscreteFiniteAllocation.jl` miscounted: it wrote four parameters for a
+    # `02_DiscreteFiniteAllocation.jl` miscounted: it wrote four parameters for a
     # five-field estimator, so `Nothing` sat on `wf` instead of `fb`. Because
     # `Nothing <: JuMPWeightFinaliserFormulation` is false, the method could never match
     # and the miscount was silent.
@@ -40,7 +40,7 @@
     end
 
     # A parameter is "pinned to `Nothing`" whether it is spelled `Nothing` or `<:Nothing`
-    # (`05_HierarchicalRiskParity.jl` uses the second spelling; the two are equivalent
+    # (`02_HierarchicalRiskParity.jl` uses the second spelling; the two are equivalent
     # here because `Nothing` is a singleton).
     is_nothing_param(p) = p === Nothing || (isa(p, TypeVar) && p.ub === Nothing)
 
@@ -75,6 +75,6 @@
                   Tuple{da_type(Nothing), FiniteAllocationInput})
     with_fb = which(PortfolioOptimisers.optimise,
                     Tuple{da_type(GreedyAllocation), FiniteAllocationInput})
-    @test basename(string(no_fb.file)) == "22_DiscreteFiniteAllocation.jl"
+    @test basename(string(no_fb.file)) == "02_DiscreteFiniteAllocation.jl"
     @test basename(string(with_fb.file)) == "01_Base_Optimisation.jl"
 end

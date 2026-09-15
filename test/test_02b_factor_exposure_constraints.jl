@@ -179,7 +179,7 @@
         @test all(x -> x.ineq.A == linear_constraints(bare, sets).ineq.A, vb)
     end
     @testset "The wrapped key overrides the factor axis" begin
-        # `key === nothing` resolves to `sets.fkey` rather than `sets.xkey`; a key written on
+        # `key === nothing` resolves to `sets.tfkey` rather than `sets.xkey`; a key written on
         # the wrapped estimator still wins, so an alternative factor partition can be named.
         setsk = UniverseSets(;
                              dict = Dict("nx" => ["A", "B", "C"],
@@ -240,7 +240,9 @@
         @test occursin("not in factor universe", msg)
         @test occursin("3 factors under key `nf`", msg)
         @test occursin("did you mean `MTUM`?", msg)
-        # Non-strict warns and drops, then reports the row as empty against the factor axis.
+        # Non-strict warns once and drops the row whole (ADR 0125). It does *not* also
+        # report the row as empty: the row went at the name it could not resolve, so the
+        # second message would have been the same news twice.
         logs, _ = Test.collect_test_logs() do
             return linear_constraints(ExposureConstraintEstimator(;
                                                                   lce = LinearConstraintEstimator(;
@@ -250,10 +252,11 @@
         end
         msgs = [l.message for l in logs]
         @test any(m -> occursin("not in factor universe", m), msgs)
-        @test any(m -> occursin("matched no factors in the universe", m), msgs)
+        @test !any(m -> occursin("summed to zero", m), msgs)
+        @test length(msgs) == 1
         # A row whose names *did* resolve but whose loadings annihilate it is a different
-        # failure, and says so: reporting "matched no factors" would send a user hunting for
-        # a typo that is not there.
+        # failure, and says so: reporting the row's own arithmetic for it would send a user
+        # auditing coefficients that are fine.
         rrz = Regression(; M = [0.0 0.0 0.2; 0.0 0.5 0.0; 0.0 1.0 0.7])
         msg = try
             linear_constraints(ExposureConstraintEstimator(;
@@ -289,7 +292,7 @@
         @test vec(lcr.ineq.A) ≈ M[:, 1]
         # The axis check counts `M`'s columns, not `L`'s: `L` has two here and the constraint
         # still builds against a three-factor axis.
-        @test size(rrl.L, 2) != length(sets.dict[sets.fkey])
+        @test size(rrl.L, 2) != length(sets.dict[sets.tfkey])
     end
     # A tiny factor market for the optimiser tests: the assets are combinations of two
     # factors plus noise, so a fitted `M` is close to `Mo` without being it. Every assertion
@@ -351,6 +354,37 @@
                                                      sets = osets, lcse = hand)), rdo)
         @test isapprox(res.w, resh.w; rtol = 5e-5)
     end
+    @testset "A re-based row survives the ratio's scale floor (#924)" begin
+        # A `FactorSpace` row is dense by construction — one column per asset, all of them
+        # non-zero — so it is the row that carried the largest violation when `MaximumRatio`
+        # answered on the degenerate homogenised ray. The floor `MaximumRatio` now writes is
+        # what keeps it binding; `kmin` set below the collapse reproduces the defect exactly.
+        # See the scale floor section of `MaximumRatio` for the mechanism.
+        ue = EllipsoidalUncertaintySet(; sigma = Matrix(0.1I, 3, 3), k = 1e3,
+                                       class = MuUncertaintySetClass())
+        cap = ExposureConstraintEstimator(;
+                                          lce = LinearConstraintEstimator(;
+                                                                          val = "MTUM >= 0.9"),
+                                          space = fs)
+        ratio(obj) = optimise(MeanRisk(; obj = obj,
+                                       opt = JuMPOptimiser(; pe = FactorPrior(), slv = oslv,
+                                                           sets = osets, bgt = 1.0,
+                                                           wb = WeightBounds(; lb = 0.0,
+                                                                             ub = 1.0),
+                                                           lcse = cap,
+                                                           ret = ArithmeticReturn(;
+                                                                                  ucs = ue))),
+                              rdo)
+        held = ratio(MaximumRatio())
+        @test isa(held.retcode, PortfolioOptimisers.OptimisationSuccess)
+        @test dot(held.pa.pr.rr.M[:, 1], held.w) >= 0.9 - 1e-5
+        # Which the collapsed scale did not: a floor below the ray reports the same success
+        # and hands back weights that break the mandate the caller wrote.
+        broken = ratio(MaximumRatio(; kmin = 1e-12))
+        @test isa(broken.retcode, PortfolioOptimisers.OptimisationSuccess)
+        @test dot(broken.pa.pr.rr.M[:, 1], broken.w) < 0.9 - 1e-3
+    end
+
     @testset "Every JuMP optimiser inherits it" begin
         # They all share `JuMPOptimiser`, so the wiring is one edit rather than one per
         # optimiser.
@@ -622,4 +656,39 @@
         # basis is therefore legal under it, and correct: the view follows the subset.
         @test SubsetResampling(; opt = jopt(pinned)) isa SubsetResampling
     end
+end
+
+@testset "The two re-basis routes agree (issue #513)" begin
+    using PortfolioOptimisers, Test, Logging, LinearAlgebra
+    #        F1    F2
+    #   A    0.5   0.2
+    #   B    0.1   0.9
+    #   C    0.3   0.4
+    M = [0.5 0.2; 0.1 0.9; 0.3 0.4]
+    rr = Regression(; M = M)
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"]))
+    # `constraint_row_term` projects each term as the row is assembled;
+    # `project_linear_constraint` projects the assembled factor-width row wholesale. The
+    # identity `aᵀ wf = (M a)ᵀ wa` says the two must land on the same row.
+    eqn = "F1 + 2*F2 <= 1"
+    stepwise = linear_constraints(eqn, sets, "nf"; rr = rr)
+    wholesale = PortfolioOptimisers.project_linear_constraint(linear_constraints(eqn, sets,
+                                                                                 "nf"), M)
+    @test collect(stepwise.ineq.A) ≈ collect(wholesale.ineq.A)
+    @test stepwise.ineq.B == wholesale.ineq.B
+    @test vec(collect(stepwise.ineq.A)) ≈ M[:, 1] + 2 * M[:, 2]
+
+    # A repeated factor name contributes every column bearing it, in both routes, which is
+    # how the asset path treats a duplicated asset name.
+    dsets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F1"]))
+    dstep = linear_constraints("F1 <= 1", dsets, "nf"; rr = rr)
+    dwhole = PortfolioOptimisers.project_linear_constraint(linear_constraints("F1 <= 1",
+                                                                              dsets, "nf"),
+                                                           M)
+    @test collect(dstep.ineq.A) ≈ collect(dwhole.ineq.A)
+    @test vec(collect(dstep.ineq.A)) ≈ M[:, 1] + M[:, 2]
+
+    # The re-based row is asset-length whatever the row was written in.
+    @test PortfolioOptimisers.constraint_row_length(nothing, ["F1", "F2"]) == 2
+    @test PortfolioOptimisers.constraint_row_length(rr, ["F1", "F2"]) == 3
 end
