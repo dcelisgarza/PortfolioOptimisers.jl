@@ -64,7 +64,7 @@ jobs:
       # rename here.
       - name: Publish lcov.info for the ratchet
         if: ${{ inputs.run_codecov }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lcov
           path: lcov.info
@@ -134,8 +134,8 @@ jobs:
       # would write it. A contributor drops it in place and commits it with no Julia at all.
       # ADR 0075.
       - name: Publish the Refresh Artifact
-        if: ${{ steps.ratchet.outcome == 'failure' }}
-        uses: actions/upload-artifact@v4
+        if: failure()
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-refresh
           path: code_health/_refresh/*.toml
