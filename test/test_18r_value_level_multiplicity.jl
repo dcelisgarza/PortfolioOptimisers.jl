@@ -411,3 +411,105 @@ end
     # A single measure keeps working unchanged.
     @test is_plot(plot_measures(res_vec, pr; x = Variance(), y = ExpectedReturn()))
 end
+
+@testset "Value-level: an empty slot the functor reads is refused by name (#1079)" begin
+    using PortfolioOptimisers, Test, StableRNGs, LinearAlgebra, Statistics, Dates
+    PO = PortfolioOptimisers
+    rng = StableRNG(1079)
+    X = randn(rng, 100, 5)
+    w = fill(0.2, 5)
+    pr = prior(EmpiricalPrior(), X)
+    hpr = prior(HighOrderPriorEstimator(), X)
+    rd = ReturnsResult(; nx = string.("A", 1:5), X = X, ts = Date(2020, 1, 1) .+ Day.(0:99))
+    sigma = cov(PortfolioOptimisersCovariance(), X)
+    message(f) =
+        try
+            f()
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+
+    @testset "the matrix route names the measure, the slot and both ways out" begin
+        # `Variance()` is built with `sigma` at `nothing`, and the functor is
+        # `dot(w, r.sigma, w)`. Before #1079 this was a `MethodError` from inside
+        # `LinearAlgebra` naming neither.
+        @test_throws IsNothingError expected_risk(Variance(), w, X)
+        @test_throws IsNothingError risk_contribution(Variance(), w, X)
+        @test_throws IsNothingError expected_risk(StandardDeviation(), w, X)
+        msg = message(() -> expected_risk(Variance(), w, X))
+        @test occursin("`Variance.sigma` is `nothing`", msg)
+        @test occursin("prior(EmpiricalPrior(), X)", msg)
+        @test occursin("Variance(; sigma = ", msg)
+        # The `ReturnsResult` route carries no moments either, so it refuses on the same
+        # terms.
+        @test_throws IsNothingError expected_risk(Variance(), w, rd)
+        @test_throws IsNothingError risk_contribution(Variance(), w, rd)
+        # A vector is refused element by element, so the third element is named.
+        @test_throws IsNothingError expected_risk([ConditionalValueatRisk(), Variance()], w,
+                                                  X)
+        @test occursin("`Variance.sigma`",
+                       message(() -> expected_risk([ConditionalValueatRisk(), Variance()],
+                                                   w, X)))
+    end
+
+    @testset "both ways out work, and agree" begin
+        # The prior route fills the slot through `factory`, and the stated slot needs no
+        # filling. The two agree exactly when the prior is empirical, and the matrix route
+        # never fills the slot itself, so they are free to disagree when it is not.
+        @test expected_risk(Variance(), w, pr) ==
+              expected_risk(Variance(; sigma = sigma), w, X)
+        @test risk_contribution(Variance(), w, pr) ==
+              risk_contribution(Variance(; sigma = sigma), w, X)
+        @test expected_risk(StandardDeviation(), w, pr) ==
+              expected_risk(StandardDeviation(; sigma = sigma), w, X)
+    end
+
+    @testset "every declared slot refuses, and none that has a sample reading" begin
+        # `mu` at `nothing` means the sample mean on a value-level route, so the moment
+        # measures pass and evaluate.
+        for r in (LowOrderMoment(), HighOrderMoment(), Kurtosis(), Skewness(),
+                  MedianAbsoluteDeviation(), ThirdCentralMoment())
+            @test isnothing(PO.assert_resolved_slots(r))
+            @test isa(expected_risk(r, w, X), Number)
+        end
+        @test_throws IsNothingError expected_risk(UncertaintySetVariance(), w, X)
+        @test_throws IsNothingError expected_risk(NegativeSkewness(), w, X)
+        @test occursin("`NegativeSkewness.sk`",
+                       message(() -> expected_risk(NegativeSkewness(), w, X)))
+        # The parametric formulation reads `mu` and `sigma` off `alg`, and the walk reaches
+        # it through the measure's `alg` slot.
+        rv = ValueatRisk(; alg = DistributionValueatRisk())
+        @test_throws IsNothingError expected_risk(rv, w, X)
+        @test occursin("`DistributionValueatRisk.mu`",
+                       message(() -> expected_risk(rv, w, X)))
+        @test isa(expected_risk(rv, w, pr), Number)
+        # A container that reads a grandchild names it by the path the caller wrote. `vr`
+        # is reached through the child, so the child's own name is what the refusal reads,
+        # and it is refused first. With `vr` stated the grandchildren are the ones named.
+        vsk = VarianceSkewKurtosis()
+        @test_throws IsNothingError expected_risk(vsk, w, X)
+        @test occursin("`Variance.sigma`", message(() -> expected_risk(vsk, w, X)))
+        vsk2 = VarianceSkewKurtosis(; vr = Variance(; sigma = sigma))
+        @test_throws IsNothingError expected_risk(vsk2, w, X)
+        @test occursin("`VarianceSkewKurtosis.sk.sk`",
+                       message(() -> expected_risk(vsk2, w, X)))
+        # A Deferred Quantity below the container is named before the slot the container
+        # reads off that child: the deferred `pe` is what would fill `sk`.
+        vsk3 = VarianceSkewKurtosis(; vr = Variance(; sigma = sigma),
+                                    sk = Skewness(; pe = HighOrderPriorEstimator()))
+        @test_throws ArgumentError expected_risk(vsk3, w, X)
+        @test occursin("`Skewness.pe`", message(() -> expected_risk(vsk3, w, X)))
+        # A low-order prior carries no co-moment tensor, so the prior route leaves the
+        # grandchild empty and the same refusal names it; the high-order prior fills it.
+        @test_throws IsNothingError expected_risk(vsk, w, pr)
+        @test occursin("`VarianceSkewKurtosis.sk.sk`",
+                       message(() -> expected_risk(vsk, w, pr)))
+        @test isa(expected_risk(vsk, w, hpr), Number)
+        @test isa(expected_risk(NegativeSkewness(), w, hpr), Number)
+        # A child measure held by a tracking measure is reached through its slot.
+        rt = RiskTrackingRiskMeasure(; r = Variance(), tr = WeightsTracking(; w = w))
+        @test_throws IsNothingError expected_risk(rt, w, X)
+        @test isa(expected_risk(rt, w, pr), Number)
+    end
+end

@@ -685,6 +685,11 @@ end
 # Deferrable slots — see `deferred_slots`. The three children carry their own, so the check
 # recurses into them.
 deferred_slots(r::VarianceSkewKurtosis) = (; vr = r.vr, sk = r.sk, kt = r.kt, pe = r.pe)
+# The functor reads the co-moment tensors off the children directly, and neither child reads
+# its own on a value-level route, so the container names both grandchildren by the path the
+# caller wrote. `vr` reads its own `sigma`, so it is reached through `deferred_slots` — see
+# `functor_slots`.
+functor_slots(r::VarianceSkewKurtosis) = (; var"sk.sk" = r.sk.sk, var"kt.kt" = r.kt.kt)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

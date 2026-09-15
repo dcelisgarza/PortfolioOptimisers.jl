@@ -400,6 +400,9 @@ end
 function deferred_slots(alg::DistributionValueatRisk)
     return (; mu = alg.mu, sigma = alg.sigma, pe = alg.pe)
 end
+# The parametric functor reads `mu` and `sigma` as they stand, and neither has a sample
+# reading here: the model's terms are the prior's moments — see `functor_slots`.
+functor_slots(alg::DistributionValueatRisk) = (; mu = alg.mu, sigma = alg.sigma)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

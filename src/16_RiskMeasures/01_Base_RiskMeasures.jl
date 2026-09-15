@@ -1855,6 +1855,22 @@ A type that resolves a quantity of its own — a matrix out of a covariance esti
 """
 deferred_slots(::Any) = (;)
 """
+    functor_slots(x)
+
+Declare the slots of `x` that its functor reads **as they stand**, as a `NamedTuple` mapping each slot's name to its current value. The default is empty: a type whose functor computes every moment from the returns it is handed needs no method.
+
+[`assert_resolved_slots`](@ref) reads this beside [`deferred_slots`](@ref). A slot named here that holds `nothing` is refused at a value-level entry point by name, because nothing on that route fills it and the functor would otherwise meet the `nothing` several frames down, as `dot(w, nothing, w)` inside `LinearAlgebra`.
+
+A slot is named here only when `nothing` there has **no** value-level reading. The covariance a [`Variance`](@ref) contracts the weights with is one: the functor is `dot(w, r.sigma, w)`, and a bare matrix cannot stand in. A moment measure's `mu` is not: `nothing` there means *centre on the sample mean*, which the functor computes from the returns, so [`LowOrderMoment`](@ref) declares no method. A slot that holds a child measure is not named here either — the child names its own, and [`assert_resolved_slots`](@ref) reaches it through [`deferred_slots`](@ref). A container that reads a **grandchild** directly names it by the path the caller wrote, so a refusal reads `VarianceSkewKurtosis.sk.sk`.
+
+# Related
+
+  - [`deferred_slots`](@ref)
+  - [`assert_resolved_slots`](@ref)
+  - [`expected_risk`](@ref)
+"""
+functor_slots(::Any) = (;)
+"""
     resolve_deferred_child(slot, pr::AbstractPriorResult, slv = nothing)
 
 Resolve one slot that [`deferred_slots`](@ref) declared, on behalf of the derived recursion in [`resolve_deferred_quantities`](@ref).
@@ -2060,9 +2076,11 @@ end
 """
     assert_resolved_slots(x)
 
-Refuse a **Deferred Quantity** that reached a value-level entry point, which has no prior result to resolve it against.
+Refuse a **Deferred Quantity**, or an empty slot the functor reads, that reached a value-level entry point, which has no prior result to resolve or fill it with.
 
 [`expected_risk`](@ref) takes either a prior result or a plain returns matrix. Given the prior it resolves the measure through [`factory`](@ref) first. Given the matrix it cannot: that call has no `pr.w` to thread and no factor returns to reach, so resolving there would use a different rule than the settled one. So it refuses instead, naming the slot and the Estimator standing in it — without the refusal the failure lands several frames down, inside a kernel that expected a matrix.
+
+The same door refuses a slot that holds `nothing` when the functor reads it as it stands. `Variance()` is built with `sigma` at `nothing`, and the prior route fills it through [`factory`](@ref); the matrix route has nothing to fill it from, and `dot(w, nothing, w)` raised a bare `MethodError` inside `LinearAlgebra` that named neither the measure nor the slot (#1079). Which slots those are is declared by [`functor_slots`](@ref), so a slot whose `nothing` **has** a value-level reading — a moment measure's `mu`, which then means the sample mean — is never refused. Resolving the slot from the matrix instead would pick an estimator the caller never named, and would make the matrix route and the prior route disagree whenever the prior is not empirical, so the door refuses by name and states the two ways out.
 
 This is the shape [`HopCount`](@ref) and [`PathLength`](@ref) already use: the consumer resolves, the kernel refuses.
 
@@ -2072,14 +2090,17 @@ The message names both types with `nameof`, not by printing the type. A printed 
 
 # Algorithm
 
- 1. Walk the pairs that [`deferred_slots`](@ref) declares for `x`, giving each slot's name `key` and its occupant `slot`.
- 2. Refuse an occupant that holds a [`DeferredQuantity`](@ref).
- 3. Recurse into the occupant, so a child measure's own slots are checked as well. A slot that holds a vector of children is walked element by element.
- 4. Return `nothing` once the walk is spent.
+ 1. Walk the pairs that [`deferred_slots`](@ref) declares for `x`, giving each slot's name `key` and its occupant `slot`, and refuse an occupant that holds a [`DeferredQuantity`](@ref).
+ 2. Recurse into every occupant, so a child measure's own slots are checked as well. A slot that holds a vector of children is walked element by element.
+ 3. Walk the pairs that [`functor_slots`](@ref) declares for `x`, and refuse an occupant that is `nothing`.
+ 4. Return `nothing` once the three walks are spent.
+
+The order is the precedence. A Deferred Quantity on `x` is named before anything below it, because its fit is what would fill the empty slots of the children — a `VarianceSkewKurtosis` whose `pe` is deferred has an empty `sigma` on its `vr` for that reason alone. A child is walked before the slots `x` reads off it, for the same reason one level down: a `Skewness` whose `pe` is deferred has an empty `sk`, and that is the slot the container reads.
 
 # Validation
 
   - Throws an `ArgumentError` when a slot of `x`, or of any child the walk reaches, holds a [`DeferredQuantity`](@ref). The message names the slot, the Estimator standing in it and the two ways out.
+  - Throws an [`IsNothingError`](@ref) when a slot that [`functor_slots`](@ref) declares for `x`, or for any child the walk reaches, holds `nothing`. The message names the slot and the two ways out: a prior result that carries the quantity, or the quantity stated on the measure.
 
 # Returns
 
@@ -2088,15 +2109,23 @@ The message names both types with `nameof`, not by printing the type. A printed 
 # Related
 
   - [`deferred_slots`](@ref)
+  - [`functor_slots`](@ref)
   - [`DeferredQuantity`](@ref)
   - [`resolve_deferred_quantities`](@ref)
   - [`expected_risk`](@ref)
 """
 function assert_resolved_slots(x)
-    for (key, slot) in pairs(deferred_slots(x))
+    slots = deferred_slots(x)
+    for (key, slot) in pairs(slots)
         @argcheck(!isa(slot, DeferredQuantity),
                   ArgumentError("`$(nameof(typeof(x))).$key` holds a Deferred Quantity, a `$(nameof(typeof(slot)))`, and this entry point has no prior result to resolve it against. Resolving a slot needs `pr.w` and the factor returns, which a bare returns matrix does not carry. Pass the prior result itself — `expected_risk(r, w, pr, fees)` — or resolve the measure first with `factory(r, pr)`."))
+    end
+    for slot in slots
         assert_resolved_slots(slot)
+    end
+    for (key, slot) in pairs(functor_slots(x))
+        @argcheck(!isnothing(slot),
+                  IsNothingError("`$(nameof(typeof(x))).$key` is `nothing`, and the functor reads the slot as it stands, so the call would meet the `nothing` several frames down. Nothing on this route fills it: a bare returns matrix carries no moments, and a prior result fills a slot only from a field it carries. Pass a prior result that carries the quantity — `expected_risk(r, w, prior(EmpiricalPrior(), X))` fills a covariance, and `prior(HighOrderPriorEstimator(), X)` a co-moment tensor — or state the quantity on the measure, as `Variance(; sigma = cov(PortfolioOptimisersCovariance(), X))` does."))
     end
     return nothing
 end

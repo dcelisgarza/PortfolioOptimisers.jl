@@ -1569,9 +1569,12 @@ end
                                                                                               mu = SimpleExpectedReturns())]))
     # A vector of measures that state nothing passes the check and evaluates. The two axes
     # hold measures a bare returns matrix can evaluate; `StandardDeviation()` is not one,
-    # because it needs a `sigma` that this entry point does not carry.
+    # because it needs a `sigma` that this entry point does not carry, and since #1079 the
+    # same walk refuses that by name too.
     @test isnothing(PO.assert_resolved_slots(NonOptimisationRiskRatio(;
-                                                                      r1 = [StandardDeviation()])))
+                                                                      r1 = [ConditionalValueatRisk()])))
+    @test_throws IsNothingError PO.assert_resolved_slots(NonOptimisationRiskRatio(;
+                                                                                  r1 = [StandardDeviation()]))
     @test isa(expected_risk(NonOptimisationRiskRatio(; r1 = [ConditionalValueatRisk()],
                                                      r2 = [ConditionalValueatRisk(;
                                                                                   alpha = 0.1)]),

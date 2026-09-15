@@ -212,6 +212,9 @@ end
 # Deferrable slots — see `deferred_slots`. `V` is derived and never defers on its own, and
 # `mp` holds a processor by design.
 deferred_slots(r::NegativeSkewness) = (; sk = r.sk)
+# The functor reads `V`, which the constructor ties to `sk`: the two are stated together or
+# not at all, so the refusal names the slot the caller states — see `functor_slots`.
+functor_slots(r::NegativeSkewness) = (; sk = r.sk)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

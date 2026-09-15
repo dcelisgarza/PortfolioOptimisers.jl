@@ -1837,6 +1837,20 @@
                 sprint(showerror, e)
             end
             @test occursin("neither `wd` nor `pws`", msg)
+
+            # The fold-taking form hands the fold's bare asset returns to the free
+            # function, so a moment measure whose slot is unfilled is refused by name there
+            # too, rather than as a `MethodError` from `dot(w, nothing, w)` (#1079). The
+            # stated slot is the way out, and it reads the same as the free function.
+            @test_throws IsNothingError risk_contribution(Variance(), p)
+            msg = try
+                risk_contribution(Variance(), p)
+            catch e
+                sprint(showerror, e)
+            end
+            @test occursin("`Variance.sigma` is `nothing`", msg)
+            rv = Variance(; sigma = cov(PortfolioOptimisersCovariance(), p.hw.X))
+            @test risk_contribution(rv, p) == risk_contribution(rv, p.res.w, p.hw.X, fees)
         end
     end
     @testset "Every result that carries a population rebuilds its return code" begin

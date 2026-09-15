@@ -240,7 +240,7 @@
 "src/13_Fees.jl" = { map = 8, units = 38, algorithm = 24, swept = false }
 "src/14_NetReturnsDrawdowns.jl" = { map = 8, units = 48, algorithm = 11, swept = false }
 "src/15_Tracking.jl" = { map = 8, units = 14, algorithm = 4, swept = true, bindings = ["AbstractTracking", "AbstractTrackingAlgorithm", "DependentVariableTracking", "IndependentVariableTracking", "ReturnsTracking", "Tr_VecTr", "TrackingError", "VariableTracking", "VecTr", "WeightsTracking", "factory", "needs_previous_weights", "tracking_benchmark", "tracking_benchmark"] }
-"src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 89, swept = false }
+"src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 90, swept = false }
 "src/16_RiskMeasures/02_Variance.jl" = { map = 9, units = 24, swept = false }
 "src/16_RiskMeasures/03_MomentRiskMeasures.jl" = { map = 9, units = 32, swept = false }
 "src/16_RiskMeasures/04_Kurtosis.jl" = { map = 9, units = 9, swept = false }

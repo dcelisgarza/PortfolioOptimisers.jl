@@ -60,7 +60,7 @@ Every public entry is bounded [`BaseRM_VecBaseRM`](@ref), so it takes one risk m
 
 Given a prior result the measure is put through [`factory`](@ref) first, so the number reported here is the one the optimiser optimises: a **Deferred Quantity** resolves against that prior, and a slot the measure leaves unstated falls back to the prior's own field.
 
-Given a bare returns matrix neither can happen. That call has no `pr.w` to thread and no factor returns to reach, so an unresolved slot is refused by name rather than several frames down ([`assert_resolved_slots`](@ref)), and an unstated slot keeps whatever the measure holds.
+Given a bare returns matrix neither can happen. That call has no `pr.w` to thread and no factor returns to reach, so an unresolved slot is refused by name rather than several frames down ([`assert_resolved_slots`](@ref)), and an unstated slot keeps whatever the measure holds. When the functor reads that slot as it stands — `Variance()` is built with `sigma` at `nothing`, and its functor is `dot(w, r.sigma, w)` — an unstated one is refused by name on the same door ([`functor_slots`](@ref)), rather than as a `MethodError` from inside `LinearAlgebra`. The matrix route never fills the slot itself: that would pick an estimator the caller never named, and would make the matrix route and the prior route disagree whenever the prior is not empirical.
 
 A **Calibration Rule** is refused on the same terms, by [`assert_calibrated_slots`](@ref). A rule reads the sample size, the moments and the effective observation weights that a prior result carries, so a bare matrix cannot run one either. The two refusals are separate verbs because the two mechanisms are, and both are taken here.
 
