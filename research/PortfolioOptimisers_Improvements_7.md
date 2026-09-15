@@ -2,7 +2,7 @@
 
 ## 1. Executive summary
 
-This review was grounded in the current implementation and docs of the `dev` branch, especially the optimizer and risk stack in [src/20_Optimisation/11_MeanRisk.jl](../src/20_Optimisation/11_MeanRisk.jl), the uncertainty-set machinery in [src/14_UncertaintySets/03_NormalUncertaintySets.jl](../src/14_UncertaintySets/03_NormalUncertaintySets.jl), the Black-Litterman prior implementation in [src/13_Prior/06_BlackLittermanPrior.jl](../src/13_Prior/06_BlackLittermanPrior.jl), the risk-budgeting abstractions in [src/20_Optimisation/14_RiskBudgeting.jl](../src/20_Optimisation/14_RiskBudgeting.jl), and the time-dependent CV mechanics shown in [docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md](../docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md).
+This review was grounded in the current implementation and docs of the `dev` branch, especially the optimizer and risk stack in [src/17_Optimisation/05_JuMP/04_MeanRisk.jl](../src/17_Optimisation/05_JuMP/04_MeanRisk.jl), the uncertainty-set machinery in [src/11_UncertaintySets/03_NormalUncertaintySets.jl](../src/11_UncertaintySets/03_NormalUncertaintySets.jl), the Black-Litterman prior implementation in [src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl](../src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl), the risk-budgeting abstractions in [src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl](../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl), and the time-dependent CV mechanics shown in [examples/5_validation_tuning/04_Time_Dependent_Constraints.jl](../examples/5_validation_tuning/04_Time_Dependent_Constraints.jl).
 
 The codebase is already unusually strong in a few directions:
 
@@ -27,7 +27,7 @@ These ideas fit naturally into the library’s current design because the packag
 
 ### 2.1 Optimization architecture
 
-The current mean-risk optimizer in [src/20_Optimisation/11_MeanRisk.jl](../src/20_Optimisation/11_MeanRisk.jl) already supports a broad objective family:
+The current mean-risk optimizer in [src/17_Optimisation/05_JuMP/04_MeanRisk.jl](../src/17_Optimisation/05_JuMP/04_MeanRisk.jl) already supports a broad objective family:
 
 - minimum risk,
 - maximum return,
@@ -44,11 +44,11 @@ This is a strong base for extensions, because the library cleanly separates:
 
 ### 2.2 Uncertainty sets and priors
 
-The uncertainty set code in [src/14_UncertaintySets/03_NormalUncertaintySets.jl](../src/14_UncertaintySets/03_NormalUncertaintySets.jl) already formalizes box and ellipsoidal uncertainty around mean/covariance estimates. The library also incorporates Black-Litterman-style priors in [src/13_Prior/06_BlackLittermanPrior.jl](../src/13_Prior/06_BlackLittermanPrior.jl), which is exactly the right foundation for Bayesian or robust portfolio workflows.
+The uncertainty set code in [src/11_UncertaintySets/03_NormalUncertaintySets.jl](../src/11_UncertaintySets/03_NormalUncertaintySets.jl) already formalizes box and ellipsoidal uncertainty around mean/covariance estimates. The library also incorporates Black-Litterman-style priors in [src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl](../src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl), which is exactly the right foundation for Bayesian or robust portfolio workflows.
 
 ### 2.3 Risk budget and time-dependent dynamics
 
-The library already contains detailed risk-budgeting machinery in [src/20_Optimisation/14_RiskBudgeting.jl](../src/20_Optimisation/14_RiskBudgeting.jl), and it already supports time-dependent schedules in [docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md](../docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md). That is a particularly important signal: the package is already thinking in terms of dynamic, folded, rebalancing-aware optimization problems.
+The library already contains detailed risk-budgeting machinery in [src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl](../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl), and it already supports time-dependent schedules in [examples/5_validation_tuning/04_Time_Dependent_Constraints.jl](../examples/5_validation_tuning/04_Time_Dependent_Constraints.jl). That is a particularly important signal: the package is already thinking in terms of dynamic, folded, rebalancing-aware optimization problems.
 
 This means the next leap is not a brand-new conceptual layer; it is a tighter integration of these ideas into a single multi-period, uncertainty-aware optimization workflow.
 
@@ -62,9 +62,9 @@ This means the next leap is not a brand-new conceptual layer; it is a tighter in
 
 The library already has:
 
-- turnover constraints in [src/15_Turnover.jl](../src/15_Turnover.jl),
-- tracking/risk-budget machinery in [src/18_Tracking.jl](../src/18_Tracking.jl) and [src/20_Optimisation/14_RiskBudgeting.jl](../src/20_Optimisation/14_RiskBudgeting.jl),
-- time-dependent fold logic in [docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md](../docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md).
+- turnover constraints in [src/12_Turnover.jl](../src/12_Turnover.jl),
+- tracking/risk-budget machinery in [src/15_Tracking.jl](../src/15_Tracking.jl) and [src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl](../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl),
+- time-dependent fold logic in [examples/5_validation_tuning/04_Time_Dependent_Constraints.jl](../examples/5_validation_tuning/04_Time_Dependent_Constraints.jl).
 
 This is the most natural and highest-value extension.
 
@@ -127,7 +127,7 @@ This could be implemented as a new optimizer estimator, e.g.:
 end
 ```
 
-where `turnover` and `transaction_costs` are estimators or structured objects that behave like existing `TurnoverEstimator` and fee components in [src/15_Turnover.jl](../src/15_Turnover.jl) and [src/16_Fees.jl](../src/16_Fees.jl).
+where `turnover` and `transaction_costs` are estimators or structured objects that behave like existing `TurnoverEstimator` and fee components in [src/12_Turnover.jl](../src/12_Turnover.jl) and [src/13_Fees.jl](../src/13_Fees.jl).
 
 ### Implementation sketch
 
@@ -188,7 +188,7 @@ This would sit naturally alongside the current `MeanRisk` and `RiskBudgeting` op
 
 ### Why it fits
 
-The library already has uncertainty-set abstractions, and the package is structured for robust estimation and optimization. The dynamic is already there, especially in [src/14_UncertaintySets/03_NormalUncertaintySets.jl](../src/14_UncertaintySets/03_NormalUncertaintySets.jl), but the strongest next move is more direct robust optimization as a first-class optimizer feature.
+The library already has uncertainty-set abstractions, and the package is structured for robust estimation and optimization. The dynamic is already there, especially in [src/11_UncertaintySets/03_NormalUncertaintySets.jl](../src/11_UncertaintySets/03_NormalUncertaintySets.jl), but the strongest next move is more direct robust optimization as a first-class optimizer feature.
 
 ### Mathematical formulation
 
@@ -965,9 +965,9 @@ This keeps the core library focused while allowing richer, domain-specific tools
 
 The implementation should stay consistent with the package style, which already uses fine-grained files, submodule-like conceptual groupings, and typed estimators. I would recommend adding new files in the same spirit as the existing structure:
 
-- `src/20_Optimisation/18_MultiPeriodRebalance.jl`
-- `src/14_UncertaintySets/06_WassersteinDRO.jl`
-- `src/13_Prior/14_RegimeAwarePrior.jl`
+- `src/17_Optimisation/18_MultiPeriodRebalance.jl`
+- `src/11_UncertaintySets/06_WassersteinDRO.jl`
+- `src/10_Prior/14_RegimeAwarePrior.jl`
 - `src/18_Tracking/02_BenchmarkRelativeTracking.jl` or extend the existing tracking file
 
 This is consistent with the numerical grouping already visible in the package root file [src/PortfolioOptimisers.jl](../src/PortfolioOptimisers.jl).
@@ -1043,13 +1043,13 @@ res = optimise(BenchmarkRelativeRisk(; benchmark = b, active_risk_limit = 0.05),
 
 - [README.md](../README.md)
 - [src/PortfolioOptimisers.jl](../src/PortfolioOptimisers.jl)
-- [src/20_Optimisation/11_MeanRisk.jl](../src/20_Optimisation/11_MeanRisk.jl)
-- [src/14_UncertaintySets/03_NormalUncertaintySets.jl](../src/14_UncertaintySets/03_NormalUncertaintySets.jl)
-- [src/13_Prior/06_BlackLittermanPrior.jl](../src/13_Prior/06_BlackLittermanPrior.jl)
-- [src/20_Optimisation/14_RiskBudgeting.jl](../src/20_Optimisation/14_RiskBudgeting.jl)
-- [src/15_Turnover.jl](../src/15_Turnover.jl)
-- [src/18_Tracking.jl](../src/18_Tracking.jl)
-- [docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md](../docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md)
+- [src/17_Optimisation/05_JuMP/04_MeanRisk.jl](../src/17_Optimisation/05_JuMP/04_MeanRisk.jl)
+- [src/11_UncertaintySets/03_NormalUncertaintySets.jl](../src/11_UncertaintySets/03_NormalUncertaintySets.jl)
+- [src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl](../src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl)
+- [src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl](../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl)
+- [src/12_Turnover.jl](../src/12_Turnover.jl)
+- [src/15_Tracking.jl](../src/15_Tracking.jl)
+- [examples/5_validation_tuning/04_Time_Dependent_Constraints.jl](../examples/5_validation_tuning/04_Time_Dependent_Constraints.jl)
 
 ### Literature references
 

@@ -99,7 +99,7 @@ supported_risk_measures(HierarchicalRiskParity)           # OptimisationRiskMeas
 The curated one-liner for each measure, its alias, and its class — grouped by what the measure
 *looks at* rather than by source file. Every name below is exported and documented: the full
 signature, fields, and references live under
-[API → Risk Measures](../api/19_RiskMeasures/01_Base_RiskMeasures.md), and `?ConditionalValueatRisk`
+[API → Risk Measures](../api/16_RiskMeasures/01_Base_RiskMeasures.md), and `?ConditionalValueatRisk`
 in the REPL gets you there without leaving the terminal.
 =#
 
@@ -353,7 +353,7 @@ plot_histogram(w, rd)
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
 #src - Closes card 9 of the 2026-07-19 ergonomics review: the ~57-measure family was reachable
-#src   only from src/19_RiskMeasures + src/25_Aliases.jl, and the `LowOrderMoment(alg = …) ≡ MAD()`
+#src   only from src/16_RiskMeasures + src/23_Aliases.jl, and the `LowOrderMoment(alg = …) ≡ MAD()`
 #src   decoding had to be done by hand.
 #src - Every table is generated: alias column reverse-maps the exported alias layer, `Optimisers`
 #src   column comes from the ADR 0018 trait, `Expands to` is read off constructed objects. The

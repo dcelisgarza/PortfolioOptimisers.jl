@@ -2,7 +2,7 @@
     using Test
 
     # Model State (the `JuMP.Model` object dictionary shared by every constraint and risk
-    # builder) is reached through the typed interface in `08_Base_JuMPOptimisation.jl`:
+    # builder) is reached through the typed interface in `01_Base_JuMPOptimisation.jl`:
     # `state_key` / `state_set!` / `state_has` / `state_get` / `state_build!` /
     # `nested_prefix`, plus the named accessors built on them (`get_X`, `get_dd`, …).
     #
@@ -44,12 +44,12 @@
     # threshold/fee/xbgt model (ADR 0033/0034).
 
     srcdir = normpath(joinpath(@__DIR__, "..", "src"))
-    interface = "08_Base_JuMPOptimisation.jl"
+    interface = "01_Base_JuMPOptimisation.jl"
 
     # Files that build a DIFFERENT `JuMP.Model` — not the portfolio model, so the Model
     # State vocabulary does not apply to them at all.
-    other_models = ["19_RiskMeasures/10_OWARiskMeasures.jl",          # OWA weight fitting
-                    "20_Optimisation/22_DiscreteFiniteAllocation.jl"]  # allocation MIP
+    other_models = ["16_RiskMeasures/07_OWARiskMeasures.jl",          # OWA weight fitting
+                    "17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl"]  # allocation MIP
 
     # Strip `#` line comments, `\"\"\"` docstrings and `#=` block comments so prose mentions
     # of a key (e.g. "stored as model[:W]") and dead legacy code do not trip the lock.
@@ -83,8 +83,8 @@
 
     # No file is exempt from rule 3. The frontier sweep used to be: the registry stores
     # `(bound_var_key, bound_key)` pairs built by `set_risk_upper_bound!` and
-    # `set_return_bounds!`, and the sweep loops in `11_MeanRisk.jl` and
-    # `13_NearOptimalCentering.jl` created the parameter and constraint under exactly those
+    # `set_return_bounds!`, and the sweep loops in `04_MeanRisk.jl` and
+    # `06_NearOptimalCentering.jl` created the parameter and constraint under exactly those
     # keys, so both files were exempted by name. The exemption was the tell that the sweep
     # had no interface (ADR 0062): `set_ret_frontier_parameters!`,
     # `set_risk_frontier_parameters!` and `set_frontier_point!` are now the sweep's own seam

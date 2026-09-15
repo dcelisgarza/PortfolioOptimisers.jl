@@ -279,7 +279,7 @@ Return the edges whose weight exceeds `threshold`, as index pairs.
 
   - These are the pairs for a mutual-exclusion constraint `z_i + z_j <= 1` in a
     mixed-integer model. **The library already has the indicator machinery** in
-    `src/20_Optimisation/09_JuMPConstraints/01_MIPIndicators.jl` and the
+    `src/17_Optimisation/05_JuMP/02_JuMPConstraints/01_MIPIndicators.jl` and the
     integer phylogeny constraints, so this returns the input those need rather
     than the constraint itself.
   - **Prefer the penalty to the exclusion** unless the exclusion is a real

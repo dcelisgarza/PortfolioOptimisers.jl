@@ -1,0 +1,924 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for processed risk budgeting attributes. Every collection of processed risk budgeting attributes should subtype this.
+
+# Related
+
+  - [`ProcessedAssetRiskBudgetingAttributes`](@ref)
+  - [`ProcessedFactorRiskBudgetingAttributes`](@ref)
+"""
+abstract type ProcessedRiskBudgetingAttributes <: ProcessedAttributes end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Processed factor risk budgeting attributes for intermediate computations.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+"""
+@concrete struct ProcessedFactorRiskBudgetingAttributes <: ProcessedRiskBudgetingAttributes
+    """
+    Processed risk budget constraints vector.
+    """
+    rkb
+    """
+    Factor-level risk budget vector.
+    """
+    b1
+    """
+    Regression result used for factor loading estimation.
+    """
+    rr
+    function ProcessedFactorRiskBudgetingAttributes(rkb::RiskBudget, b1::MatNum,
+                                                    rr::AbstractLoadingsRegressionResult)
+        return new{typeof(rkb), typeof(b1), typeof(rr)}(rkb, b1, rr)
+    end
+end
+function ProcessedFactorRiskBudgetingAttributes(; rkb::RiskBudget, b1::MatNum,
+                                                rr::AbstractLoadingsRegressionResult)::ProcessedFactorRiskBudgetingAttributes
+    return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Processed asset risk budgeting attributes for intermediate computations.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+"""
+@concrete struct ProcessedAssetRiskBudgetingAttributes <: ProcessedRiskBudgetingAttributes
+    """
+    Processed asset risk budget constraints vector.
+    """
+    rkb
+    function ProcessedAssetRiskBudgetingAttributes(rkb::RiskBudget)
+        return new{typeof(rkb)}(rkb)
+    end
+end
+function ProcessedAssetRiskBudgetingAttributes(;
+                                               rkb::RiskBudget)::ProcessedAssetRiskBudgetingAttributes
+    return ProcessedAssetRiskBudgetingAttributes(rkb)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Risk Budgeting portfolio optimisation.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unknown properties forward to `prb` first, then through `jr` (including the virtual `:w` and the `pa` fall-through).
+
+# Constructors
+
+    RiskBudgetingResult(;
+        jr::JuMPOptimisationResult,
+        r::BaseRM_VecBaseRM,
+        prb::Union{ProcessedAssetRiskBudgetingAttributes,
+                   ProcessedFactorRiskBudgetingAttributes},
+        fb::Option{<:OptE_Opt_FbChain}
+    ) -> RiskBudgetingResult
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`RelaxedRiskBudgetingResult`](@ref)
+  - [`RiskJuMPOptimisationResult`](@ref)
+  - [`JuMPOptimisationResult`](@ref)
+"""
+@concrete struct RiskBudgetingResult <: RiskJuMPOptimisationResult
+    """
+    Shared JuMP result core, see [`JuMPOptimisationResult`](@ref).
+    """
+    jr
+    """
+    $(field_dict[:r_res])
+    """
+    r
+    """
+    $(field_dict[:prb])
+    """
+    prb
+    """
+    $(field_dict[:fb_res])
+    """
+    fb
+    function RiskBudgetingResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
+                                 prb::Union{ProcessedAssetRiskBudgetingAttributes,
+                                            ProcessedFactorRiskBudgetingAttributes},
+                                 fb::Option{<:OptE_Opt_FbChain})
+        return new{typeof(jr), typeof(r), typeof(prb), typeof(fb)}(jr, r, prb, fb)
+    end
+end
+function RiskBudgetingResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
+                             prb::Union{ProcessedAssetRiskBudgetingAttributes,
+                                        ProcessedFactorRiskBudgetingAttributes},
+                             fb::Option{<:OptE_Opt_FbChain})::RiskBudgetingResult
+    return RiskBudgetingResult(jr, r, prb, fb)
+end
+"""
+    set_retcode(res::RiskBudgetingResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`RiskBudgetingResult`](@ref) with a different return code.
+
+`retcode` is not a field of this result and resolves through the [`JuMPOptimisationResult`](@ref) it embeds, so the rebuild rebuilds `jr` and carries every other member over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`RiskBudgetingResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`RiskBudgetingResult`](@ref)
+"""
+function set_retcode(res::RiskBudgetingResult, retcode::OptRetCode_VecOptRetCode)
+    return RiskBudgetingResult(set_retcode(res.jr, retcode), res.r, res.prb, res.fb)
+end
+# Unique field `prb` resolves directly; unknown properties forward into `prb` first, then
+# into the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
+@forward_properties RiskBudgetingResult begin
+    forward(prb)
+    forward(jr)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for risk budgeting optimisation formulations.
+
+# Related
+
+  - [`LogRiskBudgeting`](@ref)
+  - [`MixedIntegerRiskBudgeting`](@ref)
+"""
+abstract type RiskBudgetingFormulation <: OptimisationAlgorithm end
+"""
+    port_opt_view(::RiskBudgetingFormulation, args...) -> nothing
+
+Default fallback for risk budgeting formulation view. Returns `nothing` for formulations that do not require view slicing.
+"""
+function port_opt_view(::RiskBudgetingFormulation, ::Any, args...)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Log-barrier formulation for Risk Budgeting.
+
+Adds the constraint ``\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq 0``, whose Karush-Kuhn-Tucker conditions are the risk budgeting condition. The logarithm needs a positive argument, so the solution lies in one orthant. An optional orthant vector `z` states which one, asset by asset.
+
+The orthant vector is an extension of the published model, which reaches a long-short portfolio through [`MixedIntegerRiskBudgeting`](@ref) instead. Stating the orthant costs no binary variable, and it needs the signs to be known in advance.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    LogRiskBudgeting(;
+        z::Option{<:VecInt} = nothing
+    ) -> LogRiskBudgeting
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `z` is provided: `!isempty(z)` and `all(x -> abs(x) == 1, z)`.
+
+# Related
+
+  - [`RiskBudgetingFormulation`](@ref)
+  - [`MixedIntegerRiskBudgeting`](@ref)
+  - [`RiskBudgeting`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 10.1.3, Equations 10.8-10.10.
+  - $(ref_dict[:maillard2008])
+  - $(ref_dict[:bruderroncalli2012])
+"""
+@concrete struct LogRiskBudgeting{T} <: RiskBudgetingFormulation
+    """
+    Optional orthant vector of ±1 defining which assets can have negative weights (`-1`) or must be positive (`+1`). If `nothing`, all assets have positive weights.
+    """
+    z::T
+    function LogRiskBudgeting(z::Option{<:VecInt})
+        if !isnothing(z)
+            @argcheck(!isempty(z), IsEmptyError("z cannot be empty"))
+            @argcheck(all(x -> abs(x) == 1, z),
+                      ArgumentError("all elements of z must be ±1"))
+        end
+        return new{typeof(z)}(z)
+    end
+end
+function LogRiskBudgeting(; z::Option{<:VecInt} = nothing)::LogRiskBudgeting
+    return LogRiskBudgeting(z)
+end
+function port_opt_view(alg::LogRiskBudgeting{Nothing}, i, args...)
+    return alg
+end
+function port_opt_view(alg::LogRiskBudgeting{<:VecInt}, i, args...)
+    return LogRiskBudgeting(; z = view(alg.z, i))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Mixed-integer formulation for Risk Budgeting.
+
+Uses binary variables and big-M constraints to enforce the risk budget constraints. This can find the minimal risk portfolio which meets the risk budgeting constraints by exploring all possible sign combinations of weights. This can be very expensive for large universes.
+
+# Related
+
+  - [`RiskBudgetingFormulation`](@ref)
+  - [`LogRiskBudgeting`](@ref)
+  - [`RiskBudgeting`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 10.1.4, Equation 10.11.
+  - $(ref_dict[:mosek2023c])
+"""
+struct MixedIntegerRiskBudgeting <: RiskBudgetingFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for risk budgeting algorithm specifications.
+
+# Related
+
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+"""
+abstract type RiskBudgetingAlgorithm <: OptimisationAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Asset-level Risk Budgeting algorithm.
+
+`AssetRiskBudgeting` specifies the risk budget as a vector of asset-level risk targets, optionally grouped by asset sets.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    AssetRiskBudgeting(;
+        rkb::Option{<:RkbE_Rkb} = nothing,
+        sets::Option{<:UniverseSets} = nothing,
+        alg::RiskBudgetingFormulation = LogRiskBudgeting()
+    ) -> AssetRiskBudgeting
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `rkb` is a `RiskBudgetEstimator`: `!isnothing(sets)`.
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `rkb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `alg`: Recursively viewed via [`port_opt_view`](@ref).
+
+# Related
+
+  - [`RiskBudgetingAlgorithm`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+  - [`RiskBudgeting`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 10.1.
+  - $(ref_dict[:maillard2008])
+  - $(ref_dict[:bruderroncalli2012])
+"""
+@propagatable @concrete struct AssetRiskBudgeting <: RiskBudgetingAlgorithm
+    """
+    $(field_dict[:rkb])
+    """
+    @vprop rkb
+    """
+    $(field_dict[:sets])
+    """
+    @vprop sets
+    """
+    $(field_dict[:rba])
+    """
+    @vprop alg
+    function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb}, sets::Option{<:UniverseSets},
+                                alg::RiskBudgetingFormulation)
+        if isa(rkb, RiskBudgetEstimator)
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
+        end
+        return new{typeof(rkb), typeof(sets), typeof(alg)}(rkb, sets, alg)
+    end
+end
+function AssetRiskBudgeting(; rkb::Option{<:RkbE_Rkb} = nothing,
+                            sets::Option{<:UniverseSets} = nothing,
+                            alg::RiskBudgetingFormulation = LogRiskBudgeting())::AssetRiskBudgeting
+    return AssetRiskBudgeting(rkb, sets, alg)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Factor-level Risk Budgeting algorithm.
+
+`FactorRiskBudgeting` specifies the risk budget at the factor level, using a factor model regression to decompose risk across factors and an idiosyncratic component.
+
+A named budget is written in **factor** names and resolved against the factor axis `re` names — [`factor_axis_key`](@ref) reads `sets.tfkey` off the time-series family and `sets.cfkey` off the cross-sectional one. That axis must name the columns of `rr.L` in order — see [`risk_budget_universe_key`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    FactorRiskBudgeting(;
+        re::RegE_Reg = StepwiseRegression(),
+        rkb::Option{<:RkbE_Rkb} = nothing,
+        sets::Option{<:UniverseSets} = nothing,
+        flag::Bool = true
+    ) -> FactorRiskBudgeting
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `rkb` is a `RiskBudgetEstimator`: `!isnothing(sets)`.
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `re`: Loadings sliced to the selected assets via [`port_opt_view`](@ref).
+  - `sets`: Sliced via [`port_opt_view`](@ref), which subsets the **asset** axis and leaves the factor entries untouched. The field participates in views because it may carry both axes; `rkb` does not, because a factor budget has no asset index to slice by.
+
+# Related
+
+  - [`RiskBudgetingAlgorithm`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+  - [`RiskBudgeting`](@ref)
+  - [`risk_budget_universe_key`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 10.2.2, Equation 10.21.
+  - $(ref_dict[:roncalliweisang2012])
+"""
+@propagatable @concrete struct FactorRiskBudgeting <: RiskBudgetingAlgorithm
+    """
+    $(field_dict[:re])
+    """
+    @vprop re
+    """
+    $(field_dict[:rkb])
+    """
+    rkb
+    """
+    $(field_dict[:sets_frb])
+    """
+    @vprop sets
+    """
+    $(field_dict[:flag])
+    """
+    flag
+    function FactorRiskBudgeting(re::RegE_Reg, rkb::Option{<:RkbE_Rkb},
+                                 sets::Option{<:UniverseSets}, flag::Bool)
+        if isa(rkb, RiskBudgetEstimator)
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when rkb is a RiskBudgetEstimator: the budget is written in factor names and is resolved against the factor axis `re` names, `sets.dict[sets.tfkey]` or `sets.dict[sets.cfkey]`"))
+        end
+        return new{typeof(re), typeof(rkb), typeof(sets), typeof(flag)}(re, rkb, sets, flag)
+    end
+end
+function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
+                             rkb::Option{<:RkbE_Rkb} = nothing,
+                             sets::Option{<:UniverseSets} = nothing,
+                             flag::Bool = true)::FactorRiskBudgeting
+    return FactorRiskBudgeting(re, rkb, sets, flag)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`RiskBudgeting`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function risk_budgeting_td_defaults()::NamedTuple
+    return (; r = Variance(), rba = AssetRiskBudgeting())
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Risk Budgeting (RB) portfolio optimiser.
+
+`RiskBudgeting` allocates portfolio weights so that each asset (or factor) contributes a specified fraction of the total portfolio risk. It uses a logarithmic or mixed-integer formulation and can be combined with any risk measure.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RiskBudgeting(;
+        opt::JuMPOptimiser,
+        r::TD{<:RM_VecRM} = Variance(),
+        rba::TD{<:RiskBudgetingAlgorithm} = AssetRiskBudgeting(),
+        wi::TD_Option{<:VecNum} = nothing,
+        fb::TDO_Option{<:OptE_Opt} = nothing
+    ) -> RiskBudgeting
+
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the risk measure, budgeting algorithm (and with it the risk budget), warm start and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `wi` and `fb`).
+
+## Validation
+
+  - If `r` is a vector: `!isempty(r)`.
+  - If `wi` is provided: `!isempty(wi)`.
+  - `fb` schedules: `bind !== :nearest`.
+
+# Mathematical definition
+
+A positive homogeneous convex risk measure splits into the risk contributions of the assets, which is the Euler decomposition:
+
+```math
+\\begin{align}
+\\rho(\\boldsymbol{w}) &= \\sum_{i=1}^{N} RC_{i}(\\boldsymbol{w})\\,, \\quad RC_{i}(\\boldsymbol{w}) = w_{i} \\frac{\\partial \\rho(\\boldsymbol{w})}{\\partial w_{i}}\\,.
+\\end{align}
+```
+
+A risk budgeting portfolio is one whose contributions stand in the stated proportions ``\\boldsymbol{b}``:
+
+```math
+\\begin{align}
+w_{i} \\frac{\\partial \\rho(\\boldsymbol{w})}{\\partial w_{i}} &= b_{i} \\, \\rho(\\boldsymbol{w})\\,, \\quad \\sum_{i=1}^{N} b_{i} = 1\\,, \\quad b_{i} \\geq 0\\,.
+\\end{align}
+```
+
+That condition is not solved directly. [`LogRiskBudgeting`](@ref) solves the equivalent problem, in which a logarithmic **constraint** replaces it. Its solution ``\\boldsymbol{y}`` is determined up to scale, and the weights are recovered as ``\\boldsymbol{w} = \\boldsymbol{y} / k``:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{y},\\, k}{\\min} \\; &\\rho(\\boldsymbol{y}) \\\\
+\\text{s.t.} \\quad &\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq 0\\,, \\\\
+&\\boldsymbol{1}^\\intercal \\boldsymbol{y} = k\\,, \\\\
+&\\boldsymbol{y} \\geq \\boldsymbol{0}\\,.
+\\end{align}
+```
+
+The right-hand side of the logarithmic constraint sets the scale of ``\\boldsymbol{y}`` alone, so `0` is used where the published model writes an arbitrary constant. The Karush-Kuhn-Tucker conditions of this problem are the risk budgeting condition above.
+
+The logarithm confines the solution to one orthant. [`MixedIntegerRiskBudgeting`](@ref) reaches a long-short portfolio by splitting the weight into two non-negative parts and taking the logarithm of their sum, and a binary vector holds one part at zero per asset:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{y}^{+},\\, \\boldsymbol{y}^{-},\\, \\boldsymbol{z},\\, k}{\\min} \\; &\\rho(\\boldsymbol{y}) \\\\
+\\text{s.t.} \\quad &\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}^{+} + \\boldsymbol{y}^{-}) \\geq 0\\,, \\\\
+&\\boldsymbol{y} = \\boldsymbol{y}^{+} - \\boldsymbol{y}^{-}\\,, \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{y} \\geq k\\,, \\\\
+&\\boldsymbol{y}^{+} \\leq M \\boldsymbol{z}\\,, \\quad \\boldsymbol{y}^{-} \\leq M (\\boldsymbol{1} - \\boldsymbol{z})\\,, \\\\
+&\\boldsymbol{y}^{+},\\, \\boldsymbol{y}^{-} \\geq \\boldsymbol{0}\\,, \\quad \\boldsymbol{z} \\in \\{0, 1\\}^{N}\\,.
+\\end{align}
+```
+
+[`FactorRiskBudgeting`](@ref) states the budget over the factors instead. The weights are re-based onto the factor axis, ``\\boldsymbol{y} = (\\mathbf{B}^\\intercal)^{+} \\boldsymbol{y}_{f}``, and the logarithmic constraint is written on ``\\boldsymbol{b}_{f}^\\intercal \\ln(\\boldsymbol{y}_{f})``.
+
+Where:
+
+  - ``\\boldsymbol{w}``: Portfolio weight vector.
+  - ``w_{i}``: Portfolio weight of asset ``i``.
+  - ``\\boldsymbol{y}``: Unscaled weight vector, the decision variable. ``\\boldsymbol{w} = \\boldsymbol{y} / k``.
+  - ``k``: Scaling variable.
+  - ``\\rho(\\boldsymbol{w})``: Portfolio risk measure.
+  - ``RC_{i}(\\boldsymbol{w})``: Risk contribution of asset ``i``.
+  - ``\\boldsymbol{b}``: Risk budget vector, `rba.rkb`.
+  - ``\\boldsymbol{b}_{f}``: Risk budget vector over the factors.
+  - ``\\boldsymbol{y}_{f}``: Factor exposure vector.
+  - ``\\mathbf{B}``: Loading matrix.
+  - ``\\boldsymbol{z}``: Binary vector. ``z_{i} = 1`` lets asset ``i`` be long, ``z_{i} = 0`` lets it be short.
+  - ``M``: Large constant of the big-M constraints.
+  - ``N``: Number of assets.
+
+# Details
+
+  - Every logarithm is modelled as an exponential cone.
+  - `k` is a **free** variable under this head, not `k >= 0` and not the literal `1`. The logarithmic constraint pins the scale on its own.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `r`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+`RiskBudgeting` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the returns matrix `X` as its third argument. When `opt.pe` already holds a prior **result**, the method replaces `X` with `opt.pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
+  - `opt` and `r` recurse through [`port_opt_view`](@ref) with that matrix. `rba` recurses with the index alone.
+  - `wi` is sliced to the selected assets.
+  - `fb` is carried through unchanged.
+
+# Related
+
+  - [`optimise`](@ref)
+  - [`RiskBudgetingResult`](@ref)
+  - [`scalarise_risk_expression!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`RiskJuMPOptimisationEstimator`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Chapter 10.
+  - $(ref_dict[:maillard2008])
+  - $(ref_dict[:bruderroncalli2012])
+  - $(ref_dict[:roncalliweisang2012])
+"""
+@propagatable @concrete struct RiskBudgeting <: RiskJuMPOptimisationEstimator
+    """
+    $(field_dict[:opt_jmp])
+    """
+    @fprop opt
+    """
+    $(field_dict[:r_opt])
+    """
+    @fprop r
+    """
+    $(field_dict[:rba])
+    """
+    rba
+    """
+    $(field_dict[:wi])
+    """
+    wi
+    """
+    $(field_dict[:fb])
+    """
+    @fprop fb
+    function RiskBudgeting(opt::JuMPOptimiser, r::TD{<:RM_VecRM},
+                           rba::TD{<:RiskBudgetingAlgorithm}, wi::TD_Option{<:VecNum},
+                           fb::TDO_Option{<:OptE_Opt})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RiskBudgeting)
+        if isa(r, AbstractVector)
+            @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
+        end
+        assert_risk_measure_required(r, :RiskBudgeting; flag = zero_risk_expression_flag)
+        if isa(wi, VecNum)
+            @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
+        end
+        assert_time_dependent_substitution(RiskBudgeting, (; opt, r, rba, wi, fb),
+                                           risk_budgeting_td_defaults())
+        return new{typeof(opt), typeof(r), typeof(rba), typeof(wi), typeof(fb)}(opt, r, rba,
+                                                                                wi, fb)
+    end
+end
+function RiskBudgeting(; opt::JuMPOptimiser, r::TD{<:RM_VecRM} = Variance(),
+                       rba::TD{<:RiskBudgetingAlgorithm} = AssetRiskBudgeting(),
+                       wi::TD_Option{<:VecNum} = nothing,
+                       fb::TDO_Option{<:OptE_Opt} = nothing)::RiskBudgeting
+    return RiskBudgeting(opt, r, rba, wi, fb)
+end
+function time_dependent_field_defaults(::RiskBudgeting)::NamedTuple
+    return risk_budgeting_td_defaults()
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any sub-estimator of `opt` requires previous portfolio weights (JuMP optimiser, risk measure, or fallback).
+"""
+function needs_previous_weights(opt::RiskBudgeting)
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.opt) ||
+            needs_previous_weights(opt.r) ||
+            needs_previous_weights(opt.fb))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a cluster-sliced copy of [`RiskBudgeting`](@ref) for asset index set `i` and returns matrix `X`.
+"""
+function port_opt_view(rb::RiskBudgeting, i, X::MatNum, args...)::RiskBudgeting
+    X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
+    opt = port_opt_view(rb.opt, i, X)
+    r = port_opt_view(rb.r, i, X)
+    rba = port_opt_view(rb.rba, i)
+    wi = nothing_scalar_array_view(rb.wi, i)
+    return RiskBudgeting(; opt = opt, r = r, rba = rba, wi = wi, fb = rb.fb)
+end
+"""
+    risk_budget_universe_key(rba::RiskBudgetingAlgorithm,
+                             N::Integer) -> Option{<:AbstractString}
+
+Return the key of the universe a named risk budget resolves against, or `nothing` for the asset frame.
+
+The budget vector is indexed by the variables the budget is *over*, so the universe naming it is a property of the algorithm rather than of the sets: [`AssetRiskBudgeting`](@ref) budgets the asset weights and takes the default axis, while [`FactorRiskBudgeting`](@ref) budgets the factor weights `w1` and takes the factor axis its own `re` names, which [`factor_axis_key`](@ref) reads.
+
+The axis is only read when `rba.rkb` is a [`RiskBudgetEstimator`](@ref) — a [`RiskBudget`](@ref) result carries its own vector and resolves no names, so an unread axis is left unvalidated, as it is in every other consumer of the declared axis. When it *is* read, [`factor_universe`](@ref) checks it against `N`, the number of factor weights, which is `size(rr.L, 2)`: under a [`DimensionReductionRegression`](@ref) that is the reduced basis the risk is decomposed in and not the columns of `F`, so a budget named after the original factors is rejected here rather than by a bare `DimensionMismatch` further down.
+
+# Arguments
+
+  - `rba`: Risk budgeting algorithm.
+  - `N`: Number of budgeted variables, `length(w)` at the call site.
+
+# Returns
+
+  - `key::Option{<:AbstractString}`: The universe key, or `nothing` to use `sets.xkey`.
+
+# Related
+
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+  - [`factor_universe`](@ref)
+  - [`risk_budget_constraints`](@ref)
+"""
+function risk_budget_universe_key(::AssetRiskBudgeting, ::Integer)
+    return nothing
+end
+function risk_budget_universe_key(rba::FactorRiskBudgeting, N::Integer)
+    if !isa(rba.rkb, RiskBudgetEstimator)
+        return nothing
+    end
+    key = factor_axis_key(rba.sets, rba.re)
+    factor_universe(rba.sets, key, N, "a $(FactorRiskBudgeting) risk budget", "rr.L")
+    return key
+end
+"""
+    _set_risk_budgeting_constraints!(model, rb, ...)
+
+Internal function to set risk budgeting constraints in the JuMP model.
+
+Configures the equality constraints ensuring each asset's marginal risk contribution equals its budget target.
+
+# Arguments
+
+  - `model`: JuMP model.
+  - `rb`: [`RiskBudgeting`](@ref) optimiser configuration.
+  - Additional risk and budget parameters.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+"""
+function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
+                                          w::VecJuMPScalar; strict::Bool = false)
+    N = length(w)
+    rkb = risk_budget_constraints(rb.rba.rkb, rb.rba.sets,
+                                  risk_budget_universe_key(rb.rba, N); N = N,
+                                  strict = strict)
+    rb = rkb.val
+    @argcheck(length(rb) == N, DimensionMismatch("rb ($(length(rb))) must match N ($N)"))
+    sc = get_constraint_scale(model)
+    # This head is the one producer of `k` that is not
+    # `set_maximum_ratio_factor_variables!`: the barrier below pins the scale, so `k` is a
+    # *free* variable here rather than `k >= 0` or the literal `1`. `get_k`'s error message
+    # names both routes.
+    JuMP.@variable(model, k)
+    JuMP.@variable(model, log_w[1:N])
+    JuMP.@constraints(model,
+                      begin
+                          clog_w[i = 1:N],
+                          [sc * log_w[i], sc, sc * w[i]] in JuMP.MOI.ExponentialCone()
+                          crkb, sc * LinearAlgebra.dot(rb, log_w) >= 0
+                      end)
+    # The log-barrier normalisation above pins the scale, so downstream builders may use 1
+    # in place of the free variable `k`.
+    set_unit_budget!(model)
+    return rkb
+end
+function non_investable_universe(rba::AssetRiskBudgeting, ni::VecStr)::AssetRiskBudgeting
+    return rebuild_estimator(rba, (; sets = non_investable_sets(rba.sets, ni)))
+end
+function non_investable_universe(rb::RiskBudgeting, ni::VecStr)::RiskBudgeting
+    return rebuild_estimator(rb, (; rba = non_investable_universe(rb.rba, ni)))
+end
+"""
+    set_risk_budgeting_constraints!(model, rb, pr, wb, args...)
+
+Add risk budgeting constraints and weight variables to the JuMP model.
+
+Dispatches based on the risk budgeting algorithm and formulation. Sets up weight variables, logarithmic risk budget constraints, and weight bounds for the specified formulation (log, MIP, or factor-based).
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `rb::RiskBudgeting`: Risk budgeting estimator configuration.
+  - `pr::AbstractPriorResult`: Prior result with asset moments.
+  - `wb::WeightBounds`: Weight bounds configuration.
+  - `args...`: Additional arguments (e.g. returns data for factor risk budgeting).
+
+# Returns
+
+  - Processed risk budgeting attributes.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+"""
+function set_risk_budgeting_constraints!(model::JuMP.Model,
+                                         rb::RiskBudgeting{<:Any, <:Any,
+                                                           <:AssetRiskBudgeting{<:Any,
+                                                                                <:Any,
+                                                                                <:LogRiskBudgeting{Nothing}},
+                                                           <:Any}, pr::AbstractPriorResult,
+                                         wb::WeightBounds, args...)
+    set_w!(model, pr.X, rb.wi)
+    rkb = _set_risk_budgeting_constraints!(model, rb, get_w(model); strict = rb.opt.strict)
+    set_weight_constraints!(model, wb, rb.opt, true)
+    return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
+end
+function set_risk_budgeting_constraints!(model::JuMP.Model,
+                                         rb::RiskBudgeting{<:Any, <:Any,
+                                                           <:AssetRiskBudgeting{<:Any,
+                                                                                <:Any,
+                                                                                <:LogRiskBudgeting{<:VecInt}},
+                                                           <:Any}, pr::AbstractPriorResult,
+                                         wb::WeightBounds, args...)
+    set_w!(model, pr.X, rb.wi)
+    z = rb.rba.alg.z
+    @argcheck(length(z) == length(get_w(model)),
+              DimensionMismatch("z ($(length(z))) must match w ($(length(get_w(model)))))"))
+    w = z .* get_w(model)
+    rkb = _set_risk_budgeting_constraints!(model, rb, w; strict = rb.opt.strict)
+    sc = get_constraint_scale(model)
+    k = get_k(model)
+    JuMP.@constraints(model, begin
+                          mipcrkb, sc * (sum(w) - k) >= 0
+                          orthcrkb, sc * w >= 0
+                      end)
+    set_weight_constraints!(model, wb, rb.opt)
+    return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
+end
+function set_risk_budgeting_constraints!(model::JuMP.Model,
+                                         rb::RiskBudgeting{<:Any, <:Any,
+                                                           <:FactorRiskBudgeting, <:Any},
+                                         pr::AbstractPriorResult, wb::WeightBounds,
+                                         rd::ReturnsResult)
+    b1, rr = set_factor_risk_contribution_constraints!(model, rb.rba.re, rd, pr,
+                                                       rb.rba.flag, rb.wi)
+    rkb = _set_risk_budgeting_constraints!(model, rb, shared_get(model, :w1);
+                                           strict = rb.opt.strict)
+    set_weight_constraints!(model, wb, rb.opt)
+    return ProcessedFactorRiskBudgetingAttributes(; rkb = rkb, b1 = b1, rr = rr)
+end
+"""
+    set_rb_mip_w!(model::JuMP.Model, X::MatNum)
+
+Create long and short weight variables for MIP risk budgeting in the JuMP model.
+
+Registers long `lw`, short `sw` weight variables and the derived expressions `w = lw - sw` and `w_obj = lw + sw`.
+
+Because `w` is *derived* from the parts, this declares a [`WeightsFromParts`](@ref) decomposition contract for builders that pin the decomposition.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `X::MatNum`: Asset returns matrix (used to determine number of assets).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_risk_budgeting_constraints!`](@ref)
+  - [`set_decomposition_contract!`](@ref)
+  - [`WeightsFromParts`](@ref)
+  - [`RiskBudgeting`](@ref)
+"""
+function set_rb_mip_w!(model::JuMP.Model, X::MatNum)
+    N = size(X, 2)
+    JuMP.@variables(model, begin
+                        lw[1:N] >= 0
+                        sw[1:N] >= 0
+                    end)
+    JuMP.@expressions(model, begin
+                          w, lw - sw
+                          w_obj, lw + sw
+                      end)
+    set_decomposition_contract!(model, WeightsFromParts())
+    return nothing
+end
+function set_risk_budgeting_constraints!(model::JuMP.Model,
+                                         rb::RiskBudgeting{<:Any, <:Any,
+                                                           <:AssetRiskBudgeting{<:Any,
+                                                                                <:Any,
+                                                                                <:MixedIntegerRiskBudgeting},
+                                                           <:Any}, pr::AbstractPriorResult,
+                                         wb::WeightBounds, args...)
+    set_rb_mip_w!(model, pr.X)
+    rkb = _set_risk_budgeting_constraints!(model, rb, shared_get(model, :w_obj);
+                                           strict = rb.opt.strict)
+    w = get_w(model)
+    sc = get_constraint_scale(model)
+    k = get_k(model)
+    JuMP.@constraint(model, mipcrkb, sc * (sum(w) - k) >= 0)
+    set_weight_constraints!(model, wb, rb.opt)
+    return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
+end
+function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                   str_names::Bool = false, save::Bool = true, kwargs...)
+    rb = reset_time_dependent_estimator(rb)
+    attrs = processed_jump_optimiser_attributes(rb.opt, rd; dims = dims, kwargs...)
+    # The bundle reduced what it carries. The head carries the rest — an initial weight
+    # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
+    # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
+    # `rd`. Both are unchanged when every asset is investable.
+    rb, rd = investable_view(rb, rd, attrs.pr, attrs.imsk)
+    model = JuMP.Model()
+    JuMP.set_string_names_on_creation(model, str_names)
+    set_model_scales!(model, rb.opt.sc, rb.opt.so)
+    set_model_observations!(model, size(attrs.pr.X, 1))
+    prb = set_risk_budgeting_constraints!(model, rb, attrs.pr, attrs.wb, rd)
+    assemble_jump_model!(model, rb, rb.opt, attrs, rd, rb.r, MinimumRisk())
+    set_portfolio_objective_function!(model, MinimumRisk(), rb, attrs)
+    retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))
+    return RiskBudgetingResult(;
+                               jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode,
+                                                           sol = sol,
+                                                           model = ifelse(save, model,
+                                                                          nothing)),
+                               r = factory(rb.r, attrs.pr, rb.opt.slv), prb = prb,
+                               fb = nothing)
+end
+"""
+    optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
+             rd::ReturnsResult; dims::Int = 1,
+             str_names::Bool = false, save::Bool = true, kwargs...) -> RiskBudgetingResult
+
+Run the Risk Budgeting portfolio optimisation.
+
+# Arguments
+
+  - `rb`: The risk budgeting optimiser to use.
+  - $(arg_dict[:rd]) If `isa(rb.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - `dims`: The dimension along which observations advance in time.
+  - `str_names`: Whether to use string names for the assets in the optimisation.
+  - `save`: Whether to save the JuMP model in the optimisation result.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Validation
+
+  - No field in the tree of `rb` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`RiskBudgetingResult`](@ref)
+"""
+function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
+                  dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+    assert_batch_entry(rb, "`optimise`")
+    return _optimise(rb, rd; dims = dims, str_names = str_names, save = save, kwargs...)
+end
+
+@pipe_delegates RiskBudgeting opt
+@pipe_route_rkb RiskBudgeting
+@pipe_route_sigma_ucs RiskBudgeting
+export AssetRiskBudgeting, FactorRiskBudgeting, RiskBudgeting, RiskBudgetingResult,
+       LogRiskBudgeting, MixedIntegerRiskBudgeting

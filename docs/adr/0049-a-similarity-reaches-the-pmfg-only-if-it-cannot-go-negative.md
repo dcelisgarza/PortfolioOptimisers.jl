@@ -7,28 +7,28 @@ status: accepted
 ## Context
 
 `NetworkEstimator(; alg = AngularSimilarity())` threw. The error came from
-[`PMFG_T2s`](../../src/11_Phylogeny/04_DBHT.jl)'s own non-negativity check, one transformation
+[`PMFG_T2s`](../../src/08_Phylogeny/06_DBHT/01_DBHT.jl)'s own non-negativity check, one transformation
 after the mistake was made, and it named `W` rather than the configuration that produced it. That
 was [#239](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/239).
 
 The blast radius is wider than the report. Four call sites hand `distance_to_similarity` output
-straight to `PMFG_T2s`: [`calc_adjacency`](../../src/11_Phylogeny/06_Phylogeny.jl),
-[`clusterise`](../../src/11_Phylogeny/06_Phylogeny.jl),
-[`DBHTs`](../../src/11_Phylogeny/04_DBHT.jl) and `logo!`. None of them guarded the sign, so
+straight to `PMFG_T2s`: [`calc_adjacency`](../../src/08_Phylogeny/05_Phylogeny.jl),
+[`clusterise`](../../src/08_Phylogeny/05_Phylogeny.jl),
+[`DBHTs`](../../src/08_Phylogeny/06_DBHT/01_DBHT.jl) and `logo!`. None of them guarded the sign, so
 `DBHT(; sim = AngularSimilarity())` and `LoGo(; sim = AngularSimilarity())` failed the same way.
 Three estimators, one defect.
 
 The negative number is a symptom. The disease is a **mismatched pairing**.
-[`AngularSimilarity`](../../src/09_Distance/04_Similarity.jl) is `cos(pi * D)`, the honest inverse
-of an angular distance and of nothing else. [`SimpleDistance`](../../src/09_Distance/02_Distance.jl)
+[`AngularSimilarity`](../../src/06_Distance/04_Similarity.jl) is `cos(pi * D)`, the honest inverse
+of an angular distance and of nothing else. [`SimpleDistance`](../../src/06_Distance/02_Distance.jl)
 is `sqrt((1 - rho) / 2)`, and it shares `AngularDist`'s `[0, 1]` range exactly. The two are
 **indistinguishable by range**, so `cos(pi * D)` type-checks for both while being correct for only
 one. Under `SimpleDistance` the similarity turns negative wherever `rho < 0.5`, not where
 `rho < 0`. The measured `D = 0.706` in #239 is a correlation of `0.003`, and `cos(pi * 0.706)` is
 `-0.618`.
 
-[`default_similarity`](../../src/09_Distance/04_Similarity.jl) already pairs a metric with its
-inverse, and [`FeatureDistance`](../../src/09_Distance/05_FeatureDistance.jl) uses it.
+[`default_similarity`](../../src/06_Distance/04_Similarity.jl) already pairs a metric with its
+inverse, and [`FeatureDistance`](../../src/06_Distance/05_FeatureDistance.jl) uses it.
 `NetworkEstimator.alg`, `DBHT.sim` and `LoGo.sim` took any member, with no reference to the distance
 estimator that produced `D`.
 
@@ -220,7 +220,7 @@ cross-validation folds shifts every row of the feature matrix.
 
 ### The domain precondition is interface-scoped, not member-wide
 
-[`assert_similarity_domain(sim, de, D)`](../../src/09_Distance/04_Similarity.jl) runs at the five
+[`assert_similarity_domain(sim, de, D)`](../../src/06_Distance/04_Similarity.jl) runs at the five
 PMFG entry points and nowhere else. It is deliberately **not** called inside
 `distance_to_similarity`, which stays a pure transformation with no domain of its own.
 
@@ -328,3 +328,39 @@ mechanism for a question that no longer concerns a refusal.
 precondition was justified by `LogDistance` mapping an exactly zero correlation to `Inf`, and that
 arithmetic holds. Reproducing it needs a noise matrix: `Denoise()` on the shipped `SP500` fixture
 produces **no** exact zero.
+
+## Amendment (2026-09-01): the four call sites live in four files
+
+`src/11_Phylogeny/04_DBHT.jl` held eight concepts in 2294 lines, and
+`src/11_Phylogeny/06_Phylogeny.jl` held twelve in 3626. Each is now one file per concept. The four
+call sites this ADR names, and the check it names, moved with them. No name, no signature and no
+docstring changed.
+
+- `src/11_Phylogeny/07_PMFG.jl` — `PMFG_T2s` and `assert_pmfg_weights`.
+- `src/11_Phylogeny/10_BubbleTree.jl` — `DirectHb`, `BubbleCluster8s` and `BubbleMember`.
+- `src/11_Phylogeny/12_DBHTClustering.jl` — `DBHTs`.
+- `src/11_Phylogeny/13_LoGo.jl` — `logo!`, `LoGo` and `J_LoGo`.
+- `src/11_Phylogeny/19_NetworkGraph.jl` — `calc_adjacency`.
+- `src/11_Phylogeny/21_PhylogenyClustering.jl` — the `clusterise` of a `NetworkClustersEstimator`.
+
+The three line references under *Consequences* — `04_DBHT.jl:942-948`, `:1084-1086` and
+`:1022-1024` — name `DirectHb`, `BubbleMember` and `BubbleCluster8s`. Read them in
+`10_BubbleTree.jl`. The decision is unchanged: the non-negativity bound sits on the field, so a
+similarity that can go negative fails at construction.
+
+## Amendment (2026-09-14): the back half of the pipeline is a test seam, and the unsafe aggregation has a test at its own step
+
+Everything `DBHTs` runs after `CliqHierarchyTree2s` — `BubbleHierarchy`, `DirectHb`,
+`BubbleCluster8s`, `BubbleMember`, `LinkageFunction`, `DendroConstruct`, `build_link_and_dendro`,
+`HierarchyConstruct4s` and `turn_into_Hclust_merges` — reads matrices alone and nothing it reads
+is a PMFG in particular. Each is an internal seam: unexported, single-purpose, documented, and
+driven directly from a hand-built bubble structure in `test/test_13f_dbht_seam.jl`, where every
+expected answer is derived by hand beside the assertion. The public entry point does not move, and
+no signature changes.
+
+The `BubbleMember` case is the one this ADR names. With `phi`'s denominator a total weight, two
+edges flipped negative make the fraction `(-0.2) / (-0.1) = 2`, and the vertex is given to the
+bubble it is repelled from; an exact cancellation makes `0 / 0`, and `argmax` selects the `NaN`.
+Both are pinned as the mechanism, not guarded, because the guard is upstream and stays there:
+`PMFG_T2s` refuses the input before `Rpm` exists, and the same file pins that refusal on the
+smallest matrix it accepts. #1037 records the gap and the change.

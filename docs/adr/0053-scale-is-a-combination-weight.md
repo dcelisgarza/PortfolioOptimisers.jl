@@ -10,11 +10,11 @@ Four places in the package multiply something by a `settings.scale` before addin
 running total:
 
 1. the model's `:risk_vec`, through
-   [`set_risk_expression!`](../../src/20_Optimisation/20_RiskMeasureConstraints/01_BaseRiskConstraints.jl),
+   [`set_risk_expression!`](../../src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/01_BaseRiskConstraints.jl),
 2. the value-level `scalarise` closures in Near Optimal Centering, Hierarchical Risk Parity
    and Hierarchical Equal Risk Contribution,
 3. the model's `:ret_vec`, through
-   [`set_return_expression!`](../../src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl),
+   [`set_return_expression!`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl),
 4. Schur Complement Hierarchical Risk Parity's blend over its parameter bundles.
 
 `scale` had no ADR and no `CONTEXT.md` entry. ADR 0024 owns the `scalarise` **seam** and never

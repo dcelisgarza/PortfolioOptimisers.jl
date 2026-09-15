@@ -6,10 +6,10 @@ status: accepted
 
 ## Context
 
-[`JuMPOptimiser`](../../src/20_Optimisation/10_JuMPOptimiser.jl)'s `ret` field held **one**
+[`JuMPOptimiser`](../../src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl)'s `ret` field held **one**
 returns estimator. The risk side of the same struct had held a vector for far longer:
 `MeanRisk.r` takes one risk measure or several, each carrying a
-[`RiskMeasureSettings`](../../src/19_RiskMeasures/01_Base_RiskMeasures.jl) bundle, and the
+[`RiskMeasureSettings`](../../src/16_RiskMeasures/01_Base_RiskMeasures.jl) bundle, and the
 optimiser's `sca` field names the **Scalariser** that collapses them into the model's single
 `:risk` expression.
 
@@ -35,7 +35,7 @@ decisions.
 ### The plural noun is the *term*, not the characteristic
 
 An element of the vector is **any**
-[`JuMPReturnsEstimator`](../../src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl),
+[`JuMPReturnsEstimator`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl),
 and two admissible elements have no characteristic at all:
 
 - `LogarithmicReturn` holds `settings` and `w`. There is **no per-asset quantity on it**, so
@@ -85,9 +85,9 @@ cvxpy's `scalarize` transforms**, and cvxpy is the authority on what a scalarise
 
 Sense-normalisation would rescue all three at a stroke — store `-ret`, minimise, and every
 transform becomes available and conic. It is **barred**. `:ret` is a model-global name that
-[`get_ret`](../../src/20_Optimisation/08_Base_JuMPOptimisation.jl) serves to the objective, to
+[`get_ret`](../../src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation.jl) serves to the objective, to
 the return bounds, to the `MaximumRatio` numerator and to
-[`NearOptimalCentering`](../../src/20_Optimisation/13_NearOptimalCentering.jl). A stored
+[`NearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl). A stored
 `-ret` leads every one of them astray, and the cost of that is spread across the whole model
 rather than paid at one site.
 
@@ -104,7 +104,7 @@ exactly cvxpy's `weights` argument, and it is the only route to a weighted
 ## Consequences
 
 **The shape that shipped.** Every return term carries a
-[`JuMPReturnsSettings`](../../src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl)
+[`JuMPReturnsSettings`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl)
 bundle — `scale`, `lb`, `rte`, `fee`, `mic` — in a field called `settings` placed **first**,
 matching `Variance(settings, sigma, chol, rc, alg)` on the risk side. Each term's builder
 registers index-suffixed names (`ret_1`, `t_l1ucs_2`), `set_return_expression!` pushes
@@ -149,7 +149,7 @@ closed owing.
 The Consequences section above states `model[:ret] == model[:ret_1]` for one term **at
 `scale = 1`**. That qualifier described the code accurately and hid a defect. The singular
 route,
-[`set_return_constraints!(model, pret::JuMPReturnsEstimator, …)`](../../src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl),
+[`set_return_constraints!(model, pret::JuMPReturnsEstimator, …)`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl),
 carried no step that dropped the weight, so a lone term at `scale = 2` built
 `model[:ret] == 2 * model[:ret_1]`.
 

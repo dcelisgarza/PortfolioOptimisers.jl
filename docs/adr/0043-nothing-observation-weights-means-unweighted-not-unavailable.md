@@ -6,7 +6,7 @@ status: accepted
 
 ## Context
 
-[`DynamicAbstractWeights`](../../src/01_Base.jl) is an extension point: a user subtypes it and
+[`DynamicAbstractWeights`](../../src/01_Base/02_TypeRoots.jl) is an extension point: a user subtypes it and
 implements `get_observation_weights` for the input shapes they care about — a `VecNum` arity and a
 `MatNum` arity, both documented on the abstract type. The library ships **no concrete subtype and no
 test** exercising one, so the contract lived entirely in prose.
@@ -36,22 +36,22 @@ Nothing in the library ever wants `nothing` back from a `DynamicAbstractWeights`
 
 - `19_RiskMeasures` dispatches on the weights type, resolves, then **rebuilds itself and
   re-dispatches** — e.g. `LowOrderMoment{<:Any, <:DynamicAbstractWeights, …}` in
-  [`03_MomentRiskMeasures.jl`](../../src/19_RiskMeasures/03_MomentRiskMeasures.jl). A `nothing`
+  [`03_MomentRiskMeasures.jl`](../../src/16_RiskMeasures/03_MomentRiskMeasures.jl). A `nothing`
   resolution rebuilt the measure as `{…, Nothing, …}` and re-dispatched straight to the *unweighted*
   method. Same defect, one layer deeper.
 - `20_Optimisation` resolves then branches, e.g. `wi = get_observation_weights(wi, pr.X)` followed by
   `if isnothing(wi)` in
-  [`11_AverageDrawdownConstraints.jl`](../../src/20_Optimisation/20_RiskMeasureConstraints/11_AverageDrawdownConstraints.jl).
+  [`11_AverageDrawdownConstraints.jl`](../../src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/08_AverageDrawdownConstraints.jl).
   That branch exists for the genuinely-unweighted case; an unresolvable dynamic type landed in it.
 
 What is actually load-bearing is **resolve-before-dispatch** — the property the
-[`average_drawdown`](../../src/19_RiskMeasures/11_AverageDrawdown.jl) docstring describes when it
+[`average_drawdown`](../../src/16_RiskMeasures/08_AverageDrawdown.jl) docstring describes when it
 says the aggregator "only ever sees a concrete weight vector or `nothing`". The `nothing` in that
 sentence is the requested-unweighted case. #177 read it as sanctioning the unresolvable case too.
 
 Because the defect is a *meaning* problem rather than a call-site problem, enumerating call sites was
 also the wrong detection method. `cov(::GeneralCovariance, …)` in
-[`03_Covariance.jl`](../../src/08_Moments/03_Covariance.jl) never called `get_observation_weights` at
+[`03_Covariance.jl`](../../src/05_Moments/03_Covariance.jl) never called `get_observation_weights` at
 all — it branched on `isnothing(ce.w)` and passed `ce.w` to `robust_cov` raw, so *any* dynamic type,
 even a fully-implemented one, died with a `MethodError` inside `robust_cov` while its sibling `cor`
 worked. No survey of `get_observation_weights` callers could have found it.
@@ -84,7 +84,7 @@ Three corollaries follow:
    only ever sees a concrete vector or a deliberate `nothing`. `cov(::GeneralCovariance, …)` is
    fixed to do this, matching `cor`.
 3. **The error carries the guidance**, since a user hitting it is by definition mid-way through
-   implementing an extension point: [`ObservationWeightsError`](../../src/01_Base.jl) (a
+   implementing an extension point: [`ObservationWeightsError`](../../src/01_Base/07_Errors.jl) (a
    `PortfolioOptimisersError`, following `TimeDependentDefaultError`) names the offending type, the
    shape it was handed, and both method signatures to write.
 

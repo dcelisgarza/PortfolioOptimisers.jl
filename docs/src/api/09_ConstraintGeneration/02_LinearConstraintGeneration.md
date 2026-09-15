@@ -1,0 +1,64 @@
+# Linear Constraints
+
+```@docs
+PartialLinearConstraint
+LinearConstraint
+merge_partial_linear_constraints
+merge_linear_constraints
+VecLc
+Lc_VecLc
+LinearConstraintEstimator
+LcE_Lc
+VecLcE
+LcE_VecLcE
+VecLcE_Lc
+LcE_Lc_VecLcE_Lc
+ParsingResult
+VecPR
+PR_VecPR
+replace_group_by_assets
+estimator_to_val
+parse_equation
+linear_constraints
+get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
+                                key::Option{<:AbstractString} = nothing;
+                                datatype::DataType = Float64, strict::Bool = false,
+                                rr::Option{<:AbstractRegressionResult} = nothing)
+prefixed_sets_keys
+unclaimed_sets_keys
+assert_factor_partition
+assert_factor_unique_group
+universe_axis
+constraint_row_length
+constraint_row_term
+AbstractParsingResult
+name_to_val!
+_parse_equation
+rethrow_parse_error
+format_term
+collect_terms!
+_collect_terms
+allowed_functions
+eval_numeric_functions
+has_invalid_plus
+port_opt_view(sets::UniverseSets, i, args...)
+port_opt_view(lc::LinearConstraint, ::Any, args...)
+factor_universe
+factor_axis_key
+_expr_depth_exceeds
+assert_investable_constraint_width
+non_investable_sets
+non_investable_names
+record_non_investable_drop!
+record_group_shed!
+announce_non_investable
+counterpart_axis_names
+shed_departed_members
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

@@ -3,7 +3,7 @@
 #
 # Purpose
 #   `PopulationPredictionResult` exists in
-#   `src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl`, and it
+#   `src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl`, and it
 #   already carries `sort_by_measure` and `quantile_by_measure`. Its members
 #   are **cross-validation paths**: one data split, many folds. What is absent
 #   is a population whose members are **models**: one data set, many defensible
@@ -361,7 +361,7 @@ single common direction, whatever the number of members.
     nothing. That is a **budget** result: it says where to stop adding models.
   - The measure is the same participation ratio the library already uses for
     the effective number of assets. See `set_weight_norm_2_constraints!` in
-    `src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl`.
+    `src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl`.
 """
 function effective_number_of_models(pop::PortfolioPopulation)
     W = pop.W

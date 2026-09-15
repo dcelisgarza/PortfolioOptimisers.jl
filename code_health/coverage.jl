@@ -18,6 +18,9 @@ if !(isdefined(Main, :CodeHealth))
 end
 
 using Main.CodeHealth
+# The name a definition binds is `CodeHealth`'s, so this file and `test/test_26_docs.jl` write one
+# answer. `test/test_49_coverage_attribution_census.jl` reads these four names through this file.
+using Main.CodeHealth: definition_name, defname, is_signature, unwrap
 using TOML
 
 const NAME = "coverage_baseline.toml"
@@ -49,39 +52,39 @@ const TOPLEVEL = "<toplevel>"
 # --- reading lcov.info -----------------------------------------------------
 
 """
-    lcov_path() -> String
+    lcov_path(; root = CodeHealth.REPO_ROOT) -> String
 
 Where the gate looks for `lcov.info`. `COVERAGE_LCOV` overrides it, which is how the CI job hands
 over the file it downloaded from the test job's artifact.
 """
-function lcov_path()
-    return get(ENV, "COVERAGE_LCOV", joinpath(CodeHealth.REPO_ROOT, "lcov.info"))
+function lcov_path(; root = CodeHealth.REPO_ROOT)
+    return get(ENV, "COVERAGE_LCOV", joinpath(root, "lcov.info"))
 end
 
 """
-    relative(path) -> String
+    relative(path; root = CodeHealth.REPO_ROOT) -> String
 
-An `SF:` record's path as a repository-relative one. `Coverage.jl` writes the path it was given, so
+An `SF:` record's path as a path relative to `root`. `Coverage.jl` writes the path it was given, so
 it may be absolute or relative depending on where `julia-processcoverage` ran.
 """
-function relative(path::AbstractString)
+function relative(path::AbstractString; root = CodeHealth.REPO_ROOT)
     p = replace(String(path), '\\' => '/')
-    root = replace(CodeHealth.REPO_ROOT, '\\' => '/')
-    root = endswith(root, "/") ? root : root * "/"
-    if startswith(p, root)
-        p = p[(length(root) + 1):end]
+    base = replace(String(root), '\\' => '/')
+    base = endswith(base, "/") ? base : base * "/"
+    if startswith(p, base)
+        p = p[(length(base) + 1):end]
     end
     return startswith(p, "./") ? p[3:end] : p
 end
 
 """
-    parse_lcov(path) -> Dict{String, Dict{Int, Int}}
+    parse_lcov(path; root = CodeHealth.REPO_ROOT) -> Dict{String, Dict{Int, Int}}
 
 The `DA:<line>,<count>` records of an LCOV file, per source file. `Coverage.jl` writes `SF`, `DA`,
 `LH`, `LF` and `end_of_record` and no function records at all, so a line is the only unit there is.
 A line with no `DA` record is not executable and is never counted.
 """
-function parse_lcov(path::AbstractString)
+function parse_lcov(path::AbstractString; root = CodeHealth.REPO_ROOT)
     if !(isfile(path))
         error("No coverage data at $path.\n" *
               "The gate reads the lcov.info that julia-processcoverage writes. Set COVERAGE_LCOV " *
@@ -91,7 +94,7 @@ function parse_lcov(path::AbstractString)
     current = ""
     for line in eachline(path)
         if startswith(line, "SF:")
-            current = relative(strip(line[4:end]))
+            current = relative(strip(line[4:end]); root)
             get!(out, current, Dict{Int, Int}())
         elseif startswith(line, "DA:") && !(isempty(current))
             body = strip(line[4:end])
@@ -117,88 +120,6 @@ end
 
 # --- attributing a line to a definition ------------------------------------
 
-defname(x::Symbol) = String(x)
-defname(x::QuoteNode) = defname(x.value)
-# A docstring parses to `Expr(:macrocall, GlobalRef(Core, Symbol("@doc")), …)`, and a `GlobalRef`
-# is neither a `Symbol` nor an `Expr`. Without this method every documented definition in the
-# library falls to the empty default and is attributed to `<toplevel>`.
-defname(x::GlobalRef) = defname(x.name)
-function defname(e::Expr)
-    if isempty(e.args)
-        return ""
-    end
-    if e.head === :call
-        return defname(e.args[1])
-    end
-    if e.head === :where
-        return defname(e.args[1])
-    end
-    if e.head === :(<:)
-        return defname(e.args[1])
-    end
-    if e.head === :(::)
-        return defname(e.args[end])
-    end
-    if e.head === :curly
-        return defname(e.args[1])
-    end
-    if e.head === :.
-        return defname(e.args[end])
-    end
-    if e.head === :macrocall
-        return defname(e.args[1])
-    end
-    return ""
-end
-defname(x) = ""
-
-"""
-    unwrap(e) -> Expr
-
-A docstring parses as a `Core.@doc` macro call wrapping the definition, so a documented definition
-would otherwise be named after the doc macro. Nearly every definition in this library is documented,
-so dropping the wrapper is not a corner case.
-"""
-function unwrap(e)
-    if e isa Expr && e.head === :macrocall && defname(e.args[1]) == "@doc"
-        return unwrap(e.args[end])
-    end
-    return e
-end
-
-"""
-    definition_name(e) -> String
-
-The name a Coverage Exemption row writes for one top-level expression, or `""` when the expression
-declares nothing a reader would name.
-"""
-function definition_name(e0)
-    e = unwrap(e0)
-    if !(e isa Expr)
-        return ""
-    end
-    if e.head in (:function, :macro)
-        return defname(e.args[1])
-    elseif e.head === :(=) && e.args[1] isa Expr && e.args[1].head in (:call, :where)
-        return defname(e.args[1])
-    elseif e.head === :struct
-        # `Expr(:struct, mutable, name, body)`.
-        return length(e.args) >= 2 ? defname(e.args[2]) : ""
-    elseif e.head in (:abstract, :primitive)
-        # `Expr(:abstract, :(T <: S))` carries one argument, not the three a struct carries.
-        return isempty(e.args) ? "" : defname(e.args[1])
-    elseif e.head === :const
-        return e.args[1] isa Expr ? defname(e.args[1].args[1]) : defname(e.args[1])
-    elseif e.head === :macrocall
-        # A Declaration Macro wraps the definition it declares, so name the definition. Naming the
-        # macro instead would collapse every `@concrete` call in a file onto one ambiguous key.
-        # A macro that declares nothing, such as `@define_pretty_show T`, keeps its own name.
-        inner = definition_name(e.args[end])
-        return isempty(inner) ? defname(e.args[1]) : inner
-    end
-    return ""
-end
-
 function line_numbers!(acc::Vector{Int}, e)
     if e isa LineNumberNode
         push!(acc, e.line)
@@ -211,7 +132,7 @@ function line_numbers!(acc::Vector{Int}, e)
 end
 
 """
-    definition_ranges(file) -> Vector{Tuple{String, Int, Int}}
+    definition_ranges(file; root = CodeHealth.REPO_ROOT) -> Vector{Tuple{String, Int, Int}}
 
 One entry per named top-level definition: its name and the first and last source line it holds. The
 range is taken from the `LineNumberNode`s the parser leaves in the expression, and every executable
@@ -220,8 +141,8 @@ line carries one, so a miss line always falls inside the range of the definition
 The walk is deliberately top-level only. A closure inside a function is attributed to that function,
 because a Coverage Exemption is written and read by a human and a human names the method.
 """
-function definition_ranges(file::AbstractString)
-    top = CodeHealth.parse_file(file)
+function definition_ranges(file::AbstractString; root = CodeHealth.REPO_ROOT)
+    top = CodeHealth.parse_file(file; root)
     out = Tuple{String, Int, Int}[]
     if !(top isa Expr)
         return out
@@ -271,24 +192,33 @@ struct FileCoverage
     by_definition::Dict{String, Int}
 end
 
-function measure()
-    files = filter(CodeHealth.in_scope, CodeHealth.tracked_jl_files())
-    lcov = parse_lcov(lcov_path())
+"""
+    measure(; root, files, lcov) -> NamedTuple
+
+Count the uncovered lines of `files` from the LCOV file at `lcov`, and attribute each one to the
+definition that holds it. Every path is read relative to `root`. The defaults are the live checkout,
+every file in scope and the `lcov.info` the test job wrote, so the entry script calls `measure()`
+unchanged; a test passes a fixture tree and a fixture LCOV file instead. `CodeHealth.REPO_ROOT`
+states why the seam is written this way.
+"""
+function measure(; root = CodeHealth.REPO_ROOT, files = CodeHealth.source_files(; root),
+                 lcov = lcov_path(; root))
+    hits_by_file = parse_lcov(lcov; root)
     numbers = Dict{String, FileCoverage}()
     for f in files
-        hits = get(lcov, f, Dict{Int, Int}())
+        hits = get(hits_by_file, f, Dict{Int, Int}())
         misses = sort!([ln for (ln, n) in hits if n == 0])
         by_def = if isempty(misses)
             Dict{String, Int}()
         else
-            attribute(definition_ranges(f), misses)
+            attribute(definition_ranges(f; root), misses)
         end
         numbers[f] = FileCoverage(length(hits), misses, by_def)
     end
     # An lcov record naming a file outside the scope is not a failure. `julia-processcoverage`
     # walks the package directory, and a stray record costs the gate nothing.
-    foreign = sort!(collect(setdiff(Set(keys(lcov)), Set(files))))
-    return (; files, numbers, foreign, provenance = provenance())
+    foreign = sort!(collect(setdiff(Set(keys(hits_by_file)), Set(files))))
+    return (; files, numbers, foreign, provenance = provenance(; root))
 end
 
 """
@@ -300,8 +230,8 @@ test job, and ADR 0056 floats that job on the newest release, so a pin here woul
 on a Julia patch release for no defect. A move in Julia's line attribution shows up as an ordinary
 rise instead, and the Refresh Artifact clears it on the same route as any other rise. ADR 0082.
 """
-function provenance()
-    return ["julia" => string(VERSION), "commit" => CodeHealth.git_short_commit()]
+function provenance(; root = CodeHealth.REPO_ROOT)
+    return ["julia" => string(VERSION), "commit" => CodeHealth.git_short_commit(; root)]
 end
 
 row(c::FileCoverage) = ["lines" => c.lines, "misses" => length(c.misses)]
@@ -407,8 +337,7 @@ end
 
 # --- render ----------------------------------------------------------------
 
-function render(m, recorded, accept_rise::Bool)
-    rulings = CodeHealth.read_rulings()
+function render(m, recorded, accept_rise::Bool; rulings = CodeHealth.read_rulings())
     measured = rows(m)
     rec = recorded_rows(recorded)
     if !(isempty(rec))
@@ -445,8 +374,7 @@ end
 
 # --- verify ----------------------------------------------------------------
 
-function verify(m, recorded)
-    rulings = CodeHealth.read_rulings()
+function verify(m, recorded; rulings = CodeHealth.read_rulings())
     failures = String[]
     for line in CodeHealth.check_rationale_citations(rulings)
         push!(failures, "ERROR: " * line)

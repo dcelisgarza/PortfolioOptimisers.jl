@@ -3,13 +3,16 @@
 # included by each split file. See ADR 0003.
 using PortfolioOptimisers, CSV, Test, TimeSeries, Clarabel, DataFrames, StableRNGs,
       Pajarito, HiGHS, JuMP, Clustering, NearestCorrelationMatrix
-rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                 timestamp = :Date)[(end - 252):end],
-                       TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
-                                 timestamp = :Date)[(end - 252):end];
-                       B = TimeArray(CSV.File(joinpath(@__DIR__,
-                                                       "./assets/SP500_idx.csv.gz"));
-                                     timestamp = :Date))
+rd = prices_to_returns(price_ingestion(PriceIngestion(),
+                                       TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                   "./assets/SP500.csv.gz"));
+                                                 timestamp = :Date)[(end - 252):end];
+                                       F = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                       "./assets/Factors.csv.gz"));
+                                                     timestamp = :Date)[(end - 252):end],
+                                       B = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                       "./assets/SP500_idx.csv.gz"));
+                                                     timestamp = :Date)[(end - 252):end]))
 slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
               check_sol = (; allow_local = true, allow_almost = true),
               settings = Dict("verbose" => false)),
@@ -192,7 +195,7 @@ sets = UniverseSets(;
                                      "Energy", "Industrials", "Healthcare",
                                      "Consumer_Staples"]))
 # The post-#224 shape for a factor-flavoured consumer: both axes declared, factors under
-# `fkey`. No consumer in this group still reads factors off `xkey`.
+# `tfkey`. No consumer in this group still reads factors off `xkey`.
 xfsets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 pr = prior(HighOrderPriorEstimator(), rd)
 rr = regression(DimensionReductionRegression(), rd)

@@ -6,11 +6,11 @@ status: accepted
 
 ## Context
 
-Three optimisers — [`JuMPOptimiser`](../../src/20_Optimisation/10_JuMPOptimiser.jl),
-[`HierarchicalOptimiser`](../../src/20_Optimisation/04_Base_ClusteringOptimisation.jl) and
-[`NestedClustered`](../../src/20_Optimisation/17_NestedClustered.jl) — carried a field
+Three optimisers — [`JuMPOptimiser`](../../src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl),
+[`HierarchicalOptimiser`](../../src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl) and
+[`NestedClustered`](../../src/17_Optimisation/06_Meta/02_NestedClustered.jl) — carried a field
 `cle_pr::Bool = true`, forwarded as a keyword argument into the prior-layer bridge in
-[`01_Base_Prior.jl`](../../src/13_Prior/01_Base_Prior.jl), where eight sites spelled the same line:
+[`01_Base_Prior.jl`](../../src/10_Prior/01_Base_Prior.jl), where eight sites spelled the same line:
 
 ```julia
 X = isnothing(rd) || cle_pr ? pr.X : rd.X
@@ -66,7 +66,8 @@ rename.
 folds and the raw data on others would produce a weight path no single problem definition explains.
 
 **The Symbol is validated.** A `Bool` could not be wrong; a `Symbol` can. `assert_source_selector`
-in [`01_Base.jl`](../../src/01_Base.jl) enforces `src in (:prior, :data)` and is called from all
+in [`01_Base/10_Assertions.jl`](../../src/01_Base/10_Assertions.jl)
+enforces `src in (:prior, :data)` and is called from all
 three inner constructors, so a typo throws where it was written rather than silently selecting the
 other carrier. The bridge is validated too, via a single `returns_matrix_picker(pr, rd, x_src)` that
 replaces the eight copies of the ternary — the direct `clusterise(cle, pr; x_src = …)` entry points

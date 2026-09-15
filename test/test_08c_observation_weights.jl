@@ -160,7 +160,7 @@ const PO = PortfolioOptimisers
         @test isnothing(w)
     end
 
-    @testset "08_Moments estimators" begin
+    @testset "05_Moments estimators" begin
         vw = VectorOnlyObsWeights()
         cw = CompleteObsWeights(10)
 
@@ -191,7 +191,7 @@ const PO = PortfolioOptimisers
         @test isa(mean(SimpleExpectedReturns(), X), AbstractArray)
     end
 
-    @testset "19_RiskMeasures resolve-then-rebuild" begin
+    @testset "16_RiskMeasures resolve-then-rebuild" begin
         # These measures dispatch on the weights type, resolve, then rebuild themselves and
         # re-dispatch. A `nothing` resolution used to rebuild as an unweighted measure and
         # silently re-dispatch to the unweighted method - the same defect, one layer deeper.
@@ -272,6 +272,7 @@ pass `pr.X`, which is the documented `MatNum` arity.
         model = PO.JuMP.Model()
         PO.JuMP.set_string_names_on_creation(model, false)
         PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
+        PO.set_model_observations!(model, size(attrs.pr.X, 1))
         PO.set_maximum_ratio_factor_variables!(model, mr.obj)
         PO.set_w!(model, attrs.pr.X, mr.wi)
         PO.set_weight_constraints!(model, attrs.wb, mr.opt)

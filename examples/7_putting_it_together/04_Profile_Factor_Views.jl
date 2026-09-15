@@ -51,7 +51,7 @@ earns 3 bps/day.
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
-rd = prices_to_returns(X, F)
+rd = prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))
 prices = vec(values(X)[end, :])
 
 asset_sets = UniverseSets(;
@@ -59,7 +59,7 @@ asset_sets = UniverseSets(;
                                       "energy" => ["CVX", "XOM", "RRC"],
                                       "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
 ## `FactorBlackLittermanPrior` reads the *declared* factor axis, so the sets it takes names
-## both: assets under `xkey`, factors under `fkey`, in the column order of `rd.F`.
+## both: assets under `xkey`, factors under `tfkey`, in the column order of `rd.F`.
 factor_sets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 tau = 1 / size(rd.X, 1)
 

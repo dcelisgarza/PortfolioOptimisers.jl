@@ -12,8 +12,8 @@ status: accepted
 ## Context
 
 JuMP-based optimisers build one `JuMP.Model` incrementally: dozens of constraint
-and risk builders across [09_JuMPConstraints](../../src/20_Optimisation/09_JuMPConstraints/)
-and [20_RiskMeasureConstraints](../../src/20_Optimisation/20_RiskMeasureConstraints/)
+and risk builders across [09_JuMPConstraints](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/)
+and [20_RiskMeasureConstraints](../../src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/)
 read and write shared entries by raw symbol key — `model[:sc]`, `model[:w]`,
 `model[:k]`, … — with no accessor layer. There are ~650 `model[:sym]` references
 over ~120 distinct keys, plus 126 `haskey(model, :sym)` guards and 112 raw
@@ -35,7 +35,7 @@ Inspecting the keys shows they are **two different things**, not one:
   already locally scoped and self-documenting.
 
 The cost of the missing interface is concrete, not cosmetic. The clearest example is
-[18_TrackingRiskMeasureConstraints.jl](../../src/20_Optimisation/20_RiskMeasureConstraints/18_TrackingRiskMeasureConstraints.jl):
+[19_TrackingRiskMeasureConstraints.jl](../../src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/16_TrackingRiskMeasureConstraints.jl):
 `RiskTrackingRiskMeasure` applies a risk measure to the portfolio-vs-benchmark
 difference, which requires rebuilding the risk expressions against a different
 returns vector. It does this with ~150 lines that manually rename every live
@@ -48,7 +48,7 @@ hazard made real.
 A second, quieter hazard: `set_net_portfolio_returns!` treats `net_X = X` with **no
 error** when `:fees` is absent, so a fees builder running *after* a net-returns
 consumer silently drops fees. Today this is held together only by call order in the
-orchestrator ([11_MeanRisk.jl](../../src/20_Optimisation/11_MeanRisk.jl), fees at
+orchestrator ([11_MeanRisk.jl](../../src/17_Optimisation/05_JuMP/04_MeanRisk.jl), fees at
 line 649 before risk at 650), not by anything structural.
 
 ## Decision
@@ -79,7 +79,7 @@ The trade-off: this is a **discipline seam, not a compiler-enforced one**.
 
 ### 3. Home: `08_Base_JuMPOptimisation.jl`
 
-The interface lives in [08_Base_JuMPOptimisation.jl](../../src/20_Optimisation/08_Base_JuMPOptimisation.jl),
+The interface lives in [08_Base_JuMPOptimisation.jl](../../src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation.jl),
 which already holds the embryonic setters (`set_w!`, `set_model_scales!`,
 `set_portfolio_returns!`) and is included before both constraint directories, so
 include-order — the only hard constraint in a flat module — is satisfied.

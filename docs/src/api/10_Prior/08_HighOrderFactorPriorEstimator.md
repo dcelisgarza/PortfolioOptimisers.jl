@@ -1,0 +1,19 @@
+# High Order Factor Prior
+
+```@docs
+AbstractHighOrderPriorEstimator_F
+AbstractHiLoOrderPriorEstimator_F
+HighOrderFactorPriorEstimator
+coskewness_residuals
+cokurtosis_residuals
+prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
+      pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
+PortfolioOptimisers.show_fields(::HighOrderFactorPriorEstimator)
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

@@ -1,0 +1,66 @@
+# Base Cross Validation
+
+```@docs
+CrossValidationResult
+Base.split(res::CrossValidationResult, args...)
+CrossValidationAlgorithm
+CVER
+OptimisationCrossValidationEstimator
+SequentialCrossValidationEstimator
+NonSequentialCrossValidationEstimator
+OptimisationCrossValidationResult
+SequentialCrossValidationResult
+NonSequentialCrossValidationResult
+OptCVER
+NonSeqCVER
+SeqCVER
+NonOptimisationCrossValidationEstimator
+NonOptimisationSequentialCrossValidationEstimator
+NonOptimisationNonSequentialCrossValidationEstimator
+NonOptimisationCrossValidationResult
+NonOptimisationSequentialCrossValidationResult
+NonOptimisationNonSequentialCrossValidationResult
+AbstractPredictionResult
+PredictionReturnsResult
+PredictionResult
+VecPredRes
+PredRes_MultiPredRes
+mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecNum}}, sym = :X)
+MultiPeriodPredictionResult
+VecMPredRes
+PopulationPredictionResult
+predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
+fit_predict(opt::OptE_Opt, rd::ReturnsResult)
+sort_by_measure
+quantile_by_measure
+fit_and_predict
+reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X::VecNum)
+sort_predictions!(test_idx::VecVecInt, predictions::VecPredRes)
+VecVecPredRes
+VecPredRes_MultiPredRes
+cv_sequential_info
+parallel_folds
+run_folds
+advance_previous_fold
+Fold
+folds_are_time_ordered
+fold_evaluation
+fold_fit
+investable_fold_view
+fold_fees
+previous_weights
+threads_weights
+fold_solved
+held_weight_members
+held_start_weights
+fold_factor_returns
+collapse_benchmark(B::Nothing, w::VecNum_VecVecNum, hw)
+ruined_retcodes
+mark_ruined_members
+warn_ruined_members
+fold_loop
+assert_unshuffled_folds
+cv_nobs
+cv_live_assets
+cv_timestamps
+```

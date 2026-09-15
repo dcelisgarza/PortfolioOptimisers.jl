@@ -1,0 +1,21 @@
+# Opinion Pooling
+
+```@docs
+LinearOpinionPooling
+LogarithmicOpinionPooling
+OpinionPoolingPrior
+prior(pe::OpinionPoolingPrior, X::MatNum,
+               F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
+               dims::Int = 1, strict::Bool = false, kwargs...)
+OpinionPoolingAlgorithm
+robust_probabilities
+compute_pooling
+PortfolioOptimisers.show_fields(::OpinionPoolingPrior)
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

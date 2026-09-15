@@ -23,7 +23,7 @@ to fix it.
 ## Decision
 
 **Provide one generic `scalarise(f, ::Scalariser, itr; by)` seam in
-[01_Base_RiskMeasures.jl](../../src/19_RiskMeasures/01_Base_RiskMeasures.jl) and delete the
+[01_Base_RiskMeasures.jl](../../src/16_RiskMeasures/01_Base_RiskMeasures.jl) and delete the
 per-optimiser copies.**
 
 - `scalarise(f, ::SumScalariser, itr)`, `::MaxScalariser`, `::MinScalariser` reduce with the obvious

@@ -80,3 +80,32 @@ continue to pin `:optimal`.
   `to_tree`.
 - `src/11_Phylogeny/03_Hierarchical.jl` — `branchorder` reaches `Clustering.hclust`.
 - `docs/reports/maintainability-review-20260816.html` — finding 1, withdrawn.
+
+## Amendment (2026-09-09)
+
+`:optimal` is not a single algorithm this library owns; it is
+`Clustering.orderbranches_barjoseph!`, a routine the `Clustering.jl` dependency ships. #947
+measured that this library's leaf order and a reference implementation's disagree on the same
+dendrogram — same distance matrix, same linkage heights, same merge tree, different branch
+order — because each side calls its own package's optimal-leaf-ordering routine, and the two
+routines do not attain the same objective value on every fixture. Substituting the reference's
+order into this library's HRP reproduces the reference's weights exactly, so nothing in this
+library's HRP, its distance, or its linkage is implicated; the divergence is entirely in the
+third-party ordering step.
+
+This ADR's decision stands: recursive bisection still fixes `branchorder` internally rather than
+exposing it, because the leaf permutation is still load-bearing for HRP and Schur. What this
+amendment adds is the scope of that guarantee: **reproducibility of the leaf order, and therefore
+of an HRP or Schur allocation, holds within this library's own dependency versions, not across
+implementations.** Pinning the ordering to a routine this library owns and tests, so that the
+allocation stops moving with `Clustering.jl`'s version or with a port to another language, is a
+breaking numerical change to every hierarchical caller and is not taken here. A future ADR may
+take it; until then, a cross-language HRP or Schur parity test should hold the leaf order equal
+rather than assert on it.
+
+### References (amendment)
+
+- Issue #947 — the reproduction, the per-fold leaf orders, and the brute-force objective scores
+  that show neither routine attains the minimum on every fold.
+- `test/test_57b_reference_walk_forward_parity.jl` — the walk-forward parity that holds the leaf
+  order equal and passes to `5.6e-17`.

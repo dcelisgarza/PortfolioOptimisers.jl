@@ -11,6 +11,13 @@ Manifest.toml
 benchmark/*.json
 coverage
 docs/build/
+# The docs build writes these four paths from `examples/**/*.jl`, `user_guide/*.jl`,
+# `docs/capability_catalogue.jl` and `docs/generate_type_hierarchy.jl` on every run, and no
+# workflow commits them back, so a committed copy is stale from the next docs change on. ADR 0151.
+docs/src/examples/
+docs/src/user_guide/
+docs/src/capability_catalogue.md
+docs/src/api/*_TypeHierarchy.md
 env
 node_modules
 *NOTRACK*
@@ -28,3 +35,4 @@ __pycache__/
 # committed; the contributor puts the downloaded file at its committed path instead.
 code_health/_refresh/
 code_health/_triage/
+code_health/_sweep/
