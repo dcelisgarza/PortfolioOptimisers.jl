@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  Social/link preview card for PortfolioOptimisers.jl.
+
+  This is the source of `preview.png`. Documenter turns that file into the `og:image`,
+  `twitter:image` and `twitter:card` tags of every built page (issue #569), and the GitHub
+  repository uses it as the social preview (issue #563). Documenter accepts a raster format
+  only, and 1280 x 640 is the card size the platforms expect.
+
+  Re-render after an edit, from `docs/src/assets/`:
+
+      inkscape -o preview.png -w 1280 -h 640 preview.svg
+
+  The mark repeats the four paths of `logo.svg`, with the transform pair that file uses, in
+  the Julia colours.
+
+  The four chips name the four broad stages of the pipeline. The count is a census of the
+  non-abstract leaves of the risk-measure type tree, 57, rounded down. The chips fill the
+  width of the card, so the frontier curve runs under the row and rises only past its right
+  end. No chip and no line of text sits on a changing background.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="1280" height="640" viewBox="0 0 1280 640" version="1.1">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#131820"/>
+      <stop offset="1" stop-color="#0a0d12"/>
+    </linearGradient>
+    <linearGradient id="rule" gradientUnits="userSpaceOnUse" x1="80" y1="0" x2="392" y2="0">
+      <stop offset="0.00" stop-color="#cb3c33"/>
+      <stop offset="0.33" stop-color="#9558b2"/>
+      <stop offset="0.66" stop-color="#4063d8"/>
+      <stop offset="1.00" stop-color="#389826"/>
+    </linearGradient>
+    <linearGradient id="frontier" gradientUnits="userSpaceOnUse" x1="660" y1="0" x2="1280" y2="0">
+      <stop offset="0" stop-color="#4063d8" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#389826" stop-opacity="0.20"/>
+    </linearGradient>
+
+    <!-- The logo mark, on a 60 x 60 grid. -->
+    <g id="mark">
+      <g transform="translate(-56.335952,-26.370902)">
+        <g transform="matrix(2.0000065,0,0,2.0000065,-56.336322,-26.371075)">
+          <path d="M 64.991152,49.658378 C 49.762062,39.631998 82.127531,27.369248 82.127531,27.369248"
+                fill="none" stroke="#4063d8" stroke-width="1.05833" stroke-linecap="round"/>
+          <path d="M 56.892887,51.834458 67.515655,27.026178"
+                fill="none" stroke="#389826" stroke-width="1.05833" stroke-linecap="round"
+                stroke-dasharray="3.175, 3.175" stroke-dashoffset="2.32833"/>
+          <circle cx="61.66338" cy="40.911316" r="1.4114462" fill="#cb3c33"/>
+          <path d="m 56.865119,26.900068 v 28.94157 h 28.941572"
+                fill="none" stroke="#9558b2" stroke-width="1.05833" stroke-linecap="round"/>
+        </g>
+      </g>
+    </g>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <!-- A faint efficient frontier. It runs under the chip row, and rises past its end. -->
+  <path d="M 660,640 C 910,640 1070,600 1160,510 1215,452 1255,300 1280,120 L 1280,640 Z"
+        fill="url(#frontier)"/>
+  <path d="M 660,640 C 910,640 1070,600 1160,510 1215,452 1255,300 1280,120"
+        fill="none" stroke="#4063d8" stroke-width="3" stroke-opacity="0.32"/>
+
+  <!-- Header: the mark and the name. -->
+  <use xlink:href="#mark" transform="translate(80,64) scale(2.05)"/>
+  <text x="232" y="152" font-family="DejaVu Sans, Inter, Helvetica, Arial, sans-serif"
+        font-size="60" font-weight="bold" fill="#f0f6fc">PortfolioOptimisers.jl</text>
+
+  <rect x="80" y="248" width="312" height="7" rx="3.5" fill="url(#rule)"/>
+
+  <text x="80" y="336" font-family="DejaVu Sans, Inter, Helvetica, Arial, sans-serif"
+        font-size="44" fill="#dbe3ec">Quantitative portfolio construction</text>
+  <text x="80" y="390" font-family="DejaVu Sans, Inter, Helvetica, Arial, sans-serif"
+        font-size="27" fill="#93a1b1">Democratising, demystifying, and derisking investing</text>
+
+  <!-- Capability chips, one row. -->
+  <g font-family="DejaVu Sans, Inter, Helvetica, Arial, sans-serif" font-size="21">
+    <g>
+      <rect x="80" y="446" width="220" height="52" rx="26" fill="#4063d8" fill-opacity="0.15"
+            stroke="#4063d8" stroke-opacity="0.6" stroke-width="1.5"/>
+      <text x="190" y="479.5" fill="#a8bcf5" text-anchor="middle">Priors and views</text>
+    </g>
+    <g>
+      <rect x="318" y="446" width="247" height="52" rx="26" fill="#389826" fill-opacity="0.15"
+            stroke="#389826" stroke-opacity="0.6" stroke-width="1.5"/>
+      <text x="441.5" y="479.5" fill="#8fd47f" text-anchor="middle">50+ risk measures</text>
+    </g>
+    <g>
+      <rect x="583" y="446" width="227" height="52" rx="26" fill="#9558b2" fill-opacity="0.15"
+            stroke="#9558b2" stroke-opacity="0.6" stroke-width="1.5"/>
+      <text x="696.5" y="479.5" fill="#cdaade" text-anchor="middle">Robust moments</text>
+    </g>
+    <g>
+      <rect x="828" y="446" width="277" height="52" rx="26" fill="#cb3c33" fill-opacity="0.15"
+            stroke="#cb3c33" stroke-opacity="0.6" stroke-width="1.5"/>
+      <text x="966.5" y="479.5" fill="#f0a099" text-anchor="middle">Constraints and costs</text>
+    </g>
+  </g>
+
+  <text x="80" y="570" font-family="DejaVu Sans Mono, JetBrains Mono, monospace"
+        font-size="23" fill="#6e7d8f">dcelisgarza.github.io/PortfolioOptimisers.jl</text>
+</svg>

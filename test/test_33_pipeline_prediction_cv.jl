@@ -18,6 +18,16 @@ end
 function PortfolioOptimisers.needs_previous_weights(::TDPipePrevW)
     return true
 end
+# `TDPipeKFoldSwitch` turns the previous weights into an observable difference in the fold's
+# weights: a fold that receives none optimises equal weights, a fold that receives some
+# optimises inverse volatility. Every fold of a non-sequential scheme takes the first branch.
+struct TDPipeKFoldSwitch <: PortfolioOptimisers.TimeDependentOptimiserCallable end
+function (::TDPipeKFoldSwitch)(ctx::TimeDependentContext)
+    return isnothing(ctx.w_prev) ? EqualWeighted() : InverseVolatility()
+end
+function PortfolioOptimisers.needs_previous_weights(::TDPipeKFoldSwitch)
+    return true
+end
 @testset "Pipeline prediction and CV" begin
     using Test, PortfolioOptimisers, TimeSeries, Dates, StableRNGs, Statistics, FLoops
 
@@ -90,14 +100,16 @@ end
         X = make_prices()
         vals = copy(values(X))
         vals[1:50, 2] .= NaN     # A2: 62.5% missing in the train window -> dropped
-        vals[10, 3] = NaN        # A3: sparse missing -> imputed
+        vals[10, 3] = NaN        # A3: sparse missing -> filled
         Xm = TimeArray(timestamp(X), vals, string.("A", 1:5))
-        pr = PricesResult(; X = Xm)
+        # The fill is bounded by the Listing Span, so the carrier states one: here a
+        # caller's declaration that every asset is listed throughout (ADR 0129, ADR 0130).
+        pr = PricesResult(; X = Xm, span = trues(size(vals)))
 
         pipe = Pipeline(;
                         steps = ("filter" => MissingDataFilter(; col_thr = 0.5),
-                                 "impute" => Imputer(), PricesToReturns(), EmpiricalPrior(),
-                                 EqualWeighted()))
+                                 "gap_fill" => PriceGapFill(), PricesToReturns(),
+                                 EmpiricalPrior(), EqualWeighted()))
         train_idx, test_idx = 1:80, 81:120
         res = fit(pipe, PortfolioOptimisers.port_opt_view(pr, train_idx))
 
@@ -110,7 +122,7 @@ end
         # manual replay of the fitted steps on the test window
         pv = PortfolioOptimisers.port_opt_view(pr, test_idx)
         pv = PortfolioOptimisers.apply_preprocessing(res["filter"], pv)
-        pv = PortfolioOptimisers.apply_preprocessing(res["impute"], pv)
+        pv = PortfolioOptimisers.apply_preprocessing(res["gap_fill"], pv)
         rd_test = PortfolioOptimisers.apply_preprocessing(PricesToReturns(), pv)
         pred_manual = PortfolioOptimisers.predict(res.ctx.opt, rd_test)
         @test pred.rd.X == pred_manual.rd.X
@@ -118,8 +130,11 @@ end
         # the T -> T-1 contraction: k price rows produce k-1 return rows
         @test size(pred.rd.X, 1) == length(test_idx) - 1
 
-        # the test window is subset to the *train* universe even when clean
-        pr_clean = PricesResult(; X = X)
+        # the test window is subset to the *train* universe even when clean. It states the
+        # same calendar as the gapped one: a pipeline fitted on a span-stating carrier emits
+        # an Asset Panel, and `assert_universe_aligned` refuses a test window that states
+        # none, because the two did not come from one ingestion.
+        pr_clean = PricesResult(; X = X, span = trues(size(values(X))))
         pred_clean = PortfolioOptimisers.predict(res, pr_clean, test_idx)
         @test size(pred_clean.rd.X, 2) == 1  # net portfolio returns column
         rd_clean = PortfolioOptimisers.apply_fitted_steps(res.results,
@@ -167,11 +182,12 @@ end
         @test_throws ArgumentError PortfolioOptimisers.predict(broken, pr, 1:10)
     end
 
-    @testset "universe drift between train and test is an error" begin
-        # PricesToReturns is stateless, and prices_to_returns drops assets that are
-        # entirely missing in the window it converts. A train window in which one
-        # asset is fully missing therefore yields fewer assets than a clean test
-        # window -- weights and test returns would silently misalign.
+    @testset "the conversion cannot drift a universe, so the fold aligns" begin
+        # ADR 0133. `PricesToReturns` is stateless, and it now deletes no asset and no
+        # observation: a train window in which one asset is fully missing yields the same
+        # universe as a clean test window, so the drift this testset was written for is not
+        # reachable through the conversion at all. That is the point -- the drift used to be
+        # an unfitted universe policy hiding inside a stateless step.
         X = make_prices(; T = 60, N = 4)
         vals = copy(values(X))
         vals[1:30, 2] .= NaN     # A2 fully missing across the train window 1:30
@@ -180,20 +196,32 @@ end
 
         pipe = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), EqualWeighted()))
         res = fit(pipe, PortfolioOptimisers.port_opt_view(pr, 1:30))
-        @test res.ctx.returns.nx == ["A1", "A3", "A4"]
-        @test length(res.w) == 3
+        @test res.ctx.returns.nx == ["A1", "A2", "A3", "A4"]
+        @test length(res.w) == 4
 
-        # predicting on a window where A2 is present must fail loudly, not misalign
-        @test_throws ArgumentError PortfolioOptimisers.predict(res, pr, 31:60)
+        # A2 carries no finite return over the training window, so the Coverage Universe
+        # excludes it and it holds exactly zero -- stated by the reduction rather than by an
+        # asset vanishing from the table.
+        @test iszero(res.w[2])
 
-        # pinning the universe with a filter (and filling gaps) makes it well defined
+        # Predicting on a window where A2 is priced now aligns and runs, rather than
+        # refusing a fold whose universes never needed to differ. `predict` replays on the
+        # universe the fitted result reduced to, which is reduce-and-expand doing its job.
+        pred = PortfolioOptimisers.predict(res, pr, 31:60)
+        @test pred.rd.nx == ["A1", "A3", "A4"]
+        @test size(pred.rd.X, 1) == 29
+
+        # Deleting the asset is still expressible, and it is a fitted step: the filter
+        # records the surviving names on the training window and replays them, so both
+        # windows carry the same three names and the fold aligns for that reason instead.
         pipe_ok = Pipeline(;
-                           steps = (MissingDataFilter(; col_thr = 0.5), Imputer(),
-                                    PricesToReturns(), EmpiricalPrior(), EqualWeighted()))
+                           steps = (MissingDataFilter(; col_thr = 0.5), PricesToReturns(),
+                                    EmpiricalPrior(), EqualWeighted()))
         res_ok = fit(pipe_ok, PortfolioOptimisers.port_opt_view(pr, 1:30))
         @test res_ok.ctx.returns.nx == ["A1", "A3", "A4"]
-        pred = PortfolioOptimisers.predict(res_ok, pr, 31:60)
-        @test size(pred.rd.X, 1) == 29
+        pred_ok = PortfolioOptimisers.predict(res_ok, pr, 31:60)
+        @test pred_ok.rd.nx == ["A1", "A3", "A4"]
+        @test size(pred_ok.rd.X, 1) == 29
     end
 
     @testset "nested pipelines replay recursively" begin
@@ -214,7 +242,7 @@ end
         nf = length(sp.train_idx)
         @test nf == 2
         ew, iv = EqualWeighted(), InverseVolatility()
-        prep = (MissingDataFilter(), Imputer(), PricesToReturns(), EmpiricalPrior())
+        prep = (MissingDataFilter(), PriceGapFill(), PricesToReturns(), EmpiricalPrior())
         static_pipe(opt) = Pipeline(; steps = (prep..., opt))
         function manual(opt, i)
             res = fit(static_pipe(opt),
@@ -290,7 +318,7 @@ end
 
         @testset "the fold's computed slots reach the fold's optimiser" begin
             hrp = HierarchicalRiskParity()
-            capped = (MissingDataFilter(), Imputer(), PricesToReturns(),
+            capped = (MissingDataFilter(), PriceGapFill(), PricesToReturns(),
                       WeightBoundsEstimator(; lb = nothing, ub = 0.3))
             p = cross_val_predict(Pipeline(;
                                            steps = (capped..., TimeDependent([hrp, hrp]))),
@@ -321,6 +349,46 @@ end
             p = @test_logs (:info,) match_mode = :any cross_val_predict(pipe, pr, cvw)
             @test isnothing(cap.seen[1])
             @test cap.seen[2] ≈ p.pred[1].res.w
+        end
+
+        @testset "a non-sequential scheme carries no history" begin
+            # Issue #759. A `KFold` fold is independent of the other folds, so a pipeline
+            # that needs the previous weights still runs the folds in parallel with none.
+            # This is the behaviour the optimiser-level `KFold` path already had. The scheme
+            # states the answer once, through `folds_are_time_ordered`, and every call site
+            # that holds a scheme reads it.
+            kf = KFold(; n = 3)
+            @test !PortfolioOptimisers.folds_are_time_ordered(kf)
+            @test !PortfolioOptimisers.folds_are_time_ordered(CombinatorialCrossValidation())
+            @test PortfolioOptimisers.folds_are_time_ordered(cvw)
+            @test PortfolioOptimisers.folds_are_time_ordered(MultipleRandomised(cvw))
+            # A result answers with its estimator.
+            @test !PortfolioOptimisers.folds_are_time_ordered(split(kf, pr))
+            @test PortfolioOptimisers.folds_are_time_ordered(sp)
+
+            nk = length(split(kf, pr).train_idx)
+            cap = TDPipePrevW(Vector{Any}(nothing, nk))
+            pipe = Pipeline(; steps = (prep..., TimeDependent(cap)))
+            @test PortfolioOptimisers.needs_previous_weights(pipe)
+            # One guard covers both legs of the thread. `w_prev` is `nothing`, so neither
+            # the fold's context nor the `factory` pass over the optimisation steps sees a
+            # previous fold's weights. The run is silent: `cv_sequential_info` is emitted by
+            # `run_folds`, which a non-sequential scheme no longer reaches.
+            p = @test_logs cross_val_predict(pipe, pr, kf)
+            @test length(p.pred) == nk
+            @test all(isnothing, cap.seen)
+
+            # The switch makes the branch observable in the weights.
+            sw = Pipeline(; steps = (prep..., TimeDependent(TDPipeKFoldSwitch())))
+            ewt = fill(1 / 5, 5)
+            pk = cross_val_predict(sw, pr, kf)
+            @test length(pk.pred) == nk
+            @test all(pred -> isapprox(pred.res.w, ewt), pk.pred)
+            # A walk-forward is a timeline, so it keeps threading: fold 1 receives no
+            # previous weights and fold 2 does.
+            pw = @test_logs (:info,) match_mode = :any cross_val_predict(sw, pr, cvw)
+            @test isapprox(pw.pred[1].res.w, ewt)
+            @test !isapprox(pw.pred[2].res.w, ewt)
         end
 
         @testset "fold-less fit is default-or-throw" begin

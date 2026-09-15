@@ -4,7 +4,7 @@
 # Purpose
 #   The library holds Wasserstein machinery inside two risk measures
 #   (`DistributionallyRobustConditionalValueatRisk` and its range twin) and
-#   nowhere else. The uncertainty-set family in `src/14_UncertaintySets` has
+#   nowhere else. The uncertainty-set family in `src/11_UncertaintySets` has
 #   four members and none of them is an ambiguity set. This file shows the
 #   fifth member, and it shows that three separate robust counterparts fall
 #   out of one radius.
@@ -13,7 +13,7 @@
 #   of a linear loss and of CVaR is the empirical value **plus a dual-norm
 #   penalty on the weights**. The library can already emit that penalty. See
 #   `L2Regularisation` and `LpRegularisation` in
-#   `src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl`.
+#   `src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl`.
 #   What is absent is the name and the calibrated radius.
 #
 # Status

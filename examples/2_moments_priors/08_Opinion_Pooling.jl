@@ -174,7 +174,7 @@ pr_robust = prior(OpinionPoolingPrior(; pes = [opinion_a, opinion_b, opinion_c],
 ```
 
 A caveat from dogfooding this page: on this S&P 500 slice the robust adjustment moved the
-posterior *mean and covariance* only at the level of numerical noise (``\\sim 10^{-14}``),
+posterior *mean and covariance* only at the level of numerical noise (``\sim 10^{-14}``),
 even with a deliberately extreme fourth opinion. The KL discount reshapes the pooled *scenario
 probabilities*, but with all opinions sharing the same return scenarios that barely propagates
 into the first two moments here. Treat `p` as a lever that matters when opinions are
@@ -219,7 +219,7 @@ plot_stacked_bar_composition([res_emp, res_op], rd; xticks = (1:2, ["Empirical",
 #src - BUG FIXED this session (→ #126): prior(OpinionPoolingPrior) used to MUTATE the stored
 #src   weights `pe.w` in place — `ow = pe.w` aliased it and `push!(ow, rw)` grew it when
 #src   sum(w)<1, so a second prior() call threw `length(w) == length(pes)`. Fixed in
-#src   src/13_Prior/13_OpinionPoolingPrior.jl by `ow = vcat(ow, rw)` (also fixes the uniform
+#src   src/10_Prior/07_OpinionPoolingPrior.jl by `ow = vcat(ow, rw)` (also fixes the uniform
 #src   `range` branch, which was immutable). Regression test added in test_12b_prior_core.jl.
 #src - FINDING (→ #126): robust pooling `p` had NEGLIGIBLE effect here — even an extreme outlier
 #src   (AMD == 0.006) at p∈{1.0,0.5,0.1,0.01} moved pooled mu by ~1e-14 (machine eps) and sigma

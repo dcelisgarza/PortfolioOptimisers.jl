@@ -185,7 +185,7 @@
 
         pipe = Pipeline(;
                         steps = (TrainTestSplit(; test_size = 0.2), MissingDataFilter(),
-                                 Imputer(), PricesToReturns(), EmpiricalPrior(),
+                                 PriceGapFill(), PricesToReturns(), EmpiricalPrior(),
                                  EqualWeighted()))
         res = fit(pipe, pr)
 
@@ -200,7 +200,7 @@
 
         # without a split, fit_predict stays in-sample
         pipe_ns = Pipeline(;
-                           steps = (MissingDataFilter(), Imputer(), PricesToReturns(),
+                           steps = (MissingDataFilter(), PriceGapFill(), PricesToReturns(),
                                     EmpiricalPrior(), EqualWeighted()))
         pred_ns = fit_predict(pipe_ns, pr)
         @test length(pred_ns.rd.X) == 99

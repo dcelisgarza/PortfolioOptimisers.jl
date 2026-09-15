@@ -47,13 +47,13 @@ typo is obvious while a legitimately-absent asset stays quiet.**
   builders never interpolate the full universe (only `length(nx)` and the key) nor the input
   value dictionary / parsed struct, so the info-leak-safe shape and the suggestion behaviour cannot
   drift between call sites. The known boundaries are `get_linear_constraints`
-  ([02_LinearConstraintGeneration.jl](../../src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl)),
+  ([02_LinearConstraintGeneration.jl](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration.jl)),
   `group_to_val!` / `estimator_to_val` (same file — the value-mapping path behind
   `WeightBoundsEstimator`, `Fees`, `Turnover`, threshold and risk-budget estimators), the
   Black-Litterman view generator
-  ([05_BlackLittermanViewsGeneration.jl](../../src/13_Prior/05_BlackLittermanViewsGeneration.jl)), and
+  ([05_BlackLittermanViewsGeneration.jl](../../src/10_Prior/05_BlackLitterman/01_BlackLittermanViewsGeneration.jl)), and
   the entropy-pooling view generator
-  ([10_Base_EntropyPoolingPrior.jl](../../src/13_Prior/10_Base_EntropyPoolingPrior.jl)).
+  ([10_Base_EntropyPoolingPrior.jl](../../src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior.jl)).
 - `unknown_variable_msg` takes an optional `candidates` pool (default: the asset universe `nx`) that
   is searched for the typo suggestion, while the *reported* universe size stays `length(nx)`.
   `group_to_val!` passes `[nx; keys(sdict)]` so a mistyped **group** name — valid only in the group
@@ -111,10 +111,11 @@ typo is obvious while a legitimately-absent asset stays quiet.**
 
 A later review found one more unbounded internal-state dump outside the shared-builder discipline:
 the `JuMPResult` constructor's solve-failure warning
-([10_JuMPModelOptimisation.jl](../../src/10_JuMPModelOptimisation.jl)) interpolated the whole
+([10_JuMPModelOptimisation.jl](../../src/07_JuMPModelOptimisation.jl)) interpolated the whole
 `trials` dictionary into the log — every solver name, the solver *settings*, and full caught
 exception objects, unbounded in size. It now routes through a fourth shared builder,
-`failed_solve_msg` ([01_Base.jl](../../src/01_Base.jl), beside the other three): one bounded line
+`failed_solve_msg` ([01_Base/06_Messages.jl](../../src/01_Base/06_Messages.jl), beside the other
+three): one bounded line
 per failed solver stage (solver name, stage, first line of the error truncated to 200 characters so
 a JuMP termination status stays visible), solver names sorted for deterministic logs, and
 `:settings` entries never printed. The raw exceptions and settings remain available on

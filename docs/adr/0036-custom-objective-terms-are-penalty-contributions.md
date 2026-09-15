@@ -6,7 +6,7 @@ status: accepted
 
 ## Context
 
-`cobj` and `ccnt` on a [`JuMPOptimiser`](../../src/20_Optimisation/10_JuMPOptimiser.jl) are the
+`cobj` and `ccnt` on a [`JuMPOptimiser`](../../src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl) are the
 user-facing escape hatch: subtype `CustomJuMPObjective` / `CustomJuMPConstraint` and implement one
 builder method. The two hooks were meant to be siblings. They had drifted badly apart:
 

@@ -60,9 +60,9 @@ Elementwise (Hadamard) multiplication.
 
 Where:
 
-  - ``\\boldsymbol{a}``, ``\\boldsymbol{b}``: Array operands, read in linear index order.
-  - ``\\alpha``, ``\\beta``: Scalar operands.
-  - ``i``: Linear index, ``i = 1,\\ldots,n``.
+  - $(math_dict[:ab_operands])
+  - $(math_dict[:alpha_beta_scalars])
+  - $(math_dict[:i_linear])
 
 Both array operands must carry the same length. A scalar operand multiplies every entry of the array operand.
 
@@ -126,9 +126,9 @@ Elementwise (Hadamard) division.
 
 Where:
 
-  - ``\\boldsymbol{a}``, ``\\boldsymbol{b}``: Array operands, read in linear index order.
-  - ``\\alpha``, ``\\beta``: Scalar operands.
-  - ``i``: Linear index, ``i = 1,\\ldots,n``.
+  - $(math_dict[:ab_operands])
+  - $(math_dict[:alpha_beta_scalars])
+  - $(math_dict[:i_linear])
 
 Both array operands must carry the same length. The division is not guarded, so a zero divisor gives an infinity or a `NaN`.
 
@@ -192,9 +192,9 @@ Elementwise (Hadamard) addition.
 
 Where:
 
-  - ``\\boldsymbol{a}``, ``\\boldsymbol{b}``: Array operands, read in linear index order.
-  - ``\\alpha``, ``\\beta``: Scalar operands.
-  - ``i``: Linear index, ``i = 1,\\ldots,n``.
+  - $(math_dict[:ab_operands])
+  - $(math_dict[:alpha_beta_scalars])
+  - $(math_dict[:i_linear])
 
 Both array operands must carry the same length. A scalar operand is added to every entry of the array operand, which the built-in `+` refuses.
 
@@ -258,9 +258,9 @@ Elementwise (Hadamard) subtraction.
 
 Where:
 
-  - ``\\boldsymbol{a}``, ``\\boldsymbol{b}``: Array operands, read in linear index order.
-  - ``\\alpha``, ``\\beta``: Scalar operands.
-  - ``i``: Linear index, ``i = 1,\\ldots,n``.
+  - $(math_dict[:ab_operands])
+  - $(math_dict[:alpha_beta_scalars])
+  - $(math_dict[:i_linear])
 
 Both array operands must carry the same length. A scalar operand is subtracted from every entry of the array operand, which the built-in `-` refuses.
 
@@ -593,9 +593,9 @@ Sub-select an estimator's **observation weights** to the observations `i`.
 
 # Algorithm
 
- 1. Return `x` unchanged. This universal fallback reads neither its index nor the fields of `x`.
+ 1. Return `x` unchanged. This universal fallback reads neither its index nor the fields of `x`. An estimator that carries no weights, and one whose struct is not [`@propagatable`](@ref), therefore behave as they did before the verb existed.
 
-A [`@propagatable`](@ref) struct with at least one `@wprop`-tagged field carries a generated method that dominates this one. That method rebuilds the struct with the same constructor, indexing each `@wprop` field to `i` through [`nothing_scalar_array_getindex`](@ref) and recursing into each `@fprop` field through this verb.
+A [`@propagatable`](@ref) struct with at least one `@wprop`-tagged field carries a generated method that dominates this one. That method rebuilds the struct with the same constructor, indexing each `@wprop` field to `i` through [`nothing_scalar_array_getindex`](@ref) and recursing into each `@fprop` field through this verb. A hand-written type that holds weights outside that tag must define its own method, or its weights keep their full-sample length and the windowed call raises.
 
 # Arguments
 
@@ -606,12 +606,6 @@ A [`@propagatable`](@ref) struct with at least one `@wprop`-tagged field carries
 
   - `x`: The value, with every observation-weights field indexed to `i`.
 
-# Details
-
-  - This universal fallback returns `x` unchanged. An estimator that carries no weights, and one whose struct is not [`@propagatable`](@ref), therefore behave as they did before the verb existed.
-  - A struct gains a generated method when it has at least one `@wprop`-tagged field. A hand-written type that holds weights outside that tag must define its own method, or its weights keep their full-sample length and the windowed call raises.
-  - [`realised_vol`](@ref) is the site that drives it.
-
 # Related
 
   - [`port_opt_view`](@ref)
@@ -620,6 +614,7 @@ A [`@propagatable`](@ref) struct with at least one `@wprop`-tagged field carries
   - [`PROP_TAG_CHANNELS`](@ref)
   - [`nothing_scalar_array_getindex`](@ref)
   - [`ObsWeights`](@ref)
+  - [`realised_vol`](@ref): the site that drives this verb.
 """
 obs_weights_view(x, ::Any) = x
 """
@@ -1224,6 +1219,8 @@ Writing that half per type — rather than per field — is what lets slots that
 be resolved together: a deferred `sigma` supplies `chol` from the same fit, so the pair is
 never mixed across two sources.
 
+`slv` is the effective solver, and it is what a **Calibration Rule** in the same struct reads. It carries the value the optimisation settled on, so a rule resolves against one solver on both routes. On the [`factory`](@ref) route the [`@cprop`](@ref) selection has already put that solver on the struct, so the argument stays at its default. On the `JuMP` route no selection runs, so [`set_risk_constraints!`](@ref) reads the solver off the estimator and threads it here. A type that carries a solver of its own settles it locally as `sel(x.slv, slv)`, beside the observation weights it already settles that way, and a type that carries none gives its rules none on either route.
+
 # Algorithm
 
  1. Return `x` unchanged. This method is the arm for a second argument that is **not** a prior result: with no prior in hand nothing can be fitted, so the deferred state travels on.
@@ -1238,7 +1235,7 @@ A more specific method dominates this one on a prior result: the one that [`defe
   - [`factory`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
-resolve_deferred_quantities(x, ::Any) = x
+resolve_deferred_quantities(x, ::Any, ::Any = nothing) = x
 # ---------------------------------------------------------------------------
 # @propagatable — struct-definition macro for factory propagation
 # ---------------------------------------------------------------------------
@@ -2338,12 +2335,13 @@ orthogonal, stackable field tags:
     threaded optimiser value (a solver) found by type via `sel(getfield(x, :f), _ctx(args...))`.
 
 When at least one field is tagged `@pprop` or `@cprop`, a second method
-`factory(x, pr::AbstractPriorResult, args...)` is generated. It first calls
-[`resolve_deferred_quantities`](@ref) on `x` — the identity unless the type declares a
-method — so every slot holding a **Deferred Quantity** becomes a plain value before
-selection runs. It then selects `@pprop`/`@cprop` fields as above and threads
-`@fprop`-only fields with `pr` (`factory_child(getfield(x, :f), pr, args...)`);
-a field tagged both `@pprop` and `@fprop` is prior-selected in this method (`@pprop` wins).
+`factory(x, pr::AbstractPriorResult, args...)` is generated. It selects `@pprop`/`@cprop`
+fields as above and threads `@fprop`-only fields with `pr`
+(`factory_child(getfield(x, :f), pr, args...)`); a field tagged both `@pprop` and `@fprop`
+is prior-selected in this method (`@pprop` wins). It then calls
+[`resolve_deferred_quantities`](@ref) on the **selected** struct — the identity unless the
+type declares a method — so the Deferred-Quantity resolution runs **last** and a slot that
+holds one sees the solver, the observation weights and the children already settled.
 Because this method is more specific than the general `factory(x, args...)`, it is chosen
 whenever a prior is passed.
 
@@ -2410,7 +2408,7 @@ Docstrings on the enclosing definition are forwarded correctly via
  6. Emit the `factory` method. When [`prop_channel_active`](@ref) holds for the `factory` channel, the body is a call to the keyword constructor whose pairs come from [`prop_channel_pairs`](@ref); otherwise the body is `x` itself. **This method is always emitted**, so an untagged [`@propagatable`](@ref) struct still answers [`factory`](@ref) with the identity.
  7. When the `view` channel is active, emit `port_opt_view(x::StructName, i, args...)`, whose channel threads `i` before `args...`.
  8. When the `obs` channel is active, emit `obs_weights_view(x::StructName, i)`, whose channel threads `i` and takes no tail.
- 9. When the `prior` channel is active, emit `factory(x::StructName, pr::AbstractPriorResult, args...; kwargs...)`. Its body first binds `xr` to [`resolve_deferred_quantities`](@ref) of `x` against `pr`, and **every field is then read off `xr` rather than off `x`**, so a Deferred Quantity is a plain value before selection runs. This method is more specific than the one of step 6, so a call that threads a prior chooses it.
+ 9. When the `prior` channel is active, emit `factory(x::StructName, pr::AbstractPriorResult, args...; kwargs...)`. Its body selects every tagged field off `x` and then hands the selected struct to [`resolve_deferred_quantities`](@ref), so **the Deferred-Quantity resolution runs last**. A Deferred Quantity and a **Calibration Rule** therefore see the solver, the observation weights and the children in the state the optimisation settled them in, and a rule may call [`ERM`](@ref) or [`RRM`](@ref). This method is more specific than the one of step 6, so a call that threads a prior chooses it.
 10. Build `pprop_tuple`, the `@pprop`-tagged field names as a tuple of quoted symbols.
 11. Return one escaped block holding, in order: `Base.@__doc__ chain`, so a docstring on the declaration reaches the struct; the emitted methods; and the call to [`propagatable_register!`](@ref) that records the type and `pprop_tuple`.
 
@@ -2515,15 +2513,17 @@ macro propagatable(expr)
 
     # --- prior/context selection (@pprop / @cprop) — emit only when a field opts in ---
     if prop_channel_active(:prior, tagged)
-        # Every field is read off the Deferred-Quantity-resolved struct, not the argument.
+        # Every field is read off the argument, the selections run on it, and the
+        # Deferred-Quantity resolution runs on the selected struct, LAST. A Deferred
+        # Quantity and a Calibration Rule therefore see the solver, the observation
+        # weights and the children in the state the optimisation settled them in.
         prior_body = Expr(:call, struct_name,
                           Expr(:parameters,
-                               prop_channel_pairs(:prior, tagged, all_fields, :xr, POMOD,
+                               prop_channel_pairs(:prior, tagged, all_fields, :x, POMOD,
                                                   (:pr,))...))
         prior_def = quote
             function $_factory(x::$struct_name, pr::$_prior_result, args...; kwargs...)
-                xr = $_resolve_fn(x, pr)
-                return $prior_body
+                return $_resolve_fn($prior_body, pr)
             end
         end
         push!(defs, prior_def)
@@ -2788,15 +2788,6 @@ resolves **before** the field check.
 
 Step 4 is where the two orderings in the first paragraph come from: a `swap` runs **before** the own-field check, so it replaces a real field, and every other rule runs **after** it, so it can only add a name. Within each group the first branch that matches wins, and the order of the branches is the declaration order of the rules.
 
-# Details
-
-The generated `getproperty` applies any `swap` rules first (in declaration order),
-then checks the receiver's own `fieldnames` (via `getfield`, so it never recurses),
-then each remaining rule in declaration order with first-match-wins, then falls
-through to `getfield(x, sym)` (the standard "no field" error on `T`). The generated
-`propertynames` unions the own field names with every forwarded, subset, aliased,
-computed and swapped name, deduplicated.
-
 # Related
 
   - [`PropertyPathError`](@ref)
@@ -3013,8 +3004,8 @@ Algorithm for reducing a vector of real values to its minimum.
 
 Where:
 
-  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
-  - ``v_{i}``: Its ``i``-th entry, ``i = 1,\\ldots,n``.
+  - $(math_dict[:v_reduce])
+  - $(math_dict[:v_i_entry])
 
 The reduction carries no weights, so a weighted call gives the same value as an unweighted one.
 
@@ -3056,8 +3047,8 @@ Algorithm for reducing a vector of real values to its optionally weighted mean.
 
 Where:
 
-  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
-  - ``v_{i}``: Its ``i``-th entry.
+  - $(math_dict[:v_reduce])
+  - $(math_dict[:v_i_entry])
   - ``w_{i}``: The ``i``-th observation weight, from the field `w`.
 
 The weighted form normalises by the total weight, so a weight vector scaled by a positive constant gives the same value. `w` must carry one entry per entry of ``\\boldsymbol{v}``.
@@ -3136,16 +3127,12 @@ Algorithm for reducing a vector of real values to its optionally weighted median
 
 Where:
 
-  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
+  - $(math_dict[:v_reduce])
   - ``\\boldsymbol{w}``: The observation weights, from the field `w`. The first line is the case `w = nothing`.
   - ``Q_{\\boldsymbol{v}}(p)``: The ``p``-quantile of ``\\boldsymbol{v}``.
   - ``Q_{\\boldsymbol{v}, \\boldsymbol{w}}(p)``: The weighted ``p``-quantile of ``\\boldsymbol{v}``, as `StatsBase` defines it.
 
-**Both forms are quantiles, and both interpolate.** Neither is an order statistic, so the result need not be an entry of ``\\boldsymbol{v}``. On a vector of even length the unweighted form averages the two middle entries, and the weighted form interpolates between the two entries that bracket half the weight mass. The `# Details` section carries a worked case of each.
-
-# Details
-
-  - The weighted case is not an order statistic. `Statistics.median(val, w)` is the weighted 0.5-quantile, so it **interpolates** between the two values that bracket half the weight mass. On `[1.0, 2.0, 3.0, 4.0]` with weights `[0.1, 0.2, 0.3, 0.4]` the result is `2.8333`, which is not an element of the input. The unweighted case, `w = nothing`, is the ordinary median and gives `2.5`.
+**Both forms are quantiles, and both interpolate.** Neither is an order statistic, so the result need not be an entry of ``\\boldsymbol{v}``. On a vector of even length the unweighted form averages the two middle entries, and the weighted form interpolates between the two entries that bracket half the weight mass. On ``\\boldsymbol{v} = [1, 2, 3, 4]`` the unweighted form gives ``2.5``, and the weighted form under ``\\boldsymbol{w} = [0.1, 0.2, 0.3, 0.4]`` gives ``2.8333``, which is not an entry of ``\\boldsymbol{v}``.
 
 # Fields
 
@@ -3220,8 +3207,8 @@ Algorithm for reducing a vector of real values to its maximum.
 
 Where:
 
-  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
-  - ``v_{i}``: Its ``i``-th entry, ``i = 1,\\ldots,n``.
+  - $(math_dict[:v_reduce])
+  - $(math_dict[:v_i_entry])
 
 The reduction carries no weights, so a weighted call gives the same value as an unweighted one.
 
@@ -3248,7 +3235,7 @@ struct MaxValue <: VectorToScalarMeasure end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for reducing a vector of real values to its optionally weighted standard deviation.
+Algorithm for reducing a vector of real values to its optionally weighted standard deviation. The unweighted default is safe and the weighted default is not: `corrected = true` under a plain `StatsBase.Weights` raises an `ArgumentError`, because that type declares no bias correction. Pass an `AnalyticWeights`, a `FrequencyWeights` or a `ProbabilityWeights`, or set `corrected = false`.
 
 # Mathematical definition
 
@@ -3260,15 +3247,10 @@ Algorithm for reducing a vector of real values to its optionally weighted standa
 
 Where:
 
-  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
+  - $(math_dict[:v_reduce])
   - ``\\mathrm{VarValue}(\\boldsymbol{v})``: The variance under the same `w` and the same `corrected`, whose four denominators [`VarValue`](@ref) states.
 
 `corrected` selects the denominator of the variance, and the square root carries that choice through. The unweighted default `corrected = true` divides by ``n - 1``.
-
-# Details
-
-  - **The unweighted default is safe; the weighted default is not.** `corrected = true` under a plain `StatsBase.Weights` raises an `ArgumentError`, because that type declares no bias correction. Pass an `AnalyticWeights`, a `FrequencyWeights` or a `ProbabilityWeights`, or set `corrected = false`. [`VarValue`](@ref) carries the four denominators.
-  - `mean` reaches `Statistics.std` through the keywords, which is how [`StandardisedValue`](@ref) makes the deviation be taken about the mean that its `mv` produced.
 
 # Fields
 
@@ -3310,8 +3292,8 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
 
   - [`VectorToScalarMeasure`](@ref)
   - [`MeanValue`](@ref)
-  - [`VarValue`](@ref)
-  - [`StandardisedValue`](@ref)
+  - [`VarValue`](@ref): the four denominators that `corrected` and the type of `w` select.
+  - [`StandardisedValue`](@ref): reaches `Statistics.std` with a `mean` keyword, which is how it makes the deviation be taken about the mean that its `mv` produced.
   - [`vec_to_real_measure`](@ref)
   - [`factory`](@ref)
   - [`obs_weights_view`](@ref)
@@ -3336,7 +3318,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for reducing a vector of real values to its optionally weighted variance.
+Algorithm for reducing a vector of real values to its optionally weighted variance. The weighted default raises: a plain `StatsBase.Weights` declares no bias correction, so `corrected = true` under it raises an `ArgumentError` rather than returning a value. Pass one of the three corrected weight types below, or set `corrected = false`.
 
 # Mathematical definition
 
@@ -3349,7 +3331,7 @@ Algorithm for reducing a vector of real values to its optionally weighted varian
 
 Where:
 
-  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
+  - $(math_dict[:v_reduce])
   - ``w_{i}``: The ``i``-th observation weight. The unweighted case is ``w_{i} = 1``.
   - ``\\bar{v}``: The mean of ``\\boldsymbol{v}`` under those weights.
   - ``d``: The denominator, which `corrected` and the **type** of `w` together select.
@@ -3363,10 +3345,7 @@ Where:
 
 With `corrected = false` every weighted case takes ``d = \\sum w_{i}``.
 
-# Details
-
-  - **The weighted default raises.** A plain `StatsBase.Weights` declares no bias correction, so the default `corrected = true` under it raises an `ArgumentError` rather than returning a value. Pass one of the three corrected weight types above, or set `corrected = false`.
-  - The correction is a property of the **weights type**, not of the weight values, so two numerically identical weight vectors of different types give different variances.
+``d`` is selected by the **type** of ``\\boldsymbol{w}`` and not by its values, so two numerically identical weight vectors of different types give different variances.
 
 # Fields
 
@@ -3446,8 +3425,8 @@ Algorithm for reducing a vector of real values to its sum.
 
 Where:
 
-  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
-  - ``v_{i}``: Its ``i``-th entry.
+  - $(math_dict[:v_reduce])
+  - $(math_dict[:v_i_entry])
 
 The reduction carries no weights. [`MeanValue`](@ref) is the weighted sum normalised by the total weight, so a weighted sum is that value multiplied by the total weight.
 
@@ -3485,8 +3464,8 @@ Algorithm for reducing a vector of real values to its product.
 
 Where:
 
-  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
-  - ``v_{i}``: Its ``i``-th entry.
+  - $(math_dict[:v_reduce])
+  - $(math_dict[:v_i_entry])
 
 The reduction carries no weights. One zero entry gives zero, and the product of many entries below one underflows, so this reduction is for a short vector of values near one.
 
@@ -3524,7 +3503,7 @@ Algorithm for reducing a vector of real values to its mode.
 
 Where:
 
-  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
+  - $(math_dict[:v_reduce])
   - ``u``: A value that ``\\boldsymbol{v}`` carries.
   - ``\\left| \\cdot \\right|``: The count of a set.
 
@@ -3552,7 +3531,7 @@ struct ModeValue <: VectorToScalarMeasure end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for reducing a vector of real values to its optionally weighted mean divided by its optionally weighted standard deviation.
+Algorithm for reducing a vector of real values to its optionally weighted mean divided by its optionally weighted standard deviation. A weighted [`factory`](@ref) call can make the reduction raise: `factory` replaces the `w` field of both `mv` and `sv` with the incoming [`ObsWeights`](@ref), and `sv` keeps its default `corrected = true`, which raises an `ArgumentError` under a plain `StatsBase.Weights`. Thread an `AnalyticWeights`, a `FrequencyWeights` or a `ProbabilityWeights`, or declare `sv = StdValue(; corrected = false)`.
 
 # Mathematical definition
 
@@ -3571,22 +3550,17 @@ Where:
   - ``\\tilde{\\sigma}``: The guarded denominator.
   - ``\\varepsilon``: Machine epsilon of the element type of ``\\hat{\\sigma}``.
 
+``\\hat{\\sigma}`` is undefined on a vector of one entry, because a corrected standard deviation needs two. The first case then gives ``\\tilde{\\sigma} = 1`` and ``z = \\hat{\\mu}``, so the reduction is defined on every non-empty vector.
+
 # Algorithm
 
  1. Reduce `val` with `mv`, giving `m`.
- 2. Reduce `val` with `sv`, and pass `m` as the `mean` keyword, giving `s`. The deviation is therefore always taken about the mean that step 1 produced.
+ 2. Reduce `val` with `sv`, and pass `m` as the `mean` keyword, giving `s`. The deviation is therefore always taken about the mean that step 1 produced, so weighting `mv` without weighting `sv` changes the denominator too.
  3. Guard `s`:
      1. `s` is `NaN`: replace it with `one(s)`.
-     2. `s` is an exact zero: replace it with `sqrt(eps(eltype(s)))`.
+     2. `s` is an exact zero: replace it with `sqrt(eps(eltype(s)))`. The test is an equality, so a small `s` is not guarded: on the constant vector `[2.0, 2.0, 2.0]` the result is `1.342e8`, which is `2 / sqrt(eps(Float64))`.
      3. Otherwise: keep `s`.
  4. Return `m / s`.
-
-# Details
-
-  - `sv` receives ``\\hat{\\mu}`` as its `mean` keyword, so the standard deviation is always taken about the mean that `mv` produced. Weighting `mv` without weighting `sv` therefore changes the denominator too.
-  - The zero guard fires on an **exact** zero only, not on a small denominator. On the constant vector `[2.0, 2.0, 2.0]` the result is `1.342e8`, which is `2 / sqrt(eps(Float64))`.
-  - A one-value vector has no corrected standard deviation, so ``\\hat{\\sigma}`` is `NaN`. The denominator is then ``1`` and the result is the mean itself. This makes the reduction defined on every non-empty vector.
-  - **A weighted `factory` call can make the reduction raise.** [`factory`](@ref) replaces the `w` field of both `mv` and `sv` with the incoming [`ObsWeights`](@ref), and `sv` keeps its default `corrected = true`. Under a plain `StatsBase.Weights` that combination raises an `ArgumentError`. Thread an `AnalyticWeights`, a `FrequencyWeights` or a `ProbabilityWeights`, or declare `sv = StdValue(; corrected = false)`. [`VarValue`](@ref) carries the four denominators.
 
 # Fields
 
@@ -3656,7 +3630,7 @@ Reduce a vector of real values to a single real value using a specified measure.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. `measure` names the reduction, and the type parameter of a weighted measure names the branch.
+The method that Julia selects is the algorithm. `measure` names the reduction, and the type parameter of a weighted measure names the branch, `MeanValue{Nothing}` against `MeanValue{<:ObsWeights}`, so the branch is chosen at compile time and the field is never tested at run time.
 
  1. `measure` is a `Number`: return it, and read nothing of `val`.
  2. `measure` is a `Function`: return `measure(val)`.
@@ -3676,18 +3650,13 @@ Step 1 is the case that makes a plain number a legal `measure`: a caller that al
       + `::Number`: The value to return, whatever `val` holds.
       + `::Function`: Applied to `val` directly, as `measure(val)`.
 
-  - `val`: A vector or tuple of real values to be reduced. It is ignored when `measure` is a `Number`.
+  - `val`: A vector or tuple of real values to be reduced. A tuple is accepted wherever a vector is, and the weighted reductions `collect` it first, because `Statistics` needs an `AbstractVector` beside its weights. It is ignored when `measure` is a `Number`.
 
   - `kwargs...`: Forwarded to the underlying reduction. Only the [`StdValue`](@ref) and [`VarValue`](@ref) reductions read them.
 
 # Returns
 
   - `score::Number`: Computed value according to `measure`.
-
-# Details
-
-  - A tuple is accepted wherever a vector is. The weighted reductions `collect` it first, because `Statistics` needs an `AbstractVector` beside its weights.
-  - The weighted reductions dispatch on the **type parameter** of the measure, `MeanValue{Nothing}` against `MeanValue{<:ObsWeights}`, so the branch is chosen at compile time and the field is never tested at run time.
 
 # Examples
 

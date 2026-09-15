@@ -6,7 +6,7 @@
     and once on their negation. `set_range_risk_constraints!` reads the pair from
     `range_tails`, builds each tail, and registers only their sum.
 
-    The throwing fallback at `src/19_RiskMeasures/01_Base_RiskMeasures.jl:227` enforces
+    The throwing fallback at `src/16_RiskMeasures/01_Base_RiskMeasures.jl:227` enforces
     ONE direction of that rule. A non-fused range that forgets `range_tails` throws the
     first time it is used. It cannot enforce the other direction: a FUSED range that
     wrongly declared `range_tails` would be decomposed and double-counted, and nothing
@@ -48,7 +48,7 @@
     `range_tails`. The reason is written per entry, because "it throws" is not a reason.
 
       - `Range` writes `wr_risk - br_risk` directly in
-        `20_RiskMeasureConstraints/16_RangeConstraints.jl:47`. It never reaches
+        `09_RiskMeasureConstraints/14_RangeConstraints.jl:47`. It never reaches
         `set_range_risk_constraints!`, so there is no pair to state.
       - `ValueatRiskRange` under `DistributionValueatRisk` is parametric: the two tails are
         two quantiles of one fitted distribution, not two separate measures.
@@ -121,7 +121,7 @@
             with ONE documented exception. `GenericValueatRiskRange` is the range whose
             tails are GIVEN rather than derived: the caller states both measures, and the
             constructor keeps their `ub` on purpose, "so a caller can bound one tail"
-            (`21_GenericValueatRiskRange.jl:151`). Its default tails carry no bound, so the
+            (`18_GenericValueatRiskRange.jl:151`). Its default tails carry no bound, so the
             assertion below still bites on the shipped value; what it must not do is forbid
             a bound the design admits.
             =#

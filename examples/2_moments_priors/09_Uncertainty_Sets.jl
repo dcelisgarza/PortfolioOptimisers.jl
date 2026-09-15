@@ -159,6 +159,13 @@ mean set couples the assets through the joint estimation geometry, so no single 
 in isolation and the worst-case allocation spreads out toward a near-equal-weight portfolio. The
 lesson: "box vs ellipsoid" does not map to "concentrated vs diversified" in the abstract — it
 depends on whether you are making the *mean* or the *covariance* robust.
+
+!!! note "Both worst-case-mean books here sit on the ratio's scale floor"
+    At these radii no portfolio's worst-case return beats `rf`, so the ratio is non-positive
+    everywhere and there is no tangency portfolio to find. [`MaximumRatio`](@ref) answers at its
+    scale floor `kmin` rather than on the degenerate ray, which is why the weights above respect
+    their constraints; read them as "the best worst-case return at that scale", not as a
+    worst-case tangency portfolio. The nominal book above is unaffected — it has a real one.
 =#
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Nominal" => ret_nom.w,

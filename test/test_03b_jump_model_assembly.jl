@@ -21,6 +21,7 @@
         attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
         model = JuMP.Model()
         PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
+        PO.set_model_observations!(model, size(attrs.pr.X, 1))
         # Reach the head's own seams, not a copy of them: `set_maximum_ratio_factor_variables!`
         # takes exactly one objective, and the budget group travels as `mr.opt`. A hand-copied
         # call used to pass three arguments here and to name `bgt`/`sbgt` alone, so the

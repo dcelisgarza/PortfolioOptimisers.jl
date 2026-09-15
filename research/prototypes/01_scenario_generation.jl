@@ -187,7 +187,7 @@ stationary, which is the property the fixed-block bootstrap lacks.
     produced. That last property is a limit, not a feature: a stress test
     built on it cannot go beyond the worst day in the sample.
   - The library already uses this algorithm for uncertainty sets. See
-    `src/14_UncertaintySets/04_BootstrapUncertaintySets.jl`. What is absent is
+    `src/11_UncertaintySets/04_BootstrapUncertaintySets.jl`. What is absent is
     the use of it as a returns generator.
 """
 struct StationaryBootstrapScenarios{T <: Real} <: AbstractScenarioAlgorithm

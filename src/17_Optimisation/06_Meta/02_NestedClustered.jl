@@ -1,0 +1,867 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for [`NestedClustered`](@ref).
+
+`clr` holds the clustering the algorithm found, and `resi` holds one intra-cluster optimisation per cluster, in cluster order. `reso` is the inter-cluster optimisation over the synthetic universe those clusters define, so `reso.w` has one entry per cluster rather than one per asset. `w` is the product of the two.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    NestedClusteredResult(;
+        pr::Option{<:AbstractPriorResult},
+        clr::Option{<:AbstractClusteringResult},
+        wb::Option{<:WeightBounds},
+        fees::Option{<:Fees},
+        resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+        reso::OptimisationResult,
+        cv::Option{<:OptimisationCrossValidation},
+        retcode::OptRetCode_VecOptRetCode,
+        w::VecNum_VecVecNum,
+        imsk::Option{<:BitVector} = nothing,
+        fb::Option{<:OptE_Opt_FbChain}
+    ) -> NestedClusteredResult
+
+Keywords correspond to the struct's fields.
+
+The keyword constructor is the one door `_optimise` exits through, so it is where the aggregated weights expand back onto the full asset universe, through [`expand_investable_weights`](@ref). The positional constructor never expands: [`set_retcode`](@ref) rebuilds through it, and a second pass would expand twice. `pr`, `clr`, `wb`, `fees` and every member of `resi` are the objects of the reduced universe, because that is what the algorithm ran on.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`StackingResult`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`expand_investable_weights`](@ref)
+
+# References
+
+  - $(ref_dict[:lopezdeprado2019robust])
+  - $(ref_dict[:mlp1]) Chapter 7.
+  - $(ref_dict[:cajas2025]) Section 12.3.
+"""
+@concrete struct NestedClusteredResult <: NonJuMPOptimisationResult
+    """
+    $(field_dict[:pr])
+    """
+    pr
+    """
+    $(field_dict[:clr])
+    """
+    clr
+    """
+    $(field_dict[:wb])
+    """
+    wb
+    """
+    $(field_dict[:fees])
+    """
+    fees
+    """
+    $(field_dict[:resi])
+    """
+    resi
+    """
+    $(field_dict[:reso])
+    """
+    reso
+    """
+    $(field_dict[:cv])
+    """
+    cv
+    """
+    $(field_dict[:retcode])
+    """
+    retcode
+    """
+    Final aggregated portfolio weights.
+    """
+    w
+    """
+    $(field_dict[:imsk])
+    """
+    imsk
+    """
+    $(field_dict[:fb_res])
+    """
+    fb
+    function NestedClusteredResult(pr::Option{<:AbstractPriorResult},
+                                   clr::Option{<:AbstractClusteringResult},
+                                   wb::Option{<:WeightBounds}, fees::Option{<:Fees},
+                                   resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+                                   reso::OptimisationResult,
+                                   cv::Option{<:OptimisationCrossValidation},
+                                   retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
+                                   imsk::Option{<:BitVector},
+                                   fb::Option{<:OptE_Opt_FbChain})
+        return new{typeof(pr), typeof(clr), typeof(wb), typeof(fees), typeof(resi),
+                   typeof(reso), typeof(cv), typeof(retcode), typeof(w), typeof(imsk),
+                   typeof(fb)}(pr, clr, wb, fees, resi, reso, cv, retcode, w, imsk, fb)
+    end
+end
+function NestedClusteredResult(; pr::Option{<:AbstractPriorResult},
+                               clr::Option{<:AbstractClusteringResult},
+                               wb::Option{<:WeightBounds}, fees::Option{<:Fees},
+                               resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+                               reso::OptimisationResult,
+                               cv::Option{<:OptimisationCrossValidation},
+                               retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
+                               imsk::Option{<:BitVector} = nothing,
+                               fb::Option{<:OptE_Opt_FbChain})::NestedClusteredResult
+    return NestedClusteredResult(pr, clr, wb, fees, resi, reso, cv, retcode,
+                                 expand_investable_weights(imsk, w), imsk, fb)
+end
+# The nested-clustered family carries the mask on the result itself, so the fold reads it
+# directly. The inner results are of the reduced universe, so the outer mask is the one the
+# fold scores against.
+function result_investable_mask(res::NestedClusteredResult)
+    return res.imsk
+end
+"""
+    set_retcode(res::NestedClusteredResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`NestedClusteredResult`](@ref) with a different return code.
+
+The result carries one return code per member of the population, so a member is dropped by failing its own entry. Every other member of the record is carried over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`NestedClusteredResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`NestedClusteredResult`](@ref)
+"""
+function set_retcode(res::NestedClusteredResult, retcode::OptRetCode_VecOptRetCode)
+    return NestedClusteredResult(res.pr, res.clr, res.wb, res.fees, res.resi, res.reso,
+                                 res.cv, retcode, res.w, res.imsk, res.fb)
+end
+"""
+    assert_internal_optimiser(opt)
+
+Assert that the inner (cluster-level) optimiser is valid for use in NCO.
+
+Checks that the inner optimiser does not use pre-computed prior results or regression results, since these must be re-estimated for each cluster during NCO.
+
+# Arguments
+
+  - `opt`: Inner optimisation estimator.
+
+# Returns
+
+  - `nothing` on success; throws an `ArgumentError` otherwise.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+"""
+function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)::Nothing
+    @argcheck(!isa(opt.opt.cle, AbstractClusteringResult),
+              ArgumentError("opt.opt.cle cannot be a precomputed AbstractClusteringResult; use an estimator instead"))
+    return nothing
+end
+"""
+    assert_rc_variance(opt)
+
+Assert that the optimiser does not use variance risk contribution for NCO outer optimisation.
+
+Checks that risk budgeting-based JuMP optimisers do not use variance for risk contribution when used as the outer optimiser in NCO.
+
+# Arguments
+
+  - `opt`: Optimisation estimator.
+
+# Returns
+
+  - `nothing` on success; throws an `ArgumentError` otherwise.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`assert_external_optimiser`](@ref)
+"""
+function assert_rc_variance(::Any)::Nothing
+    return nothing
+end
+function assert_rc_variance(opt::RiskJuMPOptimisationEstimator)::Nothing
+    if isa(opt.r, Variance)
+        @argcheck(!isa(opt.r.rc, LinearConstraint),
+                  "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
+    elseif isa(opt.r, AbstractVector) && any(x -> isa(x, Variance), opt.r)
+        idx = findall(x -> isa(x, Variance), opt.r)
+        @argcheck(!any(x -> isa(x.rc, LinearConstraint), view(opt.r, idx)),
+                  "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
+    end
+    return nothing
+end
+"""
+    assert_rc_pl(opt)
+
+Assert that the optimiser does not use phylogeny risk contribution for NCO outer optimisation.
+
+Checks that factor risk contribution optimisers do not use phylogeny-based constraints when used as the outer optimiser in NCO.
+
+# Arguments
+
+  - `opt`: Optimisation estimator.
+
+# Returns
+
+  - `nothing` on success; throws an `ArgumentError` otherwise.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`assert_external_optimiser`](@ref)
+"""
+function assert_rc_pl(::Any)::Nothing
+    return nothing
+end
+function assert_rc_pl(opt::FactorRiskContribution)::Nothing
+    @argcheck(!isa(opt.frc_ple, AbstractPhylogenyConstraintResult) &&
+              !(isa(opt.frc_ple, AbstractVector) &&
+                any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.frc_ple)),
+              ArgumentError("opt.frc_ple cannot be a precomputed AbstractPhylogenyConstraintResult in NCO outer optimiser; use an estimator instead"))
+    return nothing
+end
+function assert_internal_optimiser(opt::JuMPOptimisationEstimator)::Nothing
+    assert_rc_variance(opt)
+    assert_rc_pl(opt)
+    @argcheck(!(isa(opt.opt.lcse, LinearConstraint) ||
+                isa(opt.opt.lcse, AbstractVector) &&
+                any(x -> isa(x, LinearConstraint), opt.opt.lcse)),
+              ArgumentError("opt.opt.lcse cannot be a LinearConstraint in NCO inner optimiser"))
+    @argcheck(!(isa(opt.opt.cte, LinearConstraint) ||
+                isa(opt.opt.cte, AbstractVector) &&
+                any(x -> isa(x, LinearConstraint), opt.opt.cte)),
+              ArgumentError("opt.opt.cte cannot be a LinearConstraint in NCO inner optimiser"))
+    @argcheck(!isa(opt.opt.gcarde, LinearConstraint),
+              ArgumentError("opt.opt.gcarde cannot be a LinearConstraint in NCO inner optimiser"))
+    @argcheck(!(isa(opt.opt.sgcarde, LinearConstraint) ||
+                isa(opt.opt.sgcarde, AbstractVector) &&
+                any(x -> isa(x, LinearConstraint), opt.opt.sgcarde)),
+              ArgumentError("opt.opt.sgcarde cannot be a LinearConstraint in NCO inner optimiser"))
+    @argcheck(!isa(opt.opt.ple, AbstractPhylogenyConstraintResult) &&
+              !(isa(opt.opt.ple, AbstractVector) &&
+                any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.ple)),
+              ArgumentError("opt.opt.ple cannot be a precomputed AbstractPhylogenyConstraintResult in NCO inner optimiser; use an estimator instead"))
+    return nothing
+end
+function assert_internal_optimiser(opt::VecOptE_Opt_TD)::Nothing
+    assert_internal_optimiser.(opt)
+    return nothing
+end
+"""
+    assert_external_optimiser(opt)
+
+Assert that the outer optimiser is valid for use in NCO.
+
+Checks that the outer optimiser does not use pre-computed prior results, regression results, or unsupported variance/phylogeny risk contribution configurations.
+
+# Arguments
+
+  - `opt`: Outer optimisation estimator.
+
+# Returns
+
+  - `nothing` on success; throws an `ArgumentError` otherwise.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+"""
+function assert_external_optimiser(opt::ClusteringOptimisationEstimator)::Nothing
+    assert_internal_optimiser(opt)
+    return nothing
+end
+"""
+    stated_constraint_space_basis(space::FactorSpace) -> Bool
+    stated_constraint_space_basis(ece::ExposureConstraintEstimator) -> Bool
+    stated_constraint_space_basis(lcse::AbstractVector) -> Bool
+    stated_constraint_space_basis(::Any) -> Bool
+
+Report whether anything in an `lcse` slot carries a **precomputed** basis, so an outer optimiser can refuse it.
+
+A stated basis is asset-indexed data written before the universe was known. An inner solve slices the universe, and [`port_opt_view`](@ref) slices the basis with it, so a stated basis is legal there. An outer solve *replaces* the universe with cluster names, and no slice of asset loadings follows that — so it must be refused, in the same shape as the refusals on `opt.re` and `opt.rba.re`.
+
+The predicate is `false` for everything else, including a space whose `re` is an *estimator*: an estimator refits against whatever universe it is handed, which is exactly what makes it the remedy the message names.
+
+# Related
+
+  - [`assert_external_optimiser`](@ref)
+  - [`FactorSpace`](@ref)
+  - [`ExposureConstraintEstimator`](@ref)
+"""
+function stated_constraint_space_basis(space::FactorSpace)::Bool
+    return isa(space.re, AbstractLoadingsRegressionResult)
+end
+function stated_constraint_space_basis(::Any)::Bool
+    return false
+end
+function stated_constraint_space_basis(ece::ExposureConstraintEstimator)::Bool
+    return stated_constraint_space_basis(ece.space)
+end
+function stated_constraint_space_basis(lcse::AbstractVector)::Bool
+    return any(stated_constraint_space_basis, lcse)
+end
+"""
+    assert_external_lcse(opt) -> Nothing
+
+Assert that an outer optimiser's `lcse` slot carries no precomputed basis.
+
+Factored out because the three JuMP-side [`assert_external_optimiser`](@ref) methods all need it and already share the precomputed-prior refusal. See [`stated_constraint_space_basis`](@ref) for why an outer solve refuses what an inner one views.
+
+# Related
+
+  - [`assert_external_optimiser`](@ref)
+  - [`stated_constraint_space_basis`](@ref)
+"""
+function assert_external_lcse(opt)::Nothing
+    @argcheck(!stated_constraint_space_basis(opt.opt.lcse),
+              ArgumentError("a constraint space in opt.opt.lcse cannot hold a precomputed AbstractLoadingsRegressionResult in re; use an estimator instead. The outer problem replaces the asset universe with cluster names, so stated loadings cannot be sliced to follow it, and a row re-based through them would name assets that no longer exist"))
+    return nothing
+end
+function assert_external_optimiser(opt::JuMPOptimisationEstimator)::Nothing
+    #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
+              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    assert_external_lcse(opt)
+    assert_internal_optimiser(opt)
+    return nothing
+end
+"""
+    const RiskBudgetingOptimiser = Union{<:RiskBudgeting, <:RelaxedRiskBudgeting}
+
+Alias for risk budgeting JuMP optimisers.
+
+Matches either [`RiskBudgeting`](@ref) or [`RelaxedRiskBudgeting`](@ref). Used for dispatch in NCO validation and constraint generation.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
+"""
+const RiskBudgetingOptimiser = Union{<:RiskBudgeting, <:RelaxedRiskBudgeting}
+function assert_external_optimiser(opt::RiskBudgetingOptimiser)::Nothing
+    #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
+              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    if isa(opt.rba, FactorRiskBudgeting)
+        @argcheck(!isa(opt.rba.re, AbstractLoadingsRegressionResult),
+                  ArgumentError("opt.rba.re cannot be a precomputed AbstractLoadingsRegressionResult; use an estimator instead"))
+    end
+    assert_external_lcse(opt)
+    assert_internal_optimiser(opt)
+    return nothing
+end
+function assert_external_optimiser(opt::FactorRiskContribution)::Nothing
+    #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
+              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    @argcheck(!isa(opt.re, AbstractLoadingsRegressionResult),
+              ArgumentError("opt.re cannot be a precomputed AbstractLoadingsRegressionResult; use an estimator instead"))
+    assert_external_lcse(opt)
+    assert_internal_optimiser(opt)
+    return nothing
+end
+function assert_external_optimiser(opt::VecOptE_Opt_TD)::Nothing
+    assert_external_optimiser.(opt)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Nested Clustered Optimisation (NCO) portfolio optimiser.
+
+`NestedClustered` implements the Nested Clustered Optimisation algorithm. It first clusters assets, then solves a within-cluster (inner) optimisation for each cluster independently, and finally solves an across-cluster (outer) optimisation to combine the cluster portfolios into a final portfolio.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    NestedClustered(;
+        pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
+        cle::TD{<:ClE_Cl} = ClustersEstimator(),
+        wb::TD_Option{<:WbE_Wb} = nothing,
+        fees::TD_Option{<:FeesE_Fees} = nothing,
+        sets::TD_Option{<:UniverseSets} = nothing,
+        opti::OptE_TD,
+        opto::OptE_TD,
+        cv::Option{<:OptimisationCrossValidation} = nothing,
+        wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+        fb::TDO_Option{<:OptE_Opt} = nothing,
+        brt::Bool = false,
+        x_src::Symbol = :prior,
+        strict::Bool = false,
+        cache::Option{<:ReturnsBufferState} = nothing
+    ) -> NestedClustered
+
+Keywords correspond to the struct's fields.
+
+## Time-dependent fields
+
+`pe`, `cle`, `wb`, `fees`, `sets`, `wf`, `opti`, `opto` and `fb` may hold a [`TimeDependent`](@ref) per-fold schedule. `opto` and `fb` are `bind = :outermost` only — no inner fold loop consumes them. `opti` additionally admits `bind = :nearest`: the inner cross-validation is entered per cluster (`cross_val_predict(opti, …; cols = cl)`), so the field itself is the inner fold loop's entry point and a `:nearest` schedule is consumed there, per cluster. A `:nearest` `opti` schedule requires an explicit `default` and `cv !== nothing` at construction (see [`assert_nearest_optimiser_schedule`](@ref)) because the per-cluster optimise leg always resolves it fold-lessly to its `default`. `cv` itself stays static: it *is* the inner fold loop, not part of the per-fold problem definition, and the `:nearest` construction checks must be able to inspect it.
+
+Schedule entries for `opti`/`opto` must be estimators, like the static fields: a vector schedule holding a precomputed result is rejected at construction by the entry substitution pass.
+
+## Validation
+
+  - `x_src in (:prior, :data)`.
+  - `opto` must pass `assert_external_optimiser` and `assert_special_nco_requirements` (schedules delegate to their entries and `default`).
+  - If `opti !== opto`: `opti` must pass `assert_internal_optimiser` and `assert_special_nco_requirements`.
+  - If `cv` is provided: `opti` must also pass `assert_external_optimiser` and `assert_special_nco_requirements`.
+  - `opto` and `fb` schedules: `bind !== :nearest`. A `bind = :nearest` `opti` schedule: explicit `default` and `cv !== nothing`.
+
+# Mathematical definition
+
+Let clusters ``C_1, \\ldots, C_K`` partition the ``N`` assets. The NCO algorithm:
+
+ 1. **Inner**: for each cluster ``k``, solve ``\\boldsymbol{w}_{C_k} = \\mathrm{opti}(\\mathbf{X}_{C_k})`` (sub-portfolio weights within ``C_k``).
+ 2. **Outer**: form a ``T \\times K`` synthetic returns matrix from cluster portfolios and solve ``\\boldsymbol{a} = \\mathrm{opto}(\\mathbf{X}_{\\mathrm{cluster}})`` (allocation across clusters).
+ 3. **Combine**: ``w_i = a_k \\cdot w_{C_k, i}`` for ``i \\in C_k``.
+
+Step 1 is the book's *intra-cluster asset allocation* and step 2 its *inter-cluster asset allocation*. The combined weights then pass through `wf` and `wb` (see [`finalise_weight_bounds`](@ref)), which is what the result's `w` and `retcode` carry.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `fees`: Recursively updated via [`factory`](@ref).
+  - `opti`: Recursively updated via [`factory`](@ref).
+  - `opto`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+`NestedClustered` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the returns matrix `X` as its third argument. When `pe` already holds a prior **result**, the method replaces `X` with `pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
+  - `pe`, `wb`, `fees` and `sets` recurse through [`port_opt_view`](@ref) with the index alone.
+  - `opti` and `opto` recurse with that matrix.
+  - `cle` and the remaining fields are carried through unchanged.
+
+# Related
+
+  - [`optimise`](@ref)
+  - [`NestedClusteredResult`](@ref)
+  - [`ClusteringOptimisationEstimator`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`Stacking`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:lopezdeprado2019robust])
+  - $(ref_dict[:mlp1]) Chapter 7.
+  - $(ref_dict[:cajas2025]) Section 12.3.
+"""
+@propagatable @concrete struct NestedClustered <: ClusteringOptimisationEstimator
+    """
+    $(field_dict[:pe])
+    """
+    pe
+    """
+    $(field_dict[:cle])
+    """
+    cle
+    """
+    $(field_dict[:wb_jmp])
+    """
+    wb
+    """
+    $(field_dict[:feese])
+    """
+    @fprop fees
+    """
+    $(field_dict[:sets])
+    """
+    sets
+    """
+    $(field_dict[:opti])
+    """
+    @fprop opti
+    """
+    $(field_dict[:opto])
+    """
+    @fprop opto
+    """
+    $(field_dict[:cv])
+    """
+    cv
+    """
+    $(field_dict[:wf])
+    """
+    wf
+    """
+    $(field_dict[:ex])
+    """
+    ex
+    """
+    $(field_dict[:fb])
+    """
+    @fprop fb
+    """
+    $(field_dict[:brt])
+    """
+    brt
+    """
+    $(field_dict[:x_src])
+    """
+    x_src
+    """
+    $(field_dict[:strict_opt])
+    """
+    strict
+    """
+    $(field_dict[:cache_opt])
+    """
+    @fprop cache
+    function NestedClustered(pe::Onl{<:TD{<:PrE_Pr}}, cle::TD{<:ClE_Cl},
+                             wb::TD_Option{<:WbE_Wb}, fees::TD_Option{<:FeesE_Fees},
+                             sets::TD_Option{<:UniverseSets}, opti::OptE_TD, opto::OptE_TD,
+                             cv::Option{<:OptimisationCrossValidation},
+                             wf::TD{<:WeightFinaliser}, ex::FLoops.Transducers.Executor,
+                             fb::TDO_Option{<:OptE_Opt}, brt::Bool, x_src::Symbol,
+                             strict::Bool, cache::Option{<:ReturnsBufferState})
+        assert_source_selector(x_src, :x_src)
+        assert_nearest_optimiser_schedule(opti, :opti, cv, :NestedClustered)
+        assert_no_nearest_bind_optimiser_schedule(opto, :opto, :NestedClustered)
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :NestedClustered)
+        assert_external_optimiser(opto)
+        assert_special_nco_requirements(opto)
+        if !(opti === opto)
+            assert_internal_optimiser(opti)
+            assert_special_nco_requirements(opti)
+        end
+        if !isnothing(cv)
+            assert_external_optimiser(opti)
+        end
+        if isa(wb, WeightBoundsEstimator)
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
+        end
+        if isa(fees, FeesEstimator)
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
+        end
+        assert_time_dependent_substitution(NestedClustered,
+                                           (; pe, cle, wb, fees, sets, opti, opto, cv, wf,
+                                            ex, fb, brt, x_src, strict),
+                                           nested_clustered_td_defaults())
+        return new{typeof(pe), typeof(cle), typeof(wb), typeof(fees), typeof(sets),
+                   typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
+                   typeof(fb), typeof(brt), typeof(x_src), typeof(strict), typeof(cache)}(pe,
+                                                                                          cle,
+                                                                                          wb,
+                                                                                          fees,
+                                                                                          sets,
+                                                                                          opti,
+                                                                                          opto,
+                                                                                          cv,
+                                                                                          wf,
+                                                                                          ex,
+                                                                                          fb,
+                                                                                          brt,
+                                                                                          x_src,
+                                                                                          strict,
+                                                                                          cache)
+    end
+end
+function NestedClustered(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
+                         cle::TD{<:ClE_Cl} = ClustersEstimator(),
+                         wb::TD_Option{<:WbE_Wb} = nothing,
+                         fees::TD_Option{<:FeesE_Fees} = nothing,
+                         sets::TD_Option{<:UniverseSets} = nothing, opti::OptE_TD,
+                         opto::OptE_TD, cv::Option{<:OptimisationCrossValidation} = nothing,
+                         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                         fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
+                         x_src::Symbol = :prior, strict::Bool = false,
+                         cache::Option{<:ReturnsBufferState} = nothing)
+    return NestedClustered(pe, cle, wb, fees, sets, opti, opto, cv, wf, ex, fb, brt, x_src,
+                           strict, cache)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`NestedClustered`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref). The optimiser-valued fields `opti` and `opto` are required and have no static default, so they are marked [`NoDefault`](@ref): a schedule there must carry its own `default` to be usable outside a fold loop. `pe`, `cle` and `wf` reset to their keyword defaults; fields whose static default is `nothing` (`wb`, `fees`, `sets`, `fb`) are omitted.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function nested_clustered_td_defaults()::NamedTuple
+    return (; pe = EmpiricalPrior(), cle = ClustersEstimator(), opti = NoDefault(),
+            opto = NoDefault(), wf = IterativeWeightFinaliser())
+end
+function time_dependent_field_defaults(::NestedClustered)::NamedTuple
+    return nested_clustered_td_defaults()
+end
+function inner_fold_fields(::NestedClustered)::Tuple
+    return (:opti,)
+end
+function assert_internal_optimiser(opt::NestedClustered)::Nothing
+    @argcheck(!isa(opt.cle, AbstractClusteringResult),
+              ArgumentError("opt.cle cannot be a precomputed AbstractClusteringResult; use an estimator instead"))
+    assert_external_optimiser(opt.opto)
+    if !(opt.opti === opt.opto)
+        assert_internal_optimiser(opt.opti)
+    end
+    return nothing
+end
+function assert_external_optimiser(opt::NestedClustered)::Nothing
+    #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
+    @argcheck(!isa(opt.pe, AbstractPriorResult),
+              ArgumentError("opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    @argcheck(!isa(opt.cle, AbstractClusteringResult),
+              ArgumentError("opt.cle cannot be a precomputed AbstractClusteringResult; use an estimator instead"))
+    assert_external_optimiser(opt.opto)
+    if !(opt.opti === opt.opto)
+        assert_internal_optimiser(opt.opti)
+    end
+    if !isnothing(opt.cv)
+        assert_external_optimiser(opt.opti)
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any sub-estimator of `opt` requires previous portfolio weights (fees, inner optimiser, outer optimiser, or fallback).
+"""
+function needs_previous_weights(opt::NestedClustered)
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.fees) ||
+            needs_previous_weights(opt.opti) ||
+            needs_previous_weights(opt.opto) ||
+            needs_previous_weights(opt.fb))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if the inner optimiser, outer optimiser, or fallback carries time-dependent constraints.
+"""
+function is_time_dependent(opt::NestedClustered)
+    return (!isempty(time_dependent_fields(opt)) ||
+            is_time_dependent(opt.opti) ||
+            is_time_dependent(opt.opto) ||
+            is_time_dependent(opt.fb))
+end
+function assert_time_dependent_fold_count(opt::NestedClustered, n::Integer,
+                                          all_binds::Bool = true)::Nothing
+    assert_time_dependent_fields_fold_count(opt, n, all_binds)
+    assert_time_dependent_fold_count(opt.opti, n, false)
+    assert_time_dependent_fold_count(opt.opto, n, all_binds)
+    assert_time_dependent_fold_count(opt.fb, n, all_binds)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner optimiser, outer optimiser, and fallback.
+"""
+function update_time_dependent_estimator(opt::NestedClustered, ctx::TimeDependentContext,
+                                         all_binds::Bool = true)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    opt = update_time_dependent_fields(opt, ctx, all_binds)
+    return rebuild_estimator(opt,
+                             (;
+                              opti = update_time_dependent_estimator(opt.opti, ctx, false),
+                              opto = update_time_dependent_estimator(opt.opto, ctx,
+                                                                     all_binds),
+                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Replace this meta-optimiser's own time-dependent fields with their static defaults.
+
+Deliberately does **not** recurse into the wrapped optimisers: a standalone meta solve consumes inner per-fold schedules through its inner cross-validation leg, and its fold-less full-window inner solves reset themselves at their own `_optimise` seam. Only the meta's own fields (applied to the combined weights, resolved by an outer fold loop when one exists) are inert here. A `bind = :nearest` schedule in a field the meta hands across its own inner fold loop (see [`inner_fold_fields`](@ref)) is likewise left in place — resetting it here would replace it with its `default` before the inner cross-validation ever saw it.
+"""
+function reset_time_dependent_estimator(opt::NestedClustered)
+    return reset_time_dependent_fields(opt)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a cluster-sliced copy of [`NestedClustered`](@ref) for asset index set `i` and returns matrix `X`.
+"""
+function port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
+    X = isa(nco.pe, AbstractPriorResult) ? nco.pe.X : X
+    pe = port_opt_view(nco.pe, i)
+    wb = port_opt_view(nco.wb, i)
+    fees = port_opt_view(nco.fees, i, X)
+    sets = port_opt_view(nco.sets, i)
+    opti = port_opt_view(nco.opti, i, X)
+    opto = port_opt_view(nco.opto, i, X)
+    return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, fees = fees, sets = sets,
+                           opti = opti, opto = opto, cv = nco.cv, wf = nco.wf, ex = nco.ex,
+                           fb = nco.fb, brt = nco.brt, x_src = nco.x_src,
+                           strict = nco.strict, cache = port_opt_view(nco.cache, i))
+end
+function non_investable_universe(nco::NestedClustered, ni::VecStr)::NestedClustered
+    return rebuild_estimator(nco, (; sets = non_investable_sets(nco.sets, ni)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Align the outer optimiser's asset sets with the synthetic universe produced by the inner optimisations.
+
+The outer optimiser of a [`NestedClustered`](@ref) does not see the original assets. It sees one synthetic asset per cluster, whose names are carried by the outer returns result `rdo`. An outer optimiser configured with [`UniverseSets`](@ref) built over the original universe would therefore resolve its constraints against the wrong names, so the sets are rebuilt over the cluster names before the outer solve.
+
+# Arguments
+
+  - `nco::NestedClustered`: The nested clustered optimiser.
+  - `rdo::ReturnsResult`: Outer returns result, whose `nx` holds the cluster names.
+
+# Returns
+
+  - `nco::NestedClustered`: Instance with the outer optimiser's asset sets rebuilt over `rdo.nx`, or `nco` unchanged when it has no outer asset sets, or they already match.
+
+# Details
+
+  - Handles both shapes of outer optimiser: one that nests its own optimiser (`nco.opto.opt.sets`) and one that carries the sets directly (`nco.opto.sets`).
+  - The dictionary is copied before being reset, so the caller's [`UniverseSets`](@ref) is not mutated.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`UniverseSets`](@ref)
+  - [`predict_outer_returns`](@ref)
+"""
+function _update_asset_sets(nco::NestedClustered, rdo::ReturnsResult)
+    return if (hasproperty(nco.opto, :opt) &&
+               hasproperty(nco.opto.opt, :sets) &&
+               !isnothing(nco.opto.opt.sets) &&
+               get(nco.opto.opt.sets.dict, nco.opto.opt.sets.xkey, nothing) !== rdo.nx)
+        ndict = copy(nco.opto.opt.sets.dict)
+        ndict[nco.opto.opt.sets.xkey] = rdo.nx
+        Accessors.@reset nco.opto.opt.sets.dict = ndict
+    elseif (hasproperty(nco.opto, :sets) &&
+            !isnothing(nco.opto.sets) &&
+            get(nco.opto.sets.dict, nco.opto.sets.xkey, nothing) !== rdo.nx)
+        ndict = copy(nco.opto.sets.dict)
+        ndict[nco.opto.sets.xkey] = rdo.nx
+        Accessors.@reset nco.opto.sets.dict = ndict
+    else
+        nco
+    end
+end
+function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
+                   branchorder::Symbol = :optimal, str_names::Bool = false,
+                   save::Bool = true, kwargs...)
+    nco = reset_time_dependent_estimator(nco)
+    rd = returns_result_picker(rd, nco.brt)
+    pr = prior(nco.pe, rd; dims = dims)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # A name stated over that universe must not be refused because the data delisted the
+    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
+    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # resolved fee on the axes the mask leaves.
+    imsk = investable_mask(pr)
+    fees = investable_fees_view(fees_constraints(nco.fees, nco.sets;
+                                                 datatype = eltype(pr.X),
+                                                 strict = nco.strict), imsk, pr.X)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here, so
+    # that no cluster holds a non-investable asset and every cluster slice below indexes
+    # the reduced axis. The weights are expanded back in `NestedClusteredResult`.
+    # The reduced carrier takes a name of its own. `rd` is assigned twice above, and a
+    # variable that is reassigned and then captured by the fold's closure is boxed, which
+    # FLoops reports as a correctness and performance problem on every call.
+    _, pr, nco, rdr = investable_reduction(imsk, pr, nco, rd)
+    X = pr.X
+    clr = clusterise(nco.cle, pr; rd = rdr, iv = rdr.iv, ivpa = rdr.ivpa, dims = dims,
+                     branchorder = branchorder, x_src = nco.x_src)
+    assert_clustering_universe(clr, size(X, 2))
+    idx = assignments(clr)
+    cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
+    wi = zeros(eltype(X), size(X, 2), clr.k)
+    opti = nco.opti
+    resi = Vector{NonFiniteAllocationOptimisationResult}(undef, clr.k)
+    FLoops.@floop nco.ex for (i, cl) in pairs(cls)
+        optic = port_opt_view(opti, cl, X)
+        rdc = port_opt_view(rdr, cl)
+        res = optimise(optic, rdc; dims = dims, branchorder = branchorder,
+                       str_names = str_names, save = save, kwargs...)
+        #! Support efficient frontier?
+        @argcheck(!isa(res.retcode, AbstractVector),
+                  ArgumentError("res.retcode cannot be an AbstractVector; efficient frontier results are not supported in NCO"))
+        wi[cl, i] = res.w
+        resi[i] = res
+    end
+    rdo = predict_outer_returns(nco.cv, nco, ClusterUniverse(cls), rdr, pr, cfees, wi, resi)
+    nco = _update_asset_sets(nco, rdo)
+    reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
+                    str_names = str_names, save = save, kwargs...)
+    wb = weight_bounds_constraints(nco.wb, nco.sets; N = size(X, 2), strict = nco.strict,
+                                   datatype = eltype(X))
+    retcode, w = outer_optimisation_finaliser(wb, nco.wf, resi, reso.retcode, reso.w, wi)
+    return NestedClusteredResult(; pr = pr, clr = clr, wb = wb, fees = fees, resi = resi,
+                                 reso = reso, cv = nco.cv, retcode = retcode, w = w,
+                                 imsk = imsk, fb = nothing)
+end
+"""
+    optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                      <:Any, <:Any, <:Any, Nothing
+                  }, rd::ReturnsResult;
+             dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+             save::Bool = true, kwargs...) -> NestedClusteredResult
+
+Run the Nested Clustered Optimisation portfolio optimisation.
+
+# Arguments
+
+  - `nco`: The nested clustered optimiser to use.
+  - $(arg_dict[:rd])
+  - `dims`: The dimension along which observations advance in time.
+  - `branchorder`: Passed to the inner and outer optimisers. If this optimiser uses hierarchical clustering, this applies to the clusterisation. The branch order to use for the clusterisation.
+  - `str_names`: Passed to the inner and outer optimisers. Whether to use string names for the assets in the optimisation.
+  - `save`: Passed to the inner and outer optimisers. Whether to save the JuMP model in the optimisation result.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Validation
+
+  - No field in the tree of `nco` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+
+# Returns
+
+  - `res::NestedClusteredResult`: The combined portfolio. `retcode` is an [`OptimisationFailure`](@ref) when any intra-cluster optimisation, the inter-cluster optimisation, or the weight finalisation failed.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`NestedClusteredResult`](@ref)
+"""
+function optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                       <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
+                  dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+                  save::Bool = true, kwargs...)
+    assert_batch_entry(nco, "`optimise`")
+    return _optimise(nco, rd; dims = dims, branchorder = branchorder, str_names = str_names,
+                     save = save, kwargs...)
+end
+
+export NestedClusteredResult, NestedClustered

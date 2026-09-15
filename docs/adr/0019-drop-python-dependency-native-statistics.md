@@ -8,12 +8,12 @@ status: accepted
 
 Two features borrowed algorithms from Python packages through `PythonCall` and a `CondaPkg.toml`:
 
-- **Histogram bin selection** ([10_Histogram.jl](../../src/08_Moments/10_Histogram.jl)) used
+- **Histogram bin selection** ([10_Histogram.jl](../../src/05_Moments/09_Histogram.jl)) used
   [AstroPy](https://www.astropy.org/)'s `astropy.stats` for the Knuth, Freedman–Diaconis and
   Scott rules. The abstract type was literally named `AstroPyBins`, and every docstring pointed
   at the AstroPy library.
 - **Block bootstrap uncertainty sets**
-  ([04_BootstrapUncertaintySets.jl](../../src/14_UncertaintySets/04_BootstrapUncertaintySets.jl))
+  ([04_BootstrapUncertaintySets.jl](../../src/11_UncertaintySets/04_BootstrapUncertaintySets.jl))
   used the [`arch`](https://pypi.org/project/arch/) package (`arch-py`) for the stationary,
   circular and moving block bootstraps.
 

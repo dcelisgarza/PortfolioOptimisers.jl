@@ -105,7 +105,7 @@ Two more, found while consolidating:
 
 **Multi-period deserves its paragraph.** It is the most valuable item on this list, and cvxportfolio
 does it well. I still keep it out of the core, for a structural reason: `w` is one vector in every
-file in `src/20_Optimisation/09_JuMPConstraints/`. A horizon index breaks all thirteen, plus every
+file in `src/17_Optimisation/05_JuMP/02_JuMPConstraints/`. A horizon index breaks all thirteen, plus every
 risk-measure constraint file. That is a rewrite, not a feature. The design note in
 `research/NOTRACK_AlgoTrader.jl_README.md` already places the loop in the companion package and
 treats `optimise` as a pure function called inside it. **I agree with that split.** Prototypes 15,
@@ -393,7 +393,7 @@ calibration windows:
 The marginal number is on target and the conditional numbers are ten points apart. **The interval is
 too wide when nothing is happening and too narrow exactly when it is needed.** Clustering does not
 break the theorem; it breaks the interpretation. The fix is a volatility-adjusted score, and the
-library already has the estimator for it in `src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl`.
+library already has the estimator for it in `src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl`.
 
 Separately, the bootstrap makes the difference between procedures stark: mean weight standard
 deviation `0.022` for minimum variance against **`8.16`** for tangency, with sign stability `0.99`
@@ -503,7 +503,7 @@ frozen holds 0.1870, sub-budget 0.8130, restored budget 1.000000, frozen preserv
 
 **Turnover measured against the last target instead of the drifted holdings understated the trade by
 54.2 per cent** — 0.0667 against 0.1455. That is real money, invisible to any calculation that never
-sees the holdings. The library's `src/15_Turnover.jl` is *capable* of the correct calculation; what
+sees the holdings. The library's `src/12_Turnover.jl` is *capable* of the correct calculation; what
 is absent is the state object that makes the drifted vector the natural argument.
 
 ---
@@ -586,7 +586,7 @@ Two, both counter-intuitive and both worth documenting in any adaptation.
 
 And a tractability note: a `Q^(3/2)` cost is two rotated second-order cones, and a general exponent
 `1+δ` is one `MOI.PowerCone`. The library already uses that cone in
-`src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl`. **A convex impact model costs
+`src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl`. **A convex impact model costs
 nothing in tractability.**
 
 ---

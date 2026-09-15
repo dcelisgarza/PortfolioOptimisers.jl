@@ -1,0 +1,29 @@
+# Asset Panel builder
+
+## The Asset Panel
+
+```@docs
+asset_panel
+PortfolioOptimisers.panel_build_observations
+PortfolioOptimisers.AbstractAssetPanelEstimator
+PortfolioOptimisers.AbstractPanelFieldInput
+NumericPanelInput
+CategoricalPanelInput
+TensorPanelInput
+PortfolioOptimisers.AbstractPanelFillAlgorithm
+NoPanelFill
+ConstantPanelFill
+ForwardPanelFill
+BackwardPanelFill
+PortfolioOptimisers.panel_fill
+PortfolioOptimisers.panel_fill_array
+PortfolioOptimisers.panel_directional_fill
+PortfolioOptimisers.panel_resolve
+PortfolioOptimisers.panel_input_field
+PortfolioOptimisers.panel_input_is_static
+PortfolioOptimisers.is_panel_blank
+PortfolioOptimisers.assert_panel_fill
+PortfolioOptimisers.assert_panel_input
+PortfolioOptimisers.assert_categorical_fill
+PortfolioOptimisers.assert_panel_input_fill
+```

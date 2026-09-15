@@ -1,0 +1,737 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for estimators that determine the size of each asset subset.
+
+A subtype reaches a [`MultipleRandomised`](@ref) through its `subset_size` field, and is called on the
+returns data to give the value.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`SubsetSizeEC`](@ref)
+"""
+abstract type SubsetSizeEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for estimators that determine the number of random subsets to draw.
+
+A subtype reaches a [`MultipleRandomised`](@ref) through its `n_subsets` field, and is called on the
+returns data to give the value.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`NumberSubsetsEC`](@ref)
+"""
+abstract type NumberSubsetsEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for estimators that determine the rolling window size.
+
+A subtype reaches a [`MultipleRandomised`](@ref) through its `window_size` field, and is called on the
+returns data to give the value.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`WindowSizeEC`](@ref)
+"""
+abstract type WindowSizeEstimator <: AbstractEstimator end
+"""
+    const SubsetSizeEC
+
+Union of [`SubsetSizeEstimator`](@ref) subtypes and plain functions that compute a
+subset size from a returns dataset.
+"""
+const SubsetSizeEC = Union{<:SubsetSizeEstimator, <:Function}
+"""
+    const NumberSubsetsEC
+
+Union of [`NumberSubsetsEstimator`](@ref) subtypes and plain functions that compute the
+number of subsets from a returns dataset.
+"""
+const NumberSubsetsEC = Union{<:NumberSubsetsEstimator, <:Function}
+"""
+    const WindowSizeEC
+
+Union of [`WindowSizeEstimator`](@ref) subtypes and plain functions that compute a
+window size from a returns dataset.
+"""
+const WindowSizeEC = Union{<:WindowSizeEstimator, <:Function}
+"""
+    const SubsetSizeE
+
+Union of a concrete subset-size value or an estimator/function for it.
+"""
+const SubsetSizeE = Union{<:Number, <:SubsetSizeEC}
+"""
+    const NumberSubsetsE
+
+Union of a concrete number-of-subsets value or an estimator/function for it.
+"""
+const NumberSubsetsE = Union{<:Integer, <:NumberSubsetsEC}
+"""
+    const WindowSizeE
+
+Union of a concrete window-size value or an estimator/function for it.
+"""
+const WindowSizeE = Union{<:Number, <:WindowSizeEC}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Cross-validation scheme that draws multiple random asset subsets and applies a
+walk-forward estimator to each. Each combination of a random asset subset and a set of
+walk-forward folds forms one *path*.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    MultipleRandomised(
+        cv::WalkForwardEstimator;
+        subset_size::SubsetSizeE = 1,
+        n_subsets::NumberSubsetsE = 2,
+        max_comb::Integer = 1_000_000_000,
+        window_size::Option{<:WindowSizeE} = nothing,
+        rng::Random.AbstractRNG = Random.default_rng(),
+        seed::Option{<:Integer} = nothing
+    ) -> MultipleRandomised
+
+`cv` is positional; remaining arguments are keyword and correspond to the struct's fields.
+
+## Validation
+
+  - If `subset_size` is an `Integer`: `subset_size >= 1`.
+  - If `subset_size` is a float: `0 < subset_size < 1`.
+  - If `n_subsets` is an `Integer`: `n_subsets >= 2`.
+  - `max_comb > 0` and finite.
+  - If `window_size` is an `Integer`: `window_size >= 2`.
+  - If `window_size` is a float: `0 < window_size < 1`.
+
+# Related
+
+  - [`cross_val_predict`](@ref)
+  - [`search_cross_validation`](@ref)
+  - [`MultipleRandomisedResult`](@ref)
+  - [`WalkForwardEstimator`](@ref)
+  - [`IndexWalkForward`](@ref)
+  - [`DateWalkForward`](@ref)
+
+# References
+
+  - $(ref_dict[:palomar2025]) Chapter 8.
+"""
+@concrete struct MultipleRandomised <: NonOptimisationSequentialCrossValidationEstimator
+    """
+    $(field_dict[:cv])
+    """
+    cv
+    """
+    $(field_dict[:subset_size])
+    """
+    subset_size
+    """
+    $(field_dict[:n_subsets])
+    """
+    n_subsets
+    """
+    $(field_dict[:max_comb])
+    """
+    max_comb
+    """
+    $(field_dict[:window_size])
+    """
+    window_size
+    """
+    $(field_dict[:rng])
+    """
+    rng
+    """
+    $(field_dict[:seed])
+    """
+    seed
+    function MultipleRandomised(cv::WalkForwardEstimator, subset_size::SubsetSizeE,
+                                n_subsets::NumberSubsetsE, max_comb::Integer,
+                                window_size::Option{<:WindowSizeE}, rng::Random.AbstractRNG,
+                                seed::Option{<:Integer})
+        if isa(subset_size, Integer)
+            assert_nonempty_nonneg_finite_val(subset_size - 1, "subset_size - 1")
+        elseif isa(subset_size, AbstractFloat)
+            assert_unit_interval(subset_size, :subset_size)
+        end
+        if isa(n_subsets, Integer)
+            assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
+        end
+        assert_nonempty_gt0_finite_val(max_comb, :max_comb)
+        if isa(window_size, Integer)
+            assert_nonempty_nonneg_finite_val(window_size - 2, "window_size - 2")
+        elseif isa(window_size, AbstractFloat)
+            assert_unit_interval(window_size, :window_size)
+        end
+        return new{typeof(cv), typeof(subset_size), typeof(n_subsets), typeof(max_comb),
+                   typeof(window_size), typeof(rng), typeof(seed)}(cv, subset_size,
+                                                                   n_subsets, max_comb,
+                                                                   window_size, rng, seed)
+    end
+end
+function MultipleRandomised(cv::WalkForwardEstimator; subset_size::SubsetSizeE = 1,
+                            n_subsets::NumberSubsetsE = 2,
+                            max_comb::Integer = 1_000_000_000,
+                            window_size::Option{<:WindowSizeE} = nothing,
+                            rng::Random.AbstractRNG = Random.default_rng(),
+                            seed::Option{<:Integer} = nothing)
+    return MultipleRandomised(cv, subset_size, n_subsets, max_comb, window_size, rng, seed)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Stores the split result produced by [`MultipleRandomised`](@ref). Contains the training,
+test, and asset index sets for every fold across all random paths, along with a path
+identifier for each fold.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    MultipleRandomisedResult(;
+        train_idx::VecVecInt,
+        test_idx::VecVecInt,
+        asset_idx::VecVecInt,
+        path_ids::VecInt
+    ) -> MultipleRandomisedResult
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(train_idx)`.
+  - `!isempty(test_idx)`.
+  - `!isempty(asset_idx)`.
+  - `!isempty(path_ids)`.
+  - `length(train_idx) == length(test_idx) == length(asset_idx) == length(path_ids)`.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+"""
+@concrete struct MultipleRandomisedResult <: NonOptimisationSequentialCrossValidationResult
+    """
+    $(field_dict[:train_idx])
+    """
+    train_idx
+    """
+    $(field_dict[:test_idx])
+    """
+    test_idx
+    """
+    $(field_dict[:asset_idx])
+    """
+    asset_idx
+    """
+    $(field_dict[:path_ids])
+    """
+    path_ids
+    function MultipleRandomisedResult(train_idx::VecVecInt, test_idx::VecVecInt,
+                                      asset_idx::VecVecInt, path_ids::VecInt)
+        @argcheck(!isempty(train_idx), IsEmptyError("train_idx cannot be empty"))
+        @argcheck(!isempty(test_idx), IsEmptyError("test_idx cannot be empty"))
+        @argcheck(!isempty(asset_idx), IsEmptyError("asset_idx cannot be empty"))
+        @argcheck(!isempty(path_ids), IsEmptyError("path_ids cannot be empty"))
+        @argcheck(length(train_idx) ==
+                  length(test_idx) ==
+                  length(asset_idx) ==
+                  length(path_ids),
+                  DimensionMismatch("train_idx ($(length(train_idx))), test_idx ($(length(test_idx))), asset_idx ($(length(asset_idx))), and path_ids ($(length(path_ids))) must all match"))
+        return new{typeof(train_idx), typeof(test_idx), typeof(asset_idx),
+                   typeof(path_ids)}(train_idx, test_idx, asset_idx, path_ids)
+    end
+end
+function MultipleRandomisedResult(; train_idx::VecVecInt, test_idx::VecVecInt,
+                                  asset_idx::VecVecInt,
+                                  path_ids::VecInt)::MultipleRandomisedResult
+    return MultipleRandomisedResult(train_idx, test_idx, asset_idx, path_ids)
+end
+function n_splits(mre::MultipleRandomised, rd::Prices_RR)
+    if !isnothing(mre.window_size) && isa(mre.cv, DateWalkForward)
+        throw(ArgumentError("when using a `DateWalkForward` with `window_size`, the number of splits cannot be determined before calling [`split`](@ref)."))
+    end
+    # Both quantities are resolved against the FULL `rd`, exactly as `split` resolves them, and
+    # only then is the window view taken. Reading the fields directly instead throws on every
+    # documented non-integer form: a float or a callable `window_size` cannot index, and a
+    # callable `n_subsets` cannot multiply.
+    n_subsets = get_n_subsets(mre.n_subsets, rd)
+    window_size = get_window_size(mre.window_size, rd)
+    if !isnothing(window_size)
+        rd = port_opt_view(rd, 1:window_size, :)
+    end
+    return n_subsets * n_splits(mre.cv, rd)
+end
+function n_splits(mrr::MultipleRandomisedResult)
+    return length(mrr.path_ids)
+end
+"""
+    const MRCVR = Union{<:MultipleRandomised, <:MultipleRandomisedResult}
+
+Alias for a multiple-randomised cross-validation estimator or result.
+
+Matches either a [`MultipleRandomised`](@ref) estimator or a [`MultipleRandomisedResult`](@ref).
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`MultipleRandomisedResult`](@ref)
+"""
+const MRCVR = Union{<:MultipleRandomised, <:MultipleRandomisedResult}
+"""
+    combination_by_index(idx::Integer, N::Integer, k::Integer) -> VecInt
+
+Return the `idx`-th combination of `k` items from `N` total items.
+
+Internal helper for combinatorial path generation. Converts a lexicographic combination index to the actual combination elements.
+
+# Arguments
+
+  - `idx`: Combination index (1-based).
+  - `N`: Total number of items.
+  - `k`: Number of items in each combination.
+
+# Returns
+
+  - Vector of `k` item indices.
+
+# Related
+
+  - [`CombinatorialCrossValidation`](@ref)
+  - [`sample_unique_assets`](@ref)
+"""
+function combination_by_index(idx::Integer, N::Integer, k::Integer)
+    n_comb = binomial(N, k)
+    @argcheck(0 < idx <= n_comb, DomainError(idx, "idx must be in (0, $n_comb]"))
+    combination = Vector{typeof(N)}(undef, k)
+    remaining_rank = idx
+    next_element = 1
+    for i in 1:k
+        remaining_slots = k - i
+        x = next_element
+        block_size = binomial(N - x, remaining_slots)
+        while block_size < remaining_rank
+            remaining_rank -= block_size
+            x += 1
+            block_size = binomial(N - x, remaining_slots)
+        end
+        combination[i] = x
+        next_element = x + 1
+    end
+    return combination
+end
+"""
+    sample_unique_assets(N, k, n_subsets; kwargs...)
+
+Sample `n_subsets` unique asset subsets of size `k` from `N` assets.
+
+Internal function used in multiple-randomised cross-validation to generate diverse asset subsets for resampling.
+
+# Arguments
+
+  - `N`: Total number of assets.
+  - `k`: Subset size.
+  - `n_subsets`: Number of unique subsets to sample.
+  - `kwargs...`: Additional keyword arguments (e.g., random seed).
+
+# Returns
+
+  - Matrix of size `(k, n_subsets)` with asset indices.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`combination_by_index`](@ref)
+"""
+function sample_unique_assets(N::Integer, k::Integer, n_subsets::Integer;
+                              max_comb::Integer = 1_000_000_000,
+                              rng::Random.AbstractRNG = Random.default_rng(),
+                              seed::Option{<:Integer} = nothing)
+    assert_nonempty_nonneg_finite_val(N, :N)
+    assert_nonempty_nonneg_finite_val(k, :k)
+    @argcheck(k <= N,
+              DomainError((k, N),
+                          "`k` is $k and `N` is $N. A subset draws `k` assets from a universe of `N`, so `k <= N` must hold."))
+    assert_nonempty_finite_val(n_subsets, :n_subsets)
+    n_comb = binomial(N, k)
+    @argcheck(n_subsets <= n_comb,
+              "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $k) = $n_comb`.")
+    rng = resolve_rng(rng, seed)
+    subsets = Matrix{typeof(N)}(undef, k, n_subsets)
+    if n_comb <= max_comb
+        ranks = StatsBase.sample(rng, 1:n_comb, n_subsets; replace = false)
+        @inbounds for (i, rank) in enumerate(ranks)
+            subsets[:, i] .= combination_by_index(rank, N, k)
+        end
+    else
+        @warn("The number of combinations for `subset_size = $k` and `N = $N` is `binomial(assets, subset_size) = n_comb => binomial($N, $k) = $n_comb`, which may be computationally expensive. We will use an approximate alternate approach. If you want the exact approach consider increasing `max_comb` or moving `subset_size` closer to `div(assets, 2) = $(div(N, 2))`.")
+        for i in axes(subsets, 2)
+            subsets[:, i] .= sort!(StatsBase.sample(rng, 1:N, k; replace = false))
+        end
+    end
+    return subsets
+end
+"""
+    get_subset_size(subset_size, rd, args...)
+
+Get the actual asset subset size for multiple-randomised cross-validation.
+
+Resolves the subset size from either an integer (direct count) or a fraction of the total assets.
+
+# Arguments
+
+  - `subset_size`: Integer or float subset size specification.
+  - `rd`: Returns result or prior.
+  - `args...`: Additional arguments.
+
+# Returns
+
+  - Integer subset size.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`sample_unique_assets`](@ref)
+"""
+function get_subset_size(subset_size::Integer, rd::Union{<:Pr_RR, <:AbstractPricesResult},
+                         args...)
+    @argcheck(subset_size <= size(rd.X, 2),
+              "subset_size must not be greater than the number of assets")
+    return subset_size
+end
+function get_subset_size(subset_size::AbstractFloat,
+                         rd::Union{<:Pr_RR, <:AbstractPricesResult}, args...)
+    subset_size = max(round(Int, subset_size * size(rd.X, 2)), 1)
+    return subset_size
+end
+function get_subset_size(subset_size::SubsetSizeEC,
+                         rd::Union{<:Pr_RR, <:AbstractPricesResult})
+    res = subset_size(rd)
+    assert_nonempty_nonneg_finite_val(res - 1, "subset_size - 1")
+    @argcheck(res <= size(rd.X, 2),
+              "subset_size must not be greater than the number of assets")
+    return res
+end
+"""
+    get_window_size(window_size, rd, args...)
+
+Get the actual rolling window size for multiple-randomised cross-validation.
+
+Resolves the window size from `nothing` (no windowing), an integer (direct count), a float (fraction of observations), or a callable.
+
+# Arguments
+
+  - `window_size`: Window size specification (`nothing`, integer, float, or callable).
+  - `rd`: Returns result or prior.
+  - `args...`: Additional arguments.
+
+# Returns
+
+  - Integer window size or `nothing`.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`get_subset_size`](@ref)
+"""
+function get_window_size(::Nothing, args...)
+    return nothing
+end
+function get_window_size(window_size::Integer, rd::Union{<:Pr_RR, <:AbstractPricesResult},
+                         args...)
+    # Every row count in this file is the whole sample a cross-validation window is cut out
+    # of. It is not the model-wide `:T` of any one fit, which covers a single window.
+    @argcheck(window_size <= size(rd.X, 1),
+              "window_size must not be greater than the number of observations")
+    return window_size
+end
+function get_window_size(window_size::AbstractFloat,
+                         rd::Union{<:Pr_RR, <:AbstractPricesResult}, args...)
+    window_size = max(round(Int, window_size * size(rd.X, 1)), 2)
+    @argcheck(window_size <= size(rd.X, 1),
+              "window_size must not be greater than the number of observations")
+    return window_size
+end
+function get_window_size(window_size::WindowSizeEC,
+                         rd::Union{<:Pr_RR, <:AbstractPricesResult})
+    res = window_size(rd)
+    assert_nonempty_nonneg_finite_val(res - 2, "window_size - 2")
+    @argcheck(res <= size(rd.X, 1),
+              "window_size must not be greater than the number of observations")
+    return res
+end
+"""
+    get_n_subsets(n_subsets, args...)
+
+Get the number of asset subsets for multiple-randomised cross-validation.
+
+Resolves the number of subsets from either an integer (direct count) or a callable that computes it from the returns data.
+
+This is the single point at which the (possibly [`TimeDependent`](@ref) or callable) subset count becomes a concrete integer, so it is where the [`RESOURCE_LIMITS`](@ref) `max_n_subsets` ceiling is enforced — a constructor check could not see the value a schedule or callable ultimately produces. Every subset runs a full inner optimisation, so an absurd count is a compute-exhaustion sink rather than a merely large allocation.
+
+# Arguments
+
+  - `n_subsets`: Integer or callable number-of-subsets specification.
+  - `args...`: Additional arguments (returns result or prior).
+
+# Returns
+
+  - Integer number of subsets.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`sample_unique_assets`](@ref)
+  - [`assert_resource_cap`](@ref)
+"""
+function get_n_subsets(n_subsets::Integer, args...)
+    assert_resource_cap(n_subsets, RESOURCE_LIMITS[].max_n_subsets, :n_subsets,
+                        :max_n_subsets)
+    return n_subsets
+end
+function get_n_subsets(n_subsets::NumberSubsetsEC,
+                       rd::Union{<:Pr_RR, <:AbstractPricesResult})
+    res = n_subsets(rd)
+    assert_nonempty_nonneg_finite_val(res - 2, "n_subsets - 2")
+    assert_resource_cap(res, RESOURCE_LIMITS[].max_n_subsets, :n_subsets, :max_n_subsets)
+    return res
+end
+"""
+    Base.split(mrcv::MultipleRandomised, rd::Prices_RR) -> MultipleRandomisedResult
+
+Split the price- or returns-level data `rd` by drawing multiple random asset subsets and
+applying the internal walk-forward estimator to each subset. Each combination of a random
+asset subset and a set of walk-forward folds forms one path.
+
+Unlike combinatorial cross-validation, multiple-randomised resampling draws over **assets**
+(columns) while every observation window comes from an inner walk-forward, so the rows of
+each fold stay contiguous. That is why it is admissible at the price level for a
+price-starting pipeline — the rolling-window rule that blocks combinatorial does not apply.
+
+## The draw is over the Coverage Universe of the path's own window
+
+Each path draws its window first, then draws `subset_size` assets from the **Coverage
+Universe of that window**: the assets whose price or return is finite at every row of it, and
+whose active mask in the [`AssetPanel`](@ref) is `true` at every row of it. A subset is
+therefore always `subset_size` live assets, and a dead asset is never drawn, so no inner
+optimisation is handed a column it could not have traded.
+
+`max_comb` applies **per path**, because the combination count is now
+`binomial(live_assets, subset_size)` of that path's window rather than one number for the
+whole sample. A window whose Coverage Universe is smaller than `subset_size` throws an
+`IsEmptyError` naming both counts.
+
+!!! warning
+
+    The window draw and the asset draw swapped order in the one random stream the seed
+    governs, so a seeded split gives **different** indices from the released one. The split is
+    still deterministic in `seed`.
+
+# Arguments
+
+  - `mrcv::MultipleRandomised`: Multiple randomised cross-validation estimator.
+  - `rd::Prices_RR`: Price- or returns-level data to split.
+
+# Validation
+
+  - Every path's Coverage Universe must hold at least `subset_size` assets.
+
+# Returns
+
+  - `MultipleRandomisedResult`: Result containing training, test, and asset indices for
+    every fold across all random paths, together with a path identifier for each fold. Every
+    asset index names a column that is live throughout its own path's window.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`MultipleRandomisedResult`](@ref)
+  - [`cv_live_assets`](@ref)
+  - [`sample_unique_assets`](@ref)
+  - [`n_splits`](@ref)
+"""
+function Base.split(mrcv::MultipleRandomised, rd::Prices_RR)
+    T, N = size(rd.X)
+    (; cv, subset_size, n_subsets, max_comb, window_size, rng, seed) = mrcv
+    subset_size = get_subset_size(subset_size, rd)
+    n_subsets = get_n_subsets(n_subsets, rd)
+    window_size = get_window_size(window_size, rd)
+    # Resolve once: this single stream must serve BOTH the per-path window offsets
+    # (`rand(rng, ...)` in the loop) and the asset-subset sampling that follows each of them,
+    # so `seed` governs the whole split. `sample_unique_assets` is therefore handed the
+    # already-resolved rng and no seed.
+    rng = resolve_rng(rng, seed)
+    path_ids = Vector{typeof(n_subsets)}(undef, 0)
+    train_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
+    test_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
+    asset_indices = Vector{Vector{typeof(T)}}(undef, 0)
+    for i in 1:n_subsets
+        if isnothing(window_size)
+            start_obs = 1
+            rdi = rd
+        else
+            start_obs = rand(rng, 1:(T - window_size))
+            idx = start_obs:(start_obs + window_size - 1)
+            rdi = port_opt_view(rd, idx, :)
+        end
+        live = cv_live_assets(rdi)
+        @argcheck(subset_size <= length(live),
+                  IsEmptyError("path $i draws $subset_size assets from the Coverage Universe of its own window, which holds $(length(live)) of the $N assets; lower subset_size, widen window_size, or give the window assets that are listed and quoted throughout it"))
+        cols = live[vec(sample_unique_assets(length(live), subset_size, 1;
+                                             max_comb = max_comb, rng = rng))]
+        start_obs -= 1
+        (; train_idx, test_idx) = try
+            split(cv, rdi)
+        catch err
+            if isa(err, IsEmptyError)
+                throw(IsEmptyError(err.msg *
+                                   "\nthe local rd does not contain enough observations for the window size:\n$rdi"))
+            else
+                rethrow(err)
+            end
+        end
+        num_splits = length(train_idx)
+        append!(path_ids, fill(i, num_splits))
+        append!(train_indices, [t .+ start_obs for t in train_idx])
+        append!(test_indices, [t .+ start_obs for t in test_idx])
+        append!(asset_indices, Iterators.repeated(cols, num_splits))
+    end
+    return MultipleRandomisedResult(; train_idx = train_indices, test_idx = test_indices,
+                                    asset_idx = asset_indices, path_ids = path_ids)
+end
+"""
+    path_fit_and_predict(opt, rd, train_idx, test_idx, cols; ex, id, cv)
+
+Fit and predict along a sequence of (train, test, asset) triples, respecting sequential constraints.
+
+The path runs through [`fold_loop`](@ref), which takes each fold's asset-subset view of `(opt, rd)` and resolves the fold's time-dependent entries. The path runs sequentially when the optimiser needs the previous fold's weights, and in parallel over `ex` otherwise. A time-dependent optimiser alone does not force sequential execution, because its per-fold values are known upfront. `cv` is the scheme the path belongs to, handed on so the loop reads its Fold Fit ([`fold_fit`](@ref)): under an [`OnlineStep`](@ref) the path's estimator is sliced to the subset once and threaded through the path's folds.
+
+# Arguments
+
+  - `opt::NonFiniteAllocationOptimisationEstimator`: Portfolio optimisation estimator.
+  - `rd::ReturnsResult`: FullMoment returns data.
+  - `train_idx`: Sequence of training index vectors.
+  - `test_idx`: Sequence of test index vectors.
+  - `cols`: Sequence of asset column indices for each fold.
+  - `ex::FLoops.Transducers.Executor`: Executor for parallel processing.
+  - `id`: Optional path identifier.
+  - `cv`: The scheme the path belongs to, or `nothing`.
+
+# Returns
+
+  - [`MultiPeriodPredictionResult`](@ref) with predictions sorted by test index.
+
+# Related
+
+  - [`fit_and_predict`](@ref)
+  - [`fold_loop`](@ref)
+  - [`needs_previous_weights`](@ref)
+  - [`is_time_dependent`](@ref)
+  - [`update_time_dependent_estimator`](@ref)
+"""
+function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_idx, cols;
+                              ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                              id = nothing, wd::Option{<:AbstractWeightDrift} = nothing,
+                              hwd::Option{<:AbstractWeightDrift} = wd,
+                              fa::Option{<:AbstractFeeAmortisation} = nothing,
+                              pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+                              store_weight_path::Bool = false, strict::Bool = false,
+                              cv = nothing)
+    # `i` is the fold's position in the path's split enumeration — no ordering is imposed
+    # on time-dependent entries (predictions are sorted for reporting only, after the
+    # loop); the user keys entries off ctx.train_idx[ctx.i] / ctx.test_idx[ctx.i].
+    function asset_view(i)
+        rdi = port_opt_view(rd, cols[i])
+        return (port_opt_view(opt, cols[i], rdi.X), rdi)
+    end
+    predictions, est = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
+                                 test_idx = test_idx, path_id = id, fold_view = asset_view,
+                                 pws = pws, cv = cv) do fold
+        return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
+                               test_idx = fold.test, wd = wd, hwd = hwd, fa = fa,
+                               store_weight_path = store_weight_path, strict = strict,
+                               w_prev = fold.w_prev)
+    end
+    return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
+                                       id = id, opt = est)
+end
+function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::MRCVR;
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
+    cv_res = split(cv, rd)
+    (; train_idx, test_idx, asset_idx, path_ids) = cv_res
+    assert_unshuffled_folds(cv, train_idx)
+    unique_ids = unique(path_ids)
+    dict = [Vector{Tuple{eltype(train_idx), eltype(test_idx), eltype(asset_idx)}}(undef, 0)
+            for _ in unique_ids]
+    for (train, test, asset, path_id) in zip(train_idx, test_idx, asset_idx, path_ids)
+        push!(dict[path_id], (train, test, asset))
+    end
+    (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
+    hwd = held_weights_drift(wd, pws)
+    predictions = parallel_folds(length(unique_ids), ex, MultiPeriodPredictionResult) do i
+        vals = dict[i]
+        train = map(x -> x[1], vals)
+        test = map(x -> x[2], vals)
+        asset = map(x -> x[3], vals)
+        return path_fit_and_predict(opt, rd, train, test, asset; ex = ex, id = i, wd = wd,
+                                    hwd = hwd, fa = fa, pws = pws,
+                                    store_weight_path = store_weight_path, strict = strict,
+                                    cv = cv)
+    end
+    return PopulationPredictionResult(; pred = predictions)
+end
+
+"""
+    fold_evaluation(cv::MultipleRandomised)
+
+Read the evaluation switches of a [`MultipleRandomised`](@ref).
+
+The scheme carries no switch of its own. Each of its paths is an inner walk-forward, so it inherits every switch from the scheme in its `cv` field, and a caller sets them there.
+
+# Returns
+
+  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
+
+# Related
+
+  - [`fold_evaluation`](@ref)
+  - [`MultipleRandomised`](@ref)
+  - [`held_weights_drift`](@ref)
+  - [`override_fee_amortisation`](@ref)
+"""
+function fold_evaluation(cv::MultipleRandomised)
+    return fold_evaluation(cv.cv)
+end
+"""
+    fold_fit(cv::MultipleRandomised)
+
+Read the Fold Fit of a [`MultipleRandomised`](@ref).
+
+The scheme carries no switch of its own. Each of its paths is an inner walk-forward, so it inherits the Fold Fit from the scheme in its `cv` field, as it inherits its evaluation switches. Under an [`OnlineStep`](@ref) each path slices the estimator to its asset subset once and threads it through the path's folds.
+
+# Returns
+
+  - `ff::Option{<:AbstractFoldFit}`: The inner walk-forward's Fold Fit.
+
+# Related
+
+  - [`fold_fit`](@ref)
+  - [`fold_evaluation`](@ref)
+  - [`MultipleRandomised`](@ref)
+  - [`path_fit_and_predict`](@ref)
+"""
+function fold_fit(cv::MultipleRandomised)
+    return fold_fit(cv.cv)
+end
+export MultipleRandomised, MultipleRandomisedResult

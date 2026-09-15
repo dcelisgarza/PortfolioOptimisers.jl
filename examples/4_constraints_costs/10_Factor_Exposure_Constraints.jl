@@ -50,7 +50,7 @@ prices and records the factor names on the [`ReturnsResult`](@ref)'s `nf` field.
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
-rd = prices_to_returns(X, F)
+rd = prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))
 
 slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),
@@ -62,9 +62,11 @@ rd.nf
 ## 2. Declaring the factor axis
 
 [`UniverseSets`](@ref) declares **every axis it carries**, each under its own key: `xkey` for
-assets (default `"nx"`) and `fkey` for factors (default `"nf"`). The asset axis is required; the
-factor axis is optional, and a constraint that needs it and does not find it fails at the point of
-need rather than at construction.
+assets (default `"nx"`) and `tfkey` for time-series factors (default `"nf"`). A cross-sectional
+factor model names its own axis under `cfkey`, and `factor_axis_key` picks the key off the loadings
+so a caller never states it. The asset axis is required; both factor axes are optional, and a
+constraint that needs one and does not find it fails at the point of need rather than at
+construction.
 
 A universe is an **ordered** declaration. Position is the only link between a name and a column of
 the data, so a universe listing the right names in the wrong order attaches every constraint to

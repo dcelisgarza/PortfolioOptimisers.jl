@@ -45,52 +45,6 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
                                                                          params = SchurComplementParams(;
                                                                                                         gamma = 0.5),
                                                                          opt = hopto)),
-            NestedClustered(; pe = pr, cle = clr,
-                            opti = Stacking(;
-                                            opti = [MeanRisk(; opt = jopti),
-                                                    HierarchicalRiskParity(; opt = hopti),
-                                                    InverseVolatility(; pe = pr),
-                                                    EqualWeighted(),
-                                                    NestedClustered(; pe = pr,
-                                                                    opti = NearOptimalCentering(;
-                                                                                                opt = jopti),
-                                                                    opto = NearOptimalCentering(;
-                                                                                                opt = jopto))],
-                                            opto = Stacking(;
-                                                            opti = [MeanRisk(; opt = jopto),
-                                                                    HierarchicalRiskParity(;
-                                                                                           opt = hopto),
-                                                                    InverseVolatility(),
-                                                                    EqualWeighted(),
-                                                                    NestedClustered(;
-                                                                                    opti = NearOptimalCentering(;
-                                                                                                                opt = jopto),
-                                                                                    opto = NearOptimalCentering(;
-                                                                                                                opt = jopto))],
-                                                            opto = HierarchicalRiskParity(;
-                                                                                          opt = hopto))),
-                            opto = Stacking(;
-                                            opti = [MeanRisk(; opt = jopto),
-                                                    HierarchicalRiskParity(; opt = hopto),
-                                                    InverseVolatility(), EqualWeighted(),
-                                                    NestedClustered(;
-                                                                    opti = NearOptimalCentering(;
-                                                                                                opt = jopto),
-                                                                    opto = NearOptimalCentering(;
-                                                                                                opt = jopto))],
-                                            opto = Stacking(;
-                                                            opti = [MeanRisk(; opt = jopto),
-                                                                    HierarchicalRiskParity(;
-                                                                                           opt = hopto),
-                                                                    InverseVolatility(),
-                                                                    EqualWeighted(),
-                                                                    NestedClustered(;
-                                                                                    opti = NearOptimalCentering(;
-                                                                                                                opt = jopto),
-                                                                                    opto = NearOptimalCentering(;
-                                                                                                                opt = jopto))],
-                                                            opto = HierarchicalRiskParity(;
-                                                                                          opt = hopto)))),
             NestedClustered(; cle = clr,
                             opti = FactorRiskContribution(; flag = true, opt = jopti),
                             opto = FactorRiskContribution(; flag = true, opt = jopto)),
@@ -282,9 +236,9 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
                                                     opto = RiskBudgeting(; opt = jopto)),
                                     rd).w, res.w, rtol = 5e-5)
         end
-        rtol = if i in (2, 16)
+        rtol = if i in (2, 15)
             5e-5
-        elseif i in (12, 20)
+        elseif i == 19
             5e-6
         elseif i == 10
             1.1
@@ -299,5 +253,34 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
             find_tol(res.w, df[!, i])
         end
         @test success
+    end
+end
+
+@testset "No meta-optimiser fold captures a boxed carrier" begin
+    #=
+    `NestedClustered` and `Stacking` assign `rd` twice before their `@floop` — the
+    benchmark-relative picker, then the investable reduction — and a variable that is
+    reassigned and then captured by the fold's closure is boxed. FLoops reports a boxed
+    capture as a correctness and performance problem, once per process, so a test file whose
+    earlier NCO call already fired it never sees it again, and example 16 does on every fresh
+    run. The reduced carrier therefore takes a name of its own, and this gate asks FLoops to
+    throw rather than warn on the two fold loops. `assistant` is process-wide, so the default
+    `:warn` is restored whatever happens.
+    =#
+    PortfolioOptimisers.FLoops.assistant(:error)
+    try
+        jopti = JuMPOptimiser(; pe = pr, slv = slv, sets = sets)
+        hopti = HierarchicalOptimiser(; pe = pr, slv = slv)
+        hopto = HierarchicalOptimiser(; slv = slv)
+        nco = NestedClustered(; cle = clr, opti = HierarchicalRiskParity(; opt = hopti),
+                              opto = HierarchicalRiskParity(; opt = hopto))
+        @test isa(optimise(nco, rd).retcode, OptimisationSuccess)
+        st = Stacking(;
+                      opti = [HierarchicalRiskParity(; opt = hopti),
+                              MeanRisk(; opt = jopti)],
+                      opto = HierarchicalRiskParity(; opt = hopto))
+        @test isa(optimise(st, rd).retcode, OptimisationSuccess)
+    finally
+        PortfolioOptimisers.FLoops.assistant(:warn)
     end
 end

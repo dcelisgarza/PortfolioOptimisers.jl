@@ -26,7 +26,7 @@ so they never collide with the outer model's keys and nothing has to be saved,
 unregistered, or restored.
 
 A single helper, `preg!(model, prefix, name, val)` in
-[08_Base_JuMPOptimisation.jl](../../src/20_Optimisation/08_Base_JuMPOptimisation.jl),
+[08_Base_JuMPOptimisation.jl](../../src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation.jl),
 registers `val` under `Symbol(prefix, name)`. Shared-infrastructure builders and the
 read accessors take a `prefix::Symbol = Symbol("")` keyword: the default empty prefix
 reproduces the original bare key (so the change is behaviour-preserving everywhere
@@ -38,7 +38,7 @@ risk-build spine; the inner build reads and writes only prefixed keys.
 ## Consequences
 
 - The ~390-line save→build→restore block and the `:w`↔`:oldw` swap in
-  [18_TrackingRiskMeasureConstraints.jl](../../src/20_Optimisation/20_RiskMeasureConstraints/18_TrackingRiskMeasureConstraints.jl)
+  [19_TrackingRiskMeasureConstraints.jl](../../src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/16_TrackingRiskMeasureConstraints.jl)
   are **deleted**, not relocated. This is the payoff.
 - Nested builds are re-entrant: distinct prefixes never alias, so a tracking measure
   can itself contain a tracking measure without special handling.

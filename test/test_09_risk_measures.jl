@@ -572,4 +572,174 @@
         @test isnothing(MaxRiskMeasureSettings().lb)
         @test isa(MaxRiskMeasureSettings(; lb = Frontier(; N = 3)).lb, Frontier)
     end
+    @testset "The unweighted tail statistics read the k smallest (#629)" begin
+        # `partialsort!(v, k)` places the value at index `k` in the position it holds in a
+        # fully sorted vector, and it promises nothing about the rest of the vector. Julia
+        # switches selection strategy above a size threshold, and above it `v[1:k - 1]` is
+        # not the `k - 1` smallest values. Four sites read that prefix as if it were, so
+        # each returned a number that is not the statistic once `k` clears the threshold.
+        # At `alpha = 0.5` the conditional value at risk came out negative, which is below
+        # the value at risk it averages past.
+        #
+        # The series has to be long enough to reach the threshold. On a vector of 1008 the
+        # prefix first goes wrong at `k = 117`, which is `alpha = 0.116`; on a vector of
+        # 252 no `k` goes wrong at all, so the 252 rows the rest of this file reads would
+        # have proved nothing. The levels below straddle 0.116 on purpose, and 0.05 is the
+        # control that read correctly even before the fix.
+        #
+        # The weighted method of each measure sorts with `sortperm` and walks the
+        # cumulative weights, so it rests on no prefix. Under uniform weights the two
+        # methods price the same quantity, and that equality is what pins each site.
+        rdl = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
+                                                            "./assets/SP500.csv.gz"));
+                                          timestamp = :Date))
+        xl = rdl.X * fill(inv(size(rdl.X, 2)), size(rdl.X, 2))
+        Tl = length(xl)
+        @test Tl >= 500
+        wl = StatsBase.pweights(fill(inv(Tl), Tl))
+
+        # The definition: the mean of the losses past the value at risk, with the boundary
+        # scenario carrying only the part of its mass the level leaves.
+        function cvar_reference(x, alpha)
+            xs = sort(x)
+            aT = alpha * length(x)
+            idx = ceil(Int, aT)
+            return -(sum(view(xs, 1:(idx - 1))) + xs[idx] * (aT - (idx - 1))) / aT
+        end
+
+        for a in (0.05, 0.15, 0.2, 0.3, 0.5)
+            # `ConditionalValueatRisk` and its distributionally robust twin are one method.
+            cv = ConditionalValueatRisk(; alpha = a)(xl)
+            @test isapprox(cv, cvar_reference(xl, a))
+            @test isapprox(cv, ConditionalValueatRisk(; alpha = a, w = wl)(xl))
+            # A conditional value at risk averages the losses past the value at risk, so it
+            # can never sit below it.
+            @test cv >= ValueatRisk(; alpha = a)(xl)
+            @test isapprox(DistributionallyRobustConditionalValueatRisk(; alpha = a)(xl),
+                           DistributionallyRobustConditionalValueatRisk(; alpha = a,
+                                                                        w = wl)(xl))
+
+            # Both ends of the range read a prefix, so the level sets `alpha` and `beta`.
+            @test isapprox(ConditionalValueatRiskRange(; alpha = a, beta = a)(xl),
+                           ConditionalValueatRiskRange(; alpha = a, beta = a, w = wl)(xl))
+            @test isapprox(DistributionallyRobustConditionalValueatRiskRange(; alpha = a,
+                                                                             beta = a)(xl),
+                           DistributionallyRobustConditionalValueatRiskRange(; alpha = a,
+                                                                             beta = a,
+                                                                             w = wl)(xl))
+
+            # `conditional_drawdown_at_risk` is the fourth site, and it reads a drawdown
+            # series rather than the returns series.
+            @test isapprox(ConditionalDrawdownatRisk(; alpha = a)(xl),
+                           ConditionalDrawdownatRisk(; alpha = a, w = wl)(xl))
+            @test isapprox(RelativeConditionalDrawdownatRisk(; alpha = a)(xl),
+                           RelativeConditionalDrawdownatRisk(; alpha = a, w = wl)(xl))
+        end
+    end
+    @testset "The realised-history rolling window measure reads a series (#770)" begin
+        # One verb, two readings. The constant-weight reading re-scores one weight vector on
+        # every window, so each number is a property of that vector. The realised-history
+        # reading rolls a series that is already formed, so each number is a property of the
+        # history that formed it. Over a constant-weight series the two price the same
+        # quantity, which is what pins the new method to the old one.
+        T = size(rd.X, 1)
+        rw = ConditionalValueatRisk()
+        ret = calc_net_returns(w, rd.X)
+
+        # The definition, written out: each window is the measure on that window's rows.
+        @test PortfolioOptimisers.rolling_window_measure(rw, ret, 20) ==
+              [rw(view(ret, (t - 19):t)) for t in 20:T]
+        # The two readings agree on a series no drift moved. They reduce the same rows in a
+        # different order, so this is an `isapprox` rather than an equality.
+        @test isapprox(PortfolioOptimisers.rolling_window_measure(rw, ret, 20),
+                       PortfolioOptimisers.rolling_window_measure(rw, w, rd.X, nothing, 20))
+        @test length(PortfolioOptimisers.rolling_window_measure(rw, ret, T)) == 1
+        @test length(PortfolioOptimisers.rolling_window_measure(rw, ret, 20)) == T - 19
+
+        # The window is refused at the same boundary as the constant-weight method, and the
+        # message names the length of the series rather than the row count of a matrix.
+        for bad in (0, -1, T + 1)
+            @test_throws DomainError PortfolioOptimisers.rolling_window_measure(rw, ret,
+                                                                                bad)
+        end
+        err = try
+            PortfolioOptimisers.rolling_window_measure(rw, ret, T + 1)
+        catch e
+            e
+        end
+        @test occursin("observations in ret", sprint(showerror, err))
+
+        # A vector of measures scalarises inside each window, so `sca` reaches the series
+        # method exactly as it reaches the constant-weight one.
+        rws = [ConditionalValueatRisk(), ValueatRisk()]
+        @test isapprox(PortfolioOptimisers.rolling_window_measure(rws, ret, 20),
+                       PortfolioOptimisers.rolling_window_measure(rws, w, rd.X, nothing,
+                                                                  20))
+        @test PortfolioOptimisers.rolling_window_measure(rws, ret, 20;
+                                                         sca = MaxScalariser()) !=
+              PortfolioOptimisers.rolling_window_measure(rws, ret, 20)
+
+        # A measure that consumes weights is refused by name through the guard that
+        # `expected_risk_from_returns` already carries. No new error type is added.
+        @test !PortfolioOptimisers.supports_precomputed_returns(Variance())
+        @test_throws ArgumentError PortfolioOptimisers.rolling_window_measure(Variance(),
+                                                                              ret, 20)
+
+        # A population of series is rolled one member at a time, which mirrors
+        # `expected_risk_from_returns` on a vector of vectors.
+        pop = PortfolioOptimisers.rolling_window_measure(rw, [ret, 2 * ret], 20)
+        @test length(pop) == 2
+        @test pop[1] == PortfolioOptimisers.rolling_window_measure(rw, ret, 20)
+        @test pop[2] == PortfolioOptimisers.rolling_window_measure(rw, 2 * ret, 20)
+    end
+    @testset "The ending-weights rolling window measure reads a path (#769)" begin
+        # The third reading of the one verb. The weight argument's type is the picker: a
+        # vector is one target vector, and a matrix is a weight path whose row `t` holds the
+        # weights carried through observation `t`. A window closing at row `t` is scored
+        # against row `t` of the path — the weights held by the time the window closed.
+        PO = PortfolioOptimisers
+        T = size(rd.X, 1)
+        rw = ConditionalValueatRisk()
+        wdr = SelfFinancingDrift()
+        U = PO.weight_path(wdr, w, rd.X)
+        Uc = PO.weight_path(nothing, w, rd.X)
+
+        # The definition, written out.
+        @test PO.rolling_window_measure(rw, U, rd.X, nothing, 20) ==
+              [rw(view(rd.X, (t - 19):t, :) * view(U, t, :)) for t in 20:T]
+
+        # Every row of a constant path is the same vector, so the reading reproduces the
+        # constant-weight method exactly rather than approximately.
+        @test PO.rolling_window_measure(rw, Uc, rd.X, nothing, 20) ==
+              PO.rolling_window_measure(rw, w, rd.X, nothing, 20)
+        @test length(PO.rolling_window_measure(rw, U, rd.X, nothing, T)) == 1
+        @test length(PO.rolling_window_measure(rw, U, rd.X, nothing, 20)) == T - 19
+
+        # A drifted path moves the numbers, which is the whole point of the reading.
+        @test PO.rolling_window_measure(rw, U, rd.X, nothing, 20) !=
+              PO.rolling_window_measure(rw, w, rd.X, nothing, 20)
+
+        # The window is refused at the same boundary as the two methods beside it.
+        for bad in (0, -1, T + 1)
+            @test_throws DomainError PO.rolling_window_measure(rw, U, rd.X, nothing, bad)
+        end
+
+        # A path shorter than the sample is refused by name, rather than surfacing as a
+        # `BoundsError` from inside whichever measure `r` names.
+        @test_throws DimensionMismatch PO.rolling_window_measure(rw, view(U, 1:(T - 1), :),
+                                                                 rd.X, nothing, 20)
+        err = try
+            PO.rolling_window_measure(rw, view(U, 1:(T - 1), :), rd.X, nothing, 20)
+        catch e
+            e
+        end
+        @test occursin("size(w, 1) == size(X, 1)", sprint(showerror, err))
+
+        # A vector of measures scalarises inside each window here too.
+        rws = [ConditionalValueatRisk(), ValueatRisk()]
+        @test PO.rolling_window_measure(rws, Uc, rd.X, nothing, 20) ==
+              PO.rolling_window_measure(rws, w, rd.X, nothing, 20)
+        @test PO.rolling_window_measure(rws, U, rd.X, nothing, 20; sca = MaxScalariser()) !=
+              PO.rolling_window_measure(rws, U, rd.X, nothing, 20)
+    end
 end

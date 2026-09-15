@@ -9,7 +9,7 @@ status: accepted
 Cross-validation backtests re-optimise the same estimator over a sequence of time-ordered folds,
 but every constraint field is fixed for the whole horizon. The hooks for per-period updates
 (`is_time_dependent`, `update_time_dependent_estimator`, `needs_previous_weights` in
-[01_Base_Optimisation.jl](../../src/20_Optimisation/01_Base_Optimisation.jl)) existed as
+[01_Base_Optimisation.jl](../../src/17_Optimisation/01_Base_Optimisation.jl)) existed as
 scaffolding with no concrete overload — nothing in the library actually varied a constraint over
 time. The naive approach of "put a vector in the field" is unrepresentable: several fields
 already accept vectors with field-level meaning (`smtx`/`sgmtx` = multiple subset spaces,

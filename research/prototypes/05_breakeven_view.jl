@@ -15,7 +15,7 @@
 #
 #   The construction is an **inverse entropy pooling** problem. The library
 #   already solves the forward problem in
-#   `src/13_Prior/10_EntropyPoolingPrior.jl`: given views, find the
+#   `src/10_Prior/10_EntropyPoolingPrior.jl`: given views, find the
 #   least-distorted probabilities that satisfy them. The inverse problem is:
 #   given a decision, find the least-distorted probabilities that reverse it.
 #   It is the same convex program with the view supplied by the decision

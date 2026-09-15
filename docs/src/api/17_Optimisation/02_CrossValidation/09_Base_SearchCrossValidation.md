@@ -1,0 +1,22 @@
+# Base search cross validation
+
+```@docs
+AbstractSearchCrossValidationEstimator
+CrossValidationSearchScorer
+CrossValSearchScorer
+HighestMeanScore
+finite_candidate_index
+AbstractSearchCrossValidationResult
+AbstractSearchCrossValidationAlgorithm
+SearchCrossValidationResult
+assert_search_entry
+pin_draw
+score_rows
+write_candidate_scores!
+parse_lens
+assert_search_grid_cap
+_expr_to_lens
+_eval_index
+expr_to_lens_chain
+pipeline_asset_view
+```
