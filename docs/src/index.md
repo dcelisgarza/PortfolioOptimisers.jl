@@ -59,6 +59,7 @@ features:
 
 ```@meta
 CurrentModule = PortfolioOptimisers
+Description = "PortfolioOptimisers.jl is a portfolio optimisation (portfolio optimization) library for Julia, built from composable immutable estimators."
 ```
 
 # Welcome to PortfolioOptimisers.jl

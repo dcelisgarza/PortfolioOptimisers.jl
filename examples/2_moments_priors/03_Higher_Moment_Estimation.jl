@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Coskewness and cokurtosis estimation in PortfolioOptimisers.jl, the higher moments that skewness and kurtosis risk measures need."
+```
+
 # Higher moment estimation
 
 Mean–variance optimisation only looks at the first two moments. But asset returns are skewed

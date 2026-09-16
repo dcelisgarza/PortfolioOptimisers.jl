@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "BrownianDistanceVariance and VarianceSkewKurtosis in PortfolioOptimisers.jl: risk measures for non-linear dependence and higher moments."
+```
+
 # Specialist risk measures: BrownianDistanceVariance and VarianceSkewKurtosis
 
 Some risk measures capture dependence structure or higher-order moment interactions that

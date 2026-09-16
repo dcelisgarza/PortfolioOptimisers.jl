@@ -223,6 +223,18 @@ contribute = [joinpath("contribute", file)
 # `<link rel="canonical">`, and `generate_sitemap` roots every sitemap entry at it.
 const CANONICAL_URL = "https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable"
 
+# The site-wide `<meta name="description">`, which Documenter writes into every page that
+# states no `Description` of its own (#561). It is the landing page's own line, read off
+# `index.md` so the two cannot drift, and the generated search page is the one page that
+# always takes it. `test/test_64_docs_page_metadata_census.jl` checks that every other page
+# states its own line, so a page that carries this one has slipped the gate.
+include(joinpath(@__DIR__, "page_metadata.jl"))
+const SITE_DESCRIPTION = meta_description(read(joinpath(@__DIR__, "src", HOME_PAGE),
+                                               String))
+if isnothing(SITE_DESCRIPTION)
+    error("docs/make.jl: `$HOME_PAGE` states no `Description` in its `@meta` block.")
+end
+
 makedocs(; modules = [PortfolioOptimisers], doctest = false,
          authors = "Daniel Celis Garza <daniel.celis.garza@gmail.com>",
          repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/{commit}{path}#{line}",
@@ -240,6 +252,8 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                                   # entry at the same constant, so the sitemap
                                   # and the canonical tags cannot disagree.
                                   canonical = CANONICAL_URL,
+                                  # The fallback description; see `SITE_DESCRIPTION`.
+                                  description = SITE_DESCRIPTION,
                                   # `repo` above is a String, so Documenter cannot
                                   # derive the navbar link. Name the remote explicitly.
                                   repolink = "https://github.com/dcelisgarza/PortfolioOptimisers.jl",
@@ -257,7 +271,9 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                                   # off and only the warning survives.
                                   size_threshold = nothing,
                                   size_threshold_warn = 400 * 2^10),
-         pages = ["Home" => HOME_PAGE;
+         # The landing page's label is its `<title>` and its sidebar entry, so it carries
+         # the words a search ranks the site on, not "Home" (#561).
+         pages = ["Portfolio optimisation library in Julia" => HOME_PAGE;
                   "Capability Catalogue" => CATALOGUE_PAGE;
                   "User Guide" => user_guide;
                   "Examples" => examples;

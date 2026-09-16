@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "The optimiser families of PortfolioOptimisers.jl with one minimal call each: mean-risk, risk budgeting, hierarchical, near-optimal centering, naive and meta."
+```
+
 # Optimisers
 
 This is the breadth tour of the optimiser families. Every optimiser shares the same call —

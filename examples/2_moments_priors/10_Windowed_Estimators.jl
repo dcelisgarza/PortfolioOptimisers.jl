@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Windowed moment estimators in PortfolioOptimisers.jl: restrict or reweight the observations a moment is computed from."
+```
+
 # Windowed moment estimators
 
 Every moment estimator in the previous pages used the **whole** return sample with equal weight

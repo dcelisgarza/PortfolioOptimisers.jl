@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Train/test splitting in PortfolioOptimisers.jl: the holdout protocol everyone reaches for first, done honestly, before any cross-validation."
+```
+
 # Train/test splitting
 
 The cheapest honest question you can ask of a portfolio is: *does it survive data it has

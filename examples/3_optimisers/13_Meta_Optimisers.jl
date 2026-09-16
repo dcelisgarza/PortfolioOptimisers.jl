@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Meta-optimisers in PortfolioOptimisers.jl: nested clustered, stacking and subset resampling, which split a problem and recombine the pieces."
+```
+
 # Meta-optimisers
 
 Every optimiser so far produces weights by solving *one* problem. **Meta-optimisers** instead

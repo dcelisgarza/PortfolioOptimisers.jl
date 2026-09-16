@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Performance attribution in PortfolioOptimisers.jl: cumulative returns, drawdowns, risk contributions and fees as diagnostics after optimise."
+```
+
 # Performance attribution and post-optimisation diagnostics
 
 An optimiser hands you weights; it does not tell you whether the resulting book is any good.

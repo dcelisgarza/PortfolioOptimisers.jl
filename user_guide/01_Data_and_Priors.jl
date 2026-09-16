@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Turn prices into returns and returns into a prior with prices_to_returns and prior: the expected returns and covariance every optimiser consumes."
+```
+
 # Data and priors
 
 The first pipeline stage turns raw prices into a **prior** — the expected-returns vector and

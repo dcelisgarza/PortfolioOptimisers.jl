@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "An end-to-end profile in PortfolioOptimisers.jl: a professional desk rebalancing monthly on a view and the full risk-return trade-off."
+```
+
 # Profile: desk, monthly
 
 The second profile is a **professional desk rebalancing monthly**. The trade-offs invert the

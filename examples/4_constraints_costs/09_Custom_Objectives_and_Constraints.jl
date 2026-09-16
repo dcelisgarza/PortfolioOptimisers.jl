@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Custom objectives and constraints in PortfolioOptimisers.jl: write straight against the JuMP model with CustomJuMPObjective and CustomJuMPConstraint."
+```
+
 # Custom objectives and constraints
 
 Every keyword on a [`JuMPOptimiser`](@ref) — bounds, budgets, turnover, fees, cardinality —

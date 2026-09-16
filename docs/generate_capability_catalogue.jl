@@ -273,6 +273,10 @@ function collapse_blank_runs(md::AbstractString)::String
 end
 
 const _PREAMBLE = """
+```@meta
+Description = "Every estimator, risk measure, constraint and optimiser PortfolioOptimisers.jl ships, grouped by the job it does and linked to its docstring."
+```
+
 # [$(_PAGE_TITLE)](@id capability-catalogue)
 
 Everything `PortfolioOptimisers.jl` can do, grouped by the job it does rather

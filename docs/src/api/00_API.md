@@ -1,3 +1,7 @@
+```@meta
+Description = "The API reference of PortfolioOptimisers.jl: every documented name of the library, one page per source file, mirroring the src tree."
+```
+
 # API introduction
 
 This section explains `PortfolioOptimisers.jl` API in detail. The pages are organised in exactly the same way as the `src` folder itself. This means there should be a 1 to 1 correspondence between documentation and source files[^1].

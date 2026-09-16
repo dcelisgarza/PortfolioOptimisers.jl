@@ -1,3 +1,7 @@
+```@meta
+Description = "The bibliography of PortfolioOptimisers.jl: every paper and book the docstrings cite, and the contributors to the library."
+```
+
 # [References](@id references)
 
 ```@bibliography

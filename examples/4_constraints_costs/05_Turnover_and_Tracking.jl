@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Turnover and tracking in PortfolioOptimisers.jl, each as a constraint on a JuMPOptimiser or as a risk measure to minimise directly."
+```
+
 # Turnover and tracking
 
 The constraints so far shape *what* the portfolio holds. **Turnover** and **tracking** constrain

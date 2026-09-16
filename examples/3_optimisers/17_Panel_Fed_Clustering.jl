@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Clustering on a fundamentals panel in PortfolioOptimisers.jl: build an AssetPanel with gaps and mixed scales and feed it to a clustering optimiser."
+```
+
 # Clustering on a fundamentals panel
 
 [Feature matrices as a distance source](16_Feature_Distance_Clustering.md) builds its panel from

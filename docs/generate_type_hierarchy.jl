@@ -111,6 +111,10 @@ function generate_type_hierarchy(dir::String = joinpath(@__DIR__, "src", "api"))
     open(path, "w") do io
         print(io,
               """
+              ```@meta
+              Description = "The type hierarchy of PortfolioOptimisers.jl: every result, estimator, algorithm and covariance estimator as a tree, each linked to its docstring."
+              ```
+
               # Type hierarchy
 
               The trees below are generated automatically from the live type hierarchy

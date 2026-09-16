@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Constraints and costs as keywords on JuMPOptimiser: weight bounds, budgets, groups, turnover, tracking, cardinality and fees, one minimal call each."
+```
+
 # Constraints and costs
 
 Real mandates are not unconstrained. You cap concentration, hold a sector band, limit how much

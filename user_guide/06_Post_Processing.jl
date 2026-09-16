@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Post-processing in PortfolioOptimisers.jl: turn continuous weights into whole shares under a cash budget, and plot the result."
+```
+
 # Post-processing
 
 An optimiser returns *continuous* weights — fractions of capital. To trade them you need whole

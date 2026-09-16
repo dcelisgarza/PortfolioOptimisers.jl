@@ -113,3 +113,71 @@ concern, not this gate's.
   build time) is exactly the classification pass the mirror trees are generated from.
 - The 21-entry foreign-owned class this ADR classifies always-public was untested by #557's two
   prototype pages, because neither carried one; the rule here is the first place it is decided.
+
+## Amendment (2026-09-17)
+
+[Issue #561](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/561) decided the
+title and the description each docs page carries, and three of its rulings bind the mirror
+pages this ADR creates. They are recorded here so the migration writes them and the census
+that follows can be read against one document.
+
+### The private mirror's H1 carries a suffix
+
+The public mirror keeps the source page's H1 verbatim. The private mirror's H1 is the same
+text followed by `: private API` — `# Asset turnover: private API` — so the H1, the `<title>`
+Documenter derives from it, and the sidebar entry agree without a per-page label in
+`docs/make.jl`. The navigation groups stay `Public API` and `Private API`, so one phrase
+serves the rail, the H1 and the description. "Internals" was considered and rejected:
+"private API" is the standard Julia term and is symmetric with "public API".
+
+### A mirror page's description is derived from the page itself
+
+Every mirror page carries a `Description = "…"` in its `@meta` block, and the line is
+derived, never hand-written:
+
+```text
+<subject>, public API of PortfolioOptimisers.jl: <names…>.
+<subject>, private API of PortfolioOptimisers.jl: <names…>.
+```
+
+`<subject>` is the H1 with the `: private API` suffix stripped, case untouched. `<names…>`
+are the binding names of the page's own `@docs` blocks — signatures stripped, the
+`PortfolioOptimisers.` qualification dropped, a foreign qualification such as `Base.` kept,
+duplicates dropped, in page order — cut on a name boundary once the line passes 155
+characters, with `, …` marking the cut. An empty mirror reads
+`<subject> has no public API in PortfolioOptimisers.jl; its names are in the private API.`,
+and the converse on the other side.
+
+Everything the derivation reads is in the `.md` itself, so it is re-derived without a docs
+build and without the live module. The derivation is written once, in
+`docs/page_metadata.jl`, and both the generator that writes the line and the census that
+checks it call that one function, so they cannot drift.
+
+### A census owns every page's title and description
+
+`test/test_64_docs_page_metadata_census.jl`, parallel to the placement census this ADR's
+Decision names, gates the metadata of every page class:
+
+- a mirror page: the `Description` equals the derivation from the same file, and the H1 ends
+  in `: private API` exactly on the private side;
+- every other page: a `Description` is present in the source, is not Documenter's default,
+  is unique across the site, and is 50–160 characters; the landing line may carry the
+  American spelling once, and no other line carries it;
+- `docs/make.jl`: the landing page's `pages` label is `Portfolio optimisation library in
+  Julia`, which Documenter renders as the `<title>`, and the site-wide fallback description
+  `Documenter.HTML(; description = SITE_DESCRIPTION)` is read off the landing page's own
+  line. The generated search page always takes the fallback, so it is the one page permitted
+  to duplicate the landing line.
+
+The mirror checks pass vacuously while `docs/src/public_api/` and `docs/src/private_api/` do
+not exist, so the migration turns them on by creating the trees and needs no edit to the
+census.
+
+### Consequences of the amendment
+
+- The migration writes, for each mirror page, the H1 suffix on the private side and the
+  derived `Description`, through `docs/page_metadata.jl`.
+- `STANDARDS.md` routes "a docs page's `<title>` or its description" to this amendment, with
+  `docs/page_metadata.jl` as the derivation and the page-metadata census as the gate.
+- A hand-written page added to the site owes a `Description` from its first commit, because
+  the census is absolute over the page classes it walks.

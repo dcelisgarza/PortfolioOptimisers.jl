@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Weight drift and held weights in PortfolioOptimisers.jl: read a backtest as a fund holds it, with each position growing at its own return."
+```
+
 # Weight drift and held weights: reading a backtest as a fund holds it
 
 A backtest reads a fold in two places, and each place asks a question that has two honest answers.

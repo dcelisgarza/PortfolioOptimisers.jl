@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Phylogeny and centrality constraints in PortfolioOptimisers.jl: limit exposure to tightly-knit clusters and tilt toward network hubs."
+```
+
 # Phylogeny and centrality constraints
 
 The constraints in [Linear and group constraints](02_Linear_Group_Constraints.md) act on names

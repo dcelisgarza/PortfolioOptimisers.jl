@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "The risk measures of PortfolioOptimisers.jl: variance, semi-moments, MAD, VaR, CVaR, EVaR, RLVaR, drawdowns and OWA, and the aliases that configure them."
+```
+
 # Risk measures
 
 The previous page showed *which optimiser* to call. This one is the catalogue of *what you ask it

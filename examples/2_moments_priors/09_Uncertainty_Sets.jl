@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Uncertainty sets in PortfolioOptimisers.jl: robust optimisation against the worst case within box and ellipsoidal sets around the moments."
+```
+
 # Uncertainty sets
 
 The view priors so far ([Black–Litterman](05_Black_Litterman.md),

@@ -1,3 +1,7 @@
+```@meta
+Description = "How to contribute to PortfolioOptimisers.jl: bug reports, discussions, working on an issue, and the code of conduct."
+```
+
 # [Contributing guidelines](@id contributing)
 
 First of all, thanks for the interest!

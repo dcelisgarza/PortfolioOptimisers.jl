@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "A decision framework for choosing an optimiser, risk measure and prior in PortfolioOptimisers.jl from four questions about your mandate."
+```
+
 # Choosing a strategy
 
 The previous pages showed *how* to call each tool. This one is about *which* to reach for. There

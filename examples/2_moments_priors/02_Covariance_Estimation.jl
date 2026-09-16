@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Covariance estimation in PortfolioOptimisers.jl: denoising, detoning, shrinkage and robust estimators for a short, noisy return sample."
+```
+
 # Covariance estimation
 
 The covariance matrix is the second moment that almost every optimiser depends on, and on a

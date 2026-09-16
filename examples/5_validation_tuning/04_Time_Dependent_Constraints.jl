@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Time-dependent constraints in PortfolioOptimisers.jl: a TimeDependent schedule or callable in any optimiser field, varied fold by fold."
+```
+
 # Time-dependent constraints
 
 Every constraint we have used so far is *static*: it is fixed when the optimiser is constructed and applies unchanged to every optimisation. Under cross-validation, however, each fold is a separate optimisation over a different slice of time — and sometimes the constraint itself should change with time: a de-leveraging schedule that tightens position caps, a turnover budget relative to the previous rebalance, bounds that react to the volatility regime of the training window.

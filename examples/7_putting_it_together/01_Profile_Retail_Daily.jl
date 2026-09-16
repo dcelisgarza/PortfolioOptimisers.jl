@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "An end-to-end profile in PortfolioOptimisers.jl: a retail investor rebalancing daily under compute, trading-cost and capital limits."
+```
+
 # Profile: retail, daily
 
 The earlier examples each isolate one piece of the pipeline. The *putting-it-together* profiles

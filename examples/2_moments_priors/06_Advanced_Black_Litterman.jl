@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Advanced Black-Litterman variants in PortfolioOptimisers.jl: factor views, asset and factor views at once, and the Bayesian form."
+```
+
 # Advanced Black–Litterman variants
 
 The base [`BlackLittermanPrior`](@ref) ([previous page](05_Black_Litterman.md)) works entirely

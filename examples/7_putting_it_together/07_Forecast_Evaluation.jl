@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Read a Return Forecast before an optimiser sees it: forecast evaluation for CrossSectionalFactorPrior in PortfolioOptimisers.jl."
+```
+
 # Reading a Return Forecast before an optimiser sees it
 
 A [`CrossSectionalFactorPrior`](@ref) takes a **Return Forecast** — an opinion about which

@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Nested clustered optimisation with constraints and fees at the inner, outer and final layers of NestedClustered in PortfolioOptimisers.jl."
+```
+
 # Nested clustered optimisation with layered constraints and fees
 
 This example shows how to apply constraints at three distinct layers of

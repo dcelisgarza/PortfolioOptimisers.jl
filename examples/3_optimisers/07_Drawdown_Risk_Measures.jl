@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Drawdown risk measures in PortfolioOptimisers.jl: average, maximum and conditional drawdown at risk on the path of cumulative wealth."
+```
+
 # Drawdown risk measures
 
 Drawdown-based risk measures describe how far the portfolio has fallen from its previous

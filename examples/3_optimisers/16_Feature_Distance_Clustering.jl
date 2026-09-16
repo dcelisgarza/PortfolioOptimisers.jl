@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Cluster on a feature matrix instead of returns with FeatureDistance in PortfolioOptimisers.jl: sectors, loadings or any per-asset quantity."
+```
+
 # Feature matrices as a distance source
 
 Every clustering optimiser met so far builds its hierarchy from the **returns**: a covariance

@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "The Black-Litterman model in PortfolioOptimisers.jl: tilt an equilibrium prior toward your views on assets and asset groups."
+```
+
 # Black–Litterman
 
 The estimators so far take the data at face value. But you often *have a view* — "Apple will

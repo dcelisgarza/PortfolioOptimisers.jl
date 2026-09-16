@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Entropy pooling in PortfolioOptimisers.jl: views as constraints on any moment, imposed by reweighting scenarios without assuming normality."
+```
+
 # Entropy pooling
 
 [Black–Litterman](05_Black_Litterman.md) blends views into the *mean* through a Gaussian

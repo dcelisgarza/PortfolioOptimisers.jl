@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Hyperparameter tuning in PortfolioOptimisers.jl: grid and randomised search over any estimator, scored on cross-validation folds."
+```
+
 # Hyperparameter tuning
 
 Hyper parameter tuning is a powerful technique to choose parameters based on their performance on test folds. In this example, we will showcase the two implemented approaches implemented in PortfolioOptimisers.jl.

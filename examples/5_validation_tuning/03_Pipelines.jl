@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Pipelines in PortfolioOptimisers.jl: put data cleaning, filling and filtering inside the cross-validation loop and tune their parameters."
+```
+
 # Pipelines
 
 Every example so far has started from a returns matrix. But a returns matrix is already the

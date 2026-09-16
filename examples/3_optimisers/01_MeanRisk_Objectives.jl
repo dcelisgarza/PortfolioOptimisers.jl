@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "The MeanRisk objectives in PortfolioOptimisers.jl: minimum risk, maximum utility, maximum ratio and maximum return on one prior and risk measure."
+```
+
 # `MeanRisk` objectives
 
 [`MeanRisk`](@ref) is the workhorse optimiser: it casts portfolio selection as an explicit

@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Subset resampling under cross-validation in PortfolioOptimisers.jl: how stable a meta-optimiser's out-of-sample weights and frontier are."
+```
+
 # Subset resampling and cross-validation
 
 This example deepens the basic meta-optimiser walkthrough by focusing on two practical

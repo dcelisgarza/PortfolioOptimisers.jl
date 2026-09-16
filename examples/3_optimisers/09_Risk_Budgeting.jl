@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Risk budgeting in PortfolioOptimisers.jl: match per-asset or per-factor risk contributions to a budget, with equal risk contribution as the special case."
+```
+
 # Risk budgeting
 
 [`RiskBudgeting`](@ref) takes a different stance from [`MeanRisk`](@ref). Instead of trading

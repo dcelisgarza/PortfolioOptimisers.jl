@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Near optimal centering in PortfolioOptimisers.jl: trade a sliver of optimality for the stable analytic centre of the near-optimal region."
+```
+
 # Near optimal centering
 
 A classic optimiser returns the single point that *exactly* extremises its objective — the

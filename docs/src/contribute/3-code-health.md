@@ -3,6 +3,10 @@
      code block, so a page that mixes admonitions with fenced code can never satisfy
      MD046's consistency check. 2-developer.md has the same shape. -->
 
+```@meta
+Description = "The code-health loop of PortfolioOptimisers.jl: what each gate measures, the priority order, and how to dismiss or exempt a finding."
+```
+
 # [Code health: the maintenance loop](@id code_health)
 
 !!! note "Developer documentation"
