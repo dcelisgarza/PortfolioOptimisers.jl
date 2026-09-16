@@ -172,3 +172,12 @@ not fail on a type the page omits on purpose.
 
 The exemption is about the *page*, not about visibility. An exempt type keeps its
 docstring and its API-page entry, and `Base.undocumented_names` still covers it.
+
+## Amendment (2026-09-17)
+
+Decision 6 left `00_API.md` holding the design-philosophy essay. Issue #562 moved the
+essay whole to `docs/src/contribute/0-design.md`, because a contributor reads it and a
+user of the reference does not. `00_API.md` now opens with the reference-page contract:
+one page per source file, split into a public and a private page per ADR 0128, and the
+capability catalogue as the place to browse by job. The catalogue's own placement and
+its two checks are unchanged.

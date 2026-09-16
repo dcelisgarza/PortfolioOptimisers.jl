@@ -63,6 +63,35 @@ function page_h1(text::AbstractString)
 end
 
 """
+    opening_paragraph(text, h1) -> Union{Nothing, String}
+
+The first paragraph under the level-one heading whose text is `h1`: the lines from the first
+non-blank line after the heading to the next blank line, joined with newlines. `nothing` when
+the page has no such heading, or nothing but blank lines follows it. The README opening and
+the landing-page opening are one text kept in two places (#562 § 5), and this is how the
+census reads both.
+"""
+function opening_paragraph(text::AbstractString, h1::AbstractString)
+    lines = split(text, '\n')
+    start = findfirst(==("# $h1"), lines)
+    if isnothing(start)
+        return nothing
+    end
+    i = start + 1
+    while i <= length(lines) && isempty(strip(lines[i]))
+        i += 1
+    end
+    if i > length(lines)
+        return nothing
+    end
+    j = i
+    while j <= length(lines) && !isempty(strip(lines[j]))
+        j += 1
+    end
+    return join(lines[i:(j - 1)], '\n')
+end
+
+"""
     meta_description(text) -> Union{Nothing, String}
 
 The `Description = "…"` line of the page's `@meta` blocks, or `nothing` when no block

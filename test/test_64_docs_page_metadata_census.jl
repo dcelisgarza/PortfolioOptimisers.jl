@@ -107,6 +107,13 @@ end
         @test isnothing(meta_description("```@meta\nCurrentModule = X\n```\n# Title\n"))
         @test isnothing(meta_description("# Title\n"))
 
+        # The opening paragraph under a named H1: blank lines skipped, cut at the next blank
+        # line, line breaks kept so a rewrap on one side shows as a difference.
+        page = "badge\n\n# Title\n\nFirst line.\nSecond line.\n\nNext paragraph.\n"
+        @test opening_paragraph(page, "Title") == "First line.\nSecond line."
+        @test isnothing(opening_paragraph(page, "Other"))
+        @test isnothing(opening_paragraph("# Title\n\n\n", "Title"))
+
         # `@docs` names: signatures and parameters stripped, the package qualification
         # dropped, a foreign qualification kept, duplicates dropped, page order kept.
         page = """
@@ -230,6 +237,25 @@ end
         elsewhere = sort([p
                           for (p, d) in stated if p != "index.md" && occursin(american, d)])
         @test elsewhere == String[]
+    end
+
+    @testset "the README opening and the landing opening are one text" begin
+        # #562 § 5: the two-sentence opening under the README's H1 and under the landing
+        # page's H1 are one text maintained in two places, identical by rule, character for
+        # character. Whichever file is edited, the other must follow.
+        readme = opening_paragraph(read(joinpath(REPO_ROOT, "README.md"), String),
+                                   "PortfolioOptimisers.jl")
+        index = opening_paragraph(read(sources["index.md"], String),
+                                  "Welcome to PortfolioOptimisers.jl")
+        @test !isnothing(readme)
+        @test !isnothing(index)
+        @test readme == index
+        # The opening is the two sentences #562 fixed: the library, Julia, composable
+        # immutable estimators, and the one parenthetical American spelling.
+        @test occursin("library for Julia", readme)
+        @test occursin("(portfolio optimization)", readme)
+        @test count(r"optimiz"i, readme) == 1
+        @test occursin("immutable estimator", readme)
     end
 
     @testset "make.jl: the home title and the site-wide fallback" begin
