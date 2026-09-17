@@ -628,3 +628,4 @@ function apply_preprocessing(ptr::PricesToReturns, pr::PricesResult)::ReturnsRes
     return prices_to_returns(ptr, pr)
 end
 export prices_to_returns, PricesToReturns, CatchUpGapReturn
+public AbstractGapReturnAlgorithm, gap_return

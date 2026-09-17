@@ -1,5 +1,5 @@
 ```@meta
-Description = "Cross-sectional transforms, private API of PortfolioOptimisers.jl: AbstractCrossSectionalTransform, CS_MISSING_GROUP, CS_MAD_CONSISTENCY, …"
+Description = "Cross-sectional transforms, private API of PortfolioOptimisers.jl: CS_MISSING_GROUP, CS_MAD_CONSISTENCY, assert_cross_sectional_matrix, …"
 ```
 
 # Cross-sectional transforms: private API
@@ -7,7 +7,6 @@ Description = "Cross-sectional transforms, private API of PortfolioOptimisers.jl
 ## Types
 
 ```@docs
-PortfolioOptimisers.AbstractCrossSectionalTransform
 PortfolioOptimisers.CS_MISSING_GROUP
 PortfolioOptimisers.CS_MAD_CONSISTENCY
 ```

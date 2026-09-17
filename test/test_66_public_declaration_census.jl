@@ -111,15 +111,14 @@ end
     promotion_debt = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
                           :AbstractAmbiguityTailWeightCalibrationAlgorithm,
                           :AbstractConstraintEstimator, :AbstractConstraintResult,
-                          :AbstractConstraintSpace, :AbstractCrossSectionalTransform,
+                          :AbstractConstraintSpace,
                           :AbstractDeformationCalibrationAlgorithm,
                           :AbstractDenoiseAlgorithm, :AbstractDenoiseEstimator,
                           :AbstractDetoneEstimator, :AbstractExpectedReturnsAlgorithm,
-                          :AbstractGapReturnAlgorithm, :AbstractMatrixProcessingAlgorithm,
+                          :AbstractMatrixProcessingAlgorithm,
                           :AbstractMatrixProcessingEstimator, :AbstractMomentAlgorithm,
                           :AbstractNormCeilingCalibrationAlgorithm,
-                          :AbstractOrderedWeightsArrayFunction, :AbstractPanelField,
-                          :AbstractPanelFieldInput, :AbstractPanelFillAlgorithm,
+                          :AbstractOrderedWeightsArrayFunction,
                           :AbstractPosdefEstimator, :AbstractPreorderBy,
                           :AbstractPreviousWeightsSource, :AbstractPriorEstimator,
                           :AbstractPriorResult, :AbstractPriorUncertaintySetEstimator,
@@ -147,12 +146,10 @@ end
     (`prior`, `port_opt_view`, `mu_ucs`, ...) is not here -- only a name a promotion ticket
     must still declare alongside its type.
     =#
-    verb_debt = Set([:_denoise!, :bootstrap_indices, :compute_pooling, :gap_return,
+    verb_debt = Set([:_denoise!, :bootstrap_indices, :compute_pooling,
                      :get_node_property, :k_ucs, :matrix_processing_algorithm,
                      :matrix_processing_algorithm!, :needs_previous_weights,
-                     :opt_weight_bounds, :panel_field_axes, :panel_field_labels,
-                     :panel_field_stack!, :panel_field_view, :panel_fill,
-                     :panel_input_field, :panel_input_is_static, :panel_resolve,
+                     :opt_weight_bounds,
                      :reads_prior_result, :realised_target, :reconstruct_prior, :scalarise,
                      :scalarise_risk_expression!, :set_clustering_weight_finaliser_alg!,
                      :target_dof, :target_step_dof, :time_dependent_field_defaults,
@@ -248,5 +245,5 @@ end
     # alive.
     @test length(sections) > 80
     @test length(promotion_debt) > 50
-    @test length(verb_debt) > 20
+    @test length(verb_debt) > 15
 end

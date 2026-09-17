@@ -1,5 +1,5 @@
 ```@meta
-Description = "Cross-sectional transforms, public API of PortfolioOptimisers.jl: CrossSectionalWinsoriser, CrossSectionalTanhShrinker, CrossSectionalStandardiser, …"
+Description = "Cross-sectional transforms, public API of PortfolioOptimisers.jl: AbstractCrossSectionalTransform, CrossSectionalWinsoriser, CrossSectionalTanhShrinker, …"
 ```
 
 # Cross-sectional transforms
@@ -25,6 +25,7 @@ benchmark and a different classification at every call site.
 ## Types
 
 ```@docs
+AbstractCrossSectionalTransform
 CrossSectionalWinsoriser
 CrossSectionalTanhShrinker
 CrossSectionalStandardiser

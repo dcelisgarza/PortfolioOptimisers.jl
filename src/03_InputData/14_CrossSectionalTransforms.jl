@@ -1554,3 +1554,4 @@ end
 export CrossSectionalWinsoriser, CrossSectionalTanhShrinker, CrossSectionalStandardiser,
        CrossSectionalGaussianRank, CrossSectionalPercentileRank, cross_sectional_transform,
        cross_sectional_groups
+public AbstractCrossSectionalTransform

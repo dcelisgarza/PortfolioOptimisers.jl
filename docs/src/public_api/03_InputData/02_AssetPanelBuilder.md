@@ -1,5 +1,5 @@
 ```@meta
-Description = "Asset Panel builder, public API of PortfolioOptimisers.jl: NumericPanelInput, CategoricalPanelInput, TensorPanelInput, NoPanelFill, ConstantPanelFill, …"
+Description = "Asset Panel builder, public API of PortfolioOptimisers.jl: AbstractPanelFieldInput, AbstractPanelFillAlgorithm, NumericPanelInput, …"
 ```
 
 # Asset Panel builder
@@ -7,6 +7,8 @@ Description = "Asset Panel builder, public API of PortfolioOptimisers.jl: Numeri
 ## Types
 
 ```@docs
+AbstractPanelFieldInput
+AbstractPanelFillAlgorithm
 NumericPanelInput
 CategoricalPanelInput
 TensorPanelInput
@@ -20,4 +22,8 @@ BackwardPanelFill
 
 ```@docs
 asset_panel
+panel_fill
+panel_resolve
+panel_input_field
+panel_input_is_static
 ```

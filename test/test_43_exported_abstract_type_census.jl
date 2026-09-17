@@ -38,17 +38,21 @@
     second route: an abstract type whose docstring carries a `# Interfaces` section earns a
     `public` declaration on the type and on every verb the section names, one
     promotion-ticket directory at a time (issue #553) — `VectorToScalarMeasure` joined this
-    way on 2026-09-17 (issue #1127), the nine `src/01_Base/` types below joined the same day
-    (issue #1126), and the twenty-five `src/05_Moments/` types below joined the same day
-    (issue #1130). They are held to their own list for the same reason — public is API too.
+    way on 2026-09-17 (issue #1127), the nine `src/01_Base/` types joined the same day (issue
+    #1126), the twenty-five `src/05_Moments/` types joined the same day (issue #1130), and the
+    five `src/03_InputData/` types below joined the same day too (issue #1128). They are held
+    to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:AbstractBins, :AbstractCoverageAlgorithm,
                           :AbstractCovarianceEstimator,
                           :AbstractCrossSectionalRegressionEstimator,
+                          :AbstractCrossSectionalTransform,
                           :AbstractCrossSectionalWeightsAlgorithm,
                           :AbstractDescriptorEstimator, :AbstractEstimatorValueAlgorithm,
                           :AbstractExpectedReturnsEstimator, :AbstractExposureEstimator,
-                          :AbstractForecastTarget, :AbstractOptimisationEstimator,
+                          :AbstractForecastTarget, :AbstractGapReturnAlgorithm,
+                          :AbstractOptimisationEstimator, :AbstractPanelField,
+                          :AbstractPanelFieldInput, :AbstractPanelFillAlgorithm,
                           :AbstractPartialFitState, :AbstractReturnForecastEstimator,
                           :AbstractTimeSeriesRegressionEstimator,
                           :AbstractVarianceEstimator, :BaseGerberCovariance,

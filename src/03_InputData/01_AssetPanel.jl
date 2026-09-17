@@ -1603,3 +1603,5 @@ function check_asset_panel(pnl::AssetPanel, na::Option{<:Integer}, nobs::Option{
 end
 export AssetPanel, NumericPanelField, CategoricalPanelField, TensorPanelField, panel_field,
        panel_feature_matrix
+public AbstractPanelField, panel_field_axes, panel_field_labels, panel_field_stack!,
+       panel_field_view

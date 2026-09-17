@@ -1,5 +1,5 @@
 ```@meta
-Description = "Asset Panel builder, private API of PortfolioOptimisers.jl: AbstractAssetPanelEstimator, AbstractPanelFieldInput, AbstractPanelFillAlgorithm, …"
+Description = "Asset Panel builder, private API of PortfolioOptimisers.jl: AbstractAssetPanelEstimator, panel_build_observations, panel_fill_array, …"
 ```
 
 # Asset Panel builder: private API
@@ -8,20 +8,14 @@ Description = "Asset Panel builder, private API of PortfolioOptimisers.jl: Abstr
 
 ```@docs
 PortfolioOptimisers.AbstractAssetPanelEstimator
-PortfolioOptimisers.AbstractPanelFieldInput
-PortfolioOptimisers.AbstractPanelFillAlgorithm
 ```
 
 ## Functions
 
 ```@docs
 PortfolioOptimisers.panel_build_observations
-PortfolioOptimisers.panel_fill
 PortfolioOptimisers.panel_fill_array
 PortfolioOptimisers.panel_directional_fill
-PortfolioOptimisers.panel_resolve
-PortfolioOptimisers.panel_input_field
-PortfolioOptimisers.panel_input_is_static
 PortfolioOptimisers.is_panel_blank
 PortfolioOptimisers.assert_panel_fill
 PortfolioOptimisers.assert_panel_input

@@ -1,5 +1,5 @@
 ```@meta
-Description = "The Asset Panel, public API of PortfolioOptimisers.jl: AssetPanel, NumericPanelField, CategoricalPanelField, TensorPanelField, panel_field, …"
+Description = "The Asset Panel, public API of PortfolioOptimisers.jl: AbstractPanelField, AssetPanel, NumericPanelField, CategoricalPanelField, TensorPanelField, …"
 ```
 
 # The Asset Panel
@@ -36,6 +36,7 @@ Feature Matrix.
 ## Types
 
 ```@docs
+AbstractPanelField
 AssetPanel
 NumericPanelField
 CategoricalPanelField
@@ -48,4 +49,8 @@ TensorPanelField
 panel_field
 panel_feature_matrix
 port_opt_view(::AssetPanel, ::Any)
+panel_field_axes
+panel_field_labels
+panel_field_stack!
+panel_field_view
 ```
