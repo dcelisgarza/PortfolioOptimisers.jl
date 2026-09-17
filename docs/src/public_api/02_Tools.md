@@ -41,6 +41,7 @@ obs_weights_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator, <:Abstr
 Some estimators and constraints are based on summary statistics of vectors. These types are used to dispatch the appropriate functions and encapsulate auxiliary data such as weights.
 
 ```@docs
+VectorToScalarMeasure
 MinValue
 MeanValue
 MedianValue
@@ -56,4 +57,5 @@ factory(mdv::MedianValue, args...; kwargs...)
 factory(sv::StdValue, args...; kwargs...)
 factory(vv::VarValue, args...; kwargs...)
 factory(msv::StandardisedValue, args...; kwargs...)
+vec_to_real_measure
 ```

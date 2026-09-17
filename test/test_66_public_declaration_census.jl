@@ -160,8 +160,7 @@ end
                           :OptimisationReturnCode, :RegimeAdjustedMethod, :Scalariser,
                           :TimeDependentCallable, :TimeDependentConstraintCallable,
                           :TimeDependentOptimiserCallable,
-                          :VectorAbstractEstimatorValueAlgorithm, :VectorToScalarMeasure,
-                          :WeightFinaliser])
+                          :VectorAbstractEstimatorValueAlgorithm, :WeightFinaliser])
 
     #=
     The verbs the still-private types above name that are themselves neither exported nor
@@ -182,7 +181,7 @@ end
                      :realised_target, :reconstruct_prior, :regime_multiplier, :scalarise,
                      :scalarise_risk_expression!, :set_clustering_weight_finaliser_alg!,
                      :target_dof, :target_step_dof, :time_dependent_field_defaults,
-                     :tracking_benchmark, :variance_risk_bounds_val, :vec_to_real_measure])
+                     :tracking_benchmark, :variance_risk_bounds_val])
 
     undeclared_types = Symbol[]
     undeclared_verbs = Tuple{Symbol, Symbol}[]

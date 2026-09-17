@@ -71,7 +71,5 @@ fourth_moment_index_generator
 Some estimators and constraints are based on summary statistics of vectors. These types are used to dispatch the appropriate functions and encapsulate auxiliary data such as weights.
 
 ```@docs
-VectorToScalarMeasure
 Num_VecToScaM
-vec_to_real_measure
 ```

@@ -3762,4 +3762,5 @@ end
 export factory, concrete_typed_array, MinValue, MeanValue, MedianValue, MaxValue,
        StandardisedValue, StdValue, VarValue, SumValue, ProdValue, ModeValue
 public @propagatable, @fprop, @vprop, @pprop, @cprop, @wprop, @forward_properties,
-       traverse_concrete_subtypes, factory_child, port_opt_view, obs_weights_view
+       traverse_concrete_subtypes, factory_child, port_opt_view, obs_weights_view,
+       VectorToScalarMeasure, vec_to_real_measure

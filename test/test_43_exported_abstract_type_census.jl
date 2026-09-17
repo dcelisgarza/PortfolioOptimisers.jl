@@ -31,14 +31,16 @@
 
     #=
     `public` is the weaker declaration, and `names(PortfolioOptimisers)` returns both, so a
-    census that reads that list alone reports four names it should not. These four are
-    deliberate: a caller subtypes `CustomJuMPObjective` or `CustomJuMPConstraint` to write a
-    custom objective or constraint (ADR 0036), and the two vector aliases are `AbstractVector`
-    over those families, which `isabstracttype` also answers `true` for. They are held to
-    their own list for the same reason — public is API too.
+    census that reads that list alone reports five names it should not. Four are deliberate:
+    a caller subtypes `CustomJuMPObjective` or `CustomJuMPConstraint` to write a custom
+    objective or constraint (ADR 0036), and the two vector aliases are `AbstractVector` over
+    those families, which `isabstracttype` also answers `true` for. `VectorToScalarMeasure`
+    joined on 2026-09-17 (issue #1127): ADR 0154 promotes an abstract type carrying a
+    `# Interfaces` section, and its docstring names one, `vec_to_real_measure`. They are held
+    to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:CustomJuMPConstraint, :CustomJuMPObjective, :VecJuMPConstr,
-                          :VecJuMPObj])
+                          :VecJuMPObj, :VectorToScalarMeasure])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&
