@@ -1,16 +1,13 @@
-# Phylogeny Constraints
+```@meta
+Description = "Phylogeny Constraints, private API of PortfolioOptimisers.jl: AbstractCentralityConstraint, VecCC, CC_VecCC, AbstractPhylogenyConstraintEstimator, …"
+```
+
+# Phylogeny Constraints: private API
 
 ```@docs
-SemiDefinitePhylogenyEstimator
-SemiDefinitePhylogeny
-IntegerPhylogenyEstimator
-IntegerPhylogeny
-phylogeny_constraints
 AbstractCentralityConstraint
-CentralityConstraint
 VecCC
 CC_VecCC
-centrality_constraints
 AbstractPhylogenyConstraintEstimator
 AbstractPhylogenyConstraintResult
 PlCE_PlC
@@ -22,11 +19,4 @@ MatNum_PhRMatNum
 Lc_CC_VecCC
 _validate_length_integer_phylogeny_constraint_B
 validate_length_integer_phylogeny_constraint_B
-```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
 ```
