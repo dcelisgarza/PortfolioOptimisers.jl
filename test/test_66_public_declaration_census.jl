@@ -115,7 +115,7 @@ end
                           :AbstractDeformationCalibrationAlgorithm,
                           :AbstractExpectedReturnsAlgorithm, :AbstractMomentAlgorithm,
                           :AbstractNormCeilingCalibrationAlgorithm,
-                          :AbstractOrderedWeightsArrayFunction, :AbstractPreorderBy,
+                          :AbstractOrderedWeightsArrayFunction,
                           :AbstractPreviousWeightsSource, :AbstractPriorEstimator,
                           :AbstractPriorResult, :AbstractPriorUncertaintySetEstimator,
                           :AbstractRealisedTarget, :AbstractRedundancyAlgorithm,
@@ -142,12 +142,12 @@ end
     (`prior`, `port_opt_view`, `mu_ucs`, ...) is not here -- only a name a promotion ticket
     must still declare alongside its type.
     =#
-    verb_debt = Set([:bootstrap_indices, :compute_pooling, :get_node_property, :k_ucs,
-                     :needs_previous_weights, :opt_weight_bounds, :reads_prior_result,
-                     :realised_target, :reconstruct_prior, :scalarise,
-                     :scalarise_risk_expression!, :set_clustering_weight_finaliser_alg!,
-                     :target_dof, :target_step_dof, :time_dependent_field_defaults,
-                     :tracking_benchmark, :variance_risk_bounds_val])
+    verb_debt = Set([:bootstrap_indices, :compute_pooling, :k_ucs, :needs_previous_weights,
+                     :opt_weight_bounds, :reads_prior_result, :realised_target,
+                     :reconstruct_prior, :scalarise, :scalarise_risk_expression!,
+                     :set_clustering_weight_finaliser_alg!, :target_dof, :target_step_dof,
+                     :time_dependent_field_defaults, :tracking_benchmark,
+                     :variance_risk_bounds_val])
 
     undeclared_types = Symbol[]
     undeclared_verbs = Tuple{Symbol, Symbol}[]

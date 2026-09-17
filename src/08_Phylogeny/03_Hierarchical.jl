@@ -646,3 +646,5 @@ end
 
 export ClusterNode, is_leaf, PreorderTreeByID, pre_order, to_tree, optimal_number_clusters,
        assignments
+# The seam and the verb its `# Interfaces` section names (ADR 0154, issue #1131).
+public AbstractPreorderBy, get_node_property

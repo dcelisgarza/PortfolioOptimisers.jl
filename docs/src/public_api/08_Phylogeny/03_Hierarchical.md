@@ -1,12 +1,14 @@
 ```@meta
-Description = "Hierarchical, public API of PortfolioOptimisers.jl: ClusterNode, PreorderTreeByID, is_leaf, pre_order, to_tree, optimal_number_clusters, clusterise, …"
+Description = "Hierarchical, public API of PortfolioOptimisers.jl: ClusterNode, AbstractPreorderBy, PreorderTreeByID, get_node_property, is_leaf, pre_order, to_tree, …"
 ```
 
 # Hierarchical
 
 ```@docs
 ClusterNode
+AbstractPreorderBy
 PreorderTreeByID
+get_node_property
 is_leaf
 pre_order
 to_tree

@@ -40,8 +40,9 @@
     promotion-ticket directory at a time (issue #553) — `VectorToScalarMeasure` joined this
     way on 2026-09-17 (issue #1127), the nine `src/01_Base/` types joined the same day (issue
     #1126), the twenty-five `src/05_Moments/` types joined the same day (issue #1130), the five
-    `src/03_InputData/` types joined the same day too (issue #1128), and the six
-    `src/04_MatrixProcessing/` types below joined the same day again (issue #1129). They are
+    `src/03_InputData/` types joined the same day too (issue #1128), the six
+    `src/04_MatrixProcessing/` types below joined the same day again (issue #1129), and
+    `AbstractPreorderBy` from `src/08_Phylogeny/` joined the same day (issue #1131). They are
     held to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:AbstractBins, :AbstractCovarianceEstimator,
@@ -59,7 +60,7 @@
                           :AbstractOptimisationEstimator, :AbstractPanelField,
                           :AbstractPanelFieldInput, :AbstractPanelFillAlgorithm,
                           :AbstractPartialFitState, :AbstractPosdefEstimator,
-                          :AbstractReturnForecastEstimator,
+                          :AbstractPreorderBy, :AbstractReturnForecastEstimator,
                           :AbstractTimeSeriesRegressionEstimator,
                           :AbstractVarianceEstimator, :BaseGerberCovariance,
                           :BaseGerberIQCovariance, :BinWidthBins, :CokurtosisEstimator,
