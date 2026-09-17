@@ -34,9 +34,10 @@ renders at under `docs/src`. The generated guide and example pages are read at t
 `.jl` sources, and the two generated root-level pages at their generators, because the
 generated `.md` is untracked and never edited (ADR 0151).
 
-The legacy `docs/src/api/` pages, other than the introduction, are not in this set: their
-descriptions are the derived lines the migration writes into the mirror pages, and the mirror
-testsets take over from them.
+The legacy `docs/src/api/` pages are not in this set: their descriptions are the derived
+lines the migration writes into the mirror pages, and the mirror testsets take over from
+them. The introduction moved out of that tree to `docs/src/00_API.md` (ADR 0128), so the
+top-level walk below finds it like any other hand-written page.
 =#
 function described_page_sources(repo::AbstractString)
     docs_src = joinpath(repo, "docs", "src")
@@ -53,7 +54,6 @@ function described_page_sources(repo::AbstractString)
         end
         sources[joinpath("contribute", file)] = joinpath(docs_src, "contribute", file)
     end
-    sources[joinpath("api", "00_API.md")] = joinpath(docs_src, "api", "00_API.md")
     sources["capability_catalogue.md"] = joinpath(repo, "docs",
                                                   "generate_capability_catalogue.jl")
     sources[joinpath("api", "TypeHierarchy.md")] = joinpath(repo, "docs",
@@ -187,7 +187,7 @@ end
         @test haskey(sources, "migration.md")
         @test haskey(sources, "99_references.md")
         @test haskey(sources, "capability_catalogue.md")
-        @test haskey(sources, joinpath("api", "00_API.md"))
+        @test haskey(sources, "00_API.md")
         @test count(p -> startswith(p, "contribute"), keys(sources)) >= 3
         @test count(p -> startswith(p, "user_guide"), keys(sources)) >= 10
         @test count(p -> startswith(p, "examples"), keys(sources)) >= 60

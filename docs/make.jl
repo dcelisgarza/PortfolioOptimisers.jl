@@ -175,7 +175,10 @@ const HOME_PAGE = "index.md"
 const REFERENCES_PAGE = "99_references.md"
 const CATALOGUE_PAGE = "capability_catalogue.md"
 const MIGRATION_PAGE = "migration.md"
-for page in (HOME_PAGE, REFERENCES_PAGE, CATALOGUE_PAGE, MIGRATION_PAGE)
+# Re-homed out of `docs/src/api/` (ADR 0128): the introduction sits above both mirror
+# trees rather than inside either, so it moved to `docs/src` alongside them.
+const API_INTRO_PAGE = "00_API.md"
+for page in (HOME_PAGE, REFERENCES_PAGE, CATALOGUE_PAGE, MIGRATION_PAGE, API_INTRO_PAGE)
     if !(isfile(joinpath(@__DIR__, "src", page)))
         error("docs/make.jl: expected root page `$page` is missing.")
     else
@@ -200,7 +203,8 @@ end
 # directory of pages for every directory of files (ADR 0150). Files and directories share
 # one numbering at each level, so the listing sorted by name is the load order of `src/`,
 # and a directory becomes a nested group labelled by its name. Nothing here is positional:
-# a directory added under `docs/src/api/` appears where its number puts it.
+# a directory added under a walked root appears where its number puts it. Reused over both
+# mirror-tree roots below, since the mirroring rule is the same rule either side (ADR 0128).
 function api_pages(dir::String, rel::String)
     pages = Any[]
     for entry in sort(readdir(dir))
@@ -214,7 +218,15 @@ function api_pages(dir::String, rel::String)
     end
     return pages
 end
-api = api_pages(joinpath(@__DIR__, "src/api"), "api")
+# `docs/src/public_api/` and `docs/src/private_api/` replace `docs/src/api/` outright
+# (ADR 0128 § Decision): the two mirrored trees walk here instead of the single
+# `docs/src/api/` this build used before. Created even before a migration ticket lands the
+# first page, so the walk always has a directory to read and a migration ticket only ever
+# adds content, never build wiring.
+mkpath(joinpath(@__DIR__, "src/public_api"))
+mkpath(joinpath(@__DIR__, "src/private_api"))
+public_api = api_pages(joinpath(@__DIR__, "src/public_api"), "public_api")
+private_api = api_pages(joinpath(@__DIR__, "src/private_api"), "private_api")
 contribute = [joinpath("contribute", file)
               for file in readdir(joinpath(@__DIR__, "src/contribute"))
               if splitext(file)[2] == ".md"]
@@ -273,14 +285,22 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                                   size_threshold_warn = 400 * 2^10),
          # The landing page's label is its `<title>` and its sidebar entry, so it carries
          # the words a search ranks the site on, not "Home" (#561).
-         pages = ["Portfolio optimisation library in Julia" => HOME_PAGE;
-                  "Capability Catalogue" => CATALOGUE_PAGE;
-                  "User Guide" => user_guide;
-                  "Examples" => examples;
-                  "API" => api;
-                  "Contribute" => contribute;
-                  "Migration guide" => MIGRATION_PAGE;
-                  "References" => REFERENCES_PAGE],
+         #
+         # The mirror trees are empty until a migration ticket lands their first page
+         # (ADR 0128), so "Public API"/"Private API" are added only once non-empty, the
+         # same rule `api_pages` applies to a nested directory of its own walk.
+         pages = [["Portfolio optimisation library in Julia" => HOME_PAGE;
+                   "Capability Catalogue" => CATALOGUE_PAGE;
+                   "User Guide" => user_guide;
+                   "Examples" => examples;
+                   "API introduction" => API_INTRO_PAGE];
+                  [label => group
+                   for (label, group) in
+                       (("Public API", public_api), ("Private API", private_api))
+                   if !isempty(group)];
+                  ["Contribute" => contribute;
+                   "Migration guide" => MIGRATION_PAGE;
+                   "References" => REFERENCES_PAGE]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric), CodeBlocks(), LandingPage()])
 

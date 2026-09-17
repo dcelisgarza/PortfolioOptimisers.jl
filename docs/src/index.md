@@ -21,7 +21,7 @@ hero:
       link: examples/00_Examples
     - theme: alt
       text: API
-      link: api/00_API
+      link: 00_API
 
 features:
   - icon: 🔮
