@@ -1,6 +1,8 @@
-# Tracking
+```@meta
+Description = "Tracking, public API of PortfolioOptimisers.jl: IndependentVariableTracking, DependentVariableTracking, WeightsTracking, ReturnsTracking, TrackingError, …"
+```
 
-## Public
+# Tracking
 
 ```@docs
 IndependentVariableTracking
@@ -8,20 +10,7 @@ DependentVariableTracking
 WeightsTracking
 ReturnsTracking
 TrackingError
-```
-
-## Private
-
-```@docs
-AbstractTracking
-AbstractTrackingAlgorithm
-VecTr
-Tr_VecTr
-VariableTracking
-tracking_benchmark
 factory(tr::WeightsTracking, w::VecNum)
-needs_previous_weights(tr::TrackingError)
-narrow_optimiser_vector
 ```
 
 ## References

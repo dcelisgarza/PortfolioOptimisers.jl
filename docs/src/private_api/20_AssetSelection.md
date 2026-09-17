@@ -1,21 +1,8 @@
-# Asset selection
-
-Asset selectors narrow the universe from the data: drop constant columns, keep the best or worst assets by a risk measure, prune redundant ones. They are ordinary returns-preprocessing estimators — they know nothing about pipelines, and a [`Pipeline`](@ref) drives them through [`fit_preprocessing`](@ref) and [`apply_preprocessing`](@ref) like any other step.
-
-The universe a selector chooses on the training window is its **fitted state**. Applying the fitted result to an unseen window replays that universe rather than re-deciding it, which is what makes a selector safe inside cross-validation.
-
-See `docs/adr/0029-asset-selection-is-returns-preprocessing.md` for the design rationale, and [`PortfolioOptimisers.AbstractAssetSelector`](@ref) for the seam every selector shares.
-
-## Scoring assets with a risk measure
-
-A [`ScoreSelector`](@ref) scores each asset by evaluating a risk measure on that asset's own return series, then hands the scores to a rule. Any risk measure whose [`supports_precomputed_returns`](@ref) is `true` may be used, which covers the quantile and drawdown families, the moment measures, and [`MeanReturn`](@ref). [`bigger_is_better`](@ref) tells the ordinal rules which end of the ordering is "best".
-
-Two measures are notable exceptions. [`Variance`](@ref) and [`StandardDeviation`](@ref) are [`WeightsInput`](@ref) measures: their functors consume portfolio weights, not a return series, so they cannot score a single asset and are rejected at construction. Use `SCM()`, which computes the same quantity from a return series — [`ZeroVarianceFilter`](@ref) spells this for you.
-
-```@docs
-ScoreSelector
-CompleteAssetSelector
+```@meta
+Description = "Asset selection, private API of PortfolioOptimisers.jl: AbstractSelectionRule, AbstractRedundancyAlgorithm, tail_mask, tail_action_mask, groups_argbest, …"
 ```
+
+# Asset selection: private API
 
 ## Selection rules
 
@@ -25,9 +12,6 @@ Ties at a rank cut are excluded entirely, so an ordinal rule may return fewer as
 
 ```@docs
 PortfolioOptimisers.AbstractSelectionRule
-ThresholdRule
-RankRule
-QuantileRule
 ```
 
 ## Discarding redundant assets
@@ -41,25 +25,17 @@ Leaving `score` as `nothing` falls back to the correlation algorithms' own survi
 [`ClusterGroups`](@ref) is also the only redundancy algorithm that reaches a distance estimator — the other two carry a `StatsBase.CovarianceEstimator` — so it is the only one that can be driven by a feature matrix rather than by the returns. Give its `cle` a [`FeatureDistance`](@ref) and the redundancy groups come from exogenous structure: a sector taxonomy, carried as a categorical Panel Field through [`panel_input`](@ref), reduces the universe to one representative per classification, not per correlated blob. The panel is read straight off the [`ReturnsResult`](@ref), because preselection runs before any prior exists — a producer that reads a prior raises here, and [`PhylogenyPanel`](@ref) is the one that does not.
 
 ```@docs
-RedundancySelector
 PortfolioOptimisers.AbstractRedundancyAlgorithm
-PairwiseCorrelation
-CorrelationComponents
-ClusterGroups
 ```
 
-## Internals
+## Functions
 
 ```@docs
-PortfolioOptimisers.asset_scores
-PortfolioOptimisers.rule_keep
 PortfolioOptimisers.tail_mask
 PortfolioOptimisers.tail_action_mask
 PortfolioOptimisers.groups_argbest
 PortfolioOptimisers.correlation_components
 PortfolioOptimisers.drop_scores
-PortfolioOptimisers.redundancy_keep
-PortfolioOptimisers.requires_score
 PortfolioOptimisers.assert_scoreable
 PortfolioOptimisers.assert_selection_action
 PortfolioOptimisers.assert_tail_counts

@@ -1,6 +1,10 @@
+```@meta
+Description = "Tools, public API of PortfolioOptimisers.jl: traverse_concrete_subtypes, concrete_typed_array, factory, @propagatable, factory_child, @fprop, @vprop, …"
+```
+
 # Tools
 
-`PorfolioOptimisers.jl` is a complex codebase which uses a variety of general purpose tools including functions, constants and types.
+`PortfolioOptimisers.jl` is a complex codebase which uses a variety of general purpose tools including functions, constants and types.
 
 ## Utility functions
 
@@ -9,9 +13,7 @@ We strive to be as type-stable, inferrable, and immutable as possible in order t
 ```@docs
 traverse_concrete_subtypes
 concrete_typed_array
-concrete_typed_array_if_abstract
 factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, args...; kwargs...)
-get_window
 @propagatable
 factory_child
 @fprop
@@ -19,48 +21,7 @@ factory_child
 @pprop
 @wprop
 @cprop
-PROP_TAG_NAMES
-PROP_TAG_MACRO_NAMES
-PROP_TAG_CHANNELS
-prop_tag
-is_prop_tag_call
-prop_tag_expr
-prop_channel_active
-prop_channel_pairs
-check_prop_tag_macros
-is_doc_macro
-_ctx
-_wprop
-resolve_deferred_quantities
-sel
-extract_field_name
-propagatable_find_struct
-propagatable_bare_name
-try_field_name
-peel_prop_tags
-propagatable_parse_body
-PROPAGATABLE_CONTRACTS
-propagatable_register!
-propagatable_keywords
-propagatable_contract_violations
-check_propagatable_contracts
 @forward_properties
-forward_nonnothing
-forward_flatten_path
-forward_walk_expr
-```
-
-## Mathematical functions
-
-`PortfolioOptimisers.jl` makes use of various mathematical operators, some of which are generic to support the variety of inputs supported by the library.
-
-```@docs
-:⊗
-:⊙
-:⊘
-:⊕
-:⊖
-dot_scalar
 ```
 
 ## View functions
@@ -73,11 +34,6 @@ port_opt_view(x::VecScalar, i, args...)
 port_opt_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}}, i, args...; kwargs...)
 obs_weights_view(x, ::Any)
 obs_weights_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}}, i)
-nothing_scalar_array_view
-nothing_scalar_array_view_odd_order
-nothing_scalar_array_getindex
-nothing_scalar_array_getindex_odd_order
-fourth_moment_index_generator
 ```
 
 ## Summary statistics
@@ -85,22 +41,19 @@ fourth_moment_index_generator
 Some estimators and constraints are based on summary statistics of vectors. These types are used to dispatch the appropriate functions and encapsulate auxiliary data such as weights.
 
 ```@docs
-VectorToScalarMeasure
-Num_VecToScaM
 MinValue
 MeanValue
-factory(mv::MeanValue, args...; kwargs...)
 MedianValue
-factory(mdv::MedianValue, args...; kwargs...)
 MaxValue
 StdValue
-factory(sv::StdValue, args...; kwargs...)
 VarValue
-factory(vv::VarValue, args...; kwargs...)
 SumValue
 ProdValue
 ModeValue
 StandardisedValue
+factory(mv::MeanValue, args...; kwargs...)
+factory(mdv::MedianValue, args...; kwargs...)
+factory(sv::StdValue, args...; kwargs...)
+factory(vv::VarValue, args...; kwargs...)
 factory(msv::StandardisedValue, args...; kwargs...)
-vec_to_real_measure
 ```

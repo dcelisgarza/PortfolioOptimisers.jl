@@ -1,10 +1,12 @@
-# Net returns and drawdowns
+```@meta
+Description = "Net returns and drawdowns, private API of PortfolioOptimisers.jl: AbstractWeightDrift, AbstractPreviousWeightsSource, drift_position_values, drift_wealth, …"
+```
 
-Net returns and drawdowns are two of the performance metrics of a portfolio. Here we define functions used to compute portfolio returns and related quantities.
+# Net returns and drawdowns: private API
 
 ```@docs
 AbstractWeightDrift
-SelfFinancingDrift
+AbstractPreviousWeightsSource
 drift_position_values
 drift_wealth
 drift_returns
@@ -14,9 +16,6 @@ weight_path
 held_weights
 drifted_weight_path
 drifted_held_weights
-AbstractPreviousWeightsSource
-DriftedWeights
-HeldWeightsResult
 assert_held_weights_shape
 assert_held_start_shape
 rebuild_weight_path
@@ -38,13 +37,6 @@ charge_asset_fees
 charges_nothing
 charge_fee_axis!
 assert_fee_axis_width
-calc_net_returns(w::VecNum, X::MatNum, args...)
-calc_net_returns(w::MatNum, X::MatNum, args...)
-calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift, obs = nothing)
-calc_net_asset_returns
-calc_turnover
-cumulative_returns
-drawdowns
 absolute_drawdown_arr
 relative_drawdown_arr
 relative_cumulative_returns

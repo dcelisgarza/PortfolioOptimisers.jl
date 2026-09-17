@@ -1,3 +1,7 @@
+```@meta
+Description = "Plotting, public API of PortfolioOptimisers.jl: plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_composition, …"
+```
+
 # Plotting
 
 ```@docs
@@ -73,10 +77,4 @@ plot_forecast_ic_decay
 plot_forecast_portfolio_decay
 plot_forecast_factor_correlation
 plot_forecast_evaluation_summary
-relevant_assets
-finite_magnitudes
-finite_symmetric_clim
-finite_columns
-investable_plot_view
-attribution_plot_axis
 ```
