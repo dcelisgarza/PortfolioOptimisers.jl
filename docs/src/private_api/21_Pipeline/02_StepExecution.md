@@ -1,4 +1,8 @@
-# Step execution
+```@meta
+Description = "Step execution, private API of PortfolioOptimisers.jl: run_step, require_slot, set_slot, run_uncertainty_step, uncertainty_step_source, run_constraint_step, …"
+```
+
+# Step execution: private API
 
 The step execution contract is the only pipeline-aware layer over the estimator families. Each `run_step` method reads the [`PipelineContext`](@ref) slots its estimator needs, dispatches to that family's **native verb** — [`prior`](@ref) for prior estimators, [`clusterise`](@ref) for clustering, [`optimise`](@ref) for optimisers, [`fit_preprocessing`](@ref)/[`apply_preprocessing`](@ref) for preprocessing estimators — and writes the slot the family produces.
 
