@@ -214,7 +214,7 @@ A member stands in the `kappa` slot of an [`OrthogonalUncertaintySet`](@ref), wh
 
 A rule is named for the **method** it runs, on ADR 0015's reading, and neither bare word is claimed elsewhere in the library. [`ResidualInflation`](@ref) inflates the residual variance to a confidence bound, and [`VarianceFraction`](@ref) matches the penalty to a fraction of the nominal variance at a reference portfolio.
 
-# Interface
+# Interfaces
 
 ## `k_compact`
 
@@ -1907,3 +1907,7 @@ export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,
        ChiSqKUncertaintyAlgorithm, EllipsoidalUncertaintySetAlgorithm,
        NormBallUncertaintySetAlgorithm, EllipsoidalUncertaintySet, SigmaUncertaintySetClass,
        MuUncertaintySetClass, AbstractUncertaintyEpsAlgorithm
+public AbstractUncertaintySetEstimator, AbstractPriorUncertaintySetEstimator,
+       AbstractUncertaintySetAlgorithm, AbstractUncertaintySetResult,
+       AbstractUncertaintyKAlgorithm, AbstractCompactRadiusAlgorithm,
+       AbstractUncertaintySetClass, reads_prior_result, k_ucs

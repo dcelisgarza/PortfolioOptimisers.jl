@@ -108,22 +108,13 @@ end
     ticket removes the entries it promotes in the same commit that adds the `public`
     declaration; it never adds an entry.
     =#
-    promotion_debt = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
-                          :AbstractAmbiguityTailWeightCalibrationAlgorithm,
-                          :AbstractDeformationCalibrationAlgorithm,
-                          :AbstractExpectedReturnsAlgorithm, :AbstractMomentAlgorithm,
-                          :AbstractNormCeilingCalibrationAlgorithm,
+    promotion_debt = Set([:AbstractExpectedReturnsAlgorithm, :AbstractMomentAlgorithm,
                           :AbstractOrderedWeightsArrayFunction, :AbstractPriorEstimator,
-                          :AbstractPriorResult, :AbstractPriorUncertaintySetEstimator,
-                          :AbstractRealisedTarget, :AbstractRedundancyAlgorithm,
-                          :AbstractRiskMeasureSettings,
+                          :AbstractPriorResult, :AbstractRealisedTarget,
+                          :AbstractRedundancyAlgorithm, :AbstractRiskMeasureSettings,
                           :AbstractSearchCrossValidationResult, :AbstractSelectionRule,
-                          :AbstractSignificanceCalibrationAlgorithm,
-                          :AbstractTrackingAlgorithm, :AbstractUncertaintyKAlgorithm,
-                          :AbstractUncertaintySetAlgorithm, :AbstractUncertaintySetClass,
-                          :AbstractUncertaintySetEstimator, :AbstractUncertaintySetResult,
-                          :BaseHierarchicalOptimisationResult, :BaseOptimisationEstimator,
-                          :BootstrapUncertaintySetEstimator, :CrossValidationSearchScorer,
+                          :AbstractTrackingAlgorithm, :BaseHierarchicalOptimisationResult,
+                          :BaseOptimisationEstimator, :CrossValidationSearchScorer,
                           :FrontierBoundEstimator, :HierarchicalOptimisationResult,
                           :JuMPWeightFinaliserFormulation,
                           :NonFiniteAllocationOptimisationResult,
@@ -145,9 +136,8 @@ end
     (`GerberIQDecayEstimator`). The parser now reads the package's own prefix, and the entry
     records debt that existed all along rather than debt this file grew.
     =#
-    verb_debt = Set([:bootstrap_indices, :compute_pooling, :k_ucs, :needs_previous_weights,
-                     :opt_weight_bounds, :reads_prior_result, :realised_target,
-                     :reconstruct_prior, :regenerate_decay, :scalarise,
+    verb_debt = Set([:compute_pooling, :needs_previous_weights, :opt_weight_bounds,
+                     :realised_target, :reconstruct_prior, :regenerate_decay, :scalarise,
                      :scalarise_risk_expression!, :set_clustering_weight_finaliser_alg!,
                      :target_dof, :target_step_dof, :time_dependent_field_defaults,
                      :tracking_benchmark, :variance_risk_bounds_val])
@@ -241,6 +231,6 @@ end
     # satisfy every assertion above with an empty set on each side, so the shape is proven
     # alive.
     @test length(sections) > 80
-    @test length(promotion_debt) > 40
-    @test length(verb_debt) > 15
+    @test length(promotion_debt) > 15
+    @test length(verb_debt) > 5
 end

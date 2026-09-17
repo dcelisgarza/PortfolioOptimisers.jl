@@ -1,10 +1,15 @@
 ```@meta
-Description = "Calibration Rules, public API of PortfolioOptimisers.jl: ReturnsSeries, AbsoluteDrawdownSeries, RelativeDrawdownSeries, CalibrationContext, ScenarioCount, …"
+Description = "Calibration Rules, public API of PortfolioOptimisers.jl: AbstractSignificanceCalibrationAlgorithm, AbstractDeformationCalibrationAlgorithm, …"
 ```
 
 # Calibration Rules
 
 ```@docs
+AbstractSignificanceCalibrationAlgorithm
+AbstractDeformationCalibrationAlgorithm
+AbstractAmbiguityRadiusCalibrationAlgorithm
+AbstractAmbiguityTailWeightCalibrationAlgorithm
+AbstractNormCeilingCalibrationAlgorithm
 ReturnsSeries
 AbsoluteDrawdownSeries
 RelativeDrawdownSeries

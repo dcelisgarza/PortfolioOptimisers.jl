@@ -390,3 +390,4 @@ function k_compact(alg::VarianceFraction, ::Number, ::AbstractOrthogonalityMetri
            sum(abs2, Cw - Q * (transpose(Q) * Cw))
 end
 export ResidualInflation, VarianceFraction
+public k_compact

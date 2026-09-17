@@ -2683,3 +2683,7 @@ export CalibrationContext, ReturnsSeries, AbsoluteDrawdownSeries, RelativeDrawdo
        ScenarioCount, RateSignificance, EntropyBudget, HillTailDecay, RadialTailDecay,
        ConcentrationRadius, RateRadius, DimensionalRateRadius, DualNormRadius,
        TailTermParity, EffectiveAssetFloor
+public AbstractSignificanceCalibrationAlgorithm, AbstractDeformationCalibrationAlgorithm,
+       AbstractAmbiguityRadiusCalibrationAlgorithm,
+       AbstractAmbiguityTailWeightCalibrationAlgorithm,
+       AbstractNormCeilingCalibrationAlgorithm

@@ -1,11 +1,18 @@
 ```@meta
-Description = "Base Uncertainty Sets, public API of PortfolioOptimisers.jl: AbstractUncertaintyEpsAlgorithm, BoxUncertaintySet, BoxUncertaintySetAlgorithm, …"
+Description = "Base Uncertainty Sets, public API of PortfolioOptimisers.jl: AbstractUncertaintySetEstimator, AbstractPriorUncertaintySetEstimator, …"
 ```
 
 # Base Uncertainty Sets
 
 ```@docs
+AbstractUncertaintySetEstimator
+AbstractPriorUncertaintySetEstimator
+AbstractUncertaintySetAlgorithm
+AbstractUncertaintySetResult
+AbstractUncertaintyKAlgorithm
+AbstractCompactRadiusAlgorithm
 AbstractUncertaintyEpsAlgorithm
+AbstractUncertaintySetClass
 BoxUncertaintySet
 BoxUncertaintySetAlgorithm
 MuUncertaintySetClass
@@ -26,6 +33,8 @@ mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPrior
 sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
 sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult; kwargs...)
+reads_prior_result
+k_ucs
 port_opt_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::Any, args...)
 port_opt_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i, args...)
 port_opt_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i, args...)

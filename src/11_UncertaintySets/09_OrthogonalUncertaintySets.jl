@@ -5,7 +5,7 @@ Abstract supertype of the scalings that size each direction inside the Orthogona
 
 A member states the ``r \\times r`` matrix ``\\mathbf{\\Lambda}`` of the mean set, whose square root maps the ball's coordinates onto the subspace basis. The scaling changes the shape of the set and not its support: every member confines the set to the same subspace, and the radius reads the same `rank` degrees of freedom.
 
-# Interface
+# Interfaces
 
 ## `orthogonal_scaling`
 
@@ -725,3 +725,4 @@ function cs_diagnostic_weight_history(A::MatNum, ::AbstractString, ::AbstractStr
 end
 
 export IdentityScaling, IdiosyncraticVarianceScaling, OrthogonalUncertaintySet
+public AbstractOrthogonalScaling, orthogonal_scaling

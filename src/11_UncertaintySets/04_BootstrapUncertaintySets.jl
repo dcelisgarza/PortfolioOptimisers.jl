@@ -1272,3 +1272,4 @@ function sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
 end
 
 export StationaryBootstrap, CircularBootstrap, MovingBootstrap, ARCHUncertaintySet
+public BootstrapUncertaintySetEstimator, ARCHBootstrapSet, bootstrap_indices
