@@ -331,11 +331,11 @@ It is also possible to compute per-asset fees incurred using the same definition
   - ``\\boldsymbol{w} \\neq 0``: Read as `!isapprox(w, 0; kwargs...)`, so `kwargs` decides how near zero counts as zero. Only the fixed terms carry it: a proportional fee on a zero weight is zero anyway.
   - ``\\odot``: Elementwise (Hadamard) product.
 
-The short proportional term is **subtracted**. ``\\boldsymbol{w}`` is negative wherever its indicator fires, so the minus sign is what makes the fee a positive charge. On ``\\boldsymbol{w} = [0.6,\\, -0.4]`` with a short rate of `0.01` and no other term, [`calc_fees`](@ref) returns `0.004`.
+The short proportional term is **subtracted**. ``\\boldsymbol{w}`` is negative wherever its indicator fires, so the minus sign is what makes the fee a positive charge.
 
 ## The per asset fees sum to the portfolio fee
 
-The two families compute one definition. [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar, so the entries of the vector sum to the scalar. The sums differ in the order in which they add, so the identity holds to rounding and not to `==`. On ``\\boldsymbol{w} = [0.6,\\, -0.4,\\, 0,\\, 0.25]`` with all four rate fields set and a [`Turnover`](@ref) whose `w` differs from the candidate, they gave `11.036000000000001` and `11.036`, a difference of `1.8e-15`.
+The two families compute one definition. [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar, so the entries of the vector sum to the scalar. The sums differ in the order in which they add, so the identity holds to rounding and not to `==`.
 
 ## The JuMP model charges the same fee only when the decomposition is pinned
 

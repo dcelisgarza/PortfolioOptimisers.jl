@@ -245,7 +245,7 @@ Where:
   - ``\\mathrm{rk}(\\cdot)``: Mid-rank function.
   - ``\\sigma_{\\mathrm{rk}(\\cdot)}``: Standard deviation of the rank variable.
 
-Without ties this equals the closed form ``1 - 6 \\sum_t d_t^2 / (T(T^2 - 1))``, with ``d_t = \\mathrm{rk}(x_{ti}) - \\mathrm{rk}(x_{tj})``. **The two differ when ties are present**: on `[1.0 1.0; 2.0 1.0; 2.0 3.0; 4.0 4.0; 5.0 2.0]` (one tied pair in each series), the closed form gives `0.575` and this method returns `0.5526315789473685`.
+Without ties this equals the closed form ``1 - 6 \\sum_t d_t^2 / (T(T^2 - 1))``, with ``d_t = \\mathrm{rk}(x_{ti}) - \\mathrm{rk}(x_{tj})``. **The two differ when ties are present.**
 
 # Algorithm
 

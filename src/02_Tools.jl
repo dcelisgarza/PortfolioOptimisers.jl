@@ -3132,7 +3132,7 @@ Where:
   - ``Q_{\\boldsymbol{v}}(p)``: The ``p``-quantile of ``\\boldsymbol{v}``.
   - ``Q_{\\boldsymbol{v}, \\boldsymbol{w}}(p)``: The weighted ``p``-quantile of ``\\boldsymbol{v}``, as `StatsBase` defines it.
 
-**Both forms are quantiles, and both interpolate.** Neither is an order statistic, so the result need not be an entry of ``\\boldsymbol{v}``. On a vector of even length the unweighted form averages the two middle entries, and the weighted form interpolates between the two entries that bracket half the weight mass. On ``\\boldsymbol{v} = [1, 2, 3, 4]`` the unweighted form gives ``2.5``, and the weighted form under ``\\boldsymbol{w} = [0.1, 0.2, 0.3, 0.4]`` gives ``2.8333``, which is not an entry of ``\\boldsymbol{v}``.
+**Both forms are quantiles, and both interpolate.** Neither is an order statistic, so the result need not be an entry of ``\\boldsymbol{v}``. On a vector of even length the unweighted form averages the two middle entries, and the weighted form interpolates between the two entries that bracket half the weight mass.
 
 # Fields
 

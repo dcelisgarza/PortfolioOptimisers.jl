@@ -592,7 +592,7 @@ The right-hand side is ``\\mathbf{q}_{\\mathrm{max}}`` itself, so the score is t
 
 Declares [`SimilarityPolarity`](@ref) — the only member that declares it — unless `ov` overrides it: it is the leading eigenvector of the adjacency matrix itself, so a stronger link must contribute a larger entry. It therefore reads weights on the similarity branch alone. A tree is selected by minimising a distance and carries no similarity, so this algorithm runs unweighted there rather than being handed the wrong quantity. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
-The weights change the answer by less than the shortest-path algorithms do, and they do change it: over the same triangulated maximally filtered graph the weighted and unweighted vectors differ by a maximum absolute `0.02561` and correlate `0.99361`, on entries whose median is `0.1969` on either vector. Withdrawing the weights also moves the structure's ``\\lambda_{\\mathrm{max}}``, from `4.844612909369407` to `6.174911353215694`.
+The weights change the answer by less than the shortest-path algorithms do, and they do change it: the weighted and unweighted vectors differ while still correlating closely, and withdrawing the weights also moves the structure's ``\\lambda_{\\mathrm{max}}``.
 
 # Fields
 
@@ -676,7 +676,7 @@ The series converges to the resolvent only for ``\\alpha < 1 / \\lambda_{\\mathr
 
 Above the bound the linear solve still returns a vector, and the vector is not a centrality: some of its scores turn negative, and a negative centrality has no reading.
 
-**The constructor cannot check this.** ``\\lambda_{\\mathrm{max}}`` is a property of the graph, and the graph is built later by [`centrality_graph`](@ref), so the validation is `alpha > 0` and the bound is the caller's to respect. A dense network raises ``\\lambda_{\\mathrm{max}}`` and lowers the bound, so a value that held on a tree can fail on a triangulated maximally filtered graph over the same assets: over those same 20 assets the filtered graph has ``\\lambda_{\\mathrm{max}} = 6.174911353215694``, a bound of `0.16194564468998124`, and the default `alpha = 0.3` is outside it.
+**The constructor cannot check this.** ``\\lambda_{\\mathrm{max}}`` is a property of the graph, and the graph is built later by [`centrality_graph`](@ref), so the validation is `alpha > 0` and the bound is the caller's to respect. A dense network raises ``\\lambda_{\\mathrm{max}}`` and lowers the bound, so a value that held on a tree can fail on a triangulated maximally filtered graph over the same assets — the default `alpha = 0.3` is not safe against every graph shape.
 
 # Fields
 

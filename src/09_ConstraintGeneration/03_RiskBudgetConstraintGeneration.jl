@@ -233,7 +233,7 @@ This method returns a uniform risk budget allocation when no explicit risk budge
 
 The vector is a constant `range`, not an `Array`, and its element type is always `Float64` because it comes from `inv(N)`. This method takes no `datatype` keyword; one passed here is swallowed by `kwargs...` and changes nothing.
 
-This is the one branch whose budget sums to **exactly** one. `sum` of a range reads the arithmetic series rather than the entries, so `sum` of the result is `1.0` for `N = 3`, `N = 7` and `N = 10` alike, while `sum(collect(...))` returns `0.9999999999999998` for `N = 7`. The estimator branch divides by a computed sum instead, and lands within round-off of one rather than on it.
+This is the one branch whose budget sums to **exactly** one. `sum` of a range reads the arithmetic series rather than the entries, so it lands on exactly `1.0` for any `N`, where summing the collected entries would accumulate rounding error instead. The estimator branch divides by a computed sum instead, and lands within round-off of one rather than on it.
 
 # Algorithm
 
@@ -324,7 +324,7 @@ This method constructs a [`RiskBudget`](@ref) from a mapping of asset or group n
 
 A **scalar** `rb` resolves to a scalar, not to a uniform vector, so the normalisation returns `1.0` whatever the scalar was. The result is a `RiskBudget` holding one number, and an optimiser accepts it only for a one-asset universe. Write the uniform budget as `nothing`, which the no-op method turns into `1/N` over `N` entries.
 
-The normalisation divides by a computed sum, so the result lands within round-off of one rather than on it: a seven-asset budget naming two assets sums to `1.0000000000000002`. Only the `nothing` branch sums to exactly one.
+The normalisation divides by a computed sum, so the result lands within round-off of one rather than on it. Only the `nothing` branch sums to exactly one.
 
 # Algorithm
 

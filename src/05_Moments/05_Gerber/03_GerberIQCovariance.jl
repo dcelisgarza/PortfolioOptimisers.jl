@@ -1411,7 +1411,7 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-**Only the six diagonal weights carry a free default.** `n1`, `n2`, `n4`, `n5`, `n11` and `n12` name the six magnitude classes, and each of the other fifteen defaults to the geometric mean of the two diagonal weights of the classes its channel joins. That is the bound [`clamp_gerber_iq_n`](@ref) enforces under [`Gerber2`](@ref), so the default template meets it whatever the six are set to, and the clamp never moves a default. [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) is the defect that made this the rule: four of the earlier defaults read two **mixed** weights instead, and a two-asset sample then returned `1.0299`.
+**Only the six diagonal weights carry a free default.** `n1`, `n2`, `n4`, `n5`, `n11` and `n12` name the six magnitude classes, and each of the other fifteen defaults to the geometric mean of the two diagonal weights of the classes its channel joins. That is the bound [`clamp_gerber_iq_n`](@ref) enforces under [`Gerber2`](@ref), so the default template meets it whatever the six are set to, and the clamp never moves a default. [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) is the defect that made this the rule: four of the earlier defaults read two **mixed** weights instead, which let a two-asset sample return a correlation above `1`.
 
 ## Validation
 

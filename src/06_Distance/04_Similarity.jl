@@ -79,7 +79,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Subtracts the squared distance from a ceiling placed above the largest squared distance.
 
-The ceiling is what makes the result non-negative for a distance matrix of any scale. The source states the transformation as ``\\rho_{i,\\,j} = 1 - d_{i,\\,j}^{2}``, which this reproduces exactly whenever ``\\max(\\mathbf{D}) \\leq 1`` — the case for [`SimpleDistance`](@ref), [`SimpleAbsoluteDistance`](@ref) and [`CorrelationDistance`](@ref). Above that the source's form goes negative and this one does not: on a [`LogDistance`](@ref) matrix whose largest entry was `6.759438300750648`, ``1 - d_{i,\\,j}^{2}`` reached `-44.690006141654806` while this transformation stayed at `0.30999385834519444`.
+The ceiling is what makes the result non-negative for a distance matrix of any scale. The source states the transformation as ``\\rho_{i,\\,j} = 1 - d_{i,\\,j}^{2}``, which this reproduces exactly whenever ``\\max(\\mathbf{D}) \\leq 1`` — the case for [`SimpleDistance`](@ref), [`SimpleAbsoluteDistance`](@ref) and [`CorrelationDistance`](@ref). Above that the source's form goes negative and this one does not.
 
 # Mathematical definition
 
@@ -276,7 +276,7 @@ This recovers the named similarity counterpart of every distance that is itself 
 
 !!! warning "The domain is `D <= 1`"
 
-    The result is only correlation-like when ``\\mathbf{D} \\in [0,\\,1]``. Above `1` the similarity is negative: ``D_{i,\\,j} = 7`` gives ``S_{i,\\,j} = -6``.
+    The result is only correlation-like when ``\\mathbf{D} \\in [0,\\,1]``. Above `1` the similarity is negative.
 
     What happens next depends on the path. On the [`FeatureDistance`](@ref) path the value is **kept**, lands outside the ``[-1,\\,1]`` range that [`plot_clusters`](@ref) assumes, and is silently clipped there rather than flagged. On the PMFG path the same input is **refused** by [`assert_similarity_domain`](@ref), because [`PMFG_T2s`](@ref)'s consumers cannot take a negative weight. Symmetry and the unit diagonal survive either way.
 
@@ -286,7 +286,7 @@ This recovers the named similarity counterpart of every distance that is itself 
 
     This member is the honest inverse of a **specific** set of metrics, listed above. Paired with any other distance it returns a number that is in domain, non-negative, and wrong — and nothing catches it, on any path.
 
-    [`SimpleDistance`](@ref) is ``\\sqrt{(1 - \\rho) / 2}``, so a correlation of `0.003` gives `D = 0.706` and this member reports a similarity of `0.29`. No check placed anywhere can detect that, because `0.706` is a perfectly legal bounded distance. [`default_similarity`](@ref) pairs a metric with its inverse on the [`FeatureDistance`](@ref) path; [`NetworkEstimator`](@ref)'s `alg`, [`DBHT`](@ref)'s `sim` and [`LoGo`](@ref)'s `sim` take a member with no reference to the distance estimator that produced ``\\mathbf{D}``, so on those the pairing is the caller's to get right.
+    [`SimpleDistance`](@ref) is ``\\sqrt{(1 - \\rho) / 2}``, so an ordinary correlation gives a `D` that is a perfectly legal bounded distance, and this member reports a plausible-looking similarity for it. No check placed anywhere can detect that. [`default_similarity`](@ref) pairs a metric with its inverse on the [`FeatureDistance`](@ref) path; [`NetworkEstimator`](@ref)'s `alg`, [`DBHT`](@ref)'s `sim` and [`LoGo`](@ref)'s `sim` take a member with no reference to the distance estimator that produced ``\\mathbf{D}``, so on those the pairing is the caller's to get right.
 
 # Algorithm
 
@@ -329,7 +329,7 @@ Where:
   - $(math_dict[:D_mat_dist])
   - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
 
-For an angular distance ``D_{i,\\,j} = \\arccos(\\rho_{i,\\,j}) / \\pi`` this recovers ``\\rho_{i,\\,j}`` exactly, without reference to the data the distance was computed from. Against [`AngularDist`](@ref) on an 8-asset feature matrix the recovered cosine matched the one computed from the features to `3.608224830031759e-16`. It maps ``[0,\\,1] \\to [1,\\,-1]``, so the similarity is bounded and the diagonal is unity whenever the distance matrix has a zero diagonal.
+For an angular distance ``D_{i,\\,j} = \\arccos(\\rho_{i,\\,j}) / \\pi`` this recovers ``\\rho_{i,\\,j}`` exactly, without reference to the data the distance was computed from. Against [`AngularDist`](@ref) the recovered cosine matches the one computed from the features to floating-point precision. It maps ``[0,\\,1] \\to [1,\\,-1]``, so the similarity is bounded and the diagonal is unity whenever the distance matrix has a zero diagonal.
 
 # Where this member is correct, and where it is refused
 
@@ -339,7 +339,7 @@ It is **not** a member of [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
 
 !!! warning "The pairing is not checked"
 
-    Paired with a distance that is not an angular one, this member returns a number that is not a correlation. [`SimpleDistance`](@ref) is ``\\sqrt{(1 - \\rho) / 2}`` and shares this member's ``[0,\\,1]`` range exactly, so it type-checks: a correlation of `0.003` gives `D = 0.706` and ``\\cos(\\pi D)`` reports `-0.603`, which is not a weak negative correlation but nonsense.
+    Paired with a distance that is not an angular one, this member returns a number that is not a correlation. [`SimpleDistance`](@ref) is ``\\sqrt{(1 - \\rho) / 2}`` and shares this member's ``[0,\\,1]`` range exactly, so it type-checks: an ordinary positive correlation can map through ``\\cos(\\pi D)`` to a large negative number that is not a weak negative correlation, but nonsense.
 
 # Algorithm
 

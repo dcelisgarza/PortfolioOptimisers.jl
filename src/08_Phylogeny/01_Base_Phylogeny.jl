@@ -728,7 +728,7 @@ Where:
 
 The middle ground between [`LinearDecay`](@ref) and [`ExponentialDecay`](@ref): heavier-tailed than the exponential, so distant assets keep a small but non-negligible score.
 
-The `1 +` is what makes classical inverse-distance weighting finite at ``d = 0``; it also pins `f(0) = 1`, matching [`ExponentialDecay`](@ref)'s scale for free. The alternative spelling ``(1 + d^p)^{-1}`` is *not* used: it pins ``f(1) = 1/2`` for every `p`, and its response to `p` at fixed `d` **flips sign about that pivot** — raising the exponent scores a pair nearer than ``d = 1`` *higher* and a pair further away lower. At ``p = 1`` and ``p = 3`` it scores ``d = 0.5`` as ``0.6667`` and ``0.8889``, and ``d = 2`` as ``0.3333`` and ``0.1111``. So `p` is no fall-off dial there, because it cannot sharpen the decay inside the pivot at all. Under the spelling above, raising `p` lowers the score at every ``d > 0``.
+The `1 +` is what makes classical inverse-distance weighting finite at ``d = 0``; it also pins `f(0) = 1`, matching [`ExponentialDecay`](@ref)'s scale for free. The alternative spelling ``(1 + d^p)^{-1}`` is *not* used: it pins ``f(1) = 1/2`` for every `p`, and its response to `p` at fixed `d` **flips sign about that pivot** — raising the exponent scores a pair nearer than ``d = 1`` *higher* and a pair further away lower. So `p` is no fall-off dial there, because it cannot sharpen the decay inside the pivot at all. Under the spelling above, raising `p` lowers the score at every ``d > 0``.
 
 # Fields
 
