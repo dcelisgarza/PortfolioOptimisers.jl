@@ -1,5 +1,5 @@
 ```@meta
-Description = "Forecast Evaluation, public API of PortfolioOptimisers.jl: AbstractForecastTarget, IdiosyncraticTarget, AssetReturnTarget, PanelFieldTarget, ForecastEvaluationResult, …"
+Description = "Forecast Evaluation, public API of PortfolioOptimisers.jl: AbstractForecastTarget, IdiosyncraticTarget, AssetReturnTarget, PanelFieldTarget, …"
 ```
 
 # [Forecast Evaluation](@id api-forecast-evaluation)

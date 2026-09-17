@@ -1,5 +1,5 @@
 ```@meta
-Description = "Asset Panel builder, public API of PortfolioOptimisers.jl: AbstractPanelFieldInput, AbstractPanelFillAlgorithm, NumericPanelInput, …"
+Description = "Asset Panel builder, public API of PortfolioOptimisers.jl: AbstractPanelFieldInput, AbstractPanelFillAlgorithm, NumericPanelInput, CategoricalPanelInput, …"
 ```
 
 # Asset Panel builder

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base moments, public API of PortfolioOptimisers.jl: AbstractCovarianceEstimator, AbstractVarianceEstimator, AbstractExpectedReturnsEstimator, port_opt_view, factory, cov, cor, var, std, mean, FullMoment, SemiMoment."
+Description = "Base moments, public API of PortfolioOptimisers.jl: AbstractCovarianceEstimator, AbstractVarianceEstimator, AbstractExpectedReturnsEstimator, port_opt_view, …"
 ```
 
 # Base moments

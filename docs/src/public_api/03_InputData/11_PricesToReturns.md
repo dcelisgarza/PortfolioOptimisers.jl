@@ -1,5 +1,5 @@
 ```@meta
-Description = "Prices to returns, public API of PortfolioOptimisers.jl: AbstractGapReturnAlgorithm, CatchUpGapReturn, PricesToReturns, prices_to_returns, …"
+Description = "Prices to returns, public API of PortfolioOptimisers.jl: AbstractGapReturnAlgorithm, CatchUpGapReturn, PricesToReturns, prices_to_returns, gap_return."
 ```
 
 # Prices to returns

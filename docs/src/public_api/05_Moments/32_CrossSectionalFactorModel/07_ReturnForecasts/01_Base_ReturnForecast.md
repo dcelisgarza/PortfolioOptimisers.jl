@@ -1,5 +1,5 @@
 ```@meta
-Description = "Return Forecast Base, public API of PortfolioOptimisers.jl: AbstractReturnForecastEstimator, IdiosyncraticReturnUnit, IdiosyncraticSharpeUnit, return_forecast."
+Description = "Return Forecast Base, public API of PortfolioOptimisers.jl: AbstractReturnForecastEstimator, IdiosyncraticReturnUnit, IdiosyncraticSharpeUnit, …"
 ```
 
 # [Return Forecast Base](@id api-return-forecast-base)

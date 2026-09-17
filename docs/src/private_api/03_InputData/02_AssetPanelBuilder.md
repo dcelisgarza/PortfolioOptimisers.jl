@@ -1,5 +1,5 @@
 ```@meta
-Description = "Asset Panel builder, private API of PortfolioOptimisers.jl: AbstractAssetPanelEstimator, panel_build_observations, panel_fill_array, …"
+Description = "Asset Panel builder, private API of PortfolioOptimisers.jl: AbstractAssetPanelEstimator, panel_build_observations, panel_fill_array, panel_directional_fill, …"
 ```
 
 # Asset Panel builder: private API

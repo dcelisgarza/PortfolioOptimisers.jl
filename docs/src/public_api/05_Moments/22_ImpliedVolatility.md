@@ -1,5 +1,5 @@
 ```@meta
-Description = "Implied Volatility, public API of PortfolioOptimisers.jl: ImpliedVolatilityAlgorithm, ImpliedVolatilityRegression, ImpliedVolatilityPremium, ImpliedVolatility, predict_realised_vols, cov, cor."
+Description = "Implied Volatility, public API of PortfolioOptimisers.jl: ImpliedVolatilityAlgorithm, ImpliedVolatilityRegression, ImpliedVolatilityPremium, …"
 ```
 
 # Implied Volatility

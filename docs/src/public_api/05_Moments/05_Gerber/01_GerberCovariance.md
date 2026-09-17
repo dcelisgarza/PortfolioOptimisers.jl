@@ -1,5 +1,5 @@
 ```@meta
-Description = "Gerber covariance, public API of PortfolioOptimisers.jl: BaseGerberCovariance, GerberCovarianceAlgorithm, Gerber0, Gerber1, Gerber2, GerberCovariance, cov, cor."
+Description = "Gerber covariance, public API of PortfolioOptimisers.jl: BaseGerberCovariance, GerberCovarianceAlgorithm, Gerber0, Gerber1, Gerber2, GerberCovariance, cov, …"
 ```
 
 # Gerber covariance

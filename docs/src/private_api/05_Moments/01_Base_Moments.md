@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base moments, private API of PortfolioOptimisers.jl: AbstractExpectedReturnsAlgorithm, AbstractMomentAlgorithm, gap_fill_value, densify, …"
+Description = "Base moments, private API of PortfolioOptimisers.jl: AbstractExpectedReturnsAlgorithm, AbstractMomentAlgorithm, gap_fill_value, densify, robust_cov, …"
 ```
 
 # Base moments: private API

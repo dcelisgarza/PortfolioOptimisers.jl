@@ -1,5 +1,5 @@
 ```@meta
-Description = "Regression, public API of PortfolioOptimisers.jl: AbstractTimeSeriesRegressionEstimator, AbstractCrossSectionalRegressionEstimator, LinearModel, GeneralisedLinearModel, Regression, factory, StatsAPI.fit, regression, port_opt_view."
+Description = "Regression, public API of PortfolioOptimisers.jl: AbstractTimeSeriesRegressionEstimator, AbstractCrossSectionalRegressionEstimator, LinearModel, …"
 ```
 
 # [Regression](@id api-regression)

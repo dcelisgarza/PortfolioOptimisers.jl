@@ -1,5 +1,5 @@
 ```@meta
-Description = "Regime Adjusted Exponential Weighted Variance, public API of PortfolioOptimisers.jl: RegimeAdjustedMethod, LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted, regime_multiplier, …"
+Description = "Regime Adjusted Exponential Weighted Variance, public API of PortfolioOptimisers.jl: RegimeAdjustedMethod, LogRegimeAdjusted, FirstMomentRegimeAdjusted, …"
 ```
 
 # Regime Adjusted Exponential Weighted Variance
