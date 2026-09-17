@@ -4,4 +4,4 @@ Description = "Worst Realisation has no private API in PortfolioOptimisers.jl; i
 
 # Worst Realisation: private API
 
-Worst Realisation has no private API in PortfolioOptimisers.jl; see [`Worst Realisation`](@ref) for its public API.
+Worst Realisation has no private API in PortfolioOptimisers.jl; see [Worst Realisation](../../public_api/16_RiskMeasures/12_WorstRealisation.md) for its public API.

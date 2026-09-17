@@ -4,4 +4,4 @@ Description = "Cardinality Constraints has no public API in PortfolioOptimisers.
 
 # Cardinality Constraints
 
-Cardinality Constraints has no public API in PortfolioOptimisers.jl; see [`Cardinality Constraints: private API`](@ref) for its private API.
+Cardinality Constraints has no public API in PortfolioOptimisers.jl; see [Cardinality Constraints: private API](../../../../private_api/17_Optimisation/05_JuMP/02_JuMPConstraints/07_CardinalityConstraints.md) for its private API.

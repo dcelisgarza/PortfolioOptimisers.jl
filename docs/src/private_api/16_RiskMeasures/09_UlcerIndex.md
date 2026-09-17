@@ -4,4 +4,4 @@ Description = "Ulcer Index has no private API in PortfolioOptimisers.jl; its nam
 
 # Ulcer Index: private API
 
-Ulcer Index has no private API in PortfolioOptimisers.jl; see [`Ulcer Index`](@ref) for its public API.
+Ulcer Index has no private API in PortfolioOptimisers.jl; see [Ulcer Index](../../public_api/16_RiskMeasures/09_UlcerIndex.md) for its public API.

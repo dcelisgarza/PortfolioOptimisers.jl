@@ -4,4 +4,4 @@ Description = "Feature selector has no public API in PortfolioOptimisers.jl; its
 
 # Feature selector
 
-Feature selector has no public API in PortfolioOptimisers.jl; see [`Feature selector: private API`](@ref) for its private API.
+Feature selector has no public API in PortfolioOptimisers.jl; see [Feature selector: private API](../../private_api/03_InputData/15_FeatureSelector.md) for its private API.

@@ -4,4 +4,4 @@ Description = "Network Graph has no public API in PortfolioOptimisers.jl; its na
 
 # Network Graph
 
-Network Graph has no public API in PortfolioOptimisers.jl; see [`Network Graph: private API`](@ref) for its private API.
+Network Graph has no public API in PortfolioOptimisers.jl; see [Network Graph: private API](../../../private_api/08_Phylogeny/08_Network/03_NetworkGraph.md) for its private API.

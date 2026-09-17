@@ -688,11 +688,12 @@ end
     @test s[1] === s
     @test collect(s) == [s]
     # The root is not exported. The seam's whole public surface is the two verbs, so nothing
-    # here reaches a caller by its bare name.
+    # here reaches a caller by its bare name. The root and `merge_states` are `public`,
+    # which `names` also lists, so those two read `Base.isexported`.
     @test :partial_fit! in names(PortfolioOptimisers)
     @test :partial_fit in names(PortfolioOptimisers)
-    @test !(:AbstractPartialFitState in names(PortfolioOptimisers))
-    @test !(:merge_states in names(PortfolioOptimisers))
+    @test !Base.isexported(PortfolioOptimisers, :AbstractPartialFitState)
+    @test !Base.isexported(PortfolioOptimisers, :merge_states)
     @test !(:chan_merge in names(PortfolioOptimisers))
     @test !(:assert_mergeable_states in names(PortfolioOptimisers))
 end

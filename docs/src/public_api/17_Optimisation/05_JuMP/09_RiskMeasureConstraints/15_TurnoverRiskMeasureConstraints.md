@@ -4,4 +4,4 @@ Description = "Turnover Risk Measure Constraints has no public API in PortfolioO
 
 # Turnover Risk Measure Constraints
 
-Turnover Risk Measure Constraints has no public API in PortfolioOptimisers.jl; see [`Turnover Risk Measure Constraints: private API`](@ref) for its private API.
+Turnover Risk Measure Constraints has no public API in PortfolioOptimisers.jl; see [Turnover Risk Measure Constraints: private API](../../../../private_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/15_TurnoverRiskMeasureConstraints.md) for its private API.

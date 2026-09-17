@@ -130,13 +130,13 @@ const CTX = ProbeContext()
     @test !isa(KRULE, PO.DeferredQuantity)
     @test !isa(probe_rate, PO.DeferredQuantity)
 
-    # The abstract types stay unexported; the rules themselves are caller-facing.
-    exported = names(PortfolioOptimisers)
-    @test !(:AbstractCalibrationAlgorithm in exported)
-    @test !(:AbstractSignificanceCalibrationAlgorithm in exported)
-    @test !(:AbstractDeformationCalibrationAlgorithm in exported)
-    @test :ScenarioCount in exported
-    @test :EntropyBudget in exported
+    # The abstract types stay unexported; the rules themselves are caller-facing. `names`
+    # lists a `public` binding too, so the export check reads `Base.isexported`.
+    @test !Base.isexported(PortfolioOptimisers, :AbstractCalibrationAlgorithm)
+    @test !Base.isexported(PortfolioOptimisers, :AbstractSignificanceCalibrationAlgorithm)
+    @test !Base.isexported(PortfolioOptimisers, :AbstractDeformationCalibrationAlgorithm)
+    @test Base.isexported(PortfolioOptimisers, :ScenarioCount)
+    @test Base.isexported(PortfolioOptimisers, :EntropyBudget)
 
     # The seven rules, their root, and the verb that put them on are all gone.
     for name in (:AbstractCalibrationEstimator, :SignificanceTailCalibration,

@@ -4,4 +4,4 @@ Description = "Detone has no private API in PortfolioOptimisers.jl; its names ar
 
 # Detone: private API
 
-Detone has no private API in PortfolioOptimisers.jl; see [`Detone`](@ref) for its public API.
+Detone has no private API in PortfolioOptimisers.jl; see [Detone](../../public_api/04_MatrixProcessing/03_Detone.md) for its public API.

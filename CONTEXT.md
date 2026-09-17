@@ -315,7 +315,7 @@ Structural axes: **low-order** is mean plus covariance, **high-order** adds cosk
 - **SyntheticDataPrior**: moments of a panel drawn from a fitted Synthetic-Data Generator, optionally under a Stress Statement; the vine copula is the first generator.
 
 **Synthetic-Data Generator**
-A model of the joint distribution of asset returns that is fitted to a panel and then drawn from. Its estimator carries every knob of the fit, including any conditioning it can honour; its Result is the fitted model, and `simulate(rng, result, n)` draws `n` scenarios from it, returning the observations × assets matrix beside a **Simulation Result** (below). The vine copula is the first generator; a bootstrap or a path-simulating model joins the family with its own estimator and no change to the prior that wraps it. A conditioning that the fitted model can honour lives on the Result the fit produced, so re-conditioning a fitted generator is a field change on the Result, never a refit. ADR 0153.
+A model of the joint distribution of asset returns that is fitted to a panel and then drawn from. Its estimator carries every knob of the fit, including any conditioning it can honour; its Result is the fitted model, and a draw of `n` scenarios from it under a stated `rng` returns the observations × assets matrix beside a **Simulation Result** (below). The vine copula is the first generator; a bootstrap or a path-simulating model joins the family with its own estimator and no change to the prior that wraps it. A conditioning that the fitted model can honour lives on the Result the fit produced, so re-conditioning a fitted generator is a field change on the Result, never a refit. ADR 0153.
 *Avoid*: reading the generator as a Prior; it produces scenarios, and a **Synthetic-Data Prior** (below) turns them into moments.
 
 **Synthetic-Data Prior**
@@ -323,7 +323,7 @@ The Prior Estimator that wraps a Synthetic-Data Generator: it fits the generator
 *Avoid*: reading `ens` as the count the generator was fitted over; it is whatever the inner estimator stated over the synthetic rows, and the fitted count lives on the generator's Result.
 
 **Simulation Result**
-The read of how a draw ran: the route the sampler took (exact, rejection or importance), the acceptance rate, the draws it took, and the mask of columns the constant-column repair touched. It is returned beside the matrix by `simulate` and carried on the Prior Result under `sim`, where a reweighting wrapper dispatches on it to refit the inner moments on the drawn panel rather than draw again. ADR 0153.
+The read of how a draw ran: the route the sampler took (exact, rejection or importance), the acceptance rate, the draws it took, and the mask of columns the constant-column repair touched. It is returned beside the matrix by the draw and carried on the Prior Result under `sim`, where a reweighting wrapper dispatches on it to refit the inner moments on the drawn panel rather than draw again. ADR 0153.
 *Avoid*: reading it as importance weights; a weighted draw states its weights on the Prior Result's `w` and their Kish count on `ens`, and the default importance route resamples so both stay `nothing`.
 
 **Group Pair View**

@@ -26,7 +26,11 @@ jobs:
         shell: julia --color=yes {0}
         run: |
           using Pkg
-          Pkg.add(PackageSpec(name="Aqua"))
+          # Pinned: Aqua 0.8.17's `test_persistent_tasks` walks the manifest and errors on a
+          # weak dependency that is not installed ("Unable to locate `ChainRulesCore`, a
+          # dependency of `SpecialFunctions`"). 0.8.16 passes on the same tree. Lift the pin
+          # once a later Aqua passes.
+          Pkg.add(PackageSpec(name="Aqua", version="0.8.16"))
           Pkg.develop(PackageSpec(path=pwd()))
           using PortfolioOptimisers, Aqua
           Aqua.test_ambiguities(PortfolioOptimisers)

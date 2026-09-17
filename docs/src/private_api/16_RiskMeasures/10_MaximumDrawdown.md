@@ -4,4 +4,4 @@ Description = "Maximum Drawdown has no private API in PortfolioOptimisers.jl; it
 
 # Maximum Drawdown: private API
 
-Maximum Drawdown has no private API in PortfolioOptimisers.jl; see [`Maximum Drawdown`](@ref) for its public API.
+Maximum Drawdown has no private API in PortfolioOptimisers.jl; see [Maximum Drawdown](../../public_api/16_RiskMeasures/10_MaximumDrawdown.md) for its public API.
