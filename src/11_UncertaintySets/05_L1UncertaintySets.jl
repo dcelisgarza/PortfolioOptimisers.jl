@@ -1087,3 +1087,4 @@ end
 export ActiveAssetsUncertaintyAlgorithm, L1UncertaintySet, SignedL1UncertaintySet,
        L1UncertaintySetAlgorithm, SignedL1UncertaintySetAlgorithm,
        CharacteristicUncertaintySet
+public l1_resolve_eps

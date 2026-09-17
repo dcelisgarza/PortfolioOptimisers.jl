@@ -1,5 +1,5 @@
 ```@meta
-Description = "ℓ1 Uncertainty Sets, private API of PortfolioOptimisers.jl: l1_activation_ladder, l1_active_count, l1_eps_from_ladder, l1_resolve_eps."
+Description = "ℓ1 Uncertainty Sets, private API of PortfolioOptimisers.jl: l1_activation_ladder, l1_active_count, l1_eps_from_ladder."
 ```
 
 # ℓ1 Uncertainty Sets: private API
@@ -8,7 +8,6 @@ Description = "ℓ1 Uncertainty Sets, private API of PortfolioOptimisers.jl: l1_
 l1_activation_ladder
 l1_active_count
 l1_eps_from_ladder
-l1_resolve_eps
 ```
 
 ## References

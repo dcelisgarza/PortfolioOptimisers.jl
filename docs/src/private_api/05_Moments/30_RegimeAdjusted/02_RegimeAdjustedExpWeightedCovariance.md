@@ -1,5 +1,5 @@
 ```@meta
-Description = "Regime Adjusted Exponential Weighted Covariance, private API of PortfolioOptimisers.jl: RegimeAdjustedCovarianceState, min_active_assets, …"
+Description = "Regime Adjusted Exponential Weighted Covariance, private API of PortfolioOptimisers.jl: RegimeAdjustedCovarianceState, has_separate_cor_decay, regime_kappa, …"
 ```
 
 # Regime Adjusted Exponential Weighted Covariance: private API
@@ -13,7 +13,6 @@ RegimeAdjustedCovarianceState
 ## Functions
 
 ```@docs
-min_active_assets
 has_separate_cor_decay
 regime_kappa
 regime_denom

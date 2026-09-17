@@ -188,6 +188,129 @@ function docstring_text(x)
     return ""
 end
 
+# --- the `# Interfaces` docstring section ------------------------------------
+#
+# **This is the one section reader.** `test/test_61_interfaces_section_census.jl` validates the
+# prose inside a `# Interfaces` section, and `test/test_66_public_declaration_census.jl` (ADR
+# 0154) gates the `public`/`export` declaration the section's existence obliges, so the two
+# censuses read the section boundary through the same function and can never disagree about where
+# it starts and ends.
+
+"""
+    interfaces_section(text::AbstractString) -> Union{Nothing, Vector{String}}
+
+The lines of a docstring's `# Interfaces` section, up to the next top-level heading, with every
+fenced block dropped — a `jldoctest` inside the section is an implementation, not a contract, and
+its lines are never a heading or a bullet. `nothing` when `text` carries no `# Interfaces` heading.
+"""
+function interfaces_section(text::AbstractString)
+    lines = split(text, '\n')
+    i = findfirst(l -> strip(l) == "# Interfaces", lines)
+    if i === nothing
+        return nothing
+    end
+    out = String[]
+    fenced = false
+    for l in lines[(i + 1):end]
+        if startswith(l, "# ")
+            break
+        end
+        if startswith(strip(l), "```")
+            fenced = !fenced
+            continue
+        end
+        fenced || push!(out, String(l))
+    end
+    return out
+end
+
+const INTERFACES_HEADING_RE = r"^## `([^`]+)`"
+const INTERFACES_BULLET_RE = r"^\s*-\s+`([^`]+)`"
+const INTERFACES_CALL_RE = r"^[A-Za-z_][\w!]*(\.[A-Za-z_][\w!]*)*\("
+
+"""
+    interfaces_verbs(section::AbstractVector{<:AbstractString}) -> Vector{Symbol}
+
+The bare verb names an `# Interfaces` section (as [`interfaces_section`](@ref) returns it) names:
+a level-two verb heading, and the callee of a call-shaped bullet under it or standalone. A
+module-qualified name (`Base.copy`) is skipped: the census this feeds asks whether the package's
+own declaration covers the verb, and a qualified name is never one.
+"""
+function interfaces_verbs(section)
+    out = Symbol[]
+    for l in section
+        m = match(INTERFACES_HEADING_RE, l)
+        if m !== nothing
+            v = try
+                Meta.parse(m.captures[1])
+            catch
+                continue
+            end
+            if isa(v, Symbol)
+                push!(out, v)
+            end
+            continue
+        elseif startswith(l, "## ")
+            continue
+        end
+        m = match(INTERFACES_BULLET_RE, l)
+        if m === nothing
+            continue
+        end
+        code = m.captures[1]
+        if !(occursin(INTERFACES_CALL_RE, code))
+            continue
+        end
+        ex = try
+            Meta.parse(code)
+        catch
+            continue
+        end
+        if Meta.isexpr(ex, :->)
+            (ex = ex.args[1])
+        end
+        while Meta.isexpr(ex, :where)
+            ex = ex.args[1]
+        end
+        if Meta.isexpr(ex, :(::), 2)
+            (ex = ex.args[1])
+        end
+        if !(Meta.isexpr(ex, :call))
+            continue
+        end
+        verb = ex.args[1]
+        isa(verb, Symbol) && push!(out, verb)
+    end
+    return unique(out)
+end
+
+# --- every type a module declares --------------------------------------------
+
+"""
+    declared_types(mod::Module) -> Dict{Symbol, DataType}
+
+Every type `mod` defines, keyed by the name it was declared under. A parametric type is a
+`UnionAll` at the binding, so it is unwrapped before it is classified; an alias binds a name to
+another type's own name and is skipped, because it does not carry the name it is bound to.
+"""
+function declared_types(mod::Module)
+    declared = Dict{Symbol, DataType}()
+    for n in names(mod; all = true)
+        if !(isdefined(mod, n))
+            continue
+        end
+        T = getfield(mod, n)
+        if !(isa(T, Type))
+            continue
+        end
+        T0 = Base.unwrap_unionall(T)
+        if isa(T0, DataType) && parentmodule(T0) === mod && nameof(T0) === n
+            declared[n] = T0
+        end
+    end
+    return declared
+end
+
 # --- the name a definition binds --------------------------------------------
 #
 # **This is the one resolver.** `code_health/coverage.jl` writes the `definition` key of a

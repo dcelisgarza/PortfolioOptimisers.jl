@@ -2411,3 +2411,4 @@ function supports_partial_fit(::RegimeAdjustedExpWeightedCovariance)
 end
 export RegimeAdjustedTarget, MahalanobisTarget, DiagonalTarget, PortfolioTarget,
        RegimeAdjustedExpWeightedCovariance
+public min_active_assets

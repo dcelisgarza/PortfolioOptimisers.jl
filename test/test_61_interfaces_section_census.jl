@@ -77,25 +77,10 @@ end
         end
     end
 
-    # The lines of the `# Interfaces` section, up to the next top-level heading, with every
-    # fenced block dropped: a `jldoctest` inside the section is an implementation, not a
-    # contract, and its lines are never bullets. `nothing` when the docstring has none.
-    function interfaces_section(text)
-        lines = split(text, '\n')
-        i = findfirst(l -> strip(l) == "# Interfaces", lines)
-        i === nothing && return nothing
-        out = String[]
-        fenced = false
-        for l in lines[(i + 1):end]
-            startswith(l, "# ") && break
-            if startswith(strip(l), "```")
-                fenced = !fenced
-                continue
-            end
-            fenced || push!(out, String(l))
-        end
-        return out
-    end
+    # The lines of the `# Interfaces` section, up to the next top-level heading. Shared with
+    # `test/test_66_public_declaration_census.jl` as `CH.interfaces_section`, so the two censuses
+    # can never disagree about where the section starts and ends.
+    interfaces_section = CH.interfaces_section
 
     # A verb heading is `## \`verb\``, optionally followed by prose (`## \`k_ucs\` interface`).
     # A bullet is `- \`…\``, and it is call-shaped when the code opens with a name and a paren.
@@ -269,22 +254,10 @@ end
 
     # ------------------------------------------------------------- check 3
 
-    # Every type the package defines, keyed by the name it was declared under. A parametric
-    # type is a `UnionAll` at the binding, so it is unwrapped before it is classified; an
-    # alias (`VecNum`) is skipped, because it does not carry the name it is bound to.
-    function declared_type(n)
-        isdefined(PO, n) || return nothing
-        T = getfield(PO, n)
-        isa(T, Type) || return nothing
-        T0 = Base.unwrap_unionall(T)
-        isa(T0, DataType) && parentmodule(T0) === PO && nameof(T0) === n || return nothing
-        return T0
-    end
-    declared = Dict{Symbol, DataType}()
-    for n in names(PO; all = true)
-        T = declared_type(n)
-        T === nothing || (declared[n] = T)
-    end
+    # Every type the package defines, keyed by the name it was declared under. Shared with
+    # `test/test_66_public_declaration_census.jl` as `CH.declared_types`, an alias (`VecNum`) is
+    # skipped, because it does not carry the name it is bound to.
+    declared = CH.declared_types(PO)
     abstracts = Set(n for (n, T) in declared if isabstracttype(T))
 
     # The direct supertype of every concrete type the package defines, when that

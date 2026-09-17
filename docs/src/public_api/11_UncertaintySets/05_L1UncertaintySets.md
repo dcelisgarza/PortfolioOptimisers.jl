@@ -15,6 +15,7 @@ port_opt_view(risk_ucs::L1UncertaintySet, i, args...)
 port_opt_view(risk_ucs::SignedL1UncertaintySet, i, args...)
 mu_ucs(ue::CharacteristicUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 ucs(ue::CharacteristicUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing; kwargs...)
+l1_resolve_eps
 ```
 
 ## References
