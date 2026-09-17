@@ -110,8 +110,6 @@ end
     =#
     promotion_debt = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
                           :AbstractAmbiguityTailWeightCalibrationAlgorithm,
-                          :AbstractConstraintEstimator, :AbstractConstraintResult,
-                          :AbstractConstraintSpace,
                           :AbstractDeformationCalibrationAlgorithm,
                           :AbstractExpectedReturnsAlgorithm, :AbstractMomentAlgorithm,
                           :AbstractNormCeilingCalibrationAlgorithm,
@@ -141,13 +139,19 @@ end
     `public`-declared, measured the same day. A verb already public through another route
     (`prior`, `port_opt_view`, `mu_ucs`, ...) is not here -- only a name a promotion ticket
     must still declare alongside its type.
+
+    `regenerate_decay` is the one addition, made by issue #1132 on the same day:
+    `interfaces_verbs` read a self-qualified bullet (`PortfolioOptimisers.foo(...)`) as
+    foreign and skipped it, so the verb was never measured when #1130 promoted its type
+    (`GerberIQDecayEstimator`). The parser now reads the package's own prefix, and the entry
+    records debt that existed all along rather than debt this file grew.
     =#
     verb_debt = Set([:bootstrap_indices, :compute_pooling, :k_ucs, :needs_previous_weights,
                      :opt_weight_bounds, :reads_prior_result, :realised_target,
-                     :reconstruct_prior, :scalarise, :scalarise_risk_expression!,
-                     :set_clustering_weight_finaliser_alg!, :target_dof, :target_step_dof,
-                     :time_dependent_field_defaults, :tracking_benchmark,
-                     :variance_risk_bounds_val])
+                     :reconstruct_prior, :regenerate_decay, :scalarise,
+                     :scalarise_risk_expression!, :set_clustering_weight_finaliser_alg!,
+                     :target_dof, :target_step_dof, :time_dependent_field_defaults,
+                     :tracking_benchmark, :variance_risk_bounds_val])
 
     undeclared_types = Symbol[]
     undeclared_verbs = Tuple{Symbol, Symbol}[]

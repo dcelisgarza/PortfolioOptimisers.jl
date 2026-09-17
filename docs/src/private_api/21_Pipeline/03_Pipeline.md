@@ -1,5 +1,5 @@
 ```@meta
-Description = "PortfolioOptimisers pipeline, private API of PortfolioOptimisers.jl: first_duplicate, inject_context, constraint_results, implicit_constraint_target, …"
+Description = "PortfolioOptimisers pipeline, private API of PortfolioOptimisers.jl: first_duplicate, inject_context, constraint_results, constraint_target_of, …"
 ```
 
 # PortfolioOptimisers pipeline: private API
@@ -15,7 +15,6 @@ The pipeline resolves its computed slots into [routing targets](@ref PIPELINE_RO
 ```@docs
 inject_context
 constraint_results
-implicit_constraint_target
 constraint_target_of
 constraint_value_of
 accumulate_constraint_values

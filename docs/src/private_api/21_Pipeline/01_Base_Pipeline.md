@@ -26,5 +26,4 @@ unroutable_target
 assert_opt_last
 pipe_reads
 pipe_writes
-pipe_constraint_targets
 ```

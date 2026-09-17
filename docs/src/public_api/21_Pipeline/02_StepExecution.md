@@ -1,7 +1,9 @@
 ```@meta
-Description = "Step execution has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Step execution, public API of PortfolioOptimisers.jl: constraint_step_value."
 ```
 
 # Step execution
 
-Step execution has no public API in PortfolioOptimisers.jl; see [`Step execution: private API`](@ref) for its private API.
+```@docs
+constraint_step_value
+```

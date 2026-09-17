@@ -609,3 +609,4 @@ function linear_constraints(lcs::VecEcE_LcE_Lc, sets::UniverseSets;
 end
 
 export FactorSpace, ExposureConstraintEstimator
+public AbstractConstraintSpace, constraint_space_basis

@@ -300,3 +300,6 @@ function axis_name_indices(members, nx::AbstractVector, on_missing)
     end
     return idx
 end
+
+public AbstractConstraintResult, AbstractConstraintEstimator, implicit_constraint_target,
+       pipe_constraint_targets, constraint_step_value

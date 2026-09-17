@@ -233,8 +233,10 @@ const INTERFACES_CALL_RE = r"^[A-Za-z_][\w!]*(\.[A-Za-z_][\w!]*)*\("
 
 The bare verb names an `# Interfaces` section (as [`interfaces_section`](@ref) returns it) names:
 a level-two verb heading, and the callee of a call-shaped bullet under it or standalone. A
-module-qualified name (`Base.copy`) is skipped: the census this feeds asks whether the package's
-own declaration covers the verb, and a qualified name is never one.
+foreign-qualified name (`Base.copy`) is skipped: the census this feeds asks whether the package's
+own declaration covers the verb, and a foreign name is never one. A self-qualified name
+(`PortfolioOptimisers.foo`) is the package's own, spelled the way a caller reaches an unexported
+name, so it counts as the bare `foo`.
 """
 function interfaces_verbs(section)
     out = Symbol[]
@@ -246,6 +248,7 @@ function interfaces_verbs(section)
             catch
                 continue
             end
+            v = own_name(v)
             if isa(v, Symbol)
                 push!(out, v)
             end
@@ -278,10 +281,22 @@ function interfaces_verbs(section)
         if !(Meta.isexpr(ex, :call))
             continue
         end
-        verb = ex.args[1]
+        verb = own_name(ex.args[1])
         isa(verb, Symbol) && push!(out, verb)
     end
     return unique(out)
+end
+
+# The bare name of a symbol or of a `PortfolioOptimisers.`-qualified one; any other expression
+# (a foreign-qualified name, a call) is returned as is, so the caller's `isa(_, Symbol)` skips it.
+function own_name(ex)
+    if Meta.isexpr(ex, :., 2) &&
+       ex.args[1] === :PortfolioOptimisers &&
+       isa(ex.args[2], QuoteNode) &&
+       isa(ex.args[2].value, Symbol)
+        return ex.args[2].value
+    end
+    return ex
 end
 
 # --- every type a module declares --------------------------------------------

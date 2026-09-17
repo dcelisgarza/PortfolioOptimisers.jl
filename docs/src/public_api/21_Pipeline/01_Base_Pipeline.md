@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base Pipeline, public API of PortfolioOptimisers.jl: PipelineStep."
+Description = "Base Pipeline, public API of PortfolioOptimisers.jl: PipelineStep, pipe_constraint_targets."
 ```
 
 # Base Pipeline
@@ -8,4 +8,5 @@ A pipeline reifies an end-to-end workflow — price preprocessing, prices-to-ret
 
 ```@docs
 PipelineStep
+pipe_constraint_targets
 ```

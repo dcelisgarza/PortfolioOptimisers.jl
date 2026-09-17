@@ -41,12 +41,14 @@
     way on 2026-09-17 (issue #1127), the nine `src/01_Base/` types joined the same day (issue
     #1126), the twenty-five `src/05_Moments/` types joined the same day (issue #1130), the five
     `src/03_InputData/` types joined the same day too (issue #1128), the six
-    `src/04_MatrixProcessing/` types below joined the same day again (issue #1129), and
-    `AbstractPreorderBy` from `src/08_Phylogeny/` joined the same day (issue #1131). They are
-    held to their own list for the same reason — public is API too.
+    `src/04_MatrixProcessing/` types below joined the same day again (issue #1129),
+    `AbstractPreorderBy` from `src/08_Phylogeny/` joined the same day (issue #1131), and the
+    three `src/09_ConstraintGeneration/` types joined the same day as well (issue #1132). They
+    are held to their own list for the same reason — public is API too.
     =#
-    allowed_public = Set([:AbstractBins, :AbstractCovarianceEstimator,
-                          :AbstractCoverageAlgorithm,
+    allowed_public = Set([:AbstractBins, :AbstractConstraintEstimator,
+                          :AbstractConstraintResult, :AbstractConstraintSpace,
+                          :AbstractCovarianceEstimator, :AbstractCoverageAlgorithm,
                           :AbstractCrossSectionalRegressionEstimator,
                           :AbstractCrossSectionalTransform,
                           :AbstractCrossSectionalWeightsAlgorithm,
@@ -107,16 +109,19 @@
     @test length(exported) < length(defined) / 10
 
     #=
-    The nine names stay reachable through the module prefix, which is what an extension needs
-    to subtype them, and each keeps its docstring and its `docs/src/api/` entry. Unexported
-    is not undocumented. They are pinned by name so the regression cannot come back quietly.
-    The last three are the time-dependent callable family, whose classification is stated in
-    the type tree rather than in the export list.
+    The seven names stay reachable through the module prefix, which is what an extension
+    needs to subtype them, and each keeps its docstring and its private mirror-page entry.
+    Unexported is not undocumented. They are pinned by name so the regression cannot come
+    back quietly. The last three are the time-dependent callable family, whose
+    classification is stated in the type tree rather than in the export list.
+    `AbstractConstraintSpace` left this list on 2026-09-17: its docstring carries a
+    `# Interfaces` section, so ADR 0154 promotes it to `public` (issue #1132), and it now
+    sits on `allowed_public` above.
     =#
     for n in (:AbstractAssetPanelEstimator, :AbstractPhylogenyFeatureAlgorithm,
-              :AbstractConstraintSpace, :AbstractSimilarityMatrixAlgorithm,
-              :AbstractNonNegativeSimilarityMatrixAlgorithm, :TimeDependentCallable,
-              :TimeDependentConstraintCallable, :TimeDependentOptimiserCallable)
+              :AbstractSimilarityMatrixAlgorithm, :AbstractNonNegativeSimilarityMatrixAlgorithm,
+              :TimeDependentCallable, :TimeDependentConstraintCallable,
+              :TimeDependentOptimiserCallable)
         @test is_abstract(n)
         @test !Base.isexported(PortfolioOptimisers, n)
         @test n ∉ names(PortfolioOptimisers)

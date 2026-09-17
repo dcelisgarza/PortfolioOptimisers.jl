@@ -16,7 +16,6 @@ run_uncertainty_step
 uncertainty_step_source
 run_constraint_step
 resolve_constraint_target
-constraint_step_value
 pipeline_asset_sets
 add_constraint_result
 ```
