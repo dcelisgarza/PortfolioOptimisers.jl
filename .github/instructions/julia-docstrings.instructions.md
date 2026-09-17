@@ -564,9 +564,17 @@ The four rules above are checked by the `"References"` testset in `test/test_26_
 
 ---
 
-## `docs/src/api/` Markdown Files
+## `docs/src/public_api/` and `docs/src/private_api/` Markdown Files
 
-Each source file `src/SomeFeature.jl` has a corresponding `docs/src/api/SomeFeature.md`. Every public symbol defined in the source file must be listed under an appropriate heading using the Documenter.jl `@docs` block:
+Each source file `src/SomeFeature.jl` has a corresponding page on both mirror trees:
+`docs/src/public_api/SomeFeature.md` and `docs/src/private_api/SomeFeature.md`. A symbol lands
+on exactly one of the two — public when it is `export`ed, `public`-declared, or extends a
+foreign generic such as `Base.iterate` or `StatsAPI.fit`; private otherwise — per
+`docs/api_classification.jl`'s `classify_binding` (ADR 0128). A side with nothing on it still
+gets its page, holding a one-line note that the file has no public (or no private) names.
+
+List the symbol under an appropriate heading using the Documenter.jl `@docs` block, on whichever
+mirror its classification puts it:
 
 **Template.**
 
@@ -580,7 +588,9 @@ MyAbstractType
 ```
 ````
 
-When adding a new symbol, also add it to the corresponding API markdown file.
+When adding a new symbol, also add it to the corresponding mirror page.
+`test/test_65_docs_public_private_placement_census.jl` gates that every `@docs` entry sits on
+the side its classification names.
 
 ---
 

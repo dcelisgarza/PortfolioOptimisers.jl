@@ -468,10 +468,9 @@ end
     directory carries a distinct prefix, and the `include` list is the listing sorted by that
     prefix, so the number on the file IS the order the module loads it in.
 
-    `docs/src/api/` mirrors `src/` and is numbered the same way; `docs/generate_type_hierarchy.jl`
-    numbers its own page past the largest prefix there, so that tree is held to the first
-    claim too. `ext/` carries no prefixes today and is walked so a numbered file entering it
-    is held to the rule on the day it arrives.
+    `docs/src/public_api/` and `docs/src/private_api/` each mirror `src/` and are numbered the
+    same way, so both trees are held to the first claim too. `ext/` carries no prefixes today
+    and is walked so a numbered file entering it is held to the rule on the day it arrives.
     =#
     @testset "a prefix is unique in its directory, and the include list is the prefix order" begin
         # `(number, name)` per path component: the number orders, and the name breaks a tie
@@ -522,7 +521,8 @@ end
         end
 
         collisions = prefix_collisions((SRC, joinpath(ROOT, "ext"),
-                                        joinpath(ROOT, "docs", "src", "api")), ROOT)
+                                        joinpath(ROOT, "docs", "src", "public_api"),
+                                        joinpath(ROOT, "docs", "src", "private_api")), ROOT)
         if !isempty(collisions)
             @warn """$(length(collisions)) directory prefix collision(s). Two entries under one
                      number state no load order between them. Renumber the entries that follow
