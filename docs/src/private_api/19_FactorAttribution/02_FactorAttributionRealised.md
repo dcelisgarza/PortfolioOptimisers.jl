@@ -1,6 +1,8 @@
-# Realised factor attribution
+```@meta
+Description = "Realised factor attribution, private API of PortfolioOptimisers.jl: ATTRIBUTION_CURRENCY_FAMILY, attribution_slice, attribution_weights, attribution_cov, …"
+```
 
-## Private
+# Realised factor attribution: private API
 
 ```@docs
 ATTRIBUTION_CURRENCY_FAMILY

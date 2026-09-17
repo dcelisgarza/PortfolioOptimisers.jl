@@ -1,17 +1,8 @@
-# Factor attribution
-
-## Public
-
-```@docs
-AttributionComponent
-AttributionBreakdown
-AssetAttributionBreakdown
-AssetFactorContribution
-FactorAttributionResult
-factor_attribution
+```@meta
+Description = "Factor attribution, private API of PortfolioOptimisers.jl: attribution_idiosyncratic_covariance, attribution_idiosyncratic_returns, …"
 ```
 
-## Private
+# Factor attribution: private API
 
 ```@docs
 attribution_idiosyncratic_covariance
