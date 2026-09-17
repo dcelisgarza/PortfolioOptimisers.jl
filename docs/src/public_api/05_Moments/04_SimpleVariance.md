@@ -1,5 +1,5 @@
 ```@meta
-Description = "Simple variance and standard deviation, public API of PortfolioOptimisers.jl: SimpleVariance, std, var, partial_fit!, port_opt_view."
+Description = "Simple variance and standard deviation, public API of PortfolioOptimisers.jl: SimpleVariance, std, var, partial_fit!, port_opt_view, merge_states, …"
 ```
 
 # Simple variance and standard deviation
@@ -26,6 +26,7 @@ partial_fit!(ve::SimpleVariance, X::MatNum; dims::Int = 1)
 partial_fit!(ve::SimpleVariance, x::VecNum)
 var(ve::SimpleVariance, state::SimpleVarianceState)
 port_opt_view(x::SimpleVarianceState, i, args...)
+merge_states(a::SimpleVarianceState, b::SimpleVarianceState)
 ```
 
 ## Available-case fit
@@ -35,4 +36,5 @@ With a [`CoveragePolicy`](@ref) in its `cvg` field the estimator fits each asset
 ```@docs
 partial_fit!(state::SimpleVarianceState, x::VecNum, ::Nothing, ::Option{<:AbstractVector{<:Bool}})
 partial_fit!(state::SimpleVarianceState, x::VecNum, cvg::CoveragePolicy, active_mask::Option{<:AbstractVector{<:Bool}})
+fold_inactive!(::ResetCoverage, state::SimpleVarianceState, ni::AbstractVector{<:Bool})
 ```

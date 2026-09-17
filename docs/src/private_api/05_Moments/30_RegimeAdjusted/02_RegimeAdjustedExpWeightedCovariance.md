@@ -32,7 +32,6 @@ regime_adjusted_covariance_pass!
 regime_adjusted_covariance
 regime_adjusted_correlation
 gap_fill_value(::RegimeAdjustedExpWeightedCovariance)
-PortfolioOptimisers.merge_states(a::RegimeAdjustedCovarianceState, b::RegimeAdjustedCovarianceState)
 Base.copy(x::PortfolioOptimisers.RegimeAdjustedCovarianceState)
 variance_series(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 variance_series(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)

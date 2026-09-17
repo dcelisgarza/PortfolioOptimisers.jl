@@ -19,6 +19,5 @@ exp_weighted_pass!(est::ExpWeightedVariance, X::MatNum, dims::Int, active_mask::
 exp_weighted_moment(cache::ExpWeightedVarianceState, est::ExpWeightedVariance)
 variance_series(ce::ExpWeightedVariance, X::MatNum; dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 variance_series(ce::ExpWeightedVariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-PortfolioOptimisers.merge_states(a::ExpWeightedVarianceState, b::ExpWeightedVarianceState)
 Base.copy(x::PortfolioOptimisers.ExpWeightedVarianceState)
 ```

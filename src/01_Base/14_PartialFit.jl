@@ -417,3 +417,4 @@ function observation_count(est::Union{<:AbstractEstimator, <:StatsBase.Covarianc
     return partial_fit_cache(est).n
 end
 export partial_fit!, partial_fit
+public merge_states

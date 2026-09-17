@@ -1,5 +1,5 @@
 ```@meta
-Description = "Simple covariance, private API of PortfolioOptimisers.jl: show_fields, covariance_centre_and_estimator, CovarianceState, merge_states, Base.copy, …"
+Description = "Simple covariance, private API of PortfolioOptimisers.jl: show_fields, covariance_centre_and_estimator, CovarianceState, Base.copy, covariance_state_seed, …"
 ```
 
 # Simple covariance: private API
@@ -25,7 +25,6 @@ The full-moment sample covariance folds one observation at a time, so a long his
 
 ```@docs
 CovarianceState
-merge_states(a::CovarianceState, b::CovarianceState)
 Base.copy(x::CovarianceState)
 covariance_state_seed
 partial_fit_corrected(ce::StatsBase.SimpleCovariance)
@@ -48,7 +47,6 @@ PortfolioOptimisers.coverage_covariance(ce::Union{<:GeneralCovariance, <:Covaria
 PortfolioOptimisers.coverage_covariance(ce::Covariance{<:Any, <:Any, <:FullMoment}, cvg::CoveragePolicy, state::CovarianceState)
 PortfolioOptimisers.coverage_correlation
 PortfolioOptimisers.coverage_policy
-PortfolioOptimisers.fold_inactive!(::ResetCoverage, state::CovarianceState, ni::AbstractVector{<:Bool})
 ```
 
 ## References

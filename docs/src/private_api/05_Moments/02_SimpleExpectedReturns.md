@@ -1,5 +1,5 @@
 ```@meta
-Description = "Simple expected returns, private API of PortfolioOptimisers.jl: show_fields, SimpleExpectedReturnsState, expected_returns_state_seed, merge_states, …"
+Description = "Simple expected returns, private API of PortfolioOptimisers.jl: show_fields, SimpleExpectedReturnsState, expected_returns_state_seed, Base.copy, …"
 ```
 
 # Simple expected returns: private API
@@ -17,7 +17,6 @@ The sample mean folds one observation at a time, so a long history need not be h
 ```@docs
 SimpleExpectedReturnsState
 expected_returns_state_seed
-merge_states(a::SimpleExpectedReturnsState, b::SimpleExpectedReturnsState)
 Base.copy(x::SimpleExpectedReturnsState)
 ```
 
@@ -31,5 +30,4 @@ PortfolioOptimisers.coverage_mean(me::SimpleExpectedReturns, ::Nothing, X::MatNu
 PortfolioOptimisers.coverage_mean(me::SimpleExpectedReturns, cvg::CoveragePolicy, X::MatNum)
 PortfolioOptimisers.coverage_mean(::SimpleExpectedReturns, ::Nothing, state::SimpleExpectedReturnsState)
 PortfolioOptimisers.coverage_mean(::SimpleExpectedReturns, cvg::CoveragePolicy, state::SimpleExpectedReturnsState)
-PortfolioOptimisers.fold_inactive!(::ResetCoverage, state::SimpleExpectedReturnsState, ni::AbstractVector{<:Bool})
 ```

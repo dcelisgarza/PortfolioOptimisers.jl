@@ -31,16 +31,24 @@
 
     #=
     `public` is the weaker declaration, and `names(PortfolioOptimisers)` returns both, so a
-    census that reads that list alone reports five names it should not. Four are deliberate:
-    a caller subtypes `CustomJuMPObjective` or `CustomJuMPConstraint` to write a custom
-    objective or constraint (ADR 0036), and the two vector aliases are `AbstractVector` over
-    those families, which `isabstracttype` also answers `true` for. `VectorToScalarMeasure`
-    joined on 2026-09-17 (issue #1127): ADR 0154 promotes an abstract type carrying a
-    `# Interfaces` section, and its docstring names one, `vec_to_real_measure`. They are held
-    to their own list for the same reason — public is API too.
+    census that reads that list alone reports names it should not. Two are deliberate from
+    the start: a caller subtypes `CustomJuMPObjective` or `CustomJuMPConstraint` to write a
+    custom objective or constraint (ADR 0036), and the two vector aliases are `AbstractVector`
+    over those families, which `isabstracttype` also answers `true` for. ADR 0154 adds a
+    second route: an abstract type whose docstring carries a `# Interfaces` section earns a
+    `public` declaration on the type and on every verb the section names, one
+    promotion-ticket directory at a time (issue #553) — `VectorToScalarMeasure` joined this
+    way on 2026-09-17 (issue #1127), and the nine `src/01_Base/` types below joined the same
+    day (issue #1126). They are held to their own list for the same reason — public is API
+    too.
     =#
-    allowed_public = Set([:CustomJuMPConstraint, :CustomJuMPObjective, :VecJuMPConstr,
-                          :VecJuMPObj, :VectorToScalarMeasure])
+    allowed_public = Set([:AbstractCoverageAlgorithm, :AbstractEstimatorValueAlgorithm,
+                          :AbstractOptimisationEstimator, :AbstractPartialFitState,
+                          :CustomJuMPConstraint, :CustomJuMPObjective,
+                          :DynamicAbstractWeights,
+                          :NonFiniteAllocationOptimisationEstimator, :NormError,
+                          :OptimisationEstimator, :VecJuMPConstr, :VecJuMPObj,
+                          :VectorAbstractEstimatorValueAlgorithm, :VectorToScalarMeasure])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&

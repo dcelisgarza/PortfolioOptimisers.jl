@@ -28,7 +28,6 @@ PortfolioOptimisers.copy_buffer_rows!
 PortfolioOptimisers.reserve_sample_buffer
 PortfolioOptimisers.compact_buffer_array
 PortfolioOptimisers.observation_row
-PortfolioOptimisers.merge_states(a::PortfolioOptimisers.SampleBufferState, b::PortfolioOptimisers.SampleBufferState)
 PortfolioOptimisers.merge_buffer_array
 PortfolioOptimisers.trim_merged_array
 Base.copy(x::PortfolioOptimisers.SampleBufferState)

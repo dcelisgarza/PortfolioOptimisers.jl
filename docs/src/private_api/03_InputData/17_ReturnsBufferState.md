@@ -23,7 +23,6 @@ PortfolioOptimisers.fold_column
 PortfolioOptimisers.fold_column_masked
 PortfolioOptimisers.returns_result(state::PortfolioOptimisers.ReturnsBufferState, rows::PortfolioOptimisers.SampleBufferState)
 PortfolioOptimisers.column_matrix
-PortfolioOptimisers.merge_states(a::PortfolioOptimisers.ReturnsBufferState, b::PortfolioOptimisers.ReturnsBufferState)
 PortfolioOptimisers.merge_column
 Base.copy(x::PortfolioOptimisers.ReturnsBufferState)
 PortfolioOptimisers.copy_column

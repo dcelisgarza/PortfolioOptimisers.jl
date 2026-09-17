@@ -1,5 +1,5 @@
 ```@meta
-Description = "Type aliases, private API of PortfolioOptimisers.jl: AbstractCustomValue, AbstractEstimatorValueAlgorithm, VectorAbstractEstimatorValueAlgorithm, Option, …"
+Description = "Type aliases, private API of PortfolioOptimisers.jl: AbstractCustomValue, Option, VecNum, VecInt, MatNum, ArrNum, Arr3Num, VecNum_MatNum, MatNum_Arr3Num, …"
 ```
 
 # Type aliases: private API
@@ -8,8 +8,6 @@ Description = "Type aliases, private API of PortfolioOptimisers.jl: AbstractCust
 
 ```@docs
 AbstractCustomValue
-AbstractEstimatorValueAlgorithm
-VectorAbstractEstimatorValueAlgorithm
 Option{T}
 VecNum
 VecInt

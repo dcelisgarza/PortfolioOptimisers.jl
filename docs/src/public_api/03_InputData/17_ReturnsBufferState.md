@@ -1,5 +1,5 @@
 ```@meta
-Description = "Returns buffer state, public API of PortfolioOptimisers.jl: partial_fit!, port_opt_view."
+Description = "Returns buffer state, public API of PortfolioOptimisers.jl: partial_fit!, port_opt_view, merge_states."
 ```
 
 # Returns buffer state
@@ -16,4 +16,5 @@ no prior sits beneath the optimiser. [`PortfolioOptimisers.returns_result`](@ref
 ```@docs
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.ReturnsBufferState, rd::ReturnsResult; own_returns::Bool = false)
 PortfolioOptimisers.port_opt_view(x::PortfolioOptimisers.ReturnsBufferState, i, args...)
+merge_states(a::PortfolioOptimisers.ReturnsBufferState, b::PortfolioOptimisers.ReturnsBufferState)
 ```

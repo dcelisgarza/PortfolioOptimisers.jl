@@ -18,7 +18,6 @@ The sample variance folds one observation at a time, so a long history need not 
 ```@docs
 SimpleVarianceState
 variance_state_seed
-merge_states(a::SimpleVarianceState, b::SimpleVarianceState)
 Base.copy(x::SimpleVarianceState)
 ```
 
@@ -35,5 +34,4 @@ PortfolioOptimisers.coverage_variance(f, ve::SimpleVariance, cvg::CoveragePolicy
 PortfolioOptimisers.coverage_variance(ve::SimpleVariance, ::Nothing, state::SimpleVarianceState)
 PortfolioOptimisers.coverage_variance(ve::SimpleVariance, cvg::CoveragePolicy, state::SimpleVarianceState)
 PortfolioOptimisers.coverage_moment_map
-PortfolioOptimisers.fold_inactive!(::ResetCoverage, state::SimpleVarianceState, ni::AbstractVector{<:Bool})
 ```

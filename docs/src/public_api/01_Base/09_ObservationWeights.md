@@ -1,7 +1,9 @@
 ```@meta
-Description = "Observation weights has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Observation weights, public API of PortfolioOptimisers.jl: get_observation_weights."
 ```
 
 # Observation weights
 
-Observation weights has no public API in `PortfolioOptimisers.jl`; its names are in the private API.
+```@docs
+get_observation_weights
+```

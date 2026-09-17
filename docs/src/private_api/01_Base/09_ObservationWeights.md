@@ -1,10 +1,9 @@
 ```@meta
-Description = "Observation weights, private API of PortfolioOptimisers.jl: ObsWeights, get_observation_weights."
+Description = "Observation weights, private API of PortfolioOptimisers.jl: ObsWeights."
 ```
 
 # Observation weights: private API
 
 ```@docs
 ObsWeights
-get_observation_weights
 ```

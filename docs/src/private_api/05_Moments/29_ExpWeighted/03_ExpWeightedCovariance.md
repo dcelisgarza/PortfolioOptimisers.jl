@@ -20,6 +20,5 @@ exp_weighted_moment(cache::ExpWeightedCovarianceState, est::ExpWeightedCovarianc
 gap_fill_value(::ExpWeightedCovariance)
 variance_series(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 variance_series(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-PortfolioOptimisers.merge_states(a::ExpWeightedCovarianceState, b::ExpWeightedCovarianceState)
 Base.copy(x::PortfolioOptimisers.ExpWeightedCovarianceState)
 ```

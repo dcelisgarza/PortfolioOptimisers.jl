@@ -17,6 +17,5 @@ process_observation!(cache::ExpWeightedExpectedReturnsState, me::ExpWeightedExpe
 exp_weighted_pass!(f, est::ExpWeightedExpectedReturns, X::MatNum, dims::Int, active_mask::Option{<:AbstractMatrix{<:Bool}}, state::Option{<:ExpWeightedExpectedReturnsState} = nothing)
 exp_weighted_pass!(est::ExpWeightedExpectedReturns, X::MatNum, dims::Int, active_mask::Option{<:AbstractMatrix{<:Bool}}, state::Option{<:ExpWeightedExpectedReturnsState} = nothing)
 exp_weighted_moment(cache::ExpWeightedExpectedReturnsState, est::ExpWeightedExpectedReturns)
-PortfolioOptimisers.merge_states(a::ExpWeightedExpectedReturnsState, b::ExpWeightedExpectedReturnsState)
 Base.copy(x::PortfolioOptimisers.ExpWeightedExpectedReturnsState)
 ```

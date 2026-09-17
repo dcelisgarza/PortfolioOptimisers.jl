@@ -1,17 +1,11 @@
 ```@meta
-Description = "The coverage policy, private API of PortfolioOptimisers.jl: AbstractCoverageAlgorithm, CoverageCounts, fold_inactive!, admits, coverage_counts_seed, …"
+Description = "The coverage policy, private API of PortfolioOptimisers.jl: CoverageCounts, coverage_counts_seed, Base.copy, coverage_counts_view, coverage_valid, …"
 ```
 
 # The coverage policy: private API
 
 ```@docs
-PortfolioOptimisers.AbstractCoverageAlgorithm
 PortfolioOptimisers.CoverageCounts
-PortfolioOptimisers.fold_inactive!
-PortfolioOptimisers.fold_inactive!(::Union{<:DecayCoverage, <:ExpireCoverage}, state::PortfolioOptimisers.AbstractPartialFitState, ::AbstractVector{<:Bool})
-PortfolioOptimisers.admits
-PortfolioOptimisers.admits(::Union{<:DecayCoverage, <:ResetCoverage}, share::Real, active::Bool, ::Integer, min_coverage::Real)
-PortfolioOptimisers.admits(alg::ExpireCoverage, share::Real, active::Bool, stale::Integer, min_coverage::Real)
 PortfolioOptimisers.coverage_counts_seed
 Base.copy(x::PortfolioOptimisers.CoverageCounts)
 PortfolioOptimisers.coverage_counts_view

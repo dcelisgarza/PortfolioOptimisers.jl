@@ -1,5 +1,5 @@
 ```@meta
-Description = "Exponentially Weighted Variance, public API of PortfolioOptimisers.jl: ExpWeightedVariance, var, std, partial_fit!."
+Description = "Exponentially Weighted Variance, public API of PortfolioOptimisers.jl: ExpWeightedVariance, var, std, partial_fit!, merge_states."
 ```
 
 # Exponentially Weighted Variance
@@ -23,4 +23,5 @@ var(ce::ExpWeightedVariance, state::ExpWeightedVarianceState; kwargs...)
 var(ce::ExpWeightedVariance; kwargs...)
 std(ce::ExpWeightedVariance, state::ExpWeightedVarianceState; kwargs...)
 std(ce::ExpWeightedVariance; kwargs...)
+merge_states(a::ExpWeightedVarianceState, b::ExpWeightedVarianceState)
 ```

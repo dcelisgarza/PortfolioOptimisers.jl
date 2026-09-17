@@ -1,5 +1,5 @@
 ```@meta
-Description = "The online step, public API of PortfolioOptimisers.jl: Online, partial_fit!, port_opt_view."
+Description = "The online step, public API of PortfolioOptimisers.jl: Online, partial_fit!, port_opt_view, merge_states."
 ```
 
 # The online step
@@ -12,4 +12,5 @@ PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.SampleBufferState, X
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.SampleBufferState, x::PortfolioOptimisers.VecNum, f::PortfolioOptimisers.Option{<:PortfolioOptimisers.VecNum} = nothing)
 PortfolioOptimisers.port_opt_view(x::PortfolioOptimisers.SampleBufferState, i, args...)
 PortfolioOptimisers.partial_fit!(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator}, X::PortfolioOptimisers.VecNum_MatNum; dims::Int = 1)
+merge_states(a::PortfolioOptimisers.SampleBufferState, b::PortfolioOptimisers.SampleBufferState)
 ```

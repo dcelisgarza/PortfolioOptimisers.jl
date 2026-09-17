@@ -1,5 +1,5 @@
 ```@meta
-Description = "Type roots, private API of PortfolioOptimisers.jl: AbstractEstimator, AbstractAlgorithm, AbstractResult, CrossValidationEstimator, DynamicAbstractWeights, …"
+Description = "Type roots, private API of PortfolioOptimisers.jl: AbstractEstimator, AbstractAlgorithm, AbstractResult, CrossValidationEstimator."
 ```
 
 # Type roots: private API
@@ -13,6 +13,4 @@ AbstractEstimator
 AbstractAlgorithm
 AbstractResult
 CrossValidationEstimator
-DynamicAbstractWeights
-PortfolioOptimisers.AbstractPartialFitState
 ```

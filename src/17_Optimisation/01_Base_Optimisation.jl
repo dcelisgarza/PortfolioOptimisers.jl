@@ -3594,3 +3594,4 @@ export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinali
        AbsoluteErrorWeightFinaliser, SquaredAbsoluteErrorWeightFinaliser,
        JuMPWeightFinaliser, TimeDependent, TimeDependentContext, PreviousWeightsFunction,
        NoDefault, TimeDependentDefaultError
+public _optimise

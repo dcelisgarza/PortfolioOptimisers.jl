@@ -1,11 +1,9 @@
 ```@meta
-Description = "Norm error, private API of PortfolioOptimisers.jl: NormError, norm_error, norm_factor."
+Description = "Norm error, private API of PortfolioOptimisers.jl: norm_error."
 ```
 
 # Norm error: private API
 
 ```@docs
-NormError
 norm_error
-norm_factor
 ```

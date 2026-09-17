@@ -1,5 +1,5 @@
 ```@meta
-Description = "Simple covariance, public API of PortfolioOptimisers.jl: GeneralCovariance, cov, cor, Covariance, partial_fit!, port_opt_view."
+Description = "Simple covariance, public API of PortfolioOptimisers.jl: GeneralCovariance, cov, cor, Covariance, partial_fit!, port_opt_view, merge_states, fold_inactive!."
 ```
 
 # [Simple covariance](@id api-covariance)
@@ -38,6 +38,7 @@ partial_fit!(ce::Covariance, ::VecNum_MatNum; kwargs...)
 cov(ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}}, state::CovarianceState)
 cor(ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}}, state::CovarianceState)
 port_opt_view(x::CovarianceState, i, args...)
+merge_states(a::CovarianceState, b::CovarianceState)
 ```
 
 ## Available-case fit
@@ -47,6 +48,7 @@ With a [`CoveragePolicy`](@ref) in its `cvg` field the estimator fits each pair 
 ```@docs
 partial_fit!(state::CovarianceState, x::VecNum, ::Nothing, ::Option{<:AbstractVector{<:Bool}})
 partial_fit!(state::CovarianceState, x::VecNum, cvg::CoveragePolicy, active_mask::Option{<:AbstractVector{<:Bool}})
+fold_inactive!(::ResetCoverage, state::CovarianceState, ni::AbstractVector{<:Bool})
 ```
 
 ## References

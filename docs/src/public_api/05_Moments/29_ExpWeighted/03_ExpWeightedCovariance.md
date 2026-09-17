@@ -1,5 +1,5 @@
 ```@meta
-Description = "Exponentially Weighted Covariance, public API of PortfolioOptimisers.jl: ExpWeightedCovariance, cov, cor, var, std, partial_fit!."
+Description = "Exponentially Weighted Covariance, public API of PortfolioOptimisers.jl: ExpWeightedCovariance, cov, cor, var, std, partial_fit!, merge_states."
 ```
 
 # Exponentially Weighted Covariance
@@ -25,4 +25,5 @@ cov(ce::ExpWeightedCovariance, state::ExpWeightedCovarianceState; kwargs...)
 cov(ce::ExpWeightedCovariance; kwargs...)
 cor(ce::ExpWeightedCovariance, state::ExpWeightedCovarianceState; kwargs...)
 cor(ce::ExpWeightedCovariance; kwargs...)
+merge_states(a::ExpWeightedCovarianceState, b::ExpWeightedCovarianceState)
 ```

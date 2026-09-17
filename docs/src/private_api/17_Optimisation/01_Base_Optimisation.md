@@ -1,14 +1,11 @@
 ```@meta
-Description = "Base optimisation, private API of PortfolioOptimisers.jl: AbstractOptimisationEstimator, BaseOptimisationEstimator, OptimisationEstimator, …"
+Description = "Base optimisation, private API of PortfolioOptimisers.jl: BaseOptimisationEstimator, OptimisationAlgorithm, OptimisationResult, …"
 ```
 
 # Base optimisation: private API
 
 ```@docs
-AbstractOptimisationEstimator
 BaseOptimisationEstimator
-OptimisationEstimator
-NonFiniteAllocationOptimisationEstimator
 OptimisationAlgorithm
 OptimisationResult
 NonFiniteAllocationOptimisationResult
@@ -45,7 +42,6 @@ route_sigma_ucs
 @pipe_route_rkb
 result_investable_mask
 set_retcode
-_optimise
 assert_special_nco_requirements(::OptE_Opt)
 assert_special_nco_requirements(opt::VecOptE_Opt)
 needs_previous_weights(::Option{<:Union{<:AbstractEstimator, <:AbstractAlgorithm, <: AbstractResult}})

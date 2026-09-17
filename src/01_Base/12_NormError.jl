@@ -546,3 +546,4 @@ function norm_error(f::LInfNorm, a, T::Option{<:Number} = nothing)
 end
 
 export L2Norm, SquaredL2Norm, L1Norm, LpNorm, LInfNorm
+public NormError, norm_factor

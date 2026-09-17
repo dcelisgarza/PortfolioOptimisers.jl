@@ -16,6 +16,10 @@ optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; dim
 optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1, kwargs...)
 factory(pw::PreviousWeights, w::VecNum)
 optimise(pw::PreviousWeights{<:Any, Nothing}, rd::ReturnsResult = ReturnsResult(); kwargs...)
+_optimise(iv::InverseVolatility, rd::ReturnsResult)
+_optimise(ew::EqualWeighted, rd::ReturnsResult)
+_optimise(rw::RandomWeighted, rd::ReturnsResult)
+_optimise(pw::PreviousWeights, rd::ReturnsResult = ReturnsResult(); kwargs...)
 ```
 
 ## References

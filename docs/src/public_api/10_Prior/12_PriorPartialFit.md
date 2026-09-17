@@ -1,5 +1,5 @@
 ```@meta
-Description = "The prior family on the partial-fit seam, public API of PortfolioOptimisers.jl: partial_fit!, port_opt_view, prior."
+Description = "The prior family on the partial-fit seam, public API of PortfolioOptimisers.jl: partial_fit!, port_opt_view, merge_states, prior."
 ```
 
 # The prior family on the partial-fit seam
@@ -13,6 +13,7 @@ A host that carries the observations folds every member that folds and runs the 
 ```@docs
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.PriorCarryState, x::PortfolioOptimisers.VecNum)
 PortfolioOptimisers.port_opt_view(x::PortfolioOptimisers.PriorCarryState, i, args...)
+merge_states(a::PortfolioOptimisers.PriorCarryState, b::PortfolioOptimisers.PriorCarryState)
 prior(pe::PortfolioOptimisers.AbstractPriorEstimator; kwargs...)
 PortfolioOptimisers.partial_fit!(pe::PortfolioOptimisers.AbstractPriorEstimator, X::PortfolioOptimisers.VecNum_MatNum, F::PortfolioOptimisers.Option{<:PortfolioOptimisers.VecNum_MatNum} = nothing; dims::Int = 1, active_mask = nothing, estimation_mask = nothing)
 PortfolioOptimisers.partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any, <:Option{<:PortfolioOptimisers.PriorCarryState}}, x::PortfolioOptimisers.VecNum, ::PortfolioOptimisers.Option{<:PortfolioOptimisers.VecNum_MatNum} = nothing; kwargs...)

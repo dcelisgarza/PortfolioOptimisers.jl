@@ -848,3 +848,4 @@ function coverage_refuse_comoment!(val::AbstractMatrix, cmsk::BitVector,
     return nothing
 end
 export CoveragePolicy, DecayCoverage, ResetCoverage, ExpireCoverage
+public AbstractCoverageAlgorithm, fold_inactive!, admits

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base optimisation, public API of PortfolioOptimisers.jl: OptimisationSuccess, OptimisationFailure, RelativeErrorWeightFinaliser, …"
+Description = "Base optimisation, public API of PortfolioOptimisers.jl: AbstractOptimisationEstimator, OptimisationEstimator, NonFiniteAllocationOptimisationEstimator, …"
 ```
 
 # Base optimisation
@@ -7,6 +7,9 @@ Description = "Base optimisation, public API of PortfolioOptimisers.jl: Optimisa
 All optimisers are defined as their whole names, however this can be unwieldy, so we also provide convenience aliases defined in [Public API → Aliases](../23_Aliases.md).
 
 ```@docs
+AbstractOptimisationEstimator
+OptimisationEstimator
+NonFiniteAllocationOptimisationEstimator
 OptimisationSuccess
 OptimisationFailure
 RelativeErrorWeightFinaliser
@@ -22,6 +25,7 @@ NoDefault
 TimeDependentDefaultError
 optimise(opt::OptimisationResult, args...; kwargs...)
 optimise(opt::OptimisationEstimator, args...; kwargs...)
+_optimise
 calc_net_returns(res::OptimisationResult, X::MatNum, fees::Option{<:Fees} = nothing, wd::Option{<:AbstractWeightDrift} = nothing, obs = nothing)
 factory(td::TimeDependent, args...)
 optimise(td::TD_OptE_Opt, args...; kwargs...)

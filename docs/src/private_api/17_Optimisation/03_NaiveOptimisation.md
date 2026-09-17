@@ -13,9 +13,5 @@ assert_internal_optimiser(::NaiveOptimisationEstimator)
 assert_external_optimiser(::NaiveOptimisationEstimator)
 naive_optimiser_td_defaults
 assert_external_optimiser(opt::InverseVolatility)
-_optimise(iv::InverseVolatility, rd::ReturnsResult)
-_optimise(ew::EqualWeighted, rd::ReturnsResult)
-_optimise(rw::RandomWeighted, rd::ReturnsResult)
-_optimise(pw::PreviousWeights, rd::ReturnsResult = ReturnsResult(); kwargs...)
 failed_hold_weights
 ```

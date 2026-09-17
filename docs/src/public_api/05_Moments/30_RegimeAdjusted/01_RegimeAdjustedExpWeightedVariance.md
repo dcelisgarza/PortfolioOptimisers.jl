@@ -25,4 +25,5 @@ var(ce::RegimeAdjustedExpWeightedVariance; kwargs...)
 std(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 std(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceState; kwargs...)
 std(ce::RegimeAdjustedExpWeightedVariance; kwargs...)
+merge_states(a::RegimeAdjustedVarianceState, b::RegimeAdjustedVarianceState)
 ```

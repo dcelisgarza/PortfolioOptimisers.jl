@@ -372,3 +372,5 @@ function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                   <:AbstractResult}, i::Int)
     return i == 1 ? obj : throw(BoundsError(obj, i))
 end
+public AbstractPartialFitState, DynamicAbstractWeights, AbstractOptimisationEstimator,
+       OptimisationEstimator, NonFiniteAllocationOptimisationEstimator

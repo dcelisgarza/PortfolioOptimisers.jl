@@ -30,4 +30,5 @@ cor(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel
 var(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 std(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 min_active_assets
+merge_states(a::RegimeAdjustedCovarianceState, b::RegimeAdjustedCovarianceState)
 ```

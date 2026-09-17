@@ -23,6 +23,5 @@ process_observation!(cache::RegimeAdjustedVarianceState, ce::RegimeAdjustedExpWe
 regime_adjusted_variance_pass!
 regime_adjusted_variance
 variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-PortfolioOptimisers.merge_states(a::RegimeAdjustedVarianceState, b::RegimeAdjustedVarianceState)
 Base.copy(x::PortfolioOptimisers.RegimeAdjustedVarianceState)
 ```
