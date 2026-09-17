@@ -3595,3 +3595,16 @@ export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinali
        JuMPWeightFinaliser, TimeDependent, TimeDependentContext, PreviousWeightsFunction,
        NoDefault, TimeDependentDefaultError
 public _optimise
+# The `# Interfaces`-marked types and verbs of #1138 (ADR 0154). `OptimisationAlgorithm`,
+# `OptimisationResult`, `NonFiniteAllocationOptimisationResult`, `NonJuMPOptimisationResult`,
+# `BaseHierarchicalOptimisationResult`, `HierarchicalOptimisationResult`,
+# `OptimisationReturnCode` and `OptimisationModelResult` name no verb of their own;
+# `TimeDependentConstraintCallable` and `TimeDependentOptimiserCallable` name only the
+# functor and `needs_previous_weights` their parent `TimeDependentCallable` already names.
+public BaseOptimisationEstimator, time_dependent_field_defaults, OptimisationAlgorithm,
+       OptimisationResult, NonFiniteAllocationOptimisationResult, NonJuMPOptimisationResult,
+       BaseHierarchicalOptimisationResult, HierarchicalOptimisationResult,
+       OptimisationReturnCode, OptimisationModelResult, TimeDependentCallable,
+       needs_previous_weights, TimeDependentConstraintCallable,
+       TimeDependentOptimiserCallable, JuMPWeightFinaliserFormulation,
+       set_clustering_weight_finaliser_alg!, WeightFinaliser, opt_weight_bounds

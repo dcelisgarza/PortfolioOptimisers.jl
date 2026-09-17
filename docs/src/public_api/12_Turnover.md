@@ -1,5 +1,5 @@
 ```@meta
-Description = "Asset turnover, public API of PortfolioOptimisers.jl: TurnoverEstimator, Turnover, factory, turnover_constraints, port_opt_view."
+Description = "Asset turnover, public API of PortfolioOptimisers.jl: TurnoverEstimator, Turnover, factory, turnover_constraints, port_opt_view, needs_previous_weights."
 ```
 
 # Asset turnover
@@ -14,6 +14,7 @@ factory(tn::TurnoverEstimator, w::VecNum)
 factory(tn::VecTnE_Tn, w::VecNum)
 turnover_constraints
 port_opt_view(tn::VecTnE_Tn, i, args...)
+needs_previous_weights(tn::TnE_Tn)
 ```
 
 ## References

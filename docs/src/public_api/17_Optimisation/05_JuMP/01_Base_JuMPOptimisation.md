@@ -17,4 +17,7 @@ add_custom_constraint!
 get_constraint_scale
 get_w
 get_k
+NonJuMPOptimisationResult
+needs_previous_weights(::CustomJuMPConstraint)
+needs_previous_weights(::CustomJuMPObjective)
 ```

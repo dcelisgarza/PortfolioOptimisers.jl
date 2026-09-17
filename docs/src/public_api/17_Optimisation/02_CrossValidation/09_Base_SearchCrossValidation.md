@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base search cross validation, public API of PortfolioOptimisers.jl: HighestMeanScore, SearchCrossValidationResult."
+Description = "Base search cross validation, public API of PortfolioOptimisers.jl: HighestMeanScore, SearchCrossValidationResult, AbstractSearchCrossValidationResult, …"
 ```
 
 # Base search cross validation
@@ -7,4 +7,6 @@ Description = "Base search cross validation, public API of PortfolioOptimisers.j
 ```@docs
 HighestMeanScore
 SearchCrossValidationResult
+AbstractSearchCrossValidationResult
+CrossValidationSearchScorer
 ```

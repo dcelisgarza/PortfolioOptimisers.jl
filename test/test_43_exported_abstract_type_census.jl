@@ -46,9 +46,10 @@
     three `src/09_ConstraintGeneration/` types joined the same day as well (issue #1132), the
     fifteen `src/11_UncertaintySets/` types joined the same day (issue #1134), the three
     `src/10_Prior/` types joined the same day (issue #1133), the four
-    `src/16_RiskMeasures/` types below joined the same day too (issue #1137), and the two
-    `src/20_AssetSelection.jl` types below joined the same day again (issue #1139). They are
-    held to their own list for the same reason — public is API too.
+    `src/16_RiskMeasures/` types below joined the same day too (issue #1137), the seventeen
+    `src/17_Optimisation/` types below joined the same day again (issue #1138), and the two
+    `src/20_AssetSelection.jl` types below joined the same day once more (issue #1139). They
+    are held to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
                           :AbstractAmbiguityTailWeightCalibrationAlgorithm, :AbstractBins,
@@ -74,27 +75,36 @@
                           :AbstractPosdefEstimator, :AbstractPreorderBy,
                           :AbstractPreviousWeightsSource, :AbstractPriorEstimator,
                           :AbstractPriorResult, :AbstractPriorUncertaintySetEstimator,
-                          :AbstractRedundancyAlgorithm, :AbstractReturnForecastEstimator,
-                          :AbstractRiskMeasureSettings, :AbstractSelectionRule,
+                          :AbstractRealisedTarget, :AbstractRedundancyAlgorithm,
+                          :AbstractReturnForecastEstimator, :AbstractRiskMeasureSettings,
+                          :AbstractSearchCrossValidationResult, :AbstractSelectionRule,
                           :AbstractSignificanceCalibrationAlgorithm,
                           :AbstractTimeSeriesRegressionEstimator,
                           :AbstractTrackingAlgorithm, :AbstractUncertaintyKAlgorithm,
                           :AbstractUncertaintySetAlgorithm, :AbstractUncertaintySetClass,
                           :AbstractUncertaintySetEstimator, :AbstractUncertaintySetResult,
                           :AbstractVarianceEstimator, :BaseGerberCovariance,
-                          :BaseGerberIQCovariance, :BinWidthBins,
+                          :BaseGerberIQCovariance, :BaseHierarchicalOptimisationResult,
+                          :BaseOptimisationEstimator, :BinWidthBins,
                           :BootstrapUncertaintySetEstimator, :CokurtosisEstimator,
-                          :CoskewnessEstimator, :CustomExpectedReturnsValueAlgorithm,
-                          :CustomJuMPConstraint, :CustomJuMPObjective,
-                          :DynamicAbstractWeights, :FrontierBoundEstimator,
-                          :GerberCovarianceAlgorithm, :GerberIQCovarianceAlgorithm,
-                          :GerberIQDecayEstimator, :GerberIQEpsEstimator,
-                          :GerberIQGammaEstimator, :GerberIQScalerEstimator,
-                          :ImpliedVolatilityAlgorithm,
-                          :NonFiniteAllocationOptimisationEstimator, :NormError,
-                          :OpinionPoolingAlgorithm, :OptimisationEstimator,
-                          :RegimeAdjustedMethod, :Scalariser, :VecJuMPConstr, :VecJuMPObj,
-                          :VectorAbstractEstimatorValueAlgorithm, :VectorToScalarMeasure])
+                          :CoskewnessEstimator, :CrossValidationSearchScorer,
+                          :CustomExpectedReturnsValueAlgorithm, :CustomJuMPConstraint,
+                          :CustomJuMPObjective, :DynamicAbstractWeights,
+                          :FrontierBoundEstimator, :GerberCovarianceAlgorithm,
+                          :GerberIQCovarianceAlgorithm, :GerberIQDecayEstimator,
+                          :GerberIQEpsEstimator, :GerberIQGammaEstimator,
+                          :GerberIQScalerEstimator, :HierarchicalOptimisationResult,
+                          :ImpliedVolatilityAlgorithm, :JuMPWeightFinaliserFormulation,
+                          :NonFiniteAllocationOptimisationEstimator,
+                          :NonFiniteAllocationOptimisationResult,
+                          :NonJuMPOptimisationResult, :NormError, :OpinionPoolingAlgorithm,
+                          :OptimisationAlgorithm, :OptimisationEstimator,
+                          :OptimisationModelResult, :OptimisationResult,
+                          :OptimisationReturnCode, :RegimeAdjustedMethod, :Scalariser,
+                          :TimeDependentCallable, :TimeDependentConstraintCallable,
+                          :TimeDependentOptimiserCallable, :VecJuMPConstr, :VecJuMPObj,
+                          :VectorAbstractEstimatorValueAlgorithm, :VectorToScalarMeasure,
+                          :WeightFinaliser])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&
@@ -128,19 +138,21 @@
     @test length(exported) < length(defined) / 10
 
     #=
-    The seven names stay reachable through the module prefix, which is what an extension
+    The four names stay reachable through the module prefix, which is what an extension
     needs to subtype them, and each keeps its docstring and its private mirror-page entry.
     Unexported is not undocumented. They are pinned by name so the regression cannot come
-    back quietly. The last three are the time-dependent callable family, whose
-    classification is stated in the type tree rather than in the export list.
-    `AbstractConstraintSpace` left this list on 2026-09-17: its docstring carries a
-    `# Interfaces` section, so ADR 0154 promotes it to `public` (issue #1132), and it now
-    sits on `allowed_public` above.
+    back quietly. `AbstractConstraintSpace` left this list on 2026-09-17: its docstring
+    carries a `# Interfaces` section, so ADR 0154 promotes it to `public` (issue #1132), and
+    it now sits on `allowed_public` above. The time-dependent callable family
+    (`TimeDependentCallable`, `TimeDependentConstraintCallable`,
+    `TimeDependentOptimiserCallable`) left the same way on 2026-09-17 (issue #1138): the
+    2026-08-19 amendment to ADR 0030 kept the family unexported by design, but did not
+    anticipate ADR 0154 -- the root's own `# Interfaces` section already states "subtype one
+    of the two children, not this root", so promoting the root to `public` alongside its
+    children restates that rule as the public contract rather than contradicting it.
     =#
     for n in (:AbstractAssetPanelEstimator, :AbstractPhylogenyFeatureAlgorithm,
-              :AbstractSimilarityMatrixAlgorithm, :AbstractNonNegativeSimilarityMatrixAlgorithm,
-              :TimeDependentCallable, :TimeDependentConstraintCallable,
-              :TimeDependentOptimiserCallable)
+              :AbstractSimilarityMatrixAlgorithm, :AbstractNonNegativeSimilarityMatrixAlgorithm)
         @test is_abstract(n)
         @test !Base.isexported(PortfolioOptimisers, n)
         @test n ∉ names(PortfolioOptimisers)

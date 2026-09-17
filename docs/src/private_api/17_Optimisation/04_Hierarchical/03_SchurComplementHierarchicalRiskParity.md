@@ -17,5 +17,4 @@ schur_complement_binary_search(objective::Function, lgamma::Number, hgamma::Numb
 schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt, wb::WeightBounds, params::SchurComplementParams{<:Any, <:Any, <:Any, <:NonMonotonicSchurComplement, <:Any}, gamma::Option{<:Number} = nothing)
 schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt, wb::WeightBounds, params::SchurComplementParams{<:Any, <:Any, <:Any, <:MonotonicSchurComplement, <:Any})
 schur_complement_hrp_td_defaults
-needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
 ```

@@ -13,4 +13,8 @@ CovarianceForecastEvaluationResult
 covariance_forecast_step
 PortfolioOptimisers.partial_fit!(ce::PortfolioOptimisers.AbstractCovarianceEstimator, rd::ReturnsResult)
 covariance_forecast_evaluation
+PortfolioOptimisers.AbstractRealisedTarget
+PortfolioOptimisers.realised_target
+PortfolioOptimisers.target_dof
+PortfolioOptimisers.target_step_dof
 ```

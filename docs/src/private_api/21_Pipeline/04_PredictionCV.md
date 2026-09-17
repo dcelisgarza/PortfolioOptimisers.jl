@@ -30,7 +30,6 @@ The per-step legs of the time-dependent machinery: the traits recurse over a pip
 ```@docs
 PortfolioOptimisers.pipeline_step_is_time_dependent
 is_time_dependent(p::Pipeline)
-needs_previous_weights(p::Pipeline)
 PortfolioOptimisers.assert_pipeline_step_fold_count
 PortfolioOptimisers.update_time_dependent_step
 update_time_dependent_estimator(p::Pipeline, ctx::TimeDependentContext, all_binds::Bool = true)

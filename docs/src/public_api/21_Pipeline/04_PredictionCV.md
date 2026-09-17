@@ -1,5 +1,5 @@
 ```@meta
-Description = "Pipeline cross-validation, public API of PortfolioOptimisers.jl: port_opt_view, cross_val_predict, factory."
+Description = "Pipeline cross-validation, public API of PortfolioOptimisers.jl: port_opt_view, needs_previous_weights, cross_val_predict, factory."
 ```
 
 # Pipeline cross-validation
@@ -10,6 +10,7 @@ Combinatorial and multiple-randomised cross-validation recombine non-contiguous 
 
 ```@docs
 port_opt_view(pipe::Pipeline, i, args...; kwargs...)
+needs_previous_weights(p::Pipeline)
 ```
 
 ## The pipeline fold loop

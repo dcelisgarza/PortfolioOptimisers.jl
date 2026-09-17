@@ -1,5 +1,5 @@
 ```@meta
-Description = "Nested Clustered, private API of PortfolioOptimisers.jl: RiskBudgetingOptimiser, nested_clustered_td_defaults, needs_previous_weights, is_time_dependent, …"
+Description = "Nested Clustered, private API of PortfolioOptimisers.jl: RiskBudgetingOptimiser, nested_clustered_td_defaults, is_time_dependent, …"
 ```
 
 # Nested Clustered: private API
@@ -7,7 +7,6 @@ Description = "Nested Clustered, private API of PortfolioOptimisers.jl: RiskBudg
 ```@docs
 RiskBudgetingOptimiser
 nested_clustered_td_defaults
-needs_previous_weights(opt::NestedClustered)
 is_time_dependent(opt::NestedClustered)
 reset_time_dependent_estimator(opt::NestedClustered)
 assert_rc_pl(::Any)

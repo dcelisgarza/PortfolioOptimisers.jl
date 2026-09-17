@@ -8,7 +8,6 @@ Description = "Near optimal centering, private API of PortfolioOptimisers.jl: Ne
 NearOptimalCenteringAlgorithm
 NearOptimalSetup
 near_optimal_centering_td_defaults
-needs_previous_weights(opt::NearOptimalCentering)
 near_optimal_centering_risks
 near_optimal_centering_setup
 frontier_return_terms

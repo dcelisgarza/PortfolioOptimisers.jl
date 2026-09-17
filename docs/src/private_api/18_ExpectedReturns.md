@@ -1,5 +1,5 @@
 ```@meta
-Description = "Expected Returns, private API of PortfolioOptimisers.jl: PerfRM, PrRM, supports_precomputed_returns, term_fees, sric_penalty, needs_previous_weights, …"
+Description = "Expected Returns, private API of PortfolioOptimisers.jl: PerfRM, PrRM, supports_precomputed_returns, term_fees, sric_penalty, prrm_prediction_message."
 ```
 
 # Expected Returns: private API
@@ -10,6 +10,5 @@ PrRM
 supports_precomputed_returns(::PrRM)
 term_fees
 sric_penalty
-needs_previous_weights(r::ExpectedReturnRiskRatio)
 prrm_prediction_message
 ```

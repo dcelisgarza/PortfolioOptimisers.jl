@@ -1,12 +1,11 @@
 ```@meta
-Description = "Relaxed risk budgeting, private API of PortfolioOptimisers.jl: RelaxedRiskBudgetingAlgorithm, needs_previous_weights, relaxed_risk_budgeting_td_defaults, …"
+Description = "Relaxed risk budgeting, private API of PortfolioOptimisers.jl: RelaxedRiskBudgetingAlgorithm, relaxed_risk_budgeting_td_defaults, …"
 ```
 
 # Relaxed risk budgeting: private API
 
 ```@docs
 RelaxedRiskBudgetingAlgorithm
-needs_previous_weights(opt::RelaxedRiskBudgeting)
 relaxed_risk_budgeting_td_defaults
 set_relaxed_risk_budgeting_alg_constraints!
 _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model, rrb::RelaxedRiskBudgeting, w::VecJuMPScalar, sigma::MatNum, chol::Option{<:MatNum})

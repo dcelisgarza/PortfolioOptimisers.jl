@@ -1,23 +1,12 @@
 ```@meta
-Description = "Base optimisation, private API of PortfolioOptimisers.jl: BaseOptimisationEstimator, OptimisationAlgorithm, OptimisationResult, …"
+Description = "Base optimisation, private API of PortfolioOptimisers.jl: VecOptRetCode, OptRetCode_VecOptRetCode, TD_Option, TD, TD_OptE_Opt, TDO_Option, OptE_TD, …"
 ```
 
 # Base optimisation: private API
 
 ```@docs
-BaseOptimisationEstimator
-OptimisationAlgorithm
-OptimisationResult
-NonFiniteAllocationOptimisationResult
-OptimisationReturnCode
 VecOptRetCode
 OptRetCode_VecOptRetCode
-OptimisationModelResult
-JuMPWeightFinaliserFormulation
-WeightFinaliser
-TimeDependentCallable
-TimeDependentConstraintCallable
-TimeDependentOptimiserCallable
 TD_Option
 TD
 TD_OptE_Opt
@@ -44,11 +33,6 @@ result_investable_mask
 set_retcode
 assert_special_nco_requirements(::OptE_Opt)
 assert_special_nco_requirements(opt::VecOptE_Opt)
-needs_previous_weights(::Option{<:Union{<:AbstractEstimator, <:AbstractAlgorithm, <: AbstractResult}})
-needs_previous_weights(::OptE_Opt)
-needs_previous_weights(opt::VecOptE_Opt)
-needs_previous_weights(td::TimeDependent)
-needs_previous_weights(opt::VecOptE_Opt_TD)
 assert_nearest_optimiser_schedule
 inner_fold_fields
 time_dependent_value
@@ -72,13 +56,10 @@ is_time_dependent(::TimeDependent)
 is_time_dependent(opt::VecOptE_Opt_TD)
 update_time_dependent_estimator
 update_time_dependent_fields
-time_dependent_field_defaults
 reset_time_dependent_estimator(opt::OptE_Opt)
 reset_time_dependent_estimator(opt::BaseOptimisationEstimator)
 reset_time_dependent_estimator(td::TD_OptE_Opt)
 reset_time_dependent_fields
-set_clustering_weight_finaliser_alg!
-opt_weight_bounds
 finalise_weight_bounds
 investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisationEstimator, rd::ReturnsResult)
 coverage_reduction(opt::AbstractOptimisationEstimator, rd::ReturnsResult)

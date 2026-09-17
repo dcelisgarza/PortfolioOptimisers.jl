@@ -1,5 +1,5 @@
 ```@meta
-Description = "Tracking, private API of PortfolioOptimisers.jl: AbstractTracking, VecTr, Tr_VecTr, VariableTracking, needs_previous_weights, narrow_optimiser_vector."
+Description = "Tracking, private API of PortfolioOptimisers.jl: AbstractTracking, VecTr, Tr_VecTr, VariableTracking, narrow_optimiser_vector."
 ```
 
 # Tracking: private API
@@ -9,6 +9,5 @@ AbstractTracking
 VecTr
 Tr_VecTr
 VariableTracking
-needs_previous_weights(tr::TrackingError)
 narrow_optimiser_vector
 ```

@@ -14,6 +14,7 @@ Base.getproperty(r::NearOptimalCenteringResult, sym::Symbol)
 factory(noc::NearOptimalCentering, w::AbstractVector)
 port_opt_view(noc::NearOptimalCentering, i, X::MatNum, args...)
 optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+needs_previous_weights(opt::NearOptimalCentering)
 ```
 
 ## References

@@ -13,6 +13,7 @@ ReturnsTracking
 TrackingError
 factory(tr::WeightsTracking, w::VecNum)
 tracking_benchmark
+needs_previous_weights(tr::TrackingError)
 ```
 
 ## References

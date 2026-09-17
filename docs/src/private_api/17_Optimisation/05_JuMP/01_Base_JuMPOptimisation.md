@@ -19,13 +19,10 @@ BaseJuMPOptimisationResult
 RiskJuMPOptimisationResult
 NonRiskJuMPOptimisationResult
 RJR_NRJR
-NonJuMPOptimisationResult
 AbstractDecompositionContract
 SHARED_STATE
 WeightsFromParts
 PartsBoundWeights
-needs_previous_weights(::CustomJuMPConstraint)
-needs_previous_weights(::CustomJuMPObjective)
 is_time_dependent(opt::JuMPOptimisationEstimator)
 reset_time_dependent_estimator(opt::JuMPOptimisationEstimator)
 process_model

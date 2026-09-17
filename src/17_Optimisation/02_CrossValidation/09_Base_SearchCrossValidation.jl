@@ -902,3 +902,7 @@ function assert_search_grid_cap(estval::AbstractDict{<:Any, <:AbstractVector})::
 end
 
 export SearchCrossValidationResult, HighestMeanScore
+# The `# Interfaces`-marked types of #1138 (ADR 0154). `AbstractSearchCrossValidationResult`
+# names required fields only, and `CrossValidationSearchScorer` names only its callable
+# shape, so neither names a separate verb.
+public AbstractSearchCrossValidationResult, CrossValidationSearchScorer

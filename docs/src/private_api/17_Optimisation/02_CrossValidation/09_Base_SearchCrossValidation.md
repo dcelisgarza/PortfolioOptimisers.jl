@@ -1,14 +1,12 @@
 ```@meta
-Description = "Base search cross validation, private API of PortfolioOptimisers.jl: AbstractSearchCrossValidationEstimator, CrossValidationSearchScorer, …"
+Description = "Base search cross validation, private API of PortfolioOptimisers.jl: AbstractSearchCrossValidationEstimator, CrossValSearchScorer, …"
 ```
 
 # Base search cross validation: private API
 
 ```@docs
 AbstractSearchCrossValidationEstimator
-CrossValidationSearchScorer
 CrossValSearchScorer
-AbstractSearchCrossValidationResult
 AbstractSearchCrossValidationAlgorithm
 finite_candidate_index
 assert_search_entry

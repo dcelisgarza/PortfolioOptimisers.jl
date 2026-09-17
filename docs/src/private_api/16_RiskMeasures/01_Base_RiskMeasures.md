@@ -55,7 +55,6 @@ assert_derived_slot_has_source
 risk_measure_nothing_scalar_array_view
 solver_selector
 bigger_is_better
-needs_previous_weights(::AbstractBaseRiskMeasure)
 range_tails
 supports_precomputed_returns(r::AbstractBaseRiskMeasure)
 supports_precomputed_returns(rs::VecBaseRM)
@@ -66,11 +65,4 @@ weight_independent_target(::Nothing)
 weight_independent_target(::Number)
 weight_independent_target(::Any)
 _Frontier
-```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
 ```

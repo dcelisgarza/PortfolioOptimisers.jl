@@ -1,9 +1,8 @@
 ```@meta
-Description = "Turnover risk measure, private API of PortfolioOptimisers.jl: needs_previous_weights."
+Description = "Turnover risk measure has no private API in PortfolioOptimisers.jl; its names are in the public API."
 ```
 
 # Turnover risk measure: private API
 
 ```@docs
-needs_previous_weights(r::TurnoverRiskMeasure)
 ```

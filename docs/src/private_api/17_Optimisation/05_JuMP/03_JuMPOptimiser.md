@@ -1,5 +1,5 @@
 ```@meta
-Description = "JuMP Optimiser, private API of PortfolioOptimisers.jl: ProcessedAttributes, assert_finite_nonnegative_real_or_vec, needs_previous_weights, …"
+Description = "JuMP Optimiser, private API of PortfolioOptimisers.jl: ProcessedAttributes, assert_finite_nonnegative_real_or_vec, jump_optimiser_td_defaults, …"
 ```
 
 # JuMP Optimiser: private API
@@ -7,7 +7,6 @@ Description = "JuMP Optimiser, private API of PortfolioOptimisers.jl: ProcessedA
 ```@docs
 ProcessedAttributes
 assert_finite_nonnegative_real_or_vec
-needs_previous_weights(opt::JuMPOptimiser)
 jump_optimiser_td_defaults
 assert_universe_axis_order
 investable_view

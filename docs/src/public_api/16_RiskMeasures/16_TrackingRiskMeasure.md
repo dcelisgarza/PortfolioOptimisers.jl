@@ -1,5 +1,5 @@
 ```@meta
-Description = "Tracking risk measure, public API of PortfolioOptimisers.jl: RiskTrackingError, TrackingRiskMeasure, RiskTrackingRiskMeasure, port_opt_view, factory."
+Description = "Tracking risk measure, public API of PortfolioOptimisers.jl: RiskTrackingError, TrackingRiskMeasure, RiskTrackingRiskMeasure, port_opt_view, factory, …"
 ```
 
 # Tracking risk measure
@@ -17,6 +17,9 @@ factory(r::TrackingRiskMeasure, ::Any, ::Any, ::Any, w::VecNum, args...; kwargs.
 port_opt_view(r::RiskTrackingRiskMeasure, i, X::MatNum, args...)
 factory(r::RiskTrackingRiskMeasure, w::VecNum)
 factory(r::RiskTrackingRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
+needs_previous_weights(tr::RiskTrackingError)
+needs_previous_weights(r::TrackingRiskMeasure)
+needs_previous_weights(r::RiskTrackingRiskMeasure)
 ```
 
 ## References

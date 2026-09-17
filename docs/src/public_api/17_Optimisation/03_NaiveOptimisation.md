@@ -20,6 +20,7 @@ _optimise(iv::InverseVolatility, rd::ReturnsResult)
 _optimise(ew::EqualWeighted, rd::ReturnsResult)
 _optimise(rw::RandomWeighted, rd::ReturnsResult)
 _optimise(pw::PreviousWeights, rd::ReturnsResult = ReturnsResult(); kwargs...)
+needs_previous_weights(opt::NaiveOptimisationEstimator)
 ```
 
 ## References

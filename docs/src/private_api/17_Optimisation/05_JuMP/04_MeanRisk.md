@@ -1,12 +1,11 @@
 ```@meta
-Description = "Mean Risk, private API of PortfolioOptimisers.jl: mean_risk_td_defaults, needs_previous_weights, solve_mean_risk!, return_term, compute_ret_lbs, …"
+Description = "Mean Risk, private API of PortfolioOptimisers.jl: mean_risk_td_defaults, solve_mean_risk!, return_term, compute_ret_lbs, _rebuild_risk_frontier, …"
 ```
 
 # Mean Risk: private API
 
 ```@docs
 mean_risk_td_defaults
-needs_previous_weights(opt::MeanRisk)
 solve_mean_risk!
 return_term
 compute_ret_lbs

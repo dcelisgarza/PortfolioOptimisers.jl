@@ -17,7 +17,6 @@ calc_asset_liquidation_fees
 calc_asset_fixed_liquidation_fees
 add_liquidation_terms
 override_fee_amortisation
-needs_previous_weights(fe::FeesE_Fees)
 two_axis_fees_view
 strip_liquidation_carriers
 investable_fees_view

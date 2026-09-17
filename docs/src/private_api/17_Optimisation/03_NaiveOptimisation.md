@@ -1,12 +1,11 @@
 ```@meta
-Description = "Naive optimisation, private API of PortfolioOptimisers.jl: NaiveOptimisationEstimator, needs_previous_weights, is_time_dependent, …"
+Description = "Naive optimisation, private API of PortfolioOptimisers.jl: NaiveOptimisationEstimator, is_time_dependent, reset_time_dependent_estimator, …"
 ```
 
 # Naive optimisation: private API
 
 ```@docs
 NaiveOptimisationEstimator
-needs_previous_weights(opt::NaiveOptimisationEstimator)
 is_time_dependent(opt::NaiveOptimisationEstimator)
 reset_time_dependent_estimator(opt::NaiveOptimisationEstimator)
 assert_internal_optimiser(::NaiveOptimisationEstimator)

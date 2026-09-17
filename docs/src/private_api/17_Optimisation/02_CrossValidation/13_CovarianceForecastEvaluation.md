@@ -1,14 +1,10 @@
 ```@meta
-Description = "The covariance forecast evaluation, private API of PortfolioOptimisers.jl: AbstractRealisedTarget, realised_target, target_dof, target_step_dof, …"
+Description = "The covariance forecast evaluation, private API of PortfolioOptimisers.jl: forecast_location, forecast_state_location, forecast_coverage_policy, …"
 ```
 
 # The covariance forecast evaluation: private API
 
 ```@docs
-PortfolioOptimisers.AbstractRealisedTarget
-PortfolioOptimisers.realised_target
-PortfolioOptimisers.target_dof
-PortfolioOptimisers.target_step_dof
 PortfolioOptimisers.forecast_location
 PortfolioOptimisers.forecast_state_location
 PortfolioOptimisers.forecast_coverage_policy

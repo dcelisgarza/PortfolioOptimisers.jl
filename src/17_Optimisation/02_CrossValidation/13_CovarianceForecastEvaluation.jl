@@ -919,3 +919,5 @@ end
 
 export RealisedCovariance, HorizonReturn, covariance_forecast_step,
        covariance_forecast_evaluation, CovarianceForecastEvaluationResult
+# The `# Interfaces`-marked type and verbs of #1138 (ADR 0154).
+public AbstractRealisedTarget, realised_target, target_dof, target_step_dof

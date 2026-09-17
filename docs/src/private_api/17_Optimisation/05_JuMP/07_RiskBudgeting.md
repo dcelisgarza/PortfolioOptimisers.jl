@@ -12,7 +12,6 @@ ProcessedFactorRiskBudgetingAttributes
 ProcessedAssetRiskBudgetingAttributes
 risk_budgeting_td_defaults
 risk_budget_universe_key
-needs_previous_weights(opt::RiskBudgeting)
 _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting, w::VecJuMPScalar; strict::Bool = false)
 set_risk_budgeting_constraints!
 set_rb_mip_w!

@@ -14,6 +14,7 @@ port_opt_view(sp::SchurComplementParams, i, X::MatNum, args...)
 factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:OptE_Opt_FbChain})
 port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum, args...)
 optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1, kwargs...)
+needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
 ```
 
 ## References
