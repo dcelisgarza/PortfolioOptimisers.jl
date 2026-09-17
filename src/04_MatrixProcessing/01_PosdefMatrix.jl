@@ -270,3 +270,4 @@ function posdef(pdm::AbstractPosdefEstimator, X::MatNum)
 end
 
 export Posdef, posdef, posdef!
+public AbstractPosdefEstimator

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Matrix processing, public API of PortfolioOptimisers.jl: MatrixProcessing, matrix_processing!, matrix_processing."
+Description = "Matrix processing, public API of PortfolioOptimisers.jl: AbstractMatrixProcessingEstimator, AbstractMatrixProcessingAlgorithm, MatrixProcessing, …"
 ```
 
 # Matrix processing
@@ -18,9 +18,13 @@ The only set order is that positive definite projection should come first. This 
 Aside from this, there is no set canonical order, the closest to a heuristic we can justify is to denoise before detoning. The order is configured as a tuple or vector of step symbols (`:pdm`, `:dn`, `:dt`, `:alg`), applied left to right.
 
 ```@docs
+AbstractMatrixProcessingEstimator
+AbstractMatrixProcessingAlgorithm
 MatrixProcessing
 matrix_processing!
 matrix_processing
+matrix_processing_algorithm!(::Nothing, sigma::MatNum, args...; kwargs...)
+matrix_processing_algorithm(::Nothing, sigma::MatNum, args...; kwargs...)
 ```
 
 ## References

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Detone, public API of PortfolioOptimisers.jl: Detone, detone, detone!."
+Description = "Detone, public API of PortfolioOptimisers.jl: AbstractDetoneEstimator, Detone, detone, detone!."
 ```
 
 # Detone
@@ -9,6 +9,7 @@ Financial data is often responds to broad market conditions. This market-wide be
 Detoned matrices may be non-positive definite, so they can be unsuitable for traditional optimisations, but they can be quite effective for clustering ones.
 
 ```@docs
+AbstractDetoneEstimator
 Detone
 detone
 detone!

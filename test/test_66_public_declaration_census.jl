@@ -113,13 +113,9 @@ end
                           :AbstractConstraintEstimator, :AbstractConstraintResult,
                           :AbstractConstraintSpace,
                           :AbstractDeformationCalibrationAlgorithm,
-                          :AbstractDenoiseAlgorithm, :AbstractDenoiseEstimator,
-                          :AbstractDetoneEstimator, :AbstractExpectedReturnsAlgorithm,
-                          :AbstractMatrixProcessingAlgorithm,
-                          :AbstractMatrixProcessingEstimator, :AbstractMomentAlgorithm,
+                          :AbstractExpectedReturnsAlgorithm, :AbstractMomentAlgorithm,
                           :AbstractNormCeilingCalibrationAlgorithm,
-                          :AbstractOrderedWeightsArrayFunction,
-                          :AbstractPosdefEstimator, :AbstractPreorderBy,
+                          :AbstractOrderedWeightsArrayFunction, :AbstractPreorderBy,
                           :AbstractPreviousWeightsSource, :AbstractPriorEstimator,
                           :AbstractPriorResult, :AbstractPriorUncertaintySetEstimator,
                           :AbstractRealisedTarget, :AbstractRedundancyAlgorithm,
@@ -146,11 +142,9 @@ end
     (`prior`, `port_opt_view`, `mu_ucs`, ...) is not here -- only a name a promotion ticket
     must still declare alongside its type.
     =#
-    verb_debt = Set([:_denoise!, :bootstrap_indices, :compute_pooling,
-                     :get_node_property, :k_ucs, :matrix_processing_algorithm,
-                     :matrix_processing_algorithm!, :needs_previous_weights,
-                     :opt_weight_bounds,
-                     :reads_prior_result, :realised_target, :reconstruct_prior, :scalarise,
+    verb_debt = Set([:bootstrap_indices, :compute_pooling, :get_node_property, :k_ucs,
+                     :needs_previous_weights, :opt_weight_bounds, :reads_prior_result,
+                     :realised_target, :reconstruct_prior, :scalarise,
                      :scalarise_risk_expression!, :set_clustering_weight_finaliser_alg!,
                      :target_dof, :target_step_dof, :time_dependent_field_defaults,
                      :tracking_benchmark, :variance_risk_bounds_val])
@@ -244,6 +238,6 @@ end
     # satisfy every assertion above with an empty set on each side, so the shape is proven
     # alive.
     @test length(sections) > 80
-    @test length(promotion_debt) > 50
+    @test length(promotion_debt) > 40
     @test length(verb_debt) > 15
 end

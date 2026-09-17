@@ -1,11 +1,7 @@
 ```@meta
-Description = "Detone, private API of PortfolioOptimisers.jl: AbstractDetoneEstimator."
+Description = "Detone has no private API in PortfolioOptimisers.jl; its names are in the public API."
 ```
 
 # Detone: private API
 
-The internal interface behind detoning.
-
-```@docs
-AbstractDetoneEstimator
-```
+Detone has no private API in PortfolioOptimisers.jl; see [`Detone`](@ref) for its public API.

@@ -39,21 +39,27 @@
     `public` declaration on the type and on every verb the section names, one
     promotion-ticket directory at a time (issue #553) — `VectorToScalarMeasure` joined this
     way on 2026-09-17 (issue #1127), the nine `src/01_Base/` types joined the same day (issue
-    #1126), the twenty-five `src/05_Moments/` types joined the same day (issue #1130), and the
-    five `src/03_InputData/` types below joined the same day too (issue #1128). They are held
-    to their own list for the same reason — public is API too.
+    #1126), the twenty-five `src/05_Moments/` types joined the same day (issue #1130), the five
+    `src/03_InputData/` types joined the same day too (issue #1128), and the six
+    `src/04_MatrixProcessing/` types below joined the same day again (issue #1129). They are
+    held to their own list for the same reason — public is API too.
     =#
-    allowed_public = Set([:AbstractBins, :AbstractCoverageAlgorithm,
-                          :AbstractCovarianceEstimator,
+    allowed_public = Set([:AbstractBins, :AbstractCovarianceEstimator,
+                          :AbstractCoverageAlgorithm,
                           :AbstractCrossSectionalRegressionEstimator,
                           :AbstractCrossSectionalTransform,
                           :AbstractCrossSectionalWeightsAlgorithm,
-                          :AbstractDescriptorEstimator, :AbstractEstimatorValueAlgorithm,
+                          :AbstractDenoiseAlgorithm, :AbstractDenoiseEstimator,
+                          :AbstractDescriptorEstimator, :AbstractDetoneEstimator,
+                          :AbstractEstimatorValueAlgorithm,
                           :AbstractExpectedReturnsEstimator, :AbstractExposureEstimator,
                           :AbstractForecastTarget, :AbstractGapReturnAlgorithm,
+                          :AbstractMatrixProcessingAlgorithm,
+                          :AbstractMatrixProcessingEstimator,
                           :AbstractOptimisationEstimator, :AbstractPanelField,
                           :AbstractPanelFieldInput, :AbstractPanelFillAlgorithm,
-                          :AbstractPartialFitState, :AbstractReturnForecastEstimator,
+                          :AbstractPartialFitState, :AbstractPosdefEstimator,
+                          :AbstractReturnForecastEstimator,
                           :AbstractTimeSeriesRegressionEstimator,
                           :AbstractVarianceEstimator, :BaseGerberCovariance,
                           :BaseGerberIQCovariance, :BinWidthBins, :CokurtosisEstimator,

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Positive definite matrix projection, public API of PortfolioOptimisers.jl: Posdef, posdef, posdef!."
+Description = "Positive definite matrix projection, public API of PortfolioOptimisers.jl: AbstractPosdefEstimator, Posdef, posdef, posdef!."
 ```
 
 # Positive definite matrix projection
@@ -14,6 +14,7 @@ In order to obtain unique results and improve numerical stability, these non-pos
 These types and functions let us do so.
 
 ```@docs
+AbstractPosdefEstimator
 Posdef
 posdef
 posdef!
