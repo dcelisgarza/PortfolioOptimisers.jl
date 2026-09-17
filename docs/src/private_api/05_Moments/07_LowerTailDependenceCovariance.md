@@ -7,10 +7,3 @@ Description = "Lower Tail Dependence Covariance, private API of PortfolioOptimis
 ```@docs
 lower_tail_dependence
 ```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
-```

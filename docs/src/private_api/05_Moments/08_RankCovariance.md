@@ -7,10 +7,3 @@ Description = "Rank Covariances, private API of PortfolioOptimisers.jl: RankCova
 ```@docs
 RankCovarianceEstimator
 ```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
-```

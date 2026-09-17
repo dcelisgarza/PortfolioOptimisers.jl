@@ -12,3 +12,10 @@ AbstractDenoiseAlgorithm
 find_max_eval
 _denoise!
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

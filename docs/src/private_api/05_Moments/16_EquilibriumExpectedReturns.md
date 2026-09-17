@@ -7,10 +7,3 @@ Description = "Equilibrium expected returns, private API of PortfolioOptimisers.
 ```@docs
 equilibrium_mu
 ```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
-```

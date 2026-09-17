@@ -13,10 +13,3 @@ add_best_factor_after_pval_failure!
 get_forward_reg_incl_excl!
 get_backward_reg_incl!
 ```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
-```
