@@ -1,4 +1,8 @@
-# Cross-Sectional Factor Prior internals
+```@meta
+Description = "Cross-Sectional Factor Prior internals, private API of PortfolioOptimisers.jl: cross_sectional_prior_pairs, cross_sectional_benchmark_carrier, …"
+```
+
+# Cross-Sectional Factor Prior internals: private API
 
 The verbs a [`CrossSectionalFactorPrior`](@ref) composes: the carrier it hands its Exposure Estimators, the exposure history and its dependency order, the two masks the fit runs on, the idiosyncratic block, the scenario reconstruction, and the lift onto the assets.
 

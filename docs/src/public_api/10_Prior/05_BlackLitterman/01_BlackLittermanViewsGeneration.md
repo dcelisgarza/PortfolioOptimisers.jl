@@ -1,12 +1,12 @@
+```@meta
+Description = "Black-Litterman Views Generation, public API of PortfolioOptimisers.jl: BlackLittermanViews, black_litterman_views."
+```
+
 # Black-Litterman Views Generation
 
 ```@docs
 BlackLittermanViews
 black_litterman_views
-get_black_litterman_views
-assert_bl_views_conf
-assert_bl
-Lc_BLV
 ```
 
 ## References

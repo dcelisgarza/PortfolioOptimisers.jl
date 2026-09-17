@@ -1,0 +1,20 @@
+```@meta
+Description = "The prior family on the partial-fit seam, private API of PortfolioOptimisers.jl: PriorCarryState, sample_buffer, fold_carry, merge_states, Base.copy, …"
+```
+
+# The prior family on the partial-fit seam: private API
+
+```@docs
+PortfolioOptimisers.PriorCarryState
+PortfolioOptimisers.sample_buffer(state::PortfolioOptimisers.PriorCarryState)
+PortfolioOptimisers.fold_carry
+PortfolioOptimisers.merge_states(a::PortfolioOptimisers.PriorCarryState, b::PortfolioOptimisers.PriorCarryState)
+Base.copy(x::PortfolioOptimisers.PriorCarryState)
+PortfolioOptimisers.needs_factor_returns
+PortfolioOptimisers.combine_factor_answers
+PortfolioOptimisers.assert_factor_returns
+PortfolioOptimisers.fold_factor_argument
+PortfolioOptimisers.fold_member
+PortfolioOptimisers.read_member
+PortfolioOptimisers.update_online_estimator(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior})
+```

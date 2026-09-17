@@ -1,0 +1,17 @@
+```@meta
+Description = "Factor Black-Litterman Prior, public API of PortfolioOptimisers.jl: FactorBlackLittermanPrior, prior."
+```
+
+# Factor Black-Litterman Prior
+
+```@docs
+FactorBlackLittermanPrior
+prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false, kwargs...)
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

@@ -1,15 +1,18 @@
-# Entropy Pooling
+```@meta
+Description = "Entropy Pooling, private API of PortfolioOptimisers.jl: AbstractSequentialTailViewConstraint, VecEP, LinearConditionalValueatRiskViewConstraint, …"
+```
 
-## Tail views
+# Entropy Pooling: private API
 
 ```@docs
+AbstractSequentialTailViewConstraint
+VecEP
 LinearConditionalValueatRiskViewConstraint
 IntegerConditionalValueatRiskViewConstraint
 ConicEntropicValueatRiskViewConstraint
 GridEntropicValueatRiskViewConstraint
 ConicRelativisticValueatRiskViewConstraint
 GridRelativisticValueatRiskViewConstraint
-AbstractSequentialTailViewConstraint
 SequentialConditionalValueatRiskViewConstraint
 SequentialEntropicValueatRiskViewConstraint
 SequentialRelativisticValueatRiskViewConstraint
@@ -48,20 +51,8 @@ ep_add_tail_view!
 ep_tail_views!
 add_ep_tail_view!
 PortfolioOptimisers.show_fields(::EntropyPoolingPrior)
-```
-
-## Estimator
-
-```@docs
-EntropyPoolingPrior
-VecEP
-prior(pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing,
-      pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false, kwargs...)
-ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum},
-         pnl::Option{<:AssetPanel} = nothing; strict::Bool = false, kwargs...)
-ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
-         F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing; strict::Bool = false,
-         kwargs...)
+ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing; strict::Bool = false, kwargs...)
+ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing; strict::Bool = false, kwargs...)
 ```
 
 ## References

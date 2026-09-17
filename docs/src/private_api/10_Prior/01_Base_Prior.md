@@ -1,19 +1,10 @@
-# Base Prior
+```@meta
+Description = "Base Prior, private API of PortfolioOptimisers.jl: AbstractPriorEstimator, AbstractLowOrderPriorEstimator, AbstractLowOrderPriorEstimator_A, …"
+```
+
+# Base Prior: private API
 
 ```@docs
-LowOrderPrior
-HighOrderPrior
-prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
-prior(pr::AbstractPriorResult, args...; kwargs...)
-assert_prior_regression
-prior_regression_remedy
-forward_prior
-reconstruct_prior
-prior_field_values
-prior_result_property_pool
-bound_field_is_stale
-returns_matrix_picker
-clusterise(cle::AbstractClustersEstimator, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior, kwargs...)
 AbstractPriorEstimator
 AbstractLowOrderPriorEstimator
 AbstractLowOrderPriorEstimator_A
@@ -26,9 +17,13 @@ AbstractHighOrderPriorEstimator
 AbstractPriorResult
 Pr_RR
 PrE_Pr
-port_opt_view(pr::Union{Nothing, AbstractPriorEstimator}, ::Any, args...)
-port_opt_view(pr::LowOrderPrior, rd, args...)
-port_opt_view(pr::HighOrderPrior, rd, args...)
+assert_prior_regression
+prior_regression_remedy
+reconstruct_prior
+prior_field_values
+prior_result_property_pool
+bound_field_is_stale
+returns_matrix_picker
 investable_mask
 investable_views
 investable_prior
