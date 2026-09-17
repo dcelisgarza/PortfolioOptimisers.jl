@@ -15,6 +15,7 @@ KatzCentrality
 Pagerank
 RadialityCentrality
 StressCentrality
+calc_centrality
 ```
 
 ## References

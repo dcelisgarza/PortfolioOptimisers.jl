@@ -232,6 +232,25 @@ Abstract supertype for custom JuMP constraint implementations.
 
 Subtype this and implement [`add_custom_constraint!`](@ref) — the single method the type exists to make you define — to add custom constraints to the JuMP model. Pass the resulting estimator (or a vector of them) as the `ccnt` field of [`JuMPOptimiser`](@ref).
 
+# Interfaces
+
+In order to implement a new constraint that works seamlessly with the library, subtype `CustomJuMPConstraint` with the constraint's parameters as fields, and implement the following method. The verb is `public` and not exported, so the method is defined on the qualified name, `PortfolioOptimisers.add_custom_constraint!`.
+
+## `add_custom_constraint!`
+
+  - `add_custom_constraint!(model::JuMP.Model, ccnt::MyConstraint, optimiser, attrs::ProcessedJuMPOptimiserAttributes) -> Nothing`: Add the constraint to `model`. There is no fallback: a subtype with no method of its own raises. Scale the constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), the homogenisation variable, so the bound is compared against unrescaled weights under a ratio objective (ADR 0008).
+
+### Arguments
+
+  - `model`: The JuMP model, mid-assembly; read the weights with [`get_w`](@ref).
+  - `ccnt`: The concrete subtype instance.
+  - `optimiser`: The outer optimisation estimator, e.g. the [`MeanRisk`](@ref) itself.
+  - `attrs`: The processed problem data: `attrs.pr` is the prior, `attrs.wb` the bounds.
+
+### Returns
+
+  - `nothing`.
+
 # Related
 
   - [`add_custom_constraint!`](@ref) — the method to implement
@@ -266,6 +285,26 @@ $(DocStringExtensions.TYPEDEF)
 Abstract supertype for custom JuMP objective implementations.
 
 Subtype this and implement [`add_custom_objective_term!`](@ref) — the single method the type exists to make you define — to add custom penalty or reward terms to the JuMP model objective. Pass the resulting estimator (or a vector of them) as the `cobj` field of [`JuMPOptimiser`](@ref).
+
+# Interfaces
+
+In order to implement a new objective term that works seamlessly with the library, subtype `CustomJuMPObjective` with the term's parameters as fields, and implement the following method. The verb is `public` and not exported, so the method is defined on the qualified name, `PortfolioOptimisers.add_custom_objective_term!`.
+
+## `add_custom_objective_term!`
+
+  - `add_custom_objective_term!(model::JuMP.Model, obj::ObjectiveFunction, cobj::MyObjective, optimiser, attrs::ProcessedJuMPOptimiserAttributes) -> Nothing`: Contribute the term to the model's objective. There is no fallback: a subtype with no method of its own raises. Contribute through [`add_to_objective_penalty!`](@ref) rather than by touching the objective expression: the accumulated penalty is folded in with the sign the objective's sense needs, so a contribution always worsens the objective and a reward is a negative contribution (ADR 0036). A term that is not homogeneous of degree one in the weights multiplies its constants by [`get_k`](@ref).
+
+### Arguments
+
+  - `model`: The JuMP model, mid-assembly; read the weights with [`get_w`](@ref).
+  - `obj`: The objective being built, which differs from the declared one inside a [`Frontier`](@ref) sweep.
+  - `cobj`: The concrete subtype instance.
+  - `optimiser`: The outer optimisation estimator, e.g. the [`MeanRisk`](@ref) itself.
+  - `attrs`: The processed problem data: `attrs.pr` is the prior, `attrs.wb` the bounds.
+
+### Returns
+
+  - `nothing`.
 
 # Related
 

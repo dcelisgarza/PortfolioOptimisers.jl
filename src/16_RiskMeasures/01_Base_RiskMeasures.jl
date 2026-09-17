@@ -452,10 +452,53 @@ Abstract supertype for standard risk measures used in portfolio optimisation.
 
 Subtype `RiskMeasure` to implement concrete risk measures that quantify portfolio risk and can be used as objectives or constraints in optimisation problems. This type ensures compatibility with the optimisation framework and enables composability with other estimators and algorithms.
 
+# Interfaces
+
+In order to implement a new risk measure that works seamlessly with the library, subtype `RiskMeasure` with a `settings::RiskMeasureSettings` field — [`set_risk_expression!`](@ref) reads its `scale` and `rke`, [`set_risk_upper_bound!`](@ref) its `ub`, and [`expected_risk`](@ref) its `scale` when several measures combine — and implement the following methods:
+
+## `risk_input_kind`
+
+  - `risk_input_kind(r::MyRiskMeasure) -> RiskInputKind`: Declare which of the three functor shapes the measure exposes. There is no default: an undeclared measure throws rather than routing to the wrong input shape.
+
+### Arguments
+
+  - `r`: The concrete subtype instance.
+
+### Returns
+
+  - `kind::RiskInputKind`: One of `NetReturnsInput()`, `WeightsReturnsFeesInput()` or `WeightsInput()`.
+
+## The functor
+
+[`expected_risk`](@ref) evaluates the measure as a functor, in the shape its kind declares:
+
+  - `(r::MyRiskMeasure)(x::VecNum) -> Number` under [`NetReturnsInput`](@ref), where `x` is the net portfolio return series [`calc_net_returns`](@ref) builds.
+  - `(r::MyRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees}) -> Number` under [`WeightsReturnsFeesInput`](@ref).
+  - `(r::MyRiskMeasure)(w::VecNum) -> Number` under [`WeightsInput`](@ref).
+
+A [`WeightsReturnsFeesInput`](@ref) measure also declares [`supports_precomputed_returns`](@ref), as `supports_precomputed_returns(r::MyRiskMeasure) -> Bool`, stating whether its risk is a function of the net return series alone; the fallback for that kind throws rather than guessing. The other two kinds answer through the kind itself.
+
+## The model builder
+
+A `JuMP` optimiser builds the measure into its model through [`set_risk_constraints!`](@ref), as `set_risk_constraints!(model::JuMP.Model, i, r::MyRiskMeasure, opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...; kwargs...)`, which has no fallback. The method builds the risk expression from the model's weights, then registers it with [`set_risk_bounds_and_expression!`](@ref), which reads the bound and the contribution to the aggregate risk expression off `r.settings`. Scale every constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), so the bound is compared against unrescaled weights under a ratio objective (ADR 0008).
+
+## Optional methods
+
+Each has a fallback on [`AbstractBaseRiskMeasure`](@ref):
+
+  - [`needs_previous_weights`](@ref): `true` for a measure that reads the previous weights; the fallback answers `false`.
+  - [`bigger_is_better`](@ref): `true` for a measure a caller maximises; the fallback answers `false`.
+  - [`range_tails`](@ref): the two point measures a range measure is the sum of; the fallback throws.
+  - [`factory`](@ref): rebuild the measure against a prior result before it is evaluated, for a measure whose slots are filled from the prior.
+
 # Related
 
   - [`OptimisationRiskMeasure`](@ref)
   - [`HierarchicalRiskMeasure`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`risk_input_kind`](@ref)
+  - [`expected_risk`](@ref)
+  - [`set_risk_constraints!`](@ref)
 """
 abstract type RiskMeasure <: OptimisationRiskMeasure end
 """
@@ -488,10 +531,47 @@ Abstract supertype for hierarchical risk measures used in portfolio optimisation
 
 Subtype `HierarchicalRiskMeasure` to implement risk measures that operate on hierarchical or clustered portfolio structures. These measures are designed for use as objectives or constraints in optimisation problems that leverage asset clustering, hierarchical risk parity, or similar techniques.
 
+# Interfaces
+
+A hierarchical measure is only ever evaluated at the value level, through [`expected_risk`](@ref), so it builds no `JuMP` model and needs no model builder. In order to implement a new one that works seamlessly with the library, subtype `HierarchicalRiskMeasure` with a `settings::HierarchicalRiskMeasureSettings` field — [`expected_risk`](@ref) reads its `scale` when several measures combine — and implement the following methods:
+
+## `risk_input_kind`
+
+  - `risk_input_kind(r::MyRiskMeasure) -> RiskInputKind`: Declare which of the three functor shapes the measure exposes. There is no default: an undeclared measure throws rather than routing to the wrong input shape.
+
+### Arguments
+
+  - `r`: The concrete subtype instance.
+
+### Returns
+
+  - `kind::RiskInputKind`: One of `NetReturnsInput()`, `WeightsReturnsFeesInput()` or `WeightsInput()`.
+
+## The functor
+
+[`expected_risk`](@ref) evaluates the measure as a functor, in the shape its kind declares:
+
+  - `(r::MyRiskMeasure)(x::VecNum) -> Number` under [`NetReturnsInput`](@ref), where `x` is the net portfolio return series [`calc_net_returns`](@ref) builds.
+  - `(r::MyRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees}) -> Number` under [`WeightsReturnsFeesInput`](@ref).
+  - `(r::MyRiskMeasure)(w::VecNum) -> Number` under [`WeightsInput`](@ref).
+
+A [`WeightsReturnsFeesInput`](@ref) measure also declares [`supports_precomputed_returns`](@ref), as `supports_precomputed_returns(r::MyRiskMeasure) -> Bool`, stating whether its risk is a function of the net return series alone; the fallback for that kind throws rather than guessing. The other two kinds answer through the kind itself.
+
+## Optional methods
+
+Each has a fallback on [`AbstractBaseRiskMeasure`](@ref):
+
+  - [`needs_previous_weights`](@ref): `true` for a measure that reads the previous weights; the fallback answers `false`.
+  - [`bigger_is_better`](@ref): `true` for a measure a caller maximises; the fallback answers `false`.
+  - [`factory`](@ref): rebuild the measure against a prior result before it is evaluated, for a measure whose slots are filled from the prior.
+
 # Related
 
   - [`OptimisationRiskMeasure`](@ref)
   - [`RiskMeasure`](@ref)
+  - [`HierarchicalRiskMeasureSettings`](@ref)
+  - [`risk_input_kind`](@ref)
+  - [`expected_risk`](@ref)
 """
 abstract type HierarchicalRiskMeasure <: OptimisationRiskMeasure end
 """
@@ -2347,3 +2427,7 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
        MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk,
        expected_risk_from_returns, RiskMeasure, HierarchicalRiskMeasure, SquareRootBound,
        LinearBound, SquaredBound
+# The verb the `# Interfaces` sections of `RiskMeasure` and `HierarchicalRiskMeasure` name
+# (ADR 0154). Public, not exported: it is only ever extended, and an extension must qualify
+# it as `PortfolioOptimisers.risk_input_kind` anyway.
+public risk_input_kind

@@ -33,12 +33,12 @@ end
     being promoted, is a regression this census must fail on.
 
     The reverse direction found five pre-existing violations the same day:
-    `HierarchicalRiskMeasure` and `RiskMeasure` state only prose ("subtype this to implement
+    `HierarchicalRiskMeasure` and `RiskMeasure` stated only prose ("subtype this to implement
     concrete risk measures"), and `AbstractCentralityAlgorithm`, `CustomJuMPConstraint` and
-    `CustomJuMPObjective` name their contract method under `# Related` rather than under a
-    `# Interfaces` heading. Writing each contract is a call on what the method's own signature
-    should say -- not a shape this infrastructure ticket can pick -- so they sit on a second,
-    symmetric debt list, filed as issue #1142.
+    `CustomJuMPObjective` named their contract method under `# Related` rather than under a
+    `# Interfaces` heading. They sat on a second, symmetric debt list until issue #1142 wrote
+    the five contracts and emptied it; the list stays, empty, so the reverse direction has a
+    named place to record a future exemption rather than an edit no one remembers to make.
 
     `interfaces_section`, `interfaces_verbs` and `declared_types` are read from
     `code_health/CodeHealth.jl`, shared with `test_61_interfaces_section_census.jl` so the two
@@ -238,12 +238,11 @@ end
 
     #=
     Five abstract types were already `public`/`export`-declared on 2026-09-17 with a
-    docstring that documents no `# Interfaces` contract. Writing each contract is a call on
-    what the method's own signature should say, not a shape this infrastructure ticket can
-    pick -- filed as issue #1142. May only shrink.
+    docstring that documents no `# Interfaces` contract; issue #1142 wrote the five contracts
+    and emptied this list. May only shrink, so it stays empty: a public abstract type that
+    gains no section is a failure below, never an addition here.
     =#
-    section_debt = Set([:AbstractCentralityAlgorithm, :CustomJuMPConstraint,
-                        :CustomJuMPObjective, :HierarchicalRiskMeasure, :RiskMeasure])
+    section_debt = Set{Symbol}()
 
     missing_section = Symbol[]
     for (n, T) in declared

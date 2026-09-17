@@ -128,6 +128,7 @@ LogSumExpScalariser
 LinearBound
 SquareRootBound
 SquaredBound
+risk_input_kind
 factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
 port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any, args...)
 ```

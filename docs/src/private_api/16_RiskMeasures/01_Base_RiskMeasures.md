@@ -60,7 +60,6 @@ risk_measure_nothing_scalar_array_view
 solver_selector
 bigger_is_better
 needs_previous_weights(::AbstractBaseRiskMeasure)
-risk_input_kind
 range_tails
 supports_precomputed_returns(r::AbstractBaseRiskMeasure)
 supports_precomputed_returns(rs::VecBaseRM)

@@ -13,6 +13,35 @@ A member says which quantity its edge weights must be, through [`centrality_pola
 
 The five members that do declare one carry an `ov` field, and [`TopologyOnly`](@ref) in it withdraws the declaration for that instance. [`centrality_polarity`](@ref) therefore answers the **effective** polarity, not the declared one.
 
+# Interfaces
+
+In order to implement a new centrality algorithm that works seamlessly with the library, subtype `AbstractCentralityAlgorithm` with the routine's configuration as fields, and implement the following method:
+
+## `calc_centrality`
+
+  - `calc_centrality(ct::MyCentrality, g::Graphs.AbstractGraph) -> VecNum`: Score every vertex of `g`. [`centrality_graph`](@ref) has already weighted `g` in the polarity the algorithm declares, so the method forwards to the routine and inspects nothing.
+
+### Arguments
+
+  - `ct`: The concrete subtype instance.
+  - `g`: The graph to score, weighted or plain as the declared polarity decides.
+
+### Returns
+
+  - `scores::VecNum`: One score per vertex of `g`, in vertex order.
+
+## `centrality_polarity`
+
+  - `centrality_polarity(ct::MyCentrality) -> Option{<:AbstractCentralityPolarity}`: Declare which quantity the edge weights must be. The fallback answers `nothing`, so a new algorithm runs on the plain graph until it opts in. Declare [`DistancePolarity`](@ref) for a routine defined over shortest paths, and [`SimilarityPolarity`](@ref) for one that reads the adjacency matrix itself.
+
+### Arguments
+
+  - `ct`: The concrete subtype instance.
+
+### Returns
+
+  - `polarity::Option{<:AbstractCentralityPolarity}`: The effective polarity, or `nothing` for an algorithm that reads the topology alone.
+
 # Related
 
   - [`centrality_polarity`](@ref)
@@ -1030,3 +1059,7 @@ end
 export AbstractCentralityAlgorithm, TopologyOnly, BetweennessCentrality,
        ClosenessCentrality, DegreeCentrality, EigenvectorCentrality, KatzCentrality,
        Pagerank, RadialityCentrality, StressCentrality
+# The verb the `# Interfaces` section of `AbstractCentralityAlgorithm` names (ADR 0154).
+# Public, not exported: it is only ever extended, and an extension must qualify it as
+# `PortfolioOptimisers.calc_centrality` anyway.
+public calc_centrality
