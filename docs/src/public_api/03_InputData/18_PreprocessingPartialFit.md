@@ -1,3 +1,7 @@
+```@meta
+Description = "Preprocessing partial fit, public API of PortfolioOptimisers.jl: fit_preprocessing."
+```
+
 # Preprocessing partial fit
 
 ## The online form of the data steps
@@ -13,22 +17,7 @@ and [`MissingDataFilter`](@ref) keeps its missing counts. Each reads its fitted 
 by name.
 
 ```@docs
-PortfolioOptimisers.vcat_carrier_rows
-PortfolioOptimisers.assert_pinned_carrier
-PortfolioOptimisers.vcat_optional
-PortfolioOptimisers.vcat_panel_rows
-PortfolioOptimisers.carrier_rows
-PortfolioOptimisers.partial_fit_transform
-PortfolioOptimisers.PricesToReturnsState
-PortfolioOptimisers.series_values
-PortfolioOptimisers.advance_anchor
-PortfolioOptimisers.block_gap_return!
-PortfolioOptimisers.series_values_returns
-PortfolioOptimisers.returns_with_series
 fit_preprocessing(ptr::PricesToReturns)
-PortfolioOptimisers.PriceGapFillState
 fit_preprocessing(est::PriceGapFill)
-PortfolioOptimisers.MissingDataFilterState
 fit_preprocessing(mdf::MissingDataFilter)
-PortfolioOptimisers.show_fields(est::Union{<:PricesToReturns, <:PriceGapFill, <:MissingDataFilter})
 ```

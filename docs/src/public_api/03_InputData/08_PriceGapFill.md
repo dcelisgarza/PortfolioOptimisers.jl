@@ -1,3 +1,7 @@
+```@meta
+Description = "Price gap fill, public API of PortfolioOptimisers.jl: CarriedPrice, PriceGapFill, PriceGapFillResult."
+```
+
 # Price gap fill
 
 ## The price gap fill
@@ -25,8 +29,4 @@ gap entirely. A filled cell is therefore finite in the returns and its estimatio
 CarriedPrice
 PriceGapFill
 PriceGapFillResult
-PortfolioOptimisers.carrier_listing_span
-PortfolioOptimisers.gap_fill_span
-PortfolioOptimisers.gap_fill_seed
-PortfolioOptimisers.gap_fill_column!
 ```

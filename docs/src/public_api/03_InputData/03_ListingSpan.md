@@ -1,3 +1,7 @@
+```@meta
+Description = "The Listing Span, public API of PortfolioOptimisers.jl: listing_span, universe_masks."
+```
+
 # The Listing Span
 
 ## The Listing Span
@@ -25,6 +29,4 @@ and `docs/adr/0131-a-return-needs-two-consecutive-prices-and-a-gap-return-writes
 ```@docs
 listing_span
 universe_masks
-PortfolioOptimisers.ListingSpan
-PortfolioOptimisers.project_span
 ```

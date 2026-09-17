@@ -1,9 +1,10 @@
-# Panel data frame
+```@meta
+Description = "Panel data frame, private API of PortfolioOptimisers.jl: panel_frame_columns, panel_frame_fields, panel_frame_assets, panel_frame_block!, panel_frame_field, …"
+```
 
-## The Asset Panel
+# Panel data frame: private API
 
 ```@docs
-panel_dataframe
 PortfolioOptimisers.panel_frame_columns
 PortfolioOptimisers.panel_frame_fields
 PortfolioOptimisers.panel_frame_assets

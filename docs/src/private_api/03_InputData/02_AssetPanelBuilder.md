@@ -1,20 +1,21 @@
-# Asset Panel builder
+```@meta
+Description = "Asset Panel builder, private API of PortfolioOptimisers.jl: AbstractAssetPanelEstimator, AbstractPanelFieldInput, AbstractPanelFillAlgorithm, …"
+```
 
-## The Asset Panel
+# Asset Panel builder: private API
+
+## Types
 
 ```@docs
-asset_panel
-PortfolioOptimisers.panel_build_observations
 PortfolioOptimisers.AbstractAssetPanelEstimator
 PortfolioOptimisers.AbstractPanelFieldInput
-NumericPanelInput
-CategoricalPanelInput
-TensorPanelInput
 PortfolioOptimisers.AbstractPanelFillAlgorithm
-NoPanelFill
-ConstantPanelFill
-ForwardPanelFill
-BackwardPanelFill
+```
+
+## Functions
+
+```@docs
+PortfolioOptimisers.panel_build_observations
 PortfolioOptimisers.panel_fill
 PortfolioOptimisers.panel_fill_array
 PortfolioOptimisers.panel_directional_fill

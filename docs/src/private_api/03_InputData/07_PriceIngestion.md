@@ -1,0 +1,28 @@
+```@meta
+Description = "Price ingestion, private API of PortfolioOptimisers.jl: project_panel_clock, unify_gaps, assert_no_infinite_price, series_value_type, absence_type, …"
+```
+
+# Price ingestion: private API
+
+```@docs
+PortfolioOptimisers.project_panel_clock
+PortfolioOptimisers.unify_gaps
+PortfolioOptimisers.assert_no_infinite_price
+PortfolioOptimisers.series_value_type
+PortfolioOptimisers.absence_type
+PortfolioOptimisers.absent_value
+PortfolioOptimisers.assert_pad_spellable
+PortfolioOptimisers.align_series
+PortfolioOptimisers.padded_observations
+PortfolioOptimisers.padding_report_line
+PortfolioOptimisers.assert_join_padding
+PortfolioOptimisers.series_names
+PortfolioOptimisers.assert_disjoint_series_names
+PortfolioOptimisers.assert_unreserved_series_names
+PortfolioOptimisers.assert_distinct_series_names
+PortfolioOptimisers.assert_span_shape
+PortfolioOptimisers.returns_universe_masks
+PortfolioOptimisers.compress_all_true
+PortfolioOptimisers.attach_universe_masks
+PortfolioOptimisers.span_carrier_view
+```

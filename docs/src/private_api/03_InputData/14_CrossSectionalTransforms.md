@@ -1,0 +1,38 @@
+```@meta
+Description = "Cross-sectional transforms, private API of PortfolioOptimisers.jl: AbstractCrossSectionalTransform, CS_MISSING_GROUP, CS_MAD_CONSISTENCY, …"
+```
+
+# Cross-sectional transforms: private API
+
+## Types
+
+```@docs
+PortfolioOptimisers.AbstractCrossSectionalTransform
+PortfolioOptimisers.CS_MISSING_GROUP
+PortfolioOptimisers.CS_MAD_CONSISTENCY
+```
+
+## Functions
+
+```@docs
+PortfolioOptimisers.assert_cross_sectional_matrix
+PortfolioOptimisers.assert_cross_sectional_weights
+PortfolioOptimisers.assert_cross_sectional_groups
+PortfolioOptimisers.cross_sectional_groups_observed!
+PortfolioOptimisers.cross_sectional_estimation_mask
+PortfolioOptimisers.cross_sectional_indices
+PortfolioOptimisers.cross_sectional_weight_type
+PortfolioOptimisers.cross_sectional_weighted_mean
+PortfolioOptimisers.cross_sectional_equal_std
+PortfolioOptimisers.cross_sectional_stat
+PortfolioOptimisers.cross_sectional_blank_row!
+PortfolioOptimisers.cross_sectional_zscore_row!
+PortfolioOptimisers.cross_sectional_recentre_rescale!
+PortfolioOptimisers.cross_sectional_midranks!
+PortfolioOptimisers.cross_sectional_rank_counts
+PortfolioOptimisers.cross_sectional_row_groups
+PortfolioOptimisers.cross_sectional_group_split
+PortfolioOptimisers.cross_sectional_percentile_ranks
+PortfolioOptimisers.cross_sectional_standardise!
+PortfolioOptimisers.cross_sectional_cell_stats
+```

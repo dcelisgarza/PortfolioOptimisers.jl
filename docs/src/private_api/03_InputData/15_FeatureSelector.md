@@ -1,6 +1,8 @@
-# Feature selector
+```@meta
+Description = "Feature selector, private API of PortfolioOptimisers.jl: panel_field_keys, panel_value_columns!, panel_key_column!, panel_column_label, …"
+```
 
-## The Asset Panel
+# Feature selector: private API
 
 ```@docs
 PortfolioOptimisers.panel_field_keys

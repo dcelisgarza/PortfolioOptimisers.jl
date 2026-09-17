@@ -1,10 +1,8 @@
-# Price ingestion
-
-## Prices to returns
-
-```@docs
-PortfolioOptimisers.project_panel_clock
+```@meta
+Description = "Price ingestion, public API of PortfolioOptimisers.jl: PriceIngestion, price_ingestion."
 ```
+
+# Price ingestion
 
 ## The ingestion layer
 
@@ -43,26 +41,14 @@ to spell. An absent implied volatility is carried like an absent price, and
 volatilities are complete. See
 `docs/adr/0135-the-asset-table-states-the-clock-and-the-layer-carries-every-absence-and-names-it.md`.
 
+## Types
+
 ```@docs
 PriceIngestion
+```
+
+## Functions
+
+```@docs
 price_ingestion
-PortfolioOptimisers.unify_gaps
-PortfolioOptimisers.assert_no_infinite_price
-PortfolioOptimisers.series_value_type
-PortfolioOptimisers.absence_type
-PortfolioOptimisers.absent_value
-PortfolioOptimisers.assert_pad_spellable
-PortfolioOptimisers.align_series
-PortfolioOptimisers.padded_observations
-PortfolioOptimisers.padding_report_line
-PortfolioOptimisers.assert_join_padding
-PortfolioOptimisers.series_names
-PortfolioOptimisers.assert_disjoint_series_names
-PortfolioOptimisers.assert_unreserved_series_names
-PortfolioOptimisers.assert_distinct_series_names
-PortfolioOptimisers.assert_span_shape
-PortfolioOptimisers.returns_universe_masks
-PortfolioOptimisers.compress_all_true
-PortfolioOptimisers.attach_universe_masks
-PortfolioOptimisers.span_carrier_view
 ```

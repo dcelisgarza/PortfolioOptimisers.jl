@@ -1,10 +1,8 @@
-# The Asset Panel
-
-## The ingestion layer
-
-```@docs
-PortfolioOptimisers.AllTrueMask
+```@meta
+Description = "The Asset Panel, public API of PortfolioOptimisers.jl: AssetPanel, NumericPanelField, CategoricalPanelField, TensorPanelField, panel_field, …"
 ```
+
+# The Asset Panel
 
 ## The Asset Panel
 
@@ -35,38 +33,19 @@ per `(observation, asset)` filtered by the active mask, and a `:wide` layout giv
 column per trailing-axis label there, under the same `"<field>=<label>"` name it takes in a
 Feature Matrix.
 
+## Types
+
 ```@docs
 AssetPanel
-panel_field
-PortfolioOptimisers.panel_axes
-panel_feature_matrix
-PortfolioOptimisers.features_are_assets
-PortfolioOptimisers.panel_onehot
-PortfolioOptimisers.RepeatedLeading
-PortfolioOptimisers.panel_field_lift
-port_opt_view(::AssetPanel, ::Any)
-PortfolioOptimisers.AbstractPanelField
 NumericPanelField
 CategoricalPanelField
 TensorPanelField
-PortfolioOptimisers.panel_is_static
-PortfolioOptimisers.panel_field_axes
-PortfolioOptimisers.panel_value_eltype
-PortfolioOptimisers.panel_field_labels
-PortfolioOptimisers.panel_field_observed_labels
-PortfolioOptimisers.panel_field_stack!
-PortfolioOptimisers.panel_field_stack_observed!
-PortfolioOptimisers.panel_field_view
-PortfolioOptimisers.panel_groups_view
-PortfolioOptimisers.panel_array_view
-PortfolioOptimisers.panel_tensor_view
-PortfolioOptimisers.panel_mask_view
-PortfolioOptimisers.panel_claim!
-PortfolioOptimisers.check_asset_panel
-PortfolioOptimisers.assert_panel_labels
-PortfolioOptimisers.assert_panel_field_name
-PortfolioOptimisers.assert_panel_field_shape
-PortfolioOptimisers.assert_panel_field_mask
-PortfolioOptimisers.assert_panel_masks
-PortfolioOptimisers.assert_panel_finite
+```
+
+## Functions
+
+```@docs
+panel_field
+panel_feature_matrix
+port_opt_view(::AssetPanel, ::Any)
 ```

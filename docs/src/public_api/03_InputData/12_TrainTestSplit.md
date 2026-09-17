@@ -1,3 +1,7 @@
+```@meta
+Description = "Train/test split, public API of PortfolioOptimisers.jl: TrainTestSplit, TrainTestSplitResult, train_test_split."
+```
+
 # Train/test split
 
 ## Train/test splitting
@@ -8,10 +12,15 @@ Sizes are row counts (`Integer`) or fractions of the observations (`AbstractFloa
 
 The keyword form returns a bare `(train, test)` tuple; the estimator form, `train_test_split(tts, data)`, returns the same [`TrainTestSplitResult`](@ref) a pipeline's split step produces, so one configured holdout can be reused inside and outside a pipeline.
 
+## Types
+
 ```@docs
-train_test_split
 TrainTestSplit
 TrainTestSplitResult
-PortfolioOptimisers.safe_index
-PortfolioOptimisers.split_count
+```
+
+## Functions
+
+```@docs
+train_test_split
 ```
