@@ -1,6 +1,8 @@
-# Messages
+```@meta
+Description = "Messages, private API of PortfolioOptimisers.jl: did_you_mean, suggest_declared_key, unknown_variable_msg, misaligned_axis_msg, strict_diagnostic, …"
+```
 
-## Logging
+# Messages: private API
 
 ```@docs
 did_you_mean

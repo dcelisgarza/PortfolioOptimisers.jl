@@ -1,21 +1,17 @@
-# The coverage policy
+```@meta
+Description = "The coverage policy, private API of PortfolioOptimisers.jl: AbstractCoverageAlgorithm, CoverageCounts, fold_inactive!, admits, coverage_counts_seed, …"
+```
 
-## The coverage policy
-
-A moment estimator that carries a [`CoveragePolicy`](@ref) fits each cell of its answer on the observations that cell has, instead of reducing its window to the Coverage Universe. The rule for a delisted asset is an [`PortfolioOptimisers.AbstractCoverageAlgorithm`](@ref), whose two verbs are [`PortfolioOptimisers.fold_inactive!`](@ref) at fold time and [`PortfolioOptimisers.admits`](@ref) at read-out, and the per-cell denominators live in a [`PortfolioOptimisers.CoverageCounts`](@ref) the partial-fit state carries.
+# The coverage policy: private API
 
 ```@docs
-CoveragePolicy
 PortfolioOptimisers.AbstractCoverageAlgorithm
-DecayCoverage
-ResetCoverage
-ExpireCoverage
+PortfolioOptimisers.CoverageCounts
 PortfolioOptimisers.fold_inactive!
 PortfolioOptimisers.fold_inactive!(::Union{<:DecayCoverage, <:ExpireCoverage}, state::PortfolioOptimisers.AbstractPartialFitState, ::AbstractVector{<:Bool})
 PortfolioOptimisers.admits
 PortfolioOptimisers.admits(::Union{<:DecayCoverage, <:ResetCoverage}, share::Real, active::Bool, ::Integer, min_coverage::Real)
 PortfolioOptimisers.admits(alg::ExpireCoverage, share::Real, active::Bool, stale::Integer, min_coverage::Real)
-PortfolioOptimisers.CoverageCounts
 PortfolioOptimisers.coverage_counts_seed
 Base.copy(x::PortfolioOptimisers.CoverageCounts)
 PortfolioOptimisers.coverage_counts_view

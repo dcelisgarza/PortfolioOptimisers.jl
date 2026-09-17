@@ -1,18 +1,15 @@
-# Type aliases
+```@meta
+Description = "Type aliases, private API of PortfolioOptimisers.jl: AbstractCustomValue, AbstractEstimatorValueAlgorithm, VectorAbstractEstimatorValueAlgorithm, Option, …"
+```
 
-## Utilities
+# Type aliases: private API
+
+`PortfolioOptimisers.jl` heavily relies on `Julia`'s dispatch and type system to ensure data validity. Many custom types and functions/methods can accept different data types. These can be represented as type unions, many of which are used throughout the library. The following type aliases centralise these union definitions, as well as improving correctness and maintainability.
 
 ```@docs
 AbstractCustomValue
 AbstractEstimatorValueAlgorithm
 VectorAbstractEstimatorValueAlgorithm
-```
-
-## Base type aliases
-
-`PortfolioOptimisers.jl` heavily relies on `Julia`'s dispatch and type system to ensure data validity. Many custom types and functions/methods can accept different data types. These can be represented as type unions, many of which are used throughout the library. The following type aliases centralise these union definitions, as well as improving correctness and maintainability.
-
-```@docs
 Option{T}
 VecNum
 VecInt

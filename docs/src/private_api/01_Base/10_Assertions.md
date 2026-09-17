@@ -1,23 +1,15 @@
-# Assertions
-
-## Configuration
-
-```@docs
-assert_resource_cap
-assert_ep_grid_size
+```@meta
+Description = "Assertions, private API of PortfolioOptimisers.jl: assert_resource_cap, assert_ep_grid_size, resolve_rng, assert_nonempty, assert_finite, assert_nonneg, …"
 ```
 
-## Utilities
-
-```@docs
-resolve_rng
-```
-
-## Assertions
+# Assertions: private API
 
 In order to increase correctness, robustness, and safety, we make extensive use of [defensive programming](https://en.wikipedia.org/wiki/Defensive_programming). The following functions perform some of these validations and are usually called at variable instantiation.
 
 ```@docs
+assert_resource_cap
+assert_ep_grid_size
+resolve_rng
 assert_nonempty
 assert_finite
 assert_nonneg
