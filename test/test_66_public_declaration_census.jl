@@ -109,8 +109,7 @@ end
     declaration; it never adds an entry.
     =#
     promotion_debt = Set([:AbstractExpectedReturnsAlgorithm, :AbstractMomentAlgorithm,
-                          :AbstractOrderedWeightsArrayFunction, :AbstractPriorEstimator,
-                          :AbstractPriorResult, :AbstractRealisedTarget,
+                          :AbstractOrderedWeightsArrayFunction, :AbstractRealisedTarget,
                           :AbstractRedundancyAlgorithm, :AbstractRiskMeasureSettings,
                           :AbstractSearchCrossValidationResult, :AbstractSelectionRule,
                           :AbstractTrackingAlgorithm, :BaseHierarchicalOptimisationResult,
@@ -118,11 +117,11 @@ end
                           :FrontierBoundEstimator, :HierarchicalOptimisationResult,
                           :JuMPWeightFinaliserFormulation,
                           :NonFiniteAllocationOptimisationResult,
-                          :NonJuMPOptimisationResult, :OpinionPoolingAlgorithm,
-                          :OptimisationAlgorithm, :OptimisationModelResult,
-                          :OptimisationResult, :OptimisationReturnCode, :Scalariser,
-                          :TimeDependentCallable, :TimeDependentConstraintCallable,
-                          :TimeDependentOptimiserCallable, :WeightFinaliser])
+                          :NonJuMPOptimisationResult, :OptimisationAlgorithm,
+                          :OptimisationModelResult, :OptimisationResult,
+                          :OptimisationReturnCode, :Scalariser, :TimeDependentCallable,
+                          :TimeDependentConstraintCallable, :TimeDependentOptimiserCallable,
+                          :WeightFinaliser])
 
     #=
     The verbs the still-private types above name that are themselves neither exported nor
@@ -136,11 +135,11 @@ end
     (`GerberIQDecayEstimator`). The parser now reads the package's own prefix, and the entry
     records debt that existed all along rather than debt this file grew.
     =#
-    verb_debt = Set([:compute_pooling, :needs_previous_weights, :opt_weight_bounds,
-                     :realised_target, :reconstruct_prior, :regenerate_decay, :scalarise,
-                     :scalarise_risk_expression!, :set_clustering_weight_finaliser_alg!,
-                     :target_dof, :target_step_dof, :time_dependent_field_defaults,
-                     :tracking_benchmark, :variance_risk_bounds_val])
+    verb_debt = Set([:needs_previous_weights, :opt_weight_bounds, :realised_target,
+                     :regenerate_decay, :scalarise, :scalarise_risk_expression!,
+                     :set_clustering_weight_finaliser_alg!, :target_dof, :target_step_dof,
+                     :time_dependent_field_defaults, :tracking_benchmark,
+                     :variance_risk_bounds_val])
 
     undeclared_types = Symbol[]
     undeclared_verbs = Tuple{Symbol, Symbol}[]

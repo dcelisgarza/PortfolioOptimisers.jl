@@ -42,10 +42,11 @@
     #1126), the twenty-five `src/05_Moments/` types joined the same day (issue #1130), the five
     `src/03_InputData/` types joined the same day too (issue #1128), the six
     `src/04_MatrixProcessing/` types below joined the same day again (issue #1129),
-    `AbstractPreorderBy` from `src/08_Phylogeny/` joined the same day (issue #1131), and the
-    three `src/09_ConstraintGeneration/` types joined the same day as well (issue #1132), and
-    the fifteen `src/11_UncertaintySets/` types joined the same day (issue #1134). They
-    are held to their own list for the same reason — public is API too.
+    `AbstractPreorderBy` from `src/08_Phylogeny/` joined the same day (issue #1131), the
+    three `src/09_ConstraintGeneration/` types joined the same day as well (issue #1132), the
+    fifteen `src/11_UncertaintySets/` types joined the same day (issue #1134), and the three
+    `src/10_Prior/` types joined the same day (issue #1133). They are held to their own list
+    for the same reason — public is API too.
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
                           :AbstractAmbiguityTailWeightCalibrationAlgorithm, :AbstractBins,
@@ -68,8 +69,8 @@
                           :AbstractPanelField, :AbstractPanelFieldInput,
                           :AbstractPanelFillAlgorithm, :AbstractPartialFitState,
                           :AbstractPosdefEstimator, :AbstractPreorderBy,
-                          :AbstractPreviousWeightsSource,
-                          :AbstractPriorUncertaintySetEstimator,
+                          :AbstractPreviousWeightsSource, :AbstractPriorEstimator,
+                          :AbstractPriorResult, :AbstractPriorUncertaintySetEstimator,
                           :AbstractReturnForecastEstimator,
                           :AbstractSignificanceCalibrationAlgorithm,
                           :AbstractTimeSeriesRegressionEstimator,
@@ -85,9 +86,9 @@
                           :GerberIQEpsEstimator, :GerberIQGammaEstimator,
                           :GerberIQScalerEstimator, :ImpliedVolatilityAlgorithm,
                           :NonFiniteAllocationOptimisationEstimator, :NormError,
-                          :OptimisationEstimator, :RegimeAdjustedMethod, :VecJuMPConstr,
-                          :VecJuMPObj, :VectorAbstractEstimatorValueAlgorithm,
-                          :VectorToScalarMeasure])
+                          :OpinionPoolingAlgorithm, :OptimisationEstimator,
+                          :RegimeAdjustedMethod, :VecJuMPConstr, :VecJuMPObj,
+                          :VectorAbstractEstimatorValueAlgorithm, :VectorToScalarMeasure])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&

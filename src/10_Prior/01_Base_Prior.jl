@@ -2390,4 +2390,4 @@ function prior_result_property_pool()
 end
 
 export prior, LowOrderPrior, HighOrderPrior
-public forward_prior
+public forward_prior, AbstractPriorEstimator, AbstractPriorResult, reconstruct_prior

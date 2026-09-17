@@ -590,3 +590,4 @@ function factor_residual_config(pe::OpinionPoolingPrior)
 end
 
 export LinearOpinionPooling, LogarithmicOpinionPooling, OpinionPoolingPrior
+public OpinionPoolingAlgorithm, compute_pooling

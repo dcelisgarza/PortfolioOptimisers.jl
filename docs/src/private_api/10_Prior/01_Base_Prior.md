@@ -1,11 +1,10 @@
 ```@meta
-Description = "Base Prior, private API of PortfolioOptimisers.jl: AbstractPriorEstimator, AbstractLowOrderPriorEstimator, AbstractLowOrderPriorEstimator_A, …"
+Description = "Base Prior, private API of PortfolioOptimisers.jl: AbstractLowOrderPriorEstimator, AbstractLowOrderPriorEstimator_A, AbstractLowOrderPriorEstimator_F, …"
 ```
 
 # Base Prior: private API
 
 ```@docs
-AbstractPriorEstimator
 AbstractLowOrderPriorEstimator
 AbstractLowOrderPriorEstimator_A
 AbstractLowOrderPriorEstimator_F
@@ -14,12 +13,10 @@ AbstractLowOrderPriorEstimator_A_AF
 AbstractLowOrderPriorEstimator_F_AF
 AbstractLowOrderPriorEstimator_A_F_AF
 AbstractHighOrderPriorEstimator
-AbstractPriorResult
 Pr_RR
 PrE_Pr
 assert_prior_regression
 prior_regression_remedy
-reconstruct_prior
 prior_field_values
 prior_result_property_pool
 bound_field_is_stale
