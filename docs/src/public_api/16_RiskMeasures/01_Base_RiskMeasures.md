@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base Risk Measures, public API of PortfolioOptimisers.jl: RiskMeasure, HierarchicalRiskMeasure, Frontier, RiskMeasureSettings, …"
+Description = "Base Risk Measures, public API of PortfolioOptimisers.jl: RiskMeasure, HierarchicalRiskMeasure, Frontier, AbstractRiskMeasureSettings, RiskMeasureSettings, …"
 ```
 
 # Base Risk Measures
@@ -119,12 +119,16 @@ Table Key:
 RiskMeasure
 HierarchicalRiskMeasure
 Frontier
+AbstractRiskMeasureSettings
 RiskMeasureSettings
 HierarchicalRiskMeasureSettings
+Scalariser
+scalarise
 SumScalariser
 MaxScalariser
 MinScalariser
 LogSumExpScalariser
+FrontierBoundEstimator
 LinearBound
 SquareRootBound
 SquaredBound

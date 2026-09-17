@@ -2350,3 +2350,6 @@ export MaximumEntropy, ExponentialConeEntropy, RelativeEntropy, MinimumSquaredDi
        OrderedWeightsArray, OrderedWeightsArrayRange, LinearMoment,
        OrderedWeightsArrayConditionalValueatRisk, OrderedWeightsArrayTailGini,
        OrderedWeightsArrayConditionalValueatRiskRange, OrderedWeightsArrayTailGiniRange
+# The `# Interfaces`-marked type of #1137 (ADR 0154). Its section names only the callable
+# shape, so no separate verb is promoted alongside it.
+public AbstractOrderedWeightsArrayFunction

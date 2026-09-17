@@ -8,10 +8,7 @@ Description = "Base Risk Measures, private API of PortfolioOptimisers.jl: Abstra
 AbstractBaseRiskMeasure
 NonOptimisationRiskMeasure
 OptimisationRiskMeasure
-AbstractRiskMeasureSettings
 JuMPRiskMeasureSettings
-FrontierBoundEstimator
-Scalariser
 NonHierarchicalScalariser
 HierarchicalScalariser
 DeferredQuantity
@@ -31,7 +28,6 @@ RiskInputKind
 NetReturnsInput
 WeightsReturnsFeesInput
 WeightsInput
-scalarise
 scalarise_combine
 scalarise_map
 scalarise_logsumexp

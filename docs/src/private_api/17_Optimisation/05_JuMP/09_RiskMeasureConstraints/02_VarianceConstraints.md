@@ -18,7 +18,6 @@ sdp_variance_flag!
 set_variance_risk!
 set_sdp_variance_risk!
 variance_risk_bounds_expr
-variance_risk_bounds_val
 rc_variance_constraints!
 set_ucs_variance_risk!
 ```

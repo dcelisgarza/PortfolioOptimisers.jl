@@ -9,7 +9,6 @@ AbstractRiskSeriesAlgorithm
 NonFRCJuMPOpt
 NetReturnsRiskSeries
 DrawdownRiskSeries
-scalarise_risk_expression!
 set_risk_constraints!(model::JuMP.Model, r::RiskMeasure, opt::JuMPOptimisationEstimator, pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing; kwargs...)
 risk_frontier_length
 set_risk_frontier_owner!

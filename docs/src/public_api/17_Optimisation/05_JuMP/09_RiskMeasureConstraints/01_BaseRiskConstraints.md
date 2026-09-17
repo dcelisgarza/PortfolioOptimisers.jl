@@ -1,7 +1,9 @@
 ```@meta
-Description = "Base Risk Constraints has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Base Risk Constraints, public API of PortfolioOptimisers.jl: scalarise_risk_expression!."
 ```
 
 # Base Risk Constraints
 
-Base Risk Constraints has no public API in PortfolioOptimisers.jl; see [`Base Risk Constraints: private API`](@ref) for its private API.
+```@docs
+scalarise_risk_expression!
+```

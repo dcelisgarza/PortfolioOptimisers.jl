@@ -1,5 +1,5 @@
 ```@meta
-Description = "Ordered Weights Array, public API of PortfolioOptimisers.jl: ExponentialConeEntropy, RelativeEntropy, MaximumEntropy, MinimumSquaredDistance, …"
+Description = "Ordered Weights Array, public API of PortfolioOptimisers.jl: AbstractOrderedWeightsArrayFunction, ExponentialConeEntropy, RelativeEntropy, MaximumEntropy, …"
 ```
 
 # Ordered Weights Array
@@ -9,6 +9,7 @@ Certain risk measures can be expressed as ordered weights arrays [owa1,owa3](@ci
 These types and functions implement the various existing formulations and risk measures representable by ordered weights arrays.
 
 ```@docs
+AbstractOrderedWeightsArrayFunction
 ExponentialConeEntropy
 RelativeEntropy
 MaximumEntropy

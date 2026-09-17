@@ -109,16 +109,15 @@ end
     declaration; it never adds an entry.
     =#
     promotion_debt = Set([:AbstractExpectedReturnsAlgorithm, :AbstractMomentAlgorithm,
-                          :AbstractOrderedWeightsArrayFunction, :AbstractRealisedTarget,
-                          :AbstractRedundancyAlgorithm, :AbstractRiskMeasureSettings,
+                          :AbstractRealisedTarget, :AbstractRedundancyAlgorithm,
                           :AbstractSearchCrossValidationResult, :AbstractSelectionRule,
                           :BaseHierarchicalOptimisationResult, :BaseOptimisationEstimator,
-                          :CrossValidationSearchScorer, :FrontierBoundEstimator,
-                          :HierarchicalOptimisationResult, :JuMPWeightFinaliserFormulation,
+                          :CrossValidationSearchScorer, :HierarchicalOptimisationResult,
+                          :JuMPWeightFinaliserFormulation,
                           :NonFiniteAllocationOptimisationResult,
                           :NonJuMPOptimisationResult, :OptimisationAlgorithm,
                           :OptimisationModelResult, :OptimisationResult,
-                          :OptimisationReturnCode, :Scalariser, :TimeDependentCallable,
+                          :OptimisationReturnCode, :TimeDependentCallable,
                           :TimeDependentConstraintCallable, :TimeDependentOptimiserCallable,
                           :WeightFinaliser])
 
@@ -135,9 +134,8 @@ end
     records debt that existed all along rather than debt this file grew.
     =#
     verb_debt = Set([:needs_previous_weights, :opt_weight_bounds, :realised_target,
-                     :regenerate_decay, :scalarise, :scalarise_risk_expression!,
-                     :set_clustering_weight_finaliser_alg!, :target_dof, :target_step_dof,
-                     :time_dependent_field_defaults, :variance_risk_bounds_val])
+                     :regenerate_decay, :set_clustering_weight_finaliser_alg!, :target_dof,
+                     :target_step_dof, :time_dependent_field_defaults])
 
     undeclared_types = Symbol[]
     undeclared_verbs = Tuple{Symbol, Symbol}[]

@@ -7,7 +7,6 @@ Description = "Ordered Weights Array, private API of PortfolioOptimisers.jl: Abs
 ```@docs
 AbstractOrderedWeightsArrayEstimator
 AbstractOrderedWeightsArrayAlgorithm
-AbstractOrderedWeightsArrayFunction
 SquaredOrderedWeightsArrayAlgorithm
 UnionAllSOCRiskExpr
 UnionSOCRiskExpr

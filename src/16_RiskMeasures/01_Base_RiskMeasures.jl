@@ -2431,3 +2431,8 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
 # (ADR 0154). Public, not exported: it is only ever extended, and an extension must qualify
 # it as `PortfolioOptimisers.risk_input_kind` anyway.
 public risk_input_kind
+# The `# Interfaces`-marked types and verbs of #1137 (ADR 0154): AbstractRiskMeasureSettings
+# names required fields only; FrontierBoundEstimator and Scalariser each name the verb(s) an
+# extension must implement.
+public AbstractRiskMeasureSettings, FrontierBoundEstimator, variance_risk_bounds_val,
+       Scalariser, scalarise, scalarise_risk_expression!
