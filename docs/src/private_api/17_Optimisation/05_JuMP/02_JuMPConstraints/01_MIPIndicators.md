@@ -1,19 +1,23 @@
-# MIP Constraints
+```@meta
+Description = "MIP Constraints, private API of PortfolioOptimisers.jl: AbstractMIPSpace, AbstractMIPIndicators, AssetMIPSpace, SubsetMIPSpace, HeldIndicators, …"
+```
+
+# MIP Constraints: private API
 
 ```@docs
-get_mip_ss
-set_mip_ss_expr!
 AbstractMIPSpace
+AbstractMIPIndicators
 AssetMIPSpace
 SubsetMIPSpace
+HeldIndicators
+LongShortIndicators
+SignIndicators
+get_mip_ss
+set_mip_ss_expr!
 mip_key
 mip_wx!
 mip_bounds
 use_direct_mip_indicators
-AbstractMIPIndicators
-HeldIndicators
-LongShortIndicators
-SignIndicators
 held
 held_bin
 set_mip_indicators!

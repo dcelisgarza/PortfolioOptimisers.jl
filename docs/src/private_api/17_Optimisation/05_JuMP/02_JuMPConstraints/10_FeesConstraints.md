@@ -1,4 +1,8 @@
-# Fees Constraints
+```@meta
+Description = "Fees Constraints, private API of PortfolioOptimisers.jl: add_to_fees!, add_to_one_time_fees!, charge_one_time_fees, set_turnover_fees!, set_non_fixed_fees!, …"
+```
+
+# Fees Constraints: private API
 
 ```@docs
 add_to_fees!

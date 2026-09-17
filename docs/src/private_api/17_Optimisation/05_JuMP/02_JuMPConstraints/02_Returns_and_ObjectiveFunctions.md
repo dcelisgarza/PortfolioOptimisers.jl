@@ -1,27 +1,22 @@
-# Returns and Objective Functions
+```@meta
+Description = "Returns and Objective Functions, private API of PortfolioOptimisers.jl: VecJRE, JRE_VecJRE, ArithRetMu, MaximumElementReturn, resolve_deferred_quantities, …"
+```
+
+# Returns and Objective Functions: private API
 
 ```@docs
-JuMPReturnsSettings
 VecJRE
 JRE_VecJRE
 ArithRetMu
-ArithmeticReturn
+MaximumElementReturn
 resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResult)
-LogarithmicReturn
-NoReturn
 zero_return_expression_flag
 assert_no_return_objective_compatibility
 assert_return_term_required
-bounds_returns_estimator
 no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool)
 no_bounds_returns_settings
 unit_scale_returns_estimator
 no_bounds_optimiser
-MinimumRisk
-MaximumUtility
-MaximumRatio
-MaximumReturn
-MaximumElementReturn
 set_maximum_ratio_factor_variables!
 set_maximum_ratio_normalisation!
 set_maximum_ratio_scale_floor!
@@ -38,7 +33,6 @@ set_ucs_return_constraints!(model::JuMP.Model, i, ucs::EllipsoidalUncertaintySet
 set_ucs_return_constraints!(model::JuMP.Model, i, ucs::L1UncertaintySet, mu::Num_VecNum, settings::JuMPReturnsSettings)
 set_ucs_return_constraints!(model::JuMP.Model, i, ucs::SignedL1UncertaintySet, mu::Num_VecNum, settings::JuMPReturnsSettings)
 set_ucs_return_constraints!(model::JuMP.Model, i, ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any, <:MuUncertaintySetClass}, mu::Num_VecNum, settings::JuMPReturnsSettings)
-add_to_objective_penalty!
 add_penalty_to_objective!
 set_portfolio_objective_function!
 ```

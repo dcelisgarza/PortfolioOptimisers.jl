@@ -1,4 +1,8 @@
-# Base JuMP Optimisation
+```@meta
+Description = "Base JuMP Optimisation, private API of PortfolioOptimisers.jl: BaseJuMPOptimisationEstimator, JuMPOptimisationEstimator, RiskJuMPOptimisationEstimator, …"
+```
+
+# Base JuMP Optimisation: private API
 
 ```@docs
 BaseJuMPOptimisationEstimator
@@ -7,28 +11,23 @@ RiskJuMPOptimisationEstimator
 ObjectiveFunction
 JuMPReturnsEstimator
 JuMPConstraintEstimator
-CustomJuMPConstraint
-VecJuMPConstr
 JuMPConstr_VecJuMPConstr
-CustomJuMPObjective
-VecJuMPObj
 JuMPObj_VecJuMPObj
-needs_previous_weights(::CustomJuMPConstraint)
-needs_previous_weights(::CustomJuMPObjective)
-is_time_dependent(opt::JuMPOptimisationEstimator)
-reset_time_dependent_estimator(opt::JuMPOptimisationEstimator)
-JuMPOptimisationSolution
 VecJuMPOptSol
 JuMPOptSol_VecJuMPOptSol
 BaseJuMPOptimisationResult
 RiskJuMPOptimisationResult
 NonRiskJuMPOptimisationResult
 RJR_NRJR
-Base.propertynames(r::RJR_NRJR)
-Base.getproperty(r::RJR_NRJR, sym::Symbol)
 NonJuMPOptimisationResult
-add_custom_objective_term!
-add_custom_constraint!
+AbstractDecompositionContract
+SHARED_STATE
+WeightsFromParts
+PartsBoundWeights
+needs_previous_weights(::CustomJuMPConstraint)
+needs_previous_weights(::CustomJuMPObjective)
+is_time_dependent(opt::JuMPOptimisationEstimator)
+reset_time_dependent_estimator(opt::JuMPOptimisationEstimator)
 process_model
 optimise_JuMP_model!
 set_model_scales!
@@ -41,21 +40,15 @@ set_asset_returns_plus_one!
 set_asset_neg_returns_plus_one!
 set_portfolio_drawdowns_plus_one!
 set_risk_constraints!
-get_constraint_scale
 has_Xap1
 get_ret
 get_net_X
 get_ddap1
-get_w
 get_objective_scale
 get_T
-get_k
 set_unit_budget!
 is_unit_budget
 effective_k
-AbstractDecompositionContract
-WeightsFromParts
-PartsBoundWeights
 set_decomposition_contract!
 decomposition_contract
 get_Xap1
@@ -66,7 +59,6 @@ get_risk
 get_dd
 has_X
 has_dd
-SHARED_STATE
 assert_shared_state
 shared_set!
 shared_has
