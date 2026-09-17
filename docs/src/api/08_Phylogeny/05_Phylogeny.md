@@ -1,5 +1,0 @@
-# Phylogeny
-
-```@docs
-PhylogenyResult
-```
