@@ -469,8 +469,10 @@ end
     prefix, so the number on the file IS the order the module loads it in.
 
     `docs/src/public_api/` and `docs/src/private_api/` each mirror `src/` and are numbered the
-    same way, so both trees are held to the first claim too. `ext/` carries no prefixes today
-    and is walked so a numbered file entering it is held to the rule on the day it arrives.
+    same way, so both trees are held to the first claim too. The type hierarchy no longer lives
+    in either: it moved to `docs/src/TypeHierarchy.md` (ADR 0128 § Amendment), a fixed name
+    outside the numbered trees. `ext/` carries no prefixes today and is walked so a numbered
+    file entering it is held to the rule on the day it arrives.
     =#
     @testset "a prefix is unique in its directory, and the include list is the prefix order" begin
         # `(number, name)` per path component: the number orders, and the name breaks a tie

@@ -44,7 +44,9 @@ function described_page_sources(repo::AbstractString)
     sources = Dict{String, String}()
     for file in readdir(docs_src)
         path = joinpath(docs_src, file)
-        if endswith(file, ".md") && file != "capability_catalogue.md"
+        if endswith(file, ".md") &&
+           file != "capability_catalogue.md" &&
+           file != "TypeHierarchy.md"
             sources[file] = path
         end
     end
@@ -56,8 +58,7 @@ function described_page_sources(repo::AbstractString)
     end
     sources["capability_catalogue.md"] = joinpath(repo, "docs",
                                                   "generate_capability_catalogue.jl")
-    sources[joinpath("api", "TypeHierarchy.md")] = joinpath(repo, "docs",
-                                                            "generate_type_hierarchy.jl")
+    sources["TypeHierarchy.md"] = joinpath(repo, "docs", "generate_type_hierarchy.jl")
     for section in ("user_guide", "examples")
         for (dir, _, files) in walkdir(joinpath(repo, section))
             for file in files
@@ -188,6 +189,7 @@ end
         @test haskey(sources, "99_references.md")
         @test haskey(sources, "capability_catalogue.md")
         @test haskey(sources, "00_API.md")
+        @test haskey(sources, "TypeHierarchy.md")
         @test count(p -> startswith(p, "contribute"), keys(sources)) >= 3
         @test count(p -> startswith(p, "user_guide"), keys(sources)) >= 10
         @test count(p -> startswith(p, "examples"), keys(sources)) >= 60

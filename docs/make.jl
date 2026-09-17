@@ -178,7 +178,11 @@ const MIGRATION_PAGE = "migration.md"
 # Re-homed out of `docs/src/api/` (ADR 0128): the introduction sits above both mirror
 # trees rather than inside either, so it moved to `docs/src` alongside them.
 const API_INTRO_PAGE = "00_API.md"
-for page in (HOME_PAGE, REFERENCES_PAGE, CATALOGUE_PAGE, MIGRATION_PAGE, API_INTRO_PAGE)
+# Re-homed out of `docs/src/api/` for the same reason (ADR 0128 § Amendment): the tree links
+# each type into whichever mirror holds it, so it spans both sides and sits beside them.
+const TYPE_HIERARCHY_PAGE = "TypeHierarchy.md"
+for page in (HOME_PAGE, REFERENCES_PAGE, CATALOGUE_PAGE, MIGRATION_PAGE, API_INTRO_PAGE,
+             TYPE_HIERARCHY_PAGE)
     if !(isfile(joinpath(@__DIR__, "src", page)))
         error("docs/make.jl: expected root page `$page` is missing.")
     else
@@ -293,7 +297,8 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                    "Capability Catalogue" => CATALOGUE_PAGE;
                    "User Guide" => user_guide;
                    "Examples" => examples;
-                   "API introduction" => API_INTRO_PAGE];
+                   "API introduction" => API_INTRO_PAGE;
+                   "Type hierarchy" => TYPE_HIERARCHY_PAGE];
                   [label => group
                    for (label, group) in
                        (("Public API", public_api), ("Private API", private_api))

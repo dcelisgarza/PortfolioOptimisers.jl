@@ -17,7 +17,7 @@ docs/build/
 docs/src/examples/
 docs/src/user_guide/
 docs/src/capability_catalogue.md
-docs/src/api/*_TypeHierarchy.md
+docs/src/TypeHierarchy.md
 env
 node_modules
 *NOTRACK*
