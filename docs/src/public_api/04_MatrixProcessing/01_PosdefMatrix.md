@@ -1,3 +1,7 @@
+```@meta
+Description = "Positive definite matrix projection, public API of PortfolioOptimisers.jl: Posdef, posdef, posdef!."
+```
+
 # Positive definite matrix projection
 
 All co-moment matrices are supposed to be positive definite. However, non-positive definite matrices can arise due to collinearity, having fewer observations than observables, and floating point inacuracies. Non-positive definite matrices have zero or negative eigenvalues.
@@ -10,10 +14,9 @@ In order to obtain unique results and improve numerical stability, these non-pos
 These types and functions let us do so.
 
 ```@docs
-AbstractPosdefEstimator
 Posdef
-posdef!
 posdef
+posdef!
 ```
 
 ## References

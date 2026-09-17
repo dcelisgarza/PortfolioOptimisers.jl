@@ -1,3 +1,7 @@
+```@meta
+Description = "Matrix processing, public API of PortfolioOptimisers.jl: MatrixProcessing, matrix_processing!, matrix_processing."
+```
+
 # Matrix processing
 
 Co-moment matrices can be post-processed after being computed. These processes are often complementary but there is no set order.
@@ -14,17 +18,9 @@ The only set order is that positive definite projection should come first. This 
 Aside from this, there is no set canonical order, the closest to a heuristic we can justify is to denoise before detoning. The order is configured as a tuple or vector of step symbols (`:pdm`, `:dn`, `:dt`, `:alg`), applied left to right.
 
 ```@docs
-AbstractMatrixProcessingEstimator
-AbstractMatrixProcessingAlgorithm
 MatrixProcessing
 matrix_processing!
-matrix_processing_block!
-PortfolioOptimisers.assert_finite_block
-matrix_processing_step!
-PortfolioOptimisers.assert_shape_only_matrix_processing
 matrix_processing
-matrix_processing_algorithm!(::Nothing, sigma::MatNum, args...; kwargs...)
-matrix_processing_algorithm(::Nothing, sigma::MatNum, args...; kwargs...)
 ```
 
 ## References
