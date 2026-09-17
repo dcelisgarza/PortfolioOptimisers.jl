@@ -1232,7 +1232,7 @@ end
 
 Resolve the centre that a moment estimator's own observation weights weight.
 
-[ADR 0088](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/adr/0088-a-moment-estimators-weights-weight-its-centre.md) decided that a moment estimator's observation weights weight its centre, and not its deviations alone. This verb is the one place that decision lives, so [`SimpleVariance`](@ref), [`Covariance`](@ref), [`Coskewness`](@ref) and [`Cokurtosis`](@ref) reach their centre by one rule.
+A moment estimator's observation weights weight its centre, and not its deviations alone. This verb is the one place that rule lives, so [`SimpleVariance`](@ref), [`Covariance`](@ref), [`Coskewness`](@ref) and [`Cokurtosis`](@ref) reach their centre by one rule.
 
 # Algorithm
 
@@ -1891,7 +1891,7 @@ Five nominal types exist rather than one parametric `Windowed{E}` because each a
 different generic and must subtype a different abstract estimator — `AbstractCovarianceEstimator`,
 `CoskewnessEstimator`, and the rest are load-bearing for dispatch across the library, and a
 Julia struct's supertype cannot depend on a type parameter. This macro is what keeps the five
-in sync; see ADR 0039.
+in sync.
 
 # Body
 

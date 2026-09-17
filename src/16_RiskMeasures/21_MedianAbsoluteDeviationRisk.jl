@@ -304,7 +304,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the vector of deviations from the centering target for a precomputed returns series for [`MedianAbsoluteDeviation`](@ref).
 
-Single-argument form used by the precomputed-returns functor `r(x::VecNum)` (ADR 0007).
+Single-argument form used by the precomputed-returns functor `r(x::VecNum)`.
 
 # Related
 

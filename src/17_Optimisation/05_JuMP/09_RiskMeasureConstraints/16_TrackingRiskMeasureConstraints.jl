@@ -301,7 +301,7 @@ vector of measures.
 The nested build's entries are separated from the enclosing build's by its `prefix` alone.
 The index seeds only the *measure* axis, exactly as it does at the outer level, because
 [`state_key`](@ref) resolves both axes. Seeding the index with the prefix as well — which
-this did before ADR 0037's amendment — carried the same fact twice.
+this did in an earlier design — carried the same fact twice.
 
 # Arguments
 
@@ -346,7 +346,7 @@ The caller stores the tracking-difference weights under `tprefix`, so the inner
 [`set_risk_tr_constraints!`](@ref) build reads and writes ALL of its model-state keys
 (`:w`, `:net_X`, `:W`, `:variance_flag`, the per-measure scratch, …) under `tprefix` and
 cannot collide with the outer model's keys. This replaces the former
-save/unregister/restore swap (ADR 0005): the prefix isolates the nested build structurally.
+save/unregister/restore swap: the prefix isolates the nested build structurally.
 Because tracking prefixes COMPOSE (`tprefix = nested_prefix(prefix, :tr_iv_, i)`),
 tracking-nested-in-tracking is collision-free.
 
@@ -386,7 +386,7 @@ Stores the benchmark-shifted weights `w - wb*k` at `Symbol(tprefix, :w)` under t
 tracking prefix `tprefix = nested_prefix(prefix, :tr_iv_, i)`, delegates to
 [`set_risk_tracking_risk_constraints!`](@ref) to build the inner risk on those weights under
 `tprefix`, then applies risk bounds and expression registration. The prefix namespacing
-replaces the former save/restore swap (ADR 0005) and is re-entrant.
+replaces the former save/restore swap and is re-entrant.
 
 # Arguments
 
@@ -440,7 +440,7 @@ Computes the benchmark's expected risk value, stores the (unshifted) portfolio w
 [`set_risk_tracking_risk_constraints!`](@ref) to build the inner portfolio risk under
 `tprefix`, then adds an L1-norm cone constraint on the difference between the portfolio's
 risk expression and the benchmark's expected risk scaled by the allocation variable `k`.
-The prefix namespacing replaces the former save/restore swap (ADR 0005) and is re-entrant.
+The prefix namespacing replaces the former save/restore swap and is re-entrant.
 
 # Arguments
 

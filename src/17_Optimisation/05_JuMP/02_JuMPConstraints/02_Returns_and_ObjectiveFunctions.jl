@@ -188,8 +188,8 @@ Keywords correspond to the struct's fields.
 
   - `ucs` accepts either a pre-built mean uncertainty set (the result of [`mu_ucs`](@ref), e.g. a `BoxUncertaintySet` or `EllipsoidalUncertaintySet`) or an uncertainty-set *estimator*. A pre-built set is the simplest path — symmetric with how [`UncertaintySetVariance`](@ref) takes a pre-built [`sigma_ucs`](@ref) result. Passing an estimator defers construction to solve time and requires the returns data (`rd`) to be threaded through the optimiser.
   - `mu` accepts a **Deferred Quantity**: an expected-returns estimator or a prior estimator that computes the vector against the optimisation's own prior at [`factory`](@ref) time. See [`resolve_deferred_quantities`](@ref).
-  - A `ucs` that carries its own centre outranks `mu`, and `mu` outranks `pr.mu` (ADR 0050). A Deferred Quantity is a state of the `mu` rung, not a rung of its own: beside a centre-carrying set it is resolved and then goes unused, exactly as a stated vector does.
-  - The lower bound lives on `settings.lb`, not on the term itself (ADR 0052).
+  - A `ucs` that carries its own centre outranks `mu`, and `mu` outranks `pr.mu`. A Deferred Quantity is a state of the `mu` rung, not a rung of its own: beside a centre-carrying set it is resolved and then goes unused, exactly as a stated vector does.
+  - The lower bound lives on `settings.lb`, not on the term itself.
 
 ## Validation
 
@@ -319,8 +319,9 @@ must range freely over the feasible set.
 
 Only `lb` and — when `flag` is `false` — `ucs` are stripped. Everything else the term carries
 survives, `mu` included: dropping the characteristic would silently re-centre the term on the
-prior's own vector, which is the ADR 0050 defect class, and with several terms it
-would collapse every one of them onto the same corner.
+prior's own vector — a set is a neighbourhood of the one quantity it was calibrated on, not a
+shared default — and with several terms it would collapse every one of them onto the same
+corner.
 
 # Arguments
 
@@ -571,7 +572,7 @@ a degeneracy: the barrier constrains `exp(log_ret) <= ret - rt`, and with no ret
 sides are zero.
 
 Every refusal above is reached by `settings.rte = false` on every term too, because the guards
-test the state of the expression and not the type of the term (ADR 0054).
+test the state of the expression and not the type of the term.
 
 The term holds no per-asset quantity, so `settings.scale`, `settings.fee` and `settings.mic`
 are inert — zero scaled is still zero, and a charge subtracted here would make the expression
@@ -954,8 +955,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` when the model's `:ret` expression is identically zero.
 
-The degeneracy guard tests the **state** of the expression, not the **type** of the term (ADR
-0054). Two routes reach that state — a [`NoReturn`](@ref) term, and a term taken out of the
+The degeneracy guard tests the **state** of the expression, not the **type** of the term.
+Two routes reach that state — a [`NoReturn`](@ref) term, and a term taken out of the
 sum by `settings.rte = false` — and this predicate is one **fused** test over both.
 
 The fusion is load-bearing. `:ret` is the weighted sum of the terms, so it is zero exactly
@@ -1003,7 +1004,7 @@ every other objective takes the no-op fallback, because a zero `:ret` is legitim
 | [`MaximumElementReturn`](@ref) | term `i` is a [`NoReturn`](@ref) |
 
 The first two use [`zero_return_expression_flag`](@ref), so both routes to a zero expression
-are covered (ADR 0054). [`MaximumElementReturn`](@ref) is **per index** and ignores
+are covered. [`MaximumElementReturn`](@ref) is **per index** and ignores
 `settings.rte` entirely: it maximises `ret_i` directly, which the builder registers whatever
 the flag says, so a `false` flag removes that term from the *sum* without touching the
 objective. Only the sentinel type makes `ret_i` itself zero.
@@ -1068,7 +1069,7 @@ rather than degenerate, and without this check the failure arrives as a solver
 `OptimisationFailure` naming nothing.
 
 The criterion is [`zero_return_expression_flag`](@ref), so both routes to a zero expression
-are covered (ADR 0054). This guard stays at the **constructor**, unlike the objective-level
+are covered. This guard stays at the **constructor**, unlike the objective-level
 [`assert_no_return_objective_compatibility`](@ref), and the split is principled: this one asks
 whether the *formulation* needs a return term, which is knowable from the estimator alone,
 while the other asks whether the *objective* does, and objective and term first meet at model
@@ -1355,7 +1356,7 @@ end
 Collapse the `:ret_vec` entries into the model's single scalar `:ret` expression.
 
 The collapse is always the **weighted sum** ``\\sum_i s_i\\, \\mathrm{ret}_i``. There is no
-scalariser on this side, and there is no configuration in which there is one (ADR 0052): the
+scalariser on this side, and there is no configuration in which there is one: the
 package's scalarisers follow cvxpy's `scalarize` transforms, whose `max` and `log_sum_exp`
 discard the objective's sense and so fail on a maximised concave expression, and cvxpy ships
 no `min`. Normalising the sense to rescue them is barred, because `:ret` is a model-global
@@ -1691,7 +1692,7 @@ Where:
 # Returns
 
   - `(ret, mu, robust)`: the term's expression, the characteristic the set is centred on —
-    the set's own field wins over the fallback (ADR 0050) — and whether the builder raised a
+    the set's own field wins over the fallback — and whether the builder raised a
     cone the ratio's `ret == rf k + ohf` normalisation cannot be used with.
 
 # Related
@@ -2087,7 +2088,7 @@ Set the portfolio objective function in the JuMP model.
 
 Dispatches on the objective function type to build the appropriate JuMP objective expression, then folds in the [Objective Penalty](@ref add_to_objective_penalty!) accumulated by the regularisation, soft-constraint, and custom-term builders.
 
-Custom objective terms are applied *before* the penalty is folded in, because they contribute to the same accumulator: `add_penalty_to_objective!` applies the sign factor matching this method's optimisation sense, so a contribution always worsens the objective regardless of which objective is being built. See ADR 0036.
+Custom objective terms are applied *before* the penalty is folded in, because they contribute to the same accumulator: `add_penalty_to_objective!` applies the sign factor matching this method's optimisation sense, so a contribution always worsens the objective regardless of which objective is being built.
 
 The return term is **not** a parameter of this function. It used to be passed positionally so that a [`LogarithmicReturn`](@ref) ratio problem could dispatch to its own method, because the logarithmic builder registered `sr_elog_ret_risk` where every other branch registered `sr_risk`. The hoisted ratio constraint registers one name for every term shape, so the two methods collapse into one keyed on the presence of `:sr_risk`, and the positional lost its only dispatch reason.
 

@@ -81,7 +81,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - `ucs::AbstractUncertaintySetResult`: The fitted set, or a tuple of the mean set and the covariance set for `ucs`.
 
-A subtype inherits the three-argument methods of the triple, which drop the returns data and call the two-argument methods above, because the root answers `true` to [`reads_prior_result`](@ref). It needs no method of the returns-data interface [`AbstractUncertaintySetEstimator`](@ref) declares, because no consumer reaches that interface through this root. The same contract is reached without subtyping by each of the four returns-data families when its `pe` is `nothing` (ADR 0138): [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) each carry a prior-result arm of the triple over that type, and the optimiser hands such a set the prior it is solving on.
+A subtype inherits the three-argument methods of the triple, which drop the returns data and call the two-argument methods above, because the root answers `true` to [`reads_prior_result`](@ref). It needs no method of the returns-data interface [`AbstractUncertaintySetEstimator`](@ref) declares, because no consumer reaches that interface through this root. The same contract is reached without subtyping by each of the four returns-data families when its `pe` is `nothing`: [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) each carry a prior-result arm of the triple over that type, and the optimiser hands such a set the prior it is solving on.
 
 There is no default fit. The root carries a method of each of the three verbs, and each raises and names the type it was called on, so a subtype that declares none says which method its author owes rather than failing on the root.
 
@@ -118,7 +118,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries a fitted uncertainty set, which is the data a worst-case model reads to build its robust expression.
 
-All concrete subtypes should subtype `AbstractUncertaintySetResult`. A subtype also carries the statistic its bounds were calibrated on, so that the consumer bounds that statistic and not an unrelated one. See ADR 0050.
+All concrete subtypes should subtype `AbstractUncertaintySetResult`. A subtype also carries the statistic its bounds were calibrated on, so that the consumer bounds that statistic and not an unrelated one.
 
 # Interfaces
 
@@ -210,9 +210,9 @@ Computes the radius ``\\kappa`` of a [`CompactCovarianceUncertaintySet`](@ref) f
 
 A member stands in the `kappa` slot of an [`OrthogonalUncertaintySet`](@ref), whose bound is [`Num_CptRad`](@ref). A plain number in that slot is the radius itself, exactly as it is today, and [`k_compact`](@ref) returns it unchanged.
 
-**This family is not the calibration channel of ADR 0095, and the two do not meet.** A **Calibration Rule** reads `(pr, w, slv, ctx)` and nothing else. The compact radius cannot be sized from those alone, because its units move with a sibling field of its own owner: the penalty is ``\\kappa \\lVert (\\mathbf{I} - \\mathbf{Q}\\mathbf{Q}^{\\intercal})\\mathbf{C}\\boldsymbol{w} \\rVert_{2}^{2}`` with ``\\mathbf{C} = \\mathbf{W}^{-1/2}``, so under [`IdentityMetric`](@ref) ``\\kappa`` carries variance units and under [`InverseIdiosyncraticVarianceMetric`](@ref) it is dimensionless. A rule that saw only the prior result would have to state one of the two readings and be wrong under the other. So the radius is sized **in family**, where the metric, the loadings block and the span are all in hand, exactly as the mean radius of the same estimator is sized by [`k_norm_ball`](@ref) through the `method` slot. ADR 0070 is the Authority for a radius slot admitting the rule that computes it.
+**This family is not the calibration-rule channel, and the two do not meet.** A **Calibration Rule** reads `(pr, w, slv, ctx)` and nothing else. The compact radius cannot be sized from those alone, because its units move with a sibling field of its own owner: the penalty is ``\\kappa \\lVert (\\mathbf{I} - \\mathbf{Q}\\mathbf{Q}^{\\intercal})\\mathbf{C}\\boldsymbol{w} \\rVert_{2}^{2}`` with ``\\mathbf{C} = \\mathbf{W}^{-1/2}``, so under [`IdentityMetric`](@ref) ``\\kappa`` carries variance units and under [`InverseIdiosyncraticVarianceMetric`](@ref) it is dimensionless. A rule that saw only the prior result would have to state one of the two readings and be wrong under the other. So the radius is sized **in family**, where the metric, the loadings block and the span are all in hand, exactly as the mean radius of the same estimator is sized by [`k_norm_ball`](@ref) through the `method` slot. A radius slot admits the rule that computes it.
 
-A rule is named for the **method** it runs, on ADR 0015's reading, and neither bare word is claimed elsewhere in the library. [`ResidualInflation`](@ref) inflates the residual variance to a confidence bound, and [`VarianceFraction`](@ref) matches the penalty to a fraction of the nominal variance at a reference portfolio.
+A rule is named for the **method** it runs, and neither bare word is claimed elsewhere in the library. [`ResidualInflation`](@ref) inflates the residual variance to a confidence bound, and [`VarianceFraction`](@ref) matches the penalty to a fraction of the nominal variance at a reference portfolio.
 
 # Interfaces
 
@@ -447,7 +447,7 @@ end
 
 Reduce a prior result, and the returns data beside it, to the Investable Mask before a set is fitted on them standalone.
 
-A Prior Result lives on the full asset universe, and an asset outside its Investable Mask carries `NaN` in its moments and in every block a factor fit wrote, so a set fitted on the whole result meets a `NaN` where its arithmetic needs a number. Inside an optimiser the result arrives already reduced, because every optimisation family reduces once at its entry (ADR 0115), and the mask this verb derives is then `nothing`. Standalone, which ADR 0111 offers as a mode, the result arrives whole, and this verb takes the same view the optimiser takes, so the two routes fit the same set. [`expand_investable_ucs`](@ref) writes the fitted set back onto the full universe, and the pair is the reduce-and-expand shape ADR 0117 gives every prior result.
+A Prior Result lives on the full asset universe, and an asset outside its Investable Mask carries `NaN` in its moments and in every block a factor fit wrote, so a set fitted on the whole result meets a `NaN` where its arithmetic needs a number. Inside an optimiser the result arrives already reduced, because every optimisation family reduces once at its entry, and the mask this verb derives is then `nothing`. Standalone, the result arrives whole, and this verb takes the same view the optimiser takes, so the two routes fit the same set. [`expand_investable_ucs`](@ref) writes the fitted set back onto the full universe, and the pair is the reduce-and-expand shape every prior result takes.
 
 Three methods, and the branch is dispatch rather than a condition, as it is in `investable_reduction`. The first derives the mask; the `nothing` method is the all-investable path and returns its arguments untouched; the `BitVector` method takes the two views.
 
@@ -679,7 +679,7 @@ end
 
 States whether an uncertainty set estimator is calibrated on the prior result it is handed, rather than on a prior it fits for itself from returns data.
 
-It is a per-type predicate, read off the type and the `pe` field and never off a method table, so that the three consumers which must route an estimator to the argument it reads — the three-argument form of the ucs triple, [`ucs_risk_measure`](@ref) and the Pipeline's uncertainty step — ask one question and agree on the answer. Two kinds of estimator answer `true`: every [`AbstractPriorUncertaintySetEstimator`](@ref), which carries no `pe` at all, and each of the four returns-data families when its `pe` is `nothing` (ADR 0138), each of which declares its own method beside its prior-result arm. Every other estimator answers `false`, which is the default a caller's own subtype inherits. A built set, or `nothing`, answers `false` too: it is fitted already and passes through every verb unchanged, so a slot that may hold either an estimator or a result can be asked without a test of its own.
+It is a per-type predicate, read off the type and the `pe` field and never off a method table, so that the three consumers which must route an estimator to the argument it reads — the three-argument form of the ucs triple, [`ucs_risk_measure`](@ref) and the Pipeline's uncertainty step — ask one question and agree on the answer. Two kinds of estimator answer `true`: every [`AbstractPriorUncertaintySetEstimator`](@ref), which carries no `pe` at all, and each of the four returns-data families when its `pe` is `nothing`, each of which declares its own method beside its prior-result arm. Every other estimator answers `false`, which is the default a caller's own subtype inherits. A built set, or `nothing`, answers `false` too: it is fitted already and passes through every verb unchanged, so a slot that may hold either an estimator or a result can be asked without a test of its own.
 
 # Arguments
 
@@ -712,7 +712,7 @@ end
 
 Fits the prior an uncertainty set calibrates itself on, or refuses by name when the set holds none.
 
-The one door through which every returns-data verb of the four families — [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) — fits its `pe`, so the refusal is written once rather than once per verb per family. A set whose `pe` is `nothing` is calibrated on a prior result it is handed (ADR 0138), and `nothing` says that one thing: it does not resolve to an empirical prior over `X` at the fit, because that would calibrate the same estimator on two different priors depending on the call site. The returns-data form therefore raises and points at the prior-result form, `ucs(ue, pr)`, and at `pe`.
+The one door through which every returns-data verb of the four families — [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) — fits its `pe`, so the refusal is written once rather than once per verb per family. A set whose `pe` is `nothing` is calibrated on a prior result it is handed, and `nothing` says that one thing: it does not resolve to an empirical prior over `X` at the fit, because that would calibrate the same estimator on two different priors depending on the call site. The returns-data form therefore raises and points at the prior-result form, `ucs(ue, pr)`, and at `pe`.
 
 # Arguments
 
@@ -756,7 +756,7 @@ This is the form both JuMP builders call, and it exists so that one call site se
 | an [`AbstractPriorUncertaintySetEstimator`](@ref), or a returns-data estimator with `pe = nothing` | `pr`    | `ucs(uc, pr; rd = rd)` |
 | a built pair, or `nothing`                                                                         | neither | itself, unchanged      |
 
-The prior is dropped rather than checked on the first row. An estimator that carries its own `pe` fits it on the returns it is handed, so the optimisation's own prior is not an input of that fit, and passing it changes no number. An estimator on the second row is calibrated on `pr`: inside an optimiser that is the prior being solved on, so the set's centre and the objective's `mu` are the same number by construction (ADR 0138).
+The prior is dropped rather than checked on the first row. An estimator that carries its own `pe` fits it on the returns it is handed, so the optimisation's own prior is not an input of that fit, and passing it changes no number. An estimator on the second row is calibrated on `pr`: inside an optimiser that is the prior being solved on, so the set's centre and the objective's `mu` are the same number by construction.
 
 # Arguments
 

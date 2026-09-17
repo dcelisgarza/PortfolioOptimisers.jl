@@ -237,7 +237,7 @@ Alias for a vector of optional threshold estimators or results.
 
 Represents a collection of optional [`BtE_Bt`](@ref) elements (threshold estimators or results, or `nothing`).
 
-The group exists because the threshold's routing targets are **positional lists**. ADR 0038 puts `:slt`, `:sst`, `:sglt` and `:sgst` in the set of targets that accumulate, and entry `i` of such a list belongs to scenario or group block `i`, paired with `scard` or `sgcarde`. A block with no threshold is written as `nothing` rather than dropped, because dropping it would move every later block by one. That is why the element type is optional and why [`threshold_constraints`](@ref) carries a method for this alias, while [`RkbE_Rkb`](@ref) needs neither.
+The group exists because the threshold's routing targets are **positional lists**. `:slt`, `:sst`, `:sglt` and `:sgst` are in the set of targets that accumulate, and entry `i` of such a list belongs to scenario or group block `i`, paired with `scard` or `sgcarde`. A block with no threshold is written as `nothing` rather than dropped, because dropping it would move every later block by one. That is why the element type is optional and why [`threshold_constraints`](@ref) carries a method for this alias, while [`RkbE_Rkb`](@ref) needs neither.
 
 # Related
 
@@ -403,7 +403,7 @@ Broadcasts [`threshold_constraints`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simultaneously. Each entry is resolved by the method its own type selects, so an estimator resolves, a [`Threshold`](@ref) passes through and a `nothing` stays `nothing`. The result is a [`VecOptBt`](@ref) of the same length and the same order, which is what a scenario-block target needs: entry `i` belongs to block `i`, so an empty block must survive as `nothing` rather than be dropped.
 
-**This is the difference from [`risk_budget_constraints`](@ref), which has no vector method.** ADR 0038 decides it: the threshold targets `:slt`, `:sst`, `:sglt` and `:sgst` are in the set of routing targets that accumulate and hold a positional list, and a risk budget's target `:rkb` is not. [`RkbE_Rkb`](@ref) states the same decision from the other side.
+**This is the difference from [`risk_budget_constraints`](@ref), which has no vector method.** The threshold targets `:slt`, `:sst`, `:sglt` and `:sgst` are in the set of routing targets that accumulate and hold a positional list, and a risk budget's target `:rkb` is not. [`RkbE_Rkb`](@ref) states the same decision from the other side.
 
 # Algorithm
 

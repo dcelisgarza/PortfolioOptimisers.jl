@@ -349,7 +349,7 @@ Return the idiosyncratic return series a realised factor attribution weights by 
 
 One of the five reads [`factor_attribution`](@ref) takes off a loadings result. The root refuses, so a loadings result that keeps no residual history is named rather than attributed to zero.
 
-The read takes the carrier beside the block, because a block that stores no series recovers it from the result it travels on. A [`CrossSectionalFactorModel`](@ref) keeps its own residuals and ignores the carrier. A [`Regression`](@ref) keeps none, so the series is `original_returns(pr) - pr.X`: the difference between the returns the carrier was fitted on and the reconstruction `F * M' .+ b'` it holds. A wrapping prior that replaces `X` moves this series, and the difference lands in the unattributed remainder, which is the anchor ADR 0113 states.
+The read takes the carrier beside the block, because a block that stores no series recovers it from the result it travels on. A [`CrossSectionalFactorModel`](@ref) keeps its own residuals and ignores the carrier. A [`Regression`](@ref) keeps none, so the series is `original_returns(pr) - pr.X`: the difference between the returns the carrier was fitted on and the reconstruction `F * M' .+ b'` it holds. A wrapping prior that replaces `X` moves this series, and the difference lands in the unattributed remainder.
 
 # Arguments
 
@@ -1041,7 +1041,7 @@ Decompose a portfolio's volatility and mean return over the factors of a factor 
 
 The verb reads the weights and the factor model block, and returns one [`FactorAttributionResult`](@ref). The **predicted** methods take no return series and decompose the moments the optimiser saw. The **realised** methods take one, and decompose the history the portfolio actually produced. Each realised method has a **rolling** twin that takes a positional `window` and returns one Result per window.
 
-**The predicted totals anchor on the prior result, not on the model.** `pr.mu` and `pr.sigma` are what the optimiser saw and what [`expected_return`](@ref) and [`expected_risk`](@ref) report, so they are the totals. A wrapping prior replaces them while it forwards the block unchanged, so the model no longer reproduces them, and the two gaps `dot(w, pr.mu - M * fpr.mu - b)` and `dot(w, (pr.sigma - M * F * M' - D) * w) / sigma_P` land in the unattributed remainder. The remainder is therefore present on the predicted side too, and it is at rounding level on a plain fit. ADR 0113 records the rule and the four alternatives it refused.
+**The predicted totals anchor on the prior result, not on the model.** `pr.mu` and `pr.sigma` are what the optimiser saw and what [`expected_return`](@ref) and [`expected_risk`](@ref) report, so they are the totals. A wrapping prior replaces them while it forwards the block unchanged, so the model no longer reproduces them, and the two gaps `dot(w, pr.mu - M * fpr.mu - b)` and `dot(w, (pr.sigma - M * F * M' - D) * w) / sigma_P` land in the unattributed remainder. The remainder is therefore present on the predicted side too, and it is at rounding level on a plain fit.
 
 **Every source of unexplained return lands in the remainder, and no guard reports it.** On the realised side the identity per observation is `portfolio return = systematic + idiosyncratic + unattributed`, and the remainder holds the per-observation intercept share `b_t * sum(w)`, the fees, the cash, the weight drift inside a period and the exposure lag. A large `pct_var` on the remainder means the model does not explain the portfolio, and the reader draws that conclusion.
 
@@ -1062,7 +1062,7 @@ The verb reads the weights and the factor model block, and returns one [`FactorA
   - `w`: Portfolio weights.
   - `W`: Portfolio weight history, `observations × assets`.
   - `pr`: Prior result carrying the factor model block.
-  - `res`: Optimisation result whose weights, prior and fees the verb reads through [`result_investable_view`](@ref). The result's own prior is on the universe the fit solved, ADR 0115's rule, and its weights are on the caller's, so the two meet on the result's investable universe, a caller's `pr` or `rd` is viewed at the same mask, and the attribution's asset axis spans the investable assets alone.
+  - `res`: Optimisation result whose weights, prior and fees the verb reads through [`result_investable_view`](@ref). The result's own prior is on the universe the fit solved, and its weights are on the caller's, so the two meet on the result's investable universe, a caller's `pr` or `rd` is viewed at the same mask, and the attribution's asset axis spans the investable assets alone.
   - `X`: Asset returns, `observations × assets`.
   - `rd`: Returns result carrying the asset returns.
   - `ret`: Net portfolio return series.

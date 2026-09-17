@@ -4,7 +4,7 @@
 
 The fit of one fold, by whether the fold carries a training window.
 
-The two arms of [`fit_and_predict`](@ref)'s estimator form, chosen by dispatch on `train_idx`. A window fits the estimator over it, `optimise(opt, port_opt_view(rd, train_idx, cols))`, which is the refit every fold of the batch arms runs. `nothing` says *the estimator holds its window* — the online arm of [`fold_loop`](@ref) has already folded every row of it — so the fold reads the estimator out through `optimise(opt)` with no returns, and the read-out rebuilds the carrier from the state and runs the ordinary batch path over it (ADR 0137). The asset view, when `cols` is not `:`, is taken by the caller before either arm, so a stepped estimator is sliced by asset as a cold one is.
+The two arms of [`fit_and_predict`](@ref)'s estimator form, chosen by dispatch on `train_idx`. A window fits the estimator over it, `optimise(opt, port_opt_view(rd, train_idx, cols))`, which is the refit every fold of the batch arms runs. `nothing` says *the estimator holds its window* — the online arm of [`fold_loop`](@ref) has already folded every row of it — so the fold reads the estimator out through `optimise(opt)` with no returns, and the read-out rebuilds the carrier from the state and runs the ordinary batch path over it. The asset view, when `cols` is not `:`, is taken by the caller before either arm, so a stepped estimator is sliced by asset as a cold one is.
 
 # Arguments
 
@@ -129,7 +129,7 @@ This is the third arm of [`fold_loop`](@ref), taken when the scheme declares a F
     are refused by name before any solve.
  2. It warms up once. Under a multiple-randomised path it takes the path's asset view
     through `fold_view(1)` here, because a path is one asset subset crossed with the
-    walk-forward's folds, and the sliced estimator is what it threads (ADR 0107: a view
+    walk-forward's folds, and the sliced estimator is what it threads (a view
     slices a state by asset). It then resolves every [`Online`](@ref) wrapper through
     [`update_online_estimator`](@ref), and folds the first training window `train_idx[1]`
     into the estimator with [`partial_fit!`](@ref).
@@ -175,7 +175,7 @@ resolve, the carrier, and the training window, which is `nothing` here. `ElT` is
 # Returns
 
   - `predictions::Vector{ElT}`: One prediction per fold, in split order.
-  - `est`: The threaded estimator, folded through `last(train_idx[n])`, for the Result to carry (ADR 0144).
+  - `est`: The threaded estimator, folded through `last(train_idx[n])`, for the Result to carry.
 
 # Related
 

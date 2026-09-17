@@ -30,7 +30,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fills the price gaps inside an asset's listing with a stated convention, and touches nothing outside it.
 
-`PriceGapFill` is the ingestion layer's one fill, and it is off unless a caller adds it. A fill exists to **state a price convention** across a suspension or a holiday, not to remove a gap: a gap is carried through the conversion, so nothing downstream needs it gone. The fill is bounded by the **Listing Span**, so it touches **Held Gaps** alone and can never fabricate a price where an asset was not yet listed or has been delisted. ADR 0130 owns both rules.
+`PriceGapFill` is the ingestion layer's one fill, and it is off unless a caller adds it. A fill exists to **state a price convention** across a suspension or a holiday, not to remove a gap: a gap is carried through the conversion, so nothing downstream needs it gone. The fill is bounded by the **Listing Span**, so it touches **Held Gaps** alone and can never fabricate a price where an asset was not yet listed or has been delisted.
 
 It runs at the price level, before [`PricesToReturns`](@ref), because a carried price is a statement about a price and cannot be expressed after the conversion: across a gapped run `p₀, _, _, p₃` the unfilled returns are all non-finite, and zeroing them discards the `p₀ → p₃` move entirely. Carried forward at the price level the same run gives `0, 0, p₃/p₀ - 1`. A filled cell is therefore finite in the returns and its estimation mask entry is `true`, which is the design rather than an oversight: a caller who filled has said the asset traded.
 
@@ -163,7 +163,7 @@ end
 
 Read the Listing Span a price carrier states, or `nothing` when it states none.
 
-ADR 0129 rides the span on the price carrier, so a step that needs one asks the carrier rather than deriving its own. A [`PricesResult`](@ref) answers with its `span` field, which [`price_ingestion`](@ref) fills and a carrier assembled by hand leaves `nothing`; every other member of the family answers `nothing`, because a carrier that carries no span states no listing calendar and the step that asked must fall back and say so.
+The Listing Span rides on the price carrier, so a step that needs one asks the carrier rather than deriving its own. A [`PricesResult`](@ref) answers with its `span` field, which [`price_ingestion`](@ref) fills and a carrier assembled by hand leaves `nothing`; every other member of the family answers `nothing`, because a carrier that carries no span states no listing calendar and the step that asked must fall back and say so.
 
 # Algorithm
 

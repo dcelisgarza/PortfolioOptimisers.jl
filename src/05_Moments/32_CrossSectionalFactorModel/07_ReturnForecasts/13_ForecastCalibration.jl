@@ -256,7 +256,7 @@ This is the third reading of a forecast, and the only one that asks anything of 
 
 The three are different objects, and only this one is out of sample.
 
-  - An [`AbstractCalibrationAlgorithm`](@ref) computes the radius of an uncertainty set, or another number a slot would otherwise state, from the Prior. ADR 0095 owns it, and it has nothing to do with a forecast.
+  - An [`AbstractCalibrationAlgorithm`](@ref) computes the radius of an uncertainty set, or another number a slot would otherwise state, from the Prior, and it has nothing to do with a forecast.
   - [`idio_calibration`](@ref) states whether a fitted factor model predicted the size of its own idiosyncratic returns, in sample, by the standard deviation of the standardised residuals.
   - `TargetReturnForecast`'s `calib` field is a member's **own** calibration coefficient, one exponentially weighted scalar regression fitted at fit time to put its transformed predictions back into return units. That one acts on the forecast; this verb measures, out of sample, whether the result landed in the right units. A member whose `calib` did its work reports a slope near `1` here, and a member that never calibrated reports whatever scale its predictions happen to carry.
 

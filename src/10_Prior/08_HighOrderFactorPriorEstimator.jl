@@ -43,7 +43,7 @@ Column ``(i - 1)N + i`` is the one that holds ``\\varepsilon_i \\varepsilon_i`` 
 
 ## The incremental fit
 
-This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit. ADR 0136 records the decision.
+This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit.
 
 `cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
 
@@ -364,7 +364,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`HighOrderFactorPriorEstimator`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:HighOrderFactorPriorEstimator, true)` to render it. ADR 0105 records the decision.
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:HighOrderFactorPriorEstimator, true)` to render it.
 
 # Arguments
 
@@ -397,7 +397,7 @@ Compute high order factor prior moments for asset returns using a factor model.
 
 !!! note
 
-    A Black-Litterman prior underneath this estimator now **returns numbers where it used to throw**. Every wrapping estimator forwards `rr` and the factor block under ADR 0046, so `HighOrderFactorPriorEstimator(; pe = BlackLittermanPrior(; pe = FactorPrior(…)))` reaches a regression instead of an `IsNothingError`.
+    A Black-Litterman prior underneath this estimator now **returns numbers where it used to throw**. Every wrapping estimator forwards `rr` and the factor block, so `HighOrderFactorPriorEstimator(; pe = BlackLittermanPrior(; pe = FactorPrior(…)))` reaches a regression instead of an `IsNothingError`.
 
     What comes back is worth understanding. The higher co-moments project through `rr.M` while `mu` and `sigma` carry the views — Black-Litterman makes no claim about third and fourth moments, so the factor projection is the only estimate available.
 

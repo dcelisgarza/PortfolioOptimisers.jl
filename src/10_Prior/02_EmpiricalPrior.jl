@@ -30,7 +30,7 @@ Keywords correspond to the struct's fields.
 
 ## The incremental fit
 
-The empirical prior **folds and carries**. [`partial_fit!`](@ref) forwards each observation to `me` and to `ce`, both of which fold exactly, and appends the row to a [`PriorCarryState`](@ref) of its own; the one-argument [`prior`](@ref) reads `mu` and `sigma` off the two folded arms and `X` off the carried rows. The step is therefore quadratic in the number of assets and independent of the number of observations folded, and the buffer is memory rather than arithmetic: it exists because [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, not because anything needs refitting. ADR 0136 records the decision.
+The empirical prior **folds and carries**. [`partial_fit!`](@ref) forwards each observation to `me` and to `ce`, both of which fold exactly, and appends the row to a [`PriorCarryState`](@ref) of its own; the one-argument [`prior`](@ref) reads `mu` and `sigma` off the two folded arms and `X` off the carried rows. The step is therefore quadratic in the number of assets and independent of the number of observations folded, and the buffer is memory rather than arithmetic: it exists because [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, not because anything needs refitting.
 
 ## Two caps, two names
 
@@ -171,7 +171,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of an [`EmpiricalPrior`](@ref) except `cache`, and `max_scenarios` only where it is set.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. `max_scenarios` is a cap most callers never set, and a `nothing` row for it would move every rendering of every host that carries a prior; it appears exactly where a caller chose one. Set `set_show_nothing_fields!(:EmpiricalPrior, true)` to render both. ADR 0105 records the decision.
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. `max_scenarios` is a cap most callers never set, and a `nothing` row for it would move every rendering of every host that carries a prior; it appears exactly where a caller chose one. Set `set_show_nothing_fields!(:EmpiricalPrior, true)` to render both.
 
 # Arguments
 
@@ -199,7 +199,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 [`EmpiricalPrior`](@ref) method of [`coverage_floor`](@ref), the binding floor of its two arms.
 
-`pe.me` and `pe.ce` may each carry a [`CoveragePolicy`](@ref), and either bounds every investable column on its own, because the Investable Mask is the conjunction of the two admissions and both read the same per-asset observation count. The binding floor is therefore the **maximum** of the floors the arms state, and a mixed configuration needs no rule of its own (ADR 0118).
+`pe.me` and `pe.ce` may each carry a [`CoveragePolicy`](@ref), and either bounds every investable column on its own, because the Investable Mask is the conjunction of the two admissions and both read the same per-asset observation count. The binding floor is therefore the **maximum** of the floors the arms state, and a mixed configuration needs no rule of its own.
 
 # Arguments
 
@@ -309,7 +309,7 @@ This method takes the **arithmetic** moments of `X` directly. It applies no log 
 
 # The scenario cap
 
-`pe.max_scenarios` cuts the returns matrix the result carries down to its last `max_scenarios` rows, through [`scenario_window`](@ref), and leaves `mu` and `sigma` fitted over every observation. The cut is taken **before** the fill, so the share the fill measures is the share of the window a consumer actually reads. A `max_scenarios` of `nothing`, the default, carries every row, and a cap at or above the number of observations is a `view` that copies nothing. When the cap cuts, the result states the number of observations the moments were fitted over in `ens`, through [`scenario_ens`](@ref), so a consumer that prices a sample size reads that count and not the rows carried (ADR 0138); otherwise `ens` stays `nothing`.
+`pe.max_scenarios` cuts the returns matrix the result carries down to its last `max_scenarios` rows, through [`scenario_window`](@ref), and leaves `mu` and `sigma` fitted over every observation. The cut is taken **before** the fill, so the share the fill measures is the share of the window a consumer actually reads. A `max_scenarios` of `nothing`, the default, carries every row, and a cap at or above the number of observations is a `view` that copies nothing. When the cap cuts, the result states the number of observations the moments were fitted over in `ens`, through [`scenario_ens`](@ref), so a consumer that prices a sample size reads that count and not the rows carried; otherwise `ens` stays `nothing`.
 
 # The scenario fill
 
@@ -417,7 +417,7 @@ The order of steps 5 to 7 is **not free**. Step 6 reads the `mu` that step 5 lef
 
 # The scenario cap
 
-`pe.max_scenarios` cuts the returns matrix the result carries down to its last `max_scenarios` rows, through [`scenario_window`](@ref), and leaves `mu` and `sigma` fitted over every observation. The cut is taken **before** the fill, so the share the fill measures is the share of the window a consumer actually reads. A `max_scenarios` of `nothing`, the default, carries every row, and a cap at or above the number of observations is a `view` that copies nothing. When the cap cuts, the result states the number of observations the moments were fitted over in `ens`, through [`scenario_ens`](@ref), so a consumer that prices a sample size reads that count and not the rows carried (ADR 0138); otherwise `ens` stays `nothing`.
+`pe.max_scenarios` cuts the returns matrix the result carries down to its last `max_scenarios` rows, through [`scenario_window`](@ref), and leaves `mu` and `sigma` fitted over every observation. The cut is taken **before** the fill, so the share the fill measures is the share of the window a consumer actually reads. A `max_scenarios` of `nothing`, the default, carries every row, and a cap at or above the number of observations is a `view` that copies nothing. When the cap cuts, the result states the number of observations the moments were fitted over in `ens`, through [`scenario_ens`](@ref), so a consumer that prices a sample size reads that count and not the rows carried; otherwise `ens` stays `nothing`.
 
 # The scenario fill
 

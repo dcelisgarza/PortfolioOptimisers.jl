@@ -186,7 +186,7 @@ The target comes from the [`PipelineStep`](@ref) wrapper:
 
 A narrowed step fills its half of the [`PipelineUncertaintySets`](@ref) pair and leaves the other untouched, so separate `:mu` and `:sigma` steps compose. Every populated half must reach the optimiser: each becomes its own [routing target](@ref PIPELINE_ROUTING_TARGETS) — `:mu_ucs` and `:sigma_ucs` — and neither is [optional](@ref PIPELINE_OPTIONAL_TARGETS), so a set that cannot be routed is rejected rather than dropped and `:both` requires an optimiser with an [`ArithmeticReturn`](@ref) *and* an [`UncertaintySetVariance`](@ref) risk measure.
 
-Which slot the step reads is decided by [`reads_prior_result`](@ref). An estimator with a prior of its own is fitted from the `returns` slot. One that reads a prior result — an [`AbstractPriorUncertaintySetEstimator`](@ref), or a returns-data estimator with `pe = nothing` (ADR 0138) — is fitted from the `prior` slot instead, so a prior step must come earlier; the returns are not read at all, so a pipeline that writes `:prior` from a precomputed result needs no `:returns` slot for such a step.
+Which slot the step reads is decided by [`reads_prior_result`](@ref). An estimator with a prior of its own is fitted from the `returns` slot. One that reads a prior result — an [`AbstractPriorUncertaintySetEstimator`](@ref), or a returns-data estimator with `pe = nothing` — is fitted from the `prior` slot instead, so a prior step must come earlier; the returns are not read at all, so a pipeline that writes `:prior` from a precomputed result needs no `:returns` slot for such a step.
 
 # Arguments
 

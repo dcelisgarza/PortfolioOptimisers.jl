@@ -27,7 +27,7 @@ Keywords correspond to the struct's fields.
 
 ## Composition: what this estimator forwards
 
-The views are applied to the **assets**. Under ADR 0046 the wrapped prior is forwarded whole and only the deviations are spelled out: `mu` and `sigma` become the posterior, and `chol` is **dropped** because the posterior covariance supersedes the one it factorises. Everything else forwards — Black-Litterman leaves the observation axis untouched, so `w`, `ens`, `kld`, `ow` and `Z` all still describe the axis they were computed over, and `rr` and the factor block `fpr` are structural, over data the views do not modify.
+The views are applied to the **assets**. The wrapped prior is forwarded whole and only the deviations are spelled out: `mu` and `sigma` become the posterior, and `chol` is **dropped** because the posterior covariance supersedes the one it factorises. Everything else forwards — Black-Litterman leaves the observation axis untouched, so `w`, `ens`, `kld`, `ow` and `Z` all still describe the axis they were computed over, and `rr` and the factor block `fpr` are structural, over data the views do not modify.
 
 !!! warning
 
@@ -355,7 +355,7 @@ This is the family's call of [`announce_non_investable`](@ref), written once so 
 
 The sentence is one sentence for all four members, and it is exactly true of each. Two of them write their views on the **factor** axis, where no asset name ever appears, so the view clause simply does not bite for them; what does bite for every member is the first clause, because all four estimate their posterior over the assets that remain.
 
-`viewless` says the fit ended with no view at all, and it is reported two ways because it happens two ways. When the **ledger** is non-empty a departure took the last surviving view, which is the case ADR 0125 singles out: the message is raised to a warning and says so in the departure's own words. When the ledger is empty nobody departed, so [`announce_non_investable`](@ref) is silent — it has no name to report — and the view-free fit gets a warning of its own instead. That is the sub-universe case: a cluster of a nested optimisation or a subset of a resampling holds none of the names the caller wrote, every row is dropped whole, and the caller is handed an unconditioned answer with nothing else to tell them. Every drop that only *trims* the view set stays `@info`.
+`viewless` says the fit ended with no view at all, and it is reported two ways because it happens two ways. When the **ledger** is non-empty a departure took the last surviving view: the message is raised to a warning and says so in the departure's own words. When the ledger is empty nobody departed, so [`announce_non_investable`](@ref) is silent — it has no name to report — and the view-free fit gets a warning of its own instead. That is the sub-universe case: a cluster of a nested optimisation or a subset of a resampling holds none of the names the caller wrote, every row is dropped whole, and the caller is handed an unconditioned answer with nothing else to tell them. Every drop that only *trims* the view set stays `@info`.
 
 # Arguments
 
@@ -403,7 +403,7 @@ end
 
 Run the master equations, or hand back the prior pair when nothing is left to run them with.
 
-[`bl_preroll`](@ref) answers `nothing` whenever no view row survived — a departure took the last one, the universe this fit was handed holds none of the names, or the caller mistyped. ADR 0125 says the fit proceeds rather than refusing, and a Black-Litterman posterior with no view **is** the distribution it was going to update — so that is what this returns.
+[`bl_preroll`](@ref) answers `nothing` whenever no view row survived — a departure took the last one, the universe this fit was handed holds none of the names, or the caller mistyped. The fit proceeds rather than refusing, and a Black-Litterman posterior with no view **is** the distribution it was going to update — so that is what this returns.
 
 It is the prior pair itself and not the empty-view algebra, and the difference is not rounding. [`vanilla_posteriors`](@ref) adds the estimation-error term ``[(\\tau\\mathbf{\\Sigma})^{-1}]^{-1} = \\tau\\mathbf{\\Sigma}`` to the covariance, so an empty ``\\mathbf{P}`` would answer ``(1 + \\tau)\\mathbf{\\Sigma}`` — a *wider* covariance than the prior, produced by views that are not there. Forwarding the prior pair is what makes the missing view cost the caller the view and nothing else.
 

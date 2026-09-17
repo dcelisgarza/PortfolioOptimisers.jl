@@ -657,7 +657,7 @@ end
 
 Fold a block of observations into the estimator's own online covariance state.
 
-The estimator carries the state in its `cache` field, so a second call continues the recursion rather than restarting it. This is the exception ADR 0106 states: a partial-fit state is the one Result an estimator may hold.
+The estimator carries the state in its `cache` field, so a second call continues the recursion rather than restarting it. A partial-fit state is the one Result an estimator may hold, and this is that exception.
 
 # Arguments
 

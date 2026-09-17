@@ -298,7 +298,7 @@ end
 
 Reduce a prior result, the weights scored against it and the fees charged on them to the Investable Mask.
 
-This is ADR 0115's rule at the **value-level** door. An optimiser reduces once at its entry, so no optimiser meets a gap. A caller who scores a weight vector against a prior result by hand does meet one: a non-investable asset carries `NaN` in `mu`, on the diagonal of `sigma` and down its column of `pr.X`, so `dot(w, pr.sigma, w)` and `pr.X * w` are `NaN` at **any** weight, the optimiser's own zero included. [`expected_risk`](@ref), [`expected_return`](@ref), [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) reduce here instead, and a per-asset answer expands back through [`expand_investable_weights`](@ref).
+An optimiser reduces once at its entry, so no optimiser meets a gap. A caller who scores a weight vector against a prior result by hand does meet one: a non-investable asset carries `NaN` in `mu`, on the diagonal of `sigma` and down its column of `pr.X`, so `dot(w, pr.sigma, w)` and `pr.X * w` are `NaN` at **any** weight, the optimiser's own zero included. [`expected_risk`](@ref), [`expected_return`](@ref), [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) reduce here instead, and a per-asset answer expands back through [`expand_investable_weights`](@ref).
 
 Every block of the prior is reduced together by the [`port_opt_view`](@ref) method the prior's owner already writes, so a new block cannot be forgotten, and the reduced `pr.X` carries no dead column. The fees travel with the weights, because a [`Fees`](@ref) whose rates are one number per asset is indexed by the same axis and would otherwise meet a shorter weight vector.
 

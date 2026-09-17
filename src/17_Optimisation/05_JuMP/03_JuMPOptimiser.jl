@@ -22,7 +22,7 @@ Flat bundle of all processed constraint and prior results consumed by
 
 Produced once per `optimise` call by [`processed_jump_optimiser_attributes`](@ref) and
 passed directly to the model-assembly pipeline, so every builder reads already-resolved
-results rather than re-processing estimators. See ADR 0008 (`0008-jump-model-assembly.md`).
+results rather than re-processing estimators.
 
 # Fields
 
@@ -1528,8 +1528,7 @@ One step of [`assemble_jump_model!`](@ref), dispatched on `r`: when `r` is `noth
 
 This is the one place the fee argument is positional. Every head reaches
 [`set_risk_constraints!`](@ref) through it, so a head cannot mis-order the list and lose the
-fees: unconstrained [`NearOptimalCentering`](@ref) did exactly that while it inlined the step
-(ADR 0008, amendment 2 §3).
+fees: unconstrained [`NearOptimalCentering`](@ref) did exactly that while it inlined the step.
 
 # Arguments
 
@@ -1694,7 +1693,7 @@ Route a mean uncertainty set into a [`JuMPOptimiser`](@ref)'s return estimator.
 
 One of the two [Routing Targets](@ref PIPELINE_ROUTING_TARGETS) that names no plain field: the set lands in `ret.ucs`, and only an [`ArithmeticReturn`](@ref) can bound expected returns, so any other return estimator is an error rather than a silent drop.
 
-A **vector** of return terms is refused for the same reason, from the other side: one set is a neighbourhood of one quantity (ADR 0050), so broadcasting it across *k* terms would apply a ball fitted on one fit to every other one — the very defect [#277](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/277) removed. Name the set on the term it belongs to instead.
+A **vector** of return terms is refused for the same reason, from the other side: one set is a neighbourhood of one quantity, so broadcasting it across *k* terms would apply a ball fitted on one fit to every other one — the very defect [#277](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/277) removed. Name the set on the term it belongs to instead.
 
 Internal machinery — not part of the user-facing API.
 

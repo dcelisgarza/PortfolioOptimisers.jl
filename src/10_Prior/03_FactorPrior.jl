@@ -39,7 +39,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
 ## Composition: what this estimator forwards
 
-This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its carrier directly rather than forwarding one along its own axis; the rule of ADR 0046 still governs each field. It is the plain projection of the family — nothing here modifies the factor distribution, so [`FactorBlackLittermanPrior`](@ref) is this estimator with views landing on the factor block on the way through.
+This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its carrier directly rather than forwarding one along its own axis; the forwarding rule still governs each field. It is the plain projection of the family — nothing here modifies the factor distribution, so [`FactorBlackLittermanPrior`](@ref) is this estimator with views landing on the factor block on the way through.
 
   - The factor block `fpr` **is** the wrapped factor prior, forwarded whole and untouched: it needs no reconstruction, because the asset moments are its projection rather than an update of it.
   - `mu` and `sigma` are that block projected through the loadings, so the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction. `sigma` optionally gains a residual correction when `rsd` is `true`.
@@ -97,7 +97,7 @@ FactorPrior
 
 ## The incremental fit
 
-This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit. ADR 0136 records the decision.
+This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit.
 
 `cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
 
@@ -166,7 +166,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`FactorPrior`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:FactorPrior, true)` to render it. ADR 0105 records the decision.
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:FactorPrior, true)` to render it.
 
 # Arguments
 

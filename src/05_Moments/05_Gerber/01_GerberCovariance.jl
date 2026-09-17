@@ -348,7 +348,7 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:N])
 
-The two bands never overlap, so no observation is marked in both matrices and their sum is the crossing indicator. The sign test is what keeps them apart at a zero band edge. `ce.t = 0` produces one, and so does a zero entry of `sd`, which the `Statistics.cor` method rules out by raising `sd` to at least `eps`. Without the sign test the two closed comparisons both hold on an exactly zero return, and the sum is two rather than one. ADR 0090 records the decision.
+The two bands never overlap, so no observation is marked in both matrices and their sum is the crossing indicator. The sign test is what keeps them apart at a zero band edge. `ce.t = 0` produces one, and so does a zero entry of `sd`, which the `Statistics.cor` method rules out by raising `sd` to at least `eps`. Without the sign test the two closed comparisons both hold on an exactly zero return, and the sum is two rather than one.
 
 For a positive band edge the sign test is redundant, because ``x_{t,\\,i} \\geq t \\, \\sigma_i > 0`` already implies ``x_{t,\\,i} > 0``. A zero band edge therefore makes the pair of matrices the sign of the return, and the Gerber statistic the sign concordance.
 

@@ -105,7 +105,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`GeneralCovariance`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:GeneralCovariance, true)` to render it. ADR 0105 records the decision.
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:GeneralCovariance, true)` to render it.
 
 # Arguments
 
@@ -247,7 +247,7 @@ Estimates the covariance matrix of asset returns from a centring estimator, a co
 
 `Covariance` encapsulates all components required for estimating the covariance matrix of asset returns, including the expected returns estimator for centering the data, the covariance estimator, and the moment algorithm.
 
-`w` weights the whole estimate, so it reaches the centre as well as the deviations. The four methods send `me` and `ce` through [`factory`](@ref), which replaces the weights of each with `w`, so `w` wins over the weights that `me` and `ce` carry. Pass `mean` for a centre that `w` does not describe. ADR 0088 records the decision.
+`w` weights the whole estimate, so it reaches the centre as well as the deviations. The four methods send `me` and `ce` through [`factory`](@ref), which replaces the weights of each with `w`, so `w` wins over the weights that `me` and `ce` carry. Pass `mean` for a centre that `w` does not describe.
 
 `ce` admits any `StatsBase.CovarianceEstimator`, and no verb of this library reads the weights of one that the library does not own. A `ce` from a package such as [`CovarianceEstimation.jl`](https://github.com/mateuszbaran/CovarianceEstimation.jl) therefore keeps its own configuration, and `w` is the field that weights a `Covariance`.
 
@@ -385,7 +385,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`Covariance`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:Covariance, true)` to render it. ADR 0105 records the decision.
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:Covariance, true)` to render it.
 
 # Arguments
 
@@ -410,7 +410,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the centring vector and the inner covariance estimator that a [`Covariance`](@ref) method computes with.
 
-The four methods of `Statistics.cov` and `Statistics.cor` that take a [`Covariance`](@ref) reach one centre and one inner estimator by this verb, so `ce.w` reaches the centre and the deviations by one rule. ADR 0088 records the decision.
+The four methods of `Statistics.cov` and `Statistics.cor` that take a [`Covariance`](@ref) reach one centre and one inner estimator by this verb, so `ce.w` reaches the centre and the deviations by one rule.
 
 # Algorithm
 

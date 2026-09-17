@@ -68,7 +68,7 @@ A **Calibration Rule** is refused on the same terms, by [`assert_calibrated_slot
 
 A prior result lives on the **full** asset universe, and an asset it could not estimate carries `NaN` in `mu`, on the diagonal of `sigma` and down its column of `pr.X`. So `dot(w, pr.sigma, w)` and `pr.X * w` are `NaN` at **any** weight, the optimiser's own zero included, and an optimisation result on a gapped panel could not be scored by hand at all.
 
-The prior-taking methods therefore reduce the prior, the weights and the fees once at their entry, through [`investable_reduction`](@ref). This is the rule ADR 0115 states for an optimiser, taken at the value-level door. A held non-investable asset warns and its weight is dropped; `strict = true` refuses instead. A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask exists and they pass through unchanged.
+The prior-taking methods therefore reduce the prior, the weights and the fees once at their entry, through [`investable_reduction`](@ref) — the rule for an optimiser, taken at the value-level door. A held non-investable asset warns and its weight is dropped; `strict = true` refuses instead. A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask exists and they pass through unchanged.
 
 # Keyword Arguments
 
@@ -473,8 +473,8 @@ end
 """
     expected_risk_from_returns(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...) -> Number
 
-Contract entry for evaluating a risk measure on an already-reduced net-return series `X`
-(ADR 0007). Consults [`supports_precomputed_returns`](@ref): for an eligible measure it
+Contract entry for evaluating a risk measure on an already-reduced net-return series `X`.
+Consults [`supports_precomputed_returns`](@ref): for an eligible measure it
 returns `r(X)`; for an ineligible one it throws an explanatory `ArgumentError` instead of
 silently consuming `X` as weights (a [`WeightsInput`](@ref) measure) or hitting an opaque
 `MethodError` (a moment measure with a per-asset `mu`).

@@ -818,7 +818,7 @@ The marker selects one of three branches.
  2. [`GerberComovementOne`](@ref): return `(p - n) / (p + n + nn)`, or `zero(T)` when `p + n + nn` is zero. This is the only branch that reads `nn`.
  3. [`GerberComovementTwo`](@ref): return `p - n`, and apply no denominator. [`standardise_comovement!`](@ref) normalises the assembled matrix afterwards.
 
-A zero denominator means that the pair qualified no observation, and the guarded zero is the right answer for an **off-diagonal** entry. It is the wrong answer on the **diagonal**, where a correlation is one by definition. This function cannot separate the two cases, because it does not know whether the pair is `(i, i)`. [`comovement_unit_diagonal!`](@ref) writes the diagonal after the matrix is assembled, and ADR 0093 records the decision.
+A zero denominator means that the pair qualified no observation, and the guarded zero is the right answer for an **off-diagonal** entry. It is the wrong answer on the **diagonal**, where a correlation is one by definition. This function cannot separate the two cases, because it does not know whether the pair is `(i, i)`. [`comovement_unit_diagonal!`](@ref) writes the diagonal after the matrix is assembled.
 
 # Arguments
 
@@ -861,7 +861,7 @@ Normalise a net co-movement matrix in place by the geometric mean of its own dia
 
 Only the [`GerberComovementTwo`](@ref) markers reach the acting method; the fall-through method is a no-op, so every caller may call this unconditionally. **It writes into `rho` and into nothing else**, so the marker it is handed and the estimator that owns the marker are unchanged afterwards.
 
-**The Gerber IQ family does not call this function.** Its thresholds move with the pair whenever `sc` is not pair-separable, so an asset's magnitude class off the diagonal is not the class the assembled diagonal records, and the ratio leaves `[-1, 1]`. [`gerber_IQ`](@ref) divides by the pair's own two diagonal projections instead, which [`iq_add_diagonal`](@ref) accumulates. The other three families threshold each asset in its own units, so the assembled diagonal is the same number and this function stands. ADR 0094 records the split.
+**The Gerber IQ family does not call this function.** Its thresholds move with the pair whenever `sc` is not pair-separable, so an asset's magnitude class off the diagonal is not the class the assembled diagonal records, and the ratio leaves `[-1, 1]`. [`gerber_IQ`](@ref) divides by the pair's own two diagonal projections instead, which [`iq_add_diagonal`](@ref) accumulates. The other three families threshold each asset in its own units, so the assembled diagonal is the same number and this function stands.
 
 # Algorithm
 
@@ -899,7 +899,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Write one onto a zero diagonal entry of an assembled co-movement matrix, in place.
 
-The correlation of an asset with itself is one by definition, whatever the sample holds. Every reduction of [`comovement_ratio`](@ref) already returns one there when the asset crosses its threshold at least once, so only the degenerate case is left. An asset that crosses no threshold gives a zero denominator for every pair it belongs to, takes the guarded `zero(T)` over its whole row, and takes it on its diagonal entry too. **It writes into `rho` and into nothing else**, so every other entry is unchanged afterwards. ADR 0093 records the decision.
+The correlation of an asset with itself is one by definition, whatever the sample holds. Every reduction of [`comovement_ratio`](@ref) already returns one there when the asset crosses its threshold at least once, so only the degenerate case is left. An asset that crosses no threshold gives a zero denominator for every pair it belongs to, takes the guarded `zero(T)` over its whole row, and takes it on its diagonal entry too. **It writes into `rho` and into nothing else**, so every other entry is unchanged afterwards.
 
 **The write is guarded by `iszero`, and does not restate a diagonal that is already one.** A `2` marker divides the diagonal by its own square root twice, so its diagonal entry is one to within a unit in the last place rather than exactly one. [`posdef!`](@ref) reads its diagonal with an exact `isone` test to decide whether it holds a correlation matrix or a covariance matrix, and the two branches answer differently. Writing an exact one over an entry that already reads as one moves that branch, and with it the answer of a sample that carries no degenerate asset. The guard keeps this function to the defect it fixes.
 
@@ -1252,11 +1252,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Decide whether one asset left the indecision zone at one observation.
 
-An asset leaves the indecision zone when the magnitude of its centred, standardised return reaches `c2` **and** that return is not exactly zero. The sign test is redundant for a positive threshold, because `ar >= c > 0` already implies that `r` is not zero. It binds only at `c2 = 0`, where the closed comparison `ar >= 0` holds for every return, including one that is exactly zero. ADR 0090 settled that a return of exactly zero never crosses, and this is that rule for the Smyth-Broby family.
+An asset leaves the indecision zone when the magnitude of its centred, standardised return reaches `c2` **and** that return is not exactly zero. The sign test is redundant for a positive threshold, because `ar >= c > 0` already implies that `r` is not zero. It binds only at `c2 = 0`, where the closed comparison `ar >= 0` holds for every return, including one that is exactly zero. A return of exactly zero never crosses, and this is that rule for the Smyth-Broby family.
 
 The rule is what keeps the diagonal of the statistic at one. The pair `(i, i)` either crosses on both axes or on neither, so it never reaches the neutral accumulator that a [`GerberComovementOne`](@ref) marker divides by. Without the sign test a zero return crossed on both axes but carried no sign, so it fell through to that accumulator and pulled the diagonal below one.
 
-**The rule binds on this gate and not on the confusion zone.** The two gates read different quantities. Here the quantity is centred, so an exactly zero return is an asset that did not move away from its own mean, and it has no sign to classify. The confusion zone reads the **raw, uncentred** return, whose zero is an arbitrary point of the scale of the data: an asset whose raw return is zero moved by ``-\\mu`` against its mean, which is a deviation with a sign. That gate also only rejects and never classifies, so it produces no wrong count of its own. ADR 0090 records the asymmetry.
+**The rule binds on this gate and not on the confusion zone.** The two gates read different quantities. Here the quantity is centred, so an exactly zero return is an asset that did not move away from its own mean, and it has no sign to classify. The confusion zone reads the **raw, uncentred** return, whose zero is an arbitrary point of the scale of the data: an asset whose raw return is zero moved by ``-\\mu`` against its mean, which is a deviation with a sign. That gate also only rejects and never classifies, so it produces no wrong count of its own.
 
 # Arguments
 
@@ -1282,7 +1282,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Fold one observation of a pair into the co-movement accumulator.
 
-**The confusion zone reads the raw, uncentred return and the indecision zone reads the centred, standardised one.** That mix is the source's, not an oversight, and centring the confusion zone as well moves the statistic. The mix also decides which gate carries the rule of ADR 0090: [`sb_crossed`](@ref) keeps a return of exactly zero inside the indecision zone, and the confusion zone takes no such test, because the zero of a raw return is an arbitrary point of the scale of the data. The Gerber IQ method thresholds absolute returns against the pair's scaled thresholds with [`iq_crossed`](@ref), and weights observations by the IQ template and temporal decay via [`gerber_IQ_delta`](@ref).
+**The confusion zone reads the raw, uncentred return and the indecision zone reads the centred, standardised one.** That mix is the source's, not an oversight, and centring the confusion zone as well moves the statistic. The mix also decides which gate carries the rule that a return of exactly zero never crosses: [`sb_crossed`](@ref) keeps a return of exactly zero inside the indecision zone, and the confusion zone takes no such test, because the zero of a raw return is an arbitrary point of the scale of the data. The Gerber IQ method thresholds absolute returns against the pair's scaled thresholds with [`iq_crossed`](@ref), and weights observations by the IQ template and temporal decay via [`gerber_IQ_delta`](@ref).
 
 # Algorithm
 
@@ -1437,7 +1437,7 @@ The **significance zone** compares the **centred, standardised** return ``\\tild
 \\end{align}
 ```
 
-and the zone rejects ``t`` when either asset exceeds ``c_3`` or neither asset crosses. The second test of the crossing binds only at ``c_2 = 0``, because ``|\\tilde{r}| \\geq c_2 > 0`` already excludes a zero return. It is the rule of ADR 0090 for this family, and [`sb_crossed`](@ref) is where the code states it. The gate reads the uncentred return and the zone reads the centred one; this mix is the source's, not an oversight. Centering the gate as well moves the statistic, and the rule of ADR 0090 binds on the centred quantity alone.
+and the zone rejects ``t`` when either asset exceeds ``c_3`` or neither asset crosses. The second test of the crossing binds only at ``c_2 = 0``, because ``|\\tilde{r}| \\geq c_2 > 0`` already excludes a zero return. A return of exactly zero never crosses for this family, and [`sb_crossed`](@ref) is where the code states it. The gate reads the uncentred return and the zone reads the centred one; this mix is the source's, not an oversight. Centering the gate as well moves the statistic, and the rule binds on the centred quantity alone.
 
 An admitted observation is concordant when both assets cross and ``\\tilde{r}_{ti} \\tilde{r}_{tj} > 0``, discordant when both cross and the product is negative, and neutral otherwise, which is the case where exactly one asset crosses. Accumulate the kernel and the count of each class over the admitted observations:
 

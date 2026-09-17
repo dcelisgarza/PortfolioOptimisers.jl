@@ -879,7 +879,7 @@ end
 
 Record, for the door to report, one thing a departure cost.
 
-A departed name is dropped where it is met — a view row here, a group member there — and each of those places is far from the door that derived the mask and knows the departure happened *as an event*. Reporting at the site would say the same thing once per row per window of a walk-forward, which is what ADR 0125 refused. Reporting nothing leaves a caller who wrote three views and got one fitted with no way to learn it. So the site writes what it dropped into a **ledger**, and the door reads the ledger once and says both things together, through [`announce_non_investable`](@ref).
+A departed name is dropped where it is met — a view row here, a group member there — and each of those places is far from the door that derived the mask and knows the departure happened *as an event*. Reporting at the site would say the same thing once per row per window of a walk-forward, and that repetition is refused. Reporting nothing leaves a caller who wrote three views and got one fitted with no way to learn it. So the site writes what it dropped into a **ledger**, and the door reads the ledger once and says both things together, through [`announce_non_investable`](@ref).
 
 A `nothing` ledger is the no-collection path, and it is the default everywhere: a caller who assembles constraints outside a door has no door to report to, and pays nothing for the ledger it does not keep. The branch is dispatch rather than a condition, as it is throughout the reduction machinery.
 
@@ -1137,7 +1137,7 @@ end
 
 Strike from a group's member list the names that sit on the counterpart axis, and tell the door's ledger what went.
 
-A group is a **description the data resolves**, not a term the caller chose: `"tech"` means the technology assets of this problem, and when one of them delists the description still names the rest. [`replace_group_by_assets`](@ref) therefore sheds the departed members *before* it spreads the group's coefficient, so a Black–Litterman mean divides by the surviving count and an entropy pooling sum runs over the survivors — the row still computes what its right-hand side asserts. Striking a member afterwards would leave `k - 1` legs of `c/k` against an unchanged target. ADR 0125 states the rule and the reason it differs from a written-out name, which takes its row with it.
+A group is a **description the data resolves**, not a term the caller chose: `"tech"` means the technology assets of this problem, and when one of them delists the description still names the rest. [`replace_group_by_assets`](@ref) therefore sheds the departed members *before* it spreads the group's coefficient, so a Black–Litterman mean divides by the surviving count and an entropy pooling sum runs over the survivors — the row still computes what its right-hand side asserts. Striking a member afterwards would leave `k - 1` legs of `c/k` against an unchanged target. That is why a group differs from a written-out name, which takes its row with it.
 
 A group that loses **every** member keeps the first of them rather than answering empty, because a group that describes nobody *is* a row naming a departed asset, and saying so is what makes it drop by the counterpart rule one door later — whole, and in silence. Answering empty would leave a row with no variable in it, which is what a caller writing `1 == 0.004` produces, and that one still has to be diagnosed.
 
@@ -2410,7 +2410,7 @@ Contribution of one matched variable to a constraint row.
 
 Without a re-basis the contribution is the indicator `Ai` scaled by the coefficient `c`. With one it is the columns of the loadings that `Ai` selects, summed and scaled. The columns are **summed** rather than indexed by `findfirst`, so a factor universe carrying a duplicated name contributes every column bearing it, matching how the asset path treats a duplicated asset name.
 
-`rr.M` is used, never `rr.L`: `M`'s columns are the named original factors, and a constraint must be *written* in names a user can put in an equation. Risk decomposition wants `L` and is right to; see ADR 0047.
+`rr.M` is used, never `rr.L`: `M`'s columns are the named original factors, and a constraint must be *written* in names a user can put in an equation. Risk decomposition wants `L` and is right to.
 
 # Mathematical definition
 
@@ -2470,7 +2470,7 @@ Convert parsed linear constraint equations into a `LinearConstraint` object.
 
 A row takes one of two shapes. Without `rr` it runs over the universe the names resolve against. With `rr` it runs over the assets, because the loadings re-base each term as the row is assembled and what leaves the function is an ordinary asset-space row.
 
-**A row is the unit of a drop.** A row is a joint statement over several names with one right-hand side, so a name this function cannot resolve takes the whole row with it rather than only its own term: `a + c == 0.05` assembled without `c` would fit `a == 0.05`, a different and stronger claim than the caller wrote. What the name's failure was decides only whether the drop is *reported*. A name on the **counterpart axis** — read with [`counterpart_axis_names`](@ref), and in practice the Non-Investable Axis a door minted — is dropped in silence under both settings of `strict`, because it was a correct name over the universe the caller was handed and the data moved it; the departure is announced once, by the door. A name on neither axis is a typo, and is reported exactly as before. ADR 0125 states the rule.
+**A row is the unit of a drop.** A row is a joint statement over several names with one right-hand side, so a name this function cannot resolve takes the whole row with it rather than only its own term: `a + c == 0.05` assembled without `c` would fit `a == 0.05`, a different and stronger claim than the caller wrote. What the name's failure was decides only whether the drop is *reported*. A name on the **counterpart axis** — read with [`counterpart_axis_names`](@ref), and in practice the Non-Investable Axis a door minted — is dropped in silence under both settings of `strict`, because it was a correct name over the universe the caller was handed and the data moved it; the departure is announced once, by the door. A name on neither axis is a typo, and is reported exactly as before.
 
 # Algorithm
 

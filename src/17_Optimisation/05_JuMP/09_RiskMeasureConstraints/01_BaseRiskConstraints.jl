@@ -447,7 +447,7 @@ with `settings.scale` and `settings.rke`.
   - `settings::RiskMeasureSettings`: Settings carrying upper bound, scale, and `rke` flag.
   - `name`: Bare Model State entry name seeding the derived bound keys (`<name>_ub`,
     `<name>_ub_var`). The key is resolved here rather than at the call site, so emitters
-    never build a key by hand (ADR 0037).
+    never build a key by hand.
   - `i`: Measure index, for per-measure entry names. The indexed method resolves the same
     key the emitter registered the risk expression under, so the bound keys and the entry
     key cannot drift apart.

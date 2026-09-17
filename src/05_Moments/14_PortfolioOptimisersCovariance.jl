@@ -109,7 +109,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`PortfolioOptimisersCovariance`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:PortfolioOptimisersCovariance, true)` to render it. ADR 0105 records the decision.
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:PortfolioOptimisersCovariance, true)` to render it.
 
 # Arguments
 

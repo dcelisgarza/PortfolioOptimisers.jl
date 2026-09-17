@@ -331,7 +331,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the vector of deviations from the target value for a precomputed returns series for [`Kurtosis`](@ref).
 
-Single-argument form used by the precomputed-returns functor `r(x::VecNum)` (ADR 0007).
+Single-argument form used by the precomputed-returns functor `r(x::VecNum)`.
 
 # Related
 

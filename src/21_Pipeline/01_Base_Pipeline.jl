@@ -113,7 +113,7 @@ The [routing targets](@ref PIPELINE_ROUTING_TARGETS) an optimiser may have no ho
 
 The asymmetry is the whole of the injection policy, and it turns on whether dropping the value changes the *answer*:
 
-  - `:pe` and `:cle` do not. An optimiser with no `pe` field either needs no prior ([`EqualWeighted`](@ref)) or computes an equivalent one internally, which is what ADR 0028 means by every stage being optional. A [`JuMPOptimiser`](@ref) has no `cle` field because phylogeny reaches it as constraint results — generated from returns, not from this slot — so the structure is genuinely surplus to it.
+  - `:pe` and `:cle` do not. An optimiser with no `pe` field either needs no prior ([`EqualWeighted`](@ref)) or computes an equivalent one internally, so every stage stays optional. A [`JuMPOptimiser`](@ref) has no `cle` field because phylogeny reaches it as constraint results — generated from returns, not from this slot — so the structure is genuinely surplus to it.
   - Everything else does. A weight bound, linear constraint, phylogeny constraint or uncertainty set that reaches no optimiser field would silently change the solved portfolio, so it is an error — the same reason [`PipelineStep`](@ref)'s `target` rejects an uncertainty half it cannot place.
 
 Note the cost that *is* paid: no step reads the `prior` or `phylogeny` slots — [`inject_context`](@ref) is their only consumer — so a step writing a slot the terminal optimiser cannot receive is wasted computation, silently. That is a performance trap rather than a correctness one, which is why it is tolerated rather than rejected, but it is the reason to keep this list short.

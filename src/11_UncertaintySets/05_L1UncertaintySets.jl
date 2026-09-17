@@ -127,7 +127,7 @@ L1UncertaintySet
   - [`CharacteristicUncertaintySet`](@ref): the estimator that fits this set. It is mean-only, so [`sigma_ucs`](@ref) is not defined for it.
   - [`L1UncertaintySetAlgorithm`](@ref)
   - [`AbstractUncertaintySetResult`](@ref)
-  - [`mu_ucs`](@ref): a set it builds carries in `mu` the characteristic vector its radius was calibrated on, so the consumer bounds that vector and not an unrelated one. See ADR 0050.
+  - [`mu_ucs`](@ref): a set it builds carries in `mu` the characteristic vector its radius was calibrated on, so the consumer bounds that vector and not an unrelated one.
   - [`port_opt_view`](@ref)
 
 # References
@@ -280,7 +280,7 @@ SignedL1UncertaintySet
   - [`L1UncertaintySet`](@ref): the joint set. Under a long-only budget the weights are single-signed, the two worst cases coincide, and the joint set is the simpler choice.
   - [`SignedL1UncertaintySetAlgorithm`](@ref)
   - [`CharacteristicUncertaintySet`](@ref): the estimator that fits this set. It is mean-only, so [`sigma_ucs`](@ref) is not defined for it.
-  - [`mu_ucs`](@ref): a set it builds carries in `mu` the characteristic vector its radii were calibrated on, so the consumer bounds that vector and not an unrelated one. See ADR 0050.
+  - [`mu_ucs`](@ref): a set it builds carries in `mu` the characteristic vector its radii were calibrated on, so the consumer bounds that vector and not an unrelated one.
   - [`AbstractUncertaintySetResult`](@ref)
   - [`port_opt_view`](@ref)
 
@@ -936,9 +936,9 @@ end
 
 Construct an ``\\ell_1`` uncertainty set on the characteristic vector, from the set's own prior fitted on returns data or from a prior result the set is handed.
 
-The two signatures are the two routes of ADR 0138 and share one tail. The returns-data method fits `ue.pe` once through [`ucs_prior`](@ref), which refuses a `pe` of `nothing` by name, and hands the result to the prior-result method of the same set with its `pe` set to `nothing`, which is where the two shapes are dispatched. The prior-result method is defined only for a set whose `pe` is `nothing`: inside an optimiser `pr` is the prior the optimiser is solving on, so the characteristic vector the radius is calibrated on is the objective's own `mu`.
+The two signatures are the two routes a set with a `pe` field takes and share one tail. The returns-data method fits `ue.pe` once through [`ucs_prior`](@ref), which refuses a `pe` of `nothing` by name, and hands the result to the prior-result method of the same set with its `pe` set to `nothing`, which is where the two shapes are dispatched. The prior-result method is defined only for a set whose `pe` is `nothing`: inside an optimiser `pr` is the prior the optimiser is solving on, so the characteristic vector the radius is calibrated on is the objective's own `mu`.
 
-The calibration runs on the ranking, and the set is returned in the universe's own order: `mu` and `sd` carry one entry per asset in the order the prior produced them, which is the order the optimiser indexes and the order [`port_opt_view`](@ref) slices. Only the ladders see the sorted vector, and a ladder needs no asset identity. The set carries ``\\hat{\\boldsymbol{\\mu}}`` in its `mu` field, so the consumer bounds the characteristic vector the radius was calibrated on. See ADR 0050.
+The calibration runs on the ranking, and the set is returned in the universe's own order: `mu` and `sd` carry one entry per asset in the order the prior produced them, which is the order the optimiser indexes and the order [`port_opt_view`](@ref) slices. Only the ladders see the sorted vector, and a ladder needs no asset identity. The set carries ``\\hat{\\boldsymbol{\\mu}}`` in its `mu` field, so the consumer bounds the characteristic vector the radius was calibrated on.
 
 # Algorithm
 
@@ -1033,7 +1033,7 @@ end
 
 Always throw. [`CharacteristicUncertaintySet`](@ref) is mean-only.
 
-All four methods are refusals rather than procedures, so none carries an `# Algorithm` section. The returns-data pair takes the same `(X, F)` signature as the rest of the family rather than a catch-all, so that the [`ReturnsResult`](@ref) forwarders in the base reach them without ambiguity, and the prior-result pair takes the signature of the prior-result arm of ADR 0138, so that the three-argument routing of a set with no prior of its own reaches the same refusal.
+All four methods are refusals rather than procedures, so none carries an `# Algorithm` section. The returns-data pair takes the same `(X, F)` signature as the rest of the family rather than a catch-all, so that the [`ReturnsResult`](@ref) forwarders in the base reach them without ambiguity, and the prior-result pair takes the signature the family's prior-result arm shares, so that the three-argument routing of a set with no prior of its own reaches the same refusal.
 
 # Arguments
 

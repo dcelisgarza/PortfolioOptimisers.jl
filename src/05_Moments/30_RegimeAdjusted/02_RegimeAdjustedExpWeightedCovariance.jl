@@ -341,7 +341,7 @@ true
     """
     centred
     """
-    Running state of an incremental fit, or `nothing` before the first call to [`partial_fit!`](@ref). It is the one Result this estimator holds, and its type bound is the enforcement of the rule that ADR 0106 excepts. [`Statistics.cov(ce::RegimeAdjustedExpWeightedCovariance)`](@ref) reads it, and a fit over a matrix ignores it.
+    Running state of an incremental fit, or `nothing` before the first call to [`partial_fit!`](@ref). It is the one Result this estimator holds, and its type bound is the enforcement of that exception. [`Statistics.cov(ce::RegimeAdjustedExpWeightedCovariance)`](@ref) reads it, and a fit over a matrix ignores it.
     """
     cache
     function RegimeAdjustedExpWeightedCovariance(decay::Number, cor_decay::Option{<:Number},

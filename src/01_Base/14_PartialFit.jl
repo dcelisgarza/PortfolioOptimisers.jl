@@ -3,7 +3,7 @@
 
 Folds observations into an estimator's partial-fit state, and returns the estimator.
 
-An incremental fit reads each observation once and keeps what it needs in an [`AbstractPartialFitState`](@ref), so a later call continues where the last one stopped instead of reading the sample again. The state lives in the estimator's `cache` field, which holds `nothing` until the first call. ADR 0106 records why that field is the one Result an estimator holds.
+An incremental fit reads each observation once and keeps what it needs in an [`AbstractPartialFitState`](@ref), so a later call continues where the last one stopped instead of reading the sample again. The state lives in the estimator's `cache` field, which holds `nothing` until the first call. That field is the one Result an estimator holds.
 
 Reading the sample once is the advertised benefit; **numerical accuracy is the real one**. Every state accumulates by Welford's recursion at the observation and by the merge of [chan1983](@cite) at the block, and both centre each increment on the running mean rather than differencing two large sums. On a sample whose mean dwarfs its spread — prices rather than returns — a textbook accumulator of squares loses most of its significant digits to cancellation, while these recursions hold machine precision. `test/test_08r_partial_fit.jl` pins that on a sample of mean 1000 and unit spread, so a later simplification to the textbook formula fails loudly instead of quietly returning a worse answer.
 

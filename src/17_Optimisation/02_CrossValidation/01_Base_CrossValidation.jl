@@ -885,7 +885,7 @@ Decompose a fold's risk over its assets.
 
 The fold-taking method of [`risk_contribution`](@ref). It resolves the fold's **target** weights, its asset returns and its fee, and hands them to the free function, so the figures are the free function's own.
 
-The three do not sit on one universe. The Held Weights record came back on the caller's universe through [`expand_held_weights`](@ref), and so did the target weights (ADR 0115), while the result's fee stayed on the universe it solved on. The method therefore views the weights and the asset returns at the result's Investable Mask before the finite difference, exactly as [`investable_reduction`](@ref) does at the value-level door, and expands the per asset answer back with a zero at every non-investable asset. A result whose mask is `nothing` views nothing.
+The three do not sit on one universe. The Held Weights record came back on the caller's universe through [`expand_held_weights`](@ref), and so did the target weights, while the result's fee stayed on the universe it solved on. The method therefore views the weights and the asset returns at the result's Investable Mask before the finite difference, exactly as [`investable_reduction`](@ref) does at the value-level door, and expands the per asset answer back with a zero at every non-investable asset. A result whose mask is `nothing` views nothing.
 
 Under a Weight Drift the figures are exact to **first order in the drift** only, for the reason the free function states: the drifted series is not linear in the target weights, so the contributions sum to the fold's realised risk approximately rather than exactly. The target weights are still what a contribution is reported against, because they are the decision the finite difference perturbs.
 
@@ -1065,7 +1065,7 @@ A feature matrix is **not** among them. It is not carried through the folds at a
 
 $(DocStringExtensions.FIELDS)
 
-An online run's Result also carries the estimator the fold loop threaded, in `opt`, folded through the last training end `last(train_idx[end])` (ADR 0144). A batch run writes `nothing`. [`Resume`](@ref) hands the Result back to the loop over a longer history, and the loop continues from the fold after the last one held; a hand step in the value form, `partial_fit(res.opt, rows)`, deploys the state from the last training end and leaves the Result resumable. The bang form, `partial_fit!(res.opt, rows)`, writes the state's arrays in place — the held timestamps among them — so the Result it came from then names a row no fold ends at, and `Resume` refuses it; that is the seam's contract for a kept estimator, stated at [`partial_fit!`](@ref).
+An online run's Result also carries the estimator the fold loop threaded, in `opt`, folded through the last training end `last(train_idx[end])`. A batch run writes `nothing`. [`Resume`](@ref) hands the Result back to the loop over a longer history, and the loop continues from the fold after the last one held; a hand step in the value form, `partial_fit(res.opt, rows)`, deploys the state from the last training end and leaves the Result resumable. The bang form, `partial_fit!(res.opt, rows)`, writes the state's arrays in place — the held timestamps among them — so the Result it came from then names a row no fold ends at, and `Resume` refuses it; that is the seam's contract for a kept estimator, stated at [`partial_fit!`](@ref).
 
 # Constructors
 
@@ -1470,9 +1470,9 @@ end
 
 View a fold's weights and test window at the Investable Mask, and pass its fees through.
 
-ADR 0115 reduces an optimisation to the Investable Mask at its entry and expands the solved weights back to the caller's universe, so the weight of an asset the fit found non-investable is `0`. ADR 0120 carries that rule to the window those weights are scored on: the fold views the weights and the window together, before anything reads the window, so a dead column is never read at all and the Held Gap filter of [`filter_held_gaps`](@ref) runs over the investable columns alone.
+An optimisation reduces to the Investable Mask at its entry and expands the solved weights back to the caller's universe, so the weight of an asset the fit found non-investable is `0`. That rule carries to the window those weights are scored on: the fold views the weights and the window together, before anything reads the window, so a dead column is never read at all and the Held Gap filter of [`filter_held_gaps`](@ref) runs over the investable columns alone.
 
-The fees are **not** viewed. A result carries the objects of the universe it solved on beside the mask, ADR 0115's rule, so `res.fees` is on the investable universe already and a second view would index its per-asset rates by positions of the full universe. The fees ride along so the verb hands the fold the three things it scores with in one call.
+The fees are **not** viewed. A result carries the objects of the universe it solved on beside the mask, so `res.fees` is on the investable universe already and a second view would index its per-asset rates by positions of the full universe. The fees ride along so the verb hands the fold the three things it scores with in one call.
 
 A result whose mask is `nothing` views nothing, which is what keeps a universe with nothing to exclude on the path it took before the mask existed.
 
@@ -1509,7 +1509,7 @@ end
 
 Resolve the fee a fold-taking consumer charges: the result's own, or a caller's viewed at the result's Investable Mask.
 
-The three fold-taking consumers — [`calc_net_asset_returns`](@ref), [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) on a [`PredictionResult`](@ref) — take an optional `fees` so a caller can score a stored fold under a fee of their own (ADR 0122). The two fees they can meet live on different universes. The result's own fee was reduced at the fit's door, so its five per-asset fields sit on the investable axis and its two liquidation carriers on the complement, and [`investable_fold_view`](@ref) hands it through unviewed. A caller's fee is stated on the caller's universe, as a caller's `rd` is, so it takes the same door a fee takes at the fit: [`investable_fees_view`](@ref) slices the per-asset fields to the mask and the carriers to its complement, deriving the complement from the width of the expanded record `X`, and strips the carriers when the mask is `nothing`, because nothing left.
+The three fold-taking consumers — [`calc_net_asset_returns`](@ref), [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) on a [`PredictionResult`](@ref) — take an optional `fees` so a caller can score a stored fold under a fee of their own. The two fees they can meet live on different universes. The result's own fee was reduced at the fit's door, so its five per-asset fields sit on the investable axis and its two liquidation carriers on the complement, and [`investable_fold_view`](@ref) hands it through unviewed. A caller's fee is stated on the caller's universe, as a caller's `rd` is, so it takes the same door a fee takes at the fit: [`investable_fees_view`](@ref) slices the per-asset fields to the mask and the carriers to its complement, deriving the complement from the width of the expanded record `X`, and strips the carriers when the mask is `nothing`, because nothing left.
 
 The split is by dispatch on `fees`. A `nothing` reads the result's fee through [`extract_fees`](@ref); a `Fees` is the caller's and is viewed. Without the view a per-asset rate stated on the full universe met the reduced weights with a `BoundsError`, and a full-universe carrier was charged as though every position had been liquidated.
 
@@ -1710,7 +1710,7 @@ is the verb, and the cross-validation schemes state the keyword in a field of th
 A test window over a point-in-time universe holds two kinds of gap, and `predict` takes them in
 order.
 
- 1. **The column of a non-investable asset.** The fit found it, its weight is `0` by ADR 0115, and
+ 1. **The column of a non-investable asset.** The fit found it, its weight is `0`, and
     the fold views the window and the weights at `res.imsk` through
     [`investable_fold_view`](@ref) before anything reads them, so the column is never read. The
     fees are not viewed, because the result carries them on the investable universe already.
@@ -1983,7 +1983,7 @@ decides which of the two runs, and neither one re-decides.
 `ElT` is a *positional* `::Type{ElT}` argument, not a keyword, so a method always
 specialises on it and `Vector{ElT}(undef, n)` stays a compile-time construction. As a
 keyword its value only survives constant propagation, which one forwarding hop is enough
-to lose — see the amendment of ADR 0067.
+to lose.
 
 # Related
 
@@ -2269,8 +2269,7 @@ No loop re-decides.
 value a call site computes. All are decided by the *types* of `cv` and `est`, so inference
 folds the conjunction and eliminates the arm that cannot run. A `Bool` keyword cannot do
 this: its value survives only by constant propagation, which one call hop loses, and the
-sequential arm is then inferred even where it can never run — see the amendments of ADR
-0067. The two path-level sites enumerate an inner walk-forward; the optimiser's passes the
+sequential arm is then inferred even where it can never run. The two path-level sites enumerate an inner walk-forward; the optimiser's passes the
 [`MultipleRandomised`](@ref) it runs, which forwards its Fold Fit, and the Pipeline's holds no
 scheme and omits `cv`; `folds_are_time_ordered(nothing)` answers `true`.
 
@@ -2284,7 +2283,7 @@ multi-path combinatorial scheme. It is positional for the reason given in
   - `predictions::Vector{ElT}`: One result per fold, in split order — the new folds only under
     a [`Resume`](@ref).
   - `opt`: The estimator the online arm threaded, folded through the last training end, or
-    `nothing` from the batch arms. An online walk-forward's Result carries it (ADR 0144).
+    `nothing` from the batch arms. An online walk-forward's Result carries it.
 
 # Related
 

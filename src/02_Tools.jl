@@ -1300,8 +1300,8 @@ One entry per generated method. Each entry has two tuples of tags:
     that channel.
 
 The `factory` channel prefers `@fprop` over `@wprop`. The `prior` channel prefers `@pprop`,
-then `@cprop`, then `@wprop`, then `@fprop`, so `@pprop` wins over `@fprop` on one field
-(ADR 0012). The precedence used to live in two hand-written `if`/`elseif` chains that no
+then `@cprop`, then `@wprop`, then `@fprop`, so `@pprop` wins over `@fprop` on one field.
+The precedence used to live in two hand-written `if`/`elseif` chains that no
 comment linked; it is now read by [`prop_channel_pairs`](@ref) for every channel.
 
 **A tag means what its channel says it means.** The `obs` channel reads the same `@wprop`
@@ -1987,7 +1987,7 @@ risk-measure value if present, else the same-named moment from the prior result.
 
 Orthogonal to, and stackable with, [`@wprop`](@ref) (`@pprop @wprop w` gives a weights
 field both a prior factory and an `ObsWeights` factory) or [`@fprop`](@ref); `@pprop` wins
-in the prior method. Mutually exclusive with [`@cprop`](@ref) on a single field. See ADR 0012.
+in the prior method. Mutually exclusive with [`@cprop`](@ref) on a single field.
 
 # Algorithm
 
@@ -1998,7 +1998,7 @@ The tag never expands. [`@propagatable`](@ref) runs first and consumes it, so th
  3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value: `sel(x.field, getproperty(pr, :field))`. The prior result supplies the property of the **same name** as the field, so the tag names no source of its own.
  4. The generated method rebuilds the struct with its keyword constructor, so every validation the constructor carries runs again on the propagated value.
 
-Step 3 is the whole meaning of the tag. `@pprop` is first in the `prior` channel's precedence, so a field carrying both `@pprop` and [`@fprop`](@ref) takes the prior transform on that channel and the factory transform on the `factory` channel. ADR 0012 owns that rule.
+Step 3 is the whole meaning of the tag. `@pprop` is first in the `prior` channel's precedence, so a field carrying both `@pprop` and [`@fprop`](@ref) takes the prior transform on that channel and the factory transform on the `factory` channel.
 
 This macro body itself raises an error. It is reached only when the tag is written outside a [`@propagatable`](@ref) struct body, where nothing consumed it.
 
@@ -2022,7 +2022,7 @@ Marks the field as **context-selected**: when `factory(x, pr::AbstractPriorResul
 invoked, the field is set to `sel(getfield(x, :field), _ctx(args...))` — the risk-measure
 value if present, else the threaded optimiser value (a solver) located by type in the
 variadic tail. Used for `slv` fields, whose source is a threaded argument rather than the
-prior. Mutually exclusive with [`@pprop`](@ref) on a single field. See ADR 0012.
+prior. Mutually exclusive with [`@pprop`](@ref) on a single field.
 
 # Algorithm
 
@@ -2033,7 +2033,7 @@ The tag never expands. [`@propagatable`](@ref) runs first and consumes it, so th
  3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value: `sel(x.field, _ctx(args...))`. `_ctx` finds the value **by type** in the threaded tail, so the source is an argument and not the prior result.
  4. The generated method rebuilds the struct with its keyword constructor, so every validation the constructor carries runs again on the propagated value.
 
-Step 3 is the whole meaning of the tag. `@cprop` follows [`@pprop`](@ref) in the `prior` channel's precedence, and the two are mutually exclusive on one field. ADR 0012 owns that rule.
+Step 3 is the whole meaning of the tag. `@cprop` follows [`@pprop`](@ref) in the `prior` channel's precedence, and the two are mutually exclusive on one field.
 
 This macro body itself raises an error. It is reached only when the tag is written outside a [`@propagatable`](@ref) struct body, where nothing consumed it.
 
@@ -2349,7 +2349,7 @@ Untagged fields pass through unchanged in every method, regardless of type —
 tagging is explicit and opt-in. The tags are independent and the relevant field sets
 genuinely diverge. `@pprop` and `@cprop` are mutually exclusive on one field (a value comes
 from exactly one source); legal stacks are `@pprop @fprop` (sub-estimator) and
-`@pprop @wprop` (weights slot). See ADR 0010 and 0012.
+`@pprop @wprop` (weights slot).
 
 Two consequences of the emitted code are **contracts on the declaration**, and both are checked
 where the struct is written rather than at the first call:
@@ -2364,12 +2364,12 @@ The macro registers each declaration in [`PROPAGATABLE_CONTRACTS`](@ref), and
 [`check_propagatable_contracts`](@ref) checks the whole registry once the module is complete.
 A mistyped field name therefore fails at precompilation with a
 [`suggest_declared_key`](@ref) suggestion, rather than surfacing as a `MethodError` at the
-first [`factory`](@ref) call. [`forward_prior`](@ref) leans on the same contract (ADR 0046).
+first [`factory`](@ref) call. [`forward_prior`](@ref) leans on the same contract.
 
 The tag set itself is data. [`PROP_TAG_NAMES`](@ref) holds the rows,
 [`prop_tag_expr`](@ref) holds each tag's field transform, and [`PROP_TAG_CHANNELS`](@ref)
 holds each channel's gate and tag precedence, so a new propagation channel is a table row
-rather than an edit at seven sites (ADR 0061).
+rather than an edit at seven sites.
 
 Composes with `@concrete` (put `@propagatable` outermost):
 
@@ -2404,7 +2404,7 @@ Docstrings on the enclosing definition are forwarded correctly via
  2. Read `type_head` and `body` off `struct_node`, and read `struct_name` off `type_head` with [`propagatable_bare_name`](@ref), which drops the type parameters and the supertype.
  3. Parse the body with [`propagatable_parse_body`](@ref), which gives `tagged`, the field names per tag; `all_fields`, every declared field in declaration order; and `new_body`, the body with every tag stripped.
  4. Build `new_struct` from `new_body`, and `chain` from `rebuild(new_struct)`. `chain` is the original declaration with the tags gone, so `@concrete` and Julia both see an ordinary struct.
- 5. Bind `POMOD` to the module that **defines** the macro, and qualify every emitted name against it. A bare name would resolve in the caller's module, where `function factory(…)` declares a new function of the caller's own and the method never reaches `PortfolioOptimisers.factory`. That failure is silent, because the declaration compiles and the type never joins the propagation chain. ADR 0002, decision 4, owns the rule.
+ 5. Bind `POMOD` to the module that **defines** the macro, and qualify every emitted name against it. A bare name would resolve in the caller's module, where `function factory(…)` declares a new function of the caller's own and the method never reaches `PortfolioOptimisers.factory`. That failure is silent, because the declaration compiles and the type never joins the propagation chain.
  6. Emit the `factory` method. When [`prop_channel_active`](@ref) holds for the `factory` channel, the body is a call to the keyword constructor whose pairs come from [`prop_channel_pairs`](@ref); otherwise the body is `x` itself. **This method is always emitted**, so an untagged [`@propagatable`](@ref) struct still answers [`factory`](@ref) with the identity.
  7. When the `view` channel is active, emit `port_opt_view(x::StructName, i, args...)`, whose channel threads `i` before `args...`.
  8. When the `obs` channel is active, emit `obs_weights_view(x::StructName, i)`, whose channel threads `i` and takes no tail.
@@ -2412,7 +2412,7 @@ Docstrings on the enclosing definition are forwarded correctly via
 10. Build `pprop_tuple`, the `@pprop`-tagged field names as a tuple of quoted symbols.
 11. Return one escaped block holding, in order: `Base.@__doc__ chain`, so a docstring on the declaration reaches the struct; the emitted methods; and the call to [`propagatable_register!`](@ref) that records the type and `pprop_tuple`.
 
-Steps 6 to 9 differ only in the method head and in the arguments that the channel threads. Each reads its gate and its tag precedence off [`PROP_TAG_CHANNELS`](@ref), so a new channel is a row of that table, a branch in [`prop_tag_expr`](@ref) and a stub macro, rather than an edit at seven sites. ADR 0061 owns that rule.
+Steps 6 to 9 differ only in the method head and in the arguments that the channel threads. Each reads its gate and its tag precedence off [`PROP_TAG_CHANNELS`](@ref), so a new channel is a row of that table, a branch in [`prop_tag_expr`](@ref) and a stub macro, rather than an edit at seven sites.
 
 # Related
 
@@ -2734,7 +2734,7 @@ end
 
 Generate the `Base.getproperty` / `Base.propertynames` pair for type `T` from a
 block of declarative forwarding rules, so the property-forwarding decision lives
-in one declared surface instead of a hand-written `getproperty` body (ADR 0013).
+in one declared surface instead of a hand-written `getproperty` body.
 `T` may be a bare type name or a parametric/`UnionAll` signature
 (`Foo{<:Any, Nothing, <:Any}`), so a `swap` can be specialised per type parameter.
 

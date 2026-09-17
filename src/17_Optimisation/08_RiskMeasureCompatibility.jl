@@ -6,7 +6,7 @@ Return the abstract risk-measure category an optimiser accepts.
 
 For a leaf optimiser the answer is derived entirely from its family supertype — the same abstract
 type its constraint builders already dispatch on — so it cannot drift from what the optimiser
-actually accepts (see ADR 0018):
+actually accepts:
 
   - risk-taking JuMP optimisers ([`RiskJuMPOptimisationEstimator`](@ref): `MeanRisk`,
     `NearOptimalCentering`, `FactorRiskContribution`, `RiskBudgeting`) accept

@@ -466,7 +466,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the vector of deviations from the centering target for a precomputed returns series for [`ThirdCentralMoment`](@ref) and [`Skewness`](@ref) risk measures.
 
-Single-argument form used by the precomputed-returns functor `r(x::VecNum)` (ADR 0007).
+Single-argument form used by the precomputed-returns functor `r(x::VecNum)`.
 
 # Related
 

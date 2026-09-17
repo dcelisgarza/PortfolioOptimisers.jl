@@ -73,7 +73,7 @@ via [`set_risk_expression!`](@ref) according to `settings`.
   - `ub`: Upper bound value.
   - `name::Symbol`: Bare Model State entry name seeding the derived bound keys.
   - `i`: Measure index. `name` and `i` are resolved here, so the bound keys cannot drift
-    from the key the emitter registered the risk expression under (ADR 0037).
+    from the key the emitter registered the risk expression under.
   - `r_expr::JuMP.AbstractJuMPScalar`: Risk expression added to the objective.
   - `settings::RiskMeasureSettings`: Settings carrying scale and `rke` flag.
   - `flag::Bool`: If true, sets upper bound; if false sets lower bound.
@@ -161,7 +161,7 @@ where ``\\mathbf{G}`` is the upper Cholesky factor of ``\\boldsymbol{\\Sigma}`` 
 
   - A 2-tuple `(risk_expr, name)` of the JuMP risk expression and the bare Model State
     entry name it was registered under. The caller pairs the name with the same index to
-    resolve the key, so no composed key crosses the boundary (ADR 0037).
+    resolve the key, so no composed key crosses the boundary.
 
 # Related
 
@@ -633,7 +633,7 @@ squares. It is the one overload that leaves the programme a second-order cone pr
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
   - `ucs`: Uncertainty set instance (`BoxUncertaintySet`, `EllipsoidalUncertaintySet`, `CompactCovarianceUncertaintySet` or a covariance `NormBallUncertaintySet`).
-  - `sigma::MatNum`: Fallback covariance matrix (used by every overload but the box). The set's own `val` field wins over it (ADR 0050). The box overload names no centre at all, so it ignores both.
+  - `sigma::MatNum`: Fallback covariance matrix (used by every overload but the box). The set's own `val` field wins over it. The box overload names no centre at all, so it ignores both.
 
 # Returns
 

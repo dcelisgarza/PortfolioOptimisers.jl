@@ -214,7 +214,7 @@ Matches either a [`RiskBudgetEstimator`](@ref) (specifying how to generate risk 
 
 There is no vector counterpart, and [`risk_budget_constraints`](@ref) has no vector method. A risk budget is one allocation over the whole universe, so an optimiser holds exactly one. This is the same reason [`WbE_Wb`](@ref) and [`FeesE_Fees`](@ref) are singular, and the reason [`TnE_Tn`](@ref), [`LcE_Lc`](@ref) and [`PlCE_PlC`](@ref) are not: several turnover, linear or phylogeny constraints can hold at once, and each of those does carry a vector alias and a broadcast method.
 
-The gap is a decision, not an omission. ADR 0038 names the routing targets that accumulate — `(:lcse, :cte, :ple, :slt, :sst, :sglt, :sgst, :smtx, :sgmtx)` — and a risk budget's target `:rkb` is not among them, while four of the threshold's six targets — `:slt`, `:sst`, `:sglt` and `:sgst` — are, each holding a positional list with one entry per scenario or group block. That is why [`threshold_constraints`](@ref) carries a [`VecOptBtE_Bt`](@ref) method and this family carries none. Passing a vector here raises `MethodError`; no broader method takes it silently.
+The gap is a decision, not an omission. The routing targets that accumulate are `(:lcse, :cte, :ple, :slt, :sst, :sglt, :sgst, :smtx, :sgmtx)`, and a risk budget's target `:rkb` is not among them, while four of the threshold's six targets — `:slt`, `:sst`, `:sglt` and `:sgst` — are, each holding a positional list with one entry per scenario or group block. That is why [`threshold_constraints`](@ref) carries a [`VecOptBtE_Bt`](@ref) method and this family carries none. Passing a vector here raises `MethodError`; no broader method takes it silently.
 
 # Related
 

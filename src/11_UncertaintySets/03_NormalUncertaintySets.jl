@@ -234,7 +234,7 @@ end
 
 Return ``T``, the effective number of observations that divides the covariance to give the asymptotic covariance of the mean.
 
-Three sources are read in order, and the first that is not `nothing` wins: the estimator's own `ens`, the prior's `ens`, and the row count of the prior's returns matrix. The first two exist because a weighted or a shrunk prior carries fewer effective observations than it has rows, and because a prior under a Scenario Cap carries fewer rows than the observations its moments were fitted over, which it states in `ens` (ADR 0138). Every set the file builds is scaled by ``T``, and the width of a set scales as ``T^{-1/2}``, so a prior that reports fewer effective scenarios than it has rows widens the set. Quartering ``T`` doubles the width of the mean box.
+Three sources are read in order, and the first that is not `nothing` wins: the estimator's own `ens`, the prior's `ens`, and the row count of the prior's returns matrix. The first two exist because a weighted or a shrunk prior carries fewer effective observations than it has rows, and because a prior under a Scenario Cap carries fewer rows than the observations its moments were fitted over, which it states in `ens`. Every set the file builds is scaled by ``T``, and the width of a set scales as ``T^{-1/2}``, so a prior that reports fewer effective scenarios than it has rows widens the set. Quartering ``T`` doubles the width of the mean box.
 
 # Algorithm
 
@@ -617,7 +617,7 @@ end
 
 Fits a [`NormalUncertaintySet`](@ref) from returns data, by fitting the set's own prior and calibrating the set on the result.
 
-These are the returns-data arms of the three verbs, and they are one method each whatever shape the set builds, because the shape is decided one call later. Each fits `ue.pe` once through [`ucs_prior`](@ref), which refuses a `pe` of `nothing` by name, and hands the result to the prior-result arm of the same verb on the same set with its `pe` set to `nothing`, which is where the box, the ellipsoid and the norm ball are dispatched (ADR 0138). A set with a prior of its own is therefore calibrated on that prior fitted on the returns it is handed, and on nothing else; the two routes share one body per shape, so a set reached through `ucs(ue, X)` and one reached through `ucs(ue′, prior(ue.pe, X))` with `ue′` the same set without its prior are the same set to the last bit.
+These are the returns-data arms of the three verbs, and they are one method each whatever shape the set builds, because the shape is decided one call later. Each fits `ue.pe` once through [`ucs_prior`](@ref), which refuses a `pe` of `nothing` by name, and hands the result to the prior-result arm of the same verb on the same set with its `pe` set to `nothing`, which is where the box, the ellipsoid and the norm ball are dispatched. A set with a prior of its own is therefore calibrated on that prior fitted on the returns it is handed, and on nothing else; the two routes share one body per shape, so a set reached through `ucs(ue, X)` and one reached through `ucs(ue′, prior(ue.pe, X))` with `ue′` the same set without its prior are the same set to the last bit.
 
 # Algorithm
 
@@ -672,7 +672,7 @@ end
 
 Constructs box uncertainty sets for mean and covariance statistics under the assumption of normally distributed returns.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 # Mathematical definition
 
@@ -750,7 +750,7 @@ end
 
 Constructs a box uncertainty set for expected returns under the assumption of normally distributed returns.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 # Mathematical definition
 
@@ -809,7 +809,7 @@ end
 
 Constructs a box uncertainty set for covariance under the assumption of normally distributed returns.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 # Mathematical definition
 
@@ -872,7 +872,7 @@ end
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **The two samples are estimation errors, not levels.** [`k_ucs`](@ref) measures a Mahalanobis distance against the shape matrix, so step 5 draws from the sampling law of the estimator, ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}}/T)``, and centres the draws on ``\\hat{\\boldsymbol{\\mu}}``. A draw from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` in its place multiplies every deviation, and therefore the radius, by ``\\sqrt{T}``. Step 6 is on the matching scale for the same reason: the variance of an entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw is the matching diagonal entry of ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``.
 
@@ -979,7 +979,7 @@ end
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns, using a generic ellipsoidal algorithm.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs. The two routes build the same shapes, so they differ only in the radius.
 
@@ -1063,7 +1063,7 @@ end
 
 Constructs an ellipsoidal uncertainty set for expected returns under the assumption of normally distributed returns, using a normal scaling algorithm.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **The sample is the estimation error, not the level.** [`k_ucs`](@ref) measures a Mahalanobis distance against the shape matrix, so step 4 draws from the sampling law of the estimator, ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}}/T)``, and centres the draws on ``\\hat{\\boldsymbol{\\mu}}``. A draw from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` in its place multiplies every deviation, and therefore the radius, by ``\\sqrt{T}``.
 
@@ -1133,7 +1133,7 @@ end
 
 Constructs an ellipsoidal uncertainty set for expected returns under the assumption of normally distributed returns, using a generic ellipsoidal algorithm.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The shape matrix is ``\\hat{\\mathbf{\\Sigma}} / T`` of Equation 11.24. This method runs no simulation, so it serves every radius algorithm that reads none, which is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref) and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same shape.
 
@@ -1202,7 +1202,7 @@ end
 
 Constructs an ellipsoidal uncertainty set for covariance under the assumption of normally distributed returns, using a normal scaling algorithm.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **The sample is the estimation error, not the level.** The draws of step 4 are subtracted from ``\\hat{\\mathbf{\\Sigma}}``, and the variance of an entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw is the matching diagonal entry of ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``, so the sample and the shape it is measured against are on one scale. `N` is read from `size(pr.X, 2)`, the same source [`ucs`](@ref) reads it from, so a prior that changes the asset count moves both, and the two shape matrices are equal.
 
@@ -1280,7 +1280,7 @@ end
 
 Constructs an ellipsoidal uncertainty set for covariance under the assumption of normally distributed returns, using a generic ellipsoidal algorithm.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs. The two routes build the same shapes, so they differ only in the radius.
 
@@ -1355,7 +1355,7 @@ end
 
 Constructs norm-ball uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns, using a normal scaling algorithm.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The two sets are the two ellipsoids of the sibling route with their shape matrices factorised, so they name the same region and reach the same weights. The gain is on the consumer's side: a [`NormBallUncertaintySet`](@ref) carries the factor, so neither builder factorises anything at solve time. This route draws the sample the empirical radius reads, off one generator, so its Wishart draws follow its normal draws.
 
@@ -1423,7 +1423,7 @@ end
 
 Constructs norm-ball uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns, using a generic radius algorithm.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs. The two routes build the same maps, so they differ only in the radius.
 
@@ -1487,7 +1487,7 @@ end
 
 Constructs a norm-ball uncertainty set for expected returns under the assumption of normally distributed returns, using a normal scaling algorithm.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The map is the factor of ``\\hat{\\mathbf{\\Sigma}} / T``, so the set is the mean ellipsoid of the sibling route with its shape factorised. This method draws its normal sample off a generator that nothing has advanced, which is the same stream position [`ucs`](@ref) draws its own mean sample from, so the two radii agree under one seed.
 
@@ -1545,7 +1545,7 @@ end
 
 Constructs a norm-ball uncertainty set for expected returns under the assumption of normally distributed returns, using a generic radius algorithm.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same map.
 
@@ -1601,7 +1601,7 @@ end
 
 Constructs a norm-ball uncertainty set for covariance under the assumption of normally distributed returns, using a normal scaling algorithm.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The map is the factor of the vectorised covariance's asymptotic covariance, so the set is the covariance ellipsoid of the sibling route with its shape factorised. **The radius is not the one [`ucs`](@ref) fits, under the same seed**, because this method draws its Wishart matrices off a generator that nothing has advanced while [`ucs`](@ref) draws its mean sample first. Both radii are valid fits of the same quantity.
 
@@ -1663,7 +1663,7 @@ end
 
 Constructs a norm-ball uncertainty set for covariance under the assumption of normally distributed returns, using a generic radius algorithm.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same map.
 

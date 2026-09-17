@@ -33,7 +33,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The input-carrier buffer `Online(pipe)` seeds: every block of observations a [`Pipeline`](@ref) is handed, concatenated, so the read-out is the batch fit over them.
 
-The declared refit of ADR 0142. No step folds under it — the buffer holds the pipeline's input as it was given, price- or returns-level, and `fit(pipe)` runs `fit(pipe, data)` over the buffer — so it is exact for every configuration at batch cost, and with a cap it is a rolling Pipeline, equal to the rolling batch walk-forward. The state's type is the route: a [`ReturnsBufferState`](@ref) in `pipe.cache` is the host route's Fold Context, and this is the refit route.
+The declared refit. No step folds under it — the buffer holds the pipeline's input as it was given, price- or returns-level, and `fit(pipe)` runs `fit(pipe, data)` over the buffer — so it is exact for every configuration at batch cost, and with a cap it is a rolling Pipeline, equal to the rolling batch walk-forward. The state's type is the route: a [`ReturnsBufferState`](@ref) in `pipe.cache` is the host route's Fold Context, and this is the refit route.
 
 # Fields
 
@@ -187,7 +187,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Finds the row owner of a [`Pipeline`](@ref) by a walk: the first prior step, else the optimisation step, else `0`.
 
-The prior step owns the rows when there is one, because [`inject_context`](@ref) overrides the optimiser's `pe` with it and the optimiser's own prior is never fitted; else the optimisation step, which is then a host of ADR 0137 and keeps its own Fold Context; and a pipeline with neither has nothing to fold into.
+The prior step owns the rows when there is one, because [`inject_context`](@ref) overrides the optimiser's `pe` with it and the optimiser's own prior is never fitted; else the optimisation step, which is then itself a host and keeps its own Fold Context; and a pipeline with neither has nothing to fold into.
 
 # Related
 
@@ -300,7 +300,7 @@ end
 
 Refuses a [`Pipeline`](@ref) that cannot take the online step, at the entry of the fold loop's online arm and before any fit, by name.
 
-The walk over the steps ADR 0142 decides. On the host route, six refusals. A state anywhere — the Pipeline's own `cache` or a step's — because the loop starts cold (ADR 0140). No row owner: a pipeline with neither a prior nor an optimisation step has nothing to fold into. A [`TimeDependent`](@ref) schedule as the row owner, which is the case only when no prior step precedes the optimisation step: a schedule swaps the estimator that carries the state; with a prior step before it, the schedule swaps a stateless step and composes. An optimisation step that owns the rows is held to [`assert_online_entry`](@ref)'s own refusals. And every data step before the owner must fold or defer: a **window-valued** configuration ([`PriceGapFill`](@ref) with a statistic fill, [`MissingDataFilter`](@ref) with `row_thr < 1`), a callable [`PipelineStep`](@ref) writing `:prices` or `:returns`, a nested `Pipeline`, and a caller's preprocessing estimator with no online form are refused, and the message names both routes: give the step a [`partial_fit_transform`](@ref), or declare a refit with `Online(pipe)`. And a **capped owner** — an [`Online`](@ref) on the owner's path carrying `max_history`, read through [`step_online_cap`](@ref) — is refused when a row-local step folds before it: the owner's window is counted in its own rows, and the step's carry reaches across the window's front edge, so the run equals no batch scheme. The rolling window through a Pipeline is `Online(pipe; max_history = w)`. A capped owner behind universe-only steps alone, or on returns input, stays on the host route, because the read-out refits a universe-only step over the owner's capped rows.
+The walk goes over the steps of the route. On the host route, six refusals. A state anywhere — the Pipeline's own `cache` or a step's — because the loop starts cold. No row owner: a pipeline with neither a prior nor an optimisation step has nothing to fold into. A [`TimeDependent`](@ref) schedule as the row owner, which is the case only when no prior step precedes the optimisation step: a schedule swaps the estimator that carries the state; with a prior step before it, the schedule swaps a stateless step and composes. An optimisation step that owns the rows is held to [`assert_online_entry`](@ref)'s own refusals. And every data step before the owner must fold or defer: a **window-valued** configuration ([`PriceGapFill`](@ref) with a statistic fill, [`MissingDataFilter`](@ref) with `row_thr < 1`), a callable [`PipelineStep`](@ref) writing `:prices` or `:returns`, a nested `Pipeline`, and a caller's preprocessing estimator with no online form are refused, and the message names both routes: give the step a [`partial_fit_transform`](@ref), or declare a refit with `Online(pipe)`. And a **capped owner** — an [`Online`](@ref) on the owner's path carrying `max_history`, read through [`step_online_cap`](@ref) — is refused when a row-local step folds before it: the owner's window is counted in its own rows, and the step's carry reaches across the window's front edge, so the run equals no batch scheme. The rolling window through a Pipeline is `Online(pipe; max_history = w)`. A capped owner behind universe-only steps alone, or on returns input, stays on the host route, because the read-out refits a universe-only step over the owner's capped rows.
 
 On the refit route, two: a state anywhere, as above, and an [`Online`](@ref) member below the `Online(pipe)`, because no member folds under a refit and its cap would be silently ignored.
 
@@ -565,7 +565,7 @@ const PipelineResume = Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any,
 
 Continue an online walk-forward over a [`Pipeline`](@ref) from its Result, over the full history extended.
 
-The pipeline door of [`Resume`](@ref): the scheme is checked ([`assert_resume_scheme`](@ref)), the holdout refused as the one-shot door refuses it, and the fold loop takes its resumed arm through [`pipeline_cross_val_predict`](@ref). A host route and an `Online(pipe)` refit route resume alike, because the entry reads the state off the pipeline generically (ADR 0142).
+The pipeline door of [`Resume`](@ref): the scheme is checked ([`assert_resume_scheme`](@ref)), the holdout refused as the one-shot door refuses it, and the fold loop takes its resumed arm through [`pipeline_cross_val_predict`](@ref). A host route and an `Online(pipe)` refit route resume alike, because the entry reads the state off the pipeline generically.
 
 # Related
 
@@ -588,7 +588,7 @@ end
 
 Folds a block of observations into a [`Pipeline`](@ref), without fitting.
 
-The Pipeline's online step, decided by ADR 0142: the pipeline is a host, and the verb walks the steps in order, handing each the block the step before it emitted, until the rows reach the **row owner** — the prior step, else the optimisation step ([`pipeline_row_owner`](@ref)). A row-local step folds and emits through [`partial_fit_transform`](@ref); a universe-only step ([`is_universe_step`](@ref)) passes the rows through untouched, its universe deferred to the read-out; every step after the owner is untouched, and is fitted at the read-out exactly as batch fits it. A prior owner is folded through [`fold_prior`](@ref), and the Pipeline records the rest of the carrier — the benchmark, the timestamps, the pinned names and a static panel — in a [`ReturnsBufferState`](@ref) of its own, taking the owner's cap, so that `fit(pipe)` can rebuild the carrier the batch path reads. An optimisation owner is folded through its own [`partial_fit!`](@ref), and keeps its own Fold Context; the Pipeline then holds none.
+The Pipeline's online step: the pipeline is a host, and the verb walks the steps in order, handing each the block the step before it emitted, until the rows reach the **row owner** — the prior step, else the optimisation step ([`pipeline_row_owner`](@ref)). A row-local step folds and emits through [`partial_fit_transform`](@ref); a universe-only step ([`is_universe_step`](@ref)) passes the rows through untouched, its universe deferred to the read-out; every step after the owner is untouched, and is fitted at the read-out exactly as batch fits it. A prior owner is folded through [`fold_prior`](@ref), and the Pipeline records the rest of the carrier — the benchmark, the timestamps, the pinned names and a static panel — in a [`ReturnsBufferState`](@ref) of its own, taking the owner's cap, so that `fit(pipe)` can rebuild the carrier the batch path reads. An optimisation owner is folded through its own [`partial_fit!`](@ref), and keeps its own Fold Context; the Pipeline then holds none.
 
 Under `Online(pipe)` the pipeline carries a [`PipelineBufferState`](@ref) instead, and the block is appended to it: no step folds, and the read-out is a batch fit over the buffer.
 
@@ -669,7 +669,7 @@ end
 
 Folds a block into the row owner of a [`Pipeline`](@ref) and records the Pipeline's own context where the owner keeps none.
 
-A prior owner is folded through [`fold_prior`](@ref), first, because the Pipeline's context takes its cap from the buffer the prior seeds, exactly as an optimiser's does ([`fold_returns`](@ref)). The factor column is owned once, on the same terms: the context keeps it only when the prior's tree never reads it. An optimisation owner is a host of ADR 0137 and folds through its own step, and the Pipeline records nothing beside it.
+A prior owner is folded through [`fold_prior`](@ref), first, because the Pipeline's context takes its cap from the buffer the prior seeds, exactly as an optimiser's does ([`fold_returns`](@ref)). The factor column is owned once, on the same terms: the context keeps it only when the prior's tree never reads it. An optimisation owner is itself a host and folds through its own step, and the Pipeline records nothing beside it.
 
 # Related
 
@@ -699,7 +699,7 @@ The read-out verb of the Pipeline's online step, mirroring `optimise(opt)`. It r
  1. Rebuild the carrier of the observations folded so far, `rd₀`, from the row owner: a prior owner's rows through [`prior_returns_buffer`](@ref) and the Pipeline's own [`ReturnsBufferState`](@ref), an optimisation owner's through its [`returns_result`](@ref). The carrier is over the pipeline's input universe at warm-up width.
  2. Walk the data steps before the owner in order, through [`readout_data_step`](@ref). A row-local step reads its fitted Result out of its state, restricted to the assets that survive so far. A universe-only step runs its batch verb over `rd₀` viewed to the surviving assets, and narrows the surviving set. The index `idx` of the surviving assets into `rd₀` is the column map, and `rd = port_opt_view(rd₀, :, idx)` is the context's returns.
  3. Run every other step before the owner — a phylogeny, an uncertainty-set or a constraint step — over that context, as batch runs it.
- 4. Read the owner out over the surviving assets: a prior owner through `prior(port_opt_view(pe, idx))`, whose state is viewed by asset (ADR 0107) and never re-sliced; an optimisation owner through `optimise(opt)` on the viewed and injected estimator.
+ 4. Read the owner out over the surviving assets: a prior owner through `prior(port_opt_view(pe, idx))`, whose state is viewed by asset and never re-sliced; an optimisation owner through `optimise(opt)` on the viewed and injected estimator.
  5. Run every step after the owner as batch, the optimisation step with the context injected, and return the result.
 
 So a selection that moves between two steps is expressed as a view of a state fitted over the whole universe, which is the batch fit over those columns, and the selector re-ranks per step exactly as the batch loop refits it per fold.
@@ -854,7 +854,7 @@ end
 
 Reads the row owner of a folded [`Pipeline`](@ref) out over the surviving assets, and writes its slot.
 
-The owner's state is viewed to the surviving assets through [`port_opt_view`](@ref) before it is read out, which is ADR 0107's slice by asset: a state fitted over the full universe, viewed to a column set and read out, is the batch fit over that column set. A prior owner reads out through `prior(pe)`; an optimisation owner is injected with the context and read out through `optimise(opt)`, so the clustering, the constraints and every uncertainty set are fitted from the reconstituted carrier exactly as batch fits them.
+The owner's state is viewed to the surviving assets through [`port_opt_view`](@ref) before it is read out — a slice by asset: a state fitted over the full universe, viewed to a column set and read out, is the batch fit over that column set. A prior owner reads out through `prior(pe)`; an optimisation owner is injected with the context and read out through `optimise(opt)`, so the clustering, the constraints and every uncertainty set are fitted from the reconstituted carrier exactly as batch fits them.
 
 # Related
 

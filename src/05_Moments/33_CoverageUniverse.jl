@@ -730,7 +730,7 @@ Fit a moment on the Coverage Universe of an Asset Panel, and expand it to the fu
 
 This is the covariance root, and the six verbs beside it — `cor`, `var`, `std`, `mean`, [`coskewness`](@ref) and [`cokurtosis`](@ref) — each carry the same root and refer to this one for the rule.
 
-The Asset Panel travels as the **third positional argument** of every moment verb, as it travels as the third positional argument of [`prior`](@ref). This is the root method of each verb, and it is the reduce-and-expand of ADR 0117: it reduces `X` to its Coverage Universe, hands the clean block to the plain estimator, and writes the answer back into a `NaN` frame of the full width.
+The Asset Panel travels as the **third positional argument** of every moment verb, as it travels as the third positional argument of [`prior`](@ref). This is the root method of each verb, and it is the reduce-and-expand: it reduces `X` to its Coverage Universe, hands the clean block to the plain estimator, and writes the answer back into a `NaN` frame of the full width.
 
 A plain estimator needs no method of its own and no declaration. A **mask-aware** estimator overrides this method and reads `pnl.amsk` itself, because it alone knows its warm-up, its freezes and its resets, and it emits its own frame over the whole window.
 

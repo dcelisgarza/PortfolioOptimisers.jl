@@ -513,7 +513,7 @@ end
 
 Compute the coskewness tensor of a dataset, together with its negative spectral skewness matrix. Observation weights in `ske.w` are applied if set. [`FullMoment`](@ref) takes the centred returns, and [`SemiMoment`](@ref) clips every positive deviation to zero. If the estimator is `nothing`, returns `(nothing, nothing)`.
 
-`ske.w` weights the whole estimate, so it reaches the centre as well as the deviations. When `mean` is `nothing` and `ske.w` is not, the method sends `ske.me` through [`factory`](@ref) with `ske.w`, so `ske.w` wins over the weights that `ske.me` carries. Pass `mean` for a centre that `ske.w` does not describe. ADR 0088 records the decision.
+`ske.w` weights the whole estimate, so it reaches the centre as well as the deviations. When `mean` is `nothing` and `ske.w` is not, the method sends `ske.me` through [`factory`](@ref) with `ske.w`, so `ske.w` wins over the weights that `ske.me` carries. Pass `mean` for a centre that `ske.w` does not describe.
 
 The two returned matrices are different objects. The first is the coskewness tensor itself, and the second is the negative spectral skewness matrix that [`negative_spectral_coskewness`](@ref) reduces it to.
 

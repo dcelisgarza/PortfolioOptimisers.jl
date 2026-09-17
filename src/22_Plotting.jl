@@ -459,7 +459,7 @@ function plot_drawdowns end
 
 Scatter plot of risk/return measures across a collection of portfolio weight vectors.
 
-Each axis is one [`expected_risk`](@ref) call, and that verb reduces to the Investable Mask at its own entry against a Prior Result, which is ADR 0118's value-level door. So a gapped prior is handled one level below this figure, and no check is added here. A prediction arity is finite already, because the fold zeroed the Held Gap once in [`predict`](@ref).
+Each axis is one [`expected_risk`](@ref) call, and that verb reduces to the Investable Mask at its own entry against a Prior Result, at the value-level door. So a gapped prior is handled one level below this figure, and no check is added here. A prediction arity is finite already, because the fold zeroed the Held Gap once in [`predict`](@ref).
 
 # Arguments
 
@@ -1123,7 +1123,7 @@ function plot_coskewness end
 
 Eigenvalue spectrum of the cokurtosis matrix (N² × N²) from a [`HighOrderPrior`](@ref).
 
-The two arities of the figure take opposite sides of ADR 0118's rule, because one draws and the other computes. Under `heatmap = true` the figure **draws**: a non-investable asset keeps its rows and its columns, they are blank cells, and the colour limits are [`finite_symmetric_clim`](@ref) so one gap does not flatten the scale. Under the default the figure **computes**: `eigvals(Symmetric(kt))` refuses a `NaN`, so the prior arity reduces to the Investable Mask at its entry through [`investable_plot_view`](@ref), and the spectrum is that of the investable block, which is `Nᵢ²` long rather than `N²`. The bare `kt` arity computes on the matrix the caller holds, and a gap in it raises rather than reduces.
+The two arities of the figure take opposite sides of the same rule, because one draws and the other computes. Under `heatmap = true` the figure **draws**: a non-investable asset keeps its rows and its columns, they are blank cells, and the colour limits are [`finite_symmetric_clim`](@ref) so one gap does not flatten the scale. Under the default the figure **computes**: `eigvals(Symmetric(kt))` refuses a `NaN`, so the prior arity reduces to the Investable Mask at its entry through [`investable_plot_view`](@ref), and the spectrum is that of the investable block, which is `Nᵢ²` long rather than `N²`. The bare `kt` arity computes on the matrix the caller holds, and a gap in it raises rather than reduces.
 
 # Arguments
 
@@ -1177,7 +1177,7 @@ Four-panel composite plot for a single optimisation result:
 Note: panel 3 requires raw asset returns. Pass `rd::ReturnsResult` (original returns),
 not a `PredictionResult`, for the risk contribution panel.
 
-Each panel takes its own side of ADR 0118's rule, and this figure adds no rule of its own. Panel 1 draws a weight, which is zero at a non-investable asset. Panel 3 goes through [`risk_contribution`](@ref), which reduces to the Investable Mask at its own entry against a Prior Result and expands the per-asset answer. Panels 2 and 4 compute on the returns the caller hands them, so a gapped panel is scored through `predict(res, rd)` first.
+Each panel takes its own side of the draw/compute rule, and this figure adds no rule of its own. Panel 1 draws a weight, which is zero at a non-investable asset. Panel 3 goes through [`risk_contribution`](@ref), which reduces to the Investable Mask at its own entry against a Prior Result and expands the per-asset answer. Panels 2 and 4 compute on the returns the caller hands them, so a gapped panel is scored through `predict(res, rd)` first.
 
 # Arguments
 
@@ -2452,7 +2452,7 @@ end
 
 Reduce a prior result, the axis names and the weights a computed figure draws to the Investable Mask.
 
-This is ADR 0118's rule at the figure's door. A **drawn** plot keeps the frame: a heatmap or a bar chart of a Prior Result shows the full universe, and the backend leaves a blank cell and a missing bar where the asset is not investable. A **computed** plot has no such option. `eigvals(Symmetric(sigma))` refuses a `NaN`, and a phylogeny or a centrality score is fitted by a plain moment estimator, which refuses one too. Such a figure reduces here instead, and it draws the investable universe alone.
+A **drawn** plot keeps the frame: a heatmap or a bar chart of a Prior Result shows the full universe, and the backend leaves a blank cell and a missing bar where the asset is not investable. A **computed** plot has no such option. `eigvals(Symmetric(sigma))` refuses a `NaN`, and a phylogeny or a centrality score is fitted by a plain moment estimator, which refuses one too. Such a figure reduces here instead, and it draws the investable universe alone.
 
 The reduction is the one [`port_opt_view`](@ref) the prior's owner already writes, so a new block cannot be forgotten and the reduced `pr.X` carries no dead column. The names and the weights ride the asset axis, so they take the mask directly.
 

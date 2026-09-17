@@ -95,7 +95,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`SimpleExpectedReturns`](@ref) except `cache`, and `cvg` only where a policy is set.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:SimpleExpectedReturns, true)` to render it. ADR 0105 records the decision. `cvg` is read from the instance rather than from the type, because an opt-in that a caller has not taken is not part of the configuration they chose: an estimator whose `cvg` is `nothing` renders exactly as it did before the field existed, and one that carries a [`CoveragePolicy`](@ref) renders it.
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:SimpleExpectedReturns, true)` to render it. `cvg` is read from the instance rather than from the type, because an opt-in that a caller has not taken is not part of the configuration they chose: an estimator whose `cvg` is `nothing` renders exactly as it did before the field existed, and one that carries a [`CoveragePolicy`](@ref) renders it.
 
 # Arguments
 

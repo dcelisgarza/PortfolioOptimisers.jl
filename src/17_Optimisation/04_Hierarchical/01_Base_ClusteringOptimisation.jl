@@ -87,7 +87,7 @@ Holds the fields common to [`HierarchicalRiskParityResult`](@ref) and [`Hierarch
 
 ## The core carries no `fb`
 
-ADR 0011 fixes `fb` as the **last** field of each concrete result and keeps it out of the core, because every optimisation result already ends in `fb`. Both leaves end in `fb`, so ADR 0011's one generic `factory(res, fb)` rebuilds them by the same convention and needs no change. The core sits off [`AbstractResult`](@ref)'s optimisation branch, so that generic never reaches it.
+`fb` is fixed as the **last** field of each concrete result and kept out of the core, because every optimisation result already ends in `fb`. Both leaves end in `fb`, so the one generic `factory(res, fb)` rebuilds them by the same convention and needs no change. The core sits off [`AbstractResult`](@ref)'s optimisation branch, so that generic never reaches it.
 
 # Fields
 
