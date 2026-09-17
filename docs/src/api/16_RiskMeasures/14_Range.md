@@ -1,5 +1,0 @@
-# Range
-
-```@docs
-Range
-```
