@@ -1,16 +1,15 @@
+```@meta
+Description = "Similarity Matrices, public API of PortfolioOptimisers.jl: MaximumDistanceSimilarity, ExponentialSimilarity, GeneralExponentialSimilarity, …"
+```
+
 # Similarity Matrices
 
 ```@docs
-AbstractSimilarityMatrixAlgorithm
-AbstractNonNegativeSimilarityMatrixAlgorithm
 MaximumDistanceSimilarity
 ExponentialSimilarity
 GeneralExponentialSimilarity
 ComplementSimilarity
 AngularSimilarity
-distance_to_similarity
-assert_similarity_domain
-default_similarity
 ```
 
 ## References

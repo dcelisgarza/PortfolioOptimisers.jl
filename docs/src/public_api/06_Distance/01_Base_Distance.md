@@ -1,3 +1,7 @@
+```@meta
+Description = "Base Distance, public API of PortfolioOptimisers.jl: SimpleDistance, SimpleAbsoluteDistance, LogDistance, CorrelationDistance, VariationInfoDistance, …"
+```
+
 # Base Distance
 
 ```@docs
@@ -7,8 +11,6 @@ LogDistance
 CorrelationDistance
 VariationInfoDistance
 CanonicalDistance
-AbstractDistanceEstimator
-AbstractDistanceAlgorithm
 ```
 
 ## References

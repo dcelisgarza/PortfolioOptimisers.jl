@@ -1,25 +1,18 @@
+```@meta
+Description = "Feature Distance, public API of PortfolioOptimisers.jl: AngularDist, MeanCollapse, MedianCollapse, LastObservation, AggregateFeatures, AggregateDistances, …"
+```
+
 # Feature Distance
 
 ```@docs
 AngularDist
-AbstractCollapseAlgorithm
 MeanCollapse
 MedianCollapse
-AbstractFeatureCollapseAlgorithm
 LastObservation
 AggregateFeatures
 AggregateDistances
 StackObservations
 FeatureDistance
-assert_metric_domain
-assert_feature_matrix
-zero_feature_vectors
-patch_zero_feature_vectors!
-feature_distance
-collapse_features
-stack_observations
-collapse_weights
-collapse_rows
 feature_matrix
 feature_labels
 ```
