@@ -1,6 +1,11 @@
+```@meta
+Description = "Base Uncertainty Sets, public API of PortfolioOptimisers.jl: AbstractUncertaintyEpsAlgorithm, BoxUncertaintySet, BoxUncertaintySetAlgorithm, …"
+```
+
 # Base Uncertainty Sets
 
 ```@docs
+AbstractUncertaintyEpsAlgorithm
 BoxUncertaintySet
 BoxUncertaintySetAlgorithm
 MuUncertaintySetClass
@@ -11,13 +16,9 @@ ChiSqKUncertaintyAlgorithm
 EllipsoidalUncertaintySet
 EllipsoidalUncertaintySetAlgorithm
 NormBallUncertaintySetAlgorithm
-ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
-                       <:Option{<:AbstractUncertaintySetResult}}}, args...;
-             kwargs...)
+ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult}, <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
 ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
 ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)
-reads_prior_result
-ucs_prior
 ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult; kwargs...)
 mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
@@ -25,34 +26,11 @@ mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPrior
 sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
 sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult; kwargs...)
-AbstractUncertaintySetEstimator
-AbstractPriorUncertaintySetEstimator
-AbstractUncertaintySetAlgorithm
-AbstractUncertaintySetResult
-AbstractUncertaintyKAlgorithm
-AbstractUncertaintyEpsAlgorithm
-UcSE_UcS
-Num_UcSK
-Num_UcSEps
-AbstractCompactRadiusAlgorithm
-Num_CptRad
-AbstractUncertaintySetClass
-ucs_selector
-k_ucs
 port_opt_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::Any, args...)
-investable_ucs_reduction
-expand_investable_ucs(set::AbstractUncertaintySetResult, ::Nothing, ::AbstractPriorResult)
 port_opt_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i, args...)
 port_opt_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i, args...)
 port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:SigmaUncertaintySetClass}, i, args...)
 port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:MuUncertaintySetClass}, i, args...)
-expand_investable_ucs(set::BoxUncertaintySet{<:VecNum, <:VecNum}, imsk::BitVector, pr::AbstractPriorResult)
-expand_investable_ucs(set::BoxUncertaintySet{<:MatNum, <:MatNum}, imsk::BitVector, pr::AbstractPriorResult)
-expand_investable_ucs(set::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:SigmaUncertaintySetClass}, imsk::BitVector, pr::AbstractPriorResult)
-expand_investable_ucs(set::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:MuUncertaintySetClass}, imsk::BitVector, pr::AbstractPriorResult)
-vec_quantile_bounds
-ellipsoidal_set
-box_quantile_bounds
 ```
 
 ## References

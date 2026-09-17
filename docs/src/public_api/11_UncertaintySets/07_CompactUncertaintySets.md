@@ -1,9 +1,11 @@
+```@meta
+Description = "Compact Uncertainty Sets, public API of PortfolioOptimisers.jl: CompactCovarianceUncertaintySet, port_opt_view, mu_ucs."
+```
+
 # Compact Uncertainty Sets
 
 ```@docs
 CompactCovarianceUncertaintySet
-orthonormalise_basis
 port_opt_view(risk_ucs::CompactCovarianceUncertaintySet, i, args...)
-expand_investable_ucs(set::CompactCovarianceUncertaintySet, imsk::BitVector, pr::AbstractPriorResult)
 mu_ucs(::CompactCovarianceUncertaintySet, args...; kwargs...)
 ```
