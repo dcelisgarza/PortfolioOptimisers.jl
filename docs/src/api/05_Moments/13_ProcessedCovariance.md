@@ -1,5 +1,0 @@
-# Processed covariance
-
-```@docs
-ProcessedCovariance
-```
