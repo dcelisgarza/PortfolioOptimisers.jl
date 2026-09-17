@@ -111,10 +111,10 @@ decision only fixes that the gate must exist.
 
 - `STANDARDS.md` gains a row: subject = a private name's promotion to `public`, authority = this
   ADR, gate = the new census file, not yet created.
-- The infrastructure ticket owes the census and the STANDARDS.md row it gates. Each of the twelve
-  directory tickets it unblocks owes, per abstract type it promotes: the `public` declaration on
-  the type and every verb its `# Interfaces` section names, and the mirror-tree page updates the
-  promotion moves entries on.
+- The infrastructure ticket owes the census and the STANDARDS.md row it gates. Each directory
+  ticket it unblocks owes, per abstract type it promotes: the `public` declaration on the type and
+  every verb its `# Interfaces` section names, and the mirror-tree page updates the promotion moves
+  entries on.
 - `@ref`-linking a private name from a public docstring, and calling a private name qualified from
   a guide or example, both remain unrestricted and carry no promotion obligation on their own — the
   `# Interfaces` section is the only signal that does.
