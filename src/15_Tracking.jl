@@ -697,3 +697,4 @@ end
 
 export IndependentVariableTracking, DependentVariableTracking, WeightsTracking,
        ReturnsTracking, TrackingError
+public AbstractTrackingAlgorithm, tracking_benchmark

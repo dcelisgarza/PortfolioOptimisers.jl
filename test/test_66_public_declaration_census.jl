@@ -112,10 +112,9 @@ end
                           :AbstractOrderedWeightsArrayFunction, :AbstractRealisedTarget,
                           :AbstractRedundancyAlgorithm, :AbstractRiskMeasureSettings,
                           :AbstractSearchCrossValidationResult, :AbstractSelectionRule,
-                          :AbstractTrackingAlgorithm, :BaseHierarchicalOptimisationResult,
-                          :BaseOptimisationEstimator, :CrossValidationSearchScorer,
-                          :FrontierBoundEstimator, :HierarchicalOptimisationResult,
-                          :JuMPWeightFinaliserFormulation,
+                          :BaseHierarchicalOptimisationResult, :BaseOptimisationEstimator,
+                          :CrossValidationSearchScorer, :FrontierBoundEstimator,
+                          :HierarchicalOptimisationResult, :JuMPWeightFinaliserFormulation,
                           :NonFiniteAllocationOptimisationResult,
                           :NonJuMPOptimisationResult, :OptimisationAlgorithm,
                           :OptimisationModelResult, :OptimisationResult,
@@ -138,8 +137,7 @@ end
     verb_debt = Set([:needs_previous_weights, :opt_weight_bounds, :realised_target,
                      :regenerate_decay, :scalarise, :scalarise_risk_expression!,
                      :set_clustering_weight_finaliser_alg!, :target_dof, :target_step_dof,
-                     :time_dependent_field_defaults, :tracking_benchmark,
-                     :variance_risk_bounds_val])
+                     :time_dependent_field_defaults, :variance_risk_bounds_val])
 
     undeclared_types = Symbol[]
     undeclared_verbs = Tuple{Symbol, Symbol}[]
