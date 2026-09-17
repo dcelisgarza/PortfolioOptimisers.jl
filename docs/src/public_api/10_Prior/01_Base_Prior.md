@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base Prior, public API of PortfolioOptimisers.jl: AbstractPriorEstimator, AbstractPriorResult, LowOrderPrior, HighOrderPrior, prior, forward_prior, …"
+Description = "Base Prior, public API of PortfolioOptimisers.jl: AbstractPriorEstimator, AbstractPriorResult, AbstractLowOrderPriorEstimator_A, …"
 ```
 
 # Base Prior
@@ -7,6 +7,10 @@ Description = "Base Prior, public API of PortfolioOptimisers.jl: AbstractPriorEs
 ```@docs
 AbstractPriorEstimator
 AbstractPriorResult
+AbstractLowOrderPriorEstimator_A
+AbstractLowOrderPriorEstimator_F
+AbstractLowOrderPriorEstimator_AF
+AbstractHighOrderPriorEstimator_F
 LowOrderPrior
 HighOrderPrior
 prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)

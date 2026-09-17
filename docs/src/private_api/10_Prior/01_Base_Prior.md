@@ -1,14 +1,11 @@
 ```@meta
-Description = "Base Prior, private API of PortfolioOptimisers.jl: AbstractLowOrderPriorEstimator, AbstractLowOrderPriorEstimator_A, AbstractLowOrderPriorEstimator_F, …"
+Description = "Base Prior, private API of PortfolioOptimisers.jl: AbstractLowOrderPriorEstimator, AbstractLowOrderPriorEstimator_A_AF, AbstractLowOrderPriorEstimator_F_AF, …"
 ```
 
 # Base Prior: private API
 
 ```@docs
 AbstractLowOrderPriorEstimator
-AbstractLowOrderPriorEstimator_A
-AbstractLowOrderPriorEstimator_F
-AbstractLowOrderPriorEstimator_AF
 AbstractLowOrderPriorEstimator_A_AF
 AbstractLowOrderPriorEstimator_F_AF
 AbstractLowOrderPriorEstimator_A_F_AF

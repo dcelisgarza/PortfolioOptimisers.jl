@@ -47,8 +47,10 @@
     fifteen `src/11_UncertaintySets/` types joined the same day (issue #1134), the three
     `src/10_Prior/` types joined the same day (issue #1133), the four
     `src/16_RiskMeasures/` types below joined the same day too (issue #1137), the seventeen
-    `src/17_Optimisation/` types below joined the same day again (issue #1138), and the two
-    `src/20_AssetSelection.jl` types below joined the same day once more (issue #1139). They
+    `src/17_Optimisation/` types below joined the same day again (issue #1138), the two
+    `src/20_AssetSelection.jl` types below joined the same day once more (issue #1139), and
+    the four `src/10_Prior/` family types below — `AbstractPriorEstimator`'s own section
+    tells an author to subtype one of them — joined on 2026-09-17 too (issue #1146). They
     are held to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
@@ -65,6 +67,10 @@
                           :AbstractEstimatorValueAlgorithm,
                           :AbstractExpectedReturnsEstimator, :AbstractExposureEstimator,
                           :AbstractForecastTarget, :AbstractGapReturnAlgorithm,
+                          :AbstractHighOrderPriorEstimator_F,
+                          :AbstractLowOrderPriorEstimator_A,
+                          :AbstractLowOrderPriorEstimator_AF,
+                          :AbstractLowOrderPriorEstimator_F,
                           :AbstractMatrixProcessingAlgorithm,
                           :AbstractMatrixProcessingEstimator,
                           :AbstractNormCeilingCalibrationAlgorithm,

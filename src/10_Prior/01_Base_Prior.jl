@@ -95,6 +95,10 @@ Low order prior estimator using only asset returns.
 
 This is the first of the three source shapes. A member **admits asset returns only**: its `prior` method declares the factor argument as `args...` and never reads it, so factor returns handed to it are ignored rather than refused.
 
+# Interfaces
+
+  - `prior(pe::AbstractLowOrderPriorEstimator_A, X::MatNum, args...; dims::Int = 1, kwargs...) -> LowOrderPrior`: Estimate the prior from asset returns alone; `args...` absorbs and ignores any factor returns handed in.
+
 # Related
 
   - [`AbstractLowOrderPriorEstimator`](@ref)
@@ -111,6 +115,10 @@ Low order prior estimator using factor returns.
 `AbstractLowOrderPriorEstimator_F` is the base type for estimators that compute low order moments (mean and covariance) requiring the use of both asset and factor returns data. All concrete factor-adjusted prior estimators should subtype this type.
 
 This is the second of the three source shapes. A member **admits asset returns and requires factor returns**: its `prior` method declares the factor argument as `F::MatNum` with no default, so a call that omits factor returns is a `MethodError`. [`prior`](@ref) raises earlier and more clearly when a [`ReturnsResult`](@ref) with `F === nothing` reaches such an estimator.
+
+# Interfaces
+
+  - `prior(pe::AbstractLowOrderPriorEstimator_F, X::MatNum, F::MatNum, args...; dims::Int = 1, kwargs...) -> LowOrderPrior`: Estimate the prior from asset and factor returns; a call that omits `F` is a `MethodError`.
 
 # Related
 
@@ -131,6 +139,10 @@ Low order prior estimator using both asset and factor returns.
 This is the third of the three source shapes. A member **admits asset returns and admits factor returns optionally**: its `prior` method declares the factor argument as `F::Option{<:MatNum} = nothing` and reads it when it is supplied. The shape therefore says nothing about whether the result carries a regression: use [`assert_prior_regression`](@ref) to establish that.
 
 Nor does the shape say whether the fit *reads* factor returns, and [`needs_factor_returns`](@ref) answers that three ways. A member that requires them answers `true`, a member that never reads them answers `false`, and this shape answers `nothing` by default: *the type does not say; take what the fold is given*, which is what its batch verb does. Every member of this shape the library ships embeds another prior and hands `F` to it, so each defines the recursion and answers the leaf's value. A caller's own subtype that embeds a prior should define the same recursion; one that reads `F` itself may leave the default.
+
+# Interfaces
+
+  - `prior(pe::AbstractLowOrderPriorEstimator_AF, X::MatNum, F::Option{<:MatNum} = nothing, args...; dims::Int = 1, kwargs...) -> LowOrderPrior`: Estimate the prior from asset returns, reading `F` when it is supplied.
 
 # Related
 
@@ -229,6 +241,10 @@ High order prior estimator using factor returns.
 
 A member **admits asset returns and requires factor returns**, on the same terms as [`AbstractLowOrderPriorEstimator_F`](@ref) one order down: its `prior` method declares the factor argument as `F::MatNum` with no default. The two are the members of [`AbstractHiLoOrderPriorEstimator_F`](@ref), which is how [`prior`](@ref) recognises a factor prior without naming an order.
 
+# Interfaces
+
+  - `prior(pe::AbstractHighOrderPriorEstimator_F, X::MatNum, F::MatNum, args...; dims::Int = 1, kwargs...) -> HighOrderPrior`: Estimate the prior from asset and factor returns; a call that omits `F` is a `MethodError`.
+
 # Related
 
   - [`AbstractHighOrderPriorEstimator`](@ref)
@@ -271,7 +287,7 @@ In order to implement a new prior result carrier which will work seamlessly with
   - `reconstruct_prior(pr::AbstractPriorResult, patch::NamedTuple) -> AbstractPriorResult`: Rebuild the carrier through its own constructor with `patch` applied. This is what makes [`forward_prior`](@ref) work on the carrier, and it is written per carrier because the constructor is named rather than recovered by reflection.
   - `port_opt_view(pr::AbstractPriorResult, i, args...) -> AbstractPriorResult`: Restrict the carrier to the assets at index `i`, for hierarchical and subset optimisation.
 
-The field list is derived by [`prior_field_values`](@ref), so a carrier that gains a field needs no further method. Add the carrier's name to [`prior_result_property_pool`](@ref) so that an `@pprop` field naming one of its properties is recognised.
+The field list is derived by [`prior_field_values`](@ref), so a carrier that gains a field needs no further method. An `@pprop` field may only name a property of the two carriers [`prior_result_property_pool`](@ref) hard-codes today — [`LowOrderPrior`](@ref) and [`HighOrderPrior`](@ref); a third-party carrier's own property is refused by [`check_propagatable_contracts`](@ref) rather than recognised.
 
 ## Arguments
 
@@ -2391,3 +2407,8 @@ end
 
 export prior, LowOrderPrior, HighOrderPrior
 public forward_prior, AbstractPriorEstimator, AbstractPriorResult, reconstruct_prior
+# The `# Interfaces`-marked types of #1146 (ADR 0154): the four families
+# `AbstractPriorEstimator`'s own section tells an author to subtype now carry the contract
+# themselves. Their verb, `prior`, is already exported.
+public AbstractLowOrderPriorEstimator_A, AbstractLowOrderPriorEstimator_F,
+       AbstractLowOrderPriorEstimator_AF, AbstractHighOrderPriorEstimator_F

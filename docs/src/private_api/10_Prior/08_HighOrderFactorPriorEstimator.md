@@ -1,11 +1,10 @@
 ```@meta
-Description = "High Order Factor Prior, private API of PortfolioOptimisers.jl: AbstractHighOrderPriorEstimator_F, AbstractHiLoOrderPriorEstimator_F, coskewness_residuals, …"
+Description = "High Order Factor Prior, private API of PortfolioOptimisers.jl: AbstractHiLoOrderPriorEstimator_F, coskewness_residuals, cokurtosis_residuals, show_fields."
 ```
 
 # High Order Factor Prior: private API
 
 ```@docs
-AbstractHighOrderPriorEstimator_F
 AbstractHiLoOrderPriorEstimator_F
 coskewness_residuals
 cokurtosis_residuals
