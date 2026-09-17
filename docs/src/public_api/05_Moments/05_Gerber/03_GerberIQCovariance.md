@@ -13,6 +13,7 @@ GerberIQScalerEstimator
 GerberIQDecayEstimator
 AssetVolatilityGerberIQScaler
 ExpGerberIQDecay
+regenerate_decay
 BasicGerberIQ
 PartialGerberIQ
 FullGerberIQ

@@ -13,7 +13,6 @@ clamp_gerber_iq_n
 gerber_iq_eps
 gerber_iq_gamma
 gerber_iq_scaling
-regenerate_decay
 gerber_iq_assert_c_d
 gerber_iq_weight
 gerber_IQ_delta

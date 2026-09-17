@@ -115,14 +115,8 @@ end
     `public`-declared, measured the same day. A verb already public through another route
     (`prior`, `port_opt_view`, `mu_ucs`, ...) is not here -- only a name a promotion ticket
     must still declare alongside its type.
-
-    `regenerate_decay` is the one addition, made by issue #1132 on the same day:
-    `interfaces_verbs` read a self-qualified bullet (`PortfolioOptimisers.foo(...)`) as
-    foreign and skipped it, so the verb was never measured when #1130 promoted its type
-    (`GerberIQDecayEstimator`). The parser now reads the package's own prefix, and the entry
-    records debt that existed all along rather than debt this file grew.
     =#
-    verb_debt = Set([:regenerate_decay])
+    verb_debt = Set{Symbol}()
 
     undeclared_types = Symbol[]
     undeclared_verbs = Tuple{Symbol, Symbol}[]
@@ -211,10 +205,10 @@ end
 
     # A section reader or a declaration classifier that quietly stopped matching would
     # satisfy every assertion above with an empty set on each side, so the shape is proven
-    # alive. The two debt floors only ever fall, in the same commit that shrinks the debt
-    # list below them (#1138 pays 17 types and 6 verbs, taking promotion_debt from 21 to 4
-    # and verb_debt from 7 to 1): the map ends when both lists, and these floors, reach zero.
+    # alive. The promotion debt floor only ever falls, in the same commit that shrinks the
+    # debt list below it: the map ends when it, too, reaches zero. `verb_debt` paid its last
+    # entry, `regenerate_decay`, in #1144, so it carries no floor any more -- like
+    # `section_debt` above, an empty debt list proves nothing about the classifier's health.
     @test length(sections) > 80
     @test length(promotion_debt) > 0
-    @test length(verb_debt) > 0
 end

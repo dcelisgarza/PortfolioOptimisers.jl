@@ -2524,4 +2524,5 @@ end
 export AssetVolatilityGerberIQScaler, BasicGerberIQ, PartialGerberIQ, FullGerberIQ,
        ExpGerberIQDecay, GerberIQCovariance
 public BaseGerberIQCovariance, GerberIQCovarianceAlgorithm, GerberIQEpsEstimator,
-       GerberIQGammaEstimator, GerberIQScalerEstimator, GerberIQDecayEstimator
+       GerberIQGammaEstimator, GerberIQScalerEstimator, GerberIQDecayEstimator,
+       regenerate_decay
