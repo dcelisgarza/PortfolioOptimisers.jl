@@ -1,5 +1,5 @@
 ```@meta
-Description = "Gerber covariance, private API of PortfolioOptimisers.jl: BaseGerberCovariance, GerberCovarianceAlgorithm, gerber_updown, concordance_counts, gerber."
+Description = "Gerber covariance, private API of PortfolioOptimisers.jl: gerber_updown, concordance_counts, gerber."
 ```
 
 # Gerber covariance: private API
@@ -7,15 +7,6 @@ Description = "Gerber covariance, private API of PortfolioOptimisers.jl: BaseGer
 The Gerber statistic is a vote-based robust co-movement measure. It ignores fluctuations below a threshold while limiting the effect of extreme movements. It extends Kendall's Tau coefficient by counting the proportion of concordant and discordant movements within the window defined by the upper and lower limits [gerber](@cite).
 
 Three variants have been published and all three have been implemented because each has unique characteristics [gerber_analysis](@cite).
-
-## Abstract Gerber covariance types
-
-These serve as the scaffolding for defining Gerber covariance estimators and algorithms.
-
-```@docs
-BaseGerberCovariance
-GerberCovarianceAlgorithm
-```
 
 ## Concrete Gerber covariance implementations
 

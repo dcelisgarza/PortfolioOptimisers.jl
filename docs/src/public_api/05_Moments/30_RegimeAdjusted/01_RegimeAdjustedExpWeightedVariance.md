@@ -1,5 +1,5 @@
 ```@meta
-Description = "Regime Adjusted Exponential Weighted Variance, public API of PortfolioOptimisers.jl: LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted, …"
+Description = "Regime Adjusted Exponential Weighted Variance, public API of PortfolioOptimisers.jl: RegimeAdjustedMethod, LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted, regime_multiplier, …"
 ```
 
 # Regime Adjusted Exponential Weighted Variance
@@ -7,6 +7,7 @@ Description = "Regime Adjusted Exponential Weighted Variance, public API of Port
 ## Types
 
 ```@docs
+RegimeAdjustedMethod
 LogRegimeAdjusted
 FirstMomentRegimeAdjusted
 RootMeanSquaredAdjusted
@@ -16,6 +17,7 @@ RegimeAdjustedExpWeightedVariance
 ## Functions
 
 ```@docs
+regime_multiplier
 var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 partial_fit!(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)

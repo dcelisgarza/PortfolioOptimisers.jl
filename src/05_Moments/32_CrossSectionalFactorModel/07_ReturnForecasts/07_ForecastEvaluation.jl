@@ -596,3 +596,4 @@ end
 
 export IdiosyncraticTarget, AssetReturnTarget, PanelFieldTarget, ForecastEvaluationResult,
        forecast_evaluation
+public AbstractForecastTarget, forecast_target_history

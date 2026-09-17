@@ -1381,3 +1381,4 @@ end
 
 export regression, Regression, LinearModel, GeneralisedLinearModel, BenchmarkWeightMetric,
        RegressionWeightMetric, InverseIdiosyncraticVarianceMetric, IdentityMetric
+public AbstractTimeSeriesRegressionEstimator, AbstractCrossSectionalRegressionEstimator

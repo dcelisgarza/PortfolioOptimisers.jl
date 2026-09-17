@@ -1,5 +1,5 @@
 ```@meta
-Description = "Return Forecast Base, private API of PortfolioOptimisers.jl: AbstractReturnForecastEstimator, AbstractReturnForecastResult, AbstractForecastUnit, …"
+Description = "Return Forecast Base, private API of PortfolioOptimisers.jl: AbstractReturnForecastResult, AbstractForecastUnit, forecast_return_units, …"
 ```
 
 # Return Forecast Base: private API
@@ -7,7 +7,6 @@ Description = "Return Forecast Base, private API of PortfolioOptimisers.jl: Abst
 ## Types
 
 ```@docs
-AbstractReturnForecastEstimator
 AbstractReturnForecastResult
 AbstractForecastUnit
 ```

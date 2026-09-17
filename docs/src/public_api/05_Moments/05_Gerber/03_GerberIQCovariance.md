@@ -1,10 +1,16 @@
 ```@meta
-Description = "Gerber Information Quality Covariance, public API of PortfolioOptimisers.jl: AssetVolatilityGerberIQScaler, ExpGerberIQDecay, BasicGerberIQ, …"
+Description = "Gerber Information Quality Covariance, public API of PortfolioOptimisers.jl: BaseGerberIQCovariance, GerberIQCovarianceAlgorithm, GerberIQEpsEstimator, …"
 ```
 
 # Gerber Information Quality Covariance
 
 ```@docs
+BaseGerberIQCovariance
+GerberIQCovarianceAlgorithm
+GerberIQEpsEstimator
+GerberIQGammaEstimator
+GerberIQScalerEstimator
+GerberIQDecayEstimator
 AssetVolatilityGerberIQScaler
 ExpGerberIQDecay
 BasicGerberIQ

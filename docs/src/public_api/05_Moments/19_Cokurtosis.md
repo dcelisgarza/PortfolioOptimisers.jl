@@ -1,10 +1,11 @@
 ```@meta
-Description = "Cokurtosis, public API of PortfolioOptimisers.jl: Cokurtosis, cokurtosis."
+Description = "Cokurtosis, public API of PortfolioOptimisers.jl: CokurtosisEstimator, Cokurtosis, cokurtosis."
 ```
 
 # Cokurtosis
 
 ```@docs
+CokurtosisEstimator
 Cokurtosis
 cokurtosis
 ```

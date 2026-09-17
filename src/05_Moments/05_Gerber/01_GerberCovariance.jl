@@ -790,3 +790,4 @@ function Statistics.cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs..
 end
 
 export GerberCovariance, Gerber0, Gerber1, Gerber2
+public BaseGerberCovariance, GerberCovarianceAlgorithm

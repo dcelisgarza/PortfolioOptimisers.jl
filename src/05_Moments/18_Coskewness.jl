@@ -707,3 +707,4 @@ function coskewness(::Nothing, args...; kwargs...)
 end
 
 export Coskewness, coskewness
+public CoskewnessEstimator

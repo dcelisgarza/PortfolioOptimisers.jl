@@ -283,3 +283,4 @@ function port_opt_view(me::CustomValueExpectedReturns{<:VecNum}, i,
 end
 
 export CustomValueExpectedReturns
+public CustomExpectedReturnsValueAlgorithm

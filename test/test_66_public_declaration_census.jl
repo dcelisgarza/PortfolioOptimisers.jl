@@ -109,19 +109,13 @@ end
     declaration; it never adds an entry.
     =#
     promotion_debt = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
-                          :AbstractAmbiguityTailWeightCalibrationAlgorithm, :AbstractBins,
+                          :AbstractAmbiguityTailWeightCalibrationAlgorithm,
                           :AbstractConstraintEstimator, :AbstractConstraintResult,
-                          :AbstractConstraintSpace, :AbstractCovarianceEstimator,
-                          :AbstractCrossSectionalRegressionEstimator,
-                          :AbstractCrossSectionalTransform,
-                          :AbstractCrossSectionalWeightsAlgorithm,
+                          :AbstractConstraintSpace, :AbstractCrossSectionalTransform,
                           :AbstractDeformationCalibrationAlgorithm,
                           :AbstractDenoiseAlgorithm, :AbstractDenoiseEstimator,
-                          :AbstractDescriptorEstimator, :AbstractDetoneEstimator,
-                          :AbstractExpectedReturnsAlgorithm,
-                          :AbstractExpectedReturnsEstimator, :AbstractExposureEstimator,
-                          :AbstractForecastTarget, :AbstractGapReturnAlgorithm,
-                          :AbstractMatrixProcessingAlgorithm,
+                          :AbstractDetoneEstimator, :AbstractExpectedReturnsAlgorithm,
+                          :AbstractGapReturnAlgorithm, :AbstractMatrixProcessingAlgorithm,
                           :AbstractMatrixProcessingEstimator, :AbstractMomentAlgorithm,
                           :AbstractNormCeilingCalibrationAlgorithm,
                           :AbstractOrderedWeightsArrayFunction, :AbstractPanelField,
@@ -130,31 +124,22 @@ end
                           :AbstractPreviousWeightsSource, :AbstractPriorEstimator,
                           :AbstractPriorResult, :AbstractPriorUncertaintySetEstimator,
                           :AbstractRealisedTarget, :AbstractRedundancyAlgorithm,
-                          :AbstractReturnForecastEstimator, :AbstractRiskMeasureSettings,
+                          :AbstractRiskMeasureSettings,
                           :AbstractSearchCrossValidationResult, :AbstractSelectionRule,
                           :AbstractSignificanceCalibrationAlgorithm,
-                          :AbstractTimeSeriesRegressionEstimator,
                           :AbstractTrackingAlgorithm, :AbstractUncertaintyKAlgorithm,
                           :AbstractUncertaintySetAlgorithm, :AbstractUncertaintySetClass,
                           :AbstractUncertaintySetEstimator, :AbstractUncertaintySetResult,
-                          :AbstractVarianceEstimator, :BaseGerberCovariance,
-                          :BaseGerberIQCovariance, :BaseHierarchicalOptimisationResult,
-                          :BaseOptimisationEstimator, :BinWidthBins,
-                          :BootstrapUncertaintySetEstimator, :CokurtosisEstimator,
-                          :CoskewnessEstimator, :CrossValidationSearchScorer,
-                          :CustomExpectedReturnsValueAlgorithm, :FrontierBoundEstimator,
-                          :GerberCovarianceAlgorithm, :GerberIQCovarianceAlgorithm,
-                          :GerberIQDecayEstimator, :GerberIQEpsEstimator,
-                          :GerberIQGammaEstimator, :GerberIQScalerEstimator,
-                          :HierarchicalOptimisationResult, :ImpliedVolatilityAlgorithm,
+                          :BaseHierarchicalOptimisationResult, :BaseOptimisationEstimator,
+                          :BootstrapUncertaintySetEstimator, :CrossValidationSearchScorer,
+                          :FrontierBoundEstimator, :HierarchicalOptimisationResult,
                           :JuMPWeightFinaliserFormulation,
                           :NonFiniteAllocationOptimisationResult,
                           :NonJuMPOptimisationResult, :OpinionPoolingAlgorithm,
                           :OptimisationAlgorithm, :OptimisationModelResult,
-                          :OptimisationResult, :OptimisationReturnCode,
-                          :RegimeAdjustedMethod, :Scalariser, :TimeDependentCallable,
-                          :TimeDependentConstraintCallable, :TimeDependentOptimiserCallable,
-                          :WeightFinaliser])
+                          :OptimisationResult, :OptimisationReturnCode, :Scalariser,
+                          :TimeDependentCallable, :TimeDependentConstraintCallable,
+                          :TimeDependentOptimiserCallable, :WeightFinaliser])
 
     #=
     The verbs the still-private types above name that are themselves neither exported nor
@@ -162,19 +147,16 @@ end
     (`prior`, `port_opt_view`, `mu_ucs`, ...) is not here -- only a name a promotion ticket
     must still declare alongside its type.
     =#
-    verb_debt = Set([:_denoise!, :bin_width, :bootstrap_indices, :calc_num_bins,
-                     :compute_pooling, :cs_weights_initial, :cs_weights_refine,
-                     :forecast_target_history, :gap_return, :get_node_property, :k_ucs,
-                     :matrix_processing_algorithm, :matrix_processing_algorithm!,
-                     :needs_previous_weights, :needs_second_pass, :opt_weight_bounds,
-                     :panel_field_axes, :panel_field_labels, :panel_field_stack!,
-                     :panel_field_view, :panel_fill, :panel_input_field,
-                     :panel_input_is_static, :panel_resolve, :predict_realised_vols,
-                     :reads_prior_result, :realised_target, :reconstruct_prior,
-                     :regime_multiplier, :scalarise, :scalarise_risk_expression!,
-                     :set_clustering_weight_finaliser_alg!, :target_dof, :target_step_dof,
-                     :time_dependent_field_defaults, :tracking_benchmark,
-                     :variance_risk_bounds_val])
+    verb_debt = Set([:_denoise!, :bootstrap_indices, :compute_pooling, :gap_return,
+                     :get_node_property, :k_ucs, :matrix_processing_algorithm,
+                     :matrix_processing_algorithm!, :needs_previous_weights,
+                     :opt_weight_bounds, :panel_field_axes, :panel_field_labels,
+                     :panel_field_stack!, :panel_field_view, :panel_fill,
+                     :panel_input_field, :panel_input_is_static, :panel_resolve,
+                     :reads_prior_result, :realised_target, :reconstruct_prior, :scalarise,
+                     :scalarise_risk_expression!, :set_clustering_weight_finaliser_alg!,
+                     :target_dof, :target_step_dof, :time_dependent_field_defaults,
+                     :tracking_benchmark, :variance_risk_bounds_val])
 
     undeclared_types = Symbol[]
     undeclared_verbs = Tuple{Symbol, Symbol}[]
@@ -265,6 +247,6 @@ end
     # satisfy every assertion above with an empty set on each side, so the shape is proven
     # alive.
     @test length(sections) > 80
-    @test length(promotion_debt) > 80
-    @test length(verb_debt) > 30
+    @test length(promotion_debt) > 50
+    @test length(verb_debt) > 20
 end

@@ -1,15 +1,11 @@
 ```@meta
-Description = "Histogram, private API of PortfolioOptimisers.jl: AbstractBins, BinWidthBins, Int_Bin, bin_width, calc_num_bins, calc_hist_data, intrinsic_mutual_info, …"
+Description = "Histogram, private API of PortfolioOptimisers.jl: Int_Bin, calc_hist_data, intrinsic_mutual_info, variation_info, …"
 ```
 
 # Histogram: private API
 
 ```@docs
-AbstractBins
-BinWidthBins
 Int_Bin
-bin_width
-calc_num_bins
 calc_hist_data
 intrinsic_mutual_info
 variation_info

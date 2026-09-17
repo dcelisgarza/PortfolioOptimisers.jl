@@ -552,3 +552,4 @@ function cokurtosis(::Nothing, args...; kwargs...)
 end
 
 export cokurtosis, Cokurtosis
+public CokurtosisEstimator

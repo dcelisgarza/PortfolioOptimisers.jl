@@ -1669,3 +1669,4 @@ function supports_partial_fit(::RegimeAdjustedExpWeightedVariance)
 end
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
        RegimeAdjustedExpWeightedVariance
+public RegimeAdjustedMethod, regime_multiplier

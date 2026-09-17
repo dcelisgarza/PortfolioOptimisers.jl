@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base moments, private API of PortfolioOptimisers.jl: AbstractExpectedReturnsEstimator, AbstractExpectedReturnsAlgorithm, AbstractMomentAlgorithm, …"
+Description = "Base moments, private API of PortfolioOptimisers.jl: AbstractExpectedReturnsAlgorithm, AbstractMomentAlgorithm, gap_fill_value, densify, …"
 ```
 
 # Base moments: private API
@@ -11,11 +11,8 @@ Some optimisations and constraints make use of summary statistics. These types a
 They also provide generic fallbacks for the various functionality in the library.
 
 ```@docs
-AbstractExpectedReturnsEstimator
 AbstractExpectedReturnsAlgorithm
 AbstractMomentAlgorithm
-AbstractCovarianceEstimator
-AbstractVarianceEstimator
 gap_fill_value(::StatsBase.CovarianceEstimator)
 densify
 robust_cov

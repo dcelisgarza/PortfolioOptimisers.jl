@@ -1,14 +1,8 @@
 ```@meta
-Description = "Exposure Base, private API of PortfolioOptimisers.jl: AbstractExposureEstimator, assert_exposure_family, exposure_benchmark_weights, exposure_weight_fill!, …"
+Description = "Exposure Base, private API of PortfolioOptimisers.jl: assert_exposure_family, exposure_benchmark_weights, exposure_weight_fill!, exposure_group_labels, …"
 ```
 
 # Exposure Base: private API
-
-## Types
-
-```@docs
-AbstractExposureEstimator
-```
 
 ## Functions
 

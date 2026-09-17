@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base moments, public API of PortfolioOptimisers.jl: port_opt_view, factory, cov, cor, var, std, mean, FullMoment, SemiMoment."
+Description = "Base moments, public API of PortfolioOptimisers.jl: AbstractCovarianceEstimator, AbstractVarianceEstimator, AbstractExpectedReturnsEstimator, port_opt_view, factory, cov, cor, var, std, mean, FullMoment, SemiMoment."
 ```
 
 # Base moments
@@ -11,6 +11,9 @@ Some optimisations and constraints make use of summary statistics. These types a
 They also provide generic fallbacks for the various functionality in the library.
 
 ```@docs
+AbstractCovarianceEstimator
+AbstractVarianceEstimator
+AbstractExpectedReturnsEstimator
 port_opt_view(ce::StatsBase.CovarianceEstimator, ::Any, args...)
 factory(ce::StatsBase.CovarianceEstimator, args...)
 port_opt_view(me::AbstractExpectedReturnsEstimator, ::Any, args...)

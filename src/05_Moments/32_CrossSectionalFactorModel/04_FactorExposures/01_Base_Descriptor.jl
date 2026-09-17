@@ -549,3 +549,4 @@ function ew_beta_reset!(amsk::AbstractMatrix{Bool}, mu::AbstractVector{<:Number}
 end
 
 export descriptor
+public AbstractDescriptorEstimator

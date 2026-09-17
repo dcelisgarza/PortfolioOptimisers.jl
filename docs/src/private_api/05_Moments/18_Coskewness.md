@@ -1,11 +1,10 @@
 ```@meta
-Description = "Coskewness, private API of PortfolioOptimisers.jl: CoskewnessEstimator, negative_spectral_coskewness, negative_spectral_part, coverage_coskewness, …"
+Description = "Coskewness, private API of PortfolioOptimisers.jl: negative_spectral_coskewness, negative_spectral_part, coverage_coskewness, _coskewness."
 ```
 
 # Coskewness: private API
 
 ```@docs
-CoskewnessEstimator
 negative_spectral_coskewness
 negative_spectral_part
 coverage_coskewness

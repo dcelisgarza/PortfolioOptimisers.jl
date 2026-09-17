@@ -38,17 +38,31 @@
     second route: an abstract type whose docstring carries a `# Interfaces` section earns a
     `public` declaration on the type and on every verb the section names, one
     promotion-ticket directory at a time (issue #553) — `VectorToScalarMeasure` joined this
-    way on 2026-09-17 (issue #1127), and the nine `src/01_Base/` types below joined the same
-    day (issue #1126). They are held to their own list for the same reason — public is API
-    too.
+    way on 2026-09-17 (issue #1127), the nine `src/01_Base/` types below joined the same day
+    (issue #1126), and the twenty-five `src/05_Moments/` types below joined the same day
+    (issue #1130). They are held to their own list for the same reason — public is API too.
     =#
-    allowed_public = Set([:AbstractCoverageAlgorithm, :AbstractEstimatorValueAlgorithm,
-                          :AbstractOptimisationEstimator, :AbstractPartialFitState,
+    allowed_public = Set([:AbstractBins, :AbstractCoverageAlgorithm,
+                          :AbstractCovarianceEstimator,
+                          :AbstractCrossSectionalRegressionEstimator,
+                          :AbstractCrossSectionalWeightsAlgorithm,
+                          :AbstractDescriptorEstimator, :AbstractEstimatorValueAlgorithm,
+                          :AbstractExpectedReturnsEstimator, :AbstractExposureEstimator,
+                          :AbstractForecastTarget, :AbstractOptimisationEstimator,
+                          :AbstractPartialFitState, :AbstractReturnForecastEstimator,
+                          :AbstractTimeSeriesRegressionEstimator,
+                          :AbstractVarianceEstimator, :BaseGerberCovariance,
+                          :BaseGerberIQCovariance, :BinWidthBins, :CokurtosisEstimator,
+                          :CoskewnessEstimator, :CustomExpectedReturnsValueAlgorithm,
                           :CustomJuMPConstraint, :CustomJuMPObjective,
-                          :DynamicAbstractWeights,
+                          :DynamicAbstractWeights, :GerberCovarianceAlgorithm,
+                          :GerberIQCovarianceAlgorithm, :GerberIQDecayEstimator,
+                          :GerberIQEpsEstimator, :GerberIQGammaEstimator,
+                          :GerberIQScalerEstimator, :ImpliedVolatilityAlgorithm,
                           :NonFiniteAllocationOptimisationEstimator, :NormError,
-                          :OptimisationEstimator, :VecJuMPConstr, :VecJuMPObj,
-                          :VectorAbstractEstimatorValueAlgorithm, :VectorToScalarMeasure])
+                          :OptimisationEstimator, :RegimeAdjustedMethod, :VecJuMPConstr,
+                          :VecJuMPObj, :VectorAbstractEstimatorValueAlgorithm,
+                          :VectorToScalarMeasure])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&

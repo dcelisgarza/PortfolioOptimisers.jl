@@ -1,5 +1,5 @@
 ```@meta
-Description = "Regime Adjusted Exponential Weighted Variance, private API of PortfolioOptimisers.jl: RegimeAdjustedMethod, RegimeAdjustedVarianceState, regime_multiplier, …"
+Description = "Regime Adjusted Exponential Weighted Variance, private API of PortfolioOptimisers.jl: RegimeAdjustedVarianceState, get_regime_state, hac_squared_returns!, …"
 ```
 
 # Regime Adjusted Exponential Weighted Variance: private API
@@ -7,14 +7,12 @@ Description = "Regime Adjusted Exponential Weighted Variance, private API of Por
 ## Types
 
 ```@docs
-RegimeAdjustedMethod
 RegimeAdjustedVarianceState
 ```
 
 ## Functions
 
 ```@docs
-regime_multiplier
 get_regime_state(::RootMeanSquaredAdjusted, z2_valid::VecNum, ::Any)
 get_regime_state(method::FirstMomentRegimeAdjusted, z2_valid::VecNum, ::Any)
 get_regime_state(method::LogRegimeAdjusted, z2_valid::VecNum, min_val::Number = sqrt(eps(eltype(z2_valid))))

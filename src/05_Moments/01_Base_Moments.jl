@@ -2065,3 +2065,5 @@ macro windowed_estimator(head, body)
 end
 
 export FullMoment, SemiMoment
+public AbstractCovarianceEstimator, AbstractVarianceEstimator,
+       AbstractExpectedReturnsEstimator, AbstractReturnForecastEstimator
