@@ -1771,7 +1771,9 @@ The two walk-forward schemes carry this family in their `pws` field, bound to `O
 
 # Interfaces
 
-A subtype names a source of previous weights and declares no method of its own. [`previous_weights`](@ref) reads it.
+In order to implement a new previous-weights source which will work seamlessly with the library, subtype `AbstractPreviousWeightsSource` with a `wd::AbstractWeightDrift` field, the Weight Drift [`held_weights_drift`](@ref) runs when the scheme sets no drift of its own, and implement the following method:
+
+  - `previous_weights(pws::AbstractPreviousWeightsSource, prev::PredictionResult) -> VecNum_VecVecNum`: Read the weights the previous fold threads into the fold that follows it. A fallback method reads the held weights of the previous fold, `prev.hw.w`, so it is only needed when the source threads something else.
 
 # Related
 
@@ -2427,3 +2429,4 @@ function expand_held_member(imsk::BitVector, x::VecMatNum)
 end
 export calc_net_returns, calc_net_asset_returns, calc_turnover, cumulative_returns,
        drawdowns, SelfFinancingDrift, DriftedWeights, HeldWeightsResult
+public AbstractPreviousWeightsSource

@@ -1,12 +1,11 @@
 ```@meta
-Description = "Net returns and drawdowns, private API of PortfolioOptimisers.jl: AbstractWeightDrift, AbstractPreviousWeightsSource, drift_position_values, drift_wealth, …"
+Description = "Net returns and drawdowns, private API of PortfolioOptimisers.jl: AbstractWeightDrift, drift_position_values, drift_wealth, drift_returns, …"
 ```
 
 # Net returns and drawdowns: private API
 
 ```@docs
 AbstractWeightDrift
-AbstractPreviousWeightsSource
 drift_position_values
 drift_wealth
 drift_returns

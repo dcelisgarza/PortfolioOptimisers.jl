@@ -2366,3 +2366,4 @@ end
 
 export PredictionResult, MultiPeriodPredictionResult, PopulationPredictionResult,
        PredictionReturnsResult, fit, predict, fit_predict, sort_by_measure
+public previous_weights

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Net returns and drawdowns, public API of PortfolioOptimisers.jl: SelfFinancingDrift, DriftedWeights, HeldWeightsResult, calc_net_returns, …"
+Description = "Net returns and drawdowns, public API of PortfolioOptimisers.jl: AbstractPreviousWeightsSource, SelfFinancingDrift, DriftedWeights, HeldWeightsResult, …"
 ```
 
 # Net returns and drawdowns
@@ -7,6 +7,7 @@ Description = "Net returns and drawdowns, public API of PortfolioOptimisers.jl: 
 Net returns and drawdowns are two of the performance metrics of a portfolio. Here we define functions used to compute portfolio returns and related quantities.
 
 ```@docs
+AbstractPreviousWeightsSource
 SelfFinancingDrift
 DriftedWeights
 HeldWeightsResult

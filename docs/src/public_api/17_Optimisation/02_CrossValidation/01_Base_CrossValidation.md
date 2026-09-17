@@ -13,4 +13,5 @@ Base.split(res::CrossValidationResult, args...)
 predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
 fit_predict(opt::OptE_Opt, rd::ReturnsResult)
 sort_by_measure
+previous_weights
 ```
