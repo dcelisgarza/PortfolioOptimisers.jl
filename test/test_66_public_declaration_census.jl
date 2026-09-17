@@ -109,8 +109,7 @@ end
     declaration; it never adds an entry.
     =#
     promotion_debt = Set([:AbstractExpectedReturnsAlgorithm, :AbstractMomentAlgorithm,
-                          :AbstractRealisedTarget, :AbstractRedundancyAlgorithm,
-                          :AbstractSearchCrossValidationResult, :AbstractSelectionRule,
+                          :AbstractRealisedTarget, :AbstractSearchCrossValidationResult,
                           :BaseHierarchicalOptimisationResult, :BaseOptimisationEstimator,
                           :CrossValidationSearchScorer, :HierarchicalOptimisationResult,
                           :JuMPWeightFinaliserFormulation,

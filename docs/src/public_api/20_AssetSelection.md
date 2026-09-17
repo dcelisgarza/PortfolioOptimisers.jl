@@ -1,5 +1,5 @@
 ```@meta
-Description = "Asset selection, public API of PortfolioOptimisers.jl: ScoreSelector, CompleteAssetSelector, ThresholdRule, RankRule, QuantileRule, RedundancySelector, …"
+Description = "Asset selection, public API of PortfolioOptimisers.jl: ScoreSelector, CompleteAssetSelector, AbstractSelectionRule, ThresholdRule, RankRule, QuantileRule, …"
 ```
 
 # Asset selection
@@ -28,6 +28,7 @@ A rule turns per-asset scores into a keep-mask. [`ThresholdRule`](@ref) is *lite
 Ties at a rank cut are excluded entirely, so an ordinal rule may return fewer assets than asked. If the 20th and 21st assets score equally, `RankRule(; best = 20)` keeps 19: the tied block is dropped rather than split arbitrarily. This is the library's "if we cannot tell them apart, trust neither" tie policy.
 
 ```@docs
+PortfolioOptimisers.AbstractSelectionRule
 ThresholdRule
 RankRule
 QuantileRule
@@ -44,6 +45,7 @@ Leaving `score` as `nothing` falls back to the correlation algorithms' own survi
 [`ClusterGroups`](@ref) is also the only redundancy algorithm that reaches a distance estimator — the other two carry a `StatsBase.CovarianceEstimator` — so it is the only one that can be driven by a feature matrix rather than by the returns. Give its `cle` a [`FeatureDistance`](@ref) and the redundancy groups come from exogenous structure: a sector taxonomy, carried as a categorical Panel Field through [`panel_input`](@ref), reduces the universe to one representative per classification, not per correlated blob. The panel is read straight off the [`ReturnsResult`](@ref), because preselection runs before any prior exists — a producer that reads a prior raises here, and [`PhylogenyPanel`](@ref) is the one that does not.
 
 ```@docs
+PortfolioOptimisers.AbstractRedundancyAlgorithm
 RedundancySelector
 PairwiseCorrelation
 CorrelationComponents

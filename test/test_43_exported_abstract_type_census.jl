@@ -45,9 +45,10 @@
     `AbstractPreorderBy` from `src/08_Phylogeny/` joined the same day (issue #1131), the
     three `src/09_ConstraintGeneration/` types joined the same day as well (issue #1132), the
     fifteen `src/11_UncertaintySets/` types joined the same day (issue #1134), the three
-    `src/10_Prior/` types joined the same day (issue #1133), and the four
-    `src/16_RiskMeasures/` types below joined the same day too (issue #1137). They are held
-    to their own list for the same reason — public is API too.
+    `src/10_Prior/` types joined the same day (issue #1133), the four
+    `src/16_RiskMeasures/` types below joined the same day too (issue #1137), and the two
+    `src/20_AssetSelection.jl` types below joined the same day again (issue #1139). They are
+    held to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
                           :AbstractAmbiguityTailWeightCalibrationAlgorithm, :AbstractBins,
@@ -73,7 +74,8 @@
                           :AbstractPosdefEstimator, :AbstractPreorderBy,
                           :AbstractPreviousWeightsSource, :AbstractPriorEstimator,
                           :AbstractPriorResult, :AbstractPriorUncertaintySetEstimator,
-                          :AbstractReturnForecastEstimator, :AbstractRiskMeasureSettings,
+                          :AbstractRedundancyAlgorithm, :AbstractReturnForecastEstimator,
+                          :AbstractRiskMeasureSettings, :AbstractSelectionRule,
                           :AbstractSignificanceCalibrationAlgorithm,
                           :AbstractTimeSeriesRegressionEstimator,
                           :AbstractTrackingAlgorithm, :AbstractUncertaintyKAlgorithm,
