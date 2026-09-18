@@ -64,9 +64,11 @@ one-step definition that carries the regret bound.
 
 ### One head, the rule on a slot, under the naive family
 
-`OnlinePortfolioSelection <: NaiveOptimisationEstimator` is the one concrete head. It holds the
-fields every naive head holds — `wb`, `sets`, `wf`, `fb`, `strict`, `cache` — and the update rule
-on `alg::AbstractOnlinePortfolioSelectionAlgorithm`, an unexported abstract type under
+`OnlinePortfolioSelection <: NaiveOptimisationEstimator` is the one concrete head. It holds
+`fb`, `strict` and `cache` as every naive head does, its constraints as one Allocation Set on `set`
+in place of `wb`, `sets` and a Weight Finaliser
+([ADR 0159](0159-a-constrained-online-update-projects-onto-an-allocation-set-in-the-rules-own-geometry-and-the-default-set-needs-no-solver.md)),
+and the update rule on `alg::AbstractOnlinePortfolioSelectionAlgorithm`, an unexported abstract type under
 `AbstractAlgorithm`, one concrete rule per algorithm (`ExponentiatedGradient`,
 `MovingAverageReversion`, …; the roster is a later ticket's). The rule is the only thing that
 varies across the 36 rows of the ledger, so it is the only thing a member writes: a rule struct, a

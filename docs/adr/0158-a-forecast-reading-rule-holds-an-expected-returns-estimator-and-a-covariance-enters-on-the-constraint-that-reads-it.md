@@ -10,7 +10,7 @@ status: proposed
 fixed the shape of online portfolio selection: one head, `OnlinePortfolioSelection`, the rule on
 `alg`, a Rule State beside the rows held once
 ([ADR 0157](0157-an-online-selection-state-is-a-rule-state-beside-the-rows-held-once-and-a-block-of-rows-is-that-many-single-row-updates.md)),
-and the head's field list — `wb`, `sets`, `wf`, `fb`, `strict`, `cache` — with **no prior slot**.
+and the head's field list — its constraints on `set`, then `fb`, `strict`, `cache` — with **no prior slot**.
 [ADR 0156](0156-every-online-selection-algorithm-ships-as-a-closed-form-rule-an-expert-mixture-or-a-follow-the-leader-over-a-selected-sample.md)
 named the roster and deferred to this decision the spelling of the variants that change *what is
 read*: the exponential-moving-average reversion and the cost-aware rule's two forecasts.
