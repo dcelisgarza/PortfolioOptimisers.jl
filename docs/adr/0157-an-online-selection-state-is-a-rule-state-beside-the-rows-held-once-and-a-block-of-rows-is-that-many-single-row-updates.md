@@ -14,7 +14,7 @@ rule's private carriers, a batch verb that is the Causal Pass, and a read-out th
 Recursion Read-out. It left to
 [issue #1152](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1152) the state's
 contract: the one verb every rule writes, the state's field list, what a fold of several rows
-means, what a step does with a non-finite price relative, how the state answers a view by
+means, what a step does with a non-finite return, how the state answers a view by
 asset, and what pins the Fold Context a `Resume` reads.
 [ADR 0156](0156-every-online-selection-algorithm-ships-as-a-closed-form-rule-an-expert-mixture-or-a-follow-the-leader-over-a-selected-sample.md)
 added the constraint that the state must admit a carrier that is a window or a prefix of rows,
@@ -64,7 +64,7 @@ in place where it can, the value returned is the truth.
 | :--- | :--- |
 | `w` | the allocation held during the current period, over the full pinned universe |
 | `st` | the rule's private carrier, or `nothing` |
-| `X` | the rows any rule of the tree reads, a `SampleBufferState` of price relatives, or `nothing` |
+| `X` | the rows any rule of the tree reads, a `SampleBufferState` of returns, or `nothing` |
 | `nx`, `pnl` | the asset names and the static Asset Panel, pinned by the first step |
 | `ts` | every timestamp folded, in order, unbounded |
 
@@ -106,15 +106,17 @@ wants a rule that genuinely rebalances weekly resamples the returns to weekly an
 read the *held* (drifted) weights mid-block is the start-weights, drift, turnover and fees
 ticket's question.
 
-### A non-finite price relative is filled with one, once, before the buffer and the rule
+### A non-finite return is filled with zero, once, before the buffer and the rule
 
-The head fills every non-finite cell of `x` with `1` — a zero return, the position sits in
-cash — before it pushes the row into `X` and before it calls the rule. A cell outside the
-panel's active mask is filled silently, because an inactive asset has no return by definition;
-a cell inside it is a Held Gap and is named through the head's `strict`: a warning by default,
-a refusal under `strict`. The rule and the rows buffer therefore see finite rows over the full
-pinned universe, a re-solve on the rows sees a zero return at the gap exactly as `predict`
-scores one, and masks act at the read-out and never inside the recursion. `step_active_mask`'s
+The head fills every non-finite cell of the row `r` with `0` — the Held Gap's own number, the
+position sits in cash — before it pushes the row into `X` and before it forms the price relative
+`x = 1 .+ r` the rule reads
+([ADR 0162](0162-an-online-selection-head-buffers-returns-and-starts-from-a-given-allocation-or-a-uniform-one-over-the-pinned-universe.md)).
+A cell outside the panel's active mask is filled silently, because an inactive asset has no
+return by definition; a cell inside it is a Held Gap and is named through the head's `strict`: a
+warning by default, a refusal under `strict`. The rule and the rows buffer therefore see finite
+rows over the full pinned universe, a re-solve on the rows sees a zero return at the gap exactly
+as `predict` scores one, and masks act at the read-out and never inside the recursion. `step_active_mask`'s
 three refusals — `iv`, a panel with fields, `emsk ≠ amsk` — are reused verbatim.
 
 A consequence is that the state's `w` never carries a forced zero. An asset that is unlisted

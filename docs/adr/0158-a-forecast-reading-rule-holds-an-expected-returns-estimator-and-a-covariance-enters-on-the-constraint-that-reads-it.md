@@ -108,7 +108,8 @@ slot in the library may hold it, so a Black–Litterman or shrunk mean may drive
 an `ExpectedReturn` risk measure, or an `EmpiricalPrior`. It **refuses at construction a prior
 for which `needs_factor_returns(pe) === true`**, because the expected-returns seam carries no
 factor returns anywhere in the library; a *take what is given* prior is admitted and fitted
-without them. The head's rows buffer stays a buffer of price relatives.
+without them. The head's rows buffer is a buffer of returns, which is what every `me` reads
+([ADR 0162](0162-an-online-selection-head-buffers-returns-and-starts-from-a-given-allocation-or-a-uniform-one-over-the-pinned-universe.md)).
 
 ### A forecaster folds where it can and refits from the head's rows otherwise
 

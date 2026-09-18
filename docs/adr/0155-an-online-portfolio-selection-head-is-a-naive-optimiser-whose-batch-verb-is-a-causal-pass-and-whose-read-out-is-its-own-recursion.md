@@ -68,6 +68,10 @@ one-step definition that carries the regret bound.
 `fb`, `strict` and `cache` as every naive head does, its constraints as one Allocation Set on `set`
 in place of `wb`, `sets` and a Weight Finaliser
 ([ADR 0159](0159-a-constrained-online-update-projects-onto-an-allocation-set-in-the-rules-own-geometry-and-the-default-set-needs-no-solver.md)),
+its fees on `fees`
+([ADR 0160](0160-an-online-update-starts-from-its-own-allocation-and-its-trade-is-measured-from-the-price-adjusted-one.md)),
+its Start Allocation on `w0`
+([ADR 0162](0162-an-online-selection-head-buffers-returns-and-starts-from-a-given-allocation-or-a-uniform-one-over-the-pinned-universe.md)),
 and the update rule on `alg::AbstractOnlinePortfolioSelectionAlgorithm`, an unexported abstract type under
 `AbstractAlgorithm`, one concrete rule per algorithm (`ExponentiatedGradient`,
 `MovingAverageReversion`, …; the roster is a later ticket's). The rule is the only thing that

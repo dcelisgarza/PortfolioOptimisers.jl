@@ -53,7 +53,7 @@ ceiling. Six facts measured on `dev` at `a44e79c271` shaped the decision.
   `NonFRCJuMPOpt`, a `Union` of the four concrete JuMP optimisers, and read `opt.sets` and
   `opt.opt.strict`; the tracking-error builders take a prior result. A variance bound on its own
   is a ten-line second-order cone, `[ub; G w] ∈ SOC` with `G` the Cholesky factor of `sigma`, and a
-  tracking error over the head's rows is `‖(X − 1) w − b‖ ≤ err √T`.
+  tracking error over the head's rows of returns is `‖X w − b‖ ≤ err √T`.
 - **A budget is a cash column.** The library's wealth recursion at any budget is `1 + ⟨w, r⟩`;
   under `Σw = 1` it is `⟨w, x⟩`, the form every rule's formula uses — the gradient `x / ⟨w, x⟩`,
   the loss `⟨w, x⟩ ≤ ε`, the Newton gradient. A budget below one with idle cash is exactly a
