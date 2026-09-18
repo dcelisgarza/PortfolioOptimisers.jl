@@ -74,14 +74,18 @@ subtype of the unexported `AbstractProjectionGeometry`: `EuclideanProjection`,
 `EntropicProjection` (Kullback–Leibler) and `GramProjection(; slv)` (the norm of the rule's Gram
 matrix). The default is the paper's geometry, and **the slot's type bound on each rule names the
 geometries admissible for that rule**, so a combination no theorem covers fails at construction and
-not at run time. For the first set: `ExponentiatedGradient` and the Expert Mixture's weighting
-rules bound the slot to `EntropicProjection`; `NewtonStep` to
-`Union{EuclideanProjection, GramProjection}` with `EuclideanProjection()` the default, which is the
-prototype's answer and needs no solver; `PassiveAggressiveMeanReversion`, `ForecastReversion`,
-`ConstantRebalancedPortfolio` and `BuyAndHold` to `EuclideanProjection`. An Expert Mixture has no
-slot of its own: a convex combination of feasible experts is feasible, so the experts' rules carry
-the geometry and the mixture projects nothing. A later set states its bound in its own ADR under
-the same rule: the paper's geometry, plus any the literature has run the rule under.
+not at run time. For the first set: `ExponentiatedGradient` bounds the slot to
+`EntropicProjection`; `NewtonStep` to `Union{EuclideanProjection, GramProjection}` with
+`EuclideanProjection()` the default, which is the prototype's answer and needs no solver;
+`PassiveAggressiveMeanReversion`, `ForecastReversion`, `ConstantRebalancedPortfolio` and
+`BuyAndHold` to `EuclideanProjection`. A rule used as an Expert Mixture's weighting keeps its own
+bound and projects onto the mixture's Expert Set, the bare simplex over the experts by default. The
+mixture's experts each project onto the head's set in their own geometry, and the mixture then
+projects its blend onto the same set once more in the Euclidean geometry, the identity wherever the
+blend is already feasible
+([ADR 0163](0163-an-expert-mixture-weights-its-experts-on-an-expert-set-of-its-own-and-projects-its-blend-onto-the-allocation-set-once-more.md)).
+A later set states its bound in its own ADR under the same rule: the paper's geometry, plus any the
+literature has run the rule under.
 
 The sparsity follows from the geometry and is documented, not chosen: a Euclidean projection zeroes
 every entry below its threshold, an entropic projection cannot zero a positive entry, and a

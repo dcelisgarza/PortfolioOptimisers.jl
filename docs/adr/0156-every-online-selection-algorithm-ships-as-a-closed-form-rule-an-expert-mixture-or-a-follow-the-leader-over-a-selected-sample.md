@@ -61,7 +61,7 @@ beyond what the prototype already computes inside its rules.
 
 ### The universal portfolio is the expert mixture over sampled constant rebalanced portfolios
 
-`ExpertMixture(; experts, alg)` is a rule whose state is every expert's state plus the weight
+`ExpertMixture(; experts, alg, eset, proj)` is a rule whose state is every expert's state plus the weight
 vector `p_t` over the experts, whose update steps every expert and moves `p_t` by `alg`, and whose
 answer is `Σ_k p_{t+1,k} h_k(t+1)`. `ConstantRebalancedPortfolio(; w)` is a rule whose update is
 `w_{t+1} = w`, uniform by default. `UniversalPortfolio(; n_experts, rng, prior)` is a constructor
