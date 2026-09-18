@@ -197,3 +197,32 @@ reference line for line and correct today for every non-frontier optimiser.
   therefore comes from whichever of the two owns it, and `returns_result` reads the prior's buffer
   when the context holds no factor column. #1013 replaced the duplicate this bullet used to
   record.
+
+## Amendment (2026-09-18)
+
+**A read-out is one of two kinds, and the reconstitution this ADR fixed is the first.**
+[ADR 0155](0155-an-online-portfolio-selection-head-is-a-naive-optimiser-whose-batch-verb-is-a-causal-pass-and-whose-read-out-is-its-own-recursion.md)
+brings in the first optimiser whose read-out is not a batch fit: an online portfolio selection
+head updates its allocation from each realised price relative through a one-step rule, fits no
+moment and solves no programme, and the state it holds *is* the answer. There is nothing to
+reconstitute, because no batch fit over the folded rows would produce the weights it holds.
+
+An optimiser's read-out is therefore one of two kinds, and which one is the family's to declare:
+
+- A **reconstitution**, as decided above: the read-out rebuilds the carrier from the state,
+  swaps the folded prior for its read-out, and runs the batch path, so everything beside the prior
+  is identical to batch by construction and the identity `optimise(opt) == optimise(opt, rd[1:t])`
+  holds to the moment layer's tolerance. Every host this ADR named takes it.
+- A **recursion**: the read-out reads the allocation the state holds, wraps it in a Result, and
+  runs no batch path. The family's batch verb is defined as the same causal pass the online step
+  takes — the rule applied to every row in order from the start weights — so the identity holds
+  **exactly**, both arms taking the same sequence of single-row updates. Such a state holds no
+  column buffer, only the recursion's carriers, the pinned Fold Context and the timestamps, and
+  it refuses `merge_states` because an online update is not a sufficient statistic for its block.
+
+The rule that an optimiser forwards the observation to its prior and to nothing else is unchanged
+where a prior is held: a recursive head that reads a forecast off a prior forwards the observation
+to that prior *and* folds its own recursion, and everything else it holds still takes its
+ordinary batch treatment at read-out. The sentence in `CONTEXT.md`'s *Fold Context* entry that
+nothing above the prior takes a step of its own now names the recursion as the one thing that
+does.

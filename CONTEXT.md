@@ -40,6 +40,7 @@ The number of observations a fold-and-carry Prior Estimator keeps in its Result'
 **Fold Context**
 What an optimiser keeps beside its Prior Estimator when it takes the online step: every column of the `ReturnsResult` the prior does not own — the benchmark and timestamp columns, and the factor column only when the prior's tree never reads it, as buffers of their own — and the context pinned by the first step and checked at every step after it, the asset, factor and benchmark names and a static Asset Panel. It lives in a `ReturnsBufferState` in the optimiser's Partial Fit State slot, and a read-out rebuilds from it the carrier a batch fit over the same observations would have read. The returns are owned once, by the prior; a head that holds no prior is the bottom of its own chain and keeps them in its Fold Context.
 A Pipeline holds one too, but only when its prior step owns the rows — the one host whose own estimator is not the row owner, because `inject_context` overrides the optimiser's prior with the step's; when the optimiser step owns the rows, that optimiser already holds the context. ADR 0142. A time-varying Asset Panel is never pinned: its active mask rides into the returns buffer beside the rows, and the read-out rebuilds the panel from it. ADR 0137.
+An Online Portfolio Selection head (§4.1) is the one optimiser that takes a step of its own above the prior: its read-out is a Recursion Read-out, its state pins the same names and static panel and records the timestamps, and it holds no column, because the read-out rebuilds nothing. ADR 0137 amended, ADR 0155.
 *Avoid*: reading it as a second Sample Buffer; it holds no returns where a prior does, and no estimate ever. And reading the read-out as an online solve; `optimise(opt)` reconstitutes the carrier and runs the ordinary batch path, so nothing above the prior takes a step of its own.
 
 **Choice Surface**
@@ -509,6 +510,27 @@ Produces portfolio weights from a Prior Result and zero or more constraints and 
 - **EqualWeighted**: `1/N` across assets.
 - **InverseVolatility**: weights inversely proportional to asset volatility.
 - **RandomWeighted**: random feasible weights, as a baseline.
+- **OnlinePortfolioSelection**: updates the allocation from each realised price relative through an Online Update held on `alg`; fits no moment and solves no programme.
+
+**Online Portfolio Selection**
+The naive head that updates its allocation from each realised price relative through an Online Update, fitting no moment and solving no programme, and carrying the regret guarantee the rule's paper states against every price sequence. It is one head, `OnlinePortfolioSelection`, generic over the rule it holds, and every shared verb — the batch Causal Pass, the Recursion Read-out, the block step, the projection, the refusals — is the head's; a member is a rule, the state of its private carriers, and one update. A meta-learning aggregator over experts is a rule over rules, not a second head. ADR 0155.
+*Avoid*: the `Online` wrapper, which declares a Sample Buffer on one estimator; and `OnlineStep`, which is the Fold Loop's Fold Fit. Both may carry this head without being it.
+
+**Online Update**
+The one-step rule of an Online Portfolio Selection head, `(state, w_t, x_t) → (state', w_{t+1})`: from the allocation held during period `t` and the price relative period `t` revealed, the allocation for period `t+1`, on the simplex, or the constrained set once a constraint is stated. It is held on the head's `alg` slot and is the only thing that varies between members of the family; its private carriers — a Gram matrix, a window of price levels, expert log-wealths — live in the head's Partial Fit State beside the allocation. ADR 0155.
+*Avoid*: `partial_fit!`, which is the verb that applies the rule to a block of rows; and an Online Step, which is the Fold Loop's cadence, not the rule.
+
+**Next-Period Allocation**
+The convention an Online Portfolio Selection head answers under, batch and online alike: read after rows `1:t`, the answer is the portfolio for period `t+1`, and row `t` of any weight path reads rows `1:t-1` and nothing later. It is the papers' protocol — the update to `b_{t+1}` closes every iteration — and it is one more update than a backtest driver takes, because an optimiser's answer is always for the period after its data. ADR 0155.
+*Avoid*: the portfolio held during the last row, which a backtest's wealth uses and a live deployment never trades.
+
+**Causal Pass**
+The batch verb of an Online Portfolio Selection head: from the start weights, the Online Update over every row of the window in order, answering the Next-Period Allocation. A batch call on a head that already carries a state runs from the start weights and neither reads nor writes the state; *continue from here* is `partial_fit!` then the read-out. ADR 0155.
+*Avoid*: a refit, which no member of the family does; and the hindsight benchmark over the same window, which is `MeanRisk` under a logarithmic return.
+
+**Recursion Read-out**
+The second kind of read-out an optimiser may declare (ADR 0137 amended): the state's allocation is the answer, wrapped in a Result, and no batch path runs. Its batch verb is the same Causal Pass the online step takes, so the identity between a batch fit over the folded rows and the read-out holds exactly, both arms taking the same sequence of single-row updates. The state behind it pins the Fold Context and records the timestamps, holds no column buffer, and refuses a State Merge because an online update is not a sufficient statistic for its block. The result is a `NaiveOptimisationResult` with one vector, and a weight sequence is a walk-forward's product, never an optimisation result. ADR 0155.
+*Avoid*: a Reconstitution, the first kind, under which the read-out rebuilds the carrier and runs the batch path; and reading the head's answer off the state by hand, which skips the Result, the mask and the finaliser.
 
 ### 4.2 Clustering (Non-JuMP)
 
