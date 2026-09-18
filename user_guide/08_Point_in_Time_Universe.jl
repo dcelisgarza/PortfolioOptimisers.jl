@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "How PortfolioOptimisers.jl handles assets that list, delist or go quiet mid-sample: the point-in-time universe, end to end."
+```
+
 # The point-in-time universe
 
 Real asset universes move. A company lists halfway through your sample, another is acquired and

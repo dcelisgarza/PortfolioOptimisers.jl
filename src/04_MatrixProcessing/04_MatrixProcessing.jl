@@ -811,3 +811,5 @@ function assert_finite_block(block::AbstractArray)::Nothing
 end
 
 export MatrixProcessing, matrix_processing, matrix_processing!
+public AbstractMatrixProcessingEstimator, AbstractMatrixProcessingAlgorithm,
+       matrix_processing_algorithm, matrix_processing_algorithm!

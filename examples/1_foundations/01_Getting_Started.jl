@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Getting started with PortfolioOptimisers.jl: a classic Markowitz mean-variance optimisation with MeanRisk, from prices to weights."
+```
+
 # Getting started: a simple `MeanRisk` optimisation
 
 Here we show a simple example of how to use `PortfolioOptimisers`. We will perform the classic Markowitz optimisation.

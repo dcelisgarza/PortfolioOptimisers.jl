@@ -238,8 +238,7 @@ end
 """
     (r::AbstractBaseRiskMeasure)(::VecNum)
 
-Backstop for the single-argument *precomputed-returns* functor contract `r(x::VecNum)`
-(ADR 0007).
+Backstop for the single-argument *precomputed-returns* functor contract `r(x::VecNum)`.
 
 This method is only ever reached by a measure that defines **no** `VecNum` functor of its
 own — e.g. a composite carrying a weights-only variance term such as `VarianceSkewKurtosis`.
@@ -274,7 +273,7 @@ end
 
 Whether risk measure `r` has a well-defined *precomputed-returns* form — i.e. whether its
 expected risk can be evaluated on an already-reduced net-return series `x` alone, via the
-functor `r(x::VecNum)` (ADR 0007).
+functor `r(x::VecNum)`.
 
 The contract is well-defined exactly when the measure's result is a function of the series
 alone:
@@ -452,10 +451,53 @@ Abstract supertype for standard risk measures used in portfolio optimisation.
 
 Subtype `RiskMeasure` to implement concrete risk measures that quantify portfolio risk and can be used as objectives or constraints in optimisation problems. This type ensures compatibility with the optimisation framework and enables composability with other estimators and algorithms.
 
+# Interfaces
+
+In order to implement a new risk measure that works seamlessly with the library, subtype `RiskMeasure` with a `settings::RiskMeasureSettings` field — [`set_risk_expression!`](@ref) reads its `scale` and `rke`, [`set_risk_upper_bound!`](@ref) its `ub`, and [`expected_risk`](@ref) its `scale` when several measures combine — and implement the following methods:
+
+## `risk_input_kind`
+
+  - `risk_input_kind(r::MyRiskMeasure) -> RiskInputKind`: Declare which of the three functor shapes the measure exposes. There is no default: an undeclared measure throws rather than routing to the wrong input shape.
+
+### Arguments
+
+  - `r`: The concrete subtype instance.
+
+### Returns
+
+  - `kind::RiskInputKind`: One of `NetReturnsInput()`, `WeightsReturnsFeesInput()` or `WeightsInput()`.
+
+## The functor
+
+[`expected_risk`](@ref) evaluates the measure as a functor, in the shape its kind declares:
+
+  - `(r::MyRiskMeasure)(x::VecNum) -> Number` under [`NetReturnsInput`](@ref), where `x` is the net portfolio return series [`calc_net_returns`](@ref) builds.
+  - `(r::MyRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees}) -> Number` under [`WeightsReturnsFeesInput`](@ref).
+  - `(r::MyRiskMeasure)(w::VecNum) -> Number` under [`WeightsInput`](@ref).
+
+A [`WeightsReturnsFeesInput`](@ref) measure also declares [`supports_precomputed_returns`](@ref), as `supports_precomputed_returns(r::MyRiskMeasure) -> Bool`, stating whether its risk is a function of the net return series alone; the fallback for that kind throws rather than guessing. The other two kinds answer through the kind itself.
+
+## The model builder
+
+A `JuMP` optimiser builds the measure into its model through [`set_risk_constraints!`](@ref), as `set_risk_constraints!(model::JuMP.Model, i, r::MyRiskMeasure, opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...; kwargs...)`, which has no fallback. The method builds the risk expression from the model's weights, then registers it with [`set_risk_bounds_and_expression!`](@ref), which reads the bound and the contribution to the aggregate risk expression off `r.settings`. Scale every constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), so the bound is compared against unrescaled weights under a ratio objective (ADR 0008).
+
+## Optional methods
+
+Each has a fallback on [`AbstractBaseRiskMeasure`](@ref):
+
+  - [`needs_previous_weights`](@ref): `true` for a measure that reads the previous weights; the fallback answers `false`.
+  - [`bigger_is_better`](@ref): `true` for a measure a caller maximises; the fallback answers `false`.
+  - [`range_tails`](@ref): the two point measures a range measure is the sum of; the fallback throws.
+  - [`factory`](@ref): rebuild the measure against a prior result before it is evaluated, for a measure whose slots are filled from the prior.
+
 # Related
 
   - [`OptimisationRiskMeasure`](@ref)
   - [`HierarchicalRiskMeasure`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`risk_input_kind`](@ref)
+  - [`expected_risk`](@ref)
+  - [`set_risk_constraints!`](@ref)
 """
 abstract type RiskMeasure <: OptimisationRiskMeasure end
 """
@@ -488,10 +530,47 @@ Abstract supertype for hierarchical risk measures used in portfolio optimisation
 
 Subtype `HierarchicalRiskMeasure` to implement risk measures that operate on hierarchical or clustered portfolio structures. These measures are designed for use as objectives or constraints in optimisation problems that leverage asset clustering, hierarchical risk parity, or similar techniques.
 
+# Interfaces
+
+A hierarchical measure is only ever evaluated at the value level, through [`expected_risk`](@ref), so it builds no `JuMP` model and needs no model builder. In order to implement a new one that works seamlessly with the library, subtype `HierarchicalRiskMeasure` with a `settings::HierarchicalRiskMeasureSettings` field — [`expected_risk`](@ref) reads its `scale` when several measures combine — and implement the following methods:
+
+## `risk_input_kind`
+
+  - `risk_input_kind(r::MyRiskMeasure) -> RiskInputKind`: Declare which of the three functor shapes the measure exposes. There is no default: an undeclared measure throws rather than routing to the wrong input shape.
+
+### Arguments
+
+  - `r`: The concrete subtype instance.
+
+### Returns
+
+  - `kind::RiskInputKind`: One of `NetReturnsInput()`, `WeightsReturnsFeesInput()` or `WeightsInput()`.
+
+## The functor
+
+[`expected_risk`](@ref) evaluates the measure as a functor, in the shape its kind declares:
+
+  - `(r::MyRiskMeasure)(x::VecNum) -> Number` under [`NetReturnsInput`](@ref), where `x` is the net portfolio return series [`calc_net_returns`](@ref) builds.
+  - `(r::MyRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees}) -> Number` under [`WeightsReturnsFeesInput`](@ref).
+  - `(r::MyRiskMeasure)(w::VecNum) -> Number` under [`WeightsInput`](@ref).
+
+A [`WeightsReturnsFeesInput`](@ref) measure also declares [`supports_precomputed_returns`](@ref), as `supports_precomputed_returns(r::MyRiskMeasure) -> Bool`, stating whether its risk is a function of the net return series alone; the fallback for that kind throws rather than guessing. The other two kinds answer through the kind itself.
+
+## Optional methods
+
+Each has a fallback on [`AbstractBaseRiskMeasure`](@ref):
+
+  - [`needs_previous_weights`](@ref): `true` for a measure that reads the previous weights; the fallback answers `false`.
+  - [`bigger_is_better`](@ref): `true` for a measure a caller maximises; the fallback answers `false`.
+  - [`factory`](@ref): rebuild the measure against a prior result before it is evaluated, for a measure whose slots are filled from the prior.
+
 # Related
 
   - [`OptimisationRiskMeasure`](@ref)
   - [`RiskMeasure`](@ref)
+  - [`HierarchicalRiskMeasureSettings`](@ref)
+  - [`risk_input_kind`](@ref)
+  - [`expected_risk`](@ref)
 """
 abstract type HierarchicalRiskMeasure <: OptimisationRiskMeasure end
 """
@@ -1174,7 +1253,7 @@ So a large ``\\gamma`` gives the maximum. Under a minimum-risk objective the mod
 
 !!! warning
 
-    A small ``\\gamma`` does **not** give the weighted sum. The same three values return `1098.73` at ``\\gamma = 0.001``, against a weighted sum of `0.35`. The bound above shows why: the aggregate never falls below the maximum, and ``\\log N / \\gamma`` diverges. What survives is the shape — subtracting that divergent term leaves `0.11666861`, the weighted **mean** `0.11666667`. An additive constant does not move a minimiser, so the *portfolio* a small ``\\gamma`` selects tends to the weighted sum's, while the *number* reported does not. The model degenerates first: with the risks near `1e-2` and the objective near ``\\log 2``, a two-measure model at ``\\gamma = 1`` already failed to solve.
+    A small ``\\gamma`` does **not** give the weighted sum. The bound above shows why: the aggregate never falls below the maximum, and ``\\log N / \\gamma`` diverges. What survives is the shape — subtracting that divergent term recovers the weighted **mean**. An additive constant does not move a minimiser, so the *portfolio* a small ``\\gamma`` selects tends to the weighted sum's, while the *number* reported does not. The model degenerates first: ``\\gamma`` small enough to make the divergent term negligible can already fail to solve.
 
 !!! warning
 
@@ -1941,7 +2020,7 @@ end
 
 Refuse a type that declares a deferrable slot and no way to resolve it.
 
-`slots` is what the derived recursion produced. A **Deferred Quantity** that survives it names a type that declared the slot in [`deferred_slots`](@ref) and then wrote no [`resolve_deferred_quantities`](@ref) method, so the estimator would reach the model builders and be multiplied as though it were a matrix. ADR 0051 pairs the two declarations; this is where the pair is enforced.
+`slots` is what the derived recursion produced. A **Deferred Quantity** that survives it names a type that declared the slot in [`deferred_slots`](@ref) and then wrote no [`resolve_deferred_quantities`](@ref) method, so the estimator would reach the model builders and be multiplied as though it were a matrix. The two declarations are paired; this is where the pair is enforced.
 
 # Algorithm
 
@@ -1978,9 +2057,9 @@ Resolve the slots that [`calibration_slots`](@ref) declared, and return them as 
 
 This is the derived half of the calibration channel, and it is the parallel of the container recursion in [`resolve_deferred_quantities`](@ref). A type whose slots carry no order between them declares them once and writes no resolution: the declaration is the whole statement, and this method reads it.
 
-A type whose slots **do** carry an order writes its own [`resolve_deferred_quantities`](@ref) method instead, and that method is more specific, so it wins. A [`CalibrationContext`](@ref) built from a sibling's resolved number is what an order looks like: the slot reads that number off the context, and no derivation can know which sibling or in which direction. ADR 0095 states that rule, and it reaches the slots that read a sibling and no others.
+A type whose slots **do** carry an order writes its own [`resolve_deferred_quantities`](@ref) method instead, and that method is more specific, so it wins. A [`CalibrationContext`](@ref) built from a sibling's resolved number is what an order looks like: the slot reads that number off the context, and no derivation can know which sibling or in which direction. That rule reaches the slots that read a sibling and no others.
 
-A type whose slot key is **not** the field's name declares a method of this verb returning an empty `NamedTuple`, which takes it out of the derivation. The three regularisation keys are the one case that ships: `val` is one field under three quantities, which ADR 0097 settles, and a derivation that read the field name would hand the rule the wrong key.
+A type whose slot key is **not** the field's name declares a method of this verb returning an empty `NamedTuple`, which takes it out of the derivation. The three regularisation keys are the one case that ships: `val` is one field under three quantities, and a derivation that read the field name would hand the rule the wrong key.
 
 The effective observation weights and the effective solver are the two quantities a rule reads beyond the prior, and both are read off `x` by the names the library gives them everywhere: `w` holds the measure's own observation weights and `slv` its own solver. A type that carries the field settles it against the caller's with [`sel`](@ref); a type that carries none reads `nothing` and `sel` then hands over what the caller gave. The read is skipped where no slot holds a role, so a container whose `w` names a child rather than a weight vector never reaches it.
 
@@ -2036,7 +2115,7 @@ This is the derived half of the resolution rule. A container declares its childr
 
 A type that resolves a quantity of its own overrides this with its own method, which is more specific. So the derivation carries container recursion alone, and never guesses how a matrix, a tensor or the centre a moment was taken about comes out of a fit.
 
-Both channels end in **one** rebuild, which is what ADR 0095 asks for: a measure that carries both kinds of slot must not be rebuilt twice. [`resolve_calibration_slots`](@ref) states the calibration half and returns its resolved slots rather than a rebuilt object, and the two answers merge here. The deferred half merges last, so it wins a key both channels declare. A container names one child in both, and the child the recursion resolved is the one to keep.
+Both channels end in **one** rebuild: a measure that carries both kinds of slot must not be rebuilt twice. [`resolve_calibration_slots`](@ref) states the calibration half and returns its resolved slots rather than a rebuilt object, and the two answers merge here. The deferred half merges last, so it wins a key both channels declare. A container names one child in both, and the child the recursion resolved is the one to keep.
 
 `slv` is the effective solver, and the recursion threads it to every child. A container states no solver of its own, so it changes none: each child settles the one it was handed against the one it carries.
 
@@ -2223,8 +2302,7 @@ The Deferred-Quantity arm exists because [`@propagatable`](@ref) runs the select
 
 Note: the `solver_selector` both-`nothing` "cannot solve" error is not reachable through
 `sel` (both-`nothing` routes to the moment selector and returns `nothing`); the
-`JuMPOptimiser` solver-required invariant makes that case unreachable in the pipeline. See
-ADR 0012.
+`JuMPOptimiser` solver-required invariant makes that case unreachable in the pipeline.
 
 # Related
 
@@ -2251,7 +2329,7 @@ sel(risk_variable::Union{<:AbstractCalibrationAlgorithm, <:Function}, ::Any) = r
 Locate the lone threaded optimiser context value (a solver, `Slv_VecSlv`) in the variadic
 tail of a prior `factory` call, returning `nothing` if none is present. Emitted by the
 [`@cprop`](@ref) tag as the source argument to [`sel`](@ref). The tuple scan is unrolled by
-the compiler, so it is type-stable and allocation-free. See ADR 0012.
+the compiler, so it is type-stable and allocation-free.
 
 # Related
 
@@ -2347,3 +2425,12 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
        MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk,
        expected_risk_from_returns, RiskMeasure, HierarchicalRiskMeasure, SquareRootBound,
        LinearBound, SquaredBound
+# The verb the `# Interfaces` sections of `RiskMeasure` and `HierarchicalRiskMeasure` name
+# (ADR 0154). Public, not exported: it is only ever extended, and an extension must qualify
+# it as `PortfolioOptimisers.risk_input_kind` anyway.
+public risk_input_kind
+# The `# Interfaces`-marked types and verbs of #1137 (ADR 0154): AbstractRiskMeasureSettings
+# names required fields only; FrontierBoundEstimator and Scalariser each name the verb(s) an
+# extension must implement.
+public AbstractRiskMeasureSettings, FrontierBoundEstimator, variance_risk_bounds_val,
+       Scalariser, scalarise, scalarise_risk_expression!

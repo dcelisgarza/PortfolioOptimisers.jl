@@ -1,5 +1,0 @@
-# Denoise covariance
-
-```@docs
-DenoiseCovariance
-```

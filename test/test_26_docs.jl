@@ -225,7 +225,10 @@ nothing raises `@error "File exists but no references were collected"` in
     SRC = joinpath(@__DIR__, "..", "src")
     EXT = joinpath(@__DIR__, "..", "ext")
     BIB = joinpath(@__DIR__, "..", "docs", "src", "References.bib")
-    API = joinpath(@__DIR__, "..", "docs", "src", "api")
+    # The API pages live in the two mirror trees ADR 0128 introduced; `docs/src/api/` is
+    # gone since the last migration ticket (#1118) landed.
+    DOCS = joinpath(@__DIR__, "..", "docs", "src")
+    API = [joinpath(DOCS, "public_api"), joinpath(DOCS, "private_api")]
 
     function files_under(dir, ext)
         acc = String[]
@@ -390,15 +393,15 @@ nothing raises `@error "File exists but no references were collected"` in
         # Collect rather than assert per page: a bare `false == true` does not say which
         # page is wrong, and the fix is always "add (or remove) the block on that page".
         missing_block, stray_block = String[], String[]
-        for p in files_under(API, ".md")
+        for p in reduce(vcat, files_under.(API, ".md"))
             text = read(p, String)
             has_block = occursin("```@bibliography", text)
             cites = occursin("(@cite)", text) ||
                     any(n -> occursin("(@cite)", docstring_text(n)), docs_block_names(text))
             if cites && !has_block
-                push!(missing_block, relpath(p, API))
+                push!(missing_block, relpath(p, DOCS))
             elseif !cites && has_block
-                push!(stray_block, relpath(p, API))
+                push!(stray_block, relpath(p, DOCS))
             end
         end
         @test missing_block == String[]

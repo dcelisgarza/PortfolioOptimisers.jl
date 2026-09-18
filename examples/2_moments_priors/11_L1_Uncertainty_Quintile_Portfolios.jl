@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Reproduce the quintile and 1/N portfolios as robust optimisations with an l1 uncertainty set in PortfolioOptimisers.jl."
+```
+
 # ℓ1 uncertainty sets: the quintile and 1/N portfolios
 
 Two of the most stubbornly popular portfolios in practice have no theory behind them. The

@@ -554,7 +554,7 @@ end
 
 Fits an [`ARCHUncertaintySet`](@ref) from returns data, by fitting the set's own prior and calibrating the set on the result.
 
-These are the returns-data arms of the three verbs, and they are one method each whatever shape the set builds, because the shape is decided one call later. Each fits `ue.pe` once through [`ucs_prior`](@ref), which refuses a `pe` of `nothing` by name, and hands the result to the prior-result arm of the same verb on the same set with its `pe` set to `nothing`, which is where the box, the ellipsoid and the norm ball are dispatched (ADR 0138). The resample is drawn from the `X` that prior result carries, as it always was, so a set with a prior of its own is calibrated on that prior fitted on the returns it is handed, and on nothing else. The keyword arguments travel to both the prior fit and the resample estimators, as before.
+These are the returns-data arms of the three verbs, and they are one method each whatever shape the set builds, because the shape is decided one call later. Each fits `ue.pe` once through [`ucs_prior`](@ref), which refuses a `pe` of `nothing` by name, and hands the result to the prior-result arm of the same verb on the same set with its `pe` set to `nothing`, which is where the box, the ellipsoid and the norm ball are dispatched. The resample is drawn from the `X` that prior result carries, as it always was, so a set with a prior of its own is calibrated on that prior fitted on the returns it is handed, and on nothing else. The keyword arguments travel to both the prior fit and the resample estimators, as before.
 
 # Algorithm
 
@@ -609,7 +609,7 @@ end
 
 Constructs box uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 Both sets come from one pass over one index stream, so the mean and the covariance of a given simulation are read from the same resample. With `ue.seed` set, this method and the pair [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) return the same bounds bit for bit, because [`resolve_rng`](@ref) restarts each call at the same place and all three walk one index stream. With `ue.seed` unset they do not: over 200 resamples of a 252-by-5 sample the mean lower bound moved by 5.31e-4 against a set width of 9.53e-3. So a caller who splits one [`ucs`](@ref) call into two calls to save work keeps the answer only while a seed is set.
 
@@ -691,7 +691,7 @@ end
 
 Constructs a box uncertainty set for expected returns using bootstrap resampling for time series data.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The method walks its own index stream. With `ue.seed` set it returns the same bounds as the mean half of [`ucs`](@ref), bit for bit, because [`resolve_rng`](@ref) restarts each call at the same place. With `ue.seed` unset it does not: over 200 resamples of a 252-by-5 sample the lower bound moved by 5.31e-4 against a set width of 9.53e-3.
 
@@ -757,7 +757,7 @@ end
 
 Constructs a box uncertainty set for covariance using bootstrap resampling for time series data.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The method walks its own index stream. With `ue.seed` set it returns the same bounds as the covariance half of [`ucs`](@ref), bit for bit, because [`resolve_rng`](@ref) restarts each call at the same place. With `ue.seed` unset it does not: over 200 resamples of a 252-by-5 sample the lower bound moved by 2.12e-5.
 
@@ -826,7 +826,7 @@ end
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 Both sets come from one pass over one index stream. The shape matrices are the empirical covariances of the bootstrap deviations, fitted with `ue.ce`, so `ue.ce` fits the covariance axis twice: once inside every resample and once over the deviations of those resampled covariances. The mean axis reads it once, over the mean deviations alone. With `ue.seed` set, this method and the pair [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) agree; with `ue.seed` unset they do not.
 
@@ -927,7 +927,7 @@ end
 
 Constructs an ellipsoidal uncertainty set for expected returns using bootstrap resampling for time series data.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The shape matrix is the empirical covariance of the bootstrap mean deviations, fitted with `ue.ce`, so `ue.ce` enters this axis once even though no covariance is fitted inside a resample. With `ue.seed` set the method returns the same set as the mean half of [`ucs`](@ref); with `ue.seed` unset it does not.
 
@@ -1000,7 +1000,7 @@ end
 
 Constructs an ellipsoidal uncertainty set for covariance using bootstrap resampling for time series data.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The shape matrix is the empirical covariance of the bootstrap covariance deviations, fitted with `ue.ce`, so `ue.ce` enters this axis twice: once inside every resample and once over the deviations. Turning off its bias correction moves the resampled covariances by 0.397% over 252 observations and the shape matrix by 1.784% over 100 resamples. With `ue.seed` set the method returns the same set as the covariance half of [`ucs`](@ref); with `ue.seed` unset it does not.
 
@@ -1074,7 +1074,7 @@ end
 
 Constructs norm-ball uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **The bootstrap deviations are the geometry map, so this route builds no shape matrix.** The ellipsoidal sibling fits `ue.ce` on the deviations, which on the covariance axis is an ``N^{2} \\times N^{2}`` matrix of rank at most ``\\min(M - 1, N(N+1)/2)``, so it is rank deficient at every sample size and the default matrix processing repairs it. The map [`norm_ball_deviation_factor`](@ref) builds carries the same second moment exactly, at the rank the sample has, and `ue.ce` takes no part in it. `ue.ce` still fits the covariance of every resample, so it enters this axis once rather than twice. On the mean axis the map is of full rank once `ue.n_sim` exceeds ``N``, so the two shapes agree and the two sets reach the same weights.
 
@@ -1156,7 +1156,7 @@ end
 
 Constructs a norm-ball uncertainty set for expected returns using bootstrap resampling for time series data.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **The bootstrap deviations are the geometry map, so this route builds no shape matrix**, and `ue.ce` takes no part on this axis at all: the ellipsoidal sibling fits it on the mean deviations, and the map carries the same second moment without it. With `ue.seed` set the method sees the same resamples as the mean half of [`ucs`](@ref); with `ue.seed` unset it does not.
 
@@ -1216,7 +1216,7 @@ end
 
 Constructs a norm-ball uncertainty set for covariance using bootstrap resampling for time series data.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **This is the one route of the library that bounds a covariance without a matrix of side ``N^{2}``.** The ellipsoidal sibling fits `ue.ce` on the ``M \\times N^{2}`` deviations, and its shape is rank deficient at **every** sample size, because a vectorised symmetric matrix spans only ``N(N+1)/2`` coordinates; the default matrix processing then repairs it into a matrix the sample never named, and the chi-squared radius reads ``N^{2}`` degrees of freedom where the errors have ``N(N+1)/2``. The map [`norm_ball_deviation_factor`](@ref) builds is the deviations themselves, scaled, so it carries the sample second moment exactly at rank ``\\min(M - 1, N(N+1)/2)``, and [`k_norm_ball`](@ref) reads that rank rather than the side of a shape.
 
@@ -1272,3 +1272,4 @@ function sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
 end
 
 export StationaryBootstrap, CircularBootstrap, MovingBootstrap, ARCHUncertaintySet
+public BootstrapUncertaintySetEstimator, ARCHBootstrapSet, bootstrap_indices

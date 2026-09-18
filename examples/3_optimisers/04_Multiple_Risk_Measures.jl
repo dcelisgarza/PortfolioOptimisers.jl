@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Multiple risk measures in one PortfolioOptimisers.jl optimisation: combine them in the objective or bound each one as a limit."
+```
+
 # Multiple risk measures
 
 This example shows how to use multiple risk measures.

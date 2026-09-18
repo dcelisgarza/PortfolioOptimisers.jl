@@ -66,12 +66,13 @@ before you merge so you lower the number that is current.
 
 - **Only edit `.jl`.** These are written by the docs build and are untracked:
   `examples/**/*.ipynb`, `docs/src/examples/**`, `docs/src/user_guide/**`,
-  `docs/src/capability_catalogue.md`, `docs/src/api/*_TypeHierarchy.md`.
-  Their sources are `examples/**/*.jl`, `user_guide/*.jl`, `docs/capability_catalogue.jl`.
-  `docs/src/api/**` (except the type hierarchy) is hand-written. No gate reads a generated
-  page from the tree: the Docs build writes them fresh and its cross-reference check fails on
-  a link to a page that does not exist, so a broken link in one is fixed at the `.jl` source
-  alone (ADR 0151).
+  `docs/src/capability_catalogue.md`, `docs/src/TypeHierarchy.md`.
+  Their sources are `examples/**/*.jl`, `user_guide/*.jl`, `docs/capability_catalogue.jl`,
+  `docs/generate_type_hierarchy.jl`.
+  `docs/src/public_api/**` and `docs/src/private_api/**` are hand-written. No gate reads a
+  generated page from the tree: the Docs build writes them fresh and its cross-reference check
+  fails on a link to a page that does not exist, so a broken link in one is fixed at the `.jl`
+  source alone (ADR 0151).
 - **JuliaFormatter runs over the whole repository, and every file it reaches is formatted in
   place.** It escapes a quote inside a jldoctest block as `\"`, which is normal output: inside a
   `"""` docstring `\"` renders as `"`, and the doctests pass. **Do not revert the escaping.**

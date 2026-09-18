@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Deep single-topic examples of PortfolioOptimisers.jl, from a first Markowitz optimisation to end-to-end investor profiles."
+```
+
 # Examples introduction
 
 The examples provided in this package demonstrate how to use the various features of `PortfolioOptimisers.jl`. Each example is designed to illustrate a specific feature or use case, ranging from basic portfolio optimization techniques to more advanced functionality.

@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the observations a prior keeps when it folds its estimate exactly, and the assets whose scenario fill it has already named.
 
-The state of a **fold-and-carry** prior, and what separates that route from a refit. A [`SampleBufferState`](@ref) means refit, everywhere in the library: an estimator carrying one has no recursion of its own, and its read-out is the batch verb over the rows the buffer kept. A prior carrying *this* state has folded its moments exactly, member by member, and keeps the rows for one reason only — [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, so the observations are **memory, not arithmetic**. Its read-out reads two folded moments and a matrix it already holds, and touches none of the rows. ADR 0136 records the decision.
+The state of a **fold-and-carry** prior, and what separates that route from a refit. A [`SampleBufferState`](@ref) means refit, everywhere in the library: an estimator carrying one has no recursion of its own, and its read-out is the batch verb over the rows the buffer kept. A prior carrying *this* state has folded its moments exactly, member by member, and keeps the rows for one reason only — [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, so the observations are **memory, not arithmetic**. Its read-out reads two folded moments and a matrix it already holds, and touches none of the rows.
 
 A prior a wrapper seeds therefore falls to the refit route rather than to this one, which is what makes `Online`'s cap the window of the whole fit.
 
@@ -373,7 +373,7 @@ Refuses a missing factor matrix at a door whose prior's tree requires one.
 
 The one refusal the five doors share — the prior's [`ReturnsResult`](@ref) method, the optimiser's step, and the three uncertainty-set doors — written once so that its message and its test cannot drift apart. The test is [`needs_factor_returns`](@ref) answering `true`, which walks the estimator tree, so a factor leaf nested under a host whose own factor argument is optional is refused here by name rather than by the leaf's `MethodError` one call later.
 
-A `pe` of `nothing` is an uncertainty set with no prior of its own (ADR 0138). It reads no factor matrix, so nothing is checked here; the returns-data form it is on its way to refuses it by name through [`ucs_prior`](@ref).
+A `pe` of `nothing` is an uncertainty set with no prior of its own. It reads no factor matrix, so nothing is checked here; the returns-data form it is on its way to refuses it by name through [`ucs_prior`](@ref).
 
 # Arguments
 
@@ -511,7 +511,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds an observation into a member of a carrying host, where that member folds.
 
-The fold half of the mixed-host rule of ADR 0136. A host that carries the observations folds every member that folds and leaves the rest untouched, because it can run their batch verb over its own rows at the read-out. [`supports_partial_fit`](@ref) is the question, and it is answered from the member's type and its `cache` field, so a host of concrete members resolves the branch at compile time and folds nothing it should not.
+The fold half of the mixed-host rule. A host that carries the observations folds every member that folds and leaves the rest untouched, because it can run their batch verb over its own rows at the read-out. [`supports_partial_fit`](@ref) is the question, and it is answered from the member's type and its `cache` field, so a host of concrete members resolves the branch at compile time and folds nothing it should not.
 
 A member the host does not hold is `nothing`, and folding it is a no-op.
 
@@ -543,7 +543,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a member's estimate out of its fold, or refits it over the host's own rows.
 
-The read-out half of the mixed-host rule of ADR 0136, and the twin of [`fold_member`](@ref): a member the host folded answers from its state, and a member it did not fold answers from the matrix the host carries. `f` is the member's batch verb — `Statistics.mean`, `Statistics.cov`, [`coskewness`](@ref), [`cokurtosis`](@ref) — and the one-argument form of that same verb is its read-out, which is a convention every family of the seam already follows.
+The read-out half of the mixed-host rule, and the twin of [`fold_member`](@ref): a member the host folded answers from its state, and a member it did not fold answers from the matrix the host carries. `f` is the member's batch verb — `Statistics.mean`, `Statistics.cov`, [`coskewness`](@ref), [`cokurtosis`](@ref) — and the one-argument form of that same verb is its read-out, which is a convention every family of the seam already follows.
 
 No [`AssetPanel`](@ref) reaches this verb. A panel is fold context rather than sample, and a buffer holds no activity mask, so a member refitted here is refitted over the rows alone; that is [#999](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/999)'s to change.
 
@@ -650,7 +650,7 @@ Reads an [`EmpiricalPrior`](@ref) out of its fold, with no data matrix.
 
 `mu` comes off `pe.me`, `sigma` comes off `pe.ce`, and `X` is the matrix the carry state already holds; the rows are read, never refitted. The horizon arm then takes the same four steps of the batch method — scale by `pe.horizon`, exponentiate, build the covariance on the ``\\hat{\\mu}_i + 1`` factors, subtract the one — through [`horizon_moments!`](@ref), which is the one place that algebra lives.
 
-`pe.max_scenarios` cuts the rows the Result carries, exactly as it does in batch, and the fill runs over the window that cut leaves. When the cap cuts, the Result states the number of observations folded in `ens`, through [`scenario_ens`](@ref), so a count reader prices `t` and not the `w` rows carried, exactly as in batch (ADR 0138). The fill's notice is narrowed by the carry state's named-asset set, so a walk-forward names an asset at the step it lists and not at every step afterwards.
+`pe.max_scenarios` cuts the rows the Result carries, exactly as it does in batch, and the fill runs over the window that cut leaves. When the cap cuts, the Result states the number of observations folded in `ens`, through [`scenario_ens`](@ref), so a count reader prices `t` and not the `w` rows carried, exactly as in batch. The fill's notice is narrowed by the carry state's named-asset set, so a walk-forward names an asset at the step it lists and not at every step afterwards.
 
 No [`AssetPanel`](@ref) is read. A panel is fold context rather than sample, and the Coverage Universe of this read-out agrees with a batch fit's **by construction**, because [`coverage_mask`](@ref) is a pure function of the rows and the carry state holds exactly the rows a batch fit would have seen.
 

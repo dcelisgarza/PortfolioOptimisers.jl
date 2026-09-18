@@ -16,8 +16,9 @@ include(joinpath(@__DIR__, "..", "docs", "generate_sitemap.jl"))
 # A stand-in for `docs/build` after a `prettyurls = true` build: one page per directory
 # that holds an `index.html`, the generated search page, and files that are not pages.
 function make_fixture_build(dir)
-    for page in ["", "capability_catalogue", "search", joinpath("api", "00_API"),
-                 joinpath("api", "01_Moments"), joinpath("examples", "1_foundations", "01_first")]
+    for page in
+        ["", "capability_catalogue", "search", "00_API", joinpath("api", "01_Moments"),
+         joinpath("examples", "1_foundations", "01_first")]
         mkpath(joinpath(dir, page))
         write(joinpath(dir, page, "index.html"), "<html></html>")
     end
@@ -42,7 +43,7 @@ end
             @test all(x -> endswith(x, "/"), urls)
 
             # Every page of the fixture is present, and only those pages.
-            @test urls == ["$base/", "$base/api/00_API/", "$base/api/01_Moments/",
+            @test urls == ["$base/", "$base/00_API/", "$base/api/01_Moments/",
                            "$base/capability_catalogue/", "$base/examples/1_foundations/01_first/"]
 
             # The generated search page is excluded: its content is built in the browser.
@@ -72,7 +73,7 @@ end
     end
 
     @testset "XML document" begin
-        urls = ["$base/", "$base/api/00_API/"]
+        urls = ["$base/", "$base/00_API/"]
         xml = sitemap_xml(urls)
         @test startswith(xml, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
         @test occursin("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">",

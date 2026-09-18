@@ -5,7 +5,7 @@ Computes the marginal variance and standard deviation, optionally weighted and o
 
 `me` centres the data when no `mean` is supplied, `w` weights the observations, and `corrected` selects the bias correction. `me` reaches the matrix methods only: the vector methods leave the centring to `Statistics`.
 
-`w` weights the whole estimate, so it reaches the centre as well as the deviations. The matrix methods send `me` through [`factory`](@ref), which replaces the weights of `me` with `w`, and `Statistics` centres a weighted vector on its weighted mean. Both paths therefore answer the same number over the same data, and `w` wins over the weights that `me` carries. Pass `mean` for a centre that `w` does not describe. ADR 0088 records the decision.
+`w` weights the whole estimate, so it reaches the centre as well as the deviations. The matrix methods send `me` through [`factory`](@ref), which replaces the weights of `me` with `w`, and `Statistics` centres a weighted vector on its weighted mean. Both paths therefore answer the same number over the same data, and `w` wins over the weights that `me` carries. Pass `mean` for a centre that `w` does not describe.
 
 # Fields
 
@@ -130,7 +130,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`SimpleVariance`](@ref) except `cache`, and `cvg` only where a policy is set.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:SimpleVariance, true)` to render it. ADR 0105 records the decision. `cvg` is read from the instance rather than from the type, as it is for [`SimpleExpectedReturns`](@ref), which states the reason.
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:SimpleVariance, true)` to render it. `cvg` is read from the instance rather than from the type, as it is for [`SimpleExpectedReturns`](@ref), which states the reason.
 
 # Arguments
 
@@ -171,7 +171,7 @@ The vector method:
  2. When `w` is `nothing`, call `f(X; corrected = ve.corrected, mean = mean)`.
  3. Otherwise call `f(X, w; corrected = ve.corrected, mean = mean)`.
 
-The two methods reach one centre by two routes. The matrix method resolves a centre before it calls `f`, and [`weighted_centre`](@ref) takes that centre from `me` after [`factory`](@ref) writes `ve.w` into it. The vector method passes `mean` through, so a `mean` of `nothing` leaves `f` to centre on the **weighted** mean of `X`. One `SimpleVariance` therefore answers a one-column matrix and the matching vector with one number. `ve.w` wins over the weights that `me` carries, which is what [`factory`](@ref) does on every other path. ADR 0088 records the decision, and `mean` takes any other centre.
+The two methods reach one centre by two routes. The matrix method resolves a centre before it calls `f`, and [`weighted_centre`](@ref) takes that centre from `me` after [`factory`](@ref) writes `ve.w` into it. The vector method passes `mean` through, so a `mean` of `nothing` leaves `f` to centre on the **weighted** mean of `X`. One `SimpleVariance` therefore answers a one-column matrix and the matching vector with one number. `ve.w` wins over the weights that `me` carries, which is what [`factory`](@ref) does on every other path, and `mean` takes any other centre.
 
 [`weighted_centre`](@ref) calls [`factory`](@ref) only when `ve.w` is not `nothing`. That test is a performance guard and not a second contract: `ve.w` is a field, so its type decides the branch, and the guard keeps a windowed loop from rebuilding the estimator tree of `me` once per window.
 
@@ -410,7 +410,7 @@ Where:
  4. When `w` is `nothing`, take the unweighted standard deviation of `X` along `dims`, centred on `mu`.
  5. Otherwise take the standard deviation of `X` weighted by `w` along `dims`, centred on `mu`.
 
-``\\hat{\\mu}_j`` comes from `ve.me`, and `ve.w` reaches `ve.me` through [`factory`](@ref). A `SimpleVariance` whose `w` is set therefore weights the centre and the squared deviations alike, so a vector and its one-column matrix answer the same number. Pass `mean` for any other centre. ADR 0088 records the decision.
+``\\hat{\\mu}_j`` comes from `ve.me`, and `ve.w` reaches `ve.me` through [`factory`](@ref). A `SimpleVariance` whose `w` is set therefore weights the centre and the squared deviations alike, so a vector and its one-column matrix answer the same number. Pass `mean` for any other centre.
 
 # Arguments
 
@@ -490,7 +490,7 @@ This method computes the standard deviation of the input vector `X` using the co
  2. When `w` is `nothing`, take the unweighted standard deviation of `X`, centred on `mean`.
  3. Otherwise take the standard deviation of `X` weighted by `w`, centred on `mean`.
 
-The vector methods ignore `ve.me`: a `mean` of `nothing` reaches `Statistics.std`, which centres on the mean of `X` — the **weighted** mean when `w` is not `nothing`. The matrix methods resolve the centre from `ve.me` under the same `ve.w`, so the two paths answer the same number for the same data. ADR 0088 records the decision.
+The vector methods ignore `ve.me`: a `mean` of `nothing` reaches `Statistics.std`, which centres on the mean of `X` — the **weighted** mean when `w` is not `nothing`. The matrix methods resolve the centre from `ve.me` under the same `ve.w`, so the two paths answer the same number for the same data.
 
 # Arguments
 
@@ -599,7 +599,7 @@ Where:
  4. When `w` is `nothing`, take the unweighted variance of `X` along `dims`, centred on `mu`.
  5. Otherwise take the variance of `X` weighted by `w` along `dims`, centred on `mu`.
 
-``\\hat{\\mu}_j`` comes from `ve.me`, and `ve.w` reaches `ve.me` through [`factory`](@ref). A `SimpleVariance` whose `w` is set therefore weights the centre and the squared deviations alike, so a vector and its one-column matrix answer the same number. Pass `mean` for any other centre. ADR 0088 records the decision.
+``\\hat{\\mu}_j`` comes from `ve.me`, and `ve.w` reaches `ve.me` through [`factory`](@ref). A `SimpleVariance` whose `w` is set therefore weights the centre and the squared deviations alike, so a vector and its one-column matrix answer the same number. Pass `mean` for any other centre.
 
 # Arguments
 
@@ -679,7 +679,7 @@ This method computes the variance of the input vector `X` using the configuratio
  2. When `w` is `nothing`, take the unweighted variance of `X`, centred on `mean`.
  3. Otherwise take the variance of `X` weighted by `w`, centred on `mean`.
 
-The vector methods ignore `ve.me`: a `mean` of `nothing` reaches `Statistics.var`, which centres on the mean of `X` — the **weighted** mean when `w` is not `nothing`. The matrix methods resolve the centre from `ve.me` under the same `ve.w`, so the two paths answer the same number for the same data. ADR 0088 records the decision.
+The vector methods ignore `ve.me`: a `mean` of `nothing` reaches `Statistics.var`, which centres on the mean of `X` — the **weighted** mean when `w` is not `nothing`. The matrix methods resolve the centre from `ve.me` under the same `ve.w`, so the two paths answer the same number for the same data.
 
 # Arguments
 

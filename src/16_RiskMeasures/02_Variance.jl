@@ -956,7 +956,7 @@ optimiser sees.
 # Arguments
 
   - `ucs`: Fitted uncertainty set result.
-  - `sigma::MatNum`: Fallback covariance matrix. The set's own `val` field wins over it (ADR 0050).
+  - `sigma::MatNum`: Fallback covariance matrix. The set's own `val` field wins over it.
   - `w::VecNum`: Vector of portfolio weights.
 
 # Returns
@@ -1168,7 +1168,7 @@ are returned unchanged; vectors of risk measures are resolved element-wise.
 
 A risk measure whose slot holds an estimator that reads a prior result — one for which
 [`reads_prior_result`](@ref) answers `true`: an [`AbstractPriorUncertaintySetEstimator`](@ref),
-or a returns-data estimator with `pe = nothing` (ADR 0138) — is returned unchanged too. Such
+or a returns-data estimator with `pe = nothing` — is returned unchanged too. Such
 an estimator is calibrated on the optimisation's own prior result, and this pre-fit runs before
 any prior exists, so the estimator travels to the builder and each corner solve fits it there
 against the prior that solve was handed.

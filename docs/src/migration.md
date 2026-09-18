@@ -1,3 +1,7 @@
+```@meta
+Description = "Every breaking change between releases of PortfolioOptimisers.jl and the replacement to write, one section per version."
+```
+
 # [Migration guide](@id migration)
 
 This page lists every change that can break code written against an earlier release, with the replacement to write. Each version has its own section; read the one for the version you are upgrading from, and every section after it.

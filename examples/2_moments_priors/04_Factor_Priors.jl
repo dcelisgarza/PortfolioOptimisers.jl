@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Factor priors in PortfolioOptimisers.jl: asset moments implied by a regression onto common risk factors, to cut estimation error."
+```
+
 # Factor priors
 
 This example shows how to use factor models to perform optimisations. These reduce the estimation error by modelling asset returns as a function of common risk factors.

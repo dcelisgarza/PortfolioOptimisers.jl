@@ -1,0 +1,30 @@
+```@meta
+Description = "Factor attribution, private API of PortfolioOptimisers.jl: attribution_idiosyncratic_covariance, attribution_idiosyncratic_returns, …"
+```
+
+# Factor attribution: private API
+
+```@docs
+attribution_idiosyncratic_covariance
+attribution_idiosyncratic_returns
+attribution_factor_returns
+attribution_exposures
+attribution_lag
+attribution_families
+attribution_family_basis
+attribution_regression_weights
+attribution_idiosyncratic_variances
+assert_attribution_field
+assert_attribution_carrier
+attribution_finite
+attribution_investable_diagnostic
+attribution_investable_rows
+attribution_investable_block
+attribution_prior_block
+attribution_scale
+attribution_idiosyncratic_matrix
+attribution_safe_corr
+attribution_family_index
+attribution_family_axis
+predicted_attribution_assets
+```

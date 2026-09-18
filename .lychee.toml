@@ -27,16 +27,6 @@ exclude = [
   # Every other file link of every other ADR stays checked.
   "^file:.*/src/03_Preprocessing\\.jl$",
   "^file:.*/src/13_Prior/15_FeaturePrior\\.jl$",
-  # `src/01_Base/` is a directory on `dev` and a single `src/01_Base.jl` on `main`, which is the
-  # last release. The link of `docs/src/api/01_Base.md` answers 404 until the next release, in the
-  # same way as a release tag that does not exist yet, one line above.
-  "^https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/src/01_Base$",
-  # Issues #1060 and #1058 renumbered the top level of `docs/src/api/` on `dev`, so the
-  # Plotting and Aliases pages are `22_Plotting` and `23_Aliases` there and `24_Plotting` and
-  # `25_Aliases` on the deployed `stable` site until the next release. Same reason as the line
-  # above.
-  "^https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/22_Plotting$",
-  "^https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/23_Aliases$",
   # ACM resolves 10.1145 DOIs to dl.acm.org, which answers 403 to automated clients.
   "^https://doi.org/10.1145/",
   # www.ijcai.org answers in 0.8 seconds from a developer machine and does not answer the CI

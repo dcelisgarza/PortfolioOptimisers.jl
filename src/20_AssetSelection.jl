@@ -1444,4 +1444,5 @@ end
 
 export ThresholdRule, RankRule, QuantileRule, ScoreSelector, CompleteAssetSelector,
        PairwiseCorrelation, CorrelationComponents, ClusterGroups, RedundancySelector
-public select_assets, asset_scores, rule_keep, redundancy_keep, requires_score
+public AbstractSelectionRule, AbstractRedundancyAlgorithm, select_assets, asset_scores,
+       rule_keep, redundancy_keep, requires_score

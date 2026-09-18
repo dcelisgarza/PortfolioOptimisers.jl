@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Plotting and reporting in PortfolioOptimisers.jl: inputs, allocation, risk contribution, performance and one-call dashboards from StatsPlots."
+```
+
 # Plotting and reporting
 
 A portfolio is only as useful as your ability to explain it. `PortfolioOptimisers.jl` ships a

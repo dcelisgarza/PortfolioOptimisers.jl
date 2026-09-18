@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Calibrated risk measures in PortfolioOptimisers.jl: a rule that computes alpha from the sample in front of it instead of a fixed number."
+```
+
 # Calibrated risk measures: a rule in place of a number
 
 `alpha = 0.05` is a statement about the *probability* of the tail. It is not a statement about

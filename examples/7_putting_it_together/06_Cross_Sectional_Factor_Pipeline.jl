@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "The cross-sectional factor model through a Pipeline in PortfolioOptimisers.jl: the same weights as the hand-wired version, in far fewer lines."
+```
+
 # Cross-sectional factor model through a Pipeline
 
 The [deep dive](05_Cross_Sectional_Factor_Model.md) built a cross-sectional factor model, fitted

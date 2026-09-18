@@ -1,5 +1,0 @@
-# Detone covariance
-
-```@docs
-DetoneCovariance
-```

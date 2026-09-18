@@ -75,9 +75,7 @@ All concrete and/or abstract types that implement a specific denoising algorithm
 
 # Interfaces
 
-If you wish to implement a new denoising algorithm that works with an existing denoising estimator, subtype `AbstractDenoiseAlgorithm`, with all necessary parameters as part of the struct, and implement the following method:
-
-  - `_denoise!(alg::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum, vecs::MatNum, num_factors::Integer) -> MatNum`: In-place denoising of a covariance or correlation matrix using the specific algorithm.
+If you wish to implement a new denoising algorithm that works with an existing denoising estimator, subtype `AbstractDenoiseAlgorithm`, with all necessary parameters as part of the struct, and implement `_denoise!`, `Denoise`'s internal in-place dispatch hook: `_denoise!(alg::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum, vecs::MatNum, num_factors::Integer) -> MatNum`, denoising a covariance or correlation matrix using the specific algorithm. The leading underscore marks it as reached only through [`denoise!`](@ref)/[`denoise`](@ref)'s dispatch, never called directly by a user of the library.
 
 ## Arguments
 
@@ -898,3 +896,4 @@ function denoise(dn::AbstractDenoiseEstimator, X::MatNum, q::Number)
 end
 
 export Denoise, SpectralDenoise, FixedDenoise, ShrunkDenoise, denoise, denoise!
+public AbstractDenoiseEstimator, AbstractDenoiseAlgorithm

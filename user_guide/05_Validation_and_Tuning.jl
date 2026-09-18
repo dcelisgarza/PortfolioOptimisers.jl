@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Walk-forward and combinatorial cross-validation, and cross-validated hyperparameter search, for any PortfolioOptimisers.jl optimiser."
+```
+
 # Validation and tuning
 
 Before trusting a strategy you want to know how it behaves on data it was not fitted to, and you

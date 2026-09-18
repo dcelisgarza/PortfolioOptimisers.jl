@@ -331,11 +331,11 @@ It is also possible to compute per-asset fees incurred using the same definition
   - ``\\boldsymbol{w} \\neq 0``: Read as `!isapprox(w, 0; kwargs...)`, so `kwargs` decides how near zero counts as zero. Only the fixed terms carry it: a proportional fee on a zero weight is zero anyway.
   - ``\\odot``: Elementwise (Hadamard) product.
 
-The short proportional term is **subtracted**. ``\\boldsymbol{w}`` is negative wherever its indicator fires, so the minus sign is what makes the fee a positive charge. On ``\\boldsymbol{w} = [0.6,\\, -0.4]`` with a short rate of `0.01` and no other term, [`calc_fees`](@ref) returns `0.004`.
+The short proportional term is **subtracted**. ``\\boldsymbol{w}`` is negative wherever its indicator fires, so the minus sign is what makes the fee a positive charge.
 
 ## The per asset fees sum to the portfolio fee
 
-The two families compute one definition. [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar, so the entries of the vector sum to the scalar. The sums differ in the order in which they add, so the identity holds to rounding and not to `==`. On ``\\boldsymbol{w} = [0.6,\\, -0.4,\\, 0,\\, 0.25]`` with all four rate fields set and a [`Turnover`](@ref) whose `w` differs from the candidate, they gave `11.036000000000001` and `11.036`, a difference of `1.8e-15`.
+The two families compute one definition. [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar, so the entries of the vector sum to the scalar. The sums differ in the order in which they add, so the identity holds to rounding and not to `==`.
 
 ## The JuMP model charges the same fee only when the decomposition is pinned
 
@@ -952,7 +952,7 @@ end
 
 Put a fee a door reduced back onto the full universe, on **both** of its axes.
 
-The inverse of [`investable_fees_view`](@ref). ADR 0115 reduces an optimisation to its Investable Mask and expands the solved weights back to the caller's universe, so a result pairs a **full-length** `w` with a fee that spans two **reduced** axes: `tn`, `l`, `s`, `fl` and `fs` on the investable assets, `lq` and `flq` on the complement. A consumer that indexes the fee by the full-length weights meets a four-element field and a five-element selector, which is the defect of #914.
+The inverse of [`investable_fees_view`](@ref). Reducing an optimisation to its Investable Mask and expanding the solved weights back to the caller's universe leaves a result that pairs a **full-length** `w` with a fee that spans two **reduced** axes: `tn`, `l`, `s`, `fl` and `fs` on the investable assets, `lq` and `flq` on the complement. A consumer that indexes the fee by the full-length weights meets a four-element field and a five-element selector, which is the defect of #914.
 
 This verb closes the gap by moving the fee onto the axis the weights already live on. The mask it lifts at is the one the fee carries in `imsk`, which the door wrote when it reduced the fee, so the fee is the one source of the axes it is on. Every per-asset field comes back at `length(imsk)`, zero-filled where it says nothing: the five holding fields carry a zero at each asset that left, and the two carriers carry a zero at each asset that stayed. A zero rate charges nothing and a zero reference weight trades nothing, so the lift moves no number the reduced fee already charged. A scalar rate applies to every asset whatever the axis is, so it is carried through untouched. The lifted fee is unmarked, because it is on the full universe again.
 

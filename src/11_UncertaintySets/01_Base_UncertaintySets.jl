@@ -81,7 +81,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - `ucs::AbstractUncertaintySetResult`: The fitted set, or a tuple of the mean set and the covariance set for `ucs`.
 
-A subtype inherits the three-argument methods of the triple, which drop the returns data and call the two-argument methods above, because the root answers `true` to [`reads_prior_result`](@ref). It needs no method of the returns-data interface [`AbstractUncertaintySetEstimator`](@ref) declares, because no consumer reaches that interface through this root. The same contract is reached without subtyping by each of the four returns-data families when its `pe` is `nothing` (ADR 0138): [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) each carry a prior-result arm of the triple over that type, and the optimiser hands such a set the prior it is solving on.
+A subtype inherits the three-argument methods of the triple, which drop the returns data and call the two-argument methods above, because the root answers `true` to [`reads_prior_result`](@ref). It needs no method of the returns-data interface [`AbstractUncertaintySetEstimator`](@ref) declares, because no consumer reaches that interface through this root. The same contract is reached without subtyping by each of the four returns-data families when its `pe` is `nothing`: [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) each carry a prior-result arm of the triple over that type, and the optimiser hands such a set the prior it is solving on.
 
 There is no default fit. The root carries a method of each of the three verbs, and each raises and names the type it was called on, so a subtype that declares none says which method its author owes rather than failing on the root.
 
@@ -118,7 +118,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries a fitted uncertainty set, which is the data a worst-case model reads to build its robust expression.
 
-All concrete subtypes should subtype `AbstractUncertaintySetResult`. A subtype also carries the statistic its bounds were calibrated on, so that the consumer bounds that statistic and not an unrelated one. See ADR 0050.
+All concrete subtypes should subtype `AbstractUncertaintySetResult`. A subtype also carries the statistic its bounds were calibrated on, so that the consumer bounds that statistic and not an unrelated one.
 
 # Interfaces
 
@@ -210,11 +210,11 @@ Computes the radius ``\\kappa`` of a [`CompactCovarianceUncertaintySet`](@ref) f
 
 A member stands in the `kappa` slot of an [`OrthogonalUncertaintySet`](@ref), whose bound is [`Num_CptRad`](@ref). A plain number in that slot is the radius itself, exactly as it is today, and [`k_compact`](@ref) returns it unchanged.
 
-**This family is not the calibration channel of ADR 0095, and the two do not meet.** A **Calibration Rule** reads `(pr, w, slv, ctx)` and nothing else. The compact radius cannot be sized from those alone, because its units move with a sibling field of its own owner: the penalty is ``\\kappa \\lVert (\\mathbf{I} - \\mathbf{Q}\\mathbf{Q}^{\\intercal})\\mathbf{C}\\boldsymbol{w} \\rVert_{2}^{2}`` with ``\\mathbf{C} = \\mathbf{W}^{-1/2}``, so under [`IdentityMetric`](@ref) ``\\kappa`` carries variance units and under [`InverseIdiosyncraticVarianceMetric`](@ref) it is dimensionless. A rule that saw only the prior result would have to state one of the two readings and be wrong under the other. So the radius is sized **in family**, where the metric, the loadings block and the span are all in hand, exactly as the mean radius of the same estimator is sized by [`k_norm_ball`](@ref) through the `method` slot. ADR 0070 is the Authority for a radius slot admitting the rule that computes it.
+**This family is not the calibration-rule channel, and the two do not meet.** A **Calibration Rule** reads `(pr, w, slv, ctx)` and nothing else. The compact radius cannot be sized from those alone, because its units move with a sibling field of its own owner: the penalty is ``\\kappa \\lVert (\\mathbf{I} - \\mathbf{Q}\\mathbf{Q}^{\\intercal})\\mathbf{C}\\boldsymbol{w} \\rVert_{2}^{2}`` with ``\\mathbf{C} = \\mathbf{W}^{-1/2}``, so under [`IdentityMetric`](@ref) ``\\kappa`` carries variance units and under [`InverseIdiosyncraticVarianceMetric`](@ref) it is dimensionless. A rule that saw only the prior result would have to state one of the two readings and be wrong under the other. So the radius is sized **in family**, where the metric, the loadings block and the span are all in hand, exactly as the mean radius of the same estimator is sized by [`k_norm_ball`](@ref) through the `method` slot. A radius slot admits the rule that computes it.
 
-A rule is named for the **method** it runs, on ADR 0015's reading, and neither bare word is claimed elsewhere in the library. [`ResidualInflation`](@ref) inflates the residual variance to a confidence bound, and [`VarianceFraction`](@ref) matches the penalty to a fraction of the nominal variance at a reference portfolio.
+A rule is named for the **method** it runs, and neither bare word is claimed elsewhere in the library. [`ResidualInflation`](@ref) inflates the residual variance to a confidence bound, and [`VarianceFraction`](@ref) matches the penalty to a fraction of the nominal variance at a reference portfolio.
 
-# Interface
+# Interfaces
 
 ## `k_compact`
 
@@ -447,7 +447,7 @@ end
 
 Reduce a prior result, and the returns data beside it, to the Investable Mask before a set is fitted on them standalone.
 
-A Prior Result lives on the full asset universe, and an asset outside its Investable Mask carries `NaN` in its moments and in every block a factor fit wrote, so a set fitted on the whole result meets a `NaN` where its arithmetic needs a number. Inside an optimiser the result arrives already reduced, because every optimisation family reduces once at its entry (ADR 0115), and the mask this verb derives is then `nothing`. Standalone, which ADR 0111 offers as a mode, the result arrives whole, and this verb takes the same view the optimiser takes, so the two routes fit the same set. [`expand_investable_ucs`](@ref) writes the fitted set back onto the full universe, and the pair is the reduce-and-expand shape ADR 0117 gives every prior result.
+A Prior Result lives on the full asset universe, and an asset outside its Investable Mask carries `NaN` in its moments and in every block a factor fit wrote, so a set fitted on the whole result meets a `NaN` where its arithmetic needs a number. Inside an optimiser the result arrives already reduced, because every optimisation family reduces once at its entry, and the mask this verb derives is then `nothing`. Standalone, the result arrives whole, and this verb takes the same view the optimiser takes, so the two routes fit the same set. [`expand_investable_ucs`](@ref) writes the fitted set back onto the full universe, and the pair is the reduce-and-expand shape every prior result takes.
 
 Three methods, and the branch is dispatch rather than a condition, as it is in `investable_reduction`. The first derives the mask; the `nothing` method is the all-investable path and returns its arguments untouched; the `BitVector` method takes the two views.
 
@@ -679,7 +679,7 @@ end
 
 States whether an uncertainty set estimator is calibrated on the prior result it is handed, rather than on a prior it fits for itself from returns data.
 
-It is a per-type predicate, read off the type and the `pe` field and never off a method table, so that the three consumers which must route an estimator to the argument it reads — the three-argument form of the ucs triple, [`ucs_risk_measure`](@ref) and the Pipeline's uncertainty step — ask one question and agree on the answer. Two kinds of estimator answer `true`: every [`AbstractPriorUncertaintySetEstimator`](@ref), which carries no `pe` at all, and each of the four returns-data families when its `pe` is `nothing` (ADR 0138), each of which declares its own method beside its prior-result arm. Every other estimator answers `false`, which is the default a caller's own subtype inherits. A built set, or `nothing`, answers `false` too: it is fitted already and passes through every verb unchanged, so a slot that may hold either an estimator or a result can be asked without a test of its own.
+It is a per-type predicate, read off the type and the `pe` field and never off a method table, so that the three consumers which must route an estimator to the argument it reads — the three-argument form of the ucs triple, [`ucs_risk_measure`](@ref) and the Pipeline's uncertainty step — ask one question and agree on the answer. Two kinds of estimator answer `true`: every [`AbstractPriorUncertaintySetEstimator`](@ref), which carries no `pe` at all, and each of the four returns-data families when its `pe` is `nothing`, each of which declares its own method beside its prior-result arm. Every other estimator answers `false`, which is the default a caller's own subtype inherits. A built set, or `nothing`, answers `false` too: it is fitted already and passes through every verb unchanged, so a slot that may hold either an estimator or a result can be asked without a test of its own.
 
 # Arguments
 
@@ -712,7 +712,7 @@ end
 
 Fits the prior an uncertainty set calibrates itself on, or refuses by name when the set holds none.
 
-The one door through which every returns-data verb of the four families — [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) — fits its `pe`, so the refusal is written once rather than once per verb per family. A set whose `pe` is `nothing` is calibrated on a prior result it is handed (ADR 0138), and `nothing` says that one thing: it does not resolve to an empirical prior over `X` at the fit, because that would calibrate the same estimator on two different priors depending on the call site. The returns-data form therefore raises and points at the prior-result form, `ucs(ue, pr)`, and at `pe`.
+The one door through which every returns-data verb of the four families — [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) — fits its `pe`, so the refusal is written once rather than once per verb per family. A set whose `pe` is `nothing` is calibrated on a prior result it is handed, and `nothing` says that one thing: it does not resolve to an empirical prior over `X` at the fit, because that would calibrate the same estimator on two different priors depending on the call site. The returns-data form therefore raises and points at the prior-result form, `ucs(ue, pr)`, and at `pe`.
 
 # Arguments
 
@@ -756,7 +756,7 @@ This is the form both JuMP builders call, and it exists so that one call site se
 | an [`AbstractPriorUncertaintySetEstimator`](@ref), or a returns-data estimator with `pe = nothing` | `pr`    | `ucs(uc, pr; rd = rd)` |
 | a built pair, or `nothing`                                                                         | neither | itself, unchanged      |
 
-The prior is dropped rather than checked on the first row. An estimator that carries its own `pe` fits it on the returns it is handed, so the optimisation's own prior is not an input of that fit, and passing it changes no number. An estimator on the second row is calibrated on `pr`: inside an optimiser that is the prior being solved on, so the set's centre and the objective's `mu` are the same number by construction (ADR 0138).
+The prior is dropped rather than checked on the first row. An estimator that carries its own `pe` fits it on the returns it is handed, so the optimisation's own prior is not an input of that fit, and passing it changes no number. An estimator on the second row is calibrated on `pr`: inside an optimiser that is the prior being solved on, so the set's centre and the objective's `mu` are the same number by construction.
 
 # Arguments
 
@@ -1111,9 +1111,9 @@ Fits the ellipsoid radius `k` empirically, as the `1 - q` quantile of the Mahala
 
 The route makes no distributional assumption: it reads the errors the estimator family sampled, whether they come from a parametric draw or from a bootstrap resample. Its two closed-form siblings are [`ChiSqKUncertaintyAlgorithm`](@ref) and [`GeneralKUncertaintyAlgorithm`](@ref).
 
-The sample must be the estimation **error**, not the estimate. Under normality the centred Mahalanobis distance is a chi-squared variate, so this algorithm and [`ChiSqKUncertaintyAlgorithm`](@ref) compute one radius two ways and agree up to sampling noise. On 3000 draws of a 20-asset mean fitted over 252 observations the empirical radius lands within about one percent of ``5.6045``, which is ``\\sqrt{\\chi^{2,\\,-1}_{20}(0.95)}`` and depends on the dimension and the significance level alone. Feeding the raw estimates instead makes the distance **non-central**, and the radius then grows with the non-centrality ``T \\hat{\\boldsymbol{\\mu}}^{\\intercal} \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}``: on those same draws it rises to about ``7.3``, inflating by a third a radius that is meant to measure estimation error alone.
+The sample must be the estimation **error**, not the estimate. Under normality the centred Mahalanobis distance is a chi-squared variate, so this algorithm and [`ChiSqKUncertaintyAlgorithm`](@ref) compute one radius two ways and agree up to sampling noise, and that radius depends on the dimension and the significance level alone. Feeding the raw estimates instead makes the distance **non-central**, and the radius then grows with the non-centrality ``T \\hat{\\boldsymbol{\\mu}}^{\\intercal} \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}``, inflating a radius that is meant to measure estimation error alone.
 
-The quantile is taken against the shape matrix this algorithm is handed, not against the shape the estimator started from. [`ellipsoidal_set`](@ref) replaces the asymptotic covariance with its diagonal **before** it calls [`k_ucs`](@ref), so under the `diagonal = true` default the radius is a quantile of Mahalanobis distances measured against the diagonal shape. The two radii differ: on the 252-by-5 sample `randn(StableRNG(20250828), 252, 5) * 0.01`, whose own sample covariance is the shape, the full shape gives ``3.4463`` and its diagonal gives ``3.4407``. Neither shape is reliably the larger. Over the sixty samples `randn(StableRNG(s), 252, 5) * 0.01` for `s` in `1:60`, the diagonal radius is the larger in thirty-four of them.
+The quantile is taken against the shape matrix this algorithm is handed, not against the shape the estimator started from. [`ellipsoidal_set`](@ref) replaces the asymptotic covariance with its diagonal **before** it calls [`k_ucs`](@ref), so under the `diagonal = true` default the radius is a quantile of Mahalanobis distances measured against the diagonal shape. The two radii differ, and neither shape is reliably the larger.
 
 # Mathematical definition
 
@@ -1499,7 +1499,7 @@ An ellipsoid is a Mahalanobis ball, so it reads as a confidence region that carr
 
 **`class` names the axis, and the axis fixes both the size of `sigma` and the index a view applies.** A [`MuUncertaintySetClass`](@ref) carries an ``N \\times N`` shape matrix and takes the plain asset index. A [`SigmaUncertaintySetClass`](@ref) carries an ``N^{2} \\times N^{2}`` one, because it bounds a vectorised covariance, so [`port_opt_view`](@ref) recovers ``N`` from the shape matrix and maps the asset index through [`fourth_moment_index_generator`](@ref) before it slices. The two consumers dispatch on the tag too, and the robust-return builder refuses a set that carries the covariance tag.
 
-**A view carries `k` through unchanged, so it is not the set the same estimator would fit on the subset alone.** The restricted shape matrix does equal the one fitted on the subset, entry for entry, whenever the shape is diagonal. The radius does not, because two of the three algorithms calibrate it on the dimension or on the sample: on a four-asset universe restricted to two assets, [`ChiSqKUncertaintyAlgorithm`](@ref) gives ``3.0802`` on the view against ``2.4477`` on the subset fit, and [`NormalKUncertaintyAlgorithm`](@ref) gives ``3.0398`` against ``2.4242``. Only [`GeneralKUncertaintyAlgorithm`](@ref) agrees, because its radius reads neither the data nor the shape. A view is therefore the conservative choice, and a caller who wants the subset's own radius fits the subset.
+**A view carries `k` through unchanged, so it is not the set the same estimator would fit on the subset alone.** The restricted shape matrix does equal the one fitted on the subset, entry for entry, whenever the shape is diagonal. The radius does not, because two of the three algorithms calibrate it on the dimension or on the sample. Only [`GeneralKUncertaintyAlgorithm`](@ref) agrees, because its radius reads neither the data nor the shape. A view is therefore the conservative choice, and a caller who wants the subset's own radius fits the subset.
 
 # Mathematical definition
 
@@ -1863,7 +1863,7 @@ Assemble an [`EllipsoidalUncertaintySet`](@ref) from an already-computed asympto
 
 Shared by every ellipsoidal [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) construction across estimator families. [`k_ucs`](@ref) absorbs the trailing arguments its own algorithm does not read, so `samples` may be the deviation matrix, a `1:n_sim` range, or `nothing`, whichever the caller has.
 
-**The order of the two steps below is load-bearing.** The diagonal is taken *before* the radius is fitted, so under the `diagonal = true` default an empirical radius is a quantile of Mahalanobis distances measured against the diagonal shape and not against the full one. On the 252-by-5 sample `randn(StableRNG(20250828), 252, 5) * 0.01`, whose own sample covariance is the shape, the full shape gives ``3.4463`` and its diagonal gives ``3.4407``, and neither shape is reliably the larger. Taking the diagonal afterwards would pair a radius calibrated on one shape with a different shape, and the set would not hold the coverage its significance level names.
+**The order of the two steps below is load-bearing.** The diagonal is taken *before* the radius is fitted, so under the `diagonal = true` default an empirical radius is a quantile of Mahalanobis distances measured against the diagonal shape and not against the full one, and neither shape reliably gives the larger radius. Taking the diagonal afterwards would pair a radius calibrated on one shape with a different shape, and the set would not hold the coverage its significance level names.
 
 # Algorithm
 
@@ -1907,3 +1907,7 @@ export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,
        ChiSqKUncertaintyAlgorithm, EllipsoidalUncertaintySetAlgorithm,
        NormBallUncertaintySetAlgorithm, EllipsoidalUncertaintySet, SigmaUncertaintySetClass,
        MuUncertaintySetClass, AbstractUncertaintyEpsAlgorithm
+public AbstractUncertaintySetEstimator, AbstractPriorUncertaintySetEstimator,
+       AbstractUncertaintySetAlgorithm, AbstractUncertaintySetResult,
+       AbstractUncertaintyKAlgorithm, AbstractCompactRadiusAlgorithm,
+       AbstractUncertaintySetClass, reads_prior_result, k_ucs

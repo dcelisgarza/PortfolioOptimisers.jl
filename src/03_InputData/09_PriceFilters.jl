@@ -5,7 +5,7 @@ Preprocessing estimator dropping assets and observations with excessive missing 
 
 The *asset universe is fitted state*: the training window decides which assets survive (per-column missing fraction at most `col_thr`), and applying the fitted result to an unseen window subsets it to that same universe — so train weights and test returns always refer to the same assets. Observation (row) filtering is window-local: rows whose missing fraction across the surviving assets exceeds `row_thr` are dropped from whichever window is being transformed.
 
-This estimator is the library's **only** missing-data filter: [`prices_to_returns`](@ref) removes no observation and no asset, because deleting either is a **Universe Policy** and a policy is fitted on a training window and replayed by name, which a stateless conversion cannot do (ADR 0133). Only the asset series `X` decides what survives; the implied volatility columns and the Asset Panel follow the assets, and every series the carrier holds is read at the observations that survive, because the carrier states one clock.
+This estimator is the library's **only** missing-data filter: [`prices_to_returns`](@ref) removes no observation and no asset, because deleting either is a **Universe Policy** and a policy is fitted on a training window and replayed by name, which a stateless conversion cannot do. Only the asset series `X` decides what survives; the implied volatility columns and the Asset Panel follow the assets, and every series the carrier holds is read at the observations that survive, because the carrier states one clock.
 
 # Algorithm
 

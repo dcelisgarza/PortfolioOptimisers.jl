@@ -50,7 +50,7 @@ Abstract supertype for the running state of an incremental fit.
 
 All partial-fit state objects should subtype `AbstractPartialFitState`.
 
-A partial-fit state carries the quantities an estimator needs to fold one more observation into an estimate without reading the sample again. It subtypes [`AbstractResult`](@ref), so it inherits the length-1 iteration protocol and the pretty `show`, but it is not consumable: the rest of the library reads an ordinary Result, so a read-out verb turns a state into one first. It is the one kind of Result an estimator holds, and ADR 0106 records that exception.
+A partial-fit state carries the quantities an estimator needs to fold one more observation into an estimate without reading the sample again. It subtypes [`AbstractResult`](@ref), so it inherits the length-1 iteration protocol and the pretty `show`, but it is not consumable: the rest of the library reads an ordinary Result, so a read-out verb turns a state into one first. It is the one kind of Result an estimator holds.
 
 # Interfaces
 
@@ -372,3 +372,5 @@ function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                   <:AbstractResult}, i::Int)
     return i == 1 ? obj : throw(BoundsError(obj, i))
 end
+public AbstractPartialFitState, DynamicAbstractWeights, AbstractOptimisationEstimator,
+       OptimisationEstimator, NonFiniteAllocationOptimisationEstimator

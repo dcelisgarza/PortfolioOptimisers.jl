@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Sweep a Pareto surface in PortfolioOptimisers.jl: trade off return against two risk measures at once with NearOptimalCentering."
+```
+
 # Pareto surface
 
 This example kicks up the complexity a couple of notches. We will introduce a new optimisation estimator, `NearOptimalCentering` optimiser.

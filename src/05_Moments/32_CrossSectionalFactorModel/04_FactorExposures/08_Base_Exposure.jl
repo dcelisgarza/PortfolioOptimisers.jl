@@ -283,3 +283,4 @@ function exposure_active_fill!(L::AbstractArray{<:Number, 3}, pnl::AssetPanel)::
 end
 
 export factor_exposure
+public AbstractExposureEstimator

@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Finite allocation in PortfolioOptimisers.jl: turn continuous weights into whole shares under a cash budget with greedy or discrete allocation."
+```
+
 # Finite allocation
 
 An optimiser returns *continuous* weights — fractions of capital. To actually trade them you need

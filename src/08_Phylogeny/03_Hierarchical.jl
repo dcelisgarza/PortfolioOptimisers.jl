@@ -431,7 +431,7 @@ Takes a candidate, tests it with [`validate_k_value`](@ref), and on failure blan
 
 !!! warning
 
-    The scores are trusted as they arrive, and a `NaN` is not rejected. `argmax` returns the index of the first `NaN` in an array that carries one, ahead of every real score. An array that is `NaN` **throughout** takes the `length(arr)` branch instead, because a `NaN` is neither finite nor infinite, and answers `1` when the tree rejects that candidate. [`SecondOrderDifference`](@ref)'s default measure no longer produces such an array: ADR 0080 makes an undefined standard deviation divide by one, so a cluster of exactly two assets contributes its single pairwise distance rather than a `NaN`.
+    The scores are trusted as they arrive, and a `NaN` is not rejected. `argmax` returns the index of the first `NaN` in an array that carries one, ahead of every real score. An array that is `NaN` **throughout** takes the `length(arr)` branch instead, because a `NaN` is neither finite nor infinite, and answers `1` when the tree rejects that candidate. [`SecondOrderDifference`](@ref)'s default measure no longer produces such an array: an undefined standard deviation divides by one, so a cluster of exactly two assets contributes its single pairwise distance rather than a `NaN`.
 
 # Algorithm
 
@@ -646,3 +646,5 @@ end
 
 export ClusterNode, is_leaf, PreorderTreeByID, pre_order, to_tree, optimal_number_clusters,
        assignments
+# The seam and the verb its `# Interfaces` section names (ADR 0154, issue #1131).
+public AbstractPreorderBy, get_node_property

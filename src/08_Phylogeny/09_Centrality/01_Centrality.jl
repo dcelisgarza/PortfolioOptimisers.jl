@@ -13,6 +13,35 @@ A member says which quantity its edge weights must be, through [`centrality_pola
 
 The five members that do declare one carry an `ov` field, and [`TopologyOnly`](@ref) in it withdraws the declaration for that instance. [`centrality_polarity`](@ref) therefore answers the **effective** polarity, not the declared one.
 
+# Interfaces
+
+In order to implement a new centrality algorithm that works seamlessly with the library, subtype `AbstractCentralityAlgorithm` with the routine's configuration as fields, and implement the following method:
+
+## `calc_centrality`
+
+  - `calc_centrality(ct::MyCentrality, g::Graphs.AbstractGraph) -> VecNum`: Score every vertex of `g`. [`centrality_graph`](@ref) has already weighted `g` in the polarity the algorithm declares, so the method forwards to the routine and inspects nothing.
+
+### Arguments
+
+  - `ct`: The concrete subtype instance.
+  - `g`: The graph to score, weighted or plain as the declared polarity decides.
+
+### Returns
+
+  - `scores::VecNum`: One score per vertex of `g`, in vertex order.
+
+## `centrality_polarity`
+
+  - `centrality_polarity(ct::MyCentrality) -> Option{<:AbstractCentralityPolarity}`: Declare which quantity the edge weights must be. The fallback answers `nothing`, so a new algorithm runs on the plain graph until it opts in. Declare [`DistancePolarity`](@ref) for a routine defined over shortest paths, and [`SimilarityPolarity`](@ref) for one that reads the adjacency matrix itself.
+
+### Arguments
+
+  - `ct`: The concrete subtype instance.
+
+### Returns
+
+  - `polarity::Option{<:AbstractCentralityPolarity}`: The effective polarity, or `nothing` for an algorithm that reads the topology alone.
+
 # Related
 
   - [`centrality_polarity`](@ref)
@@ -563,7 +592,7 @@ The right-hand side is ``\\mathbf{q}_{\\mathrm{max}}`` itself, so the score is t
 
 Declares [`SimilarityPolarity`](@ref) — the only member that declares it — unless `ov` overrides it: it is the leading eigenvector of the adjacency matrix itself, so a stronger link must contribute a larger entry. It therefore reads weights on the similarity branch alone. A tree is selected by minimising a distance and carries no similarity, so this algorithm runs unweighted there rather than being handed the wrong quantity. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
-The weights change the answer by less than the shortest-path algorithms do, and they do change it: over the same triangulated maximally filtered graph the weighted and unweighted vectors differ by a maximum absolute `0.02561` and correlate `0.99361`, on entries whose median is `0.1969` on either vector. Withdrawing the weights also moves the structure's ``\\lambda_{\\mathrm{max}}``, from `4.844612909369407` to `6.174911353215694`.
+The weights change the answer by less than the shortest-path algorithms do, and they do change it: the weighted and unweighted vectors differ while still correlating closely, and withdrawing the weights also moves the structure's ``\\lambda_{\\mathrm{max}}``.
 
 # Fields
 
@@ -647,7 +676,7 @@ The series converges to the resolvent only for ``\\alpha < 1 / \\lambda_{\\mathr
 
 Above the bound the linear solve still returns a vector, and the vector is not a centrality: some of its scores turn negative, and a negative centrality has no reading.
 
-**The constructor cannot check this.** ``\\lambda_{\\mathrm{max}}`` is a property of the graph, and the graph is built later by [`centrality_graph`](@ref), so the validation is `alpha > 0` and the bound is the caller's to respect. A dense network raises ``\\lambda_{\\mathrm{max}}`` and lowers the bound, so a value that held on a tree can fail on a triangulated maximally filtered graph over the same assets: over those same 20 assets the filtered graph has ``\\lambda_{\\mathrm{max}} = 6.174911353215694``, a bound of `0.16194564468998124`, and the default `alpha = 0.3` is outside it.
+**The constructor cannot check this.** ``\\lambda_{\\mathrm{max}}`` is a property of the graph, and the graph is built later by [`centrality_graph`](@ref), so the validation is `alpha > 0` and the bound is the caller's to respect. A dense network raises ``\\lambda_{\\mathrm{max}}`` and lowers the bound, so a value that held on a tree can fail on a triangulated maximally filtered graph over the same assets — the default `alpha = 0.3` is not safe against every graph shape.
 
 # Fields
 
@@ -1030,3 +1059,7 @@ end
 export AbstractCentralityAlgorithm, TopologyOnly, BetweennessCentrality,
        ClosenessCentrality, DegreeCentrality, EigenvectorCentrality, KatzCentrality,
        Pagerank, RadialityCentrality, StressCentrality
+# The verb the `# Interfaces` section of `AbstractCentralityAlgorithm` names (ADR 0154).
+# Public, not exported: it is only ever extended, and an extension must qualify it as
+# `PortfolioOptimisers.calc_centrality` anyway.
+public calc_centrality

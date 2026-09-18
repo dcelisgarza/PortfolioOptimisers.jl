@@ -1,5 +1,9 @@
 # PortfolioOptimisers.jl
 
+`PortfolioOptimisers.jl` is a portfolio optimisation (portfolio optimization) library for Julia.
+Every component is an immutable estimator you compose, so a prior, a risk measure or a
+constraint swaps out without touching the optimiser.
+
 | Category | Badge |
 | :--------- | :---- |
 | Docs | [![Stable Documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable) [![Development documentation](https://img.shields.io/badge/docs-dev-blue.svg)](https://dcelisgarza.github.io/PortfolioOptimisers.jl/dev) |
@@ -16,18 +20,16 @@
 > [!CAUTION]
 > Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
 
-Portfolio optimisation is the science of either:
+## What it does
 
-- Minimising risk whilst keeping returns to acceptable levels.
-- Maximising returns whilst keeping risk to acceptable levels.
+- **Optimisers** — mean-risk, risk budgeting and relaxed risk budgeting, near-optimal centering, hierarchical risk parity, hierarchical equal risk contribution, Schur complement, nested clustered optimisation, stacking, subset resampling and naive portfolios, with discrete and greedy finite allocation. See the [optimisers guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/02_Optimisers).
+- **Risk measures** — over 50 risk measures: variance, semi-moments, mean absolute deviation, VaR, CVaR, EVaR and RLVaR, ordered weights arrays, average, maximum and ulcer drawdowns, worst realisation, range, tracking and turnover measures, skewness and kurtosis. See the [risk measures guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/03_Risk_Measures).
+- **Priors and views** — empirical, factor and high-order priors; four Black-Litterman variants, entropy pooling in Meucci's form and the general form, and opinion pooling. See the [data and priors guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/01_Data_and_Priors).
+- **Moment estimation** — Gerber, Gerber-IQ and Smyth-Broby covariances, distance and mutual-information covariance, denoising, detoning, regime-adjusted exponentially-weighted covariance, coskewness and cokurtosis. See the [covariance estimation example](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/2_moments_priors/02_Covariance_Estimation).
+- **Constraints and costs** — budget, group, factor exposure, cardinality, turnover, tracking, phylogeny and centrality constraints; fees and market impact; your own JuMP expressions. See the [constraints and costs guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/04_Constraints_and_Costs).
+- **Validation and tuning** — walk-forward and combinatorial cross-validation, grid and randomised hyperparameter search, and pipelines. See the [validation and tuning guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/05_Validation_and_Tuning).
 
-To some definition of acceptable, and with any number of additional constraints available to the optimisation type.
-
-There exist myriad statistical, pre- and post-processing, optimisations, and constraints that allow one to explore an extensive landscape of "optimal" portfolios.
-
-`PortfolioOptimisers.jl` is an attempt at providing as many of these as possible under a single banner. We make extensive use of `Julia`'s type system, module extensions, and multiple dispatch to simplify development and maintenance.
-
-Please visit the [documentation](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable) for details on the *vast* feature list.
+The [capability catalogue](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/capability_catalogue) is the full inventory, generated from the live package.
 
 ## Installation
 

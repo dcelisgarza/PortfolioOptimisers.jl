@@ -369,7 +369,7 @@ Both are assets-major, so the panel's asset axis is the carrier's with no transp
 # Validation
 
   - The call supplies a prior result. Raises an [`IsNothingError`](@ref) naming the site.
-  - The wrapped prior carries a regression (see [`assert_prior_regression`](@ref)). Nesting order does not matter: every wrapping estimator forwards `rr` and the factor block `fpr` (ADR 0046). What throws is a prior that never computed a regression at all, such as [`EmpiricalPrior`](@ref).
+  - The wrapped prior carries a regression (see [`assert_prior_regression`](@ref)). Nesting order does not matter: every wrapping estimator forwards `rr` and the factor block `fpr`. What throws is a prior that never computed a regression at all, such as [`EmpiricalPrior`](@ref).
 
 # Examples
 
@@ -530,10 +530,10 @@ A [`RegressionPanel`](@ref) takes four steps:
 
  1. Check that a prior result reached the call, with [`assert_producer_prior`](@ref).
  2. Check that the prior carries a regression, with [`assert_prior_regression`](@ref).
- 3. Reduce the prior to its Investable Mask through [`investable_mask`](@ref) and [`port_opt_view`](@ref), and read the loadings there. A prior fitted on a point-in-time Asset Panel writes `NaN` on the loadings of every asset outside its mask (ADR 0117), and a Panel Field admits no `NaN`. Inside an optimiser the prior arrives reduced and the view is the whole universe.
+ 3. Reduce the prior to its Investable Mask through [`investable_mask`](@ref) and [`port_opt_view`](@ref), and read the loadings there. A prior fitted on a point-in-time Asset Panel writes `NaN` on the loadings of every asset outside its mask, and a Panel Field admits no `NaN`. Inside an optimiser the prior arrives reduced and the view is the whole universe.
  4. Check that every loading on the mask is finite, and refuse otherwise: an asset the check counts has a finite moment and a loadings row that is not, which is a defect of the regression.
  5. Label the loadings axis with [`panel_axis_labels`](@ref), from [`regression_factor_names`](@ref).
- 6. Expand the loadings back onto the full universe with [`expand_investable_loadings`](@ref): a zero row and a false observed mask outside the mask, as ADR 0111 writes every set fitted standalone on such a prior.
+ 6. Expand the loadings back onto the full universe with [`expand_investable_loadings`](@ref): a zero row and a false observed mask outside the mask, the same rule every uncertainty set fitted standalone on such a prior follows.
  7. Return the panel holding them as the field `"loadings"` on the axis `"factor"`.
 
 A [`PhylogenyPanel`](@ref) takes three steps:
@@ -590,7 +590,7 @@ end
 
 Write the loadings a [`RegressionPanel`](@ref) read on the Investable Mask back onto the full asset universe.
 
-A prior fitted on a point-in-time Asset Panel writes `NaN` on the loadings of every asset outside its Investable Mask (ADR 0117), and a Panel Field admits no `NaN`. The producer therefore reads the loadings on the mask and expands them here: an asset outside the mask takes a **zero row** and a **false observed mask**, which is the rule ADR 0111 gives every uncertainty set fitted standalone on such a prior, and the shape a Panel Field already has for a cell a fill policy wrote. A zero row is a zero feature vector, which [`AngularDist`](@ref) places at distance `1` from every asset that has loadings and `0` from every other asset that has none, and `"loadings" => :observed` selects the mask as a column. A view of the expanded field at the mask recovers the reduced loadings, so a panel built standalone can be handed to an optimiser on the full universe.
+A prior fitted on a point-in-time Asset Panel writes `NaN` on the loadings of every asset outside its Investable Mask, and a Panel Field admits no `NaN`. The producer therefore reads the loadings on the mask and expands them here: an asset outside the mask takes a **zero row** and a **false observed mask**, the same rule every uncertainty set fitted standalone on such a prior follows, and the shape a Panel Field already has for a cell a fill policy wrote. A zero row is a zero feature vector, which [`AngularDist`](@ref) places at distance `1` from every asset that has loadings and `0` from every other asset that has none, and `"loadings" => :observed` selects the mask as a column. A view of the expanded field at the mask recovers the reduced loadings, so a panel built standalone can be handed to an optimiser on the full universe.
 
 # Algorithm
 

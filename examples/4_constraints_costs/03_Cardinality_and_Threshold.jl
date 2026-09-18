@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Cardinality and threshold constraints in PortfolioOptimisers.jl, from asset-level buy-in thresholds to group-of-sets cardinality."
+```
+
 # Cardinality and threshold
 
 This example walks from the simplest mixed-integer constraints to the most structured ones:

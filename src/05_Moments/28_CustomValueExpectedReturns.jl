@@ -254,7 +254,7 @@ would throw a `DimensionMismatch` against the sample it was handed.
 
 The bound of `val` is a union of the three shapes, so this declaration is a method on the shape
 that is on the asset axis rather than an [`@vprop`](@ref) tag on the field, which would slice all
-three. ADR 0115 records the decision.
+three.
 
 # Algorithm
 
@@ -283,3 +283,4 @@ function port_opt_view(me::CustomValueExpectedReturns{<:VecNum}, i,
 end
 
 export CustomValueExpectedReturns
+public CustomExpectedReturnsValueAlgorithm

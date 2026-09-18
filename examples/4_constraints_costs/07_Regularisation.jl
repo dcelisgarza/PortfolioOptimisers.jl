@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Regularisation in PortfolioOptimisers.jl: L1, L2, Lp and L-infinity penalties and ceilings on the weights, as numbers or as calibration rules."
+```
+
 # Regularisation
 
 This example shows one of the simplest ways to improve the robustness of portfolios, regularisation penalties.

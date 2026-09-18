@@ -128,7 +128,7 @@ carrier_rows(rd::ReturnsResult) = size(rd.X, 1)
 
 Folds a block of observations into a data step and emits the block the step's transform gives it.
 
-The online form of a preprocessing step that changes the rows it is handed, decided by [ADR 0142](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/adr/0142-a-pipeline-is-a-host-its-steps-fold-or-defer-to-a-view-and-a-step-with-no-online-form-is-refused-unless-the-pipeline-declares-a-refit.md). A [`Pipeline`](@ref) walking its steps hands each one the block it received from the step before and takes back the block the step emits, so a step's fold and its transform are one call: the transform of the new rows reads the state the earlier rows left, and the state is advanced past them. The two halves are inseparable — the first return of a new block is computed from the last price row the step kept — so the verb returns both.
+The online form of a preprocessing step that changes the rows it is handed. A [`Pipeline`](@ref) walking its steps hands each one the block it received from the step before and takes back the block the step emits, so a step's fold and its transform are one call: the transform of the new rows reads the state the earlier rows left, and the state is advanced past them. The two halves are inseparable — the first return of a new block is computed from the last price row the step kept — so the verb returns both.
 
 [`partial_fit!`](@ref) on a data step is this verb's first element, and a step's read-out is [`fit_preprocessing`](@ref) with no data. A caller's own preprocessing estimator joins the host route by writing those three: this verb, the read-out, and [`supports_partial_fit`](@ref) answering `true`.
 
@@ -650,7 +650,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Renders every field of a data step but its `cache`, which appears only where a state is set, so no rendering of a step that took no step moves. ADR 0105 records the decision.
+Renders every field of a data step but its `cache`, which appears only where a state is set, so no rendering of a step that took no step moves.
 
 # Related
 

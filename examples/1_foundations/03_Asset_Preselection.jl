@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Asset pre-selection in PortfolioOptimisers.jl: drop constant, dominated and redundant assets before optimising, and why it helps."
+```
+
 # Asset pre-selection
 
 Not every asset in a universe earns its place. Some carry no information at all — a constant

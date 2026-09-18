@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "The risk measures of PortfolioOptimisers.jl: variance, semi-moments, MAD, VaR, CVaR, EVaR, RLVaR, drawdowns and OWA, and the aliases that configure them."
+```
+
 # Risk measures
 
 The previous page showed *which optimiser* to call. This one is the catalogue of *what you ask it
@@ -99,7 +103,7 @@ supported_risk_measures(HierarchicalRiskParity)           # OptimisationRiskMeas
 The curated one-liner for each measure, its alias, and its class — grouped by what the measure
 *looks at* rather than by source file. Every name below is exported and documented: the full
 signature, fields, and references live under
-[API → Risk Measures](../api/16_RiskMeasures/01_Base_RiskMeasures.md), and `?ConditionalValueatRisk`
+[Public API → Risk Measures](../public_api/16_RiskMeasures/01_Base_RiskMeasures.md), and `?ConditionalValueatRisk`
 in the REPL gets you there without leaving the terminal.
 =#
 

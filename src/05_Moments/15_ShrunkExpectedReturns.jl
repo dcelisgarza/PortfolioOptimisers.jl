@@ -639,7 +639,7 @@ Two consequences of the form bound where it is usable.
 
 # Validation
 
-  - `!iszero(dot(mu - b, mu - b))`. The [`JamesStein`](@ref) intensity divides by this denominator, and it is exactly zero when the target equals the sample mean. [`GrandMean`](@ref) and [`VolatilityWeighted`](@ref) both do so at ``N = 1``. The other two overloads state their own rules. ADR 0092 records the decision to raise here.
+  - `!iszero(dot(mu - b, mu - b))`. The [`JamesStein`](@ref) intensity divides by this denominator, and it is exactly zero when the target equals the sample mean. [`GrandMean`](@ref) and [`VolatilityWeighted`](@ref) both do so at ``N = 1``, and the other two overloads state their own rules for raising.
 
 # Returns
 
@@ -813,7 +813,6 @@ Three consequences of the form separate this algorithm from the other two.
 
   - `T > N`, the estimator's own published condition. The term ``N/(T-N)`` is undefined at ``T = N`` and negative below it.
   - `!iszero(u * v - w^2)`. Both coefficients divide by this Cauchy-Schwarz gap, and it is exactly zero when the target is a multiple of the sample mean. Every vector is such a multiple at ``N = 1``.
-  - ADR 0092 records the decision to raise on both.
 
 # Related
 

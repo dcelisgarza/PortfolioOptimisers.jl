@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Tail risk measures beyond CVaR in PortfolioOptimisers.jl: EVaR, RLVaR, power-norm VaR and the VaR ranges that weight the extreme tail harder."
+```
+
 # Exotic tail risk measures: beyond CVaR
 
 [`ConditionalValueatRisk`](@ref) (CVaR) is the workhorse coherent tail measure — the expected

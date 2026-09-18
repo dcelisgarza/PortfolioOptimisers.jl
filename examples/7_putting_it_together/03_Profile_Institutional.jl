@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "An end-to-end profile in PortfolioOptimisers.jl: an institutional mandate under concentration limits, sector caps and a tracking-error budget."
+```
+
 # Profile: institutional
 
 The third profile is an **institutional mandate** — a large, benchmarked book hemmed in by rules.

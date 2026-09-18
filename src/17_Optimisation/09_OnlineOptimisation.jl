@@ -118,7 +118,7 @@ Forwards the observations of a carrier to the prior, in the prior's own arity.
 
 The one forward the optimiser's step makes, and the rule for every optimiser: **an optimiser forwards the observation to its prior and to nothing else**, and everything it holds beside the prior takes its ordinary batch fit at read-out, from the reconstituted fold context. The carrier is unpacked on the way down exactly as [`prior`](@ref) unpacks it in batch — `rd.X` and `rd.F` verbatim, with a missing `rd.F` refused by name at this door when the prior's tree requires one, through [`needs_factor_returns`](@ref) — and the active mask of a time-varying panel rides as the keyword the prior's step takes. What the prior does with `F` is the prior's own decision: its tree records it, drops it, or takes what it is given, exactly as its batch verb does.
 
-Two refusals. A prior that is already a [`AbstractPriorResult`](@ref) has no state to fold into: it is batch configuration, and an optimiser holding one runs `optimise(opt, rd)`. A [`TimeDependent`](@ref) on the prior is refused because a schedule swaps the estimator that carries the state, and a member that never saw the folded rows cannot be handed them. No loop resolves a schedule before stepping: a schedule reaches stateless fields only, and the fold loop's online arm refuses one on the prior at warm-up ([`assert_online_entry`](@ref), ADR 0140).
+Two refusals. A prior that is already a [`AbstractPriorResult`](@ref) has no state to fold into: it is batch configuration, and an optimiser holding one runs `optimise(opt, rd)`. A [`TimeDependent`](@ref) on the prior is refused because a schedule swaps the estimator that carries the state, and a member that never saw the folded rows cannot be handed them. No loop resolves a schedule before stepping: a schedule reaches stateless fields only, and the fold loop's online arm refuses one on the prior at warm-up ([`assert_online_entry`](@ref)).
 
 # Arguments
 
@@ -380,7 +380,7 @@ end
 
 Refuse a [`TimeDependent`](@ref) schedule on a field that carries a state, by name.
 
-A schedule replaces its field's value every fold, and a state is threaded *through* that value, so the two write one slot with opposite intentions and the schedule wins: the value it hands a fold never saw the rows folded before it. The one such field a schedule can reach is a host's `pe`, whose bound admits one; a JuMP or hierarchical head's `opt` holds the bundle and its bound refuses a schedule at construction, so the heads only recurse. The walk is the one [`update_online_estimator`](@ref) makes, and a schedule on any other field — a meta-optimiser's inner optimisers included, which the read-out refits from the buffer — composes with no rule, because it writes the per-fold copy while the state threads through the unresolved estimator. ADR 0140 records the decision; carrying a state across a swap is a possible future extension and is not built.
+A schedule replaces its field's value every fold, and a state is threaded *through* that value, so the two write one slot with opposite intentions and the schedule wins: the value it hands a fold never saw the rows folded before it. The one such field a schedule can reach is a host's `pe`, whose bound admits one; a JuMP or hierarchical head's `opt` holds the bundle and its bound refuses a schedule at construction, so the heads only recurse. The walk is the one [`update_online_estimator`](@ref) makes, and a schedule on any other field — a meta-optimiser's inner optimisers included, which the read-out refits from the buffer — composes with no rule, because it writes the per-fold copy while the state threads through the unresolved estimator. Carrying a state across a swap is a possible future extension and is not built.
 
 # Related
 
@@ -430,7 +430,7 @@ end
 
 Refuse an estimator that is not the configuration alone at the entry of the fold loop's online arm.
 
-Three refusals, all before any solve. A [`TimeDependent`](@ref) schedule of optimisers at the root, because the loop threads one estimator and a schedule is a different one per fold. A schedule on a host's `pe`, the one stateful field whose bound admits one, through [`assert_stateless_schedule`](@ref). And a partial-fit state anywhere in the tree, through [`online_entry_state`](@ref): **the loop starts cold**. The batch loop already reads its argument as configuration alone — [`factory`](@ref) carries a state and `prior(pe, X)` never reads it — and so does this one. A reset was costed at one "empty, keep the cap" verb per state type, and folding the warm-up on top of what the estimator holds double-counts rows in silence; both were rejected in ADR 0140. A resume, a state that leaves a result and re-enters a loop, is its own ticket with an explicit entry.
+Three refusals, all before any solve. A [`TimeDependent`](@ref) schedule of optimisers at the root, because the loop threads one estimator and a schedule is a different one per fold. A schedule on a host's `pe`, the one stateful field whose bound admits one, through [`assert_stateless_schedule`](@ref). And a partial-fit state anywhere in the tree, through [`online_entry_state`](@ref): **the loop starts cold**. The batch loop already reads its argument as configuration alone — [`factory`](@ref) carries a state and `prior(pe, X)` never reads it — and so does this one. A reset was costed at one "empty, keep the cap" verb per state type, and folding the warm-up on top of what the estimator holds double-counts rows in silence; both were rejected. A resume, a state that leaves a result and re-enters a loop, is its own ticket with an explicit entry.
 
 # Arguments
 
@@ -676,7 +676,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a host of the online step except its `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the optimiser at every site that renders one. Set `set_show_nothing_fields!` for the type to render it. ADR 0105 records the decision.
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the optimiser at every site that renders one. Set `set_show_nothing_fields!` for the type to render it.
 
 # Arguments
 

@@ -232,6 +232,25 @@ Abstract supertype for custom JuMP constraint implementations.
 
 Subtype this and implement [`add_custom_constraint!`](@ref) — the single method the type exists to make you define — to add custom constraints to the JuMP model. Pass the resulting estimator (or a vector of them) as the `ccnt` field of [`JuMPOptimiser`](@ref).
 
+# Interfaces
+
+In order to implement a new constraint that works seamlessly with the library, subtype `CustomJuMPConstraint` with the constraint's parameters as fields, and implement the following method. The verb is `public` and not exported, so the method is defined on the qualified name, `PortfolioOptimisers.add_custom_constraint!`.
+
+## `add_custom_constraint!`
+
+  - `add_custom_constraint!(model::JuMP.Model, ccnt::MyConstraint, optimiser, attrs::ProcessedJuMPOptimiserAttributes) -> Nothing`: Add the constraint to `model`. There is no fallback: a subtype with no method of its own raises. Scale the constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), the homogenisation variable, so the bound is compared against unrescaled weights under a ratio objective (ADR 0008).
+
+### Arguments
+
+  - `model`: The JuMP model, mid-assembly; read the weights with [`get_w`](@ref).
+  - `ccnt`: The concrete subtype instance.
+  - `optimiser`: The outer optimisation estimator, e.g. the [`MeanRisk`](@ref) itself.
+  - `attrs`: The processed problem data: `attrs.pr` is the prior, `attrs.wb` the bounds.
+
+### Returns
+
+  - `nothing`.
+
 # Related
 
   - [`add_custom_constraint!`](@ref) — the method to implement
@@ -266,6 +285,26 @@ $(DocStringExtensions.TYPEDEF)
 Abstract supertype for custom JuMP objective implementations.
 
 Subtype this and implement [`add_custom_objective_term!`](@ref) — the single method the type exists to make you define — to add custom penalty or reward terms to the JuMP model objective. Pass the resulting estimator (or a vector of them) as the `cobj` field of [`JuMPOptimiser`](@ref).
+
+# Interfaces
+
+In order to implement a new objective term that works seamlessly with the library, subtype `CustomJuMPObjective` with the term's parameters as fields, and implement the following method. The verb is `public` and not exported, so the method is defined on the qualified name, `PortfolioOptimisers.add_custom_objective_term!`.
+
+## `add_custom_objective_term!`
+
+  - `add_custom_objective_term!(model::JuMP.Model, obj::ObjectiveFunction, cobj::MyObjective, optimiser, attrs::ProcessedJuMPOptimiserAttributes) -> Nothing`: Contribute the term to the model's objective. There is no fallback: a subtype with no method of its own raises. Contribute through [`add_to_objective_penalty!`](@ref) rather than by touching the objective expression: the accumulated penalty is folded in with the sign the objective's sense needs, so a contribution always worsens the objective and a reward is a negative contribution (ADR 0036). A term that is not homogeneous of degree one in the weights multiplies its constants by [`get_k`](@ref).
+
+### Arguments
+
+  - `model`: The JuMP model, mid-assembly; read the weights with [`get_w`](@ref).
+  - `obj`: The objective being built, which differs from the declared one inside a [`Frontier`](@ref) sweep.
+  - `cobj`: The concrete subtype instance.
+  - `optimiser`: The outer optimisation estimator, e.g. the [`MeanRisk`](@ref) itself.
+  - `attrs`: The processed problem data: `attrs.pr` is the prior, `attrs.wb` the bounds.
+
+### Returns
+
+  - `nothing`.
 
 # Related
 
@@ -329,7 +368,7 @@ end
 
 Add a custom objective term to the JuMP model.
 
-Implement this for a subtype of [`CustomJuMPObjective`](@ref) to price a preference the library does not already name. Contribute the term with [`add_to_objective_penalty!`](@ref) rather than touching the objective expression: the accumulated penalty is folded in by [`add_penalty_to_objective!`](@ref) with the sign factor matching the objective's optimisation sense, so a contribution always worsens the objective and **a reward is a negative contribution**. This is what makes a term correct under every objective, [`MaximumRatio`](@ref) included, without the implementer consulting the sense (ADR 0036).
+Implement this for a subtype of [`CustomJuMPObjective`](@ref) to price a preference the library does not already name. Contribute the term with [`add_to_objective_penalty!`](@ref) rather than touching the objective expression: the accumulated penalty is folded in by [`add_penalty_to_objective!`](@ref) with the sign factor matching the objective's optimisation sense, so a contribution always worsens the objective and **a reward is a negative contribution**. This is what makes a term correct under every objective, [`MaximumRatio`](@ref) included, without the implementer consulting the sense.
 
 `add_to_objective_penalty!` promotes an affine accumulator to a quadratic one as needed, so a quadratic term is safe on every configuration.
 
@@ -392,7 +431,7 @@ end
 
 Add a custom constraint to the JuMP model.
 
-Implement this for a subtype of [`CustomJuMPConstraint`](@ref) to mandate a preference the library does not already name. Two idioms keep a hand-written constraint correct (ADR 0008): scale it by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), the homogenisation variable, so the bound is compared against unrescaled weights under a ratio objective.
+Implement this for a subtype of [`CustomJuMPConstraint`](@ref) to mandate a preference the library does not already name. Two idioms keep a hand-written constraint correct: scale it by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), the homogenisation variable, so the bound is compared against unrescaled weights under a ratio objective.
 
 There is no no-op fallback for a [`CustomJuMPConstraint`](@ref) — a subtype with no method of its own raises, so a mis-shaped or stale signature fails loudly instead of silently adding no constraint. `nothing` (no custom constraint configured) is the only no-op.
 
@@ -1007,9 +1046,9 @@ The Model State entries deliberately shared **bare** across a nested risk build.
 
 The complement of Per-Build Risk State: an entry belongs here iff it is *not* a function of
 the weights being optimised and *not* a build-scoped presence flag, so the inner and outer
-builds want the same object and prefixing it would break sharing rather than protect it
-(ADR 0005). [`shared_get`](@ref) and friends validate against this set, so the classification
-is enforced at run time rather than only by the seam-lock test (ADR 0037).
+builds want the same object and prefixing it would break sharing rather than protect it.
+[`shared_get`](@ref) and friends validate against this set, so the classification
+is enforced at run time rather than only by the seam-lock test.
 
 Each grouping records *why* those entries are shared. Adding a name here is a claim that a
 nested build may safely see the enclosing build's copy — check that claim before adding.
@@ -1456,13 +1495,13 @@ Internal to the Model State interface: the single place the two namespacing conv
 spelled. A Model State key is disambiguated on two axes, and both are resolved here:
 
   - `prefix` separates one *build* from another, so a nested risk build cannot collide with
-    the build that encloses it (ADR 0005).
+    the build that encloses it.
   - `i` separates one *measure instance* from another inside a single build, so two
     `ConditionalValueatRisk` measures in the same vector get their own scratch entries.
 
 Keeping both here is what lets the seam-lock test assert that no emitter builds a key by
 hand — emitters reach Model State through [`state_get`](@ref), [`state_has`](@ref),
-[`state_set!`](@ref) and [`state_build!`](@ref). See ADR 0037.
+[`state_set!`](@ref) and [`state_build!`](@ref).
 
 Neither axis carries a delimiter, so composition is **not injective**: `(:te_dr_, 11)` and
 `(:te_dr_1, 1)` both give `:te_dr_11`. The spelling is kept — a delimiter would move every
@@ -1498,7 +1537,7 @@ A delimiter was rejected as the fix: it would move every top-level key spelling
 one emitter overwrite another's entry under a key both spell correctly. The guard closes
 both. Re-registration under one key has no legitimate reading either: the build-once case
 is [`state_build!`](@ref), which returns the existing entry untouched, and the flag case is
-[`mark_state!`](@ref), which is idempotent. See ADR 0037.
+[`mark_state!`](@ref), which is idempotent.
 
 # Returns
 
@@ -1528,7 +1567,7 @@ Register `val` in the model under the prefixed Model State key and return it.
 
 A nested risk build (e.g. risk tracking) passes a non-empty `prefix` so the shared
 infrastructure entries it creates (`:X`, `:net_X`, `:W`, `:dd`, …) do not collide with the
-outer model's; the default empty prefix reproduces the bare key. See ADR 0005.
+outer model's; the default empty prefix reproduces the bare key.
 
 The indexed method registers per-measure scratch (`:cvar_risk_`, `:z_cvar_`, …) at measure
 index `i`, so two instances of the same measure in one build get their own entries. Both
@@ -1618,8 +1657,8 @@ under the prefixed key. Companion entries created inside `f` register with
 [`state_set!`](@ref).
 
 Because the key is resolved here rather than at the call site, a Model State entry added in
-future participates in the prefix discipline with no further work. That is what closes the
-residual hole ADR 0004 §2 accepted; see ADR 0037.
+future participates in the prefix discipline with no further work. That is what closes a
+residual hole an earlier, more permissive design left open.
 
 # Related
 
@@ -1651,8 +1690,8 @@ Record that this build has `name` present, idempotently.
 
 A build-scoped presence flag: `name` carries no value beyond its own existence, and readers
 test it with [`state_has`](@ref) rather than reading it. Marking under `prefix` is what keeps
-a nested build's flags out of the enclosing build — the second half of Per-Build Risk State
-(ADR 0005), the half that is not weight-dependent.
+a nested build's flags out of the enclosing build — the second half of Per-Build Risk State,
+the half that is not weight-dependent.
 
 # Related
 
@@ -1676,7 +1715,7 @@ Compose the Model State namespace a nested build threads down its own spine.
 Distinct from a Model State *key*: this produces a `prefix`, not an entry name, so a nested
 build's entries cannot alias the enclosing build's. `tag` names the nesting kind (`:tr_iv_`,
 `:tr_dv_`, `:te_ir_`, `:te_dr_`, `:gain_`) and the optional `i` disambiguates the measure
-index, which is what makes tracking-nested-in-tracking collision-free. See ADR 0005.
+index, which is what makes tracking-nested-in-tracking collision-free.
 
 # Related
 
@@ -1701,7 +1740,7 @@ the build's infrastructure entries and must not each rebuild them. `tag` names t
 (`:loss_`, `:gain_`), and the composition nests, so a range inside a range stays
 collision-free.
 
-Distinct from a Model State *key*: this produces an index, not an entry name. See ADR 0037.
+Distinct from a Model State *key*: this produces an index, not an entry name.
 
 # Related
 

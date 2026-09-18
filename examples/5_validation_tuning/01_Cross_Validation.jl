@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Cross-validation in PortfolioOptimisers.jl: walk-forward, K-fold and combinatorial splitters, the metrics they compute and their plots."
+```
+
 # Cross validation
 
 Cross validation is a powerful technique to evaluate the performance of a model on unseen data. In this example, we will showcase the different cross validation methods available in PortfolioOptimisers.jl and how to use them to evaluate the performance of our portfolio optimization models.

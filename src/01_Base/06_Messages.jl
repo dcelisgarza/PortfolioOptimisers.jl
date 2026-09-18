@@ -43,7 +43,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Suggest the nearest `candidates` entry to a mistyped **declaration key**: a macro block key, a dictionary key, a struct field name, or a keyword of a generated constructor.
 
-Wraps [`did_you_mean`](@ref) in a looser scoped configuration than the global default: Damerau-Levenshtein (so a transposed pair costs one edit, not two) at `min_score = 0.5`. The strict global default exists to keep near-miss probes from echoing real *asset names* back to the caller (ADR 0026); that boundary does not apply here, because the candidates are compile-time constants — block keys, dictionary keys and field names — with nothing to leak. At the default `0.7` under plain Levenshtein, short keys never match: `nuon` scores 0.5 against `noun`, so the suggestion would be dead code.
+Wraps [`did_you_mean`](@ref) in a looser scoped configuration than the global default: Damerau-Levenshtein (so a transposed pair costs one edit, not two) at `min_score = 0.5`. The strict global default exists to keep near-miss probes from echoing real *asset names* back to the caller; that boundary does not apply here, because the candidates are compile-time constants — block keys, dictionary keys and field names — with nothing to leak. At the default `0.7` under plain Levenshtein, short keys never match: `nuon` scores 0.5 against `noun`, so the suggestion would be dead code.
 
 # Arguments
 

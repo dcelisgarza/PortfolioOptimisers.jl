@@ -250,7 +250,7 @@
                            "docs/src/capability_catalogue.md" =>
                                "written by the docs build from " *
                                "`docs/capability_catalogue.jl`; untracked since ADR 0151",
-                           "docs/src/api/*_TypeHierarchy.md" =>
+                           "docs/src/TypeHierarchy.md" =>
                                "written by the docs build by " *
                                "`docs/generate_type_hierarchy.jl`; untracked since ADR 0151")
 

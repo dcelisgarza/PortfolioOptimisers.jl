@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Expected returns estimation in PortfolioOptimisers.jl: shrinkage estimators that pull the noisy sample mean toward a structured target."
+```
+
 # Expected returns estimation
 
 The sample mean is the noisiest ingredient in portfolio optimisation. With only a year of

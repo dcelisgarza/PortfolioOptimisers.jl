@@ -205,7 +205,7 @@ A member of this family **selects** a weight vector a fitted loadings block alre
 
 Two readers resolve a member to two different shapes, both over the same field of the block. `orthogonality_weights` reads the weights of the **latest** observation, one entry per asset, for an uncertainty set whose geometry serves the next decision. `cs_diagnostic_weights` reads the **whole** observation history, one row per observation, for a diagnostic that scores every observation instead of only the latest.
 
-# Interface
+# Interfaces
 
 ## `orthogonality_weights`
 
@@ -1381,3 +1381,8 @@ end
 
 export regression, Regression, LinearModel, GeneralisedLinearModel, BenchmarkWeightMetric,
        RegressionWeightMetric, InverseIdiosyncraticVarianceMetric, IdentityMetric
+public AbstractTimeSeriesRegressionEstimator, AbstractCrossSectionalRegressionEstimator
+# The `# Interfaces`-marked type of #1145 (ADR 0154): AbstractOrthogonalityMetric names the two
+# verbs an extension must implement, whose concrete methods live under
+# src/11_UncertaintySets/09_OrthogonalUncertaintySets.jl -- the same split #1137 already used.
+public AbstractOrthogonalityMetric, orthogonality_weights, cs_diagnostic_weights

@@ -148,7 +148,7 @@ Fits each cell of a moment on the observations that cell has, instead of on the 
 
 The opt-in that replaces all-or-nothing coverage by available-case estimation. It is the `cvg` field of a moment estimator, it is `nothing` there by default, and the `nothing` arm is today's reduce-and-expand path read by dispatch, so a caller who asks for nothing pays nothing. With a policy set, every cell of the answer is fitted on the observations at which every asset of that cell is finite and active, each cell carries its own denominator, and an asset reaches the answer only where [`admits`](@ref) says so.
 
-**`min_coverage` is also the share a [`scenario_fill`](@ref) passes in silence.** [`admits`](@ref) reads an asset's coverage share as its own observation count over the number of observations folded, and the fill counts that column's non-finite entries over the same denominator, so the two are complements and the admission test **is** the fill test. [`resolve_fill_limit`](@ref) derives `1 - min_coverage` wherever a prior's `fill_limit` is `nothing`, which never fires: an admitted column satisfies it by construction. So turning a policy on does not turn a warning on, and an available-case walk-forward names nothing while it does what it was configured to do. The default `min_coverage = 0` therefore admits a one-observation column and **fills it in silence**, which is what `0` asks for; a caller who wants to admit broadly and be told anyway states the prior's `fill_limit` explicitly, tighter than `1 - min_coverage` (ADR 0118).
+**`min_coverage` is also the share a [`scenario_fill`](@ref) passes in silence.** [`admits`](@ref) reads an asset's coverage share as its own observation count over the number of observations folded, and the fill counts that column's non-finite entries over the same denominator, so the two are complements and the admission test **is** the fill test. [`resolve_fill_limit`](@ref) derives `1 - min_coverage` wherever a prior's `fill_limit` is `nothing`, which never fires: an admitted column satisfies it by construction. So turning a policy on does not turn a warning on, and an available-case walk-forward names nothing while it does what it was configured to do. The default `min_coverage = 0` therefore admits a one-observation column and **fills it in silence**, which is what `0` asks for; a caller who wants to admit broadly and be told anyway states the prior's `fill_limit` explicitly, tighter than `1 - min_coverage`.
 
 # Fields
 
@@ -848,3 +848,4 @@ function coverage_refuse_comoment!(val::AbstractMatrix, cmsk::BitVector,
     return nothing
 end
 export CoveragePolicy, DecayCoverage, ResetCoverage, ExpireCoverage
+public AbstractCoverageAlgorithm, fold_inactive!, admits

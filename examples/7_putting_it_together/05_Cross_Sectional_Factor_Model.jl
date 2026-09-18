@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "A cross-sectional factor model in PortfolioOptimisers.jl, end to end: factor returns from lagged asset traits, uncertainty sets and a constrained book."
+```
+
 # Cross-sectional factor model, end to end
 
 Every other factor example on this site fits a factor model **through time**: it regresses each

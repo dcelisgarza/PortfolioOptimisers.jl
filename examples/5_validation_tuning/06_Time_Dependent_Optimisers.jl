@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Time-dependent optimisers in PortfolioOptimisers.jl: a TimeDependent schedule of whole optimisers, run fold by fold under cross-validation."
+```
+
 # Time-dependent optimisers
 
 The [previous example](04_Time_Dependent_Constraints.md) varied *inputs* of one optimiser over

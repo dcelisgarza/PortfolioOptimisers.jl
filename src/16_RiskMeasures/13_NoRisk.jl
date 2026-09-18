@@ -115,8 +115,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` when the model's `:risk` expression is identically zero.
 
-The degeneracy guard tests the **state** of the expression, not the **type** of the term (ADR
-0054). Two routes reach that state, and this predicate is the disjunction of both:
+The degeneracy guard tests the **state** of the expression, not the **type** of the term. Two routes reach that state, and this predicate is the disjunction of both:
 
  1. A [`NoRisk`](@ref) measure is present. This is [`norisk_flag`](@ref), whose quantifier is
     `any` — earned on the *hierarchical* path, where one `NoRisk` zeroes a divisor under three
@@ -167,7 +166,7 @@ Assert that a zero risk expression is paired with an objective that ignores risk
 
 Rejects a zero `:risk` under [`MinimumRisk`](@ref) — whose objective would be identically zero, so the solver could return *any* feasible portfolio, silently — and under [`MaximumRatio`](@ref), whose risk-normalisation constraint would go vacuous and leave the model unbounded.
 
-The criterion is [`zero_risk_expression_flag`](@ref), so the guard covers both routes to a zero expression: a [`NoRisk`](@ref) measure, and every measure carrying `settings.rke = false` (ADR 0054). The second route shipped unguarded since the inclusion flag was introduced.
+The criterion is [`zero_risk_expression_flag`](@ref), so the guard covers both routes to a zero expression: a [`NoRisk`](@ref) measure, and every measure carrying `settings.rke = false`. The second route shipped unguarded since the inclusion flag was introduced.
 
 Called from [`MeanRisk`](@ref)'s constructor. [`TimeDependent`](@ref) schedules are skipped here and reached instead through [`assert_time_dependent_substitution`](@ref), which re-runs the constructor on each scheduled entry.
 
@@ -212,7 +211,7 @@ Assert that `r` gives a non-zero risk expression, for optimisers built around on
 
 A zero risk expression is only coherent in [`MeanRisk`](@ref), under an objective that never consults it. Every other risk-taking optimiser *is* its risk measure — a risk budget with nothing to budget, a risk contribution that is always zero, a clustering optimiser dividing by a zero risk — so they reject it rather than return a degenerate answer.
 
-`flag` selects the predicate, because the two families of caller do not see the same routes (ADR 0054):
+`flag` selects the predicate, because the two families of caller do not see the same routes:
 
   - The JuMP optimisers pass [`zero_risk_expression_flag`](@ref), which covers a [`NoRisk`](@ref) measure **and** every measure carrying `settings.rke = false`.
   - [`HierarchicalRiskParity`](@ref) and [`HierarchicalEqualRiskContribution`](@ref) keep the default [`norisk_flag`](@ref). They never reach the JuMP risk builders, so `rke` is inert for them, and widening the predicate would refuse a configuration that solves correctly today.

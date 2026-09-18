@@ -1128,7 +1128,7 @@ Run the Schur Complement Hierarchical Risk Parity portfolio optimisation.
 
 # Details
 
-Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser accepts no `branchorder` keyword. Recursive bisection allocates by splitting the dendrogram's leaf permutation, so that permutation is the algorithm's input rather than a presentation detail, and the clusterisation always runs with the optimal ordering. A `branchorder` passed here is absorbed by `kwargs` and ignored. See ADR 0055.
+Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser accepts no `branchorder` keyword. Recursive bisection allocates by splitting the dendrogram's leaf permutation, so that permutation is the algorithm's input rather than a presentation detail, and the clusterisation always runs with the optimal ordering. A `branchorder` passed here is absorbed by `kwargs` and ignored.
 
 # Validation
 

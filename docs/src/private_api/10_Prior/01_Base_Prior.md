@@ -1,0 +1,35 @@
+```@meta
+Description = "Base Prior, private API of PortfolioOptimisers.jl: AbstractLowOrderPriorEstimator, AbstractLowOrderPriorEstimator_A_AF, AbstractLowOrderPriorEstimator_F_AF, …"
+```
+
+# Base Prior: private API
+
+```@docs
+AbstractLowOrderPriorEstimator
+AbstractLowOrderPriorEstimator_A_AF
+AbstractLowOrderPriorEstimator_F_AF
+AbstractLowOrderPriorEstimator_A_F_AF
+AbstractHighOrderPriorEstimator
+Pr_RR
+PrE_Pr
+assert_prior_regression
+prior_regression_remedy
+prior_field_values
+prior_result_property_pool
+bound_field_is_stale
+returns_matrix_picker
+investable_mask
+investable_views
+investable_prior
+investable_universe_names
+scenario_fill_pairs
+scenario_fill_msg
+resolve_fill_limit
+scenario_fill
+held_non_investable
+investable_weights_view
+PortfolioOptimisers.scenario_window
+PortfolioOptimisers.scenario_ens
+PortfolioOptimisers.scenario_fill_report
+PortfolioOptimisers.scenario_fill_remember!
+```

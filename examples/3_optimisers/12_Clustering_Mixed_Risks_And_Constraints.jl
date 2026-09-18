@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Clustering optimisers with mixed risk measures, scalarisers, constraints and fees across the hierarchy in PortfolioOptimisers.jl."
+```
+
 # Clustering optimisers with mixed risks and constraints
 
 This example turns the clustering optimiser chapter into a deeper playground for two things

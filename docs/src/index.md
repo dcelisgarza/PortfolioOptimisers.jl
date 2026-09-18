@@ -5,7 +5,7 @@ layout: home
 
 hero:
   name: "PortfolioOptimisers.jl"
-  text: Quantitative portfolio construction
+  text: Portfolio optimisation library for Julia
   tagline: Democratising, demystifying, and derisking investing
   image:
     # Root-relative: DocumenterLandingPage remaps a bare filename under `/` into the site's
@@ -21,7 +21,7 @@ hero:
       link: examples/00_Examples
     - theme: alt
       text: API
-      link: api/00_API
+      link: 00_API
 
 features:
   - icon: 🔮
@@ -59,26 +59,18 @@ features:
 
 ```@meta
 CurrentModule = PortfolioOptimisers
+Description = "PortfolioOptimisers.jl is a portfolio optimisation (portfolio optimization) library for Julia, built from composable immutable estimators."
 ```
 
 # Welcome to PortfolioOptimisers.jl
 
+`PortfolioOptimisers.jl` is a portfolio optimisation (portfolio optimization) library for Julia.
+Every component is an immutable estimator you compose, so a prior, a risk measure or a
+constraint swaps out without touching the optimiser.
+
 !!! danger
 
     Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
-
-Portfolio optimisation is the science of either:
-
-- Minimising risk whilst keeping returns to acceptable levels.
-- Maximising returns whilst keeping risk to acceptable levels.
-
-To some definition of acceptable, and with any number of additional constraints available to the optimisation type.
-
-There exist myriad statistical, pre- and post-processing, optimisations, and constraints that allow one to explore an extensive landscape of "optimal" portfolios.
-
-`PortfolioOptimisers.jl` is an attempt at providing as many of these as possible under a single banner. We make extensive use of `Julia`'s type system, module extensions, and multiple dispatch to simplify development and maintenance.
-
-The cards above are the highlights. The [capability catalogue](@ref capability-catalogue) lists every estimator, risk measure, constraint, and optimiser the library ships, each one linked to its docstring.
 
 ## Caveat emptor
 
@@ -278,4 +270,4 @@ We can also plot the compounded or uncompounded drawdowns.
 plot_drawdowns(mip_res.w, rd.X; slv = slv, ts = rd.ts, compound = true)
 ```
 
-There are many other types of plotting functionality in `PortfolioOptimisers.jl`, check out the [Plotting](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/22_Plotting) page of the documentation.
+There are many other types of plotting functionality in `PortfolioOptimisers.jl`, check out the [Plotting](public_api/22_Plotting.md) page of the documentation.

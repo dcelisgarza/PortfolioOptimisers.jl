@@ -1292,7 +1292,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the vector of deviations from the target value for a precomputed returns series.
 
-Single-argument form of [`calc_deviations_vec`](@ref) used by the precomputed-returns functor `r(x::VecNum)` (ADR 0007).
+Single-argument form of [`calc_deviations_vec`](@ref) used by the precomputed-returns functor `r(x::VecNum)`.
 
 # Related
 
@@ -1318,7 +1318,7 @@ per-algorithm reduction (lower/full, the power, the standardisation, the formula
 Both functor arities funnel through this kernel: `r(w, X, fees)` calls
 `moment_risk(r, calc_deviations_vec(r, w, X, fees))`, and the single-argument
 precomputed-returns form `r(x::VecNum)` calls `moment_risk(r, calc_deviations_vec(r, x))`,
-so the two share one definition of the math (ADR 0007).
+so the two share one definition of the math.
 
 # Related
 

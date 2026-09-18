@@ -108,7 +108,7 @@ Read the taxonomy column `sets.dict[key]`, checking that the key exists.
 
 The sibling of [`factor_universe`](@ref) for a **group name key**, and written for the same reason: one shared helper whose message names the key and says what to do about it, so every consumer of a caller-supplied taxonomy key fails the same way. A bare `sets.dict[key]` raises a `KeyError` carrying the key alone, which says nothing about which of the two producers asked for it, and offers no help with a typo.
 
-`need` names the consumer. The suggestion comes from [`suggest_declared_key`](@ref), the looser configuration shared by every declaration-key suggestion: the candidates here are `sets.dict` keys the caller authored, not asset names, so the info-leak boundary of ADR 0026 does not apply.
+`need` names the consumer. The suggestion comes from [`suggest_declared_key`](@ref), the looser configuration shared by every declaration-key suggestion: the candidates here are `sets.dict` keys the caller authored, not asset names, so the info-leak-safe boundary does not apply.
 
 # Arguments
 

@@ -14,7 +14,7 @@ Compute the expected portfolio return using the specified return estimator.
 
 ## The prior route reduces to the Investable Mask
 
-A prior result lives on the **full** asset universe, and an asset it could not estimate carries `NaN` in `mu` and down its column of `pr.X`. So `dot(w, mu)` and `X * w` are `NaN` at **any** weight, the optimiser's own zero included. Each method therefore reduces the prior, the weights and the fees once at its entry, through [`investable_reduction`](@ref), which is the rule ADR 0115 states for an optimiser, taken at the value-level door. A held non-investable asset warns and its weight is dropped, or raises under `strict`. [`NoReturn`](@ref) answers zero at every weight, so it reads nothing and reduces nothing.
+A prior result lives on the **full** asset universe, and an asset it could not estimate carries `NaN` in `mu` and down its column of `pr.X`. So `dot(w, mu)` and `X * w` are `NaN` at **any** weight, the optimiser's own zero included. Each method therefore reduces the prior, the weights and the fees once at its entry, through [`investable_reduction`](@ref) — the rule for an optimiser, taken at the value-level door. A held non-investable asset warns and its weight is dropped, or raises under `strict`. [`NoReturn`](@ref) answers zero at every weight, so it reads nothing and reduces nothing.
 
 The reduction is a **no-op on a prior that is already reduced**, because a reduced prior's moments are finite everywhere and [`investable_mask`](@ref) then answers `nothing`. That is what keeps a vector of terms, a population, and a composite such as [`expected_ratio`](@ref) to exactly one diagnostic.
 

@@ -38,11 +38,11 @@ The matrix method, `Distances._pairwise!(::AngularDist, r, a)`. It receives `a` 
  2. Mark the zero columns of `a`, giving `z`.
  3. Rewrite every entry of `r` in place: the diagonal to `zero(T)`; a pair of zero columns to `zero(T)`; a zero column against a non-zero one to `one(T)`; every other entry to ``\\arccos(1 - r_{i,\\,j}) / \\pi``.
 
-One matrix multiplication replaces ``N^{2}`` scalar calls, and it is the faster path from three assets upward: `1.2` times at ``N = 3``, `2.3` at ``N = 5``, and `4` to `9` times from ``N = 8``. It loses only at ``N = 2``, where the single distance it saves does not pay for the call. So there is one matrix path and nothing to tune.
+One matrix multiplication replaces ``N^{2}`` scalar calls, and it is the faster path from three assets upward. It loses only at ``N = 2``, where the single distance it saves does not pay for the call. So there is one matrix path and nothing to tune.
 
 !!! note "The two paths differ on the diagonal, and the matrix path is the correct one"
 
-    ``\\arccos(1 - r) / \\pi`` is the algebraic identity of the elementwise method, not its floating-point result. Off the diagonal the two paths agree to a few units in the last place. On the diagonal they differ by up to `6.707879276254074e-9`: the cosine of a vector with itself rounds to `0.9999999999999999`, ``\\arccos`` has an infinite derivative at `1`, and a `1e-16` error there becomes a `1e-8` error in the distance. The matrix path writes an exact zero instead.
+    ``\\arccos(1 - r) / \\pi`` is the algebraic identity of the elementwise method, not its floating-point result. Off the diagonal the two paths agree to a few units in the last place. On the diagonal they differ more: the cosine of a vector with itself rounds only to within floating-point precision of `1`, ``\\arccos`` has an infinite derivative at `1`, so that residual is amplified into a much larger error in the distance. The matrix path writes an exact zero instead.
 
     `Distances.pairwise` writes an exact zero diagonal, so the matrix entry points — which are the only route [`FeatureDistance`](@ref) takes — never see the residual. Call the metric directly on a pair of identical vectors and it is there. The `"AngularDist gemm path matches the elementwise method"` testset pins the two paths together, and that is why it pins them with a tolerance.
 
@@ -852,7 +852,7 @@ end
 
 Resolve the observation weights of a collapse algorithm against a window of time-varying features.
 
-`Z` is matricised to `observations × (assets · features)` first, because [`get_observation_weights`](@ref)'s documented interface is `VecNum`/`MatNum` and a raw 3-D array matches neither — a user's correct `MatNum` method would otherwise never fire. There is no caller-side `nothing` guard: [`get_observation_weights`](@ref) raises [`ObservationWeightsError`](@ref) itself when a [`DynamicAbstractWeights`](@ref) cannot resolve, so `nothing` here means only that no weights were requested (ADR 0043).
+`Z` is matricised to `observations × (assets · features)` first, because [`get_observation_weights`](@ref)'s documented interface is `VecNum`/`MatNum` and a raw 3-D array matches neither — a user's correct `MatNum` method would otherwise never fire. There is no caller-side `nothing` guard: [`get_observation_weights`](@ref) raises [`ObservationWeightsError`](@ref) itself when a [`DynamicAbstractWeights`](@ref) cannot resolve, so `nothing` here means only that no weights were requested.
 
 Cross-fold weighting requires a [`DynamicAbstractWeights`](@ref). It resolves against the `Z` it is handed, so it is fold-local and correct automatically. A *static* `AbstractWeights` is fixed at construction and outlives the fold: a longer one used to be read positionally by [`AggregateDistances`](@ref), giving the *oldest* weights to the *newest* observations with no bounds error, and a shorter one gave a bare `BoundsError`. The length check makes both loud.
 

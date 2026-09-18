@@ -1,6 +1,6 @@
-# Auto-generates the type-hierarchy API page (`<NN>_TypeHierarchy.md`). The
-# numeric prefix is chosen dynamically so the page always sorts last in
-# `docs/src/api/`, even after new numbered files are added before it.
+# Auto-generates the type-hierarchy page (`docs/src/TypeHierarchy.md`), alongside `00_API.md`
+# and `capability_catalogue.md`: it spans both mirror trees (ADR 0128), so it sits above them
+# rather than inside either.
 #
 # Walks the subtype tree of each root abstract type and renders it as an ASCII
 # tree (same box-drawing style as the ADRs), with each type name a Documenter
@@ -77,32 +77,8 @@ function type_tree(T::Type)
     return string(join(_type_tree(String[], T), "\\\n"), "\n\n")
 end
 
-const _PAGE_SUFFIX = "_TypeHierarchy.md"
-
-# Highest `NN_` prefix among the entries in `dir` (files and directories alike,
-# since both are numbered in `src/api`), or -1 if none.
-function max_api_index(dir::String)
-    maxn = -1
-    for entry in readdir(dir)
-        m = match(r"^(\d+)_", entry)
-        if m === nothing
-            continue
-        end
-        maxn = max(maxn, parse(Int, m.captures[1]))
-    end
-    return maxn
-end
-
-function generate_type_hierarchy(dir::String = joinpath(@__DIR__, "src", "api"))
-    # Drop any previously generated page first, so its own prefix never inflates
-    # the index and no stale duplicate is left behind when the number changes.
-    for entry in readdir(dir)
-        if endswith(entry, _PAGE_SUFFIX)
-            rm(joinpath(dir, entry))
-        end
-    end
-    idx = max_api_index(dir) + 1
-    path = joinpath(dir, string(lpad(idx, 2, '0'), _PAGE_SUFFIX))
+function generate_type_hierarchy(path::String = joinpath(@__DIR__, "src",
+                                                         "TypeHierarchy.md"))
     roots = ["AbstractResult" => PortfolioOptimisers.AbstractResult,
              "AbstractEstimator" => PortfolioOptimisers.AbstractEstimator,
              "AbstractAlgorithm" => PortfolioOptimisers.AbstractAlgorithm,
@@ -111,12 +87,20 @@ function generate_type_hierarchy(dir::String = joinpath(@__DIR__, "src", "api"))
     open(path, "w") do io
         print(io,
               """
+              ```@meta
+              Description = "The type hierarchy of PortfolioOptimisers.jl: every result, estimator, algorithm and covariance estimator as a tree, each linked to its docstring."
+              ```
+
               # Type hierarchy
 
               The trees below are generated automatically from the live type hierarchy
               every time the documentation is built (see [docs/generate_type_hierarchy.jl](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/generate_type_hierarchy.jl)),
               so they always reflect the current state of the package. Each type links to
-              its docstring.
+              its docstring, on whichever side of the public/private split (ADR 0128,
+              `docs/adr/`) holds it.
+
+              For the same types grouped by the job they do rather than by subtyping, see the
+              [capability catalogue](@ref capability-catalogue).
               """)
         for (name, T) in roots
             println(io, "\n## [", name, "](@id type-hierarchy-", name, ")\n")

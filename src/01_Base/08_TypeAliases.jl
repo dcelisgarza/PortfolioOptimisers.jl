@@ -592,3 +592,4 @@ Alias for a union of an abstract string or an abstract vector.
   - [`Str_Expr`](@ref)
 """
 const Str_Vec = Union{<:AbstractString, <:AbstractVector}
+public AbstractEstimatorValueAlgorithm, VectorAbstractEstimatorValueAlgorithm

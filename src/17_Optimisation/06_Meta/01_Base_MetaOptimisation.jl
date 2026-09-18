@@ -244,10 +244,10 @@ The outer optimiser decides how much of each sub-portfolio to hold. A Combinatio
 
 ## What the rescale buys
 
-Only the ratios between the entries of a Combination Weight carry meaning (ADR 0053), and the rescale is what makes that true here — a common factor cancels, so the weight needs no normalised form of its own. Three cases are then exactly inert:
+Only the ratios between the entries of a Combination Weight carry meaning, and the rescale is what makes that true here — a common factor cancels, so the weight needs no normalised form of its own. Three cases are then exactly inert:
 
   - A **uniform** weight gives back `w`, whatever it sums to.
-  - A **lone** sub-portfolio gives back `w`. One element is not a combination, which is ADR 0053's rule.
+  - A **lone** sub-portfolio gives back `w`. One element is not a combination.
   - An outer optimiser that chose a total other than one keeps it. Rescaling to one instead would silently overrule a `bgt` of `0.9`.
 
 ## Why the outer problem never sees the weight

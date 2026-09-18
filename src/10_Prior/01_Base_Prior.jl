@@ -95,6 +95,10 @@ Low order prior estimator using only asset returns.
 
 This is the first of the three source shapes. A member **admits asset returns only**: its `prior` method declares the factor argument as `args...` and never reads it, so factor returns handed to it are ignored rather than refused.
 
+# Interfaces
+
+  - `prior(pe::AbstractLowOrderPriorEstimator_A, X::MatNum, args...; dims::Int = 1, kwargs...) -> LowOrderPrior`: Estimate the prior from asset returns alone; `args...` absorbs and ignores any factor returns handed in.
+
 # Related
 
   - [`AbstractLowOrderPriorEstimator`](@ref)
@@ -111,6 +115,10 @@ Low order prior estimator using factor returns.
 `AbstractLowOrderPriorEstimator_F` is the base type for estimators that compute low order moments (mean and covariance) requiring the use of both asset and factor returns data. All concrete factor-adjusted prior estimators should subtype this type.
 
 This is the second of the three source shapes. A member **admits asset returns and requires factor returns**: its `prior` method declares the factor argument as `F::MatNum` with no default, so a call that omits factor returns is a `MethodError`. [`prior`](@ref) raises earlier and more clearly when a [`ReturnsResult`](@ref) with `F === nothing` reaches such an estimator.
+
+# Interfaces
+
+  - `prior(pe::AbstractLowOrderPriorEstimator_F, X::MatNum, F::MatNum, args...; dims::Int = 1, kwargs...) -> LowOrderPrior`: Estimate the prior from asset and factor returns; a call that omits `F` is a `MethodError`.
 
 # Related
 
@@ -131,6 +139,10 @@ Low order prior estimator using both asset and factor returns.
 This is the third of the three source shapes. A member **admits asset returns and admits factor returns optionally**: its `prior` method declares the factor argument as `F::Option{<:MatNum} = nothing` and reads it when it is supplied. The shape therefore says nothing about whether the result carries a regression: use [`assert_prior_regression`](@ref) to establish that.
 
 Nor does the shape say whether the fit *reads* factor returns, and [`needs_factor_returns`](@ref) answers that three ways. A member that requires them answers `true`, a member that never reads them answers `false`, and this shape answers `nothing` by default: *the type does not say; take what the fold is given*, which is what its batch verb does. Every member of this shape the library ships embeds another prior and hands `F` to it, so each defines the recursion and answers the leaf's value. A caller's own subtype that embeds a prior should define the same recursion; one that reads `F` itself may leave the default.
+
+# Interfaces
+
+  - `prior(pe::AbstractLowOrderPriorEstimator_AF, X::MatNum, F::Option{<:MatNum} = nothing, args...; dims::Int = 1, kwargs...) -> LowOrderPrior`: Estimate the prior from asset returns, reading `F` when it is supplied.
 
 # Related
 
@@ -229,6 +241,10 @@ High order prior estimator using factor returns.
 
 A member **admits asset returns and requires factor returns**, on the same terms as [`AbstractLowOrderPriorEstimator_F`](@ref) one order down: its `prior` method declares the factor argument as `F::MatNum` with no default. The two are the members of [`AbstractHiLoOrderPriorEstimator_F`](@ref), which is how [`prior`](@ref) recognises a factor prior without naming an order.
 
+# Interfaces
+
+  - `prior(pe::AbstractHighOrderPriorEstimator_F, X::MatNum, F::MatNum, args...; dims::Int = 1, kwargs...) -> HighOrderPrior`: Estimate the prior from asset and factor returns; a call that omits `F` is a `MethodError`.
+
 # Related
 
   - [`AbstractHighOrderPriorEstimator`](@ref)
@@ -271,7 +287,7 @@ In order to implement a new prior result carrier which will work seamlessly with
   - `reconstruct_prior(pr::AbstractPriorResult, patch::NamedTuple) -> AbstractPriorResult`: Rebuild the carrier through its own constructor with `patch` applied. This is what makes [`forward_prior`](@ref) work on the carrier, and it is written per carrier because the constructor is named rather than recovered by reflection.
   - `port_opt_view(pr::AbstractPriorResult, i, args...) -> AbstractPriorResult`: Restrict the carrier to the assets at index `i`, for hierarchical and subset optimisation.
 
-The field list is derived by [`prior_field_values`](@ref), so a carrier that gains a field needs no further method. Add the carrier's name to [`prior_result_property_pool`](@ref) so that an `@pprop` field naming one of its properties is recognised.
+The field list is derived by [`prior_field_values`](@ref), so a carrier that gains a field needs no further method. An `@pprop` field may only name a property of the two carriers [`prior_result_property_pool`](@ref) hard-codes today — [`LowOrderPrior`](@ref) and [`HighOrderPrior`](@ref); a third-party carrier's own property is refused by [`check_propagatable_contracts`](@ref) rather than recognised.
 
 ## Arguments
 
@@ -410,7 +426,8 @@ Consumers differ in *what* they wanted the loadings for — projecting factor mo
 them, or drawing them — so each supplies its own opening sentence via
 [`assert_prior_regression`](@ref)'s `lead`. What none of them may restate is the diagnosis:
 there is exactly one way to arrive with `rr === nothing`, and exactly one remedy, and both
-are consequences of ADR 0046 rather than of the consumer.
+are consequences of the rule that every wrapping estimator forwards `rr` and the factor block
+`fpr` rather than of the consumer.
 
 ## Which errors carry it
 
@@ -438,7 +455,7 @@ Assert that a prior result carries a factor block, so its loadings can be read.
 
 Estimators whose `pe` field is typed [`AbstractLowOrderPriorEstimator_F_AF`](@ref) accept the [`AbstractLowOrderPriorEstimator_AF`](@ref) half of that union, whose members use factor returns only *optionally*. The type therefore constrains which returns an estimator **consumes**, not whether the result it **produces** carries a regression. An estimator that projects factor moments through the loadings needs the latter, and must check for it.
 
-There is one way to arrive with `pr.rr === nothing`: nothing in the chain ever computed a regression (`EntropyPoolingPrior(; pe = EmpiricalPrior())`). Discarding one is no longer possible — every wrapping estimator forwards `rr` and the factor block `fpr` under ADR 0046, so nesting order does not matter. Checking `rr` covers the whole factor block, because [`LowOrderPrior`](@ref) already requires `rr` and `fpr` to be provided together or not at all — which is why the plotting entry points that want `fpr.mu` or `fpr.sigma` check `rr` here rather than testing the virtual read they are about to take.
+There is one way to arrive with `pr.rr === nothing`: nothing in the chain ever computed a regression (`EntropyPoolingPrior(; pe = EmpiricalPrior())`). Discarding one is no longer possible — every wrapping estimator forwards `rr` and the factor block `fpr`, so nesting order does not matter. Checking `rr` covers the whole factor block, because [`LowOrderPrior`](@ref) already requires `rr` and `fpr` to be provided together or not at all — which is why the plotting entry points that want `fpr.mu` or `fpr.sigma` check `rr` here rather than testing the virtual read they are about to take.
 
 Estimators are not the only consumer: the factor-space plotting entry points need the same block, and get the same diagnosis. Only the opening sentence differs, so `lead` carries it and [`prior_regression_remedy`](@ref) carries the rest.
 
@@ -504,7 +521,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Forward a wrapped prior result, spelling out only what the wrapping estimator changes or drops.
 
-This is the mechanical half of the composition rule recorded in ADR 0046:
+This is the mechanical half of the composition rule:
 
 > **Forward when forwarding is correct; drop only where forwarding would state something false; document every drop in the estimator's docstring.**
 
@@ -1147,7 +1164,7 @@ The two reads also differ where the block is absent, which is the one case worth
 
 ## Composition: what a wrapping estimator forwards
 
-Most prior estimators wrap another and return a carrier built from the one they were handed. Which fields survive that hop is governed by a single rule, recorded in ADR 0046 and enforced by [`forward_prior`](@ref):
+Most prior estimators wrap another and return a carrier built from the one they were handed. Which fields survive that hop is governed by a single rule, enforced by [`forward_prior`](@ref):
 
 > **Forward when forwarding is correct; drop only where forwarding would state something false; document every drop in the estimator's docstring.**
 
@@ -1161,7 +1178,7 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
 
 **Read it as `original_X`, never as `o_X`.** The property is always a matrix — the field where there is one, `X` where there is not — so a consumer needs no fallback and cannot forget one. The field is storage, and it answers a different question: `isnothing(pr.o_X)` is how to ask whether this carrier reconstructed `X`. The field carries the state rather than the property carrying it, because [`forward_prior`](@ref) rebuilds through the keyword constructor with every field named, and a `nothing` is inert there where an always-populated matrix would go stale past a change to `X`.
 
-`o_X` requires `rr`. Every estimator that overwrites `X` today does so by projecting a factor prior through regression loadings, so a carrier claiming a reconstruction it cannot explain is a bug. This is a present-tense constraint rather than a law of the domain: see the amendment to ADR 0046.
+`o_X` requires `rr`. Every estimator that overwrites `X` today does so by projecting a factor prior through regression loadings, so a carrier claiming a reconstruction it cannot explain is a bug. This is a present-tense constraint rather than a law of the domain, and a future estimator that transforms `X` without a regression must relax it deliberately.
 
 ## Validation
 
@@ -1453,11 +1470,11 @@ end
 
 Derive the Investable Mask of a fitted prior, and give a view builder the universe it may write rows over.
 
-A view is a **dense linear form over the asset axis**, and a departed asset carries `NaN` in `mu` and on the diagonal of `sigma`. `A[i] == 0` does not protect a row from it, because `0 * NaN` is `NaN`, so a view naming only *live* assets is poisoned exactly as thoroughly as one naming the asset that left: the row reaches the solver all `NaN`, and the fit fails naming something that is not the cause. Building the row on the investable columns is the whole fix, and it is the same reduction every optimiser takes at its entry — [`port_opt_view`](@ref) of the carrier at `findall(imsk)`, which ADR 0115 states and [#919](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/919) measured bit-exact against the hand-reduced oracle.
+A view is a **dense linear form over the asset axis**, and a departed asset carries `NaN` in `mu` and on the diagonal of `sigma`. `A[i] == 0` does not protect a row from it, because `0 * NaN` is `NaN`, so a view naming only *live* assets is poisoned exactly as thoroughly as one naming the asset that left: the row reaches the solver all `NaN`, and the fit fails naming something that is not the cause. Building the row on the investable columns is the whole fix, and it is the same reduction every optimiser takes at its entry — [`port_opt_view`](@ref) of the carrier at `findall(imsk)`, and [#919](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/919) measured it bit-exact against the hand-reduced oracle.
 
 **Both view-taking prior families reduce here, and what they owe afterwards is theirs, not this door's.** An entropy pooling row runs over *observations*, so its solved probabilities carry no asset axis and nothing is expanded back — the moments come from the refit wrapped prior, which already holds the full-universe `NaN` frame. A Black–Litterman posterior is a *moment pair over the reduced assets*, so it has to be written back into a `NaN` frame of the full width with [`expand_moment`](@ref) before it leaves the estimator. That is the whole of the difference, and it is why this verb hands back the index rather than swallowing it.
 
-The door also **mints the Non-Investable Axis** on the sets it hands the builders, with [`non_investable_sets`](@ref) after [`port_opt_view`](@ref) — after, because the view drops the axis so that a sub-problem cannot inherit its parent's departures. That is what lets a builder tell a departed name from a typo: ADR 0125 drops the row whole and in silence for the first, and keeps today's `strict_diagnostic` for the second.
+The door also **mints the Non-Investable Axis** on the sets it hands the builders, with [`non_investable_sets`](@ref) after [`port_opt_view`](@ref) — after, because the view drops the axis so that a sub-problem cannot inherit its parent's departures. That is what lets a builder tell a departed name from a typo: the row is dropped whole and in silence for the first, and today's `strict_diagnostic` applies for the second.
 
 **`sets` splits by dispatch and the mask by a condition**, and the asymmetry is the whole of the reason. `sets` is a field of a `@concrete` estimator, so whether it is `nothing` is a **type** fact, fixed per instantiation: the pair is static dispatch, it costs nothing, and it is what keeps the returned sets concretely a [`UniverseSets`](@ref). A single method over `Option{<:UniverseSets}` would answer a value-level `Union`, and the view builders declare `sets::UniverseSets` — so JET finds no method for the `Nothing` half at every builder call site, none of them reachable. [`investable_mask`](@ref), by contrast, answers a `Union{Nothing, BitVector}` that depends on the **data**: Julia union-splits a two-member `Union` and compiles a method pair back into this very branch, so dispatching on it would buy nothing and cost a unit in a swept file. Dispatch where the fact is a type; branch where it is a value.
 
@@ -1665,7 +1682,7 @@ Resolve the share of an investable column a [`scenario_fill`](@ref) may invent i
 
 So `nothing` **derives**. Where any arm of the fitting estimator states a floor, `nothing` means `1 - floor`, and it never fires: every admitted column satisfies it by construction. Where no arm states one — the exponentially weighted family is mask-aware without a policy, gating on `min_obs`, a *count* that says nothing about the share of a long window — `nothing` keeps its original meaning and names every fill, because a caller who set no floor has weighed no trade.
 
-An explicit `fill_limit` overrides the derivation and must be **tighter** than admission. A value above `1 - floor` is refused, because it is dead by construction: nothing that reaches the fill could trip it, and a knob that cannot fire is worse than no knob. What an explicit value buys is the one configuration the derivation cannot express — admit broadly and be told anyway, `min_coverage = 0.3` with `fill_limit = 0.5` (ADR 0118).
+An explicit `fill_limit` overrides the derivation and must be **tighter** than admission. A value above `1 - floor` is refused, because it is dead by construction: nothing that reaches the fill could trip it, and a knob that cannot fire is worse than no knob. What an explicit value buys is the one configuration the derivation cannot express — admit broadly and be told anyway, `min_coverage = 0.3` with `fill_limit = 0.5`.
 
 The four methods are dispatch rather than a branch, so a call site holding two `Option`s finds a method for every arm of its union split.
 
@@ -1710,7 +1727,7 @@ end
 
 Cut the returns matrix a Prior Result carries down to the last `max_scenarios` observations.
 
-The Scenario Cap of ADR 0136, applied. A prior that carries `X` carries it for the scenario risk measures, and a caller who wants a long window of moments and a short window of scenarios says so with one field rather than with two fits. The cap therefore touches `X` alone: `mu` and `sigma` are already computed when this runs, over every observation the fit read, and nothing here can or does move them.
+The Scenario Cap, applied. A prior that carries `X` carries it for the scenario risk measures, and a caller who wants a long window of moments and a short window of scenarios says so with one field rather than with two fits. The cap therefore touches `X` alone: `mu` and `sigma` are already computed when this runs, over every observation the fit read, and nothing here can or does move them.
 
 It is deliberately the **same** verb in batch and online. A cap is a property of the result, not of the fold, so `prior(pe, X)` and the read-out of a folded `pe` cut the same rows off the same tail.
 
@@ -1744,7 +1761,7 @@ end
 
 State the number of observations the moments of a capped Prior Result were fitted over, or `nothing` when the cap cuts nothing.
 
-The count a Scenario Cap owes its readers (ADR 0138). [`scenario_window`](@ref) cuts the rows the result carries and leaves `mu` and `sigma` fitted over every observation, so a consumer that prices a sample size off `size(pr.X, 1)` — an uncertainty set's `T`, a calibration rule's count — would read `w` rows for moments fitted over `t`, and mis-price every count by `t / w`. The result therefore states `t` in `ens` exactly when the cap cuts, and every count reader takes `ens` before the shape. When the cap does not cut, or there is no cap, the rows carried *are* the observations fitted over, and `ens` stays `nothing`, so a fit without a cap is bit-identical to what it was.
+The count a Scenario Cap owes its readers. [`scenario_window`](@ref) cuts the rows the result carries and leaves `mu` and `sigma` fitted over every observation, so a consumer that prices a sample size off `size(pr.X, 1)` — an uncertainty set's `T`, a calibration rule's count — would read `w` rows for moments fitted over `t`, and mis-price every count by `t / w`. The result therefore states `t` in `ens` exactly when the cap cuts, and every count reader takes `ens` before the shape. When the cap does not cut, or there is no cap, the rows carried *are* the observations fitted over, and `ens` stays `nothing`, so a fit without a cap is bit-identical to what it was.
 
 It is the same verb in batch and at the folded read-out, as [`scenario_window`](@ref) is, and the two agree by construction: both read the same `t` off the same matrix.
 
@@ -1843,7 +1860,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the returns matrix with the missing rows of every investable asset filled with zero, and say so above the fitting estimator's resolved `fill_limit`.
 
-A mask-aware moment estimator answers a young asset from the observations it has, so the asset is investable and its returns column still carries a `NaN` at every row before it listed. Every consumer of a Prior Result reads that column — the JuMP model, the meta-optimisers and the value-level door among them — so the fill is paid **once**, here, on the estimator's own pass, rather than at each of them (ADR 0118).
+A mask-aware moment estimator answers a young asset from the observations it has, so the asset is investable and its returns column still carries a `NaN` at every row before it listed. Every consumer of a Prior Result reads that column — the JuMP model, the meta-optimisers and the value-level door among them — so the fill is paid **once**, here, on the estimator's own pass, rather than at each of them.
 
 A non-investable asset keeps its `NaN` column, so [`investable_mask`](@ref) is unchanged. `mu`, `sigma` and every other block are untouched, because the estimator computed them from the rows it saw.
 
@@ -1851,7 +1868,7 @@ A non-investable asset keeps its `NaN` column, so [`investable_mask`](@ref) is u
 
 How much of the trade passes in silence is the fitting estimator's own answer, carried in its `fill_limit` field and resolved at the fit by [`resolve_fill_limit`](@ref) against the coverage floor of its arms — the share is a property of one fit, not of the session, so two priors in one program may answer differently. Under `strict = false` the trade is silent while the worst column's share stays at or below the resolved limit, and is named through [`strict_diagnostic`](@ref) above it. Under `strict = true` **any** fill refuses, whatever the limit holds.
 
-Two mask-aware families reach this verb. The exponentially weighted family carries no [`CoveragePolicy`](@ref), so a `fill_limit` of `nothing` names every fill there. The plain family is mask-aware exactly where a policy is set, and a policy derives a limit that never fires, so an available-case fit names nothing while it does what it was configured to do. A plain estimator with no policy never reaches this verb at all: under the whole-window rule of ADR 0117 an asset it could not cover leaves the Coverage Universe and is not investable.
+Two mask-aware families reach this verb. The exponentially weighted family carries no [`CoveragePolicy`](@ref), so a `fill_limit` of `nothing` names every fill there. The plain family is mask-aware exactly where a policy is set, and a policy derives a limit that never fires, so an available-case fit names nothing while it does what it was configured to do. A plain estimator with no policy never reaches this verb at all: under the whole-window rule, an asset it could not cover leaves the Coverage Universe and is not investable.
 
 # Algorithm
 
@@ -2390,4 +2407,9 @@ function prior_result_property_pool()
 end
 
 export prior, LowOrderPrior, HighOrderPrior
-public forward_prior
+public forward_prior, AbstractPriorEstimator, AbstractPriorResult, reconstruct_prior
+# The `# Interfaces`-marked types of #1146 (ADR 0154): the four families
+# `AbstractPriorEstimator`'s own section tells an author to subtype now carry the contract
+# themselves. Their verb, `prior`, is already exported.
+public AbstractLowOrderPriorEstimator_A, AbstractLowOrderPriorEstimator_F,
+       AbstractLowOrderPriorEstimator_AF, AbstractHighOrderPriorEstimator_F

@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Linear and group constraints in PortfolioOptimisers.jl: weight bounds, sector bands, relative and sum constraints on a JuMPOptimiser."
+```
+
 # Linear and group constraints
 
 A mandate is rarely "optimise freely". You cap single-name concentration, hold sector bands,

@@ -122,9 +122,12 @@ end
     @test !isdefined(PortfolioOptimisers, :AmbiguityTailWeightCalibration)
 
     # Neither abstract type is exported: an export is public API, and the convention is
-    # that an abstract type is not one.
-    @test :AbstractAmbiguityRadiusCalibrationAlgorithm ∉ names(PortfolioOptimisers)
-    @test :AbstractAmbiguityTailWeightCalibrationAlgorithm ∉ names(PortfolioOptimisers)
+    # that an abstract type is not one. Both are `public`, which `names` also lists, so
+    # the check reads `Base.isexported`.
+    @test !Base.isexported(PortfolioOptimisers,
+                           :AbstractAmbiguityRadiusCalibrationAlgorithm)
+    @test !Base.isexported(PortfolioOptimisers,
+                           :AbstractAmbiguityTailWeightCalibrationAlgorithm)
 
     # The five concrete names are exported, on the same terms as the rules of the two
     # older families.

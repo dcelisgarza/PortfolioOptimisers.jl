@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Opinion pooling in PortfolioOptimisers.jl: combine several entropy-pooling posteriors into one consensus prior weighted by trust."
+```
+
 # Opinion pooling
 
 [Entropy pooling](07_Entropy_Pooling.md) turns *one* set of views into a reweighted prior. But

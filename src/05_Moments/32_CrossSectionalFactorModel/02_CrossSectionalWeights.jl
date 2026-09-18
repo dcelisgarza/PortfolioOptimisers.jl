@@ -668,3 +668,5 @@ function cs_weights_refine(alg::BlendedInverseVarianceWeights, W0::MatNum, eps::
 end
 
 export MarketCapWeights, BlendedInverseVarianceWeights
+public AbstractCrossSectionalWeightsAlgorithm, cs_weights_initial, cs_weights_refine,
+       needs_second_pass

@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "The online walk-forward in PortfolioOptimisers.jl worked through: one estimator warmed on the first fold and stepped through the rest."
+```
+
 # The online walk-forward: one estimator, stepped fold by fold
 
 A walk-forward refits every fold from its training window. Fold `i` reads every row fold

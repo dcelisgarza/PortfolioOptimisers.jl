@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "The online walk-forward in PortfolioOptimisers.jl: warm one estimator on the first window and step it fold by fold instead of refitting."
+```
+
 # The online walk-forward
 
 A walk-forward refits every fold from its training window, so on an expanding window each

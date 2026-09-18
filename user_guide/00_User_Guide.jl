@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "A fast tour of PortfolioOptimisers.jl: the one minimal call for each stage of the pipeline, from prices to a traded portfolio."
+```
+
 # Introduction to the user guide
 
 Welcome to the `PortfolioOptimisers.jl` **user guide** — a fast, skimmable tour of the package.

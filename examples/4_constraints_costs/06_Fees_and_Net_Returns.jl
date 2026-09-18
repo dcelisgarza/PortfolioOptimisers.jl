@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Fees and net returns in PortfolioOptimisers.jl: proportional, fixed and turnover fees, optimised net of cost and evaluated with calc_net_returns."
+```
+
 # Fees and net returns
 
 Every trade and every position costs something, and a portfolio that looks good *gross* can be

@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Factor exposure constraints in PortfolioOptimisers.jl: bound the portfolio's factor weights through a loadings matrix instead of its tickers."
+```
+
 # Factor exposure constraints
 
 A mandate is rarely written in tickers. It is written in *factors*: "at most 10% momentum",

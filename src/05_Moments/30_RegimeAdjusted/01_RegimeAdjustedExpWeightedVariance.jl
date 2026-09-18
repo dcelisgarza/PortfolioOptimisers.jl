@@ -467,7 +467,7 @@ julia> ce.min_obs
     """
     centred
     """
-    Running state of an incremental fit, or `nothing` before the first call to [`partial_fit!`](@ref). It is the one Result this estimator holds, and its type bound is the enforcement of the rule that ADR 0106 excepts. [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance)`](@ref) reads it, and a fit over a matrix ignores it.
+    Running state of an incremental fit, or `nothing` before the first call to [`partial_fit!`](@ref). It is the one Result this estimator holds, and its type bound is the enforcement of that exception. [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance)`](@ref) reads it, and a fit over a matrix ignores it.
     """
     cache
     function RegimeAdjustedExpWeightedVariance(decay::Number, min_obs::Integer,
@@ -1669,3 +1669,4 @@ function supports_partial_fit(::RegimeAdjustedExpWeightedVariance)
 end
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
        RegimeAdjustedExpWeightedVariance
+public RegimeAdjustedMethod, regime_multiplier

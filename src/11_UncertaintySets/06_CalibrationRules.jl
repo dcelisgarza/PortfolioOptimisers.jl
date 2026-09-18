@@ -5,7 +5,7 @@ Computes a calibrated quantity — a tail probability, a deformation parameter, 
 
 All concrete subtypes should subtype one of the families under this root rather than the root itself, and `# Related` names them. A plain number in place of a rule is the quantity itself, exactly as it is today.
 
-A rule is named for the **method** it runs, and carries the name of the quantity as a suffix only where the bare method word is already claimed. [`ScenarioCount`](@ref), [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref) and [`EffectiveAssetFloor`](@ref) name a method and stop there. Five names carry the quantity, and each of the five earns it. [`RateSignificance`](@ref) and [`RateRadius`](@ref) are one method over two quantities, so neither may hold the bare word `Rate`, and [`DimensionalRateRadius`](@ref) carries that same stem under a prefix. [`ConcentrationRadius`](@ref) and [`DualNormRadius`](@ref) are each named after a mathematical object, so the bare word would name the object rather than the rule. ADR 0015 is the Authority for the reading, and ADR 0095 owns the list.
+A rule is named for the **method** it runs, and carries the name of the quantity as a suffix only where the bare method word is already claimed. [`ScenarioCount`](@ref), [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref) and [`EffectiveAssetFloor`](@ref) name a method and stop there. Five names carry the quantity, and each of the five earns it. [`RateSignificance`](@ref) and [`RateRadius`](@ref) are one method over two quantities, so neither may hold the bare word `Rate`, and [`DimensionalRateRadius`](@ref) carries that same stem under a prefix. [`ConcentrationRadius`](@ref) and [`DualNormRadius`](@ref) are each named after a mathematical object, so the bare word would name the object rather than the rule.
 
 A rule states a default for every keyword it can, so a bare call constructs. Two rules state none, because the quantity the keyword takes is the whole content of the rule and no value suits every sample. [`ScenarioCount`](@ref) and [`EntropyBudget`](@ref) are those two. The keyword of each stands at `nothing`, which is not a value of the quantity, so a bare call is refused with a message that names the quantity, the reason there is no default, and a value to start from.
 
@@ -637,7 +637,7 @@ end
 
 Return the number of observations behind the moments of `pr`, weighted by `w`.
 
-This is the count a calibration rule divides by, so the rules that read a count read one definition of it. Three sources are read in order, and the first that answers wins. With weights it is Kish's effective sample size, which is the number of equally weighted observations that carries the information the weighted sample carries. Without weights it is the count the result **states** in `ens`, when it states one and carries no weighting of its own: a Scenario Cap states the number of observations its moments were fitted over there, because the rows the result carries are then fewer than the observations behind its moments, and a count read off the shape would price every rule by `t / w` (ADR 0138). Otherwise it is the row count of `pr.X`, which is then the sample.
+This is the count a calibration rule divides by, so the rules that read a count read one definition of it. Three sources are read in order, and the first that answers wins. With weights it is Kish's effective sample size, which is the number of equally weighted observations that carries the information the weighted sample carries. Without weights it is the count the result **states** in `ens`, when it states one and carries no weighting of its own: a Scenario Cap states the number of observations its moments were fitted over there, because the rows the result carries are then fewer than the observations behind its moments, and a count read off the shape would price every rule by `t / w`. Otherwise it is the row count of `pr.X`, which is then the sample.
 
 An `ens` beside a `w` is not read by this arm. `ens` is bound to `w` as a diagnostic of it — an entropy-pooling prior writes `exp(entropy(w))` there — so a reader that reads no weights reads no diagnostic of them either, and a rule that reads the raw row count under such a prior still does. The only `ens` a result states with no `w` is the one a cap writes.
 
@@ -703,7 +703,7 @@ end
 
 Return the count a Prior Result states in `ens` beside no weighting, and the row count of `X` otherwise.
 
-The unweighted arm of [`effective_sample_size`](@ref), by dispatch on the result's own `w` and `ens`. A result that carries no `w` and states an `ens` is one a Scenario Cap wrote, and the count is the observations its moments were fitted over (ADR 0138). An `ens` beside a `w` is a diagnostic of that weighting, which an unweighted read does not take, and a result that states no `ens` carries its sample in `X`.
+The unweighted arm of [`effective_sample_size`](@ref), by dispatch on the result's own `w` and `ens`. A result that carries no `w` and states an `ens` is one a Scenario Cap wrote, and the count is the observations its moments were fitted over. An `ens` beside a `w` is a diagnostic of that weighting, which an unweighted read does not take, and a result that states no `ens` carries its sample in `X`.
 
 # Arguments
 
@@ -827,7 +827,7 @@ Computes a significance level that shrinks with the square root of the sample le
 
 The tail probability is `c / sqrt(T)`, so the tail's expected count is `c * sqrt(T)`. It grows with the sample, but more slowly than the sample does, which is the rate at which a sample mean's own error falls. A longer sample therefore buys a further tail rather than only a fuller one, and [`ScenarioCount`](@ref) is the rule that buys neither.
 
-The rule reads the raw row count, and not the effective sample size that [`ScenarioCount`](@ref) reads. The rate is a statement about the length of the record, whereas a scenario count is a statement about the observations the tail holds. The length of the record is the count the result states in `ens` when a Scenario Cap carries fewer rows than it fitted over, and the row count otherwise, which is [`effective_sample_size`](@ref) with no weights (ADR 0138).
+The rule reads the raw row count, and not the effective sample size that [`ScenarioCount`](@ref) reads. The rate is a statement about the length of the record, whereas a scenario count is a statement about the observations the tail holds. The length of the record is the count the result states in `ens` when a Scenario Cap carries fewer rows than it fitted over, and the row count otherwise, which is [`effective_sample_size`](@ref) with no weights.
 
 The rule carries no range check of its own, on the same terms as [`ScenarioCount`](@ref).
 
@@ -1977,7 +1977,7 @@ Computes an ambiguity radius that shrinks with the square root of the sample len
 
 The radius is `c / sqrt(T)`. The rate is the part of the form to trust, and the coefficient is the part to calibrate: a cross-validation over `c` is the honest route to a radius, and this is the shape a grid moves over.
 
-The rule reads the raw row count, and not the effective sample size that [`ConcentrationRadius`](@ref) reads. The rate is a statement about the length of the record, on the same terms as [`RateSignificance`](@ref), and the length of the record is read the same way: the count a Scenario Cap states in `ens`, else the row count, which is [`effective_sample_size`](@ref) with no weights (ADR 0138).
+The rule reads the raw row count, and not the effective sample size that [`ConcentrationRadius`](@ref) reads. The rate is a statement about the length of the record, on the same terms as [`RateSignificance`](@ref), and the length of the record is read the same way: the count a Scenario Cap states in `ens`, else the row count, which is [`effective_sample_size`](@ref) with no weights.
 
 `c` carries the units of the returns, because the rate itself is dimensionless.
 
@@ -2683,3 +2683,7 @@ export CalibrationContext, ReturnsSeries, AbsoluteDrawdownSeries, RelativeDrawdo
        ScenarioCount, RateSignificance, EntropyBudget, HillTailDecay, RadialTailDecay,
        ConcentrationRadius, RateRadius, DimensionalRateRadius, DualNormRadius,
        TailTermParity, EffectiveAssetFloor
+public AbstractSignificanceCalibrationAlgorithm, AbstractDeformationCalibrationAlgorithm,
+       AbstractAmbiguityRadiusCalibrationAlgorithm,
+       AbstractAmbiguityTailWeightCalibrationAlgorithm,
+       AbstractNormCeilingCalibrationAlgorithm

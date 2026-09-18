@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Ordered weighted average (OWA) risk measures in PortfolioOptimisers.jl: weight sorted returns to build tail and dispersion measures."
+```
+
 # OWA risk measures
 
 Ordered Weighted Average (OWA) risk measures describe portfolio risk as a linear

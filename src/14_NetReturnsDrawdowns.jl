@@ -5,9 +5,9 @@
 
 Compute the net portfolio returns. If `fees` is not `nothing`, it deducts the computed fees from the gross returns.
 
-The fee is two scalars on two clocks. [`calc_fees`](@ref) contracts the whole weight vector into a per period number and a one-time number: the first is subtracted from every row of ``\\mathbf{X}\\boldsymbol{w}``, so a `T`-row matrix charges it `T` times, and the second lands on the clock `fees.fa` names, the first row by default. On a three-period matrix with ``\\boldsymbol{w} = [0.6,\\, -0.4,\\, 0,\\, 0.25]`` and `l = 0.002`, `s = 0.003`, `fl = 0.01`, `fs = 0.02`, the per period fee measured `0.0029` and the one-time fee `0.04`, so the first net return sat `0.0429` below its gross value and the other two `0.0029` below theirs. That is why the [`Fees`](@ref) rates must be stated per period of `X`, and the two fixed amounts for the whole holding period.
+The fee is two scalars on two clocks. [`calc_fees`](@ref) contracts the whole weight vector into a per period number and a one-time number: the first is subtracted from every row of ``\\mathbf{X}\\boldsymbol{w}``, so a `T`-row matrix charges it `T` times, and the second lands on the clock `fees.fa` names, the first row by default. That is why the [`Fees`](@ref) rates must be stated per period of `X`, and the two fixed amounts for the whole holding period.
 
-The per asset returns sum to this series. `vec(sum(calc_net_asset_returns(w, X, fees); dims = 2))` reproduces `calc_net_returns(w, X, fees)`, because [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar. The two sides add in a different order, so the identity holds to rounding and not to `==`: on the weights above the largest difference measured `6.9e-18`.
+The per asset returns sum to this series. `vec(sum(calc_net_asset_returns(w, X, fees); dims = 2))` reproduces `calc_net_returns(w, X, fees)`, because [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar. The two sides add in a different order, so the identity holds to rounding and not to `==`.
 
 **This verb is the plain product, and a non-finite entry poisons its whole observation.** `0 * NaN` is `NaN`, so a zero weight does not save the row: one `NaN` in `X[t, i]` makes `val[t]` non-finite whatever `w[i]` holds. The verb takes no finiteness check, because it is the funnel of the library and a scan here is paid at each of its call sites on every evaluation. A gapped panel is scored through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref), which reduces the window to the Investable Mask and filters the Held Gaps once with [`filter_held_gaps`](@ref) before it reaches this verb.
 
@@ -298,7 +298,7 @@ end
 
 Reduce a prior result, the weights scored against it and the fees charged on them to the Investable Mask.
 
-This is ADR 0115's rule at the **value-level** door. An optimiser reduces once at its entry, so no optimiser meets a gap. A caller who scores a weight vector against a prior result by hand does meet one: a non-investable asset carries `NaN` in `mu`, on the diagonal of `sigma` and down its column of `pr.X`, so `dot(w, pr.sigma, w)` and `pr.X * w` are `NaN` at **any** weight, the optimiser's own zero included. [`expected_risk`](@ref), [`expected_return`](@ref), [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) reduce here instead, and a per-asset answer expands back through [`expand_investable_weights`](@ref).
+An optimiser reduces once at its entry, so no optimiser meets a gap. A caller who scores a weight vector against a prior result by hand does meet one: a non-investable asset carries `NaN` in `mu`, on the diagonal of `sigma` and down its column of `pr.X`, so `dot(w, pr.sigma, w)` and `pr.X * w` are `NaN` at **any** weight, the optimiser's own zero included. [`expected_risk`](@ref), [`expected_return`](@ref), [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) reduce here instead, and a per-asset answer expands back through [`expand_investable_weights`](@ref).
 
 Every block of the prior is reduced together by the [`port_opt_view`](@ref) method the prior's owner already writes, so a new block cannot be forgotten, and the reduced `pr.X` carries no dead column. The fees travel with the weights, because a [`Fees`](@ref) whose rates are one number per asset is indexed by the same axis and would otherwise meet a shorter weight vector.
 
@@ -1771,7 +1771,9 @@ The two walk-forward schemes carry this family in their `pws` field, bound to `O
 
 # Interfaces
 
-A subtype names a source of previous weights and declares no method of its own. [`previous_weights`](@ref) reads it.
+In order to implement a new previous-weights source which will work seamlessly with the library, subtype `AbstractPreviousWeightsSource` with a `wd::AbstractWeightDrift` field, the Weight Drift [`held_weights_drift`](@ref) runs when the scheme sets no drift of its own, and implement the following method:
+
+  - `previous_weights(pws::AbstractPreviousWeightsSource, prev::PredictionResult) -> VecNum_VecVecNum`: Read the weights the previous fold threads into the fold that follows it. A fallback method reads the held weights of the previous fold, `prev.hw.w`, so it is only needed when the source threads something else.
 
 # Related
 
@@ -2427,3 +2429,4 @@ function expand_held_member(imsk::BitVector, x::VecMatNum)
 end
 export calc_net_returns, calc_net_asset_returns, calc_turnover, cumulative_returns,
        drawdowns, SelfFinancingDrift, DriftedWeights, HeldWeightsResult
+public AbstractPreviousWeightsSource

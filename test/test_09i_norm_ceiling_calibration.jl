@@ -64,8 +64,9 @@ end
     @test EffectiveAssetFloor <: PO.AbstractNormCeilingCalibrationAlgorithm
 
     # The abstract type is not exported: an export is public API, and the convention is
-    # that an abstract type is not one.
-    @test :AbstractNormCeilingCalibrationAlgorithm ∉ names(PortfolioOptimisers)
+    # that an abstract type is not one. It is `public`, which `names` also lists, so the
+    # check reads `Base.isexported`.
+    @test !Base.isexported(PortfolioOptimisers, :AbstractNormCeilingCalibrationAlgorithm)
 
     # The rule is exported, on the same terms as the radius family's.
     @test :EffectiveAssetFloor ∈ names(PortfolioOptimisers)

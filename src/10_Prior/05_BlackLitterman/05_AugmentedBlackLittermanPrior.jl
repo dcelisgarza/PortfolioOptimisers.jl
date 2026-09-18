@@ -107,7 +107,7 @@ Keywords correspond to the struct's fields.
 
 ## Composition: what this estimator forwards
 
-This estimator **merges two** priors rather than forwarding one along its own axis, so it builds its carrier directly; the rule of ADR 0046 still governs which source each field takes. It solves one augmented Black-Litterman system over `[assets; factors]` and reports both halves:
+This estimator **merges two** priors rather than forwarding one along its own axis, so it builds its carrier directly; the same posterior-versus-structural pattern still governs which source each field takes. It solves one augmented Black-Litterman system over `[assets; factors]` and reports both halves:
 
   - `mu` and `sigma` are the asset half of the augmented posterior; the factor block `fpr` is the **factor half**, so both are posterior. `chol` is dropped on both sides, because the posterior covariances supersede the ones they factorise.
   - `w`, `ens`, `kld` and `ow` come from the **asset** prior, and `fpr`'s own come from the **factor** prior. Two priors disagreeing about observation weights is a legitimate configuration, and the nested block is what keeps the two weightings distinguishable rather than forcing a choice.
@@ -259,7 +259,7 @@ AugmentedBlackLittermanPrior
 
 ## The incremental fit
 
-This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit. ADR 0136 records the decision.
+This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit.
 
 `cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
 
@@ -384,7 +384,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`AugmentedBlackLittermanPrior`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:AugmentedBlackLittermanPrior, true)` to render it. ADR 0105 records the decision.
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:AugmentedBlackLittermanPrior, true)` to render it.
 
 # Arguments
 

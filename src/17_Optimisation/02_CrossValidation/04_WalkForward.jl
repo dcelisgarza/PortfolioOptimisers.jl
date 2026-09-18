@@ -83,7 +83,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype of the Fold Fit selectors: how the fold loop fits each fold of a walk-forward.
 
-A walk-forward carries one in its `ff` field, read by [`fold_fit`](@ref), beside its other execution switches. `nothing` refits every fold from its training window, which is the released behaviour; a member selects another fit. The family is a selector-tag family like [`AbstractWeightDrift`](@ref): a member carries no data, and a caller's own subtype extends the loop through a method of its own. ADR 0140 records the decision.
+A walk-forward carries one in its `ff` field, read by [`fold_fit`](@ref), beside its other execution switches. `nothing` refits every fold from its training window, which is the released behaviour; a member selects another fit. The family is a selector-tag family like [`AbstractWeightDrift`](@ref): a member carries no data, and a caller's own subtype extends the loop through a method of its own.
 
 # Related
 

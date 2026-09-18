@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Cleaning real price data with price_ingestion: leading and trailing gaps, stale quotes, halts and mismatched calendars, before any optimiser sees it."
+```
+
 # Data preprocessing and the ingestion layer
 
 Real price data is rarely clean. Assets list partway through the window (leading gaps), trade

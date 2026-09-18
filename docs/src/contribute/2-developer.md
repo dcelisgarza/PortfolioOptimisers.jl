@@ -1,3 +1,7 @@
+```@meta
+Description = "Developer documentation for PortfolioOptimisers.jl: cloning, linting, testing, the code-health gates, writing docs and making a release."
+```
+
 # [Developer documentation](@id dev_docs)
 
 !!! note "Contributing guidelines"

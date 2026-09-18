@@ -42,7 +42,7 @@ Books a Held Gap's whole move on the observation that ends it, shortening the ga
 
 A suspension of `k` observations leaves `k + 1` non-finite returns by default. This puts ``P_{t+k} / P_{t-1} - 1`` on the observation the asset resumes trading and leaves the `k` observations inside the gap non-finite, so wealth is conserved across the gap and the Held Gap is exactly the run of unpriced observations. An asset's inception is untouched: it has no earlier observed price to anchor on.
 
-The cost is stated by ADR 0131. The estimation mask reads the values it was given and is unaware of which algorithm produced them, so the re-pricing cell is estimable and a `(k + 1)`-period return enters a one-period moment as one draw, at roughly ``\\sqrt{k + 1}`` the scale.
+The estimation mask reads the values it was given and is unaware of which algorithm produced them, so the re-pricing cell is estimable and a `(k + 1)`-period return enters a one-period moment as one draw, at roughly ``\\sqrt{k + 1}`` the scale.
 
 # Constructors
 
@@ -264,7 +264,7 @@ end
 
 Lay one of the carrier's price blocks beside the asset block, on the asset clock.
 
-The carrier states one clock, so a factor or benchmark series is read at the asset timestamps rather than joined onto them: a join adds or drops observations, which is a clock move, and [ADR 0129](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/adr/0129-the-ingestion-layer-seams-at-the-listing-span-and-the-clock-draws-the-pipeline-boundary.md) gives every clock move to [`price_ingestion`](@ref). Laying the columns out one by one also frees [`prices_to_returns`](@ref) of `TimeSeries.merge`'s one-value-type requirement, so a `Float32` factor table beside a `Float64` asset table converts instead of raising a `MethodError`.
+The carrier states one clock, so a factor or benchmark series is read at the asset timestamps rather than joined onto them: a join adds or drops observations, which is a clock move, and every clock move belongs to [`price_ingestion`](@ref). Laying the columns out one by one also frees [`prices_to_returns`](@ref) of `TimeSeries.merge`'s one-value-type requirement, so a `Float32` factor table beside a `Float64` asset table converts instead of raising a `MethodError`.
 
 # Algorithm
 
@@ -323,11 +323,11 @@ end
 
 Compute returns from the price carrier, and nothing else.
 
-A keyword survives here if and only if it changes the arithmetic of a return, which is the rule ADR 0133 states and the reason there are three. Every datum the conversion reads — the asset prices, the factors, the benchmark, the implied volatilities, the **Listing Span** and the [`AssetPanel`](@ref) — is already a field of the [`PricesResult`](@ref), so naming one as a keyword would be a second way to say what the carrier says.
+A keyword survives here if and only if it changes the arithmetic of a return, which is the rule and the reason there are three. Every datum the conversion reads — the asset prices, the factors, the benchmark, the implied volatilities, the **Listing Span** and the [`AssetPanel`](@ref) — is already a field of the [`PricesResult`](@ref), so naming one as a keyword would be a second way to say what the carrier says.
 
 The second method is the friendliest call in the library, and it is the layer's own path rather than a way around it: it runs [`price_ingestion`](@ref) with a default [`PriceIngestion`](@ref) and converts what that emits. A caller wanting a different join, a collapse, a declared span, or factor, benchmark and implied-volatility series writes the two steps.
 
-An absent price has one spelling, `NaN`, and the conversion carries it into the returns rather than deleting the observation or the asset that holds one. Filling a gap is [`PriceGapFill`](@ref)'s and deleting one is [`MissingDataFilter`](@ref)'s, both of them fitted steps; ADR 0133 owns the rule.
+An absent price has one spelling, `NaN`, and the conversion carries it into the returns rather than deleting the observation or the asset that holds one. Filling a gap is [`PriceGapFill`](@ref)'s and deleting one is [`MissingDataFilter`](@ref)'s, both of them fitted steps.
 
 # Mathematical definition
 
@@ -364,7 +364,7 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
  9. Build the asset, factor and benchmark matrices from the columns of each group. The asset group is always present, because the conversion removes no column; a factor or benchmark group given no column is `nothing`.
 10. Return the [`ReturnsResult`](@ref).
 
-**The conversion removes no observation and no asset.** Deleting either is a **Universe Policy**, and a policy is fitted on a training window and replayed by name, which a stateless conversion cannot do; [`MissingDataFilter`](@ref) owns it, with `col_thr` deleting an asset and `row_thr` an observation. ADR 0133 states the rule that a keyword survives here if and only if it changes the arithmetic of a return.
+**The conversion removes no observation and no asset.** Deleting either is a **Universe Policy**, and a policy is fitted on a training window and replayed by name, which a stateless conversion cannot do; [`MissingDataFilter`](@ref) owns it, with `col_thr` deleting an asset and `row_thr` an observation. A keyword survives here if and only if it changes the arithmetic of a return.
 
 # Arguments
 
@@ -517,7 +517,7 @@ Preprocessing estimator converting price-level data into returns-level data.
 
 `PricesToReturns` is the estimator form of [`prices_to_returns`](@ref): it consumes a [`PricesResult`](@ref) and produces a [`ReturnsResult`](@ref). It is stateless — applying it to any window simply runs the conversion — so its fitted object is the estimator itself.
 
-Its three fields are the three keywords that survive the rule ADR 0133 states: a keyword belongs to the conversion if and only if it changes the arithmetic of a return. Joining and collapsing move the observation clock and are [`PriceIngestion`](@ref)'s; filling is [`PriceGapFill`](@ref)'s and deleting is [`MissingDataFilter`](@ref)'s, both fitted steps; and every datum the conversion reads is a field of the [`PricesResult`](@ref) it consumes.
+Its three fields are the three keywords that survive the rule that a keyword belongs to the conversion if and only if it changes the arithmetic of a return. Joining and collapsing move the observation clock and are [`PriceIngestion`](@ref)'s; filling is [`PriceGapFill`](@ref)'s and deleting is [`MissingDataFilter`](@ref)'s, both fitted steps; and every datum the conversion reads is a field of the [`PricesResult`](@ref) it consumes.
 
 The step is stateless, and it does not need to be stateful to fix an asset universe: the carrier states one. A [`PricesResult`](@ref) that [`price_ingestion`](@ref) built carries a **Listing Span**, and this step projects it onto the returns clock and hands the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) whose two masks say which assets are in the universe and which of them can be estimated at each observation. The asset axis is fixed before the split, so every window of every fold carries every asset and a window can no longer silently lose a column.
 
@@ -628,3 +628,4 @@ function apply_preprocessing(ptr::PricesToReturns, pr::PricesResult)::ReturnsRes
     return prices_to_returns(ptr, pr)
 end
 export prices_to_returns, PricesToReturns, CatchUpGapReturn
+public AbstractGapReturnAlgorithm, gap_return

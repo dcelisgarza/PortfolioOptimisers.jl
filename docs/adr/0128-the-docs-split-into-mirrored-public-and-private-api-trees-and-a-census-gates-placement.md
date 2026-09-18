@@ -113,3 +113,120 @@ concern, not this gate's.
   build time) is exactly the classification pass the mirror trees are generated from.
 - The 21-entry foreign-owned class this ADR classifies always-public was untested by #557's two
   prototype pages, because neither carried one; the rule here is the first place it is decided.
+
+## Amendment (2026-09-17)
+
+[Issue #561](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/561) decided the
+title and the description each docs page carries, and three of its rulings bind the mirror
+pages this ADR creates. They are recorded here so the migration writes them and the census
+that follows can be read against one document.
+
+### The private mirror's H1 carries a suffix
+
+The public mirror keeps the source page's H1 verbatim. The private mirror's H1 is the same
+text followed by `: private API` — `# Asset turnover: private API` — so the H1, the `<title>`
+Documenter derives from it, and the sidebar entry agree without a per-page label in
+`docs/make.jl`. The navigation groups stay `Public API` and `Private API`, so one phrase
+serves the rail, the H1 and the description. "Internals" was considered and rejected:
+"private API" is the standard Julia term and is symmetric with "public API".
+
+### A mirror page's description is derived from the page itself
+
+Every mirror page carries a `Description = "…"` in its `@meta` block, and the line is
+derived, never hand-written:
+
+```text
+<subject>, public API of PortfolioOptimisers.jl: <names…>.
+<subject>, private API of PortfolioOptimisers.jl: <names…>.
+```
+
+`<subject>` is the H1 with the `: private API` suffix stripped, case untouched. `<names…>`
+are the binding names of the page's own `@docs` blocks — signatures stripped, the
+`PortfolioOptimisers.` qualification dropped, a foreign qualification such as `Base.` kept,
+duplicates dropped, in page order — cut on a name boundary once the line passes 155
+characters, with `, …` marking the cut. An empty mirror reads
+`<subject> has no public API in PortfolioOptimisers.jl; its names are in the private API.`,
+and the converse on the other side.
+
+Everything the derivation reads is in the `.md` itself, so it is re-derived without a docs
+build and without the live module. The derivation is written once, in
+`docs/page_metadata.jl`, and both the generator that writes the line and the census that
+checks it call that one function, so they cannot drift.
+
+### A census owns every page's title and description
+
+`test/test_64_docs_page_metadata_census.jl`, parallel to the placement census this ADR's
+Decision names, gates the metadata of every page class:
+
+- a mirror page: the `Description` equals the derivation from the same file, and the H1 ends
+  in `: private API` exactly on the private side;
+- every other page: a `Description` is present in the source, is not Documenter's default,
+  is unique across the site, and is 50–160 characters; the landing line may carry the
+  American spelling once, and no other line carries it;
+- `docs/make.jl`: the landing page's `pages` label is `Portfolio optimisation library in
+  Julia`, which Documenter renders as the `<title>`, and the site-wide fallback description
+  `Documenter.HTML(; description = SITE_DESCRIPTION)` is read off the landing page's own
+  line. The generated search page always takes the fallback, so it is the one page permitted
+  to duplicate the landing line.
+
+The mirror checks pass vacuously while `docs/src/public_api/` and `docs/src/private_api/` do
+not exist, so the migration turns them on by creating the trees and needs no edit to the
+census.
+
+### Consequences of the amendment
+
+- The migration writes, for each mirror page, the H1 suffix on the private side and the
+  derived `Description`, through `docs/page_metadata.jl`.
+- `STANDARDS.md` routes "a docs page's `<title>` or its description" to this amendment, with
+  `docs/page_metadata.jl` as the derivation and the page-metadata census as the gate.
+- A hand-written page added to the site owes a `Description` from its first commit, because
+  the census is absolute over the page classes it walks.
+
+## Amendment (2026-09-17): the generated pages mark the boundary by linking into it
+
+[Issue #1121](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1121) decided
+whether the two generated pages that list names without saying which side each is on — the
+type hierarchy and the capability catalogue — mark the public/private boundary this ADR
+creates, now that the mirror-tree migration is complete.
+
+### The type hierarchy links each node to its mirror page; it does not split or style the tree
+
+Every type name's `@ref` already points at wherever the name's `@docs` block lives, and the
+migration placed that block on `public_api/…` or `private_api/…` by `classify_binding`
+(`docs/api_classification.jl`). The boundary is therefore the link target itself: clicking a
+node lands on the side that holds it. No new authority is created, because the link routes
+through the one classification the migration already made — the tree is not split into two,
+and no node carries a style the other lacks, since most branches mix public and private
+members and splitting would fragment the one view the page exists to give.
+
+The page itself moves out of `docs/src/api/` to `docs/src/TypeHierarchy.md`, alongside
+`00_API.md` and `capability_catalogue.md`: it spans both mirrors, so it sits above them
+rather than inside either, the same reasoning that re-homed the introduction earlier in this
+ADR. `docs/generate_type_hierarchy.jl` no longer numbers the page dynamically — a page at
+`docs/src` root is referenced by name in `docs/make.jl`'s `pages` list, not discovered by a
+directory walk, so the numbering existed only to place it inside the old `docs/src/api/`
+tree and has no purpose once it moves out.
+
+### The capability catalogue states its scope in one sentence
+
+The catalogue's intro prose now says every entry is public API, because ADR 0040 plus
+`test/test_26_docs.jl`'s "every exported function is accounted for" testset already make
+every row public by construction. No per-row marker or column is added: a value that never
+varies carries no information.
+
+### Neither marker is a boundary the source does not declare
+
+Both derive from `classify_binding`/`Base.isexported`/`Base.ispublic` at build time — the
+same rule this ADR already authorises for the hand-written mirror pages. This adds a second
+and third place the rule shows up, not a second rule.
+
+### Consequences of this amendment
+
+- `docs/generate_type_hierarchy.jl` writes `docs/src/TypeHierarchy.md` directly, with no
+  numeric prefix; `docs/make.jl` names it in the root page list beside `00_API.md`.
+- The four generated-and-untracked paths ADR 0151 names change: `docs/src/api/*_TypeHierarchy.md`
+  becomes `docs/src/TypeHierarchy.md` in `.gitignore`, `.markdownlintignore`, `CLAUDE.md` §
+  Editing and `test/test_46_standards_citation_census.jl`'s citation allow-list. ADR 0151 is
+  amended in turn.
+- `test/test_64_docs_page_metadata_census.jl` reads the page's description at its generator,
+  keyed by the new path, exactly as it already did for the capability catalogue.

@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Risk contribution in PortfolioOptimisers.jl: constrain where risk lands by asset or by factor, and compare the result across objectives."
+```
+
 # Risk contribution
 
 This example focuses on *where* risk lands rather than only on how much risk a portfolio

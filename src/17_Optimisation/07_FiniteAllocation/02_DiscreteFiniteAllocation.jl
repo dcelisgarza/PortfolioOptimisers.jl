@@ -339,7 +339,7 @@ end
 
 Write one side's fee in the allocation model's own variables, and return it.
 
-A fee is a cost of the portfolio the allocator actually buys. The model holds the share vector `x` and the prices `p`, so `x .* p` is the money in each position exactly. Every term is written against that money, and no weight and no price appears on its own. This is the rule ADR 0123 states.
+A fee is a cost of the portfolio the allocator actually buys. The model holds the share vector `x` and the prices `p`, so `x .* p` is the money in each position exactly. Every term is written against that money, and no weight and no price appears on its own.
 
 `sf` is one side's charge, of [`allocation_side_fees`](@ref). A `nothing` `sf` writes nothing and returns a zero expression, so the caller needs no branch.
 

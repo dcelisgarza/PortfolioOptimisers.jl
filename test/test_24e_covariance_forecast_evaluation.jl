@@ -492,7 +492,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test !po.needs_previous_weights(po.Online(Covariance()))
         @test po.advance_previous_fold(nothing, :prev, (; a = 1)) == :prev
         @test isdefined(PortfolioOptimisers, :AbstractRealisedTarget)
-        @test !(:AbstractRealisedTarget in names(PortfolioOptimisers))
+        @test !Base.isexported(PortfolioOptimisers, :AbstractRealisedTarget)
         for nm in (:RealisedCovariance, :HorizonReturn, :covariance_forecast_step,
                    :covariance_forecast_evaluation, :CovarianceForecastEvaluationResult,
                    :covariance_forecast_summary, :CovarianceForecastSummaryResult,

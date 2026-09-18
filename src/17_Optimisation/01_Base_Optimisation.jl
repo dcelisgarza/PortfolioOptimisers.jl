@@ -301,7 +301,7 @@ end
 
 Read the Investable Mask an optimisation result reduced on.
 
-ADR 0115 reduces every optimisation to the Investable Mask at its entry and expands the solved weights back to the caller's universe, so the result's own `w` is on the **full** universe and the mask is the record of which assets the optimisation traded. A fold reads that record to view its test window before it scores the weights, which is ADR 0120's first decision.
+An optimisation reduces to the Investable Mask at its entry and expands the solved weights back to the caller's universe, so the result's own `w` is on the **full** universe and the mask is the record of which assets the optimisation traded. A fold reads that record to view its test window before it scores the weights.
 
 The mask is read through this verb rather than off a field, because the families carry it in different places: a JuMP result holds it on its processed attribute bundle, a hierarchical leaf holds it on the core it wraps, and a family that derives no mask answers `nothing`. **A family that gains a mask must add its own method here**, and so must a leaf that forwards its properties into a core, because the verb dispatches on the type and a forwarded `res.imsk` never reaches it. `test/test_54_held_gap_filter.jl` censuses the concrete results and fails when one carries a mask this verb cannot read, as a field or as a forwarded property, so the omission cannot be silent.
 
@@ -1268,7 +1268,7 @@ Field names of `opt` whose *type* admits a [`TimeDependent`](@ref) value — the
 
 Whether a field can hold a schedule is decidable from `fieldtype` alone: a host built through the widened constructor signatures (see [`TD_Option`](@ref)) records a schedule in the field's type parameter, so a field that holds no schedule cannot have a type intersecting [`TimeDependent`](@ref). The tuple is therefore computed once per host type by a generated function, and a fold-invariant scan over a wide static host such as `JuMPOptimiser`, whose fields number in the dozens, folds to an empty tuple at compile time rather than walking every field dynamically on every `split` and `_optimise`.
 
-This stays derived from the field types — no hand-maintained list — so the constructor signatures remain the single source of truth for which fields may vary over folds (ADR 0030).
+This stays derived from the field types — no hand-maintained list — so the constructor signatures remain the single source of truth for which fields may vary over folds.
 
 # Related
 
@@ -3371,7 +3371,7 @@ An explicitly provided `pr` wins. Otherwise the one test is `hasproperty(res, :p
 
   - `pr::Pr_RR`: The prior result to use for risk calculation. Throws an `ArgumentError` when none is found.
 
-A result's prior is on the universe the fit **solved**, ADR 0115's rule, so a consumer that pairs it with `res.w`, which is on the caller's, reads both through [`result_investable_view`](@ref) rather than through this verb alone.
+A result's prior is on the universe the fit **solved**, so a consumer that pairs it with `res.w`, which is on the caller's, reads both through [`result_investable_view`](@ref) rather than through this verb alone.
 
 # Related
 
@@ -3478,11 +3478,11 @@ end
 
 Pair the weights, the returns carrier, the fee and the axis names a result-taking consumer reads, on the investable universe of the result.
 
-A result carries three things on two universes. ADR 0115 reduces an optimisation to its Investable Mask at the entry and expands the solved weights back, so `res.w` is on the **full** universe the caller stated, while `res.pr` is the prior of the universe the fit **solved**, and `res.fees` was reduced at the same door, its five per-asset fields to the mask and its two liquidation carriers to the complement. A consumer that reads two of the three separately pairs a full vector with a reduced one: a per-asset fee indexed at a full-length mask raises a `BoundsError`, a reduced returns matrix against a full weight vector a `DimensionMismatch`, and a reduced `mu` under the caller's full names draws every bar after the gap under the name of the asset before it. This verb is the one place the pairing is made, so every result-taking arity of [`expected_risk`](@ref), [`calc_net_returns`](@ref), [`factor_attribution`](@ref), [`performance_summary`](@ref) and the plotting extension reads all three through it.
+A result carries three things on two universes. An optimisation reduces to its Investable Mask at the entry and expands the solved weights back, so `res.w` is on the **full** universe the caller stated, while `res.pr` is the prior of the universe the fit **solved**, and `res.fees` was reduced at the same door, its five per-asset fields to the mask and its two liquidation carriers to the complement. A consumer that reads two of the three separately pairs a full vector with a reduced one: a per-asset fee indexed at a full-length mask raises a `BoundsError`, a reduced returns matrix against a full weight vector a `DimensionMismatch`, and a reduced `mu` under the caller's full names draws every bar after the gap under the name of the asset before it. This verb is the one place the pairing is made, so every result-taking arity of [`expected_risk`](@ref), [`calc_net_returns`](@ref), [`factor_attribution`](@ref), [`performance_summary`](@ref) and the plotting extension reads all three through it.
 
 The answers are on the **investable** universe of `res`, which is the universe its own prior and fee are already on. The weights are viewed at the mask through [`investable_weights_view`](@ref). The carrier is resolved by [`result_investable_carrier`](@ref) and the fee by [`result_investable_fees`](@ref): the result's own are taken as they are, and a caller's, stated on the universe `res.w` spans, is viewed at the mask, the carrier through the [`port_opt_view`](@ref) its owner writes and the fee through the door a fee takes at the fit. The axis names ride the asset axis, so they take the mask directly, and a drawn figure labels each bar with its own asset.
 
-A result whose mask is `nothing` reduced on nothing, so the weights and the names are returned unchanged. A per-asset answer a consumer forms on the investable universe expands back through [`expand_investable_weights`](@ref) with the mask this verb returns first, as the value-level doors of ADR 0118 do.
+A result whose mask is `nothing` reduced on nothing, so the weights and the names are returned unchanged. A per-asset answer a consumer forms on the investable universe expands back through [`expand_investable_weights`](@ref) with the mask this verb returns first, as the value-level doors do.
 
 # Algorithm
 
@@ -3539,7 +3539,7 @@ Compute the expected risk for an [`OptimisationResult`](@ref).
 
 Extracts `w` from `res` and delegates to the weight-based [`expected_risk`](@ref). `fees` takes precedence over `res.fees` if both are provided.
 
-The weights, the carrier and the fee meet on the investable universe of `res`, through [`result_investable_view`](@ref). The result's own prior is on the universe the fit solved on, ADR 0115's rule, and its fee was reduced at the same door, while `res.w` is expanded back to the caller's universe, so the weights are viewed at the result's Investable Mask ([`result_investable_mask`](@ref)) before they meet them; a result with no mask views nothing. A caller's own `pr`, a caller's `X` and a caller's `fees` are on the universe of `res.w`, and are viewed at the same mask.
+The weights, the carrier and the fee meet on the investable universe of `res`, through [`result_investable_view`](@ref). The result's own prior is on the universe the fit solved on, and its fee was reduced at the same door, while `res.w` is expanded back to the caller's universe, so the weights are viewed at the result's Investable Mask ([`result_investable_mask`](@ref)) before they meet them; a result with no mask views nothing. A caller's own `pr`, a caller's `X` and a caller's `fees` are on the universe of `res.w`, and are viewed at the same mask.
 
 `r` is one measure or a vector of them; a vector is scalarised by `sca`, defaulting to [`SumScalariser`](@ref). The measure is **not** read from `res`, so a result that carries its own `r` and `sca` reports the figure it optimised only when the caller passes them back, as `expected_risk(res.r, res; sca = res.sca)`.
 
@@ -3594,3 +3594,17 @@ export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinali
        AbsoluteErrorWeightFinaliser, SquaredAbsoluteErrorWeightFinaliser,
        JuMPWeightFinaliser, TimeDependent, TimeDependentContext, PreviousWeightsFunction,
        NoDefault, TimeDependentDefaultError
+public _optimise
+# The `# Interfaces`-marked types and verbs of #1138 (ADR 0154). `OptimisationAlgorithm`,
+# `OptimisationResult`, `NonFiniteAllocationOptimisationResult`, `NonJuMPOptimisationResult`,
+# `BaseHierarchicalOptimisationResult`, `HierarchicalOptimisationResult`,
+# `OptimisationReturnCode` and `OptimisationModelResult` name no verb of their own;
+# `TimeDependentConstraintCallable` and `TimeDependentOptimiserCallable` name only the
+# functor and `needs_previous_weights` their parent `TimeDependentCallable` already names.
+public BaseOptimisationEstimator, time_dependent_field_defaults, OptimisationAlgorithm,
+       OptimisationResult, NonFiniteAllocationOptimisationResult, NonJuMPOptimisationResult,
+       BaseHierarchicalOptimisationResult, HierarchicalOptimisationResult,
+       OptimisationReturnCode, OptimisationModelResult, TimeDependentCallable,
+       needs_previous_weights, TimeDependentConstraintCallable,
+       TimeDependentOptimiserCallable, JuMPWeightFinaliserFormulation,
+       set_clustering_weight_finaliser_alg!, WeightFinaliser, opt_weight_bounds

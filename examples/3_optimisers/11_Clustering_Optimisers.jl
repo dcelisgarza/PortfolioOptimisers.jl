@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Clustering optimisers in PortfolioOptimisers.jl: hierarchical risk parity, HERC and Schur complement allocation from a dendrogram of the assets."
+```
+
 # Clustering optimisers
 
 The optimisers we have met so far ([`MeanRisk`](@ref), [`RiskBudgeting`](@ref),

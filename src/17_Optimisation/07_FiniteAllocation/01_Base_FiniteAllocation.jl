@@ -70,9 +70,9 @@ Problem data fed to a finite allocation optimiser.
 
 `FiniteAllocationInput` bundles the inputs shared by every finite allocation optimiser — the target continuous weights, current asset prices, cash budget, the cash held before the trade, and an optional time horizon, fee and Investable Mask — into a single value passed as the second argument to [`optimise`](@ref). It is consumed by both [`DiscreteAllocation`](@ref) and [`GreedyAllocation`](@ref).
 
-It subtypes [`AbstractEstimator`](@ref) rather than the [`FiniteAllocationOptimisationResult`](@ref) tree: it is the *input* to an allocation, not a computed output, and is deliberately kept clear of the `OptimisationResult` dispatch surface (plotting, result `factory`) that its fields cannot honour. See ADR 0017.
+It subtypes [`AbstractEstimator`](@ref) rather than the [`FiniteAllocationOptimisationResult`](@ref) tree: it is the *input* to an allocation, not a computed output, and is deliberately kept clear of the `OptimisationResult` dispatch surface (plotting, result `factory`) that its fields cannot honour.
 
-`imsk` is what lets a reduced optimisation be allocated. ADR 0115 reduces an optimisation to its Investable Mask and expands the solved weights back to the caller's universe, so a result pairs a **full-length** `w` with a fee on two **reduced** axes. The mask records that reduction, and [`allocation_side_fees`](@ref) lifts the fee back onto the axis `w` and `prices` already live on with [`lift_fees`](@ref), so the forced exit of a delisted asset is charged on the money it traded. The fee carries the mask it was reduced on in its own `imsk`, and the lift reads that, so the constructor reconciles the two through [`mark_fees`](@ref): a stated `imsk` marks an unmarked fee, a marked fee supplies a missing `imsk`, and a pair that disagrees is refused.
+`imsk` is what lets a reduced optimisation be allocated. An optimisation reduces to its Investable Mask and expands the solved weights back to the caller's universe, so a result pairs a **full-length** `w` with a fee on two **reduced** axes. The mask records that reduction, and [`allocation_side_fees`](@ref) lifts the fee back onto the axis `w` and `prices` already live on with [`lift_fees`](@ref), so the forced exit of a delisted asset is charged on the money it traded. The fee carries the mask it was reduced on in its own `imsk`, and the lift reads that, so the constructor reconciles the two through [`mark_fees`](@ref): a stated `imsk` marks an unmarked fee, a marked fee supplies a missing `imsk`, and a pair that disagrees is refused.
 
 # Fields
 
@@ -284,7 +284,7 @@ Split a portfolio into its long and its short side, and share the cash between t
 
 Both finite allocators solve one sub-problem per side. This routine computes the budget of each side, and gives each side the share of the cash its budget calls for.
 
-The routine charges no fee. A fee is a cost of the portfolio the allocator actually buys, so each sub-problem charges its own side inside its own model, on the money it buys. See [`set_allocation_fees!`](@ref) and ADR 0123.
+The routine charges no fee. A fee is a cost of the portfolio the allocator actually buys, so each sub-problem charges its own side inside its own model, on the money it buys. See [`set_allocation_fees!`](@ref).
 
 # Arguments
 
@@ -370,9 +370,9 @@ end
 
 Charge the forced exit of every asset that left the universe, as one constant.
 
-ADR 0121 gives a [`Fees`](@ref) two liquidation carriers. `lq` is a rate and `flq` is a currency amount, and both key on the **previous** weight of a position the optimisation was forced to sell. The exiting assets are not among the share counts an allocator solves for, so neither carrier needs a variable and the whole charge is a constant of the sub-problem — which is what [`set_liquidation_fees!`](@ref) and [`set_fixed_liquidation_fees!`](@ref) found for the JuMP model.
+A [`Fees`](@ref) carries two liquidation carriers. `lq` is a rate and `flq` is a currency amount, and both key on the **previous** weight of a position the optimisation was forced to sell. The exiting assets are not among the share counts an allocator solves for, so neither carrier needs a variable and the whole charge is a constant of the sub-problem — which is what [`set_liquidation_fees!`](@ref) and [`set_fixed_liquidation_fees!`](@ref) found for the JuMP model.
 
-The charge is in money, as ADR 0123 requires of every term of an allocation. `lq.w` is a weight, so the money the exit sold is `prev_cash * lq.w`, the rule [`allocation_turnover_money`](@ref) reads for `tn`. `flq` is already a currency amount, so it is charged once for each entry whose previous weight is not `isapprox` to zero, on both sides of the book, exactly as [`calc_fixed_liquidation_fees`](@ref) charges it.
+The charge is in money, as every term of an allocation must be. `lq.w` is a weight, so the money the exit sold is `prev_cash * lq.w`, the rule [`allocation_turnover_money`](@ref) reads for `tn`. `flq` is already a currency amount, so it is charged once for each entry whose previous weight is not `isapprox` to zero, on both sides of the book, exactly as [`calc_fixed_liquidation_fees`](@ref) charges it.
 
 The whole charge falls on the long sub-problem. Every exiting asset carries a zero target weight, and [`setup_alloc_optim`](@ref) puts a zero weight on the long side, so that side is the one the allocator's own split gives them. It is a constant, so the split moves no reported number; it decides which budget pays, and a long-only book has no other.
 
@@ -478,7 +478,7 @@ end
 
 Charge one side's whole fee against a share vector.
 
-`shares .* p` is the money in each position exactly, and every term is charged against that money. No weight and no price appears on its own. This is the rule ADR 0123 states, and it is the number both allocators report.
+`shares .* p` is the money in each position exactly, and every term is charged against that money. No weight and no price appears on its own. This is the rule every term of an allocation follows, and it is the number both allocators report.
 
 `sf` is one side's charge, of [`allocation_side_fees`](@ref). A `nothing` `sf` charges nothing.
 

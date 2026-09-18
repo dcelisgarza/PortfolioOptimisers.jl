@@ -21,9 +21,9 @@ The comparison operator a view accepts depends on the moment it constrains: `var
 
     The CVaR search reports on its own variable, and the view rides on a solve it never reads. With one view `Roots.find_zero` root-finds the posterior tail mass minus `alpha` over the candidate value at risk, and it stops when that residual is small. The view itself is the constraint the inner [`entropy_pooling`](@ref) solve carries, and how closely that solve met it is read nowhere. With more than one view the guard is `Optim.converged`, which accepts a solve that stopped on the step in `x` rather than on stationarity. A **feasible** view set can therefore return a posterior that misses its target, with no raise. It is not the answer the warning above describes: `ens` is healthy, `kld` is small, and the statistic the view named is the only thing that is short.
 
-    The size of the miss is a property of the run and not of the estimator. Under the default [`OptimEntropyPooling`](@ref) stopping rule a single-view case solved alone meets its target to about `1e-7` relative. The same case solved after other cases in the same process has been measured at `3.1e-4` on `ubuntu-latest`, and at `5.5e-3` in a probe over twenty assets. Issue #573 also records a residual that moves when 200 lines of comment are added to a file, so the cause is not the search alone and it is not settled.
+    The size of the miss is a property of the run and not of the estimator, and it is not reproducible: a case that meets its target closely when solved alone can miss it by orders of magnitude when solved after other cases in the same process. Issue #573 also records the residual moving for reasons as unrelated as an edit to a comment elsewhere in the file, so the cause is not the search alone and it is not settled.
 
-    Read the result rather than the flag. Measure the posterior with [`ConditionalValueatRisk`](@ref) at the view's own `alpha`, and compare it with the target the view names. Where the answer has to be repeatable, pass a tighter `Optim.Options` in the optimiser's `args`, which holds the same cases to about `1e-11`; [`OptimEntropyPooling`](@ref) gives the block. No tolerance of the library's own is read on the residual: a threshold that decides whether a solve really succeeded is a policy this library does not set.
+    Read the result rather than the flag. Measure the posterior with [`ConditionalValueatRisk`](@ref) at the view's own `alpha`, and compare it with the target the view names. Where the answer has to be repeatable, pass a tighter `Optim.Options` in the optimiser's `args`; [`OptimEntropyPooling`](@ref) gives the block. No tolerance of the library's own is read on the residual: a threshold that decides whether a solve really succeeded is a policy this library does not set.
 
 # Algorithm
 
@@ -152,7 +152,7 @@ MeucciEntropyPoolingPrior
 
 ## The incremental fit
 
-This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit. ADR 0136 records the decision.
+This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit.
 
 `cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
 
@@ -328,7 +328,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`MeucciEntropyPoolingPrior`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:MeucciEntropyPoolingPrior, true)` to render it. ADR 0105 records the decision.
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:MeucciEntropyPoolingPrior, true)` to render it.
 
 # Arguments
 

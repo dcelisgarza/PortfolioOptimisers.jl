@@ -177,7 +177,7 @@ Where:
  1. Build `d_sigma`, the element-wise half-width, from `dsigma` and the element-wise absolute value of `pr.sigma`. It is non-negative everywhere, which is what orders the two bounds.
  2. Subtract `d_sigma` from `pr.sigma`, giving the lower bound. It is symmetric, because both operands are.
  3. Add `d_sigma` to `pr.sigma`, giving the upper bound.
- 4. Build a [`BoxUncertaintySet`](@ref) from the two bounds and `val = pr.sigma`, the covariance they are calibrated on. The covariance route ignores `val`, which the mean route reads, so the field is carried for the reader and for ADR 0050 rather than for this consumer.
+ 4. Build a [`BoxUncertaintySet`](@ref) from the two bounds and `val = pr.sigma`, the covariance they are calibrated on. The covariance route ignores `val`, which the mean route reads, so the field is carried for the reader rather than for this consumer.
 
 # Arguments
 
@@ -216,7 +216,7 @@ end
 
 Constructs box uncertainty sets for mean and covariance statistics using delta bounds, from the set's own prior fitted on returns data or from a prior result the set is handed.
 
-The two methods are the two routes of ADR 0138 and share one tail. The returns-data method fits `ue.pe` once through [`ucs_prior`](@ref) and hands the result to the prior-result method of the same set with its `pe` set to `nothing`, so both routes build the two boxes from one `pr` by the same two calls. The prior-result method is defined only for a set whose `pe` is `nothing`, because a set with a prior of its own is calibrated on that prior and on nothing else; a set with no prior of its own is calibrated on the `pr` it is handed, which inside an optimiser is the prior the optimiser is solving on. The single-axis verbs [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) fit the prior once each on the returns-data route, so the single-axis pair costs two prior fits for the same two sets. The three verbs agree on their common axes to the last bit, because they call the same two builders on an identically fitted prior.
+The two methods are the two routes a set with a `pe` field takes and share one tail. The returns-data method fits `ue.pe` once through [`ucs_prior`](@ref) and hands the result to the prior-result method of the same set with its `pe` set to `nothing`, so both routes build the two boxes from one `pr` by the same two calls. The prior-result method is defined only for a set whose `pe` is `nothing`, because a set with a prior of its own is calibrated on that prior and on nothing else; a set with no prior of its own is calibrated on the `pr` it is handed, which inside an optimiser is the prior the optimiser is solving on. The single-axis verbs [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) fit the prior once each on the returns-data route, so the single-axis pair costs two prior fits for the same two sets. The three verbs agree on their common axes to the last bit, because they call the same two builders on an identically fitted prior.
 
 # Mathematical definition
 
@@ -301,7 +301,7 @@ end
 
 Constructs a box uncertainty set for expected returns (mean) using delta bounds, from the set's own prior fitted on returns data or from a prior result the set is handed.
 
-The two methods are the two routes of ADR 0138 and share one tail, as [`ucs`](@ref) states. On the returns-data route it fits its own prior, so it reaches the same set as the first element of [`ucs`](@ref) at the cost of a second fit. `ue.dsigma` is not read on this path.
+The two methods are the two routes a set with a `pe` field takes and share one tail, as [`ucs`](@ref) states. On the returns-data route it fits its own prior, so it reaches the same set as the first element of [`ucs`](@ref) at the cost of a second fit. `ue.dsigma` is not read on this path.
 
 # Mathematical definition
 
@@ -367,7 +367,7 @@ end
 
 Constructs a box uncertainty set for covariance using delta bounds, from the set's own prior fitted on returns data or from a prior result the set is handed.
 
-The two methods are the two routes of ADR 0138 and share one tail, as [`ucs`](@ref) states. On the returns-data route it fits its own prior, so it reaches the same set as the second element of [`ucs`](@ref) at the cost of a second fit. `ue.dmu` is not read on this path.
+The two methods are the two routes a set with a `pe` field takes and share one tail, as [`ucs`](@ref) states. On the returns-data route it fits its own prior, so it reaches the same set as the second element of [`ucs`](@ref) at the cost of a second fit. `ue.dmu` is not read on this path.
 
 # Mathematical definition
 

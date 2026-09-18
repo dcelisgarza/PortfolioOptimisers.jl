@@ -67,7 +67,7 @@ Add the new algorithm type and any new public functions to the `export` statemen
 
 ## Step 7 — Add to API docs
 
-Add the symbol to the corresponding `docs/src/api/*.md` file:
+Add the symbol to the corresponding `docs/src/public_api/*.md` or `docs/src/private_api/*.md` file, whichever side its classification puts it on:
 
 ````markdown
 ```@docs
@@ -75,7 +75,7 @@ MyAlgorithm
 ```
 ````
 
-[`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *`docs/src/api/` Markdown Files* owns the layout of that page, including when the page carries a bibliography block.
+[`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *`docs/src/public_api/` and `docs/src/private_api/` Markdown Files* owns the layout of that page, including when the page carries a bibliography block.
 
 ## Step 8 — Write tests
 

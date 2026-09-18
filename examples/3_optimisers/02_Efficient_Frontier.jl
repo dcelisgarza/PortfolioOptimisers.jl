@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Trace the efficient frontier in PortfolioOptimisers.jl: the whole risk-return curve from one MeanRisk estimator, and how to read it."
+```
+
 # Efficient frontier
 
 A single [`MeanRisk`](@ref) objective returns *one* portfolio. The **efficient frontier** is the

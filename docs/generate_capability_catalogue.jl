@@ -273,10 +273,17 @@ function collapse_blank_runs(md::AbstractString)::String
 end
 
 const _PREAMBLE = """
+```@meta
+Description = "Every estimator, risk measure, constraint and optimiser PortfolioOptimisers.jl ships, grouped by the job it does and linked to its docstring."
+```
+
 # [$(_PAGE_TITLE)](@id capability-catalogue)
 
 Everything `PortfolioOptimisers.jl` can do, grouped by the job it does rather
-than by the file it lives in. Each entry links to its docstring.
+than by the file it lives in. Each entry links to its docstring. Every entry
+here is public API: `test_26_docs.jl`'s "every exported function is accounted
+for" testset makes that true by construction (ADR 0040), so the page needs no
+per-entry marker.
 
 This page is generated (see
 [docs/generate_capability_catalogue.jl](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/generate_capability_catalogue.jl)):

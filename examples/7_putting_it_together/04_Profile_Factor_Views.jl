@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "An end-to-end profile in PortfolioOptimisers.jl: a desk with factor views propagated through a factor model into a constrained optimisation."
+```
+
 # Profile: factor-views desk
 
 The fourth profile is a **factor-aware desk that trades on factor views**. Where the

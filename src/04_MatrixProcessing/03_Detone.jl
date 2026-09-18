@@ -314,3 +314,4 @@ function detone(dt::AbstractDetoneEstimator, X::MatNum)
 end
 
 export Detone, detone, detone!
+public AbstractDetoneEstimator

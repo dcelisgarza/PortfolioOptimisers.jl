@@ -185,8 +185,7 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the first element that repeats an earlier one, for a name-uniqueness error
-that names the offending token without dumping the whole collection (ADR 0026 boundary
-discipline). Only ever called on the failing path.
+that names the offending token without dumping the whole collection. Only ever called on the failing path.
 
 # Arguments
 
@@ -248,7 +247,7 @@ Steps are given in execution order. Each element is either a step estimator or a
 
 # Online form
 
-A Pipeline is a host of the online step, decided by [ADR 0142](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/adr/0142-a-pipeline-is-a-host-its-steps-fold-or-defer-to-a-view-and-a-step-with-no-online-form-is-refused-unless-the-pipeline-declares-a-refit.md): [`partial_fit!`](@ref) walks the steps in order, folding each block of observations through them into the **row owner** — the prior step, else the optimiser step — and `fit(pipe)` with no data reads the fitted [`PipelineResult`](@ref) out. Every step before the owner belongs to one of three classes. A **row-local** step ([`PricesToReturns`](@ref), [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref), [`MissingDataFilter`](@ref) at `row_thr = 1`) folds and emits the transformed rows. A **universe-only** step (an [`AbstractAssetSelector`](@ref), and the column filter of a `MissingDataFilter`) folds nothing and is refitted at the read-out over the owner's rows, its universe applied as a view. A **window-valued** step, and any other step that writes a data slot, is refused at warm-up by name, and `Online(pipe)` is the declared refit that admits it. A cap on the row owner alone, `Online(pe; max_history = w)`, is a window counted in the owner's rows, and a row-local step before it folds a state across that window's front edge, so the pair is refused at warm-up by name too: the rolling window through a Pipeline is `Online(pipe; max_history = w)`, which refits every step over the window. `cache` is the Fold Context the Pipeline keeps when a prior step owns the rows, or the input-carrier buffer `Online(pipe)` seeds; it is `nothing` until a step writes one. See [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref) and [`fit(pipe::Pipeline)`](@ref).
+A Pipeline is a host of the online step: [`partial_fit!`](@ref) walks the steps in order, folding each block of observations through them into the **row owner** — the prior step, else the optimiser step — and `fit(pipe)` with no data reads the fitted [`PipelineResult`](@ref) out. Every step before the owner belongs to one of three classes. A **row-local** step ([`PricesToReturns`](@ref), [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref), [`MissingDataFilter`](@ref) at `row_thr = 1`) folds and emits the transformed rows. A **universe-only** step (an [`AbstractAssetSelector`](@ref), and the column filter of a `MissingDataFilter`) folds nothing and is refitted at the read-out over the owner's rows, its universe applied as a view. A **window-valued** step, and any other step that writes a data slot, is refused at warm-up by name, and `Online(pipe)` is the declared refit that admits it. A cap on the row owner alone, `Online(pe; max_history = w)`, is a window counted in the owner's rows, and a row-local step before it folds a state across that window's front edge, so the pair is refused at warm-up by name too: the rolling window through a Pipeline is `Online(pipe; max_history = w)`, which refits every step over the window. `cache` is the Fold Context the Pipeline keeps when a prior step owns the rows, or the input-carrier buffer `Online(pipe)` seeds; it is `nothing` until a step writes one. See [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref) and [`fit(pipe::Pipeline)`](@ref).
 
 # Examples
 
@@ -382,7 +381,7 @@ end
 
 Deliberately unsupported: a [`Pipeline`](@ref) cannot be sub-selected by asset view.
 
-Meta-optimisers (`NestedClustered`, `Stacking`, `SubsetResampling`) build asset sub-portfolios by taking a `port_opt_view` of their inner estimator. A pipeline's asset universe is *fitted state* — the missing-data filter decides it from the training window — so an asset view taken before fitting is not well defined. Wrapping a `Pipeline` in a meta-optimiser is therefore unsupported in v1 (ADR 0028, "Future expansion"); a meta-optimiser may still be the *optimisation step of* a pipeline.
+Meta-optimisers (`NestedClustered`, `Stacking`, `SubsetResampling`) build asset sub-portfolios by taking a `port_opt_view` of their inner estimator. A pipeline's asset universe is *fitted state* — the missing-data filter decides it from the training window — so an asset view taken before fitting is not well defined. Wrapping a `Pipeline` in a meta-optimiser is therefore unsupported for now; a meta-optimiser may still be the *optimisation step of* a pipeline.
 
 # Related
 

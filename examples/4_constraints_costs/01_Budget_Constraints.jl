@@ -1,4 +1,8 @@
 #=
+```@meta
+Description = "Budget constraints in PortfolioOptimisers.jl: long, short and total budgets on the weights, and how the short relaxation variables read."
+```
+
 # Budget constraints
 
 This example shows how to use basic budget constraints.

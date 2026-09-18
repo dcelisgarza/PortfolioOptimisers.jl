@@ -35,7 +35,7 @@ Unconstrained Near Optimal Centering algorithm. This is the default `alg` of
 Centres inside the near-optimal region of the *unconstrained* problem. The centring model
 carries the weight bounds and the budgets its head applies, the risk expression, the return
 expression and the non-fixed fees, and nothing else — the constraint and penalty builders of
-the shared middle do not run (ADR 0008, amendment 2). "Unconstrained" names that omission.
+the shared middle do not run. "Unconstrained" names that omission.
 
 The omitted settings are **carried and validated, not rejected**. They are not inert: the
 three anchor portfolios are solved as [`MeanRisk`](@ref) sub-problems that do run the whole
@@ -853,9 +853,9 @@ Set the Near Optimal Centering objective function in the JuMP model.
 
 Formulates the NOC objective based on the algorithm variant. For `UnconstrainedNearOptimalCentering`, uses only the barrier function. For `ConstrainedNearOptimalCentering`, also adds objective penalties and custom objective terms.
 
-The centring problem is a *distance minimisation*, so the objective it reports to a custom term is [`MinimumRisk`](@ref) — the objective actually being built, not `noc.obj`, which describes the reference-point sub-problems (ADR 0036).
+The centring problem is a *distance minimisation*, so the objective it reports to a custom term is [`MinimumRisk`](@ref) — the objective actually being built, not `noc.obj`, which describes the reference-point sub-problems.
 
-The unconstrained variant reaches neither [`add_custom_objective_term!`](@ref) nor [`add_penalty_to_objective!`](@ref), so `opt.cobj` prices the anchor sub-problems and not the centring solve. No builder on that path contributes to the [Objective Penalty](@ref add_to_objective_penalty!) either, so the accumulator is empty and the omitted fold changes no number today. The one case a user can observe is a Custom Objective Term that names itself and supplies no builder: it raises on the anchor solve, and raises nowhere when `w_min`, `w_opt` and `w_max` are all supplied and no anchor solve runs (ADR 0036, amendment).
+The unconstrained variant reaches neither [`add_custom_objective_term!`](@ref) nor [`add_penalty_to_objective!`](@ref), so `opt.cobj` prices the anchor sub-problems and not the centring solve. No builder on that path contributes to the [Objective Penalty](@ref add_to_objective_penalty!) either, so the accumulator is empty and the omitted fold changes no number today. The one case a user can observe is a Custom Objective Term that names itself and supplies no builder: it raises on the anchor solve, and raises nowhere when `w_min`, `w_opt` and `w_max` are all supplied and no anchor solve runs.
 
 # Arguments
 
@@ -1248,12 +1248,12 @@ The two variants share a head and a Result, and differ only in the middle and in
 This is the middle. [`ConstrainedNearOptimalCentering`](@ref) delegates to the shared
 [`assemble_jump_model!`](@ref). [`UnconstrainedNearOptimalCentering`](@ref) runs the four
 steps of that sequence it needs — non-fixed fees, risk, scalarisation, return — and then the
-same [`assert_frontier_sweep_cap`](@ref) tail (ADR 0008, amendments 2 and 3).
+same [`assert_frontier_sweep_cap`](@ref) tail.
 
 [`set_non_fixed_fees!`](@ref) runs before the risk build, as it does in
 [`assemble_jump_model!`](@ref). It is what makes the model's return expression net of fees,
 and the barrier compares that expression against the `noc_rt` target, which
-[`near_optimal_centering_setup`](@ref) computes net of fees as well (ADR 0008, amendment 3).
+[`near_optimal_centering_setup`](@ref) computes net of fees as well.
 A fixed fee still does not apply: it needs the cardinality binaries `set_mip_constraints!`
 produces, and that builder belongs to the middle this variant does not run.
 

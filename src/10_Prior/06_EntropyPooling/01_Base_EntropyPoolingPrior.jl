@@ -615,7 +615,7 @@ This is the family's call of [`announce_non_investable`](@ref), written once so 
 
 It is said **at the end of the fit**, not at the reduction. A staged algorithm interleaves its view builders with its solves, so the ledger is only complete when the last stage has stated its views; reporting earlier would report a third of the truth and reporting per stage would be three messages for one departure.
 
-`viewless` raises the message to a warning, and it is the case ADR 0125 singles out: a departure that took the **last** surviving view leaves the fit with nothing to condition on, so the posterior is the prior probabilities and the answer is not the one the caller asked for. Every other drop trims the view set and is `@info`.
+`viewless` raises the message to a warning: a departure that took the **last** surviving view leaves the fit with nothing to condition on, so the posterior is the prior probabilities and the answer is not the one the caller asked for. Every other drop trims the view set and is `@info`.
 
 # Arguments
 
@@ -2749,7 +2749,7 @@ Return the prior probabilities an entropy pooling fit starts from.
 
 A prior that reweights observations works on the observation axis its nested prior **answered**, not on the axis it was handed. A nested prior may drop rows: a [`CrossSectionalFactorPrior`](@ref) drops the observations its Descriptors warm up over and the observations its exposure lag consumes, so its scenarios are the window the fit is defined on. So `pr` is fitted first, and the prior probabilities are read on its rows.
 
-The three sources are read in order. A caller's `pe.w` wins, because it is the one tilt no fit can state. The nested result's own `w` comes next, because a nested pooling prior already tilted the scenarios it answered, and uniform is then not the prior (ADR 0046). Uniform over the rows of `pr.X` is the last.
+The three sources are read in order. A caller's `pe.w` wins, because it is the one tilt no fit can state. The nested result's own `w` comes next, because a nested pooling prior already tilted the scenarios it answered, and uniform is then not the prior. Uniform over the rows of `pr.X` is the last.
 
 # Algorithm
 

@@ -77,3 +77,4 @@ end
 function get_observation_weights(w::VecNum, args...; kwargs...)
     return w
 end
+public get_observation_weights

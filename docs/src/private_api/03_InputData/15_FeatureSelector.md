@@ -1,0 +1,20 @@
+```@meta
+Description = "Feature selector, private API of PortfolioOptimisers.jl: panel_field_keys, panel_value_columns!, panel_key_column!, panel_column_label, …"
+```
+
+# Feature selector: private API
+
+```@docs
+PortfolioOptimisers.panel_field_keys
+PortfolioOptimisers.panel_value_columns!
+PortfolioOptimisers.panel_key_column!
+PortfolioOptimisers.panel_column_label
+PortfolioOptimisers.panel_field_value_column!
+PortfolioOptimisers.panel_field_observed_column!
+PortfolioOptimisers.stacked_axes
+PortfolioOptimisers.select_fields
+PortfolioOptimisers.select_fields_push!
+PortfolioOptimisers.panel_selector_msg
+PortfolioOptimisers.assert_feature_selector
+PortfolioOptimisers.assert_selector_entry
+```

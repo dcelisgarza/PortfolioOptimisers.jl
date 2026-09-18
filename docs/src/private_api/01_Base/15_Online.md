@@ -1,0 +1,45 @@
+```@meta
+Description = "The online step, private API of PortfolioOptimisers.jl: Online_Option, Onl, SampleBufferState, assert_sample_buffer_state, assert_buffer_mask_shape, …"
+```
+
+# The online step: private API
+
+```@docs
+PortfolioOptimisers.Online_Option
+PortfolioOptimisers.Onl
+PortfolioOptimisers.SampleBufferState
+PortfolioOptimisers.assert_sample_buffer_state
+PortfolioOptimisers.assert_buffer_mask_shape
+PortfolioOptimisers.assert_buffer_factor_shape
+PortfolioOptimisers.buffer_rows_view
+PortfolioOptimisers.sample_buffer
+PortfolioOptimisers.sample_buffer_kwargs
+PortfolioOptimisers.factor_buffer
+PortfolioOptimisers.assert_sample_buffer(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator})
+PortfolioOptimisers.assert_sample_buffer(::PortfolioOptimisers.Online)
+PortfolioOptimisers.sample_buffer_seed
+PortfolioOptimisers.fold_buffer
+PortfolioOptimisers.assert_buffer_factor_width
+PortfolioOptimisers.assert_buffer_presence_agreement
+PortfolioOptimisers.reset_empty_buffer
+PortfolioOptimisers.seed_sample_buffer
+PortfolioOptimisers.seed_buffer_array
+PortfolioOptimisers.copy_buffer_rows!
+PortfolioOptimisers.reserve_sample_buffer
+PortfolioOptimisers.compact_buffer_array
+PortfolioOptimisers.observation_row
+PortfolioOptimisers.merge_buffer_array
+PortfolioOptimisers.trim_merged_array
+Base.copy(x::PortfolioOptimisers.SampleBufferState)
+PortfolioOptimisers.copy_buffer_array
+PortfolioOptimisers.slice_buffer_mask
+PortfolioOptimisers.supports_partial_fit
+PortfolioOptimisers.online_candidate_fields
+PortfolioOptimisers.online_fields
+PortfolioOptimisers.online_state_seed(::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator}, ::PortfolioOptimisers.Option{<:Integer})
+PortfolioOptimisers.update_online_estimator
+PortfolioOptimisers.estimator_fields
+PortfolioOptimisers.online_entry_state
+PortfolioOptimisers.online_wrapper_path
+PortfolioOptimisers.assert_batch_entry
+```

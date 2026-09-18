@@ -1875,7 +1875,7 @@ OWA formulation that computes the exact OWA risk by solving a linear programme.
 
 It adds two vector variables `a` and `b` of length `T` and the `T × T` block of constraints ``y_{i} w_{j} \\leq a_{j} + b_{i}``, and the risk is ``\\sum_{t} (a_{t} + b_{t})``. This is the dual of the assignment problem that orders the sample. It costs `T^2` constraints, so [`ApproxOrderedWeightsArray`](@ref) is the cheaper choice for a long sample.
 
-The programme pairs the largest weight with the largest sorted return, so it attains ``\\mathrm{sort}(\\boldsymbol{\\omega})^{\\intercal} \\mathrm{sort}(\\hat{\\boldsymbol{r}})``. This is the OWA risk when, and only when, the weight vector is monotonic non-decreasing, which is also the condition for the risk measure to be convex. Every weight builder in this package returns such a vector. A weight vector supplied out of order is sorted by the programme, so the model and the functor then disagree: a shuffled Gini mean difference vector at `T = 100`, `N = 8` gave a model risk of `0.0035485` against a functor risk of `0.00034632`.
+The programme pairs the largest weight with the largest sorted return, so it attains ``\\mathrm{sort}(\\boldsymbol{\\omega})^{\\intercal} \\mathrm{sort}(\\hat{\\boldsymbol{r}})``. This is the OWA risk when, and only when, the weight vector is monotonic non-decreasing, which is also the condition for the risk measure to be convex. Every weight builder in this package returns such a vector. A weight vector supplied out of order is sorted by the programme, so the model and the functor then disagree.
 
 # Related
 
@@ -2350,3 +2350,6 @@ export MaximumEntropy, ExponentialConeEntropy, RelativeEntropy, MinimumSquaredDi
        OrderedWeightsArray, OrderedWeightsArrayRange, LinearMoment,
        OrderedWeightsArrayConditionalValueatRisk, OrderedWeightsArrayTailGini,
        OrderedWeightsArrayConditionalValueatRiskRange, OrderedWeightsArrayTailGiniRange
+# The `# Interfaces`-marked type of #1137 (ADR 0154). Its section names only the callable
+# shape, so no separate verb is promoted alongside it.
+public AbstractOrderedWeightsArrayFunction

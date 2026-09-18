@@ -1199,3 +1199,5 @@ abstract type AbstractAssetPanelEstimator <: AbstractEstimator end
 
 export asset_panel, NumericPanelInput, CategoricalPanelInput, TensorPanelInput, NoPanelFill,
        ConstantPanelFill, ForwardPanelFill, BackwardPanelFill
+public AbstractPanelFillAlgorithm, panel_fill, AbstractPanelFieldInput,
+       panel_input_is_static, panel_resolve, panel_input_field

@@ -919,3 +919,4 @@ function Statistics.cor(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPan
 end
 
 export ImpliedVolatility, ImpliedVolatilityPremium, ImpliedVolatilityRegression
+public ImpliedVolatilityAlgorithm, predict_realised_vols

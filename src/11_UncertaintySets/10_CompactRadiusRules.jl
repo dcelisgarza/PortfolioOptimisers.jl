@@ -39,7 +39,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Effective sample size behind a prior result, Kish's when the result carries observation weights.
 
-A weighted estimate carries the information of `sum(w)^2 / sum(w .^ 2)` equally weighted observations rather than of `size(pr.X, 1)` rows, and a rule that prices estimation error reads the former. This is the reading [`ConcentrationRadius`](@ref) already takes for the same reason, and it is [`effective_sample_size`](@ref) on the result's own weights, so a Scenario Cap's stated count is read here too (ADR 0138).
+A weighted estimate carries the information of `sum(w)^2 / sum(w .^ 2)` equally weighted observations rather than of `size(pr.X, 1)` rows, and a rule that prices estimation error reads the former. This is the reading [`ConcentrationRadius`](@ref) already takes for the same reason, and it is [`effective_sample_size`](@ref) on the result's own weights, so a Scenario Cap's stated count is read here too.
 
 # Arguments
 
@@ -390,3 +390,4 @@ function k_compact(alg::VarianceFraction, ::Number, ::AbstractOrthogonalityMetri
            sum(abs2, Cw - Q * (transpose(Q) * Cw))
 end
 export ResidualInflation, VarianceFraction
+public k_compact

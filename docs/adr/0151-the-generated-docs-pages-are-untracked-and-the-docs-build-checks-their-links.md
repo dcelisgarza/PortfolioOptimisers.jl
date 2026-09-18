@@ -78,3 +78,17 @@ The tree is browsable at the deployed site, which is built from the same generat
 'docs/src/api/*_TypeHierarchy.md'` lists nothing. `git check-ignore` answers each of the four
 paths. `test/test_46_standards_citation_census.jl` and `test/test_50_docs_sitemap.jl` pass, and
 the ADR index carries the row.
+
+## Amendment (2026-09-17)
+
+[ADR 0128 § Amendment](0128-the-docs-split-into-mirrored-public-and-private-api-trees-and-a-census-gates-placement.md)
+moves the type hierarchy out of `docs/src/api/` to `docs/src/TypeHierarchy.md`, a fixed name
+with no numeric prefix. The fourth of the four untracked paths this ADR names changes with it:
+`docs/src/api/*_TypeHierarchy.md` becomes `docs/src/TypeHierarchy.md` in `.gitignore`,
+`.markdownlintignore`, `CLAUDE.md` § Editing and the citation allow-list of
+`test/test_46_standards_citation_census.jl`. The other three paths, the reasoning in Decision
+and Consequences, and the rejection of a CI-committed alternative are unchanged.
+
+Verification is re-run against the new path: `git ls-files docs/src/user_guide
+docs/src/examples docs/src/capability_catalogue.md docs/src/TypeHierarchy.md` lists nothing,
+and `git check-ignore` answers all four.
