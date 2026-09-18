@@ -8,8 +8,9 @@ status: proposed
 
 [Map #1148](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1148) brings online
 portfolio selection into the library: the family of algorithms that update a portfolio directly
-from the last realised price relative, fit no moment, solve no programme, and carry a regret
-guarantee against every price sequence (Cover 1991; Helmbold, Schapire, Singer and Warmuth 1998;
+from the last realised price relative, fit no moment, solve no programme of their own — a rule
+may hold an optimisation estimator and re-solve it on the rows it selects (ADR 0156) — and carry
+a regret guarantee against every price sequence (Cover 1991; Helmbold, Schapire, Singer and Warmuth 1998;
 Agarwal, Hazan, Kale and Schapire 2006; Li, Zhao, Hoi and Gopalkrishnan 2012; Li and Hoi 2012;
 Huang, Zhou, Li, Hoi and Zhou 2016; Li and Hoi 2014 for the survey). The starting artifact is the
 library's own prototype, `research/prototypes/09_online_portfolio_selection.jl`: seven update
@@ -109,8 +110,9 @@ tolerance.
 
 The state is `OnlinePortfolioSelectionState <: AbstractPartialFitState`, one type on the head's
 `cache`: the allocation `w_t`, the rule's private carriers, the Fold Context's pinned asset names
-and static Asset Panel, and the timestamps folded. It holds **no column buffer** — no returns,
-factor or benchmark column — because the read-out rebuilds nothing; the pin-and-check every host
+and static Asset Panel, and the timestamps folded. It holds **no shared column buffer** — no
+returns, factor or benchmark column — because the read-out rebuilds nothing; a rule's private
+carrier may be the rows it re-solves on, unbounded for a prefix (ADR 0156); the pin-and-check every host
 runs at the first step and after it is kept, so a hand-called step on a reordered universe is
 refused by name and not folded silently, and the timestamps serve
 [ADR 0144](0144-an-online-runs-result-carries-the-threaded-estimator-and-resume-re-enters-the-fold-loop-from-the-folds-it-holds.md)'s
