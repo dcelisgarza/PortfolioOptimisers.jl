@@ -23,8 +23,6 @@ Both verbs work on bare arrays and carry no estimator. The type bound is `Abstra
 a caller's own declaration — a listing calendar, or a constituency that leaves and rejoins — enters
 at the same point and replaces the derived active mask outright. The estimation mask is never the
 caller's to state and is always re-derived, which is what makes `emsk ⊆ amsk` hold by construction.
-See `docs/adr/0129-the-ingestion-layer-seams-at-the-listing-span-and-the-clock-draws-the-pipeline-boundary.md`
-and `docs/adr/0131-a-return-needs-two-consecutive-prices-and-a-gap-return-writes-only-the-cells-that-lack-them.md`.
 
 ```@docs
 listing_span

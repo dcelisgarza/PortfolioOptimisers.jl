@@ -238,7 +238,7 @@ In order to implement a new constraint that works seamlessly with the library, s
 
 ## `add_custom_constraint!`
 
-  - `add_custom_constraint!(model::JuMP.Model, ccnt::MyConstraint, optimiser, attrs::ProcessedJuMPOptimiserAttributes) -> Nothing`: Add the constraint to `model`. There is no fallback: a subtype with no method of its own raises. Scale the constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), the homogenisation variable, so the bound is compared against unrescaled weights under a ratio objective (ADR 0008).
+  - `add_custom_constraint!(model::JuMP.Model, ccnt::MyConstraint, optimiser, attrs::ProcessedJuMPOptimiserAttributes) -> Nothing`: Add the constraint to `model`. There is no fallback: a subtype with no method of its own raises. Scale the constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), the homogenisation variable, so the bound is compared against unrescaled weights under a ratio objective.
 
 ### Arguments
 
@@ -292,7 +292,7 @@ In order to implement a new objective term that works seamlessly with the librar
 
 ## `add_custom_objective_term!`
 
-  - `add_custom_objective_term!(model::JuMP.Model, obj::ObjectiveFunction, cobj::MyObjective, optimiser, attrs::ProcessedJuMPOptimiserAttributes) -> Nothing`: Contribute the term to the model's objective. There is no fallback: a subtype with no method of its own raises. Contribute through [`add_to_objective_penalty!`](@ref) rather than by touching the objective expression: the accumulated penalty is folded in with the sign the objective's sense needs, so a contribution always worsens the objective and a reward is a negative contribution (ADR 0036). A term that is not homogeneous of degree one in the weights multiplies its constants by [`get_k`](@ref).
+  - `add_custom_objective_term!(model::JuMP.Model, obj::ObjectiveFunction, cobj::MyObjective, optimiser, attrs::ProcessedJuMPOptimiserAttributes) -> Nothing`: Contribute the term to the model's objective. There is no fallback: a subtype with no method of its own raises. Contribute through [`add_to_objective_penalty!`](@ref) rather than by touching the objective expression: the accumulated penalty is folded in with the sign the objective's sense needs, so a contribution always worsens the objective and a reward is a negative contribution. A term that is not homogeneous of degree one in the weights multiplies its constants by [`get_k`](@ref).
 
 ### Arguments
 

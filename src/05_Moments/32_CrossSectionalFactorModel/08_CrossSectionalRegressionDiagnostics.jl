@@ -997,7 +997,7 @@ end
 
 Return the pieces every cross-sectional regression score is built from.
 
-The four scores read the same three quantities: the eligible asset count, the weight-normalised residual sum of squares, and the coefficient of determination. They are computed here once per score rather than held on a Result, because [#709](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/709) refused a grouped Result: the scores are independent statistics with no identity between them.
+The four scores read the same three quantities: the eligible asset count, the weight-normalised residual sum of squares, and the coefficient of determination. They are computed here once per score rather than held on a Result, because the scores are independent statistics with no identity between them.
 
 The mask of a score is the finiteness of the **asset return**, which the exposures, the factor returns and the residuals reconstruct. That differs from the mask of a Gram diagnostic, which reads the exposures and the residuals separately.
 

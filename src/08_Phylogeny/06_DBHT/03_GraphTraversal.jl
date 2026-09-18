@@ -127,7 +127,7 @@ This function performs a breadth-first search (BFS) on a binary (directed or und
 
 !!! warning
 
-    `distance[source]` does not stay `0`. Step 4 fires on the source itself the first time one of the source's own neighbours is expanded, so on an undirected graph without a self-loop the entry ends at `2`, and at `1` where the graph carries a self-loop on the source. This is the behaviour of the MATLAB original. All three callers reset the entry after the call: [`FindDisjoint`](@ref), [`DirectHb`](@ref) and [`BubbleCluster8s`](@ref) each write a `0` into it. Measured in issue #470 on a five-vertex path with a leaf, where the source reads `2.0`.
+    `distance[source]` does not stay `0`. Step 4 fires on the source itself the first time one of the source's own neighbours is expanded, so on an undirected graph without a self-loop the entry ends at `2`, and at `1` where the graph carries a self-loop on the source. This is the behaviour of the MATLAB original. All three callers reset the entry after the call: [`FindDisjoint`](@ref), [`DirectHb`](@ref) and [`BubbleCluster8s`](@ref) each write a `0` into it. On a five-vertex path with a leaf, the source reads `2.0`.
 
 # Arguments
 

@@ -8,7 +8,7 @@ Asset selectors narrow the universe from the data: drop constant columns, keep t
 
 The universe a selector chooses on the training window is its **fitted state**. Applying the fitted result to an unseen window replays that universe rather than re-deciding it, which is what makes a selector safe inside cross-validation.
 
-See `docs/adr/0029-asset-selection-is-returns-preprocessing.md` for the design rationale, and [`PortfolioOptimisers.AbstractAssetSelector`](@ref) for the seam every selector shares.
+See [`PortfolioOptimisers.AbstractAssetSelector`](@ref) for the seam every selector shares.
 
 ## Scoring assets with a risk measure
 

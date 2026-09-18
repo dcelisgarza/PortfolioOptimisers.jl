@@ -70,8 +70,6 @@ The funnel reduces the training window to its **Coverage Universe** before it ca
 
 Selectors restrict *columns only*. Observation filtering is a price-level concern ([`MissingDataFilter`](@ref)), because a fitted transformation cannot decide which rows of an unseen window to drop without breaking the weights/returns alignment `assert_universe_aligned` enforces.
 
-See `docs/adr/0029-asset-selection-is-returns-preprocessing.md` for the design rationale.
-
 # Related
 
   - [`select_assets`](@ref)

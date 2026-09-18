@@ -479,7 +479,7 @@ A [`WeightsReturnsFeesInput`](@ref) measure also declares [`supports_precomputed
 
 ## The model builder
 
-A `JuMP` optimiser builds the measure into its model through [`set_risk_constraints!`](@ref), as `set_risk_constraints!(model::JuMP.Model, i, r::MyRiskMeasure, opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...; kwargs...)`, which has no fallback. The method builds the risk expression from the model's weights, then registers it with [`set_risk_bounds_and_expression!`](@ref), which reads the bound and the contribution to the aggregate risk expression off `r.settings`. Scale every constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), so the bound is compared against unrescaled weights under a ratio objective (ADR 0008).
+A `JuMP` optimiser builds the measure into its model through [`set_risk_constraints!`](@ref), as `set_risk_constraints!(model::JuMP.Model, i, r::MyRiskMeasure, opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...; kwargs...)`, which has no fallback. The method builds the risk expression from the model's weights, then registers it with [`set_risk_bounds_and_expression!`](@ref), which reads the bound and the contribution to the aggregate risk expression off `r.settings`. Scale every constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), so the bound is compared against unrescaled weights under a ratio objective.
 
 ## Optional methods
 

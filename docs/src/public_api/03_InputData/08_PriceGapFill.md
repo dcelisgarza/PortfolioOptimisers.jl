@@ -22,8 +22,7 @@ normally wants.
 It runs at the price level, before [`PricesToReturns`](@ref), because a carried price cannot be
 stated after the conversion: zeroing the returns a gap left non-finite discards the move across the
 gap entirely. A filled cell is therefore finite in the returns and its estimation mask entry is
-`true` — a caller who filled has said the asset traded. See
-`docs/adr/0130-a-universe-policy-is-fitted-and-the-only-fill-is-a-span-bounded-price-convention.md`.
+`true` — a caller who filled has said the asset traded.
 
 ```@docs
 CarriedPrice

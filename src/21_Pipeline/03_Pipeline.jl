@@ -223,8 +223,6 @@ Steps are ordinary estimators — preprocessing, prior, phylogeny, uncertainty-s
 
 A terminal optimiser is not required: a prior-only pipeline is legal; prediction is what needs weights.
 
-See `docs/adr/0028-pipeline-workflow-estimator.md` for the design rationale.
-
 # Fields
 
 $(DocStringExtensions.FIELDS)

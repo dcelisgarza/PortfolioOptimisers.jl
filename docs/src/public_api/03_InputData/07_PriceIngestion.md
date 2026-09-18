@@ -23,10 +23,7 @@ The layer spells an absent price `NaN`, which is the library's one spelling for 
 conversion carries it into the returns rather than deleting the observation or the asset that holds
 one. A carrier the layer did not build states no span, and then no universe: the conversion does not
 guess one from the window, because a delisting straddling the window end reads there as an asset
-that was never listed. See
-`docs/adr/0129-the-ingestion-layer-seams-at-the-listing-span-and-the-clock-draws-the-pipeline-boundary.md`
-and
-`docs/adr/0132-the-layer-emits-one-carrier-and-alignment-splits-into-a-fixed-axis-and-a-provenance-check.md`.
+that was never listed.
 
 **The asset table states the clock.** Under the default `join_method = :left` the factor,
 benchmark and implied-volatility series are aligned to the asset clock and padded `NaN` where they
@@ -38,8 +35,7 @@ derived from the series rather than named: a `Float32` panel stays `Float32`, `F
 gives it, and a type that cannot spell an absence is refused by name at the first gap it would have
 to spell. An absent implied volatility is carried like an absent price, and
 [`ImpliedVolatility`](@ref) narrows its Coverage Universe to the columns whose implied
-volatilities are complete. See
-`docs/adr/0135-the-asset-table-states-the-clock-and-the-layer-carries-every-absence-and-names-it.md`.
+volatilities are complete.
 
 ## Types
 

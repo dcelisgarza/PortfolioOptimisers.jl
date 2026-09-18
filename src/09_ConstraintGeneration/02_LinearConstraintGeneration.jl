@@ -1554,7 +1554,7 @@ end
                                                :log => log, :log2 => log2, :log10 => log10,
                                                :abs => abs, :min => min, :max => max)
 
-Enumerated table of the functions permitted in equation parsing, mapping each allowed name directly to its function object. Evaluating constraint/view strings crosses a trust boundary (config files, spreadsheets, UI), so the parser must be able to call *only* these 16 mathematical functions. Using an explicit `Symbol => Function` table — rather than resolving a name against `Base` with `getfield(Base, fname)` — bounds that capability to exactly this table: a name absent from the keys fails closed with a `Meta.ParseError`, and the set of callable functions cannot drift from the set of allowed names, because they are the same list. See `docs/adr/0025-enumerated-parser-allowlist.md`.
+Enumerated table of the functions permitted in equation parsing, mapping each allowed name directly to its function object. Evaluating constraint/view strings crosses a trust boundary (config files, spreadsheets, UI), so the parser must be able to call *only* these 16 mathematical functions. Using an explicit `Symbol => Function` table — rather than resolving a name against `Base` with `getfield(Base, fname)` — bounds that capability to exactly this table: a name absent from the keys fails closed with a `Meta.ParseError`, and the set of callable functions cannot drift from the set of allowed names, because they are the same list.
 
 The `prior(...)` marker is deliberately absent from this table: it names assets/groups (not numbers) and is expanded structurally by [`eval_numeric_functions`](@ref)/[`replace_group_by_assets`](@ref), never evaluated numerically.
 
@@ -1919,7 +1919,7 @@ end
 
 Parse a linear constraint equation from a string into a structured [`ParsingResult`](@ref).
 
-An equation string crosses a trust boundary, so both entry shapes carry a limit from `EQUATION_LIMITS[]` before any recursive walk runs. The string form is capped on length before `Meta.parse` runs, and no length applies to the pre-built `Expr` form. Both forms are then capped on the depth of the expression tree, so one number bounds the recursion whichever shape the input takes. `docs/adr/0027-cap-equation-parser-recursion.md` owns both limits.
+An equation string crosses a trust boundary, so both entry shapes carry a limit from `EQUATION_LIMITS[]` before any recursive walk runs. The string form is capped on length before `Meta.parse` runs, and no length applies to the pre-built `Expr` form. Both forms are then capped on the depth of the expression tree, so one number bounds the recursion whichever shape the input takes.
 
 # Algorithm
 
@@ -2068,7 +2068,6 @@ Return `true` if the expression tree `x` is deeper than `limit`.
 Guards the `Expr` form of [`parse_equation`](@ref) against a deeply nested AST that no
 string length cap covers. The check itself recurses at most `limit + 1` frames deep and
 short-circuits the moment the limit is breached, so it cannot exhaust the stack it protects.
-`docs/adr/0027-cap-equation-parser-recursion.md` owns the limit this function is called with.
 
 # Algorithm
 

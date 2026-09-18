@@ -545,7 +545,7 @@ Reads a member's estimate out of its fold, or refits it over the host's own rows
 
 The read-out half of the mixed-host rule, and the twin of [`fold_member`](@ref): a member the host folded answers from its state, and a member it did not fold answers from the matrix the host carries. `f` is the member's batch verb — `Statistics.mean`, `Statistics.cov`, [`coskewness`](@ref), [`cokurtosis`](@ref) — and the one-argument form of that same verb is its read-out, which is a convention every family of the seam already follows.
 
-No [`AssetPanel`](@ref) reaches this verb. A panel is fold context rather than sample, and a buffer holds no activity mask, so a member refitted here is refitted over the rows alone; that is [#999](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/999)'s to change.
+No [`AssetPanel`](@ref) reaches this verb. A panel is fold context rather than sample, and a buffer holds no activity mask, so a member refitted here is refitted over the rows alone.
 
 # Arguments
 

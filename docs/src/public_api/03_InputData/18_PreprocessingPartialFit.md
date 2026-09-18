@@ -6,7 +6,7 @@ Description = "Preprocessing partial fit, public API of PortfolioOptimisers.jl: 
 
 ## The online form of the data steps
 
-A [`Pipeline`](@ref) is a host of the online step (ADR 0142), and the data steps before its row
+A [`Pipeline`](@ref) is a host of the online step, and the data steps before its row
 owner take the step in the form their class allows. A row-local step folds a block of
 observations and emits the block its transform gives it, through
 [`PortfolioOptimisers.partial_fit_transform`](@ref): [`PricesToReturns`](@ref) keeps the last

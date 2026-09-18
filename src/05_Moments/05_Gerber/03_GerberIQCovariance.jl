@@ -389,7 +389,7 @@ Computes or returns the threshold scaling parameters for defining significant co
 
 Every threshold of the pair — the noise threshold `c` and each boundary of the squeezing template — is multiplied by the value this function returns for its own axis. So the scaler fixes the units in which a co-movement is judged large.
 
-A scaler is **pair-separable** when its first component reads `sdi` alone, so that an asset's thresholds are the same whatever partner it is measured against. [`AssetVolatilityGerberIQScaler`](@ref) is pair-separable. The fall-through is not, because the pair mean moves with `sdj`, and a `Function` need not be. Every scaler is safe under every marker. [`Gerber2`](@ref) reads its denominator in the pair's own units through [`iq_add_diagonal`](@ref), so a scaler that moves an asset's class moves the numerator and the denominator together. This is the fix of [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500).
+A scaler is **pair-separable** when its first component reads `sdi` alone, so that an asset's thresholds are the same whatever partner it is measured against. [`AssetVolatilityGerberIQScaler`](@ref) is pair-separable. The fall-through is not, because the pair mean moves with `sdj`, and a `Function` need not be. Every scaler is safe under every marker. [`Gerber2`](@ref) reads its denominator in the pair's own units through [`iq_add_diagonal`](@ref), so a scaler that moves an asset's class moves the numerator and the denominator together.
 
 # Mathematical definition
 
@@ -1178,7 +1178,7 @@ The four discordant weights need a case split. A concordant pair is judged again
 
 !!! note
 
-    The clamp is a necessary and a sufficient condition on the **template**, and it is the whole condition. `sc` needs no restriction, because [`Gerber2`](@ref) reads its denominator in the pair's own units. [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) and [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500) are the two defects this closes. The shipped defaults sit exactly **on** the bound, so the clamp does not move them.
+    The clamp is a necessary and a sufficient condition on the **template**, and it is the whole condition. `sc` needs no restriction, because [`Gerber2`](@ref) reads its denominator in the pair's own units. The shipped defaults sit exactly **on** the bound, so the clamp does not move them.
 
 # Mathematical definition
 
@@ -1411,7 +1411,7 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-**Only the six diagonal weights carry a free default.** `n1`, `n2`, `n4`, `n5`, `n11` and `n12` name the six magnitude classes, and each of the other fifteen defaults to the geometric mean of the two diagonal weights of the classes its channel joins. That is the bound [`clamp_gerber_iq_n`](@ref) enforces under [`Gerber2`](@ref), so the default template meets it whatever the six are set to, and the clamp never moves a default. [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) is the defect that made this the rule: four of the earlier defaults read two **mixed** weights instead, which let a two-asset sample return a correlation above `1`.
+**Only the six diagonal weights carry a free default.** `n1`, `n2`, `n4`, `n5`, `n11` and `n12` name the six magnitude classes, and each of the other fifteen defaults to the geometric mean of the two diagonal weights of the classes its channel joins. That is the bound [`clamp_gerber_iq_n`](@ref) enforces under [`Gerber2`](@ref), so the default template meets it whatever the six are set to, and the clamp never moves a default. A default that instead reads two **mixed** weights lets a two-asset sample return a correlation above `1`.
 
 ## Validation
 
@@ -1694,7 +1694,7 @@ The source proves that the ratio is bounded by one **if and only if** each of th
 
 !!! note
 
-    The clamp is a necessary and a sufficient condition on the **template**, and it is the whole condition. `sc` needs no restriction, because [`Gerber2`](@ref) reads its denominator in the pair's own units. [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) and [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500) are the two defects this closes. Every shipped default meets the bound, so the clamp does not move one.
+    The clamp is a necessary and a sufficient condition on the **template**, and it is the whole condition. `sc` needs no restriction, because [`Gerber2`](@ref) reads its denominator in the pair's own units. Every shipped default meets the bound, so the clamp does not move one.
 
 # Mathematical definition
 
@@ -2185,7 +2185,7 @@ Only [`Gerber2`](@ref) reaches the acting method, because only its denominator r
 
 The projection of an observation in the `i` direction is the co-movement `(x_i, x_i)`, judged in **this pair's** units. Both coordinates then fall in the same magnitude class and the co-movement is concordant, so the projection names the diagonal weight of asset `i` at that observation. The `j` direction is the mirror. An asset contributes only when it left the noise zone, which is the same admission test the numerator applies.
 
-The projection is what keeps the statistic inside `[-1, 1]`. An asset's magnitude class moves with its partner whenever `sc` is not pair-separable, and a denominator read from the assembled diagonal reads the class of the pair `(i, i)` instead. Cauchy-Schwarz then has nothing to stand on. Reading the class in the pair's own units restores it for every scaler, and [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500) is the defect.
+The projection is what keeps the statistic inside `[-1, 1]`. An asset's magnitude class moves with its partner whenever `sc` is not pair-separable, and a denominator read from the assembled diagonal reads the class of the pair `(i, i)` instead. Cauchy-Schwarz then has nothing to stand on. Reading the class in the pair's own units restores it for every scaler.
 
 # Arguments
 
@@ -2428,7 +2428,7 @@ The standard deviations serve two purposes at once. They scale the thresholds th
 
 !!! note
 
-    An asset that never leaves its own noise zone gets a **zero row**, because no observation votes for any pair it belongs to. Its diagonal entry is one, which [`comovement_unit_diagonal!`](@ref) writes, so the matrix stays a formal correlation matrix and the asset reads as uncorrelated with every other one. That is what the sample says about it. Lower `c` when a short window meets a quiet asset, and the asset votes again. [#495](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/495) is the defect that led to this rule.
+    An asset that never leaves its own noise zone gets a **zero row**, because no observation votes for any pair it belongs to. Its diagonal entry is one, which [`comovement_unit_diagonal!`](@ref) writes, so the matrix stays a formal correlation matrix and the asset reads as uncorrelated with every other one. That is what the sample says about it. Lower `c` when a short window meets a quiet asset, and the asset votes again.
 
 # Related
 

@@ -876,7 +876,7 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
 
 **The two samples are estimation errors, not levels.** [`k_ucs`](@ref) measures a Mahalanobis distance against the shape matrix, so step 5 draws from the sampling law of the estimator, ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}}/T)``, and centres the draws on ``\\hat{\\boldsymbol{\\mu}}``. A draw from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` in its place multiplies every deviation, and therefore the radius, by ``\\sqrt{T}``. Step 6 is on the matching scale for the same reason: the variance of an entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw is the matching diagonal entry of ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``.
 
-**One generator serves both draws, so this method's covariance radius is not [`sigma_ucs`](@ref)'s.** Issue #590 holds the decision on whether to change that. Step 4 resolves the generator once, and step 5 consumes it before step 6 reaches it. [`sigma_ucs`](@ref) draws its Wishart matrices off a generator that nothing has advanced, so under one seed the two covariance radii differ. The mean radius agrees, because the mean sample is the first draw in both. The box route has no such split: [`sigma_normal_box_set`](@ref) resolves its own generator, so there the two entry points agree entry for entry.
+**One generator serves both draws, so this method's covariance radius is not [`sigma_ucs`](@ref)'s.** Step 4 resolves the generator once, and step 5 consumes it before step 6 reaches it. [`sigma_ucs`](@ref) draws its Wishart matrices off a generator that nothing has advanced, so under one seed the two covariance radii differ. The mean radius agrees, because the mean sample is the first draw in both. The box route has no such split: [`sigma_normal_box_set`](@ref) resolves its own generator, so there the two entry points agree entry for entry.
 
 # Mathematical definition
 
@@ -1206,7 +1206,7 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
 
 **The sample is the estimation error, not the level.** The draws of step 4 are subtracted from ``\\hat{\\mathbf{\\Sigma}}``, and the variance of an entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw is the matching diagonal entry of ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``, so the sample and the shape it is measured against are on one scale. `N` is read from `size(pr.X, 2)`, the same source [`ucs`](@ref) reads it from, so a prior that changes the asset count moves both, and the two shape matrices are equal.
 
-**The radius is not the one [`ucs`](@ref) fits, under the same seed.** Issue #590 holds the decision on whether to change that. This method draws its Wishart matrices off a generator that nothing has advanced. [`ucs`](@ref) resolves one generator and draws its mean sample off it first, so its Wishart draws differ from these. Both radii are valid fits of the same quantity, and only the box route makes the two entry points agree entry for entry.
+**The radius is not the one [`ucs`](@ref) fits, under the same seed.** This method draws its Wishart matrices off a generator that nothing has advanced. [`ucs`](@ref) resolves one generator and draws its mean sample off it first, so its Wishart draws differ from these. Both radii are valid fits of the same quantity, and only the box route makes the two entry points agree entry for entry.
 
 # Mathematical definition
 

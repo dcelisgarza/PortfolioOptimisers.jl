@@ -1302,7 +1302,7 @@ Refuses an [`Online`](@ref) that reached a fold without being resolved, naming t
 
 [`update_online_estimator`](@ref) replaces every wrapper it can reach at warm-up, so a wrapper that reaches a fold is one the warm-up never saw. The case that produces it is a **callable** [`TimeDependent`](@ref): a schedule's value is computed per fold, after the warm-up has run, so a wrapper the callable returns is never seeded. The vector and `default` forms of a schedule are refused at construction; a callable's return cannot be, because it does not exist until the fold does.
 
-Returning the estimator the wrapper would produce is not the fix either, and [#870](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/870) owns what is: a schedule *replaces* the field's value every fold, while the buffer is threaded *through* it, so a schedule that hands back a captured estimator hands back the buffer as it stood when the closure was built and discards every step since.
+Returning the estimator the wrapper would produce is not the fix: a schedule *replaces* the field's value every fold, while the buffer is threaded *through* it, so a schedule that hands back a captured estimator hands back the buffer as it stood when the closure was built and discards every step since.
 
 # Arguments
 

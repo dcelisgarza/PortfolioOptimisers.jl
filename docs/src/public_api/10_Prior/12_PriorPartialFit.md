@@ -8,7 +8,7 @@ A prior takes the online step by one of two routes, and the type of the state it
 
 A prior that folds its moments exactly carries a [`PortfolioOptimisers.PriorCarryState`](@ref): the moments come off its members' own folds and the rows are kept only because a [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, so a read-out never reads them. A prior that has no recursion carries a [`PortfolioOptimisers.SampleBufferState`](@ref), which [`Online`](@ref) seeds, and its read-out is the batch verb over the rows the buffer kept. The factor observations ride inside that same buffer, and whether the fold records them is decided by the estimator tree through [`PortfolioOptimisers.needs_factor_returns`](@ref), so the fold mirrors the batch verb's arity.
 
-A host that carries the observations folds every member that folds and runs the batch verb over its own rows for every member that does not, so a caller writes the estimator they would write in batch. ADR 0136 records the decision.
+A host that carries the observations folds every member that folds and runs the batch verb over its own rows for every member that does not, so a caller writes the estimator they would write in batch.
 
 ```@docs
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.PriorCarryState, x::PortfolioOptimisers.VecNum)

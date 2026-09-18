@@ -180,6 +180,16 @@ The Capability Catalogue extracts the **first sentence only** of the summary par
 
 ---
 
+## A docstring cites no process
+
+A docstring documents the released unit, not the discussion that produced it. **It never names a GitHub issue, a pull request, an ADR, or an unpublished numerical experiment**, in any section, including an admonition (`!!! note`, `!!! warning`) — an admonition renders on the API page exactly like the paragraph beside it, so it is not an exception.
+
+- **State the fact, not its provenance.** Write the rule, the bound, or the defect the way a reader with no repository access needs it — what holds, what fails, and why — instead of pointing at the ticket that established it. `The clamp is a necessary and sufficient condition on the template.` stands on its own; `This closes #494 and #500.` sends the reader to a page the docstring does not need.
+- **A decision belongs in `docs/adr/`.** Link an ADR from another ADR, from `STANDARDS.md`, or from `CONTEXT.md` — never from a docstring.
+- **`# References` cites only a published external source**, through `ref_dict`. A GitHub issue or pull request is neither published nor external in that sense, and gets no bullet there either.
+
+---
+
 ## Section Structure for Types (abstract and concrete)
 
 ### Abstract types
