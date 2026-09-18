@@ -285,7 +285,8 @@
 "src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { map = 12, units = 19, swept = false }
 "src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { map = 12, units = 6, swept = false }
 "src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { map = 12, units = 16, swept = false }
-"src/17_Optimisation/03_NaiveOptimisation.jl" = { map = 10, units = 24, swept = false }
+"src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl" = { map = 12, units = 3, swept = false }
+"src/17_Optimisation/03_NaiveOptimisation.jl" = { map = 10, units = 28, swept = false }
 "src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl" = { map = 10, units = 16, swept = false }
 "src/17_Optimisation/04_Hierarchical/02_HierarchicalRiskParity.jl" = { map = 10, units = 9, swept = false }
 "src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl" = { map = 10, units = 23, swept = false }

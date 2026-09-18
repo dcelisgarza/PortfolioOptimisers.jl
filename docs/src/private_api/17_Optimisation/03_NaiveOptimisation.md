@@ -13,4 +13,5 @@ assert_external_optimiser(::NaiveOptimisationEstimator)
 naive_optimiser_td_defaults
 assert_external_optimiser(opt::InverseVolatility)
 failed_hold_weights
+cover_fixed_point
 ```

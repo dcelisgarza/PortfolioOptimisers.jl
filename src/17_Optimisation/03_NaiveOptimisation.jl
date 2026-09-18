@@ -894,6 +894,274 @@ function optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, N
                   rd::ReturnsResult; dims::Int = 1, kwargs...)::NaiveOptimisationResult
     return _optimise(rw, rd; dims = dims, kwargs...)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Allocates the constant rebalanced portfolio that maximises the log wealth of the window it is fit on, by Cover's fixed point and no solver.
+
+The Hindsight Comparator of the online selection family with no solver attached: fit it on the rows a strategy is scored on and predict it in sample over the same rows, and its log wealth is the ceiling every constant portfolio, and every strategy that pays no attention to order, is measured against with [`log_wealth_regret`](@ref). It is also the solver-free optimiser a follow-the-leader rule re-solves on the rows it selects. A caller with a JuMP solver reaches the same portfolio, and a bounded or otherwise constrained one, through [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref); the parity of the two is tested to the solver's tolerance.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{w}^{\\star} &= \\underset{\\boldsymbol{w} \\in \\Delta^{N}}{\\arg\\max} \\sum_{t=1}^{T} \\log\\left(1 + \\boldsymbol{x}_t^{\\intercal} \\boldsymbol{w}\\right)\\,, \\\\
+w_i^{(k+1)} &= w_i^{(k)} \\, \\frac{1}{T} \\sum_{t=1}^{T} \\frac{1 + x_{t,i}}{1 + \\boldsymbol{x}_t^{\\intercal} \\boldsymbol{w}^{(k)}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}^{\\star}``: The best constant rebalanced portfolio, on the simplex ``\\Delta^{N}``.
+  - $(math_dict[:x_t_obs]) ``1 + x_{t,i}`` is asset ``i``'s price relative.
+  - $(math_dict[:T])
+  - ``w_i^{(k)}``: Weight of asset ``i`` at iteration ``k``, started from ``1/N``.
+
+The objective is concave on the simplex, so its maximum is global. The multiplier of an asset is the average ratio of its price relative to the portfolio's own; an asset that beats the portfolio on average grows, and at a fixed point every held asset has multiplier one, which is the first-order condition. The iteration is a minorise–maximise scheme, so the log wealth is non-decreasing at every step, and it stops when the change in log wealth falls below `tol` relative to its size, or after `iters` steps. A weight that starts at zero stays at zero, so the uniform start is what lets every asset compete.
+
+The head is simplex-only. The fixed point knows no bound other than the simplex, so a `wb` that binds is imposed by the weight finaliser `wf` **after** the fixed point: the returned weights are then a repair of the unconstrained optimum, not the constrained one. A bounded or constrained Hindsight Comparator is [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref), with the bounds stated on its optimiser. The default bounds are the simplex, and the finaliser leaves the fixed point untouched.
+
+The head fits no prior and derives the Coverage Universe of its own window: an asset is kept when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row, and every other asset holds a zero. The result carries that universe as `imsk`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    BestConstantRebalancedPortfolio(;
+        wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+        sets::TD_Option{<:UniverseSets} = nothing,
+        wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+        fb::TDO_Option{<:OptE_Opt} = nothing,
+        iters::Integer = 20_000,
+        tol::Number = 1e-12,
+        strict::Bool = false,
+        cache::Option{<:ReturnsBufferState} = nothing
+    ) -> BestConstantRebalancedPortfolio
+
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `iters`, `tol` and `strict` are execution control and stay static.
+
+## Validation
+
+  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - `fb` schedules: `bind !== :nearest`.
+  - `iters > 0`.
+  - `tol > 0`.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `fb`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
+# Examples
+
+```jldoctest
+julia> BestConstantRebalancedPortfolio()
+BestConstantRebalancedPortfolio
+      wb ┼ WeightBounds
+         │   lb ┼ Float64: 0.0
+         │   ub ┴ Float64: 1.0
+    sets ┼ nothing
+      wf ┼ IterativeWeightFinaliser
+         │   iter ┴ Int64: 100
+      fb ┼ nothing
+   iters ┼ Int64: 20000
+     tol ┼ Float64: 1.0e-12
+  strict ┴ Bool: false
+```
+
+# Related
+
+  - [`optimise`](@ref)
+  - [`NaiveOptimisationResult`](@ref)
+  - [`NaiveOptimisationEstimator`](@ref)
+  - [`log_wealth_regret`](@ref)
+  - [`LogarithmicReturn`](@ref)
+  - [`EqualWeighted`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cover1984])
+"""
+@propagatable @concrete struct BestConstantRebalancedPortfolio <: NaiveOptimisationEstimator
+    """
+    $(field_dict[:wb])
+    """
+    @vprop wb
+    """
+    $(field_dict[:sets])
+    """
+    @vprop sets
+    """
+    $(field_dict[:wf])
+    """
+    wf
+    """
+    $(field_dict[:fb])
+    """
+    @fprop fb
+    """
+    Maximum number of fixed-point iterations.
+    """
+    iters
+    """
+    Convergence tolerance on the relative change in log wealth between two iterations.
+    """
+    tol
+    """
+    $(field_dict[:strict_opt])
+    """
+    strict
+    """
+    $(field_dict[:cache_rows])
+    """
+    @fprop @vprop cache
+    function BestConstantRebalancedPortfolio(wb::TD_Option{<:WbE_Wb},
+                                             sets::TD_Option{<:UniverseSets},
+                                             wf::TD{<:WeightFinaliser},
+                                             fb::TDO_Option{<:OptE_Opt}, iters::Integer,
+                                             tol::Number, strict::Bool,
+                                             cache::Option{<:ReturnsBufferState})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :BestConstantRebalancedPortfolio)
+        if isa(wb, WeightBoundsEstimator)
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
+        end
+        @argcheck(iters > 0, DomainError(iters, "`iters` must be positive"))
+        @argcheck(tol > zero(tol), DomainError(tol, "`tol` must be positive"))
+        assert_time_dependent_substitution(BestConstantRebalancedPortfolio,
+                                           (; wb, sets, wf, fb, iters, tol, strict),
+                                           naive_optimiser_td_defaults())
+        return new{typeof(wb), typeof(sets), typeof(wf), typeof(fb), typeof(iters),
+                   typeof(tol), typeof(strict), typeof(cache)}(wb, sets, wf, fb, iters, tol,
+                                                               strict, cache)
+    end
+end
+function BestConstantRebalancedPortfolio(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+                                         sets::TD_Option{<:UniverseSets} = nothing,
+                                         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+                                         fb::TDO_Option{<:OptE_Opt} = nothing,
+                                         iters::Integer = 20_000, tol::Number = 1e-12,
+                                         strict::Bool = false,
+                                         cache::Option{<:ReturnsBufferState} = nothing)::BestConstantRebalancedPortfolio
+    return BestConstantRebalancedPortfolio(wb, sets, wf, fb, iters, tol, strict, cache)
+end
+function non_investable_universe(bcrp::BestConstantRebalancedPortfolio,
+                                 ni::VecStr)::BestConstantRebalancedPortfolio
+    return rebuild_estimator(bcrp, (; sets = non_investable_sets(bcrp.sets, ni)))
+end
+"""
+    cover_fixed_point(X::MatNum, iters::Integer, tol::Number) -> NamedTuple
+
+Run Cover's fixed-point iteration for the best constant rebalanced portfolio over a matrix of price relatives.
+
+The kernel of [`BestConstantRebalancedPortfolio`](@ref), on a bare matrix so it can be tested against the closed form on a hand example and reused by a rule that re-solves it. Starts from the uniform portfolio and multiplies each weight by the average ratio of its price relative to the portfolio's, renormalising after every step; stops when the change in log wealth is at most `tol * max(1, |log wealth|)`, or after `iters` steps.
+
+# Arguments
+
+  - `X`: Price relatives, `observations × assets`, every entry positive.
+  - `iters`: Maximum number of iterations.
+  - `tol`: Relative tolerance on the change in log wealth.
+
+# Returns
+
+  - `fp::NamedTuple`: `w`, the weights on the simplex; `log_wealth`, ``\\sum_t \\log(\\boldsymbol{x}_t^{\\intercal} \\boldsymbol{w})``; `converged`, whether the tolerance was met; `iterations`, the number of multiplicative steps taken.
+
+# Related
+
+  - [`BestConstantRebalancedPortfolio`](@ref)
+"""
+function cover_fixed_point(X::MatNum, iters::Integer, tol::Number)
+    N = size(X, 2)
+    w = fill(one(eltype(X)) / N, N)
+    p = X * w
+    lw = sum(log, p)
+    converged = false
+    iterations = 0
+    for _ in 1:iters
+        iterations += 1
+        # Cover's multiplicative fixed point: the mean over observations of each asset's
+        # price relative against the portfolio's own, then renormalise onto the simplex.
+        w = w .* vec(Statistics.mean(X ./ p; dims = 1))
+        w ./= sum(w)
+        p = X * w
+        lw_new = sum(log, p)
+        if abs(lw_new - lw) <= tol * max(one(lw_new), abs(lw_new))
+            lw = lw_new
+            converged = true
+            break
+        end
+        lw = lw_new
+    end
+    return (; w = w, log_wealth = lw, converged = converged, iterations = iterations)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run the best constant rebalanced portfolio optimisation.
+
+Internal dispatch called by [`optimise`](@ref). Reduces the optimiser and the returns data to the Coverage Universe of the window with [`coverage_reduction`](@ref), forms the price relatives `1 .+ rd.X`, runs [`cover_fixed_point`](@ref) from the uniform portfolio, then applies weight bounds through the finaliser. [`NaiveOptimisationResult`](@ref) expands the weights back onto the full asset universe. The return code is the finaliser's; a successful one carries the fixed point's `converged` flag and iteration count in its `res`, so a run that stopped at `iters` is read off the result rather than guarded.
+
+# Related
+
+  - [`BestConstantRebalancedPortfolio`](@ref)
+  - [`cover_fixed_point`](@ref)
+  - [`coverage_reduction`](@ref)
+  - [`optimise`](@ref)
+  - [`_optimise`](@ref)
+"""
+function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; dims::Int = 1,
+                   kwargs...)
+    @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
+    assert_returns_result_dims(dims)
+    bcrp = reset_time_dependent_estimator(bcrp)
+    # This head fits no prior, so it derives the Coverage Universe of its own window and
+    # reduces once, here, as `EqualWeighted` does. `NaiveOptimisationResult` expands back.
+    cmsk, bcrp, rd = coverage_reduction(bcrp, rd; dims = dims)
+    X = one(eltype(rd.X)) .+ rd.X
+    N = size(X, 2)
+    fp = cover_fixed_point(X, bcrp.iters, bcrp.tol)
+    wb = weight_bounds_constraints(bcrp.wb, bcrp.sets; N = N, strict = bcrp.strict,
+                                   datatype = eltype(X))
+    retcode, w = finalise_weight_bounds(bcrp.wf, wb, fp.w)
+    if isa(retcode, OptimisationSuccess)
+        retcode = OptimisationSuccess(;
+                                      res = (; converged = fp.converged,
+                                             iterations = fp.iterations))
+    end
+    return NaiveOptimisationResult(; pr = rd, wb = wb, retcode = retcode, w = w,
+                                   imsk = cmsk, fb = nothing)
+end
+"""
+    optimise(bcrp::BestConstantRebalancedPortfolio{<:Any, <:Any, <:Any, Nothing},
+             rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
+
+Run the best constant rebalanced portfolio optimisation.
+
+A Hindsight Comparator is fit on the rows it is scored on, so `predict(optimise(bcrp, rd_test), rd_test)` is the comparator's prediction result over `rd_test`, and `cross_val_predict(bcrp, rd, cv)` is the causal constant portfolio over the same rows.
+
+# Arguments
+
+  - `bcrp`: The best constant rebalanced portfolio optimiser to use.
+  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, which is the universe the fixed point runs over.
+  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets, so `dims == 2` throws `ConflictingArgumentError`; build one in this layout with `prices_to_returns`.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
+function optimise(bcrp::BestConstantRebalancedPortfolio{<:Any, <:Any, <:Any, Nothing},
+                  rd::ReturnsResult; dims::Int = 1, kwargs...)::NaiveOptimisationResult
+    return _optimise(bcrp, rd; dims = dims, kwargs...)
+end
 
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1066,4 +1334,4 @@ function optimise(pw::PreviousWeights{<:Any, Nothing}, rd::ReturnsResult = Retur
     return _optimise(pw, rd; kwargs...)
 end
 export NaiveOptimisationResult, InverseVolatility, EqualWeighted, RandomWeighted,
-       PreviousWeights
+       PreviousWeights, BestConstantRebalancedPortfolio

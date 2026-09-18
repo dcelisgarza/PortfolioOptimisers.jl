@@ -10,7 +10,7 @@ commit = "8411336595"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2997, doc = 0, comment = 238, blank = 48, total = 3283 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1135, doc = 113, comment = 125, blank = 43, total = 1416 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1137, doc = 113, comment = 125, blank = 43, total = 1418 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -243,7 +243,8 @@ commit = "8411336595"
 "src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { code = 309, doc = 447, comment = 4, blank = 163, total = 923 }
 "src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { code = 168, doc = 263, comment = 0, blank = 69, total = 500 }
 "src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { code = 155, doc = 218, comment = 2, blank = 101, total = 476 }
-"src/17_Optimisation/03_NaiveOptimisation.jl" = { code = 308, doc = 559, comment = 22, blank = 180, total = 1069 }
+"src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl" = { code = 40, doc = 105, comment = 0, blank = 36, total = 181 }
+"src/17_Optimisation/03_NaiveOptimisation.jl" = { code = 397, doc = 690, comment = 26, blank = 224, total = 1337 }
 "src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl" = { code = 197, doc = 395, comment = 4, blank = 113, total = 709 }
 "src/17_Optimisation/04_Hierarchical/02_HierarchicalRiskParity.jl" = { code = 181, doc = 264, comment = 34, blank = 76, total = 555 }
 "src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl" = { code = 371, doc = 554, comment = 32, blank = 193, total = 1150 }

@@ -218,7 +218,7 @@ end
     partial_fit!(opt::JuMPOptimisationEstimator, rd::ReturnsResult)
     partial_fit!(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity}, rd::ReturnsResult)
     partial_fit!(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling}, rd::ReturnsResult)
-    partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted}, rd::ReturnsResult)
+    partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio}, rd::ReturnsResult)
     partial_fit!(opt::PreviousWeights, rd::ReturnsResult)
     partial_fit!(opt::FiniteAllocationOptimisationEstimator, rd::ReturnsResult)
     partial_fit!(td::TD_OptE_Opt, rd::ReturnsResult)
@@ -268,7 +268,8 @@ function partial_fit!(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
                                  <:SubsetResampling}, rd::ReturnsResult)
     return fold_returns(opt, rd)
 end
-function partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted}, rd::ReturnsResult)
+function partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted,
+                                 <:BestConstantRebalancedPortfolio}, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     max_history = isnothing(opt.cache) ? nothing : opt.cache.max_history
     return rebuild_estimator(opt,
@@ -285,7 +286,7 @@ function partial_fit!(::TD_OptE_Opt, ::ReturnsResult)
     return throw(ArgumentError("a `TimeDependent` schedule of optimisers has no online step: a schedule swaps the optimiser that carries the state, and no loop resolves a schedule before stepping — a schedule reaches stateless fields only. Step one optimiser, and schedule a field that carries no state."))
 end
 """
-    online_state_seed(opt::Union{<:EqualWeighted, <:RandomWeighted}, max_history)
+    online_state_seed(opt::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio}, max_history)
     online_state_seed(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling}, max_history)
 
 Seeds the fold context an [`Online`](@ref) declares on a prior-less head, and refuses the wrapper on a host that holds a prior.
@@ -307,7 +308,8 @@ Seeds the fold context an [`Online`](@ref) declares on a prior-less head, and re
   - [`ReturnsBufferState`](@ref)
   - [`update_online_estimator`](@ref)
 """
-function online_state_seed(::Union{<:EqualWeighted, <:RandomWeighted},
+function online_state_seed(::Union{<:EqualWeighted, <:RandomWeighted,
+                                   <:BestConstantRebalancedPortfolio},
                            max_history::Option{<:Integer})
     return ReturnsBufferState(; max_history = max_history)
 end
@@ -470,7 +472,7 @@ function assert_online_entry(est)
 end
 """
     returns_result(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
-    returns_result(host::Union{<:EqualWeighted, <:RandomWeighted})
+    returns_result(host::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio})
     returns_result(opt::JuMPOptimisationEstimator)
     returns_result(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
 
@@ -502,7 +504,8 @@ function returns_result(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
                                     <:SubsetResampling})
     return returns_result(partial_fit_cache(host), prior_returns_buffer(host.pe))
 end
-function returns_result(host::Union{<:EqualWeighted, <:RandomWeighted})
+function returns_result(host::Union{<:EqualWeighted, <:RandomWeighted,
+                                    <:BestConstantRebalancedPortfolio})
     state = partial_fit_cache(host)
     return returns_result(state, state.X)
 end
@@ -515,7 +518,7 @@ function returns_result(opt::Union{<:HierarchicalRiskParity,
     return returns_result(opt.opt)
 end
 """
-    held_timestamps(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling, <:EqualWeighted, <:RandomWeighted})
+    held_timestamps(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling, <:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio})
     held_timestamps(opt::JuMPOptimisationEstimator)
     held_timestamps(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
     held_timestamps(::PreviousWeights)
@@ -541,7 +544,8 @@ The accessor [`Resume`](@ref)'s alignment check reads. The [`ReturnsBufferState`
 """
 function held_timestamps(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
                                      <:InverseVolatility, <:NestedClustered, <:Stacking,
-                                     <:SubsetResampling, <:EqualWeighted, <:RandomWeighted})
+                                     <:SubsetResampling, <:EqualWeighted, <:RandomWeighted,
+                                     <:BestConstantRebalancedPortfolio})
     return context_timestamps(host.cache)
 end
 function held_timestamps(opt::JuMPOptimisationEstimator)
@@ -557,7 +561,7 @@ function held_timestamps(::PreviousWeights)
 end
 """
     online_readout(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
-    online_readout(host::Union{<:EqualWeighted, <:RandomWeighted})
+    online_readout(host::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio})
     online_readout(opt::JuMPOptimisationEstimator)
     online_readout(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
     online_readout(opt::FiniteAllocationOptimisationEstimator)
@@ -593,7 +597,8 @@ function online_readout(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
     rd = returns_result(host)
     return rebuild_estimator(host, (; pe = prior(host.pe), cache = nothing)), rd
 end
-function online_readout(host::Union{<:EqualWeighted, <:RandomWeighted})
+function online_readout(host::Union{<:EqualWeighted, <:RandomWeighted,
+                                    <:BestConstantRebalancedPortfolio})
     if isnothing(host.cache)
         return readout_without_state(host, nothing)
     end
@@ -693,6 +698,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 """
 function show_fields(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
                                 <:InverseVolatility, <:EqualWeighted, <:RandomWeighted,
-                                <:NestedClustered, <:Stacking, <:SubsetResampling})
+                                <:BestConstantRebalancedPortfolio, <:NestedClustered,
+                                <:Stacking, <:SubsetResampling})
     return filter(!=(:cache), fieldnames(typeof(opt)))
 end
