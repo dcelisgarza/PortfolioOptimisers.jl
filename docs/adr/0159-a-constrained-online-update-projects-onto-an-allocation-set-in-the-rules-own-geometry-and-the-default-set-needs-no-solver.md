@@ -113,8 +113,9 @@ any rule at its default geometry on the default set — solves nothing.
 
 The programme set admits the kinds whose builders take a model and an object, plus the two cones
 it writes itself: weight bounds (`wb`, `sets`); linear constraints in the asset basis (`lcs` over
-`sets`); a turnover ceiling (`tn`), whose reference is the `w` the update receives — which weights
-the fold loop threads into that `w` is the start-weights-and-drift decision's; a `Variance` or
+`sets`); a turnover ceiling (`tn`), whose reference is the Price-Adjusted Allocation `ŵ_t = w_t .* x_t /
+⟨w_t, x_t⟩` of the update, the book the step trades from, computed in-step on that row — the
+executed trade, never the distance between two targets (ADR 0160); a `Variance` or
 `StandardDeviation` upper bound (`r`) from a `pe` on the set, fitted on the head's rows as ADR 0158
 rules, through the set's own second-order cone; a tracking error (`te`) over the head's rows; and
 the MIP kinds — cardinality, group cardinality, thresholds and semi-continuous bounds — through the
@@ -147,8 +148,10 @@ undefined; that is documented on the set, not guarded.
 
 When the programme fails to solve — infeasible, timed out, or a MIP at its limit — the step keeps
 the allocation it received, warns once with the row's timestamp, and continues: the rule's carrier
-still absorbs the row, only the allocation is held. The head's Result carries the retcode of the
-step that produced the Next-Period Allocation. A step never throws on a failed solve and never
+still absorbs the row, only the allocation is held. The hold is the family's own decision, so the
+read-out carries an `OptimisationSuccess` whose `res` records it — the programme's termination
+status and the row's timestamp — and the fallback chain never runs on it (ADR 0160). A step never
+throws on a failed solve and never
 falls back to a weaker set, because a constraint that is silently dropped on the day it binds is
 not a constraint.
 
@@ -213,5 +216,5 @@ quadratic programme.
   map, asks whether the risk-measure builders can be widened past the optimiser union so a
   programme set may bound any risk measure.
 - The map's build sequence is now phrasable: the constraint route was the last decision it waited
-  on. The start-weights-and-drift decision still owes what `w` the loop threads into the update and
-  hence what the turnover ceiling measures against.
+  on. The start-weights-and-drift decision, ADR 0160, ruled that the loop threads nothing into the
+  update and that the turnover ceiling measures against the Price-Adjusted Allocation.

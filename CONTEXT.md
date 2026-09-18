@@ -572,7 +572,12 @@ The two halves of every Online Update: the rule's unconstrained step to a raw ve
 
 **Held Step**
 An Online Update whose projection programme failed to solve: the step keeps the allocation it received, warns with the row's timestamp, and continues, the rule's carrier still absorbing the row. The head's Result reports the retcode of the step that produced the Next-Period Allocation. ADR 0159.
+The hold is the family's own decision, so the read-out reports an `OptimisationSuccess` whose `res` records the programme's termination status and the row's timestamp; the fallback chain never runs on a hold, and the fold threads and drifts the held allocation. ADR 0160.
 *Avoid*: a Held Gap, which is a missing return at a held weight, per observation and asset; and a fallback to a weaker set, which would drop a constraint on the day it binds.
+
+**Price-Adjusted Allocation**
+The book an Online Portfolio Selection head holds at the end of period `t` before it trades, `ŵ_t = w_t .* x_t / ⟨w_t, x_t⟩`: one row of the self-financing Weight Drift at budget one, a closed form of the update's own inputs, computed in-step on that row. It is the reference of the Allocation Set's turnover ceiling, always, so the ceiling bounds the trade the step executes — zero for `BuyAndHold`, whose update is this vector, and the full rebalance for `ConstantRebalancedPortfolio` — and it is what the cost-aware rules update from. At `test_size = 1` it equals the fold's Held Weights, so a turnover fee charged under a Previous-Weights Source prices the same trade the ceiling bounds. ADR 0160.
+*Avoid*: the distance between two consecutive targets, which is a change of decision and not a trade, and which every rule's own regulariser already measures; and the loop's threaded previous weights, which an Online Update never reads.
 
 **The roster** (name · acronym · family · set), ADR 0156. Set 1: `BuyAndHold` · UBAH · benchmark; `ConstantRebalancedPortfolio` · CRP, UCRP · benchmark; `ExponentiatedGradient` · EG · follow-the-winner; `NewtonStep` · ONS · follow-the-winner; `PassiveAggressiveMeanReversion` · PAMR · follow-the-loser; `ForecastReversion` · OLMAR, RMR, OLMAR-2 · follow-the-loser, with the constructors `MovingAverageReversion` and `RobustMedianReversion` (ADR 0158); `ExpertMixture` · BAH_W · meta-learning; `UniversalPortfolio` · UP · follow-the-winner, a constructor of the mixture. Set 2: `ConfidenceWeightedMeanReversion` · CWMR; `AntiCorrelation` · Anticor; `TransactionCostOptimisation` · TCO; `PeakPriceTracking` · PPT; `ShortTermSparsePortfolio` · SSPO, all follow-the-loser; `SwitchingPortfolio` · SP; `GradientProjection` · GP; `ExpectationMaximisation` · EM, all follow-the-winner; the weightings `AggregatingAlgorithm` · AA and `TopK` · CORN-K, meta-learning.
 Set 3: `FollowTheLeader` · FTL, SCRP, VRP, WSCRP, follow-the-winner, with the Sample Selectors `Prefix`, `LastRows`, `HistogramMatch` · BH, `KernelMatch` · BK, `NearestNeighbourMatch` · BNN, `CorrelationMatch` · CORN, pattern-matching, and the optimiser variants BS, BM, BGV; `FollowTheLeadingHistory` · FLH, meta-learning.
@@ -726,11 +731,13 @@ The fold to continue from is read off the state's last held timestamp and not of
 
 **Weight Drift**
 The movement of a fold's held weights away from its target weights, because each position grows at its own return under the self-financing recursion. Unset, a fold reports `X * w` on every observation, which is the reading the optimiser maximises.
+An Online Portfolio Selection head never reads a fold's drift: its Online Update starts from the allocation it chose, and a block of rows drifts the block-start target while the recursion walks allocations it never held. The drift it does read is its own one-row form, the Price-Adjusted Allocation. ADR 0160.
 *Avoid*: using it for the distance a `TrackingError` or a `TurnoverRiskMeasure` bounds. That is a divergence between two portfolios; this is the movement of one portfolio's own weights.
 
 **Previous-Weights Source**
 Which weights of the previous fold the Fold Loop threads to the next: its target weights, or its drifted weights after its last observation. It changes what `Turnover`, `TurnoverEstimator`, `WeightsTracking`, `TurnoverRiskMeasure` and the turnover fee measure, and it changes nothing else. It is a field of the two walk-forwards alone, because a scheme whose folds carry no history has no previous fold to read.
 The previous fold is the last one whose weights the source can thread, not always the fold before: a fold whose solve failed has `NaN` target weights, so the target read skips it and reads the last solved fold, while a source reads its Held Weights, which are finite because a failed fold holds. ADR 0145.
+For an Online Portfolio Selection head the source reaches the turnover fee and a `PreviousWeights` fallback alone; the update and the Allocation Set's turnover ceiling read the Price-Adjusted Allocation and no threaded weight. A turnover fee on that head is measured against the held book or against nothing the head does, so the Fold Loop refuses it by name at its entry when no source is set. ADR 0160.
 *Avoid*: Turnover, which measures the trade a source implies and does not choose the source.
 
 **Held Weights**
