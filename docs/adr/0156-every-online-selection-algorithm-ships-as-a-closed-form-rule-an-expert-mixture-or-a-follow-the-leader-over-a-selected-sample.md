@@ -51,7 +51,7 @@ set waits on a decision it does not need:
 
 | set | mechanism | structs | served as a configuration |
 | :--- | :--- | :--- | :--- |
-| 1 | closed form, plus the mixture | `BuyAndHold`, `ConstantRebalancedPortfolio`, `ExponentiatedGradient`, `NewtonStep`, `PassiveAggressiveMeanReversion`, `MovingAverageReversion`, `RobustMedianReversion`, `ExpertMixture` | the universal portfolio, the Dirichlet(½) universal portfolio, the uniform constant rebalanced portfolio, the uniform buy-and-hold, every paper's `BAH_W` |
+| 1 | closed form, plus the mixture | `BuyAndHold`, `ConstantRebalancedPortfolio`, `ExponentiatedGradient`, `NewtonStep`, `PassiveAggressiveMeanReversion`, `ForecastReversion`, `ExpertMixture` | the universal portfolio, the Dirichlet(½) universal portfolio, the uniform constant rebalanced portfolio, the uniform buy-and-hold, every paper's `BAH_W`, and the moving-average and robust-median reversions as the constructors `MovingAverageReversion` and `RobustMedianReversion` of `ForecastReversion` (ADR 0158) |
 | 2 | closed form, beyond the prototype | `ConfidenceWeightedMeanReversion`, `AntiCorrelation`, `TransactionCostOptimisation`, `PeakPriceTracking`, `ShortTermSparsePortfolio`, `SwitchingPortfolio`, `GradientProjection`, `ExpectationMaximisation`, the weightings `AggregatingAlgorithm` and `TopK` | the exponential-moving-average reversion, fast universalisation, the online gradient and online Newton updates, `CORN-K` |
 | 3 | a solve over a selected sample | `FollowTheLeader`, the selectors `Prefix`, `LastRows`, `HistogramMatch`, `KernelMatch`, `NearestNeighbourMatch`, `CorrelationMatch`, and `FollowTheLeadingHistory` | follow the leader, the successive, windowed and weighted constant rebalanced portfolios, the exp-concave leader, and the histogram, kernel, nearest-neighbour, semi-log-optimal, Markowitz-type, cost-aware and correlation-driven pattern-matching rules |
 
@@ -112,8 +112,13 @@ A rule struct is named by **the paper's own name for the algorithm, in full word
 spelling; a leading "Online" is dropped because the family says it; a trailing "Optimisation" or
 "System" is dropped because the head says it; "Portfolio" stays where the paper names the
 portfolio.** The acronym goes in the docstring and in `CONTEXT.md`, never in a type name. The
-rule gives the table above; the two names it costs recognisability are `NewtonStep` for `ONS` and
-`MovingAverageReversion` for `OLMAR`, both accepted.
+rule gives the table above; the one name it costs recognisability is `NewtonStep` for `ONS`,
+accepted. Where two papers share one update and neither names the mechanism, the struct is named
+for the mechanism and each paper's name is a **constructor** of it, as `UniversalPortfolio`
+constructs the mixture: the moving-average and robust-median reversions are one passive-aggressive
+step toward a forecast, `ForecastReversion(; me, eps)`, and `MovingAverageReversion(; window, eps)`
+and `RobustMedianReversion(; window, eps, iters, tol)` fill its forecaster with the paper's statistic
+(ADR 0158).
 
 A paper's numbered variants that change **one formula** inside one rule are a **typed slot** on
 the struct, as `Variance(; formulation)` does: `PassiveAggressiveMeanReversion(; slack)` with
@@ -121,7 +126,8 @@ the struct, as `Variance(; formulation)` does: `PassiveAggressiveMeanReversion(;
 `ConfidenceWeightedMeanReversion(; formulation)` with `VarianceUpdate()` and
 `StandardDeviationUpdate()` for `CWMR-Var/Stdev`. Variants that change **what is read** —
 `OLMAR-2`'s exponential moving average of price levels, `TCO-2`'s moving average — are the same
-rule under a different forecast, and their spelling is the Prior-slot ticket's.
+rule under a different forecast on its `me` slot, spelled by
+[ADR 0158](0158-a-forecast-reading-rule-holds-an-expected-returns-estimator-and-a-covariance-enters-on-the-constraint-that-reads-it.md).
 
 ### The survey taxonomy is a docs grouping
 
@@ -146,8 +152,8 @@ slot, because a slot needs a bound.
    an expert inside a mixture where a walk-forward cannot.
 4. **One leaf rule per solved paper.** Rejected: thirteen structs sharing one update.
 5. **Pattern-matching selectors as Priors.** A matched sample is a conditional distribution,
-   which is what a Prior is here. Rejected for this map: the head's Prior slot is the
-   forecast-reading arm's ticket, and a Prior re-fit each period inside a naive head is the JuMP
+   which is what a Prior is here. Rejected for this map: where a forecast enters a rule is the
+   forecast-reading arm's ticket (ADR 0158 put it on the rule's `me` slot), and a Prior re-fit each period inside a naive head is the JuMP
    head's walk-forward with more steps. A selector is a small enough object to become a Prior
    later if one is wanted.
 6. **The mixture weighted by wealth only**, with the online gradient and Newton updates as
@@ -174,8 +180,8 @@ slot, because a slot needs a bound.
   "no column buffer" in the same sense.
 - `CONTEXT.md` §4.1 gains the roster — name, acronym, family, set — and the terms *Expert
   Mixture*, *Sample Selector* and *Online Selection Rule*.
-- The state ticket must admit a rule carrier that is a window or a prefix of rows; the Prior-slot
-  ticket spells `OLMAR-2` and `TCO-2`; the constrained-update ticket meets a rule whose update is
+- The state ticket must admit a rule carrier that is a window or a prefix of rows; ADR 0158
+  spells `OLMAR-2` and `TCO-2` and merges the two reversion structs into `ForecastReversion`; the constrained-update ticket meets a rule whose update is
   already a programme, where a constraint is a constraint on `opt`.
 - Peak price tracking's update is unverified against its paper (ledger §7), so a task ticket asks
   the maintainer for the paper before set 2 builds that row.
