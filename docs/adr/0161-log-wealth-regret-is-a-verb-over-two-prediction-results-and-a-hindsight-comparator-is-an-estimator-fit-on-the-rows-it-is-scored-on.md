@@ -103,8 +103,10 @@ NaiveOptimisationEstimator`, Cover's (1984) fixed point with `iters` and `tol` f
 prototype's defaults, simplex only, taking the naive family's fields (`wb` through the finaliser,
 `cache` as a `ReturnsBufferState` under ADR 0137's batch read-out, `fees` under ADR 0160, `fb`,
 `strict`). It is the solver-free comparator for a caller with no JuMP solver, the parity
-cross-check the seams ledger ran, and the solver-free `opt` of `FollowTheLeader`. A bounded or
-constrained comparator stays `MeanRisk`.
+cross-check the seams ledger ran, and the solver-free `opt` of `FollowTheLeader` on the default
+set — under a bounded set it answers the repaired fixed point, and a programme set is refused
+([ADR 0164](0164-a-follow-the-leader-rule-solves-its-programme-on-the-allocation-set-and-projects-only-its-damped-mix.md)).
+A bounded or constrained comparator stays `MeanRisk`.
 
 ### The universal portfolio's bound is stated twice, each statement attributed
 

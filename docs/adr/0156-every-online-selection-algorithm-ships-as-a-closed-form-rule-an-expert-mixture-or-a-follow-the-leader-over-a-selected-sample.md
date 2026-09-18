@@ -181,8 +181,10 @@ slot, because a slot needs a bound.
 - `CONTEXT.md` §4.1 gains the roster — name, acronym, family, set — and the terms *Expert
   Mixture*, *Sample Selector* and *Online Selection Rule*.
 - The state ticket must admit a rule carrier that is a window or a prefix of rows; ADR 0158
-  spells `OLMAR-2` and `TCO-2` and merges the two reversion structs into `ForecastReversion`; the constrained-update ticket meets a rule whose update is
-  already a programme, where a constraint is a constraint on `opt`.
+  spells `OLMAR-2` and `TCO-2` and merges the two reversion structs into `ForecastReversion`; a rule whose update is
+  already a programme takes the head's Allocation Set as its programme's feasible region, and
+  projects only its damped mix
+  ([ADR 0164](0164-a-follow-the-leader-rule-solves-its-programme-on-the-allocation-set-and-projects-only-its-damped-mix.md)).
 - Peak price tracking's update is unverified against its paper (ledger §7), so a task ticket asks
   the maintainer for the paper before set 2 builds that row.
 - The map's *Not yet specified* loses "the second algorithm set" and gains the three build sets

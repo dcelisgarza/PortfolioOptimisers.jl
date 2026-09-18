@@ -512,7 +512,7 @@ Produces portfolio weights from a Prior Result and zero or more constraints and 
 - **EqualWeighted**: `1/N` across assets.
 - **InverseVolatility**: weights inversely proportional to asset volatility.
 - **RandomWeighted**: random feasible weights, as a baseline.
-- **BestConstantRebalancedPortfolio**: the constant portfolio that maximises the sample's log wealth on the simplex, by Cover's (1984) fixed point and no solver; the solver-free Hindsight Comparator of the online family and the solver-free optimiser a `FollowTheLeader` rule re-solves. A bounded or constrained one is `MeanRisk` under `LogarithmicReturn`. ADR 0161.
+- **BestConstantRebalancedPortfolio**: the constant portfolio that maximises the sample's log wealth on the simplex, by Cover's (1984) fixed point and no solver; the solver-free Hindsight Comparator of the online family and the solver-free optimiser a `FollowTheLeader` rule re-solves on the default set; under a bounded set it answers the repaired fixed point and a programme set is refused. A bounded or constrained one is `MeanRisk` under `LogarithmicReturn`. ADR 0161, ADR 0164.
 - **OnlinePortfolioSelection**: updates the allocation from each realised price relative through an Online Update held on `alg`; fits no moment and solves no programme of its own.
 
 **Online Portfolio Selection**
@@ -548,8 +548,12 @@ Its Online Update has one step more than the experts': after every expert projec
 The Allocation Set over an Expert Mixture's `K` experts that its weighting's step is projected onto, in the weighting rule's own Projection Geometry, held on the mixture's `eset` slot: the bare `K`-simplex when the slot is `nothing`, the default, and otherwise weight bounds on each expert's share, a scalar bound broadcast over the experts and a vector bound one entry per expert. It admits the closed-form kind only, so it never needs a solver; a mixture whose expert set changes each period admits scalar bounds alone. ADR 0163.
 *Avoid*: the head's Allocation Set, which is over the assets and is what the blend meets; and a weighting's `proj`, which is the geometry the Expert Set is reached in, not the set.
 
+**Allocation Set Constraint**
+The adapter through which a follow-the-leader rule's re-solve honours the head's Allocation Set: the resolved set, the step's Price-Adjusted Allocation and the head's rows, wrapped as a custom JuMP constraint and appended to the held optimisation estimator's `ccnt` for that solve, so the programme's feasible region is the set intersected with whatever the held estimator carries itself — both homes hold, and a caller who wants one leaves the held estimator bare. It calls the set's own builders on the leader's model, so the turnover ceiling measures from the Price-Adjusted Allocation and the variance ceiling reads the set's own `pe` on the head's rows, as they do in a projection. The solver-free `BestConstantRebalancedPortfolio` has no model to add it to: a bounded set goes into its `wb` and answers the repaired fixed point, a programme set is refused by name where the rule and the set meet. ADR 0164.
+*Avoid*: a translation of the set into the held estimator's own constraint fields, which needs a rebuild per head and a precedence rule; and a projection of the optimum, which is not the leader.
+
 **Sample Selector**
-The part of a follow-the-leader rule that names which past rows the held optimisation estimator re-solves on: every row so far, the last `W`, or the rows whose preceding window resembles the latest one by histogram cell, kernel radius, nearest neighbours or correlation. An empty selection answers the uniform portfolio. The rows it names are read from the rows the head holds once, unbounded for a prefix. ADR 0156, ADR 0157.
+The part of a follow-the-leader rule that names which past rows the held optimisation estimator re-solves on: every row so far, the last `W`, or the rows whose preceding window resembles the latest one by histogram cell, kernel radius, nearest neighbours or correlation. An empty selection answers the uniform portfolio, projected onto the Allocation Set. The rows it names are read from the rows the head holds once, unbounded for a prefix; the re-solve runs on the Allocation Set through an Allocation Set Constraint. ADR 0156, ADR 0157, ADR 0164.
 *Avoid*: a Prior — a matched sample is a conditional distribution, but the selector feeds a re-solve inside a rule and does not sit on the head's prior slot.
 
 **Rule State**
@@ -574,7 +578,8 @@ The divergence an Online Selection Rule projects its raw step back onto the Allo
 
 **Constrained Update**
 The two halves of every Online Update: the rule's unconstrained step to a raw vector, then its projection onto the Allocation Set in the rule's Projection Geometry. The projection is closed form where the set admits it and a programme in the geometry's divergence otherwise, assembled from the same constraint builders a JuMP optimiser uses; the rule never sees the constraints and the set never sees the rule. ADR 0159.
-*Avoid*: a solve of the rule's own objective, which no member of the family does; and a Weight Finaliser applied after the step.
+A follow-the-leader rule is the one member whose step is itself a programme, and it does not project its optimum: the Allocation Set enters its re-solve as an Allocation Set Constraint, the optimum is the leader on the set, and only the damped mix `(1 − γ) w⋆ + γ w_t` is projected, in the Euclidean geometry. ADR 0164.
+*Avoid*: a solve of the rule's own objective in a closed-form member, which none does; a projection of a solved optimum, which is not the leader; and a Weight Finaliser applied after the step.
 
 **Held Step**
 An Online Update whose projection programme failed to solve: the step keeps the allocation it received, warns with the row's timestamp, and continues, the rule's carrier still absorbing the row. The head's Result reports the retcode of the step that produced the Next-Period Allocation. ADR 0159.

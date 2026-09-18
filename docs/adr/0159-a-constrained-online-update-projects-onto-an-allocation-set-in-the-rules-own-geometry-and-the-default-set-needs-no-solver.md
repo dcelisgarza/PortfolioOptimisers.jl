@@ -109,8 +109,11 @@ every entry below its threshold, an entropic projection cannot zero a positive e
 
 `GramProjection` carries its own `slv` because it has no closed form on any set. The mechanism is
 one dispatch, `project(proj, set, q, w)`: `(EuclideanProjection | EntropicProjection) ×
-BoundedAllocationSet` is the scalar root; every other pair is the programme. That is the whole of
-the solver-free promise: it is a fact of the types, not a check, and the default configuration —
+BoundedAllocationSet` is the scalar root; every other pair is the programme. A rule whose update is
+itself a programme does not project its optimum: the set enters that programme as a constraint
+and the optimum is the answer, and only its damped mix is projected
+([ADR 0164](0164-a-follow-the-leader-rule-solves-its-programme-on-the-allocation-set-and-projects-only-its-damped-mix.md)).
+That is the whole of the solver-free promise: it is a fact of the types, not a check, and the default configuration —
 any rule at its default geometry on the default set — solves nothing.
 
 ### The admissible constraints, and the refusals
