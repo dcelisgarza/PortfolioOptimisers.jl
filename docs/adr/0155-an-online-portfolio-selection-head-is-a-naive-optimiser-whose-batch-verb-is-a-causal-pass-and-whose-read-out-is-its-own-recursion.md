@@ -111,15 +111,17 @@ tolerance.
 The state is `OnlinePortfolioSelectionState <: AbstractPartialFitState`, one type on the head's
 `cache`: the allocation `w_t`, the rule's private carriers, the Fold Context's pinned asset names
 and static Asset Panel, and the timestamps folded. It holds **no shared column buffer** — no
-returns, factor or benchmark column — because the read-out rebuilds nothing; a rule's private
-carrier may be the rows it re-solves on, unbounded for a prefix (ADR 0156); the pin-and-check every host
+returns, factor or benchmark column — because the read-out rebuilds nothing; the rows any rule
+of the tree reads — a reversion's window, a follow-the-leader's prefix — are held once on the
+head's state, capped by the rule tree's need (ADR 0156, ADR 0157); the pin-and-check every host
 runs at the first step and after it is kept, so a hand-called step on a reordered universe is
 refused by name and not folded silently, and the timestamps serve
 [ADR 0144](0144-an-online-runs-result-carries-the-threaded-estimator-and-resume-re-enters-the-fold-loop-from-the-folds-it-holds.md)'s
 `Resume`. `merge_states` refuses, naming order-dependence: an online update is not a sufficient
 statistic for its block. `Online(head)` is refused by name as the prior-holding hosts refuse it —
 the family never refits from a buffer, and a window is the rule's field. The field list of the
-state, and what a step does with a `NaN` price relative, are the state ticket's.
+state, the one verb a rule writes, the block step, and what a step does with a `NaN` price
+relative are ADR 0157's.
 
 ### The Result is `NaiveOptimisationResult`, and a weight sequence is not an OptimisationResult
 
