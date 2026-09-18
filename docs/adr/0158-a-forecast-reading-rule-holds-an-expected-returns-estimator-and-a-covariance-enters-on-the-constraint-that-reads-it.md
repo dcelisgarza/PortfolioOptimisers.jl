@@ -209,7 +209,10 @@ not over returns.
 - The build tickets graduate: `PriceLevelExpectedReturns` and its five statistics, with the
   Weiszfeld correction and a parity test against the prototype at the moving average;
   `PriorExpectedReturns` and its factor refusal; the `me` slot on `ForecastReversion`,
-  `TransactionCostOptimisation`, `PeakPriceTracking` and `ShortTermSparsePortfolio`;
+  `TransactionCostOptimisation`, `ForecastTracking` (whose constructor is `PeakPriceTracking`) and
+  `ShortTermSparsePortfolio`; the `scale` slot on `ForecastReversion`, the `ReweightedPriceRelative`
+  statistic and the constructors `ReweightedPriceRelativeTracking` and
+  `ExponentialMovingAverageReversion` (ADR 0165);
   `rows_needed(me)`; the fold-or-refit of a forecaster on the Rule State; the `Online(me)`
   refusal.
 - A factor forecast is recorded as fog on the map, should one ever be wanted; nothing on the

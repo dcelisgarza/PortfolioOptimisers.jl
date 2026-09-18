@@ -71,7 +71,9 @@ as it was scored, fees included, so the comparator's fee policy is the caller's.
 - `variance`, `z`, `p`, `lags` and `n_periods`: the Newey–West long-run variance of `difference`
   at `lags` lags, the Diebold–Mariano–West statistic and its two-sided `p` under equal expected
   log growth, computed by the same `newey_west_variance` the covariance comparison uses;
-- `wealth_a` and `wealth_b`, the two terminal wealths.
+- `wealth_a` and `wealth_b`, the two terminal wealths;
+- `path_length` and `cumulative` (ADR 0165): the comparator's `Σ_t ‖u_t − u_{t−1}‖₂` read off
+  its weight path, `NaN` when it carries none, and the running regret `cumsum(difference)`.
 
 The test is exact only for a comparator that did not read the rows; against a hindsight
 comparator it is optimistic by construction, and the docstring says so. The verb accepts the
@@ -86,7 +88,8 @@ summary column would need a comparator the summary does not hold.
 The **Hindsight Comparator** is a rule, not a type: fit an estimator on the evaluation rows and
 predict it in sample over the same rows, `predict(optimise(est, rd_test), rd_test)`; run the same
 estimator through `cross_val_predict` with the online head's `cv` for the causal comparator over
-the same rows. No oracle is a member of the online family, because a rule that reads the whole
+the same rows, and through `HindsightSplit(; prefix)` (ADR 0165) for the per-row hindsight
+comparators — be-the-leader and the per-period minimiser — that dynamic regret is stated against. No oracle is a member of the online family, because a rule that reads the whole
 buffer breaks the Causal Pass.
 
 The docs name the literature's two oracles as recipes of that rule, and state the generalisation:

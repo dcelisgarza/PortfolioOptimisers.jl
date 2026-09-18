@@ -71,11 +71,12 @@ ceiling. Six facts measured on `dev` at `a44e79c271` shaped the decision.
 
 Every Online Selection Rule carries a `proj` slot holding a Projection Geometry, a concrete
 subtype of the unexported `AbstractProjectionGeometry`: `EuclideanProjection`,
-`EntropicProjection` (Kullback–Leibler) and `GramProjection(; slv)` (the norm of the rule's Gram
-matrix). The default is the paper's geometry, and **the slot's type bound on each rule names the
+`EntropicProjection` (Kullback–Leibler), `GramProjection(; slv)` (the norm of the rule's Gram
+matrix), and, from ADR 0165, `TsallisProjection(; alpha)`, `LogBarrierProjection` and
+`DiagonalProjection`, each a scalar root on the default set. The default is the paper's geometry, and **the slot's type bound on each rule names the
 geometries admissible for that rule**, so a combination no theorem covers fails at construction and
-not at run time. For the first set: `ExponentiatedGradient` bounds the slot to
-`EntropicProjection`; `NewtonStep` to `Union{EuclideanProjection, GramProjection}` with
+not at run time. For the first set: `MirrorDescent` bounds the slot to every scalar-root map
+(`ExponentiatedGradient` is its entropic constructor, ADR 0165); `NewtonStep` to `Union{EuclideanProjection, GramProjection}` with
 `EuclideanProjection()` the default, which is the prototype's answer and needs no solver;
 `PassiveAggressiveMeanReversion`, `ForecastReversion`, `ConstantRebalancedPortfolio` and
 `BuyAndHold` to `EuclideanProjection`. A rule used as an Expert Mixture's weighting keeps its own

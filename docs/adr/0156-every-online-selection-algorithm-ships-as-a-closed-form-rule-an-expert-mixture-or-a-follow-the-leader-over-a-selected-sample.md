@@ -51,9 +51,10 @@ set waits on a decision it does not need:
 
 | set | mechanism | structs | served as a configuration |
 | :--- | :--- | :--- | :--- |
-| 1 | closed form, plus the mixture | `BuyAndHold`, `ConstantRebalancedPortfolio`, `ExponentiatedGradient`, `NewtonStep`, `PassiveAggressiveMeanReversion`, `ForecastReversion`, `ExpertMixture` | the universal portfolio, the Dirichlet(½) universal portfolio, the uniform constant rebalanced portfolio, the uniform buy-and-hold, every paper's `BAH_W`, and the moving-average and robust-median reversions as the constructors `MovingAverageReversion` and `RobustMedianReversion` of `ForecastReversion` (ADR 0158) |
-| 2 | closed form, beyond the prototype | `ConfidenceWeightedMeanReversion`, `AntiCorrelation`, `TransactionCostOptimisation`, `PeakPriceTracking`, `ShortTermSparsePortfolio`, `SwitchingPortfolio`, `GradientProjection`, `ExpectationMaximisation`, the weightings `AggregatingAlgorithm` and `TopK` | the exponential-moving-average reversion, fast universalisation, the online gradient and online Newton updates, `CORN-K` |
-| 3 | a solve over a selected sample | `FollowTheLeader`, the selectors `Prefix`, `LastRows`, `HistogramMatch`, `KernelMatch`, `NearestNeighbourMatch`, `CorrelationMatch`, and `FollowTheLeadingHistory` | follow the leader, the successive, windowed and weighted constant rebalanced portfolios, the exp-concave leader, and the histogram, kernel, nearest-neighbour, semi-log-optimal, Markowitz-type, cost-aware and correlation-driven pattern-matching rules |
+| 1 | closed form, plus the mixture | `BuyAndHold`, `ConstantRebalancedPortfolio`, `MirrorDescent` (ADR 0165), `NewtonStep`, `PassiveAggressiveMeanReversion`, `ForecastReversion`, `ExpertMixture` | the universal portfolio, the Dirichlet(½) universal portfolio, the uniform constant rebalanced portfolio, the uniform buy-and-hold, every paper's `BAH_W`, the exponentiated gradient as the constructor `ExponentiatedGradient` of `MirrorDescent` (ADR 0165), and the moving-average and robust-median reversions as the constructors `MovingAverageReversion` and `RobustMedianReversion` of `ForecastReversion` (ADR 0158) |
+| 2 | closed form, beyond the prototype | `ConfidenceWeightedMeanReversion`, `AntiCorrelation`, `TransactionCostOptimisation`, `ForecastTracking`, `ShortTermSparsePortfolio`, `ExpectationMaximisation`, the weightings `AggregatingAlgorithm`, `TopK` and `SwitchingWeighting` | the exponential-moving-average reversion as the constructor `ExponentialMovingAverageReversion`, peak price tracking as the constructor `PeakPriceTracking` of `ForecastTracking`, the switching portfolio as the constructor `SwitchingPortfolio` of `ExpertMixture` under `SwitchingWeighting`, the gradient projection as the constructor `GradientProjection` of `MirrorDescent` (all ADR 0165), fast universalisation, the online gradient and online Newton updates, `CORN-K` |
+| 3 | a solve over a selected sample | `FollowTheLeader`, the selectors `Prefix`, `LastRows`, `HistogramMatch`, `KernelMatch`, `NearestNeighbourMatch`, `CorrelationMatch`, `ClusterMatch`, and `FollowTheLeadingHistory` | follow the leader, the successive, windowed and weighted constant rebalanced portfolios, the exp-concave leader, and the histogram, kernel, nearest-neighbour, semi-log-optimal, Markowitz-type, cost-aware and correlation-driven pattern-matching rules |
+| 4 | the online-convex-optimisation reading (ADR 0165) | `AdaptiveSubgradient`, `OptimisticStep`, the geometries `TsallisProjection`, `LogBarrierProjection`, `DiagonalProjection`, the Learning-Rate Schedules, `RiskLoss`, `RankOneCovariance` | online gradient descent, exponentiated gradient with uniform mixing, Soft-Bayes, the anytime and self-confident rates, the doubling trick, optimistic and extra-gradient steps, the dynamic-regret mixtures as the constructors `Ader` and `Sword` of `ExpertMixture`, the reweighted price-relative tracking as the constructor `ReweightedPriceRelativeTracking` of `ForecastReversion`, the short-term loss-control portfolio as the constructor `ShortTermLossControlPortfolio` of `FollowTheLeader`, the risk-aversion correlation-driven rule and the combination-weights gradient descent as configurations |
 
 A set is a membership, not a build order; the build tickets graduate from the map once the state,
 Prior-slot, constrained-update and fee tickets land, and set 1 waits on nothing those tickets add
@@ -61,7 +62,7 @@ beyond what the prototype already computes inside its rules.
 
 ### The universal portfolio is the expert mixture over sampled constant rebalanced portfolios
 
-`ExpertMixture(; experts, alg, eset, proj)` is a rule whose state is every expert's state plus the weight
+`ExpertMixture(; experts, alg, eset, proj, grad, p0)` (the last two from ADR 0165) is a rule whose state is every expert's state plus the weight
 vector `p_t` over the experts, whose update steps every expert and moves `p_t` by `alg`, and whose
 answer is `Σ_k p_{t+1,k} h_k(t+1)`. `ConstantRebalancedPortfolio(; w)` is a rule whose update is
 `w_{t+1} = w`, uniform by default. `UniversalPortfolio(; n_experts, rng, prior)` is a constructor
@@ -75,8 +76,9 @@ matrix rows.
 
 `alg` on `ExpertMixture` is any `AbstractOnlinePortfolioSelectionAlgorithm`, applied to
 `r_t = (⟨h_k(t), x_t⟩)_k` in place of `x_t`. `BuyAndHold()` is the wealth-weighted mixture every
-paper writes as `BAH_W`, and the default. `ExponentiatedGradient(; eta)` is the online gradient
-update; `NewtonStep()` is the online Newton update; `AggregatingAlgorithm(; eta)`, the power
+paper writes as `BAH_W`, and the default. `ExponentiatedGradient(; eta)` (the entropic
+`MirrorDescent`, ADR 0165) is the online gradient update; `SwitchingWeighting(; gamma)` is the
+wealth step followed by a fixed share (ADR 0165); `NewtonStep()` is the online Newton update; `AggregatingAlgorithm(; eta)`, the power
 weighting `p ∝ p .* r.^eta` of Vovk and Watkins (1998), has buy-and-hold at `eta = 1`;
 `TopK(; k)` holds the `k` experts of greatest wealth and is `CORN-K`. A weighting carries its own
 state — nothing for buy-and-hold, a `K × K` Gram matrix for the Newton weighting — and the docs
