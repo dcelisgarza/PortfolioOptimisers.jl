@@ -712,6 +712,9 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :tr => "`tr`: Tracking error constraint estimator.",#
                                  # Fees.
                                  :fees => "`fees`: Fees estimator or result.",#
+                                 :fees_res => "`fees`: The resolved [`Fees`](@ref) the head was charged with, on the universe it solved on, or `nothing`. A walk-forward fold charges it through [`extract_fees`](@ref).",#
+                                 :proj => "`proj`: The Projection Geometry the rule projects its raw step onto the Allocation Set in; the slot's type bound names the geometries the rule's theorem covers.",#
+                                 :price_window => "`window`: The number of price levels the statistic reads, the current one included; `window - 1` returns reconstruct them.",#
                                  # Near optimal centering result fields.
                                  :attrs_noc => "`attrs`: Processed JuMP optimiser attributes for the model-assembly pipeline.",#
                                  :w_opt => "`w_opt`: Optimal portfolio weights (vector or vector of vectors).",#
@@ -1323,6 +1326,15 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :cajas2025 => "[cajas2025](@cite) D. Cajas. *Advanced Portfolio Optimization: A Cutting-edge Quantitative Approach* (Springer Nature Switzerland, 2025).",#
                                  :goldfarbiyengar2003 => "[goldfarbiyengar2003](@cite) D. Goldfarb and G. Iyengar. *Robust Portfolio Selection Problems*. Mathematics of Operations Research 28, 1–38 (2003).",#
                                  :bentalnemirovski1998 => "[bentalnemirovski1998](@cite) A. Ben-Tal and A. Nemirovski. *Robust Convex Optimization*. Mathematics of Operations Research 23, 769–805 (1998).",#
+                                 :cover1991 => "[cover1991](@cite) T. M. Cover. *Universal portfolios*. Mathematical Finance 1, 1–29 (1991).",#
+                                 :coverordentlich1996 => "[coverordentlich1996](@cite) T. M. Cover and E. Ordentlich. *Universal portfolios with side information*. IEEE Transactions on Information Theory 42, 348–363 (1996).",#
+                                 :helmbold1998 => "[helmbold1998](@cite) D. P. Helmbold, R. E. Schapire, Y. Singer and M. K. Warmuth. *On-line portfolio selection using multiplicative updates*. Mathematical Finance 8, 325–347 (1998).",#
+                                 :agarwal2006 => "[agarwal2006](@cite) A. Agarwal, E. Hazan, S. Kale and R. E. Schapire. *Algorithms for portfolio management based on the Newton method*. In: Proceedings of the 23rd International Conference on Machine Learning, 9–16 (2006).",#
+                                 :li2012pamr => "[li2012pamr](@cite) B. Li, P. Zhao, S. C. H. Hoi and V. Gopalkrishnan. *PAMR: Passive aggressive mean reversion strategy for portfolio selection*. Machine Learning 87, 221–258 (2012).",#
+                                 :lihoi2012 => "[lihoi2012](@cite) B. Li and S. C. H. Hoi. *On-line portfolio selection with moving average reversion*. In: Proceedings of the 29th International Conference on Machine Learning (2012).",#
+                                 :huang2016 => "[huang2016](@cite) D. Huang, J. Zhou, B. Li, S. C. H. Hoi and S. Zhou. *Robust median reversion strategy for online portfolio selection*. IEEE Transactions on Knowledge and Data Engineering 28, 2480–2493 (2016).",#
+                                 :duchi2008 => "[duchi2008](@cite) J. Duchi, S. Shalev-Shwartz, Y. Singer and T. Chandra. *Efficient projections onto the l1-ball for learning in high dimensions*. In: Proceedings of the 25th International Conference on Machine Learning, 272–279 (2008).",#
+                                 :vardizhang2000 => "[vardizhang2000](@cite) Y. Vardi and C.-H. Zhang. *The multivariate L1-median and associated data depth*. Proceedings of the National Academy of Sciences 97, 1423–1426 (2000).",#
                                  :meucci2005 => "[meucci2005](@cite) A. Meucci. *Risk and Asset Allocation* (Springer Berlin Heidelberg, 2005).",#
                                  :demiguel2009 => "[demiguel2009](@cite) V. DeMiguel, L. Garlappi, F. J. Nogales and R. Uppal. *A Generalized Approach to Portfolio Optimization: Improving Performance by Constraining Portfolio Norms*. Management Science 55, 798–812 (2009).",#
                                  :fan2008 => "[fan2008](@cite) J. Fan, Y. Fan and J. Lv. *High dimensional covariance matrix estimation using a factor model*. Journal of Econometrics 147, 186–197 (2008).",#

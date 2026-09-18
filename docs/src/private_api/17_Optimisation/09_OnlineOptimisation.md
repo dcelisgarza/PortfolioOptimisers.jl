@@ -17,6 +17,7 @@ PortfolioOptimisers.update_online_estimator(opt::PortfolioOptimisers.JuMPOptimis
 PortfolioOptimisers.assert_stateless_schedule
 PortfolioOptimisers.assert_stateless_prior
 PortfolioOptimisers.assert_online_entry
+PortfolioOptimisers.assert_online_fee_source(::Any, ::Any)
 PortfolioOptimisers.returns_result(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
 PortfolioOptimisers.held_timestamps
 PortfolioOptimisers.readout_without_state

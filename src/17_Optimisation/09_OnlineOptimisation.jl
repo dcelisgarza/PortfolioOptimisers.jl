@@ -463,6 +463,19 @@ end
 function assert_online_entry(::TimeDependent)
     return throw(ArgumentError("the online arm of the fold loop takes one estimator and threads it from fold to fold, and a `TimeDependent` schedule of optimisers is a different one per fold, so it has no state to thread. A schedule reaches stateless fields only. Step one optimiser, and schedule a field that carries no state, or refit every fold with `ff = nothing`."))
 end
+"""
+    assert_online_fee_source(est, pws)
+
+Refuse, at the entry of the fold loop's online arm, an estimator whose fee cannot be measured without a Previous-Weights Source; the default passes everything, and the one family that refuses adds its own arm ([`OnlinePortfolioSelection`](@ref)).
+
+# Related
+
+  - [`online_folds`](@ref)
+  - [`assert_online_entry`](@ref)
+"""
+function assert_online_fee_source(::Any, ::Any)::Nothing
+    return nothing
+end
 function assert_online_entry(est)
     assert_stateless_schedule(est)
     path = online_entry_state(est)

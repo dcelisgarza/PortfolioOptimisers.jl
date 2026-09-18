@@ -1,0 +1,25 @@
+```@meta
+Description = "The online portfolio selection head, public API of PortfolioOptimisers.jl: OnlinePortfolioSelection, optimise, partial_fit!, factory, port_opt_view, …"
+```
+
+# The online portfolio selection head
+
+The one head of the family (ADR 0155): a naive optimiser whose batch verb is the Causal Pass over every row of its carrier, whose `partial_fit!` is the Block Step, and whose `optimise(opt)` with no data is the Recursion Read-out.
+
+```@docs
+OnlinePortfolioSelection
+optimise(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1, kwargs...)
+optimise(opt::OnlinePortfolioSelection; kwargs...)
+PortfolioOptimisers.partial_fit!(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:PortfolioOptimisers.Option{<:PortfolioOptimisers.OnlinePortfolioSelectionState}}, rd::ReturnsResult)
+factory(opt::OnlinePortfolioSelection, w::VecNum)
+PortfolioOptimisers.port_opt_view(opt::OnlinePortfolioSelection, i, args...)
+_optimise(opt::OnlinePortfolioSelection, rd::ReturnsResult; dims::Int = 1, kwargs...)
+PortfolioOptimisers.rows_needed(opt::OnlinePortfolioSelection)
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

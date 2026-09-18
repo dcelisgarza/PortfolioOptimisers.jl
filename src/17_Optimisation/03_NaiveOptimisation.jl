@@ -141,11 +141,12 @@ $(DocStringExtensions.FIELDS)
 
     NaiveOptimisationResult(;
         pr::Option{<:Pr_RR},
-        wb::Option{<:WeightBounds}, retcode::OptimisationReturnCode, w::Option{<:VecNum},
+        wb::Option{<:WeightBounds}, fees::Option{<:Fees} = nothing,
+        retcode::OptimisationReturnCode, w::Option{<:VecNum},
         imsk::Option{<:BitVector} = nothing, fb::Option{<:OptE_Opt_FbChain}
     ) -> NaiveOptimisationResult
 
-Keywords correspond to the struct's fields. The keyword constructor expands `w` onto the full asset universe through [`expand_investable_weights`](@ref), which is the one door [`_optimise`](@ref) exits through. The positional constructor never expands.
+Keywords correspond to the struct's fields. The keyword constructor expands `w` onto the full asset universe through [`expand_investable_weights`](@ref), which is the one door [`_optimise`](@ref) exits through. The positional constructor never expands. `fees` is the fee the head was charged with, on the universe it solved on, so a walk-forward fold charges it through [`extract_fees`](@ref) exactly as it charges a hierarchical head's; it is `nothing` for a head that carries none.
 
 # Examples
 
@@ -155,6 +156,7 @@ julia> NaiveOptimisationResult(; pr = nothing, wb = nothing, retcode = Optimisat
 NaiveOptimisationResult
        pr ┼ nothing
        wb ┼ nothing
+     fees ┼ nothing
   retcode ┼ OptimisationSuccess
           │   res ┴ nothing
         w ┼ Vector{Float64}: [0.5, 0.5]
@@ -180,6 +182,10 @@ NaiveOptimisationResult
     """
     wb
     """
+    $(field_dict[:fees_res])
+    """
+    fees
+    """
     $(field_dict[:retcode])
     """
     retcode
@@ -196,19 +202,20 @@ NaiveOptimisationResult
     """
     fb
     function NaiveOptimisationResult(pr::Option{<:Pr_RR}, wb::Option{<:WeightBounds},
-                                     retcode::OptimisationReturnCode, w::Option{<:VecNum},
-                                     imsk::Option{<:BitVector},
+                                     fees::Option{<:Fees}, retcode::OptimisationReturnCode,
+                                     w::Option{<:VecNum}, imsk::Option{<:BitVector},
                                      fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(pr), typeof(wb), typeof(retcode), typeof(w), typeof(imsk),
-                   typeof(fb)}(pr, wb, retcode, w, imsk, fb)
+        return new{typeof(pr), typeof(wb), typeof(fees), typeof(retcode), typeof(w),
+                   typeof(imsk), typeof(fb)}(pr, wb, fees, retcode, w, imsk, fb)
     end
 end
 function NaiveOptimisationResult(; pr::Option{<:Pr_RR}, wb::Option{<:WeightBounds},
+                                 fees::Option{<:Fees} = nothing,
                                  retcode::OptimisationReturnCode, w::Option{<:VecNum},
                                  imsk::Option{<:BitVector} = nothing,
                                  fb::Option{<:OptE_Opt_FbChain})::NaiveOptimisationResult
-    return NaiveOptimisationResult(pr, wb, retcode, expand_investable_weights(imsk, w),
-                                   imsk, fb)
+    return NaiveOptimisationResult(pr, wb, fees, retcode,
+                                   expand_investable_weights(imsk, w), imsk, fb)
 end
 # The naive family carries the mask on the result itself, so the fold reads it directly.
 function result_investable_mask(res::NaiveOptimisationResult)
@@ -248,6 +255,7 @@ $(DocStringExtensions.FIELDS)
     InverseVolatility(;
         pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+        fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
@@ -257,17 +265,19 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> InverseVolatility
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the prior estimator, weight bounds, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `sq`, `brt` and `strict` are execution control and stay static.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the prior estimator, weight bounds, fees, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `sq`, `brt` and `strict` are execution control and stay static. `fees` is the fee the result carries and a walk-forward fold charges; a turnover fee reads the previous weights the loop threads through [`factory`](@ref).
 
 ## Validation
 
   - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
+  - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
 ## View parameters
@@ -276,6 +286,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
   - `pe`: Recursively viewed via [`port_opt_view`](@ref).
   - `wb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
 
 # Examples
@@ -308,6 +319,7 @@ InverseVolatility
       wb ┼ WeightBounds
          │   lb ┼ Float64: 0.0
          │   ub ┴ Float64: 1.0
+    fees ┼ nothing
     sets ┼ nothing
       wf ┼ IterativeWeightFinaliser
          │   iter ┴ Int64: 100
@@ -341,6 +353,10 @@ InverseVolatility
     """
     @vprop wb
     """
+    $(field_dict[:fees])
+    """
+    @fprop @vprop fees
+    """
     $(field_dict[:sets])
     """
     @vprop sets
@@ -369,6 +385,7 @@ InverseVolatility
     """
     @fprop @vprop cache
     function InverseVolatility(pe::Onl{<:TD{<:PrE_Pr}}, wb::TD_Option{<:WbE_Wb},
+                               fees::TD_Option{<:FeesE_Fees},
                                sets::TD_Option{<:UniverseSets}, wf::TD{<:WeightFinaliser},
                                fb::TDO_Option{<:OptE_Opt}, sq::Bool, brt::Bool,
                                strict::Bool, cache::Option{<:ReturnsBufferState})
@@ -377,23 +394,36 @@ InverseVolatility
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
         end
+        if isa(fees, FeesEstimator)
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when fees is a FeesEstimator"))
+        end
         assert_time_dependent_substitution(InverseVolatility,
-                                           (; pe, wb, sets, wf, fb, sq, brt, strict),
+                                           (; pe, wb, fees, sets, wf, fb, sq, brt, strict),
                                            merge(naive_optimiser_td_defaults(),
                                                  (; pe = EmpiricalPrior())))
-        return new{typeof(pe), typeof(wb), typeof(sets), typeof(wf), typeof(fb), typeof(sq),
-                   typeof(brt), typeof(strict), typeof(cache)}(pe, wb, sets, wf, fb, sq,
-                                                               brt, strict, cache)
+        return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(wf),
+                   typeof(fb), typeof(sq), typeof(brt), typeof(strict), typeof(cache)}(pe,
+                                                                                       wb,
+                                                                                       fees,
+                                                                                       sets,
+                                                                                       wf,
+                                                                                       fb,
+                                                                                       sq,
+                                                                                       brt,
+                                                                                       strict,
+                                                                                       cache)
     end
 end
 function InverseVolatility(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                            wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+                           fees::TD_Option{<:FeesE_Fees} = nothing,
                            sets::TD_Option{<:UniverseSets} = nothing,
                            wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                            fb::TDO_Option{<:OptE_Opt} = nothing, sq::Bool = false,
                            brt::Bool = false, strict::Bool = false,
                            cache::Option{<:ReturnsBufferState} = nothing)::InverseVolatility
-    return InverseVolatility(pe, wb, sets, wf, fb, sq, brt, strict, cache)
+    return InverseVolatility(pe, wb, fees, sets, wf, fb, sq, brt, strict, cache)
 end
 function non_investable_universe(iv::InverseVolatility, ni::VecStr)::InverseVolatility
     return rebuild_estimator(iv, (; sets = non_investable_sets(iv.sets, ni)))
@@ -440,6 +470,12 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
     iv = reset_time_dependent_estimator(iv)
     rd = returns_result_picker(rd, iv.brt)
     pr = prior(iv.pe, rd; dims = dims)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`,
+    # for the reason the hierarchical heads do; `investable_fees_view` then places it on
+    # the axes the mask leaves.
+    fees = investable_fees_view(fees_constraints(iv.fees, iv.sets; strict = iv.strict,
+                                                 datatype = eltype(pr.X)),
+                                investable_mask(pr), size(pr.X, 2))
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here: the
     # diagonal below then holds a finite variance at every position, and the bounds are
@@ -455,11 +491,11 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
     wb = weight_bounds_constraints(iv.wb, iv.sets; N = size(X, 2), strict = iv.strict,
                                    datatype = eltype(X))
     retcode, w = finalise_weight_bounds(iv.wf, wb, w)
-    return NaiveOptimisationResult(; pr = pr, wb = wb, retcode = retcode, w = w,
-                                   imsk = imsk, fb = nothing)
+    return NaiveOptimisationResult(; pr = pr, wb = wb, fees = fees, retcode = retcode,
+                                   w = w, imsk = imsk, fb = nothing)
 end
 """
-    optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
+    optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
              rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
 
 Run the inverse volatility portfolio optimisation.
@@ -475,7 +511,7 @@ Run the inverse volatility portfolio optimisation.
 
   - No field in the tree of `iv` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
 """
-function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
+function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult; dims::Int = 1, kwargs...)::NaiveOptimisationResult
     assert_batch_entry(iv, "`optimise`")
     return _optimise(iv, rd; dims = dims, kwargs...)
@@ -512,6 +548,7 @@ $(DocStringExtensions.FIELDS)
 
     EqualWeighted(;
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+        fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
@@ -519,17 +556,19 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> EqualWeighted
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `strict` is execution control and stays static.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, fees, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `strict` is execution control and stays static. `fees` is the fee the result carries and a walk-forward fold charges; a turnover fee reads the previous weights the loop threads through [`factory`](@ref).
 
 ## Validation
 
   - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
+  - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
 ## View parameters
@@ -537,6 +576,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `wb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
 
 # Examples
@@ -547,6 +587,7 @@ EqualWeighted
       wb ┼ WeightBounds
          │   lb ┼ Float64: 0.0
          │   ub ┴ Float64: 1.0
+    fees ┼ nothing
     sets ┼ nothing
       wf ┼ IterativeWeightFinaliser
          │   iter ┴ Int64: 100
@@ -570,6 +611,10 @@ EqualWeighted
     """
     @vprop wb
     """
+    $(field_dict[:fees])
+    """
+    @fprop @vprop fees
+    """
     $(field_dict[:sets])
     """
     @vprop sets
@@ -589,26 +634,33 @@ EqualWeighted
     $(field_dict[:cache_rows])
     """
     @fprop @vprop cache
-    function EqualWeighted(wb::TD_Option{<:WbE_Wb}, sets::TD_Option{<:UniverseSets},
-                           wf::TD{<:WeightFinaliser}, fb::TDO_Option{<:OptE_Opt},
-                           strict::Bool, cache::Option{<:ReturnsBufferState})
+    function EqualWeighted(wb::TD_Option{<:WbE_Wb}, fees::TD_Option{<:FeesE_Fees},
+                           sets::TD_Option{<:UniverseSets}, wf::TD{<:WeightFinaliser},
+                           fb::TDO_Option{<:OptE_Opt}, strict::Bool,
+                           cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :EqualWeighted)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
         end
-        assert_time_dependent_substitution(EqualWeighted, (; wb, sets, wf, fb, strict),
+        if isa(fees, FeesEstimator)
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when fees is a FeesEstimator"))
+        end
+        assert_time_dependent_substitution(EqualWeighted,
+                                           (; wb, fees, sets, wf, fb, strict),
                                            naive_optimiser_td_defaults())
-        return new{typeof(wb), typeof(sets), typeof(wf), typeof(fb), typeof(strict),
-                   typeof(cache)}(wb, sets, wf, fb, strict, cache)
+        return new{typeof(wb), typeof(fees), typeof(sets), typeof(wf), typeof(fb),
+                   typeof(strict), typeof(cache)}(wb, fees, sets, wf, fb, strict, cache)
     end
 end
 function EqualWeighted(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+                       fees::TD_Option{<:FeesE_Fees} = nothing,
                        sets::TD_Option{<:UniverseSets} = nothing,
                        wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                        fb::TDO_Option{<:OptE_Opt} = nothing, strict::Bool = false,
                        cache::Option{<:ReturnsBufferState} = nothing)::EqualWeighted
-    return EqualWeighted(wb, sets, wf, fb, strict, cache)
+    return EqualWeighted(wb, fees, sets, wf, fb, strict, cache)
 end
 function non_investable_universe(ew::EqualWeighted, ni::VecStr)::EqualWeighted
     return rebuild_estimator(ew, (; sets = non_investable_sets(ew.sets, ni)))
@@ -633,10 +685,15 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     assert_returns_result_dims(dims)
     ew = reset_time_dependent_estimator(ew)
+    # The fee is resolved on the caller's own universe before the door below narrows
+    # `sets`, and placed on the axes the mask leaves after it.
+    Nf = size(rd.X, 2)
+    fees = fees_constraints(ew.fees, ew.sets; strict = ew.strict, datatype = eltype(rd.X))
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here: the weight bounds and the sets are stated over the full universe
     # and are viewed by the same index. `NaiveOptimisationResult` expands the weights back.
     cmsk, ew, rd = coverage_reduction(ew, rd; dims = dims)
+    fees = investable_fees_view(fees, cmsk, Nf)
     # `rd.X` is always observations by assets, whatever `dims` the caller passed, so the
     # asset count is `size(rd.X, 2)` unconditionally.
     N = size(rd.X, 2)
@@ -644,11 +701,11 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
     wb = weight_bounds_constraints(ew.wb, ew.sets; N = N, strict = ew.strict,
                                    datatype = eltype(rd.X))
     retcode, w = finalise_weight_bounds(ew.wf, wb, w)
-    return NaiveOptimisationResult(; pr = rd, wb = wb, retcode = retcode, w = w,
-                                   imsk = cmsk, fb = nothing)
+    return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
+                                   w = w, imsk = cmsk, fb = nothing)
 end
 """
-    optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing},
+    optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, <:Any, Nothing},
              rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
 
 Run the equal-weighted portfolio optimisation.
@@ -660,7 +717,7 @@ Run the equal-weighted portfolio optimisation.
   - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets, so `dims == 2` throws `ConflictingArgumentError`; build one in this layout with `prices_to_returns`.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 """
-function optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
+function optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
                   dims::Int = 1, kwargs...)::NaiveOptimisationResult
     return _optimise(ew, rd; dims = dims, kwargs...)
 end
@@ -699,6 +756,7 @@ $(DocStringExtensions.FIELDS)
         rng::Random.AbstractRNG = Random.default_rng(),
         seed::Option{<:Integer} = nothing,
         wb::TD_Option{<:WbE_Wb} = nothing,
+        fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
@@ -706,18 +764,20 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> RandomWeighted
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `wb`, `sets` and `fb`). `rng`, `seed` and `strict` are execution control and stay static.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, fees, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `wb`, `fees`, `sets` and `fb`). `rng`, `seed` and `strict` are execution control and stay static. `fees` is the fee the result carries and a walk-forward fold charges; a turnover fee reads the previous weights the loop threads through [`factory`](@ref).
 
 ## Validation
 
   - `alpha`: non-empty, and every element is positive and finite.
   - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
+  - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
 ## View parameters
@@ -726,6 +786,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
   - `alpha`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `wb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
 
 # Examples
@@ -737,6 +798,7 @@ RandomWeighted
      rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
     seed ┼ nothing
       wb ┼ nothing
+    fees ┼ nothing
     sets ┼ nothing
       wf ┼ IterativeWeightFinaliser
          │   iter ┴ Int64: 100
@@ -772,6 +834,10 @@ RandomWeighted
     """
     @vprop wb
     """
+    $(field_dict[:fees])
+    """
+    @fprop @vprop fees
+    """
     $(field_dict[:sets])
     """
     @vprop sets
@@ -793,33 +859,45 @@ RandomWeighted
     @fprop @vprop cache
     function RandomWeighted(alpha::Num_VecNum, rng::Random.AbstractRNG,
                             seed::Option{<:Integer}, wb::TD_Option{<:WbE_Wb},
-                            sets::TD_Option{<:UniverseSets}, wf::TD{<:WeightFinaliser},
-                            fb::TDO_Option{<:OptE_Opt}, strict::Bool,
-                            cache::Option{<:ReturnsBufferState})
+                            fees::TD_Option{<:FeesE_Fees}, sets::TD_Option{<:UniverseSets},
+                            wf::TD{<:WeightFinaliser}, fb::TDO_Option{<:OptE_Opt},
+                            strict::Bool, cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RandomWeighted)
         assert_nonempty_gt0_finite_val(alpha, :alpha)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
         end
+        if isa(fees, FeesEstimator)
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when fees is a FeesEstimator"))
+        end
         assert_time_dependent_substitution(RandomWeighted,
-                                           (; alpha, rng, seed, wb, sets, wf, fb, strict),
-                                           (; wf = IterativeWeightFinaliser()))
-        return new{typeof(alpha), typeof(rng), typeof(seed), typeof(wb), typeof(sets),
-                   typeof(wf), typeof(fb), typeof(strict), typeof(cache)}(alpha, rng, seed,
-                                                                          wb, sets, wf, fb,
-                                                                          strict, cache)
+                                           (; alpha, rng, seed, wb, fees, sets, wf, fb,
+                                            strict), (; wf = IterativeWeightFinaliser()))
+        return new{typeof(alpha), typeof(rng), typeof(seed), typeof(wb), typeof(fees),
+                   typeof(sets), typeof(wf), typeof(fb), typeof(strict), typeof(cache)}(alpha,
+                                                                                        rng,
+                                                                                        seed,
+                                                                                        wb,
+                                                                                        fees,
+                                                                                        sets,
+                                                                                        wf,
+                                                                                        fb,
+                                                                                        strict,
+                                                                                        cache)
     end
 end
 function RandomWeighted(; alpha::Num_VecNum = 1,
                         rng::Random.AbstractRNG = Random.default_rng(),
                         seed::Option{<:Integer} = nothing,
                         wb::TD_Option{<:WbE_Wb} = nothing,
+                        fees::TD_Option{<:FeesE_Fees} = nothing,
                         sets::TD_Option{<:UniverseSets} = nothing,
                         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                         fb::TDO_Option{<:OptE_Opt} = nothing, strict::Bool = false,
                         cache::Option{<:ReturnsBufferState} = nothing)::RandomWeighted
-    return RandomWeighted(alpha, rng, seed, wb, sets, wf, fb, strict, cache)
+    return RandomWeighted(alpha, rng, seed, wb, fees, sets, wf, fb, strict, cache)
 end
 function non_investable_universe(rw::RandomWeighted, ni::VecStr)::RandomWeighted
     return rebuild_estimator(rw, (; sets = non_investable_sets(rw.sets, ni)))
@@ -851,18 +929,22 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     rw = reset_time_dependent_estimator(rw)
     # `rd.X` is always observations by assets, whatever `dims` the caller passed, so the
     # asset count is `size(rd.X, 2)` unconditionally.
+    Nf = size(rd.X, 2)
     if isa(rw.alpha, VecNum)
         # The caller states one concentration per asset of the full universe, so the check
         # reads the full width. The reduction below slices `alpha` with the rest.
-        Nf = size(rd.X, 2)
         @argcheck(length(rw.alpha) == Nf,
                   DimensionMismatch("rw.alpha ($(length(rw.alpha))) must match N ($Nf)"))
     end
+    # The fee is resolved on the caller's own universe before the door below narrows
+    # `sets`, and placed on the axes the mask leaves after it.
+    fees = fees_constraints(rw.fees, rw.sets; strict = rw.strict, datatype = eltype(rd.X))
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here: the concentrations, the weight bounds and the sets are stated over
     # the full universe and are viewed by the same index. `NaiveOptimisationResult` expands
     # the weights back.
     cmsk, rw, rd = coverage_reduction(rw, rd; dims = dims)
+    fees = investable_fees_view(fees, cmsk, Nf)
     N = size(rd.X, 2)
     dist = if isa(rw.alpha, Number)
         Distributions.Dirichlet(N, rw.alpha)
@@ -874,11 +956,11 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     wb = weight_bounds_constraints(rw.wb, rw.sets; N = N, strict = rw.strict,
                                    datatype = eltype(rd.X))
     retcode, w = finalise_weight_bounds(rw.wf, wb, w)
-    return NaiveOptimisationResult(; pr = rd, wb = wb, retcode = retcode, w = w,
-                                   imsk = cmsk, fb = nothing)
+    return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
+                                   w = w, imsk = cmsk, fb = nothing)
 end
 """
-    optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
+    optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
              rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
 
 Run the random-weighted portfolio optimisation.
@@ -890,8 +972,9 @@ Run the random-weighted portfolio optimisation.
   - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets, so `dims == 2` throws `ConflictingArgumentError`; build one in this layout with `prices_to_returns`.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 """
-function optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; dims::Int = 1, kwargs...)::NaiveOptimisationResult
+function optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                     Nothing}, rd::ReturnsResult; dims::Int = 1,
+                  kwargs...)::NaiveOptimisationResult
     return _optimise(rw, rd; dims = dims, kwargs...)
 end
 """
@@ -931,6 +1014,7 @@ $(DocStringExtensions.FIELDS)
 
     BestConstantRebalancedPortfolio(;
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+        fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
@@ -940,11 +1024,12 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> BestConstantRebalancedPortfolio
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `iters`, `tol` and `strict` are execution control and stay static.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, fees, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `iters`, `tol` and `strict` are execution control and stay static. `fees` is the fee the result carries and a walk-forward fold charges; a turnover fee reads the previous weights the loop threads through [`factory`](@ref).
 
 ## Validation
 
   - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
   - `iters > 0`.
   - `tol > 0`.
@@ -953,6 +1038,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
 
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
+  - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
 ## View parameters
@@ -960,6 +1046,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `wb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
 
 # Examples
@@ -970,6 +1057,7 @@ BestConstantRebalancedPortfolio
       wb ┼ WeightBounds
          │   lb ┼ Float64: 0.0
          │   ub ┴ Float64: 1.0
+    fees ┼ nothing
     sets ┼ nothing
       wf ┼ IterativeWeightFinaliser
          │   iter ┴ Int64: 100
@@ -1000,6 +1088,10 @@ BestConstantRebalancedPortfolio
     """
     @vprop wb
     """
+    $(field_dict[:fees])
+    """
+    @fprop @vprop fees
+    """
     $(field_dict[:sets])
     """
     @vprop sets
@@ -1028,6 +1120,7 @@ BestConstantRebalancedPortfolio
     """
     @fprop @vprop cache
     function BestConstantRebalancedPortfolio(wb::TD_Option{<:WbE_Wb},
+                                             fees::TD_Option{<:FeesE_Fees},
                                              sets::TD_Option{<:UniverseSets},
                                              wf::TD{<:WeightFinaliser},
                                              fb::TDO_Option{<:OptE_Opt}, iters::Integer,
@@ -1038,24 +1131,32 @@ BestConstantRebalancedPortfolio
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
         end
+        if isa(fees, FeesEstimator)
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when fees is a FeesEstimator"))
+        end
         @argcheck(iters > 0, DomainError(iters, "`iters` must be positive"))
         @argcheck(tol > zero(tol), DomainError(tol, "`tol` must be positive"))
         assert_time_dependent_substitution(BestConstantRebalancedPortfolio,
-                                           (; wb, sets, wf, fb, iters, tol, strict),
+                                           (; wb, fees, sets, wf, fb, iters, tol, strict),
                                            naive_optimiser_td_defaults())
-        return new{typeof(wb), typeof(sets), typeof(wf), typeof(fb), typeof(iters),
-                   typeof(tol), typeof(strict), typeof(cache)}(wb, sets, wf, fb, iters, tol,
-                                                               strict, cache)
+        return new{typeof(wb), typeof(fees), typeof(sets), typeof(wf), typeof(fb),
+                   typeof(iters), typeof(tol), typeof(strict), typeof(cache)}(wb, fees,
+                                                                              sets, wf, fb,
+                                                                              iters, tol,
+                                                                              strict, cache)
     end
 end
 function BestConstantRebalancedPortfolio(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+                                         fees::TD_Option{<:FeesE_Fees} = nothing,
                                          sets::TD_Option{<:UniverseSets} = nothing,
                                          wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                                          fb::TDO_Option{<:OptE_Opt} = nothing,
                                          iters::Integer = 20_000, tol::Number = 1e-12,
                                          strict::Bool = false,
                                          cache::Option{<:ReturnsBufferState} = nothing)::BestConstantRebalancedPortfolio
-    return BestConstantRebalancedPortfolio(wb, sets, wf, fb, iters, tol, strict, cache)
+    return BestConstantRebalancedPortfolio(wb, fees, sets, wf, fb, iters, tol, strict,
+                                           cache)
 end
 function non_investable_universe(bcrp::BestConstantRebalancedPortfolio,
                                  ni::VecStr)::BestConstantRebalancedPortfolio
@@ -1126,9 +1227,15 @@ function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; dim
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     assert_returns_result_dims(dims)
     bcrp = reset_time_dependent_estimator(bcrp)
+    # The fee is resolved on the caller's own universe before the door below narrows
+    # `sets`, and placed on the axes the mask leaves after it.
+    Nf = size(rd.X, 2)
+    fees = fees_constraints(bcrp.fees, bcrp.sets; strict = bcrp.strict,
+                            datatype = eltype(rd.X))
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here, as `EqualWeighted` does. `NaiveOptimisationResult` expands back.
     cmsk, bcrp, rd = coverage_reduction(bcrp, rd; dims = dims)
+    fees = investable_fees_view(fees, cmsk, Nf)
     X = one(eltype(rd.X)) .+ rd.X
     N = size(X, 2)
     fp = cover_fixed_point(X, bcrp.iters, bcrp.tol)
@@ -1140,11 +1247,11 @@ function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; dim
                                       res = (; converged = fp.converged,
                                              iterations = fp.iterations))
     end
-    return NaiveOptimisationResult(; pr = rd, wb = wb, retcode = retcode, w = w,
-                                   imsk = cmsk, fb = nothing)
+    return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
+                                   w = w, imsk = cmsk, fb = nothing)
 end
 """
-    optimise(bcrp::BestConstantRebalancedPortfolio{<:Any, <:Any, <:Any, Nothing},
+    optimise(bcrp::BestConstantRebalancedPortfolio{<:Any, <:Any, <:Any, <:Any, Nothing},
              rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
 
 Run the best constant rebalanced portfolio optimisation.
@@ -1158,8 +1265,9 @@ A Hindsight Comparator is fit on the rows it is scored on, so `predict(optimise(
   - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets, so `dims == 2` throws `ConflictingArgumentError`; build one in this layout with `prices_to_returns`.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 """
-function optimise(bcrp::BestConstantRebalancedPortfolio{<:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; dims::Int = 1, kwargs...)::NaiveOptimisationResult
+function optimise(bcrp::BestConstantRebalancedPortfolio{<:Any, <:Any, <:Any, <:Any,
+                                                        Nothing}, rd::ReturnsResult;
+                  dims::Int = 1, kwargs...)::NaiveOptimisationResult
     return _optimise(bcrp, rd; dims = dims, kwargs...)
 end
 
@@ -1178,9 +1286,9 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    PreviousWeights(; w::Option{<:VecNum} = nothing, fb::TDO_Option{<:OptE_Opt} = nothing) -> PreviousWeights
+    PreviousWeights(; w::Option{<:VecNum} = nothing, fees::Option{<:Fees} = nothing, fb::TDO_Option{<:OptE_Opt} = nothing) -> PreviousWeights
 
-Keywords correspond to the struct's fields. `fb` may hold a [`TimeDependent`](@ref) per-fold schedule.
+Keywords correspond to the struct's fields. `fb` may hold a [`TimeDependent`](@ref) per-fold schedule. `fees` is a resolved [`Fees`](@ref), never an estimator, because the head holds no `sets` to resolve one over; it is the fee the result carries and a walk-forward fold charges, and under a Previous-Weights Source its turnover term prices the rebalance from the drifted book back to the held target.
 
 ## Validation
 
@@ -1191,6 +1299,7 @@ Keywords correspond to the struct's fields. `fb` may hold a [`TimeDependent`](@r
 
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
+  - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
 # Examples
@@ -1198,8 +1307,9 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 ```jldoctest
 julia> PreviousWeights()
 PreviousWeights
-   w ┼ nothing
-  fb ┴ nothing
+     w ┼ nothing
+  fees ┼ nothing
+    fb ┴ nothing
 ```
 
 # Related
@@ -1218,22 +1328,27 @@ PreviousWeights
     """
     w
     """
+    $(field_dict[:fees_res])
+    """
+    @fprop fees
+    """
     $(field_dict[:fb])
     """
     @fprop fb
-    function PreviousWeights(w::Option{<:VecNum}, fb::TDO_Option{<:OptE_Opt})
+    function PreviousWeights(w::Option{<:VecNum}, fees::Option{<:Fees},
+                             fb::TDO_Option{<:OptE_Opt})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :PreviousWeights)
         if !isnothing(w)
             assert_finite(w, :w)
         end
-        assert_time_dependent_substitution(PreviousWeights, (; w, fb),
+        assert_time_dependent_substitution(PreviousWeights, (; w, fees, fb),
                                            naive_optimiser_td_defaults())
-        return new{typeof(w), typeof(fb)}(w, fb)
+        return new{typeof(w), typeof(fees), typeof(fb)}(w, fees, fb)
     end
 end
-function PreviousWeights(; w::Option{<:VecNum} = nothing,
+function PreviousWeights(; w::Option{<:VecNum} = nothing, fees::Option{<:Fees} = nothing,
                          fb::TDO_Option{<:OptE_Opt} = nothing)::PreviousWeights
-    return PreviousWeights(w, fb)
+    return PreviousWeights(w, fees, fb)
 end
 function needs_previous_weights(::PreviousWeights)
     return true
@@ -1241,7 +1356,7 @@ end
 """
     factory(pw::PreviousWeights, w::VecNum) -> PreviousWeights
 
-Thread the previous fold's weights into the hold-only head, and on into its fallback.
+Thread the previous fold's weights into the hold-only head, into its fee, and on into its fallback.
 
 # Arguments
 
@@ -1250,15 +1365,16 @@ Thread the previous fold's weights into the hold-only head, and on into its fall
 
 # Returns
 
-  - `PreviousWeights`: The head holding `w`, with `fb` propagated through [`factory`](@ref).
+  - `PreviousWeights`: The head holding `w`, with `fees` and `fb` propagated through [`factory`](@ref).
 
 # Examples
 
 ```jldoctest
 julia> PortfolioOptimisers.factory(PreviousWeights(), [0.25, 0.75])
 PreviousWeights
-   w ┼ Vector{Float64}: [0.25, 0.75]
-  fb ┴ nothing
+     w ┼ Vector{Float64}: [0.25, 0.75]
+  fees ┼ nothing
+    fb ┴ nothing
 ```
 
 # Related
@@ -1268,7 +1384,7 @@ PreviousWeights
   - [`fold_loop`](@ref)
 """
 function factory(pw::PreviousWeights, w::VecNum)::PreviousWeights
-    return PreviousWeights(; w = w, fb = factory(pw.fb, w))
+    return PreviousWeights(; w = w, fees = factory(pw.fees, w), fb = factory(pw.fb, w))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1297,8 +1413,9 @@ function _optimise(pw::PreviousWeights, rd::ReturnsResult = ReturnsResult(); kwa
     else
         (OptimisationSuccess(), pw.w)
     end
-    return NaiveOptimisationResult(; pr = rd, wb = nothing, retcode = retcode, w = w,
-                                   fb = nothing)
+    return NaiveOptimisationResult(; pr = rd, wb = nothing,
+                                   fees = investable_fees_view(pw.fees, nothing, nothing),
+                                   retcode = retcode, w = w, fb = nothing)
 end
 """
     failed_hold_weights(X::Nothing)
@@ -1318,7 +1435,7 @@ function failed_hold_weights(X::MatNum)
     return fill(convert(eltype(X), NaN), size(X, 2))
 end
 """
-    optimise(pw::PreviousWeights{<:Any, Nothing}, rd::ReturnsResult = ReturnsResult();
+    optimise(pw::PreviousWeights{<:Any, <:Any, Nothing}, rd::ReturnsResult = ReturnsResult();
              kwargs...) -> NaiveOptimisationResult
 
 Hold the weights the head carries.
@@ -1329,8 +1446,8 @@ Hold the weights the head carries.
   - $(arg_dict[:rd]) Read for nothing, and recorded on the result as `pr`.
   - `kwargs`: Additional keyword arguments, ignored.
 """
-function optimise(pw::PreviousWeights{<:Any, Nothing}, rd::ReturnsResult = ReturnsResult();
-                  kwargs...)::NaiveOptimisationResult
+function optimise(pw::PreviousWeights{<:Any, <:Any, Nothing},
+                  rd::ReturnsResult = ReturnsResult(); kwargs...)::NaiveOptimisationResult
     return _optimise(pw, rd; kwargs...)
 end
 export NaiveOptimisationResult, InverseVolatility, EqualWeighted, RandomWeighted,

@@ -126,7 +126,9 @@ This is the third arm of [`fold_loop`](@ref), taken when the scheme declares a F
     [`assert_online_entry`](@ref): one carrying a partial-fit state at entry, because the
     loop starts cold, and one carrying a [`TimeDependent`](@ref) schedule on a field that
     carries a state, because a schedule replaces the value a state is threaded through. Both
-    are refused by name before any solve.
+    are refused by name before any solve. It then refuses, through
+    [`assert_online_fee_source`](@ref), an [`OnlinePortfolioSelection`](@ref) head whose
+    fees carry a turnover term while the scheme threads no Previous-Weights Source.
  2. It warms up once. Under a multiple-randomised path it takes the path's asset view
     through `fold_view(1)` here, because a path is one asset subset crossed with the
     walk-forward's folds, and the sliced estimator is what it threads (a view
@@ -170,7 +172,7 @@ resolve, the carrier, and the training window, which is `nothing` here. `ElT` is
 
 # Validation
 
-  - Everything [`assert_online_entry`](@ref) refuses.
+  - Everything [`assert_online_entry`](@ref) and [`assert_online_fee_source`](@ref) refuse.
 
 # Returns
 
@@ -194,6 +196,7 @@ function online_folds(fit_fold, est, n::Integer, ::Type{ElT}; rd, train_idx,
                       test_idx = nothing, fold_view = nothing, pws = nothing) where {ElT}
     @info(cv_online_info())
     assert_online_entry(est)
+    assert_online_fee_source(est, pws)
     (est, rd) = isnothing(fold_view) ? (est, rd) : fold_view(1)
     est = update_online_estimator(est)
     est = partial_fit!(est, port_opt_view(rd, train_idx[1], :))

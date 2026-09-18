@@ -1,0 +1,17 @@
+```@meta
+Description = "Price-level expected returns, public API of PortfolioOptimisers.jl: AbstractPriceLevelStatistic, MovingAverage, SpatialMedian, PriceLevelExpectedReturns, …"
+```
+
+# Price-level expected returns
+
+The Price Relative Forecast of the online portfolio selection family, as an expected-returns estimator any `me` slot may hold: the level of the last observation is set to one, the earlier levels are reconstructed from the last `window - 1` returns, and the expected return is a statistic of those levels over the last one, less one (ADR 0158).
+
+```@docs
+PortfolioOptimisers.AbstractPriceLevelStatistic
+MovingAverage
+SpatialMedian
+PriceLevelExpectedReturns
+PortfolioOptimisers.rows_needed(me::PriceLevelExpectedReturns)
+PortfolioOptimisers.price_level_statistic
+mean(me::PriceLevelExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+```

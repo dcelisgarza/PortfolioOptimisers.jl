@@ -50,8 +50,10 @@
     `src/17_Optimisation/` types below joined the same day again (issue #1138), the two
     `src/20_AssetSelection.jl` types below joined the same day once more (issue #1139), and
     the four `src/10_Prior/` family types below — `AbstractPriorEstimator`'s own section
-    tells an author to subtype one of them — joined on 2026-09-17 too (issue #1146). They
-    are held to their own list for the same reason — public is API too.
+    tells an author to subtype one of them — joined on 2026-09-17 too (issue #1146), and
+    the five online-selection types below — the rule, the geometry, the set, the slack and
+    the price-level statistic — joined on 2026-09-18 with their `# Interfaces` sections
+    (issue #1161). They are held to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
                           :AbstractAmbiguityTailWeightCalibrationAlgorithm, :AbstractBins,
@@ -74,13 +76,16 @@
                           :AbstractMatrixProcessingAlgorithm,
                           :AbstractMatrixProcessingEstimator,
                           :AbstractNormCeilingCalibrationAlgorithm,
-                          :AbstractOptimisationEstimator,
+                          :AbstractOptimisationEstimator, :AbstractAllocationSet,
+                          :AbstractOnlinePortfolioSelectionAlgorithm,
                           :AbstractOrderedWeightsArrayFunction, :AbstractOrthogonalScaling,
                           :AbstractOrthogonalityMetric, :AbstractPanelField,
                           :AbstractPanelFieldInput, :AbstractPanelFillAlgorithm,
-                          :AbstractPartialFitState, :AbstractPosdefEstimator,
-                          :AbstractPreorderBy, :AbstractPreviousWeightsSource,
+                          :AbstractPartialFitState, :AbstractPassiveAggressiveSlack,
+                          :AbstractPosdefEstimator, :AbstractPreorderBy,
+                          :AbstractPreviousWeightsSource, :AbstractPriceLevelStatistic,
                           :AbstractPriorEstimator, :AbstractPriorResult,
+                          :AbstractProjectionGeometry,
                           :AbstractPriorUncertaintySetEstimator, :AbstractRealisedTarget,
                           :AbstractRedundancyAlgorithm, :AbstractReturnForecastEstimator,
                           :AbstractRiskMeasureSettings,

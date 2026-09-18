@@ -1360,7 +1360,9 @@ function assert_time_dependent_substitution(::Type{T}, args::NamedTuple,
     end
     base = merge(args, NamedTuple{tdfs}(map(something, stand_ins)))
     for f in tdfs
-        td = args[f]
+        # The filter above kept the schedules alone; the assertion tells a static analyser so,
+        # and costs nothing at run time.
+        td = args[f]::TimeDependent
         v = td.val
         if isa(v, AbstractVector)
             for x in v

@@ -132,6 +132,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/33_CoverageUniverse.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -232,7 +233,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/24_ExpectedRisk.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/25_RiskMeasureTools.jl" = { raw = 0, reviewed = 0 }
-"src/17_Optimisation/01_Base_Optimisation.jl" = { raw = 6, reviewed = 6 }
+"src/17_Optimisation/01_Base_Optimisation.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { raw = 9, reviewed = 9 }
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { raw = 0, reviewed = 0 }
@@ -305,6 +306,9 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/09_OnlineOptimisation.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { raw = 0, reviewed = 0 }
 "src/18_ExpectedReturns.jl" = { raw = 1, reviewed = 1 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { raw = 0, reviewed = 0 }
@@ -441,6 +445,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/33_CoverageUniverse.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -614,6 +619,9 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/09_OnlineOptimisation.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { raw = 0, reviewed = 0 }
 "src/18_ExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { raw = 0, reviewed = 0 }

@@ -10,7 +10,7 @@ commit = "8411336595"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2997, doc = 0, comment = 238, blank = 48, total = 3283 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1137, doc = 113, comment = 125, blank = 43, total = 1418 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1149, doc = 113, comment = 125, blank = 43, total = 1430 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -127,6 +127,7 @@ commit = "8411336595"
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { code = 225, doc = 318, comment = 2, blank = 150, total = 695 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 230, doc = 368, comment = 0, blank = 184, total = 782 }
 "src/05_Moments/33_CoverageUniverse.jl" = { code = 403, doc = 639, comment = 0, blank = 298, total = 1340 }
+"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { code = 121, doc = 212, comment = 1, blank = 98, total = 432 }
 "src/06_Distance/01_Base_Distance.jl" = { code = 24, doc = 222, comment = 0, blank = 89, total = 335 }
 "src/06_Distance/02_Distance.jl" = { code = 160, doc = 350, comment = 0, blank = 157, total = 667 }
 "src/06_Distance/03_DistanceDistance.jl" = { code = 39, doc = 132, comment = 0, blank = 58, total = 229 }
@@ -227,7 +228,7 @@ commit = "8411336595"
 "src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { code = 55, doc = 46, comment = 0, blank = 13, total = 114 }
 "src/16_RiskMeasures/24_ExpectedRisk.jl" = { code = 273, doc = 456, comment = 40, blank = 207, total = 976 }
 "src/16_RiskMeasures/25_RiskMeasureTools.jl" = { code = 84, doc = 95, comment = 0, blank = 51, total = 230 }
-"src/17_Optimisation/01_Base_Optimisation.jl" = { code = 958, doc = 1756, comment = 35, blank = 861, total = 3610 }
+"src/17_Optimisation/01_Base_Optimisation.jl" = { code = 958, doc = 1756, comment = 37, blank = 861, total = 3612 }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 646, doc = 1201, comment = 44, blank = 478, total = 2369 }
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 85, doc = 125, comment = 0, blank = 49, total = 259 }
 "src/17_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { code = 256, doc = 303, comment = 7, blank = 123, total = 689 }
@@ -239,12 +240,12 @@ commit = "8411336595"
 "src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { code = 301, doc = 438, comment = 9, blank = 160, total = 908 }
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { code = 102, doc = 71, comment = 11, blank = 24, total = 208 }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { code = 34, doc = 39, comment = 0, blank = 18, total = 91 }
-"src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { code = 53, doc = 116, comment = 1, blank = 35, total = 205 }
+"src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { code = 54, doc = 118, comment = 1, blank = 35, total = 208 }
 "src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { code = 309, doc = 447, comment = 4, blank = 163, total = 923 }
 "src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { code = 168, doc = 263, comment = 0, blank = 69, total = 500 }
 "src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { code = 155, doc = 218, comment = 2, blank = 101, total = 476 }
 "src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl" = { code = 40, doc = 105, comment = 0, blank = 36, total = 181 }
-"src/17_Optimisation/03_NaiveOptimisation.jl" = { code = 397, doc = 690, comment = 26, blank = 224, total = 1337 }
+"src/17_Optimisation/03_NaiveOptimisation.jl" = { code = 462, doc = 733, comment = 35, blank = 224, total = 1454 }
 "src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl" = { code = 197, doc = 395, comment = 4, blank = 113, total = 709 }
 "src/17_Optimisation/04_Hierarchical/02_HierarchicalRiskParity.jl" = { code = 181, doc = 264, comment = 34, blank = 76, total = 555 }
 "src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl" = { code = 371, doc = 554, comment = 32, blank = 193, total = 1150 }
@@ -299,7 +300,10 @@ commit = "8411336595"
 "src/17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl" = { code = 244, doc = 268, comment = 25, blank = 82, total = 619 }
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { code = 149, doc = 213, comment = 13, blank = 83, total = 458 }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { code = 42, doc = 61, comment = 4, blank = 20, total = 127 }
-"src/17_Optimisation/09_OnlineOptimisation.jl" = { code = 229, doc = 310, comment = 3, blank = 156, total = 698 }
+"src/17_Optimisation/09_OnlineOptimisation.jl" = { code = 232, doc = 317, comment = 3, blank = 159, total = 711 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { code = 203, doc = 374, comment = 5, blank = 166, total = 748 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { code = 357, doc = 546, comment = 2, blank = 211, total = 1116 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { code = 229, doc = 284, comment = 2, blank = 124, total = 639 }
 "src/18_ExpectedReturns.jl" = { code = 290, doc = 832, comment = 43, blank = 293, total = 1458 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { code = 313, doc = 631, comment = 5, blank = 270, total = 1219 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { code = 449, doc = 634, comment = 2, blank = 315, total = 1400 }
@@ -312,4 +316,4 @@ commit = "8411336595"
 "src/21_Pipeline/06_OnlinePipeline.jl" = { code = 391, doc = 372, comment = 0, blank = 162, total = 925 }
 "src/22_Plotting.jl" = { code = 150, doc = 2294, comment = 111, blank = 797, total = 3352 }
 "src/23_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
-"src/PortfolioOptimisers.jl" = { code = 339, doc = 3, comment = 29, blank = 5, total = 376 }
+"src/PortfolioOptimisers.jl" = { code = 343, doc = 3, comment = 29, blank = 5, total = 380 }
