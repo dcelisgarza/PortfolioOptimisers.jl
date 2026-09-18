@@ -4,7 +4,7 @@ Description = "Price-level expected returns, public API of PortfolioOptimisers.j
 
 # Price-level expected returns
 
-The Price Relative Forecast of the online portfolio selection family, as an expected-returns estimator any `me` slot may hold: the level of the last observation is set to one, the earlier levels are reconstructed from the last `window - 1` returns, and the expected return is a statistic of those levels over the last one, less one (ADR 0158).
+The Price Relative Forecast of the online portfolio selection family, as an expected-returns estimator any `me` slot may hold: the level of the last observation is set to one, the earlier levels are reconstructed from the last `window - 1` returns, and the expected return is a statistic of those levels over the last one, less one.
 
 ```@docs
 PortfolioOptimisers.AbstractPriceLevelStatistic

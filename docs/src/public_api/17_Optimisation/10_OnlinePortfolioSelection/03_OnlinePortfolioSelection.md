@@ -4,7 +4,7 @@ Description = "The online portfolio selection head, public API of PortfolioOptim
 
 # The online portfolio selection head
 
-The one head of the family (ADR 0155): a naive optimiser whose batch verb is the Causal Pass over every row of its carrier, whose `partial_fit!` is the Block Step, and whose `optimise(opt)` with no data is the Recursion Read-out.
+The one head of the family: a naive optimiser whose batch verb is the Causal Pass over every row of its carrier, whose `partial_fit!` is the Block Step, and whose `optimise(opt)` with no data is the Recursion Read-out.
 
 ```@docs
 OnlinePortfolioSelection

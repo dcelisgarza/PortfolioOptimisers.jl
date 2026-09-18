@@ -8,7 +8,7 @@ This is the API reference of `PortfolioOptimisers.jl`: every documented name of 
 one page per source file, so the pages are organised exactly as the `src` folder itself and a
 documentation page corresponds one to one with a source file[^1]. Each source file's names are
 split across a public page and a private page, the split being read off the source declarations
-at build time (ADR 0128, `docs/adr/`). The public page holds the names the package exports or
+at build time. The public page holds the names the package exports or
 declares `public`, which are the API a release keeps; the private page holds the internals,
 which can change between releases. To browse by the job you want done rather than by the file
 the code lives in, start from the [capability catalogue](@ref capability-catalogue).
