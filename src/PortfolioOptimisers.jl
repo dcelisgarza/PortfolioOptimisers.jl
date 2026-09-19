@@ -361,6 +361,7 @@ include("17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl"
 include("17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl")
 include("17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl")
 include("17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl")
+include("17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl")
 include("18_ExpectedReturns.jl")
 include("19_FactorAttribution/01_FactorAttribution.jl")
 include("19_FactorAttribution/02_FactorAttributionRealised.jl")

@@ -10,7 +10,7 @@ commit = "8411336595"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2997, doc = 0, comment = 238, blank = 48, total = 3283 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1160, doc = 113, comment = 125, blank = 43, total = 1441 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1170, doc = 113, comment = 125, blank = 43, total = 1451 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -308,6 +308,7 @@ commit = "8411336595"
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { code = 239, doc = 292, comment = 2, blank = 126, total = 659 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { code = 292, doc = 300, comment = 2, blank = 87, total = 681 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { code = 405, doc = 576, comment = 1, blank = 187, total = 1169 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { code = 299, doc = 427, comment = 2, blank = 174, total = 902 }
 "src/18_ExpectedReturns.jl" = { code = 290, doc = 832, comment = 43, blank = 293, total = 1458 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { code = 313, doc = 631, comment = 5, blank = 270, total = 1219 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { code = 449, doc = 634, comment = 2, blank = 315, total = 1400 }

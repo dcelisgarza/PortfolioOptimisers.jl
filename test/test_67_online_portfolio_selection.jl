@@ -119,7 +119,11 @@ end
     @testset "The batch-online identity is exact at every block size" begin
         for alg in (BuyAndHold(), ExponentiatedGradient(), NewtonStep(),
                     PassiveAggressiveMeanReversion(), MovingAverageReversion(; window = 4),
-                    UniversalPortfolio(; N = N, n_experts = 20, seed = 3))
+                    UniversalPortfolio(; N = N, n_experts = 20, seed = 3),
+                    ConfidenceWeightedMeanReversion(), AntiCorrelation(; window = 3),
+                    ExpectationMaximisation(), AggregatingAlgorithm(), TopK(; k = 2),
+                    WeakAggregatingAlgorithm(),
+                    AggregatingExponentialGradient(; etas = [0.05, 0.1]))
             opt = OPS(; alg = alg)
             o = po.partial_fit!(opt, rows(rd, 1:10))
             o = po.partial_fit!(o, rows(rd, 11:17))

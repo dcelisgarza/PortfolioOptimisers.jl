@@ -57,9 +57,10 @@
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
                           :AbstractAmbiguityTailWeightCalibrationAlgorithm, :AbstractBins,
-                          :AbstractCompactRadiusAlgorithm, :AbstractConstraintEstimator,
-                          :AbstractConstraintResult, :AbstractConstraintSpace,
-                          :AbstractCovarianceEstimator, :AbstractCoverageAlgorithm,
+                          :AbstractCompactRadiusAlgorithm, :AbstractConfidenceUpdate,
+                          :AbstractConstraintEstimator, :AbstractConstraintResult,
+                          :AbstractConstraintSpace, :AbstractCovarianceEstimator,
+                          :AbstractCoverageAlgorithm,
                           :AbstractCrossSectionalRegressionEstimator,
                           :AbstractCrossSectionalTransform,
                           :AbstractCrossSectionalWeightsAlgorithm,
