@@ -657,11 +657,42 @@ function online_state_seed(::OnlinePortfolioSelection, ::Option{<:Integer})
     return throw(ArgumentError("`Online` does not wrap an `OnlinePortfolioSelection` head: the family never refits from a buffer, a rule's window is the rule's own field, and the head's rows buffer is capped by what its rule tree reads. Hand the head to the fold loop's online arm as it is."))
 end
 """
+    fees_carry_turnover(fees::Nothing)
+    fees_carry_turnover(fees::FeesE_Fees)
+    fees_carry_turnover(v::AbstractVector)
+    fees_carry_turnover(td::TimeDependent)
+    fees_carry_turnover(::Any)
+
+Whether a fee, or any fee a per-fold schedule can be seen to hold, carries a turnover term.
+
+A static fee answers for its own `tn`. A [`TimeDependent`](@ref) schedule answers for every entry of a vector value, descending into per-fold vector entries, and for its explicit `default`; a callable's output cannot be inspected before the fold exists and contributes `false`, as every other value does for [`needs_previous_weights`](@ref).
+
+# Related
+
+  - [`assert_online_fee_source`](@ref)
+  - [`needs_previous_weights`](@ref)
+"""
+function fees_carry_turnover(::Nothing)::Bool
+    return false
+end
+function fees_carry_turnover(fees::FeesE_Fees)::Bool
+    return !isnothing(fees.tn)
+end
+function fees_carry_turnover(v::AbstractVector)::Bool
+    return any(fees_carry_turnover, v)
+end
+function fees_carry_turnover(td::TimeDependent)::Bool
+    return fees_carry_turnover(td.val) || fees_carry_turnover(td.default)
+end
+function fees_carry_turnover(::Any)::Bool
+    return false
+end
+"""
     assert_online_fee_source(opt::OnlinePortfolioSelection, pws)
 
 Refuse, at the entry of the fold loop's online arm, an [`OnlinePortfolioSelection`](@ref) head whose `fees` carry a turnover term while the walk-forward threads no Previous-Weights Source.
 
-A turnover fee on this family is measured against the fund's held book or against nothing the family does: the recursion reads its own allocation, so without a source the fee would price the distance between two targets, which reads buy-and-hold as trading and constant rebalancing as free. The head and the walk-forward meet first at this door, so it is the earliest point the pairing exists. A head with no `tn` fee, and any other estimator, passes.
+A turnover fee on this family is measured against the fund's held book or against nothing the family does: the recursion reads its own allocation, so without a source the fee would price the distance between two targets, which reads buy-and-hold as trading and constant rebalancing as free. The head and the walk-forward meet first at this door, so it is the earliest point the pairing exists. A head with no `tn` fee, and any other estimator, passes. A per-fold schedule on `fees` is read through [`fees_carry_turnover`](@ref): every entry it can be seen to hold is checked, and a callable's output, which does not exist before the fold does, is not.
 
 # Arguments
 
@@ -670,20 +701,17 @@ A turnover fee on this family is measured against the fund's held book or agains
 
 # Validation
 
-  - `pws` is not `nothing` when `opt.fees` carries a `tn` term. An `ArgumentError` is thrown otherwise.
+  - `pws` is not `nothing` when `opt.fees` carries a `tn` term, in any entry a schedule can be seen to hold. An `ArgumentError` is thrown otherwise.
 
 # Related
 
   - [`online_folds`](@ref)
   - [`assert_online_entry`](@ref)
+  - [`fees_carry_turnover`](@ref)
   - [`DriftedWeights`](@ref)
 """
 function assert_online_fee_source(opt::OnlinePortfolioSelection, pws)::Nothing
-    fees = opt.fees
-    if isnothing(pws) &&
-       !isnothing(fees) &&
-       !isa(fees, TimeDependent) &&
-       !isnothing(fees.tn)
+    if isnothing(pws) && fees_carry_turnover(opt.fees)
         throw(ArgumentError("an `OnlinePortfolioSelection` head whose `fees` carry a turnover term needs a Previous-Weights Source on the walk-forward: the recursion reads its own allocation, so without one the fee would price the distance between two targets rather than the trade the fund makes. Set `pws = DriftedWeights()` on the scheme, or drop `tn` from the head's fees."))
     end
     return nothing

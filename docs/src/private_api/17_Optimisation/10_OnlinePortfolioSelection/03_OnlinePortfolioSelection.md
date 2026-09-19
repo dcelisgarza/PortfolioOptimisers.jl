@@ -16,5 +16,6 @@ PortfolioOptimisers.online_selection_readout
 PortfolioOptimisers.online_readout(::OnlinePortfolioSelection)
 PortfolioOptimisers.held_timestamps(opt::OnlinePortfolioSelection)
 PortfolioOptimisers.online_state_seed(::OnlinePortfolioSelection, ::PortfolioOptimisers.Option{<:Integer})
+PortfolioOptimisers.fees_carry_turnover
 PortfolioOptimisers.assert_online_fee_source(opt::OnlinePortfolioSelection, pws)
 ```

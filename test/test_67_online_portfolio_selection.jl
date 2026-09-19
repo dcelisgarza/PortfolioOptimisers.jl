@@ -569,6 +569,24 @@ end
         @test isa(cross_val_predict(opt, rd, cvb), MultiPeriodPredictionResult)
         @test isa(cross_val_predict(EqualWeighted(; fees = tnfees), rd, cv),
                   MultiPeriodPredictionResult)
+        # A per-fold schedule on `fees` is read through every entry it can be seen to
+        # hold and its default: a scheduled turnover fee is refused at the door as a
+        # static one is, and a schedule with no turnover term passes.
+        K = length(cross_val_predict(OPS(; alg = BuyAndHold()), rd, cv).pred)
+        @test po.fees_carry_turnover(TimeDependent(; val = [fees, tnfees], default = fees))
+        @test po.fees_carry_turnover(TimeDependent(; val = fill(fees, K), default = tnfees))
+        @test !po.fees_carry_turnover(TimeDependent(; val = fill(fees, K),
+                                                    default = nothing))
+        # A callable's output does not exist before the fold does, so it is not read.
+        @test !po.fees_carry_turnover(TimeDependent(; val = ctx -> tnfees, default = fees))
+        sched = OPS(; alg = BuyAndHold(),
+                    fees = TimeDependent(; val = fill(tnfees, K), default = fees))
+        @test_throws ArgumentError cross_val_predict(sched, rd, cv)
+        @test isa(cross_val_predict(sched, rd, cvd), MultiPeriodPredictionResult)
+        @test isa(cross_val_predict(OPS(; alg = BuyAndHold(),
+                                        fees = TimeDependent(; val = fill(fees, K),
+                                                             default = nothing)), rd, cv),
+                  MultiPeriodPredictionResult)
         # Under the source the turnover fee is charged against the drifted book.
         pd = cross_val_predict(opt, rd, cvd)
         p0 = cross_val_predict(OPS(; alg = ExponentiatedGradient(), w0 = fill(0.25, N)), rd,

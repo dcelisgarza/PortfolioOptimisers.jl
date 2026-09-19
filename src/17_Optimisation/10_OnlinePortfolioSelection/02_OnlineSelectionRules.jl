@@ -184,7 +184,7 @@ A_t &= I + \\sum_{s \\leq t} \\boldsymbol{g}_s \\boldsymbol{g}_s^\\intercal\\,,\
 \\end{align}
 ```
 
-with, when `eta > 0`, the shrinkage ``(1 - \\eta) \\boldsymbol{q} + \\eta \\boldsymbol{1} / N`` of the raw Newton point towards the uniform portfolio **before** the projection, so that a bound of zero or a negative lower bound on the Allocation Set is honoured — mixed after the projection, the uniform mass would leave the set. The paper's projection is in the norm of ``A_t``, the [`GramProjection`](@ref), a programme on every set that carries its own solver; the default [`EuclideanProjection`](@ref) is the standard simplification that keeps the rule free of a solver, and on the simplex at `eta = 0` the two agree wherever the Newton point already lies in it. The rule binds its current ``A_t`` onto the geometry through [`gram_geometry`](@ref) at every step; the Start Allocation is projected before any gradient at ``A_0 = I``, in the Euclidean geometry. The regret is ``O(N \\log T)`` at ``O(N^2)`` a step, which is why this rather than the universal portfolio is the practical second-order choice. As the weighting of an [`ExpertMixture`](@ref) it is the online Newton update over the expert-return vector, with a `K × K` Gram.
+with, when `eta > 0`, the shrinkage ``(1 - \\eta) \\boldsymbol{q} + \\eta \\boldsymbol{1} / N`` of the raw Newton point towards the uniform portfolio **before** the projection, so that a bound of zero or a negative lower bound on the Allocation Set is honoured — mixed after the projection, the uniform mass would leave the set. The paper's projection is in the norm of ``A_t``, the [`GramProjection`](@ref), a programme on every set that carries its own solver; the default [`EuclideanProjection`](@ref) is the standard simplification that keeps the rule free of a solver, and on the simplex at `eta = 0` the two agree wherever the Newton point already lies in it. The rule binds its current ``A_t`` onto the geometry through [`gram_geometry`](@ref) at every step; the Start Allocation is projected before any gradient at ``A_0 = I``, in the Euclidean geometry. The regret is ``O(N \\log T)`` at ``O(N^2)`` a step under the paper's projection, which is why this rather than the universal portfolio is the practical second-order choice; the bound is stated for the [`GramProjection`](@ref) and is not claimed under the Euclidean default. As the weighting of an [`ExpertMixture`](@ref) it is the online Newton update over the expert-return vector, with a `K × K` Gram.
 
 # Fields
 
@@ -449,7 +449,7 @@ The passive aggressive mean reversion of Li, Zhao, Hoi and Gopalkrishnan (2012):
 \\end{align}
 ```
 
-with ``\\tau_t`` the step of the `slack` rule and ``\\bar{x}_t`` the mean of ``\\boldsymbol{x}_t``; the step is zero when every asset moved alike. The rule sells what just rose: it is a total bet on single-period mean reversion, and its constraint runs the other way from [`ForecastReversion`](@ref)'s, on the realised relative with ``\\epsilon \\leq 1``.
+with ``\\tau_t`` the step of the `slack` rule and ``\\bar{x}_t`` the mean of ``\\boldsymbol{x}_t``; the step is zero when every asset moved alike. The rule sells what just rose: it is a total bet on single-period mean reversion, and its constraint runs the other way from [`ForecastReversion`](@ref)'s, on the realised relative with the paper's ``\\epsilon`` in ``[0, 1]``; a threshold above one is admitted and makes the rule act only on a gain above it.
 
 # Fields
 
@@ -467,7 +467,7 @@ Keywords correspond to the struct's fields. `NoSlack()`, `LinearSlack(; C)` and 
 
 ## Validation
 
-  - `eps >= 0`. A `DomainError` is thrown otherwise.
+  - `eps >= 0`. A `DomainError` is thrown otherwise. The paper states the threshold in `[0, 1]`.
 
 # Examples
 
@@ -643,7 +643,7 @@ The weighting's step is projected onto the **Expert Set** on `eset`, the Allocat
 
 `grad` is the **Gradient Point**: under [`OwnPoint`](@ref), the default, every expert reads its gradient at its own iterate; under [`BlendPoint`](@ref) every first-order expert reads it at the mixture's played blend ``\\boldsymbol{w}_t`` while stepping from its own iterate, the shared gradient ``\\nabla f_t(\\boldsymbol{w}_t)`` of Zhang, Lu and Zhou (2018) and Zhao, Zhang, Zhang and Zhou (2020), and a rule with no gradient ignores the point. Under the blend point and [`ExponentiatedGradient`](@ref) as the weighting the mixture's weight update is the exponentially weighted forecaster on the linearised loss ``\\langle \\nabla f_t(\\boldsymbol{w}_t), \\boldsymbol{h}_k(t) \\rangle`` exactly, wherever the second projection is the identity, because ``\\langle \\boldsymbol{p}_t, \\boldsymbol{r}_t \\rangle = \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` there: [`Ader`](@ref) and [`Sword`](@ref) construct that mixture over a geometric grid of first-order experts.
 
-The mixture's regret against its best expert is exact for the shipped object wherever the second projection is the identity: ``\\log S_T(\\text{best expert}) - \\log S_T(\\text{mixture}) \\leq \\log K`` for every sequence under the wealth weighting on the bare Expert Set, because the mixture's wealth is the `p_1`-weighted average of the experts' wealths. Where the Expert Set binds or the second projection repairs, the bound is not claimed.
+The mixture's regret against its best expert is exact for the shipped object wherever the second projection is the identity: ``\\log S_T(\\text{best expert}) - \\log S_T(\\text{mixture}) \\leq -\\log p_{1, k^\\star}`` for every sequence under the wealth weighting on the bare Expert Set, which is ``\\log K`` at the uniform start, because the mixture's wealth is the `p_1`-weighted average of the experts' wealths and puts at least ``p_{1, k^\\star}`` of its mass on the best expert ``k^\\star``. Where the Expert Set binds or the second projection repairs, the bound is not claimed.
 
 # Fields
 
