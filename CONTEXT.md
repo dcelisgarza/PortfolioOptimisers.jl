@@ -598,6 +598,7 @@ The allocation an Online Portfolio Selection head holds during the first period 
 
 **Log-Wealth Regret**
 The gap in log terminal wealth between a comparator and a strategy over one and the same sequence of rows, `Σ_t log(1 + r_{b,t}) − Σ_t log(1 + r_{a,t})`, positive when the comparator wins; the per-period form divides by the number of rows, and the per-row difference series carries a Newey–West test of equal expected log growth, exact only for a comparator that did not read the rows. It is read off two prediction results by a verb, never by a scorer: a hyperparameter search ranks on log wealth per period, which orders candidates as regret against any fixed comparator would. Negative regret is expected on many sequences and is not a defect. ADR 0161.
+Beside the regret the Result reports the running regret, the cumulative sum of the per-row difference, and the comparator's path length `P_T = Σ_t ‖u_t − u_{t−1}‖₂` over its per-fold targets, embedded by asset name on the union of the folds' universes and `NaN` for a comparator of one fold: dynamic regret is regret read against the path a Hindsight Split comparator was allowed to walk, zero for a static one. ADR 0165.
 *Avoid*: a summary column, since the performance summary reads one series and holds no comparator; and regret between two runs over different rows, which the verb refuses.
 
 **Hindsight Comparator**

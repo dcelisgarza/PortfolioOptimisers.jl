@@ -343,6 +343,16 @@
         @test is_plot(plot_performance_summary(res_p, rd))
         mpred_p = cross_val_predict(mr_p, rd, IndexWalkForward(80, 40))
         @test is_plot(plot_performance_summary(mpred_p))
+        # The four bars of #1184: a benchmark fills three of them, the held path the fourth,
+        # and the empty `NaN` bars of a bare series still draw.
+        bench = fill(0.001, length(mpred_p.mrd.X))
+        @test is_plot(plot_performance_summary(mpred_p; benchmark = bench))
+        @test is_plot(plot_performance_summary(w, X; benchmark = fill(0.001, size(X, 1))))
+        ps_b = performance_summary(mpred_p; benchmark = bench)
+        @test all(isfinite,
+                  (ps_b.excess_ret, ps_b.tracking_error, ps_b.information_ratio,
+                   ps_b.turnover))
+        @test is_plot(plot_performance_summary(ps_b))
     end
 
     @testset "plot_rolling_drawdowns" begin

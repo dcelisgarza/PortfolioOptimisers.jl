@@ -1220,7 +1220,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The headline performance statistics of a realised return series.
 
-`PerformanceSummaryResult` is what [`performance_summary`](@ref) returns. It carries the seven numbers [`plot_performance_summary`](@ref) draws, the standard error of the Sharpe ratio, and the four inputs that produced them, so a summary can be tabulated, compared across runs, asserted on in a test, or fed to a search without a plotting package installed.
+`PerformanceSummaryResult` is what [`performance_summary`](@ref) returns. It carries the eleven numbers [`plot_performance_summary`](@ref) draws, the standard error of the Sharpe ratio, and the four inputs that produced them, so a summary can be tabulated, compared across runs, asserted on in a test, or fed to a search without a plotting package installed. The last four numbers read inputs a bare return series does not carry, and each is `NaN` when its input is absent: the three excess statistics need a `benchmark` series, and the turnover needs the weight path of a multi-period prediction result.
 
 # Sign convention
 
@@ -1235,7 +1235,8 @@ $(DocStringExtensions.FIELDS)
     PerformanceSummaryResult(
         n_periods, periods_per_year, alpha, compound,
         ann_return, ann_volatility, sharpe, sharpe_stderr,
-        sortino, calmar, max_drawdown, cvar
+        sortino, calmar, max_drawdown, cvar,
+        excess_ret, tracking_error, information_ratio, turnover
     ) -> PerformanceSummaryResult
 
 Arguments correspond to the struct's fields, in the order they are declared. The type is a
@@ -1298,23 +1299,40 @@ the arguments that produced the statistics after them.
     $(field_dict[:ps_cvar])
     """
     cvar
+    """
+    `excess_ret`: Annualised arithmetic mean of `ret - benchmark`. `NaN` without a benchmark.
+    """
+    excess_ret
+    """
+    `tracking_error`: Annualised sample standard deviation of `ret - benchmark`. `NaN` without a benchmark.
+    """
+    tracking_error
+    """
+    `information_ratio`: `excess_ret / tracking_error`. `NaN` without a benchmark, or at a zero tracking error.
+    """
+    information_ratio
+    """
+    `turnover`: Mean turnover per rebalance of the held path, `sum(abs, w_next - w_held)` from the weights a fold held after its last observation to the next fold's target, averaged over the rebalances of a multi-period prediction result. `NaN` for a bare series, a single fold, and a multi-period result of one fold, none of which records a rebalance.
+    """
+    turnover
 end
 """
     performance_summary(ret::VecNum; periods_per_year::Number = 252, alpha::Number = 0.05,
-                        compound::Bool = false) -> PerformanceSummaryResult
+                        compound::Bool = false,
+                        benchmark::Option{<:VecNum} = nothing) -> PerformanceSummaryResult
     performance_summary(w::ArrNum, X::MatNum, fees::Option{<:Fees} = nothing;
-                        periods_per_year, alpha, compound) -> PerformanceSummaryResult
+                        periods_per_year, alpha, compound, benchmark) -> PerformanceSummaryResult
     performance_summary(w::ArrNum, rd::ReturnsResult, fees::Option{<:Fees} = nothing;
                         kwargs...) -> PerformanceSummaryResult
     performance_summary(res::OptimisationResult, rd::ReturnsResult;
                         kwargs...) -> PerformanceSummaryResult
-    performance_summary(pred::PredictionResult; kwargs...) -> PerformanceSummaryResult
-    performance_summary(pred::MultiPeriodPredictionResult;
-                        kwargs...) -> PerformanceSummaryResult
+    performance_summary(pred::PredRes_MultiPredRes; kwargs...) -> PerformanceSummaryResult
 
 Summarise a realised return series as a [`PerformanceSummaryResult`](@ref).
 
 The weight-and-returns methods net the returns through [`calc_net_returns`](@ref) first, so a summary of a portfolio accounts for its fees.
+
+Every method takes a `benchmark`, a second return series over the same periods, and answers the three excess statistics against it: the annualised mean of `ret - benchmark`, its annualised standard deviation, and their ratio. Without one the three are `NaN`. The prediction-result method also answers the **turnover** of the held path: at every rebalance of a multi-period result, the fund trades from the weights the fold held after its last observation — the drifted holding when the fold carries a Held Weights record, the target otherwise — to the next fold's target, and the turnover is the mean over those rebalances of `sum(abs, w_next - w_held)`, the quantity [`calc_turnover`](@ref) reads at one step and [`Turnover`](@ref) bounds, on the union of the folds' universes. At `test_size = 1` a rebalance is a period. A bare series, a single fold and a one-fold result record no rebalance, so their turnover is `NaN`; the drift inside a fold is not a trade and is not counted.
 
 **The Precomputed-returns contract: the series `ret` must be finite.** No method takes a finiteness check, because every internal caller hands one a finite series: the prediction methods read the fold's own funnel output, and a scan on a long series would be paid by all of them. One non-finite entry makes the mean, the volatility and every ratio non-finite, and the tail figure answers a **finite wrong number** rather than a `NaN`, because `partialsort` orders a `NaN` after every real. A caller who holds a gapped series drops the gaps first with `x[isfinite.(x)]`, and a caller who holds a gapped panel scores it through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) instead, which filters the Held Gaps once.
 
@@ -1329,6 +1347,17 @@ Let ``m`` and ``s`` be the sample mean and the sample standard deviation of the 
 \\mathrm{sharpe} &= \\dfrac{\\mathrm{ann\\_return}}{\\mathrm{ann\\_volatility}}\\\\
 \\mathrm{sortino} &= \\dfrac{\\mathrm{ann\\_return}}{\\sqrt{p \\, \\mathbb{E}\\left[\\min(\\boldsymbol{r}, 0)^{2}\\right]}}\\\\
 \\mathrm{calmar} &= \\dfrac{\\mathrm{ann\\_return}}{\\left\\lvert \\min_{t} d_{t} \\right\\rvert}\\,.
+\\end{align}
+```
+
+Against a benchmark series ``\\boldsymbol{b}``, with ``e_t = r_t - b_t``, ``m_e`` and ``s_e`` its sample mean and corrected sample standard deviation, and over a multi-period result with ``F`` folds whose fold ``f`` starts at the target ``\\boldsymbol{w}_f`` and holds ``\\hat{\\boldsymbol{w}}_f`` after its last observation:
+
+```math
+\\begin{align}
+\\mathrm{excess\\_ret} &= m_e p\\\\
+\\mathrm{tracking\\_error} &= s_e \\sqrt{p}\\\\
+\\mathrm{information\\_ratio} &= \\dfrac{\\mathrm{excess\\_ret}}{\\mathrm{tracking\\_error}}\\\\
+\\mathrm{turnover} &= \\dfrac{1}{F - 1} \\sum_{f=2}^{F} \\left\\lVert \\boldsymbol{w}_f - \\hat{\\boldsymbol{w}}_{f-1} \\right\\rVert_1\\,.
 \\end{align}
 ```
 
@@ -1350,7 +1379,7 @@ The expression corrects for the third and fourth moments and **not** for serial 
 
 # Algorithm
 
-The five other methods reduce to the `ret::VecNum` method, which runs the steps. A method that takes weights nets the returns through [`calc_net_returns`](@ref) first, and a method that takes a prediction result takes the first series when it carries several.
+Every method reduces to [`summarise_returns`](@ref), which runs the steps. A method that takes weights nets the returns through [`calc_net_returns`](@ref) first, and the method that takes a prediction result takes the first series when it carries several, and reads the turnover of its held path.
 
  1. Check `alpha` and `periods_per_year`, as `# Validation` states.
  2. Take `T`, the number of periods, and `m` and `s`, the sample mean and the corrected sample standard deviation of `ret`.
@@ -1360,7 +1389,9 @@ The five other methods reduce to the `ret::VecNum` method, which runs the steps.
  6. Build the cumulative wealth series with [`cumulative_returns`](@ref), take its drawdown path with [`drawdowns`](@ref), and read `max_dd`, the minimum of that path. Divide, giving `calmar`. A non-negative `max_dd` gives a `NaN`.
  7. Evaluate [`ConditionalValueatRisk`](@ref) at `alpha` on `ret` and negate it, giving `cvar_val` in return space.
  8. Form the per-period Sharpe ratio `sr_p`, correct its variance `var_sr` by the sample skewness and the sample excess kurtosis of `ret`, and annualise the square root, giving `sharpe_se`. A non-positive `var_sr` gives a `NaN`.
- 9. Collect the four inputs and the eight statistics into a [`PerformanceSummaryResult`](@ref).
+ 9. With a `benchmark`, take `e = ret - benchmark`, annualise its mean and its standard deviation, giving `excess_ret` and `tracking_error`, and divide, giving `information_ratio`; a non-positive `tracking_error` gives a `NaN`. Without one, all three are `NaN`.
+10. Take the turnover the prediction-result method computed through [`held_path_turnover`](@ref), or `NaN` from every other method.
+11. Collect the four inputs and the twelve statistics into a [`PerformanceSummaryResult`](@ref).
 
 # Arguments
 
@@ -1373,11 +1404,13 @@ The five other methods reduce to the `ret::VecNum` method, which runs the steps.
   - $(arg_dict[:ps_ppy])
   - $(arg_dict[:ps_alpha])
   - $(arg_dict[:ps_compound])
+  - `benchmark`: Benchmark return series over the same periods as `ret`, or `nothing` for no excess statistics.
 
 # Validation
 
   - `0 < alpha < 1`.
   - `periods_per_year > 0`.
+  - `length(benchmark) == length(ret)` when a benchmark is given. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
@@ -1390,14 +1423,141 @@ The five other methods reduce to the `ret::VecNum` method, which runs the steps.
   - [`calc_net_returns`](@ref)
   - [`cumulative_returns`](@ref)
   - [`drawdowns`](@ref)
+  - [`calc_turnover`](@ref)
+  - [`held_path_turnover`](@ref)
+  - [`log_wealth_regret`](@ref)
 
 # References
 
   - $(ref_dict[:sharpe_stderr])
 """
-function performance_summary(ret::VecNum; periods_per_year::Number = 252,
-                             alpha::Number = 0.05,
-                             compound::Bool = false)::PerformanceSummaryResult
+function performance_summary(ret::VecNum; kwargs...)::PerformanceSummaryResult
+    return summarise_returns(ret, nothing; kwargs...)
+end
+"""
+    excess_statistics(ret::VecNum, benchmark::Nothing, ann::Number, m::Number)
+    excess_statistics(ret::VecNum, benchmark::VecNum, ann::Number, m::Number)
+
+The three excess statistics of [`performance_summary`](@ref) against a benchmark series, or three `NaN`s without one.
+
+# Arguments
+
+  - `ret`: Periodic portfolio returns.
+  - `benchmark`: Benchmark returns over the same periods, or `nothing`.
+  - `ann`: Annualisation factor.
+  - `m`: Sample mean of `ret`, whose number type the `NaN`s take.
+
+# Validation
+
+  - `length(benchmark) == length(ret)`.
+
+# Returns
+
+  - `(excess_ret, tracking_error, information_ratio)`: Annualised mean and standard deviation of `ret - benchmark`, and their ratio, `NaN` at a non-positive tracking error.
+
+# Related
+
+  - [`performance_summary`](@ref)
+  - [`PerformanceSummaryResult`](@ref)
+"""
+function excess_statistics(::VecNum, ::Nothing, ann::Number, m::Number)
+    nan = oftype(m * ann, NaN)
+    return nan, nan, nan
+end
+function excess_statistics(ret::VecNum, benchmark::VecNum, ann::Number, ::Number)
+    @argcheck(length(benchmark) == length(ret),
+              DimensionMismatch("`length(benchmark) == length(ret)` must hold.\nlength(benchmark) => $(length(benchmark))\nlength(ret) => $(length(ret))"))
+    e = ret .- benchmark
+    excess_ret = mean(e) * ann
+    tracking_error = std(e) * sqrt(ann)
+    information_ratio = if tracking_error > zero(tracking_error)
+        excess_ret / tracking_error
+    else
+        NaN
+    end
+    return excess_ret, tracking_error, information_ratio
+end
+"""
+    held_path_turnover(pred::PredictionResult)
+    held_path_turnover(pred::MultiPeriodPredictionResult)
+
+The mean turnover per rebalance of a prediction result's held path, as [`performance_summary`](@ref) reports it.
+
+At each rebalance of a multi-period result the fund trades from the weights fold `f - 1` held after its last observation, [`fold_held`](@ref), to fold `f`'s target, [`fold_target`](@ref) — the drifted holding under a Held Weights record, the target otherwise — and the turnover of that trade is `sum(abs, w_f - w_held)`, the quantity [`calc_turnover`](@ref) reads at one step. Both vectors are embedded by asset name on the union of the folds' universes through [`stacked_fold_weights`](@ref), and the answer is the mean over the `F - 1` rebalances. A single prediction result and a multi-period result of one fold record no rebalance, and answer `nothing`, which the summary writes as `NaN`.
+
+# Arguments
+
+  - `pred`: The prediction result.
+
+# Returns
+
+  - `tn::Option{<:Number}`: The mean turnover per rebalance, or `nothing` when no rebalance is recorded.
+
+# Related
+
+  - [`performance_summary`](@ref)
+  - [`stacked_fold_weights`](@ref)
+  - [`calc_turnover`](@ref)
+  - [`Turnover`](@ref)
+"""
+function held_path_turnover(::PredictionResult)
+    return nothing
+end
+function held_path_turnover(pred::MultiPeriodPredictionResult)
+    W0 = stacked_fold_weights(pred, fold_target)
+    W1 = stacked_fold_weights(pred, fold_held)
+    F = size(W0, 1)
+    if F < 2
+        return nothing
+    end
+    return sum(sum(abs, view(W0, f, :) - view(W1, f - 1, :)) for f in 2:F) / (F - 1)
+end
+"""
+    resolve_turnover(turnover::Nothing, x::Number)
+    resolve_turnover(turnover::Number, x::Number)
+
+The turnover a summary writes: the number a caller read off a weight path, or `NaN` in the number type of `x` when the caller holds none.
+
+# Related
+
+  - [`summarise_returns`](@ref)
+  - [`held_path_turnover`](@ref)
+"""
+function resolve_turnover(::Nothing, x::Number)
+    return oftype(x, NaN)
+end
+function resolve_turnover(turnover::Number, ::Number)
+    return turnover
+end
+"""
+    summarise_returns(ret::VecNum, turnover::Option{<:Number}; periods_per_year::Number = 252,
+                      alpha::Number = 0.05, compound::Bool = false,
+                      benchmark::Option{<:VecNum} = nothing) -> PerformanceSummaryResult
+
+The one site that computes a [`PerformanceSummaryResult`](@ref): the steps of [`performance_summary`](@ref) over a series, a turnover a caller read off a weight path, and an optional benchmark.
+
+Every `performance_summary` method reduces to this function. The bare-series methods hand it `nothing` for the turnover, which it writes as `NaN`; the prediction-result method hands it [`held_path_turnover`](@ref).
+
+# Arguments
+
+  - `ret`: Periodic portfolio returns.
+  - `turnover`: Mean turnover per rebalance, or `nothing` when the caller holds no weight path.
+  - `periods_per_year`, `alpha`, `compound`, `benchmark`: As [`performance_summary`](@ref) states them.
+
+# Returns
+
+  - `summary::PerformanceSummaryResult`: The computed summary.
+
+# Related
+
+  - [`performance_summary`](@ref)
+  - [`excess_statistics`](@ref)
+  - [`held_path_turnover`](@ref)
+"""
+function summarise_returns(ret::VecNum, turnover::Option{<:Number};
+                           periods_per_year::Number = 252, alpha::Number = 0.05,
+                           compound::Bool = false,
+                           benchmark::Option{<:VecNum} = nothing)::PerformanceSummaryResult
     assert_unit_interval(alpha, :alpha)
     @argcheck(periods_per_year > zero(periods_per_year),
               DomainError(periods_per_year, "periods_per_year must be positive"))
@@ -1425,8 +1585,12 @@ function performance_summary(ret::VecNum; periods_per_year::Number = 252,
     var_sr = (one(sr_p) - StatsBase.skewness(ret) * sr_p +
               (StatsBase.kurtosis(ret) + 2) / 4 * sr_p^2) / (T - 1)
     sharpe_se = var_sr > zero(var_sr) ? sqrt(var_sr * ann) : NaN
+    excess_ret, tracking_error, information_ratio = excess_statistics(ret, benchmark, ann,
+                                                                      m)
     return PerformanceSummaryResult(T, ann, alpha, compound, ann_ret, ann_vol, sharpe,
-                                    sharpe_se, sortino, calmar, max_dd, cvar_val)
+                                    sharpe_se, sortino, calmar, max_dd, cvar_val,
+                                    excess_ret, tracking_error, information_ratio,
+                                    resolve_turnover(turnover, ann_ret))
 end
 function performance_summary(w::ArrNum, X::MatNum, fees::Option{<:Fees} = nothing;
                              kwargs...)::PerformanceSummaryResult
@@ -1441,16 +1605,10 @@ function performance_summary(res::OptimisationResult, rd::ReturnsResult;
     _, w, X, fees = result_investable_view(res, rd.X)
     return performance_summary(w, X, fees; kwargs...)
 end
-function performance_summary(pred::PredictionResult; kwargs...)::PerformanceSummaryResult
-    rd = pred.rd
-    ret = isa(rd.X, VecVecNum) ? first(rd.X) : rd.X
-    return performance_summary(ret; kwargs...)
-end
-function performance_summary(pred::MultiPeriodPredictionResult;
+function performance_summary(pred::PredRes_MultiPredRes;
                              kwargs...)::PerformanceSummaryResult
-    mrd = pred.mrd
-    ret = isa(mrd.X, VecVecNum) ? first(mrd.X) : mrd.X
-    return performance_summary(ret; kwargs...)
+    ret, _ = regret_series(pred)
+    return summarise_returns(ret, held_path_turnover(pred); kwargs...)
 end
 
 export expected_return, expected_ratio, expected_risk_ret_ratio, expected_sric,

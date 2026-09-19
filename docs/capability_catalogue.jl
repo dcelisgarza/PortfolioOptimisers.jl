@@ -1312,6 +1312,8 @@ const CATALOGUE = [Section("Core abstractions",
                                    Group(Cap(:WalkForwardEstimator, :WalkForwardResult;
                                              label = "Walk forward [`WalkForwardEstimator`](@ref) return a [`WalkForwardResult`](@ref)"),
                                          [Cap(:IndexWalkForward, :DateWalkForward),
+                                          Cap(:HindsightSplit;
+                                              label = "Hindsight split [`HindsightSplit`](@ref) trains each fold on its own test row, the prefix through it or the row alone, so an estimator run through it is a per-row Hindsight Comparator"),
                                           Cap(:OnlineStep;
                                               label = "Fold Fit [`OnlineStep`](@ref) fits each fold by the online step, threading one estimator from fold to fold"),
                                           Cap(:Resume;
@@ -1343,7 +1345,7 @@ const CATALOGUE = [Section("Core abstractions",
                                             Cap(:CovarianceForecastComparisonResult),
                                             Cap(:covariance_forecast_portfolio)])]),
                             Section("Log-wealth regret",
-                                    [Prose("[`log_wealth_regret`](@ref) reads two prediction results scored over the same rows and answers the gap in log terminal wealth between a comparator and a strategy, with the per-row difference and a Newey–West test of equal expected log growth. The comparator is any prediction result over the rows: the same estimator run causally, or a Hindsight Comparator fit on the rows it is scored on and predicted in sample."),
+                                    [Prose("[`log_wealth_regret`](@ref) reads two prediction results scored over the same rows and answers the gap in log terminal wealth between a comparator and a strategy, with the per-row difference and a Newey–West test of equal expected log growth. The comparator is any prediction result over the rows: the same estimator run causally, or a Hindsight Comparator fit on the rows it is scored on and predicted in sample; through a [`HindsightSplit`](@ref) it is the per-row comparator of dynamic regret, whose path length the Result reports beside the regret."),
                                      Cap(:log_wealth_regret, :LogWealthRegretResult)])]),
                    Section("[Pipeline](@id catalogue-pipeline)",
                            [Prose("A [`Pipeline`](@ref) reifies an end-to-end workflow as data: an ordered list of steps run left-to-right over a [`PipelineContext`](@ref), so preprocessing, priors, and the optimiser travel together as one estimator and can be cross-validated or tuned as a unit."),

@@ -1308,17 +1308,19 @@ function plot_efficient_frontier end
         periods_per_year::Number = 252,
         alpha::Number = 0.05,
         compound::Bool = false,
+        benchmark::Option{<:VecNum} = nothing,
         kwargs...
     ) -> Plot
-    plot_performance_summary(ret::VecNum; periods_per_year, alpha, compound, kwargs...) -> Plot
-    plot_performance_summary(w, rd::ReturnsResult, fees = nothing; alpha, compound, kwargs...) -> Plot
-    plot_performance_summary(res::OptimisationResult, rd; alpha, compound, kwargs...) -> Plot
-    plot_performance_summary(pred; alpha, compound, kwargs...) -> Plot
-    plot_performance_summary(mpred::MultiPeriodPredictionResult; alpha, compound, kwargs...) -> Plot
+    plot_performance_summary(ret::VecNum; periods_per_year, alpha, compound, benchmark, kwargs...) -> Plot
+    plot_performance_summary(w, rd::ReturnsResult, fees = nothing; alpha, compound, benchmark, kwargs...) -> Plot
+    plot_performance_summary(res::OptimisationResult, rd; alpha, compound, benchmark, kwargs...) -> Plot
+    plot_performance_summary(pred::PredRes_MultiPredRes; alpha, compound, benchmark, kwargs...) -> Plot
 
 Bar chart of annualised portfolio performance metrics:
 annualised return, annualised volatility, Sharpe ratio, Sortino ratio, Calmar ratio,
-maximum drawdown %, and CVaR %.
+maximum drawdown %, CVaR %, excess return %, tracking error %, information ratio and
+turnover %. The last four are `NaN` bars, drawn empty, when the summary has no benchmark or
+no held path.
 
 Every method other than the first computes a [`PerformanceSummaryResult`](@ref) with
 [`performance_summary`](@ref) and renders it. The statistics are defined and validated
@@ -1337,6 +1339,8 @@ A gapped panel reaches this figure only through the returns the caller hands it.
   - `periods_per_year::Number = 252`: Trading periods per year used for annualisation.
   - `alpha::Number = 0.05`: Tail probability for CVaR. Must satisfy `0 < alpha < 1`.
   - `compound::Bool = false`: If `true`, use compound cumulative returns for max drawdown.
+  - `benchmark::Option{<:VecNum} = nothing`: Benchmark return series for the three excess statistics.
+  - `pred`: A prediction result, whose held path gives the turnover bar.
 
 # Validation
 

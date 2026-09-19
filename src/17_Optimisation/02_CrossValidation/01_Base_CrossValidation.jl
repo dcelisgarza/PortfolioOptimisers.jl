@@ -2209,7 +2209,7 @@ end
 
 Read the Fold Fit of a cross-validation scheme: how [`fold_loop`](@ref) fits each fold.
 
-`nothing` means a refit from the fold's training window, which is the released behaviour and what every scheme answers unless it states otherwise. A walk-forward carries the switch in its `ff` field and answers it through a method of its own; a [`MultipleRandomised`](@ref) forwards to the walk-forward it wraps; a split result, a k-fold, a combinatorial scheme and a call site that holds no scheme reach this fallback. An [`OnlineStep`](@ref) sends the loop down its online arm.
+`nothing` means a refit from the fold's training window, which is the released behaviour and what every scheme answers unless it states otherwise. A walk-forward carries the switch in its `ff` field and answers it through a method of its own; a [`MultipleRandomised`](@ref) forwards to the walk-forward it wraps; a split result, a k-fold, a combinatorial scheme, a [`HindsightSplit`](@ref) — whose fold reads its test row and is refit by construction — and a call site that holds no scheme reach this fallback. An [`OnlineStep`](@ref) sends the loop down its online arm.
 
 The method is per type and takes the scheme itself, so inference reads the answer from the type of `cv`, exactly as [`fold_evaluation`](@ref) and [`folds_are_time_ordered`](@ref) do, and the arm that cannot run is eliminated.
 

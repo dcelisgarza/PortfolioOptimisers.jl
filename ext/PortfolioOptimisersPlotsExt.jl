@@ -2187,55 +2187,29 @@ function PortfolioOptimisers.plot_performance_summary(ps::PerformanceSummaryResu
                                                       kwargs...)
     conf = round((1 - ps.alpha) * 100; digits = 1)
     vals = [ps.ann_return * 100, ps.ann_volatility * 100, ps.sharpe, ps.sortino, ps.calmar,
-            ps.max_drawdown * 100, ps.cvar * 100]
+            ps.max_drawdown * 100, ps.cvar * 100, ps.excess_ret * 100,
+            ps.tracking_error * 100, ps.information_ratio, ps.turnover * 100]
     labels = ["Ann. Return %", "Ann. Vol %", "Sharpe", "Sortino", "Calmar", "Max DD %",
-              "$(conf)% CVaR %"]
+              "$(conf)% CVaR %", "Excess Ret %", "Track. Err %", "Info Ratio", "Turnover %"]
     colours = [v >= 0 ? :steelblue : :firebrick for v in vals]
     return bar(vals; xticks = (1:length(labels), labels), xrotation = 30,
                title = "Performance Summary", ylabel = "Value", legend = false,
                color = colours, kwargs...)
 end
-function PortfolioOptimisers.plot_performance_summary(w::ArrNum, X::MatNum,
-                                                      fees::Option{<:Fees} = nothing;
+# Every other arity computes the summary through `performance_summary`, whose own methods
+# validate it, and renders it through the method above; the four summary keywords go to the
+# summary and the rest to the bars.
+function PortfolioOptimisers.plot_performance_summary(x::Union{<:ArrNum,
+                                                               <:OptimisationResult,
+                                                               <:PortfolioOptimisers.PredRes_MultiPredRes},
+                                                      args...;
                                                       periods_per_year::Number = 252,
                                                       alpha::Number = 0.05,
-                                                      compound::Bool = false, kwargs...)
-    ps = performance_summary(w, X, fees; periods_per_year = periods_per_year, alpha = alpha,
-                             compound = compound)
-    return PortfolioOptimisers.plot_performance_summary(ps; kwargs...)
-end
-function PortfolioOptimisers.plot_performance_summary(ret::VecNum;
-                                                      periods_per_year::Number = 252,
-                                                      alpha::Number = 0.05,
-                                                      compound::Bool = false, kwargs...)
-    ps = performance_summary(ret; periods_per_year = periods_per_year, alpha = alpha,
-                             compound = compound)
-    return PortfolioOptimisers.plot_performance_summary(ps; kwargs...)
-end
-function PortfolioOptimisers.plot_performance_summary(w::ArrNum, rd::ReturnsResult,
-                                                      fees::Option{<:Fees} = nothing;
-                                                      alpha::Number = 0.05,
-                                                      compound::Bool = false, kwargs...)
-    ps = performance_summary(w, rd, fees; alpha = alpha, compound = compound)
-    return PortfolioOptimisers.plot_performance_summary(ps; kwargs...)
-end
-function PortfolioOptimisers.plot_performance_summary(res::OptimisationResult,
-                                                      rd::ReturnsResult;
-                                                      alpha::Number = 0.05,
-                                                      compound::Bool = false, kwargs...)
-    ps = performance_summary(res, rd; alpha = alpha, compound = compound)
-    return PortfolioOptimisers.plot_performance_summary(ps; kwargs...)
-end
-function PortfolioOptimisers.plot_performance_summary(pred::PredictionResult;
-                                                      alpha::Number = 0.05,
-                                                      compound::Bool = false, kwargs...)
-    ps = performance_summary(pred; alpha = alpha, compound = compound)
-    return PortfolioOptimisers.plot_performance_summary(ps; kwargs...)
-end
-function PortfolioOptimisers.plot_performance_summary(pred::MultiPeriodPredictionResult;
-                                                      alpha::Number = 0.05,
-                                                      compound::Bool = false, kwargs...)
-    ps = performance_summary(pred; alpha = alpha, compound = compound)
+                                                      compound::Bool = false,
+                                                      benchmark::Option{<:VecNum} = nothing,
+                                                      kwargs...)
+    ps = performance_summary(x, args...; periods_per_year = periods_per_year, alpha = alpha,
+                             compound = compound, benchmark = benchmark)
     return PortfolioOptimisers.plot_performance_summary(ps; kwargs...)
 end
 ## ────────────────────────────────────────────────────────────────────────────

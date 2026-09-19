@@ -940,6 +940,145 @@ function n_splits(dwf::DateWalkForward{<:Any}, rd::Prices_RR)
     end
     return special_div(last_allowed_start - M + 1, test_size) + 1
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+A cross-validator whose training set contains its test row by design: fold `t` trains on the rows through `t`, or on row `t` alone, and tests on row `t`.
+
+`HindsightSplit` is the Hindsight Comparator rule of [`log_wealth_regret`](@ref) taken per row. An estimator run through it with [`cross_val_predict`](@ref) reads the row it is scored on before it is scored on it, which no causal scheme may do and which this scheme does by declaration, so that the run yields the per-row comparators dynamic regret is stated against. Under `prefix = true` fold `t` trains on rows `1:t`: [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref), or [`BestConstantRebalancedPortfolio`](@ref), is then **be-the-leader**, the best constant rebalanced portfolio over the rows through `t` played on row `t`. Under `prefix = false` fold `t` trains on row `t` alone: the top-1 [`ScoreSelector`](@ref) under [`RankRule`](@ref)`(; best = 1)` and [`MeanReturn`](@ref)`(; flag = true)` composed with [`EqualWeighted`](@ref) in a [`Pipeline`](@ref) is then the **per-period minimiser**, one-hot on the row's best asset, whose terminal wealth is ``\\prod_t \\max_i x_{t,i}`` over the price relatives ``x``. A ``K``-switch comparator is any piecewise-constant path the caller builds. The test window is one row, and every row from `start` to the last is a fold, so the scheme's rows are those of an [`IndexWalkForward`](@ref)`(start - 1, 1)` over the same data, and the two prediction results share the timestamps the regret verb demands.
+
+The scheme is a walk-forward in every other respect: its folds are a timeline, it carries the Weight Drift, the Previous-Weights Source, the Fee Clock and the two flags of [`IndexWalkForward`](@ref), and [`fold_evaluation`](@ref) reads them. It carries no Fold Fit, because a fold that reads its test row is refit from its training window by construction.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    HindsightSplit(;
+        prefix::Bool = true,
+        start::Integer = 1,
+        wd::Option{<:AbstractWeightDrift} = nothing,
+        pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+        fa::Option{<:AbstractFeeAmortisation} = nothing,
+        store_weight_path::Bool = false,
+        strict::Bool = false,
+    ) -> HindsightSplit
+
+Keyword arguments correspond to the struct's fields.
+
+## Validation
+
+  - `start >= 1`.
+
+The rule `start <= T`, where `T` is the number of observations, belongs to the data rather
+than to the estimator, so [`Base.split`](@ref) checks it.
+
+# Examples
+
+```jldoctest
+julia> HindsightSplit(; prefix = false, start = 21)
+HindsightSplit
+             prefix ┼ Bool: false
+              start ┼ Int64: 21
+  store_weight_path ┼ Bool: false
+             strict ┴ Bool: false
+```
+
+# Related
+
+  - [`log_wealth_regret`](@ref)
+  - [`LogWealthRegretResult`](@ref)
+  - [`cross_val_predict`](@ref)
+  - [`IndexWalkForward`](@ref)
+  - [`WalkForwardEstimator`](@ref)
+  - [`WalkForwardResult`](@ref)
+  - [`BestConstantRebalancedPortfolio`](@ref)
+  - [`n_splits`](@ref)
+"""
+@concrete struct HindsightSplit <: WalkForwardEstimator
+    """
+    `prefix`: If `true`, fold `t` trains on rows `1:t`, the prefix through its test row; if `false`, on row `t` alone.
+    """
+    prefix
+    """
+    `start`: First row scored. Every row from it to the last is a fold, so a scheme over the rows of an [`IndexWalkForward`](@ref)`(train_size, 1)` sets `start = train_size + 1`.
+    """
+    start
+    """
+    $(field_dict[:wd])
+    """
+    wd
+    """
+    $(field_dict[:pws])
+    """
+    pws
+    """
+    $(field_dict[:fa_cv])
+    """
+    fa
+    """
+    $(field_dict[:store_weight_path])
+    """
+    store_weight_path
+    """
+    $(field_dict[:cv_strict])
+    """
+    strict
+    function HindsightSplit(prefix::Bool, start::Integer, wd::Option{<:AbstractWeightDrift},
+                            pws::Option{<:AbstractPreviousWeightsSource},
+                            fa::Option{<:AbstractFeeAmortisation}, store_weight_path::Bool,
+                            strict::Bool)
+        assert_nonempty_gt0_finite_val(start, :start)
+        return new{typeof(prefix), typeof(start), typeof(wd), typeof(pws), typeof(fa),
+                   typeof(store_weight_path), typeof(strict)}(prefix, start, wd, pws, fa,
+                                                              store_weight_path, strict)
+    end
+end
+function HindsightSplit(; prefix::Bool = true, start::Integer = 1,
+                        wd::Option{<:AbstractWeightDrift} = nothing,
+                        pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+                        fa::Option{<:AbstractFeeAmortisation} = nothing,
+                        store_weight_path::Bool = false, strict::Bool = false)
+    return HindsightSplit(prefix, start, wd, pws, fa, store_weight_path, strict)
+end
+"""
+    Base.split(hs::HindsightSplit, rd::Prices_RR) -> WalkForwardResult
+
+Split the returns data `rd` into one fold per row from `start` to the last: fold `t` tests on
+row `t` and trains on rows `1:t` under `prefix = true`, on row `t` alone otherwise.
+
+# Arguments
+
+  - `hs::HindsightSplit`: Hindsight splitter.
+  - `rd`: Returns-level or price-level data to split ([`Prices_RR`](@ref)).
+
+# Validation
+
+  - `start <= T`, where `T` is the number of observations in `rd`.
+
+# Returns
+
+  - `WalkForwardResult`: Result containing train and test index ranges for each fold.
+
+# Related
+
+  - [`HindsightSplit`](@ref)
+  - [`WalkForwardResult`](@ref)
+  - [`n_splits`](@ref)
+"""
+function Base.split(hs::HindsightSplit, rd::Prices_RR)
+    (; prefix, start) = hs
+    T = cv_nobs(rd)
+    @argcheck(start <= T, DomainError(start, "start ($start) must not exceed T ($T)"))
+    idx = 1:T
+    train_idx = [prefix ? idx[1:t] : idx[t:t] for t in start:T]
+    test_idx = [idx[t:t] for t in start:T]
+    return WalkForwardResult(; train_idx = train_idx, test_idx = test_idx)
+end
+function n_splits(hs::HindsightSplit, rd::Prices_RR)
+    return cv_nobs(rd) - hs.start + 1
+end
 function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::WFCVER; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
@@ -1017,6 +1156,28 @@ function fold_evaluation(cv::DateWalkForward)
             store_weight_path = cv.store_weight_path, strict = cv.strict)
 end
 """
+    fold_evaluation(cv::HindsightSplit)
+
+Read the evaluation switches of a [`HindsightSplit`](@ref).
+
+The folds of this scheme are a timeline, so it carries both weight switches and states both of them here, beside the Fee Clock of its realised series.
+
+# Returns
+
+  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
+
+# Related
+
+  - [`fold_evaluation`](@ref)
+  - [`HindsightSplit`](@ref)
+  - [`held_weights_drift`](@ref)
+  - [`override_fee_amortisation`](@ref)
+"""
+function fold_evaluation(cv::HindsightSplit)
+    return (; wd = cv.wd, pws = cv.pws, fa = cv.fa,
+            store_weight_path = cv.store_weight_path, strict = cv.strict)
+end
+"""
     fold_fit(cv::IndexWalkForward)
     fold_fit(cv::DateWalkForward)
 
@@ -1078,4 +1239,5 @@ function assert_fold_fit_expands(expand_train::Bool, ff::Option{<:AbstractFoldFi
               ArgumentError("`expand_train = false` beside `ff = $(nameof(typeof(ff)))()`: a Fold Fit folds each fold's new observations into one threaded estimator and cannot un-fold one, so an online run is expanding by construction and the loop has no rolling window to give. Leave `expand_train` unset, and for a rolling window computed online cap the prior's buffer instead: `Online(pe; max_history = $(cap))`, whose read-out is a batch fit over the last `max_history` rows."))
     return nothing
 end
-export WalkForwardResult, IndexWalkForward, DateWalkForward, OnlineStep, n_splits
+export WalkForwardResult, IndexWalkForward, DateWalkForward, HindsightSplit, OnlineStep,
+       n_splits
