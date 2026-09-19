@@ -236,11 +236,11 @@ Every rule is a value of the head's `alg` slot. The groups are Li and Hoi's (201
     hindsight, [`BestConstantRebalancedPortfolio`](@ref).
   - **Follow the winner** — [`MirrorDescent`](@ref) and its constructors
     [`ExponentiatedGradient`](@ref), [`GradientProjection`](@ref), [`EGE`](@ref), [`EGR`](@ref),
-    [`EGA`](@ref); [`NewtonStep`](@ref); [`AdaptiveSubgradient`](@ref); [`OptimisticStep`](@ref);
-    [`ExpectationMaximisation`](@ref); [`UniversalPortfolio`](@ref);
-    [`AggregatingExponentialGradient`](@ref). A rate may be a schedule:
-    [`InverseSquareRootRate`](@ref), [`DoublingTrickRate`](@ref), [`SelfConfidentRate`](@ref),
-    [`HintResidualRate`](@ref).
+    [`EGA`](@ref), [`MAEG`](@ref), [`AEG`](@ref); [`NewtonStep`](@ref);
+    [`AdaptiveSubgradient`](@ref); [`OptimisticStep`](@ref); [`ExpectationMaximisation`](@ref);
+    [`UniversalPortfolio`](@ref); [`AggregatingExponentialGradient`](@ref). A rate may be a
+    schedule: [`InverseSquareRootRate`](@ref), [`DoublingTrickRate`](@ref),
+    [`SelfConfidentRate`](@ref), [`HintResidualRate`](@ref), [`WindowedBestRate`](@ref).
   - **Follow the loser** — [`PassiveAggressiveMeanReversion`](@ref);
     [`ForecastReversion`](@ref) and its constructors [`MovingAverageReversion`](@ref),
     [`ExponentialMovingAverageReversion`](@ref), [`RobustMedianReversion`](@ref),

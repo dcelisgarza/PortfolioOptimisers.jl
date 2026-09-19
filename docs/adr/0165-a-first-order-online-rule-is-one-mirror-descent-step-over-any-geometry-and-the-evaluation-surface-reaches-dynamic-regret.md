@@ -92,14 +92,28 @@ with the period count kept, because the stages are cumulative and the count is w
 is found from. The schedule that sets the share answers it through `mixing_share(sched, t, alpha)`,
 which every other schedule and a number pass through.
 A schedule's running statistic lives in the rule's carrier, seeded by the schedule, because the
-carrier is the rule's (ADR 0157). Three schedules ship: `InverseSquareRootRate(; c)`, `c/√t`, the
+carrier is the rule's (ADR 0157). Four schedules ship: `InverseSquareRootRate(; c)`, `c/√t`, the
 anytime rule of Zinkevich (2003, Theorem 1) and Hazan (2016, Theorem 3.1) and, at the paper's
 `c`, the anytime Soft-Bayes rate of Orseau, Lattimore and Legg (2017, Theorem 10); the
 **doubling trick** of Helmbold and co-authors (1998, Corollary 4.3), stages of `2^i N² log N`
-periods with `α` and `η` set from the stage length and a restart at each boundary; and the
+periods with `α` and `η` set from the stage length and a restart at each boundary; the
 **self-confident rate** of Orseau, Lattimore and Legg (2017, Theorems 5 and 6), which reads the
-running `C₁ = Σ_t max_i (x_{t,i}/⟨w_t, x_t⟩ − 1)` from the carrier. The fixed-horizon constants of
-the theorems need `T`, which no online rule knows, and are documented formulas.
+running `C₁ = Σ_t max_i (x_{t,i}/⟨w_t, x_t⟩ − 1)` from the carrier; and the **windowed best
+rate** of Zhang, Lin, Zheng and Yang (2022), `WindowedBestRate(; etas, window)`, which keeps one
+exponentiated-gradient run per rate of `etas` on the carrier as an expert (the paper's `b_t(η)`,
+a persistent trajectory from the Start Allocation, never a replay from a window's start) and
+takes the rate of the expert whose wealth over the last `window` periods is the largest, the
+whole history at `window = nothing`; `MAEG(; etas, window)` and `AEG(; etas)` are constructors
+of the entropic rule under it at the paper's defaults, `0.001:0.001:0.2` and `30`. The paper
+chooses the rate *after* the period's price relative is received (its `η_{t+1}` forms `b_{t+1}`
+from `b_t` and `x_t`), where the other three read the past alone, so the seam gains one trait,
+`reads_period_row(sched)`, `false` by default: a rule writes the schedule's statistic before it
+reads the rate when the trait answers `true` and after its step otherwise, through the pair
+`statistic_before_rate`/`statistic_after_step`, and `ExpectationMaximisation` refuses a schedule
+that answers `true` at construction, because its online form reads the rate of the next period as
+well. A statistic that lies over the assets, as the experts do, is sliced with the carrier through
+`schedule_state_view`. The fixed-horizon constants of the theorems need `T`, which no online rule
+knows, and are documented formulas.
 
 `ExpectationMaximisation`'s update is written in the online form of Orseau, Lattimore and Legg
 (2017, Eq. 14): `w′ = (EM step at η_t)·η_{t+1}/η_t + (1 − η_{t+1}/η_t)·w₁`. At a constant `η`
@@ -255,7 +269,8 @@ A rule enters a build from its paper, as the peak-tracking task set. The rows wh
 closed and whose abstract does not fix the update — AICTR, TPPT, KTPT, GWR, LOAD, PIRA, EGM,
 MAEG/AEG, and the weak-aggregating-algorithm weighting with the two papers that run it — wait on
 one task ticket: the maintainer supplies the PDF, the ticket records the update, and a build
-graduates. Three rows are **out of the map's scope by input**: a rule reading trading volume, a
+graduates. MAEG/AEG was the last of them to arrive, on its own issue after the map closed, and
+the schedule paragraph above records what its full text fixed. Three rows are **out of the map's scope by input**: a rule reading trading volume, a
 market-index series or a stock network needs a side panel the head does not carry, a head change
 and not a rule. The barrier-regularised Newton step and its adaptive form are fog: a Gram-plus-barrier
 geometry that needs a solver on every set, and a restart keyed on a prefix programme whose own

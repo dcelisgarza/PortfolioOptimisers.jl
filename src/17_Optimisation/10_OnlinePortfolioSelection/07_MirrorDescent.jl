@@ -224,6 +224,165 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+The carrier a [`WindowedBestRate`](@ref) keeps on the rule's carrier: the expert allocations, one exponentiated-gradient run per rate, and the ring of their period log returns the window is summed over.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`WindowedBestRate`](@ref)
+  - [`MirrorDescentState`](@ref)
+"""
+@concrete struct WindowedBestRateState
+    """
+    $(field_dict[:pf_n])
+    """
+    n
+    """
+    The experts' allocations, `assets × rates`, column `k` the exponentiated-gradient run at the `k`-th rate from the Start Allocation.
+    """
+    B
+    """
+    The experts' log period returns, `window × rates`, a ring the row of period `t` overwrites at `mod1(t, window)`; `1 × rates` and a running sum under the whole history.
+    """
+    L
+end
+function Base.copy(x::WindowedBestRateState)
+    return WindowedBestRateState(x.n, copy(x.B), copy(x.L))
+end
+function schedule_state_view(s::WindowedBestRateState, i)
+    B = s.B[i, :]
+    for k in axes(B, 2)
+        B[:, k] = renormalised_view(view(s.B, :, k), i)
+    end
+    return WindowedBestRateState(s.n, B, copy(s.L))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The moving-window adaptive rate of Zhang, Lin, Zheng and Yang (2022): every rate in `etas` names an expert, the exponentiated gradient run at that rate from the Start Allocation, and the rate of the period is the expert's whose cumulative wealth over the last `window` periods is the largest, the whole history when `window` is `nothing` (MAEG; AEG under the whole history).
+
+# Mathematical definition
+
+With ``H`` the rate set and ``w`` the window, the carrier keeps the allocation ``\\boldsymbol{b}_t(\\eta)`` of every expert, the plain entropic step at its own rate from the Start Allocation. At period ``t``, after the price relative ``\\boldsymbol{x}_t`` is received, the expert's windowed wealth is
+
+```math
+\\begin{align}
+S_t(\\eta) &= \\prod_{\\tau = t'}^{t} \\langle \\boldsymbol{b}_\\tau(\\eta), \\boldsymbol{x}_\\tau \\rangle\\,,\\quad t' = \\max(1, t - w + 1)\\,,
+\\end{align}
+```
+
+and the rate of the rule's update at period ``t`` — the paper's ``\\eta_{t+1}``, which forms ``\\boldsymbol{b}_{t+1}`` from ``\\boldsymbol{b}_t`` and ``\\boldsymbol{x}_t`` — is ``\\arg\\max_{\\eta \\in H} S_t(\\eta)``, the first of `etas` at a tie. The rate is chosen from the period's own row, so the schedule answers `true` to [`reads_period_row`](@ref) and the rule writes the experts before it reads the rate. Under the whole history ``t' = 1`` and the carrier keeps one running sum per expert in place of the ring; the window is summed in logs, so the comparison never overflows.
+
+The experts are a statistic of the run and are never played: they take the paper's plain entropic step over the simplex from the rule's Start Allocation, whatever the rule's own geometry, Allocation Set, uniform mix, Gradient Transform and objective, and the rate they choose is applied to the rule's own step. The schedule is the entropic rule's, and on another geometry it is a rate chosen by replaying the exponentiated gradient. The paper's rate set is the practice of Helmbold, Schapire, Singer and Warmuth (1998), `0.001:0.001:0.2`, and its window is `30`, chosen over `7` on its own data; it reports the wealth insensitive to the window over `2` to `50`. A period costs one entropic step per rate and a sum over the ring, `O((N + w) K)` at `K` rates. The online form of [`ExpectationMaximisation`](@ref) refuses the schedule by name, because it reads the rate of the next period as well.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    WindowedBestRate(; etas::AbstractVector{<:Real} = 0.001:0.001:0.2, window::Option{<:Integer} = 30) -> WindowedBestRate
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `etas`: non-empty, and every element is positive and finite.
+  - `window >= 1` when it is a number. A `DomainError` is thrown otherwise.
+
+# Examples
+
+```jldoctest
+julia> WindowedBestRate()
+WindowedBestRate
+    etas ┼ 200-element StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}
+  window ┴ Int64: 30
+```
+
+# Related
+
+  - [`AbstractLearningRateSchedule`](@ref)
+  - [`WindowedBestRateState`](@ref)
+  - [`MirrorDescent`](@ref)
+  - [`MAEG`](@ref)
+  - [`AEG`](@ref)
+
+# References
+
+  - $(ref_dict[:zhang2022maeg])
+  - $(ref_dict[:helmbold1998])
+"""
+struct WindowedBestRate{T1 <: AbstractVector{<:Real}, T2 <: Option{<:Integer}} <:
+       AbstractLearningRateSchedule
+    """
+    The rates the experts run at, one exponentiated-gradient run each.
+    """
+    etas::T1
+    """
+    The number of periods the experts' wealth is compared over; `nothing` is the whole history.
+    """
+    window::T2
+    function WindowedBestRate(etas::AbstractVector{<:Real}, window::Option{<:Integer})
+        assert_nonempty_gt0_finite_val(etas, :etas)
+        if !isnothing(window)
+            @argcheck(window >= 1, DomainError(window, "window must be at least 1"))
+        end
+        return new{typeof(etas), typeof(window)}(etas, window)
+    end
+end
+function WindowedBestRate(; etas::AbstractVector{<:Real} = 0.001:0.001:0.2,
+                          window::Option{<:Integer} = 30)::WindowedBestRate
+    return WindowedBestRate(etas, window)
+end
+function reads_period_row(::WindowedBestRate)
+    return true
+end
+function schedule_state_seed(sched::WindowedBestRate, w::AbstractVector)
+    K = length(sched.etas)
+    rows = isnothing(sched.window) ? 1 : sched.window
+    return WindowedBestRateState(0, repeat(w, 1, K), zeros(eltype(w), rows, K))
+end
+"""
+    ring_row(window::Nothing, n::Integer)
+    ring_row(window::Integer, n::Integer)
+
+The row of a [`WindowedBestRateState`](@ref)'s ring that period `n` writes: `mod1(n, window)` under a window, and the one row of the running sum under the whole history.
+
+# Related
+
+  - [`WindowedBestRate`](@ref)
+  - [`WindowedBestRateState`](@ref)
+"""
+function ring_row(::Nothing, ::Integer)
+    return 1
+end
+function ring_row(window::Integer, n::Integer)
+    return mod1(n, window)
+end
+function schedule_update!(sched::WindowedBestRate, s::WindowedBestRateState,
+                          ::AbstractVector, x::AbstractVector)
+    n = s.n + 1
+    row = ring_row(sched.window, n)
+    # A ring row is overwritten; the one row of the whole history accumulates.
+    keep = isnothing(sched.window)
+    for (k, eta) in enumerate(sched.etas)
+        b = view(s.B, :, k)
+        r = LinearAlgebra.dot(b, x)
+        s.L[row, k] = ifelse(keep, s.L[row, k], zero(r)) + log(r)
+        b .*= exp.(eta .* x ./ r)
+        b ./= sum(b)
+    end
+    return WindowedBestRateState(n, s.B, s.L)
+end
+function learning_rate(sched::WindowedBestRate, ::Integer, st)
+    return sched.etas[argmax(vec(sum(st.s.L; dims = 1)))]
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Abstract supertype for the Gradient Transforms a [`MirrorDescent`](@ref) rule may apply to its gradient before the mirror step: the momentum carriers of Li, Zheng, Chen, Wang and Xu (2022), which rescale the exponent of the multiplicative update and leave the update itself untouched.
 
 # Interfaces
@@ -780,7 +939,7 @@ function Base.copy(x::MirrorDescentState)
 end
 function port_opt_view(x::MirrorDescentState, i, args...)
     return MirrorDescentState(x.n, renormalised_view(x.u, i), renormalised_view(x.w0, i),
-                              copy_column(x.s), gradient_state_view(x.gs, i))
+                              schedule_state_view(x.s, i), gradient_state_view(x.gs, i))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -946,13 +1105,17 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
         return MirrorDescentState(t, u0, st.w0, schedule_state_seed(alg.eta, st.w0),
                                   gradient_state_seed(alg.grad, st.w0)), copy(u0)
     end
+    # A schedule that chooses the rate from the period's row writes its statistic here, and
+    # every other one after the step; the carrier the rate is read from carries the answer.
+    st = MirrorDescentState(st.n, st.u, st.w0, statistic_before_rate(alg.eta, st.s, w, x),
+                            st.gs)
     eta = learning_rate(alg.eta, t, st)
     alpha = mixing_share(alg.eta, t, alg.alpha)
     xm = iszero(alpha) ? x : (1 - alpha / length(x)) .* x .+ alpha / length(x)
     g = loss_gradient(alg.obj, point, xm, rows)
     q = mirror_step(alg.proj, st.u, eta .* transform_gradient!(alg.grad, st.gs, g))
     u = project(alg.proj, set, q, wh)
-    s = schedule_update!(alg.eta, st.s, w, x)
+    s = statistic_after_step(alg.eta, st.s, w, x)
     played = played_allocation(u, alpha)
     return MirrorDescentState(t, u, st.w0, s, st.gs),
            iszero(alpha) ? played : reprojection(alg.proj, set, played, wh)
@@ -1172,8 +1335,79 @@ function EGA(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
                                  grad = AdaptiveMomentGradient(; gamma1 = gamma1,
                                                                gamma2 = gamma2, eps = eps))
 end
+"""
+    MAEG(; etas::AbstractVector{<:Real} = 0.001:0.001:0.2, window::Integer = 30, alpha::Real = 0)
+
+The moving-window-based adaptive exponential gradient of Zhang, Lin, Zheng and Yang (2022): [`ExponentiatedGradient`](@ref) under a [`WindowedBestRate`](@ref) over `window` periods (MAEG).
+
+The defaults are the paper's: the rate set of Helmbold, Schapire, Singer and Warmuth (1998) and the window of `30` it chose over `7`.
+
+# Examples
+
+```jldoctest
+julia> MAEG(; etas = [0.05, 0.1], window = 5)
+MirrorDescent
+    eta ┼ WindowedBestRate
+        │     etas ┼ Vector{Float64}: [0.05, 0.1]
+        │   window ┴ Int64: 5
+   proj ┼ EntropicProjection()
+  alpha ┼ Int64: 0
+    obj ┼ LogWealth()
+   grad ┴ PlainGradient()
+```
+
+# Related
+
+  - [`MirrorDescent`](@ref)
+  - [`WindowedBestRate`](@ref)
+  - [`AEG`](@ref)
+
+# References
+
+  - $(ref_dict[:zhang2022maeg])
+"""
+function MAEG(; etas::AbstractVector{<:Real} = 0.001:0.001:0.2, window::Integer = 30,
+              alpha::Real = 0)::MirrorDescent
+    return ExponentiatedGradient(; eta = WindowedBestRate(; etas = etas, window = window),
+                                 alpha = alpha)
+end
+"""
+    AEG(; etas::AbstractVector{<:Real} = 0.001:0.001:0.2, alpha::Real = 0)
+
+The adaptive exponential gradient of Zhang, Lin, Zheng and Yang (2022): [`ExponentiatedGradient`](@ref) under a [`WindowedBestRate`](@ref) over the whole history, the paper's special case of [`MAEG`](@ref) whose window is the horizon (AEG).
+
+# Examples
+
+```jldoctest
+julia> AEG(; etas = [0.05, 0.1])
+MirrorDescent
+    eta ┼ WindowedBestRate
+        │     etas ┼ Vector{Float64}: [0.05, 0.1]
+        │   window ┴ nothing
+   proj ┼ EntropicProjection()
+  alpha ┼ Int64: 0
+    obj ┼ LogWealth()
+   grad ┴ PlainGradient()
+```
+
+# Related
+
+  - [`MirrorDescent`](@ref)
+  - [`WindowedBestRate`](@ref)
+  - [`MAEG`](@ref)
+
+# References
+
+  - $(ref_dict[:zhang2022maeg])
+"""
+function AEG(; etas::AbstractVector{<:Real} = 0.001:0.001:0.2,
+             alpha::Real = 0)::MirrorDescent
+    return ExponentiatedGradient(; eta = WindowedBestRate(; etas = etas, window = nothing),
+                                 alpha = alpha)
+end
 export MirrorDescent, ExponentiatedGradient, GradientProjection, EGE, EGR, EGA, LogWealth,
-       RiskLoss, InverseSquareRootRate, DoublingTrickRate, SelfConfidentRate, PlainGradient,
-       GradientMomentum, RootMeanSquareGradient, AdaptiveMomentGradient
+       RiskLoss, InverseSquareRootRate, DoublingTrickRate, SelfConfidentRate,
+       WindowedBestRate, MAEG, AEG, PlainGradient, GradientMomentum, RootMeanSquareGradient,
+       AdaptiveMomentGradient
 public AbstractGradientTransform, gradient_state_seed, transform_gradient!,
        gradient_state_view, AbstractOnlineObjective, loss_gradient

@@ -9,7 +9,9 @@ Every literal below states its provenance: the exponentiated-gradient identity i
 example; the Euclidean, momentum and scheduled paths are hand recursions of the stated
 formulas; the barrier roots are checked against an independent bisection at `1e-12`; the
 doubling trick's first stage length is Corollary 4.3's `ceil(2 N^2 log N)`. The Risk Loss
-(issue #1182) is checked against a hand recursion on the window's sample covariance.
+(issue #1182) is checked against a hand recursion on the window's sample covariance. The
+windowed best rate (issue #1187) is checked against a hand recursion of its paper's
+Algorithm 2 at the paper's defaults.
 =#
 using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, Clarabel,
       JuMP
@@ -357,6 +359,145 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
             o = po.partial_fit!(po.partial_fit!(opt, rows(rd, 1:10)), rows(rd, 11:18))
             @test optimise(o).w == optimise(opt, rows(rd, 1:18)).w
         end
+    end
+
+    @testset "The windowed best rate of the moving-window adaptive paper" begin
+        # Construction and the refusals.
+        @test_throws po.IsEmptyError WindowedBestRate(; etas = Float64[])
+        @test_throws DomainError WindowedBestRate(; etas = [0.0, 0.1])
+        @test_throws DomainError WindowedBestRate(; etas = [0.1, Inf])
+        @test_throws DomainError WindowedBestRate(; window = 0)
+        wbr = WindowedBestRate()
+        @test wbr.etas == 0.001:0.001:0.2 && length(wbr.etas) == 200 && wbr.window == 30
+        @test isnothing(WindowedBestRate(; window = nothing).window)
+        @test isa(MAEG(), MirrorDescent) &&
+              MAEG().eta == wbr &&
+              isa(MAEG().proj, EntropicProjection)
+        @test MAEG(; window = 7).eta.window == 7 && MAEG(; alpha = 0.1).alpha == 0.1
+        @test isnothing(AEG().eta.window) && AEG().eta.etas == wbr.etas
+        # The trait: the rate is chosen from the period's row, and every other schedule
+        # and a number read the past alone.
+        @test po.reads_period_row(wbr)
+        @test !po.reads_period_row(0.05) && !po.reads_period_row(SelfConfidentRate())
+        @test !po.reads_period_row(InverseSquareRootRate()) &&
+              !po.reads_period_row(DoublingTrickRate(; N = 2))
+        @test_throws ArgumentError ExpectationMaximisation(; eta = wbr)
+        @test_throws ArgumentError ExpectationMaximisation(; eta = AEG().eta)
+
+        # Algorithm 2 of the paper as a hand recursion over the rows: every expert is the
+        # exponentiated gradient at its own rate from the uniform allocation, the window's
+        # cumulative return of each is the product of its period returns over the last `w`
+        # periods (the whole prefix while fewer have passed), and b_{t+1} is the investor's
+        # own exponentiated-gradient step at the best expert's rate, after x_t is received.
+        function maegpath(H, w)
+            K = length(H)
+            B = fill(1 / N, N, K)
+            S = zeros(T, K)
+            W = zeros(T, N)
+            W[1, :] .= 1 / N
+            for t in 1:(T - 1)
+                x = X[t, :]
+                for k in 1:K
+                    S[t, k] = dot(B[:, k], x)
+                end
+                lo = isnothing(w) ? 1 : max(1, t - w + 1)
+                wealth = [prod(S[lo:t, k]) for k in 1:K]
+                eta = H[argmax(wealth)]
+                b = W[t, :]
+                q = b .* exp.(eta .* x ./ dot(b, x))
+                W[t + 1, :] .= q ./ sum(q)
+                for k in 1:K
+                    bk = B[:, k]
+                    qk = bk .* exp.(H[k] .* x ./ dot(bk, x))
+                    B[:, k] .= qk ./ sum(qk)
+                end
+            end
+            return W
+        end
+        # Parity at the paper's defaults, and under the whole history.
+        @test maxerr(libpath(MAEG()), maegpath(0.001:0.001:0.2, 30)) < 1e-13
+        @test maxerr(libpath(AEG()), maegpath(0.001:0.001:0.2, nothing)) < 1e-13
+        # A short window on a coarse grid, where the chosen rate visibly switches.
+        H = [0.01, 0.05, 0.2]
+        Wl = libpath(MAEG(; etas = H, window = 3))
+        @test maxerr(Wl, maegpath(H, 3)) < 1e-14
+        @test maxerr(libpath(MAEG(; etas = H, window = 3)),
+                     libpath(ExponentiatedGradient(; eta = 0.05))) > 1e-6
+        # The schedule is a rate, not a rule: at one rate it is the constant step.
+        @test maxerr(libpath(MAEG(; etas = [0.05], window = 3)),
+                     libpath(ExponentiatedGradient(; eta = 0.05))) < 1e-15
+
+        # The carrier: the experts are on the simplex, the ring holds the last `window` log
+        # returns of each expert, and the rate read after the fold is the one just used.
+        sched = WindowedBestRate(; etas = H, window = 3)
+        opt = OPS(; alg = ExponentiatedGradient(; eta = sched))
+        o = po.partial_fit!(opt, rows(rd, 1:7))
+        s = o.cache.st.s
+        @test s.n == 7 && size(s.B) == (N, 3) && size(s.L) == (3, 3)
+        @test all(isapprox.(vec(sum(s.B; dims = 1)), 1; atol = 1e-14))
+        Bh = fill(1 / N, N, 3)
+        Lh = zeros(7, 3)
+        for t in 1:7, k in 1:3
+            x = X[t, :]
+            Lh[t, k] = log(dot(Bh[:, k], x))
+            qk = Bh[:, k] .* exp.(H[k] .* x ./ dot(Bh[:, k], x))
+            Bh[:, k] .= qk ./ sum(qk)
+        end
+        @test isapprox(vec(sum(s.L; dims = 1)), vec(sum(Lh[5:7, :]; dims = 1));
+                       atol = 1e-14)
+        @test isapprox(s.B, Bh; atol = 1e-14)
+        @test po.learning_rate(sched, 8, o.cache.st) ==
+              H[argmax(vec(sum(Lh[5:7, :]; dims = 1)))]
+        # The whole history keeps one running sum per expert.
+        oa = po.partial_fit!(OPS(; alg = AEG(; etas = H)), rows(rd, 1:7))
+        @test size(oa.cache.st.s.L) == (1, 3)
+        @test isapprox(vec(oa.cache.st.s.L), vec(sum(Lh; dims = 1)); atol = 1e-14)
+        # Before the first row the seed is the start allocation at every rate, and the
+        # rate of an unwritten ring is the first of the set.
+        seed = po.rule_state_seed(ExponentiatedGradient(; eta = sched), fill(0.25, N))
+        @test seed.s.n == 0 && seed.s.B == fill(0.25, N, 3) && seed.s.L == zeros(3, 3)
+        @test po.learning_rate(sched, 1, seed) == H[1]
+        # The copy is deep, and the view slices and renormalises every expert.
+        c = copy(o.cache.st)
+        @test c.s.B == s.B && c.s.B !== s.B && c.s.L == s.L && c.s.L !== s.L
+        v = po.port_opt_view(o.cache.st, [1, 3])
+        @test size(v.s.B) == (2, 3) && v.s.n == 7 && v.s.L == s.L
+        @test isapprox(v.s.B, s.B[[1, 3], :] ./ sum(s.B[[1, 3], :]; dims = 1); atol = 1e-15)
+        @test v.s.B == stack(po.renormalised_view(s.B[:, k], [1, 3]) for k in 1:3)
+        # The fold is the batch, and the read-out under a view is the viewed recursion.
+        o2 = po.partial_fit!(po.partial_fit!(opt, rows(rd, 1:10)), rows(rd, 11:18))
+        @test optimise(o2).w == optimise(opt, rows(rd, 1:18)).w
+
+        # Under a cap the rule's own step is projected while the experts stay the paper's
+        # unconstrained runs; the chosen rate is theirs.
+        cap = WeightBounds(; lb = 0, ub = 0.3)
+        oc = po.partial_fit!(OPS(; alg = MAEG(; etas = H, window = 3),
+                                 set = BoundedAllocationSet(; wb = cap)), rows(rd, 1:12))
+        @test all(oc.cache.w .<= 0.3 + 1e-12) && isapprox(sum(oc.cache.w), 1; atol = 1e-12)
+        @test isapprox(oc.cache.st.s.B,
+                       po.partial_fit!(OPS(; alg = MAEG(; etas = H, window = 3)),
+                                       rows(rd, 1:12)).cache.st.s.B; atol = 1e-14)
+        # The optimistic wrapper and a mixture's weighting carry the schedule too.
+        oo = po.partial_fit!(OPS(;
+                                 alg = OptimisticStep(; alg = MAEG(; etas = H, window = 3))),
+                             rows(rd, 1:6))
+        @test oo.cache.st.s.n == 6 && isapprox(sum(oo.cache.w), 1; atol = 1e-12)
+        vo = po.port_opt_view(oo.cache.st, [2, 4])
+        @test size(vo.s.B) == (2, 3)
+        mix = ExpertMixture(; experts = [BuyAndHold(), GradientProjection()],
+                            alg = ExponentiatedGradient(; eta = sched))
+        om = po.partial_fit!(OPS(; alg = mix), rows(rd, 1:5))
+        @test om.cache.st.pst.n == 5 &&
+              om.cache.st.pst.s.n == 5 &&
+              size(om.cache.st.pst.s.B) == (2, 3)
+        # The other schedules are untouched by the write point: the self-confident rate
+        # still reads the excess through the previous row.
+        sc = SelfConfidentRate(; eta_max = 0.8)
+        osc = po.partial_fit!(OPS(; alg = ExponentiatedGradient(; eta = sc)), rows(rd, 1:9))
+        Wsc = libpath(ExponentiatedGradient(; eta = sc))
+        @test isapprox(osc.cache.st.s[1],
+                       sum(maximum(X[t, :] ./ dot(Wsc[t, :], X[t, :])) - 1 for t in 1:9);
+                       atol = 1e-13)
     end
 
     @testset "The momentum transforms of the EGM paper" begin

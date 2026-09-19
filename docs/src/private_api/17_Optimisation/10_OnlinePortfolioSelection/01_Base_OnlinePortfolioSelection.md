@@ -25,6 +25,8 @@ PortfolioOptimisers.price_adjusted_allocation
 PortfolioOptimisers.OnlinePortfolioSelectionState
 Base.copy(x::PortfolioOptimisers.OnlinePortfolioSelectionState)
 PortfolioOptimisers.renormalised_view
+PortfolioOptimisers.statistic_before_rate
+PortfolioOptimisers.statistic_after_step
 ```
 
 ## References

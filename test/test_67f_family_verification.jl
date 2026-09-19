@@ -112,6 +112,7 @@ and is held to the family's promises:
               "MirrorDescent(doubling)" =>
                   MirrorDescent(; eta = DoublingTrickRate(; N = 2)),
               "MirrorDescent(self-confident)" => MirrorDescent(; eta = SelfConfidentRate()),
+              "MAEG" => MAEG(; etas = [0.05, 0.1], window = 3),
               "MirrorDescent(RiskLoss)" => MirrorDescent(; obj = RiskLoss(; window = 5)),
               "FollowTheLeader" => FollowTheLeader(),
               "FollowTheLeader(gamma)" => FollowTheLeader(; gamma = 0.3),

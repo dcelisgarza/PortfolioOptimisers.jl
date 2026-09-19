@@ -661,8 +661,8 @@ function Base.copy(x::OptimisticStepState)
 end
 function port_opt_view(x::OptimisticStepState, i, args...)
     return OptimisticStepState(x.n, renormalised_view(x.v, i), renormalised_view(x.u, i),
-                               renormalised_view(x.w0, i), copy_column(x.s), copy(x.res),
-                               x.m[i], predictor_state_view(x.ps, i))
+                               renormalised_view(x.w0, i), schedule_state_view(x.s, i),
+                               copy(x.res), x.m[i], predictor_state_view(x.ps, i))
 end
 function learning_rate(sched::HintResidualRate, ::Integer, st::OptimisticStepState)
     a = sqrt(st.res[1]) + sqrt(st.res[2])
@@ -827,6 +827,9 @@ function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::Abstrac
                                    zero(st.m), predictor_state_seed(alg.predictor, st.w0)),
                copy(st.w0)
     end
+    # The schedule's row enters before the rate or after the step, as the schedule says.
+    st = OptimisticStepState(st.n, st.v, st.u, st.w0,
+                             statistic_before_rate(md.eta, st.s, w, x), st.res, st.m, st.ps)
     eta = learning_rate(md.eta, t, st)
     alpha = mixing_share(md.eta, t, md.alpha)
     xm = iszero(alpha) ? x : (1 - alpha / length(x)) .* x .+ alpha / length(x)
@@ -837,7 +840,7 @@ function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::Abstrac
     u = half_step(md, set, v, eta .* m, wh)
     r = hint_residual(md.proj, g .- st.m)
     res = [st.res[1] + r, st.res[1]]
-    s = schedule_update!(md.eta, st.s, w, x)
+    s = statistic_after_step(md.eta, st.s, w, x)
     return OptimisticStepState(t, v, u, st.w0, s, res, m, ps), played_allocation(u, alpha)
 end
 export DiagonalProjection, AdaptiveSubgradient, OptimisticStep, LastGradient, MeanGradient,

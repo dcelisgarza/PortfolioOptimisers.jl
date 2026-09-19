@@ -1010,7 +1010,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the Learning-Rate Schedules a first-order Online Selection Rule may hold on `eta` in place of a number.
 
-A schedule is read at every update as a function of the period count and of the rule's carrier, so it may follow the count alone, read a running statistic of the run that the carrier keeps for it, or name a stage boundary at which the rule restarts. It owns no state: whatever it accumulates lives on the rule's carrier, seeded by the schedule and written by it after each row.
+A schedule is read at every update as a function of the period count and of the rule's carrier, so it may follow the count alone, read a running statistic of the run that the carrier keeps for it, or name a stage boundary at which the rule restarts. It owns no state: whatever it accumulates lives on the rule's carrier, seeded by the schedule and written by it once per row — after the step by default, so the rate of a period reads the past alone, or before the rate is read when the schedule declares that it chooses the rate from the period's own row.
 
 # Interfaces
 
@@ -1020,9 +1020,12 @@ In order to implement a new schedule, subtype `AbstractLearningRateSchedule` and
   - `restart(sched::AbstractLearningRateSchedule, t::Integer) -> Bool`: Whether the update at period `t` closes a stage, at which the rule answers the Start Allocation for period `t + 1` and puts its carrier back at its seed; `false` by default.
   - `schedule_state_seed(sched::AbstractLearningRateSchedule, w::AbstractVector)`: The statistic the carrier holds for the schedule before the first row, or `nothing`, the default.
   - `schedule_update!(sched::AbstractLearningRateSchedule, s, w::AbstractVector, x::AbstractVector)`: Writes the row into the statistic `s`, from the allocation `w` played during the period and its price relative `x`; the identity by default.
+  - `reads_period_row(sched::AbstractLearningRateSchedule) -> Bool`: Whether the rate of period `t` is chosen from the row of period `t`, so the statistic is written before the rate is read rather than after the step; `false` by default. A rule whose update needs the rate of the *next* period as well, as the online form of [`ExpectationMaximisation`](@ref) does, refuses a schedule that answers `true`, because the next period's row is not there to read.
   - `mixing_share(sched::AbstractLearningRateSchedule, t::Integer, alpha::Real) -> Real`: The uniform-mix share of the update at period `t`, the rule's own `alpha` by default; a schedule that sets the share from a stage length answers its own.
 
-A number on `eta` is the constant schedule: every verb answers the number, `false`, `nothing`, the identity and `alpha`.
+A statistic whose entries lie over the assets, as the expert allocations of a replaying schedule do, also implements [`schedule_state_view`](@ref), which slices it to the selected assets with the rule's carrier; a statistic over the run alone is copied as it stands.
+
+A number on `eta` is the constant schedule: every verb answers the number, `false`, `nothing`, the identity, `false` and `alpha`.
 
 # Related
 
@@ -1031,6 +1034,7 @@ A number on `eta` is the constant schedule: every verb answers the number, `fals
   - [`InverseSquareRootRate`](@ref)
   - [`DoublingTrickRate`](@ref)
   - [`SelfConfidentRate`](@ref)
+  - [`WindowedBestRate`](@ref)
 """
 abstract type AbstractLearningRateSchedule <: AbstractAlgorithm end
 """
@@ -1106,8 +1110,65 @@ function mixing_share(::Union{<:Real, <:AbstractLearningRateSchedule}, ::Integer
                       alpha::Real)
     return alpha
 end
+"""
+    reads_period_row(eta::Real)
+    reads_period_row(sched::AbstractLearningRateSchedule)
+
+Whether the schedule chooses the rate of period `t` from the row of period `t`: `true` for a schedule that replays the period before it answers, as [`WindowedBestRate`](@ref) does, and `false` for a number and for every schedule that reads the past alone. A rule writes the statistic before it reads the rate when the answer is `true`, and after its step otherwise; [`statistic_before_rate`](@ref) and [`statistic_after_step`](@ref) are the two calls.
+
+# Related
+
+  - [`AbstractLearningRateSchedule`](@ref)
+  - [`schedule_update!`](@ref)
+"""
+function reads_period_row(::Union{<:Real, <:AbstractLearningRateSchedule})
+    return false
+end
+"""
+    statistic_before_rate(eta, s, w::AbstractVector, x::AbstractVector)
+
+The first of the two points at which a rule writes its schedule's row: the statistic the rate of the period is read from. The row enters here when [`reads_period_row`](@ref) answers `true`, and the call answers `s` unchanged otherwise; [`statistic_after_step`](@ref) is the other point, so a rule makes both calls and the schedule decides which one writes.
+
+# Related
+
+  - [`AbstractLearningRateSchedule`](@ref)
+  - [`schedule_update!`](@ref)
+  - [`MirrorDescent`](@ref)
+"""
+function statistic_before_rate(eta, s, w::AbstractVector, x::AbstractVector)
+    return reads_period_row(eta) ? schedule_update!(eta, s, w, x) : s
+end
+"""
+    statistic_after_step(eta, s, w::AbstractVector, x::AbstractVector)
+
+The second of the two points at which a rule writes its schedule's row: the statistic the carrier keeps after the step. The row enters here when [`reads_period_row`](@ref) answers `false`, the default, and the call answers `s` unchanged otherwise; [`statistic_before_rate`](@ref) is the other point.
+
+# Related
+
+  - [`AbstractLearningRateSchedule`](@ref)
+  - [`schedule_update!`](@ref)
+  - [`MirrorDescent`](@ref)
+"""
+function statistic_after_step(eta, s, w::AbstractVector, x::AbstractVector)
+    return reads_period_row(eta) ? s : schedule_update!(eta, s, w, x)
+end
+"""
+    schedule_state_view(s, i)
+
+Slices a schedule's statistic to the selected assets when a rule's carrier is viewed: a copy of the statistic as it stands by default, because the statistics of the count-reading and run-reading schedules lie over the run and not over the assets; a statistic that holds allocations, as [`WindowedBestRate`](@ref)'s does, slices and renormalises each of them through [`renormalised_view`](@ref).
+
+# Related
+
+  - [`AbstractLearningRateSchedule`](@ref)
+  - [`renormalised_view`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function schedule_state_view(s, ::Any)
+    return copy_column(s)
+end
 export EuclideanProjection, EntropicProjection, GramProjection, BoundedAllocationSet
 public AbstractOnlinePortfolioSelectionAlgorithm, AbstractProjectionGeometry,
        AbstractAllocationSet, online_update!, rule_state_seed, projection_geometry, project,
        resolve_allocation_set, AbstractLearningRateSchedule, learning_rate, restart,
-       schedule_state_seed, schedule_update!, mixing_share
+       schedule_state_seed, schedule_update!, mixing_share, reads_period_row,
+       schedule_state_view

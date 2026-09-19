@@ -491,7 +491,8 @@ function Base.copy(x::ExpectationMaximisationState)
     return ExpectationMaximisationState(x.n, copy(x.w1), copy_column(x.s))
 end
 function port_opt_view(x::ExpectationMaximisationState, i, args...)
-    return ExpectationMaximisationState(x.n, renormalised_view(x.w1, i), copy_column(x.s))
+    return ExpectationMaximisationState(x.n, renormalised_view(x.w1, i),
+                                        schedule_state_view(x.s, i))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -571,6 +572,8 @@ struct ExpectationMaximisation{T1 <: Union{<:Real, <:AbstractLearningRateSchedul
         if isa(eta, Real)
             @argcheck(zero(eta) < eta < one(eta), DomainError(eta, "eta must be in (0, 1)"))
         end
+        @argcheck(!reads_period_row(eta),
+                  ArgumentError("`ExpectationMaximisation` refuses a `$(typeof(eta).name.name)` on `eta`: its online form reads the rate of the next period as well, and a schedule that chooses each period's rate from that period's row has no next row to read it from."))
         return new{typeof(eta), typeof(proj)}(eta, proj)
     end
 end
