@@ -711,6 +711,12 @@ function port_opt_view(alg::ExpertMixture, i, args...)
     return ExpertMixture(; experts = [port_opt_view(e, i, args...) for e in alg.experts],
                          alg = alg.alg, eset = alg.eset, p = alg.p, proj = alg.proj)
 end
+function assert_rule_admits_set(alg::ExpertMixture, set::AbstractAllocationSet)::Nothing
+    for e in alg.experts
+        assert_rule_admits_set(e, set)
+    end
+    return nothing
+end
 function rows_needed(alg::ExpertMixture)
     need = rows_needed(alg.alg)
     for e in alg.experts

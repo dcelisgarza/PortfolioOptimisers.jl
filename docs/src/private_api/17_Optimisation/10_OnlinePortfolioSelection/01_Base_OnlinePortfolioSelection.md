@@ -16,6 +16,8 @@ PortfolioOptimisers.PROJECTION_STEP
 PortfolioOptimisers.with_projection_step
 PortfolioOptimisers.record_held_step!
 PortfolioOptimisers.projection_step_rows
+PortfolioOptimisers.projection_step_names
+PortfolioOptimisers.assert_rule_admits_set
 PortfolioOptimisers.rows_needed_max
 PortfolioOptimisers.rule_state_view
 PortfolioOptimisers.price_adjusted_allocation

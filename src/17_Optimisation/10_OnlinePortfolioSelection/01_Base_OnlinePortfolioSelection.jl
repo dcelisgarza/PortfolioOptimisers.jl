@@ -681,9 +681,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The step a projection runs inside: the rows the head holds through the period, the row's timestamp, and the Held Steps recorded so far.
+The step a projection runs inside: the rows the head holds through the period, the pinned asset names, the row's timestamp, and the Held Steps recorded so far.
 
-The Online Update's projection is `project(proj, set, q, w)`, four arguments and no more, so a programme set's covariance cone and tracking error — which read the head's rows — and the Held Step's record — which the head must see — travel outside the signature, on the task-scoped [`PROJECTION_STEP`](@ref). The head opens one step per row through [`with_projection_step`](@ref), around the whole Online Update, so every projection of that row — a mixture's experts' and its own blend's — reads one set of rows and writes one log. Outside a step, a projection reads no rows and reports a hold as a warning.
+The Online Update's projection is `project(proj, set, q, w)`, four arguments and no more, so a programme set's covariance cone and tracking error — which read the head's rows — and the Held Step's record — which the head must see — travel outside the signature, on the task-scoped [`PROJECTION_STEP`](@ref). The head opens one step per row through [`with_projection_step`](@ref), around the whole Online Update, so every projection of that row — a mixture's experts' and its own blend's — reads one set of rows and writes one log. A rule that re-solves an optimisation estimator on the rows it selects, [`FollowTheLeader`](@ref), reads the names here too, so the carrier it hands the estimator is named as the head's was. Outside a step, a projection reads no rows and reports a hold as a warning.
 
 # Fields
 
@@ -696,11 +696,15 @@ $(DocStringExtensions.FIELDS)
   - [`HeldStep`](@ref)
   - [`project`](@ref)
 """
-struct ProjectionStep{T1, T2}
+struct ProjectionStep{T1, T2, T3}
     """
     The rows of returns the head holds through the period, `observations × assets`, or `nothing`.
     """
     rows::T1
+    """
+    The pinned asset names, or `nothing`.
+    """
+    nx::T3
     """
     The row's timestamp, or its index in the fold.
     """
@@ -724,7 +728,7 @@ const PROJECTION_STEP = ScopedValue{Union{Nothing, ProjectionStep}}(nothing)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Runs `f()` inside a [`ProjectionStep`](@ref) over `rows` at `ts`, and answers `(f(), held)`: the update's result and the Held Steps its projections recorded, an empty vector when every programme solved.
+Runs `f()` inside a [`ProjectionStep`](@ref) over `rows` at `ts`, the names `nx` pinned, and answers `(f(), held)`: the update's result and the Held Steps its projections recorded, an empty vector when every programme solved.
 
 # Related
 
@@ -732,8 +736,8 @@ Runs `f()` inside a [`ProjectionStep`](@ref) over `rows` at `ts`, and answers `(
   - [`ProjectionStep`](@ref)
   - [`fold_online_selection`](@ref)
 """
-function with_projection_step(f, rows, ts)
-    step = ProjectionStep(rows, ts, HeldStep[])
+function with_projection_step(f, rows, ts; nx = nothing)
+    step = ProjectionStep(rows, nx, ts, HeldStep[])
     out = Base.ScopedValues.with(f, PROJECTION_STEP => step)
     return out, step.held
 end
@@ -769,6 +773,35 @@ The rows the current [`ProjectionStep`](@ref) holds, or `nothing` outside a step
 function projection_step_rows()
     step = PROJECTION_STEP[]
     return isnothing(step) ? nothing : step.rows
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The asset names the current [`ProjectionStep`](@ref) pins, or `nothing` outside a step or under a carrier with none.
+
+# Related
+
+  - [`ProjectionStep`](@ref)
+  - [`FollowTheLeader`](@ref)
+"""
+function projection_step_names()
+    step = PROJECTION_STEP[]
+    return isnothing(step) ? nothing : step.nx
+end
+"""
+    assert_rule_admits_set(alg::AbstractOnlinePortfolioSelectionAlgorithm, set::AbstractAllocationSet)
+
+Refuses, at the head's construction, a rule and an Allocation Set that cannot meet: the default admits every pair, and a rule that holds an optimisation estimator with no model for a programme set refuses that set by name ([`FollowTheLeader`](@ref)). A rule over other rules forwards the check to each of them.
+
+# Related
+
+  - [`OnlinePortfolioSelection`](@ref)
+  - [`assert_geometry_admits_set`](@ref)
+  - [`FollowTheLeader`](@ref)
+"""
+function assert_rule_admits_set(::AbstractOnlinePortfolioSelectionAlgorithm,
+                                ::AbstractAllocationSet)::Nothing
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDEF)

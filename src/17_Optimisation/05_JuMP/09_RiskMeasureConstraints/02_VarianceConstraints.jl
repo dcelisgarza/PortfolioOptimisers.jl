@@ -21,10 +21,43 @@ If `model` does not yet contain a `G` expression, the factor is computed from `p
 """
 function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
     if !shared_has(model, :G)
-        G = isnothing(pr.chol) ? LinearAlgebra.cholesky(pr.sigma).U : pr.chol
+        G = isnothing(pr.chol) ? covariance_factor(pr.sigma) : pr.chol
         JuMP.@expression(model, G, G)
     end
     return shared_get(model, :G)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+An upper factor `G` of a covariance with `GᵀG = Σ`: the Cholesky factor where the matrix is positive definite, and the symmetric square root's factor ``\\Lambda^{1/2} V^\\intercal`` from the eigendecomposition ``\\Sigma = V \\Lambda V^\\intercal``, its negative eigenvalues of rounding clamped at zero, where the matrix is positive semidefinite and singular, as a rank-one estimate is.
+
+The Cholesky path is the one every consumer took before, unchanged; a matrix it cannot factorise is not refused when its spectrum is non-negative, because a singular covariance is a covariance, and the second-order cone `[dev; G w]` is well posed on any factor. A matrix that is not Hermitian, or whose spectrum is negative beyond rounding, throws its `PosDefException`.
+
+# Arguments
+
+  - `sigma`: The covariance, `assets × assets`.
+
+# Returns
+
+  - `G::AbstractMatrix`: An upper factor with `GᵀG = Σ`.
+
+# Related
+
+  - [`get_chol_or_sigma_pm`](@ref)
+  - [`chol_sigma_selector`](@ref)
+  - [`RankOneCovariance`](@ref)
+"""
+function covariance_factor(sigma::AbstractMatrix)
+    F = LinearAlgebra.cholesky(sigma; check = false)
+    if LinearAlgebra.issuccess(F)
+        return F.U
+    end
+    @argcheck(LinearAlgebra.ishermitian(sigma), LinearAlgebra.PosDefException(-1))
+    E = LinearAlgebra.eigen(LinearAlgebra.Symmetric(sigma))
+    tol = -length(E.values) * eps(eltype(E.values)) * maximum(abs, E.values)
+    @argcheck(minimum(E.values) >= tol, LinearAlgebra.PosDefException(1))
+    return LinearAlgebra.Diagonal(sqrt.(max.(E.values, zero(eltype(E.values))))) *
+           transpose(E.vectors)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -52,7 +85,7 @@ function chol_sigma_selector(model::JuMP.Model, pr::AbstractPriorResult, r::Chol
     return if isnothing(r.sigma) && isnothing(r.chol)
         get_chol_or_sigma_pm(model, pr)
     elseif isnothing(r.chol)
-        LinearAlgebra.cholesky(r.sigma).U
+        covariance_factor(r.sigma)
     else
         r.chol
     end

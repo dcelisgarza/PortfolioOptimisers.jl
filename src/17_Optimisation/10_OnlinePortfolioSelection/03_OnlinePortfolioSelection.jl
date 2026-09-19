@@ -38,6 +38,7 @@ Keywords correspond to the struct's fields. `fees` and `fb` may hold a [`TimeDep
   - `w0`: non-empty and finite, when given; it is projected onto the set at the first step, so it need not lie in it.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(set.sets)`.
   - Everything [`assert_geometry_admits_set`](@ref) refuses: a negative lower bound under an entropic rule.
+  - Everything [`assert_rule_admits_set`](@ref) refuses: a solver-free leader under a programme set.
   - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
@@ -126,6 +127,7 @@ OnlinePortfolioSelection
                                       cache::Option{<:OnlinePortfolioSelectionState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :OnlinePortfolioSelection)
         assert_geometry_admits_set(projection_geometry(alg), set)
+        assert_rule_admits_set(alg, set)
         if !isnothing(w0)
             assert_nonempty(w0, :w0)
             assert_finite(w0, :w0)
@@ -378,7 +380,7 @@ function online_selection_row!(opt::OnlinePortfolioSelection, st, w::AbstractVec
     x = one(eltype(r)) .+ r
     rows = isnothing(X) ? nothing : sample_buffer(X)
     (st, w), held = with_projection_step(() -> online_update!(opt.alg, st, w, x, rows, set),
-                                         rows, ts)
+                                         rows, ts; nx = nx)
     return st, w, X, report_held_steps(held, ts)
 end
 """

@@ -10,7 +10,7 @@ commit = "8411336595"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2997, doc = 0, comment = 238, blank = 48, total = 3283 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1174, doc = 113, comment = 125, blank = 43, total = 1455 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1186, doc = 113, comment = 125, blank = 43, total = 1467 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -230,7 +230,7 @@ commit = "8411336595"
 "src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { code = 55, doc = 46, comment = 0, blank = 13, total = 114 }
 "src/16_RiskMeasures/24_ExpectedRisk.jl" = { code = 273, doc = 456, comment = 40, blank = 207, total = 976 }
 "src/16_RiskMeasures/25_RiskMeasureTools.jl" = { code = 84, doc = 95, comment = 0, blank = 51, total = 230 }
-"src/17_Optimisation/01_Base_Optimisation.jl" = { code = 958, doc = 1756, comment = 37, blank = 861, total = 3612 }
+"src/17_Optimisation/01_Base_Optimisation.jl" = { code = 965, doc = 1765, comment = 35, blank = 865, total = 3630 }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 646, doc = 1201, comment = 44, blank = 478, total = 2369 }
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 85, doc = 125, comment = 0, blank = 49, total = 259 }
 "src/17_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { code = 256, doc = 303, comment = 7, blank = 123, total = 689 }
@@ -273,7 +273,7 @@ commit = "8411336595"
 "src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl" = { code = 306, doc = 434, comment = 12, blank = 172, total = 924 }
 "src/17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl" = { code = 224, doc = 284, comment = 7, blank = 118, total = 633 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { code = 222, doc = 354, comment = 29, blank = 139, total = 744 }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl" = { code = 329, doc = 340, comment = 15, blank = 144, total = 828 }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl" = { code = 341, doc = 353, comment = 15, blank = 152, total = 861 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.jl" = { code = 230, doc = 185, comment = 0, blank = 74, total = 489 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/04_KurtosisConstraints.jl" = { code = 148, doc = 113, comment = 10, blank = 47, total = 318 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/05_NegativeSkewnessConstraints.jl" = { code = 69, doc = 68, comment = 2, blank = 30, total = 169 }
@@ -303,10 +303,10 @@ commit = "8411336595"
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { code = 149, doc = 213, comment = 13, blank = 83, total = 458 }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { code = 42, doc = 61, comment = 4, blank = 20, total = 127 }
 "src/17_Optimisation/09_OnlineOptimisation.jl" = { code = 232, doc = 317, comment = 3, blank = 159, total = 711 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { code = 276, doc = 559, comment = 5, blank = 232, total = 1072 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { code = 300, doc = 448, comment = 2, blank = 177, total = 927 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { code = 239, doc = 292, comment = 2, blank = 126, total = 659 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { code = 292, doc = 300, comment = 2, blank = 87, total = 681 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { code = 285, doc = 577, comment = 5, blank = 238, total = 1105 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { code = 290, doc = 412, comment = 3, blank = 160, total = 865 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { code = 248, doc = 309, comment = 2, blank = 132, total = 691 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { code = 523, doc = 509, comment = 4, blank = 178, total = 1214 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { code = 405, doc = 576, comment = 1, blank = 187, total = 1169 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { code = 309, doc = 425, comment = 3, blank = 171, total = 908 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { code = 281, doc = 478, comment = 2, blank = 192, total = 953 }
@@ -322,4 +322,7 @@ commit = "8411336595"
 "src/21_Pipeline/06_OnlinePipeline.jl" = { code = 391, doc = 372, comment = 0, blank = 162, total = 925 }
 "src/22_Plotting.jl" = { code = 150, doc = 2294, comment = 111, blank = 797, total = 3352 }
 "src/23_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
-"src/PortfolioOptimisers.jl" = { code = 347, doc = 3, comment = 29, blank = 5, total = 384 }
+"src/PortfolioOptimisers.jl" = { code = 352, doc = 3, comment = 29, blank = 5, total = 389 }
+
+"src/05_Moments/36_RankOneCovariance.jl" = { code = 37, doc = 51, comment = 4, blank = 25, total = 117 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { code = 416, doc = 578, comment = 1, blank = 231, total = 1226 }

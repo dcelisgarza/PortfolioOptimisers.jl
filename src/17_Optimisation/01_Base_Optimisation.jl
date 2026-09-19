@@ -1360,20 +1360,38 @@ function assert_time_dependent_substitution(::Type{T}, args::NamedTuple,
     end
     base = merge(args, NamedTuple{tdfs}(map(something, stand_ins)))
     for f in tdfs
-        # The filter above kept the schedules alone; the assertion tells a static analyser so,
-        # and costs nothing at run time.
-        td = args[f]::TimeDependent
-        v = td.val
-        if isa(v, AbstractVector)
-            for x in v
-                T(; merge(base, NamedTuple{(f,)}((x,)))...)
-            end
-        end
-        d = td.default
-        if !isa(d, NoDefault)
-            T(; merge(base, NamedTuple{(f,)}((d,)))...)
+        substitute_time_dependent_entries(T, base, f, args[f])
+    end
+    return nothing
+end
+"""
+    substitute_time_dependent_entries(::Type{T}, base::NamedTuple, f::Symbol, td::TimeDependent) where {T}
+    substitute_time_dependent_entries(::Type, ::NamedTuple, ::Symbol, ::Any)
+
+Re-run the keyword constructor of `T` with every vector entry of the schedule `td`, and its explicit `default`, substituted into the field `f` of `base`; a field that holds no schedule substitutes nothing.
+
+The filter of [`assert_time_dependent_substitution`](@ref) keeps the schedules alone, and the dispatch says so to a static analyser at a call whose arguments hold no schedule at all, where an assertion would read as a certain failure.
+
+# Related
+
+  - [`assert_time_dependent_substitution`](@ref)
+  - [`TimeDependent`](@ref)
+"""
+function substitute_time_dependent_entries(::Type{T}, base::NamedTuple, f::Symbol,
+                                           td::TimeDependent)::Nothing where {T}
+    v = td.val
+    if isa(v, AbstractVector)
+        for x in v
+            T(; merge(base, NamedTuple{(f,)}((x,)))...)
         end
     end
+    d = td.default
+    if !isa(d, NoDefault)
+        T(; merge(base, NamedTuple{(f,)}((d,)))...)
+    end
+    return nothing
+end
+function substitute_time_dependent_entries(::Type, ::NamedTuple, ::Symbol, ::Any)::Nothing
     return nothing
 end
 """

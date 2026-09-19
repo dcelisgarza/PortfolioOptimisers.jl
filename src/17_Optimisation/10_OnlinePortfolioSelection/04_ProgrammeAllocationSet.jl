@@ -664,6 +664,163 @@ function set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAlloca
     return nothing
 end
 """
+    add_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet, w::AbstractVector, X)
+    add_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet, w::AbstractVector, X)
+
+Adds the constraints of a resolved Allocation Set to a JuMP head's model mid-assembly, the arm of the Allocation Set Constraint a [`FollowTheLeader`](@ref) rule appends to its held optimiser.
+
+The head's own builders have already registered the model's named entries — its weight bounds, its budget, its turnover and tracking-error terms under their indices — so this arm adds the set's rows without a name where the bare projection model names them: the bounds and the budget of one as anonymous constraints, the linear constraints under the `:aset_` prefix, the turnover ceiling and the tracking error at the first index the model has not used, the variance cone under its own name. Every row is the same inequality [`set_allocation_set_constraints!`](@ref) writes, so the leader's feasible region is the set intersected with whatever the head carries itself. The tracking error is written over the head's rows `X` and their count, not the selection's, which the model's own observation count and net-return expression describe.
+
+A MIP kind of the set — cardinality, a threshold, a group cardinality — registers the model's indicator variables, which one model holds once, so a MIP kind is stated in one home: on the set, or on the held optimiser.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `set`: The Allocation Set, resolved.
+  - `w`: The Price-Adjusted Allocation the step trades from, the reference of the turnover ceiling.
+  - `X`: The rows of returns the head holds through the period, `observations × assets`, or `nothing`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_allocation_set_constraints!`](@ref)
+  - [`AllocationSetConstraint`](@ref)
+  - [`FollowTheLeader`](@ref)
+"""
+function add_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet,
+                                         ::AbstractVector, ::Any)::Nothing
+    add_allocation_set_bounds!(model, set.wb)
+    return nothing
+end
+function add_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet,
+                                         w::AbstractVector, X)::Nothing
+    add_allocation_set_bounds!(model, set.wb)
+    set_linear_weight_constraints!(model, set.lcs, :aset_lcs_ineq_, :aset_lcs_eq_)
+    set_mip_constraints!(model, set.wb, set.card, set.gcard, nothing, set.lt, set.st,
+                         nothing, set.ss)
+    if !isnothing(set.tn)
+        _set_turnover_constraints!(model, Turnover(; w = w, val = set.tn),
+                                   free_state_index(model, :t_tn_))
+    end
+    pr = allocation_set_prior(set, X)
+    set_allocation_risk_cone!(model, set.r, pr)
+    if !isnothing(set.te)
+        add_allocation_tracking_error!(model, set.te, pr.X)
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Adds an Allocation Set's weight bounds and its budget of one to a model that already names its own: the same three inequalities [`set_allocation_set_bounds!`](@ref) writes, as anonymous constraints.
+
+# Validation
+
+  - `Σ lb ≤ 1 ≤ Σ ub` over the resolved bounds, through [`assert_feasible_bounds`](@ref).
+
+# Related
+
+  - [`add_allocation_set_constraints!`](@ref)
+  - [`set_allocation_set_bounds!`](@ref)
+"""
+function add_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds)::Nothing
+    assert_feasible_bounds(wb)
+    w = get_w(model)
+    k = get_k(model)
+    sc = get_constraint_scale(model)
+    if w_finite_flag(wb.lb)
+        JuMP.@constraint(model, sc * (w ⊖ k * wb.lb) >= 0)
+    end
+    if w_finite_flag(wb.ub)
+        JuMP.@constraint(model, sc * (w ⊖ k * wb.ub) <= 0)
+    end
+    JuMP.@constraint(model, sc * (sum(w) - k) == 0)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The first index `i` at which the Model State entry `name` is not registered, so a builder keyed by an index can add its term beside a head's own.
+
+# Related
+
+  - [`add_allocation_set_constraints!`](@ref)
+  - [`state_set!`](@ref)
+"""
+function free_state_index(model::JuMP.Model, name::Symbol)
+    i = 1
+    while haskey(model, state_key(Symbol(""), name, i))
+        i += 1
+    end
+    return i
+end
+"""
+    add_allocation_tracking_error!(model::JuMP.Model, te::TrackingError, X::AbstractMatrix)
+
+Adds an Allocation Set's tracking error to a JuMP head's model as anonymous constraints over the head's rows `X`: the deviation `X w − k b` from the benchmark series, its norm in the error's own `alg` — the `L1` norm as a norm-one cone, the `L2` and squared-`L2` norms as a second-order cone, the `p`-norm as `T` power cones, the `∞`-norm as a norm-infinity cone — and the ceiling `err` scaled by the row count as the head's own builders scale it.
+
+# Related
+
+  - [`add_allocation_set_constraints!`](@ref)
+  - [`set_tracking_error_constraints!`](@ref)
+"""
+function add_allocation_tracking_error!(model::JuMP.Model, te::TrackingError,
+                                        X::AbstractMatrix)::Nothing
+    w = get_w(model)
+    k = get_k(model)
+    sc = get_constraint_scale(model)
+    T = size(X, 1)
+    wb = tracking_benchmark(te.tr, X)
+    dev = JuMP.@expression(model, X * w - wb * k)
+    t = JuMP.@variable(model)
+    f = add_allocation_tracking_cone!(model, te.alg, dev, t, T, te.err, sc)
+    JuMP.@constraint(model, sc * (t - f * k) <= 0)
+    return nothing
+end
+"""
+    add_allocation_tracking_cone!(model::JuMP.Model, alg, dev, t, T::Integer, err::Number, sc)
+
+The cone of one tracking-error norm over the deviation `dev` and its bound variable `t`, answering the ceiling's scale factor for `T` rows.
+
+# Related
+
+  - [`add_allocation_tracking_error!`](@ref)
+"""
+function add_allocation_tracking_cone!(model::JuMP.Model, ::L1Norm, dev, t, T::Integer,
+                                       err::Number, sc)
+    JuMP.@constraint(model, [sc * t; sc * dev] in JuMP.MOI.NormOneCone(1 + T))
+    return err * T
+end
+function add_allocation_tracking_cone!(model::JuMP.Model,
+                                       alg::Union{<:L2Norm, <:SquaredL2Norm}, dev, t,
+                                       T::Integer, err::Number, sc)
+    JuMP.@constraint(model, [sc * t; sc * dev] in JuMP.SecondOrderCone())
+    return tracking_error_soc_factor(alg, err, T)
+end
+function add_allocation_tracking_cone!(model::JuMP.Model, alg::LpNorm, dev, t, T::Integer,
+                                       err::Number, sc)
+    @argcheck(alg.p > 1,
+              DomainError(alg.p,
+                          "`LpNorm.p` is $(alg.p), and the tracking error is the `p`-norm of the deviation, which the model states with a power cone of exponent `1 / p`, so `1 < p` must hold. State a value greater than `1`."))
+    p_inv = inv(alg.p)
+    r = JuMP.@variable(model, [1:T])
+    for i in 1:T
+        JuMP.@constraint(model,
+                         [sc * r[i], sc * t, sc * dev[i]] in JuMP.MOI.PowerCone(p_inv))
+    end
+    JuMP.@constraint(model, sc * (sum(r) - t) == 0)
+    scale = T - alg.ddof
+    return err * (alg.p == 3 ? cbrt(scale) : scale^p_inv)
+end
+function add_allocation_tracking_cone!(model::JuMP.Model, alg::LInfNorm, dev, t, T::Integer,
+                                       err::Number, sc)
+    JuMP.@constraint(model, [sc * t; sc * dev] in JuMP.MOI.NormInfinityCone(1 + T))
+    return err * (T - alg.ddof)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Adds an Allocation Set's weight bounds and its budget of one to the model: the bounds through [`set_weight_constraints!`](@ref) with no budget group, so a negative lower bound builds the long-short decomposition without pinning either side's budget, and then `Σw = k` through [`set_budget_constraints!`](@ref).

@@ -41,6 +41,7 @@ time_dependent_fields
 time_dependent_entries
 time_dependent_entry_needs_previous_weights
 assert_time_dependent_substitution
+substitute_time_dependent_entries
 time_dependent_stand_in
 time_dependent_reset_value
 assert_time_dependent_optimiser
