@@ -1,5 +1,5 @@
 ```@meta
-Description = "The online step, public API of PortfolioOptimisers.jl: Online, partial_fit!, port_opt_view, merge_states."
+Description = "The online step, public API of PortfolioOptimisers.jl: Online, AbstractAllocationSet, AbstractProgrammeAllocationSet, partial_fit!, port_opt_view, …"
 ```
 
 # The online step

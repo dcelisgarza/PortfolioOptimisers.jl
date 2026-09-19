@@ -210,6 +210,8 @@ number of times.
   - [The online walk-forward example](../examples/5_validation_tuning/09_Online_Walk_Forward.md)
     — every identity above through a JuMP head as well, the search, the refusals, and the
     gain measured by prior family and by head.
+  - [Online portfolio selection](10_Online_Portfolio_Selection.md) — the one family whose
+    read-out is its own recursion rather than a batch fit, run through the step on this page.
   - [Validation and tuning](05_Validation_and_Tuning.md) — the walk-forward and the search
     this page runs.
   - [The point-in-time universe](08_Point_in_Time_Universe.md) — the panel whose active mask

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base Risk Constraints, private API of PortfolioOptimisers.jl: AbstractRiskSeriesAlgorithm, NonFRCJuMPOpt, NetReturnsRiskSeries, DrawdownRiskSeries, …"
+Description = "Base Risk Constraints, private API of PortfolioOptimisers.jl: AbstractRiskSeriesAlgorithm, NonFRCJuMPOpt, RiskConstraintOwner, RiskBoundOwner, …"
 ```
 
 # Base Risk Constraints: private API

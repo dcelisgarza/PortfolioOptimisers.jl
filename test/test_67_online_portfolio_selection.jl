@@ -574,6 +574,26 @@ end
         p0 = cross_val_predict(OPS(; alg = ExponentiatedGradient(), w0 = fill(0.25, N)), rd,
                                cvd)
         @test all(<(0), pd.mrd.X .- p0.mrd.X)
+        # A static turnover fee makes the head need the previous weights, so the loop
+        # threads the drifted book into every fold's fee — never the constructor's `w`.
+        @test po.needs_previous_weights(opt)
+        @test all(k -> pd.pred[k].res.fees.tn.w == pd.pred[k - 1].hw.w, 2:length(pd.pred))
+        # Buy and hold's target is the drifted book, so a pure turnover fee charges nothing
+        # after the first fold, whose fee is the entry trade from the constructor's `w`.
+        tnonly = Fees(; tn = Turnover(; w = zeros(N), val = 0.02))
+        bah = cross_val_predict(OPS(; alg = BuyAndHold(), fees = tnonly), rd, cvd)
+        bah0 = cross_val_predict(OPS(; alg = BuyAndHold()), rd, cvd)
+        @test isapprox(bah.mrd.X[1], bah0.mrd.X[1] - 0.02; atol = 1e-14)
+        @test isapprox(bah.mrd.X[2:end], bah0.mrd.X[2:end]; atol = 1e-14)
+        # The batch loop threads the previous target into a static fee on the other naive
+        # heads too.
+        for est in (EqualWeighted(; fees = tnfees), InverseVolatility(; fees = tnfees),
+                    RandomWeighted(; seed = 1, fees = tnfees))
+            @test po.needs_previous_weights(est)
+            pb = cross_val_predict(est, rd, cvb)
+            @test all(k -> pb.pred[k].res.fees.tn.w == pb.pred[k - 1].res.w,
+                      2:length(pb.pred))
+        end
         # `needs_previous_weights` is the naive family's derived rule.
         @test !po.needs_previous_weights(OPS(; alg = BuyAndHold()))
         @test po.needs_previous_weights(OPS(; alg = BuyAndHold(), fb = PreviousWeights()))

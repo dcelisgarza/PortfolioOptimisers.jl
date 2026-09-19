@@ -312,6 +312,7 @@ commit = "6fbaf7f97b"
 "src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { cyc = 5, cog = 4, arg = 6, cyc_sum = 82, cog_sum = 38, arg_sum = 113, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { cyc = 3, cog = 3, arg = 8, cyc_sum = 59, cog_sum = 20, arg_sum = 127, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { cyc = 2, cog = 2, arg = 6, cyc_sum = 9, cog_sum = 5, arg_sum = 11, macros = [] }
+"src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { cyc = 3, cog = 1, arg = 3, cyc_sum = 18, cog_sum = 3, arg_sum = 11, macros = [] }
 "src/18_ExpectedReturns.jl" = { cyc = 6, cog = 10, arg = 9, cyc_sum = 54, cog_sum = 41, arg_sum = 123, macros = ["@propagatable"] }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { cyc = 3, cog = 6, arg = 6, cyc_sum = 60, cog_sum = 18, arg_sum = 72, macros = [] }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { cyc = 4, cog = 5, arg = 9, cyc_sum = 85, cog_sum = 29, arg_sum = 177, macros = [] }

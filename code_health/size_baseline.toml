@@ -329,3 +329,4 @@ commit = "8411336595"
 "src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { code = 440, doc = 637, comment = 1, blank = 253, total = 1331 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { code = 294, doc = 391, comment = 10, blank = 150, total = 845 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { code = 59, doc = 131, comment = 1, blank = 64, total = 255 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { code = 74, doc = 61, comment = 0, blank = 23, total = 158 }

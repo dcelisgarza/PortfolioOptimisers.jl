@@ -51,7 +51,11 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
 Naive optimisers use simple, solver-free rules that buy robustness through unsophistication.
 [`InverseVolatility`](@ref) weights by the reciprocal of each asset's volatility;
 [`EqualWeighted`](@ref) splits capital evenly; [`RandomWeighted`](@ref) samples a Dirichlet
-allocation. They take the [`ReturnsResult`](@ref) directly.
+allocation. They take the [`ReturnsResult`](@ref) directly. The naive family also holds
+[`OnlinePortfolioSelection`](@ref), a head that updates its allocation from each realised
+price relative through a solver-free rule and carries a worst-case guarantee against the best
+constant portfolio in hindsight; it has its own page,
+[Online portfolio selection](10_Online_Portfolio_Selection.md).
 =#
 
 res_iv = optimise(InverseVolatility(), rd)

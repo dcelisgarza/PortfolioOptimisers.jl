@@ -17,7 +17,9 @@ abstract type NaiveOptimisationEstimator <: NonFiniteAllocationOptimisationEstim
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether the naive optimiser's fallback estimator requires previous portfolio weights.
+Return whether the naive optimiser requires previous portfolio weights: through its fees, a per-fold schedule on any field, or its fallback estimator.
+
+Every naive head carries a `fees` field, and a static [`Fees`](@ref) whose turnover term is not fixed reads the previous weights through [`factory`](@ref) exactly as it does on a [`JuMPOptimiser`](@ref); a [`TimeDependent`](@ref) `fees` is read through the schedule scan instead.
 
 # Related
 
@@ -26,6 +28,7 @@ Return whether the naive optimiser's fallback estimator requires previous portfo
 """
 function needs_previous_weights(opt::NaiveOptimisationEstimator)
     return any(f -> needs_previous_weights(getfield(opt, f)), time_dependent_fields(opt)) ||
+           needs_previous_weights(opt.fees) ||
            needs_previous_weights(opt.fb)
 end
 """

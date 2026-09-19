@@ -45,6 +45,10 @@ The guide mirrors that spine, one page per stage:
   - [The online walk-forward](09_Online_Walk_Forward.md) — one estimator stepped fold by fold
     instead of refitted: the one keyword that declares it, the identity with the batch run, the
     wrapper for a member with no exact fold, the gain measured honestly, and the resume.
+  - [Online portfolio selection](10_Online_Portfolio_Selection.md) — solver-free rules that
+    update the allocation from each price relative: the two halves of the family on a
+    reverting and a trending market, the regret table against three hindsight comparators,
+    the block step, the rate search, and the roster by group.
 
 ## Reading the API
 
