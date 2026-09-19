@@ -230,6 +230,7 @@
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { map = 6, units = 6, swept = false }
 "src/10_Prior/12_PriorPartialFit.jl" = { map = 6, units = 22, swept = false }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { map = 6, units = 3, swept = false }
+"src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { map = 6, units = 3, swept = false }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 50, algorithm = 16, swept = true, bindings = ["AbstractCompactRadiusAlgorithm", "AbstractPriorUncertaintySetEstimator", "AbstractUncertaintyEpsAlgorithm", "AbstractUncertaintyKAlgorithm", "AbstractUncertaintySetAlgorithm", "AbstractUncertaintySetClass", "AbstractUncertaintySetEstimator", "AbstractUncertaintySetResult", "BoxUncertaintySet", "BoxUncertaintySetAlgorithm", "ChiSqKUncertaintyAlgorithm", "EllipsoidalUncertaintySet", "EllipsoidalUncertaintySetAlgorithm", "GeneralKUncertaintyAlgorithm", "MuUncertaintySetClass", "NormBallUncertaintySetAlgorithm", "NormalKUncertaintyAlgorithm", "Num_CptRad", "Num_UcSEps", "Num_UcSK", "SigmaUncertaintySetClass", "UcSE_UcS", "box_quantile_bounds", "ellipsoidal_set", "expand_investable_ucs", "expand_investable_ucs", "expand_investable_ucs", "expand_investable_ucs", "expand_investable_ucs", "investable_ucs_reduction", "k_ucs", "mu_ucs", "mu_ucs", "mu_ucs", "port_opt_view", "port_opt_view", "port_opt_view", "port_opt_view", "port_opt_view", "reads_prior_result", "sigma_ucs", "sigma_ucs", "sigma_ucs", "ucs", "ucs", "ucs", "ucs", "ucs_prior", "ucs_selector", "vec_quantile_bounds"] }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { map = 7, units = 6, algorithm = 5, swept = true, bindings = ["DeltaUncertaintySet", "mu_delta_box_set", "mu_ucs", "sigma_delta_box_set", "sigma_ucs", "ucs"] }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { map = 7, units = 26, algorithm = 25, swept = true, bindings = ["NormalUncertaintySet", "choose_scaling_parameter", "commutation_matrix", "mu_asymptotic_cov", "mu_normal_box_set", "mu_ucs", "mu_ucs", "mu_ucs", "mu_ucs", "mu_ucs", "normal_box_preamble", "normal_mu_error_sample", "normal_sigma_error_sample", "sigma_asymptotic_cov", "sigma_normal_box_set", "sigma_ucs", "sigma_ucs", "sigma_ucs", "sigma_ucs", "sigma_ucs", "ucs", "ucs", "ucs", "ucs", "ucs", "ucs"] }
@@ -354,7 +355,7 @@
 "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { map = 10, units = 25, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { map = 10, units = 19, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { map = 10, units = 26, swept = false }
-"src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { map = 10, units = 27, swept = false }
+"src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { map = 10, units = 29, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { map = 10, units = 19, swept = false }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { map = 8, units = 28, swept = false }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { map = 8, units = 38, swept = false }

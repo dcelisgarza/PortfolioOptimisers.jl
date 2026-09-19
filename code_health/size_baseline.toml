@@ -10,7 +10,7 @@ commit = "8411336595"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2997, doc = 0, comment = 238, blank = 48, total = 3283 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1191, doc = 113, comment = 125, blank = 43, total = 1472 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1192, doc = 113, comment = 125, blank = 43, total = 1473 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -307,7 +307,7 @@ commit = "8411336595"
 "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { code = 290, doc = 412, comment = 3, blank = 160, total = 865 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { code = 248, doc = 309, comment = 2, blank = 132, total = 691 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { code = 523, doc = 509, comment = 4, blank = 178, total = 1214 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { code = 405, doc = 576, comment = 1, blank = 187, total = 1169 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { code = 405, doc = 583, comment = 1, blank = 190, total = 1179 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { code = 309, doc = 425, comment = 3, blank = 171, total = 908 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { code = 323, doc = 587, comment = 2, blank = 221, total = 1133 }
 "src/18_ExpectedReturns.jl" = { code = 290, doc = 832, comment = 43, blank = 293, total = 1458 }
@@ -322,8 +322,9 @@ commit = "8411336595"
 "src/21_Pipeline/06_OnlinePipeline.jl" = { code = 391, doc = 372, comment = 0, blank = 162, total = 925 }
 "src/22_Plotting.jl" = { code = 150, doc = 2294, comment = 111, blank = 797, total = 3352 }
 "src/23_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
-"src/PortfolioOptimisers.jl" = { code = 352, doc = 3, comment = 29, blank = 5, total = 389 }
+"src/PortfolioOptimisers.jl" = { code = 354, doc = 3, comment = 29, blank = 5, total = 391 }
 
 "src/05_Moments/36_RankOneCovariance.jl" = { code = 37, doc = 51, comment = 4, blank = 25, total = 117 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { code = 416, doc = 578, comment = 1, blank = 231, total = 1226 }
+"src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { code = 72, doc = 99, comment = 15, blank = 35, total = 221 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { code = 440, doc = 637, comment = 1, blank = 253, total = 1331 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { code = 272, doc = 391, comment = 2, blank = 149, total = 814 }

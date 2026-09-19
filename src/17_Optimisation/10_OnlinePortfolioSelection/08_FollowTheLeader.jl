@@ -796,15 +796,16 @@ end
 """
     leader_min_rows(opt::LeaderOptimiser)
 
-The fewest selected rows the held estimator re-solves on: two for an estimator whose tree holds a second moment, whose covariance of one observation does not exist, and one otherwise.
+The fewest selected rows the held estimator re-solves on: two for an estimator whose tree holds a second moment, whose covariance of one observation does not exist, one otherwise, and the floor any estimator in the tree states through [`fit_min_rows`](@ref) where that is larger.
 
 # Related
 
   - [`FollowTheLeader`](@ref)
   - [`holds_second_moment`](@ref)
+  - [`fit_min_rows`](@ref)
 """
 function leader_min_rows(opt::LeaderOptimiser)
-    return holds_second_moment(opt) ? 2 : 1
+    return max(holds_second_moment(opt) ? 2 : 1, fit_min_rows(opt))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -977,6 +978,110 @@ function loss_control_programme(gamma::Real, slv::T1,
                          Variance(; alg = QuadRiskExpr(),
                                   settings = RiskMeasureSettings(; scale = gamma))],
                     obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pe, slv = slv))
+end
+"""
+    LowDimensionEnsemblePortfolio(; N::Integer, window::Integer = 5, gamma::Real = 0.25, xi::Real = 0.002, slv::Slv_VecSlv, pe::AbstractPriorEstimator = LowDimensionEnsemblePrior(), proj::EuclideanProjection = EuclideanProjection())
+
+The online low-dimension ensemble method of Xi, Li, Song and Ning (2023): a [`FollowTheLeader`](@ref) over the last `window` regression pairs whose programme maximises the ensemble's forecast return less `gamma` times the portfolio variance under the ensemble's predictive covariance, less a linear turnover fee of `xi` against the Price-Adjusted Allocation.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{b}}_{t + 1} &= \\underset{\\boldsymbol{b} \\in \\Delta^N}{\\arg\\min} \\left\\{ -\\hat{\\boldsymbol{x}}_{t + 1}^\\intercal \\boldsymbol{b} + \\gamma\\, \\boldsymbol{b}^\\intercal \\hat{\\Sigma}_{t + 1} \\boldsymbol{b} + \\xi\\, \\lVert \\boldsymbol{b} - \\hat{\\boldsymbol{w}}_t \\rVert_1 \\right\\}\\,,
+\\end{align}
+```
+
+the paper's equation 14, which [`MeanRisk`](@ref) states as [`MaximumUtility`](@ref) at risk aversion `gamma` over [`Variance`](@ref) under [`QuadRiskExpr`](@ref), with the ensemble prior on `pe` supplying both ``\\hat{\\boldsymbol{x}}_{t + 1} - \\boldsymbol{1}`` and ``\\hat{\\Sigma}_{t + 1}`` from one fit, and a [`Fees`](@ref) whose [`Turnover`](@ref) rate `xi` is the ``\\ell_1`` penalty against the current allocation ``\\hat{\\boldsymbol{w}}_t``, which the head threads through [`factory`](@ref) as every fee reads it. On the simplex ``\\hat{\\boldsymbol{x}}^\\intercal \\boldsymbol{b}`` and ``(\\hat{\\boldsymbol{x}} - \\boldsymbol{1})^\\intercal \\boldsymbol{b}`` differ by a constant, so the two programmes share their minimiser.
+
+The paper relaxes ``\\boldsymbol{b} \\geq \\boldsymbol{0}``, runs a coordinate-wise descent on ``\\boldsymbol{c} = \\boldsymbol{b} - \\hat{\\boldsymbol{w}}_t`` and projects the answer onto the simplex; the programme here keeps the non-negativity inside the solve, so it answers the minimiser of the stated problem, which the relax-then-project answer is not in general. The head's Allocation Set enters the programme as every follow-the-leader programme takes it. `window` regression pairs need `window + 1` rows, so the selector holds one row more than the paper's `w`; before the window fills the rule re-solves on the rows it has, and below three rows, where the regressor covariance does not exist, it answers the uniform portfolio.
+
+The turnover fee reads a reference allocation of the universe's length at construction, replaced by the Price-Adjusted Allocation at every update, so the constructor takes the number of assets `N`, as [`UniversalPortfolio`](@ref) does.
+
+# Arguments
+
+  - `N`: The number of assets, the length of the fee's reference allocation.
+  - `window`: The paper's `w`, the regression pairs of the window; the selector holds `window + 1` rows.
+  - `gamma`: The paper's `γ`, the risk aversion over the predictive variance.
+  - `xi`: The paper's `ξ`, the linear turnover fee rate.
+  - `slv`: The solver the programme runs on.
+  - `pe`: The prior estimator of the programme, the ensemble by default; any prior supplies the two moments the programme reads.
+  - `proj`: The geometry of the damped mix, unused at the rule's `gamma = 0`.
+
+# Validation
+
+  - `N >= 1`. A `DomainError` is thrown otherwise.
+  - `window >= 2`, the fewest pairs whose regressor covariance exists. A `DomainError` is thrown otherwise.
+  - `gamma >= 0`. A `DomainError` is thrown otherwise.
+  - `xi >= 0`. A `DomainError` is thrown otherwise.
+
+# Examples
+
+```jldoctest
+julia> alg = LowDimensionEnsemblePortfolio(; N = 3, slv = Solver(; solver = nothing));
+
+julia> alg.sel
+LastRows
+  W ┴ Int64: 6
+
+julia> alg.opt.obj
+MaximumUtility
+  l ┴ Float64: 0.25
+
+julia> alg.opt.opt.fees.tn
+Turnover
+      w ┼ Vector{Float64}: [0.3333333333333333, 0.3333333333333333, 0.3333333333333333]
+    val ┼ Float64: 0.002
+  fixed ┴ Bool: false
+```
+
+# Related
+
+  - [`FollowTheLeader`](@ref)
+  - [`LastRows`](@ref)
+  - [`LowDimensionEnsemblePrior`](@ref)
+  - [`MaximumUtility`](@ref)
+  - [`Variance`](@ref)
+  - [`Fees`](@ref)
+  - [`Turnover`](@ref)
+  - [`MeanRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:xi2023oldem])
+"""
+function LowDimensionEnsemblePortfolio(; N::Integer, window::Integer = 5,
+                                       gamma::Real = 0.25, xi::Real = 0.002,
+                                       slv::Slv_VecSlv,
+                                       pe::AbstractPriorEstimator = LowDimensionEnsemblePrior(),
+                                       proj::EuclideanProjection = EuclideanProjection())::FollowTheLeader
+    @argcheck(N >= 1, DomainError(N, "N must be at least 1"))
+    @argcheck(window >= 2,
+              DomainError(window,
+                          "window must be at least 2: two regression pairs are the fewest whose regressor covariance exists"))
+    @argcheck(gamma >= zero(gamma), DomainError(gamma, "gamma must be non-negative"))
+    @argcheck(xi >= zero(xi), DomainError(xi, "xi must be non-negative"))
+    w = fill(one(xi) / N, N)
+    return FollowTheLeader(; sel = LastRows(; W = window + 1),
+                           opt = ensemble_programme(gamma,
+                                                    Fees(;
+                                                         tn = Turnover(; w = w, val = xi)),
+                                                    slv, pe), proj = proj)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The programme of [`LowDimensionEnsemblePortfolio`](@ref): [`MeanRisk`](@ref) under [`MaximumUtility`](@ref) at risk aversion `gamma` over [`Variance`](@ref) under [`QuadRiskExpr`](@ref), charging `fees`, on the solver and prior given. Typed on both, so the optimiser it builds is concrete for the solver and prior it was given.
+
+# Related
+
+  - [`LowDimensionEnsemblePortfolio`](@ref)
+"""
+function ensemble_programme(gamma::Real, fees::Fees, slv::T1,
+                            pe::T2) where {T1 <: Slv_VecSlv, T2 <: AbstractPriorEstimator}
+    return MeanRisk(; r = Variance(; alg = QuadRiskExpr()),
+                    obj = MaximumUtility(; l = gamma),
+                    opt = JuMPOptimiser(; pe = pe, slv = slv, fees = fees))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1221,6 +1326,6 @@ function online_update!(alg::FollowTheLeadingHistory, st::FollowTheLeadingHistor
 end
 export Prefix, LastRows, HistogramMatch, KernelMatch, NearestNeighbourMatch,
        CorrelationMatch, ClusterMatch, FollowTheLeader, ShortTermLossControlPortfolio,
-       FollowTheLeadingHistory
+       LowDimensionEnsemblePortfolio, FollowTheLeadingHistory
 public AbstractSampleSelector, AbstractPatternMatchSelector, select_rows, matched_rows,
        AllocationSetConstraint

@@ -150,14 +150,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The number of rows a stateless forecaster needs before its batch verb is defined: two when its estimator tree holds a covariance, variance or prior estimator, whose second moment is undefined on one row, and one otherwise. Below it the forecast is flat.
+The number of rows a stateless forecaster needs before its batch verb is defined: two when its estimator tree holds a covariance, variance or prior estimator, whose second moment is undefined on one row, one otherwise, and the floor any estimator in the tree states through [`fit_min_rows`](@ref) where that is larger. Below it the forecast is flat.
 
 # Related
 
   - [`forecast_relative`](@ref)
+  - [`fit_min_rows`](@ref)
 """
 function forecast_min_rows(me::AbstractExpectedReturnsEstimator)
-    return holds_second_moment(me) ? 2 : 1
+    return max(holds_second_moment(me) ? 2 : 1, fit_min_rows(me))
 end
 """
     holds_second_moment(est)

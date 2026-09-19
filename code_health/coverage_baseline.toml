@@ -176,6 +176,7 @@ commit = "8610300"
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { lines = 71, misses = 0 }
 "src/10_Prior/12_PriorPartialFit.jl" = { lines = 76, misses = 0 }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { lines = 17, misses = 0 }
+"src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { lines = 38, misses = 0 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { lines = 128, misses = 0 }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { lines = 20, misses = 0 }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { lines = 161, misses = 0 }
