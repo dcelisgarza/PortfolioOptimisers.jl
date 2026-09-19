@@ -11,4 +11,5 @@ PortfolioOptimisers.allocation_set_prior
 PortfolioOptimisers.set_allocation_risk_ceiling!
 PortfolioOptimisers.risk_contribution_constraints(r::Variance, set::ProgrammeAllocationSet, pr::AbstractPriorResult)
 PortfolioOptimisers.allocation_risk_ceiling
+PortfolioOptimisers.clip_at_zero
 ```

@@ -805,7 +805,7 @@ end
     expert_start_allocation(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector)
     expert_start_allocation(alg::ConstantRebalancedPortfolio, w::AbstractVector)
 
-The allocation an expert of an [`ExpertMixture`](@ref) holds during the first period: the Start Allocation for a rule that reads `w`, and the constant rebalanced portfolio's own `w`, so a sampled expert's wealth is Cover's ``S_t(\\boldsymbol{b}) = \\prod_{s \\leq t} \\langle \\boldsymbol{b}, \\boldsymbol{x}_s \\rangle`` from the first row. The head itself holds the Start Allocation for that period either way.
+The allocation an expert of an [`ExpertMixture`](@ref) holds during the first period: the Start Allocation for a rule that reads `w`, and the constant rebalanced portfolio's own `w`, so a sampled expert's wealth is Cover's ``S_t(\\boldsymbol{b}) = \\prod_{s \\leq t} \\langle \\boldsymbol{b}, \\boldsymbol{x}_s \\rangle`` from the first row. The head itself holds the Start Allocation for that period either way. The constant portfolio's `w` is answered in the numeric type the head's allocation and it promote to, so a target given as integers — the one-hot experts of a switching portfolio — seeds a carrier that holds the allocation a programme set projects it to.
 
 # Related
 
@@ -817,7 +817,12 @@ function expert_start_allocation(::AbstractOnlinePortfolioSelectionAlgorithm,
     return copy(w)
 end
 function expert_start_allocation(alg::ConstantRebalancedPortfolio, w::AbstractVector)
-    return isnothing(alg.w) ? fill(one(eltype(w)) / length(w), length(w)) : copy(alg.w)
+    if isnothing(alg.w)
+        return fill(one(eltype(w)) / length(w), length(w))
+    end
+    # The carrier's numeric type is the head's, so a target given as integers, as the
+    # one-hot experts of a switching portfolio are, holds the projected allocation.
+    return promote_type(eltype(w), eltype(alg.w)).(alg.w)
 end
 function online_update!(alg::ExpertMixture, st::ExpertMixtureState, w::AbstractVector,
                         x::AbstractVector, rows, set::AbstractAllocationSet)

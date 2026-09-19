@@ -592,6 +592,8 @@ At period ``t`` the loss is ``\\rho_r(\\boldsymbol{w}; \\boldsymbol{X}_t)``, the
 
 A prior fitted on one row has no covariance, so the loss is read once the head holds two rows and the step before that is the identity on the iterate. The rows reach the loss through the head's rows buffer, capped at `window`, so the first `window - 1` steps read a shorter window than stated.
 
+Under a time-varying panel the head fills an unlisted asset's cell with a zero return, so a window over an unlisted span carries a constant column, and the default `pe` fails on it: the covariance's positive-definite repair divides that column by its zero standard deviation and throws. A loss that must run over such a span takes a `pe` whose covariance survives a constant column — an [`EmpiricalPrior`](@ref) whose `ce` skips the repair, or one over [`RankOneCovariance`](@ref).
+
 The regret theorems of the first-order rules are stated for a convex loss, and hold here for the measures that are convex in the weights: [`Variance`](@ref), [`StandardDeviation`](@ref), [`ConditionalValueatRisk`](@ref), [`EntropicValueatRisk`](@ref), [`WorstRealisation`](@ref), [`Range`](@ref), [`MaximumDrawdown`](@ref), [`AverageDrawdown`](@ref), [`ConditionalDrawdownatRisk`](@ref), [`EntropicDrawdownatRisk`](@ref), the low-order moment measures, and [`MeanReturn`](@ref), which is linear. A quantile measure — [`ValueatRisk`](@ref), [`DrawdownatRisk`](@ref) — a kurtosis, a skewness, or a ratio is not, and on it the step is a heuristic with no bound. A finite-difference gradient at a kink of a convex measure is the chord across it, a subgradient's neighbour, as [`risk_gradient`](@ref) states.
 
 # Fields
@@ -797,9 +799,9 @@ With ``\\boldsymbol{g}_t = -\\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\bo
 
 Under [`EntropicProjection`](@ref) the step is the multiplicative update ``w_{t+1, i} \\propto w_{t, i} \\exp(\\eta x_{t, i} / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle)`` of Helmbold, Schapire, Singer and Warmuth (1998), the exponentiated gradient, with regret ``O(\\sqrt{T \\log N})`` at ``\\eta = r \\sqrt{2 \\log N / T}`` when every price relative is at least ``r``; under [`EuclideanProjection`](@ref) it is the additive step ``\\boldsymbol{w}_t + \\eta \\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` followed by the projection onto the simplex, Zinkevich's (2003) online gradient descent and, up to the projection the 1997 paper assumes rather than enforces, the gradient projection of Helmbold and co-authors (1997), with regret ``O(\\sqrt{T N})``; under [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref) it is the barrier step of Abernethy, Lee and Tewari (2015), Zimmert and Seldin (2021) and Orseau, Lattimore and Legg (2017, §7), each a scalar root on the default set. Every geometry admits every Allocation Set the head admits; the fixed-horizon constants of the theorems need the horizon, which no online rule knows, and are documented formulas, and the anytime rates are [`InverseSquareRootRate`](@ref), [`SelfConfidentRate`](@ref) and [`DoublingTrickRate`](@ref) on `eta`.
 
-`alpha` is the uniform mix of Helmbold and co-authors (1998, Theorem 4.2): the update reads the mixed price relatives ``\\tilde{\\boldsymbol{x}}_t = (1 - \\alpha / N) \\boldsymbol{x}_t + (\\alpha / N) \\boldsymbol{1}`` at the unmixed iterate, and the head plays ``\\tilde{\\boldsymbol{w}}_{t+1} = (1 - \\alpha) \\boldsymbol{w}_{t+1} + (\\alpha / N) \\boldsymbol{1}``; the carrier holds the unmixed iterate, so the mix is never inverted, and at `alpha = 0` the carrier is the played allocation and the rule is the plain step. The mix is a convex shift, not a projection, so it is admitted under every geometry; the theorem — ``O(T^{3/4})`` with no lower bound on the price relatives, at ``\\alpha = (N^2 \\log N / (8 T))^{1/4}`` — is the entropic map's, and the doubling trick of Corollary 4.3 sets ``\\alpha`` and ``\\eta`` per stage and takes precedence over this slot. The Start Allocation is played unmixed for the first period, as every rule plays it.
+`alpha` is the uniform mix of Helmbold and co-authors (1998, Theorem 4.2): the update reads the mixed price relatives ``\\tilde{\\boldsymbol{x}}_t = (1 - \\alpha / N) \\boldsymbol{x}_t + (\\alpha / N) \\boldsymbol{1}`` at the unmixed iterate, and the head plays ``\\tilde{\\boldsymbol{w}}_{t+1} = (1 - \\alpha) \\boldsymbol{w}_{t+1} + (\\alpha / N) \\boldsymbol{1}``; the carrier holds the unmixed iterate, so the mix is never inverted, and at `alpha = 0` the carrier is the played allocation and the rule is the plain step. The mix is a convex shift, not a projection, so it is admitted under every geometry; the theorem — ``O(T^{3/4})`` with no lower bound on the price relatives, at ``\\alpha = (N^2 \\log N / (8 T))^{1/4}`` — is the entropic map's, and the doubling trick of Corollary 4.3 sets ``\\alpha`` and ``\\eta`` per stage and takes precedence over this slot. The Start Allocation is played unmixed for the first period, as every rule plays it. The mix lies on the Allocation Set wherever the uniform allocation does, and is projected onto the set once more in the rule's geometry where it does not — a bounded set that excludes the uniform allocation, a turnover ceiling, a MIP kind — through [`reprojection`](@ref), which the default set never pays for.
 
-A schedule that names a restart makes the update of that period answer the Start Allocation projected onto the set, held on the carrier, and puts the carrier back at its seed with the period count kept, because the stages are cumulative; the Gradient Transform's averages restart with it. As the weighting of an [`ExpertMixture`](@ref) the rule moves the weight over the experts on their period returns. As an expert of a mixture under [`BlendPoint`](@ref) the rule reads its gradient at the mixture's played blend — the seven-argument [`online_update!`](@ref) hands it the Gradient Point — while stepping from its own iterate, the shared gradient of Zhang, Lu and Zhou (2018) and Zhao, Zhang, Zhang and Zhou (2020); on the head, and under [`OwnPoint`](@ref), the point is the iterate itself.
+A schedule that names a restart makes the update of that period answer the Start Allocation re-entered onto the set from the book the fund holds ([`reprojection`](@ref)), held on the carrier, and puts the carrier back at its seed with the period count kept, because the stages are cumulative; the Gradient Transform's averages restart with it. As the weighting of an [`ExpertMixture`](@ref) the rule moves the weight over the experts on their period returns. As an expert of a mixture under [`BlendPoint`](@ref) the rule reads its gradient at the mixture's played blend — the seven-argument [`online_update!`](@ref) hands it the Gradient Point — while stepping from its own iterate, the shared gradient of Zhang, Lu and Zhou (2018) and Zhao, Zhang, Zhang and Zhou (2020); on the head, and under [`OwnPoint`](@ref), the point is the iterate itself.
 
 `obj` is the loss the gradient is taken of: [`LogWealth`](@ref), the period's ``-\\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_t \\rangle`` of every rule above, or a [`RiskLoss`](@ref), a risk measure over the last `window` rows the head holds, whose gradient [`risk_gradient`](@ref) answers at the iterate; the rule's `rows_needed` is the objective's. The uniform mix is read by the log-wealth gradient alone, because a risk measure reads the returns and not the period's relative, and the mix of the played allocation applies under either.
 
@@ -936,20 +938,56 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
                         x::AbstractVector, rows, set::AbstractAllocationSet,
                         point::AbstractVector)
     t = st.n + 1
+    wh = price_adjusted_allocation(w, x)
     if restart(alg.eta, t)
-        # The period count survives the restart: the schedule's stages are cumulative.
-        return MirrorDescentState(t, copy(st.w0), st.w0,
-                                  schedule_state_seed(alg.eta, st.w0),
-                                  gradient_state_seed(alg.grad, st.w0)), copy(st.w0)
+        # The period count survives the restart: the schedule's stages are cumulative. The
+        # start re-enters the set from the book the fund holds, as it entered at the seed.
+        u0 = reprojection(alg.proj, set, st.w0, wh)
+        return MirrorDescentState(t, u0, st.w0, schedule_state_seed(alg.eta, st.w0),
+                                  gradient_state_seed(alg.grad, st.w0)), copy(u0)
     end
     eta = learning_rate(alg.eta, t, st)
     alpha = mixing_share(alg.eta, t, alg.alpha)
     xm = iszero(alpha) ? x : (1 - alpha / length(x)) .* x .+ alpha / length(x)
     g = loss_gradient(alg.obj, point, xm, rows)
     q = mirror_step(alg.proj, st.u, eta .* transform_gradient!(alg.grad, st.gs, g))
-    u = project(alg.proj, set, q, price_adjusted_allocation(w, x))
+    u = project(alg.proj, set, q, wh)
     s = schedule_update!(alg.eta, st.s, w, x)
-    return MirrorDescentState(t, u, st.w0, s, st.gs), played_allocation(u, alpha)
+    played = played_allocation(u, alpha)
+    return MirrorDescentState(t, u, st.w0, s, st.gs),
+           iszero(alpha) ? played : reprojection(alg.proj, set, played, wh)
+end
+"""
+    reprojection(proj::AbstractProjectionGeometry, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
+    reprojection(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector)
+
+The projection onto the head's Allocation Set of an allocation a [`MirrorDescent`](@ref) rule plays without having stepped to it: the uniform mix of its iterate under `alpha`, and the Start Allocation a restarting Learning-Rate Schedule returns to. Both are allocations, and both may lie outside the set — the mix wherever the set excludes the uniform allocation, the start wherever a turnover ceiling or a MIP kind excludes it from the book the fund now holds — so the head projects them once more in the rule's own geometry, as an [`ExpertMixture`](@ref) projects its blend ([`blend_projection`](@ref)). On a [`BoundedAllocationSet`](@ref) an allocation inside the bounds is answered as is, so the default set changes nothing and pays nothing; on every other set the projection is a programme, and a rule with a positive `alpha` pays two per period.
+
+# Arguments
+
+  - `proj`: The rule's geometry.
+  - `set`: The set, resolved.
+  - `q`: The allocation to play.
+  - `w`: The Price-Adjusted Allocation the step trades from.
+
+# Returns
+
+  - `w'::AbstractVector`: `q` itself on a bounded set it lies in, its projection otherwise.
+
+# Related
+
+  - [`project`](@ref)
+  - [`blend_projection`](@ref)
+  - [`played_allocation`](@ref)
+"""
+function reprojection(proj::AbstractProjectionGeometry, set::BoundedAllocationSet,
+                      q::AbstractVector, w::AbstractVector)
+    wb = set.wb
+    return all(wb.lb .<= q .<= wb.ub) ? q : project(proj, set, q, w)
+end
+function reprojection(proj::AbstractProjectionGeometry, set::AbstractAllocationSet,
+                      q::AbstractVector, w::AbstractVector)
+    return project(proj, set, q, w)
 end
 """
     ExponentiatedGradient(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::AbstractGradientTransform = PlainGradient())

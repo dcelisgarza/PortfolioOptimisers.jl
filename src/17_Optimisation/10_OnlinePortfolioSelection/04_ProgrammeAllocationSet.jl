@@ -1070,7 +1070,7 @@ The programme arms of the Constrained Update: every pair but the scalar roots on
 
 # Validation
 
-  - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref): `all(>= 0, lb)` over the resolved bounds. A `DomainError` is thrown otherwise.
+  - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref): `all(>= 0, lb)` over the resolved bounds. A `DomainError` is thrown otherwise. Under the same three geometries the programme's answer passes through [`clip_at_zero`](@ref), so a leg the solver closed to within its tolerance below zero is zero to the next step.
 
 # Related
 
@@ -1092,7 +1092,7 @@ function project(proj::EntropicProjection, set::ProgrammeAllocationSet, q::Abstr
     @argcheck(all(x -> x >= zero(x), set.wb.lb),
               DomainError(set.wb.lb,
                           "the entropic projection admits no negative lower bound: `log w` is undefined below zero"))
-    return projection_programme(proj, set, q, w)
+    return clip_at_zero(projection_programme(proj, set, q, w))
 end
 function project(proj::GramProjection, set::ProgrammeAllocationSet, q::AbstractVector,
                  w::AbstractVector)
@@ -1103,7 +1103,7 @@ function project(proj::Union{<:TsallisProjection, <:LogBarrierProjection},
     @argcheck(all(x -> x >= zero(x), set.wb.lb),
               DomainError(set.wb.lb,
                           "a barrier projection admits no negative lower bound: the potential is undefined below zero"))
-    return projection_programme(proj, set, q, w)
+    return clip_at_zero(projection_programme(proj, set, q, w))
 end
 """
     blend_projection(proj::EuclideanProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)

@@ -226,7 +226,10 @@ hold for those only, and that a finite-difference gradient at a kink is a chord.
   share, keep with probability `1 − γ` and redistribute uniformly to the other `K − 1` experts
   with probability `γ` (Singer 1997, Eq. 4–6; the update resembles Herbster and Warmuth's fixed
   share, as the paper notes). **`SwitchingPortfolio(; N, gamma = 1/3)`** is a constructor of
-  `ExpertMixture` over the `N` single-asset `ConstantRebalancedPortfolio`s under it. The set-2
+  `ExpertMixture` over the `N` single-asset `ConstantRebalancedPortfolio`s under it. The
+  weighting's `proj` is bound to `EuclideanProjection`: the fixed share is an affine map that
+  keeps the weights in the simplex, so on the default Expert Set the projection is the identity,
+  and on a bounded Expert Set it is the Euclidean scalar root, as `TopK`'s is. The set-2
   leaf of ADR 0156 is withdrawn: applied to the held `w_t` it is the affine glide
   `w_{t+1} − 1/N = (1 − γN/(N−1))(w_t − 1/N)` and reads no price. The Krichevsky–Trofimov
   varying-`γ` version, for which the paper states there is no equivalent portfolio update, is

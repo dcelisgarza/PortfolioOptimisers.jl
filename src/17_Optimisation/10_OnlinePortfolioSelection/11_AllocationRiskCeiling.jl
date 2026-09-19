@@ -156,3 +156,24 @@ end
 function allocation_risk_ceiling(r::StandardDeviation)
     return r.settings.ub
 end
+"""
+    clip_at_zero(w::AbstractVector)
+
+The answer of a projection programme in a geometry whose domain is the non-negative orthant, with every entry below zero raised to it. A solver answers a bound it holds to its own tolerance, so a leg the programme closed comes back a few ulps below zero, and the next step's raw step, which the geometry forms multiplicatively from the allocation it holds, would carry the sign into `log w`. The clip is the size of the solver's tolerance and never renormalises: the sum stays what the solver answered.
+
+# Arguments
+
+  - `w`: The programme's answer.
+
+# Returns
+
+  - `w'::Vector`: `w` with no entry below zero.
+
+# Related
+
+  - [`project`](@ref)
+  - [`projection_programme`](@ref)
+"""
+function clip_at_zero(w::AbstractVector)
+    return map(x -> max(x, zero(x)), w)
+end

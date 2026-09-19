@@ -298,8 +298,10 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
         o = po.partial_fit!(o, rows(rd, 18:18))
         @test optimise(o).w == optimise(opt, rows(rd, 1:18)).w
         # A view onto a subset of the assets drops no expert, so the unit expert of an
-        # excluded asset has nothing to hold on the view and its constant rebalanced
-        # portfolio refuses the renormalised zero slice.
-        @test_throws DomainError po.port_opt_view(OPS(; alg = sp), [1, 3])
+        # excluded asset has nothing to hold on the view: its constant rebalanced portfolio
+        # is the uniform allocation over the kept assets, and the view runs.
+        v = po.port_opt_view(OPS(; alg = sp), [1, 3])
+        @test v.alg.experts[2].w == [0.5, 0.5] && v.alg.experts[1].w == [1.0, 0.0]
+        @test length(optimise(v, po.port_opt_view(rd, 1:5, [1, 3])).w) == 2
     end
 end

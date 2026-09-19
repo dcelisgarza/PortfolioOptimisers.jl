@@ -990,7 +990,7 @@ end
 
 Slices an allocation to the selected assets and renormalises it to sum to one, as a copy; passes an absent one through.
 
-The mass the selection leaves out is spread over the kept assets in proportion, which is the reading every per-asset view of an allocation takes in the family: the read-out under a time-varying panel, and the view of a rule's own allocation.
+The mass the selection leaves out is spread over the kept assets in proportion, which is the reading every per-asset view of an allocation takes in the family: the read-out under a time-varying panel, and the view of a rule's own allocation. A selection that keeps none of the mass, as a view of a one-hot allocation over the other assets does, has no proportion to spread it in and answers the uniform allocation over the kept assets, the family's Start Allocation.
 
 # Related
 
@@ -1002,7 +1002,8 @@ function renormalised_view(::Nothing, ::Any)
 end
 function renormalised_view(w::AbstractVector, i)
     v = w[i]
-    return v ./ sum(v)
+    s = sum(v)
+    return iszero(s) ? fill(one(s) / length(v), length(v)) : v ./ s
 end
 """
 $(DocStringExtensions.TYPEDEF)

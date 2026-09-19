@@ -168,6 +168,15 @@ Gaussian weighting reversion and the local adaptive learning are constructors of
 `ForecastReversion`, the adaptive input and composite trend representation and the trend-promote
 price tracking constructors of `ForecastTracking`.
 
+Every forecast-reading rule projects in the Euclidean geometry, and its `proj` slot is bound to
+`EuclideanProjection` as ADR 0159 binds `ForecastReversion`'s: `ForecastTracking`,
+`KernelTrendTracking`, `TransactionCostOptimisation` and `ShortTermSparsePortfolio` each take a
+step that is a Euclidean move from the held allocation — a normalised direction, a kernel-scaled
+direction, a soft-thresholded proximal step, an ADMM iterate — and their papers close each step
+with the simplex projection of Duchi and co-authors, which is that geometry's scalar root on the
+default set. No forecast-reading rule admits another geometry: none of their steps is
+multiplicative, and none carries a Gram matrix.
+
 ### What a rule may read, and what is never a Prior's
 
 The forecast slot serves **`mu` alone**. No rule reads `sigma`, `X`, `ens` or a higher moment from

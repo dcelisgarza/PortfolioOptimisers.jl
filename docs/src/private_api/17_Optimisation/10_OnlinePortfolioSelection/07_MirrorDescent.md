@@ -9,4 +9,5 @@ PortfolioOptimisers.MirrorDescentState
 PortfolioOptimisers.doubling_stage
 PortfolioOptimisers.copy_gradient_state
 PortfolioOptimisers.played_allocation
+PortfolioOptimisers.reprojection
 ```
