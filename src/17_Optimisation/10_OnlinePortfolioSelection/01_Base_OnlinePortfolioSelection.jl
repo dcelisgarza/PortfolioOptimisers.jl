@@ -360,7 +360,7 @@ end
 
 Projects a rule's raw step onto the Allocation Set in the rule's Projection Geometry.
 
-The one dispatch of the Constrained Update. On the bounded set under the simplex bounds, the Euclidean arm is the sort of Duchi and co-authors ([`project_simplex`](@ref)) and the entropic arm is normalisation; under any other bound each arm is a scalar root, `clip(q − θ, lb, ub)` and `clip(q / Z, lb, ub)`, found by bisection through [`bounded_root`](@ref). The entropic arm refuses a raw step with a negative entry, a step with no positive entry at all, which no normalisation puts on the simplex, and a negative lower bound.
+The one dispatch of the Constrained Update. On the bounded set under the simplex bounds, the Euclidean arm is the sort of Duchi and co-authors ([`project_simplex`](@ref)) and the entropic arm is normalisation; under any other bound each arm is a scalar root, `clip(q − θ, lb, ub)` ([`bounded_quadratic_projection`](@ref) at unit weights) and `clip(q / Z, lb, ub)`, found by bisection through [`bounded_root`](@ref). The entropic arm refuses a raw step with a negative entry, a step with no positive entry at all, which no normalisation puts on the simplex, and a negative lower bound.
 
 # Arguments
 
@@ -390,13 +390,7 @@ function project(::EuclideanProjection, set::BoundedAllocationSet, q::AbstractVe
     if simplex_bounds(wb)
         return project_simplex(q)
     end
-    assert_feasible_bounds(wb)
-    # `Σ clip(q − θ, lb, ub)` falls from `Σ ub` to `Σ lb` as `θ` runs from
-    # `min(q − ub)` to `max(q − lb)`, so the budget's root is bracketed there.
-    lo = minimum(q .- wb.ub)
-    hi = maximum(q .- wb.lb)
-    theta = bounded_root(t -> sum(clamp.(q .- t, wb.lb, wb.ub)), lo, hi)
-    return clamp.(q .- theta, wb.lb, wb.ub)
+    return bounded_quadratic_projection(q, wb)
 end
 function project(::EntropicProjection, set::BoundedAllocationSet, q::AbstractVector,
                  ::AbstractVector)
@@ -428,6 +422,42 @@ function project(::EntropicProjection, set::BoundedAllocationSet, q::AbstractVec
         hi *= 2
     end
     return clamp.(q ./ bounded_root(f, lo, hi), wb.lb, wb.ub)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The projection of a raw step onto a bounded set in the norm of a positive diagonal `h`, ``\\min \\tfrac{1}{2} \\sum_i h_i (w_i - q_i)^2`` subject to the budget and the bounds: the scalar root ``w_i = \\mathrm{clip}(q_i - \\theta / h_i, lb_i, ub_i)`` at the ``\\theta`` that restores the budget, found by bisection through [`bounded_root`](@ref). At `h = 1`, the default, it is the Euclidean arm of [`project`](@ref) off the simplex bounds; with the gradient mass of [`AdaptiveSubgradient`](@ref) it is the [`DiagonalProjection`](@ref) on every bound.
+
+# Arguments
+
+  - `q`: The raw step.
+  - `wb`: The resolved bounds.
+  - `h`: The diagonal of the norm, positive.
+
+# Validation
+
+  - `Σ lb ≤ 1 ≤ Σ ub` over the resolved bounds. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `w'::Vector`: The projected allocation, a new vector.
+
+# Related
+
+  - [`project`](@ref)
+  - [`bounded_root`](@ref)
+  - [`EuclideanProjection`](@ref)
+  - [`DiagonalProjection`](@ref)
+"""
+function bounded_quadratic_projection(q::AbstractVector, wb::WeightBounds,
+                                      h::AbstractVector = fill(one(eltype(q)), length(q)))
+    assert_feasible_bounds(wb)
+    # `Σ clip(q − θ / h, lb, ub)` falls from `Σ ub` to `Σ lb` as `θ` runs from
+    # `min h (q − ub)` to `max h (q − lb)`, so the budget's root is bracketed there.
+    lo = minimum(h .* (q .- wb.ub))
+    hi = maximum(h .* (q .- wb.lb))
+    theta = bounded_root(t -> sum(clamp.(q .- t ./ h, wb.lb, wb.ub)), lo, hi)
+    return clamp.(q .- theta ./ h, wb.lb, wb.ub)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

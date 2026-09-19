@@ -10,7 +10,7 @@ commit = "8411336595"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2997, doc = 0, comment = 238, blank = 48, total = 3283 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1186, doc = 113, comment = 125, blank = 43, total = 1467 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1191, doc = 113, comment = 125, blank = 43, total = 1472 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -303,7 +303,7 @@ commit = "8411336595"
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { code = 149, doc = 213, comment = 13, blank = 83, total = 458 }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { code = 42, doc = 61, comment = 4, blank = 20, total = 127 }
 "src/17_Optimisation/09_OnlineOptimisation.jl" = { code = 232, doc = 317, comment = 3, blank = 159, total = 711 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { code = 285, doc = 577, comment = 5, blank = 238, total = 1105 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { code = 289, doc = 594, comment = 5, blank = 247, total = 1135 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { code = 290, doc = 412, comment = 3, blank = 160, total = 865 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { code = 248, doc = 309, comment = 2, blank = 132, total = 691 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { code = 523, doc = 509, comment = 4, blank = 178, total = 1214 }
@@ -326,3 +326,4 @@ commit = "8411336595"
 
 "src/05_Moments/36_RankOneCovariance.jl" = { code = 37, doc = 51, comment = 4, blank = 25, total = 117 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { code = 416, doc = 578, comment = 1, blank = 231, total = 1226 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { code = 272, doc = 391, comment = 2, blank = 149, total = 814 }

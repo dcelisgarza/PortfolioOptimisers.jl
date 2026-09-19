@@ -134,8 +134,11 @@ the weighted scalar root `w_i = max(0, y_i − θ/H_{t,ii})` with `θ` the budge
 what the Euclidean root costs; on a programme set it is a weighted quadratic programme.
 `EuclideanProjection` is the `H = I` case, and the two share one root with a weight argument. The
 rule mirrors `NewtonStep` and `GramProjection` one rank down: the full-matrix variant of the paper
-is the Newton step's carrier under a square root. On a uniform start the first step is a no-op,
-because the per-coordinate normalisation cancels the first gradient exactly; the docstring says so.
+is the Newton step's carrier under a square root. The per-coordinate normalisation cancels the first
+gradient exactly, so the first raw step is a uniform shift of the start; the projection in the norm
+of `H_1` then lets the assets with the smaller gradient absorb more of the shift back, so the first
+step is not a no-op — on `x₁ = (1.2, 0.8)` from the uniform start it is `(0.5 + 0.2η, 0.5 − 0.2η)`
+— and holds only when every price relative is equal; the docstring says so.
 
 ### The optimistic step is a wrapper rule carrying the secondary iterate
 
@@ -149,7 +152,13 @@ played `w_t` is not what the next step reads, so
 path length), `MeanGradient()` (the variance hint), and `ForecastGradient(; me)`, which maps an
 expected-returns estimator's Price Relative Forecast to `M = −x̂/⟨w, x̂⟩` — the natural portfolio
 hint, not in the paper. The extra-gradient step (Chiang and co-authors 2012, the expert of Zhao and
-co-authors 2020) is `LastGradient()` taken at the played point, a predictor kind and not a rule.
+co-authors 2020) is `LastGradient()` taken at the played point, a predictor kind and not a rule —
+and it is the default, because the optimistic step reads its gradient at the played allocation, so
+the two papers write one method; the last gradient re-evaluated at the new secondary iterate is the
+Mirror-Prox form, the flag `at_played = false` on the same predictor. The adaptive rate of the
+NeurIPS companion (Corollary 2) is `HintResidualRate(; rmax)` on the wrapped rule's `eta`: the wrapper
+keeps the last hint and the two running residual sums on its carrier, the schedule reads them by
+field as the self-confident rate reads its statistic, and no new verb is added.
 `eta`, `proj`, `alpha` and `obj` are the wrapped rule's; the regret is
 `O(√Σ_t ‖g_t − M_t‖²)` and never worse than the plain step up to a constant.
 
@@ -277,7 +286,7 @@ prototype's corrections where it does not, the numbers committed as literals wit
 stated; the verification ticket sweeps them and adds the cross-set identities — `MirrorDescent` on
 the entropic map at `α = 0` equals the first build's exponentiated gradient to the last bit,
 `ExpectationMaximisation` at a constant `η` equals its Eq. 14 form, `AdaptiveSubgradient` on a
-uniform start holds for one period.
+uniform start holds for one period only under equal price relatives.
 
 ## Considered options
 

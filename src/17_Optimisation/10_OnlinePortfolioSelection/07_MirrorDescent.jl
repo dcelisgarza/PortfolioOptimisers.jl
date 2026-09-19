@@ -232,7 +232,8 @@ In order to implement a new transform, subtype `AbstractGradientTransform` and i
 
   - `gradient_state_seed(grad::AbstractGradientTransform, w::AbstractVector)`: The carrier the transform keeps on the Rule State before the first row, or `nothing`, the default; `w` is the Start Allocation, whose length and element type the carrier takes.
   - `transform_gradient!(grad::AbstractGradientTransform, gs, g::AbstractVector) -> AbstractVector`: The transformed gradient of the period from the raw one, writing the carrier `gs` in place.
-  - `gradient_state_view(gs, i)`: The carrier sliced to the assets `i`, for a view of the head; and `copy_gradient_state(gs)`, a copy sharing no array — both written for `nothing`, a vector and a pair of vectors already.
+
+A carrier that is `nothing`, a vector or a pair of vectors is sliced and copied with the head's state already; a carrier of another shape needs a slice and a copy of its own, through the two private helpers [`MirrorDescentState`](@ref) names.
 
 # Related
 
