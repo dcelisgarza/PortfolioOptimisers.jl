@@ -595,13 +595,15 @@ function exposure_ic(csfm::CrossSectionalFactorModel; horizon::Integer = 1,
     return exposure_ic(B, R, w; horizon = horizon, rank = rank)
 end
 """
-    exposure_ic_summary(ic::MatNum)
+    exposure_ic_summary(ic::MatNum; lags::Integer = 0)
     exposure_ic_summary(csfm::CrossSectionalFactorModel; horizon::Integer = 1,
                         rank::Bool = true, reduced::Bool = false)
 
 Return the summary of an information coefficient series, one entry per factor.
 
 The mean states the average score, the standard deviation states how much the score moves, their ratio states the score per unit of movement, the t-statistic states whether the mean is far enough from zero to believe over the observations that carried a score, and the hit rate states how often the score was positive. All five are read against the observations that carried a score: an observation whose score is `NaN` is one at which nothing was measured, not a miss, so it is in no denominator here, as it is in none of the library's other summaries. Whether a series was silenced often is a separate question, and the coverage of the series answers it.
+
+The t-statistic's standard error is the long-run one of [`exposure_ic_factor_summary`](@ref), read over `lags` autocovariances. [`exposure_ic`](@ref) scores every observation against a window of `horizon` observations, so `horizon - 1` consecutive rows of its series read the same returns, and the block method derives `lags` as `horizon - 1`. The bare method takes `lags` from the caller, and its default of `0` is the independent case, which a series scored at a stride of its window is.
 
 # Mathematical definition
 
@@ -610,7 +612,7 @@ The mean states the average score, the standard deviation states how much the sc
 \\qquad
 \\mathrm{IR}_{k} = \\frac{\\overline{\\mathrm{IC}}_{k}}{s_{k}}
 \\qquad
-t_{k} = \\mathrm{IR}_{k} \\sqrt{\\left| \\mathcal{T}_{k} \\right|}
+t_{k} = \\frac{\\overline{\\mathrm{IC}}_{k}}{\\sigma_{k}} \\sqrt{\\left| \\mathcal{T}_{k} \\right|}
 \\qquad
 \\mathrm{hit}_{k} = \\frac{1}{|\\mathcal{T}_{k}|} \\sum_{t \\in \\mathcal{T}_{k}} \\mathbb{1}\\left[\\mathrm{IC}_{tk} > 0\\right]
 ```
@@ -620,10 +622,12 @@ Where:
   - ``\\mathrm{IC}_{tk}``: Information coefficient of factor ``k`` at observation ``t``.
   - ``\\mathcal{T}_{k}``: The observations at which it is finite.
   - ``s_{k}``: Its standard deviation over ``\\mathcal{T}_{k}``, with one degree of freedom removed.
+  - ``\\sigma_{k}``: Its long-run standard deviation over ``\\mathcal{T}_{k}``, which [`exposure_ic_factor_summary`](@ref) defines and which is ``s_{k}`` at `lags = 0`.
 
 # Arguments
 
   - `ic`: Information coefficient series `pairs × factors`.
+  - `lags`: Number of autocovariances the t-statistic's standard error reads. It is one less than the number of rows a forward window spans, `horizon - 1` for a series scored at every observation.
   - `csfm`: A cross-sectional factor model block.
   - `horizon`: Forward window, in observations.
   - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise.
@@ -632,6 +636,7 @@ Where:
 # Validation
 
   - `!isempty(ic)`.
+  - `lags >= 0`. Raises a `DomainError`.
 
 # Returns
 
@@ -644,8 +649,9 @@ Where:
   - [`forecast_factor_correlation`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
-function exposure_ic_summary(ic::MatNum)
+function exposure_ic_summary(ic::MatNum; lags::Integer = 0)
     @argcheck(!isempty(ic), IsEmptyError("ic cannot be empty"))
+    @argcheck(lags >= zero(lags), DomainError(lags, "lags must be >= 0"))
     P, K = size(ic)
     Tf = real(eltype(ic))
     mean_ic = Vector{Tf}(undef, K)
@@ -654,7 +660,7 @@ function exposure_ic_summary(ic::MatNum)
     t_stat = Vector{Tf}(undef, K)
     hit_rate = Vector{Tf}(undef, K)
     for k in 1:K
-        m = exposure_ic_factor_summary(ic, k)
+        m = exposure_ic_factor_summary(ic, k; lags = lags)
         mean_ic[k] = m.mean_ic
         std_ic[k] = m.std_ic
         ic_ir[k] = m.ic_ir
@@ -665,18 +671,48 @@ function exposure_ic_summary(ic::MatNum)
             hit_rate = hit_rate)
 end
 """
-    exposure_ic_factor_summary(ic::MatNum, k::Integer)
+    exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0)
 
-Return the four summary numbers of one factor's information coefficient series.
+Return the five summary numbers of one factor's information coefficient series.
 
-The mean, the standard deviation and the hit rate read the observations at which the coefficient is defined, so an observation with no coefficient is in no denominator and the three agree on their sample; a series with no defined observation has no hit rate. The ratio has no answer where either of its two terms has none, and none where the standard deviation is zero. The t-statistic scales the ratio by the root of the number of observations that carried a coefficient, so it says whether the mean is far enough from zero to believe over the evidence there was; it inherits the ratio's absence.
+The mean, the standard deviation and the hit rate read the observations at which the coefficient is defined, so an observation with no coefficient is in no denominator and the three agree on their sample; a series with no defined observation has no hit rate. The ratio has no answer where either of its two terms has none, and none where the standard deviation is zero. The t-statistic is the mean over the standard error of the mean, so it says whether the mean is far enough from zero to believe over the evidence there was.
 
 It is the kernel of every summary of a per-observation correlation series, so [`forecast_ic_summary`](@ref) reads it too, and a coefficient of a factor exposure and a coefficient of a Return Forecast are summarised on the same terms.
+
+# The standard error reads the overlap
+
+A coefficient scored against a forward window that is longer than the stride between two scores reads the same returns at consecutive rows, so the rows are not independent and the standard error of their mean is not ``s / \\sqrt{n}``. The rows that overlap a given row are the ``L`` on either side of it, where ``L`` is one less than the number of strides a window spans, and under no skill the series is a moving average of that order: every autocovariance beyond ``L`` is zero and the ones up to it are not. The standard error therefore reads the long-run variance, the variance plus twice the first ``L`` autocovariances, with no taper, because the order is known from the window and the stride rather than estimated from the series. A tapered estimate at the same order under-weights autocovariances that are known to be there, and overstates the statistic by about the root of two.
+
+The autocovariances read the rows at their positions in `ic`, so a row whose coefficient is `NaN` is in no pair and the lag between two rows is their distance in the series, not in its finite subsequence. Every autocovariance divides by the same ``n - 1`` as the variance, so at `lags = 0` the standard error is exactly ``s / \\sqrt{n}`` and the statistic is ``\\mathrm{IR} \\sqrt{n}``.
+
+The long-run variance is a sum of signed terms, and a short series can sum it to a non-positive number. The t-statistic is `NaN` there, as it is where the standard deviation is zero: it is not clamped, because a clamped value would report a certainty the series does not carry.
+
+# Mathematical definition
+
+```math
+\\sigma^{2} = \\gamma_{0} + 2 \\sum_{j = 1}^{L} \\gamma_{j}
+\\qquad
+\\gamma_{j} = \\frac{1}{n - 1} \\sum_{t,\\, t + j \\in \\mathcal{T}} \\left( \\mathrm{IC}_{t} - \\overline{\\mathrm{IC}} \\right) \\left( \\mathrm{IC}_{t + j} - \\overline{\\mathrm{IC}} \\right)
+\\qquad
+t = \\frac{\\overline{\\mathrm{IC}}}{\\sigma} \\sqrt{n}
+```
+
+Where:
+
+  - ``\\mathrm{IC}_{t}``: Coefficient of factor ``k`` at row ``t``.
+  - ``\\mathcal{T}``: The rows at which it is finite, and ``n`` their number.
+  - ``L``: `lags`.
+  - ``\\gamma_{0}``: The variance ``s^{2}``.
 
 # Arguments
 
   - `ic`: Information coefficient series `pairs × factors`.
   - `k`: Position of the factor.
+  - `lags`: Number of autocovariances the standard error reads, `0` for independent rows. [`forecast_ic_lags`](@ref) derives it from a window and a stride.
+
+# Validation
+
+  - `lags >= 0`. Raises a `DomainError`.
 
 # Returns
 
@@ -686,8 +722,10 @@ It is the kernel of every summary of a per-observation correlation series, so [`
 
   - [`exposure_ic_summary`](@ref)
   - [`forecast_ic_summary`](@ref)
+  - [`forecast_ic_lags`](@ref)
 """
-function exposure_ic_factor_summary(ic::MatNum, k::Integer)
+function exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0)
+    @argcheck(lags >= zero(lags), DomainError(lags, "lags must be >= 0"))
     P = size(ic, 1)
     Tf = real(eltype(ic))
     n = 0
@@ -712,13 +750,54 @@ function exposure_ic_factor_summary(ic::MatNum, k::Integer)
     end
     sd = n > 1 ? sqrt(q / (n - 1)) : Tf(NaN)
     ir = isfinite(m) && isfinite(sd) && sd > zero(Tf) ? m / sd : Tf(NaN)
-    return (; mean_ic = m, std_ic = sd, ic_ir = ir, t_stat = ir * sqrt(Tf(n)),
+    return (; mean_ic = m, std_ic = sd, ic_ir = ir,
+            t_stat = exposure_ic_t_stat(ic, k, m, q, n, lags),
             hit_rate = n > 0 ? Tf(h) / Tf(n) : Tf(NaN))
+end
+"""
+    exposure_ic_t_stat(ic::MatNum, k::Integer, m::Real, q::Real, n::Integer,
+                       lags::Integer) -> Real
+
+Return the t-statistic of one factor's information coefficient series, over its long-run standard error.
+
+It is the second half of [`exposure_ic_factor_summary`](@ref), which hands it the mean, the sum of squared deviations and the count it has already taken, so the series is read once more for the autocovariances alone. The long-run variance is the sum of squared deviations plus twice the first `lags` autocovariance sums, every one over ``n - 1``; each pair is read at its two positions in the series, so a `NaN` row is in no pair and the lag is a distance in the series. A non-positive long-run variance, or a count of one, has no statistic.
+
+# Arguments
+
+  - `ic`: Information coefficient series `pairs × factors`.
+  - `k`: Position of the factor.
+  - `m`: Mean of the finite entries of column `k`.
+  - `q`: Sum of the squared deviations of the finite entries of column `k` from `m`.
+  - `n`: Number of finite entries of column `k`.
+  - `lags`: Number of autocovariances the standard error reads.
+
+# Returns
+
+  - `t::Real`: `m` over the long-run standard error of the mean, or `NaN`.
+
+# Related
+
+  - [`exposure_ic_factor_summary`](@ref)
+"""
+function exposure_ic_t_stat(ic::MatNum, k::Integer, m::Real, q::Real, n::Integer,
+                            lags::Integer)
+    Tf = typeof(q)
+    P = size(ic, 1)
+    lrv = q
+    for j in 1:lags, t in 1:(P - j)
+        v = ic[t, k]
+        u = ic[t + j, k]
+        if isfinite(v) && isfinite(u)
+            lrv += 2 * (Tf(v) - m) * (Tf(u) - m)
+        end
+    end
+    lrsd = n > 1 && lrv > zero(Tf) ? sqrt(lrv / (n - 1)) : Tf(NaN)
+    return isfinite(m) && isfinite(lrsd) ? m / lrsd * sqrt(Tf(n)) : Tf(NaN)
 end
 function exposure_ic_summary(csfm::CrossSectionalFactorModel; horizon::Integer = 1,
                              rank::Bool = true, reduced::Bool = false)
     return exposure_ic_summary(exposure_ic(csfm; horizon = horizon, rank = rank,
-                                           reduced = reduced))
+                                           reduced = reduced); lags = horizon - 1)
 end
 """
     exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing;

@@ -17,6 +17,7 @@ exposure_pair_correlation
 exposure_pair_observation
 exposure_pair_sums
 exposure_ic_factor_summary
+exposure_ic_t_stat
 exposure_cross_section_std
 exposure_universe_size
 exposure_covered_count

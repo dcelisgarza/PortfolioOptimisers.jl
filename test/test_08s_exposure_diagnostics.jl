@@ -167,6 +167,21 @@ using Statistics
         end
     end
 
+    @testset "the block summary reads the overlap of its forward window" begin
+        # `exposure_ic` scores every observation, so a window of `h` observations overlaps
+        # its `h - 1` neighbours and the block method hands `h - 1` lags to the kernel. At
+        # the default window there is no overlap and the bare method's default agrees.
+        ic2 = exposure_ic(csfm3; horizon = 2)
+        s2 = exposure_ic_summary(csfm3; horizon = 2)
+        @test s2.t_stat == exposure_ic_summary(ic2; lags = 1).t_stat
+        @test s2.t_stat != exposure_ic_summary(ic2).t_stat
+        @test s2.mean_ic == exposure_ic_summary(ic2).mean_ic
+        @test s2.ic_ir == exposure_ic_summary(ic2).ic_ir
+        @test exposure_ic_summary(csfm3).t_stat ==
+              exposure_ic_summary(exposure_ic(csfm3)).t_stat
+        @test_throws DomainError exposure_ic_summary(ic2; lags = -1)
+    end
+
     @testset "the correlation of a constant exposure and of a sparse one" begin
         # The third factor is constant across the assets, so its correlation against any
         # other is `0` by convention. The fourth is never finite on three common assets,

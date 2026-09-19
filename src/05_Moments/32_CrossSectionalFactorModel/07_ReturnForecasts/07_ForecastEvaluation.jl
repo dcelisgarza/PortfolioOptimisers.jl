@@ -211,7 +211,7 @@ end
 
 Return the observations an evaluation scores, as row indices into the forecast and the target.
 
-An observation is scorable when at least one asset carries a finite forecast **and** a finite target there. The first and the last such observation bound the evaluation, and the dates run between them in strides of `step`. A stride of the horizon gives forward windows that do not overlap, so the scores are independent; a stride of one gives every observation and overlapping windows.
+An observation is scorable when at least one asset carries a finite forecast **and** a finite target there. The first and the last such observation bound the evaluation, and the dates run between them in strides of `step`. A stride of the horizon gives forward windows that do not overlap, so the scores are independent; a stride of one gives every observation and overlapping windows, whose dependence the t-statistic of the summaries reads through [`forecast_ic_lags`](@ref).
 
 An observation inside the bounds that is not scorable is kept rather than dropped, because dropping it would make the stride mean different things in different parts of the sample. Its statistics are `NaN`.
 
@@ -451,7 +451,7 @@ This is the bottom of the evaluation hierarchy. The bare method takes the two ma
   - `target`: The [`AbstractForecastTarget`](@ref) the forward target is taken over. The default is the idiosyncratic return, which is the component a fitted member forecasts.
   - $(arg_dict[:rf_horizon])
   - $(arg_dict[:rf_lag])
-  - `step`: Number of observations between two evaluation dates. The default of `horizon` gives forward windows that do not overlap.
+  - `step`: Number of observations between two evaluation dates. The default of `horizon` gives forward windows that do not overlap. A smaller stride scores more dates whose windows overlap, and the t-statistic of every summary reads that overlap through [`forecast_ic_lags`](@ref), so a smaller stride does not inflate it.
   - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported. It is carried rather than applied here, because the pairing is the same whatever the threshold.
   - `ppy`: Periods per year. `252` annualises a daily fit, and the default of `1` reports the statistics per period. It is carried rather than applied here, and the verbs above map it onto `performance_summary`'s `periods_per_year`.
 

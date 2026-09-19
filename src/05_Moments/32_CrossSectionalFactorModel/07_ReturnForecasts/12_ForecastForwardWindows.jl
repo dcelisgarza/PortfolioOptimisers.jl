@@ -184,7 +184,8 @@ function forecast_window_row(fp::ForecastEvaluationResult, w::Option{<:MatNum},
                 rank_ann_return = nan, rank_sharpe = nan, zscore_ann_return = nan,
                 zscore_sharpe = nan, mean_coverage = nan)
     end
-    ic = forecast_ic_summary(forecast_ic(fp, w; min_count = min_count))
+    ic = forecast_ic_summary(forecast_ic(fp, w; min_count = min_count);
+                             lags = forecast_ic_lags(fp))
     rk = forecast_portfolio(fp; kind = :rank)
     zs = forecast_portfolio(fp; kind = :zscore)
     c = forecast_coverage(fp, w)
@@ -291,6 +292,10 @@ That set shrinks as `n` grows, so a table read at one depth is internally compar
 
 `n` is a keyword rather than a field of the evaluation, so a caller re-reads the table at a second depth without repeating the pairing that produced `fe`, which can cost a rolling refit.
 
+# The t-statistic of a deeper row reads its overlap
+
+The stride between two dates is the base evaluation's, and it does not grow with the window, so from the second row on consecutive windows read the same returns: at the default stride row `p` overlaps its `p - 1` neighbours on either side. A t-statistic that treated the rows' coefficients as independent would grow by about ``\\sqrt{p}`` down the column for a forecast with no skill at all. The `t_stat` columns therefore read the long-run standard error over [`forecast_ic_lags`](@ref) autocovariances at each row, as [`forecast_ic_summary`](@ref) states, so a t-statistic that holds down the column is the forecast holding and not the overlap accumulating. The `ic_ir` columns are the per-date ratio and are left as they are.
+
 # Algorithm
 
  1. Build the grid with [`forecast_window_grid`](@ref) at `:cumulative`, giving the windows ``[t + \\ell,\\, t + \\ell + p h)``.
@@ -319,7 +324,7 @@ That set shrinks as `n` grows, so a table read at one depth is internally compar
       + `horizon::Vector{Int}`: The window's horizon, `p` times `fe.horizon`.
       + `lag::Vector{Int}`: The window's lag, `fe.lag` at every period.
       + `dates::Vector{Int}`: The common evaluation dates every row was computed on.
-      + `spearman_mean_ic`, `spearman_ic_ir`, `spearman_t_stat`: The Spearman coefficient's summary, from [`forecast_ic_summary`](@ref).
+      + `spearman_mean_ic`, `spearman_ic_ir`, `spearman_t_stat`: The Spearman coefficient's summary, from [`forecast_ic_summary`](@ref), the t-statistic at the row's own [`forecast_ic_lags`](@ref).
       + `pearson_mean_ic`, `pearson_ic_ir`, `pearson_t_stat`: The Pearson coefficient's summary.
       + `rank_ann_return`, `rank_sharpe`: The `:rank` book's annualised return and its ratio, from [`forecast_portfolio`](@ref).
       + `zscore_ann_return`, `zscore_sharpe`: The `:zscore` book's.

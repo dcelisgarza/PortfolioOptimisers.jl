@@ -135,7 +135,67 @@ function forecast_ic(fe::ForecastEvaluationResult, csfm::CrossSectionalFactorMod
     return forecast_ic(fe, cs_diagnostic_weights(weighting, csfm); min_count = min_count)
 end
 """
-    forecast_ic_summary(ic::MatNum)
+    forecast_ic_lags(horizon::Integer, step::Integer) -> Int
+    forecast_ic_lags(fe::ForecastEvaluationResult) -> Int
+
+Return the number of consecutive evaluation dates whose forward windows overlap a given one.
+
+A window of `horizon` observations scored every `step` observations spans `cld(horizon, step)` dates, so the dates on either side of a given one that read some of the same returns are one fewer than that. It is the number of autocovariances the t-statistic of [`exposure_ic_factor_summary`](@ref) must read for its standard error to be right, and it is derived from the window and the stride rather than asked of the caller, because the overlap is a fact of the grid and not a choice. Under the default stride of [`forecast_evaluation`](@ref), `step = horizon`, it is `0`.
+
+# Mathematical definition
+
+```math
+L = \\left\\lceil \\frac{h}{s} \\right\\rceil - 1
+```
+
+Where:
+
+  - ``h``: The forward window, in observations.
+  - ``s``: The stride between two evaluation dates.
+
+# Arguments
+
+  - `horizon`: Forward window, in observations.
+  - `step`: Number of observations between two evaluation dates.
+  - `fe`: An evaluation, whose `horizon` and `step` are read.
+
+# Validation
+
+  - `horizon >= 1` and `step >= 1`. Raise a `DomainError`.
+
+# Returns
+
+  - `L::Int`: The number of overlapping dates on either side.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.forecast_ic_lags(5, 5)
+0
+
+julia> PortfolioOptimisers.forecast_ic_lags(5, 1)
+4
+
+julia> PortfolioOptimisers.forecast_ic_lags(5, 2)
+2
+```
+
+# Related
+
+  - [`forecast_ic_summary`](@ref)
+  - [`exposure_ic_factor_summary`](@ref)
+  - [`forecast_evaluation_dates`](@ref)
+"""
+function forecast_ic_lags(horizon::Integer, step::Integer)
+    @argcheck(horizon >= one(horizon), DomainError(horizon, "horizon must be >= 1"))
+    @argcheck(step >= one(step), DomainError(step, "step must be >= 1"))
+    return cld(Int(horizon), Int(step)) - 1
+end
+function forecast_ic_lags(fe::ForecastEvaluationResult)
+    return forecast_ic_lags(fe.horizon, fe.step)
+end
+"""
+    forecast_ic_summary(ic::MatNum; lags::Integer = 0)
 
 Return the summary of the two information coefficient series of an evaluation, named.
 
@@ -143,25 +203,32 @@ The mean states the average score, the standard deviation states how much the sc
 
 Each series is summarised by [`exposure_ic_factor_summary`](@ref), which the exposure diagnostics already read, so a coefficient of a forecast and a coefficient of a factor exposure are summarised on the same terms.
 
+# The t-statistic reads the overlap of the windows
+
+Two evaluation dates closer together than the forward window score some of the same returns, so their coefficients are not independent, and a t-statistic that treats them as independent overstates the evidence by about the root of the number of dates a window spans. The standard error of the mean therefore reads the long-run variance of the series, over `lags` autocovariances, as [`exposure_ic_factor_summary`](@ref) states. `lags` is the number of dates on either side of a given one whose windows overlap it, which [`forecast_ic_lags`](@ref) derives from the evaluation's `horizon` and `step`: it is `0` under the default stride, where the windows are disjoint and the statistic is the familiar ``\\mathrm{IR} \\sqrt{n}``, and it is `horizon - 1` at a stride of one. The verbs that summarise an evaluation, [`forecast_evaluation_summary`](@ref), [`forecast_holding_period`](@ref) and [`forecast_decay`](@ref), derive it; a caller who summarises a series by hand passes it.
+
 # Mathematical definition
 
 ```math
-t_{k} = \\mathrm{IR}_{k} \\sqrt{\\left| \\mathcal{T}_{k} \\right|}
+t_{k} = \\frac{\\overline{\\mathrm{IC}}_{k}}{\\sigma_{k}} \\sqrt{\\left| \\mathcal{T}_{k} \\right|}
 ```
 
 Where:
 
-  - ``\\mathrm{IR}_{k}``: Mean of series ``k`` over its finite dates, divided by their standard deviation.
+  - ``\\overline{\\mathrm{IC}}_{k}``: Mean of series ``k`` over its finite dates.
+  - ``\\sigma_{k}``: Its long-run standard deviation over `lags` autocovariances, from [`exposure_ic_factor_summary`](@ref), which is its standard deviation at `lags = 0`.
   - ``\\mathcal{T}_{k}``: The dates at which series ``k`` is finite.
 
 # Arguments
 
   - `ic`: Information coefficient series `dates × 2`, from [`forecast_ic`](@ref).
+  - `lags`: Number of autocovariances the t-statistic's standard error reads, from [`forecast_ic_lags`](@ref).
 
 # Validation
 
   - `!isempty(ic)`. Raises an [`IsEmptyError`](@ref).
   - `size(ic, 2) == 2`. Raises a `DimensionMismatch`.
+  - `lags >= 0`. Raises a `DomainError`.
 
 # Returns
 
@@ -174,23 +241,26 @@ julia> alpha = [1.0 2.0 4.0 8.0; 2.0 3.0 5.0 40.0; 1.0 5.0 2.0 3.0; 3.0 1.0 2.0 
 
 julia> y = PortfolioOptimisers.forward_mean_returns(alpha, 1, 1);
 
-julia> forecast_ic_summary(forecast_ic(forecast_evaluation(alpha, y))).spearman
+julia> fe = forecast_evaluation(alpha, y);
+
+julia> forecast_ic_summary(forecast_ic(fe); lags = PortfolioOptimisers.forecast_ic_lags(fe)).spearman
 (mean_ic = 0.3333333333333333, std_ic = 0.7023769168568493, ic_ir = 0.4745789978762494, t_stat = 0.8219949365267862, hit_rate = 0.6666666666666666)
 ```
 
 # Related
 
   - [`forecast_ic`](@ref)
+  - [`forecast_ic_lags`](@ref)
   - [`forecast_coverage`](@ref)
   - [`exposure_ic_factor_summary`](@ref)
   - [`exposure_ic_summary`](@ref)
 """
-function forecast_ic_summary(ic::MatNum)
+function forecast_ic_summary(ic::MatNum; lags::Integer = 0)
     @argcheck(!isempty(ic), IsEmptyError("ic cannot be empty"))
     @argcheck(size(ic, 2) == 2,
               DimensionMismatch("ic must carry the two columns forecast_ic answers, the Spearman coefficient and the Pearson one, and it carries $(size(ic, 2))"))
-    return (; spearman = exposure_ic_factor_summary(ic, 1),
-            pearson = exposure_ic_factor_summary(ic, 2))
+    return (; spearman = exposure_ic_factor_summary(ic, 1; lags = lags),
+            pearson = exposure_ic_factor_summary(ic, 2; lags = lags))
 end
 """
     forecast_coverage(fe::ForecastEvaluationResult,

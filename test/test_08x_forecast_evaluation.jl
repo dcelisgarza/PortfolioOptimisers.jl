@@ -42,7 +42,12 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
    the hit rate: the library reads it against every date, so a date with no coefficient is a
    miss, where the reference reads it against the dates that carried one. That is
    `exposure_ic_factor_summary`'s convention, which both summaries now share, and it is
-   asserted as a divergence rather than papered over.
+   asserted as a divergence rather than papered over. The second divergence is the
+   t-statistic: the reference scales the ratio by the root of the date count wherever it
+   is read, and the port's standard error reads the overlap of the forward windows through
+   `forecast_ic_lags`, so the two agree only where the windows are disjoint. The
+   holding-period table at a stride of one is where they part, and the reference's number
+   is asserted there as the plain ratio beside the corrected column.
 
 6. THE TWO ALPHA PORTFOLIOS ARE PINNED BY THEIR INVARIANTS, NOT BY A STORED NUMBER. Both
    are centred and scaled to 200 % gross, so every date holds one unit long and one unit
@@ -691,6 +696,181 @@ end
         @test_throws PO.IsEmptyError forecast_ic_summary(Matrix{Float64}(undef, 0, 0))
         @test_throws DimensionMismatch forecast_ic_summary(ones(3, 1))
         @test_throws DimensionMismatch forecast_ic_summary(ones(3, 3))
+        @test_throws DomainError forecast_ic_summary(ic; lags = -1)
+    end
+end
+
+@testset "The t-statistic reads the overlap of the forward windows" begin
+    PO = PortfolioOptimisers
+    # Hand computation of the kernel's long-run standard error: the variance plus twice the
+    # first `L` autocovariances, every one over `n - 1`, pairs read at their positions.
+    function hand_t(v, L)
+        f = isfinite.(v)
+        n = count(f)
+        m = sum(v[f]) / n
+        g = zeros(L + 1)
+        for j in 0:L, t in 1:(length(v) - j)
+            if f[t] && f[t + j]
+                g[j + 1] += (v[t] - m) * (v[t + j] - m)
+            end
+        end
+        lrv = (g[1] + 2 * sum(g[2:end])) / (n - 1)
+        return lrv > 0 ? m / sqrt(lrv) * sqrt(n) : NaN
+    end
+
+    @testset "The lag is one less than the number of strides a window spans" begin
+        @test PO.forecast_ic_lags(1, 1) == 0
+        @test PO.forecast_ic_lags(5, 5) == 0
+        @test PO.forecast_ic_lags(5, 1) == 4
+        @test PO.forecast_ic_lags(5, 2) == 2
+        @test PO.forecast_ic_lags(4, 2) == 1
+        @test PO.forecast_ic_lags(2, 5) == 0
+        @test_throws DomainError PO.forecast_ic_lags(0, 1)
+        @test_throws DomainError PO.forecast_ic_lags(1, 0)
+        # The Result method reads the evaluation's own window and stride.
+        y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
+        @test PO.forecast_ic_lags(forecast_evaluation(IC_ALPHA, y)) == 0
+        @test PO.forecast_ic_lags(forecast_evaluation(IC_ALPHA, y; horizon = 3, step = 1)) ==
+              2
+        @test PO.forecast_ic_lags(forecast_evaluation(IC_ALPHA, y; horizon = 3, step = 2)) ==
+              1
+    end
+
+    @testset "At no lag the statistic is the one the reference states, bit for bit" begin
+        y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
+        ic = forecast_ic(forecast_evaluation(IC_ALPHA, y))
+        for k in 1:2
+            a = PO.exposure_ic_factor_summary(ic, k)
+            b = PO.exposure_ic_factor_summary(ic, k; lags = 0)
+            @test a == b
+            @test a.t_stat == a.ic_ir * sqrt(count(isfinite, ic[:, k]))
+        end
+    end
+
+    @testset "A positive lag adds the autocovariances to the standard error" begin
+        # A smooth series, so every autocovariance up to the third lag is positive and the
+        # long-run variance is positive at every lag probed.
+        v = [0.10, 0.18, 0.26, 0.30, 0.24, 0.16, 0.08, 0.04, 0.12, 0.22, 0.28, 0.20]
+        ic = hcat(v, -v)
+        for L in 0:3
+            s = PO.exposure_ic_factor_summary(ic, 1; lags = L)
+            @test s.t_stat ≈ hand_t(v, L)
+            # The mean, the deviation, the ratio and the hit rate do not read the lag.
+            s0 = PO.exposure_ic_factor_summary(ic, 1)
+            @test (s.mean_ic, s.std_ic, s.ic_ir, s.hit_rate) ==
+                  (s0.mean_ic, s0.std_ic, s0.ic_ir, s0.hit_rate)
+            # The forecast summary hands the same lag to both of its series.
+            fs = forecast_ic_summary(ic; lags = L)
+            @test isequal(fs.spearman, s)
+            @test isequal(fs.pearson, PO.exposure_ic_factor_summary(ic, 2; lags = L))
+            @test fs.pearson.t_stat ≈ -s.t_stat
+        end
+        # A positively autocorrelated series has a smaller statistic at a positive lag.
+        w = [0.1, 0.2, 0.3, 0.4, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0]
+        t0 = PO.exposure_ic_factor_summary(hcat(w), 1).t_stat
+        t1 = PO.exposure_ic_factor_summary(hcat(w), 1; lags = 1).t_stat
+        @test 0 < t1 < t0
+        @test_throws DomainError PO.exposure_ic_factor_summary(ic, 1; lags = -1)
+        @test_throws DomainError PO.exposure_ic_summary(ic; lags = -1)
+    end
+
+    @testset "A NaN row is in no pair, and the lag is a distance in the series" begin
+        v = [0.3, NaN, 0.4, 0.2, NaN, 0.5, 0.1, 0.0, 0.3, -0.1]
+        for L in 1:2
+            @test PO.exposure_ic_factor_summary(hcat(v), 1; lags = L).t_stat ≈ hand_t(v, L)
+        end
+        # Dropping the gaps first would pair rows that are two apart as neighbours, and
+        # that is not what the kernel does.
+        u = filter(isfinite, v)
+        @test !(PO.exposure_ic_factor_summary(hcat(v), 1; lags = 1).t_stat ≈ hand_t(u, 1))
+    end
+
+    @testset "A non-positive long-run variance has no statistic" begin
+        # An alternating series has a lag-one autocovariance more negative than half its
+        # variance, so the sum is negative and the statistic is NaN rather than clamped.
+        v = [0.5, -0.4, 0.5, -0.4, 0.5, -0.4, 0.5, -0.4]
+        s = PO.exposure_ic_factor_summary(hcat(v), 1; lags = 1)
+        @test isnan(s.t_stat)
+        @test isfinite(s.ic_ir)
+        @test isfinite(PO.exposure_ic_factor_summary(hcat(v), 1).t_stat)
+    end
+
+    @testset "The evaluation summaries derive the lag from the window and the stride" begin
+        rng = StableRNG(7)
+        alpha = randn(rng, 40, 6)
+        X = randn(rng, 40, 6)
+        y = PO.forward_mean_returns(X, 3, 1)
+        # A stride of one under a window of three: two neighbours on either side overlap.
+        fe = forecast_evaluation(alpha, y; horizon = 3, step = 1)
+        ic = forecast_ic(fe)
+        s = forecast_evaluation_summary([fe])
+        @test s.spearman_t_stat[1] ≈ forecast_ic_summary(ic; lags = 2).spearman.t_stat
+        @test s.pearson_t_stat[1] ≈ forecast_ic_summary(ic; lags = 2).pearson.t_stat
+        @test !(s.spearman_t_stat[1] ≈ forecast_ic_summary(ic).spearman.t_stat)
+        # A stride of the window: no overlap, the plain statistic.
+        fe3 = forecast_evaluation(alpha, y; horizon = 3)
+        s3 = forecast_evaluation_summary([fe3])
+        @test s3.spearman_t_stat[1] ≈ forecast_ic_summary(forecast_ic(fe3)).spearman.t_stat
+        # The holding-period table's row `p` spans `p` strides at the default stride, so it
+        # reads `p - 1` lags; the decay table's windows stay one stride long.
+        fe1 = forecast_evaluation(alpha, PO.forward_mean_returns(X, 1, 1))
+        h = forecast_holding_period(fe1, X; n = 4)
+        d = forecast_decay(fe1, X; n = 4)
+        for p in 1:4
+            fp = PO.ForecastEvaluationResult(alpha,
+                                             PO.forward_mean_returns(X, h.horizon[p],
+                                                                     h.lag[p]), fe1.umsk,
+                                             h.dates, fe1.target, h.horizon[p], h.lag[p],
+                                             fe1.step, fe1.min_count, fe1.ppy)
+            @test PO.forecast_ic_lags(fp) == p - 1
+            @test isequal(h.spearman_t_stat[p],
+                          forecast_ic_summary(forecast_ic(fp); lags = p - 1).spearman.t_stat)
+            fq = PO.ForecastEvaluationResult(alpha,
+                                             PO.forward_mean_returns(X, d.horizon[p],
+                                                                     d.lag[p]), fe1.umsk,
+                                             d.dates, fe1.target, d.horizon[p], d.lag[p],
+                                             fe1.step, fe1.min_count, fe1.ppy)
+            @test PO.forecast_ic_lags(fq) == 0
+            @test d.spearman_t_stat[p] ≈
+                  forecast_ic_summary(forecast_ic(fq)).spearman.t_stat
+        end
+    end
+
+    @testset "A forecast with no skill is not made significant by a longer window" begin
+        # A persistent forecast against an independent target has no skill by construction.
+        # Its coefficient at a window of `p` observations, scored every observation, is a
+        # moving average of order `p - 1`, and the plain statistic's dispersion across
+        # samples grows with `p` where the corrected one's does not.
+        S = 120
+        T = 160
+        N = 12
+        n = 5
+        plain = zeros(S, n)
+        fixed = zeros(S, n)
+        for s in 1:S
+            rng = StableRNG(1000 + s)
+            alpha = Matrix{Float64}(undef, T, N)
+            alpha[1, :] = randn(rng, N)
+            for t in 2:T
+                alpha[t, :] = 0.99 .* alpha[t - 1, :] .+ sqrt(1 - 0.99^2) .* randn(rng, N)
+            end
+            X = randn(rng, T, N)
+            fe = forecast_evaluation(alpha, PO.forward_mean_returns(X, 1, 1))
+            h = forecast_holding_period(fe, X; n = n)
+            m = length(h.dates)
+            fixed[s, :] = h.spearman_t_stat
+            plain[s, :] = h.spearman_ic_ir .* sqrt(m)
+        end
+        sd(x) = sqrt(sum(abs2, x .- sum(x) / length(x)) / (length(x) - 1))
+        # Under the null the corrected statistic is dispersed like a unit normal at every
+        # depth; the plain one is at the first row only and by the last is far wider.
+        for p in 1:n
+            @test 0.75 < sd(fixed[:, p]) < 1.3
+        end
+        @test 0.75 < sd(plain[:, 1]) < 1.3
+        @test sd(plain[:, n]) > 1.6
+        @test sd(plain[:, n]) > 1.5 * sd(fixed[:, n])
+        @test plain[:, 1] == fixed[:, 1]
     end
 end
 
@@ -1702,10 +1882,35 @@ end
     @testset "The holding-period table is what the reference answered" begin
         @test isapprox(h.spearman_mean_ic, [0.4, 0.12, 0.28])
         @test isapprox(h.spearman_ic_ir, [1.414214, 0.395628, 0.639010]; rtol = 1e-6)
-        @test isapprox(h.spearman_t_stat, [3.162278, 0.884652, 1.428869]; rtol = 1e-6)
         @test isapprox(h.pearson_mean_ic, [0.4, 0.180180, 0.400988]; rtol = 1e-5)
         @test isapprox(h.pearson_ic_ir, [1.414214, 0.371014, 0.605921]; rtol = 1e-6)
-        @test isapprox(h.pearson_t_stat, [3.162278, 0.829613, 1.354880]; rtol = 1e-6)
+        # The reference's t-statistic is the ratio times the root of the five dates at every
+        # row. The port answers that at the first row alone: at a stride of one, row `p`'s
+        # windows overlap their `p - 1` neighbours, and the port's standard error reads the
+        # overlap where the reference's does not. That is a deliberate divergence, asserted
+        # here beside the reference's number rather than papered over.
+        @test isapprox(h.spearman_ic_ir .* sqrt(5), [3.162278, 0.884652, 1.428869];
+                       rtol = 1e-6)
+        @test isapprox(h.pearson_ic_ir .* sqrt(5), [3.162278, 0.829613, 1.354880];
+                       rtol = 1e-6)
+        @test h.spearman_t_stat[1] ≈ 3.162278 rtol = 1e-6
+        @test h.pearson_t_stat[1] ≈ 3.162278 rtol = 1e-6
+        for p in 2:3
+            fp = PO.ForecastEvaluationResult(alpha,
+                                             PO.forward_mean_returns(alpha, h.horizon[p],
+                                                                     h.lag[p]), fe.umsk,
+                                             h.dates, fe.target, h.horizon[p], h.lag[p],
+                                             fe.step, fe.min_count, fe.ppy)
+            s = forecast_ic_summary(forecast_ic(fp); lags = p - 1)
+            @test isequal(h.spearman_t_stat[p], s.spearman.t_stat)
+            @test isequal(h.pearson_t_stat[p], s.pearson.t_stat)
+        end
+        @test h.spearman_t_stat[2] ≈ 0.8624393618641034
+        @test h.pearson_t_stat[2] ≈ 0.7453765425294355
+        # Five dates at two lags sum the Spearman series' long-run variance to a
+        # non-positive number, and the statistic is NaN there rather than clamped.
+        @test isnan(h.spearman_t_stat[3])
+        @test h.pearson_t_stat[3] ≈ 1.9491738847880407
         @test isapprox(h.rank_ann_return, [1.0, 0.55, 0.733333]; rtol = 1e-6)
         @test isapprox(h.rank_sharpe, [1.414214, 0.792825, 0.964764]; rtol = 1e-6)
         @test isapprox(h.zscore_ann_return, h.rank_ann_return)

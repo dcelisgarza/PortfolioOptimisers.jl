@@ -271,3 +271,41 @@ A Neutralisation does not decorrelate a forecast from its target, because both N
 sites fit a cross-sectional regression with no intercept; that is
 [#950](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/950)'s, settled by letting a
 caller override the regression estimator, and the factor-correlation figure states it.
+
+## Amendment (2026-09-19)
+
+**The t-statistic of every coefficient summary reads the overlap of the forward windows.** The
+kernel `exposure_ic_factor_summary` scaled the ratio by ``\sqrt{n}``, which assumes the dates'
+coefficients are independent. They are not wherever a forward window is longer than the stride
+between two dates: the coefficients of two such dates read the same returns, and under no skill
+the series is a moving average of order one less than the number of strides a window spans, so
+the plain statistic overstates the evidence by about the root of that number. The stride of the
+base evaluation defaults to the horizon, so the base summary was right by default and wrong at
+any smaller `step`; `forecast_holding_period` lengthens the window at every row and keeps the
+stride, so its row ``p`` was wrong by about ``\sqrt{p}`` at the default, which is where a caller
+reads the table to choose a rebalancing frequency; and `exposure_ic_summary` on a block scores
+every observation, so it was wrong at any `horizon` above one. The reference implementation
+carries the same defect, and its maintainers were shown a synthetic no-skill forecast reaching
+"significance" at half its holding periods.
+
+The decision is to correct the default, not to add an opt-in, because the number was wrong rather
+than merely different and no caller has a use for the wrong one. The standard error is now the
+long-run one at the exact order the grid implies: the variance plus twice the first ``L``
+autocovariances, untapered, every one over the same ``n - 1`` as the variance, so at ``L = 0`` the
+statistic is bit for bit the one it was. The order is **derived**, never asked: `forecast_ic_lags`
+answers ``\lceil h / s \rceil - 1`` from the window and the stride the evaluation already carries,
+each row of the two window tables derives its own, and the block method of `exposure_ic_summary`
+derives `horizon - 1`. The bare summaries take `lags` as a keyword defaulting to `0`, for a caller
+who summarises a series by hand. The untapered estimate is chosen over a tapered one at the same
+order because the order is known from the grid, not estimated from the series, and a taper
+under-weights autocovariances that are known to be there and still overstates the statistic by
+about the root of two. A long-run variance that a short series sums to a non-positive number
+yields a `NaN` statistic, not a clamped one, as a zero standard deviation already did. The
+`ic_ir` columns are the per-date ratio and do not read the lag.
+
+`test_08x_forecast_evaluation.jl` pins the kernel against a hand computation at each lag, the
+lag derivation, the two tables' per-row lags, and the null: a persistent forecast against an
+independent target, over many seeds, whose corrected statistic is dispersed like a unit normal at
+every depth of the holding-period table while the plain one widens with the depth. The
+reference-parity literals of the holding-period table at a stride of one are kept as the plain
+statistic and asserted as a deliberate divergence, beside the corrected one.

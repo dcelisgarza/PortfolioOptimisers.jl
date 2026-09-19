@@ -421,6 +421,13 @@ worth holding; the second says how quickly the information goes stale.
     A deeper window matures later, so every row of a table is read on the dates **every** window
     of the grid can be scored at. Changing `n` therefore changes the sample as well as the depth,
     and a row from an `n = 4` table must never be set beside a row from an `n = 2` table.
+
+The stride between two dates stays at the base evaluation's, so from the second row of the
+holding-period table on, consecutive windows read the same returns and their coefficients are
+not independent. The `t_stat` column reads that overlap: its standard error is the long-run one
+at the order the window and the stride imply, so a t-statistic that holds down the column is the
+forecast holding, and not the overlap stacking up. Without it, a forecast with no skill at all
+would look more significant at every row.
 =#
 
 hp = forecast_holding_period(fe_signal, rd, csfm; n = 4)

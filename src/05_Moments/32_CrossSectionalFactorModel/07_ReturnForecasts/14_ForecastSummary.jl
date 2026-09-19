@@ -342,7 +342,7 @@ The threshold is the evaluation's own. It is not a keyword here, because [`forec
 """
 function forecast_summary_row(fe::ForecastEvaluationResult, w::Option{<:MatNum},
                               bins::Integer)
-    ic = forecast_ic_summary(forecast_ic(fe, w))
+    ic = forecast_ic_summary(forecast_ic(fe, w); lags = forecast_ic_lags(fe))
     rk = forecast_portfolio(fe; kind = :rank)
     zs = forecast_portfolio(fe; kind = :zscore)
     cb = forecast_calibration(fe, w; bins = bins)
@@ -505,7 +505,7 @@ keyword constructor, and the type validates nothing of its own.
     """
     spearman_ic_ir
     """
-    Date-level t-statistic of the mean Spearman information coefficient, one entry per forecast.
+    Date-level t-statistic of the mean Spearman information coefficient, one entry per forecast. Its standard error reads the overlap of the forward windows, so it is the familiar ratio only under a stride of the horizon.
     """
     spearman_t_stat
     """
@@ -525,7 +525,7 @@ keyword constructor, and the type validates nothing of its own.
     """
     pearson_ic_ir
     """
-    Date-level t-statistic of the mean weighted Pearson information coefficient, one entry per forecast.
+    Date-level t-statistic of the mean weighted Pearson information coefficient, one entry per forecast. Its standard error reads the overlap of the forward windows, so it is the familiar ratio only under a stride of the horizon.
     """
     pearson_t_stat
     """
