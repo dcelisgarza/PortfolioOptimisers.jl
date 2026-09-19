@@ -19,7 +19,7 @@ This example shows how to use multiple risk measures.
 !!! note "The return side takes several terms too"
     `JuMPOptimiser`'s `ret` field mirrors `r`: one return term or a vector of them, each with
     its own [`JuMPReturnsSettings`](@ref). The one asymmetry is deliberate — return terms are
-    always a **weighted sum**, so no scalariser applies to them (ADR 0052). See
+    always a **weighted sum**, so no scalariser applies to them. See
     [ℓ1 uncertainty sets](../2_moments_priors/11_L1_Uncertainty_Quintile_Portfolios.md).
 =#
 using PortfolioOptimisers, PrettyTables

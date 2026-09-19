@@ -23,7 +23,7 @@ keyword already accepts and declares the [`AbstractConstraintSpace`](@ref) the r
 in; [`FactorSpace`](@ref) is the space that resolves names against the factor axis and re-bases
 through the prior's loadings. The projection happens while the constraint is being *generated*, so
 what reaches the optimiser is an ordinary asset-space [`LinearConstraint`](@ref) — every optimiser
-sharing [`JuMPOptimiser`](@ref) supports one without knowing factors exist. See ADR 0047.
+sharing [`JuMPOptimiser`](@ref) supports one without knowing factors exist.
 
 !!! tip "When to reach for this"
     Reach for it whenever the mandate names a factor rather than an asset, and *especially* under

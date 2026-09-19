@@ -22,22 +22,19 @@ The mechanism is the incremental moment seam, [`partial_fit!`](@ref), and every 
 the moments takes the step through it:
 
   - A **prior folds and carries**: its moments come off its members' own folds, and it keeps
-    the rows only because a Prior Result carries `X` for the scenario risk measures
-    (ADR 0136).
+    the rows only because a Prior Result carries `X` for the scenario risk measures.
   - An **optimiser forwards to its prior alone**, and a read-out reconstitutes the carrier
     and runs the ordinary batch path, so every constraint, every clustering and every
-    uncertainty set is identical to batch by construction (ADR 0137). A set with no prior of
-    its own is calibrated on the prior result it is handed (ADR 0138).
+    uncertainty set is identical to batch by construction. A set with no prior of
+    its own is calibrated on the prior result it is handed.
   - A **JuMP head builds a fresh model at every read-out**: the solve is the step's cost,
-    and no model is kept warm (ADR 0139).
+    and no model is kept warm.
   - The **walk-forward declares the Fold Fit**, and the online arm threads the estimator
-    from a cold start (ADR 0140).
-  - A **search scores every candidate through the one fold loop**, online and batch alike
-    (ADR 0141).
+    from a cold start.
+  - A **search scores every candidate through the one fold loop**, online and batch alike.
   - A **Pipeline is a host**: its row-local steps fold, its universe steps view, and a step
-    with no online form is refused unless the pipeline declares a refit (ADR 0142).
-  - A **Result resumes a run**: `Resume(res)` re-enters the loop from the folds it holds
-    (ADR 0144).
+    with no online form is refused unless the pipeline declares a refit.
+  - A **Result resumes a run**: `Resume(res)` re-enters the loop from the folds it holds.
 
 A member with no exact recursion is wrapped: `Online(est; max_history)` seeds a Sample Buffer
 that the read-out refits from, and its cap is the rolling window.
@@ -400,7 +397,7 @@ same arithmetic once instead of once per fold, and the gain is the seam's own.
 
 The **head** second. A hierarchical head's read-out is a clustering over the moments, so its
 fold cost is the moment fit and the gain shows; a JuMP head's read-out is a solve, which the
-step does not touch (ADR 0139 measured the model build at a few percent of it), so the
+step does not touch (the model build measures at a few percent of it), so the
 ratio sits near one at this width and falls only as the moment fit grows into the solve.
 =#
 

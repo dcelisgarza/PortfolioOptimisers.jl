@@ -265,7 +265,7 @@ DistributionValueatRisk(; pe = EmpiricalPrior())   # mu, sigma and chol from one
 ```
 
 Slots stated by hand are left alone, and nothing makes them agree with each other. Each measure's
-docstring carries that warning; ADR 0051 records why the design warns rather than refuses.
+docstring carries that warning: the design warns rather than refuses by choice.
 =#
 
 #=

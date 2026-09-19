@@ -29,7 +29,7 @@ they are the answers to a question nobody realised they were asking.
 Because of that, this library ships **no quintile optimiser**. An ℓ1 ball is an
 [uncertainty set](09_Uncertainty_Sets.md), so the quintile portfolio is an ordinary
 [`MeanRisk`](@ref) problem with a particular `ucs` — and it composes with every constraint in
-the library for free (ADR 0032). This page is a deep dive: the ε sweep that produces the table
+the library for free. This page is a deep dive: the ε sweep that produces the table
 above, all of the paper's models, ranking on a characteristic other than return, and the
 classical portfolios the paper benchmarks against.
 
@@ -315,7 +315,7 @@ per-asset characteristic, and its Table III ranks on estimated volatility instea
 The characteristic belongs to the **return term**, so that is where it goes.
 [`ArithmeticReturn`](@ref)'s `mu` slot takes the vector itself, or — as here — the estimator
 that computes it, which is resolved against the optimisation's own prior when the model is
-built (ADR 0051). Naming the estimator rather than pasting a vector is what lets the ranking
+built. Naming the estimator rather than pasting a vector is what lets the ranking
 refit per cross-validation fold and per meta-optimiser subset:
 =#
 
@@ -374,7 +374,7 @@ minus sign between them.
 A ranking is one thing to want and an expected return is another, and an optimiser takes
 **both**: `ret` accepts a vector of return terms, exactly as `r` accepts a vector of risk
 measures. The model's return expression is their weighted sum `Σᵢ scaleᵢ · retᵢ` — there is no
-scalariser on this side and there is not going to be one (ADR 0052).
+scalariser on this side and there is not going to be one.
 
 The interesting term is the one that stays **out** of that sum. Every term carries a
 [`JuMPReturnsSettings`](@ref) bundle, and setting `rte = false` keeps the term out of the
@@ -531,7 +531,7 @@ does.
     not heuristics. `ε` is the only dial and it decides how many assets you hold.
   - This library has **no quintile optimiser** on purpose. It is
     `MeanRisk(; r = NoRisk(), obj = MaximumReturn())` over an ℓ1 `ucs`, so it composes with
-    every constraint you already know (ADR 0032).
+    every constraint you already know.
   - Do not tune `ε`. It has no scale. Use [`ActiveAssetsUncertaintyAlgorithm`](@ref) and say
     how many assets you want — but treat it as a calibration, not a guarantee.
   - `scaled = true` swaps equal weighting for inverse-volatility weighting by changing only
@@ -542,7 +542,7 @@ does.
     whatever you put in it, including the estimator that computes it. Put it on the **term**,
     never in the outer prior, whose `μ` every mean-centred risk measure reads. Mind the
     direction: the objective maximises, so negate any characteristic where smaller is better.
-  - `ret` takes **several terms**, summed with weights (ADR 0052). A term with `rte = false`
+  - `ret` takes **several terms**, summed with weights. A term with `rte = false`
     stays out of the objective and keeps its own `lb`, which is how you price what a floor on
     one quantity costs in another.
 =#

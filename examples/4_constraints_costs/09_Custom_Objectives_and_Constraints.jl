@@ -192,7 +192,7 @@ add_custom_constraint!(model, ccnt, optimiser, attrs)
     dispatch on). The two hooks take the same arguments; the objective one adds `obj` ahead of
     the dispatch argument, and that is the only difference between them.
 
-Two model idioms keep a hand-written constraint correct (see ADR 0008, *JuMP model assembly*):
+Two model idioms keep a hand-written constraint correct:
 
  1. **Scale the constraint** by [`get_constraint_scale`](@ref) (`model[:sc]`), so it sits on the
     same numerical footing as every built-in constraint.

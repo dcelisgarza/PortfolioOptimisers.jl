@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the Online Selection Rules an [`OnlinePortfolioSelection`](@ref) head holds on `alg`.
 
-A rule is the one thing that varies across the online portfolio selection family: a struct of the paper's parameters, a private carrier for what the update accumulates, and one update method. Everything shared — the Allocation Set, the Causal Pass, the Block Step, the Recursion Read-out, the refusals — is written once on the head. A rule projects its raw step onto the head's Allocation Set in its own Projection Geometry, held on its `proj` slot, whose type bound names the geometries the rule's theorem covers (ADR 0159).
+A rule is the one thing that varies across the online portfolio selection family: a struct of the paper's parameters, a private carrier for what the update accumulates, and one update method. Everything shared — the Allocation Set, the Causal Pass, the Block Step, the Recursion Read-out, the refusals — is written once on the head. A rule projects its raw step onto the head's Allocation Set in its own Projection Geometry, held on its `proj` slot, whose type bound names the geometries the rule's theorem covers.
 
 # Interfaces
 
@@ -427,7 +427,7 @@ end
 
 The Online Update: one row of the online portfolio selection recursion, written once per rule.
 
-Takes the rule, its private carrier `st`, the allocation `w` held during the period, the finite price relative `x` of that period, the rows the head holds through it, and the head's Allocation Set; answers `(st', w')`, the carrier and the allocation for the next period. The carrier is written in place where the rule can, `nothing` is a legal carrier, and `w'` is always a new vector, because the projection allocates one — so a `w` that is a view after [`port_opt_view`](@ref) is never written (ADR 0157).
+Takes the rule, its private carrier `st`, the allocation `w` held during the period, the finite price relative `x` of that period, the rows the head holds through it, and the head's Allocation Set; answers `(st', w')`, the carrier and the allocation for the next period. The carrier is written in place where the rule can, `nothing` is a legal carrier, and `w'` is always a new vector, because the projection allocates one — so a `w` that is a view after [`port_opt_view`](@ref) is never written.
 
 Every rule takes the same two halves — the unconstrained step to a raw vector, then [`project`](@ref) onto the set in the rule's geometry — and a rule that reads `w` continues from whatever it is handed, the Start Allocation on the first row.
 
@@ -532,7 +532,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The Price-Adjusted Allocation: the book the fund holds at the end of a period before it trades, `w .* x / ⟨w, x⟩`, one row of the self-financing Weight Drift at budget one (ADR 0160).
+The Price-Adjusted Allocation: the book the fund holds at the end of a period before it trades, `w .* x / ⟨w, x⟩`, one row of the self-financing Weight Drift at budget one.
 
 It is the reference of the family's trade — the update of [`BuyAndHold`](@ref) *is* this vector, and a turnover ceiling on a later set kind bounds the distance from it — and it is handed to every projection as its `w` argument.
 
@@ -559,7 +559,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The Partial Fit State of an [`OnlinePortfolioSelection`](@ref) head: a Rule State beside the rows held once, the Fold Context pinned by the first step, and every timestamp folded.
 
-The pair `(st, w)` is the Rule State, the unit the family recurses over. The rows any rule of the tree reads are held once, on this state, as a [`SampleBufferState`](@ref) of **returns** — the Returns Result's rows verbatim, a non-finite cell filled with zero before the push — capped by the rule tree's [`rows_needed`](@ref), and `nothing` for a tree that reads none. The timestamps are never capped, so [`Resume`](@ref) works for a carrier-free rule. The last folded row's active mask is the Investable Mask the read-out reduces on, `nothing` under a static panel; the recursion itself keeps the full `w` and never carries a forced zero (ADR 0157, ADR 0162).
+The pair `(st, w)` is the Rule State, the unit the family recurses over. The rows any rule of the tree reads are held once, on this state, as a [`SampleBufferState`](@ref) of **returns** — the Returns Result's rows verbatim, a non-finite cell filled with zero before the push — capped by the rule tree's [`rows_needed`](@ref), and `nothing` for a tree that reads none. The timestamps are never capped, so [`Resume`](@ref) works for a carrier-free rule. The last folded row's active mask is the Investable Mask the read-out reduces on, `nothing` under a static panel; the recursion itself keeps the full `w` and never carries a forced zero.
 
 # Fields
 
@@ -658,7 +658,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses to merge two online selection states, by name.
 
-An Online Update is not a sufficient statistic for its block: even a carrier that is — a Gram sum, a prefix of rows — sits beside an allocation that is not, so two states folded on disjoint blocks describe no single run. The family's parallel route is the Causal Pass, which is `O(N)` a row (ADR 0157).
+An Online Update is not a sufficient statistic for its block: even a carrier that is — a Gram sum, a prefix of rows — sits beside an allocation that is not, so two states folded on disjoint blocks describe no single run. The family's parallel route is the Causal Pass, which is `O(N)` a row.
 
 # Related
 

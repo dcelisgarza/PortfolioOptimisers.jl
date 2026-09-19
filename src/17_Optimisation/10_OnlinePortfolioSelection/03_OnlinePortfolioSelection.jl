@@ -1,15 +1,15 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-The online portfolio selection head: a naive optimiser that updates its allocation from each realised price relative through the Online Selection Rule on `alg`, fitting no moment and solving no programme of its own (ADR 0155).
+The online portfolio selection head: a naive optimiser that updates its allocation from each realised price relative through the Online Selection Rule on `alg`, fitting no moment and solving no programme of its own.
 
 Every member of the family is one recursion, `w_{t+1} = f(w_t, x_t)`, and one wealth, `S_T = Π_t ⟨w_t, x_t⟩`: the allocation is rebalanced to its target at the start of every period. The head writes everything the rules share. **The batch verb is the Causal Pass**: `optimise(opt, rd)` starts from the Start Allocation `w0`, applies the Online Update to every row of `rd` in order, and answers the **Next-Period Allocation** — after rows `1:T`, the portfolio for period `T + 1`, one more update than a backtest driver that stops at the last row held takes. The pass is rebalanced every row and free; `predict(res, rd)` on its Result charges the head's `fees` with no drift. **The online verbs are the same recursion**: `partial_fit!(opt, rd)` folds each row into the state as the Block Step — a fold of `k` rows is `k` single-row updates, so a walk-forward with `test_size = k` holds the Next-Period Allocation as of the block's end for `k` periods — and `optimise(opt)` with no data is the **Recursion Read-out**, the state's allocation wrapped in a Result with no batch path run. The identity `optimise(opt)` after folding rows `1:t` equals `optimise(opt, rd[1:t])` therefore holds exactly, at every `test_size`. A walk-forward's held path differs from the batch pass by the drift of the block-start target over the block and by the Block Step's cadence; the difference is documented, not tested.
 
-**The Start Allocation** is `w0`, `nothing` by default. Absent, the recursion starts at `1/N` over the whole pinned universe, unlisted names included: on a universe where `k` of `N` assets are unlisted at the first row, the recursion parks `k/N` of its weight in cash-like legs that see `x = 1` until the rule moves it, and the fund's tilts are scaled by `(N − k)/N` for as long as that lasts; a caller who wants the recursion to be the fund from row one gives `w0` over the listed assets with zeros elsewhere and accepts what the rule's geometry does with a zero. A given `w0` is over the pinned names, pinned and viewed with them, and projected once onto the Allocation Set in the rule's geometry at the first step, so a start outside the set is made feasible and never refused. It reaches the first Online Update as `w`: a rule that reads `w` continues from it, and a rule that does not — the constant rebalanced portfolio, the mixture, the Newton step — replaces it after one period, so the fund holds `w0` for exactly one period (ADR 0162).
+**The Start Allocation** is `w0`, `nothing` by default. Absent, the recursion starts at `1/N` over the whole pinned universe, unlisted names included: on a universe where `k` of `N` assets are unlisted at the first row, the recursion parks `k/N` of its weight in cash-like legs that see `x = 1` until the rule moves it, and the fund's tilts are scaled by `(N − k)/N` for as long as that lasts; a caller who wants the recursion to be the fund from row one gives `w0` over the listed assets with zeros elsewhere and accepts what the rule's geometry does with a zero. A given `w0` is over the pinned names, pinned and viewed with them, and projected once onto the Allocation Set in the rule's geometry at the first step, so a start outside the set is made feasible and never refused. It reaches the first Online Update as `w`: a rule that reads `w` continues from it, and a rule that does not — the constant rebalanced portfolio, the mixture, the Newton step — replaces it after one period, so the fund holds `w0` for exactly one period.
 
-**The Online Update reads the recursion's own allocation and no flag changes that** (ADR 0160): the loop's previous weights reach the head through [`factory`](@ref) alone, into `fees` and `fb`, never into the recursion. A turnover fee on this family is measured against the fund's held book or against nothing the family does, so the fold loop's online arm refuses, by name and before any fold, a head whose `fees` carry a `tn` term when the walk-forward's Previous-Weights Source is `nothing`; `pws = DriftedWeights()` is the whole configuration. A head with no `tn` fee is not checked.
+**The Online Update reads the recursion's own allocation and no flag changes that**: the loop's previous weights reach the head through [`factory`](@ref) alone, into `fees` and `fb`, never into the recursion. A turnover fee on this family is measured against the fund's held book or against nothing the family does, so the fold loop's online arm refuses, by name and before any fold, a head whose `fees` carry a `tn` term when the walk-forward's Previous-Weights Source is `nothing`; `pws = DriftedWeights()` is the whole configuration. A head with no `tn` fee is not checked.
 
-**A non-finite return is filled with zero once**, before the buffer and the rule, so the rule sees `x = 1` there: silently at an asset the panel marks inactive, and as a Held Gap at an active one, a warning by default and a refusal under `strict`. The allocation never carries a forced zero, and a relisting asset re-enters at the recursion's own weight. Under a time-varying panel the read-out's Investable Mask is the last folded row's active mask: the full allocation is sliced to it and renormalised, and the Result expands it back with a zero at every non-investable asset (ADR 0157).
+**A non-finite return is filled with zero once**, before the buffer and the rule, so the rule sees `x = 1` there: silently at an asset the panel marks inactive, and as a Held Gap at an active one, a warning by default and a refusal under `strict`. The allocation never carries a forced zero, and a relisting asset re-enters at the recursion's own weight. Under a time-varying panel the read-out's Investable Mask is the last folded row's active mask: the full allocation is sliced to it and renormalised, and the Result expands it back with a zero at every non-investable asset.
 
 `merge_states` on the state and `Online(head)` are refused by name: an update is order-dependent, and the family never refits from a buffer.
 
@@ -149,7 +149,7 @@ end
 
 Thread the previous fold's weights into the head's fee and fallback, and nowhere else.
 
-The recursion never reads them (ADR 0160): `alg`, `set`, `w0` and `cache` are carried unchanged.
+The recursion never reads them: `alg`, `set`, `w0` and `cache` are carried unchanged.
 
 # Related
 
@@ -534,7 +534,7 @@ end
 """
     optimise(opt::OnlinePortfolioSelection; kwargs...) -> OptimisationResult
 
-The Recursion Read-out: the state's allocation as a Result, with no batch path run (ADR 0137 amended, ADR 0155).
+The Recursion Read-out: the state's allocation as a Result, with no batch path run.
 
 A head that has taken no step is refused by name. On the one failure the read-out can answer — an allocation with no mass on the assets active at the last row — the fallback chain walks as the batch verb walks it, each fallback read out through its own `optimise(fb)`; a fallback that needs rows has folded none and refuses, so the one that serves here is a row-free head such as [`PreviousWeights`](@ref).
 
@@ -609,7 +609,7 @@ end
 
 Refuse, at the entry of the fold loop's online arm, an [`OnlinePortfolioSelection`](@ref) head whose `fees` carry a turnover term while the walk-forward threads no Previous-Weights Source.
 
-A turnover fee on this family is measured against the fund's held book or against nothing the family does (ADR 0160): the recursion reads its own allocation, so without a source the fee would price the distance between two targets, which reads buy-and-hold as trading and constant rebalancing as free. The head and the walk-forward meet first at this door, so it is the earliest point the pairing exists. A head with no `tn` fee, and any other estimator, passes.
+A turnover fee on this family is measured against the fund's held book or against nothing the family does: the recursion reads its own allocation, so without a source the fee would price the distance between two targets, which reads buy-and-hold as trading and constant rebalancing as free. The head and the walk-forward meet first at this door, so it is the earliest point the pairing exists. A head with no `tn` fee, and any other estimator, passes.
 
 # Arguments
 

@@ -18,7 +18,7 @@ This page is a reference, not a tutorial. It answers three questions in one plac
  3. What is its short alias, and what does that alias expand to?
 
 Every table below is **generated from the type system and the compatibility trait**
-([`supports_risk_measure`](@ref), ADR 0018), so it cannot drift from what the optimisers actually
+([`supports_risk_measure`](@ref)), so it cannot drift from what the optimisers actually
 dispatch on. The one-line meanings are curated, and the page fails the docs build if a measure is
 added without one.
 =#
@@ -117,7 +117,7 @@ for n in names(PortfolioOptimisers)
     end
 end
 
-## Class → the `Optimisers` column, derived from the ADR 0018 trait.
+## Class → the `Optimisers` column, derived from the compatibility trait.
 function usage_class(T)
     return if supports_risk_measure(MeanRisk, T)
         "JuMP + clustering"

@@ -226,10 +226,10 @@ over the price carrier.
 =#
 
 #=
-!!! note "ADR 0133"
+!!! note "Why these keywords moved"
     `nan_to_missing`, `impute_method`, `missing_col_percent` and `missing_row_percent` used to live
-    on `prices_to_returns`, and the default deleted every observation row holding a gap. ADR 0133
-    removed all four: a keyword survives on the conversion if and only if it changes the arithmetic
+    on `prices_to_returns`, and the default deleted every observation row holding a gap. All four
+    were removed: a keyword survives on the conversion if and only if it changes the arithmetic
     of a return. Filling is [`PriceGapFill`](@ref)'s and deleting is [`MissingDataFilter`](@ref)'s,
     whose thresholds admit `0.0` for *no gap is tolerated*.
 

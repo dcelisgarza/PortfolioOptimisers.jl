@@ -146,7 +146,7 @@ tune it rather than guess it.
 !!! note "The conversion chooses no universe"
 
     [`PricesToReturns`](@ref) is *stateless*: it computes a return and nothing else, deleting
-    no observation and no asset (ADR 0133). A gap therefore reaches the returns instead of
+    no observation and no asset. A gap therefore reaches the returns instead of
     taking its observation row with it, so a training window and a test window can never
     disagree about the universe because of the conversion.
 
