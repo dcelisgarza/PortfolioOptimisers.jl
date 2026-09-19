@@ -396,8 +396,11 @@ and `owner` is written here as `0`. The measure that registered the entry is not
 depth, so [`set_risk_frontier_owner!`](@ref) stamps it from the loop that enumerates the
 measures. The `Number` overload adds the constraint
 `sc * (r_expr - ub * k) <= 0` directly to the model. The fall-through method emits a
-warning: a non-`nothing` bound with an owner outside [`RiskBoundOwner`](@ref) is
-ignored, which would otherwise happen silently.
+warning: a non-`nothing` bound with an optimiser outside [`RiskBoundOwner`](@ref) is
+ignored, which would otherwise happen silently. A programme Allocation Set's ceiling is one
+number, so a frontier or a per-asset vector on it is refused by name: the set's constructor
+refuses it first, and this is the seam's own refusal for a set that reaches the builder without
+that check.
 
 # Arguments
 
@@ -416,13 +419,17 @@ ignored, which would otherwise happen silently.
   - [`set_risk_bounds_and_expression!`](@ref)
   - [`set_risk_expression!`](@ref)
 """
-function set_risk_upper_bound!(::JuMP.Model, ::JuMPOptimisationEstimator, r_expr, ::Nothing,
-                               key, flag::Bool = true)
+function set_risk_upper_bound!(::JuMP.Model, ::RiskConstraintOwner, r_expr, ::Nothing, key,
+                               flag::Bool = true)
     return nothing
 end
 function set_risk_upper_bound!(::JuMP.Model, opt::JuMPOptimisationEstimator, r_expr, ub,
                                key, flag::Bool = true)
     return @warn("Risk upper bound `settings.ub = $ub` ($key) is not supported by `$(typeof(opt).name.name)` and would be silently ignored. Remove `ub` from the risk measure settings, or use an optimiser that supports risk upper bounds (`MeanRisk`, `NearOptimalCentering`, `RiskBudgeting`).")
+end
+function set_risk_upper_bound!(::JuMP.Model, set::AbstractProgrammeAllocationSet, r_expr,
+                               ub::Front_NumVec, key, flag::Bool = true)
+    return throw(ArgumentError("the ceiling of a risk measure on a `$(nameof(typeof(set)))` is one number, its `settings.ub`; got `$ub` ($key), a frontier or a per-asset vector, which a one-step projection cannot bound."))
 end
 #! Using parameters to set the upper bounds would make things more difficult from a user perspective. Keep an eye on this in case things change in the future. We could simplify solve_mean_risk! and solve_noc! for pareto frontiers, we can define ub as a parameter and update it for subsequent solves.
 # Solver(; name = :clarabel2,

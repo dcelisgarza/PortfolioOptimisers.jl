@@ -76,7 +76,12 @@ asset names, is pinned with them, is sliced by a view as `w` is, and is projecte
 Allocation Set in the rule's own Projection Geometry at the first step, so a start outside the set
 is made feasible as the prototype does and never refused. A zero entry under the entropic geometry
 stays zero for the run, which is the caller's own choice and the same fact ADR 0159 states for a
-negative bound. Absent, the Start Allocation is `1/N` over the pinned universe.
+negative bound. Absent, the Start Allocation is `1/N` over the pinned universe, and it meets the
+set the same way, so the allocation held during the first period lies in the set under a cap that
+`1/N` breaks. A set that reads the head's rows — a fitted risk ceiling, a tracking error — has no
+constraints to form before the first row: the start is held as given, and the first Online Update
+projects it, as that update holds every step until the head has two rows. A programme that fails
+at the start holds the start as given and warns, as a row's Held Step does.
 
 `w0` reaches the first Online Update as its `w`, and that is the whole of its meaning. A rule that
 reads `w` — `BuyAndHold`, `ExponentiatedGradient`, `PassiveAggressive`, `ForecastReversion`

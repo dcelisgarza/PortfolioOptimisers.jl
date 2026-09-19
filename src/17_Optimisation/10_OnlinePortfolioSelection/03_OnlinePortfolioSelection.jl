@@ -5,7 +5,7 @@ The online portfolio selection head: a naive optimiser that updates its allocati
 
 Every member of the family is one recursion, `w_{t+1} = f(w_t, x_t)`, and one wealth, `S_T = Π_t ⟨w_t, x_t⟩`: the allocation is rebalanced to its target at the start of every period. The head writes everything the rules share. **The batch verb is the Causal Pass**: `optimise(opt, rd)` starts from the Start Allocation `w0`, applies the Online Update to every row of `rd` in order, and answers the **Next-Period Allocation** — after rows `1:T`, the portfolio for period `T + 1`, one more update than a backtest driver that stops at the last row held takes. The pass is rebalanced every row and free; `predict(res, rd)` on its Result charges the head's `fees` with no drift. **The online verbs are the same recursion**: `partial_fit!(opt, rd)` folds each row into the state as the Block Step — a fold of `k` rows is `k` single-row updates, so a walk-forward with `test_size = k` holds the Next-Period Allocation as of the block's end for `k` periods — and `optimise(opt)` with no data is the **Recursion Read-out**, the state's allocation wrapped in a Result with no batch path run. The identity `optimise(opt)` after folding rows `1:t` equals `optimise(opt, rd[1:t])` therefore holds exactly, at every `test_size`. A walk-forward's held path differs from the batch pass by the drift of the block-start target over the block and by the Block Step's cadence; the difference is documented, not tested.
 
-**The Start Allocation** is `w0`, `nothing` by default. Absent, the recursion starts at `1/N` over the whole pinned universe, unlisted names included: on a universe where `k` of `N` assets are unlisted at the first row, the recursion parks `k/N` of its weight in cash-like legs that see `x = 1` until the rule moves it, and the fund's tilts are scaled by `(N − k)/N` for as long as that lasts; a caller who wants the recursion to be the fund from row one gives `w0` over the listed assets with zeros elsewhere and accepts what the rule's geometry does with a zero. A given `w0` is over the pinned names, pinned and viewed with them, and projected once onto the Allocation Set in the rule's geometry at the first step, so a start outside the set is made feasible and never refused. It reaches the first Online Update as `w`: a rule that reads `w` continues from it, and a rule that does not — the constant rebalanced portfolio, the mixture, the Newton step — replaces it after one period, so the fund holds `w0` for exactly one period.
+**The Start Allocation** is `w0`, `nothing` by default. Absent, the recursion starts at `1/N` over the whole pinned universe, unlisted names included: on a universe where `k` of `N` assets are unlisted at the first row, the recursion parks `k/N` of its weight in cash-like legs that see `x = 1` until the rule moves it, and the fund's tilts are scaled by `(N − k)/N` for as long as that lasts; a caller who wants the recursion to be the fund from row one gives `w0` over the listed assets with zeros elsewhere and accepts what the rule's geometry does with a zero. A given `w0` is over the pinned names, pinned and viewed with them, and projected once onto the Allocation Set in the rule's geometry at the first step, as the uniform start is, so a start outside the set is made feasible and never refused; a set that reads the head's rows has nothing to project onto before the first row, and holds the start as given until the first update. It reaches the first Online Update as `w`: a rule that reads `w` continues from it, and a rule that does not — the constant rebalanced portfolio, the mixture, the Newton step — replaces it after one period, so the fund holds `w0` for exactly one period.
 
 **The Online Update reads the recursion's own allocation and no flag changes that**: the loop's previous weights reach the head through [`factory`](@ref) alone, into `fees` and `fb`, never into the recursion. A turnover fee on this family is measured against the fund's held book or against nothing the family does, so the fold loop's online arm refuses, by name and before any fold, a head whose `fees` carry a `tn` term when the walk-forward's Previous-Weights Source is `nothing`; `pws = DriftedWeights()` is the whole configuration. A head with no `tn` fee is not checked.
 
@@ -214,6 +214,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Seeds the head's state on its first row: pins the names and a static panel, forms the Start Allocation, projects it once onto the set in the rule's geometry, and seeds the rule's carrier and the rows buffer.
 
+The uniform start and a given `w0` meet the set alike, so the allocation held during the first period lies in the set wherever the set can be formed without rows. A set that reads the head's rows — a programme set with a fitted risk ceiling or a tracking error — has no constraints to form before the first row, so the start is held as given and the first Online Update projects it, as that update holds every step until the head has two rows. A programme that fails at the start holds the start as given and warns, as a row's Held Step does.
+
 # Arguments
 
   - `opt`: The head.
@@ -232,13 +234,23 @@ Seeds the head's state on its first row: pins the names and a static panel, form
 function online_selection_seed(opt::OnlinePortfolioSelection, rd::ReturnsResult,
                                set::AbstractAllocationSet)
     N = size(rd.X, 2)
-    w0 = if isnothing(opt.w0)
+    start = if isnothing(opt.w0)
         fill(one(eltype(rd.X)) / N, N)
     else
         @argcheck(length(opt.w0) == N,
                   DimensionMismatch("w0 ($(length(opt.w0))) must have one entry per pinned asset ($N)"))
-        first(with_projection_step(() -> project(projection_geometry(opt.alg), set, opt.w0,
-                                                 opt.w0), nothing, nothing))
+        opt.w0
+    end
+    # A set that reads the head's rows cannot form its constraints before the first row, so
+    # the start is held as given and the first Online Update projects it; every other set
+    # meets the start once, uniform or given, and a hold at the start is warned as a row's is.
+    w0 = if isnothing(rows_needed(set))
+        start
+    else
+        w, held = with_projection_step(() -> project(projection_geometry(opt.alg), set,
+                                                     start, start), nothing, nothing)
+        report_held_steps(held, "the start")
+        w
     end
     need = rows_needed(opt)
     X = if isnothing(need)

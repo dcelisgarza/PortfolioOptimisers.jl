@@ -732,7 +732,7 @@ The first index `i` at which the Model State entry `name` is not registered, so 
 """
 function free_state_index(model::JuMP.Model, name::Symbol)
     i = 1
-    while haskey(model, state_key(Symbol(""), name, i))
+    while state_has(model, Symbol(""), name, i)
         i += 1
     end
     return i
@@ -1029,8 +1029,8 @@ function projection_programme(proj::AbstractProjectionGeometry, set::AbstractAll
     set_model_scales!(model, projection_scale(set, :sc), projection_scale(set, :so))
     set_model_observations!(model, isnothing(X) ? 0 : size(X, 1))
     JuMP.@expression(model, k, 1)
-    JuMP.@variable(model, wv[1:length(q)])
-    model[:w] = wv
+    wv = state_set!(model, Symbol(""), :w,
+                    JuMP.@variable(model, [1:length(q)], base_name = "w"))
     set_allocation_set_constraints!(model, set, w, X)
     set_projection_objective!(model, proj, q)
     res = optimise_JuMP_model!(model, projection_solver(proj, set))

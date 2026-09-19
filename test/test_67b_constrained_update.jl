@@ -396,6 +396,54 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         # The batch–online identity holds through a held row.
         opt2 = po.partial_fit!(hopt, po.port_opt_view(rdh, 1:2, :))
         @test optimise(opt2).w ≈ optimise(hopt, po.port_opt_view(rdh, 1:2, :)).w
+        # The Start Allocation meets the set as a given one does: the uniform start under a
+        # cap `1/N` breaks is projected, so the allocation held during the first period lies
+        # in the set, and a given start on a bounded set is the same projection.
+        capped = BoundedAllocationSet(; wb = WeightBounds(0, [0.2, 1, 1, 1]))
+        rd4 = ReturnsResult(; nx = ["A", "B", "C", "D"],
+                            X = 0.02 .* randn(StableRNG(7), 6, 4),
+                            ts = Date(2020, 1, 1) .+ Day.(0:5))
+        seed(o, s) = po.online_selection_seed(o, rd4,
+                                              po.resolve_allocation_set(s, 4, false,
+                                                                        Float64)).w
+        @test seed(OPS(; alg = BuyAndHold(), set = capped), capped) ≈
+              [0.2, 0.8 / 3, 0.8 / 3, 0.8 / 3]
+        @test seed(OPS(; alg = BuyAndHold(), w0 = fill(0.25, 4), set = capped), capped) ≈
+              seed(OPS(; alg = BuyAndHold(), set = capped), capped)
+        @test seed(OPS(; alg = BuyAndHold()), BoundedAllocationSet()) == fill(0.25, 4)
+        # A set that reads the head's rows has nothing to project onto before the first row:
+        # a given start is held as given, never refused, and the first update holds the step
+        # as every fitted ceiling does.
+        fitted = ProgrammeAllocationSet(; slv = slv,
+                                        r = Variance(;
+                                                     settings = RiskMeasureSettings(;
+                                                                                    ub = 4e-4)))
+        @test seed(OPS(; alg = PassiveAggressiveMeanReversion(), w0 = [0.7, 0.1, 0.1, 0.1],
+                       set = fitted), fitted) == [0.7, 0.1, 0.1, 0.1]
+        rf = @test_logs (:warn, r"Held Step at 2020-01-01.*covariance of one observation") match_mode=:any optimise(OPS(;
+                                                                                                                        alg = PassiveAggressiveMeanReversion(),
+                                                                                                                        w0 = [0.7,
+                                                                                                                              0.1,
+                                                                                                                              0.1,
+                                                                                                                              0.1],
+                                                                                                                        set = fitted),
+                                                                                                                    po.port_opt_view(rd4,
+                                                                                                                                     1:1,
+                                                                                                                                     :))
+        @test isa(rf.retcode.res, po.HeldStep)
+        # A programme the start cannot meet — a book the turnover ceiling cannot bring under
+        # the cap — holds the start as given and warns, as a row's Held Step does.
+        tset0 = ProgrammeAllocationSet(; slv = slv, tn = 0.01,
+                                       wb = WeightBounds(; lb = 0, ub = 0.4))
+        @test (@test_logs (:warn, r"Held Step at the start") match_mode=:any seed(OPS(;
+                                                                                      alg = BuyAndHold(),
+                                                                                      w0 = [0.7,
+                                                                                            0.2,
+                                                                                            0.1,
+                                                                                            0.0],
+                                                                                      set = tset0),
+                                                                                  tset0)) ==
+              [0.7, 0.2, 0.1, 0.0]
     end
 
     @testset "The mixture's second projection (ADR 0163)" begin
@@ -472,6 +520,16 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test isnothing(po.risk_contribution_constraints(Variance(), cset,
                                                          prior(EmpiricalPrior(),
                                                                randn(StableRNG(1), 8, 4))))
+        # The bound seam is total over the owner: no bound is a no-op on the set as on an
+        # optimiser, and a frontier or a per-asset vector is refused by name, not by a
+        # missing method, for a programme set that reaches the builder without the
+        # constructor's check.
+        mb = JuMP.Model()
+        JuMP.@variable(mb, tb)
+        @test isnothing(po.set_risk_upper_bound!(mb, cset, tb, nothing, :x))
+        @test_throws ArgumentError po.set_risk_upper_bound!(mb, cset, tb, Frontier(; N = 3),
+                                                            :x)
+        @test_throws ArgumentError po.set_risk_upper_bound!(mb, cset, tb, [0.1, 0.2], :x)
         # Inside a step the ceiling binds on the head's rows: the tail of the projected
         # allocation meets the number, and differs from the unconstrained projection.
         rng = StableRNG(19)
