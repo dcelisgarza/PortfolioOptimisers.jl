@@ -203,6 +203,12 @@ definition = "ReturnsResult"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
+[[exemption]]
+path = "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl"
+definition = "ProgrammeAllocationSet"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
 # The split of `03_Preprocessing.jl` into the price-to-returns run. Each of these three definitions
 # moved byte-for-byte, and each now drives the maximum of a smaller file rather than sitting under
 # the row that grandfathered it. ADR 0074's entry test reads the new file as an addition, so the

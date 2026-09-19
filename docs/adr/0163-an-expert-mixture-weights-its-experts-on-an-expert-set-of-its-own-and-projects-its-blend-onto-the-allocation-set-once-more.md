@@ -37,7 +37,8 @@ does not survive;
   other weighting `p_{t+1} ≠ p′` and the re-weighting of the experts is a trade the ceiling does
   not see. On the two corner experts with `p = [½, ½]`, `x = [1.2, 0.8]` and `tn = 0.1`:
   `ŵ_mix = [0.6, 0.4]`, `BuyAndHold` answers `[0.6, 0.4]` with zero trade, and
-  `ExponentiatedGradient(; eta = 5)` answers `[0.88, 0.12]` with a trade of `0.56`.
+  `ExponentiatedGradient(; eta = 5)` answers `[0.88, 0.12]` with a trade of `0.28` per asset,
+  the library's turnover being the per-asset `|w_i − ŵ_i| ≤ tn_i`.
 - **The literature runs its mixtures unconstrained, and its one constrained shape projects the
   blend alone.** Cover's universal portfolio and the pattern-matching aggregations run on the
   simplex; the meta-aggregators of the online-convex-optimisation literature run every expert
@@ -72,7 +73,8 @@ projected onto the head's `set` in the Euclidean geometry with the mixture's own
 Allocation as the turnover reference, `project(proj, set, q, ŵ_mix)`. Where the blend is already
 feasible the projection returns it: on every convex kind under `BuyAndHold`, and on every convex
 kind but the turnover ceiling under any weighting. Where it is not, the projection is the repair:
-`[0.88, 0.12]` becomes `[0.65, 0.35]` on the example above, and a blend of corner experts under
+`[0.88, 0.12]` becomes `[0.70, 0.30]` on the example above — the nearest point within `0.1` of
+`[0.6, 0.4]` at every asset — and a blend of corner experts under
 `card = 1` becomes the one-hot on its largest entry. On a `BoundedAllocationSet` a blend of
 bounded allocations is bounded, so the second projection is skipped by dispatch on the set's type
 and the default configuration solves nothing, as ADR 0159 promises. On a `ProgrammeAllocationSet`

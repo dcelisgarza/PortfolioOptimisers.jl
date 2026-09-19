@@ -257,7 +257,7 @@ A_t &= I + \\sum_{s \\leq t} \\boldsymbol{g}_s \\boldsymbol{g}_s^\\intercal\\,,\
 \\end{align}
 ```
 
-then, when `eta > 0`, the shrinkage ``(1 - \\eta) \\boldsymbol{w}_{t+1} + \\eta \\boldsymbol{1} / N`` towards the uniform portfolio. The paper's projection is in the norm of ``A_t``; the default [`EuclideanProjection`](@ref) is the standard simplification that keeps the rule free of a solver, and a `GramProjection` on the slot is the constrained-update build's. The regret is ``O(N \\log T)`` at ``O(N^2)`` a step, which is why this rather than the universal portfolio is the practical second-order choice. As the weighting of an [`ExpertMixture`](@ref) it is the online Newton update over the expert-return vector, with a `K × K` Gram.
+with, when `eta > 0`, the shrinkage ``(1 - \\eta) \\boldsymbol{q} + \\eta \\boldsymbol{1} / N`` of the raw Newton point towards the uniform portfolio **before** the projection, so that a bound of zero or a negative lower bound on the Allocation Set is honoured — mixed after the projection, the uniform mass would leave the set. The paper's projection is in the norm of ``A_t``, the [`GramProjection`](@ref), a programme on every set that carries its own solver; the default [`EuclideanProjection`](@ref) is the standard simplification that keeps the rule free of a solver, and on the simplex at `eta = 0` the two agree wherever the Newton point already lies in it. The rule binds its current ``A_t`` onto the geometry through [`gram_geometry`](@ref) at every step; the Start Allocation is projected before any gradient at ``A_0 = I``, in the Euclidean geometry. The regret is ``O(N \\log T)`` at ``O(N^2)`` a step, which is why this rather than the universal portfolio is the practical second-order choice. As the weighting of an [`ExpertMixture`](@ref) it is the online Newton update over the expert-return vector, with a `K × K` Gram.
 
 # Fields
 
@@ -269,10 +269,10 @@ $(DocStringExtensions.FIELDS)
         beta::Real = 1,
         delta::Real = 0.125,
         eta::Real = 0,
-        proj::EuclideanProjection = EuclideanProjection()
+        proj::Union{<:EuclideanProjection, <:GramProjection} = EuclideanProjection()
     ) -> NewtonStep
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. The `proj` slot is bound to the two geometries the rule's theorem and its standard simplification cover.
 
 ## Validation
 
@@ -295,12 +295,14 @@ NewtonStep
   - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
   - [`OnlinePortfolioSelection`](@ref)
   - [`NewtonStepState`](@ref)
+  - [`GramProjection`](@ref)
 
 # References
 
   - $(ref_dict[:agarwal2006])
 """
-struct NewtonStep{T1 <: Real, T2 <: Real, T3 <: Real, T4 <: EuclideanProjection} <:
+struct NewtonStep{T1 <: Real, T2 <: Real, T3 <: Real,
+                  T4 <: Union{<:EuclideanProjection, <:GramProjection}} <:
        AbstractOnlinePortfolioSelectionAlgorithm
     """
     The paper's ``\\beta``, which scales the gradient sum.
@@ -311,24 +313,30 @@ struct NewtonStep{T1 <: Real, T2 <: Real, T3 <: Real, T4 <: EuclideanProjection}
     """
     delta::T2
     """
-    Shrinkage towards the uniform portfolio after the projection, in `[0, 1)`; `0` is the paper's rule.
+    Shrinkage of the raw Newton point towards the uniform portfolio before the projection, in `[0, 1)`; `0` is the paper's rule.
     """
     eta::T3
     """
     $(field_dict[:proj])
     """
     proj::T4
-    function NewtonStep(beta::Real, delta::Real, eta::Real, proj::EuclideanProjection)
+    function NewtonStep(beta::T1, delta::T2, eta::T3,
+                        proj::T4) where {T1 <: Real, T2 <: Real, T3 <: Real,
+                                         T4 <:
+                                         Union{<:EuclideanProjection, <:GramProjection}}
         @argcheck(beta > zero(beta), DomainError(beta, "beta must be positive"))
         @argcheck(delta > zero(delta), DomainError(delta, "delta must be positive"))
         @argcheck(zero(eta) <= eta < one(eta), DomainError(eta, "eta must be in [0, 1)"))
-        return new{typeof(beta), typeof(delta), typeof(eta), typeof(proj)}(beta, delta, eta,
-                                                                           proj)
+        return new{T1, T2, T3, T4}(beta, delta, eta, proj)
     end
 end
 function NewtonStep(; beta::Real = 1, delta::Real = 0.125, eta::Real = 0,
-                    proj::EuclideanProjection = EuclideanProjection())::NewtonStep
+                    proj::Union{<:EuclideanProjection, <:GramProjection} = EuclideanProjection())::NewtonStep
     return NewtonStep(beta, delta, eta, proj)
+end
+function projection_geometry(::NewtonStep)
+    # The Start Allocation is projected at `A_0 = I`, where the Gram norm is the Euclidean.
+    return EuclideanProjection()
 end
 function rule_state_seed(::NewtonStep, w::AbstractVector)
     N = length(w)
@@ -340,10 +348,10 @@ function online_update!(alg::NewtonStep, st::NewtonStepState, w::AbstractVector,
     st.A .+= g * transpose(g)
     st.b .+= (1 + inv(alg.beta)) .* g
     q = alg.delta .* (LinearAlgebra.Symmetric(st.A) \ st.b)
-    wn = project(alg.proj, set, q, price_adjusted_allocation(w, x))
     if !iszero(alg.eta)
-        wn .= (1 - alg.eta) .* wn .+ alg.eta / length(wn)
+        q .= (1 - alg.eta) .* q .+ alg.eta / length(q)
     end
+    wn = project(gram_geometry(alg.proj, st.A), set, q, price_adjusted_allocation(w, x))
     return NewtonStepState(st.n + 1, st.A, st.b), wn
 end
 """
@@ -847,7 +855,7 @@ r_{t, k} &= \\langle \\boldsymbol{h}_k(t), \\boldsymbol{x}_t \\rangle\\,,\\quad
 
 Under [`BuyAndHold`](@ref), the default, ``\\boldsymbol{p}_{t+1} \\propto \\boldsymbol{p}_t \\odot \\boldsymbol{r}_t`` is the wealth-weighted mixture every paper writes as `BAH_W`, and the mixture over sampled constant rebalanced portfolios is Cover's universal portfolio ([`UniversalPortfolio`](@ref)). [`ExponentiatedGradient`](@ref) and [`NewtonStep`](@ref) on the slot are the online gradient and online Newton updates over the expert-return vector; the Newton weighting over `K` experts carries a `K × K` Gram, so two thousand sampled experts cost a `2000 × 2000` solve a row.
 
-The weighting's step is projected onto the **Expert Set** on `eset`, the Allocation Set over the `K` experts, in the weighting's own Projection Geometry: `nothing`, the default, is the bare `K`-simplex, a no-op for the multiplicative weightings and the Euclidean scalar root for a Newton weighting; a given [`BoundedAllocationSet`](@ref) broadcasts a scalar bound over the experts and takes one entry per expert from a vector bound, so a cap on `eset` caps the trust in any one expert. The blend ``\\sum_k p_{t+1, k} \\boldsymbol{h}_k(t+1)`` is then projected onto the head's Allocation Set once more, in the mixture's own Euclidean geometry on `proj`, with the mixture's Price-Adjusted Allocation as the reference; on a bounded set a blend of bounded allocations is bounded and the projection is the identity, and the dispatch that skips it, with the repair a programme set needs, is the constrained-update build's. The mixture reads nothing of a given Start Allocation: the head holds it for one period and it is replaced by the experts' mix. Each expert's own Rule State starts where its rule starts — a constant rebalanced portfolio at its own `w`, a rule that reads `w` at the Start Allocation — so a sampled expert's wealth is Cover's ``S_t(\\boldsymbol{b})`` from the first row ([`expert_start_allocation`](@ref)).
+The weighting's step is projected onto the **Expert Set** on `eset`, the Allocation Set over the `K` experts, in the weighting's own Projection Geometry: `nothing`, the default, is the bare `K`-simplex, a no-op for the multiplicative weightings and the Euclidean scalar root for a Newton weighting; a given [`BoundedAllocationSet`](@ref) broadcasts a scalar bound over the experts and takes one entry per expert from a vector bound, so a cap on `eset` caps the trust in any one expert. The blend ``\\sum_k p_{t+1, k} \\boldsymbol{h}_k(t+1)`` is then projected onto the head's Allocation Set once more, in the mixture's own Euclidean geometry on `proj`, with the mixture's Price-Adjusted Allocation as the reference; on a [`BoundedAllocationSet`](@ref) a blend of bounded allocations is bounded and the projection would be the identity, so [`blend_projection`](@ref) skips it by dispatch and the default configuration solves nothing; on a [`ProgrammeAllocationSet`](@ref) it is the repair a turnover ceiling under a weighting other than buy-and-hold, or a MIP kind, needs, and the mixture pays `K + 1` programmes per period, its experts' and its own, beside the `K × K` Gram of a Newton weighting. The mixture reads nothing of a given Start Allocation: the head holds it for one period and it is replaced by the experts' mix. Each expert's own Rule State starts where its rule starts — a constant rebalanced portfolio at its own `w`, a rule that reads `w` at the Start Allocation — so a sampled expert's wealth is Cover's ``S_t(\\boldsymbol{b})`` from the first row ([`expert_start_allocation`](@ref)).
 
 The mixture's regret against its best expert is exact for the shipped object wherever the second projection is the identity: ``\\log S_T(\\text{best expert}) - \\log S_T(\\text{mixture}) \\leq \\log K`` for every sequence under the wealth weighting on the bare Expert Set, because the mixture's wealth is the `p_1`-weighted average of the experts' wealths. Where the Expert Set binds or the second projection repairs, the bound is not claimed.
 
@@ -1015,8 +1023,8 @@ function online_update!(alg::ExpertMixture, st::ExpertMixtureState, w::AbstractV
     for (k, h) in enumerate(st.h)
         q .+= p[k] .* h
     end
-    # The blend meets the head's set once more, in the mixture's own geometry (ADR 0163).
-    wn = project(alg.proj, set, q, price_adjusted_allocation(w, x))
+    # The blend meets the head's set once more, in the mixture's own geometry.
+    wn = blend_projection(alg.proj, set, q, price_adjusted_allocation(w, x))
     return ExpertMixtureState(st.n + 1, st.st, st.h, pst, p), wn
 end
 """

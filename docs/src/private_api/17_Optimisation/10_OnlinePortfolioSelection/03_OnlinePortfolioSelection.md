@@ -9,6 +9,8 @@ PortfolioOptimisers.online_selection_seed
 PortfolioOptimisers.fold_online_selection
 PortfolioOptimisers.online_selection_pin
 PortfolioOptimisers.online_selection_row!
+PortfolioOptimisers.row_timestamp
+PortfolioOptimisers.report_held_steps
 PortfolioOptimisers.fill_row_gaps!
 PortfolioOptimisers.online_selection_readout
 PortfolioOptimisers.online_readout(::OnlinePortfolioSelection)

@@ -46,8 +46,20 @@ end
         @test maxerr(libpath(ExponentiatedGradient()),
                      PT.exponentiated_gradient(X).weights) < 1e-14
         @test maxerr(libpath(NewtonStep()), PT.online_newton_step(X).weights) < 1e-13
-        @test maxerr(libpath(NewtonStep(; eta = 0.1)),
-                     PT.online_newton_step(X; eta = 0.1).weights) < 1e-13
+        # The uniform mix is applied to the raw Newton point before the projection, so a
+        # bound of zero or a negative lower bound is honoured; the prototype mixes after,
+        # so the parity is with the stated recursion, not the prototype.
+        let A = Matrix{Float64}(I, N, N), b = zeros(N), W = zeros(T, N)
+            W[1, :] .= 1 / N
+            for t in 1:(T - 1)
+                g = X[t, :] ./ dot(W[t, :], X[t, :])
+                A .+= g * g'
+                b .+= 2 .* g
+                q = 0.125 .* (Symmetric(A) \ b)
+                W[t + 1, :] .= po.project_simplex(0.9 .* q .+ 0.1 / N)
+            end
+            @test maxerr(libpath(NewtonStep(; eta = 0.1)), W) < 1e-13
+        end
         @test maxerr(libpath(PassiveAggressiveMeanReversion()), PT.pamr(X).weights) < 1e-14
         @test maxerr(libpath(PassiveAggressiveMeanReversion(; slack = LinearSlack())),
                      PT.pamr(X; variant = :pamr1).weights) < 1e-14

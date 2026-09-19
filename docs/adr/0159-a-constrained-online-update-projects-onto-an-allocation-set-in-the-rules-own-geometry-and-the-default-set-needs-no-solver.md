@@ -121,9 +121,10 @@ any rule at its default geometry on the default set — solves nothing.
 
 The programme set admits the kinds whose builders take a model and an object, plus the two cones
 it writes itself: weight bounds (`wb`, `sets`); linear constraints in the asset basis (`lcs` over
-`sets`); a turnover ceiling (`tn`), whose reference is the Price-Adjusted Allocation `ŵ_t = w_t .* x_t /
-⟨w_t, x_t⟩` of the update, the book the step trades from, computed in-step on that row — the
-executed trade, never the distance between two targets (ADR 0160); a `Variance` or
+`sets`); a turnover ceiling (`tn`), the library's per-asset `|w_i − ŵ_i| ≤ tn_i`, whose reference
+is the Price-Adjusted Allocation `ŵ_t = w_t .* x_t / ⟨w_t, x_t⟩` of the update, the book the step
+trades from, computed in-step on that row — the executed trade, never the distance between two
+targets (ADR 0160); a `Variance` or
 `StandardDeviation` upper bound (`r`) from a `pe` on the set, fitted on the head's rows as ADR 0158
 rules, through the set's own second-order cone; a tracking error (`te`) over the head's rows; and
 the MIP kinds — cardinality, group cardinality, thresholds and semi-continuous bounds — through the
@@ -154,14 +155,17 @@ undefined; that is documented on the set, not guarded.
 
 ### A failed programme holds the allocation: the Held Step
 
-When the programme fails to solve — infeasible, timed out, or a MIP at its limit — the step keeps
-the allocation it received, warns once with the row's timestamp, and continues: the rule's carrier
-still absorbs the row, only the allocation is held. The hold is the family's own decision, so the
-read-out carries an `OptimisationSuccess` whose `res` records it — the programme's termination
-status and the row's timestamp — and the fallback chain never runs on it (ADR 0160). A step never
-throws on a failed solve and never
-falls back to a weaker set, because a constraint that is silently dropped on the day it binds is
-not a constraint.
+When the programme fails to solve — infeasible, timed out, or a MIP at its limit — the projection
+answers the allocation it received, the step's Price-Adjusted Allocation, so the fund trades
+nothing that period; the head warns once with the row's timestamp and continues, the rule's
+carrier still absorbing the row. A programme whose constraints cannot be formed on the rows the
+step holds — a covariance fitted on one observation — is held the same way, before any solve. The
+hold is the family's own decision, so the read-out carries an `OptimisationSuccess` whose `res` is
+the `HeldStep` record — the row's timestamp, the reason, and the solver trials — and the fallback
+chain never runs on it (ADR 0160). A step never throws on a failed solve and never falls back to a
+weaker set, because a constraint that is silently dropped on the day it binds is not a constraint.
+The rows and the record travel outside `project`'s four-argument signature, on a task-scoped
+Projection Step the head opens around each Online Update, so no rule threads them.
 
 ### The verification is the build's, not a prototype's
 

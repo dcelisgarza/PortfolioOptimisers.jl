@@ -56,16 +56,19 @@ In order to implement a new geometry, subtype `AbstractProjectionGeometry` and i
   - `proj`: The geometry.
   - `set`: The Allocation Set, its bounds resolved to vectors.
   - `q`: The raw step of the rule, before the projection.
-  - `w`: The Price-Adjusted Allocation the step trades from, the reference a turnover ceiling on a later set kind reads; the bounded set does not read it.
+  - `w`: The Price-Adjusted Allocation the step trades from, the reference a turnover ceiling on a [`ProgrammeAllocationSet`](@ref) reads and the allocation a Held Step answers; the bounded set does not read it.
 
 ## Returns
 
   - `w'::AbstractVector`: The projected allocation.
 
+A geometry with no closed form on any set carries its own solver, as [`GramProjection`](@ref) does, and [`projection_solver`](@ref) reads it ahead of the set's.
+
 # Related
 
   - [`EuclideanProjection`](@ref)
   - [`EntropicProjection`](@ref)
+  - [`GramProjection`](@ref)
   - [`project`](@ref)
   - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
 """
@@ -112,6 +115,95 @@ EntropicProjection()
   - [`project`](@ref)
 """
 struct EntropicProjection <: AbstractProjectionGeometry end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The Gram Projection Geometry: the raw step is projected onto the Allocation Set in the norm of the rule's Gram matrix, ``\\min (\\boldsymbol{w} - \\boldsymbol{q})^\\intercal A (\\boldsymbol{w} - \\boldsymbol{q})``.
+
+It is the geometry the online Newton step's logarithmic regret is proved in (Agarwal, Hazan, Kale and Schapire 2006), and it has no closed form on any set, the bare simplex included, so it carries its own solver and every projection in it is a programme. The matrix is the rule's: [`NewtonStep`](@ref) binds its carrier's ``A_t`` onto the geometry's `A` slot at every step through [`gram_geometry`](@ref), and a geometry with no matrix bound refuses to project. The Start Allocation is projected before any gradient is seen, where ``A_0 = I`` and the geometry is the Euclidean one, so [`projection_geometry`](@ref) answers [`EuclideanProjection`](@ref) for it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    GramProjection(;
+        slv::Slv_VecSlv,
+        A::Option{<:AbstractMatrix} = nothing
+    ) -> GramProjection
+
+Keywords correspond to the struct's fields. `A` is bound by the rule, never by the caller.
+
+## Validation
+
+  - If `A` is given: `size(A, 1) == size(A, 2)`. A `DimensionMismatch` is thrown otherwise.
+
+# Examples
+
+```jldoctest
+julia> GramProjection(; slv = Solver(; solver = nothing))
+GramProjection
+  slv ┼ Solver
+      │          name ┼ String: \"\"
+      │        solver ┼ nothing
+      │      settings ┼ nothing
+      │     check_sol ┼ @NamedTuple{}: NamedTuple()
+      │   add_bridges ┴ Bool: true
+    A ┴ nothing
+```
+
+# Related
+
+  - [`AbstractProjectionGeometry`](@ref)
+  - [`EuclideanProjection`](@ref)
+  - [`NewtonStep`](@ref)
+  - [`project`](@ref)
+  - [`gram_geometry`](@ref)
+
+# References
+
+  - $(ref_dict[:agarwal2006])
+"""
+struct GramProjection{T1 <: Slv_VecSlv, T2 <: Option{<:AbstractMatrix}} <:
+       AbstractProjectionGeometry
+    """
+    $(field_dict[:slv])
+    """
+    slv::T1
+    """
+    The Gram matrix the projection is taken in the norm of, bound by the rule at each step, or `nothing` before the rule binds one.
+    """
+    A::T2
+    function GramProjection(slv::Slv_VecSlv, A::Option{<:AbstractMatrix})
+        if !isnothing(A)
+            @argcheck(size(A, 1) == size(A, 2),
+                      DimensionMismatch("the Gram matrix must be square, got $(size(A))"))
+        end
+        return new{typeof(slv), typeof(A)}(slv, A)
+    end
+end
+function GramProjection(; slv::Slv_VecSlv,
+                        A::Option{<:AbstractMatrix} = nothing)::GramProjection
+    return GramProjection(slv, A)
+end
+"""
+    gram_geometry(proj::EuclideanProjection, A::AbstractMatrix)
+    gram_geometry(proj::GramProjection, A::AbstractMatrix)
+
+The geometry a rule with a Gram matrix projects in at this step: a [`GramProjection`](@ref) with the rule's current matrix bound onto its `A` slot, and any other geometry unchanged.
+
+# Related
+
+  - [`GramProjection`](@ref)
+  - [`NewtonStep`](@ref)
+"""
+function gram_geometry(proj::AbstractProjectionGeometry, ::AbstractMatrix)
+    return proj
+end
+function gram_geometry(proj::GramProjection, A::AbstractMatrix)
+    return GramProjection(; slv = proj.slv, A = A)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -557,6 +649,130 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+The record of a Held Step: a projection programme of one row that did not solve, so the step traded nothing.
+
+A projection onto a [`ProgrammeAllocationSet`](@ref), or in a [`GramProjection`](@ref), is a programme, and a programme can fail — infeasible on the day a turnover ceiling and a cap cannot both hold, timed out, a MIP at its limit, a covariance cone with no finite data on its first rows. The step then answers the Price-Adjusted Allocation it was handed, the book the fund already holds, so the fund trades nothing; the rule's carrier still absorbs the row. The head warns once with the row's timestamp, and its Recursion Read-out carries the record of the last folded row inside an [`OptimisationSuccess`](@ref), so a fallback chain never runs on a hold. A step never throws on a failed solve, and never falls back to a weaker set: a constraint dropped on the day it binds is not a constraint.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ProgrammeAllocationSet`](@ref)
+  - [`project`](@ref)
+  - [`OnlinePortfolioSelectionState`](@ref)
+  - [`JuMPResult`](@ref)
+"""
+struct HeldStep{T1, T2 <: AbstractString, T3}
+    """
+    The timestamp of the row whose projection was held, or its index in the fold when the carrier has no timestamps, or `nothing` outside a fold.
+    """
+    ts::T1
+    """
+    What was held: which projection of the row, and why.
+    """
+    reason::T2
+    """
+    The solver trials of the failed programme, a [`JuMPResult`](@ref)'s `trials`, or `nothing` when no programme was built.
+    """
+    trials::T3
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The step a projection runs inside: the rows the head holds through the period, the row's timestamp, and the Held Steps recorded so far.
+
+The Online Update's projection is `project(proj, set, q, w)`, four arguments and no more, so a programme set's covariance cone and tracking error — which read the head's rows — and the Held Step's record — which the head must see — travel outside the signature, on the task-scoped [`PROJECTION_STEP`](@ref). The head opens one step per row through [`with_projection_step`](@ref), around the whole Online Update, so every projection of that row — a mixture's experts' and its own blend's — reads one set of rows and writes one log. Outside a step, a projection reads no rows and reports a hold as a warning.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`PROJECTION_STEP`](@ref)
+  - [`with_projection_step`](@ref)
+  - [`HeldStep`](@ref)
+  - [`project`](@ref)
+"""
+struct ProjectionStep{T1, T2}
+    """
+    The rows of returns the head holds through the period, `observations × assets`, or `nothing`.
+    """
+    rows::T1
+    """
+    The row's timestamp, or its index in the fold.
+    """
+    ts::T2
+    """
+    The Held Steps recorded during this row, in the order their programmes failed.
+    """
+    held::Vector{HeldStep}
+end
+"""
+    const PROJECTION_STEP
+
+The task-scoped [`ProjectionStep`](@ref) a projection reads, `nothing` outside a step.
+
+# Related
+
+  - [`ProjectionStep`](@ref)
+  - [`with_projection_step`](@ref)
+"""
+const PROJECTION_STEP = ScopedValue{Union{Nothing, ProjectionStep}}(nothing)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Runs `f()` inside a [`ProjectionStep`](@ref) over `rows` at `ts`, and answers `(f(), held)`: the update's result and the Held Steps its projections recorded, an empty vector when every programme solved.
+
+# Related
+
+  - [`PROJECTION_STEP`](@ref)
+  - [`ProjectionStep`](@ref)
+  - [`fold_online_selection`](@ref)
+"""
+function with_projection_step(f, rows, ts)
+    step = ProjectionStep(rows, ts, HeldStep[])
+    out = Base.ScopedValues.with(f, PROJECTION_STEP => step)
+    return out, step.held
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Records a Held Step on the current [`ProjectionStep`](@ref), or warns at once when the projection runs outside one.
+
+# Related
+
+  - [`HeldStep`](@ref)
+  - [`with_projection_step`](@ref)
+"""
+function record_held_step!(reason::AbstractString, trials)
+    step = PROJECTION_STEP[]
+    if isnothing(step)
+        @warn("Held Step outside an Online Update: $reason")
+        return nothing
+    end
+    push!(step.held, HeldStep(step.ts, reason, trials))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The rows the current [`ProjectionStep`](@ref) holds, or `nothing` outside a step.
+
+# Related
+
+  - [`ProjectionStep`](@ref)
+  - [`set_allocation_set_constraints!`](@ref)
+"""
+function projection_step_rows()
+    step = PROJECTION_STEP[]
+    return isnothing(step) ? nothing : step.rows
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 The Partial Fit State of an [`OnlinePortfolioSelection`](@ref) head: a Rule State beside the rows held once, the Fold Context pinned by the first step, and every timestamp folded.
 
 The pair `(st, w)` is the Rule State, the unit the family recurses over. The rows any rule of the tree reads are held once, on this state, as a [`SampleBufferState`](@ref) of **returns** — the Returns Result's rows verbatim, a non-finite cell filled with zero before the push — capped by the rule tree's [`rows_needed`](@ref), and `nothing` for a tree that reads none. The timestamps are never capped, so [`Resume`](@ref) works for a carrier-free rule. The last folded row's active mask is the Investable Mask the read-out reduces on, `nothing` under a static panel; the recursion itself keeps the full `w` and never carries a forced zero.
@@ -575,7 +791,8 @@ $(DocStringExtensions.FIELDS)
         nx::Option{<:VecStr} = nothing,
         pnl::Option{<:AssetPanel} = nothing,
         amsk::Option{<:AbstractVector{<:Bool}} = nothing,
-        ts::Option{<:AbstractVector} = nothing
+        ts::Option{<:AbstractVector} = nothing,
+        hold::Option{<:HeldStep} = nothing
     ) -> OnlinePortfolioSelectionState
 
 Keywords correspond to the struct's fields.
@@ -588,7 +805,7 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets: `w` is sliced and renormalised, `st` is forwarded to the carrier's own view through [`rule_state_view`](@ref), `X`, `nx`, `pnl` and `amsk` are sliced, and `n` and `ts` are copied.
+When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets: `w` is sliced and renormalised, `st` is forwarded to the carrier's own view through [`rule_state_view`](@ref), `X`, `nx`, `pnl` and `amsk` are sliced, and `n`, `ts` and `hold` are copied.
 
 # Related
 
@@ -631,13 +848,18 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
     Timestamps of the observations folded, in order and uncapped, or `nothing` when the carrier holds none.
     """
     ts
+    """
+    The [`HeldStep`](@ref) record of the last folded row when a projection of that row was held, or `nothing` when every projection of it solved; the Recursion Read-out's retcode carries it.
+    """
+    hold
 end
 function OnlinePortfolioSelectionState(; n::Integer = 0, w::AbstractVector, st = nothing,
                                        X::Option{<:SampleBufferState} = nothing,
                                        nx::Option{<:VecStr} = nothing,
                                        pnl::Option{<:AssetPanel} = nothing,
                                        amsk::Option{<:AbstractVector{<:Bool}} = nothing,
-                                       ts::Option{<:AbstractVector} = nothing)::OnlinePortfolioSelectionState
+                                       ts::Option{<:AbstractVector} = nothing,
+                                       hold::Option{<:HeldStep} = nothing)::OnlinePortfolioSelectionState
     assert_nonneg(n, :n)
     if !isnothing(nx)
         @argcheck(length(nx) == length(w),
@@ -651,7 +873,7 @@ function OnlinePortfolioSelectionState(; n::Integer = 0, w::AbstractVector, st =
         @argcheck(panel_is_static(pnl),
                   ArgumentError("an OnlinePortfolioSelectionState pins a static Asset Panel and never a time-varying one: the masks of a time-varying panel are per-observation, so the last row's rides on `amsk` and the rest with the rows."))
     end
-    return OnlinePortfolioSelectionState(n, w, st, X, nx, pnl, amsk, ts)
+    return OnlinePortfolioSelectionState(n, w, st, X, nx, pnl, amsk, ts, hold)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -682,14 +904,14 @@ function Base.copy(x::OnlinePortfolioSelectionState)
     return OnlinePortfolioSelectionState(; n = x.n, w = copy(x.w), st = copy_column(x.st),
                                          X = copy_column(x.X), nx = copy_column(x.nx),
                                          pnl = x.pnl, amsk = copy_column(x.amsk),
-                                         ts = copy_column(x.ts))
+                                         ts = copy_column(x.ts), hold = x.hold)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Slices an [`OnlinePortfolioSelectionState`](@ref) to the selected assets: the state of the same observations over them.
 
-`w` is sliced and renormalised, the carrier is forwarded to its own view through [`rule_state_view`](@ref), the rows buffer takes [`SampleBufferState`](@ref)'s view, the names, the panel and the mask are sliced, and the count and the timestamps are copied. The view is a copy for the read-out; the recursion keeps the full `w`.
+`w` is sliced and renormalised, the carrier is forwarded to its own view through [`rule_state_view`](@ref), the rows buffer takes [`SampleBufferState`](@ref)'s view, the names, the panel and the mask are sliced, and the count, the timestamps and the hold record are copied. The view is a copy for the read-out; the recursion keeps the full `w`.
 
 # Arguments
 
@@ -720,7 +942,7 @@ function port_opt_view(x::OnlinePortfolioSelectionState, i, args...)
                                          else
                                              port_opt_view(x.pnl, i)
                                          end, amsk = nothing_scalar_array_view(x.amsk, i),
-                                         ts = copy_column(x.ts))
+                                         ts = copy_column(x.ts), hold = x.hold)
 end
 """
     renormalised_view(w::Nothing, i)
@@ -742,7 +964,7 @@ function renormalised_view(w::AbstractVector, i)
     v = w[i]
     return v ./ sum(v)
 end
-export EuclideanProjection, EntropicProjection, BoundedAllocationSet
+export EuclideanProjection, EntropicProjection, GramProjection, BoundedAllocationSet
 public AbstractOnlinePortfolioSelectionAlgorithm, AbstractProjectionGeometry,
        AbstractAllocationSet, online_update!, rule_state_seed, projection_geometry, project,
        resolve_allocation_set

@@ -11,6 +11,8 @@ Every member of the family is one recursion, `w_{t+1} = f(w_t, x_t)`, and one we
 
 **A non-finite return is filled with zero once**, before the buffer and the rule, so the rule sees `x = 1` there: silently at an asset the panel marks inactive, and as a Held Gap at an active one, a warning by default and a refusal under `strict`. The allocation never carries a forced zero, and a relisting asset re-enters at the recursion's own weight. Under a time-varying panel the read-out's Investable Mask is the last folded row's active mask: the full allocation is sliced to it and renormalised, and the Result expands it back with a zero at every non-investable asset.
 
+**The Allocation Set on `set` is the Constrained Update's**: every rule's raw step is projected onto it in the rule's own Projection Geometry through [`project`](@ref). The default [`BoundedAllocationSet`](@ref) is the simplex and every projection onto it is closed form, so the default configuration solves nothing; a [`ProgrammeAllocationSet`](@ref) admits the full constraint vocabulary and its projection is a programme. A programme can fail, and the step is then a **Held Step**: the projection answers the Price-Adjusted Allocation it was handed, so the fund trades nothing that period, the rule's carrier still absorbs the row, the head warns once with the row's timestamp, and the Recursion Read-out's retcode is an [`OptimisationSuccess`](@ref) carrying the last folded row's [`HeldStep`](@ref) record, so a fallback chain never runs on a hold. A negative lower bound under an entropic rule is refused at construction.
+
 `merge_states` on the state and `Online(head)` are refused by name: an update is order-dependent, and the family never refits from a buffer.
 
 # Fields
@@ -35,6 +37,7 @@ Keywords correspond to the struct's fields. `fees` and `fb` may hold a [`TimeDep
 
   - `w0`: non-empty and finite, when given; it is projected onto the set at the first step, so it need not lie in it.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(set.sets)`.
+  - Everything [`assert_geometry_admits_set`](@ref) refuses: a negative lower bound under an entropic rule.
   - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
@@ -73,6 +76,8 @@ OnlinePortfolioSelection
   - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
   - [`OnlinePortfolioSelectionState`](@ref)
   - [`BoundedAllocationSet`](@ref)
+  - [`ProgrammeAllocationSet`](@ref)
+  - [`HeldStep`](@ref)
   - [`NaiveOptimisationResult`](@ref)
   - [`optimise`](@ref)
   - [`partial_fit!`](@ref)
@@ -117,6 +122,7 @@ OnlinePortfolioSelection
                                       fb::TDO_Option{<:OptE_Opt}, strict::Bool,
                                       cache::Option{<:OnlinePortfolioSelectionState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :OnlinePortfolioSelection)
+        assert_geometry_admits_set(projection_geometry(alg), set)
         if !isnothing(w0)
             assert_nonempty(w0, :w0)
             assert_finite(w0, :w0)
@@ -226,7 +232,8 @@ function online_selection_seed(opt::OnlinePortfolioSelection, rd::ReturnsResult,
     else
         @argcheck(length(opt.w0) == N,
                   DimensionMismatch("w0 ($(length(opt.w0))) must have one entry per pinned asset ($N)"))
-        project(projection_geometry(opt.alg), set, opt.w0, opt.w0)
+        first(with_projection_step(() -> project(projection_geometry(opt.alg), set, opt.w0,
+                                                 opt.w0), nothing, nothing))
     end
     need = rows_needed(opt)
     X = if isnothing(need)
@@ -250,7 +257,7 @@ Folds every row of a carrier into the head's state, in order: the Block Step, an
 
  1. Refuse what [`step_active_mask`](@ref) refuses, and resolve the Allocation Set over the pinned universe.
  2. Seed the state on the first block, or pin-and-check the carried one, through [`online_selection_pin`](@ref).
- 3. Per row, through [`online_selection_row!`](@ref): fill every non-finite cell with zero — silently where the row's active mask is `false`, as a Held Gap through the head's `strict` where it is `true` or there is no mask; push the row into the rows buffer where the tree keeps one; form `x = 1 .+ r`; call [`online_update!`](@ref) with the buffer's rows; record the row's active mask and timestamp.
+ 3. Per row, through [`online_selection_row!`](@ref): fill every non-finite cell with zero — silently where the row's active mask is `false`, as a Held Gap through the head's `strict` where it is `true` or there is no mask; push the row into the rows buffer where the tree keeps one; form `x = 1 .+ r`; call [`online_update!`](@ref) with the buffer's rows inside a [`ProjectionStep`](@ref); warn on a Held Step; record the row's active mask, timestamp and hold.
 
 # Arguments
 
@@ -284,16 +291,18 @@ function fold_online_selection(opt::OnlinePortfolioSelection,
     state = online_selection_pin(opt, cache, rd, set)
     w, st, X, n = state.w, state.st, state.X, state.n
     last_amsk = state.amsk
+    hold = state.hold
     for t in axes(rd.X, 1)
-        row_amsk = isnothing(amsk) ? nothing : vec(amsk[t, :])
-        st, w, X = online_selection_row!(opt, st, w, X, vec(rd.X[t, :]), row_amsk, rd.nx,
-                                         set)
+        row = (; r = vec(rd.X[t, :]), amsk = isnothing(amsk) ? nothing : vec(amsk[t, :]),
+               ts = row_timestamp(rd.ts, t, n))
+        st, w, X, hold = online_selection_row!(opt, st, w, X, row, rd.nx, set)
         n += 1
-        last_amsk = isnothing(row_amsk) ? nothing : BitVector(row_amsk)
+        last_amsk = isnothing(row.amsk) ? nothing : BitVector(row.amsk)
     end
     return OnlinePortfolioSelectionState(; n = n, w = w, st = st, X = X, nx = state.nx,
                                          pnl = state.pnl, amsk = last_amsk,
-                                         ts = fold_column(state.ts, rd.ts, nothing))
+                                         ts = fold_column(state.ts, rd.ts, nothing),
+                                         hold = hold)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -329,7 +338,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-One row of the recursion: fill the row's non-finite cells, push it into the rows buffer where the tree keeps one, form the price relative `x = 1 .+ r`, and take the Online Update over the buffer's rows.
+One row of the recursion: fill the row's non-finite cells, push it into the rows buffer where the tree keeps one, form the price relative `x = 1 .+ r`, and take the Online Update over the buffer's rows inside a [`ProjectionStep`](@ref), so every projection of the row reads the rows and reports a hold to the head.
+
+A row one of whose projections was held is warned once, naming the row's timestamp and each hold, and answers the first [`HeldStep`](@ref) record; a row whose projections all solved answers `nothing`.
 
 # Arguments
 
@@ -337,33 +348,69 @@ One row of the recursion: fill the row's non-finite cells, push it into the rows
   - `st`: The rule's carrier.
   - `w`: The allocation held during the row's period.
   - `X`: The rows buffer, or `nothing`.
-  - `r`: The row of returns, written in place by the fill.
-  - `amsk`: The row's active mask, or `nothing`.
+  - `row`: The row: `r`, its returns, written in place by the fill; `amsk`, its active mask or `nothing`; `ts`, its timestamp or its index in the fold.
   - `nx`: The asset names, for the Held Gap message.
   - `set`: The Allocation Set, resolved.
 
 # Returns
 
-  - `(st', w', X')::Tuple`: The carrier, the allocation for the next period, and the buffer after the row.
+  - `(st', w', X', hold)::Tuple`: The carrier, the allocation for the next period, the buffer after the row, and the row's hold record or `nothing`.
 
 # Related
 
   - [`fold_online_selection`](@ref)
   - [`fill_row_gaps!`](@ref)
   - [`online_update!`](@ref)
+  - [`with_projection_step`](@ref)
+  - [`HeldStep`](@ref)
 """
 function online_selection_row!(opt::OnlinePortfolioSelection, st, w::AbstractVector,
-                               X::Option{<:SampleBufferState}, r::AbstractVector,
-                               amsk::Option{<:AbstractVector{<:Bool}}, nx::Option{<:VecStr},
-                               set::AbstractAllocationSet)
+                               X::Option{<:SampleBufferState}, row::NamedTuple,
+                               nx::Option{<:VecStr}, set::AbstractAllocationSet)
+    (; r, amsk, ts) = row
     fill_row_gaps!(r, w, amsk, nx, opt.strict)
     if !isnothing(X)
         X = partial_fit!(X, r)
     end
     x = one(eltype(r)) .+ r
     rows = isnothing(X) ? nothing : sample_buffer(X)
-    st, w = online_update!(opt.alg, st, w, x, rows, set)
-    return st, w, X
+    (st, w), held = with_projection_step(() -> online_update!(opt.alg, st, w, x, rows, set),
+                                         rows, ts)
+    return st, w, X, report_held_steps(held, ts)
+end
+"""
+    row_timestamp(ts::Nothing, t::Integer, n::Integer)
+    row_timestamp(ts::AbstractVector, t::Integer, n::Integer)
+
+The timestamp a row of a block folds under: the carrier's, or the row's index in the whole fold, `n + 1` after `n` rows, when the carrier holds none.
+
+# Related
+
+  - [`fold_online_selection`](@ref)
+  - [`HeldStep`](@ref)
+"""
+function row_timestamp(::Nothing, ::Integer, n::Integer)
+    return n + 1
+end
+function row_timestamp(ts::AbstractVector, t::Integer, ::Integer)
+    return ts[t]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Warns once for a row one of whose projections was held, naming the row's timestamp and every hold, and answers the first [`HeldStep`](@ref) record; answers `nothing` for a row whose projections all solved.
+
+# Related
+
+  - [`online_selection_row!`](@ref)
+  - [`HeldStep`](@ref)
+"""
+function report_held_steps(held::AbstractVector{<:HeldStep}, ts)
+    if isempty(held)
+        return nothing
+    end
+    @warn("Held Step at $(ts): $(join([h.reason for h in held], "; ")).")
+    return first(held)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -444,7 +491,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 The Recursion Read-out: wraps the state's allocation in a [`NaiveOptimisationResult`](@ref), reduced to the last folded row's active mask and renormalised, with the resolved bounds and the head's fee.
 
-The read-out is pure: it reads the state and writes nothing, so it is callable any number of times for the same answer. A reduced allocation with no mass — every held asset inactive at the last row — is the one failure a rule cannot recover from, and answers an [`OptimisationFailure`](@ref) with `NaN` weights so a fallback chain walks on.
+The read-out is pure: it reads the state and writes nothing, so it is callable any number of times for the same answer. Its retcode is the last step's: a plain [`OptimisationSuccess`](@ref), or one whose `res` is the [`HeldStep`](@ref) record when the last folded row was held. A reduced allocation with no mass — every held asset inactive at the last row — is the one failure a rule cannot recover from, and answers an [`OptimisationFailure`](@ref) with `NaN` weights so a fallback chain walks on.
 
 # Arguments
 
@@ -484,7 +531,7 @@ function online_selection_readout(opt::OnlinePortfolioSelection,
     end
     wb = weight_bounds_constraints(set.wb, set.sets; N = Nr, strict = opt.strict,
                                    datatype = eltype(w))
-    retcode, w = OptimisationSuccess(), w ./ s
+    retcode, w = OptimisationSuccess(; res = state.hold), w ./ s
     return NaiveOptimisationResult(; pr = nothing, wb = wb, retcode = retcode, w = w,
                                    imsk = imsk, fb = nothing, fees = fees)
 end

@@ -292,6 +292,7 @@ commit = "8610300"
 "src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { lines = 102, misses = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { lines = 147, misses = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { lines = 120, misses = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { lines = 164, misses = 0 }
 "src/18_ExpectedReturns.jl" = { lines = 148, misses = 0 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { lines = 134, misses = 0 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { lines = 222, misses = 0 }
