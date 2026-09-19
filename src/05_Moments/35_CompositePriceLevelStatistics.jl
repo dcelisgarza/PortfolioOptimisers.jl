@@ -218,7 +218,7 @@ s_{i} &= \\operatorname{sign} \\sum_{a < b} \\frac{p_{b, i} - p_{a, i}}{b - a}\\
 \\end{align}
 ```
 
-At `window = 5` the sum runs over the ten pairs the paper names.
+At `window = 5` the sum runs over the ten pairs the paper's text and its sum name; the paper's displayed slope formula writes only the four slopes anchored at the current level, and the sign of those four can differ from the sign of the ten.
 
 # Fields
 

@@ -30,12 +30,17 @@ two ledgers and the code shaped the decision.
   2018), and a matched conditional sample, which ADR 0156 already made a Sample Selector. Every
   other row reads `x_t` through a loss or a gradient. **No row reads a covariance, scenarios, or
   any moment above the first.**
-- **Every price-level statistic reads exactly off the rows the head holds.** The five statistics
-  are homogeneous of degree one in the levels, so `x̂ = stat(p_{t−w+1:t}) / p_t` is a function of
-  the last `w − 1` price relatives with `p_t = 1`: on three assets with `x₂ = [0.90, 1.05, 1.00]`
-  and `x₃ = [1.05, 1.00, 0.98]`, the three-level moving average gives
-  `x̂ = (1 + 1/x₃ + 1/(x₂x₃))/3 = [1.0035, 0.9841, 1.0136]` from the rows and the same from the
-  levels. As an expected return that is `mu = x̂ − 1`.
+- **Every price-level statistic reads exactly off the rows the head holds.** Four of the five
+  statistics act on each asset's levels alone and are homogeneous of degree one in them, so
+  `x̂ = stat(p_{t−w+1:t}) / p_t` is a function of the last `w − 1` price relatives with
+  `p_t = 1`: on three assets with `x₂ = [0.90, 1.05, 1.00]` and `x₃ = [1.05, 1.00, 0.98]`, the
+  three-level moving average gives `x̂ = (1 + 1/x₃ + 1/(x₂x₃))/3 = [1.0035, 0.9841, 1.0136]`
+  from the rows and the same from the levels. As an expected return that is `mu = x̂ − 1`. The
+  spatial median couples the assets through its Euclidean distances and is not invariant to
+  scaling each asset by its own last price, so read off the rows it is the paper's median over
+  prices normalised to one at the current period, not over the prices — a scale-free statistic
+  the buffer of returns can carry, where the paper's cannot be recovered from returns at all.
+  The kernel trend pattern's regression is the same case, and both docstrings say so.
 - **The library's one-vector idiom is `me::AbstractExpectedReturnsEstimator`.** `EmpiricalPrior`
   holds one and reads `mean(me, X, pnl; dims)`; that seam carries no factor returns. A Prior
   answers `prior(pe, X, F, pnl).mu`, but `LowOrderPrior` refuses an empty `sigma`, so a Prior

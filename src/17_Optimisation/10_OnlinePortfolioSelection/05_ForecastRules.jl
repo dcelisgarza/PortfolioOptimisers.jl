@@ -383,7 +383,7 @@ end
 
 The on-line moving average reversion of Li and Hoi (2012): a [`ForecastReversion`](@ref) whose forecast is the [`MovingAverage`](@ref) of the last `window` price levels over the last price (OLMAR).
 
-`window` is the reversion horizon, the one parameter that matters, and the natural thing to tune with a search over `"alg.me.alg.window"`.
+`window` is the reversion horizon, the one parameter that matters, and the natural thing to tune with a search over `"alg.me.alg.window"`. The paper's algorithm takes `eps > 1` and `window >= 3`; the step is defined for any positive `eps` — below one it moves only when the forecast return of the held allocation falls under `eps` — and for two levels, where the average is the mean of the current price and the previous one, so the constructor admits `eps > 0` and `window >= 2`.
 
 # Examples
 
@@ -460,7 +460,7 @@ end
 
 The robust median reversion of Huang, Zhou, Li, Hoi and Zhou (2016): a [`ForecastReversion`](@ref) whose forecast is the [`SpatialMedian`](@ref) of the last `window` price levels over the last price (RMR).
 
-The point is the breakdown point: a single extreme print moves a mean without limit and a spatial median almost not at all.
+The point is the breakdown point: a single extreme print moves a mean without limit and a spatial median almost not at all. The median is read on the reconstructed price path, every asset's last level at one, and its iteration runs to a tighter tolerance than the paper's; [`SpatialMedian`](@ref) states both and their size.
 
 # Examples
 
@@ -584,7 +584,7 @@ end
 
 The local adaptive learning of Guan and An (2019): a [`ForecastReversion`](@ref) whose forecast is a [`TrendSwitch`](@ref) on the [`RegressionSlope`](@ref) — the [`WindowPeak`](@ref) of an asset whose slope exceeds `threshold`, the [`ExponentialMovingAverage`](@ref) of the others (LOAD).
 
-The paper states neither the reversion threshold `eps` nor the ridge weight `lambda`; the defaults are the moving-average reversion's `eps = 10` and plain least squares. The slope is tested on the reconstructed price path, and the exponential average is the paper's full-history recursion, so the head holds every row for this rule.
+The paper states neither the reversion threshold `eps` nor the ridge weight `lambda`; the defaults are the moving-average reversion's `eps = 10` and plain least squares. The slope is tested on the reconstructed price path, and the exponential average is the paper's full-history recursion, so the head holds every row for this rule. The paper prints its step length with the norm of the centred forecast where the solution of its own programme — the closest allocation whose forecast return reaches `eps` — has the squared norm; the step taken is that solution, the one the moving-average reversion takes, and it differs from the printed one.
 
 # Examples
 
@@ -1073,7 +1073,7 @@ $(DocStringExtensions.FIELDS)
         proj::EuclideanProjection = EuclideanProjection()
     ) -> TransactionCostOptimisation
 
-Keywords correspond to the struct's fields. `rows_needed` forwards to `me`. `gamma` is the proportional cost rate the trader faces, which the paper leaves to the market; the threshold ``\\lambda = 10 \\eta \\gamma`` is derived from it.
+Keywords correspond to the struct's fields. `rows_needed` forwards to `me`. `gamma` is the proportional cost rate the trader faces, which the paper leaves to the market; the threshold ``\\lambda = 10 \\eta \\gamma`` is derived from it. The paper's text sets the threshold at ``10 \\gamma``; ``10 \\eta \\gamma`` is the value its authors' own implementation uses and its reported results rest on, as Moon (2019) records, and it is the one taken here.
 
 ## Validation
 
@@ -1104,6 +1104,7 @@ TransactionCostOptimisation
 # References
 
   - $(ref_dict[:li2018tco])
+  - $(ref_dict[:moon2019])
 """
 struct TransactionCostOptimisation{T1 <: AbstractExpectedReturnsEstimator, T2 <: Real,
                                    T3 <: Real, T4 <: EuclideanProjection} <:
@@ -1189,7 +1190,7 @@ by the iteration, seeded at ``\\boldsymbol{b} = \\boldsymbol{g} = \\boldsymbol{w
 \\end{align}
 ```
 
-until ``\\lvert \\boldsymbol{1}^\\intercal \\boldsymbol{b} - 1 \\rvert < \\texttt{tol}`` or `iters` steps, and ``\\boldsymbol{w}_{t+1} = \\mathrm{Proj}(\\zeta \\boldsymbol{b})``. The fixed matrix is inverted once in closed form through the Sherman–Morrison identity, so every iteration is ``O(N)``. The augmented Lagrangian is proved to have a saddle point in the paper; the final step is the Euclidean projection of a **scaled** iterate, and the scale ``\\zeta`` is what makes the answer sparse.
+until ``\\lvert \\boldsymbol{1}^\\intercal \\boldsymbol{b} - 1 \\rvert < \\texttt{tol}`` or `iters` steps, and ``\\boldsymbol{w}_{t+1} = \\mathrm{Proj}(\\zeta \\boldsymbol{b})``. The fixed matrix is inverted once in closed form through the Sherman–Morrison identity, so every iteration is ``O(N)``. The augmented Lagrangian is proved to have a saddle point in the paper; the final step is the Euclidean projection of a **scaled** iterate, and the scale ``\\zeta`` is what makes the answer sparse. The budget residual changes sign as the dual variable adapts, so the paper's `tol = 1e-4` is met at a zero crossing after a few hundred to a few thousand iterations, while the iterate is still moving by tenths; the scaled projection of that point and of the point `iters` steps later can land on different assets. The answer at the paper's tolerance is the paper's; a tolerance the crossings never reach runs every one of the `iters` steps.
 
 # Fields
 

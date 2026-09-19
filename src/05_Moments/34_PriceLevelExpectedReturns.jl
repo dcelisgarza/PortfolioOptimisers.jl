@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the statistics of a window of price levels that [`PriceLevelExpectedReturns`](@ref) turns into an expected return.
 
-Every statistic is homogeneous of degree one in the levels, so the level of the last observation is set to one and the earlier levels are reconstructed from the returns of the window; the statistic is then a vector over the assets, and the expected return is `stat / p_t .- 1` with `p_t = 1`. A statistic is **windowed** when it reads a fixed number of levels ([`MovingAverage`](@ref), [`SpatialMedian`](@ref), [`WindowPeak`](@ref), [`LaggedPrice`](@ref)) and **folding** when it is an exact recursion over the price relatives ([`ExponentialMovingAverage`](@ref), [`ReweightedPriceRelative`](@ref)): a folding statistic carries one vector on a Partial Fit State and reads no rows, and its batch form over a matrix of returns is the same recursion seeded at the first level, so a fold and a batch over the same rows agree exactly. A folding statistic may also carry a **memory**, the last [`memory_rows`](@ref) relatives on the same state ([`KernelTrendPattern`](@ref)): its recursion reads the carried vector and the memory together, so it is self-contained like any fold — a host holds no rows for it — and its batch form is the recursion from the first row with the memory filling as it goes.
+Every statistic is read on the reconstructed price path: the level of the last observation is set to one in every asset, the earlier levels are reconstructed from the returns of the window, the statistic is then a vector over the assets, and the expected return is `stat / p_t .- 1` with `p_t = 1`. A statistic that acts on each asset's levels alone — the moving averages, the peak, the lagged price, the reweighted relative and the trend switches — is homogeneous of degree one in that asset's levels, so it reads the same off the path as off the prices. A statistic that couples the assets — the spatial median through its Euclidean distances, the kernel trend pattern through its regression — is not invariant to scaling each asset by its own last price, so on the path it is the paper's statistic taken over prices normalised to one at the current period, not over the prices themselves; each such statistic's docstring states it. A statistic is **windowed** when it reads a fixed number of levels ([`MovingAverage`](@ref), [`SpatialMedian`](@ref), [`WindowPeak`](@ref), [`LaggedPrice`](@ref)) and **folding** when it is an exact recursion over the price relatives ([`ExponentialMovingAverage`](@ref), [`ReweightedPriceRelative`](@ref)): a folding statistic carries one vector on a Partial Fit State and reads no rows, and its batch form over a matrix of returns is the same recursion seeded at the first level, so a fold and a batch over the same rows agree exactly. A folding statistic may also carry a **memory**, the last [`memory_rows`](@ref) relatives on the same state ([`KernelTrendPattern`](@ref)): its recursion reads the carried vector and the memory together, so it is self-contained like any fold — a host holds no rows for it — and its batch form is the recursion from the first row with the memory filling as it goes.
 
 Over the first rows a windowed statistic **truncates its window** to the levels available, as the reversion papers' reference implementations do: with `window = 5` and two returns folded, the statistic reads three levels. A folding statistic starts from its seed at the first row. A composite statistic truncates every window it holds the same way.
 
@@ -170,6 +170,8 @@ $(DocStringExtensions.TYPEDEF)
 The spatial (``L_1``) median of the last `window` price levels, the forecast of the robust median reversion of Huang, Zhou, Li, Hoi and Zhou (2016).
 
 The median is the point minimising the sum of Euclidean distances to the `window` level vectors, found by the modified Weiszfeld iteration of Vardi and Zhang (2000), which is seeded at the coordinatewise median and stays defined when an iterate lands on one of the level vectors.
+
+The distances couple the assets, so the median is not invariant to scaling each asset by its own price: it is read on the reconstructed path, every asset's last level at one, where it is the paper's median taken over prices normalised to the current period rather than over the prices themselves. The two differ — by a few hundredths in the Price Relative Forecast when one asset trades at a hundred times the price of the others — and the normalised one is scale-free, so no asset dominates the distances by its quotation. The paper stops its iteration at a relative change of the iterate's ``L_1`` norm, within two hundred iterations; the iteration here runs to an absolute Euclidean change of `tol`, which at the default is the minimiser to machine precision where the paper's rule leaves the forecast a few thousandths away.
 
 # Fields
 
@@ -943,10 +945,7 @@ The levels are reconstructed with [`price_levels`](@ref) from the last [`window_
   - [`price_level_statistic`](@ref)
 """
 function Statistics.mean(me::PriceLevelExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     @argcheck(size(X, 1) >= 1,
               IsEmptyError("X must hold at least one observation to reconstruct a price level"))
     need = window_rows(me.alg)

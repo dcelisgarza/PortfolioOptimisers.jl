@@ -87,8 +87,10 @@ end
     # The census is closed, so this number moves when an estimator is added. It is here to
     # show that the loop above ran over a real universe rather than an empty one. Issue #854
     # added `ExpWeightedExpectedReturns`, `ExpWeightedVariance` and `ExpWeightedCovariance`,
-    # which carry one, two and two verbs, so the number rose by five.
-    @test checked == 50
+    # which carry one, two and two verbs, so the number rose by five. The online portfolio
+    # selection family added `PriceLevelExpectedReturns` and `PriorExpectedReturns` (one verb
+    # each) and `RankOneCovariance` (two), so it rose by four.
+    @test checked == 54
 end
 
 @testset "no leaf spells the dims guard or the orientation by hand" begin

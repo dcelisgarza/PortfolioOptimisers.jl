@@ -438,6 +438,122 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         end
     end
 
+    @testset "The deviations from the papers, each pinned where the docstring states it" begin
+        # The spatial median is not invariant to scaling each asset by its own price. The library
+        # reads it on the path with every asset's last level at one; the paper's raw-price median
+        # over the same window differs, and by more when one asset is quoted a hundred times
+        # higher. The hand iteration is Vardi and Zhang's, written here.
+        function l1median(Pw; tol = 1e-12, iters = 500)
+            mu = vec(median(Pw; dims = 1))
+            for _ in 1:iters
+                num = zeros(size(Pw, 2))
+                den = 0.0
+                dir = zeros(size(Pw, 2))
+                eta = 0
+                for i in axes(Pw, 1)
+                    d = norm(Pw[i, :] .- mu)
+                    if iszero(d)
+                        eta += 1
+                    else
+                        num .+= Pw[i, :] ./ d
+                        den += 1 / d
+                        dir .+= (Pw[i, :] .- mu) ./ d
+                    end
+                end
+                iszero(den) && return mu
+                g = norm(dir)
+                mun = if iszero(eta)
+                    num ./ den
+                else
+                    (if iszero(g)
+                         mu
+                     else
+                         max(0, 1 - eta / g) .* (num ./ den) .+ min(1, eta / g) .* mu
+                     end)
+                end
+                norm(mun .- mu) < tol && return mun
+                mu = mun
+            end
+            return mu
+        end
+        Y = R[1:4, :]
+        Pn = levels(X[1:4, :])                      # the normalised path, last row ones
+        praw = cumprod(X[1:4, :]; dims = 1)         # raw prices from p_0 = 1
+        Praw = vcat(ones(1, N), praw)
+        xs = xhat(SpatialMedian(), Y)
+        @test isapprox(xs, l1median(Pn); atol = 1e-8)
+        @test maxerr(xs, l1median(Praw) ./ Praw[end, :]) > 1e-6
+        S = [100.0, 1, 1, 1]
+        @test maxerr(xs, l1median(Praw .* S') ./ (Praw[end, :] .* S)) > 1e-3
+        # The iteration runs to its minimiser: the optimality residual is at machine precision,
+        # where the paper's stop — a relative L1 change of 1e-3 — leaves it far from zero.
+        resid(mu) = norm(sum((Pn[i, :] .- mu) ./ norm(Pn[i, :] .- mu) for i in axes(Pn, 1)))
+        mlib = po.spatial_median(Pn, 100, 1e-8)
+        @test resid(mlib) < 1e-6
+        mu = vec(median(Pn; dims = 1))
+        mpaper = mu
+        for _ in 2:200
+            # One Weiszfeld step from `mu`, then the paper's stop.
+            num = zeros(N)
+            den = 0.0
+            for i in axes(Pn, 1)
+                d = norm(Pn[i, :] .- mu)
+                iszero(d) && continue
+                num .+= Pn[i, :] ./ d
+                den += 1 / d
+            end
+            mun = num ./ den
+            mpaper = mun
+            norm(mu .- mun, 1) <= 1e-3 * norm(mun, 1) && break
+            mu = mun
+        end
+        @test resid(mpaper) > 1e-4 && maxerr(mpaper, mlib) > 1e-5
+        # The moving-average reversion admits the two-level window and a threshold at or
+        # below one, which the paper's algorithm excludes and the step is defined for.
+        @test MovingAverageReversion(; window = 2, eps = 1).me.alg.window == 2
+        @test_throws DomainError MovingAverageReversion(; window = 1)
+        # The local adaptive learning takes the solution of the paper's programme, the
+        # squared norm in the step length, not the printed one.
+        w = fill(1 / N, N)
+        set = po.resolve_allocation_set(BoundedAllocationSet(), N, false, Float64)
+        load = LocalAdaptiveLearning(; eps = 1.05)
+        xl = 1 .+ vec(mean(load.me, R[1:5, :]))
+        dev = xl .- mean(xl)
+        _, wl = po.online_update!(load, nothing, w, X[5, :], R[1:5, :], set)
+        @test wl ≈
+              po.project_simplex(w .+ max(0, (1.05 - dot(w, xl)) / sum(abs2, dev)) .* dev)
+        @test !(wl ≈
+                po.project_simplex(w .+ max(0, (1.05 - dot(w, xl)) / norm(dev)) .* dev))
+        # The sparse portfolio stops at the paper's tolerance on the budget residual, which the
+        # iteration meets at a zero crossing of the residual long before its iterate settles:
+        # the library's answer is the projection of that early iterate, which is still tenths
+        # away from the iterate `iters` steps later. The iteration is written out here.
+        w4 = [0.4, 0.3, 0.2, 0.1]
+        xw = xhat(WindowPeak(), R[7:11, :])
+        phi = -1.1 .* log.(xw) .- 1
+        a = 0.5 / 0.01
+        b = copy(w4)
+        g = copy(w4)
+        rho = 0.0
+        bstop = nothing
+        kstop = 0
+        for o in 1:10_000
+            rhs = a .* g .+ (0.005 - rho) .- phi
+            b = rhs ./ a .- 0.005 * sum(rhs) / (a * (a + 0.005 * N))
+            g = sign.(b) .* max.(abs.(b) .- 0.01, 0)
+            res = sum(b) - 1
+            rho += 0.005 * res
+            if isnothing(bstop) && abs(res) < 1e-4
+                bstop = copy(b)
+                kstop = o
+            end
+        end
+        _, wsp = po.online_update!(ShortTermSparsePortfolio(), nothing, w4, X[11, :],
+                                   R[7:11, :], set)
+        @test wsp == po.project_simplex(500 .* bstop)
+        @test kstop < 1000 && maxerr(bstop, b) > 0.5
+    end
+
     @testset "Show and the search seam" begin
         @test occursin("ForecastReversion",
                        sprint(show, MIME("text/plain"), MovingAverageReversion()))
