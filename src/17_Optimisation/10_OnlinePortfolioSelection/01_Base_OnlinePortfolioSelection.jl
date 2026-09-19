@@ -9,7 +9,7 @@ A rule is the one thing that varies across the online portfolio selection family
 
 In order to implement a new rule, subtype `AbstractOnlinePortfolioSelectionAlgorithm` with the paper's parameters and a `proj` slot as part of the struct, and implement the following methods:
 
-  - `online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet) -> Tuple`: The Online Update: from the rule's carrier `st`, the allocation `w` held during the period, the finite price relative `x` of the period and the rows the head holds through it, answer `(st', w')`, the carrier and the allocation for the next period. `st` is written in place where the rule can, and `w'` is always a new vector.
+  - `online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet) -> Tuple`: The Online Update: from the rule's carrier `st`, the allocation `w` held during the period, the finite price relative `x` of the period and the rows the head holds through it, answer `(st', w')`, the carrier and the allocation for the next period. `st` is written in place where the rule can, and `w'` is always a new vector. A first-order rule also implements the seven-argument form, whose last argument is the Gradient Point an [`ExpertMixture`](@ref) hands it; the generic method drops the point.
   - `rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector)`: The carrier before the first update, or `nothing` for a rule that carries nothing; `w` is the Start Allocation, whose length and element type the carrier takes.
   - `rows_needed(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> Union{Nothing, Integer}`: The number of rows the rule reads at a step: `0` for one that reads none, `nothing` for one that reads every row folded so far.
   - `projection_geometry(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> AbstractProjectionGeometry`: The geometry the head projects the Start Allocation in, the rule's `proj` slot by default.
@@ -546,12 +546,15 @@ function project_simplex(v::AbstractVector)
 end
 """
     online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet)
+    online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet, point::Option{<:AbstractVector})
 
 The Online Update: one row of the online portfolio selection recursion, written once per rule.
 
 Takes the rule, its private carrier `st`, the allocation `w` held during the period, the finite price relative `x` of that period, the rows the head holds through it, and the head's Allocation Set; answers `(st', w')`, the carrier and the allocation for the next period. The carrier is written in place where the rule can, `nothing` is a legal carrier, and `w'` is always a new vector, because the projection allocates one — so a `w` that is a view after [`port_opt_view`](@ref) is never written.
 
 Every rule takes the same two halves — the unconstrained step to a raw vector, then [`project`](@ref) onto the set in the rule's geometry — and a rule that reads `w` continues from whatever it is handed, the Start Allocation on the first row.
+
+The seven-argument form names the **Gradient Point**: an [`ExpertMixture`](@ref) under [`BlendPoint`](@ref) hands every expert its played blend as `point`, and a first-order rule evaluates its gradient there while stepping from its own iterate, the shared gradient the dynamic-regret mixtures are stated on. The generic method drops the point and takes the six-argument update, so a rule that has no gradient ignores it, and a `nothing` point — the mixture under [`OwnPoint`](@ref) — is the six-argument update for every rule; [`MirrorDescent`](@ref), [`OptimisticStep`](@ref) and [`AdaptiveSubgradient`](@ref) read a given point.
 
 # Arguments
 
@@ -561,6 +564,7 @@ Every rule takes the same two halves — the unconstrained step to a raw vector,
   - `x`: The price relative of the period, `1 .+ r`.
   - `rows`: The returns the head holds through the period, or `nothing`.
   - `set`: The Allocation Set, resolved.
+  - `point`: The Gradient Point, the allocation a first-order rule evaluates its gradient at, or `nothing` for its own iterate.
 
 # Returns
 
@@ -571,8 +575,14 @@ Every rule takes the same two halves — the unconstrained step to a raw vector,
   - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
   - [`OnlinePortfolioSelection`](@ref)
   - [`project`](@ref)
+  - [`ExpertMixture`](@ref)
 """
 function online_update! end
+function online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st,
+                        w::AbstractVector, x::AbstractVector, rows,
+                        set::AbstractAllocationSet, ::Option{<:AbstractVector})
+    return online_update!(alg, st, w, x, rows, set)
+end
 """
     rule_state_seed(::AbstractOnlinePortfolioSelectionAlgorithm, ::AbstractVector)
 

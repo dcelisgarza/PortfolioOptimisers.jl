@@ -302,6 +302,7 @@ commit = "8610300"
 "src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { lines = 139, misses = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { lines = 193, misses = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { lines = 127, misses = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { lines = 29, misses = 0 }
 "src/18_ExpectedReturns.jl" = { lines = 148, misses = 0 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { lines = 134, misses = 0 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { lines = 222, misses = 0 }

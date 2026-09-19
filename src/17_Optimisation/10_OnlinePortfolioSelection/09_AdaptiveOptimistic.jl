@@ -270,7 +270,14 @@ end
 function online_update!(alg::AdaptiveSubgradient, st::AdaptiveSubgradientState,
                         w::AbstractVector, x::AbstractVector, rows,
                         set::AbstractAllocationSet)
-    g = loss_gradient(alg.obj, w, x, rows)
+    return online_update!(alg, st, w, x, rows, set, w)
+end
+# The seven-argument form is the primitive: the gradient is read at `point`, the played
+# allocation on the head and the mixture's played blend under `BlendPoint`.
+function online_update!(alg::AdaptiveSubgradient, st::AdaptiveSubgradientState,
+                        w::AbstractVector, x::AbstractVector, rows,
+                        set::AbstractAllocationSet, point::AbstractVector)
+    g = loss_gradient(alg.obj, point, x, rows)
     wh = price_adjusted_allocation(w, x)
     if all(iszero, g)
         # A zero gradient is a zero step, and no mass accrues: the norm is undefined, so
@@ -803,6 +810,14 @@ function half_step(alg::MirrorDescent, set::AbstractAllocationSet, u::AbstractVe
 end
 function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::AbstractVector,
                         x::AbstractVector, rows, set::AbstractAllocationSet)
+    return online_update!(alg, st, w, x, rows, set, st.u)
+end
+# The seven-argument form is the primitive: the gradient is read at `point`, the unmixed
+# played iterate on the head and the mixture's played blend under `BlendPoint`; the hint is
+# the predictor's and reads the secondary iterate as before.
+function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::AbstractVector,
+                        x::AbstractVector, rows, set::AbstractAllocationSet,
+                        point::AbstractVector)
     md = alg.alg
     t = st.n + 1
     if restart(md.eta, t)
@@ -815,7 +830,7 @@ function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::Abstrac
     eta = learning_rate(md.eta, t, st)
     alpha = mixing_share(md.eta, t, md.alpha)
     xm = iszero(alpha) ? x : (1 - alpha / length(x)) .* x .+ alpha / length(x)
-    g = loss_gradient(md.obj, st.u, xm, rows)
+    g = loss_gradient(md.obj, point, xm, rows)
     wh = price_adjusted_allocation(w, x)
     v = half_step(md, set, st.v, eta .* g, wh)
     ps, m = predict_gradient!(alg.predictor, st.ps, md.obj, g, v, xm, rows, t)

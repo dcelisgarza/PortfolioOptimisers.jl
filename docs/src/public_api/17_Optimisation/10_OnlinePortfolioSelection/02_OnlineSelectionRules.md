@@ -16,6 +16,8 @@ LinearSlack
 QuadraticSlack
 PortfolioOptimisers.passive_aggressive_step
 PassiveAggressiveMeanReversion
+OwnPoint
+BlendPoint
 ExpertMixture
 UniversalPortfolio
 ```

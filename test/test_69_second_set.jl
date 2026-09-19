@@ -357,9 +357,9 @@ end
         ob = po.partial_fit!(OPS(; alg = ExpertMixture(; experts = mix.experts)),
                              rows(rd, 1:T))
         @test isapprox(log(ob.cache.st.p[1] / ob.cache.st.p[3]), G[1] - G[3]; atol = 1e-12)
-        # The prior is the mixture's p.
+        # The prior is the mixture's p0.
         mixp = ExpertMixture(; experts = mix.experts, alg = WeakAggregatingAlgorithm(),
-                             p = [0.5, 0.25, 0.25])
+                             p0 = [0.5, 0.25, 0.25])
         op = po.partial_fit!(OPS(; alg = mixp), rows(rd, 1:T))
         pp = op.cache.st.p
         @test isapprox(log(pp[1] / pp[3]), log(2) + (G[1] - G[3]) / sqrt(T + 1);

@@ -353,9 +353,13 @@ end
                                                  alg = MovingAverageReversion())
         @test_throws DimensionMismatch ExpertMixture(;
                                                      experts = [BuyAndHold(), NewtonStep()],
-                                                     p = [1.0])
+                                                     p0 = [1.0])
         @test_throws DomainError ExpertMixture(; experts = [BuyAndHold(), NewtonStep()],
-                                               p = [0.7, 0.7])
+                                               p0 = [0.7, NaN])
+        # A start over the experts outside the Expert Set is projected onto it at the seed,
+        # in the weighting's geometry, as the head's `w0` is: never refused.
+        mp = ExpertMixture(; experts = [BuyAndHold(), NewtonStep()], p0 = [0.7, 0.7])
+        @test po.rule_state_seed(mp, fill(0.25, 4)).p == [0.5, 0.5]
         @test_throws DimensionMismatch UniversalPortfolio(; N = 3, alpha = [1.0, 1.0])
         # The geometry slot is a bound: a combination no theorem covers fails at
         # construction.

@@ -577,6 +577,52 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+The Gradient Point of an [`ExpertMixture`](@ref) under which every expert evaluates its gradient at its own iterate: the default, and the mixture as every paper before the dynamic-regret ones states it.
+
+# Examples
+
+```jldoctest
+julia> OwnPoint()
+OwnPoint()
+```
+
+# Related
+
+  - [`ExpertMixture`](@ref)
+  - [`BlendPoint`](@ref)
+"""
+struct OwnPoint <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The Gradient Point of an [`ExpertMixture`](@ref) under which every first-order expert evaluates its gradient at the mixture's played blend while stepping from its own iterate: the shared gradient of Zhang, Lu and Zhou (2018, Algorithm 4) and Zhao, Zhang, Zhang and Zhou (2020, Algorithm 2), on which their dynamic-regret bounds are stated, and the point [`Ader`](@ref) and [`Sword`](@ref) construct the mixture on.
+
+The mixture hands the blend through the seven-argument [`online_update!`](@ref); a rule with no gradient takes its six-argument update and ignores the point. The first-order rules that read it are [`MirrorDescent`](@ref), [`OptimisticStep`](@ref), whose hint stays the predictor's, and [`AdaptiveSubgradient`](@ref).
+
+# Examples
+
+```jldoctest
+julia> BlendPoint()
+BlendPoint()
+```
+
+# Related
+
+  - [`ExpertMixture`](@ref)
+  - [`OwnPoint`](@ref)
+  - [`MirrorDescent`](@ref)
+  - [`OptimisticStep`](@ref)
+  - [`AdaptiveSubgradient`](@ref)
+
+# References
+
+  - $(ref_dict[:zhang2018ader])
+  - $(ref_dict[:zhao2020sword])
+"""
+struct BlendPoint <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 The rule over rules: every expert takes its own Online Update, and a weighting that is itself an Online Selection Rule moves the weight vector over the experts on their period returns; the answer is the weighted mix of the experts' next allocations.
 
 # Mathematical definition
@@ -593,7 +639,9 @@ r_{t, k} &= \\langle \\boldsymbol{h}_k(t), \\boldsymbol{x}_t \\rangle\\,,\\quad
 
 Under [`BuyAndHold`](@ref), the default, ``\\boldsymbol{p}_{t+1} \\propto \\boldsymbol{p}_t \\odot \\boldsymbol{r}_t`` is the wealth-weighted mixture every paper writes as `BAH_W`, and the mixture over sampled constant rebalanced portfolios is Cover's universal portfolio ([`UniversalPortfolio`](@ref)). [`ExponentiatedGradient`](@ref) and [`NewtonStep`](@ref) on the slot are the online gradient and online Newton updates over the expert-return vector; the Newton weighting over `K` experts carries a `K × K` Gram, so two thousand sampled experts cost a `2000 × 2000` solve a row.
 
-The weighting's step is projected onto the **Expert Set** on `eset`, the Allocation Set over the `K` experts, in the weighting's own Projection Geometry: `nothing`, the default, is the bare `K`-simplex, a no-op for the multiplicative weightings and the Euclidean scalar root for a Newton weighting; a given [`BoundedAllocationSet`](@ref) broadcasts a scalar bound over the experts and takes one entry per expert from a vector bound, so a cap on `eset` caps the trust in any one expert. The blend ``\\sum_k p_{t+1, k} \\boldsymbol{h}_k(t+1)`` is then projected onto the head's Allocation Set once more, in the mixture's own Euclidean geometry on `proj`, with the mixture's Price-Adjusted Allocation as the reference; on a [`BoundedAllocationSet`](@ref) a blend of bounded allocations is bounded and the projection would be the identity, so [`blend_projection`](@ref) skips it by dispatch and the default configuration solves nothing; on a [`ProgrammeAllocationSet`](@ref) it is the repair a turnover ceiling under a weighting other than buy-and-hold, or a MIP kind, needs, and the mixture pays `K + 1` programmes per period, its experts' and its own, beside the `K × K` Gram of a Newton weighting. The mixture reads nothing of a given Start Allocation: the head holds it for one period and it is replaced by the experts' mix. Each expert's own Rule State starts where its rule starts — a constant rebalanced portfolio at its own `w`, a rule that reads `w` at the Start Allocation — so a sampled expert's wealth is Cover's ``S_t(\\boldsymbol{b})`` from the first row ([`expert_start_allocation`](@ref)).
+The weighting's step is projected onto the **Expert Set** on `eset`, the Allocation Set over the `K` experts, in the weighting's own Projection Geometry: `nothing`, the default, is the bare `K`-simplex, a no-op for the multiplicative weightings and the Euclidean scalar root for a Newton weighting; a given [`BoundedAllocationSet`](@ref) broadcasts a scalar bound over the experts and takes one entry per expert from a vector bound, so a cap on `eset` caps the trust in any one expert. The blend ``\\sum_k p_{t+1, k} \\boldsymbol{h}_k(t+1)`` is then projected onto the head's Allocation Set once more, in the mixture's own Euclidean geometry on `proj`, with the mixture's Price-Adjusted Allocation as the reference; on a [`BoundedAllocationSet`](@ref) a blend of bounded allocations is bounded and the projection would be the identity, so [`blend_projection`](@ref) skips it by dispatch and the default configuration solves nothing; on a [`ProgrammeAllocationSet`](@ref) it is the repair a turnover ceiling under a weighting other than buy-and-hold, or a MIP kind, needs, and the mixture pays `K + 1` programmes per period, its experts' and its own, beside the `K × K` Gram of a Newton weighting. The mixture reads nothing of a given Start Allocation: the head holds it for one period and it is replaced by the experts' mix. Each expert's own Rule State starts where its rule starts — a constant rebalanced portfolio at its own `w`, a rule that reads `w` at the Start Allocation — so a sampled expert's wealth is Cover's ``S_t(\\boldsymbol{b})`` from the first row ([`expert_start_allocation`](@ref)). The weight vector over the experts starts at `p0`, the mixture's own Start Allocation over them, uniform by default, and a given `p0` is projected once onto the Expert Set in the weighting's geometry at the seed, as the head's `w0` is onto the Allocation Set, so a start outside the set is made feasible and never refused.
+
+`grad` is the **Gradient Point**: under [`OwnPoint`](@ref), the default, every expert reads its gradient at its own iterate; under [`BlendPoint`](@ref) every first-order expert reads it at the mixture's played blend ``\\boldsymbol{w}_t`` while stepping from its own iterate, the shared gradient ``\\nabla f_t(\\boldsymbol{w}_t)`` of Zhang, Lu and Zhou (2018) and Zhao, Zhang, Zhang and Zhou (2020), and a rule with no gradient ignores the point. Under the blend point and [`ExponentiatedGradient`](@ref) as the weighting the mixture's weight update is the exponentially weighted forecaster on the linearised loss ``\\langle \\nabla f_t(\\boldsymbol{w}_t), \\boldsymbol{h}_k(t) \\rangle`` exactly, wherever the second projection is the identity, because ``\\langle \\boldsymbol{p}_t, \\boldsymbol{r}_t \\rangle = \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` there: [`Ader`](@ref) and [`Sword`](@ref) construct that mixture over a geometric grid of first-order experts.
 
 The mixture's regret against its best expert is exact for the shipped object wherever the second projection is the identity: ``\\log S_T(\\text{best expert}) - \\log S_T(\\text{mixture}) \\leq \\log K`` for every sequence under the wealth weighting on the bare Expert Set, because the mixture's wealth is the `p_1`-weighted average of the experts' wealths. Where the Expert Set binds or the second projection repairs, the bound is not claimed.
 
@@ -607,22 +655,23 @@ $(DocStringExtensions.FIELDS)
         experts::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm},
         alg::AbstractOnlinePortfolioSelectionAlgorithm = BuyAndHold(),
         eset::Option{<:BoundedAllocationSet} = nothing,
-        p::Option{<:AbstractVector} = nothing,
-        proj::EuclideanProjection = EuclideanProjection()
+        proj::EuclideanProjection = EuclideanProjection(),
+        grad::Union{OwnPoint, BlendPoint} = OwnPoint(),
+        p0::Option{<:AbstractVector} = nothing
     ) -> ExpertMixture
 
-Keywords correspond to the struct's fields. A `nothing` `p` starts the weighting uniform over the experts, and a `nothing` `eset` is the bare simplex over them.
+Keywords correspond to the struct's fields. A `nothing` `p0` starts the weighting uniform over the experts, and a `nothing` `eset` is the bare simplex over them.
 
 ## Validation
 
   - `experts` is non-empty. An `IsEmptyError` is thrown otherwise.
   - `rows_needed(alg) == 0`: the weighting is applied to the expert-return vector, for which no rows are held. An `ArgumentError` is thrown otherwise.
-  - `p`: of length `length(experts)`, non-negative, finite and summing to one, when given.
+  - `p0`: non-empty, finite and of length `length(experts)`, when given; it is projected onto the Expert Set at the seed, so it need not lie in it.
   - `eset`, when given, holds a [`WeightBounds`](@ref) and no `sets`: an expert has no name for a [`WeightBoundsEstimator`](@ref) to resolve over. An `ArgumentError` is thrown otherwise.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, every expert is viewed and the weighting, `eset`, `p` and `proj` are carried unchanged.
+When [`port_opt_view`](@ref) is called on this type, every expert is viewed and the weighting, `eset`, `proj`, `grad` and `p0` are carried unchanged.
 
 # Examples
 
@@ -635,8 +684,9 @@ ExpertMixture
       alg ┼ BuyAndHold
           │   proj ┴ EuclideanProjection()
      eset ┼ nothing
-        p ┼ nothing
-     proj ┴ EuclideanProjection()
+     proj ┼ EuclideanProjection()
+     grad ┼ OwnPoint()
+       p0 ┴ nothing
 ```
 
 # Related
@@ -646,15 +696,22 @@ ExpertMixture
   - [`UniversalPortfolio`](@ref)
   - [`ExpertMixtureState`](@ref)
   - [`BuyAndHold`](@ref)
+  - [`OwnPoint`](@ref)
+  - [`BlendPoint`](@ref)
+  - [`Ader`](@ref)
+  - [`Sword`](@ref)
 
 # References
 
   - $(ref_dict[:lihoi2014])
+  - $(ref_dict[:zhang2018ader])
+  - $(ref_dict[:zhao2020sword])
 """
 struct ExpertMixture{T1 <: AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm},
                      T2 <: AbstractOnlinePortfolioSelectionAlgorithm,
-                     T3 <: Option{<:BoundedAllocationSet}, T4 <: Option{<:AbstractVector},
-                     T5 <: EuclideanProjection} <: AbstractOnlinePortfolioSelectionAlgorithm
+                     T3 <: Option{<:BoundedAllocationSet}, T4 <: EuclideanProjection,
+                     T5 <: Union{OwnPoint, BlendPoint}, T6 <: Option{<:AbstractVector}} <:
+       AbstractOnlinePortfolioSelectionAlgorithm
     """
     The expert rules, one Rule State each.
     """
@@ -668,48 +725,51 @@ struct ExpertMixture{T1 <: AbstractVector{<:AbstractOnlinePortfolioSelectionAlgo
     """
     eset::T3
     """
-    The weight over the experts held during the first period, or `nothing` for uniform.
-    """
-    p::T4
-    """
     The geometry the blend is projected onto the head's Allocation Set in, once more.
     """
-    proj::T5
+    proj::T4
+    """
+    The Gradient Point: where every first-order expert evaluates its gradient.
+    """
+    grad::T5
+    """
+    The Start Allocation over the experts, projected onto the Expert Set at the seed, or `nothing` for uniform.
+    """
+    p0::T6
     function ExpertMixture(experts::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm},
                            alg::AbstractOnlinePortfolioSelectionAlgorithm,
-                           eset::Option{<:BoundedAllocationSet},
-                           p::Option{<:AbstractVector}, proj::EuclideanProjection)
+                           eset::Option{<:BoundedAllocationSet}, proj::EuclideanProjection,
+                           grad::Union{OwnPoint, BlendPoint}, p0::Option{<:AbstractVector})
         @argcheck(!isempty(experts), IsEmptyError("experts cannot be empty"))
         @argcheck(rows_needed(alg) == 0,
                   ArgumentError("the weighting of an ExpertMixture is applied to the expert-return vector, for which no rows are held, so it must read none: `rows_needed(alg)` is $(rows_needed(alg)) for a `$(typeof(alg).name.name)`"))
-        if !isnothing(p)
-            assert_nonempty_nonneg_finite_val(p, :p)
-            @argcheck(length(p) == length(experts),
-                      DimensionMismatch("p ($(length(p))) must have one entry per expert ($(length(experts)))"))
-            @argcheck(isapprox(sum(p), one(eltype(p))), DomainError(p, "p must sum to one"))
+        if !isnothing(p0)
+            assert_nonempty(p0, :p0)
+            assert_finite(p0, :p0)
+            @argcheck(length(p0) == length(experts),
+                      DimensionMismatch("p0 ($(length(p0))) must have one entry per expert ($(length(experts)))"))
         end
         if !isnothing(eset)
             @argcheck(isa(eset.wb, WeightBounds) && isnothing(eset.sets),
                       ArgumentError("the Expert Set is stated over the experts, which have no names: it holds a `WeightBounds` and no `sets`"))
         end
-        return new{typeof(experts), typeof(alg), typeof(eset), typeof(p), typeof(proj)}(experts,
-                                                                                        alg,
-                                                                                        eset,
-                                                                                        p,
-                                                                                        proj)
+        return new{typeof(experts), typeof(alg), typeof(eset), typeof(proj), typeof(grad),
+                   typeof(p0)}(experts, alg, eset, proj, grad, p0)
     end
 end
 function ExpertMixture(;
                        experts::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm},
                        alg::AbstractOnlinePortfolioSelectionAlgorithm = BuyAndHold(),
                        eset::Option{<:BoundedAllocationSet} = nothing,
-                       p::Option{<:AbstractVector} = nothing,
-                       proj::EuclideanProjection = EuclideanProjection())::ExpertMixture
-    return ExpertMixture(experts, alg, eset, p, proj)
+                       proj::EuclideanProjection = EuclideanProjection(),
+                       grad::Union{OwnPoint, BlendPoint} = OwnPoint(),
+                       p0::Option{<:AbstractVector} = nothing)::ExpertMixture
+    return ExpertMixture(experts, alg, eset, proj, grad, p0)
 end
 function port_opt_view(alg::ExpertMixture, i, args...)
     return ExpertMixture(; experts = [port_opt_view(e, i, args...) for e in alg.experts],
-                         alg = alg.alg, eset = alg.eset, p = alg.p, proj = alg.proj)
+                         alg = alg.alg, eset = alg.eset, proj = alg.proj, grad = alg.grad,
+                         p0 = alg.p0)
 end
 function assert_rule_admits_set(alg::ExpertMixture, set::AbstractAllocationSet)::Nothing
     for e in alg.experts
@@ -730,7 +790,14 @@ end
 function rule_state_seed(alg::ExpertMixture, w::AbstractVector)
     K = length(alg.experts)
     h = [expert_start_allocation(e, w) for e in alg.experts]
-    p = isnothing(alg.p) ? fill(one(eltype(w)) / K, K) : copy(alg.p)
+    p = if isnothing(alg.p0)
+        fill(one(eltype(w)) / K, K)
+    else
+        # The start over the experts meets the Expert Set once, in the weighting's geometry,
+        # as the head's `w0` meets the Allocation Set; the set is bounded, so no step is open.
+        project(projection_geometry(alg.alg), expert_allocation_set(alg.eset, K, eltype(w)),
+                alg.p0, alg.p0)
+    end
     return ExpertMixtureState(0, map(k -> rule_state_seed(alg.experts[k], h[k]), 1:K), h,
                               rule_state_seed(alg.alg, p), p)
 end
@@ -755,8 +822,9 @@ end
 function online_update!(alg::ExpertMixture, st::ExpertMixtureState, w::AbstractVector,
                         x::AbstractVector, rows, set::AbstractAllocationSet)
     r = [LinearAlgebra.dot(h, x) for h in st.h]
+    point = gradient_point(alg.grad, w)
     for (k, e) in enumerate(alg.experts)
-        st.st[k], st.h[k] = online_update!(e, st.st[k], st.h[k], x, rows, set)
+        st.st[k], st.h[k] = online_update!(e, st.st[k], st.h[k], x, rows, set, point)
     end
     # The weighting moves on the Expert Set, the bare simplex over the experts by default.
     pst, p = online_update!(alg.alg, st.pst, st.p, r, nothing,
@@ -768,6 +836,23 @@ function online_update!(alg::ExpertMixture, st::ExpertMixtureState, w::AbstractV
     # The blend meets the head's set once more, in the mixture's own geometry.
     wn = blend_projection(alg.proj, set, q, price_adjusted_allocation(w, x))
     return ExpertMixtureState(st.n + 1, st.st, st.h, pst, p), wn
+end
+"""
+    gradient_point(grad::OwnPoint, w::AbstractVector)
+    gradient_point(grad::BlendPoint, w::AbstractVector)
+
+The Gradient Point an [`ExpertMixture`](@ref) hands its experts through the seven-argument [`online_update!`](@ref): `nothing` under [`OwnPoint`](@ref), so every expert takes its own six-argument update, and the mixture's played blend `w` under [`BlendPoint`](@ref).
+
+# Related
+
+  - [`ExpertMixture`](@ref)
+  - [`online_update!`](@ref)
+"""
+function gradient_point(::OwnPoint, ::AbstractVector)
+    return nothing
+end
+function gradient_point(::BlendPoint, w::AbstractVector)
+    return w
 end
 """
     expert_allocation_set(eset::Nothing, K::Integer, datatype::DataType)
@@ -861,5 +946,6 @@ function UniversalPortfolio(; N::Integer, n_experts::Integer = 2000, alpha::Num_
     return ExpertMixture(; experts = experts, alg = alg, eset = eset)
 end
 export BuyAndHold, ConstantRebalancedPortfolio, NewtonStep, NoSlack, LinearSlack,
-       QuadraticSlack, PassiveAggressiveMeanReversion, ExpertMixture, UniversalPortfolio
+       QuadraticSlack, PassiveAggressiveMeanReversion, OwnPoint, BlendPoint, ExpertMixture,
+       UniversalPortfolio
 public AbstractPassiveAggressiveSlack, passive_aggressive_step

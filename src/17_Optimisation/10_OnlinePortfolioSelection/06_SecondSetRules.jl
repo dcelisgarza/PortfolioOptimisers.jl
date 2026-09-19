@@ -804,7 +804,7 @@ $(DocStringExtensions.FIELDS)
 
     WeakAggregatingAlgorithm(; proj::EntropicProjection = EntropicProjection()) -> WeakAggregatingAlgorithm
 
-Keywords correspond to the struct's fields. The prior is the Start Allocation: on an [`ExpertMixture`](@ref), its `p`, uniform by default.
+Keywords correspond to the struct's fields. The prior is the Start Allocation: on an [`ExpertMixture`](@ref), its `p0`, uniform by default.
 
 # Examples
 

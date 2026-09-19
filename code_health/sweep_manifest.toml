@@ -348,7 +348,7 @@
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { map = 10, units = 3, swept = false }
 "src/17_Optimisation/09_OnlineOptimisation.jl" = { map = 10, units = 20, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { map = 10, units = 41, swept = false }
-"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { map = 10, units = 15, swept = false }
+"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { map = 10, units = 18, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { map = 10, units = 20, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { map = 10, units = 32, swept = false }
 "src/18_ExpectedReturns.jl" = { map = 8, units = 25, algorithm = 5, swept = true, bindings = ["ExpectedReturn", "ExpectedReturnRiskRatio", "PerfRM", "PerformanceSummaryResult", "PrRM", "brinson_attribution", "excess_statistics", "expected_ratio", "expected_return", "expected_return", "expected_risk", "expected_risk", "expected_risk", "expected_risk", "expected_risk_ret_ratio", "expected_risk_ret_sric", "expected_sric", "held_path_turnover", "performance_summary", "prrm_prediction_message", "resolve_turnover", "sric_penalty", "summarise_returns", "supports_precomputed_returns", "term_fees"] }
@@ -357,6 +357,7 @@
 "src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { map = 10, units = 26, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { map = 10, units = 29, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { map = 10, units = 19, swept = false }
+"src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { map = 10, units = 5, swept = false }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { map = 8, units = 28, swept = false }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { map = 8, units = 38, swept = false }
 "src/20_AssetSelection.jl" = { map = 8, units = 30, algorithm = 11, swept = true, bindings = ["AbstractRedundancyAlgorithm", "AbstractSelectionRule", "ClusterGroups", "CompleteAssetSelector", "CorrelationComponents", "PairwiseCorrelation", "QuantileRule", "RankRule", "RedundancySelector", "ScoreSelector", "ThresholdRule", "assert_correlation_threshold", "assert_scoreable", "assert_selection_action", "assert_tail_counts", "asset_scores", "correlation_components", "drop_scores", "groups_argbest", "redundancy_keep", "redundancy_keep", "redundancy_keep", "redundancy_keep", "requires_score", "rule_keep", "select_assets", "select_assets", "select_assets", "tail_action_mask", "tail_mask"] }

@@ -799,7 +799,7 @@ Under [`EntropicProjection`](@ref) the step is the multiplicative update ``w_{t+
 
 `alpha` is the uniform mix of Helmbold and co-authors (1998, Theorem 4.2): the update reads the mixed price relatives ``\\tilde{\\boldsymbol{x}}_t = (1 - \\alpha / N) \\boldsymbol{x}_t + (\\alpha / N) \\boldsymbol{1}`` at the unmixed iterate, and the head plays ``\\tilde{\\boldsymbol{w}}_{t+1} = (1 - \\alpha) \\boldsymbol{w}_{t+1} + (\\alpha / N) \\boldsymbol{1}``; the carrier holds the unmixed iterate, so the mix is never inverted, and at `alpha = 0` the carrier is the played allocation and the rule is the plain step. The mix is a convex shift, not a projection, so it is admitted under every geometry; the theorem — ``O(T^{3/4})`` with no lower bound on the price relatives, at ``\\alpha = (N^2 \\log N / (8 T))^{1/4}`` — is the entropic map's, and the doubling trick of Corollary 4.3 sets ``\\alpha`` and ``\\eta`` per stage and takes precedence over this slot. The Start Allocation is played unmixed for the first period, as every rule plays it.
 
-A schedule that names a restart makes the update of that period answer the Start Allocation projected onto the set, held on the carrier, and puts the carrier back at its seed with the period count kept, because the stages are cumulative; the Gradient Transform's averages restart with it. As the weighting of an [`ExpertMixture`](@ref) the rule moves the weight over the experts on their period returns.
+A schedule that names a restart makes the update of that period answer the Start Allocation projected onto the set, held on the carrier, and puts the carrier back at its seed with the period count kept, because the stages are cumulative; the Gradient Transform's averages restart with it. As the weighting of an [`ExpertMixture`](@ref) the rule moves the weight over the experts on their period returns. As an expert of a mixture under [`BlendPoint`](@ref) the rule reads its gradient at the mixture's played blend — the seven-argument [`online_update!`](@ref) hands it the Gradient Point — while stepping from its own iterate, the shared gradient of Zhang, Lu and Zhou (2018) and Zhao, Zhang, Zhang and Zhou (2020); on the head, and under [`OwnPoint`](@ref), the point is the iterate itself.
 
 `obj` is the loss the gradient is taken of: [`LogWealth`](@ref), the period's ``-\\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_t \\rangle`` of every rule above, or a [`RiskLoss`](@ref), a risk measure over the last `window` rows the head holds, whose gradient [`risk_gradient`](@ref) answers at the iterate; the rule's `rows_needed` is the objective's. The uniform mix is read by the log-wealth gradient alone, because a risk measure reads the returns and not the period's relative, and the mix of the played allocation applies under either.
 
@@ -928,6 +928,13 @@ function rows_needed(alg::MirrorDescent)
 end
 function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractVector,
                         x::AbstractVector, rows, set::AbstractAllocationSet)
+    return online_update!(alg, st, w, x, rows, set, st.u)
+end
+# The seven-argument form is the primitive: the gradient is read at `point`, the rule's own
+# unmixed iterate on the head and the mixture's played blend under `BlendPoint`.
+function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractVector,
+                        x::AbstractVector, rows, set::AbstractAllocationSet,
+                        point::AbstractVector)
     t = st.n + 1
     if restart(alg.eta, t)
         # The period count survives the restart: the schedule's stages are cumulative.
@@ -938,7 +945,7 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
     eta = learning_rate(alg.eta, t, st)
     alpha = mixing_share(alg.eta, t, alg.alpha)
     xm = iszero(alpha) ? x : (1 - alpha / length(x)) .* x .+ alpha / length(x)
-    g = loss_gradient(alg.obj, st.u, xm, rows)
+    g = loss_gradient(alg.obj, point, xm, rows)
     q = mirror_step(alg.proj, st.u, eta .* transform_gradient!(alg.grad, st.gs, g))
     u = project(alg.proj, set, q, price_adjusted_allocation(w, x))
     s = schedule_update!(alg.eta, st.s, w, x)

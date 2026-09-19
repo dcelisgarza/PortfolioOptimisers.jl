@@ -172,10 +172,17 @@ iterate, the shared gradient of Zhang, Lu and Zhou (2018, Algorithm 4) and Zhao 
 Allocation over its experts, uniform by default and projected once onto the Expert Set in the
 weighting's geometry, as `w0` is onto the head's set
 ([ADR 0162](0162-an-online-selection-head-buffers-returns-and-starts-from-a-given-allocation-or-a-uniform-one-over-the-pinned-universe.md)).
-`Ader(; …)` and `Sword(; …)` are constructors: a mixture over `MirrorDescent` experts (and, for
-Sword, an `OptimisticStep` expert) at the geometric rate grid `η_i = 2^{i−1} η_min`, under
-`ExponentiatedGradient` as the weighting, `BlendPoint()`, and Ader's `p0 ∝ 1/(i(i+1))`. The
-second meta layer of `Sword_best`, which learns the hint in parallel, is fog.
+`Ader(; …)` and `Sword(; …)` are constructors: a mixture over `MirrorDescent` experts at the
+geometric rate grid `η_i = 2^{i−1} η_min`, under `ExponentiatedGradient` as the weighting,
+`BlendPoint()`, and Ader's `p0 ∝ 1/(i(i+1))`. The point is handed through a seven-argument
+`online_update!` whose generic method drops it, so a rule with no gradient ignores the point and
+the three first-order rules read it. `Sword` is the paper's small-loss form (Theorem 5): its meta
+is the exponentially weighted forecaster on the linearised loss, which the exponentiated-gradient
+weighting over the expert-return vector is exactly wherever the blend's second projection is the
+identity. The gradient-variation form, whose experts take the extra-gradient step *and* whose
+weighting carries the optimistic hint `⟨∇f_t(x̄_{t+1}), x_{t+1,i}⟩` at the experts' next
+allocations — a weighting that reads more than the expert-return vector, so a new weighting seam —
+and the second meta layer of `Sword_best`, which learns the hint in parallel, are fog.
 
 ### A first-order rule runs on log wealth or on a risk loss over its rows
 
