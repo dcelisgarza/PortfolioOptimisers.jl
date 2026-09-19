@@ -1688,3 +1688,4 @@ In order to implement a new programme set, subtype `AbstractProgrammeAllocationS
 abstract type AbstractProgrammeAllocationSet <: AbstractAllocationSet end
 
 export Online
+public AbstractProgrammeAllocationSet, risk_constraint_solver

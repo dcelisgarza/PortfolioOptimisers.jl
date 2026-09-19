@@ -1,7 +1,9 @@
 ```@meta
-Description = "The risk ceiling of a programme Allocation Set has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "The risk ceiling of a programme Allocation Set, public API of PortfolioOptimisers.jl: risk_constraint_solver."
 ```
 
 # The risk ceiling of a programme Allocation Set
 
-The risk ceiling of a programme Allocation Set has no public API in PortfolioOptimisers.jl; see [The risk ceiling of a programme Allocation Set: private API](../../../private_api/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.md) for its private API.
+```@docs
+PortfolioOptimisers.risk_constraint_solver(set::ProgrammeAllocationSet)
+```

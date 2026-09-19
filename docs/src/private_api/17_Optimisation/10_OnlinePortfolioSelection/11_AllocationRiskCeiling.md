@@ -9,7 +9,6 @@ PortfolioOptimisers.assert_risk_ceiling
 PortfolioOptimisers.risk_reads_rows
 PortfolioOptimisers.allocation_set_prior
 PortfolioOptimisers.set_allocation_risk_ceiling!
-PortfolioOptimisers.risk_constraint_solver(set::ProgrammeAllocationSet)
 PortfolioOptimisers.risk_contribution_constraints(r::Variance, set::ProgrammeAllocationSet, pr::AbstractPriorResult)
 PortfolioOptimisers.allocation_risk_ceiling
 ```

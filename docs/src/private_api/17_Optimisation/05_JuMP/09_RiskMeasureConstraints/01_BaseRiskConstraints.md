@@ -9,7 +9,6 @@ AbstractRiskSeriesAlgorithm
 NonFRCJuMPOpt
 RiskConstraintOwner
 RiskBoundOwner
-risk_constraint_solver(opt::JuMPOptimisationEstimator)
 NetReturnsRiskSeries
 DrawdownRiskSeries
 set_risk_constraints!(model::JuMP.Model, r::RiskMeasure, opt::Union{<:JuMPOptimisationEstimator, <:AbstractProgrammeAllocationSet}, pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing; kwargs...)

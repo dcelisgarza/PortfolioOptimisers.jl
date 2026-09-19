@@ -9,6 +9,7 @@ An estimator with no exact incremental fold keeps the observations it has seen i
 ```@docs
 Online
 PortfolioOptimisers.AbstractAllocationSet
+PortfolioOptimisers.AbstractProgrammeAllocationSet
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.SampleBufferState, X::PortfolioOptimisers.MatNum, F::PortfolioOptimisers.Option{<:PortfolioOptimisers.MatNum} = nothing; dims::Int = 1)
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.SampleBufferState, x::PortfolioOptimisers.VecNum, f::PortfolioOptimisers.Option{<:PortfolioOptimisers.VecNum} = nothing)
 PortfolioOptimisers.port_opt_view(x::PortfolioOptimisers.SampleBufferState, i, args...)
