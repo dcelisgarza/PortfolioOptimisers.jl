@@ -79,6 +79,7 @@
                           :AbstractMatrixProcessingEstimator,
                           :AbstractNormCeilingCalibrationAlgorithm,
                           :AbstractOptimisationEstimator, :AbstractAllocationSet,
+                          :AbstractOnlineObjective,
                           :AbstractOnlinePortfolioSelectionAlgorithm,
                           :AbstractOrderedWeightsArrayFunction, :AbstractOrthogonalScaling,
                           :AbstractOrthogonalityMetric, :AbstractPanelField,

@@ -14,4 +14,7 @@ resolve_factor_regression
 supports_precomputed_returns(r::RkRatioRM)
 supports_precomputed_returns(r::MeanReturnRiskRatio)
 adjusted_risk
+finite_difference_gradient
+measure_gradient
+scalariser_gradient_weights
 ```

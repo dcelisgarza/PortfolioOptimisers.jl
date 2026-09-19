@@ -7,7 +7,6 @@ Description = "Online selection rules: mirror descent, its schedules and its gra
 ```@docs
 PortfolioOptimisers.MirrorDescentState
 PortfolioOptimisers.doubling_stage
-PortfolioOptimisers.gradient_state_view
 PortfolioOptimisers.copy_gradient_state
 PortfolioOptimisers.played_allocation
 ```

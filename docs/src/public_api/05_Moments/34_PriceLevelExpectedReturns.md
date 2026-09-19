@@ -17,6 +17,8 @@ ReweightedPriceRelative
 PriceLevelExpectedReturns
 PortfolioOptimisers.PriceLevelForecastState
 PortfolioOptimisers.rows_needed(me::PriceLevelExpectedReturns)
+PortfolioOptimisers.window_rows
+PortfolioOptimisers.folds
 PortfolioOptimisers.price_level_statistic
 PortfolioOptimisers.fold_statistic
 mean(me::PriceLevelExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)

@@ -227,7 +227,7 @@ commit = "6fbaf7f97b"
 "src/16_RiskMeasures/21_MedianAbsoluteDeviationRisk.jl" = { cyc = 3, cog = 2, arg = 4, cyc_sum = 23, cog_sum = 4, arg_sum = 46, macros = ["@propagatable"] }
 "src/16_RiskMeasures/22_NonOptimisationRiskMeasures.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 28, cog_sum = 12, arg_sum = 44, macros = ["@propagatable"] }
 "src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { cyc = 1, cog = 0, arg = 3, cyc_sum = 5, cog_sum = 0, arg_sum = 15, macros = [] }
-"src/16_RiskMeasures/24_ExpectedRisk.jl" = { cyc = 5, cog = 4, arg = 10, cyc_sum = 57, cog_sum = 32, arg_sum = 201, macros = [] }
+"src/16_RiskMeasures/24_ExpectedRisk.jl" = { cyc = 5, cog = 4, arg = 10, cyc_sum = 74, cog_sum = 41, arg_sum = 253, macros = [] }
 "src/16_RiskMeasures/25_RiskMeasureTools.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 22, cog_sum = 2, arg_sum = 33, macros = [] }
 "src/17_Optimisation/01_Base_Optimisation.jl" = { cyc = 9, cog = 10, arg = 7, cyc_sum = 233, cog_sum = 156, arg_sum = 267, macros = [] }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { cyc = 21, cog = 30, arg = 12, cyc_sum = 145, cog_sum = 101, arg_sum = 260, macros = ["@forward_properties"] }
@@ -308,7 +308,7 @@ commit = "6fbaf7f97b"
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { cyc = 4, cog = 4, arg = 15, cyc_sum = 75, cog_sum = 31, arg_sum = 106, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { cyc = 3, cog = 4, arg = 8, cyc_sum = 72, cog_sum = 34, arg_sum = 120, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 55, cog_sum = 24, arg_sum = 109, macros = [] }
-"src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 58, cog_sum = 14, arg_sum = 95, macros = [] }
+"src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 62, cog_sum = 18, arg_sum = 96, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { cyc = 5, cog = 4, arg = 6, cyc_sum = 79, cog_sum = 38, arg_sum = 106, macros = [] }
 "src/18_ExpectedReturns.jl" = { cyc = 6, cog = 10, arg = 9, cyc_sum = 54, cog_sum = 41, arg_sum = 123, macros = ["@propagatable"] }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { cyc = 3, cog = 6, arg = 6, cyc_sum = 60, cog_sum = 18, arg_sum = 72, macros = [] }

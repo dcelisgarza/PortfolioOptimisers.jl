@@ -513,3 +513,117 @@ end
         @test isa(expected_risk(rt, w, pr), Number)
     end
 end
+
+@testset "Value-level multiplicity: risk_gradient is the derivative of the reported figure" begin
+    using PortfolioOptimisers, Test, StableRNGs, LinearAlgebra, Statistics
+
+    #=
+    `risk_gradient` differentiates the figure `expected_risk` reports, with no homogeneity
+    correction, so it is twice the marginal contribution on a `Variance` and equal to it
+    on a degree-one measure. The three closed forms are checked against the shared
+    finite-difference kernel at `delta = 1e-6`, and the vector route against the chain rule
+    through each scalariser written by hand.
+    =#
+
+    po = PortfolioOptimisers
+    rng = StableRNG(1182)
+    X = randn(rng, 120, 5) ./ 100 .+ 0.0004
+    w = [0.3, 0.25, 0.2, 0.15, 0.1]
+    pr = prior(EmpiricalPrior(), X)
+    fd(r; kw...) = po.finite_difference_gradient(v -> expected_risk(r, v, pr; kw...), w,
+                                                 1e-6)
+
+    @testset "the closed forms against the finite difference" begin
+        @test risk_gradient(Variance(), w, pr) == 2 .* (pr.sigma * w)
+        @test isapprox(risk_gradient(Variance(), w, pr), fd(Variance()); atol = 1e-9)
+        @test isapprox(risk_gradient(StandardDeviation(), w, pr),
+                       pr.sigma * w ./ sqrt(dot(w, pr.sigma, w)); atol = 1e-15)
+        @test isapprox(risk_gradient(StandardDeviation(), w, pr), fd(StandardDeviation());
+                       atol = 1e-8)
+        @test isapprox(risk_gradient(MeanReturn(), w, pr), vec(mean(X; dims = 1));
+                       atol = 1e-15)
+        @test isapprox(risk_gradient(MeanReturn(), w, pr), fd(MeanReturn()); atol = 1e-9)
+        # The log flag: the row's weight is divided by `1 + xᵀw`, the log-wealth gradient
+        # averaged over the rows.
+        lg = vec(transpose(X) * (inv(size(X, 1)) ./ (1 .+ X * w)))
+        @test isapprox(risk_gradient(MeanReturn(; flag = true), w, pr), lg; atol = 1e-15)
+        @test isapprox(risk_gradient(MeanReturn(; flag = true), w, pr),
+                       fd(MeanReturn(; flag = true)); atol = 1e-9)
+        # Observation weights normalise to one.
+        ow = StatsBase.pweights(collect(1.0:120.0))
+        @test isapprox(risk_gradient(MeanReturn(; w = ow), w, pr),
+                       vec(transpose(X) * (ow ./ sum(ow))); atol = 1e-15)
+        # A measure with no closed form is the finite difference of its own figure.
+        @test risk_gradient(ConditionalValueatRisk(), w, pr) == fd(ConditionalValueatRisk())
+        # The contribution is the Euler-adjusted figure: half the gradient on a variance,
+        # the gradient itself on a degree-one measure.
+        @test isapprox(risk_contribution(Variance(), w, pr; marginal = true),
+                       risk_gradient(Variance(), w, pr) ./ 2; atol = 1e-9)
+        @test isapprox(risk_contribution(ConditionalValueatRisk(), w, pr; marginal = true),
+                       risk_gradient(ConditionalValueatRisk(), w, pr); atol = 1e-12)
+    end
+
+    @testset "the matrix route and its refusals" begin
+        sigma = cov(X)
+        @test risk_gradient(Variance(; sigma = sigma), w, X) == 2 .* (sigma * w)
+        @test risk_gradient(MeanReturn(), w, X) == risk_gradient(MeanReturn(), w, pr)
+        # At a zero variance the square root has no gradient, so the closed form falls
+        # to the chord, which is the zero vector on a zero covariance.
+        @test risk_gradient(StandardDeviation(; sigma = zeros(5, 5)), w, X) == zeros(5)
+        # A `Variance()` on a bare matrix has no covariance to read, as `expected_risk`
+        # refuses it.
+        @test_throws IsNothingError risk_gradient(Variance(), w, X)
+        # A stated matrix on the measure survives the prior route.
+        @test risk_gradient(Variance(; sigma = sigma), w, pr) == 2 .* (sigma * w)
+        # A fee makes the mean return non-linear, so it takes the difference.
+        fees = Fees(; l = 0.001)
+        @test isapprox(risk_gradient(MeanReturn(), w, X, fees),
+                       po.finite_difference_gradient(v -> expected_risk(MeanReturn(), v, X,
+                                                                        fees), w, 1e-6);
+                       atol = 1e-15)
+    end
+
+    @testset "the chain rule through each scalariser" begin
+        rv = Variance(; settings = RiskMeasureSettings(; scale = 2.0))
+        rm = MeanReturn(; settings = HierarchicalRiskMeasureSettings(; scale = -1.0))
+        rc = ConditionalValueatRisk()
+        gv, gm, gc = risk_gradient(rv, w, pr), risk_gradient(rm, w, pr),
+                     risk_gradient(rc, w, pr)
+        # Sum: each at its scale, so the mean–variance utility is `-μ + 2 · 2Σw`.
+        @test isapprox(risk_gradient([rm, rv], w, pr), -gm .+ 2 .* gv; atol = 1e-15)
+        # Max and min: the winning scaled element's own gradient.
+        vals = [2 * expected_risk(rv, w, pr), -expected_risk(rm, w, pr),
+                expected_risk(rc, w, pr)]
+        gs = [2 .* gv, -gm, gc]
+        @test risk_gradient([rv, rm, rc], w, pr; sca = MaxScalariser()) == gs[argmax(vals)]
+        @test risk_gradient([rv, rm, rc], w, pr; sca = MinScalariser()) == gs[argmin(vals)]
+        # At a tie the earliest wins, which is the kink where the subgradient is a set.
+        @test risk_gradient([Variance(), Variance()], w, pr; sca = MaxScalariser()) ==
+              risk_gradient(Variance(), w, pr)
+        # Log-sum-exp: the softmax of the scaled values.
+        gamma = 50.0
+        p = exp.(gamma .* vals)
+        p ./= sum(p)
+        @test isapprox(risk_gradient([rv, rm, rc], w, pr;
+                                     sca = LogSumExpScalariser(; gamma = gamma)),
+                       sum(p .* gs); atol = 1e-12)
+        # Against the finite difference of the aggregate itself, for every scalariser.
+        for sca in (SumScalariser(), MaxScalariser(), MinScalariser(),
+                    LogSumExpScalariser(; gamma = gamma))
+            @test isapprox(risk_gradient([rv, rm, rc], w, pr; sca = sca),
+                           fd([rv, rm, rc]; sca = sca); atol = 1e-8)
+        end
+    end
+
+    @testset "the prior route reduces to the investable mask" begin
+        Xg = copy(X)
+        Xg[:, 3] .= NaN
+        prg = prior(EmpiricalPrior(), Xg)
+        wg = [0.4, 0.3, 0.0, 0.2, 0.1]
+        g = risk_gradient(Variance(), wg, prg)
+        @test length(g) == 5 && g[3] == 0
+        @test isapprox(g[[1, 2, 4, 5]],
+                       2 .* (prg.sigma[[1, 2, 4, 5], [1, 2, 4, 5]] * wg[[1, 2, 4, 5]]);
+                       atol = 1e-15)
+    end
+end

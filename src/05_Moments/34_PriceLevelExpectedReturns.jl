@@ -946,4 +946,4 @@ end
 export PriceLevelExpectedReturns, MovingAverage, ExponentialMovingAverage, SpatialMedian,
        WindowPeak, LaggedPrice, ReweightedPriceRelative
 public AbstractPriceLevelStatistic, PriceLevelForecastState, price_level_statistic,
-       fold_statistic, rows_needed
+       fold_statistic, rows_needed, window_rows, folds

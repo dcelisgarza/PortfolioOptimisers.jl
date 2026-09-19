@@ -8,9 +8,11 @@ Every literal below states its provenance: the exponentiated-gradient identity i
 `#1161` fixture through the constructor; the `alpha = 0.2` step is ADR 0165's worked
 example; the Euclidean, momentum and scheduled paths are hand recursions of the stated
 formulas; the barrier roots are checked against an independent bisection at `1e-12`; the
-doubling trick's first stage length is Corollary 4.3's `ceil(2 N^2 log N)`.
+doubling trick's first stage length is Corollary 4.3's `ceil(2 N^2 log N)`. The Risk Loss
+(issue #1182) is checked against a hand recursion on the window's sample covariance.
 =#
-using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuMP
+using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, Clarabel,
+      JuMP
 @testset "Online portfolio selection: mirror descent, its geometries and schedules" begin
     po = PortfolioOptimisers
     OPS = po.OnlinePortfolioSelection
@@ -450,5 +452,109 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         r = optimise(OPS(; alg = MirrorDescent(; proj = LogBarrierProjection(), eta = 2),
                          set = tset), rows(rd, 1:5))
         @test isapprox(sum(r.w), 1; atol = 1e-8) && all(r.w .> 0)
+    end
+
+    @testset "The Risk Loss: a risk measure over the head's rows as the objective" begin
+        # The one deliberate widening of `obj`: every earlier fixture in this file runs on
+        # `LogWealth()`, so their agreement above is the proof it left them unchanged.
+        rl = RiskLoss()
+        @test isa(rl.r, Variance) && rl.window == 20 && isa(rl.sca, SumScalariser)
+        @test isa(rl.pe, EmpiricalPrior)
+        @test isa(rl, po.AbstractOnlineObjective) &&
+              isa(LogWealth(), po.AbstractOnlineObjective)
+        @test_throws DomainError RiskLoss(; window = 1)
+        @test_throws TypeError MirrorDescent(; obj = Variance())
+        @test po.rows_needed(MirrorDescent()) == 0
+        @test po.rows_needed(MirrorDescent(; obj = RiskLoss(; window = 7))) == 7
+        @test po.rows_needed(OPS(;
+                                 alg = GradientProjection(; obj = RiskLoss(; window = 7)))) ==
+              7
+        # A first-order rule on a Risk Loss reads rows, so it is refused as a mixture's
+        # weighting, which is applied to the expert-return vector.
+        @test_throws ArgumentError ExpertMixture(; experts = [BuyAndHold(), BuyAndHold()],
+                                                 alg = GradientProjection(;
+                                                                          obj = RiskLoss()))
+
+        # One Euclidean step on `Variance()` over a 20-row window after 20 rows: the
+        # buffer holds rows 2:21 at the update of row 21, so the step is
+        # `Proj_Δ(w − η · 2 Σ w)` with `Σ` the sample covariance of those rows.
+        alg = GradientProjection(; eta = 0.3, obj = RiskLoss(; r = Variance(), window = 20))
+        o = po.partial_fit!(OPS(; alg = alg), rows(rd, 1:20))
+        u20 = copy(o.cache.st.u)
+        o = po.partial_fit!(o, rows(rd, 21:21))
+        Σ = cov(R[2:21, :]; corrected = true)
+        @test o.cache.st.u == po.project_simplex(u20 .- 0.3 .* (2 .* Σ * u20))
+        @test o.cache.n == 21 && o.cache.X.max_history == 20 && o.cache.X.n == 20
+        # One step of a small rate on a convex quadratic lowers it, unless at its minimum.
+        @test dot(o.cache.st.u, Σ, o.cache.st.u) < dot(u20, Σ, u20)
+        # The whole path, by hand: the window grows to 20 and then rolls; the first step
+        # reads no covariance and is the identity on the iterate.
+        function riskpath(proj, step)
+            W = zeros(T, N)
+            W[1, :] .= 1 / N
+            for t in 1:(T - 1)
+                if t < 2
+                    W[t + 1, :] .= W[t, :]
+                else
+                    S = cov(R[max(1, t - 19):t, :]; corrected = true)
+                    W[t + 1, :] .= step(W[t, :], 2 .* S * W[t, :])
+                end
+            end
+            return W
+        end
+        a = libpath(alg)
+        b = riskpath(EuclideanProjection(), (w, g) -> po.project_simplex(w .- 0.3 .* g))
+        @test maxerr(a, b) < 1e-14
+        @test a[2, :] == a[1, :]
+        # The same loss under the entropic map: the multiplicative step on the gradient.
+        c = libpath(ExponentiatedGradient(; eta = 5,
+                                          obj = RiskLoss(; r = Variance(), window = 20)))
+        d = riskpath(EntropicProjection(), (w, g) -> (q = w .* exp.(-5 .* g); q ./ sum(q)))
+        @test maxerr(c, d) < 1e-14
+
+        # A vector under a scale is one step on the mean–variance utility.
+        mv = [MeanReturn(; settings = HierarchicalRiskMeasureSettings(; scale = -1.0)),
+              Variance(; settings = RiskMeasureSettings(; scale = 0.5))]
+        e = libpath(GradientProjection(; eta = 0.3, obj = RiskLoss(; r = mv, window = 20)))
+        f = riskpath(EuclideanProjection(),
+                     (w, g) -> po.project_simplex(w .- 0.3 .* (0.5 .* g)))
+        # `riskpath` hands `2Σw`; the utility's gradient is `-μ + 0.5 · 2Σw`, so add the
+        # mean by hand.
+        W = zeros(T, N)
+        W[1, :] .= 1 / N
+        for t in 1:(T - 1)
+            if t < 2
+                W[t + 1, :] .= W[t, :]
+            else
+                S = cov(R[max(1, t - 19):t, :]; corrected = true)
+                mu = vec(mean(R[max(1, t - 19):t, :]; dims = 1))
+                W[t + 1, :] .= po.project_simplex(W[t, :] .-
+                                                  0.3 .* (-mu .+ 0.5 .* (2 .* S * W[t, :])))
+            end
+        end
+        @test maxerr(e, W) < 1e-14
+        @test maxerr(e, f) > 1e-6
+
+        # A measure with no closed form runs through the finite difference, and a stated
+        # covariance on the measure is kept over the window's.
+        g = libpath(GradientProjection(; eta = 0.3,
+                                       obj = RiskLoss(; r = ConditionalValueatRisk(),
+                                                      window = 10)))
+        @test all(isapprox.(sum(g; dims = 2), 1; atol = 1e-12)) && all(g .>= 0)
+        M = Matrix(1.0I, N, N)
+        h = libpath(GradientProjection(; eta = 0.3,
+                                       obj = RiskLoss(; r = Variance(; sigma = M),
+                                                      window = 5)))
+        # `2 M w = 2 w`, and the projection of `w − 0.6 w = 0.4 w` back onto the simplex
+        # is `w` itself, so the rule never moves.
+        @test maxerr(h, fill(1 / N, T, N)) < 1e-14
+
+        # The batch-online identity holds with a rows buffer: the Causal Pass and the
+        # block steps agree.
+        full = optimise(OPS(; alg = alg), rd).w
+        o = po.partial_fit!(OPS(; alg = alg), rows(rd, 1:13))
+        o = po.partial_fit!(o, rows(rd, 14:40))
+        @test maxerr(full, o.cache.w) < 1e-14
+        @test maxerr(full, optimise(o).w) < 1e-14
     end
 end

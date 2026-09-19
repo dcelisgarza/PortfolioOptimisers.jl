@@ -634,6 +634,7 @@ Where an Expert Mixture's first-order experts evaluate their gradient, held on t
 
 **Risk Loss**
 The objective a first-order Online Selection Rule may step on in place of log wealth, held on its `obj` slot: a risk measure, or a scalarised vector of them, evaluated over the last `window` rows the head holds, whose gradient is read through `risk_gradient` — a closed form where the library states one, the finite-difference kernel otherwise. It makes one step per period toward the measure's minimiser, re-estimated each period; the regret theorems hold for the convex measures alone. ADR 0165.
+The measure is resolved against the prior its `pe` fits on the window at every step, as a Programme Allocation Set resolves its ceiling, so `Variance()` reads the window's covariance and a measure that holds its own matrix keeps it; a prior on one row has no covariance, so the loss is read from the second row and `window` is at least two. `RiskLoss` and `LogWealth` share the unexported supertype `AbstractOnlineObjective`, whose verbs are `loss_gradient` and `rows_needed`.
 *Avoid*: a solved objective, which is a follow-the-leader over a Sample Selector; and a differentiation package, which the library does not take on for per-type work.
 
 **Hindsight Split**

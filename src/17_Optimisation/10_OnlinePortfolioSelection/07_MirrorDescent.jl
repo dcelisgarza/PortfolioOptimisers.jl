@@ -545,6 +545,25 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for the objectives a first-order Online Selection Rule steps on: the loss whose gradient at the iterate the mirror step reads.
+
+# Interfaces
+
+In order to implement a new objective, subtype `AbstractOnlineObjective` and implement:
+
+  - `loss_gradient(obj::AbstractOnlineObjective, u::AbstractVector, x::AbstractVector, rows) -> AbstractVector`: The gradient of the period's loss at the iterate `u`, from the period's price relative `x` and the rows the head holds, `nothing` when the objective reads none.
+  - `rows_needed(obj::AbstractOnlineObjective) -> Union{Nothing, Integer}`: The number of rows the objective reads at a step, `0` for one that reads none, which the rule that holds it answers as its own.
+
+# Related
+
+  - [`LogWealth`](@ref)
+  - [`RiskLoss`](@ref)
+  - [`MirrorDescent`](@ref)
+"""
+abstract type AbstractOnlineObjective <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 The log-wealth objective of a first-order Online Selection Rule: the loss ``-\\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_t \\rangle`` of the period, whose gradient is ``-\\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle``, one row. The default of [`MirrorDescent`](@ref), and every rule of the literature.
 
 # Examples
@@ -556,9 +575,161 @@ LogWealth()
 
 # Related
 
+  - [`AbstractOnlineObjective`](@ref)
+  - [`RiskLoss`](@ref)
   - [`MirrorDescent`](@ref)
 """
-struct LogWealth <: AbstractAlgorithm end
+struct LogWealth <: AbstractOnlineObjective end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The Risk Loss: a risk measure, or a scalarised vector of them, over the last `window` rows the head holds, as the objective of a first-order Online Selection Rule in place of log wealth.
+
+# Mathematical definition
+
+At period ``t`` the loss is ``\\rho_r(\\boldsymbol{w}; \\boldsymbol{X}_t)``, the measure evaluated at the iterate over the window ``\\boldsymbol{X}_t`` of the head's returns — returns, not price relatives, because a risk measure reads returns — and the step reads its gradient ``\\nabla_{\\boldsymbol{w}} \\rho_r(\\boldsymbol{w}_t; \\boldsymbol{X}_t)`` through [`risk_gradient`](@ref): the closed form where the library states one, the finite difference otherwise. The measure is resolved against the prior `pe` fits on the window at every step, so a [`Variance`](@ref) reads the window's covariance and a measure that holds its own matrix keeps it; the rule takes one step per period toward the measure's minimiser, re-estimated each period. A vector of measures is scalarised by `sca` at each element's `settings.scale`, so `[MeanReturn(), Variance()]` with the mean's scale negative is one step on the mean–variance utility.
+
+A prior fitted on one row has no covariance, so the loss is read once the head holds two rows and the step before that is the identity on the iterate. The rows reach the loss through the head's rows buffer, capped at `window`, so the first `window - 1` steps read a shorter window than stated.
+
+The regret theorems of the first-order rules are stated for a convex loss, and hold here for the measures that are convex in the weights: [`Variance`](@ref), [`StandardDeviation`](@ref), [`ConditionalValueatRisk`](@ref), [`EntropicValueatRisk`](@ref), [`WorstRealisation`](@ref), [`Range`](@ref), [`MaximumDrawdown`](@ref), [`AverageDrawdown`](@ref), [`ConditionalDrawdownatRisk`](@ref), [`EntropicDrawdownatRisk`](@ref), the low-order moment measures, and [`MeanReturn`](@ref), which is linear. A quantile measure — [`ValueatRisk`](@ref), [`DrawdownatRisk`](@ref) — a kurtosis, a skewness, or a ratio is not, and on it the step is a heuristic with no bound. A finite-difference gradient at a kink of a convex measure is the chord across it, a subgradient's neighbour, as [`risk_gradient`](@ref) states.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RiskLoss(;
+        r::BaseRM_VecBaseRM = Variance(),
+        window::Integer = 20,
+        sca::Scalariser = SumScalariser(),
+        pe::AbstractPriorEstimator = EmpiricalPrior()
+    ) -> RiskLoss
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `window >= 2`. A `DomainError` is thrown otherwise: a prior fitted on one row has no covariance, so a window of one is never read.
+
+# Examples
+
+```jldoctest
+julia> RiskLoss()
+RiskLoss
+       r ┼ Variance
+         │   settings ┼ RiskMeasureSettings
+         │            │   scale ┼ Float64: 1.0
+         │            │      ub ┼ nothing
+         │            │     rke ┴ Bool: true
+         │      sigma ┼ nothing
+         │       chol ┼ nothing
+         │         rc ┼ nothing
+         │        alg ┴ SquaredSOCRiskExpr()
+  window ┼ Int64: 20
+     sca ┼ SumScalariser()
+      pe ┼ EmpiricalPrior
+         │           ce ┼ PortfolioOptimisersCovariance
+         │              │   ce ┼ Covariance
+         │              │      │    me ┼ SimpleExpectedReturns
+         │              │      │       │   w ┴ nothing
+         │              │      │    ce ┼ GeneralCovariance
+         │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │              │      │       │    w ┴ nothing
+         │              │      │   alg ┼ FullMoment()
+         │              │      │     w ┴ nothing
+         │              │   mp ┼ MatrixProcessing
+         │              │      │     pdm ┼ Posdef
+         │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │              │      │      dn ┼ nothing
+         │              │      │      dt ┼ nothing
+         │              │      │     alg ┼ nothing
+         │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+         │           me ┼ SimpleExpectedReturns
+         │              │   w ┴ nothing
+         │      horizon ┼ nothing
+         │   fill_limit ┴ nothing
+```
+
+# Related
+
+  - [`AbstractOnlineObjective`](@ref)
+  - [`LogWealth`](@ref)
+  - [`MirrorDescent`](@ref)
+  - [`risk_gradient`](@ref)
+  - [`expected_risk`](@ref)
+"""
+struct RiskLoss{T1 <: BaseRM_VecBaseRM, T2 <: Integer, T3 <: Scalariser,
+                T4 <: AbstractPriorEstimator} <: AbstractOnlineObjective
+    """
+    $(field_dict[:r])
+    """
+    r::T1
+    """
+    The number of rows of the head's returns buffer the loss is evaluated over.
+    """
+    window::T2
+    """
+    $(field_dict[:sca])
+    """
+    sca::T3
+    """
+    $(field_dict[:pe])
+    """
+    pe::T4
+    function RiskLoss(r::T1, window::T2, sca::T3,
+                      pe::T4) where {T1 <: BaseRM_VecBaseRM, T2 <: Integer,
+                                     T3 <: Scalariser, T4 <: AbstractPriorEstimator}
+        @argcheck(window >= 2, DomainError(window, "window must be at least 2"))
+        return new{T1, T2, T3, T4}(r, window, sca, pe)
+    end
+end
+function RiskLoss(; r::BaseRM_VecBaseRM = Variance(), window::Integer = 20,
+                  sca::Scalariser = SumScalariser(),
+                  pe::AbstractPriorEstimator = EmpiricalPrior())::RiskLoss
+    return RiskLoss(r, window, sca, pe)
+end
+"""
+    rows_needed(obj::LogWealth)
+    rows_needed(obj::RiskLoss)
+    rows_needed(alg::MirrorDescent)
+
+The rows a first-order rule's objective reads at a step, which the rule answers as its own: none for log wealth, the window of a Risk Loss.
+
+# Related
+
+  - [`AbstractOnlineObjective`](@ref)
+  - [`MirrorDescent`](@ref)
+"""
+function rows_needed(::LogWealth)
+    return 0
+end
+function rows_needed(obj::RiskLoss)
+    return obj.window
+end
+"""
+    loss_gradient(obj::LogWealth, u::AbstractVector, x::AbstractVector, rows)
+    loss_gradient(obj::RiskLoss, u::AbstractVector, x::AbstractVector, rows)
+
+The gradient of the period's loss at the iterate `u`: ``-\\boldsymbol{x} / \\langle \\boldsymbol{u}, \\boldsymbol{x} \\rangle`` for log wealth, from the price relative alone; and [`risk_gradient`](@ref) of the Risk Loss's measure at `u`, resolved against its prior fitted on `rows`, or the zero vector while the head holds fewer than two rows.
+
+# Related
+
+  - [`AbstractOnlineObjective`](@ref)
+  - [`MirrorDescent`](@ref)
+  - [`risk_gradient`](@ref)
+"""
+function loss_gradient(::LogWealth, u::AbstractVector, x::AbstractVector, ::Any)
+    return -x ./ LinearAlgebra.dot(u, x)
+end
+function loss_gradient(obj::RiskLoss, u::AbstractVector, ::AbstractVector, rows)
+    if isnothing(rows) || size(rows, 1) < 2
+        return zeros(eltype(u), length(u))
+    end
+    pr = prior(obj.pe, rows, nothing, nothing)
+    return risk_gradient(obj.r, u, pr; sca = obj.sca)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -629,6 +800,8 @@ Under [`EntropicProjection`](@ref) the step is the multiplicative update ``w_{t+
 
 A schedule that names a restart makes the update of that period answer the Start Allocation projected onto the set, held on the carrier, and puts the carrier back at its seed with the period count kept, because the stages are cumulative; the Gradient Transform's averages restart with it. As the weighting of an [`ExpertMixture`](@ref) the rule moves the weight over the experts on their period returns.
 
+`obj` is the loss the gradient is taken of: [`LogWealth`](@ref), the period's ``-\\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_t \\rangle`` of every rule above, or a [`RiskLoss`](@ref), a risk measure over the last `window` rows the head holds, whose gradient [`risk_gradient`](@ref) answers at the iterate; the rule's `rows_needed` is the objective's. The uniform mix is read by the log-wealth gradient alone, because a risk measure reads the returns and not the period's relative, and the mix of the played allocation applies under either.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -639,7 +812,7 @@ $(DocStringExtensions.FIELDS)
         eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
         proj::Union{<:EuclideanProjection, <:EntropicProjection, <:TsallisProjection, <:LogBarrierProjection} = EntropicProjection(),
         alpha::Real = 0,
-        obj::LogWealth = LogWealth(),
+        obj::AbstractOnlineObjective = LogWealth(),
         grad::AbstractGradientTransform = PlainGradient()
     ) -> MirrorDescent
 
@@ -684,8 +857,8 @@ MirrorDescent
 struct MirrorDescent{T1 <: Union{<:Real, <:AbstractLearningRateSchedule},
                      T2 <:
                      Union{<:EuclideanProjection, <:EntropicProjection, <:TsallisProjection,
-                           <:LogBarrierProjection}, T3 <: Real, T4 <: LogWealth,
-                     T5 <: AbstractGradientTransform} <:
+                           <:LogBarrierProjection}, T3 <: Real,
+                     T4 <: AbstractOnlineObjective, T5 <: AbstractGradientTransform} <:
        AbstractOnlinePortfolioSelectionAlgorithm
     """
     Learning rate, a number or a Learning-Rate Schedule. Larger reacts faster and is less stable.
@@ -700,7 +873,7 @@ struct MirrorDescent{T1 <: Union{<:Real, <:AbstractLearningRateSchedule},
     """
     alpha::T3
     """
-    The objective the gradient is taken of.
+    The objective the gradient is taken of: log wealth, or a Risk Loss over the head's rows.
     """
     obj::T4
     """
@@ -713,7 +886,7 @@ struct MirrorDescent{T1 <: Union{<:Real, <:AbstractLearningRateSchedule},
                                             T2 <: Union{<:EuclideanProjection,
                                                         <:EntropicProjection, <:TsallisProjection,
                                                         <:LogBarrierProjection}, T3 <: Real,
-                                            T4 <: LogWealth,
+                                            T4 <: AbstractOnlineObjective,
                                             T5 <: AbstractGradientTransform}
         if isa(eta, Real)
             @argcheck(eta > zero(eta), DomainError(eta, "eta must be positive"))
@@ -726,7 +899,7 @@ end
 function MirrorDescent(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
                        proj::Union{<:EuclideanProjection, <:EntropicProjection,
                                    <:TsallisProjection, <:LogBarrierProjection} = EntropicProjection(),
-                       alpha::Real = 0, obj::LogWealth = LogWealth(),
+                       alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(),
                        grad::AbstractGradientTransform = PlainGradient())::MirrorDescent
     return MirrorDescent(eta, proj, alpha, obj, grad)
 end
@@ -749,8 +922,11 @@ function played_allocation(u::AbstractVector, alpha::Real)
     end
     return (1 - alpha) .* u .+ alpha / length(u)
 end
+function rows_needed(alg::MirrorDescent)
+    return rows_needed(alg.obj)
+end
 function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractVector,
-                        x::AbstractVector, ::Any, set::AbstractAllocationSet)
+                        x::AbstractVector, rows, set::AbstractAllocationSet)
     t = st.n + 1
     if restart(alg.eta, t)
         # The period count survives the restart: the schedule's stages are cumulative.
@@ -761,14 +937,14 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
     eta = learning_rate(alg.eta, t, st)
     alpha = mixing_share(alg.eta, t, alg.alpha)
     xm = iszero(alpha) ? x : (1 - alpha / length(x)) .* x .+ alpha / length(x)
-    g = -xm ./ LinearAlgebra.dot(st.u, xm)
+    g = loss_gradient(alg.obj, st.u, xm, rows)
     q = mirror_step(alg.proj, st.u, eta .* transform_gradient!(alg.grad, st.gs, g))
     u = project(alg.proj, set, q, price_adjusted_allocation(w, x))
     s = schedule_update!(alg.eta, st.s, w, x)
     return MirrorDescentState(t, u, st.w0, s, st.gs), played_allocation(u, alpha)
 end
 """
-    ExponentiatedGradient(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::LogWealth = LogWealth(), grad::AbstractGradientTransform = PlainGradient())
+    ExponentiatedGradient(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::AbstractGradientTransform = PlainGradient())
 
 The exponentiated gradient of Helmbold, Schapire, Singer and Warmuth (1998): a [`MirrorDescent`](@ref) rule under [`EntropicProjection`](@ref) (EG).
 
@@ -797,13 +973,13 @@ MirrorDescent
   - $(ref_dict[:helmbold1998])
 """
 function ExponentiatedGradient(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
-                               alpha::Real = 0, obj::LogWealth = LogWealth(),
+                               alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(),
                                grad::AbstractGradientTransform = PlainGradient())::MirrorDescent
     return MirrorDescent(; eta = eta, proj = EntropicProjection(), alpha = alpha, obj = obj,
                          grad = grad)
 end
 """
-    GradientProjection(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::LogWealth = LogWealth(), grad::AbstractGradientTransform = PlainGradient())
+    GradientProjection(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::AbstractGradientTransform = PlainGradient())
 
 The gradient projection of Helmbold, Schapire, Singer and Warmuth (1997), which is Zinkevich's (2003) online gradient descent on the simplex: a [`MirrorDescent`](@ref) rule under [`EuclideanProjection`](@ref) (GP, OGD).
 
@@ -833,7 +1009,7 @@ MirrorDescent
   - $(ref_dict[:zinkevich2003])
 """
 function GradientProjection(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
-                            alpha::Real = 0, obj::LogWealth = LogWealth(),
+                            alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(),
                             grad::AbstractGradientTransform = PlainGradient())::MirrorDescent
     return MirrorDescent(; eta = eta, proj = EuclideanProjection(), alpha = alpha,
                          obj = obj, grad = grad)
@@ -951,6 +1127,7 @@ function EGA(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
                                                                gamma2 = gamma2, eps = eps))
 end
 export MirrorDescent, ExponentiatedGradient, GradientProjection, EGE, EGR, EGA, LogWealth,
-       InverseSquareRootRate, DoublingTrickRate, SelfConfidentRate, PlainGradient,
+       RiskLoss, InverseSquareRootRate, DoublingTrickRate, SelfConfidentRate, PlainGradient,
        GradientMomentum, RootMeanSquareGradient, AdaptiveMomentGradient
-public AbstractGradientTransform, gradient_state_seed, transform_gradient!
+public AbstractGradientTransform, gradient_state_seed, transform_gradient!,
+       gradient_state_view, AbstractOnlineObjective, loss_gradient

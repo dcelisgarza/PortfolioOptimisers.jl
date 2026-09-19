@@ -695,25 +695,209 @@ function risk_contribution(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum_Pr,
     # vector of the full length, so a dead asset reports exactly `0`.
     imsk, X, w, fees = investable_reduction(X, w, fees, strict)
     r, X = resolve_risk_inputs(r, X)
+    rc = finite_difference_gradient(w, delta) do v
+        return adjusted_risk(sca, r, v, X, fees, delta; kwargs...)
+    end
+    if !marginal
+        rc .*= w
+    end
+    return expand_investable_weights(imsk, rc)
+end
+"""
+    finite_difference_gradient(f, w::VecNum, delta::Number)
+
+The two-sided finite difference of a scalar function `f` of the weights at `w`, `(f(w + δ eᵢ) - f(w - δ eᵢ)) / 2δ` per asset, the one kernel [`risk_contribution`](@ref) and the fallback of [`risk_gradient`](@ref) share.
+
+The two differ in what they hand it: the contribution differentiates the homogeneity-adjusted figure, so that Euler's identity recovers the aggregate, and the gradient differentiates the figure itself.
+
+# Related
+
+  - [`risk_contribution`](@ref)
+  - [`risk_gradient`](@ref)
+"""
+function finite_difference_gradient(f, w::VecNum, delta::Number)
     N = length(w)
-    rc = Vector{eltype(w)}(undef, N)
+    g = Vector{eltype(w)}(undef, N)
     ws = Matrix{eltype(w)}(undef, N, 2)
     ws .= w
     id2 = inv(2 * delta)
     for i in eachindex(w)
         ws[i, 1] += delta
         ws[i, 2] -= delta
-        r1 = adjusted_risk(sca, r, view(ws, :, 1), X, fees, delta; kwargs...)
-        r2 = adjusted_risk(sca, r, view(ws, :, 2), X, fees, delta; kwargs...)
-        rci = (r1 - r2) * id2
-        rc[i] = rci
+        g[i] = (f(view(ws, :, 1)) - f(view(ws, :, 2))) * id2
         ws[i, 1] = w[i]
         ws[i, 2] = w[i]
     end
-    if !marginal
-        rc .*= w
+    return g
+end
+"""
+    risk_gradient(
+        r::BaseRM_VecBaseRM,
+        w::VecNum,
+        X::MatNum_Pr,
+        fees::Option{<:Fees} = nothing;
+        delta::Number = 1e-6,
+        sca::Scalariser = SumScalariser(),
+        strict::Bool = false,
+        kwargs...
+    ) -> Vector
+
+The gradient of a risk measure with respect to the weights, ``\\nabla_{\\boldsymbol{w}} \\rho(\\boldsymbol{w})``, one entry per asset: the direction a first-order step moves against.
+
+# Mathematical definition
+
+The gradient is the derivative of the figure [`expected_risk`](@ref) reports, at the weights it is asked at, with no homogeneity correction — the difference from the marginal figure of [`risk_contribution`](@ref), which divides by the measure's degree so that Euler's identity recovers the aggregate. On a [`Variance`](@ref) the two differ by the factor two.
+
+A closed form is stated for three measures and taken exactly:
+
+```math
+\\begin{align}
+\\nabla \\left( \\boldsymbol{w}^\\intercal \\boldsymbol{\\Sigma} \\boldsymbol{w} \\right) &= 2 \\boldsymbol{\\Sigma} \\boldsymbol{w}\\,,\\quad
+\\nabla \\sqrt{\\boldsymbol{w}^\\intercal \\boldsymbol{\\Sigma} \\boldsymbol{w}} = \\frac{\\boldsymbol{\\Sigma} \\boldsymbol{w}}{\\sqrt{\\boldsymbol{w}^\\intercal \\boldsymbol{\\Sigma} \\boldsymbol{w}}}\\,,\\quad
+\\nabla \\sum_t \\omega_t \\, r_t(\\boldsymbol{w}) = \\boldsymbol{X}^\\intercal \\boldsymbol{\\omega}\\,,
+\\end{align}
+```
+
+the last for a [`MeanReturn`](@ref), whose ``\\boldsymbol{\\omega}`` are its observation weights normalised to one, and under its log flag ``r_t = \\log(1 + \\boldsymbol{x}_t^\\intercal \\boldsymbol{w})`` so the row's weight is divided by ``1 + \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}``. Every other measure, and a `MeanReturn` charged fees, takes the two-sided finite difference at step `delta`, `2N` evaluations of the measure. Where the gradient is undefined at the point — a tie inside a `max`, a scenario on a Value-at-Risk atom, a zero variance under the square root — the finite difference answers the chord across the kink, and the closed forms fall back to it at a zero variance.
+
+A vector of measures differentiates the scalarised aggregate by the chain rule through the scalariser, each element's gradient at its own `settings.scale`: the sum of them under [`SumScalariser`](@ref); the winning element's alone under [`MaxScalariser`](@ref) and [`MinScalariser`](@ref), the earliest at a tie, which is the kink where the subgradient is a set; and the softmax-weighted sum under [`LogSumExpScalariser`](@ref), which is smooth everywhere. So an element with a closed form keeps it inside a vector whose other elements are differenced.
+
+# Arguments
+
+  - $(arg_dict[:r])
+  - `w::VecNum`: Portfolio weights vector.
+  - `X::MatNum_Pr`: Asset returns matrix or prior result.
+  - `fees::Option{<:Fees}`: Optional fee structure.
+
+# Keyword Arguments
+
+  - `delta::Number = 1e-6`: Finite difference step size.
+  - `sca::Scalariser = SumScalariser()`: Scalariser combining a vector `r`. Inert on a single measure.
+  - `strict::Bool = false`: Whether a held non-investable asset raises rather than warns. Read only when `X` is a prior result.
+
+# Validation
+
+  - On a bare matrix a Deferred Quantity, or an empty slot the functor reads, is refused by name ([`assert_resolved_slots`](@ref)), as [`expected_risk`](@ref) refuses it.
+
+# Returns
+
+  - `Vector`: The gradient, one entry per asset of the **full** universe; a non-investable asset reports exactly `0`.
+
+# Examples
+
+```jldoctest
+julia> risk_gradient(Variance(; sigma = [0.04 0.02; 0.02 0.16]), [0.5, 0.5], zeros(2, 2))
+2-element Vector{Float64}:
+ 0.06
+ 0.18
+```
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`risk_contribution`](@ref)
+  - [`finite_difference_gradient`](@ref)
+  - [`measure_gradient`](@ref)
+  - [`scalariser_gradient_weights`](@ref)
+"""
+function risk_gradient(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
+                       fees::Option{<:Fees} = nothing; delta::Number = 1e-6, kwargs...)
+    assert_resolved_slots(r)
+    assert_calibrated_slots(r)
+    return measure_gradient(r, w, X, fees; delta = delta, kwargs...)
+end
+function risk_gradient(rs::VecBaseRM, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
+                       delta::Number = 1e-6, sca::Scalariser = SumScalariser(), kwargs...)
+    vals = map(r -> expected_risk(r, w, X, fees; kwargs...) * r.settings.scale, rs)
+    ps = scalariser_gradient_weights(sca, vals)
+    g = zeros(eltype(w), length(w))
+    for (p, r) in zip(ps, rs)
+        if iszero(p)
+            continue
+        end
+        g .+= (p * r.settings.scale) .*
+              risk_gradient(r, w, X, fees; delta = delta, kwargs...)
     end
-    return expand_investable_weights(imsk, rc)
+    return g
+end
+# The prior route: reduce to the Investable Mask once, resolve the measure once, and expand
+# the answer back to the full universe, exactly as `risk_contribution` does.
+function risk_gradient(r::BaseRM_VecBaseRM, w::VecNum, pr::Pr_RR,
+                       fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
+    imsk, pr, w, fees = investable_reduction(pr, w, fees, strict)
+    r, X = resolve_risk_inputs(r, pr)
+    return expand_investable_weights(imsk, risk_gradient(r, w, X, fees; kwargs...))
+end
+"""
+    measure_gradient(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum, fees::Option{<:Fees}; delta::Number, kwargs...)
+    measure_gradient(r::Variance, w::VecNum, X::MatNum, fees::Option{<:Fees}; kwargs...)
+    measure_gradient(r::StandardDeviation, w::VecNum, X::MatNum, fees::Option{<:Fees}; kwargs...)
+    measure_gradient(r::MeanReturn, w::VecNum, X::MatNum, fees::Nothing; kwargs...)
+
+The gradient of one resolved measure on a bare matrix: the finite difference of [`expected_risk`](@ref) for any measure, and the closed form of [`risk_gradient`](@ref) for the three that state one. A `MeanReturn` charged fees falls to the difference, because the fee is not linear in the weights.
+
+# Related
+
+  - [`risk_gradient`](@ref)
+  - [`finite_difference_gradient`](@ref)
+"""
+function measure_gradient(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
+                          fees::Option{<:Fees}; delta::Number, kwargs...)
+    return finite_difference_gradient(w, delta) do v
+        return expected_risk(r, v, X, fees; kwargs...)
+    end
+end
+function measure_gradient(r::Variance, w::VecNum, ::MatNum, ::Option{<:Fees}; kwargs...)
+    return 2 .* (r.sigma * w)
+end
+function measure_gradient(r::StandardDeviation, w::VecNum, X::MatNum, fees::Option{<:Fees};
+                          delta::Number, kwargs...)
+    s = sqrt(LinearAlgebra.dot(w, r.sigma, w))
+    if iszero(s)
+        return finite_difference_gradient(w, delta) do v
+            return expected_risk(r, v, X, fees; kwargs...)
+        end
+    end
+    return (r.sigma * w) ./ s
+end
+function measure_gradient(r::MeanReturn, w::VecNum, X::MatNum, ::Nothing; kwargs...)
+    x = X * w
+    ow = get_observation_weights(r.w, x)
+    omega = isnothing(ow) ? fill(inv(length(x)), length(x)) : ow ./ sum(ow)
+    if r.flag
+        omega = omega ./ (one(eltype(x)) .+ x)
+    end
+    return transpose(X) * omega
+end
+"""
+    scalariser_gradient_weights(sca::SumScalariser, vals::VecNum)
+    scalariser_gradient_weights(sca::MaxScalariser, vals::VecNum)
+    scalariser_gradient_weights(sca::MinScalariser, vals::VecNum)
+    scalariser_gradient_weights(sca::LogSumExpScalariser, vals::VecNum)
+
+The chain-rule weight of each scaled element in the gradient of the scalarised aggregate, from the elements' scaled values: all ones, a one-hot at the earliest maximum, a one-hot at the earliest minimum, and the softmax of `gamma * vals`.
+
+# Related
+
+  - [`risk_gradient`](@ref)
+  - [`Scalariser`](@ref)
+"""
+function scalariser_gradient_weights(::SumScalariser, vals::VecNum)
+    return ones(eltype(vals), length(vals))
+end
+function scalariser_gradient_weights(::MaxScalariser, vals::VecNum)
+    p = zeros(eltype(vals), length(vals))
+    p[argmax(vals)] = one(eltype(vals))
+    return p
+end
+function scalariser_gradient_weights(::MinScalariser, vals::VecNum)
+    p = zeros(eltype(vals), length(vals))
+    p[argmin(vals)] = one(eltype(vals))
+    return p
+end
+function scalariser_gradient_weights(sca::LogSumExpScalariser, vals::VecNum)
+    p = exp.(sca.gamma .* (vals .- maximum(vals)))
+    return p ./ sum(p)
 end
 """
     factor_risk_contribution(
@@ -972,5 +1156,5 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, ret::VecVecNum, window::Int
     return [rolling_window_measure(r, reti, window; kwargs...) for reti in ret]
 end
 
-export RiskRatio, number_effective_assets, risk_contribution, factor_risk_contribution,
-       rolling_window_measure
+export RiskRatio, number_effective_assets, risk_contribution, risk_gradient,
+       factor_risk_contribution, rolling_window_measure
