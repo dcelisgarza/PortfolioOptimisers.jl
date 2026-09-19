@@ -184,9 +184,12 @@ The Capability Catalogue extracts the **first sentence only** of the summary par
 
 A docstring documents the released unit, not the discussion that produced it. **It never names a GitHub issue, a pull request, an ADR, or an unpublished numerical experiment**, in any section, including an admonition (`!!! note`, `!!! warning`) — an admonition renders on the API page exactly like the paragraph beside it, so it is not an exception.
 
+The rule's Scope is every page a library user reaches without opening `docs/adr/`, not `src/**/*.jl`, `ext/**/*.jl` and `docs/**/*.md` alone: the same clause governs the `Prose` text in [`docs/capability_catalogue.jl`](../../docs/capability_catalogue.jl), and the rendered prose and admonitions of the Literate sources that build the example and user-guide pages, `examples/**/*.jl` and `user_guide/*.jl`. ADRs are written for a contributor deciding what to build next, not for someone calling the finished function — an ADR number means nothing to that reader and sends them looking for a file that is not part of the package.
+
 - **State the fact, not its provenance.** Write the rule, the bound, or the defect the way a reader with no repository access needs it — what holds, what fails, and why — instead of pointing at the ticket that established it. `The clamp is a necessary and sufficient condition on the template.` stands on its own; `This closes #494 and #500.` sends the reader to a page the docstring does not need.
-- **A decision belongs in `docs/adr/`.** Link an ADR from another ADR, from `STANDARDS.md`, or from `CONTEXT.md` — never from a docstring.
+- **A decision belongs in `docs/adr/`.** Link an ADR from another ADR, from `STANDARDS.md`, or from `CONTEXT.md` — never from a docstring, an example, a user-guide page or the Capability Catalogue.
 - **`# References` cites only a published external source**, through `ref_dict`. A GitHub issue or pull request is neither published nor external in that sense, and gets no bullet there either.
+- **The contributor guide is the exception.** `docs/src/contribute/` and `docs/adr/` are written for a contributor, not a library user, and may cite an ADR, an issue or a PR freely.
 
 ---
 
