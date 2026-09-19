@@ -359,7 +359,8 @@ end
         @test_throws DimensionMismatch UniversalPortfolio(; N = 3, alpha = [1.0, 1.0])
         # The geometry slot is a bound: a combination no theorem covers fails at
         # construction.
-        @test_throws TypeError ExponentiatedGradient(; proj = EuclideanProjection())
+        # `ExponentiatedGradient` is a constructor of `MirrorDescent` that fills the slot.
+        @test_throws MethodError ExponentiatedGradient(; proj = EuclideanProjection())
         @test_throws TypeError NewtonStep(; proj = EntropicProjection())
         # Under a bound other than the simplex, each geometry is a scalar root: the
         # example of ADR 0159, a raw exponentiated-gradient step under a cap of 0.4.

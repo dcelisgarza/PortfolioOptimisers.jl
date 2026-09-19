@@ -15,7 +15,6 @@ PortfolioOptimisers.confidence_gain
 ConfidenceWeightedMeanReversion
 AntiCorrelation
 ExpectationMaximisation
-PortfolioOptimisers.learning_rates
 AggregatingAlgorithm
 TopK
 WeakAggregatingAlgorithm

@@ -56,9 +56,12 @@ When [`port_opt_view`](@ref) is called on this type, the fields with a per-asset
 ```jldoctest
 julia> OnlinePortfolioSelection()
 OnlinePortfolioSelection
-     alg ┼ ExponentiatedGradient
-         │    eta ┼ Float64: 0.05
-         │   proj ┴ EntropicProjection()
+     alg ┼ MirrorDescent
+         │     eta ┼ Float64: 0.05
+         │    proj ┼ EntropicProjection()
+         │   alpha ┼ Int64: 0
+         │     obj ┼ LogWealth()
+         │    grad ┴ PlainGradient()
      set ┼ BoundedAllocationSet
          │     wb ┼ WeightBounds
          │        │   lb ┼ Float64: 0.0

@@ -311,15 +311,282 @@ function rows_needed(set::ProgrammeAllocationSet)
     return (fitted || !isnothing(set.te)) ? nothing : 0
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The Tsallis Projection Geometry: the raw step is projected onto the Allocation Set in the Bregman divergence of the power potential ``\\Psi_\\alpha(\\boldsymbol{w}) = \\sum_i w_i^\\alpha / (\\alpha (\\alpha - 1))``, ``\\alpha \\in (0, 1)``.
+
+# Mathematical definition
+
+The mirror image of an allocation is ``\\nabla \\Psi_\\alpha(\\boldsymbol{w})_i = w_i^{\\alpha - 1} / (\\alpha - 1)``, so a first-order step of length ``\\eta`` on a gradient ``\\boldsymbol{g}`` and its projection onto the default set are one scalar root,
+
+```math
+\\begin{align}
+w_{t+1, i} &= \\left( w_{t, i}^{\\alpha - 1} + (1 - \\alpha) (\\eta g_i + \\lambda) \\right)^{1 / (\\alpha - 1)}\\,,
+\\end{align}
+```
+
+with ``\\lambda`` the budget multiplier, in which the budget is monotone. On a [`BoundedAllocationSet`](@ref) the bounds are clips of the same root, as the entropic arm's are; on a [`ProgrammeAllocationSet`](@ref) the projection is the programme ``\\min_{\\boldsymbol{w}} \\Psi_\\alpha(\\boldsymbol{w}) - \\langle \\nabla \\Psi_\\alpha(\\boldsymbol{q}), \\boldsymbol{w} \\rangle`` through a power cone on the set's solver. The limit ``\\alpha \\to 1`` is the relative entropy of [`EntropicProjection`](@ref) and ``\\alpha \\to 0`` the log barrier of [`LogBarrierProjection`](@ref); the shipped range is the open interval between them. It is the geometry of the Tsallis-entropy mirror-descent and follow-the-regularised-leader steps of Abernethy, Lee and Tewari (2015) and Zimmert and Seldin (2021), whose regret on the simplex is ``O(\\sqrt{T N / (\\alpha (1 - \\alpha))})`` at the tuned rate. Like the entropic map, it cannot zero a positive entry, a zero entry stays zero, and a negative lower bound is refused, because the potential is undefined below zero.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    TsallisProjection(; alpha::Real = 0.5) -> TsallisProjection
+
+Keywords correspond to the struct's fields. The default is the ``\\alpha = 1/2`` of Zimmert and Seldin (2021).
+
+## Validation
+
+  - `0 < alpha < 1`. A `DomainError` is thrown otherwise.
+
+# Examples
+
+```jldoctest
+julia> TsallisProjection()
+TsallisProjection
+  alpha ┴ Float64: 0.5
+```
+
+# Related
+
+  - [`AbstractProjectionGeometry`](@ref)
+  - [`LogBarrierProjection`](@ref)
+  - [`EntropicProjection`](@ref)
+  - [`MirrorDescent`](@ref)
+  - [`project`](@ref)
+
+# References
+
+  - $(ref_dict[:abernethy2015])
+  - $(ref_dict[:zimmertseldin2021])
+"""
+struct TsallisProjection{T1 <: Real} <: AbstractProjectionGeometry
+    """
+    The power of the potential, in `(0, 1)`.
+    """
+    alpha::T1
+    function TsallisProjection(alpha::Real)
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError(alpha, "alpha must be in (0, 1)"))
+        return new{typeof(alpha)}(alpha)
+    end
+end
+function TsallisProjection(; alpha::Real = 0.5)::TsallisProjection
+    return TsallisProjection(alpha)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The log-barrier Projection Geometry: the raw step is projected onto the Allocation Set in the Bregman divergence of the Burg entropy ``\\Psi(\\boldsymbol{w}) = -\\sum_i \\log w_i``, which is the Itakura–Saito divergence ``\\sum_i \\left( w_i / q_i - 1 - \\log (w_i / q_i) \\right)``.
+
+# Mathematical definition
+
+The mirror image is ``\\nabla \\Psi(\\boldsymbol{w})_i = -1 / w_i``, so a first-order step of length ``\\eta`` on a gradient ``\\boldsymbol{g}`` and its projection onto the default set are one scalar root,
+
+```math
+\\begin{align}
+w_{t+1, i} &= \\frac{1}{1 / w_{t, i} + \\eta g_i + \\lambda}\\,,
+\\end{align}
+```
+
+with ``\\lambda`` the budget multiplier, in which the budget is monotone. On a [`BoundedAllocationSet`](@ref) the bounds are clips of the same root; on a [`ProgrammeAllocationSet`](@ref) the projection is the programme ``\\min_{\\boldsymbol{w}} -\\sum_i \\log w_i + \\sum_i w_i / q_i`` through an exponential cone on the set's solver. It is the geometry Orseau, Lattimore and Legg (2017, §7) name as the mirror-descent alternative to their Soft-Bayes step: the one first-order geometry whose portfolio regret, ``O(\\sqrt{N T \\log (T / N)})``, needs no lower bound on the price relatives, because a weight that has shrunk towards zero moves by its own scale. It cannot zero a positive entry, a zero entry stays zero, and a negative lower bound is refused, because the logarithm is undefined below zero.
+
+# Examples
+
+```jldoctest
+julia> LogBarrierProjection()
+LogBarrierProjection()
+```
+
+# Related
+
+  - [`AbstractProjectionGeometry`](@ref)
+  - [`TsallisProjection`](@ref)
+  - [`EntropicProjection`](@ref)
+  - [`MirrorDescent`](@ref)
+  - [`project`](@ref)
+
+# References
+
+  - $(ref_dict[:orseau2017])
+"""
+struct LogBarrierProjection <: AbstractProjectionGeometry end
+"""
+    mirror_step(proj::EuclideanProjection, u::AbstractVector, s::AbstractVector)
+    mirror_step(proj::EntropicProjection, u::AbstractVector, s::AbstractVector)
+    mirror_step(proj::TsallisProjection, u::AbstractVector, s::AbstractVector)
+    mirror_step(proj::LogBarrierProjection, u::AbstractVector, s::AbstractVector)
+
+The unconstrained mirror step from the iterate `u` along the scaled gradient `s = η g`, in the geometry's potential: the raw step ``\\nabla \\Psi^*(\\nabla \\Psi(\\boldsymbol{u}) - \\boldsymbol{s})`` that [`project`](@ref) then puts onto the Allocation Set.
+
+The Euclidean arm is `u - s`, the entropic `u ⊙ exp(-s)`, the Tsallis ``(u_i^{\\alpha - 1} + (1 - \\alpha) s_i)^{1 / (\\alpha - 1)}`` and the log-barrier ``1 / (1 / u_i + s_i)``. The last two are defined while every base is positive: under the log barrier that is ``\\eta \\hat{w}_{t, i} < 1`` for every asset, with ``\\hat{\\boldsymbol{w}}_t`` the Price-Adjusted Allocation, so it always holds at a rate below one and fails only where one asset carries more than ``1 / \\eta`` of the period's wealth; the Tsallis condition is ``(1 - \\alpha) \\eta \\hat{w}_{t, i} w_{t, i}^{-\\alpha} < 1``. A base at or below zero is a step to an unbounded allocation, and it is refused, not clipped.
+
+# Validation
+
+  - Under [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref): every base is positive. A `DomainError` naming the rate is thrown otherwise.
+
+# Related
+
+  - [`MirrorDescent`](@ref)
+  - [`project`](@ref)
+"""
+function mirror_step(::EuclideanProjection, u::AbstractVector, s::AbstractVector)
+    return u .- s
+end
+function mirror_step(::EntropicProjection, u::AbstractVector, s::AbstractVector)
+    return u .* exp.(-s)
+end
+function mirror_step(proj::TsallisProjection, u::AbstractVector, s::AbstractVector)
+    a = proj.alpha
+    base = u .^ (a - 1) .+ (1 - a) .* s
+    assert_mirror_base(base, s)
+    return base .^ inv(a - 1)
+end
+function mirror_step(::LogBarrierProjection, u::AbstractVector, s::AbstractVector)
+    base = inv.(u) .+ s
+    assert_mirror_base(base, s)
+    return inv.(base)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses a barrier mirror step one of whose bases is not positive, naming the scaled gradient that produced it.
+
+# Related
+
+  - [`mirror_step`](@ref)
+"""
+function assert_mirror_base(base::AbstractVector, s::AbstractVector)::Nothing
+    @argcheck(all(x -> x > zero(x), base),
+              DomainError(s,
+                          "the mirror step leaves the geometry's domain: a base of the barrier potential is not positive, so the unconstrained step is unbounded in some asset. Lower the learning rate; under the log barrier the step exists while `eta * w_i * x_i / <w, x> < 1` for every asset."))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The scalar root of a barrier geometry's projection onto a bounded set: the budget multiplier `μ` at which `Σ_i clip(φ(b_i + μ), lb_i, ub_i)` is one, with `b` the mirror image of the raw step and `φ` the inverse mirror map, read as the upper bound where the base is not positive.
+
+`φ` is decreasing on positive bases and unbounded as the base falls to zero, so the clipped budget is non-increasing and continuous in `μ`: every base at or below zero puts its asset at its cap, every base at infinity — a zero raw entry — at its floor. The bracket is `[-max_i b_i, hi]`, where the lower end caps every finite entry and `hi` is widened by doubling until the budget is at most one, and [`bounded_root`](@ref) bisects it. A set whose floors already sum to one is the point `lb`.
+
+# Arguments
+
+  - `b`: The mirror image of the raw step, `Inf` at a zero entry.
+  - `phi`: The inverse mirror map of a positive base.
+  - `wb`: The resolved bounds.
+
+# Validation
+
+  - `Σ lb ≤ 1 ≤ Σ ub`. An `ArgumentError` is thrown otherwise.
+  - At least one raw entry is positive, and the caps of the positive entries together with the floors of the zero ones reach the budget. A `DomainError` is thrown otherwise: the zeros stay zero under a barrier, and the rest cannot fill the budget.
+
+# Returns
+
+  - `w'::Vector`: The projected allocation.
+
+# Related
+
+  - [`project`](@ref)
+  - [`TsallisProjection`](@ref)
+  - [`LogBarrierProjection`](@ref)
+  - [`bounded_root`](@ref)
+"""
+function barrier_projection(b::AbstractVector, phi, wb::WeightBounds)
+    assert_feasible_bounds(wb)
+    lb, ub = wb.lb, wb.ub
+    if sum(lb) >= one(eltype(lb))
+        return collect(lb)
+    end
+    finite = filter(isfinite, b)
+    @argcheck(!isempty(finite),
+              DomainError(b,
+                          "a barrier projection needs a positive raw entry: a raw step of zeros has no projection, because a zero stays zero under the potential"))
+    clipped = (m, l, u) -> m > zero(m) ? clamp(phi(m), l, u) : u
+    f = mu -> sum(clipped.(b .+ mu, lb, ub))
+    lo = -maximum(finite)
+    @argcheck(f(lo) >= one(lo),
+              DomainError(b,
+                          "the zeros of the raw step stay zero under a barrier potential, and the caps of the remaining assets do not reach the budget"))
+    mu = bounded_root(f, lo, barrier_upper_bracket(f, lo))
+    return clipped.(b .+ mu, lb, ub)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The upper end of a barrier root's bracket: a multiplier above `lo` and above zero at which the clipped budget is at most one, found by doubling.
+
+# Related
+
+  - [`barrier_projection`](@ref)
+"""
+function barrier_upper_bracket(f, lo)
+    hi = max(lo, zero(lo)) + one(lo)
+    while f(hi) > one(hi)
+        hi *= 2
+    end
+    return hi
+end
+"""
+    project(proj::TsallisProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
+    project(proj::LogBarrierProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
+
+The barrier arms of the Constrained Update on the bounded set: the scalar root of [`barrier_projection`](@ref) in the geometry's mirror image, on every bound, the simplex included, because neither potential has a closed form there.
+
+# Validation
+
+  - `all(>= 0, q)` and every entry finite. A `DomainError` is thrown otherwise.
+  - `all(>= 0, lb)` over the resolved bounds. A `DomainError` is thrown otherwise.
+
+# Related
+
+  - [`project`](@ref)
+  - [`barrier_projection`](@ref)
+  - [`TsallisProjection`](@ref)
+  - [`LogBarrierProjection`](@ref)
+"""
+function project(proj::TsallisProjection, set::BoundedAllocationSet, q::AbstractVector,
+                 ::AbstractVector)
+    assert_barrier_raw_step(q, set.wb)
+    a = proj.alpha
+    return barrier_projection(q .^ (a - 1), m -> m^inv(a - 1), set.wb)
+end
+function project(::LogBarrierProjection, set::BoundedAllocationSet, q::AbstractVector,
+                 ::AbstractVector)
+    assert_barrier_raw_step(q, set.wb)
+    return barrier_projection(inv.(q), inv, set.wb)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses, for a barrier geometry, a raw step with a negative or non-finite entry and a bound with a negative floor: the potential is undefined below zero.
+
+# Related
+
+  - [`project`](@ref)
+  - [`TsallisProjection`](@ref)
+  - [`LogBarrierProjection`](@ref)
+"""
+function assert_barrier_raw_step(q::AbstractVector, wb::WeightBounds)::Nothing
+    @argcheck(all(x -> isfinite(x) && x >= zero(x), q),
+              DomainError(q,
+                          "a barrier projection is defined on finite non-negative raw steps alone: the potential is undefined below zero"))
+    @argcheck(all(x -> x >= zero(x), wb.lb),
+              DomainError(wb.lb,
+                          "a barrier projection admits no negative lower bound: the potential is undefined below zero"))
+    return nothing
+end
+"""
     assert_geometry_admits_set(proj::AbstractProjectionGeometry, set::AbstractAllocationSet)
 
-Refuses, where the head's `alg` and `set` meet, a negative lower bound under [`EntropicProjection`](@ref), whose `log w` is undefined below zero.
+Refuses, where the head's `alg` and `set` meet, a negative lower bound under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref), whose potentials are undefined below zero.
 
 The refusal is at construction when the bound is a value; a bound resolved from an estimator is refused at the projection. Any other geometry admits a negative bound, so a long-short reversion costs nothing.
 
 # Validation
 
-  - Under [`EntropicProjection`](@ref) with a [`WeightBounds`](@ref) whose `lb` is a number or a vector: `all(>= 0, lb)`. A `DomainError` is thrown otherwise.
+  - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) or [`LogBarrierProjection`](@ref) with a [`WeightBounds`](@ref) whose `lb` is a number or a vector: `all(>= 0, lb)`. A `DomainError` is thrown otherwise.
 
 # Related
 
@@ -331,13 +598,14 @@ function assert_geometry_admits_set(::AbstractProjectionGeometry,
                                     ::AbstractAllocationSet)::Nothing
     return nothing
 end
-function assert_geometry_admits_set(::EntropicProjection,
+function assert_geometry_admits_set(proj::Union{<:EntropicProjection, <:TsallisProjection,
+                                                <:LogBarrierProjection},
                                     set::AbstractAllocationSet)::Nothing
     wb = set.wb
     if isa(wb, WeightBounds) && !isnothing(wb.lb)
         @argcheck(all(x -> x >= zero(x), wb.lb),
                   DomainError(wb.lb,
-                              "the entropic projection admits no negative lower bound: `log w` is undefined below zero. Use a Euclidean rule, or a non-negative bound."))
+                              "a `$(nameof(typeof(proj)))` admits no negative lower bound: its potential is undefined below zero. Use a Euclidean rule, or a non-negative bound."))
     end
     return nothing
 end
@@ -486,14 +754,16 @@ end
     set_projection_objective!(model::JuMP.Model, proj::EuclideanProjection, q::AbstractVector)
     set_projection_objective!(model::JuMP.Model, proj::EntropicProjection, q::AbstractVector)
     set_projection_objective!(model::JuMP.Model, proj::GramProjection, q::AbstractVector)
+    set_projection_objective!(model::JuMP.Model, proj::TsallisProjection, q::AbstractVector)
+    set_projection_objective!(model::JuMP.Model, proj::LogBarrierProjection, q::AbstractVector)
 
-Sets the projection programme's objective in the geometry's divergence from the raw step `q`: the Euclidean distance through a second-order cone, the relative entropy ``\\sum_i w_i \\log (w_i / q_i)`` through a relative-entropy cone over the positive entries of `q` with the zero entries pinned at zero, and the Gram norm ``\\lVert G (\\boldsymbol{w} - \\boldsymbol{q}) \\rVert`` with ``G^\\intercal G = A`` through a second-order cone.
+Sets the projection programme's objective in the geometry's divergence from the raw step `q`: the Euclidean distance through a second-order cone, the relative entropy ``\\sum_i w_i \\log (w_i / q_i)`` through a relative-entropy cone over the positive entries of `q` with the zero entries pinned at zero, the Gram norm ``\\lVert G (\\boldsymbol{w} - \\boldsymbol{q}) \\rVert`` with ``G^\\intercal G = A`` through a second-order cone, the Tsallis divergence ``-\\sum_i w_i^\\alpha / \\alpha + \\sum_i q_i^{\\alpha - 1} w_i`` through one power cone per positive entry, and the Itakura–Saito divergence ``-\\sum_i \\log w_i + \\sum_i w_i / q_i`` through one exponential cone per positive entry; under both barriers a zero entry of `q` is pinned at zero, as under the entropic arm.
 
-The Euclidean and Gram arms minimise the norm rather than its square, which has the same minimiser and keeps the programme conic on every solver.
+The Euclidean and Gram arms minimise the norm rather than its square, which has the same minimiser and keeps the programme conic on every solver. The two barrier arms drop the terms constant in `w`, so their objective value is the divergence up to a constant, with the same minimiser.
 
 # Validation
 
-  - Under [`EntropicProjection`](@ref): `all(>= 0, q)` and `sum(q) > 0`. A `DomainError` is thrown otherwise.
+  - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref): `all(>= 0, q)` and `sum(q) > 0`. A `DomainError` is thrown otherwise.
   - Under [`GramProjection`](@ref): `proj.A` is not `nothing`. An `ArgumentError` is thrown otherwise: the rule binds the matrix.
 
 # Related
@@ -549,6 +819,57 @@ function set_projection_objective!(model::JuMP.Model, proj::GramProjection,
                      [sc * t_proj; sc * (G * (w - q))] in JuMP.SecondOrderCone())
     JuMP.@objective(model, Min, so * t_proj)
     return nothing
+end
+function set_projection_objective!(model::JuMP.Model, proj::TsallisProjection,
+                                   q::AbstractVector)::Nothing
+    pos, w, sc, so = barrier_objective_entries(model, q)
+    a = proj.alpha
+    JuMP.@variable(model, t_proj[1:length(pos)])
+    # `t_i ≤ w_i^α` is the power cone `w_i^α · 1^(1 − α) ≥ |t_i|`.
+    for (i, j) in enumerate(pos)
+        JuMP.@constraint(model, [sc * w[j], sc, sc * t_proj[i]] in JuMP.MOI.PowerCone(a))
+    end
+    obj = LinearAlgebra.dot(so .* q[pos] .^ (a - 1), w[pos]) - (so / a) * sum(t_proj)
+    JuMP.set_objective(model, JuMP.MIN_SENSE, obj)
+    return nothing
+end
+function set_projection_objective!(model::JuMP.Model, ::LogBarrierProjection,
+                                   q::AbstractVector)::Nothing
+    pos, w, sc, so = barrier_objective_entries(model, q)
+    JuMP.@variable(model, t_proj[1:length(pos)])
+    # `t_i ≤ log w_i` is the exponential cone `1 · exp(t_i) ≤ w_i`.
+    for (i, j) in enumerate(pos)
+        JuMP.@constraint(model,
+                         [sc * t_proj[i], sc, sc * w[j]] in JuMP.MOI.ExponentialCone())
+    end
+    obj = LinearAlgebra.dot(so .* inv.(q[pos]), w[pos]) - so * sum(t_proj)
+    JuMP.set_objective(model, JuMP.MIN_SENSE, obj)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The entries a barrier objective is written over: refuses a raw step with a negative entry or none positive, pins every zero entry of `q` at zero, and answers the positive indices with the model's `w` and its two scales.
+
+# Related
+
+  - [`set_projection_objective!`](@ref)
+  - [`TsallisProjection`](@ref)
+  - [`LogBarrierProjection`](@ref)
+"""
+function barrier_objective_entries(model::JuMP.Model, q::AbstractVector)
+    @argcheck(all(x -> x >= zero(x), q),
+              DomainError(q,
+                          "a barrier projection is defined on non-negative raw steps alone: the potential is undefined below zero"))
+    @argcheck(sum(q) > zero(eltype(q)),
+              DomainError(q,
+                          "a barrier projection needs a positive entry: a raw step of zeros has no projection, because a zero stays zero under the potential"))
+    w = get_w(model)
+    sc = get_constraint_scale(model)
+    for i in findall(iszero, q)
+        JuMP.@constraint(model, sc * w[i] == 0)
+    end
+    return findall(x -> x > zero(x), q), w, sc, get_objective_scale(model)
 end
 """
     projection_solver(proj::AbstractProjectionGeometry, set::ProgrammeAllocationSet)
@@ -671,12 +992,14 @@ end
     project(proj::EuclideanProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
     project(proj::EntropicProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
     project(proj::GramProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
+    project(proj::TsallisProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
+    project(proj::LogBarrierProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
 
-The programme arms of the Constrained Update: every pair but the two scalar roots on the bounded set is the bare-model programme of [`projection_programme`](@ref).
+The programme arms of the Constrained Update: every pair but the scalar roots on the bounded set is the bare-model programme of [`projection_programme`](@ref).
 
 # Validation
 
-  - Under [`EntropicProjection`](@ref): `all(>= 0, lb)` over the resolved bounds. A `DomainError` is thrown otherwise.
+  - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref): `all(>= 0, lb)` over the resolved bounds. A `DomainError` is thrown otherwise.
 
 # Related
 
@@ -704,6 +1027,13 @@ function project(proj::GramProjection, set::ProgrammeAllocationSet, q::AbstractV
                  w::AbstractVector)
     return projection_programme(proj, set, q, w)
 end
+function project(proj::Union{<:TsallisProjection, <:LogBarrierProjection},
+                 set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
+    @argcheck(all(x -> x >= zero(x), set.wb.lb),
+              DomainError(set.wb.lb,
+                          "a barrier projection admits no negative lower bound: the potential is undefined below zero"))
+    return projection_programme(proj, set, q, w)
+end
 """
     blend_projection(proj::EuclideanProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
     blend_projection(proj::EuclideanProjection, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector)
@@ -723,5 +1053,5 @@ function blend_projection(proj::EuclideanProjection, set::AbstractAllocationSet,
                           q::AbstractVector, w::AbstractVector)
     return project(proj, set, q, w)
 end
-export ProgrammeAllocationSet
-public set_allocation_set_constraints!
+export ProgrammeAllocationSet, TsallisProjection, LogBarrierProjection
+public set_allocation_set_constraints!, mirror_step

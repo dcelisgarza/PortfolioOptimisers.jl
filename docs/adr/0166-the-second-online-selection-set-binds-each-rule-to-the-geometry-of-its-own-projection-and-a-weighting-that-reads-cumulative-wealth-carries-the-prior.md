@@ -68,15 +68,17 @@ which is ADR 0159's rule; none of the six admits a second geometry, so none is a
   The ticket named the lagged correlation as the carrier; it is recomputed from the rows every
   period, so a carrier would duplicate what the head already holds once. Until `2w` rows are held
   the rule continues from the allocation it is handed.
-- `ExpectationMaximisationState(n, w1)`: the Start Allocation, the prior the online form of
-  Orseau, Lattimore and Legg's Eq. 14 pulls towards whenever the rate falls. The update is
-  written in that form, `w′ = (w ⊙ (1 − η_t + η_t g))·η_{t+1}/η_t + (1 − η_{t+1}/η_t)·w_1`, through
-  `learning_rates(eta, t) -> (η_t, η_{t+1})`, which a number answers as `(eta, eta)` so the pull
-  vanishes and the update is the plain step exactly. A Learning-Rate Schedule of ADR 0165 lands on
-  the `eta` slot by adding a method of `learning_rates`, and the test file proves it with a probe
-  rate type. The bound `eta::Real` is this ticket's; the schedule build widens it. `eta ∈ (0, 1)`
-  is enforced at construction, both papers are cited, and the `O(√(T N log N))` bound with no lower
-  bound on the price relatives is stated as the rule's own.
+- `ExpectationMaximisationState(n, w1, s)`: the Start Allocation, the prior the online form of
+  Orseau, Lattimore and Legg's Eq. 14 pulls towards whenever the rate falls, and the schedule's
+  statistic. The update is written in that form,
+  `w′ = (w ⊙ (1 − η_t + η_t g))·η_{t+1}/η_t + (1 − η_{t+1}/η_t)·w_1`, with `η_t` read through
+  `learning_rate(eta, t, st)` before the row and `η_{t+1}` after it, on the carrier the row's
+  `schedule_update!` wrote — the verbs ADR 0165's schedule build put on the family's base file —
+  so a number answers the same rate twice, the pull vanishes and the update is the plain step
+  exactly, and the test file proves the pull with a probe schedule. `eta` is bound to
+  `Union{Real, <:AbstractLearningRateSchedule}`; a number is enforced in `(0, 1)` at construction,
+  both papers are cited, and the `O(√(T N log N))` bound with no lower bound on the price relatives
+  is stated as the rule's own.
 - `CumulativeWealthState(n, G, p0)`: the cumulative log wealth of every asset — every expert on a
   mixture's slot — and the Start Allocation, shared by `TopK` and `WeakAggregatingAlgorithm`.
   The prior of the weak aggregating step is the Start Allocation the seed receives, which on an
@@ -116,6 +118,6 @@ numbers, so it is a sentence in the docstring and not a second name.
   `test/test_69_second_set.jl`; every rule joins the batch–online identity loop of `test_67`.
 - `CONTEXT.md`'s roster gains `WeakAggregatingAlgorithm` · WAA and the constructor
   `AggregatingExponentialGradient` · WAEG, CAEG.
-- The Learning-Rate Schedule build of ADR 0165 widens `ExpectationMaximisation`'s `eta` bound and
-  adds a `learning_rates` method; nothing else in the rule moves.
+- The Learning-Rate Schedule build of ADR 0165 landed second and wired the slot: the bound, the
+  carrier's `s` field and the restart; nothing else in the rule moved.
 - `SwitchingPortfolio` and `GradientProjection` are built on their own tickets as ADR 0165 rules.

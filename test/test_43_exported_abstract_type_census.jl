@@ -70,6 +70,7 @@
                           :AbstractEstimatorValueAlgorithm,
                           :AbstractExpectedReturnsEstimator, :AbstractExposureEstimator,
                           :AbstractForecastTarget, :AbstractGapReturnAlgorithm,
+                          :AbstractGradientTransform, :AbstractLearningRateSchedule,
                           :AbstractHighOrderPriorEstimator_F,
                           :AbstractLowOrderPriorEstimator_A,
                           :AbstractLowOrderPriorEstimator_AF,

@@ -133,79 +133,6 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The exponentiated gradient of Helmbold, Schapire, Singer and Warmuth (1998): a multiplicative step up the last period's log return, under a relative-entropy penalty against the current allocation (EG).
-
-# Mathematical definition
-
-```math
-\\begin{align}
-w_{t+1, i} &\\propto w_{t, i} \\exp\\left( \\eta \\frac{x_{t, i}}{\\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle} \\right)\\,,
-\\end{align}
-```
-
-normalised to sum to one, which is the entropic projection onto the simplex. It is a momentum rule — it increases the weight of whatever just did well — and its regret is ``O(\\sqrt{T \\log N})`` with ``\\eta`` tuned to the horizon. As the weighting of an [`ExpertMixture`](@ref) it is the online gradient update over the expert-return vector.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    ExponentiatedGradient(; eta::Real = 0.05, proj::EntropicProjection = EntropicProjection()) -> ExponentiatedGradient
-
-Keywords correspond to the struct's fields. The `proj` slot is bound to [`EntropicProjection`](@ref), the geometry of the theorem.
-
-## Validation
-
-  - `eta > 0`. A `DomainError` is thrown otherwise.
-
-# Examples
-
-```jldoctest
-julia> ExponentiatedGradient()
-ExponentiatedGradient
-   eta ┼ Float64: 0.05
-  proj ┴ EntropicProjection()
-```
-
-# Related
-
-  - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
-  - [`OnlinePortfolioSelection`](@ref)
-  - [`EntropicProjection`](@ref)
-
-# References
-
-  - $(ref_dict[:helmbold1998])
-"""
-struct ExponentiatedGradient{T1 <: Real, T2 <: EntropicProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
-    """
-    Learning rate. Larger reacts faster and is less stable.
-    """
-    eta::T1
-    """
-    $(field_dict[:proj])
-    """
-    proj::T2
-    function ExponentiatedGradient(eta::Real, proj::EntropicProjection)
-        @argcheck(eta > zero(eta), DomainError(eta, "eta must be positive"))
-        return new{typeof(eta), typeof(proj)}(eta, proj)
-    end
-end
-function ExponentiatedGradient(; eta::Real = 0.05,
-                               proj::EntropicProjection = EntropicProjection())::ExponentiatedGradient
-    return ExponentiatedGradient(eta, proj)
-end
-function online_update!(alg::ExponentiatedGradient, st, w::AbstractVector,
-                        x::AbstractVector, ::Any, set::AbstractAllocationSet)
-    p = LinearAlgebra.dot(w, x)
-    q = w .* exp.(alg.eta .* x ./ p)
-    return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 The carrier of [`NewtonStep`](@ref): the Gram matrix of the gradients and their weighted sum.
 
 # Fields
@@ -703,7 +630,7 @@ When [`port_opt_view`](@ref) is called on this type, every expert is viewed and 
 julia> ExpertMixture(; experts = [ExponentiatedGradient(), NewtonStep()])
 ExpertMixture
   experts ┼ 2-element Vector{PortfolioOptimisers.AbstractOnlinePortfolioSelectionAlgorithm}
-          │ ExponentiatedGradient ⋯
+          │ MirrorDescent ⋯
           │ NewtonStep ⋯
       alg ┼ BuyAndHold
           │   proj ┴ EuclideanProjection()
@@ -927,7 +854,6 @@ function UniversalPortfolio(; N::Integer, n_experts::Integer = 2000, alpha::Num_
     experts = [ConstantRebalancedPortfolio(; w = B[:, k], proj = proj) for k in 1:n_experts]
     return ExpertMixture(; experts = experts, alg = alg, eset = eset)
 end
-export BuyAndHold, ConstantRebalancedPortfolio, ExponentiatedGradient, NewtonStep, NoSlack,
-       LinearSlack, QuadraticSlack, PassiveAggressiveMeanReversion, ExpertMixture,
-       UniversalPortfolio
+export BuyAndHold, ConstantRebalancedPortfolio, NewtonStep, NoSlack, LinearSlack,
+       QuadraticSlack, PassiveAggressiveMeanReversion, ExpertMixture, UniversalPortfolio
 public AbstractPassiveAggressiveSlack, passive_aggressive_step

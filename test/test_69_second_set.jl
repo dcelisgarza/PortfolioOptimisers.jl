@@ -9,16 +9,13 @@ Parity is measured against each paper's update written out by hand on the fixtur
 step, and every rule takes the batch–online identity through the head at block sizes 10/7/1.
 =#
 
-# A rate that falls with the step, a probe for the online form's fixed-share pull: the
-# schedule slot lands on `learning_rates` and nothing else in the rule changes.
-struct DecayRate <: Real
+# A rate that falls with the step, a probe for the online form's fixed-share pull: a
+# Learning-Rate Schedule on the slot, and nothing else in the rule changes.
+struct DecayRate <: PortfolioOptimisers.AbstractLearningRateSchedule
     eta0::Float64
 end
-Base.zero(::DecayRate) = DecayRate(0.0)
-Base.one(::DecayRate) = DecayRate(1.0)
-Base.:<(a::DecayRate, b::DecayRate) = a.eta0 < b.eta0
-function PortfolioOptimisers.learning_rates(r::DecayRate, t::Integer)
-    return r.eta0 / sqrt(t), r.eta0 / sqrt(t + 1)
+function PortfolioOptimisers.learning_rate(r::DecayRate, t::Integer, ::Any)
+    return r.eta0 / sqrt(t)
 end
 
 @testset "Online portfolio selection: the second set" begin
@@ -238,7 +235,7 @@ end
         end
         # A rate slot answers the same rate at every step, so the pull vanishes; a rate
         # that falls pulls towards the Start Allocation by the online form's fixed share.
-        @test po.learning_rates(0.3, 7) == (0.3, 0.3)
+        @test po.learning_rate(0.3, 7, nothing) == 0.3
         dalg = ExpectationMaximisation(; eta = DecayRate(0.3))
         wd = copy(w0)
         stt = po.rule_state_seed(dalg, w0)

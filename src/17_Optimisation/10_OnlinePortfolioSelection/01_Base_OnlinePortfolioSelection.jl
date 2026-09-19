@@ -964,7 +964,109 @@ function renormalised_view(w::AbstractVector, i)
     v = w[i]
     return v ./ sum(v)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the Learning-Rate Schedules a first-order Online Selection Rule may hold on `eta` in place of a number.
+
+A schedule is read at every update as a function of the period count and of the rule's carrier, so it may follow the count alone, read a running statistic of the run that the carrier keeps for it, or name a stage boundary at which the rule restarts. It owns no state: whatever it accumulates lives on the rule's carrier, seeded by the schedule and written by it after each row.
+
+# Interfaces
+
+In order to implement a new schedule, subtype `AbstractLearningRateSchedule` and implement:
+
+  - `learning_rate(sched::AbstractLearningRateSchedule, t::Integer, st) -> Real`: The rate of the update at period `t`, the `t`-th row the rule has seen; `st` is the rule's carrier, whose `s` field is the schedule's own statistic.
+  - `restart(sched::AbstractLearningRateSchedule, t::Integer) -> Bool`: Whether the update at period `t` closes a stage, at which the rule answers the Start Allocation for period `t + 1` and puts its carrier back at its seed; `false` by default.
+  - `schedule_state_seed(sched::AbstractLearningRateSchedule, w::AbstractVector)`: The statistic the carrier holds for the schedule before the first row, or `nothing`, the default.
+  - `schedule_update!(sched::AbstractLearningRateSchedule, s, w::AbstractVector, x::AbstractVector)`: Writes the row into the statistic `s`, from the allocation `w` played during the period and its price relative `x`; the identity by default.
+  - `mixing_share(sched::AbstractLearningRateSchedule, t::Integer, alpha::Real) -> Real`: The uniform-mix share of the update at period `t`, the rule's own `alpha` by default; a schedule that sets the share from a stage length answers its own.
+
+A number on `eta` is the constant schedule: every verb answers the number, `false`, `nothing`, the identity and `alpha`.
+
+# Related
+
+  - [`MirrorDescent`](@ref)
+  - [`ExpectationMaximisation`](@ref)
+  - [`InverseSquareRootRate`](@ref)
+  - [`DoublingTrickRate`](@ref)
+  - [`SelfConfidentRate`](@ref)
+"""
+abstract type AbstractLearningRateSchedule <: AbstractAlgorithm end
+"""
+    learning_rate(eta::Real, t::Integer, st)
+    learning_rate(sched::AbstractLearningRateSchedule, t::Integer, st)
+
+The step size a first-order rule takes at period `t`: the number itself when `eta` is one, and the schedule's answer otherwise, read from the period count and the rule's carrier.
+
+# Related
+
+  - [`AbstractLearningRateSchedule`](@ref)
+  - [`MirrorDescent`](@ref)
+"""
+function learning_rate(eta::Real, ::Integer, ::Any)
+    return eta
+end
+"""
+    restart(eta::Real, t::Integer)
+    restart(sched::AbstractLearningRateSchedule, t::Integer)
+
+Whether the update at period `t` closes a stage of the schedule, so the rule answers the Start Allocation for period `t + 1` and puts its carrier back at its seed. A number and every schedule without stages answer `false`.
+
+# Related
+
+  - [`AbstractLearningRateSchedule`](@ref)
+  - [`DoublingTrickRate`](@ref)
+"""
+function restart(::Union{<:Real, <:AbstractLearningRateSchedule}, ::Integer)
+    return false
+end
+"""
+    schedule_state_seed(eta::Real, w::AbstractVector)
+    schedule_state_seed(sched::AbstractLearningRateSchedule, w::AbstractVector)
+
+The statistic a rule's carrier holds for its schedule before the first row: `nothing` for a number and for a schedule that reads none.
+
+# Related
+
+  - [`AbstractLearningRateSchedule`](@ref)
+  - [`SelfConfidentRate`](@ref)
+"""
+function schedule_state_seed(::Union{<:Real, <:AbstractLearningRateSchedule},
+                             ::AbstractVector)
+    return nothing
+end
+"""
+    schedule_update!(eta::Real, s, w::AbstractVector, x::AbstractVector)
+    schedule_update!(sched::AbstractLearningRateSchedule, s, w::AbstractVector, x::AbstractVector)
+
+Writes one row into the schedule's statistic `s`, from the allocation `w` played during the period and its price relative `x`, and answers the statistic; the identity for a number and for a schedule that reads none.
+
+# Related
+
+  - [`AbstractLearningRateSchedule`](@ref)
+  - [`SelfConfidentRate`](@ref)
+"""
+function schedule_update!(::Union{<:Real, <:AbstractLearningRateSchedule}, s,
+                          ::AbstractVector, ::AbstractVector)
+    return s
+end
+"""
+    mixing_share(eta::Real, t::Integer, alpha::Real)
+    mixing_share(sched::AbstractLearningRateSchedule, t::Integer, alpha::Real)
+
+The uniform-mix share of the update at period `t`: the rule's own `alpha` under a number and under every schedule that does not set it, and the stage's share under [`DoublingTrickRate`](@ref), whose share is a function of the stage length and takes precedence.
+
+# Related
+
+  - [`AbstractLearningRateSchedule`](@ref)
+  - [`MirrorDescent`](@ref)
+"""
+function mixing_share(::Union{<:Real, <:AbstractLearningRateSchedule}, ::Integer,
+                      alpha::Real)
+    return alpha
+end
 export EuclideanProjection, EntropicProjection, GramProjection, BoundedAllocationSet
 public AbstractOnlinePortfolioSelectionAlgorithm, AbstractProjectionGeometry,
        AbstractAllocationSet, online_update!, rule_state_seed, projection_geometry, project,
-       resolve_allocation_set
+       resolve_allocation_set, AbstractLearningRateSchedule, learning_rate, restart,
+       schedule_state_seed, schedule_update!, mixing_share

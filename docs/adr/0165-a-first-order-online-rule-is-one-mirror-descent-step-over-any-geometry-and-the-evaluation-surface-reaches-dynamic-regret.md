@@ -65,7 +65,10 @@ and the new `TsallisProjection(; alpha)` (the power potential; the root is in th
 multiplier, monotone) and `LogBarrierProjection` (the Burg entropy; `w_i = 1/(1/w_{t,i} + η g_i + λ)`,
 the one geometry with a portfolio theorem that needs no lower bound on `x` in mirror-descent form).
 On a `ProgrammeAllocationSet` a Tsallis or log-barrier step is a Bregman projection solved by the
-set's solver. `ExponentiatedGradient(; eta)` and `GradientProjection(; eta)` are **constructors**
+set's solver, a power cone and an exponential cone. A barrier potential's unconstrained mirror
+step exists only while every base is positive — under the log barrier, while
+`η ŵ_{t,i} < 1` for every asset, which a rate below one guarantees — and a step outside that
+domain is refused by name, not clipped: the raw step a geometry projects is always a point. `ExponentiatedGradient(; eta)` and `GradientProjection(; eta)` are **constructors**
 filling `proj` with the entropic and the Euclidean map, as `UniversalPortfolio` constructs the
 mixture; the struct of the first build becomes a constructor in place, and the roster names keep
 resolving.
@@ -84,7 +87,10 @@ map; the theorem is the entropic one's, and the docstring says so.
 period count the head's Sample Buffer already carries (`rows.n`; the mixture's own count for a
 scheduled weighting) and `st` the rule's carrier, so a schedule may read a running statistic;
 `restart(sched, t)` names a stage boundary, at which the rule puts its allocation back at the head's
-Start Allocation (uniform by default, as the doubling trick's reset is) and its carrier at the seed.
+Start Allocation (uniform by default, as the doubling trick's reset is) and its carrier at the seed
+with the period count kept, because the stages are cumulative and the count is what the next stage
+is found from. The schedule that sets the share answers it through `mixing_share(sched, t, alpha)`,
+which every other schedule and a number pass through.
 A schedule's running statistic lives in the rule's carrier, seeded by the schedule, because the
 carrier is the rule's (ADR 0157). Three schedules ship: `InverseSquareRootRate(; c)`, `c/√t`, the
 anytime rule of Zinkevich (2003, Theorem 1) and Hazan (2016, Theorem 3.1) and, at the paper's
@@ -101,6 +107,22 @@ the ratio is one and the pull vanishes, so the shipped step is unchanged; under 
 schedule the fixed-share pull toward the Start Allocation is what makes the bound telescope, which
 the plain step with a varying rate does not. The rule cites both papers and carries the
 `O(√(T N log N))` guarantee as its own.
+
+The momentum variants of the exponentiated gradient (Li, Zheng, Chen, Wang and Xu 2022) are a
+`grad` slot on `MirrorDescent`, bound to `AbstractGradientTransform`: the identity by default, an
+exponential moving average of the gradient, a root-mean-square rescaling, or both without bias
+correction, each keeping its averages on the Rule State and stacking with any geometry and any
+schedule; `EGE`, `EGR` and `EGA` are constructors of the entropic rule under each. At the paper's
+own `γ₂ = 0` the root-mean-square rescaling is the sign of the gradient, the same at every asset,
+so the rule holds its start; the docstring says so.
+
+`MirrorDescent`, the three schedules and the transforms live in a file of their own after the
+family's rules, forecast arm and second set, because the first-set file would cross the size
+ceiling with them; the schedule supertype and its five verbs — `learning_rate`, `restart`,
+`schedule_state_seed`, `schedule_update!`, `mixing_share` — live in the family's base file,
+because two rules in two files bind their `eta` slot to it and a field bound must load first; the
+geometries live in the Constrained Update seam's file, their scalar roots beside their
+programmes.
 
 ### AdaGrad is a leaf rule with a diagonal carrier and a diagonal geometry
 

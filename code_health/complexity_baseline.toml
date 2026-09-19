@@ -308,6 +308,7 @@ commit = "6fbaf7f97b"
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { cyc = 4, cog = 4, arg = 15, cyc_sum = 58, cog_sum = 24, arg_sum = 72, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { cyc = 3, cog = 4, arg = 8, cyc_sum = 72, cog_sum = 34, arg_sum = 120, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 55, cog_sum = 24, arg_sum = 109, macros = [] }
+"src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 58, cog_sum = 14, arg_sum = 95, macros = [] }
 "src/18_ExpectedReturns.jl" = { cyc = 6, cog = 10, arg = 9, cyc_sum = 54, cog_sum = 41, arg_sum = 123, macros = ["@propagatable"] }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { cyc = 3, cog = 6, arg = 6, cyc_sum = 60, cog_sum = 18, arg_sum = 72, macros = [] }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { cyc = 4, cog = 5, arg = 9, cyc_sum = 85, cog_sum = 29, arg_sum = 177, macros = [] }

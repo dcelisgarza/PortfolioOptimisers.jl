@@ -479,27 +479,19 @@ $(DocStringExtensions.FIELDS)
     The Start Allocation ``\\boldsymbol{w}_1``, the prior of the online form.
     """
     w1
+    """
+    The Learning-Rate Schedule's statistic, or `nothing`.
+    """
+    s
 end
 function merge_states(::ExpectationMaximisationState, ::ExpectationMaximisationState)
     return throw(ArgumentError("an `ExpectationMaximisationState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the carrier follows it."))
 end
 function Base.copy(x::ExpectationMaximisationState)
-    return ExpectationMaximisationState(x.n, copy(x.w1))
+    return ExpectationMaximisationState(x.n, copy(x.w1), copy_column(x.s))
 end
 function port_opt_view(x::ExpectationMaximisationState, i, args...)
-    return ExpectationMaximisationState(x.n, renormalised_view(x.w1, i))
-end
-"""
-    learning_rates(eta::Real, t::Integer)
-
-The pair ``(\\eta_t, \\eta_{t+1})`` a rate slot answers at step `t`: a number is the same rate at every step, so the pair is `(eta, eta)`.
-
-# Related
-
-  - [`ExpectationMaximisation`](@ref)
-"""
-function learning_rates(eta::Real, ::Integer)
-    return eta, eta
+    return ExpectationMaximisationState(x.n, renormalised_view(x.w1, i), copy_column(x.s))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -524,7 +516,7 @@ w_{t+1, i} &= w_{t, i} \\left( 1 - \\eta_t + \\eta_t\\, g_{t, i} \\right) \\frac
 \\end{align}
 ```
 
-a fixed-share pull towards the Start Allocation whenever the rate falls, so that a Learning-Rate Schedule lands on the `eta` slot without a rewrite; at a constant rate the pull vanishes and the update is the plain step exactly. The regret against every constant rebalanced portfolio is ``O(\\sqrt{T N \\log N})`` for every non-negative price sequence — no lower bound on the price relatives and no gradient bound, which the exponentiated gradient's bound needs — at ``\\bar{\\eta} = \\sqrt{\\log N / (T m)}``, ``\\eta = \\bar{\\eta} / (1 + \\bar{\\eta})``, with ``m \\leq N`` the number of assets that are ever the period's best. The raw step is positive wherever ``w_t`` is, so on the default Allocation Set the projection is the identity; the `proj` slot is bound to [`EuclideanProjection`](@ref), the geometry nearest the chi-squared one on a stated set. As the weighting of an [`ExpertMixture`](@ref) it is Soft-Bayes over the experts, the setting the 2017 paper is written for.
+a fixed-share pull towards the Start Allocation whenever the rate falls, with ``\\eta_t`` and ``\\eta_{t+1}`` read off the `eta` slot through [`learning_rate`](@ref) before and after the row; at a constant rate the pull vanishes and the update is the plain step exactly, and under a schedule that names a restart the update of that period answers the Start Allocation with the carrier back at its seed and the period count kept. The regret against every constant rebalanced portfolio is ``O(\\sqrt{T N \\log N})`` for every non-negative price sequence — no lower bound on the price relatives and no gradient bound, which the exponentiated gradient's bound needs — at ``\\bar{\\eta} = \\sqrt{\\log N / (T m)}``, ``\\eta = \\bar{\\eta} / (1 + \\bar{\\eta})``, with ``m \\leq N`` the number of assets that are ever the period's best. The raw step is positive wherever ``w_t`` is, so on the default Allocation Set the projection is the identity; the `proj` slot is bound to [`EuclideanProjection`](@ref), the geometry nearest the chi-squared one on a stated set. As the weighting of an [`ExpertMixture`](@ref) it is Soft-Bayes over the experts, the setting the 2017 paper is written for.
 
 # Fields
 
@@ -532,13 +524,13 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ExpectationMaximisation(; eta::Real = 0.05, proj::EuclideanProjection = EuclideanProjection()) -> ExpectationMaximisation
+    ExpectationMaximisation(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, proj::EuclideanProjection = EuclideanProjection()) -> ExpectationMaximisation
 
 Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < eta < 1`: at one the step is Cover's mixture, and above one a weight can turn negative. A `DomainError` is thrown otherwise.
+  - If `eta` is a number: `0 < eta < 1`: at one the step is Cover's mixture, and above one a weight can turn negative. A `DomainError` is thrown otherwise. A schedule is read at every period, and a scheduled rate outside the interval is the caller's.
 
 # Examples
 
@@ -555,47 +547,59 @@ ExpectationMaximisation
   - [`OnlinePortfolioSelection`](@ref)
   - [`ExpectationMaximisationState`](@ref)
   - [`ExponentiatedGradient`](@ref)
-  - [`learning_rates`](@ref)
+  - [`AbstractLearningRateSchedule`](@ref)
+  - [`learning_rate`](@ref)
 
 # References
 
   - $(ref_dict[:helmbold1997])
   - $(ref_dict[:orseau2017])
 """
-struct ExpectationMaximisation{T1 <: Real, T2 <: EuclideanProjection} <:
+struct ExpectationMaximisation{T1 <: Union{<:Real, <:AbstractLearningRateSchedule},
+                               T2 <: EuclideanProjection} <:
        AbstractOnlinePortfolioSelectionAlgorithm
     """
-    Learning rate in `(0, 1)`: the share of every weight moved to Cover's posterior each period.
+    Learning rate in `(0, 1)`, a number or a Learning-Rate Schedule: the share of every weight moved to Cover's posterior each period.
     """
     eta::T1
     """
     $(field_dict[:proj])
     """
     proj::T2
-    function ExpectationMaximisation(eta::Real, proj::EuclideanProjection)
-        @argcheck(zero(eta) < eta < one(eta), DomainError(eta, "eta must be in (0, 1)"))
+    function ExpectationMaximisation(eta::Union{<:Real, <:AbstractLearningRateSchedule},
+                                     proj::EuclideanProjection)
+        if isa(eta, Real)
+            @argcheck(zero(eta) < eta < one(eta), DomainError(eta, "eta must be in (0, 1)"))
+        end
         return new{typeof(eta), typeof(proj)}(eta, proj)
     end
 end
-function ExpectationMaximisation(; eta::Real = 0.05,
+function ExpectationMaximisation(;
+                                 eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
                                  proj::EuclideanProjection = EuclideanProjection())::ExpectationMaximisation
     return ExpectationMaximisation(eta, proj)
 end
-function rule_state_seed(::ExpectationMaximisation, w::AbstractVector)
-    return ExpectationMaximisationState(0, copy(w))
+function rule_state_seed(alg::ExpectationMaximisation, w::AbstractVector)
+    return ExpectationMaximisationState(0, copy(w), schedule_state_seed(alg.eta, w))
 end
 function online_update!(alg::ExpectationMaximisation, st::ExpectationMaximisationState,
                         w::AbstractVector, x::AbstractVector, ::Any,
                         set::AbstractAllocationSet)
-    eta_t, eta_n = learning_rates(alg.eta, st.n + 1)
+    t = st.n + 1
+    if restart(alg.eta, t)
+        # The period count survives the restart: the schedule's stages are cumulative.
+        return ExpectationMaximisationState(t, st.w1, schedule_state_seed(alg.eta, st.w1)),
+               copy(st.w1)
+    end
+    eta_t = learning_rate(alg.eta, t, st)
     g = x ./ LinearAlgebra.dot(w, x)
     q = w .* (one(eta_t) - eta_t .+ eta_t .* g)
-    ratio = eta_n / eta_t
+    stn = ExpectationMaximisationState(t, st.w1, schedule_update!(alg.eta, st.s, w, x))
+    ratio = learning_rate(alg.eta, t + 1, stn) / eta_t
     if !isone(ratio)
         q .= ratio .* q .+ (one(ratio) - ratio) .* st.w1
     end
-    wn = project(alg.proj, set, q, price_adjusted_allocation(w, x))
-    return ExpectationMaximisationState(st.n + 1, st.w1), wn
+    return stn, project(alg.proj, set, q, price_adjusted_allocation(w, x))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -902,4 +906,4 @@ end
 export ConfidenceWeightedMeanReversion, VarianceUpdate, StandardDeviationUpdate,
        AntiCorrelation, ExpectationMaximisation, AggregatingAlgorithm, TopK,
        WeakAggregatingAlgorithm, AggregatingExponentialGradient
-public AbstractConfidenceUpdate, confidence_step, confidence_gain, learning_rates
+public AbstractConfidenceUpdate, confidence_step, confidence_gain

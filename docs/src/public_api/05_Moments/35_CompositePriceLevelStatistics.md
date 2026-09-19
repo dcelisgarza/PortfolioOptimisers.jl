@@ -15,6 +15,7 @@ RegressionSlope
 PortfolioOptimisers.trend_sign
 TrendSwitch
 CompositeTrend
+PortfolioOptimisers.member_statistic
 ```
 
 ## References

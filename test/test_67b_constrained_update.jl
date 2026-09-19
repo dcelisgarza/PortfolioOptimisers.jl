@@ -52,7 +52,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, HiG
                                                                                               w = zeros(3))))
         # The NewtonStep slot admits the Gram geometry and no other rule's does.
         @test isa(NewtonStep(; proj = GramProjection(; slv = slv)).proj, GramProjection)
-        @test_throws TypeError ExponentiatedGradient(; proj = GramProjection(; slv = slv))
+        @test_throws TypeError MirrorDescent(; proj = GramProjection(; slv = slv))
         @test_throws TypeError PassiveAggressiveMeanReversion(;
                                                               proj = GramProjection(;
                                                                                     slv = slv))
