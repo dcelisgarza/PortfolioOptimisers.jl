@@ -1,7 +1,11 @@
 ```@meta
-Description = "Composite price-level statistics has no private API in PortfolioOptimisers.jl; its names are in the public API."
+Description = "Composite price-level statistics, private API of PortfolioOptimisers.jl: elastic_net_path, elastic_net_polish, trend_reverting_fraction."
 ```
 
 # Composite price-level statistics: private API
 
-Composite price-level statistics has no private API in PortfolioOptimisers.jl; see [Composite price-level statistics](../../public_api/05_Moments/35_CompositePriceLevelStatistics.md) for its public API.
+```@docs
+PortfolioOptimisers.elastic_net_path
+PortfolioOptimisers.elastic_net_polish
+PortfolioOptimisers.trend_reverting_fraction
+```

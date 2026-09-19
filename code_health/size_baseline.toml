@@ -10,7 +10,7 @@ commit = "8411336595"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2997, doc = 0, comment = 238, blank = 48, total = 3283 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1195, doc = 113, comment = 125, blank = 43, total = 1476 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1198, doc = 113, comment = 125, blank = 43, total = 1479 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -127,8 +127,8 @@ commit = "8411336595"
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { code = 225, doc = 318, comment = 2, blank = 150, total = 695 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 230, doc = 368, comment = 0, blank = 184, total = 782 }
 "src/05_Moments/33_CoverageUniverse.jl" = { code = 403, doc = 639, comment = 0, blank = 298, total = 1340 }
-"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { code = 275, doc = 464, comment = 5, blank = 205, total = 949 }
-"src/05_Moments/35_CompositePriceLevelStatistics.jl" = { code = 216, doc = 286, comment = 1, blank = 114, total = 617 }
+"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { code = 306, doc = 512, comment = 5, blank = 222, total = 1045 }
+"src/05_Moments/35_CompositePriceLevelStatistics.jl" = { code = 349, doc = 444, comment = 5, blank = 179, total = 977 }
 "src/06_Distance/01_Base_Distance.jl" = { code = 24, doc = 222, comment = 0, blank = 89, total = 335 }
 "src/06_Distance/02_Distance.jl" = { code = 160, doc = 350, comment = 0, blank = 157, total = 667 }
 "src/06_Distance/03_DistanceDistance.jl" = { code = 39, doc = 132, comment = 0, blank = 58, total = 229 }
@@ -307,7 +307,7 @@ commit = "8411336595"
 "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { code = 306, doc = 463, comment = 5, blank = 177, total = 951 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { code = 248, doc = 309, comment = 2, blank = 132, total = 691 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { code = 523, doc = 509, comment = 4, blank = 178, total = 1214 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { code = 405, doc = 583, comment = 1, blank = 190, total = 1179 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { code = 460, doc = 677, comment = 1, blank = 215, total = 1353 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { code = 309, doc = 425, comment = 3, blank = 171, total = 908 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { code = 328, doc = 587, comment = 4, blank = 222, total = 1141 }
 "src/18_ExpectedReturns.jl" = { code = 290, doc = 832, comment = 43, blank = 293, total = 1458 }

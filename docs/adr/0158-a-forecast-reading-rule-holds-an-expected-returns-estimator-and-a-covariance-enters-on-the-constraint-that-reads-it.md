@@ -121,10 +121,15 @@ the predicate says folds — is folded on the row, and **its state rides on the 
 as a `ForecasterState`, so a mixture's experts each carry their own; an estimator with no exact
 fold is refit on the rows the head holds. `EmpiricalPrior` carries its rows as memory rather
 than folding its moments alone, so the library's predicate answers refit for it and the head's
-rows are that memory, held once. `rows_needed(me)` is one method per estimator: `0` for one that
-folds, `window − 1` for a windowed price-level statistic, `lag` for the lagged price, `window`
-for `WindowedExpectedReturns`, and unbounded for a batch-only estimator or Prior, which then
-refits on the whole prefix at `O(tN)` a step — the docs state the cost and
+rows are that memory, held once. A folding statistic may carry a **memory** beside its vector — the last `memory_rows`
+relatives on the same `PriceLevelForecastState` — so a recursion that also reads a window of
+levels (the kernel trend pattern, whose previous prediction feeds its next and whose
+trend-reverting factor reads `2w + 1` levels) folds like any other, self-contained, and the head
+holds no rows for it; the alternative, a third kind on the interface that folds *and* draws on
+the head's rows, would have put the same rows in two places. `rows_needed(me)` is one method per
+estimator: `0` for one that folds, `window − 1` for a windowed price-level statistic, `lag` for
+the lagged price, `window` for `WindowedExpectedReturns`, and unbounded for a batch-only
+estimator or Prior, which then refits on the whole prefix at `O(tN)` a step — the docs state the cost and
 `WindowedExpectedReturns(; me, window)` is the user's cap. **`Online(me)` in the slot is refused
 by name**: the head's buffer is the buffer, and a second one would hold the rows twice, which
 ADR 0157 rejected for the rules. A forecaster carrying a state at the door is refused too: the
@@ -237,6 +242,10 @@ not over returns.
   `rows_needed(me)`; the fold-or-refit of a forecaster on the Rule State; the `Online(me)`
   refusal. The forecast arm is built (#1176): the forecast-reading rules live in their own
   file, the statistics of the later papers in a second, and the kernel-trend pattern tracking —
-  a stateful statistic over an elastic-net path — is split into a ticket of its own.
+  a stateful statistic over an elastic-net path — is split into a ticket of its own and built
+  there (#1191): `KernelTrendPattern` folds with a memory, its elastic net is solved in the
+  library at the middle of the path by coordinate descent finished with an exact solve on the
+  active set, and `KernelTrendTracking(; me, eta, q)` is the sibling of `ForecastTracking`
+  whose kernel-scaled step is not normalised.
 - A factor forecast is recorded as fog on the map, should one ever be wanted; nothing on the
   ledger asks for it.

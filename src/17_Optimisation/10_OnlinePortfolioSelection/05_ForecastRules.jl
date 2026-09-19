@@ -683,6 +683,7 @@ ForecastTracking
   - [`PeakPriceTracking`](@ref)
   - [`AdaptiveInputCompositeTrend`](@ref)
   - [`TrendPromotePriceTracking`](@ref)
+  - [`KernelTrendTracking`](@ref)
   - [`WindowPeak`](@ref)
 
 # References
@@ -866,6 +867,179 @@ function TrendPromotePriceTracking(; window::Integer = 5, alpha::Real = 0.5,
                       falling = WindowPeak(; window = window))
     return ForecastTracking(; me = PriceLevelExpectedReturns(; alg = alg), eps = eps,
                             proj = proj)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The kernel-scaled tracking step toward a Price Relative Forecast of Lai, Yang, Wu and Fang (2018): the centred forecast, scaled per asset by its similarity to the centred allocation, added at a fixed rate and projected; the sibling of [`ForecastTracking`](@ref) whose step is not normalised.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{\\boldsymbol{w}}_{t} &= \\boldsymbol{w}_{t} - \\bar{w}_{t} \\boldsymbol{1}\\,,\\quad
+\\tilde{\\boldsymbol{x}}_{t+1} = \\hat{\\boldsymbol{x}}_{t+1} - \\bar{x}_{t+1} \\boldsymbol{1}\\,,\\quad
+K_{i} = \\exp\\left( -\\lvert \\tilde{w}_{t, i} - \\tilde{x}_{t+1, i} \\rvert^{1/q} \\right)\\,,\\\\
+\\boldsymbol{w}_{t+1} &= \\mathrm{Proj}\\left( \\boldsymbol{w}_{t} + \\eta\\, \\boldsymbol{K} \\odot \\tilde{\\boldsymbol{x}}_{t+1} \\right)\\,,
+\\end{align}
+```
+
+holding when the centred forecast is zero. The diagonal kernel ``\\boldsymbol{K}`` is the paper's similarity between the current allocation and the forecast, largest where an asset's centred weight already matches its centred forecast; the step is the maximiser of ``\\langle \\boldsymbol{w}, \\boldsymbol{K}^{-1} \\tilde{\\boldsymbol{x}} \\rangle`` over an ellipsoid of radius ``\\eta \\lVert \\tilde{\\boldsymbol{x}} \\rVert`` in the ``\\boldsymbol{K}^{-2}`` metric, so the radius grows with the forecast and the normalisation of [`ForecastTracking`](@ref) cancels. `eta` is a rate on the centred forecast, not a step length: at the paper's `eta = 1000` the projected answer is one-hot on the asset with the largest kernel-scaled centred forecast unless two are within `1 / eta` of each other, as the peak-tracking rules' at their defaults, and the step spreads only well below `eta = 1`. The forecast is the expected-returns estimator on `me`, advanced by the fold-or-refit rule of [`forecast_relative`](@ref); [`KernelTrendPatternTracking`](@ref) is the constructor that fills it with the paper's [`KernelTrendPattern`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    KernelTrendTracking(;
+        me::Union{<:AbstractExpectedReturnsEstimator, <:Online} = PriceLevelExpectedReturns(; alg = KernelTrendPattern()),
+        eta::Real = 1000,
+        q::Real = 6,
+        proj::EuclideanProjection = EuclideanProjection()
+    ) -> KernelTrendTracking
+
+Keywords correspond to the struct's fields, and the defaults are the paper's. `rows_needed` forwards to `me`.
+
+## Validation
+
+  - `eta > 0`. A `DomainError` is thrown otherwise.
+  - `q > 0`. A `DomainError` is thrown otherwise.
+  - `me` is not, and holds no, [`Online`](@ref) wrapper. An `ArgumentError` is thrown otherwise, by name.
+
+# Examples
+
+```jldoctest
+julia> KernelTrendTracking()
+KernelTrendTracking
+    me ┼ PriceLevelExpectedReturns
+       │   alg ┼ KernelTrendPattern
+       │       │   window ┼ Int64: 5
+       │       │       nu ┼ Float64: 0.5
+       │       │     path ┼ ElasticNetPath
+       │       │          │   theta ┼ Float64: 0.99
+       │       │          │   ratio ┼ Float64: 0.001
+       │       │          │   iters ┼ Int64: 1000
+       │       │          │     tol ┴ Float64: 1.0e-10
+   eta ┼ Int64: 1000
+     q ┼ Int64: 6
+  proj ┴ EuclideanProjection()
+```
+
+# Related
+
+  - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
+  - [`ForecastTracking`](@ref)
+  - [`KernelTrendPatternTracking`](@ref)
+  - [`KernelTrendPattern`](@ref)
+
+# References
+
+  - $(ref_dict[:lai2018ktpt])
+"""
+struct KernelTrendTracking{T1 <: AbstractExpectedReturnsEstimator, T2 <: Real, T3 <: Real,
+                           T4 <: EuclideanProjection} <:
+       AbstractOnlinePortfolioSelectionAlgorithm
+    """
+    $(field_dict[:forecaster])
+    """
+    me::T1
+    """
+    The rate on the kernel-scaled centred forecast.
+    """
+    eta::T2
+    """
+    The shape of the kernel, the root the distance between an asset's centred weight and centred forecast is raised to; larger is a flatter similarity.
+    """
+    q::T3
+    """
+    $(field_dict[:proj])
+    """
+    proj::T4
+    function KernelTrendTracking(me::AbstractExpectedReturnsEstimator, eta::Real, q::Real,
+                                 proj::EuclideanProjection)
+        assert_forecaster(me)
+        @argcheck(eta > zero(eta), DomainError(eta, "eta must be positive"))
+        @argcheck(q > zero(q), DomainError(q, "q must be positive"))
+        return new{typeof(me), typeof(eta), typeof(q), typeof(proj)}(me, eta, q, proj)
+    end
+end
+function KernelTrendTracking(me::Online, ::Real, ::Real, ::EuclideanProjection)
+    return assert_forecaster(me)
+end
+function KernelTrendTracking(;
+                             me::Union{<:AbstractExpectedReturnsEstimator, <:Online} = PriceLevelExpectedReturns(;
+                                                                                                                 alg = KernelTrendPattern()),
+                             eta::Real = 1000, q::Real = 6,
+                             proj::EuclideanProjection = EuclideanProjection())::KernelTrendTracking
+    return KernelTrendTracking(me, eta, q, proj)
+end
+function port_opt_view(alg::KernelTrendTracking, i, args...)
+    return KernelTrendTracking(; me = port_opt_view(alg.me, i, args...), eta = alg.eta,
+                               q = alg.q, proj = alg.proj)
+end
+function rows_needed(alg::KernelTrendTracking)
+    return rows_needed(alg.me)
+end
+function rule_state_seed(alg::KernelTrendTracking, ::AbstractVector)
+    return forecaster_seed(alg.me)
+end
+function online_update!(alg::KernelTrendTracking, st, w::AbstractVector, x::AbstractVector,
+                        rows, set::AbstractAllocationSet)
+    st, xhat = forecast_relative(alg.me, st, x, rows)
+    dev = xhat .- Statistics.mean(xhat)
+    q = if all(iszero, dev)
+        w
+    else
+        K = exp.(-abs.((w .- Statistics.mean(w)) .- dev) .^ inv(alg.q))
+        w .+ alg.eta .* K .* dev
+    end
+    return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
+end
+"""
+    KernelTrendPatternTracking(; window::Integer = 5, nu::Real = 0.5, theta::Real = 0.99, q::Real = 6, eta::Real = 1000, proj::EuclideanProjection = EuclideanProjection())
+
+The kernel-based trend pattern tracking of Lai, Yang, Wu and Fang (2018): a [`KernelTrendTracking`](@ref) whose forecast is the [`KernelTrendPattern`](@ref) over `window` levels, its initial state mixed by `nu` and its intermediate state read off an [`ElasticNetPath`](@ref) at `theta` (KTPT).
+
+The paper's sensitivity study is flat over `eta` from 800 to 1300, which is the saturation the step's docstring states; `q` around 6 is where it reports the wealth stable. The statistic folds with a memory, so the head holds no rows for this rule.
+
+# Examples
+
+```jldoctest
+julia> KernelTrendPatternTracking(; window = 3)
+KernelTrendTracking
+    me ┼ PriceLevelExpectedReturns
+       │   alg ┼ KernelTrendPattern
+       │       │   window ┼ Int64: 3
+       │       │       nu ┼ Float64: 0.5
+       │       │     path ┼ ElasticNetPath
+       │       │          │   theta ┼ Float64: 0.99
+       │       │          │   ratio ┼ Float64: 0.001
+       │       │          │   iters ┼ Int64: 1000
+       │       │          │     tol ┴ Float64: 1.0e-10
+   eta ┼ Int64: 1000
+     q ┼ Int64: 6
+  proj ┴ EuclideanProjection()
+```
+
+# Related
+
+  - [`KernelTrendTracking`](@ref)
+  - [`KernelTrendPattern`](@ref)
+  - [`ElasticNetPath`](@ref)
+  - [`PeakPriceTracking`](@ref)
+
+# References
+
+  - $(ref_dict[:lai2018ktpt])
+"""
+function KernelTrendPatternTracking(; window::Integer = 5, nu::Real = 0.5,
+                                    theta::Real = 0.99, q::Real = 6, eta::Real = 1000,
+                                    proj::EuclideanProjection = EuclideanProjection())::KernelTrendTracking
+    alg = KernelTrendPattern(; window = window, nu = nu,
+                             path = ElasticNetPath(; theta = theta))
+    return KernelTrendTracking(; me = PriceLevelExpectedReturns(; alg = alg), eta = eta,
+                               q = q, proj = proj)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1174,6 +1348,6 @@ end
 export ForecastReversion, MovingAverageReversion, ExponentialMovingAverageReversion,
        RobustMedianReversion, ReweightedPriceRelativeTracking, GaussianWeightingReversion,
        LocalAdaptiveLearning, ForecastTracking, PeakPriceTracking,
-       AdaptiveInputCompositeTrend, TrendPromotePriceTracking, TransactionCostOptimisation,
-       ShortTermSparsePortfolio
+       AdaptiveInputCompositeTrend, TrendPromotePriceTracking, KernelTrendTracking,
+       KernelTrendPatternTracking, TransactionCostOptimisation, ShortTermSparsePortfolio
 public ForecasterState, forecast_relative

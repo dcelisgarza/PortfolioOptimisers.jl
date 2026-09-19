@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the statistics of a window of price levels that [`PriceLevelExpectedReturns`](@ref) turns into an expected return.
 
-Every statistic is homogeneous of degree one in the levels, so the level of the last observation is set to one and the earlier levels are reconstructed from the returns of the window; the statistic is then a vector over the assets, and the expected return is `stat / p_t .- 1` with `p_t = 1`. A statistic is **windowed** when it reads a fixed number of levels ([`MovingAverage`](@ref), [`SpatialMedian`](@ref), [`WindowPeak`](@ref), [`LaggedPrice`](@ref)) and **folding** when it is an exact recursion over the price relatives ([`ExponentialMovingAverage`](@ref), [`ReweightedPriceRelative`](@ref)): a folding statistic carries one vector on a Partial Fit State and reads no rows, and its batch form over a matrix of returns is the same recursion seeded at the first level, so a fold and a batch over the same rows agree exactly.
+Every statistic is homogeneous of degree one in the levels, so the level of the last observation is set to one and the earlier levels are reconstructed from the returns of the window; the statistic is then a vector over the assets, and the expected return is `stat / p_t .- 1` with `p_t = 1`. A statistic is **windowed** when it reads a fixed number of levels ([`MovingAverage`](@ref), [`SpatialMedian`](@ref), [`WindowPeak`](@ref), [`LaggedPrice`](@ref)) and **folding** when it is an exact recursion over the price relatives ([`ExponentialMovingAverage`](@ref), [`ReweightedPriceRelative`](@ref)): a folding statistic carries one vector on a Partial Fit State and reads no rows, and its batch form over a matrix of returns is the same recursion seeded at the first level, so a fold and a batch over the same rows agree exactly. A folding statistic may also carry a **memory**, the last [`memory_rows`](@ref) relatives on the same state ([`KernelTrendPattern`](@ref)): its recursion reads the carried vector and the memory together, so it is self-contained like any fold — a host holds no rows for it — and its batch form is the recursion from the first row with the memory filling as it goes.
 
 Over the first rows a windowed statistic **truncates its window** to the levels available, as the reversion papers' reference implementations do: with `window = 5` and two returns folded, the statistic reads three levels. A folding statistic starts from its seed at the first row. A composite statistic truncates every window it holds the same way.
 
@@ -15,12 +15,14 @@ In order to implement a new price-level statistic, subtype `AbstractPriceLevelSt
   - `window_rows(alg::AbstractPriceLevelStatistic) -> Union{Nothing, Integer}`: The number of return rows the batch form reads to reconstruct its levels, `window - 1` for a statistic over `window` levels, and `nothing` for one that reads every row it is handed. The default reads `alg.window - 1`.
   - `folds(alg::AbstractPriceLevelStatistic) -> Bool`: `true` when the statistic is an exact recursion over price relatives, carried by [`fold_statistic`](@ref). The default is `false`.
   - `fold_statistic(alg::AbstractPriceLevelStatistic, stat, x::AbstractVector) -> AbstractVector`: For a folding statistic, the recursion: from the carried statistic `stat` in relative terms (`nothing` before the first row) and the price relative `x` of the row, the statistic after the row, as a new vector.
+  - `memory_rows(alg::AbstractPriceLevelStatistic) -> Integer`: The number of relatives a folding statistic carries as its memory, `0` for one whose recursion reads the carried vector alone, which is the default. A statistic with a memory implements the four-argument `fold_statistic(alg, stat, hist, x)` instead, `hist` being the last `memory_rows(alg)` relatives, the row's own last, or fewer over the first rows.
 
 ## Arguments
 
   - `alg`: The concrete statistic.
   - `P`: The reconstructed price levels of the window, `levels × assets`, the last row being ones.
   - `stat`: The carried statistic, in units of the last level, or `nothing`.
+  - `hist`: The carried memory of relatives, `rows × assets`, the last row being `x`.
   - `x`: The price relative of one row, `1 .+ r`.
 
 ## Returns
@@ -28,6 +30,7 @@ In order to implement a new price-level statistic, subtype `AbstractPriceLevelSt
   - `stat::AbstractVector`: The statistic per asset, `assets × 1`.
   - `rows::Union{Nothing, Integer}`: The number of return rows the batch form reads.
   - `folds::Bool`: Whether the statistic folds.
+  - `memory::Integer`: The number of relatives the memory holds.
 
 # Related
 
@@ -38,8 +41,10 @@ In order to implement a new price-level statistic, subtype `AbstractPriceLevelSt
   - [`WindowPeak`](@ref)
   - [`LaggedPrice`](@ref)
   - [`ReweightedPriceRelative`](@ref)
+  - [`KernelTrendPattern`](@ref)
   - [`price_level_statistic`](@ref)
   - [`fold_statistic`](@ref)
+  - [`memory_rows`](@ref)
   - [`rows_needed`](@ref)
 """
 abstract type AbstractPriceLevelStatistic <: AbstractExpectedReturnsAlgorithm end
@@ -421,7 +426,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The Partial Fit State of a [`PriceLevelExpectedReturns`](@ref) whose statistic folds: the statistic in units of the last level, one entry per asset, and the number of rows folded.
+The Partial Fit State of a [`PriceLevelExpectedReturns`](@ref) whose statistic folds: the statistic in units of the last level, one entry per asset, the number of rows folded, and the memory of a statistic that carries one.
 
 # Fields
 
@@ -432,6 +437,7 @@ $(DocStringExtensions.FIELDS)
   - [`PriceLevelExpectedReturns`](@ref)
   - [`AbstractPartialFitState`](@ref)
   - [`fold_statistic`](@ref)
+  - [`memory_rows`](@ref)
 """
 @concrete struct PriceLevelForecastState <: AbstractPartialFitState
     """
@@ -442,15 +448,21 @@ $(DocStringExtensions.FIELDS)
     The folded statistic divided by the current level, `assets × 1`: the Price Relative Forecast.
     """
     stat
+    """
+    The last [`memory_rows`](@ref) relatives folded, `rows × assets`, the newest last, or `nothing` for a statistic that carries no memory.
+    """
+    hist
 end
 function merge_states(::PriceLevelForecastState, ::PriceLevelForecastState)
     return throw(ArgumentError("a `PriceLevelForecastState` is not merged: the recursion it carries is order-dependent, so two states folded on different rows have no common continuation. Fold the rows of one into the other."))
 end
 function Base.copy(x::PriceLevelForecastState)
-    return PriceLevelForecastState(x.n, copy(x.stat))
+    return PriceLevelForecastState(x.n, copy(x.stat),
+                                   isnothing(x.hist) ? nothing : copy(x.hist))
 end
 function port_opt_view(x::PriceLevelForecastState, i, args...)
-    return PriceLevelForecastState(x.n, x.stat[i])
+    return PriceLevelForecastState(x.n, x.stat[i],
+                                   isnothing(x.hist) ? nothing : x.hist[:, i])
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -595,6 +607,53 @@ function folds(::ReweightedPriceRelative)
     return true
 end
 """
+    memory_rows(alg::AbstractPriceLevelStatistic)
+
+The number of relatives a folding statistic carries as its memory on the state, `0` for one whose recursion reads the carried vector alone, which is the default.
+
+# Related
+
+  - [`AbstractPriceLevelStatistic`](@ref)
+  - [`fold_statistic`](@ref)
+  - [`PriceLevelForecastState`](@ref)
+"""
+function memory_rows(::AbstractPriceLevelStatistic)
+    return 0
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The memory after a row: the last [`memory_rows`](@ref) relatives with the row appended, `nothing` for a statistic that carries none.
+
+# Arguments
+
+  - `alg`: The statistic.
+  - `hist`: The carried memory, or `nothing`.
+  - `x`: The price relative of the row.
+
+# Returns
+
+  - `hist'::Union{Nothing, Matrix}`: The memory after the row, a new matrix.
+
+# Related
+
+  - [`memory_rows`](@ref)
+  - [`fold_statistic`](@ref)
+"""
+function push_memory(alg::AbstractPriceLevelStatistic, hist::Option{<:AbstractMatrix},
+                     x::AbstractVector)
+    m = memory_rows(alg)
+    if iszero(m)
+        return nothing
+    end
+    row = reshape(collect(x), 1, :)
+    if isnothing(hist)
+        return row
+    end
+    H = vcat(hist, row)
+    return H[max(1, size(H, 1) - m + 1):end, :]
+end
+"""
     rows_needed(me::PriceLevelExpectedReturns)
     rows_needed(me::AbstractExpectedReturnsEstimator)
     rows_needed(me::WindowedExpectedReturns)
@@ -662,7 +721,7 @@ end
 
 The statistic of a window of price levels, one value per asset, homogeneous of degree one in the levels.
 
-The moving average is the column mean of the levels. The exponential moving average is the recursion over every row from the first. The spatial median is the point minimising the sum of Euclidean distances to the level vectors, through [`spatial_median`](@ref). The window peak is the column maximum. The lagged price is the row `lag` above the last, or the first row when the window truncates. The reweighted relative is its recursion over the relatives of successive rows through [`fold_statistic`](@ref), times the last level.
+The moving average is the column mean of the levels. The exponential moving average is the recursion over every row from the first. The spatial median is the point minimising the sum of Euclidean distances to the level vectors, through [`spatial_median`](@ref). The window peak is the column maximum. The lagged price is the row `lag` above the last, or the first row when the window truncates. The reweighted relative is its recursion over the relatives of successive rows through [`fold_levels`](@ref), times the last level.
 
 # Arguments
 
@@ -678,6 +737,7 @@ The moving average is the column mean of the levels. The exponential moving aver
   - [`AbstractPriceLevelStatistic`](@ref)
   - [`PriceLevelExpectedReturns`](@ref)
   - [`fold_statistic`](@ref)
+  - [`fold_levels`](@ref)
   - [`spatial_median`](@ref)
 """
 function price_level_statistic(::MovingAverage, P::AbstractMatrix)
@@ -700,24 +760,22 @@ function price_level_statistic(alg::LaggedPrice, P::AbstractMatrix)
     return P[max(1, size(P, 1) - alg.lag), :]
 end
 function price_level_statistic(alg::ReweightedPriceRelative, P::AbstractMatrix)
-    stat = nothing
-    for t in 2:size(P, 1)
-        stat = fold_statistic(alg, stat, view(P, t, :) ./ view(P, t - 1, :))
-    end
-    return isnothing(stat) ? P[end, :] : stat .* P[end, :]
+    return fold_levels(alg, P)
 end
 """
     fold_statistic(alg::ExponentialMovingAverage, stat, x::AbstractVector)
     fold_statistic(alg::ReweightedPriceRelative, stat, x::AbstractVector)
+    fold_statistic(alg::KernelTrendPattern, stat, hist::AbstractMatrix, x::AbstractVector)
 
 One row of a folding statistic's recursion, in units of the current level.
 
-The exponential moving average steps ``\\hat{\\boldsymbol{x}}' = \\alpha + (1 - \\alpha)\\, \\hat{\\boldsymbol{x}} \\oslash \\boldsymbol{x}`` from ``\\boldsymbol{1}``. The reweighted relative is seeded at the first row's relative and steps ``\\hat{\\boldsymbol{\\varphi}}' = \\boldsymbol{\\gamma} + (\\boldsymbol{1} - \\boldsymbol{\\gamma}) \\odot \\hat{\\boldsymbol{\\varphi}} \\oslash \\boldsymbol{x}`` with ``\\boldsymbol{\\gamma} = \\theta \\boldsymbol{x} \\oslash (\\theta \\boldsymbol{x} + \\hat{\\boldsymbol{\\varphi}})``, so its forecast after the first row is one.
+The exponential moving average steps ``\\hat{\\boldsymbol{x}}' = \\alpha + (1 - \\alpha)\\, \\hat{\\boldsymbol{x}} \\oslash \\boldsymbol{x}`` from ``\\boldsymbol{1}``. The reweighted relative is seeded at the first row's relative and steps ``\\hat{\\boldsymbol{\\varphi}}' = \\boldsymbol{\\gamma} + (\\boldsymbol{1} - \\boldsymbol{\\gamma}) \\odot \\hat{\\boldsymbol{\\varphi}} \\oslash \\boldsymbol{x}`` with ``\\boldsymbol{\\gamma} = \\theta \\boldsymbol{x} \\oslash (\\theta \\boldsymbol{x} + \\hat{\\boldsymbol{\\varphi}})``, so its forecast after the first row is one. The four-argument form is the recursion of a statistic with a memory, handed the last [`memory_rows`](@ref) relatives with the row appended; the fold and the batch choose the arity by the memory. The kernel trend pattern's recursion is stated on [`KernelTrendPattern`](@ref).
 
 # Arguments
 
   - `alg`: The statistic.
   - `stat`: The carried statistic, or `nothing` before the first row.
+  - `hist`: The carried memory with the row appended, or `nothing`.
   - `x`: The price relative of the row, `1 .+ r`.
 
 # Returns
@@ -729,7 +787,9 @@ The exponential moving average steps ``\\hat{\\boldsymbol{x}}' = \\alpha + (1 - 
   - [`AbstractPriceLevelStatistic`](@ref)
   - [`ExponentialMovingAverage`](@ref)
   - [`ReweightedPriceRelative`](@ref)
+  - [`KernelTrendPattern`](@ref)
   - [`PriceLevelForecastState`](@ref)
+  - [`memory_rows`](@ref)
 """
 function fold_statistic(alg::ExponentialMovingAverage, stat::Option{<:AbstractVector},
                         x::AbstractVector)
@@ -741,6 +801,39 @@ function fold_statistic(alg::ReweightedPriceRelative, stat::Option{<:AbstractVec
     prev = isnothing(stat) ? x : stat
     gamma = alg.theta .* x ./ (alg.theta .* x .+ prev)
     return gamma .+ (one(eltype(gamma)) .- gamma) .* prev ./ x
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The batch form of a folding statistic over a matrix of levels: the recursion from the first row, the memory filling as it goes, times the last level.
+
+# Arguments
+
+  - `alg`: The folding statistic.
+  - `P`: The levels, `levels × assets`, the last row the current level.
+
+# Returns
+
+  - `stat::Vector`: The statistic per asset, in units of the levels.
+
+# Related
+
+  - [`price_level_statistic`](@ref)
+  - [`fold_statistic`](@ref)
+"""
+function fold_levels(alg::AbstractPriceLevelStatistic, P::AbstractMatrix)
+    stat = nothing
+    hist = nothing
+    for t in 2:size(P, 1)
+        x = view(P, t, :) ./ view(P, t - 1, :)
+        hist = push_memory(alg, hist, x)
+        stat = if isnothing(hist)
+            fold_statistic(alg, stat, x)
+        else
+            fold_statistic(alg, stat, hist, x)
+        end
+    end
+    return isnothing(stat) ? P[end, :] : stat .* P[end, :]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -902,7 +995,7 @@ end
 
 Folds one row of returns, or a block of them in order, into the state a folding statistic carries, seeding it on the first row.
 
-The row is turned into the price relative `1 .+ x` and handed to [`fold_statistic`](@ref); a non-finite entry is a Held Gap the caller fills before the fold, and reaches the recursion as it is.
+The row is turned into the price relative `1 .+ x`, appended to the memory of a statistic that carries one through [`push_memory`](@ref), and handed to [`fold_statistic`](@ref); a non-finite entry is a Held Gap the caller fills before the fold, and reaches the recursion as it is.
 
 # Validation
 
@@ -926,8 +1019,14 @@ function partial_fit!(me::PriceLevelExpectedReturns{<:Any,
     assert_folding_statistic(me.alg)
     prev = isnothing(me.cache) ? nothing : me.cache.stat
     n = isnothing(me.cache) ? 0 : me.cache.n
-    stat = fold_statistic(me.alg, prev, one(eltype(x)) .+ x)
-    return Accessors.@reset me.cache = PriceLevelForecastState(n + 1, stat)
+    xr = one(eltype(x)) .+ x
+    hist = push_memory(me.alg, isnothing(me.cache) ? nothing : me.cache.hist, xr)
+    stat = if isnothing(hist)
+        fold_statistic(me.alg, prev, xr)
+    else
+        fold_statistic(me.alg, prev, hist, xr)
+    end
+    return Accessors.@reset me.cache = PriceLevelForecastState(n + 1, stat, hist)
 end
 function partial_fit!(me::PriceLevelExpectedReturns{<:Any,
                                                     <:Option{<:PriceLevelForecastState}},
@@ -946,4 +1045,4 @@ end
 export PriceLevelExpectedReturns, MovingAverage, ExponentialMovingAverage, SpatialMedian,
        WindowPeak, LaggedPrice, ReweightedPriceRelative
 public AbstractPriceLevelStatistic, PriceLevelForecastState, price_level_statistic,
-       fold_statistic, rows_needed, window_rows, folds
+       fold_statistic, rows_needed, window_rows, folds, memory_rows
