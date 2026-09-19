@@ -66,7 +66,7 @@
 "src/01_Base/12_NormError.jl" = { map = 1, units = 8, algorithm = 2, swept = true, bindings = ["L1Norm", "L2Norm", "LInfNorm", "LpNorm", "NormError", "SquaredL2Norm", "norm_error", "norm_factor"] }
 "src/01_Base/13_KappaLog.jl" = { map = 1, units = 1, algorithm = 0, swept = true, bindings = ["kappa_log"] }
 "src/01_Base/14_PartialFit.jl" = { map = 1, units = 10, swept = false }
-"src/01_Base/15_Online.jl" = { map = 1, units = 43, swept = false }
+"src/01_Base/15_Online.jl" = { map = 1, units = 45, swept = false }
 "src/01_Base/16_CoveragePolicy.jl" = { map = 1, units = 24, swept = false }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true, bindings = ["MaxValue", "MeanValue", "MedianValue", "MinValue", "ModeValue", "Num_VecToScaM", "PROPAGATABLE_CONTRACTS", "PROP_TAG_CHANNELS", "PROP_TAG_MACRO_NAMES", "PROP_TAG_NAMES", "ProdValue", "StandardisedValue", "StdValue", "SumValue", "VarValue", "VectorToScalarMeasure", "_wprop", "check_prop_tag_macros", "check_propagatable_contracts", "concrete_typed_array", "concrete_typed_array_if_abstract", "cprop", "dot_scalar", "extract_field_name", "factory", "factory_child", "forward_flatten_path", "forward_nonnothing", "forward_properties", "forward_walk_expr", "fourth_moment_index_generator", "fprop", "get_window", "is_doc_macro", "is_prop_tag_call", "nothing_scalar_array_getindex", "nothing_scalar_array_getindex_odd_order", "nothing_scalar_array_view", "nothing_scalar_array_view_odd_order", "obs_weights_view", "obs_weights_view", "peel_prop_tags", "port_opt_view", "port_opt_view", "port_opt_view", "port_opt_view", "pprop", "prop_channel_active", "prop_channel_pairs", "prop_tag", "prop_tag_expr", "propagatable", "propagatable_bare_name", "propagatable_contract_violations", "propagatable_find_struct", "propagatable_keywords", "propagatable_parse_body", "propagatable_register!", "resolve_deferred_quantities", "traverse_concrete_subtypes", "try_field_name", "vec_to_real_measure", "vprop", "wprop", "⊕", "⊖", "⊗", "⊘", "⊙"] }
 "src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 34, swept = false }
@@ -316,8 +316,8 @@
 "src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl" = { map = 10, units = 26, swept = false }
 "src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl" = { map = 10, units = 21, swept = false }
 "src/17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl" = { map = 10, units = 14, swept = false }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { map = 11, units = 18, swept = false }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl" = { map = 11, units = 17, swept = false }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { map = 11, units = 22, swept = false }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl" = { map = 11, units = 18, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.jl" = { map = 11, units = 7, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/04_KurtosisConstraints.jl" = { map = 11, units = 5, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/05_NegativeSkewnessConstraints.jl" = { map = 11, units = 3, swept = false }
@@ -347,10 +347,10 @@
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { map = 10, units = 6, swept = false }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { map = 10, units = 3, swept = false }
 "src/17_Optimisation/09_OnlineOptimisation.jl" = { map = 10, units = 20, swept = false }
-"src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { map = 10, units = 41, swept = false }
+"src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { map = 10, units = 40, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { map = 10, units = 18, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { map = 10, units = 20, swept = false }
-"src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { map = 10, units = 32, swept = false }
+"src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { map = 10, units = 28, swept = false }
 "src/18_ExpectedReturns.jl" = { map = 8, units = 25, algorithm = 5, swept = true, bindings = ["ExpectedReturn", "ExpectedReturnRiskRatio", "PerfRM", "PerformanceSummaryResult", "PrRM", "brinson_attribution", "excess_statistics", "expected_ratio", "expected_return", "expected_return", "expected_risk", "expected_risk", "expected_risk", "expected_risk", "expected_risk_ret_ratio", "expected_risk_ret_sric", "expected_sric", "held_path_turnover", "performance_summary", "prrm_prediction_message", "resolve_turnover", "sric_penalty", "summarise_returns", "supports_precomputed_returns", "term_fees"] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { map = 10, units = 27, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { map = 10, units = 19, swept = false }
@@ -358,6 +358,7 @@
 "src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { map = 10, units = 29, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { map = 10, units = 19, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { map = 10, units = 5, swept = false }
+"src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { map = 10, units = 7, swept = false }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { map = 8, units = 28, swept = false }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { map = 8, units = 38, swept = false }
 "src/20_AssetSelection.jl" = { map = 8, units = 30, algorithm = 11, swept = true, bindings = ["AbstractRedundancyAlgorithm", "AbstractSelectionRule", "ClusterGroups", "CompleteAssetSelector", "CorrelationComponents", "PairwiseCorrelation", "QuantileRule", "RankRule", "RedundancySelector", "ScoreSelector", "ThresholdRule", "assert_correlation_threshold", "assert_scoreable", "assert_selection_action", "assert_tail_counts", "asset_scores", "correlation_components", "drop_scores", "groups_argbest", "redundancy_keep", "redundancy_keep", "redundancy_keep", "redundancy_keep", "requires_score", "rule_keep", "select_assets", "select_assets", "select_assets", "tail_action_mask", "tail_mask"] }

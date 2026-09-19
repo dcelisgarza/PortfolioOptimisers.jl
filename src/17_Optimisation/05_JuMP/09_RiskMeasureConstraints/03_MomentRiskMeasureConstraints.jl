@@ -107,8 +107,8 @@ where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net p
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     k = get_k(model)
@@ -161,8 +161,8 @@ expression and upper-bound constraint.
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                  <:MeanAbsoluteDeviation},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     k = get_k(model)
@@ -328,8 +328,8 @@ the risk expression and upper-bound constraint.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:SecondMoment},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
@@ -430,8 +430,8 @@ Where:
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:EvenMoment},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     w = get_w(model, prefix)
     k = effective_k(model)
     sc = get_constraint_scale(model)

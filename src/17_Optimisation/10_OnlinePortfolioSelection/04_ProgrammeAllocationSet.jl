@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-The Allocation Set of the full constraint vocabulary: weight bounds, universe sets, linear constraints in the asset basis, a turnover ceiling, a variance or standard-deviation ceiling, a tracking error and the MIP kinds, with a solver required by its field bound, because a projection onto it is a programme.
+The Allocation Set of the full constraint vocabulary: weight bounds, universe sets, linear constraints in the asset basis, a turnover ceiling, a risk ceiling under any [`RiskMeasure`](@ref), a tracking error and the MIP kinds, with a solver required by its field bound, because a projection onto it is a programme.
 
 The projection is a bare JuMP model in the Weight Finaliser's idiom — `w`, `k = 1`, `Σw = 1`, the constraint scale and the objective scale — assembled by the shared builders through [`set_allocation_set_constraints!`](@ref) and given the objective of the rule's Projection Geometry: ``\\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{q} \\rVert^2`` for [`EuclideanProjection`](@ref), ``\\sum_i w_i \\log (w_i / q_i)`` for [`EntropicProjection`](@ref), an exponential-cone programme, and ``(\\boldsymbol{w} - \\boldsymbol{q})^\\intercal A (\\boldsymbol{w} - \\boldsymbol{q})`` for [`GramProjection`](@ref). The budget is one and there is no budget field: cash is an asset with price relative one, which the rule allocates like any other.
 
@@ -10,13 +10,13 @@ The projection is a bare JuMP model in the Weight Finaliser's idiom — `w`, `k 
   - `wb`, `sets`: [`set_weight_constraints!`](@ref) with the budget one.
   - `lcs`: [`set_linear_weight_constraints!`](@ref) on [`linear_constraints`](@ref) over `sets`.
   - `tn`: [`_set_turnover_constraints!`](@ref), the library's per-asset ceiling ``\\lvert w_i - \\hat{w}_i \\rvert \\leq \\mathrm{tn}_i``, with the reference set to the Price-Adjusted Allocation ``\\hat{\\boldsymbol{w}}_t = \\boldsymbol{w}_t \\odot \\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` of the step — the book the fund trades from, never the distance between two targets. The ceiling is a number, or one per asset.
-  - `r`, `pe`: the set's own second-order cone ``[u; G \\boldsymbol{w}] \\in \\mathcal{K}_{\\mathrm{SOC}}`` with ``G^\\intercal G = \\boldsymbol{\\Sigma}`` and ``u`` the ceiling — ``\\sqrt{\\mathrm{ub}}`` for a [`Variance`](@ref), ``\\mathrm{ub}`` for a [`StandardDeviation`](@ref) — the covariance read off `r` when it holds a matrix and otherwise off `pe` fitted on the head's rows at every step.
+  - `r`, `pe`: the risk measure's own JuMP builder, [`set_risk_constraints!`](@ref), with the set as the [`RiskConstraintOwner`](@ref) and `settings.ub` as the ceiling — a conditional value at risk, a drawdown, a variance, any measure the JuMP optimisers bound — on the prior result of `pe` fitted on the head's rows at every step, the measure materialised against that prior through [`factory`](@ref) first, so a moment it carries itself is the one it is built on. A [`Variance`](@ref) or [`StandardDeviation`](@ref) that holds its matrix reads no rows and no prior: it is the set's own second-order cone ``[u; G \\boldsymbol{w}] \\in \\mathcal{K}_{\\mathrm{SOC}}`` with ``G^\\intercal G = \\boldsymbol{\\Sigma}`` and ``u`` the ceiling, ``\\sqrt{\\mathrm{ub}}`` for the variance and ``\\mathrm{ub}`` for the standard deviation, the same cone the shared builder writes ([`set_allocation_risk_ceiling!`](@ref)).
   - `te`: [`set_tracking_error_constraints!`](@ref) over the head's rows, against a [`WeightsTracking`](@ref) benchmark.
   - `card`, `gcard`, `lt`, `st`, `ss`: [`set_mip_constraints!`](@ref), the same builders [`JuMPOptimiser`](@ref) uses, under a MIP-capable `slv`.
 
-A `pe` or `te` on the set reads every row the head has folded — [`rows_needed`](@ref) answers `nothing` — unless `r` holds a matrix and `te` is absent, so a step costs one covariance fit over the whole prefix on top of its programme; a caller who wants a window states it on `pe`. A covariance of one observation does not exist, so while the head holds fewer than two rows the fit is not attempted and the step is a Held Step, recorded as such ([`allocation_set_ready`](@ref)); a caller who wants the ceiling from row one gives `r` its matrix. A MIP projection is not unique, so the identity between the Causal Pass and the Recursion Read-out is a claim about the code path — the same solves in the same order on the same rows — and holds exactly with a deterministic solver.
+A ceiling or a `te` on the set reads every row the head has folded — [`rows_needed`](@ref) answers `nothing` — unless `r` is a variance or standard deviation holding its matrix and `te` is absent, so a step costs one prior fit over the whole prefix on top of its programme; a caller who wants a window states it on `pe`. A covariance of one observation does not exist, so while the head holds fewer than two rows the fit is not attempted and the step is a Held Step, recorded as such ([`allocation_set_ready`](@ref)); a caller who wants a covariance ceiling from row one gives `r` its matrix. A MIP projection is not unique, so the identity between the Causal Pass and the Recursion Read-out is a claim about the code path — the same solves in the same order on the same rows — and holds exactly with a deterministic solver.
 
-The set refuses, by having no field for them: the SDP kinds, exposure constraints in a factor Constraint Space, every other risk measure, fees and a budget. A negative lower bound is admitted under the Euclidean and Gram geometries and refused under the entropic one, at the head's construction when the bound is a value and at the projection when it is resolved from an estimator. The wealth factor of a leveraged allocation can reach zero on an extreme day, where the log wealth and the next gradient are undefined; that is documented here, not guarded.
+The set refuses, by having no field for them: the SDP kinds, exposure constraints in a factor Constraint Space, fees and a budget; a [`Variance`](@ref) with risk-contribution rows on `rc` is an SDP kind and is refused at construction, as is a frontier or a per-asset `ub` ([`assert_risk_ceiling`](@ref)). A measure's `rke` and `scale` are not read: the projection's objective is the geometry's divergence, and the ceiling is a constraint alone. A negative lower bound is admitted under the Euclidean and Gram geometries and refused under the entropic one, at the head's construction when the bound is a value and at the projection when it is resolved from an estimator. The wealth factor of a leveraged allocation can reach zero on an extreme day, where the log wealth and the next gradient are undefined; that is documented here, not guarded.
 
 # Fields
 
@@ -30,7 +30,7 @@ $(DocStringExtensions.FIELDS)
         sets::Option{<:UniverseSets} = nothing,
         lcs::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
         tn::Option{<:Num_VecNum} = nothing,
-        r::Option{<:Union{<:Variance, <:StandardDeviation}} = nothing,
+        r::Option{<:RiskMeasure} = nothing,
         pe::AbstractPriorEstimator = EmpiricalPrior(),
         te::Option{<:TrackingError{<:WeightsTracking}} = nothing,
         card::Option{<:Integer} = nothing,
@@ -114,7 +114,7 @@ ProgrammeAllocationSet
   - [`HeldStep`](@ref)
   - [`OnlinePortfolioSelection`](@ref)
 """
-@concrete struct ProgrammeAllocationSet <: AbstractAllocationSet
+@concrete struct ProgrammeAllocationSet <: AbstractProgrammeAllocationSet
     """
     $(field_dict[:wb])
     """
@@ -132,11 +132,11 @@ ProgrammeAllocationSet
     """
     tn
     """
-    The variance or standard-deviation ceiling, a [`Variance`](@ref) or a [`StandardDeviation`](@ref) whose `settings.ub` is the ceiling, or `nothing`.
+    The risk ceiling, a [`RiskMeasure`](@ref) whose `settings.ub` is the ceiling, or `nothing`.
     """
     r
     """
-    The prior estimator the covariance of `r` and the rows of `te` are read from, fitted on the head's rows at every step; unread when `r` holds a matrix and `te` is absent.
+    The prior estimator `r` is built on and the rows of `te` are read from, fitted on the head's rows at every step; unread when `r` is a variance or standard deviation holding its matrix and `te` is absent.
     """
     pe
     """
@@ -177,8 +177,7 @@ ProgrammeAllocationSet
     so
     function ProgrammeAllocationSet(wb::Option{<:WbE_Wb}, sets::Option{<:UniverseSets},
                                     lcs::Option{<:LcE_Lc_VecLcE_Lc},
-                                    tn::Option{<:Num_VecNum},
-                                    r::Option{<:Union{<:Variance, <:StandardDeviation}},
+                                    tn::Option{<:Num_VecNum}, r::Option{<:RiskMeasure},
                                     pe::AbstractPriorEstimator,
                                     te::Option{<:TrackingError{<:WeightsTracking}},
                                     card::Option{<:Integer}, gcard::Option{<:LcE_Lc},
@@ -207,7 +206,7 @@ function ProgrammeAllocationSet(; slv::Slv_VecSlv, wb::Option{<:WbE_Wb} = Weight
                                 sets::Option{<:UniverseSets} = nothing,
                                 lcs::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
                                 tn::Option{<:Num_VecNum} = nothing,
-                                r::Option{<:Union{<:Variance, <:StandardDeviation}} = nothing,
+                                r::Option{<:RiskMeasure} = nothing,
                                 pe::AbstractPriorEstimator = EmpiricalPrior(),
                                 te::Option{<:TrackingError{<:WeightsTracking}} = nothing,
                                 card::Option{<:Integer} = nothing,
@@ -224,7 +223,7 @@ function port_opt_view(set::ProgrammeAllocationSet, i, args...)
                                   sets = port_opt_view(set.sets, i, args...),
                                   lcs = port_opt_view(set.lcs, i, args...),
                                   tn = nothing_scalar_array_view(set.tn, i),
-                                  r = port_opt_view(set.r, i, args...), pe = set.pe,
+                                  r = port_opt_view(set.r, i, nothing), pe = set.pe,
                                   te = port_opt_view(set.te, i, args...), card = set.card,
                                   gcard = port_opt_view(set.gcard, i, args...),
                                   lt = port_opt_view(set.lt, i, args...),
@@ -250,26 +249,6 @@ function name_keyed(::Union{<:WeightBoundsEstimator, <:LinearConstraintEstimator
 end
 function name_keyed(x::AbstractVector)
     return any(name_keyed, x)
-end
-"""
-    assert_risk_ceiling(r::Nothing)
-    assert_risk_ceiling(r::Union{<:Variance, <:StandardDeviation})
-
-Refuses a risk measure on a [`ProgrammeAllocationSet`](@ref) whose `settings.ub` is not the ceiling: a finite non-negative number.
-
-# Related
-
-  - [`ProgrammeAllocationSet`](@ref)
-  - [`allocation_risk_ceiling`](@ref)
-"""
-function assert_risk_ceiling(::Nothing)::Nothing
-    return nothing
-end
-function assert_risk_ceiling(r::Union{<:Variance, <:StandardDeviation})::Nothing
-    ub = r.settings.ub
-    @argcheck(isa(ub, Number) && isfinite(ub) && ub >= zero(ub),
-              ArgumentError("the ceiling of a `$(nameof(typeof(r)))` on a ProgrammeAllocationSet is its `settings.ub`, a finite non-negative number; got `$ub`"))
-    return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -299,16 +278,16 @@ end
 """
     rows_needed(set::ProgrammeAllocationSet)
 
-The rows a programme set reads at a step: `nothing`, every row folded, when it carries a tracking error or a ceiling whose covariance is fitted; `0` otherwise.
+The rows a programme set reads at a step: `nothing`, every row folded, when it carries a tracking error or a ceiling that reads the head's rows ([`risk_reads_rows`](@ref)); `0` otherwise.
 
 # Related
 
   - [`ProgrammeAllocationSet`](@ref)
   - [`rows_needed`](@ref)
+  - [`risk_reads_rows`](@ref)
 """
 function rows_needed(set::ProgrammeAllocationSet)
-    fitted = !isnothing(set.r) && !isa(set.r.sigma, AbstractMatrix)
-    return (fitted || !isnothing(set.te)) ? nothing : 0
+    return (risk_reads_rows(set.r) || !isnothing(set.te)) ? nothing : 0
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -613,7 +592,7 @@ end
     set_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet, w::AbstractVector, X)
     set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet, w::AbstractVector, X)
 
-Adds the constraints of a resolved Allocation Set to a model that already carries `w`, `k`, the scales and the observation count: the budget one and the weight bounds on both kinds, and on the programme set every admissible kind through the shared builders, the turnover ceiling measured from `w`, the set's own variance cone and the tracking error over `X`.
+Adds the constraints of a resolved Allocation Set to a model that already carries `w`, `k`, the scales and the observation count: the budget one and the weight bounds on both kinds, and on the programme set every admissible kind through the shared builders, the turnover ceiling measured from `w`, the risk ceiling and the tracking error over `X`.
 
 The bare projection model of [`project`](@ref) is one caller; a JuMP head that takes the set as its programme's feasible region is another.
 
@@ -641,6 +620,7 @@ The bare projection model of [`project`](@ref) is one caller; a JuMP head that t
   - [`_set_turnover_constraints!`](@ref)
   - [`set_tracking_error_constraints!`](@ref)
   - [`set_mip_constraints!`](@ref)
+  - [`set_allocation_risk_ceiling!`](@ref)
 """
 function set_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet,
                                          ::AbstractVector, ::Any)::Nothing
@@ -657,7 +637,7 @@ function set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAlloca
         _set_turnover_constraints!(model, Turnover(; w = w, val = set.tn))
     end
     pr = allocation_set_prior(set, X)
-    set_allocation_risk_cone!(model, set.r, pr)
+    set_allocation_risk_ceiling!(model, set.r, set, pr)
     if !isnothing(set.te)
         set_tracking_error_constraints!(model, 1, pr, set.te)
     end
@@ -669,7 +649,7 @@ end
 
 Adds the constraints of a resolved Allocation Set to a JuMP head's model mid-assembly, the arm of the Allocation Set Constraint a [`FollowTheLeader`](@ref) rule appends to its held optimiser.
 
-The head's own builders have already registered the model's named entries — its weight bounds, its budget, its turnover and tracking-error terms under their indices — so this arm adds the set's rows without a name where the bare projection model names them: the bounds and the budget of one as anonymous constraints, the linear constraints under the `:aset_` prefix, the turnover ceiling and the tracking error at the first index the model has not used, the variance cone under its own name. Every row is the same inequality [`set_allocation_set_constraints!`](@ref) writes, so the leader's feasible region is the set intersected with whatever the head carries itself. The tracking error is written over the head's rows `X` and their count, not the selection's, which the model's own observation count and net-return expression describe.
+The head's own builders have already registered the model's named entries — its weight bounds, its budget, its turnover and tracking-error terms under their indices — so this arm adds the set's rows without a name where the bare projection model names them: the bounds and the budget of one as anonymous constraints, the linear constraints under the `:aset_` prefix, the turnover ceiling and the tracking error at the first index the model has not used, the risk ceiling under the `:aset_` namespace with the head's `w` registered there, so its entries never meet the head's own measures'. Every row is the same inequality [`set_allocation_set_constraints!`](@ref) writes, so the leader's feasible region is the set intersected with whatever the head carries itself. The tracking error is written over the head's rows `X` and their count, not the selection's, which the model's own observation count and net-return expression describe.
 
 A MIP kind of the set — cardinality, a threshold, a group cardinality — registers the model's indicator variables, which one model holds once, so a MIP kind is stated in one home: on the set, or on the held optimiser.
 
@@ -706,7 +686,7 @@ function add_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAlloca
                                    free_state_index(model, :t_tn_))
     end
     pr = allocation_set_prior(set, X)
-    set_allocation_risk_cone!(model, set.r, pr)
+    set_allocation_risk_ceiling!(model, set.r, set, pr; prefix = :aset_)
     if !isnothing(set.te)
         add_allocation_tracking_error!(model, set.te, pr.X)
     end
@@ -840,72 +820,6 @@ function set_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds)::Nothin
     set_weight_constraints!(model, wb, nothing, nothing)
     set_budget_constraints!(model, 1, get_w(model))
     return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-The prior result a programme set's covariance cone and tracking error read: `pe` fitted on the head's rows, or `nothing` when the set reads none.
-
-# Related
-
-  - [`ProgrammeAllocationSet`](@ref)
-  - [`set_allocation_set_constraints!`](@ref)
-"""
-function allocation_set_prior(set::ProgrammeAllocationSet, X)
-    if isnothing(rows_needed(set))
-        @argcheck(!isnothing(X),
-                  ArgumentError("a ProgrammeAllocationSet with a fitted covariance ceiling or a tracking error reads the head's rows, which reach a projection inside an Online Update alone; `project` was called with none."))
-        assert_factor_returns(set.pe, nothing)
-        return prior(set.pe, X, nothing, nothing)
-    end
-    return nothing
-end
-"""
-    set_allocation_risk_cone!(model::JuMP.Model, r::Nothing, pr)
-    set_allocation_risk_cone!(model::JuMP.Model, r::Variance, pr)
-    set_allocation_risk_cone!(model::JuMP.Model, r::StandardDeviation, pr)
-
-Adds a programme set's own second-order cone, ``[u k; G \\boldsymbol{w}] \\in \\mathcal{K}_{\\mathrm{SOC}}`` with ``G`` the Cholesky factor of the covariance and ``u`` the ceiling: the square root of a [`Variance`](@ref)'s `settings.ub`, and a [`StandardDeviation`](@ref)'s as it is.
-
-The covariance is `r`'s own matrix when it holds one, and the prior result's otherwise. The factor is taken without a definiteness check: a covariance the prior's own processing left indefinite reaches the solver, whose failure is the step's Held Step.
-
-# Related
-
-  - [`ProgrammeAllocationSet`](@ref)
-  - [`set_allocation_set_constraints!`](@ref)
-  - [`HeldStep`](@ref)
-"""
-function set_allocation_risk_cone!(::JuMP.Model, ::Nothing, ::Any)::Nothing
-    return nothing
-end
-function set_allocation_risk_cone!(model::JuMP.Model,
-                                   r::Union{<:Variance, <:StandardDeviation}, pr)::Nothing
-    sigma = isa(r.sigma, AbstractMatrix) ? r.sigma : factory(r, pr).sigma
-    G = LinearAlgebra.cholesky(LinearAlgebra.Symmetric(sigma); check = false).U
-    u = allocation_risk_ceiling(r)
-    w = get_w(model)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    JuMP.@constraint(model, set_risk_soc,
-                     [sc * u * k; sc * (G * w)] in JuMP.SecondOrderCone())
-    return nothing
-end
-"""
-    allocation_risk_ceiling(r::Variance)
-    allocation_risk_ceiling(r::StandardDeviation)
-
-The bound on the cone variable of [`set_allocation_risk_cone!`](@ref): the square root of a [`Variance`](@ref)'s `settings.ub`, and a [`StandardDeviation`](@ref)'s as it is.
-
-# Related
-
-  - [`set_allocation_risk_cone!`](@ref)
-  - [`ProgrammeAllocationSet`](@ref)
-"""
-function allocation_risk_ceiling(r::Variance)
-    return sqrt(r.settings.ub)
-end
-function allocation_risk_ceiling(r::StandardDeviation)
-    return r.settings.ub
 end
 """
     set_projection_objective!(model::JuMP.Model, proj::EuclideanProjection, q::AbstractVector)
@@ -1062,7 +976,7 @@ end
     allocation_set_ready(set::AbstractAllocationSet, X)
     allocation_set_ready(set::ProgrammeAllocationSet, X)
 
-Whether a set's constraints can be formed on the rows `X` the step holds: `nothing` when they can, and the reason for a Held Step when they cannot — a programme set whose prior is fitted, while the head holds fewer than two rows, because a covariance of one observation does not exist.
+Whether a set's constraints can be formed on the rows `X` the step holds: `nothing` when they can, and the reason for a Held Step when they cannot — a programme set that fits its prior on the rows, while the head holds fewer than two, because a covariance of one observation does not exist.
 
 # Related
 

@@ -1,12 +1,11 @@
 ```@meta
-Description = "The programme Allocation Set and the Constrained Update's programme, private API of PortfolioOptimisers.jl: name_keyed, assert_risk_ceiling, …"
+Description = "The programme Allocation Set and the Constrained Update's programme, private API of PortfolioOptimisers.jl: name_keyed, assert_mirror_base, …"
 ```
 
 # The programme Allocation Set and the Constrained Update's programme: private API
 
 ```@docs
 PortfolioOptimisers.name_keyed
-PortfolioOptimisers.assert_risk_ceiling
 PortfolioOptimisers.assert_mirror_base
 PortfolioOptimisers.barrier_projection
 PortfolioOptimisers.barrier_upper_bracket
@@ -18,9 +17,6 @@ PortfolioOptimisers.add_allocation_set_bounds!
 PortfolioOptimisers.free_state_index
 PortfolioOptimisers.add_allocation_tracking_error!
 PortfolioOptimisers.add_allocation_tracking_cone!
-PortfolioOptimisers.allocation_set_prior
-PortfolioOptimisers.set_allocation_risk_cone!
-PortfolioOptimisers.allocation_risk_ceiling
 PortfolioOptimisers.set_projection_objective!
 PortfolioOptimisers.barrier_objective_entries
 PortfolioOptimisers.projection_solver

@@ -207,39 +207,6 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the Allocation Set an [`OnlinePortfolioSelection`](@ref) head holds on `set`: the set every allocation of the recursion lies in.
-
-The budget is one on every set, so `⟨w, x⟩` is the wealth factor every rule's formula assumes; cash is an asset with price relative one, which the rule allocates like any other.
-
-# Interfaces
-
-In order to implement a new set kind, subtype `AbstractAllocationSet` with its constraint objects as part of the struct, and implement:
-
-  - `resolve_allocation_set(set::AbstractAllocationSet, N::Integer, strict::Bool, datatype::DataType) -> AbstractAllocationSet`: The set with every estimator resolved to a value over the `N` assets, which the projection then reads.
-  - `project(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector) -> AbstractVector`: The projection onto the resolved set, for every geometry the set admits.
-  - `rows_needed(set::AbstractAllocationSet) -> Union{Nothing, Integer}`: The number of rows the set's constraints read at a step, `0` for a set that reads none.
-
-## Arguments
-
-  - `set`: The set.
-  - `N`: The number of assets of the universe the set is resolved over.
-  - `strict`: Whether an unknown name in a set is an error.
-  - `datatype`: The element type a scalar bound is expanded in.
-
-## Returns
-
-  - `set::AbstractAllocationSet`: The resolved set.
-
-# Related
-
-  - [`BoundedAllocationSet`](@ref)
-  - [`project`](@ref)
-  - [`AbstractProjectionGeometry`](@ref)
-"""
-abstract type AbstractAllocationSet <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 The Allocation Set of weight bounds alone: `Σw = 1` and `lb ≤ w ≤ ub`, with no solver field, because every projection onto it is closed form.
 
 The default, `BoundedAllocationSet()`, is the simplex. Every projection onto the set is closed form: under the simplex bounds the sort of Duchi and co-authors in the Euclidean geometry and plain normalisation in the entropic one, and under any other bound a scalar root — `w = clip(q − θ, lb, ub)` for the `θ` that restores the budget, or `w = clip(q / Z, lb, ub)` for the `Z` that does — found by bisection. A negative lower bound is admitted under the Euclidean geometry and refused under the entropic one, whose `log w` is undefined below zero.

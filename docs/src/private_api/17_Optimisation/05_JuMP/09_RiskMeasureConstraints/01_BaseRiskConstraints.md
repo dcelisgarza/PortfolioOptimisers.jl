@@ -7,9 +7,13 @@ Description = "Base Risk Constraints, private API of PortfolioOptimisers.jl: Abs
 ```@docs
 AbstractRiskSeriesAlgorithm
 NonFRCJuMPOpt
+RiskConstraintOwner
+RiskBoundOwner
+risk_constraint_solver(opt::JuMPOptimisationEstimator)
 NetReturnsRiskSeries
 DrawdownRiskSeries
-set_risk_constraints!(model::JuMP.Model, r::RiskMeasure, opt::JuMPOptimisationEstimator, pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing; kwargs...)
+set_risk_constraints!(model::JuMP.Model, r::RiskMeasure, opt::Union{<:JuMPOptimisationEstimator, <:AbstractProgrammeAllocationSet}, pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing; kwargs...)
+set_resolved_risk_constraints!
 risk_frontier_length
 set_risk_frontier_owner!
 set_risk_upper_bound!

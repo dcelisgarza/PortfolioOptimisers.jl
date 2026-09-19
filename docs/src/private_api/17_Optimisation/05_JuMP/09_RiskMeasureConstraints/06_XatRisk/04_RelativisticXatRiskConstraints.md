@@ -5,8 +5,8 @@ Description = "Relativistic XatRisk Constraints, private API of PortfolioOptimis
 # Relativistic XatRisk Constraints: private API
 
 ```@docs
-set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRisk, opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...; kwargs...)
-set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRiskRange, opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...; kwargs...)
-set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdownatRisk, opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...; kwargs...)
+set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRisk, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
+set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRiskRange, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
+set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdownatRisk, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 set_relativistic_risk_constraints!
 ```

@@ -29,8 +29,8 @@ Any prior result is accepted. Both tensors must resolve, on their child or on th
   - [`dup_elim_sum_selector`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosis,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     assert_high_order_quantity(r.sk.sk, pr, :VarianceSkewKurtosis, :sk,
                                :CoskewnessEstimator)
     assert_high_order_quantity(r.kt.kt, pr, :VarianceSkewKurtosis, :kt,

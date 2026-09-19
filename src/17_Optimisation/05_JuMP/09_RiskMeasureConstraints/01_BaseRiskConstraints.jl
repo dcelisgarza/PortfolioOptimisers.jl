@@ -13,6 +13,48 @@ Matches [`MeanRisk`](@ref), [`NearOptimalCentering`](@ref), or [`RiskBudgeting`]
 """
 const NonFRCJuMPOpt = Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting}
 """
+    const RiskConstraintOwner = Union{<:RiskJuMPOptimisationEstimator, <:AbstractProgrammeAllocationSet}
+
+The owner of the risk constraint a builder writes: the JuMP optimiser whose programme the constraint joins, or the programme Allocation Set whose projection it joins.
+
+Every `set_risk_constraints!` and `set_risk!` method takes the owner in its `opt` slot and reads it through three methods, which is the whole of what a builder asks of an optimiser: [`risk_constraint_solver`](@ref) for the solver a Deferred Quantity is resolved against, [`risk_contribution_constraints`](@ref) for a [`Variance`](@ref)'s risk-contribution rows, and [`set_risk_upper_bound!`](@ref) for the bound on the risk expression. A [`FactorRiskContribution`](@ref) is an owner whose bound is refused with a warning; a [`RiskBoundOwner`](@ref) is one whose bound is honoured.
+
+# Related
+
+  - [`RiskBoundOwner`](@ref)
+  - [`RiskJuMPOptimisationEstimator`](@ref)
+  - [`AbstractProgrammeAllocationSet`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
+const RiskConstraintOwner = Union{<:RiskJuMPOptimisationEstimator,
+                                  <:AbstractProgrammeAllocationSet}
+"""
+    const RiskBoundOwner = Union{<:NonFRCJuMPOpt, <:AbstractProgrammeAllocationSet}
+
+The [`RiskConstraintOwner`](@ref)s that honour a risk measure's `settings.ub`: the JuMP optimisers that do not use factor risk contribution, and the programme Allocation Set, whose `ub` is the ceiling of its projection.
+
+# Related
+
+  - [`RiskConstraintOwner`](@ref)
+  - [`NonFRCJuMPOpt`](@ref)
+  - [`set_risk_upper_bound!`](@ref)
+"""
+const RiskBoundOwner = Union{<:NonFRCJuMPOpt, <:AbstractProgrammeAllocationSet}
+"""
+    risk_constraint_solver(opt::JuMPOptimisationEstimator)
+
+The solver a risk-measure builder resolves a Deferred Quantity against: the JuMP optimiser's own `opt.slv`. A programme Allocation Set answers its own; see [`AbstractProgrammeAllocationSet`](@ref).
+
+# Related
+
+  - [`RiskConstraintOwner`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+"""
+function risk_constraint_solver(opt::JuMPOptimisationEstimator)
+    return opt.opt.slv
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Collapse the `risk_vec` expression array stored in `model` into a single scalar
@@ -181,14 +223,14 @@ Both overloads resolve the measure through [`resolve_deferred_quantities`](@ref)
 thread the estimator's own solver into that call. This route calls no [`factory`](@ref), so
 no selection has run and a measure that states no solver of its own still holds `nothing`. A
 **Calibration Rule** that reads the solver would see that `nothing`, while the same rule on
-the `factory` route sees the optimiser's. Threading `opt.opt.slv` is what makes the two
-routes resolve one measure against one solver.
+the `factory` route sees the optimiser's. Threading [`risk_constraint_solver`](@ref) is what
+makes the two routes resolve one measure against one solver.
 
 # Arguments
 
   - $(arg_dict[:model])
   - `r`: A [`RiskMeasure`](@ref) instance, or `rs` a vector of risk measures.
-  - $(arg_dict[:opt_jumpe])
+  - `opt`: The owner of the constraint: a [`JuMPOptimisationEstimator`](@ref), or a programme Allocation Set ([`RiskConstraintOwner`](@ref)).
   - $(arg_dict[:pr])
   - $(arg_dict[:pl_opt])
   - $(arg_dict[:fees_opt])
@@ -206,9 +248,11 @@ routes resolve one measure against one solver.
   - [`assert_declared_calibration_resolver`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
-                               opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
-                               b1::Option{<:MatNum} = nothing; kwargs...)
+                               opt::Union{<:JuMPOptimisationEstimator,
+                                          <:AbstractProgrammeAllocationSet},
+                               pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
+                               fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing;
+                               kwargs...)
     # A `JuMP` model builder reads the measure's slots directly and never calls `factory`,
     # so this is where a Deferred Quantity becomes a value. It resolves the deferred state
     # alone; each builder's own prior fallback is untouched.
@@ -231,25 +275,45 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
     # `expected_risk` refuses a surviving Calibration Rule at the value-level entry point,
     # and a `JuMP` builder reads the slot raw, so this route carried no such refusal. A rule
     # that reaches this line names a type that declared the slot and resolved it nowhere.
-    first = risk_frontier_length(model)
-    resolved = resolve_deferred_quantities(r, pr, opt.opt.slv)
-    assert_declared_calibration_resolver(resolved)
-    set_risk_constraints!(model, 1, unit_scale_risk_measure(resolved), opt, pr, pl, fees,
-                          b1; kwargs...)
-    set_risk_frontier_owner!(model, first, 1)
+    set_resolved_risk_constraints!(model, 1, unit_scale_risk_measure(r), opt, pr, pl, fees,
+                                   b1; kwargs...)
     return nothing
 end
-function set_risk_constraints!(model::JuMP.Model, rs::VecRM, opt::JuMPOptimisationEstimator,
+function set_risk_constraints!(model::JuMP.Model, rs::VecRM,
+                               opt::Union{<:JuMPOptimisationEstimator,
+                                          <:AbstractProgrammeAllocationSet},
                                pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
                                fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing;
                                kwargs...)
     for (i, r) in enumerate(rs)
-        first = risk_frontier_length(model)
-        resolved = resolve_deferred_quantities(r, pr, opt.opt.slv)
-        assert_declared_calibration_resolver(resolved)
-        set_risk_constraints!(model, i, resolved, opt, pr, pl, fees, b1; kwargs...)
-        set_risk_frontier_owner!(model, first, i)
+        set_resolved_risk_constraints!(model, i, r, opt, pr, pl, fees, b1; kwargs...)
     end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build one measure's constraints at index `i`: resolve its Deferred Quantities against the owner's solver ([`risk_constraint_solver`](@ref)), refuse a Calibration Rule that survived, build through the index-aware `set_risk_constraints!`, and stamp the measure onto the frontier entries it registered.
+
+The body both `set_risk_constraints!` entry points share, written once so the single-measure and the vector routes resolve one measure the same way.
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`set_risk_frontier_owner!`](@ref)
+"""
+function set_resolved_risk_constraints!(model::JuMP.Model, i::Integer, r::RiskMeasure,
+                                        opt::Union{<:JuMPOptimisationEstimator,
+                                                   <:AbstractProgrammeAllocationSet},
+                                        pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
+                                        fees::Option{<:Fees}, b1::Option{<:MatNum};
+                                        kwargs...)
+    first = risk_frontier_length(model)
+    resolved = resolve_deferred_quantities(r, pr, risk_constraint_solver(opt))
+    assert_declared_calibration_resolver(resolved)
+    set_risk_constraints!(model, i, resolved, opt, pr, pl, fees, b1; kwargs...)
+    set_risk_frontier_owner!(model, first, i)
     return nothing
 end
 """
@@ -332,7 +396,7 @@ and `owner` is written here as `0`. The measure that registered the entry is not
 depth, so [`set_risk_frontier_owner!`](@ref) stamps it from the loop that enumerates the
 measures. The `Number` overload adds the constraint
 `sc * (r_expr - ub * k) <= 0` directly to the model. The fall-through method emits a
-warning: a non-`nothing` bound with an optimiser outside [`NonFRCJuMPOpt`](@ref) is
+warning: a non-`nothing` bound with an owner outside [`RiskBoundOwner`](@ref) is
 ignored, which would otherwise happen silently.
 
 # Arguments
@@ -386,7 +450,7 @@ function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
     end
     return nothing
 end
-function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
+function set_risk_upper_bound!(model::JuMP.Model, ::RiskBoundOwner,
                                r_expr::JuMP.AbstractJuMPScalar, ub::Number, key,
                                flag::Bool = true)
     k = get_k(model)
@@ -467,8 +531,7 @@ with `settings.scale` and `settings.rke`.
   - [`set_risk_expression!`](@ref)
   - [`state_key`](@ref)
 """
-function set_risk_bounds_and_expression!(model::JuMP.Model,
-                                         opt::RiskJuMPOptimisationEstimator,
+function set_risk_bounds_and_expression!(model::JuMP.Model, opt::RiskConstraintOwner,
                                          r_expr::JuMP.AbstractJuMPScalar,
                                          settings::RiskMeasureSettings, name::Symbol,
                                          flag::Bool = true; prefix::Symbol = Symbol(""))
@@ -477,8 +540,7 @@ function set_risk_bounds_and_expression!(model::JuMP.Model,
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
 end
-function set_risk_bounds_and_expression!(model::JuMP.Model,
-                                         opt::RiskJuMPOptimisationEstimator,
+function set_risk_bounds_and_expression!(model::JuMP.Model, opt::RiskConstraintOwner,
                                          r_expr::JuMP.AbstractJuMPScalar,
                                          settings::RiskMeasureSettings, name::Symbol, i,
                                          flag::Bool = true; prefix::Symbol = Symbol(""))
@@ -588,7 +650,7 @@ a range nested in a range stays collision-free.
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_range_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
-                                     name::Symbol, opt::RiskJuMPOptimisationEstimator,
+                                     name::Symbol, opt::RiskConstraintOwner,
                                      pr::AbstractPriorResult, args...;
                                      prefix::Symbol = Symbol(""), kwargs...)
     (; loss, gain) = range_tails(r)

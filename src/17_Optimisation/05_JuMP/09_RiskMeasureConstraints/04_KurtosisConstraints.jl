@@ -103,7 +103,7 @@ constraint.
 """
 function set_kurtosis_risk!(model::JuMP.Model,
                             r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:SOCRiskExpr}, opt::RiskJuMPOptimisationEstimator,
+                                        <:SOCRiskExpr}, opt::RiskConstraintOwner,
                             sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, ::Any, i;
                             prefix::Symbol = Symbol(""))
     set_risk_bounds_and_expression!(model, opt, sqrt_kurtosis_risk, r.settings,
@@ -112,8 +112,7 @@ function set_kurtosis_risk!(model::JuMP.Model,
 end
 function set_kurtosis_risk!(model::JuMP.Model,
                             r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:SquaredSOCRiskExpr},
-                            opt::RiskJuMPOptimisationEstimator,
+                                        <:SquaredSOCRiskExpr}, opt::RiskConstraintOwner,
                             sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, ::Any, i;
                             prefix::Symbol = Symbol(""))
     qsqrt_kurtosis_risk = state_set!(model, prefix, :sq_kurtosis_risk_, i,
@@ -126,7 +125,7 @@ function set_kurtosis_risk!(model::JuMP.Model,
 end
 function set_kurtosis_risk!(model::JuMP.Model,
                             r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:QuadRiskExpr}, opt::RiskJuMPOptimisationEstimator,
+                                        <:QuadRiskExpr}, opt::RiskConstraintOwner,
                             sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, x_kurt, i;
                             prefix::Symbol = Symbol(""))
     qsqrt_kurtosis_risk = state_set!(model, prefix, :qd_kurtosis_risk_, i,
@@ -140,7 +139,7 @@ function set_kurtosis_risk!(model::JuMP.Model,
 end
 function set_kurtosis_risk!(model::JuMP.Model,
                             r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:RSOCRiskExpr}, opt::RiskJuMPOptimisationEstimator,
+                                        <:RSOCRiskExpr}, opt::RiskConstraintOwner,
                             sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, x_kurt, i;
                             prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
@@ -210,7 +209,7 @@ where ``\\mathbf{K}`` is the co-kurtosis matrix and ``\\mathbf{S}_2`` is the dup
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Integer, <:Any,
-                                           <:Any}, opt::RiskJuMPOptimisationEstimator,
+                                           <:Any}, opt::RiskConstraintOwner,
                                pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     assert_high_order_quantity(r.kt, pr, :Kurtosis, :kt, :CokurtosisEstimator)
@@ -292,7 +291,7 @@ they are a pure function of the asset count.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::Kurtosis{<:Any, <:Any, <:Any, <:Any, Nothing, <:Any,
-                                           <:Any}, opt::RiskJuMPOptimisationEstimator,
+                                           <:Any}, opt::RiskConstraintOwner,
                                pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     assert_high_order_quantity(r.kt, pr, :Kurtosis, :kt, :CokurtosisEstimator)

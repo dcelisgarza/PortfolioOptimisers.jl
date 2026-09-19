@@ -7,5 +7,5 @@ Description = "Negative Skewness Constraints, private API of PortfolioOptimisers
 ```@docs
 get_chol_or_V_pm
 set_negative_skewness_risk!
-set_risk_constraints!(model::JuMP.Model, i::Any, r::NegativeSkewness, opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...; kwargs...)
+set_risk_constraints!(model::JuMP.Model, i::Any, r::NegativeSkewness, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 ```

@@ -6,5 +6,5 @@ Description = "Worst Realisation Constraints, private API of PortfolioOptimisers
 
 ```@docs
 set_wr_risk_expression!
-set_risk_constraints!(model::JuMP.Model, ::Any, r::WorstRealisation, opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...; kwargs...)
+set_risk_constraints!(model::JuMP.Model, ::Any, r::WorstRealisation, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 ```

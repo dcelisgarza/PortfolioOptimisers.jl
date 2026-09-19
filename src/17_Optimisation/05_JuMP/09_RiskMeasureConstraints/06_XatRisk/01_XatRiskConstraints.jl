@@ -66,9 +66,8 @@ where ``z_\\alpha`` is the distribution quantile at level ``\\alpha`` and ``\\ma
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
-                               kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
     s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
     series, T = risk_series(model, NetReturnsRiskSeries(), pr; loss = loss, prefix = prefix)
@@ -123,7 +122,7 @@ the binaries and the cardinality constraint are written once.
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_mip_quantile_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
-                                            opt::RiskJuMPOptimisationEstimator,
+                                            opt::RiskConstraintOwner,
                                             pr::AbstractPriorResult, series, T::Int,
                                             b::Number, s::Number, keys::NamedTuple;
                                             prefix::Symbol = Symbol(""))
@@ -189,8 +188,8 @@ VaR expressions. Each tail brings its own binary indicator set and big-M block.
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
                                                    <:MIPValueatRisk},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     return set_range_risk_constraints!(model, i, r, :var_range_risk_, opt, pr, args...;
                                        prefix = prefix, kwargs...)
 end
@@ -227,9 +226,8 @@ constraint to bound the portfolio standard deviation. The VaR expression is
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any,
                                               <:DistributionValueatRisk},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
-                               kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
     G = chol_sigma_selector(model, pr, r.alg)
@@ -283,8 +281,8 @@ between the lower-tail and upper-tail VaR expressions.
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
                                                    <:DistributionValueatRisk},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
     G = chol_sigma_selector(model, pr, r.alg)
@@ -340,8 +338,8 @@ the empirical drawdown quantile at confidence level `r.alpha`.
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::DrawdownatRisk,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     b = ifelse(!isnothing(r.b), r.b, 1e3)
     s = ifelse(!isnothing(r.s), r.s, 1e-5)
     series, T = risk_series(model, DrawdownRiskSeries(), pr; prefix = prefix)

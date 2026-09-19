@@ -40,8 +40,8 @@ where ``dd_t`` is the portfolio drawdown at time ``t`` (see [`set_drawdown_const
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::AverageDrawdown,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
     T = length(dd) - 1
     wi = nothing_scalar_array_selector(r.w, pr.w)

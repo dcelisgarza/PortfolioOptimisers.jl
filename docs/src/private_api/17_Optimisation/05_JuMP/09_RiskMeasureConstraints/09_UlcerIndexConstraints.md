@@ -5,5 +5,5 @@ Description = "Ulcer Index Constraints, private API of PortfolioOptimisers.jl: s
 # Ulcer Index Constraints: private API
 
 ```@docs
-set_risk_constraints!(model::JuMP.Model, ::Any, r::UlcerIndex, opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...; kwargs...)
+set_risk_constraints!(model::JuMP.Model, ::Any, r::UlcerIndex, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 ```

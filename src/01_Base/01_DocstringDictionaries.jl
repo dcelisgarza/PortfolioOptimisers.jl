@@ -278,7 +278,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :seed => "`seed`: Seed for the random number generator.",
                                  # JuMP Optimisation
                                  :model => "`model::JuMP.Model`: The JuMP optimisation model.",
-                                 :opt_rjumpe => "`opt::RiskJuMPOptimisationEstimator`: Risk-based optimisation estimator.",
+                                 :opt_rjumpe => "`opt::RiskConstraintOwner`: The owner of the risk constraint, a risk-based JuMP optimisation estimator or a programme Allocation Set.",
                                  :opt_jumpe => "`opt::JuMPOptimisationEstimator`: JuMP optimisation estimator.",
                                  :ci => "`i`: Constraint index for unique variable and constraint naming.",
                                  :wb_arg => "`wb::WeightBounds`: Weight bound specification containing lower and upper bounds.",

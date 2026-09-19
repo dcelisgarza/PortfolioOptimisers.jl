@@ -49,11 +49,14 @@ ceiling. Six facts measured on `dev` at `a44e79c271` shaped the decision.
 - **The constraint builders are reusable on a bare model, except two.**
   `set_weight_constraints!`, `set_linear_weight_constraints!` on `linear_constraints(lcs, sets)`,
   `_set_turnover_constraints!` and the MIP builders take `model` plus the constraint object and
-  read `w`, `k` and the scales off the model. The risk-measure builders dispatch on
-  `NonFRCJuMPOpt`, a `Union` of the four concrete JuMP optimisers, and read `opt.sets` and
-  `opt.opt.strict`; the tracking-error builders take a prior result. A variance bound on its own
-  is a ten-line second-order cone, `[ub; G w] ∈ SOC` with `G` the Cholesky factor of `sigma`, and a
-  tracking error over the head's rows of returns is `‖X w − b‖ ≤ err √T`.
+  read `w`, `k` and the scales off the model. The risk-measure builders take the optimiser in
+  their `opt` slot and read three things off it: the solver a Deferred Quantity is resolved
+  against, the `sets` and `strict` a `Variance`'s risk-contribution rows are resolved over, and
+  the dispatch that decides whether `settings.ub` is honoured. Nothing else of the optimiser
+  reaches a builder; `pr` carries the returns and the moments. The tracking-error builders take a
+  prior result. A variance bound on its own is a ten-line second-order cone, `[ub; G w] ∈ SOC`
+  with `G` the Cholesky factor of `sigma`, and a tracking error over the head's rows of returns is
+  `‖X w − b‖ ≤ err √T`.
 - **A budget is a cash column.** The library's wealth recursion at any budget is `1 + ⟨w, r⟩`;
   under `Σw = 1` it is `⟨w, x⟩`, the form every rule's formula uses — the gradient `x / ⟨w, x⟩`,
   the loss `⟨w, x⟩ ≤ ε`, the Newton gradient. A budget below one with idle cash is exactly a
@@ -119,24 +122,49 @@ any rule at its default geometry on the default set — solves nothing.
 
 ### The admissible constraints, and the refusals
 
-The programme set admits the kinds whose builders take a model and an object, plus the two cones
-it writes itself: weight bounds (`wb`, `sets`); linear constraints in the asset basis (`lcs` over
+The programme set admits the kinds whose builders take a model and an object, plus the cone it
+writes itself: weight bounds (`wb`, `sets`); linear constraints in the asset basis (`lcs` over
 `sets`); a turnover ceiling (`tn`), the library's per-asset `|w_i − ŵ_i| ≤ tn_i`, whose reference
 is the Price-Adjusted Allocation `ŵ_t = w_t .* x_t / ⟨w_t, x_t⟩` of the update, the book the step
 trades from, computed in-step on that row — the executed trade, never the distance between two
-targets (ADR 0160); a `Variance` or
-`StandardDeviation` upper bound (`r`) from a `pe` on the set, fitted on the head's rows as ADR 0158
-rules, through the set's own second-order cone; a tracking error (`te`) over the head's rows; and
-the MIP kinds — cardinality, group cardinality, thresholds and semi-continuous bounds — through the
-same `model + wb + card + MIPSpace` builders `JuMPOptimiser` uses, under a MIP-capable `slv`.
+targets (ADR 0160); a risk ceiling (`r`) under any `RiskMeasure`, its `settings.ub` the number,
+built by the measure's own JuMP builder on the prior result of `pe` fitted on the head's rows as
+ADR 0158 rules; a tracking error (`te`) over the head's rows; and the MIP kinds — cardinality,
+group cardinality, thresholds and semi-continuous bounds — through the same
+`model + wb + card + MIPSpace` builders `JuMPOptimiser` uses, under a MIP-capable `slv`.
+
+The risk ceiling reaches the shared builders because the builders' `opt` slot takes a **Risk
+Constraint Owner**, `RiskConstraintOwner = Union{<:RiskJuMPOptimisationEstimator,
+<:AbstractProgrammeAllocationSet}`, and reads it through three methods that are the whole of what
+a builder asks of an optimiser: `risk_constraint_solver` for the solver a Deferred Quantity is
+resolved against, `risk_contribution_constraints` for a `Variance`'s risk-contribution rows, and
+`set_risk_upper_bound!` for the bound, honoured for a `RiskBoundOwner` (the optimisers outside
+factor risk contribution, and the programme set). `ProgrammeAllocationSet` subtypes
+`AbstractProgrammeAllocationSet`, an Allocation Set whose projection is a programme, which lives in
+`01_Base` with `AbstractAllocationSet` so the builders can name it. The set answers its own `slv`,
+and answers a `Variance`'s `rc` as it is, because its constructor refuses one. Every existing
+`set_risk_constraints!` method keeps its argument list; the `opt` annotation widened from the
+optimiser type to the union, and no caller changed. The three optimiser reads had been written
+inline in the builders (`opt.opt.slv` at three sites, `opt.opt.sets` and `opt.opt.strict` at one);
+this is where they became methods.
+
+The set materialises the measure against its prior through `factory` before the build, so a moment
+the measure carries itself is the one it is built on and the model's shared caches — `:G`, `:Gkt`,
+`:GV`, filled once per model from the first prior a builder saw — are never read for the ceiling.
+This is what lets the ceiling join a JuMP leader's model beside the head's own measures, which the
+head built from another prior; there the ceiling's entries live under the `:aset_` namespace with
+the head's `w` registered under it, so a ceiling of the same kind as a head measure never meets it.
+The measure's `rke` is cleared: the projection's objective is the geometry's divergence, and the
+ceiling is a constraint alone. A `Variance` or `StandardDeviation` holding its matrix reads no rows
+and no prior, and there is no prior result without rows, so that one ceiling stays the set's own
+second-order cone — the same cone the shared builder writes — and keeps the ceiling from row one.
 
 It refuses, by having no field for them: the SDP kinds, because a lifted `W = wwᵀ` has no meaning
-in a one-step projection and the variance ceiling has its own cone; exposure constraints in a
-factor Constraint Space, because their loadings come from a factor prior the family does not read
-(the map's factor-forecast fog item); every other risk measure, because its builder belongs to the
-optimiser union and widening that union is a library-wide change no ledger row asks for — filed as
-an issue outside the map; fees, which are a cost and not a constraint, and belong to the
-start-weights-and-drift decision; and a budget, below.
+in a one-step projection — a `Variance` with risk-contribution rows on `rc` is one, refused at
+construction; a frontier or a per-asset `ub`, because a ceiling is one number; exposure constraints
+in a factor Constraint Space, because their loadings come from a factor prior the family does not
+read (the map's factor-forecast fog item); fees, which are a cost and not a constraint, and belong
+to the start-weights-and-drift decision; and a budget, below.
 
 A MIP projection is not unique, so the batch–online identity of ADR 0155 is stated precisely: it
 is a claim about the *code path* — the Causal Pass and the Recursion Read-out run the same solves
@@ -225,8 +253,9 @@ quadratic programme.
   Held Step, `rows_needed(set)` for the covariance and tracking-error kinds, and the four parity
   tests. The head's first build carries `set` from the start.
 - [Issue #1163](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1163), outside the
-  map, asks whether the risk-measure builders can be widened past the optimiser union so a
-  programme set may bound any risk measure.
+  map, asked whether the risk-measure builders could be widened past the optimiser union so a
+  programme set may bound any risk measure. They were, as *The admissible constraints* records:
+  the builders take a Risk Constraint Owner, and the set is one.
 - The map's build sequence is now phrasable: the constraint route was the last decision it waited
   on. The start-weights-and-drift decision, ADR 0160, ruled that the loop threads nothing into the
   update and that the turnover ceiling measures against the Price-Adjusted Allocation.

@@ -126,7 +126,7 @@ via [`set_risk_expression!`](@ref) according to `settings`.
   - [`state_key`](@ref)
 """
 function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
-                                                  opt::RiskJuMPOptimisationEstimator,
+                                                  opt::RiskConstraintOwner,
                                                   r_expr_ub::JuMP.AbstractJuMPScalar,
                                                   ub::Option{<:RkRtBounds}, name::Symbol, i,
                                                   r_expr::JuMP.AbstractJuMPScalar,
@@ -186,7 +186,7 @@ where ``\\mathbf{G}`` is the upper Cholesky factor of ``\\boldsymbol{\\Sigma}`` 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
   - `r`: Risk measure instance (`StandardDeviation` or `Variance`).
-  - $(arg_dict[:opt_jumpe])
+  - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr])
   - $(arg_dict[:pl_opt])
 
@@ -202,7 +202,7 @@ where ``\\mathbf{G}`` is the upper Cholesky factor of ``\\boldsymbol{\\Sigma}`` 
   - [`set_variance_risk!`](@ref)
 """
 function set_risk!(model::JuMP.Model, i::Any, r::StandardDeviation,
-                   opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...;
+                   opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                    prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
@@ -220,7 +220,7 @@ Add standard-deviation, variance, or uncertainty-set variance risk constraints t
 
 Each method builds the appropriate JuMP variables and constraints and then calls
 [`set_risk_bounds_and_expression!`](@ref) or [`set_variance_risk_bounds_and_expression!`](@ref).
-The `Variance` / `NonFRCJuMPOpt` overload automatically chooses between SDP and SOC/quadratic
+The `Variance` / `RiskBoundOwner` overload automatically chooses between SDP and SOC/quadratic
 formulations based on risk-contribution and phylogeny settings.
 
 # Arguments
@@ -228,7 +228,7 @@ formulations based on risk-contribution and phylogeny settings.
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
   - $(arg_dict[:r_risk])
-  - $(arg_dict[:opt_jumpe])
+  - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr])
   - $(arg_dict[:pl_opt])
   - $(arg_dict[:fees_opt])
@@ -244,8 +244,8 @@ formulations based on risk-contribution and phylogeny settings.
   - [`set_ucs_variance_risk!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::StandardDeviation,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     sd_risk, name = set_risk!(model, i, r, opt, pr, args...; prefix = prefix, kwargs...)
     set_risk_bounds_and_expression!(model, opt, sd_risk, r.settings, name, i;
                                     prefix = prefix)
@@ -262,7 +262,7 @@ Returns `false` for `Nothing` (no risk-contribution constraints) and `true` for
 # Arguments
 
   - $(arg_dict[:model])
-  - `opt::NonFRCJuMPOpt`: Optimisation estimator.
+  - `opt::RiskBoundOwner`: The owner of the constraint.
   - `rc`: Risk-contribution constraint (`nothing` or `LinearConstraint`).
 
 # Returns
@@ -273,11 +273,27 @@ Returns `false` for `Nothing` (no risk-contribution constraints) and `true` for
 
   - [`sdp_variance_flag!`](@ref)
 """
-function sdp_rc_variance_flag!(::JuMP.Model, ::NonFRCJuMPOpt, ::Nothing)
+function sdp_rc_variance_flag!(::JuMP.Model, ::RiskBoundOwner, ::Nothing)
     return false
 end
-function sdp_rc_variance_flag!(::JuMP.Model, ::NonFRCJuMPOpt, ::LinearConstraint)
+function sdp_rc_variance_flag!(::JuMP.Model, ::RiskBoundOwner, ::LinearConstraint)
     return true
+end
+"""
+    risk_contribution_constraints(r::Variance, opt::NonFRCJuMPOpt, pr::AbstractPriorResult)
+
+The risk-contribution rows of a [`Variance`](@ref) as the [`RiskConstraintOwner`](@ref) resolves them: on a JuMP optimiser, `r.rc` through [`linear_constraints`](@ref) over the optimiser's `sets` and `strict`, in the element type of the prior's returns. A programme Allocation Set answers its own; see [`ProgrammeAllocationSet`](@ref).
+
+# Related
+
+  - [`RiskConstraintOwner`](@ref)
+  - [`set_risk!`](@ref)
+  - [`sdp_rc_variance_flag!`](@ref)
+"""
+function risk_contribution_constraints(r::Variance, opt::NonFRCJuMPOpt,
+                                       pr::AbstractPriorResult)
+    return linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
+                              strict = opt.opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -540,11 +556,10 @@ function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstrain
     end
     return nothing
 end
-function set_risk!(model::JuMP.Model, i::Any, r::Variance, opt::NonFRCJuMPOpt,
+function set_risk!(model::JuMP.Model, i::Any, r::Variance, opt::RiskBoundOwner,
                    pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC}, args...;
                    prefix::Symbol = Symbol(""), kwargs...)
-    rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
-                            strict = opt.opt.strict)
+    rc = risk_contribution_constraints(r, opt, pr)
     rc_flag = sdp_rc_variance_flag!(model, opt, rc)
     sdp_flag = sdp_variance_flag!(model, rc_flag, pl; prefix = prefix)
     variance_risk = set_variance_risk!(model, i, r, pr, sdp_flag; prefix = prefix)
@@ -565,7 +580,7 @@ and objective contribution according to the variance risk measure settings.
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
   - `r::Variance`: The variance risk measure.
-  - `opt::NonFRCJuMPOpt`: The optimisation estimator.
+  - `opt::RiskBoundOwner`: The optimisation estimator.
   - $(arg_dict[:pr])
   - $(arg_dict[:pl_opt])
 
@@ -579,7 +594,7 @@ and objective contribution according to the variance risk measure settings.
   - [`set_risk_constraints!`](@ref)
   - [`set_risk!`](@ref)
 """
-function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::NonFRCJuMPOpt,
+function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::RiskBoundOwner,
                                pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC}, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     mark_state!(model, prefix, :variance_flag)
@@ -841,8 +856,8 @@ and objective contribution.
   - [`set_ucs_variance_risk!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVariance,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""),
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""),
                                rd::ReturnsResult = ReturnsResult(), kwargs...)
     mark_state!(model, prefix, :variance_flag)
     # The lift is the set's business: the box and the ellipsoid bound a matrix and raise

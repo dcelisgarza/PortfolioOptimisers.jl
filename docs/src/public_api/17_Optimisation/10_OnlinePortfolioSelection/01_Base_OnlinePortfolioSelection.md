@@ -12,7 +12,6 @@ PortfolioOptimisers.AbstractProjectionGeometry
 EuclideanProjection
 EntropicProjection
 GramProjection
-PortfolioOptimisers.AbstractAllocationSet
 PortfolioOptimisers.AbstractLearningRateSchedule
 BoundedAllocationSet
 PortfolioOptimisers.resolve_allocation_set

@@ -9,8 +9,8 @@ every step of the rules; the entropic root under a loose cap equals normalisatio
 programme under a slack linear constraint equals the closed form in both geometries; the
 Gram programme on the bare simplex matches a hand-written quadratic programme.
 =#
-using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, HiGHS,
-      Pajarito, JuMP
+using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, Clarabel,
+      HiGHS, Pajarito, JuMP
 @testset "Online portfolio selection: the Constrained Update seam" begin
     po = PortfolioOptimisers
     OPS = po.OnlinePortfolioSelection
@@ -437,6 +437,140 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, HiG
               [0.7, 0.3] atol = 1e-6
     end
 
+    @testset "Any risk measure as the ceiling (#1163)" begin
+        # The set owns the shared builders' constraint: a measure the JuMP optimisers bound
+        # is a ceiling on the projection, and the refusals are the ones the set cannot build.
+        ub_of(r, ub) = RiskMeasureSettings(; ub = ub, scale = r.settings.scale,
+                                           rke = r.settings.rke)
+        @test_throws ArgumentError ProgrammeAllocationSet(; slv = slv,
+                                                          r = ConditionalValueatRisk())
+        @test_throws ArgumentError ProgrammeAllocationSet(; slv = slv,
+                                                          r = ConditionalValueatRisk(;
+                                                                                     settings = RiskMeasureSettings(;
+                                                                                                                    ub = Frontier(;
+                                                                                                                                  N = 3))))
+        @test_throws ArgumentError ProgrammeAllocationSet(; slv = slv,
+                                                          r = Variance(;
+                                                                       rc = LinearConstraintEstimator(;
+                                                                                                      val = :(A <=
+                                                                                                              0.5)),
+                                                                       settings = RiskMeasureSettings(;
+                                                                                                      ub = 1e-3)))
+        cvar = ConditionalValueatRisk(; settings = RiskMeasureSettings(; ub = 0.02))
+        mdd = MaximumDrawdown(; settings = RiskMeasureSettings(; ub = 0.05))
+        @test isnothing(po.rows_needed(ProgrammeAllocationSet(; slv = slv, r = cvar)))
+        @test po.risk_reads_rows(cvar) && po.risk_reads_rows(Variance())
+        @test !po.risk_reads_rows(nothing) && !po.risk_reads_rows(Variance(; sigma = I(3)))
+        # A two-argument view, the read-out's, carries a tail measure unchanged.
+        @test po.port_opt_view(ProgrammeAllocationSet(; slv = slv, r = cvar), [1, 3]).r ===
+              cvar
+        # The set is a Risk Constraint Owner: its solver, and no risk-contribution rows.
+        cset = resolve(ProgrammeAllocationSet(; slv = slv, r = cvar), 4)
+        @test isa(cset, po.AbstractProgrammeAllocationSet)
+        @test isa(cset, po.RiskConstraintOwner) && isa(cset, po.RiskBoundOwner)
+        @test po.risk_constraint_solver(cset) === slv
+        @test isnothing(po.risk_contribution_constraints(Variance(), cset,
+                                                         prior(EmpiricalPrior(),
+                                                               randn(StableRNG(1), 8, 4))))
+        # Inside a step the ceiling binds on the head's rows: the tail of the projected
+        # allocation meets the number, and differs from the unconstrained projection.
+        rng = StableRNG(19)
+        T, N = 60, 4
+        R = 0.02 .* randn(rng, T, N)
+        R[:, 1] .*= 3
+        q4 = [0.9, 0.05, 0.03, 0.02]
+        w4 = fill(0.25, 4)
+        free = po.project(EuclideanProjection(),
+                          resolve(ProgrammeAllocationSet(; slv = slv), 4), q4, w4)
+        @test expected_risk(cvar, free, R) > 0.02
+        (wc, hc) = po.with_projection_step(() -> po.project(EuclideanProjection(), cset, q4,
+                                                            w4), R, 1)
+        @test isempty(hc)
+        @test expected_risk(cvar, wc, R) <= 0.02 * (1 + 1e-4)
+        @test expected_risk(cvar, wc, R) >= 0.02 * (1 - 1e-2)
+        @test !isapprox(wc, free; atol = 1e-3)
+        # A drawdown ceiling, and a variance built on the fitted prior through the same
+        # route as the tail measures, which agrees with the cone the matrix route writes.
+        mset = resolve(ProgrammeAllocationSet(; slv = slv, r = mdd), 4)
+        (wm, hm) = po.with_projection_step(() -> po.project(EuclideanProjection(), mset, q4,
+                                                            w4), R, 1)
+        @test isempty(hm)
+        @test expected_risk(mdd, wm, R) <= 0.05 * (1 + 1e-4)
+        @test !isapprox(wm, free; atol = 1e-3)
+        S = cov(R)
+        vub = 0.5 * dot(free, S, free)
+        vfit = resolve(ProgrammeAllocationSet(; slv = slv,
+                                              r = Variance(;
+                                                           settings = RiskMeasureSettings(;
+                                                                                          ub = vub))),
+                       4)
+        vmat = resolve(ProgrammeAllocationSet(; slv = slv,
+                                              r = Variance(; sigma = S,
+                                                           settings = RiskMeasureSettings(;
+                                                                                          ub = vub))),
+                       4)
+        (wf, _) = po.with_projection_step(() -> po.project(EuclideanProjection(), vfit, q4,
+                                                           w4), R, 1)
+        @test isapprox(wf, po.project(EuclideanProjection(), vmat, q4, w4); atol = 1e-5)
+        @test dot(wf, S, wf) <= vub * (1 + 1e-4)
+        # The measure's `rke` is cleared and its expression joins no objective: the model
+        # holds the bound and no risk vector, whichever the measure states.
+        rke = ConditionalValueatRisk(;
+                                     settings = RiskMeasureSettings(; ub = 0.02,
+                                                                    rke = true))
+        m = JuMP.Model()
+        po.set_model_scales!(m, 1, 1)
+        po.set_model_observations!(m, T)
+        JuMP.@expression(m, k, 1)
+        JuMP.@variable(m, w[1:4])
+        po.set_allocation_set_constraints!(m,
+                                           resolve(ProgrammeAllocationSet(; slv = slv,
+                                                                          r = rke), 4), w4,
+                                           R)
+        @test haskey(m, :cvar_risk_1_ub) && !haskey(m, :risk_vec)
+        # A measure that needs a quantity the prior does not carry is refused by name.
+        kset = resolve(ProgrammeAllocationSet(; slv = slv,
+                                              r = Kurtosis(;
+                                                           settings = RiskMeasureSettings(;
+                                                                                          ub = 1e-3))),
+                       4)
+        @test_throws ArgumentError po.with_projection_step(() -> po.project(EuclideanProjection(),
+                                                                            kset, q4, w4),
+                                                           R, 1)
+        # Through a head: the tail ceiling holds on every step, and the fold before two
+        # rows is the Held Step every fitted ceiling takes.
+        rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = R,
+                           ts = Date(2020, 1, 1) .+ Day.(0:(T - 1)))
+        copt = OPS(; alg = PassiveAggressiveMeanReversion(),
+                   set = ProgrammeAllocationSet(; slv = slv, r = cvar))
+        rc1 = @test_logs (:warn, r"Held Step at 2020-01-01.*covariance of one observation") match_mode=:any optimise(copt,
+                                                                                                                     po.port_opt_view(rd,
+                                                                                                                                      1:1,
+                                                                                                                                      :))
+        @test isa(rc1.retcode.res, po.HeldStep)
+        rcT = optimise(copt, rd)
+        @test isa(rcT.retcode, OptimisationSuccess)
+        @test expected_risk(cvar, rcT.w, R) <= 0.02 * (1 + 1e-4)
+        # On a JuMP leader's model the ceiling lives in its own namespace beside the head's
+        # measure of the same kind, and both bind: the head's on its selection, the set's
+        # on the head's rows.
+        hcvar = ConditionalValueatRisk(; settings = RiskMeasureSettings(; ub = 0.03))
+        lead = FollowTheLeader(;
+                               opt = MeanRisk(; obj = MaximumReturn(), r = hcvar,
+                                              opt = JuMPOptimiser(; pe = EmpiricalPrior(),
+                                                                  slv = slv,
+                                                                  ret = LogarithmicReturn())))
+        lres = optimise(OPS(; alg = lead,
+                            set = ProgrammeAllocationSet(; slv = slv, r = cvar)), rd)
+        @test isa(lres.retcode, OptimisationSuccess)
+        @test expected_risk(cvar, lres.w, R) <= 0.02 * (1 + 1e-4)
+        @test !isapprox(lres.w,
+                        optimise(OPS(; alg = lead,
+                                     set = ProgrammeAllocationSet(; slv = slv)), rd).w;
+                        atol = 1e-3)
+        @test occursin("RiskConstraintOwner", string(@doc(po.RiskConstraintOwner)))
+        @test occursin("any", string(@doc(ProgrammeAllocationSet)))
+    end
     @testset "Docs and the search seam" begin
         @test occursin("Held Step", string(@doc(po.HeldStep)))
         @test occursin("per-asset", string(@doc(ProgrammeAllocationSet)))

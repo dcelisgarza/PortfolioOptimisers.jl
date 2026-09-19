@@ -75,9 +75,8 @@ Delegates to [`set_wr_risk_expression!`](@ref) to create `wr_risk`, then calls
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::WorstRealisation,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
-                               kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     key = ifelse(loss, :wr_risk, :wr_risk_gain)
     return state_build!(model, prefix, key) do
         wr_risk = set_wr_risk_expression!(model, pr.X; loss = loss, prefix = prefix)

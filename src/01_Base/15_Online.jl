@@ -1635,4 +1635,56 @@ function update_online_estimator(o::Online)
     return update_online_estimator(est)
 end
 
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the Allocation Set an [`OnlinePortfolioSelection`](@ref) head holds on `set`: the set every allocation of the recursion lies in.
+
+The budget is one on every set, so `⟨w, x⟩` is the wealth factor every rule's formula assumes; cash is an asset with price relative one, which the rule allocates like any other.
+
+# Interfaces
+
+In order to implement a new set kind, subtype `AbstractAllocationSet` with its constraint objects as part of the struct, and implement:
+
+  - `resolve_allocation_set(set::AbstractAllocationSet, N::Integer, strict::Bool, datatype::DataType) -> AbstractAllocationSet`: The set with every estimator resolved to a value over the `N` assets, which the projection then reads.
+  - `project(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector) -> AbstractVector`: The projection onto the resolved set, for every geometry the set admits.
+  - `rows_needed(set::AbstractAllocationSet) -> Union{Nothing, Integer}`: The number of rows the set's constraints read at a step, `0` for a set that reads none.
+
+## Arguments
+
+  - `set`: The set.
+  - `N`: The number of assets of the universe the set is resolved over.
+  - `strict`: Whether an unknown name in a set is an error.
+  - `datatype`: The element type a scalar bound is expanded in.
+
+## Returns
+
+  - `set::AbstractAllocationSet`: The resolved set.
+
+# Related
+
+  - [`BoundedAllocationSet`](@ref)
+  - [`project`](@ref)
+  - [`AbstractProjectionGeometry`](@ref)
+"""
+abstract type AbstractAllocationSet <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for an Allocation Set whose projection is a programme: a bare JuMP model the set's constraints are written into, which is what lets the set own a risk constraint the shared risk-measure builders write, as a [`RiskConstraintOwner`](@ref) beside the JuMP optimisers.
+
+# Interfaces
+
+In order to implement a new programme set, subtype `AbstractProgrammeAllocationSet`, implement everything [`AbstractAllocationSet`](@ref) asks for, and implement:
+
+  - `risk_constraint_solver(set::AbstractProgrammeAllocationSet)`: The solver a Deferred Quantity of the set's risk measure is resolved against.
+
+# Related
+
+  - [`AbstractAllocationSet`](@ref)
+  - [`RiskConstraintOwner`](@ref)
+  - [`risk_constraint_solver`](@ref)
+"""
+abstract type AbstractProgrammeAllocationSet <: AbstractAllocationSet end
+
 export Online

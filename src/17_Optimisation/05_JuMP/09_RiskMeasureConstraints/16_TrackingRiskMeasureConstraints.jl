@@ -51,8 +51,8 @@ where ``\\boldsymbol{b}`` is the benchmark return series, ``k`` is the budget sc
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:L1Norm},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
     k = get_k(model)
     X = pr.X
@@ -101,7 +101,7 @@ bound to the original SOC variable.
 """
 function set_tracking_risk!(model::JuMP.Model,
                             r::TrackingRiskMeasure{<:Any, <:Any, <:L2Norm},
-                            opt::RiskJuMPOptimisationEstimator,
+                            opt::RiskConstraintOwner,
                             tracking_risk::JuMP.AbstractJuMPScalar, i;
                             prefix::Symbol = Symbol(""))
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, :tracking_risk_,
@@ -110,7 +110,7 @@ function set_tracking_risk!(model::JuMP.Model,
 end
 function set_tracking_risk!(model::JuMP.Model,
                             r::TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Norm},
-                            opt::RiskJuMPOptimisationEstimator,
+                            opt::RiskConstraintOwner,
                             tracking_risk::JuMP.AbstractJuMPScalar, i;
                             prefix::Symbol = Symbol(""))
     qtracking_risk = state_set!(model, prefix, :sq_tracking_risk_, i,
@@ -152,8 +152,8 @@ tracking error between portfolio and benchmark returns.
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any,
                                                       <:Union{<:L2Norm, <:SquaredL2Norm}},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
     k = get_k(model)
     X = pr.X
@@ -201,8 +201,8 @@ error between portfolio and benchmark returns, scaled by `(T - ddof)^(1/p)`.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:LpNorm},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     @argcheck(r.alg.p > 1,
               DomainError(r.alg.p,
                           "`LpNorm.p` is $(r.alg.p), and the tracking risk is the `p`-norm of the deviation, which the model states with a power cone of exponent `1 / p`, so `1 < p` must hold. State a value greater than `1`."))
@@ -270,8 +270,8 @@ Introduces a scalar variable and an infinity-norm cone constraint to encode the 
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:LInfNorm},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
     k = get_k(model)
     X = pr.X
@@ -307,7 +307,7 @@ this did in an earlier design — carried the same fact twice.
 
   - $(arg_dict[:model])
   - `r`: A [`RiskMeasure`](@ref) or a vector of risk measures.
-  - $(arg_dict[:opt_jumpe])
+  - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr])
   - $(arg_dict[:pl_opt])
   - $(arg_dict[:fees_opt])
@@ -368,8 +368,7 @@ tracking-nested-in-tracking is collision-free.
 
   - [`set_risk_tr_constraints!`](@ref)
 """
-function set_risk_tracking_risk_constraints!(model::JuMP.Model, r,
-                                             opt::RiskJuMPOptimisationEstimator,
+function set_risk_tracking_risk_constraints!(model::JuMP.Model, r, opt::RiskConstraintOwner,
                                              pr::AbstractPriorResult,
                                              pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
                                              tprefix::Symbol, args...; kwargs...)
@@ -413,7 +412,7 @@ replaces the former save/restore swap and is re-entrant.
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                           <:IndependentVariableTracking},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult,
                                pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     ri = r.r
@@ -467,7 +466,7 @@ The prefix namespacing replaces the former save/restore swap and is re-entrant.
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                           <:DependentVariableTracking},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult,
                                pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     # `r` reached here through `set_risk_constraints!`, which resolved it. `deferred_slots`
@@ -476,7 +475,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     # therefore built from one resolution, not two.
     ri = r.r
     wb = r.tr.w
-    rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, fees)
+    rb = expected_risk(factory(ri, pr, risk_constraint_solver(opt)), wb, pr.X, fees)
     k = get_k(model)
     sc = get_constraint_scale(model)
     tracking_risk = state_set!(model, prefix, :tracking_risk_, i, JuMP.@variable(model))
