@@ -260,10 +260,17 @@ end
         @test isnothing(po.partial_fit!(OPS(; alg = BuyAndHold()), rows(rd, 1:3)).cache.X)
         @test isnothing(po.partial_fit!(OPS(; alg = NewtonStep()), rows(rd, 1:3)).cache.X) ==
               true
-        # A rule tree that reads every row keeps them uncapped.
-        pref = OPS(; alg = ForecastReversion(; me = SimpleExpectedReturns()))
+        # A rule tree that reads every row keeps them uncapped; a forecaster that folds is
+        # carried on the Rule State and the head holds no rows for it (ADR 0158).
+        pref = OPS(; alg = ForecastReversion(; me = MedianExpectedReturns()))
         @test isnothing(po.partial_fit!(pref, rows(rd, 1:9)).cache.X.max_history)
         @test po.partial_fit!(pref, rows(rd, 1:9)).cache.X.n == 9
+        pfold = po.partial_fit!(OPS(;
+                                    alg = ForecastReversion(; me = SimpleExpectedReturns())),
+                                rows(rd, 1:9)).cache
+        @test isnothing(pfold.X) &&
+              pfold.st isa po.ForecasterState &&
+              pfold.st.me.cache.n == 9
         # A copy aliases no array.
         c = copy(st)
         @test c.w == st.w && c.w !== st.w && c.X.X !== st.X.X && c.ts !== st.ts
@@ -461,7 +468,8 @@ end
               (3, 1)
         @test po.rows_needed(MovingAverageReversion(; window = 5)) == 4
         @test po.rows_needed(RobustMedianReversion(; window = 3)) == 2
-        @test isnothing(po.rows_needed(SimpleExpectedReturns()))
+        @test po.rows_needed(SimpleExpectedReturns()) == 0
+        @test isnothing(po.rows_needed(MedianExpectedReturns()))
         @test po.rows_needed(ExpertMixture(;
                                            experts = [BuyAndHold(),
                                                       MovingAverageReversion(; window = 7)])) ==

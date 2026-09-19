@@ -90,7 +90,7 @@
                           :AbstractRedundancyAlgorithm, :AbstractReturnForecastEstimator,
                           :AbstractRiskMeasureSettings,
                           :AbstractSearchCrossValidationResult, :AbstractSelectionRule,
-                          :AbstractSignificanceCalibrationAlgorithm,
+                          :AbstractTrendTest, :AbstractSignificanceCalibrationAlgorithm,
                           :AbstractTimeSeriesRegressionEstimator,
                           :AbstractTrackingAlgorithm, :AbstractUncertaintyKAlgorithm,
                           :AbstractUncertaintySetAlgorithm, :AbstractUncertaintySetClass,

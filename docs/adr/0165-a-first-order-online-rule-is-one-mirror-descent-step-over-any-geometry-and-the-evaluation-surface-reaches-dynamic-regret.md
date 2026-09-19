@@ -167,8 +167,11 @@ hold for those only, and that a finite-difference gradient at a kink is a chord.
   `w_{t+1} = Proj_Δ(w_t + ε x̂_⊥/‖x̂_⊥‖)` with `x̂_⊥` the centred Price Relative Forecast (hold when
   it is zero), the mirror of `ForecastReversion`; `PeakPriceTracking(; window = 5, eps = 100)`
   (Lai, Dai, Ren and Huang 2018) is its constructor filling `me = WindowPeak(window)`. ADR 0156's
-  set-2 row is rewritten in place. AICTR and TPPT become constructors filling their composite
-  statistics when their papers are read.
+  set-2 row is rewritten in place. AICTR and TPPT are constructors filling their composite
+  statistics, `CompositeTrend` and a `TrendSwitch` on the pairwise slope sum, now that their
+  papers are read (#1185); the Gaussian weighting reversion and the local adaptive learning are
+  constructors of `ForecastReversion` over a Gaussian-weighted double estimate and a
+  `TrendSwitch` on a regression slope.
 - **`ForecastReversion` gains `scale::Option{<:AbstractPriceLevelStatistic}`**, `nothing` by
   default (every existing row): a diagonal preconditioner `D = diag(x̂_scale)` on the reversion
   direction, `w_{t+1} = Proj_Δ(w_t + λ D (x̂ − x̄1))` with `λ` the passive-aggressive multiplier

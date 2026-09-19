@@ -10,7 +10,7 @@ commit = "8411336595"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2997, doc = 0, comment = 238, blank = 48, total = 3283 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1149, doc = 113, comment = 125, blank = 43, total = 1430 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1160, doc = 113, comment = 125, blank = 43, total = 1441 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -127,7 +127,8 @@ commit = "8411336595"
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { code = 225, doc = 318, comment = 2, blank = 150, total = 695 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 230, doc = 368, comment = 0, blank = 184, total = 782 }
 "src/05_Moments/33_CoverageUniverse.jl" = { code = 403, doc = 639, comment = 0, blank = 298, total = 1340 }
-"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { code = 121, doc = 212, comment = 1, blank = 98, total = 432 }
+"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { code = 275, doc = 464, comment = 5, blank = 205, total = 949 }
+"src/05_Moments/35_CompositePriceLevelStatistics.jl" = { code = 216, doc = 286, comment = 1, blank = 114, total = 617 }
 "src/06_Distance/01_Base_Distance.jl" = { code = 24, doc = 222, comment = 0, blank = 89, total = 335 }
 "src/06_Distance/02_Distance.jl" = { code = 160, doc = 350, comment = 0, blank = 157, total = 667 }
 "src/06_Distance/03_DistanceDistance.jl" = { code = 39, doc = 132, comment = 0, blank = 58, total = 229 }
@@ -185,6 +186,7 @@ commit = "8411336595"
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { code = 395, doc = 559, comment = 0, blank = 290, total = 1244 }
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { code = 189, doc = 233, comment = 27, blank = 68, total = 517 }
 "src/10_Prior/12_PriorPartialFit.jl" = { code = 216, doc = 421, comment = 20, blank = 214, total = 871 }
+"src/10_Prior/13_PriorExpectedReturns.jl" = { code = 37, doc = 77, comment = 1, blank = 28, total = 143 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { code = 319, doc = 1074, comment = 5, blank = 515, total = 1913 }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { code = 65, doc = 269, comment = 2, blank = 94, total = 430 }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { code = 335, doc = 1008, comment = 2, blank = 374, total = 1719 }
@@ -302,9 +304,10 @@ commit = "8411336595"
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { code = 42, doc = 61, comment = 4, blank = 20, total = 127 }
 "src/17_Optimisation/09_OnlineOptimisation.jl" = { code = 232, doc = 317, comment = 3, blank = 159, total = 711 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { code = 256, doc = 500, comment = 5, blank = 209, total = 970 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { code = 362, doc = 547, comment = 3, blank = 211, total = 1123 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { code = 300, doc = 448, comment = 2, blank = 177, total = 927 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { code = 239, doc = 292, comment = 2, blank = 126, total = 659 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { code = 292, doc = 300, comment = 2, blank = 87, total = 681 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { code = 405, doc = 576, comment = 1, blank = 187, total = 1169 }
 "src/18_ExpectedReturns.jl" = { code = 290, doc = 832, comment = 43, blank = 293, total = 1458 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { code = 313, doc = 631, comment = 5, blank = 270, total = 1219 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { code = 449, doc = 634, comment = 2, blank = 315, total = 1400 }
@@ -317,4 +320,4 @@ commit = "8411336595"
 "src/21_Pipeline/06_OnlinePipeline.jl" = { code = 391, doc = 372, comment = 0, blank = 162, total = 925 }
 "src/22_Plotting.jl" = { code = 150, doc = 2294, comment = 111, blank = 797, total = 3352 }
 "src/23_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
-"src/PortfolioOptimisers.jl" = { code = 343, doc = 3, comment = 29, blank = 5, total = 380 }
+"src/PortfolioOptimisers.jl" = { code = 347, doc = 3, comment = 29, blank = 5, total = 384 }

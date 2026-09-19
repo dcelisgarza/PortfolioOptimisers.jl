@@ -981,6 +981,9 @@ julia> HindsightSplit(; prefix = false, start = 21)
 HindsightSplit
              prefix ┼ Bool: false
               start ┼ Int64: 21
+                 wd ┼ nothing
+                pws ┼ nothing
+                 fa ┼ nothing
   store_weight_path ┼ Bool: false
              strict ┴ Bool: false
 ```

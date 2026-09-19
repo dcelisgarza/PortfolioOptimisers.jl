@@ -113,17 +113,32 @@ without them. The head's rows buffer is a buffer of returns, which is what every
 
 ### A forecaster folds where it can and refits from the head's rows otherwise
 
-Each step the head advances the rule's forecaster by ADR 0136's rule through `fold_member`: an
-estimator with an exact fold — `SimpleExpectedReturns`, `ExpWeightedExpectedReturns`, the
-exponential moving average of levels, `EmpiricalPrior` through `PriorExpectedReturns` — is folded
-on the row, and **its state rides on the Rule State's `st`**, so a mixture's experts each carry
-their own; an estimator with no exact fold is refit on the rows the head holds. `rows_needed(me)`
-is one method per estimator: `0` for one that folds, `window − 1` for a windowed price-level
-statistic, `lag` for the lagged price, `window` for `WindowedExpectedReturns`, and unbounded for a
-batch-only estimator or Prior, which then refits on the whole prefix at `O(tN)` a step — the docs
-state the cost and `WindowedExpectedReturns(; me, window)` is the user's cap. **`Online(me)` in the
-slot is refused by name**: the head's buffer is the buffer, and a second one would hold the rows
-twice, which ADR 0157 rejected for the rules.
+Each step the head advances the rule's forecaster by ADR 0136's rule, `supports_partial_fit`
+being the question: an estimator with an exact fold — `SimpleExpectedReturns`,
+`ExpWeightedExpectedReturns`, a price-level statistic that is a recursion over the relatives
+(the exponential moving average, the reweighted relative), a `PriorExpectedReturns` over a prior
+the predicate says folds — is folded on the row, and **its state rides on the Rule State's `st`**
+as a `ForecasterState`, so a mixture's experts each carry their own; an estimator with no exact
+fold is refit on the rows the head holds. `EmpiricalPrior` carries its rows as memory rather
+than folding its moments alone, so the library's predicate answers refit for it and the head's
+rows are that memory, held once. `rows_needed(me)` is one method per estimator: `0` for one that
+folds, `window − 1` for a windowed price-level statistic, `lag` for the lagged price, `window`
+for `WindowedExpectedReturns`, and unbounded for a batch-only estimator or Prior, which then
+refits on the whole prefix at `O(tN)` a step — the docs state the cost and
+`WindowedExpectedReturns(; me, window)` is the user's cap. **`Online(me)` in the slot is refused
+by name**: the head's buffer is the buffer, and a second one would hold the rows twice, which
+ADR 0157 rejected for the rules. A forecaster carrying a state at the door is refused too: the
+head starts cold.
+
+**The cold start truncates the window.** Over the first rows a windowed statistic reads the
+levels available — with `window = 5` and two rows folded, three levels — as the reversion
+papers' reference implementations do and as the parity test with the prototype requires; a
+folding statistic starts from its seed; a composite truncates every window it holds; and the
+anti-correlation rule's two windows and a `LastRows` selector truncate the same way. A forecast
+is **flat** — one in every asset, which every rule's step holds on — where the forecaster has
+fewer rows than its second moment needs (a Prior, a variance or a shrinkage over one row) or
+answers a non-finite entry, so a forecaster undefined over the first rows holds until it is
+defined instead of raising or stepping on `NaN`.
 
 ### `ForecastReversion` is one rule; two paper names are its constructors
 
@@ -140,7 +155,13 @@ The variants ADR 0156 deferred here are spelled: the exponential-moving-average 
 `ForecastReversion(; me = PriceLevelExpectedReturns(; alg = ExponentialMovingAverage(; alpha = 0.5)), eps = 10)`;
 the cost-aware rule's two forecasts are `TransactionCostOptimisation(; me = PriceLevelExpectedReturns(; alg = LaggedPrice(; lag = 1)))`,
 its default, and the same under `MovingAverage(; window = 5)`; peak price tracking and the sparse
-portfolio read `WindowPeak(; window = 5)`.
+portfolio read `WindowPeak(; window = 5)`. `LaggedPrice(; lag = 0)` is the current price, the
+*hold* branch of a switched statistic. The later papers' forecasts are composites over the same
+statistics, on the `alg` slot like any other: `TruncatedExponentialMovingAverage`,
+`GaussianWeightedDoubleEstimate`, `TrendSwitch` over a trend test and `CompositeTrend`; the
+Gaussian weighting reversion and the local adaptive learning are constructors of
+`ForecastReversion`, the adaptive input and composite trend representation and the trend-promote
+price tracking constructors of `ForecastTracking`.
 
 ### What a rule may read, and what is never a Prior's
 
@@ -214,6 +235,8 @@ not over returns.
   statistic and the constructors `ReweightedPriceRelativeTracking` and
   `ExponentialMovingAverageReversion` (ADR 0165);
   `rows_needed(me)`; the fold-or-refit of a forecaster on the Rule State; the `Online(me)`
-  refusal.
+  refusal. The forecast arm is built (#1176): the forecast-reading rules live in their own
+  file, the statistics of the later papers in a second, and the kernel-trend pattern tracking —
+  a stateful statistic over an elastic-net path — is split into a ticket of its own.
 - A factor forecast is recorded as fog on the map, should one ever be wanted; nothing on the
   ledger asks for it.

@@ -169,7 +169,8 @@
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { map = 3, units = 16, swept = false }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { map = 3, units = 15, swept = false }
 "src/05_Moments/33_CoverageUniverse.jl" = { map = 3, units = 43, swept = false }
-"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { map = 3, units = 10, swept = false }
+"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { map = 3, units = 21, swept = false }
+"src/05_Moments/35_CompositePriceLevelStatistics.jl" = { map = 3, units = 9, swept = false }
 "src/06_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true, bindings = ["AbstractDistanceAlgorithm", "AbstractDistanceEstimator", "CanonicalDistance", "CorrelationDistance", "LogDistance", "SimpleAbsoluteDistance", "SimpleDistance", "VariationInfoDistance"] }
 "src/06_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true, bindings = ["AllInternalMutualInfoCov", "DistCov_AllInternalDistCov", "Distance", "LTDCov_AllInternalLTDCov", "RhoDistanceAlgorithm", "_absguard", "_as_correlation", "_dist_from_cor", "cor_and_dist", "distance", "distance", "distance", "distance"] }
 "src/06_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, algorithm = 3, swept = true, bindings = ["DistanceDistance", "cor_and_dist", "distance", "distance"] }
@@ -227,6 +228,7 @@
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { map = 6, units = 30, swept = false }
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { map = 6, units = 6, swept = false }
 "src/10_Prior/12_PriorPartialFit.jl" = { map = 6, units = 22, swept = false }
+"src/10_Prior/13_PriorExpectedReturns.jl" = { map = 6, units = 3, swept = false }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 50, algorithm = 16, swept = true, bindings = ["AbstractCompactRadiusAlgorithm", "AbstractPriorUncertaintySetEstimator", "AbstractUncertaintyEpsAlgorithm", "AbstractUncertaintyKAlgorithm", "AbstractUncertaintySetAlgorithm", "AbstractUncertaintySetClass", "AbstractUncertaintySetEstimator", "AbstractUncertaintySetResult", "BoxUncertaintySet", "BoxUncertaintySetAlgorithm", "ChiSqKUncertaintyAlgorithm", "EllipsoidalUncertaintySet", "EllipsoidalUncertaintySetAlgorithm", "GeneralKUncertaintyAlgorithm", "MuUncertaintySetClass", "NormBallUncertaintySetAlgorithm", "NormalKUncertaintyAlgorithm", "Num_CptRad", "Num_UcSEps", "Num_UcSK", "SigmaUncertaintySetClass", "UcSE_UcS", "box_quantile_bounds", "ellipsoidal_set", "expand_investable_ucs", "expand_investable_ucs", "expand_investable_ucs", "expand_investable_ucs", "expand_investable_ucs", "investable_ucs_reduction", "k_ucs", "mu_ucs", "mu_ucs", "mu_ucs", "port_opt_view", "port_opt_view", "port_opt_view", "port_opt_view", "port_opt_view", "reads_prior_result", "sigma_ucs", "sigma_ucs", "sigma_ucs", "ucs", "ucs", "ucs", "ucs", "ucs_prior", "ucs_selector", "vec_quantile_bounds"] }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { map = 7, units = 6, algorithm = 5, swept = true, bindings = ["DeltaUncertaintySet", "mu_delta_box_set", "mu_ucs", "sigma_delta_box_set", "sigma_ucs", "ucs"] }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { map = 7, units = 26, algorithm = 25, swept = true, bindings = ["NormalUncertaintySet", "choose_scaling_parameter", "commutation_matrix", "mu_asymptotic_cov", "mu_normal_box_set", "mu_ucs", "mu_ucs", "mu_ucs", "mu_ucs", "mu_ucs", "normal_box_preamble", "normal_mu_error_sample", "normal_sigma_error_sample", "sigma_asymptotic_cov", "sigma_normal_box_set", "sigma_ucs", "sigma_ucs", "sigma_ucs", "sigma_ucs", "sigma_ucs", "ucs", "ucs", "ucs", "ucs", "ucs", "ucs"] }
@@ -344,10 +346,11 @@
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { map = 10, units = 3, swept = false }
 "src/17_Optimisation/09_OnlineOptimisation.jl" = { map = 10, units = 20, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { map = 10, units = 32, swept = false }
-"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { map = 10, units = 19, swept = false }
+"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { map = 10, units = 16, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { map = 10, units = 20, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { map = 10, units = 18, swept = false }
 "src/18_ExpectedReturns.jl" = { map = 8, units = 25, algorithm = 5, swept = true, bindings = ["ExpectedReturn", "ExpectedReturnRiskRatio", "PerfRM", "PerformanceSummaryResult", "PrRM", "brinson_attribution", "excess_statistics", "expected_ratio", "expected_return", "expected_return", "expected_risk", "expected_risk", "expected_risk", "expected_risk", "expected_risk_ret_ratio", "expected_risk_ret_sric", "expected_sric", "held_path_turnover", "performance_summary", "prrm_prediction_message", "resolve_turnover", "sric_penalty", "summarise_returns", "supports_precomputed_returns", "term_fees"] }
+"src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { map = 10, units = 25, swept = false }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { map = 8, units = 28, swept = false }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { map = 8, units = 38, swept = false }
 "src/20_AssetSelection.jl" = { map = 8, units = 30, algorithm = 11, swept = true, bindings = ["AbstractRedundancyAlgorithm", "AbstractSelectionRule", "ClusterGroups", "CompleteAssetSelector", "CorrelationComponents", "PairwiseCorrelation", "QuantileRule", "RankRule", "RedundancySelector", "ScoreSelector", "ThresholdRule", "assert_correlation_threshold", "assert_scoreable", "assert_selection_action", "assert_tail_counts", "asset_scores", "correlation_components", "drop_scores", "groups_argbest", "redundancy_keep", "redundancy_keep", "redundancy_keep", "redundancy_keep", "requires_score", "rule_keep", "select_assets", "select_assets", "select_assets", "tail_action_mask", "tail_mask"] }

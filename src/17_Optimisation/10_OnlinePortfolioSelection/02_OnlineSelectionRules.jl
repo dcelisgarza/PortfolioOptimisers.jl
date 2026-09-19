@@ -602,195 +602,6 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The passive-aggressive step toward a Price Relative Forecast: the closest allocation to the current one whose return on the forecast `x̂` is at least `eps`, the one update the moving-average reversion of Li and Hoi (2012) and the robust median reversion of Huang, Zhou, Li, Hoi and Zhou (2016) share (OLMAR, RMR).
-
-The forecast is the expected-returns estimator on `me`, read as `x̂ = 1 .+ mu` over the rows the head holds through the period, so the two papers differ only in the statistic on that slot; [`MovingAverageReversion`](@ref) and [`RobustMedianReversion`](@ref) are the constructors that fill it with each paper's own. Any expected-returns estimator may sit there — a mean of past returns, a shrunk mean — and a Prior's mean through the forecast-arm adapter.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\lambda_t &= \\max\\left(0, \\frac{\\epsilon - \\langle \\boldsymbol{w}_t, \\hat{\\boldsymbol{x}}_{t+1} \\rangle}{\\lVert \\hat{\\boldsymbol{x}}_{t+1} - \\bar{x}_{t+1} \\boldsymbol{1} \\rVert^2}\\right)\\,,\\quad
-\\boldsymbol{w}_{t+1} = \\mathrm{Proj}\\left( \\boldsymbol{w}_t + \\lambda_t \\left( \\hat{\\boldsymbol{x}}_{t+1} - \\bar{x}_{t+1} \\boldsymbol{1} \\right) \\right)\\,,
-\\end{align}
-```
-
-the step zero when every asset is forecast alike. The sign is opposite to [`PassiveAggressiveMeanReversion`](@ref)'s, because `x̂` forecasts the next return rather than reading the last one. The rule is a total bet on the reversion the forecast encodes: it compounds on a reverting market and collapses on a trending one.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    ForecastReversion(;
-        me::AbstractExpectedReturnsEstimator = PriceLevelExpectedReturns(),
-        eps::Real = 10,
-        proj::EuclideanProjection = EuclideanProjection()
-    ) -> ForecastReversion
-
-Keywords correspond to the struct's fields. `rows_needed` forwards to `me`, so the head holds the rows the forecaster reads.
-
-## Validation
-
-  - `eps > 0`. A `DomainError` is thrown otherwise.
-  - `me` is not an [`Online`](@ref) wrapper: the head's rows buffer is the buffer. An `ArgumentError` is thrown otherwise, by the field bound.
-
-# Examples
-
-```jldoctest
-julia> ForecastReversion()
-ForecastReversion
-    me ┼ PriceLevelExpectedReturns
-       │   alg ┼ MovingAverage
-       │       │   window ┴ Int64: 5
-   eps ┼ Int64: 10
-  proj ┴ EuclideanProjection()
-```
-
-# Related
-
-  - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
-  - [`OnlinePortfolioSelection`](@ref)
-  - [`MovingAverageReversion`](@ref)
-  - [`RobustMedianReversion`](@ref)
-  - [`PriceLevelExpectedReturns`](@ref)
-  - [`PassiveAggressiveMeanReversion`](@ref)
-
-# References
-
-  - $(ref_dict[:lihoi2012])
-  - $(ref_dict[:huang2016])
-"""
-struct ForecastReversion{T1 <: AbstractExpectedReturnsEstimator, T2 <: Real,
-                         T3 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
-    """
-    The forecaster whose mean is the Price Relative Forecast, `x̂ = 1 .+ mu`, read over the rows the head holds.
-    """
-    me::T1
-    """
-    Target return on the forecast. Larger is more aggressive.
-    """
-    eps::T2
-    """
-    $(field_dict[:proj])
-    """
-    proj::T3
-    function ForecastReversion(me::AbstractExpectedReturnsEstimator, eps::Real,
-                               proj::EuclideanProjection)
-        @argcheck(eps > zero(eps), DomainError(eps, "eps must be positive"))
-        return new{typeof(me), typeof(eps), typeof(proj)}(me, eps, proj)
-    end
-end
-function ForecastReversion(;
-                           me::AbstractExpectedReturnsEstimator = PriceLevelExpectedReturns(),
-                           eps::Real = 10,
-                           proj::EuclideanProjection = EuclideanProjection())::ForecastReversion
-    return ForecastReversion(me, eps, proj)
-end
-function port_opt_view(alg::ForecastReversion, i, args...)
-    return ForecastReversion(; me = port_opt_view(alg.me, i, args...), eps = alg.eps,
-                             proj = alg.proj)
-end
-function rows_needed(alg::ForecastReversion)
-    return rows_needed(alg.me)
-end
-function online_update!(alg::ForecastReversion, st, w::AbstractVector, x::AbstractVector,
-                        rows::AbstractMatrix, set::AbstractAllocationSet)
-    xhat = one(eltype(w)) .+ vec(Statistics.mean(alg.me, rows; dims = 1))
-    dev = xhat .- Statistics.mean(xhat)
-    denom = sum(abs2, dev)
-    lam = if iszero(denom)
-        zero(denom)
-    else
-        max(zero(denom), (alg.eps - LinearAlgebra.dot(w, xhat)) / denom)
-    end
-    q = w .+ lam .* dev
-    return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
-end
-"""
-    MovingAverageReversion(; window::Integer = 5, eps::Real = 10, proj::EuclideanProjection = EuclideanProjection())
-
-The on-line moving average reversion of Li and Hoi (2012): a [`ForecastReversion`](@ref) whose forecast is the [`MovingAverage`](@ref) of the last `window` price levels over the last price (OLMAR).
-
-`window` is the reversion horizon, the one parameter that matters, and the natural thing to tune with a search over `"alg.me.alg.window"`.
-
-# Examples
-
-```jldoctest
-julia> MovingAverageReversion(; window = 3)
-ForecastReversion
-    me ┼ PriceLevelExpectedReturns
-       │   alg ┼ MovingAverage
-       │       │   window ┴ Int64: 3
-   eps ┼ Int64: 10
-  proj ┴ EuclideanProjection()
-```
-
-# Related
-
-  - [`ForecastReversion`](@ref)
-  - [`MovingAverage`](@ref)
-  - [`RobustMedianReversion`](@ref)
-
-# References
-
-  - $(ref_dict[:lihoi2012])
-"""
-function MovingAverageReversion(; window::Integer = 5, eps::Real = 10,
-                                proj::EuclideanProjection = EuclideanProjection())::ForecastReversion
-    return ForecastReversion(;
-                             me = PriceLevelExpectedReturns(;
-                                                            alg = MovingAverage(;
-                                                                                window = window)),
-                             eps = eps, proj = proj)
-end
-"""
-    RobustMedianReversion(; window::Integer = 5, eps::Real = 5, iters::Integer = 100, tol::Real = 1e-8, proj::EuclideanProjection = EuclideanProjection())
-
-The robust median reversion of Huang, Zhou, Li, Hoi and Zhou (2016): a [`ForecastReversion`](@ref) whose forecast is the [`SpatialMedian`](@ref) of the last `window` price levels over the last price (RMR).
-
-The point is the breakdown point: a single extreme print moves a mean without limit and a spatial median almost not at all.
-
-# Examples
-
-```jldoctest
-julia> RobustMedianReversion(; window = 3)
-ForecastReversion
-    me ┼ PriceLevelExpectedReturns
-       │   alg ┼ SpatialMedian
-       │       │   window ┼ Int64: 3
-       │       │    iters ┼ Int64: 100
-       │       │      tol ┴ Float64: 1.0e-8
-   eps ┼ Int64: 5
-  proj ┴ EuclideanProjection()
-```
-
-# Related
-
-  - [`ForecastReversion`](@ref)
-  - [`SpatialMedian`](@ref)
-  - [`MovingAverageReversion`](@ref)
-
-# References
-
-  - $(ref_dict[:huang2016])
-"""
-function RobustMedianReversion(; window::Integer = 5, eps::Real = 5, iters::Integer = 100,
-                               tol::Real = 1e-8,
-                               proj::EuclideanProjection = EuclideanProjection())::ForecastReversion
-    return ForecastReversion(;
-                             me = PriceLevelExpectedReturns(;
-                                                            alg = SpatialMedian(;
-                                                                                window = window,
-                                                                                iters = iters,
-                                                                                tol = tol)),
-                             eps = eps, proj = proj)
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 The carrier of [`ExpertMixture`](@ref): every expert's Rule State, and the Rule State of the weighting over the experts.
 
 # Fields
@@ -987,9 +798,7 @@ function rule_state_seed(alg::ExpertMixture, w::AbstractVector)
     K = length(alg.experts)
     h = [expert_start_allocation(e, w) for e in alg.experts]
     p = isnothing(alg.p) ? fill(one(eltype(w)) / K, K) : copy(alg.p)
-    return ExpertMixtureState(0,
-                              [rule_state_seed(e, h[k])
-                               for (k, e) in enumerate(alg.experts)], h,
+    return ExpertMixtureState(0, map(k -> rule_state_seed(alg.experts[k], h[k]), 1:K), h,
                               rule_state_seed(alg.alg, p), p)
 end
 """
@@ -1119,6 +928,6 @@ function UniversalPortfolio(; N::Integer, n_experts::Integer = 2000, alpha::Num_
     return ExpertMixture(; experts = experts, alg = alg, eset = eset)
 end
 export BuyAndHold, ConstantRebalancedPortfolio, ExponentiatedGradient, NewtonStep, NoSlack,
-       LinearSlack, QuadraticSlack, PassiveAggressiveMeanReversion, ForecastReversion,
-       MovingAverageReversion, RobustMedianReversion, ExpertMixture, UniversalPortfolio
+       LinearSlack, QuadraticSlack, PassiveAggressiveMeanReversion, ExpertMixture,
+       UniversalPortfolio
 public AbstractPassiveAggressiveSlack, passive_aggressive_step

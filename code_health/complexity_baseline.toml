@@ -126,7 +126,8 @@ commit = "6fbaf7f97b"
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 55, cog_sum = 54, arg_sum = 45, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { cyc = 6, cog = 8, arg = 3, cyc_sum = 58, cog_sum = 61, arg_sum = 49, macros = [] }
 "src/05_Moments/33_CoverageUniverse.jl" = { cyc = 7, cog = 12, arg = 8, cyc_sum = 106, cog_sum = 70, arg_sum = 209, macros = [] }
-"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { cyc = 8, cog = 14, arg = 4, cyc_sum = 25, cog_sum = 22, arg_sum = 20, macros = [] }
+"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { cyc = 8, cog = 14, arg = 4, cyc_sum = 69, cog_sum = 49, arg_sum = 67, macros = [] }
+"src/05_Moments/35_CompositePriceLevelStatistics.jl" = { cyc = 6, cog = 8, arg = 4, cyc_sum = 40, cog_sum = 35, arg_sum = 34, macros = [] }
 "src/06_Distance/01_Base_Distance.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 3, cog_sum = 2, arg_sum = 2, macros = [] }
 "src/06_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
 "src/06_Distance/03_DistanceDistance.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 5, arg_sum = 19, macros = [] }
@@ -184,6 +185,7 @@ commit = "6fbaf7f97b"
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { cyc = 10, cog = 14, arg = 8, cyc_sum = 97, cog_sum = 82, arg_sum = 88, macros = [] }
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { cyc = 5, cog = 8, arg = 19, cyc_sum = 14, cog_sum = 13, arg_sum = 38, macros = ["@propagatable"] }
 "src/10_Prior/12_PriorPartialFit.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 50, cog_sum = 36, arg_sum = 96, macros = [] }
+"src/10_Prior/13_PriorExpectedReturns.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 10, cog_sum = 8, arg_sum = 19, macros = [] }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 63, cog_sum = 30, arg_sum = 92, macros = [] }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 11, cog_sum = 4, arg_sum = 34, macros = [] }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 33, cog_sum = 8, arg_sum = 114, macros = [] }
@@ -301,9 +303,10 @@ commit = "6fbaf7f97b"
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { cyc = 2, cog = 2, arg = 2, cyc_sum = 15, cog_sum = 6, arg_sum = 15, macros = [] }
 "src/17_Optimisation/09_OnlineOptimisation.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 61, cog_sum = 26, arg_sum = 75, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { cyc = 5, cog = 7, arg = 4, cyc_sum = 54, cog_sum = 31, arg_sum = 61, macros = ["@propagatable"] }
-"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { cyc = 4, cog = 3, arg = 6, cyc_sum = 64, cog_sum = 35, arg_sum = 112, macros = [] }
+"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { cyc = 4, cog = 3, arg = 6, cyc_sum = 55, cog_sum = 30, arg_sum = 98, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { cyc = 7, cog = 8, arg = 7, cyc_sum = 59, cog_sum = 49, arg_sum = 59, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { cyc = 4, cog = 4, arg = 15, cyc_sum = 58, cog_sum = 24, arg_sum = 72, macros = [] }
+"src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { cyc = 3, cog = 4, arg = 8, cyc_sum = 72, cog_sum = 34, arg_sum = 120, macros = [] }
 "src/18_ExpectedReturns.jl" = { cyc = 6, cog = 10, arg = 9, cyc_sum = 54, cog_sum = 41, arg_sum = 123, macros = ["@propagatable"] }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { cyc = 3, cog = 6, arg = 6, cyc_sum = 60, cog_sum = 18, arg_sum = 72, macros = [] }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { cyc = 4, cog = 5, arg = 9, cyc_sum = 85, cog_sum = 29, arg_sum = 177, macros = [] }
