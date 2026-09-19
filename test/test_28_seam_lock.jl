@@ -164,26 +164,26 @@
     # The three rules police the SPELLING of an access and the NAME of a bare entry. None
     # of them can see that two well-spelled keys COMPOSE the same Symbol: `state_key`
     # concatenates on both axes, so a name that ends in a digit at a low index collides
-    # with a shorter name at a higher index. `:te_dr_11` is how that defect presented (ADR
+    # with a shorter name at a higher index. `:tr_dr_11` is how that defect presented (ADR
     # 0037 amendment §4), and a collision is a WRONG ANSWER — the second write replaced the
     # first, the build carried one entry where it needed two, and a constraint bound the
     # wrong variable. `state_set!` is the runtime rule that closes the class: registration
     # is fresh, so a collision throws where it used to overwrite.
     let m = PortfolioOptimisers.JuMP.Model(), p = Symbol("")
-        @test PortfolioOptimisers.state_key(p, :te_dr_, 11) ==
-              PortfolioOptimisers.state_key(p, :te_dr_1, 1)
-        @test PortfolioOptimisers.state_set!(m, p, :te_dr_, 11, 1) == 1
-        @test_throws ArgumentError PortfolioOptimisers.state_set!(m, p, :te_dr_1, 1, 2)
-        @test m[:te_dr_11] == 1
+        @test PortfolioOptimisers.state_key(p, :tr_dr_, 11) ==
+              PortfolioOptimisers.state_key(p, :tr_dr_1, 1)
+        @test PortfolioOptimisers.state_set!(m, p, :tr_dr_, 11, 1) == 1
+        @test_throws ArgumentError PortfolioOptimisers.state_set!(m, p, :tr_dr_1, 1, 2)
+        @test m[:tr_dr_11] == 1
         # An entry is refused under its own key too, so a second emitter cannot replace an
         # entry the first one owns.
-        @test_throws ArgumentError PortfolioOptimisers.state_set!(m, p, :te_dr_, 11, 2)
-        @test_throws ArgumentError PortfolioOptimisers.state_set!(m, p, :te_dr_11, 3)
+        @test_throws ArgumentError PortfolioOptimisers.state_set!(m, p, :tr_dr_, 11, 2)
+        @test_throws ArgumentError PortfolioOptimisers.state_set!(m, p, :tr_dr_11, 3)
         # A free key still registers, on either arity.
         @test PortfolioOptimisers.state_set!(m, p, :cvar_risk_, 1, 3) == 3
         @test PortfolioOptimisers.state_set!(m, p, :net_X, 4) == 4
         # Reuse is the other two verbs' job, and they stay idempotent.
-        @test PortfolioOptimisers.state_build!(() -> 5, m, p, :te_dr_, 11) == 1
+        @test PortfolioOptimisers.state_build!(() -> 5, m, p, :tr_dr_, 11) == 1
         @test PortfolioOptimisers.state_build!(() -> 5, m, p, :net_X) == 4
         @test PortfolioOptimisers.mark_state!(m, p, :variance_flag) === nothing
         @test PortfolioOptimisers.mark_state!(m, p, :variance_flag) === nothing

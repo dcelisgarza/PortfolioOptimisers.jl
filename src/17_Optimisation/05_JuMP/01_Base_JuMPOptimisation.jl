@@ -1503,8 +1503,8 @@ Keeping both here is what lets the seam-lock test assert that no emitter builds 
 hand — emitters reach Model State through [`state_get`](@ref), [`state_has`](@ref),
 [`state_set!`](@ref) and [`state_build!`](@ref).
 
-Neither axis carries a delimiter, so composition is **not injective**: `(:te_dr_, 11)` and
-`(:te_dr_1, 1)` both give `:te_dr_11`. The spelling is kept — a delimiter would move every
+Neither axis carries a delimiter, so composition is **not injective**: `(:tr_dr_, 11)` and
+`(:tr_dr_1, 1)` both give `:tr_dr_11`. The spelling is kept — a delimiter would move every
 top-level key a caller reads — and the collision is caught where it does harm, by
 [`assert_state_key_free`](@ref) at registration.
 
@@ -1527,7 +1527,7 @@ Assert Model State key `key` is not registered yet, so a write cannot replace an
 
 Neither axis of [`state_key`](@ref) is separated by a delimiter, so key composition is
 **not injective**: a name that ends in a digit and a low index compose the same `Symbol` as
-a shorter name and a higher index — `state_key(p, :te_dr_, 11) == state_key(p, :te_dr_1, 1)`.
+a shorter name and a higher index — `state_key(p, :tr_dr_, 11) == state_key(p, :tr_dr_1, 1)`.
 Without this guard the second write wins, the model carries one entry where the build
 expected two, and a constraint binds the wrong variable. That is a wrong answer, not a
 crash, so the registration verb fails closed instead.
@@ -1556,7 +1556,7 @@ is [`state_build!`](@ref), which returns the existing entry untouched, and the f
 """
 function assert_state_key_free(model::JuMP.Model, key::Symbol)
     @argcheck(!haskey(model, key),
-              ArgumentError("model[$key] is already registered, so this registration would replace it and lose the earlier entry. Model State keys compose by concatenation and are not injective — state_key(prefix, :te_dr_, 11) and state_key(prefix, :te_dr_1, 1) are both :te_dr_11 — so either two entries composed the same key and one of them must be renamed, or the same entry is registered twice. Use state_build! to build an entry once and reuse it, or mark_state! for an idempotent presence flag."))
+              ArgumentError("model[$key] is already registered, so this registration would replace it and lose the earlier entry. Model State keys compose by concatenation and are not injective — state_key(prefix, :tr_dr_, 11) and state_key(prefix, :tr_dr_1, 1) are both :tr_dr_11 — so either two entries composed the same key and one of them must be renamed, or the same entry is registered twice. Use state_build! to build an entry once and reuse it, or mark_state! for an idempotent presence flag."))
     return nothing
 end
 """
@@ -1714,7 +1714,7 @@ Compose the Model State namespace a nested build threads down its own spine.
 
 Distinct from a Model State *key*: this produces a `prefix`, not an entry name, so a nested
 build's entries cannot alias the enclosing build's. `tag` names the nesting kind (`:tr_iv_`,
-`:tr_dv_`, `:te_ir_`, `:te_dr_`, `:gain_`) and the optional `i` disambiguates the measure
+`:tr_dv_`, `:tr_ir_`, `:tr_dr_`, `:gain_`) and the optional `i` disambiguates the measure
 index, which is what makes tracking-nested-in-tracking collision-free.
 
 # Related

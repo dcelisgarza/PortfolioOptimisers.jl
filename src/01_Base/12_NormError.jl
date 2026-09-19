@@ -41,7 +41,7 @@ Second-order cone (SOC) norm-based error formulation.
 
 Where:
 
-  - $(math_dict[:te_l2])
+  - $(math_dict[:tr_l2])
   - $(math_dict[:a_norm_err])
   - $(math_dict[:b_norm_err])
   - $(math_dict[:T])
@@ -118,7 +118,7 @@ The value is the square of the [`L2Norm`](@ref) error, so a `settings.ub` on a [
 
 Where:
 
-  - $(math_dict[:te_l2sq])
+  - $(math_dict[:tr_l2sq])
   - $(math_dict[:a_norm_err])
   - $(math_dict[:b_norm_err])
   - $(math_dict[:T])
@@ -191,7 +191,7 @@ Norm-one (NOC) error formulation.
 
 Where:
 
-  - $(math_dict[:te_l1])
+  - $(math_dict[:tr_l1])
   - $(math_dict[:a_norm_err])
   - $(math_dict[:b_norm_err])
   - $(math_dict[:T]) When ``T`` is not provided the denominator is 1.
@@ -238,7 +238,7 @@ L-p norm error estimator.
 
 Where:
 
-  - $(math_dict[:te_lp])
+  - $(math_dict[:tr_lp])
   - $(math_dict[:a_norm_err])
   - $(math_dict[:b_norm_err])
   - $(math_dict[:T])
@@ -312,7 +312,7 @@ L-infinity norm (maximum absolute deviation) error estimator.
 
 Where:
 
-  - $(math_dict[:te_linf])
+  - $(math_dict[:tr_linf])
   - $(math_dict[:a_norm_err])
   - $(math_dict[:b_norm_err])
   - $(math_dict[:T])
@@ -389,11 +389,11 @@ Compute the norm-based tracking error between portfolio and benchmark weights.
 
 Where:
 
-  - $(math_dict[:te_l2])
-  - $(math_dict[:te_l2sq])
-  - $(math_dict[:te_l1])
-  - $(math_dict[:te_lp])
-  - $(math_dict[:te_linf])
+  - $(math_dict[:tr_l2])
+  - $(math_dict[:tr_l2sq])
+  - $(math_dict[:tr_l1])
+  - $(math_dict[:tr_lp])
+  - $(math_dict[:tr_linf])
   - $(math_dict[:a_norm_err])
   - $(math_dict[:b_norm_err])
   - $(math_dict[:T])

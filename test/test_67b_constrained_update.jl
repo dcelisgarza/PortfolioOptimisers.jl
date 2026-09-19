@@ -47,7 +47,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test_throws Exception ProgrammeAllocationSet(; slv = slv,
                                                       wb = WeightBoundsEstimator())
         @test_throws TypeError ProgrammeAllocationSet(; slv = slv,
-                                                      te = TrackingError(;
+                                                      tr = TrackingError(;
                                                                          tr = ReturnsTracking(;
                                                                                               w = zeros(3))))
         # The NewtonStep slot admits the Gram geometry and no other rule's does.
@@ -88,7 +88,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                                                 ub = 1e-3)))) ==
               0
         @test isnothing(po.rows_needed(ProgrammeAllocationSet(; slv = slv,
-                                                              te = TrackingError(;
+                                                              tr = TrackingError(;
                                                                                  tr = WeightsTracking(;
                                                                                                       w = fill(1 /
                                                                                                                3,
@@ -97,7 +97,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         # The head's need is the maximum over the rule tree and the set.
         @test isnothing(po.rows_needed(OPS(; alg = BuyAndHold(),
                                            set = ProgrammeAllocationSet(; slv = slv,
-                                                                        te = TrackingError(;
+                                                                        tr = TrackingError(;
                                                                                            tr = WeightsTracking(;
                                                                                                                 w = fill(1 /
                                                                                                                          3,
@@ -312,7 +312,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         # The tracking error over the head's rows.
         topt = OPS(; alg = PassiveAggressiveMeanReversion(),
                    set = ProgrammeAllocationSet(; slv = slv,
-                                                te = TrackingError(;
+                                                tr = TrackingError(;
                                                                    tr = WeightsTracking(;
                                                                                         w = fill(0.25,
                                                                                                  4)),

@@ -515,7 +515,7 @@ end
     and an `L2Norm` bound of `3e-3` are the SAME bound. `tracking_error_soc_factor` writes
     one cone bound for both, and the two models must therefore return the same weights.
     Read the deviation from the weights, not from a model key: `TrackingError` registers
-    `:t_te_`, `:te_`, `:cte_soc_` and `:cte_`, and never `:sq_tracking_risk_`, which
+    `:t_tr_`, `:tr_`, `:ctr_soc_` and `:ctr_`, and never `:sq_tracking_risk_`, which
     belongs to `TrackingRiskMeasure`.
     =#
     optsq = JuMPOptimiser(; pe = pr, slv = slv,
@@ -538,12 +538,12 @@ end
     @test dl2 <= 3e-3 * (1 + 1e-6)
     @test dsq / 9e-6 > 0.999
     @test dl2 / 3e-3 > 0.999
-    # the model registers the tracking rows under `te`, not under `tracking_risk`
+    # the model registers the tracking rows under `tr`, not under `tracking_risk`
     ks = keys(JuMP.object_dictionary(ressq.model))
-    @test :t_te_1 in ks
-    @test :te_1 in ks
-    @test :cte_soc_1 in ks
-    @test :cte_1 in ks
+    @test :t_tr_1 in ks
+    @test :tr_1 in ks
+    @test :ctr_soc_1 in ks
+    @test :ctr_1 in ks
     @test !(:sq_tracking_risk_1 in ks)
     @test !(:tracking_risk_1 in ks)
     # `ddof` moves the cone bound, so it moves the realised deviation

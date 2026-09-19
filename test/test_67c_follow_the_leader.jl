@@ -373,25 +373,25 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         # the head's rows meets the norm's own ceiling, scaled as the head's builders
         # scale it, and binds.
         b3 = fill(1 / 3, 3)
-        te_bound(::L1Norm, err, T) = err * T
-        te_bound(alg::L2Norm, err, T) = err * sqrt(T - alg.ddof)
-        te_bound(alg::SquaredL2Norm, err, T) = sqrt(err * (T - alg.ddof))
-        te_bound(alg::LpNorm, err, T) = err * (T - alg.ddof)^(1 / alg.p)
-        te_bound(alg::LInfNorm, err, T) = err * (T - alg.ddof)
-        te_norm(::L1Norm, d) = sum(abs, d)
-        te_norm(::Union{<:L2Norm, <:SquaredL2Norm}, d) = norm(d)
-        te_norm(alg::LpNorm, d) = norm(d, alg.p)
-        te_norm(::LInfNorm, d) = maximum(abs, d)
+        tr_bound(::L1Norm, err, T) = err * T
+        tr_bound(alg::L2Norm, err, T) = err * sqrt(T - alg.ddof)
+        tr_bound(alg::SquaredL2Norm, err, T) = sqrt(err * (T - alg.ddof))
+        tr_bound(alg::LpNorm, err, T) = err * (T - alg.ddof)^(1 / alg.p)
+        tr_bound(alg::LInfNorm, err, T) = err * (T - alg.ddof)
+        tr_norm(::L1Norm, d) = sum(abs, d)
+        tr_norm(::Union{<:L2Norm, <:SquaredL2Norm}, d) = norm(d)
+        tr_norm(alg::LpNorm, d) = norm(d, alg.p)
+        tr_norm(::LInfNorm, d) = maximum(abs, d)
         for alg in (L1Norm(), L2Norm(), SquaredL2Norm(), LpNorm(; p = 3), LInfNorm())
             eset = ProgrammeAllocationSet(; slv = slv,
-                                          te = TrackingError(; err = 1e-6, alg = alg,
+                                          tr = TrackingError(; err = 1e-6, alg = alg,
                                                              tr = WeightsTracking(; w = b3)))
             res_e = optimise(OPS(; alg = FollowTheLeader(; opt = logopt()), set = eset),
                              rd3)
             @test !isa(res_e.retcode.res, po.HeldStep)
             d = R3 * (res_e.w .- b3)
-            @test te_norm(alg, d) <= te_bound(alg, 1e-6, T2) * (1 + 1e-4)
-            @test te_norm(alg, d) >= te_bound(alg, 1e-6, T2) * (1 - 1e-2)
+            @test tr_norm(alg, d) <= tr_bound(alg, 1e-6, T2) * (1 + 1e-4)
+            @test tr_norm(alg, d) >= tr_bound(alg, 1e-6, T2) * (1 - 1e-2)
             @test !isapprox(res_e.w, free; atol = 1e-2)
         end
         # A turnover on the held optimiser reads the same book the set's does, through

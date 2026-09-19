@@ -1160,11 +1160,11 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :b_norm_err => "``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.",#
                        :d_ddof => "``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.",#
                        :p_norm_order => "``p``: Norm order.",#
-                       :te_l2 => "``\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b})``: L2-norm error.",#
-                       :te_l2sq => "``\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b})``: Squared L2-norm error.",#
-                       :te_l1 => "``\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b})``: L1-norm error.",#
-                       :te_lp => "``\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b})``: Lp-norm error.",#
-                       :te_linf => "``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm error, the largest absolute deviation.",#
+                       :tr_l2 => "``\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b})``: L2-norm error.",#
+                       :tr_l2sq => "``\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b})``: Squared L2-norm error.",#
+                       :tr_l1 => "``\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b})``: L1-norm error.",#
+                       :tr_lp => "``\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b})``: Lp-norm error.",#
+                       :tr_linf => "``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm error, the largest absolute deviation.",#
                        # The Range convention (ADR 0057).
                        :negated_upper_tail => "The upper tail is the base measure applied to the negated returns ``-\\boldsymbol{x}``, so both tails are reported on the same sign convention and the range is their sum, not their difference.",#
                        # The Gerber family. `01_GerberCovariance.jl` states the statistic,
