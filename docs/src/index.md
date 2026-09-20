@@ -5,7 +5,7 @@ layout: home
 
 hero:
   name: "PortfolioOptimisers.jl"
-  text: Portfolio optimisation library for Julia
+  text: Portfolio optimisation library in Julia
   tagline: Democratising, demystifying, and derisking investing
   image:
     # Root-relative: DocumenterLandingPage remaps a bare filename under `/` into the site's
