@@ -14,4 +14,5 @@ prrm_prediction_message
 PortfolioOptimisers.excess_statistics
 PortfolioOptimisers.held_path_turnover
 PortfolioOptimisers.summarise_returns
+PortfolioOptimisers.resolve_turnover
 ```
