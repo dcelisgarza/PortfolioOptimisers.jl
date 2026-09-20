@@ -361,6 +361,37 @@ function PortfolioOptimisers.plot_stacked_area_composition(res_vec::AbstractVect
     nx = isnothing(rd.nx) ? (1:size(w, 1)) : rd.nx
     return PortfolioOptimisers.plot_stacked_area_composition(w, nx; kwargs...)
 end
+function PortfolioOptimisers.plot_stacked_area_composition(pred::MultiPeriodPredictionResult;
+                                                           N::Option{<:Number} = nothing,
+                                                           kwargs...)
+    folds = pred.pred
+    w_mat = hcat(getproperty.(getproperty.(folds, :res), :w)...)
+    nx = let rd1 = folds[1].rd
+        isnothing(rd1.nx) ? (1:size(w_mat, 1)) : rd1.nx
+    end
+    return PortfolioOptimisers.plot_stacked_area_composition(collect(eachcol(w_mat)), nx;
+                                                             xlabel = "Fold",
+                                                             title = "Walk-ForwardSelection Composition",
+                                                             kwargs...)
+end
+function PortfolioOptimisers.plot_stacked_area_composition(pred::PopulationPredictionResult;
+                                                           N::Option{<:Number} = nothing,
+                                                           kwargs...)
+    members = pred.pred
+    w_mat = hcat(map(m -> if isa(m, PredictionResult)
+                         m.res.w
+                     else
+                         mean(hcat(getproperty.(getproperty.(m.pred, :res), :w)...);
+                              dims = 2)[:]
+                     end, members)...)
+    nx = let rd1 = isa(members[1], PredictionResult) ? members[1].rd : members[1].pred[1].rd
+        isnothing(rd1.nx) ? (1:size(w_mat, 1)) : rd1.nx
+    end
+    return PortfolioOptimisers.plot_stacked_area_composition(collect(eachcol(w_mat)), nx;
+                                                             xlabel = "Population Member",
+                                                             title = "Population Composition",
+                                                             kwargs...)
+end
 ## plot_risk_contribution
 function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                     w::VecNum, rd::ReturnsResult,

@@ -236,12 +236,12 @@ pretty_table(DataFrame("Set" => ["Simplex", "Capped and turnover-limited"],
 ## 7. The weight path and the discrete allocation
 
 A walk-forward's Result is the same [`MultiPeriodPredictionResult`](@ref) every optimiser
-returns, so the composition plot renders the path the rule walked and the cumulative-returns
+returns, so the area plot renders the path the rule walked and the cumulative-returns
 plot renders its wealth; a fold's Result reaches the finite allocation unchanged.
 =#
 
 using StatsPlots, GraphRecipes
-plot_composition(capped_pred; N = 8)
+plot_stacked_area_composition(capped_pred; N = 8)
 
 #-
 
