@@ -372,7 +372,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test isa(vres.retcode.res, po.HeldStep)
         # The tracking error in every norm: the deviation from the benchmark series over
         # the head's rows meets the norm's own ceiling, scaled as the head's builders
-        # scale it, and binds.
+        # scale it, and binds. The ceiling is 1e-4: at 1e-6 the feasible set is a ball the
+        # solver must resolve at its own 1e-12 tolerances, and on some CI hosts it returned
+        # a Held Step; at 1e-4 every norm still binds, and at 1e-3 two of them no longer do.
         b3 = fill(1 / 3, 3)
         tr_bound(::L1Norm, err, T) = err * T
         tr_bound(alg::L2Norm, err, T) = err * sqrt(T - alg.ddof)
@@ -385,15 +387,15 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         tr_norm(::LInfNorm, d) = maximum(abs, d)
         for alg in (L1Norm(), L2Norm(), SquaredL2Norm(), LpNorm(; p = 3), LInfNorm())
             eset = ProgrammeAllocationSet(; slv = slv,
-                                          tr = TrackingError(; err = 1e-6, alg = alg,
+                                          tr = TrackingError(; err = 1e-4, alg = alg,
                                                              tr = WeightsTracking(; w = b3,
                                                                                   fixed = true)))
             res_e = optimise(OPS(; alg = FollowTheLeader(; opt = logopt()), set = eset),
                              rd3)
             @test !isa(res_e.retcode.res, po.HeldStep)
             d = R3 * (res_e.w .- b3)
-            @test tr_norm(alg, d) <= tr_bound(alg, 1e-6, T2) * (1 + 1e-4)
-            @test tr_norm(alg, d) >= tr_bound(alg, 1e-6, T2) * (1 - 1e-2)
+            @test tr_norm(alg, d) <= tr_bound(alg, 1e-4, T2) * (1 + 1e-4)
+            @test tr_norm(alg, d) >= tr_bound(alg, 1e-4, T2) * (1 - 1e-2)
             @test !isapprox(res_e.w, free; atol = 1e-2)
         end
         # A turnover on the held optimiser reads the same book the set's does, through
