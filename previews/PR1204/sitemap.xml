@@ -1135,6 +1135,9 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/18_ExpectedReturns/</loc>
   </url>
   <url>
@@ -2087,6 +2090,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/18_ExpectedReturns/</loc>
