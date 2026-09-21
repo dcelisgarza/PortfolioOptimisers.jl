@@ -73,9 +73,12 @@ through `factory(opt, ŵ_t)` as the fold loop does, and runs `optimise` on the r
 Selector names. The programme's feasible region is the Allocation Set intersected with whatever
 the held optimiser carries itself; the optimum is the leader and is taken as is — no projection.
 `add_custom_constraint!` on the adapter calls the same builders the bare projection model of ADR
-0159 is assembled from, so the set's turnover ceiling measures from `ŵ_t`, its variance ceiling
-and tracking error read the set's own `pe` and the head's rows, and its MIP kinds add their
-binaries to the leader's model. A turnover or a fee the caller placed on `opt` itself reads the
+0159 is assembled from, in the same order, so the set's turnover ceiling measures from `ŵ_t`, its
+risk ceilings and tracking errors read the set's own `pe` and the head's rows, its MIP kinds add
+their binaries to the leader's model, its semidefinite phylogeny reuses the leader's lifted `W`,
+and its objective penalties — `l1`, `l2`, `lp`, `linf`, `cobj` — fold into the Objective Penalty
+the leader's objective builder folds in, the door the semidefinite phylogeny's own `p · tr(W)`
+already takes from inside a constraint builder. The adapter is one door, not two. A turnover or a fee the caller placed on `opt` itself reads the
 same book, because `factory` gave it `ŵ_t`.
 
 Both homes hold. A caller who wants one home leaves `opt` bare of constraints and writes them on

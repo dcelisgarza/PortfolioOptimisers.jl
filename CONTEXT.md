@@ -579,8 +579,8 @@ The one vector a forecast-reading Online Selection Rule consumes, `x̂ = 1 .+ mu
 *Avoid*: Return Forecast, the idiosyncratic prediction a factor Prior splits against its exposures; the `Online` wrapper on the forecaster, which the head refuses because its rows buffer is the buffer; and a Reversion Target, which misnames a momentum forecaster.
 
 **Allocation Set**
-The set an Online Portfolio Selection head's every allocation lies in, held on the head's `set` slot: the simplex by default, and otherwise the weight bounds, linear, turnover, risk-ceiling, tracking-error and cardinality constraints the head honours, always under a budget of one. It comes in two kinds — one that every Projection Geometry reaches in closed form and so carries no solver, and one that is a programme and so requires one — so whether a configuration needs a solver is a fact of its type. Cash is an asset of the set with price relative one, never a budget below one. ADR 0159.
-A programme set's risk ceiling is any Risk Measure whose `settings.ub` is a number: the measure's own JuMP builder writes it, with the set as the Risk Constraint Owner, on the prior result fitted on the head's rows. A variance or standard deviation holding its matrix reads no rows and is the set's own second-order cone.
+The set an Online Portfolio Selection head's every allocation lies in, held on the head's `set` slot: the simplex by default, and otherwise every constraint kind a `JuMPOptimiser` takes, under the optimiser's field names and type bounds, always under a budget of one. It comes in two kinds — one that every Projection Geometry reaches in closed form and so carries no solver, and one that is a programme and so requires one — so whether a configuration needs a solver is a fact of its type. Cash is an asset of the set with price relative one, never a budget below one. ADR 0159.
+A programme set's risk ceilings are Risk Measures whose `settings.ub` is a number: each measure's own JuMP builder writes it, with the set as the Risk Constraint Owner, on the prior result fitted on the head's rows. A variance or standard deviation holding its matrix reads no rows and is the set's own cone. A kind keyed by name resolves once per fold over `sets`; a kind that reads the rows — a ceiling, a tracking error, a centrality or phylogeny row, an exposure row, a return floor — resolves at every step. The programme set also carries the optimiser's direct objective penalties, folded into the geometry's divergence through the Objective Penalty, so a penalised step is a proximal mirror step with the same regret bound. Its builders run in the order a JuMP head's do. Fees and a budget below one have no field: a fee is a deduction from a return the projection does not have, and cash is a column. ADR 0159, issue #1206.
 *Avoid*: Constraint Space, which is the basis a constraint's names resolve in, not the set; and a Weight Finaliser, which repairs a solved vector after the fact where the Allocation Set is what the step projects onto.
 
 **Risk Constraint Owner**
@@ -703,6 +703,7 @@ The fixed sequence in which an Optimisation Estimator's constraint and risk buil
 
 **Objective Penalty**
 The accumulator through which every *soft* contribution reaches the objective: regularisation, soft Turnover and Tracking, and Custom Objective Terms. A contribution always worsens the objective, so a reward is a negative contribution.
+A programme Allocation Set's penalties and its semidefinite phylogeny's `p · tr(W)` reach a leader's objective through the same accumulator, from inside the Allocation Set Constraint. ADR 0164.
 
 **Custom Term**
 The user-facing extension point for a preference the library does not name: a Custom Objective Term prices one, a Custom Constraint mandates one.

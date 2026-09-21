@@ -103,7 +103,7 @@ every entry below its threshold, an entropic projection cannot zero a positive e
   `sets`, and nothing else. It has **no `slv` field**, because every projection onto it is closed
   form: the Euclidean and the entropic scalar roots above, and the sort of Duchi and co-authors
   when the bounds are `(0, 1)`. It is the default, `BoundedAllocationSet()`, the simplex.
-- **`ProgrammeAllocationSet(; wb, sets, lcs, tn, r, pe, te, card, …, slv)`** — every admissible
+- **`ProgrammeAllocationSet(; wb, sets, lcse, tn, r, pe, tr, card, …, slv)`** — every admissible
   kind below, with **`slv` required by its field bound**, so a set that needs a solver cannot be
   built without one. The projection is a bare JuMP model in the finaliser's idiom — `w`, `k = 1`,
   `Σw = 1`, the constraint scale and the objective scale — assembled by the shared builders and
@@ -120,18 +120,58 @@ and the optimum is the answer, and only its damped mix is projected
 That is the whole of the solver-free promise: it is a fact of the types, not a check, and the default configuration —
 any rule at its default geometry on the default set — solves nothing.
 
-### The admissible constraints, and the refusals
+### The admissible constraints are `JuMPOptimiser`'s, under `JuMPOptimiser`'s names and bounds
 
-The programme set admits the kinds whose builders take a model and an object, plus the cone it
-writes itself: weight bounds (`wb`, `sets`); linear constraints in the asset basis (`lcs` over
-`sets`); a turnover ceiling (`tn`), the library's per-asset `|w_i − ŵ_i| ≤ tn_i`, whose reference
-is the Price-Adjusted Allocation `ŵ_t = w_t .* x_t / ⟨w_t, x_t⟩` of the update, the book the step
-trades from, computed in-step on that row — the executed trade, never the distance between two
-targets (ADR 0160); a risk ceiling (`r`) under any `RiskMeasure`, its `settings.ub` the number,
-built by the measure's own JuMP builder on the prior result of `pe` fitted on the head's rows as
-ADR 0158 rules; a tracking error (`te`) over the head's rows; and the MIP kinds — cardinality,
-group cardinality, thresholds and semi-continuous bounds — through the same
-`model + wb + card + MIPSpace` builders `JuMPOptimiser` uses, under a MIP-capable `slv`.
+The programme set admits every constraint kind of `JuMPOptimiser` whose data is one of three
+things — the caller's object, the `sets` a name resolves over, or the head's rows — under the
+field name and the type bound `JuMPOptimiser` gives the same kind, so a caller who knows one
+surface knows the other. [Issue #1206](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1206)
+found the two surfaces had drifted: the set's turnover was a bare number where the optimiser's
+is a `Turnover` or its estimator, its tracking error admitted one `WeightsTracking` where the
+optimiser's admits every `AbstractTracking` and vectors of them, its risk ceiling was one
+measure where the heads take a vector, and the sub-group MIP kinds were absent although the
+set's consumer held every input they need. Nothing fundamental had kept any of them out.
+
+The kinds, by the data they read:
+
+- **The caller's object or `sets`.** Weight bounds (`wb`, `sets`); the short and gross budget
+  ranges (`sbgt`, `gbgt`) and the exact long-short pin (`xbgt`) under the budget of one, which
+  is what a leverage cap on a long-short reversion is; linear constraints (`lcse`, the one slot
+  that also admits an `ExposureConstraintEstimator`); the turnover ceiling (`tn`), a `Turnover`,
+  a `TurnoverEstimator` resolved over `sets`, or a vector of them, whose reference is replaced
+  by `factory(tn, ŵ)` at every step with `ŵ` the Price-Adjusted Allocation of ADR 0160 unless
+  the object is `fixed`, in which case the caller's book stays the reference; the MIP kinds
+  (`card`, `gcarde`, `lt`, `st`, `ss`) and their sub-group forms (`scard`, `sgcarde`, `smtx`,
+  `sgmtx`, `slt`, `sst`, `sglt`, `sgst`); the norm ceilings (`l2c`, `lpc`, `linfc`); and a
+  custom constraint (`ccnt`), for which the set is the owner the door hands the callable.
+- **The head's rows.** The risk ceiling (`r`), a `RiskMeasure` or a vector of them, each with
+  `settings.ub` a number, built by the measure's own JuMP builder with the set as the Risk
+  Constraint Owner on the prior result of `pe` fitted on the rows as ADR 0158 rules — a
+  `Variance` with risk-contribution rows on `rc` included, because `risk_contribution_constraints`
+  reads them off the owner; the tracking error (`tr`), any `AbstractTracking` or a vector, a
+  `RiskTrackingError` included, whose builder reads its solver through `risk_constraint_solver`
+  as the risk builders do, and a `WeightsTracking` that is not `fixed` given `ŵ` through
+  `factory` as the turnover is; the centrality rows (`cte`) and the phylogeny kinds (`ple`), the
+  integer form and the semidefinite one, fitted on the rows; an exposure row in `lcse`, re-based
+  through the loadings its `FactorSpace` pins, `Regression(; M = …)`, because the head's rows
+  carry asset returns and no factor returns to refit them from; and a return floor (`ret`), the
+  mirror of the risk ceiling, on the prior's expected returns.
+
+The set also carries the direct objective penalties of `JuMPOptimiser` — `l1`, `l2`, `lp`,
+`linf` and `cobj` — folded into the geometry's divergence through the Objective Penalty every
+JuMP head folds into its own objective. A projection with a penalty is a proximal mirror step,
+and Duchi, Shalev-Shwartz, Singer and Tewari (2010) prove the same `O(√T)` regret for it in the
+same geometry, so every rule keeps its bound; with every penalty absent the step is the paper's
+projection. On the long-only simplex an `l2` penalty, `λ ‖w‖₂`, pulls the step toward uniform,
+because the norm's gradient is `w / ‖w‖₂`, and an `l1` penalty is a constant, so it reads only
+under a negative bound. A penalty needs a solver, so it lives on the programme set alone and the
+promise that the default set solves nothing stays a fact of the types.
+
+Resolution happens in two stages. A kind keyed by name resolves once per fold over `sets`, as
+before. A kind that reads the rows resolves at every step on the rows the head holds, as `pe`
+does, and `rows_needed` answers `nothing` when any such kind is present. The builders run in the
+order `assemble_jump_model!` runs them, on both arms — the bare projection model and the leader's
+adapter — so the set's model and a head's model name the same entries in the same order.
 
 The risk ceiling reaches the shared builders because the builders' `opt` slot takes a **Risk
 Constraint Owner**, `RiskConstraintOwner = Union{<:RiskJuMPOptimisationEstimator,
@@ -141,35 +181,51 @@ resolved against, `risk_contribution_constraints` for a `Variance`'s risk-contri
 `set_risk_upper_bound!` for the bound, honoured for a `RiskBoundOwner` (the optimisers outside
 factor risk contribution, and the programme set). `ProgrammeAllocationSet` subtypes
 `AbstractProgrammeAllocationSet`, an Allocation Set whose projection is a programme, which lives in
-`01_Base` with `AbstractAllocationSet` so the builders can name it. The set answers its own `slv`,
-and answers a `Variance`'s `rc` as it is, because its constructor refuses one. Every existing
-`set_risk_constraints!` method keeps its argument list; the `opt` annotation widened from the
-optimiser type to the union, and no caller changed. The three optimiser reads had been written
-inline in the builders (`opt.opt.slv` at three sites, `opt.opt.sets` and `opt.opt.strict` at one);
-this is where they became methods.
+`01_Base` with `AbstractAllocationSet` so the builders can name it. The set answers its own `slv`
+and a `Variance`'s `rc` as it is. Every existing `set_risk_constraints!` method keeps its argument
+list; the `opt` annotation widened from the optimiser type to the union, and no caller changed.
+The three optimiser reads had been written inline in the builders (`opt.opt.slv` at three sites,
+`opt.opt.sets` and `opt.opt.strict` at one); this is where they became methods, and the
+`RiskTrackingError` builder's own `opt.opt.slv` followed under #1206.
 
-The set materialises the measure against its prior through `factory` before the build, so a moment
-the measure carries itself is the one it is built on and the model's shared caches — `:G`, `:Gkt`,
-`:GV`, filled once per model from the first prior a builder saw — are never read for the ceiling.
-This is what lets the ceiling join a JuMP leader's model beside the head's own measures, which the
-head built from another prior; there the ceiling's entries live under the `:aset_` namespace with
-the head's `w` registered under it, so a ceiling of the same kind as a head measure never meets it.
-The measure's `rke` is cleared: the projection's objective is the geometry's divergence, and the
-ceiling is a constraint alone. A `Variance` or `StandardDeviation` holding its matrix reads no rows
-and no prior, and there is no prior result without rows, so that one ceiling stays the set's own
-second-order cone — the same cone the shared builder writes — and keeps the ceiling from row one.
+The set materialises each measure against its prior through `factory` before the build, so a
+moment the measure carries itself is the one it is built on and the model's shared caches — `:G`,
+`:Gkt`, `:GV`, filled once per model from the first prior a builder saw — are never read for the
+ceiling. This is what lets the ceiling join a JuMP leader's model beside the head's own measures,
+which the head built from another prior; there the ceiling's entries live under the `:aset_`
+namespace with the head's `w` registered under it, so a ceiling of the same kind as a head measure
+never meets it. The measure's `rke` is cleared: the ceiling is a constraint, and the objective is
+the geometry's divergence plus the set's penalties. A `Variance` or `StandardDeviation` holding its
+matrix reads no rows and no prior, and there is no prior result without rows, so that one ceiling
+stays the set's own cone — the second-order cone the shared builder writes, or `tr(ΣW) ≤ ub` on
+the lifted `W` when a semidefinite phylogeny is present, as `sdp_variance_flag!` decides for a
+head — and keeps the ceiling from row one.
 
-It refuses, by having no field for them: the SDP kinds, because a lifted `W = wwᵀ` has no meaning
-in a one-step projection — a `Variance` with risk-contribution rows on `rc` is one, refused at
-construction; a frontier or a per-asset `ub`, because a ceiling is one number; exposure constraints
-in a factor Constraint Space, because their loadings come from a factor prior the family does not
-read (the map's factor-forecast fog item); fees, which are a cost and not a constraint, and belong
-to the start-weights-and-drift decision; and a budget, below.
+A semidefinite kind costs nothing the set does not have. `set_sdp_constraints!` builds the lifted
+`W` and its cone from `w`, `k` and the constraint scale alone, and the phylogeny rows `A ⊙ W = 0`
+are pinned by the `p · tr(W)` penalty the builder folds into the Objective Penalty, so they bite
+on a projection exactly as they bite on a head whose objective carries no `W`. A kurtosis
+ceiling on the set already built `W` this way. In a leader's model the set reuses the leader's
+`W`, because one `W` belongs to one `w`, and prefixes only its own rows.
+
+It refuses, by having no field for them: a budget, below; fees, which are a deduction from an
+expected return the projection does not have, and which ADR 0160 placed on the head; the
+scalariser and the execution knobs of the optimiser (`sca`, `brt`, `x_src`, `cache`, `strict`),
+which serve an objective the set does not write or a loop the head runs; and a
+`TimeDependent` schedule, which is not a constraint kind. A frontier or a per-asset `ub` on a
+measure is refused because a ceiling is one number.
 
 A MIP projection is not unique, so the batch–online identity of ADR 0155 is stated precisely: it
 is a claim about the *code path* — the Causal Pass and the Recursion Read-out run the same solves
 in the same order on the same rows — and with a deterministic solver it holds exactly; it is not a
 claim that the optimum is unique.
+
+The two surfaces are still two spellings of one concept, the feasible set of a programme over
+`w`, and a field added to one can drift from the other again. That is a map of its own: one
+constraint block held by `JuMPOptimiser` beside its budget, fees, objective terms and knobs, and
+by the programme set beside its prior, solver and ceilings, whose first decision is the
+partition rule. This decision names the block's contents by fixing the set's names and bounds to
+the optimiser's, so the block, when it comes, takes the fields as they stand.
 
 ### The budget is one, and a bound may be negative where the geometry admits it
 
@@ -237,6 +293,22 @@ quadratic programme.
     constraint is then violated on exactly the days it binds.
 12. **A prototype ticket before the build.** Rejected: every question was answered without one;
     what remains is verification, which is a test.
+13. **The set holds a `JuMPOptimiser`.** Rejected under #1206: the optimiser carries a budget,
+    fees, a return term, a scalariser and objective terms a projection reads none of, so
+    `bgt ≠ 1` would be honoured in silence and every refusal would become a constructor value
+    check in place of an absent field.
+14. **The set's own field list, narrower than the optimiser's.** Rejected under #1206: the two
+    surfaces are one concept and they drifted; the set takes the optimiser's names and bounds.
+15. **The objective penalties on the Projection Geometry.** Rejected under #1206: a penalised
+    geometry needs a solver of its own and every rule's `proj` bound would admit it, two homes
+    for objective terms where the optimiser has one.
+16. **Fees on the set as an objective term.** Rejected under #1206: a fee is a deduction from
+    an expected return, the projection has none, and ADR 0160 placed the fee on the head; the
+    cost-aware literature's term is a rule parameter, not a fee.
+17. **The semidefinite kinds refused.** The first draft refused them on the ground that a lifted
+    `W` has no meaning in a one-step projection. Withdrawn under #1206: the cone reads `w`, `k`
+    and the scale alone, its penalty pins it on any objective, and a kurtosis ceiling on the set
+    had already built it.
 
 ## Consequences
 
@@ -256,6 +328,13 @@ quadratic programme.
   map, asked whether the risk-measure builders could be widened past the optimiser union so a
   programme set may bound any risk measure. They were, as *The admissible constraints* records:
   the builders take a Risk Constraint Owner, and the set is one.
+- [Issue #1206](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1206) widened the
+  set to the optimiser's constraint kinds, names and bounds, the objective penalties and the
+  semidefinite kinds, and fixed the builder order to `assemble_jump_model!`'s on both arms. The
+  `RiskTrackingError` builder reads its solver through `risk_constraint_solver`, the tracking and
+  semidefinite phylogeny builders take a prefix, and the leader's adapter of ADR 0164 folds the
+  set's penalties into the Objective Penalty. The map for one constraint block held by both
+  owners is [issue #1213](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1213).
 - The map's build sequence is now phrasable: the constraint route was the last decision it waited
   on. The start-weights-and-drift decision, ADR 0160, ruled that the loop threads nothing into the
   update and that the turnover ceiling measures against the Price-Adjusted Allocation.
