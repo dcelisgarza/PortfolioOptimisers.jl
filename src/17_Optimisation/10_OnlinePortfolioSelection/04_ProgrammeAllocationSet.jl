@@ -158,7 +158,7 @@ ProgrammeAllocationSet
   - [`BoundedAllocationSet`](@ref)
   - [`JuMPOptimiser`](@ref)
   - [`project`](@ref)
-  - [`set_allocation_set_constraints`](@ref)
+  - [`set_allocation_set_constraints!`](@ref)
   - [`HeldStep`](@ref)
   - [`OnlinePortfolioSelection`](@ref)
 """
