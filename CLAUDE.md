@@ -18,8 +18,7 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
   decision has **not** reached `main` is still a draft — rewrite it in place, because no reader
   outside the branch ever saw the text you would be amending.
 - To find code, prefer kaimon's `search_code` (semantic) when you can only *describe* what you
-  want, and `grep_code` when you already hold an exact token. `/graphify` builds a queryable graph
-  for larger architectural questions.
+  want, and `grep_code` when you already hold an exact token.
 
 ## Parallel sessions
 
