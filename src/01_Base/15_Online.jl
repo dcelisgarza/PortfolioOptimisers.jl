@@ -1303,7 +1303,7 @@ struct Online{T1, T2} <: AbstractEstimator
     end
 end
 function Online(cv::CrossValidationEstimator; kwargs...)
-    return throw(ArgumentError("`Online` on a scheme is an Online Scheme, and one is built by its function constructor alone — `OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit` — never by wrapping a `$(typeof(cv).name.name)` by hand. Each constructor takes its scheme's keywords minus the window knob and sets that knob `true`, because a fold cannot un-fold an observation, so an online run is expanding by construction. A scheme with no constructor of its own has no online form."))
+    return throw(ArgumentError("`Online` on a scheme is an Online Scheme, and one is built by its function constructor alone — `OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit` — never by wrapping a `$(nameof(typeof(cv)))` by hand. Each constructor takes its scheme's keywords minus the window knob and sets that knob `true`, because a fold cannot un-fold an observation, so an online run is expanding by construction. A scheme with no constructor of its own has no online form."))
 end
 function Online(::Online, args...; kwargs...)
     return throw(ArgumentError("est cannot be an Online: wrappers do not nest. One wrapper declares one buffer, and an estimator it wraps may carry wrappers of its own — they resolve at the same warm-up — but they belong in its fields, not inside this one."))
@@ -1666,8 +1666,8 @@ function update_online_estimator(o::Online)
     est = rebuild_estimator(o.est, (; cache = online_state_seed(o.est, o.max_history)))
     return update_online_estimator(est)
 end
-function update_online_estimator(o::Online{<:CrossValidationEstimator})
-    return throw(ArgumentError("`Online($(typeof(o.est).name.name))` is an Online Scheme, and it reached the warm-up in an estimator slot: a scheme seeds no sample buffer, because it is the `cv` argument of the cross-validation door, not a field of the estimator that runs through it."))
+function update_online_estimator(::Online{<:CrossValidationEstimator})
+    return throw(ArgumentError("`Online` on a scheme is an Online Scheme, and it reached the warm-up in an estimator slot: a scheme seeds no sample buffer, because it is the `cv` argument of the cross-validation door, not a field of the estimator that runs through it."))
 end
 
 """

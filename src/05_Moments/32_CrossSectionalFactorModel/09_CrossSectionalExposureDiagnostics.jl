@@ -751,12 +751,11 @@ function exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0)
     sd = n > 1 ? sqrt(q / (n - 1)) : Tf(NaN)
     ir = isfinite(m) && isfinite(sd) && sd > zero(Tf) ? m / sd : Tf(NaN)
     return (; mean_ic = m, std_ic = sd, ic_ir = ir,
-            t_stat = exposure_ic_t_stat(ic, k, m, q, n, lags),
+            t_stat = exposure_ic_t_stat(view(ic, :, k), m, q, n, lags),
             hit_rate = n > 0 ? Tf(h) / Tf(n) : Tf(NaN))
 end
 """
-    exposure_ic_t_stat(ic::MatNum, k::Integer, m::Real, q::Real, n::Integer,
-                       lags::Integer) -> Real
+    exposure_ic_t_stat(c::VecNum, m::Real, q::Real, n::Integer, lags::Integer) -> Real
 
 Return the t-statistic of one factor's information coefficient series, over its long-run standard error.
 
@@ -764,11 +763,10 @@ It is the second half of [`exposure_ic_factor_summary`](@ref), which hands it th
 
 # Arguments
 
-  - `ic`: Information coefficient series `pairs × factors`.
-  - `k`: Position of the factor.
-  - `m`: Mean of the finite entries of column `k`.
-  - `q`: Sum of the squared deviations of the finite entries of column `k` from `m`.
-  - `n`: Number of finite entries of column `k`.
+  - `c`: Information coefficient series of one factor, a column of the `pairs × factors` matrix.
+  - `m`: Mean of the finite entries of `c`.
+  - `q`: Sum of the squared deviations of the finite entries of `c` from `m`.
+  - `n`: Number of finite entries of `c`.
   - `lags`: Number of autocovariances the standard error reads.
 
 # Returns
@@ -779,14 +777,13 @@ It is the second half of [`exposure_ic_factor_summary`](@ref), which hands it th
 
   - [`exposure_ic_factor_summary`](@ref)
 """
-function exposure_ic_t_stat(ic::MatNum, k::Integer, m::Real, q::Real, n::Integer,
-                            lags::Integer)
+function exposure_ic_t_stat(c::VecNum, m::Real, q::Real, n::Integer, lags::Integer)
     Tf = typeof(q)
-    P = size(ic, 1)
+    P = length(c)
     lrv = q
     for j in 1:lags, t in 1:(P - j)
-        v = ic[t, k]
-        u = ic[t + j, k]
+        v = c[t]
+        u = c[t + j]
         if isfinite(v) && isfinite(u)
             lrv += 2 * (Tf(v) - m) * (Tf(u) - m)
         end

@@ -53,7 +53,7 @@ legal carrier, so a rule that carries nothing — buy-and-hold, the constant reb
 portfolio, exponentiated gradient, passive-aggressive reversion — needs no mutable object.
 `w′` is always a new vector, because the projection allocates one, so a `w` that is a view
 after `port_opt_view` is never written. This is `partial_fit!`'s own promise
-([ADR 0107](0107-partial-fit-bang-is-the-cheapest-exact-fold-and-partial-fit-is-value-semantic.md)):
+([ADR 0107](0107-the-update-seam-has-two-verbs-and-a-view-slices-by-asset-and-drops-by-observation.md)):
 in place where it can, the value returned is the truth.
 
 ### The state is a Rule State beside the rows held once

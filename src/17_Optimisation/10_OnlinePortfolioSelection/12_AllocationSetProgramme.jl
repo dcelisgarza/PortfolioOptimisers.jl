@@ -162,13 +162,13 @@ function assemble_allocation_set!(model::JuMP.Model, set::ProgrammeAllocationSet
     (; lcsr, ctr, plr, ret, l2c, lpc, linfc, l1, l2, lp, linf, rd) = resolve_allocation_set_rows(set,
                                                                                                  pr,
                                                                                                  X)
-    if !bare && !haskey(model, Symbol(prefix, :w))
-        model[Symbol(prefix, :w)] = get_w(model)
+    if !bare
+        state_build!(() -> get_w(model), model, prefix, :w)
     end
-    set_linear_weight_constraints!(model, lcsr, Symbol(prefix, :lcs_ineq_),
-                                   Symbol(prefix, :lcs_eq_))
-    set_linear_weight_constraints!(model, ctr, Symbol(prefix, :cent_ineq_),
-                                   Symbol(prefix, :cent_eq_))
+    set_linear_weight_constraints!(model, lcsr, state_key(prefix, :lcs_ineq_),
+                                   state_key(prefix, :lcs_eq_))
+    set_linear_weight_constraints!(model, ctr, state_key(prefix, :cent_ineq_),
+                                   state_key(prefix, :cent_eq_))
     set_mip_constraints!(model, set.wb, set.card, set.gcarde, plr, set.lt, set.st, nothing,
                          set.ss, set.xbgt)
     set_smip_constraints!(model, set.wb, set.scard, set.sgcarde, set.smtx, set.sgmtx,

@@ -1573,7 +1573,7 @@ function summarise_returns(ret::VecNum, turnover::Option{<:Number};
     return PerformanceSummaryResult(T, ann, alpha, compound, ann_ret, ann_vol, sharpe,
                                     sharpe_se, sortino, calmar, max_dd, cvar_val,
                                     excess_ret, tracking_error, information_ratio,
-                                    isnothing(turnover) ? oftype(ann_ret, NaN) : turnover)
+                                    something(turnover, oftype(ann_ret, NaN)))
 end
 function performance_summary(w::ArrNum, X::MatNum, fees::Option{<:Fees} = nothing;
                              kwargs...)::PerformanceSummaryResult

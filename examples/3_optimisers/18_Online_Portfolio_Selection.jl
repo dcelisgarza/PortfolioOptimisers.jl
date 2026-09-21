@@ -208,13 +208,16 @@ vocabulary, and its projection is a programme the solver runs at every row. Here
 moving-average reversion rule is capped at twenty percent per asset and at ten points of
 turnover per asset and period, which turns a corner-seeking rule into a diversified one:
 the volatility falls by almost half, and the net wealth more than doubles, most of it
-turnover the fee no longer takes.
+turnover the fee no longer takes. The ceiling is the optimiser's own [`Turnover`](@ref), and
+its reference `w` is a placeholder: the head replaces it with the allocation the step trades
+from at every row.
 =#
 
 capped = OnlinePortfolioSelection(; alg = MovingAverageReversion(), fees = fees,
                                   set = ProgrammeAllocationSet(; slv = slv,
                                                                wb = WeightBounds(0, 0.2),
-                                                               tn = 0.1))
+                                                               tn = Turnover(; w = zeros(N),
+                                                                             val = 0.1)))
 capped_pred = cross_val_predict(capped, rd, cv)
 ps_free = performance_summary(preds["Moving-average reversion"])
 ps_capped = performance_summary(capped_pred)

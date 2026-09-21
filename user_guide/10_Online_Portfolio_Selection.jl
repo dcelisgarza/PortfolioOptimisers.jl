@@ -226,7 +226,7 @@ market the largest rate offered wins, because the gradient keeps pointing the sa
 faster step follows it sooner, and it lifts the wealth from `2.9` to `3.0`; on the reverting
 market the same search would pick the smallest, for the same reason.
 
-## The roster by group
+## [The roster by group](@id user-guide-online-selection-roster)
 
 Every rule is a value of the head's `alg` slot. The groups are Li and Hoi's (2014), and the
 [capability catalogue](@ref catalogue-online-portfolio-selection) lists the same roster.

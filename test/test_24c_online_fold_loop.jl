@@ -182,7 +182,7 @@ assets is what keeps the JuMP families cheap.
             @test occursin("OnlineIndexWalkForward", err.msg)
         end
         @test_throws ArgumentError Online(; est = IndexWalkForward(252, 21))
-        # An Online Scheme in an estimator slot is refused at the warm-up, by name.
+        # An Online Scheme in an estimator slot is refused at the warm-up.
         err = try
             po.update_online_estimator(online_cv)
             nothing
