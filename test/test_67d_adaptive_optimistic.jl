@@ -48,7 +48,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
     struct ZeroHint <: po.AbstractGradientPredictor end
     function po.predict_gradient!(::ZeroHint, ::Nothing, ::po.AbstractOnlineObjective,
                                   g::AbstractVector, ::AbstractVector, ::AbstractVector,
-                                  ::Any, ::Integer)
+                                  ::AbstractVector, ::Any, ::Integer)
         return nothing, zero(g)
     end
     # The weighted projection onto a bounded set as a quadratic programme, independent of
@@ -333,6 +333,55 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         @test isapprox(wα, 0.8 .* u .+ 0.1; atol = 1e-15)
         o = po.partial_fit!(OPS(; alg = algα), rows(rd, 1:5))
         @test isapprox(o.cache.w, 0.8 .* o.cache.st.u .+ 0.2 / N; atol = 1e-15)
+    end
+
+    @testset "Under the mix a forecaster folds the traded relative, and a re-evaluated loss reads the mixed one" begin
+        # Issue #1210: the predictor is handed both relatives. A folding forecaster walks the
+        # path that traded, so its forecast is the statistic of the raw rows, not of the
+        # mixed ones compressed toward one; the Mirror-Prox hint re-evaluates the loss on the
+        # mixed relative the gradient was read on.
+        set = resolve(BoundedAllocationSet(), N)
+        md = ExponentiatedGradient(; eta = 0.1, alpha = 0.2)
+        alg = OptimisticStep(; alg = md,
+                             predictor = ForecastGradient(; me = SimpleExpectedReturns()))
+        st = po.rule_state_seed(alg, fill(1 / N, N))
+        @test isa(st.ps, po.ForecasterState)
+        for t in 1:3
+            st, _ = po.online_update!(alg, st, st.u, X[t, :], nothing, set)
+        end
+        xhat = 1 .+ vec(sum(R[1:3, :]; dims = 1)) ./ 3
+        @test isapprox(st.m, -xhat ./ dot(st.v, xhat); atol = 1e-12)
+        # The mixed path is a different statistic: the hint is scale-free, so only the mix's
+        # uniform shift moves it, by about 1e-3 on this fixture, six orders above the pin.
+        Xm = mapreduce(t -> po.mixed_relatives(X[t, :], 0.2)', vcat, 1:3)
+        xhatm = vec(sum(Xm; dims = 1)) ./ 3
+        @test maxerr(st.m, -xhatm ./ dot(st.v, xhatm)) > 1e-4
+        # A folding price-level statistic sees the same raw path.
+        algf = OptimisticStep(; alg = md,
+                              predictor = ForecastGradient(;
+                                                           me = PriceLevelExpectedReturns(;
+                                                                                          alg = ExponentialMovingAverage(;
+                                                                                                                         alpha = 0.5))))
+        stf = po.rule_state_seed(algf, fill(1 / N, N))
+        @test isa(stf.ps, po.ForecasterState)
+        for t in 1:3
+            stf, _ = po.online_update!(algf, stf, stf.u, X[t, :], nothing, set)
+        end
+        stg = po.forecaster_seed(algf.predictor.me)
+        xhatf = nothing
+        for t in 1:3
+            stg, xhatf = po.forecast_relative(algf.predictor.me, stg, X[t, :], nothing)
+        end
+        @test isapprox(stf.m, -xhatf ./ dot(stf.v, xhatf); atol = 1e-12)
+        # The Mirror-Prox hint reads the mixed relative at the secondary iterate: the loss
+        # the gradient saw, not the traded one.
+        algl = OptimisticStep(; alg = md, predictor = LastGradient(; at_played = false))
+        w = fill(1 / N, N)
+        stl = po.rule_state_seed(algl, w)
+        stl, _ = po.online_update!(algl, stl, w, X[1, :], nothing, set)
+        xm = po.mixed_relatives(X[1, :], 0.2)
+        @test isapprox(stl.m, -xm ./ dot(stl.v, xm); atol = 1e-14)
+        @test maxerr(stl.m, -X[1, :] ./ dot(stl.v, X[1, :])) > 1e-4
     end
 
     @testset "The hint-residual rate and the schedules of the wrapped rule" begin

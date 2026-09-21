@@ -302,7 +302,7 @@ Abstract supertype for the Gradient Predictors an [`OptimisticStep`](@ref) plays
 In order to implement a new predictor, subtype `AbstractGradientPredictor` and implement:
 
   - `predictor_state_seed(pred::AbstractGradientPredictor, w::AbstractVector)`: The carrier the predictor keeps on the Rule State before the first row, or `nothing`, the default; `w` is the Start Allocation, whose length and element type the carrier takes.
-  - `predict_gradient!(pred::AbstractGradientPredictor, ps, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, rows, t::Integer) -> Tuple`: The carrier after the period and the hint, from the wrapped rule's objective `obj`, the period's gradient `g` at the played allocation, the secondary iterate `v` the second half-step is taken from, the period's price relative `x` — the uniform mix applied where the wrapped rule mixes — the rows the head holds through the period and the period count `t`.
+  - `predict_gradient!(pred::AbstractGradientPredictor, ps, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, xm::AbstractVector, rows, t::Integer) -> Tuple`: The carrier after the period and the hint, from the wrapped rule's objective `obj`, the period's gradient `g` at the played allocation, the secondary iterate `v` the second half-step is taken from, the period's price relative `x` as traded, the same relative `xm` with the uniform mix applied where the wrapped rule mixes — the vector `g` was read on, and `x` itself where the rule does not mix — the rows the head holds through the period and the period count `t`. A predictor that reads the relative as a price folds `x`; one that re-evaluates the wrapped rule's loss reads `xm`, so the hint sees the loss `g` saw.
   - `rows_needed(pred::AbstractGradientPredictor)`: The rows the predictor reads at a step, `0` by default.
 
 A carrier that is `nothing`, a vector or a Partial Fit State is sliced and copied with the head's state already; a carrier of another shape needs a slice and a copy of its own, through the two private helpers [`OptimisticStepState`](@ref) names.
@@ -465,11 +465,11 @@ function predictor_state_seed(pred::ForecastGradient, ::AbstractVector)
     return forecaster_seed(pred.me)
 end
 """
-    predict_gradient!(pred::LastGradient, ps::Nothing, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, rows, t::Integer)
-    predict_gradient!(pred::MeanGradient, m::AbstractVector, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, rows, t::Integer)
-    predict_gradient!(pred::ForecastGradient, ps, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, rows, t::Integer)
+    predict_gradient!(pred::LastGradient, ps::Nothing, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, xm::AbstractVector, rows, t::Integer)
+    predict_gradient!(pred::MeanGradient, m::AbstractVector, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, xm::AbstractVector, rows, t::Integer)
+    predict_gradient!(pred::ForecastGradient, ps, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, xm::AbstractVector, rows, t::Integer)
 
-The hint of the period, the carrier written in place: the gradient `g` itself or the period's loss `obj` at the secondary iterate `v`, the updated running mean `m`, or the log-wealth gradient of the forecast at `v` from the forecaster folded on or refit through [`forecast_relative`](@ref), which reads no objective because a forecast is a price relative.
+The hint of the period, the carrier written in place: the gradient `g` itself or the period's loss `obj` at the secondary iterate `v` on the mixed relative `xm` the gradient `g` was read on, the updated running mean `m`, or the log-wealth gradient of the forecast at `v` from the forecaster folded on or refit through [`forecast_relative`](@ref) on the traded relative `x`, which reads no objective because a forecast is a price relative. A forecaster folds the path that traded, not the mixed one, so its statistic is not compressed toward one by the mix; the hint `-x̂ / ⟨v, x̂⟩` is scale-free, so the forecast needs no mix applied after.
 
 # Returns
 
@@ -482,22 +482,22 @@ The hint of the period, the carrier written in place: the gradient `g` itself or
   - [`OptimisticStep`](@ref)
 """
 function predict_gradient!(pred::LastGradient, ::Nothing, obj::AbstractOnlineObjective,
-                           g::AbstractVector, v::AbstractVector, x::AbstractVector, rows,
-                           ::Integer)
+                           g::AbstractVector, v::AbstractVector, ::AbstractVector,
+                           xm::AbstractVector, rows, ::Integer)
     if pred.at_played
         return nothing, copy(g)
     end
-    return nothing, loss_gradient(obj, v, x, rows)
+    return nothing, loss_gradient(obj, v, xm, rows)
 end
 function predict_gradient!(::MeanGradient, m::AbstractVector, ::AbstractOnlineObjective,
-                           g::AbstractVector, ::AbstractVector, ::AbstractVector, ::Any,
-                           t::Integer)
+                           g::AbstractVector, ::AbstractVector, ::AbstractVector,
+                           ::AbstractVector, ::Any, t::Integer)
     m .+= (g .- m) ./ t
     return m, copy(m)
 end
 function predict_gradient!(pred::ForecastGradient, ps, ::AbstractOnlineObjective,
-                           ::AbstractVector, v::AbstractVector, x::AbstractVector, rows,
-                           ::Integer)
+                           ::AbstractVector, v::AbstractVector, x::AbstractVector,
+                           ::AbstractVector, rows, ::Integer)
     ps, xhat = forecast_relative(pred.me, ps, x, rows)
     return ps, -xhat ./ LinearAlgebra.dot(v, xhat)
 end
@@ -814,7 +814,9 @@ function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::Abstrac
 end
 # The seven-argument form is the primitive: the gradient is read at `point`, the unmixed
 # played iterate on the head and the mixture's played blend under `BlendPoint`; the hint is
-# the predictor's and reads the secondary iterate as before.
+# the predictor's and reads the secondary iterate as before. The predictor is handed both the
+# traded relative and the mixed one: a forecaster folds the path that traded, and a
+# re-evaluated loss reads the vector the gradient was read on (#1210).
 function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::AbstractVector,
                         x::AbstractVector, rows, set::AbstractAllocationSet,
                         point::AbstractVector)
@@ -838,7 +840,7 @@ function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::Abstrac
     xm = mixed_relatives(x, alpha)
     g = loss_gradient(md.obj, point, xm, rows)
     v = half_step(md, set, st.v, eta .* g, wh)
-    ps, m = predict_gradient!(alg.predictor, st.ps, md.obj, g, v, xm, rows, t)
+    ps, m = predict_gradient!(alg.predictor, st.ps, md.obj, g, v, x, xm, rows, t)
     r = hint_residual(md.proj, g .- st.m)
     res = [st.res[1] + r, st.res[1]]
     s = statistic_after_step(md.eta, st.s, w, x)

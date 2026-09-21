@@ -1399,7 +1399,7 @@ const CATALOGUE = [Section("Core abstractions",
                                               label = "Hindsight split [`HindsightSplit`](@ref) trains each fold on its own test row, the prefix through it or the row alone, so an estimator run through it is a per-row Hindsight Comparator"),
                                           Cap(:OnlineIndexWalkForward,
                                               :OnlineDateWalkForward, :OnlineHindsightSplit;
-                                              label = "Online Scheme [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref) and [`OnlineHindsightSplit`](@ref) wrap a scheme in [`Online`](@ref), so the loop fits each fold by the online step, threading one estimator from fold to fold"),
+                                              label = "Online Scheme [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref) and [`OnlineHindsightSplit`](@ref) wrap a scheme in `Online`, so the loop fits each fold by the online step, threading one estimator from fold to fold"),
                                           Cap(:Resume;
                                               label = "Resume [`Resume`](@ref) continues an online walk-forward from its Result over the full history extended, and `vcat` stacks the two Results")]),
                                    Cap(:MultipleRandomised, :MultipleRandomisedResult;
