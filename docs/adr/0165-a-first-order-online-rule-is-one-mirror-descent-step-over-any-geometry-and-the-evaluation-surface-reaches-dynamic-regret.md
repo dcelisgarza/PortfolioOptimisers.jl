@@ -74,7 +74,12 @@ mixture; the struct of the first build becomes a constructor in place, and the r
 resolving.
 
 `alpha` is the uniform mix of Helmbold and co-authors (1998): the update reads
-`x̃_t = (1 − α/N) x_t + (α/N) 1` and the played allocation is `w̃_t = (1 − α) w_t + (α/N) 1`. The
+`x̃_t = (1 − α/N) x_t + (α/N) max_i x_{t,i} 1` — the paper's mix over relatives normalised to a
+period maximum of one, the assumption its Theorem 4.2 rests on and the update itself never needs,
+since every reader of `x̃_t` is invariant to its scale; a mix of the raw relatives with an unscaled
+floor is a different step, `3e-6` away in the allocation at `α = 0.2` on two per cent returns and
+`1e-4` on a day one asset moves by half — and the played allocation is
+`w̃_t = (1 − α) w_t + (α/N) 1`. The
 Rule State carries the **unmixed** iterate in a one-vector carrier, and the verb returns the played
 one; at `α = 0` the carrier is the played vector and the rule is the shipped exponentiated
 gradient to the last bit. The mix is a convex shift, not a projection, so it is admitted under every
@@ -174,7 +179,13 @@ NeurIPS companion (Corollary 2) is `HintResidualRate(; rmax)` on the wrapped rul
 keeps the last hint and the two running residual sums on its carrier, the schedule reads them by
 field as the self-confident rate reads its statistic, and no new verb is added.
 `eta`, `proj`, `alpha` and `obj` are the wrapped rule's; the regret is
-`O(√Σ_t ‖g_t − M_t‖²)` and never worse than the plain step up to a constant.
+`O(√Σ_t ‖g_t − M_t‖²)` and never worse than the plain step up to a constant. The first half-step
+is taken at `η_t` and the second at `η_{t+1}`, read from the carrier once the period's row and its
+residual are in it, because the paper forms `w_{t+1}` with `η_{t+1}` and its Corollary 2 rate
+reads the residual of the period just closed; under a number the two rates are one, and under
+`HintResidualRate` the two-rate form is `6e-3` from the one-rate form over sixty rows. The played
+mix and the start a restart returns to are re-entered onto the set through `reprojection`, as the
+wrapped rule's are.
 
 ### The mixture takes a gradient point and a start over experts
 

@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The anytime rate ``\\eta_t = c / \\sqrt{t}``: the schedule of Zinkevich (2003, Theorem 1) for online gradient descent, and at ``c = \\sqrt{\\log N / (2 N)}`` the anytime Soft-Bayes rate of Orseau, Lattimore and Legg (2017, Theorem 10).
 
-It reads the period count alone. Under the Euclidean map it carries Zinkevich's ``O(\\sqrt{T})`` regret with no horizon; under the entropic map the fixed-horizon constant of Helmbold, Schapire, Singer and Warmuth (1998, Theorem 4.1), ``\\eta = r \\sqrt{2 \\log N / T}``, needs the horizon and the lower bound ``r`` on the price relatives, which no online rule knows, so it is a documented formula and not a schedule.
+It reads the period count alone. Under the Euclidean map it carries Zinkevich's ``O(\\sqrt{T})`` regret with no horizon; under the entropic map the fixed-horizon constant of Helmbold, Schapire, Singer and Warmuth (1998, Theorem 4.1), ``\\eta = 2 r \\sqrt{2 \\log N / T}``, needs the horizon and the lower bound ``r`` on the price relatives as a fraction of the period's largest, which no online rule knows, so it is a documented formula and not a schedule.
 
 # Fields
 
@@ -157,7 +157,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The self-confident rate of Orseau, Lattimore and Legg (2017, Theorems 5 and 6): ``\\eta_t = \\sqrt{2 \\log N / C_{1, t-1}}``, read from the running first-order excess ``C_{1, t} = \\sum_{s \\leq t} \\max_i \\left( x_{s, i} / \\langle \\boldsymbol{w}_s, \\boldsymbol{x}_s \\rangle - 1 \\right)``, which the rule's carrier keeps for it beside ``\\log N``.
 
-The statistic is non-decreasing, so the rate is non-increasing and may be updated online, as the paper notes; with it Theorem 6's regret against every constant rebalanced portfolio is ``\\min(C_1, 2 \\sqrt{C_1 \\log N} + \\sqrt{2 T \\log N / C_1})``, small when one asset is the best predictor for long stretches and never worse than ``O(\\sqrt{T \\log N})``. The rate is capped at `eta_max`, because the statistic is zero before the first row and the theorem's rate lies in ``(0, 1)``; the paper states no cap, and the default is the interval's end. The excess is measured at the allocation the rule played, so the mix of a [`MirrorDescent`](@ref) with a positive `alpha` is what it reads.
+The statistic is non-decreasing, so the rate is non-increasing and may be updated online, as the paper notes; with it Theorem 6's regret of the Soft-Bayes step — [`ExpectationMaximisation`](@ref); on a [`MirrorDescent`](@ref) the rate is the paper's online correction carried over, with no bound of its own — against every constant rebalanced portfolio is ``\\min(C_1, 2 \\sqrt{C_1 \\log N} + \\sqrt{2 T \\log N / C_1})``, small when one asset is the best predictor for long stretches and never worse than ``O(\\sqrt{T \\log N})``. The rate is capped at `eta_max`, because the statistic is zero before the first row and the theorem's rate lies in ``(0, 1)``; the paper states no cap, and the default is the interval's end. The excess is measured at the allocation the rule played, so the mix of a [`MirrorDescent`](@ref) with a positive `alpha` is what it reads.
 
 # Fields
 
@@ -479,7 +479,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The root-mean-square rescaling of the gradient (Li, Zheng, Chen, Wang and Xu 2022, Eq. 8): ``\\boldsymbol{m}_{t+1} = \\gamma_2 \\boldsymbol{m}_t + (1 - \\gamma_2) \\boldsymbol{g}_t^2`` from ``\\boldsymbol{m}_1 = \\boldsymbol{0}``, and the step reads ``\\boldsymbol{g}_t / (\\sqrt{\\boldsymbol{m}_{t+1}} + \\epsilon)``.
 
-With the entropic map it is the paper's EGR. **At the paper's recommended ``\\gamma_2 = 0``, the default, ``\\boldsymbol{m}_{t+1} = \\boldsymbol{g}_t^2`` and the transformed gradient is ``\\boldsymbol{g}_t / (\\lvert \\boldsymbol{g}_t \\rvert + \\epsilon)``, the sign of the gradient up to ``\\epsilon``: every asset's exponent is the same, so the multiplicative update moves nothing and the rule holds the Price-Adjusted Allocation's normalisation of its own iterate** — the paper's own choice makes the rule nearly buy-and-hold on the current mix. A positive ``\\gamma_2`` is what gives the rescaling a memory.
+With the entropic map it is the paper's EGR. **At the paper's recommended ``\\gamma_2 = 0``, the default, ``\\boldsymbol{m}_{t+1} = \\boldsymbol{g}_t^2`` and the transformed gradient is ``\\boldsymbol{g}_t / (\\lvert \\boldsymbol{g}_t \\rvert + \\epsilon)``, the sign of the gradient up to ``\\epsilon``: every asset's exponent is the same, so the multiplicative update moves nothing and the rule holds its iterate: the constant rebalanced portfolio at the Start Allocation, up to ``\\epsilon``** — the paper's own choice makes the rule the uniform constant rebalanced portfolio, not buy-and-hold, from which it is five per cent away over sixty rows of two per cent returns. A positive ``\\gamma_2`` is what gives the rescaling a memory.
 
 # Fields
 
@@ -956,9 +956,9 @@ With ``\\boldsymbol{g}_t = -\\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\bo
 \\end{align}
 ```
 
-Under [`EntropicProjection`](@ref) the step is the multiplicative update ``w_{t+1, i} \\propto w_{t, i} \\exp(\\eta x_{t, i} / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle)`` of Helmbold, Schapire, Singer and Warmuth (1998), the exponentiated gradient, with regret ``O(\\sqrt{T \\log N})`` at ``\\eta = r \\sqrt{2 \\log N / T}`` when every price relative is at least ``r``; under [`EuclideanProjection`](@ref) it is the additive step ``\\boldsymbol{w}_t + \\eta \\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` followed by the projection onto the simplex, Zinkevich's (2003) online gradient descent and, up to the projection the 1997 paper assumes rather than enforces, the gradient projection of Helmbold and co-authors (1997), with regret ``O(\\sqrt{T N})``; under [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref) it is the barrier step of Abernethy, Lee and Tewari (2015), Zimmert and Seldin (2021) and Orseau, Lattimore and Legg (2017, §7), each a scalar root on the default set. Every geometry admits every Allocation Set the head admits; the fixed-horizon constants of the theorems need the horizon, which no online rule knows, and are documented formulas, and the anytime rates are [`InverseSquareRootRate`](@ref), [`SelfConfidentRate`](@ref) and [`DoublingTrickRate`](@ref) on `eta`.
+Under [`EntropicProjection`](@ref) the step is the multiplicative update ``w_{t+1, i} \\propto w_{t, i} \\exp(\\eta x_{t, i} / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle)`` of Helmbold, Schapire, Singer and Warmuth (1998), the exponentiated gradient, with regret ``O(\\sqrt{T \\log N})`` at ``\\eta = 2 r \\sqrt{2 \\log N / T}`` when every price relative is at least ``r`` times the period's largest; under [`EuclideanProjection`](@ref) it is the additive step ``\\boldsymbol{w}_t + \\eta \\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` followed by the projection onto the simplex, Zinkevich's (2003) online gradient descent and, up to the projection the 1997 paper assumes rather than enforces, the gradient projection of Helmbold and co-authors (1997), with regret ``O(\\sqrt{T N})``; under [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref) it is the barrier step of Abernethy, Lee and Tewari (2015), Zimmert and Seldin (2021) and Orseau, Lattimore and Legg (2017, §7), each a scalar root on the default set. Every geometry admits every Allocation Set the head admits; the fixed-horizon constants of the theorems need the horizon, which no online rule knows, and are documented formulas, and the anytime rates are [`InverseSquareRootRate`](@ref), [`SelfConfidentRate`](@ref) and [`DoublingTrickRate`](@ref) on `eta`.
 
-`alpha` is the uniform mix of Helmbold and co-authors (1998, Theorem 4.2): the update reads the mixed price relatives ``\\tilde{\\boldsymbol{x}}_t = (1 - \\alpha / N) \\boldsymbol{x}_t + (\\alpha / N) \\boldsymbol{1}`` at the unmixed iterate, and the head plays ``\\tilde{\\boldsymbol{w}}_{t+1} = (1 - \\alpha) \\boldsymbol{w}_{t+1} + (\\alpha / N) \\boldsymbol{1}``; the carrier holds the unmixed iterate, so the mix is never inverted, and at `alpha = 0` the carrier is the played allocation and the rule is the plain step. The mix is a convex shift, not a projection, so it is admitted under every geometry; the theorem — ``O(T^{3/4})`` with no lower bound on the price relatives, at ``\\alpha = (N^2 \\log N / (8 T))^{1/4}`` — is the entropic map's, and the doubling trick of Corollary 4.3 sets ``\\alpha`` and ``\\eta`` per stage and takes precedence over this slot. The Start Allocation is played unmixed for the first period, as every rule plays it. The mix lies on the Allocation Set wherever the uniform allocation does, and is projected onto the set once more in the rule's geometry where it does not — a bounded set that excludes the uniform allocation, a turnover ceiling, a MIP kind — through [`reprojection`](@ref), which the default set never pays for.
+`alpha` is the uniform mix of Helmbold and co-authors (1998, Theorem 4.2): the update reads the mixed price relatives ``\\tilde{\\boldsymbol{x}}_t = (1 - \\alpha / N) \\boldsymbol{x}_t + (\\alpha / N) \\max_i x_{t, i} \\boldsymbol{1}`` at the unmixed iterate — the paper's mix over relatives normalised to a period maximum of one, which [`mixed_relatives`](@ref) states — and the head plays ``\\tilde{\\boldsymbol{w}}_{t+1} = (1 - \\alpha) \\boldsymbol{w}_{t+1} + (\\alpha / N) \\boldsymbol{1}``; the carrier holds the unmixed iterate, so the mix is never inverted, and at `alpha = 0` the carrier is the played allocation and the rule is the plain step. The mix is a convex shift, not a projection, so it is admitted under every geometry; the theorem — ``O(T^{3/4})`` with no lower bound on the price relatives, at ``\\alpha = (N^2 \\log N / (8 T))^{1/4}`` — is the entropic map's, and the doubling trick of Corollary 4.3 sets ``\\alpha`` and ``\\eta`` per stage and takes precedence over this slot. The Start Allocation is played unmixed for the first period, as every rule plays it. The mix lies on the Allocation Set wherever the uniform allocation does, and is projected onto the set once more in the rule's geometry where it does not — a bounded set that excludes the uniform allocation, a turnover ceiling, a MIP kind — through [`reprojection`](@ref), which the default set never pays for.
 
 A schedule that names a restart makes the update of that period answer the Start Allocation re-entered onto the set from the book the fund holds ([`reprojection`](@ref)), held on the carrier, and puts the carrier back at its seed with the period count kept, because the stages are cumulative; the Gradient Transform's averages restart with it. As the weighting of an [`ExpertMixture`](@ref) the rule moves the weight over the experts on their period returns. As an expert of a mixture under [`BlendPoint`](@ref) the rule reads its gradient at the mixture's played blend — the seven-argument [`online_update!`](@ref) hands it the Gradient Point — while stepping from its own iterate, the shared gradient of Zhang, Lu and Zhou (2018) and Zhao, Zhang, Zhang and Zhou (2020); on the head, and under [`OwnPoint`](@ref), the point is the iterate itself.
 
@@ -1084,6 +1084,25 @@ function played_allocation(u::AbstractVector, alpha::Real)
     end
     return (1 - alpha) .* u .+ alpha / length(u)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The price relatives a [`MirrorDescent`](@ref) rule's update reads under the uniform mix `alpha`: `x` itself at `alpha = 0`, and ``(1 - \\alpha / N) \\boldsymbol{x} + (\\alpha / N) \\max_i x_i \\boldsymbol{1}`` otherwise.
+
+The mix of Helmbold, Schapire, Singer and Warmuth (1998, Theorem 4.2) is stated for relatives normalised to a period maximum of one, ``\\tilde{\\boldsymbol{x}} = (1 - \\alpha / N) \\boldsymbol{x} / \\max_i x_i + (\\alpha / N) \\boldsymbol{1}``, and every reader of the mixed vector — the gradient of the log-wealth loss, the hint residual — is invariant to its scale, so the floor is scaled to the period's maximum in place of the relatives to it. The mix of the raw relatives with an unscaled floor is a different step: it leaves the theorem's proof, and differs from this one by ``3 \\times 10^{-6}`` in the allocation at ``\\alpha = 0.2`` over sixty rows of two per cent returns, and by ``10^{-4}`` on a day one asset moves by half.
+
+# Related
+
+  - [`MirrorDescent`](@ref)
+  - [`played_allocation`](@ref)
+"""
+function mixed_relatives(x::AbstractVector, alpha::Real)
+    if iszero(alpha)
+        return x
+    end
+    N = length(x)
+    return (1 - alpha / N) .* x .+ (alpha / N) * maximum(x)
+end
 function rows_needed(alg::MirrorDescent)
     return rows_needed(alg.obj)
 end
@@ -1111,7 +1130,7 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
                             st.gs)
     eta = learning_rate(alg.eta, t, st)
     alpha = mixing_share(alg.eta, t, alg.alpha)
-    xm = iszero(alpha) ? x : (1 - alpha / length(x)) .* x .+ alpha / length(x)
+    xm = mixed_relatives(x, alpha)
     g = loss_gradient(alg.obj, point, xm, rows)
     q = mirror_step(alg.proj, st.u, eta .* transform_gradient!(alg.grad, st.gs, g))
     u = project(alg.proj, set, q, wh)
@@ -1264,7 +1283,7 @@ end
 
 The exponentiated gradient with root-mean-square rescaling of Li, Zheng, Chen, Wang and Xu (2022): [`ExponentiatedGradient`](@ref) under [`RootMeanSquareGradient`](@ref).
 
-At the paper's recommended `gamma2 = 0`, the default, the transformed gradient is the sign of the gradient up to `eps`, the same at every asset, so the update moves nothing: the rule holds its iterate's normalisation. [`RootMeanSquareGradient`](@ref) states why.
+At the paper's recommended `gamma2 = 0`, the default, the transformed gradient is the sign of the gradient up to `eps`, the same at every asset, so the update moves nothing: the rule is the constant rebalanced portfolio at its Start Allocation. [`RootMeanSquareGradient`](@ref) states why.
 
 # Examples
 

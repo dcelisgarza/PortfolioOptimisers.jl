@@ -9,7 +9,9 @@ of Duchi, Hazan and Singer (2011, Algorithm 1) written out by hand on a two-asse
 raw step `w + η x / (⟨w, x⟩ s)` and the projection in the norm `diag(s)`, whose budget root
 is `θ = (Σq − 1) / Σ(1 / s_i)` where no bound binds; the optimistic steps are the two
 half-steps of Rakhlin and Sridharan (2013, §2.2) on the Euclidean and entropic maps; the
-weighted roots are checked against an independent quadratic programme at `1e-8`.
+weighted roots are checked against an independent quadratic programme at `1e-8`. Under a
+schedule the second half-step is taken at the next period's rate, as the paper's Corollary 2
+forms it.
 =#
 using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuMP
 @testset "Online portfolio selection: the adaptive subgradient and the optimistic step" begin
@@ -314,14 +316,15 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         end
         xhat = 1 .+ vec(sum(R[1:3, :]; dims = 1)) ./ 3
         @test isapprox(st.m, -xhat ./ dot(st.v, xhat); atol = 1e-12)
-        # The uniform mix reads mixed relatives at the unmixed played iterate and plays the
-        # mix from the unmixed w_{t+1}.
+        # The uniform mix reads mixed relatives at the unmixed played iterate — the paper's,
+        # over the relatives normalised to a period maximum of one — and plays the mix from
+        # the unmixed w_{t+1}.
         algα = OptimisticStep(; alg = ExponentiatedGradient(; eta = 0.1, alpha = 0.2))
         w = [0.5, 0.5]
         x = [1.2, 0.8]
         stα = po.rule_state_seed(algα, w)
         stα, wα = po.online_update!(algα, stα, w, x, nothing, simplex2)
-        xm = 0.9 .* x .+ 0.1
+        xm = 0.9 .* (x ./ 1.2) .+ 0.1
         v = w .* exp.(0.1 .* xm ./ dot(w, xm))
         v ./= sum(v)
         u = v .* exp.(0.1 .* xm ./ dot(w, xm))
@@ -341,11 +344,16 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         st = po.rule_state_seed(alg, w)
         @test po.learning_rate(sched, 1, st) == 0.5
         st, w2 = po.online_update!(alg, st, w, [1.2, 0.8], nothing, simplex2)
-        # The first period ran at the cap, so it is the fixed-rate step at 0.5.
+        # The first half-step ran at the cap, and the second at the rate of period 2, which
+        # reads the residual of period 1, ‖g₁ − 0‖² = 2.08: the paper forms w₂ with η₂.
+        eta2 = 0.5 * min(1 / sqrt(1.2^2 + 0.8^2), 1)
         @test isapprox(w2,
                        po.project_simplex(po.project_simplex(w .+ 0.5 .* [1.2, 0.8]) .+
-                                          0.5 .* [1.2, 0.8]); atol = 1e-12)
-        @test po.learning_rate(sched, 2, st) == 0.5 * min(1 / sqrt(1.2^2 + 0.8^2), 1)
+                                          eta2 .* [1.2, 0.8]); atol = 1e-12)
+        @test maxerr(w2,
+                     po.project_simplex(po.project_simplex(w .+ 0.5 .* [1.2, 0.8]) .+
+                                        0.5 .* [1.2, 0.8])) > 1e-3
+        @test po.learning_rate(sched, 2, st) == eta2
         st, _ = po.online_update!(alg, st, w2, [0.9, 1.1], nothing, simplex2)
         @test po.learning_rate(sched, 3, st) ==
               0.5 * min(1 / (sqrt(st.res[1]) + sqrt(st.res[2])), 1)
@@ -354,6 +362,30 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         W = libpath(OptimisticStep(;
                                    alg = ExponentiatedGradient(; eta = HintResidualRate())))
         @test all(isapprox.(sum(W; dims = 2), 1; atol = 1e-12)) && all(W .> 0)
+        # Under any schedule the second half-step reads the next period's rate: with
+        # c / sqrt(t) the secondary iterate steps at c / sqrt(t) and the played one at
+        # c / sqrt(t + 1), by hand over the fixture.
+        Wi = libpath(OptimisticStep(;
+                                    alg = GradientProjection(;
+                                                             eta = InverseSquareRootRate(;
+                                                                                         c = 0.2))))
+        Wh = zeros(T, N)
+        Wh[1, :] .= 1 / N
+        v = fill(1 / N, N)
+        for t in 1:(T - 1)
+            g = -X[t, :] ./ dot(Wh[t, :], X[t, :])
+            v = po.project_simplex(v .- 0.2 / sqrt(t) .* g)
+            Wh[t + 1, :] .= po.project_simplex(v .- 0.2 / sqrt(t + 1) .* g)
+        end
+        @test maxerr(Wi, Wh) < 1e-14
+        # The played mix is projected once more where the set excludes the uniform
+        # allocation, as the wrapped rule's is.
+        lbset = BoundedAllocationSet(;
+                                     wb = WeightBounds(; lb = [0.3, 0.0, 0.0, 0.0], ub = 1))
+        Wb = libpath(OptimisticStep(; alg = ExponentiatedGradient(; alpha = 0.5));
+                     set = lbset)
+        @test all(Wb[2:end, 1] .>= 0.3 - 1e-12)
+        @test all(isapprox.(sum(Wb; dims = 2), 1; atol = 1e-12))
         # The wrapped rule's other schedules count the wrapper's periods: the doubling
         # trick restarts both iterates at the Start Allocation and clears the residuals.
         dt = DoublingTrickRate(; N = 2)

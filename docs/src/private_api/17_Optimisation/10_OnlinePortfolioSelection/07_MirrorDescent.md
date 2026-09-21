@@ -11,5 +11,6 @@ PortfolioOptimisers.WindowedBestRateState
 PortfolioOptimisers.ring_row
 PortfolioOptimisers.copy_gradient_state
 PortfolioOptimisers.played_allocation
+PortfolioOptimisers.mixed_relatives
 PortfolioOptimisers.reprojection
 ```

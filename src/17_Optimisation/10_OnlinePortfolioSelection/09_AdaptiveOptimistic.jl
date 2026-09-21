@@ -708,7 +708,7 @@ With ``\\boldsymbol{g}_t = -\\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\bo
 
 The secondary sequence ``\\boldsymbol{v}_t`` is what the next period's step continues from, and the played ``\\boldsymbol{w}_t`` is one hint-step ahead of it; the carrier holds both. The regret is ``\\eta^{-1} R_{\\max}^2 + \\tfrac{\\eta}{2} \\sum_t \\lVert \\boldsymbol{g}_t - M_t \\rVert_*^2`` (their Lemma 2), ``O(\\sqrt{\\sum_t \\lVert \\boldsymbol{g}_t - M_t \\rVert_*^2})`` at the rate tuned to the residuals — the gradient path length under [`LastGradient`](@ref), where the step is the two-projection algorithm of Chiang and co-authors (2012), and the gradient variance under [`MeanGradient`](@ref) — and never worse than the wrapped rule's bound by more than a constant when the hints are wrong. A zero hint is the wrapped rule exactly. [`HintResidualRate`](@ref) on the wrapped rule's `eta` is the paper's adaptive rate, which reads the residuals the carrier accrues.
 
-`eta`, `proj`, `alpha` and `obj` are the wrapped rule's: both half-steps are its mirror step in its geometry, the gradient is its objective's through [`loss_gradient`](@ref) — a [`RiskLoss`](@ref) reads the head's rows, and the wrapper's `rows_needed` is the larger of the objective's and the predictor's — a schedule on its `eta` counts the wrapper's periods and reads the wrapper's carrier, and the uniform mix `alpha` is read as the wrapped rule reads it — mixed relatives at the unmixed played iterate, and the played mix from the unmixed ``\\boldsymbol{w}_{t+1}``. A restart the schedule names returns both iterates to the Start Allocation and every carrier to its seed. The wrapped rule's Gradient Transform must be the identity, because the transforms keep a carrier written once a period from one gradient, and the optimistic step reads two.
+`eta`, `proj`, `alpha` and `obj` are the wrapped rule's: both half-steps are its mirror step in its geometry, the gradient is its objective's through [`loss_gradient`](@ref) — a [`RiskLoss`](@ref) reads the head's rows, and the wrapper's `rows_needed` is the larger of the objective's and the predictor's — a schedule on its `eta` counts the wrapper's periods and reads the wrapper's carrier, and the uniform mix `alpha` is read as the wrapped rule reads it — mixed relatives ([`mixed_relatives`](@ref)) at the unmixed played iterate, and the played mix from the unmixed ``\\boldsymbol{w}_{t+1}``, projected once more where the set excludes it ([`reprojection`](@ref)). The first half-step is taken at the rate of the period, ``\\eta_t``, and the second at the rate of the next, ``\\eta_{t+1}``, which every schedule answers from the carrier once the period's row is in it — the paper forms ``\\boldsymbol{w}_{t+1}`` with ``\\eta_{t+1}``, and its adaptive rate reads the residual of the period just closed — so a number is one rate for both and a schedule is two. A restart the schedule names returns both iterates to the Start Allocation, re-entered onto the set from the book the fund holds, and every carrier to its seed. The wrapped rule's Gradient Transform must be the identity, because the transforms keep a carrier written once a period from one gradient, and the optimistic step reads two.
 
 # Fields
 
@@ -820,28 +820,35 @@ function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::Abstrac
                         point::AbstractVector)
     md = alg.alg
     t = st.n + 1
+    wh = price_adjusted_allocation(w, x)
     if restart(md.eta, t)
-        # The period count survives the restart: the schedule's stages are cumulative.
-        return OptimisticStepState(t, copy(st.w0), copy(st.w0), st.w0,
+        # The period count survives the restart: the schedule's stages are cumulative. The
+        # start re-enters the set from the book the fund holds, as it entered at the seed.
+        u0 = reprojection(md.proj, set, st.w0, wh)
+        return OptimisticStepState(t, copy(u0), copy(u0), st.w0,
                                    schedule_state_seed(md.eta, st.w0), zero(st.res),
                                    zero(st.m), predictor_state_seed(alg.predictor, st.w0)),
-               copy(st.w0)
+               copy(u0)
     end
     # The schedule's row enters before the rate or after the step, as the schedule says.
     st = OptimisticStepState(st.n, st.v, st.u, st.w0,
                              statistic_before_rate(md.eta, st.s, w, x), st.res, st.m, st.ps)
     eta = learning_rate(md.eta, t, st)
     alpha = mixing_share(md.eta, t, md.alpha)
-    xm = iszero(alpha) ? x : (1 - alpha / length(x)) .* x .+ alpha / length(x)
+    xm = mixed_relatives(x, alpha)
     g = loss_gradient(md.obj, point, xm, rows)
-    wh = price_adjusted_allocation(w, x)
     v = half_step(md, set, st.v, eta .* g, wh)
     ps, m = predict_gradient!(alg.predictor, st.ps, md.obj, g, v, xm, rows, t)
-    u = half_step(md, set, v, eta .* m, wh)
     r = hint_residual(md.proj, g .- st.m)
     res = [st.res[1] + r, st.res[1]]
     s = statistic_after_step(md.eta, st.s, w, x)
-    return OptimisticStepState(t, v, u, st.w0, s, res, m, ps), played_allocation(u, alpha)
+    # The played iterate is formed at the rate of the next period, which the schedule
+    # answers from the carrier after the row: the paper's `f_{t+1}` at `η_{t+1}`.
+    nst = OptimisticStepState(t, v, v, st.w0, s, res, m, ps)
+    u = half_step(md, set, v, learning_rate(md.eta, t + 1, nst) .* m, wh)
+    played = played_allocation(u, alpha)
+    return OptimisticStepState(t, v, u, st.w0, s, res, m, ps),
+           iszero(alpha) ? played : reprojection(md.proj, set, played, wh)
 end
 export DiagonalProjection, AdaptiveSubgradient, OptimisticStep, LastGradient, MeanGradient,
        ForecastGradient, HintResidualRate

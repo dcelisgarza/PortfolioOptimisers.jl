@@ -5,8 +5,8 @@ the Tsallis and log-barrier projections, the Learning-Rate Schedules and the mom
 Gradient Transforms.
 
 Every literal below states its provenance: the exponentiated-gradient identity is with the
-`#1161` fixture through the constructor; the `alpha = 0.2` step is ADR 0165's worked
-example; the Euclidean, momentum and scheduled paths are hand recursions of the stated
+`#1161` fixture through the constructor; the `alpha = 0.2` step is Helmbold's Theorem 4.2 on
+one row; the Euclidean, momentum and scheduled paths are hand recursions of the stated
 formulas; the barrier roots are checked against an independent bisection at `1e-12`; the
 doubling trick's first stage length is Corollary 4.3's `ceil(2 N^2 log N)`. The Risk Loss
 (issue #1182) is checked against a hand recursion on the window's sample covariance. The
@@ -113,23 +113,32 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test isnothing(o.cache.st.s) && isnothing(o.cache.st.gs)
     end
 
-    @testset "The uniform mix: ADR 0165's worked example" begin
-        # x = [1.2, 0.8], w = [0.5, 0.5], eta = 0.05, alpha = 0.2: the update reads the
-        # mixed relatives [1.18, 0.82] at the unmixed iterate, stores [0.5045, 0.4955] and
-        # plays [0.5036, 0.4964].
+    @testset "The uniform mix: Helmbold's Theorem 4.2 on one row" begin
+        # x = [1.2, 0.8], w = [0.5, 0.5], eta = 0.05, alpha = 0.2: the paper's mix is over
+        # the relatives normalised to a period maximum of one, [1, 2/3], so the update reads
+        # (1 - 0.1) [1, 2/3] + 0.1 = [1, 0.7] up to the scale the step is invariant to —
+        # [1.2, 0.84] in the relatives' own units — at the unmixed iterate, stores
+        # [0.5044, 0.4956] and plays [0.5035, 0.4965]. The mix of the raw relatives with
+        # an unscaled floor, [1.18, 0.82], is a different step ([0.5045, 0.4955]).
         alg = ExponentiatedGradient(; alpha = 0.2)
         w = [0.5, 0.5]
         x = [1.2, 0.8]
         st = po.rule_state_seed(alg, w)
         st, wn = po.online_update!(alg, st, w, x, nothing,
                                    resolve(BoundedAllocationSet(), 2))
-        xm = 0.9 .* x .+ 0.1
+        xm = 0.9 .* (x ./ 1.2) .+ 0.1
+        @test po.mixed_relatives(x, 0.2) == 0.9 .* x .+ 0.1 * 1.2
+        @test po.mixed_relatives(x, 0) === x
         q = w .* exp.(0.05 .* xm ./ dot(w, xm))
         u = q ./ sum(q)
         @test isapprox(st.u, u; atol = 1e-15)
-        @test round.(st.u; digits = 4) == [0.5045, 0.4955]
+        @test round.(st.u; digits = 4) == [0.5044, 0.4956]
         @test isapprox(wn, 0.8 .* u .+ 0.1; atol = 1e-15)
-        @test round.(wn; digits = 4) == [0.5036, 0.4964]
+        @test round.(wn; digits = 4) == [0.5035, 0.4965]
+        # The raw mix is not what the rule takes.
+        xr = 0.9 .* x .+ 0.1
+        qr = w .* exp.(0.05 .* xr ./ dot(w, xr))
+        @test maxerr(st.u, qr ./ sum(qr)) > 1e-5
         # The carrier holds the unmixed iterate over the run, and the head plays the mix.
         o = po.partial_fit!(OPS(; alg = alg), rows(rd, 1:5))
         @test isapprox(o.cache.w, 0.8 .* o.cache.st.u .+ 0.2 / N; atol = 1e-15)

@@ -309,7 +309,7 @@ commit = "8411336595"
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { code = 523, doc = 509, comment = 4, blank = 178, total = 1214 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { code = 460, doc = 677, comment = 1, blank = 215, total = 1353 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { code = 313, doc = 425, comment = 3, blank = 171, total = 912 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { code = 412, doc = 718, comment = 8, blank = 272, total = 1410 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { code = 422, doc = 726, comment = 8, blank = 276, total = 1432 }
 "src/18_ExpectedReturns.jl" = { code = 290, doc = 832, comment = 43, blank = 293, total = 1458 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { code = 313, doc = 631, comment = 5, blank = 270, total = 1219 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { code = 449, doc = 634, comment = 2, blank = 315, total = 1400 }
@@ -327,6 +327,6 @@ commit = "8411336595"
 "src/05_Moments/36_RankOneCovariance.jl" = { code = 37, doc = 51, comment = 4, blank = 25, total = 117 }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { code = 72, doc = 99, comment = 15, blank = 35, total = 221 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { code = 440, doc = 637, comment = 1, blank = 253, total = 1331 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { code = 296, doc = 391, comment = 11, blank = 150, total = 848 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { code = 300, doc = 391, comment = 14, blank = 150, total = 855 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { code = 59, doc = 131, comment = 1, blank = 64, total = 255 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { code = 74, doc = 61, comment = 0, blank = 23, total = 158 }
