@@ -17,6 +17,10 @@ A type held inside an Estimator that selects or modifies its computational behav
 **Selector tag**
 An Algorithm that carries no field, and whose only job is to name the branch a caller takes. Dispatch on the type is the whole of its behaviour: `SpectralDenoise` selects the spectral branch of `denoise!`. Most subtypes of `AbstractAlgorithm` are selector tags.
 
+**Open Family**
+An abstract type whose docstring carries an `# Interfaces` section, so a subtype written anywhere, a private path included, dispatches on the methods the section names. It is the one justification for a unit that would otherwise be inlined: a function with one method and one caller, or an abstract type with one concrete subtype, stays only as a hand-written entry in the allow-list of the census that gates trivial units, and that entry is admissible only on an Open Family. The section is a precondition, not an exemption, because every abstract type that parents a concrete type carries one. ADR 0168.
+*Avoid*: an exported or `public` type, which is a narrower thing — the section is the route to a `public` declaration (ADR 0154), not the other way round.
+
 **Result**
 A plain data struct holding the computed output of a function applied to an Estimator: *the answer for the input it was computed on*. Never callable.
 
@@ -584,7 +588,7 @@ The object a risk-measure builder takes in its `opt` slot: the JuMP optimiser wh
 *Avoid*: an optimisation estimator, which the programme set is not; and a protocol of `sets`, `strict` and the scales, which the builders never read off the owner.
 
 **Projection Geometry**
-The divergence an Online Selection Rule projects its raw step back onto the Allocation Set in, held on the rule's `proj` slot: squared Euclidean distance, relative entropy, the Tsallis and log-barrier (Burg) potentials, the diagonal norm of a rule's own gradient mass, or the norm of the rule's own Gram matrix — every one but the Gram norm a scalar root on the default set (ADR 0165). Each rule's slot is bounded to the geometries its theorem covers and defaults to its paper's, so the geometry is a statement the rule makes, not a knob the caller turns; a bound outside the geometry's domain, such as a negative weight under relative entropy, is refused when the rule and the set meet. Sparsity belongs to the geometry: a Euclidean projection zeroes, an entropic one cannot. ADR 0159.
+The divergence an Online Selection Rule projects its raw step back onto the Allocation Set in, held on the rule's `proj` slot where the rule admits a choice, and built by the rule at the step where the geometry is its own gradient mass (ADR 0168): squared Euclidean distance, relative entropy, the Tsallis and log-barrier (Burg) potentials, the diagonal norm of a rule's own gradient mass, or the norm of the rule's own Gram matrix — every one but the Gram norm a scalar root on the default set (ADR 0165). Each rule's slot is bounded to the geometries its theorem covers and defaults to its paper's, so the geometry is a statement the rule makes, not a knob the caller turns; a bound outside the geometry's domain, such as a negative weight under relative entropy, is refused when the rule and the set meet. Sparsity belongs to the geometry: a Euclidean projection zeroes, an entropic one cannot. ADR 0159.
 *Avoid*: a `JuMPWeightFinaliserFormulation`, which is an error norm on a repair, not a divergence on a step.
 
 **Constrained Update**
