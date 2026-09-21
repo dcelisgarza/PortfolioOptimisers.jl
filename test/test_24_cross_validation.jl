@@ -590,6 +590,77 @@
                   count(k -> 1 + k * b <= a, 0:a) - 1
         end
     end
+    @testset "n_splits and split agree on short data" begin
+        # `n_splits` had no guard, so a `train_size` of `T` or more returned a count of zero
+        # or less where `split` refused the same schedule. Both now check the one rule the
+        # data owns, `train_size < T`. The purge stays out of the rule: it comes out of the
+        # training window, so it moves neither the test schedule nor the count, and
+        # `train_size + purged_size == T` is a legal schedule with `purged_size` test rows.
+        short = Dict(T => ReturnsResult(; nx = string.('A':'C'),
+                                        X = randn(StableRNG(335), T, 3) ./ 100)
+                     for T in 2:30)
+        for T in (2, 3, 4), reduce_test in (false, true), purged_size in (0, 1)
+            cv = IndexWalkForward(4, 1; purged_size = purged_size,
+                                  reduce_test = reduce_test)
+            @test_throws DomainError n_splits(cv, short[T])
+            @test_throws DomainError split(cv, short[T])
+            # The two refusals name the same value and carry the same message.
+            e1 = try
+                n_splits(cv, short[T])
+            catch e
+                e
+            end
+            e2 = try
+                split(cv, short[T])
+            catch e
+                e
+            end
+            @test e1.val == e2.val == 4
+            @test e1.msg == e2.msg
+        end
+        # One observation past the training window is one test row, under either
+        # `reduce_test`, because `test_size = 1` fits it. A purge of one takes that row off
+        # the training window, not off the test.
+        for reduce_test in (false, true), purged_size in (0, 1)
+            cv = IndexWalkForward(4, 1; purged_size = purged_size,
+                                  reduce_test = reduce_test)
+            res = split(cv, short[5])
+            @test n_splits(cv, short[5]) == length(res.train_idx) == 1
+            @test res.train_idx == [1:(4 - purged_size)]
+            @test res.test_idx == [5:5]
+        end
+        # A `test_size` wider than the rows that remain gives one partial fold under
+        # `reduce_test`, and no fold without it. `n_splits` says `0` there, and `split`
+        # refuses the empty fold list through `WalkForwardResult`.
+        cv = IndexWalkForward(4, 3; reduce_test = true)
+        res = split(cv, short[5])
+        @test n_splits(cv, short[5]) == length(res.train_idx) == 1
+        @test res.test_idx == [5:5]
+        cv = IndexWalkForward(4, 3; reduce_test = false)
+        @test n_splits(cv, short[5]) == 0
+        @test_throws IsEmptyError split(cv, short[5])
+        # Over every short schedule, the count is never negative, and it is the length of
+        # the split wherever the split exists.
+        for T in 2:30, train_size in 1:10, test_size in 1:5, reduce_test in (false, true),
+            purged_size in 0:min(2, train_size - 1)
+
+            cv = IndexWalkForward(train_size, test_size; purged_size = purged_size,
+                                  reduce_test = reduce_test)
+            if train_size >= T
+                @test_throws DomainError n_splits(cv, short[T])
+                @test_throws DomainError split(cv, short[T])
+            else
+                n = n_splits(cv, short[T])
+                @test n >= 0
+                if n == 0
+                    @test !reduce_test
+                    @test_throws IsEmptyError split(cv, short[T])
+                else
+                    @test n == length(split(cv, short[T]).train_idx)
+                end
+            end
+        end
+    end
     @testset "A zero test_size is refused" begin
         # A `test_size` of zero advances the walk-forward window by nothing, so each of the
         # three `while true` split loops runs forever and allocates forever. `n_splits`

@@ -375,6 +375,10 @@ Return the number of cross-validation splits (folds) that would be produced by `
   - `cv`: A cross-validation estimator or result (e.g. [`KFold`](@ref), [`IndexWalkForward`](@ref), [`DateWalkForward`](@ref), [`CombinatorialCrossValidation`](@ref), [`MultipleRandomised`](@ref), or their corresponding result types).
   - `rd`: Returns-level or price-level data used to determine the number of splits ([`Prices_RR`](@ref)).
 
+# Validation
+
+  - For an [`IndexWalkForward`](@ref), `train_size < T`, where `T` is the number of observations in `rd`. This is the rule [`Base.split`](@ref) checks, so the count and the split agree on data too short to test.
+
 # Returns
 
   - `Integer`: The number of folds.
@@ -390,6 +394,10 @@ Return the number of cross-validation splits (folds) that would be produced by `
 function n_splits(iwf::IndexWalkForward, rd::Prices_RR)
     (; train_size, test_size, reduce_test) = iwf
     T = cv_nobs(rd)
+    # The same rule `split` checks, so the two never disagree on short data: without it a
+    # `train_size` of `T` or more gives a count of zero or less where `split` refuses.
+    @argcheck(train_size < T,
+              DomainError(train_size, "train_size ($train_size) must be less than T ($T)"))
     N = T - train_size
     val = div(N, test_size)
     if reduce_test && N % test_size != 0
