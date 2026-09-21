@@ -221,7 +221,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
                        po.project(po.DiagonalProjection(h), resolve(cap, N), q, q);
                        atol = 1e-6)
         r = optimise(OPS(; alg = AdaptiveSubgradient(),
-                         set = ProgrammeAllocationSet(; slv = slv, tn = 0.02)),
+                         set = ProgrammeAllocationSet(; slv = slv,
+                                                      tn = Turnover(; w = zeros(4),
+                                                                    val = 0.02))),
                      rows(rd, 1:5))
         @test isapprox(sum(r.w), 1; atol = 1e-8)
     end

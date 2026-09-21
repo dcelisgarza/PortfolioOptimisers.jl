@@ -93,6 +93,7 @@ Iterates over `plgs` and, for each [`SemiDefinitePhylogeny`](@ref) entry, enforc
 
   - $(arg_dict[:model])
   - `plgs`: Phylogeny constraint(s). Accepts `nothing`, a single phylogeny, or a vector.
+  - `prefix::Symbol`: The Model State namespace the rows and the penalty are registered under, `Symbol("")` for a head's own. The lifted `W` is the model's one bare `W`, because one `W` belongs to one `w`, so a programme Allocation Set's phylogeny in a leader's model reuses the leader's and prefixes only its rows.
 
 # Returns
 
@@ -104,7 +105,8 @@ Iterates over `plgs` and, for each [`SemiDefinitePhylogeny`](@ref) entry, enforc
   - [`set_sdp_frc_phylogeny_constraints!`](@ref)
   - [`SemiDefinitePhylogeny`](@ref)
 """
-function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PlC_VecPlC})
+function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PlC_VecPlC};
+                                        prefix::Symbol = Symbol(""))
     if !(isa(plgs, SemiDefinitePhylogeny) ||
          isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
         return nothing
@@ -116,11 +118,10 @@ function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PlC_Ve
             continue
         end
         A = pl.A
-        state_set!(model, Symbol(""), :sdp_plg_, i,
-                   JuMP.@constraint(model, sc * A ⊙ W == 0))
+        state_set!(model, prefix, :sdp_plg_, i, JuMP.@constraint(model, sc * A ⊙ W == 0))
         if !shared_has(model, :variance_flag)
             p = pl.p
-            plp = state_set!(model, Symbol(""), :sdp_plg_p_, i,
+            plp = state_set!(model, prefix, :sdp_plg_p_, i,
                              JuMP.@expression(model, p * LinearAlgebra.tr(W)))
             add_to_objective_penalty!(model, plp)
         end

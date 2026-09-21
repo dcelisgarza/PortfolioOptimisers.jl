@@ -296,14 +296,15 @@ commit = "8610300"
 "src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { lines = 102, misses = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { lines = 127, misses = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { lines = 120, misses = 0 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { lines = 164, misses = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { lines = 86, misses = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { lines = 189, misses = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { lines = 165, misses = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { lines = 139, misses = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { lines = 193, misses = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { lines = 127, misses = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { lines = 29, misses = 0 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { lines = 44, misses = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { lines = 70, misses = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { lines = 220, misses = 0 }
 "src/18_ExpectedReturns.jl" = { lines = 148, misses = 0 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { lines = 134, misses = 0 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { lines = 222, misses = 0 }

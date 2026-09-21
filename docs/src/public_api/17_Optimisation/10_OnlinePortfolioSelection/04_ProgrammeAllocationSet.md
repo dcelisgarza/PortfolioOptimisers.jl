@@ -4,14 +4,13 @@ Description = "The programme Allocation Set and the Constrained Update's program
 
 # The programme Allocation Set and the Constrained Update's programme
 
-The Allocation Set of the full constraint vocabulary: weight bounds, universe sets, linear constraints, a turnover ceiling against the Price-Adjusted Allocation, a variance or standard-deviation ceiling through the set's own cone, a tracking error and the MIP kinds, with a solver required by its field bound. A projection onto it, and every projection in the Gram geometry, is a bare-model programme assembled by the same builders a JuMP head uses; a programme that does not solve is a Held Step. The two barrier geometries of the first-order rule, the Tsallis and the log-barrier potentials, live here with their scalar roots on the bounded set and their conic programmes on this one.
+The Allocation Set of the full constraint vocabulary: every constraint kind a `JuMPOptimiser` takes, under the optimiser's field names and type bounds, the optimiser's direct objective penalties, and a solver required by its field bound. Its name-keyed slots resolve once per fold and its row-reading slots at every step; the programme itself, on both arms, is the next file's. The two barrier geometries of the first-order rule, the Tsallis and the log-barrier potentials, live here with their scalar roots on the bounded set.
 
 ```@docs
 ProgrammeAllocationSet
 TsallisProjection
 LogBarrierProjection
 PortfolioOptimisers.mirror_step
-PortfolioOptimisers.set_allocation_set_constraints!
 PortfolioOptimisers.rows_needed(set::ProgrammeAllocationSet)
 ```
 

@@ -717,6 +717,10 @@ struct ProjectionStep{T1, T2, T3}
     """
     ts::T2
     """
+    The head's `strict` flag, read by a programme set's row-stage resolution, so a name an exposure row states and the universe does not carry is refused as the head refuses one.
+    """
+    strict::Bool
+    """
     The Held Steps recorded during this row, in the order their programmes failed.
     """
     held::Vector{HeldStep}
@@ -735,7 +739,7 @@ const PROJECTION_STEP = ScopedValue{Union{Nothing, ProjectionStep}}(nothing)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Runs `f()` inside a [`ProjectionStep`](@ref) over `rows` at `ts`, the names `nx` pinned, and answers `(f(), held)`: the update's result and the Held Steps its projections recorded, an empty vector when every programme solved.
+Runs `f()` inside a [`ProjectionStep`](@ref) over `rows` at `ts`, the names `nx` pinned and the head's `strict` carried, and answers `(f(), held)`: the update's result and the Held Steps its projections recorded, an empty vector when every programme solved.
 
 # Related
 
@@ -743,8 +747,8 @@ Runs `f()` inside a [`ProjectionStep`](@ref) over `rows` at `ts`, the names `nx`
   - [`ProjectionStep`](@ref)
   - [`fold_online_selection`](@ref)
 """
-function with_projection_step(f, rows, ts; nx = nothing)
-    step = ProjectionStep(rows, nx, ts, HeldStep[])
+function with_projection_step(f, rows, ts; nx = nothing, strict::Bool = false)
+    step = ProjectionStep(rows, nx, ts, strict, HeldStep[])
     out = Base.ScopedValues.with(f, PROJECTION_STEP => step)
     return out, step.held
 end
@@ -794,6 +798,20 @@ The asset names the current [`ProjectionStep`](@ref) pins, or `nothing` outside 
 function projection_step_names()
     step = PROJECTION_STEP[]
     return isnothing(step) ? nothing : step.nx
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The head's `strict` flag the current [`ProjectionStep`](@ref) carries, or `false` outside a step.
+
+# Related
+
+  - [`ProjectionStep`](@ref)
+  - [`resolve_allocation_set_rows`](@ref)
+"""
+function projection_step_strict()
+    step = PROJECTION_STEP[]
+    return isnothing(step) ? false : step.strict
 end
 """
     assert_rule_admits_set(alg::AbstractOnlinePortfolioSelectionAlgorithm, set::AbstractAllocationSet)

@@ -323,15 +323,14 @@ this did in an earlier design — carried the same fact twice.
   - [`state_key`](@ref)
 """
 function set_risk_tr_constraints!(model::JuMP.Model, r::RiskMeasure,
-                                  opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
+                                  opt::RiskConstraintOwner, pr::AbstractPriorResult,
                                   pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
                                   kwargs...)
     return set_risk_constraints!(model, 1, r, opt, pr, pl, fees, args...; kwargs...)
 end
-function set_risk_tr_constraints!(model::JuMP.Model, rs::VecRM,
-                                  opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                                  pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
-                                  kwargs...)
+function set_risk_tr_constraints!(model::JuMP.Model, rs::VecRM, opt::RiskConstraintOwner,
+                                  pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
+                                  fees::Option{<:Fees}, args...; kwargs...)
     for (i, r) in enumerate(rs)
         set_risk_constraints!(model, i, r, opt, pr, pl, fees, args...; kwargs...)
     end

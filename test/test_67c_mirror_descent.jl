@@ -564,11 +564,11 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                   dict = Dict("nx" =>
                                                                                   ["A", "B",
                                                                                    "C"])),
-                                              lcs = LinearConstraintEstimator(;
-                                                                              val = :(A +
-                                                                                      B +
-                                                                                      C <=
-                                                                                      2))),
+                                              lcse = LinearConstraintEstimator(;
+                                                                               val = :(A +
+                                                                                       B +
+                                                                                       C <=
+                                                                                       2))),
                        3)
         cset = resolve(ProgrammeAllocationSet(; slv = slv,
                                               wb = WeightBounds(; lb = 0.05, ub = 0.4)), 3)
@@ -598,7 +598,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
             @test_throws DomainError po.project(proj, nset, q, wh)
         end
         # A run of the barrier rule on a programme set with a turnover ceiling.
-        tset = ProgrammeAllocationSet(; slv = slv, tn = 0.02)
+        tset = ProgrammeAllocationSet(; slv = slv,
+                                      tn = Turnover(; w = zeros(4), val = 0.02))
         r = optimise(OPS(; alg = MirrorDescent(; proj = LogBarrierProjection(), eta = 2),
                          set = tset), rows(rd, 1:5))
         @test isapprox(sum(r.w), 1; atol = 1e-8) && all(r.w .> 0)

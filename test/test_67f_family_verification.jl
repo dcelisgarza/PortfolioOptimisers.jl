@@ -232,7 +232,8 @@ and is held to the family's promises:
         # count of non-zero legs. Both are honoured by every rule, or the step is held. The
         # start is on two legs, because no allocation on two legs lies within the ceiling of
         # the uniform one, and a set that is infeasible at the seed holds every step.
-        pset = ProgrammeAllocationSet(; slv = mip, tn = 0.1, card = 2)
+        pset = ProgrammeAllocationSet(; slv = mip, tn = Turnover(; w = zeros(4), val = 0.1),
+                                      card = 2)
         w0 = [0.5, 0.5, 0.0, 0.0]
         t0 = 6
         # A solved leader under a programme set runs its programme on the set's kind, so

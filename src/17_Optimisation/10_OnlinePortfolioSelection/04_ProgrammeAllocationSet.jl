@@ -1,22 +1,18 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-The Allocation Set of the full constraint vocabulary: weight bounds, universe sets, linear constraints in the asset basis, a turnover ceiling, a risk ceiling under any [`RiskMeasure`](@ref), a tracking error and the MIP kinds, with a solver required by its field bound, because a projection onto it is a programme.
+The Allocation Set of the full constraint vocabulary: every constraint kind a [`JuMPOptimiser`](@ref) takes, under the optimiser's field names and type bounds, plus the optimiser's direct objective penalties, with a solver required by its field bound, because a projection onto it is a programme.
 
-The projection is a bare JuMP model in the Weight Finaliser's idiom — `w`, `k = 1`, `Σw = 1`, the constraint scale and the objective scale — assembled by the shared builders through [`set_allocation_set_constraints!`](@ref) and given the objective of the rule's Projection Geometry: ``\\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{q} \\rVert^2`` for [`EuclideanProjection`](@ref), ``\\sum_i w_i \\log (w_i / q_i)`` for [`EntropicProjection`](@ref), an exponential-cone programme, and ``(\\boldsymbol{w} - \\boldsymbol{q})^\\intercal A (\\boldsymbol{w} - \\boldsymbol{q})`` for [`GramProjection`](@ref). The budget is one and there is no budget field: cash is an asset with price relative one, which the rule allocates like any other.
+The projection is a bare JuMP model in the Weight Finaliser's idiom — `w`, `k = 1`, `Σw = 1`, the constraint scale and the objective scale — assembled by the shared builders through [`set_allocation_set_constraints!`](@ref) in the order [`assemble_jump_model!`](@ref) runs them, and given the objective of the rule's Projection Geometry: ``\\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{q} \\rVert^2`` for [`EuclideanProjection`](@ref), ``\\sum_i w_i \\log (w_i / q_i)`` for [`EntropicProjection`](@ref), an exponential-cone programme, and ``(\\boldsymbol{w} - \\boldsymbol{q})^\\intercal A (\\boldsymbol{w} - \\boldsymbol{q})`` for [`GramProjection`](@ref), plus the set's penalties through the Objective Penalty. The budget is one and there is no budget field: cash is an asset with price relative one, which the rule allocates like any other.
 
-**The per-constraint mechanism.**
+**The kinds, by the data they read.**
 
-  - `wb`, `sets`: [`set_weight_constraints!`](@ref) with the budget one.
-  - `lcs`: [`set_linear_weight_constraints!`](@ref) on [`linear_constraints`](@ref) over `sets`.
-  - `tn`: [`_set_turnover_constraints!`](@ref), the library's per-asset ceiling ``\\lvert w_i - \\hat{w}_i \\rvert \\leq \\mathrm{tn}_i``, with the reference set to the Price-Adjusted Allocation ``\\hat{\\boldsymbol{w}}_t = \\boldsymbol{w}_t \\odot \\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` of the step — the book the fund trades from, never the distance between two targets. The ceiling is a number, or one per asset.
-  - `r`, `pe`: the risk measure's own JuMP builder, [`set_risk_constraints!`](@ref), with the set as the [`RiskConstraintOwner`](@ref) and `settings.ub` as the ceiling — a conditional value at risk, a drawdown, a variance, any measure the JuMP optimisers bound — on the prior result of `pe` fitted on the head's rows at every step, the measure materialised against that prior through [`factory`](@ref) first, so a moment it carries itself is the one it is built on. A [`Variance`](@ref) or [`StandardDeviation`](@ref) that holds its matrix reads no rows and no prior: it is the set's own second-order cone ``[u; G \\boldsymbol{w}] \\in \\mathcal{K}_{\\mathrm{SOC}}`` with ``G^\\intercal G = \\boldsymbol{\\Sigma}`` and ``u`` the ceiling, ``\\sqrt{\\mathrm{ub}}`` for the variance and ``\\mathrm{ub}`` for the standard deviation, the same cone the shared builder writes ([`set_allocation_risk_ceiling!`](@ref)).
-  - `tr`: [`set_tracking_error_constraints!`](@ref) over the head's rows, against a [`WeightsTracking`](@ref) benchmark.
-  - `card`, `gcard`, `lt`, `st`, `ss`: [`set_mip_constraints!`](@ref), the same builders [`JuMPOptimiser`](@ref) uses, under a MIP-capable `slv`.
+  - The caller's object, or a name resolved over `sets` once per fold: `wb`, `sbgt`, `gbgt`, `xbgt`, `lt`, `st`, `lcse`, `gcarde`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `card`, `scard`, `ss`, `l2c`, `lpc`, `linfc`, `ccnt`, `l1`, `l2`, `lp`, `linf` and `cobj`, each through the builder [`JuMPOptimiser`](@ref) hands it to. The turnover ceiling's reference is replaced by [`factory`](@ref) at every step with the Price-Adjusted Allocation ``\\hat{\\boldsymbol{w}}_t = \\boldsymbol{w}_t \\odot \\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` of the step — the book the fund trades from, never the distance between two targets — unless the object is `fixed`, in which case the caller's book stays the reference.
+  - The head's rows, resolved at every step on the prior result of `pe` fitted on them: `r`, the risk ceilings, each measure's own JuMP builder with the set as the [`RiskConstraintOwner`](@ref) and `settings.ub` as the ceiling, the measure materialised against that prior through [`factory`](@ref) first, so a moment it carries itself is the one it is built on; `tr`, the tracking errors, a `WeightsTracking` that is not `fixed` given the Price-Adjusted Allocation as the turnover is; `cte`, the centrality rows; `ple`, the integer and semidefinite phylogeny kinds; an exposure row in `lcse`, re-based through the loadings its `FactorSpace` pins, because the rows carry no factor returns to refit them from; and `ret`, a return floor on the prior's expected returns. A [`Variance`](@ref) or [`StandardDeviation`](@ref) that holds its matrix reads no rows and no prior: it is the set's own cone ([`set_allocation_risk_ceiling!`](@ref)).
 
-A ceiling or a `tr` on the set reads every row the head has folded — [`rows_needed`](@ref) answers `nothing` — unless `r` is a variance or standard deviation holding its matrix and `tr` is absent, so a step costs one prior fit over the whole prefix on top of its programme; a caller who wants a window states it on `pe`. A covariance of one observation does not exist, so while the head holds fewer than two rows the fit is not attempted and the step is a Held Step, recorded as such ([`allocation_set_ready`](@ref)); a caller who wants a covariance ceiling from row one gives `r` its matrix. A MIP projection is not unique, so the identity between the Causal Pass and the Recursion Read-out is a claim about the code path — the same solves in the same order on the same rows — and holds exactly with a deterministic solver.
+A set that reads the rows — [`rows_needed`](@ref) answers `nothing` — costs one prior fit over the whole prefix at every step on top of its programme; a caller who wants a window states it on `pe`. A covariance of one observation does not exist, so while the head holds fewer than two rows the fit is not attempted and the step is a Held Step, recorded as such ([`allocation_set_ready`](@ref)); a caller who wants a covariance ceiling from row one gives `r` its matrix. A MIP projection is not unique, so the identity between the Causal Pass and the Recursion Read-out is a claim about the code path — the same solves in the same order on the same rows — and holds exactly with a deterministic solver.
 
-The set refuses, by having no field for them: the SDP kinds, exposure constraints in a factor Constraint Space, fees and a budget; a [`Variance`](@ref) with risk-contribution rows on `rc` is an SDP kind and is refused at construction, as is a frontier or a per-asset `ub` ([`assert_risk_ceiling`](@ref)). A measure's `rke` and `scale` are not read: the projection's objective is the geometry's divergence, and the ceiling is a constraint alone. A negative lower bound is admitted under the Euclidean and Gram geometries and refused under the entropic one, at the head's construction when the bound is a value and at the projection when it is resolved from an estimator. The wealth factor of a leveraged allocation can reach zero on an extreme day, where the log wealth and the next gradient are undefined; that is documented here, not guarded.
+The set refuses, by having no field for them: a budget, fees, the return term as an objective, the scalariser, the optimiser's execution knobs and a `TimeDependent` schedule. A frontier or a per-asset `ub` on a measure is refused at construction because a ceiling is one number ([`assert_risk_ceiling`](@ref)). A measure's `rke` and `scale` are not read: the ceiling is a constraint, and the objective is the geometry's divergence plus the penalties. A negative lower bound is admitted under the Euclidean and Gram geometries and refused under the entropic one, at the head's construction when the bound is a value and at the projection when it is resolved from an estimator. The wealth factor of a leveraged allocation can reach zero on an extreme day, where the log wealth and the next gradient are undefined; that is documented here, not guarded.
 
 # Fields
 
@@ -26,131 +22,175 @@ $(DocStringExtensions.FIELDS)
 
     ProgrammeAllocationSet(;
         slv::Slv_VecSlv,
-        wb::Option{<:WbE_Wb} = WeightBounds(),
-        sets::Option{<:UniverseSets} = nothing,
-        lcs::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
-        tn::Option{<:Num_VecNum} = nothing,
-        r::Option{<:RiskMeasure} = nothing,
         pe::AbstractPriorEstimator = EmpiricalPrior(),
-        tr::Option{<:TrackingError{<:WeightsTracking}} = nothing,
-        card::Option{<:Integer} = nothing,
-        gcard::Option{<:LcE_Lc} = nothing,
+        r::Option{<:RM_VecRM} = nothing,
+        wb::Option{<:WbE_Wb} = WeightBounds(),
+        sbgt::Option{<:Num_BgtRg} = nothing,
+        gbgt::Option{<:Num_BgtRg} = nothing,
+        xbgt::Bool = false,
         lt::Option{<:BtE_Bt} = nothing,
         st::Option{<:BtE_Bt} = nothing,
-        ss::Option{<:Number} = nothing,
+        lcse::Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc} = nothing,
+        cte::Option{<:Lc_CC_VecCC} = nothing,
+        gcarde::Option{<:LcE_Lc} = nothing,
+        sgcarde::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+        smtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
+        sgmtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
+        slt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        sst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        sglt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        sgst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        tn::Option{<:TnE_Tn_VecTnE_Tn} = nothing,
+        sets::Option{<:UniverseSets} = nothing,
+        tr::Option{<:Tr_VecTr} = nothing,
+        ple::Option{<:PlCE_PlC_VecPlCE_PlC} = nothing,
+        ret::Option{<:JRE_VecJRE} = nothing,
+        ccnt::Option{<:JuMPConstr_VecJuMPConstr} = nothing,
+        cobj::Option{<:JuMPObj_VecJuMPObj} = nothing,
         sc::Number = 1,
-        so::Number = 1
+        so::Number = 1,
+        ss::Option{<:Number} = nothing,
+        card::Option{<:Integer} = nothing,
+        scard::Option{<:Int_VecInt} = nothing,
+        l2c::Option{<:Num_NormCeilCal} = nothing,
+        lpc::Option{<:LpReg_VecLpReg} = nothing,
+        linfc::Option{<:Num_NormCeilCal} = nothing,
+        l1::Option{<:Num_AmbRadCal} = nothing,
+        l2::Option{<:L2Reg_VecL2Reg} = nothing,
+        lp::Option{<:LpReg_VecLpReg} = nothing,
+        linf::Option{<:Num_AmbRadCal} = nothing
     ) -> ProgrammeAllocationSet
 
 Keywords correspond to the struct's fields. `slv` has no default: a set that needs a solver cannot be built without one.
 
 ## Validation
 
-  - If any of `wb`, `lcs`, `gcard`, `lt` or `st` is an estimator: `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
-  - If `tn` is given: `all(>= 0, tn)`. A `DomainError` is thrown otherwise.
-  - If `r` is given: `r.settings.ub` is a finite non-negative number, the ceiling. An `ArgumentError` is thrown otherwise.
-  - If `card` is given: `card >= 1`. A `DomainError` is thrown otherwise.
+  - If any slot holds an estimator keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
+  - If `slv` is a vector: non-empty. If `sbgt` or `gbgt` is a number: non-negative and finite. `assert_gross_budget_admissible` under the budget of one.
+  - If `r` is given: every measure's `settings.ub` is a finite non-negative number, the ceiling ([`assert_risk_ceiling`](@ref)).
+  - If `card` is given: `card > 0` and finite. If `cte`, `tn`, `tr`, `l2`, `lp` or `lpc` is a vector: non-empty. If `l2c`, `linfc`, `l1` or `linf` is a number: `> 0` and finite.
+  - The sub-group and sub-grouped MIP slots agree in shape ([`assert_subgroup_mip_fields`](@ref), [`assert_subgrouped_mip_fields`](@ref)), and an [`LpRegularisation`](@ref) is a coefficient in `lp` and a ceiling in `lpc`.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, `wb`, `sets`, `lcs`, `r`, `tr`, `gcard`, `lt` and `st` are viewed recursively, a vector `tn` is sliced, and the rest is carried unchanged. A precomputed [`LinearConstraint`](@ref) is the identity under a view, as it is everywhere.
+When [`port_opt_view`](@ref) is called on this type, every slot with a per-asset axis is viewed recursively as [`JuMPOptimiser`](@ref)'s is, and the rest is carried unchanged. A precomputed [`LinearConstraint`](@ref) is the identity under a view, as it is everywhere.
 
 # Examples
 
 ```jldoctest
-julia> ProgrammeAllocationSet(; slv = Solver(; solver = nothing), tn = 0.1)
+julia> ProgrammeAllocationSet(; slv = Solver(; solver = nothing),
+                              tn = Turnover(; w = fill(0.25, 4), val = 0.1))
 ProgrammeAllocationSet
-     wb ┼ WeightBounds
-        │   lb ┼ Float64: 0.0
-        │   ub ┴ Float64: 1.0
-   sets ┼ nothing
-    lcs ┼ nothing
-     tn ┼ Float64: 0.1
-      r ┼ nothing
-     pe ┼ EmpiricalPrior
-        │           ce ┼ PortfolioOptimisersCovariance
-        │              │   ce ┼ Covariance
-        │              │      │    me ┼ SimpleExpectedReturns
-        │              │      │       │   w ┴ nothing
-        │              │      │    ce ┼ GeneralCovariance
-        │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-        │              │      │       │    w ┴ nothing
-        │              │      │   alg ┼ FullMoment()
-        │              │      │     w ┴ nothing
-        │              │   mp ┼ MatrixProcessing
-        │              │      │     pdm ┼ Posdef
-        │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-        │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-        │              │      │      dn ┼ nothing
-        │              │      │      dt ┼ nothing
-        │              │      │     alg ┼ nothing
-        │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-        │           me ┼ SimpleExpectedReturns
-        │              │   w ┴ nothing
-        │      horizon ┼ nothing
-        │   fill_limit ┴ nothing
-     tr ┼ nothing
-   card ┼ nothing
-  gcard ┼ nothing
-     lt ┼ nothing
-     st ┼ nothing
-     ss ┼ nothing
-    slv ┼ Solver
-        │          name ┼ String: \"\"
-        │        solver ┼ nothing
-        │      settings ┼ nothing
-        │     check_sol ┼ @NamedTuple{}: NamedTuple()
-        │   add_bridges ┴ Bool: true
-     sc ┼ Int64: 1
-     so ┴ Int64: 1
+       pe ┼ EmpiricalPrior
+          │           ce ┼ PortfolioOptimisersCovariance
+          │              │   ce ┼ Covariance
+          │              │      │    me ┼ SimpleExpectedReturns
+          │              │      │       │   w ┴ nothing
+          │              │      │    ce ┼ GeneralCovariance
+          │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+          │              │      │       │    w ┴ nothing
+          │              │      │   alg ┼ FullMoment()
+          │              │      │     w ┴ nothing
+          │              │   mp ┼ MatrixProcessing
+          │              │      │     pdm ┼ Posdef
+          │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+          │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+          │              │      │      dn ┼ nothing
+          │              │      │      dt ┼ nothing
+          │              │      │     alg ┼ nothing
+          │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+          │           me ┼ SimpleExpectedReturns
+          │              │   w ┴ nothing
+          │      horizon ┼ nothing
+          │   fill_limit ┴ nothing
+      slv ┼ Solver
+          │          name ┼ String: \"\"
+          │        solver ┼ nothing
+          │      settings ┼ nothing
+          │     check_sol ┼ @NamedTuple{}: NamedTuple()
+          │   add_bridges ┴ Bool: true
+        r ┼ nothing
+       wb ┼ WeightBounds
+          │   lb ┼ Float64: 0.0
+          │   ub ┴ Float64: 1.0
+     sbgt ┼ nothing
+     gbgt ┼ nothing
+     xbgt ┼ Bool: false
+       lt ┼ nothing
+       st ┼ nothing
+     lcse ┼ nothing
+      cte ┼ nothing
+   gcarde ┼ nothing
+  sgcarde ┼ nothing
+     smtx ┼ nothing
+    sgmtx ┼ nothing
+      slt ┼ nothing
+      sst ┼ nothing
+     sglt ┼ nothing
+     sgst ┼ nothing
+       tn ┼ Turnover
+          │       w ┼ Vector{Float64}: [0.25, 0.25, 0.25, 0.25]
+          │     val ┼ Float64: 0.1
+          │   fixed ┴ Bool: false
+     sets ┼ nothing
+       tr ┼ nothing
+      ple ┼ nothing
+      ret ┼ nothing
+     ccnt ┼ nothing
+     cobj ┼ nothing
+       sc ┼ Int64: 1
+       so ┼ Int64: 1
+       ss ┼ nothing
+     card ┼ nothing
+    scard ┼ nothing
+      l2c ┼ nothing
+      lpc ┼ nothing
+    linfc ┼ nothing
+       l1 ┼ nothing
+       l2 ┼ nothing
+       lp ┼ nothing
+     linf ┴ nothing
 ```
 
 # Related
 
   - [`AbstractAllocationSet`](@ref)
   - [`BoundedAllocationSet`](@ref)
+  - [`JuMPOptimiser`](@ref)
   - [`project`](@ref)
-  - [`set_allocation_set_constraints!`](@ref)
+  - [`set_allocation_set_constraints`](@ref)
   - [`HeldStep`](@ref)
   - [`OnlinePortfolioSelection`](@ref)
 """
 @concrete struct ProgrammeAllocationSet <: AbstractProgrammeAllocationSet
     """
-    $(field_dict[:wb])
-    """
-    wb
-    """
-    $(field_dict[:sets])
-    """
-    sets
-    """
-    Linear constraints in the asset basis, estimators resolved over `sets`, or `nothing`.
-    """
-    lcs
-    """
-    The per-asset turnover ceiling against the step's Price-Adjusted Allocation, a number broadcast over the assets or one per asset, or `nothing`.
-    """
-    tn
-    """
-    The risk ceiling, a [`RiskMeasure`](@ref) whose `settings.ub` is the ceiling, or `nothing`.
-    """
-    r
-    """
-    The prior estimator `r` is built on and the rows of `tr` are read from, fitted on the head's rows at every step; unread when `r` is a variance or standard deviation holding its matrix and `tr` is absent.
+    The prior estimator the ceilings, the tracking errors, the centrality and phylogeny rows, an exposure row and the return floor are built on, fitted on the head's rows at every step; unread when no slot reads the rows.
     """
     pe
     """
-    The tracking error over the head's rows against a weights benchmark, or `nothing`.
+    $(field_dict[:slv])
     """
-    tr
+    slv
     """
-    $(field_dict[:card])
+    The risk ceilings, a [`RiskMeasure`](@ref) or a vector of them, each with `settings.ub` the ceiling, or `nothing`.
     """
-    card
+    r
     """
-    Grouped cardinality constraint, an estimator resolved over `sets`, or `nothing`.
+    $(field_dict[:wb_jmp])
     """
-    gcard
+    wb
+    """
+    $(field_dict[:sbgt])
+    """
+    sbgt
+    """
+    $(field_dict[:gbgt])
+    """
+    gbgt
+    """
+    $(field_dict[:xbgt])
+    """
+    xbgt
     """
     $(field_dict[:lt])
     """
@@ -160,13 +200,73 @@ ProgrammeAllocationSet
     """
     st
     """
-    $(field_dict[:ss])
+    $(field_dict[:lcse])
     """
-    ss
+    lcse
     """
-    $(field_dict[:slv])
+    The centrality rows: a [`CentralityConstraint`](@ref), a vector of them, or an already-generated [`LinearConstraint`](@ref), resolved on the head's rows at every step.
     """
-    slv
+    cte
+    """
+    $(field_dict[:gcarde])
+    """
+    gcarde
+    """
+    $(field_dict[:sgcarde])
+    """
+    sgcarde
+    """
+    $(field_dict[:smtx])
+    """
+    smtx
+    """
+    $(field_dict[:sgmtx])
+    """
+    sgmtx
+    """
+    $(field_dict[:slt])
+    """
+    slt
+    """
+    $(field_dict[:sst])
+    """
+    sst
+    """
+    $(field_dict[:sglt])
+    """
+    sglt
+    """
+    $(field_dict[:sgst])
+    """
+    sgst
+    """
+    The turnover ceilings, a [`Turnover`](@ref), a [`TurnoverEstimator`](@ref) resolved over `sets`, or a vector of them, the reference of each replaced at every step by the Price-Adjusted Allocation unless the object is `fixed`.
+    """
+    tn
+    """
+    $(field_dict[:sets])
+    """
+    sets
+    """
+    The tracking errors, any [`AbstractTracking`](@ref) or a vector of them, over the head's rows: a [`WeightsTracking`](@ref) that is not `fixed` tracks the Price-Adjusted Allocation, and a [`ReturnsTracking`](@ref) series stated over the fold is cut to the prefix the head has folded so far.
+    """
+    tr
+    """
+    $(field_dict[:ple_jmp])
+    """
+    ple
+    """
+    The return floor: a return term, or a vector of them, whose `settings.lb` bounds the prior's expected return of the projected allocation from below; the term's objective role is not read.
+    """
+    ret
+    """
+    $(field_dict[:ccnt])
+    """
+    ccnt
+    """
+    $(field_dict[:cobj])
+    """
+    cobj
     """
     $(field_dict[:sc])
     """
@@ -175,76 +275,226 @@ ProgrammeAllocationSet
     $(field_dict[:so])
     """
     so
-    function ProgrammeAllocationSet(wb::Option{<:WbE_Wb}, sets::Option{<:UniverseSets},
-                                    lcs::Option{<:LcE_Lc_VecLcE_Lc},
-                                    tn::Option{<:Num_VecNum}, r::Option{<:RiskMeasure},
-                                    pe::AbstractPriorEstimator,
-                                    tr::Option{<:TrackingError{<:WeightsTracking}},
-                                    card::Option{<:Integer}, gcard::Option{<:LcE_Lc},
-                                    lt::Option{<:BtE_Bt}, st::Option{<:BtE_Bt},
-                                    ss::Option{<:Number}, slv::Slv_VecSlv, sc::Number,
-                                    so::Number)
-        if any(name_keyed, (wb, lcs, gcard, lt, st))
-            @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb, lcs, gcard, lt or st is an estimator"))
+    """
+    $(field_dict[:ss])
+    """
+    ss
+    """
+    $(field_dict[:card])
+    """
+    card
+    """
+    $(field_dict[:scard])
+    """
+    scard
+    """
+    $(field_dict[:l2c])
+    """
+    l2c
+    """
+    $(field_dict[:lpc])
+    """
+    lpc
+    """
+    $(field_dict[:linfc])
+    """
+    linfc
+    """
+    $(field_dict[:l1])
+    """
+    l1
+    """
+    $(field_dict[:l2])
+    """
+    l2
+    """
+    $(field_dict[:lp])
+    """
+    lp
+    """
+    $(field_dict[:linf])
+    """
+    linf
+    function ProgrammeAllocationSet(pe::AbstractPriorEstimator, slv::Slv_VecSlv,
+                                    r::Option{<:RM_VecRM}, wb::Option{<:WbE_Wb},
+                                    sbgt::Option{<:Num_BgtRg}, gbgt::Option{<:Num_BgtRg},
+                                    xbgt::Bool, lt::Option{<:BtE_Bt}, st::Option{<:BtE_Bt},
+                                    lcse::Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc},
+                                    cte::Option{<:Lc_CC_VecCC}, gcarde::Option{<:LcE_Lc},
+                                    sgcarde::Option{<:LcE_Lc_VecLcE_Lc},
+                                    smtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
+                                    sgmtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
+                                    slt::Option{<:BtE_Bt_VecOptBtE_Bt},
+                                    sst::Option{<:BtE_Bt_VecOptBtE_Bt},
+                                    sglt::Option{<:BtE_Bt_VecOptBtE_Bt},
+                                    sgst::Option{<:BtE_Bt_VecOptBtE_Bt},
+                                    tn::Option{<:TnE_Tn_VecTnE_Tn},
+                                    sets::Option{<:UniverseSets}, tr::Option{<:Tr_VecTr},
+                                    ple::Option{<:PlCE_PlC_VecPlCE_PlC},
+                                    ret::Option{<:JRE_VecJRE},
+                                    ccnt::Option{<:JuMPConstr_VecJuMPConstr},
+                                    cobj::Option{<:JuMPObj_VecJuMPObj}, sc::Number,
+                                    so::Number, ss::Option{<:Number},
+                                    card::Option{<:Integer}, scard::Option{<:Int_VecInt},
+                                    l2c::Option{<:Num_NormCeilCal},
+                                    lpc::Option{<:LpReg_VecLpReg},
+                                    linfc::Option{<:Num_NormCeilCal},
+                                    l1::Option{<:Num_AmbRadCal},
+                                    l2::Option{<:L2Reg_VecL2Reg},
+                                    lp::Option{<:LpReg_VecLpReg},
+                                    linf::Option{<:Num_AmbRadCal})
+        if isa(slv, VecSlv)
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        if !isnothing(tn)
-            assert_nonneg(tn, :tn)
+        if isa(sbgt, Number)
+            assert_nonempty_nonneg_finite_val(sbgt, :sbgt)
         end
+        if isa(gbgt, Number)
+            assert_nonempty_nonneg_finite_val(gbgt, :gbgt)
+        end
+        assert_gross_budget_admissible(1, sbgt, gbgt, wb)
         assert_risk_ceiling(r)
-        if !isnothing(card)
-            @argcheck(card >= 1, DomainError(card, "card must be at least one"))
+        for (x, name) in
+            ((cte, :cte), (tn, :tn), (tr, :tr), (l2, :l2), (lp, :lp), (lpc, :lpc),
+             (ret, :ret))
+            if isa(x, AbstractVector)
+                @argcheck(!isempty(x), IsEmptyError("$name cannot be empty"))
+            end
         end
-        return new{typeof(wb), typeof(sets), typeof(lcs), typeof(tn), typeof(r), typeof(pe),
-                   typeof(tr), typeof(card), typeof(gcard), typeof(lt), typeof(st),
-                   typeof(ss), typeof(slv), typeof(sc), typeof(so)}(wb, sets, lcs, tn, r,
-                                                                    pe, tr, card, gcard, lt,
-                                                                    st, ss, slv, sc, so)
+        if !isnothing(card)
+            assert_nonempty_gt0_finite_val(card, :card)
+        end
+        for (x, name) in ((l2c, :l2c), (linfc, :linfc), (l1, :l1), (linf, :linf))
+            if !isnothing(x)
+                assert_nonempty_gt0_finite_val(x, name)
+            end
+        end
+        assert_penalty_coefficient_role(lp)
+        assert_norm_ceiling_role(lpc)
+        assert_subgroup_mip_fields(scard, smtx, slt, sst)
+        assert_subgrouped_mip_fields(sgcarde, sgmtx, sglt, sgst)
+        if any(name_keyed,
+               (wb, lt, st, lcse, cte, gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt, sgst,
+                tn))
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when a slot holds an estimator keyed by name"))
+        end
+        return new{typeof(pe), typeof(slv), typeof(r), typeof(wb), typeof(sbgt),
+                   typeof(gbgt), typeof(xbgt), typeof(lt), typeof(st), typeof(lcse),
+                   typeof(cte), typeof(gcarde), typeof(sgcarde), typeof(smtx),
+                   typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
+                   typeof(tn), typeof(sets), typeof(tr), typeof(ple), typeof(ret),
+                   typeof(ccnt), typeof(cobj), typeof(sc), typeof(so), typeof(ss),
+                   typeof(card), typeof(scard), typeof(l2c), typeof(lpc), typeof(linfc),
+                   typeof(l1), typeof(l2), typeof(lp), typeof(linf)}(pe, slv, r, wb, sbgt,
+                                                                     gbgt, xbgt, lt, st,
+                                                                     lcse, cte, gcarde,
+                                                                     sgcarde, smtx, sgmtx,
+                                                                     slt, sst, sglt, sgst,
+                                                                     tn, sets, tr, ple, ret,
+                                                                     ccnt, cobj, sc, so, ss,
+                                                                     card, scard, l2c, lpc,
+                                                                     linfc, l1, l2, lp,
+                                                                     linf)
     end
 end
-function ProgrammeAllocationSet(; slv::Slv_VecSlv, wb::Option{<:WbE_Wb} = WeightBounds(),
-                                sets::Option{<:UniverseSets} = nothing,
-                                lcs::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
-                                tn::Option{<:Num_VecNum} = nothing,
-                                r::Option{<:RiskMeasure} = nothing,
+function ProgrammeAllocationSet(; slv::Slv_VecSlv,
                                 pe::AbstractPriorEstimator = EmpiricalPrior(),
-                                tr::Option{<:TrackingError{<:WeightsTracking}} = nothing,
-                                card::Option{<:Integer} = nothing,
-                                gcard::Option{<:LcE_Lc} = nothing,
+                                r::Option{<:RM_VecRM} = nothing,
+                                wb::Option{<:WbE_Wb} = WeightBounds(),
+                                sbgt::Option{<:Num_BgtRg} = nothing,
+                                gbgt::Option{<:Num_BgtRg} = nothing, xbgt::Bool = false,
                                 lt::Option{<:BtE_Bt} = nothing,
                                 st::Option{<:BtE_Bt} = nothing,
-                                ss::Option{<:Number} = nothing, sc::Number = 1,
-                                so::Number = 1)::ProgrammeAllocationSet
-    return ProgrammeAllocationSet(wb, sets, lcs, tn, r, pe, tr, card, gcard, lt, st, ss,
-                                  slv, sc, so)
+                                lcse::Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc} = nothing,
+                                cte::Option{<:Lc_CC_VecCC} = nothing,
+                                gcarde::Option{<:LcE_Lc} = nothing,
+                                sgcarde::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+                                smtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
+                                sgmtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
+                                slt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+                                sst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+                                sglt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+                                sgst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+                                tn::Option{<:TnE_Tn_VecTnE_Tn} = nothing,
+                                sets::Option{<:UniverseSets} = nothing,
+                                tr::Option{<:Tr_VecTr} = nothing,
+                                ple::Option{<:PlCE_PlC_VecPlCE_PlC} = nothing,
+                                ret::Option{<:JRE_VecJRE} = nothing,
+                                ccnt::Option{<:JuMPConstr_VecJuMPConstr} = nothing,
+                                cobj::Option{<:JuMPObj_VecJuMPObj} = nothing,
+                                sc::Number = 1, so::Number = 1,
+                                ss::Option{<:Number} = nothing,
+                                card::Option{<:Integer} = nothing,
+                                scard::Option{<:Int_VecInt} = nothing,
+                                l2c::Option{<:Num_NormCeilCal} = nothing,
+                                lpc::Option{<:LpReg_VecLpReg} = nothing,
+                                linfc::Option{<:Num_NormCeilCal} = nothing,
+                                l1::Option{<:Num_AmbRadCal} = nothing,
+                                l2::Option{<:L2Reg_VecL2Reg} = nothing,
+                                lp::Option{<:LpReg_VecLpReg} = nothing,
+                                linf::Option{<:Num_AmbRadCal} = nothing)::ProgrammeAllocationSet
+    return ProgrammeAllocationSet(pe, slv, r, wb, sbgt, gbgt, xbgt, lt, st, lcse, cte,
+                                  gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn,
+                                  sets, tr, ple, ret, ccnt, cobj, sc, so, ss, card, scard,
+                                  l2c, lpc, linfc, l1, l2, lp, linf)
 end
 function port_opt_view(set::ProgrammeAllocationSet, i, args...)
-    return ProgrammeAllocationSet(; slv = set.slv, wb = port_opt_view(set.wb, i, args...),
-                                  sets = port_opt_view(set.sets, i, args...),
-                                  lcs = port_opt_view(set.lcs, i, args...),
-                                  tn = nothing_scalar_array_view(set.tn, i),
-                                  r = port_opt_view(set.r, i, nothing), pe = set.pe,
-                                  tr = port_opt_view(set.tr, i, args...), card = set.card,
-                                  gcard = port_opt_view(set.gcard, i, args...),
-                                  lt = port_opt_view(set.lt, i, args...),
-                                  st = port_opt_view(set.st, i, args...), ss = set.ss,
-                                  sc = set.sc, so = set.so)
+    if set.smtx === set.sgmtx
+        smtx = sgmtx = port_opt_view(set.smtx, i)
+    else
+        smtx = port_opt_view(set.smtx, i)
+        sgmtx = port_opt_view(set.sgmtx, i)
+    end
+    if set.slt === set.sglt
+        slt = sglt = port_opt_view(set.slt, i)
+    else
+        slt = port_opt_view(set.slt, i)
+        sglt = port_opt_view(set.sglt, i)
+    end
+    if set.sst === set.sgst
+        sst = sgst = port_opt_view(set.sst, i)
+    else
+        sst = port_opt_view(set.sst, i)
+        sgst = port_opt_view(set.sgst, i)
+    end
+    return ProgrammeAllocationSet(; pe = set.pe, slv = set.slv,
+                                  r = port_opt_view(set.r, i, nothing),
+                                  wb = port_opt_view(set.wb, i), sbgt = set.sbgt,
+                                  gbgt = set.gbgt, xbgt = set.xbgt,
+                                  lt = port_opt_view(set.lt, i),
+                                  st = port_opt_view(set.st, i),
+                                  lcse = port_opt_view(set.lcse, i), cte = set.cte,
+                                  gcarde = set.gcarde, sgcarde = set.sgcarde, smtx = smtx,
+                                  sgmtx = sgmtx, slt = slt, sst = sst, sglt = sglt,
+                                  sgst = sgst, tn = port_opt_view(set.tn, i),
+                                  sets = port_opt_view(set.sets, i),
+                                  tr = port_opt_view(set.tr, i, args...), ple = set.ple,
+                                  ret = port_opt_view(set.ret, i),
+                                  ccnt = port_opt_view(set.ccnt, i),
+                                  cobj = port_opt_view(set.cobj, i), sc = set.sc,
+                                  so = set.so, ss = set.ss, card = set.card,
+                                  scard = set.scard, l2c = set.l2c, lpc = set.lpc,
+                                  linfc = set.linfc, l1 = set.l1, l2 = set.l2, lp = set.lp,
+                                  linf = set.linf)
 end
 """
     name_keyed(x)
     name_keyed(x::AbstractVector)
 
-Whether a constraint slot holds an estimator that resolves its names over `sets`, so a [`ProgrammeAllocationSet`](@ref) must carry them: a [`WeightBoundsEstimator`](@ref), a [`LinearConstraintEstimator`](@ref), a [`ThresholdEstimator`](@ref), or a vector holding one.
+Whether a constraint slot holds an estimator that resolves its names over `sets`, so its owner must carry them: a [`WeightBoundsEstimator`](@ref), a [`LinearConstraintEstimator`](@ref), an [`ExposureConstraintEstimator`](@ref), a [`ThresholdEstimator`](@ref), an [`AssetSetsMatrixEstimator`](@ref), a [`TurnoverEstimator`](@ref), or a vector holding one.
 
 # Related
 
   - [`ProgrammeAllocationSet`](@ref)
+  - [`JuMPOptimiser`](@ref)
 """
 function name_keyed(::Any)
     return false
 end
 function name_keyed(::Union{<:WeightBoundsEstimator, <:LinearConstraintEstimator,
-                            <:ThresholdEstimator})
+                            <:ExposureConstraintEstimator, <:ThresholdEstimator,
+                            <:AssetSetsMatrixEstimator, <:TurnoverEstimator})
     return true
 end
 function name_keyed(x::AbstractVector)
@@ -253,32 +503,112 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolves every name-keyed constraint of a [`ProgrammeAllocationSet`](@ref) to a value over `N` assets: the weight bounds, the linear constraints, the grouped cardinality and the thresholds. The ceilings, the prior estimator, the tracking error and the solver are carried unchanged.
+The first stage of a [`ProgrammeAllocationSet`](@ref)'s resolution, once per fold: every constraint keyed by name is resolved to a value over `N` assets through `sets` — the weight bounds, the thresholds, the linear and grouped cardinality constraints, the sub-group selection matrices and thresholds, and the turnover — as [`processed_jump_optimiser_attributes`](@ref) resolves them. A slot that reads the head's rows is carried unchanged to the second stage, [`resolve_allocation_set_rows`](@ref), which runs at every step.
 
 # Related
 
   - [`ProgrammeAllocationSet`](@ref)
+  - [`resolve_allocation_set_rows`](@ref)
   - [`weight_bounds_constraints`](@ref)
   - [`linear_constraints`](@ref)
   - [`threshold_constraints`](@ref)
+  - [`asset_sets_matrix`](@ref)
+  - [`turnover_constraints`](@ref)
 """
 function resolve_allocation_set(set::ProgrammeAllocationSet, N::Integer, strict::Bool,
                                 datatype::DataType)
-    wb = weight_bounds_constraints(set.wb, set.sets; N = N, strict = strict,
+    sets = set.sets
+    wb = weight_bounds_constraints(set.wb, sets; N = N, strict = strict,
                                    datatype = datatype)
-    lcs = linear_constraints(set.lcs, set.sets; datatype = datatype, strict = strict)
-    gcard = linear_constraints(set.gcard, set.sets; datatype = Int, strict = strict)
-    lt = threshold_constraints(set.lt, set.sets; datatype = datatype, strict = strict)
-    st = threshold_constraints(set.st, set.sets; datatype = datatype, strict = strict)
-    return ProgrammeAllocationSet(; slv = set.slv, wb = wb, sets = set.sets, lcs = lcs,
-                                  tn = set.tn, r = set.r, pe = set.pe, tr = set.tr,
-                                  card = set.card, gcard = gcard, lt = lt, st = st,
-                                  ss = set.ss, sc = set.sc, so = set.so)
+    lt = threshold_constraints(set.lt, sets; datatype = datatype, strict = strict)
+    st = threshold_constraints(set.st, sets; datatype = datatype, strict = strict)
+    gcarde = linear_constraints(set.gcarde, sets; datatype = Int, strict = strict)
+    sgcarde = linear_constraints(set.sgcarde, sets; datatype = Int, strict = strict)
+    if set.smtx === set.sgmtx
+        smtx = sgmtx = asset_sets_matrix(set.smtx, sets)
+    else
+        smtx = asset_sets_matrix(set.smtx, sets)
+        sgmtx = asset_sets_matrix(set.sgmtx, sets)
+    end
+    if set.slt === set.sglt
+        slt = sglt = threshold_constraints(set.slt, sets; datatype = datatype,
+                                           strict = strict)
+    else
+        slt = threshold_constraints(set.slt, sets; datatype = datatype, strict = strict)
+        sglt = threshold_constraints(set.sglt, sets; datatype = datatype, strict = strict)
+    end
+    if set.sst === set.sgst
+        sst = sgst = threshold_constraints(set.sst, sets; datatype = datatype,
+                                           strict = strict)
+    else
+        sst = threshold_constraints(set.sst, sets; datatype = datatype, strict = strict)
+        sgst = threshold_constraints(set.sgst, sets; datatype = datatype, strict = strict)
+    end
+    tn = turnover_constraints(set.tn, sets; datatype = datatype, strict = strict)
+    # An exposure row needs the prior's loadings, so `lcse` is resolved on the rows unless
+    # it holds no exposure estimator, in which case it resolves here as the optimiser's does.
+    lcse = if exposure_keyed(set.lcse)
+        set.lcse
+    else
+        linear_constraints(set.lcse, sets; datatype = datatype, strict = strict)
+    end
+    return ProgrammeAllocationSet(; pe = set.pe, slv = set.slv, r = set.r, wb = wb,
+                                  sbgt = set.sbgt, gbgt = set.gbgt, xbgt = set.xbgt,
+                                  lt = lt, st = st, lcse = lcse, cte = set.cte,
+                                  gcarde = gcarde, sgcarde = sgcarde, smtx = smtx,
+                                  sgmtx = sgmtx, slt = slt, sst = sst, sglt = sglt,
+                                  sgst = sgst, tn = tn, sets = sets, tr = set.tr,
+                                  ple = set.ple, ret = set.ret, ccnt = set.ccnt,
+                                  cobj = set.cobj, sc = set.sc, so = set.so, ss = set.ss,
+                                  card = set.card, scard = set.scard, l2c = set.l2c,
+                                  lpc = set.lpc, linfc = set.linfc, l1 = set.l1,
+                                  l2 = set.l2, lp = set.lp, linf = set.linf)
+end
+"""
+    exposure_keyed(x)
+    exposure_keyed(x::AbstractVector)
+
+Whether a linear-constraint slot holds an [`ExposureConstraintEstimator`](@ref), whose rows are written in another basis and re-based through a factor prior's loadings, so it resolves on the head's rows and not once per fold.
+
+# Related
+
+  - [`resolve_allocation_set`](@ref)
+  - [`resolve_allocation_set_rows`](@ref)
+"""
+function exposure_keyed(::Any)
+    return false
+end
+function exposure_keyed(::ExposureConstraintEstimator)
+    return true
+end
+function exposure_keyed(x::AbstractVector)
+    return any(exposure_keyed, x)
+end
+"""
+    fitted_on_rows(x)
+    fitted_on_rows(x::AbstractVector)
+
+Whether a centrality or phylogeny slot holds an estimator, which is fitted on the head's rows at every step; a precomputed [`LinearConstraint`](@ref), [`IntegerPhylogeny`](@ref) or [`SemiDefinitePhylogeny`](@ref) reads none.
+
+# Related
+
+  - [`rows_needed`](@ref)
+  - [`resolve_allocation_set_rows`](@ref)
+"""
+function fitted_on_rows(::Any)
+    return false
+end
+function fitted_on_rows(::Union{<:AbstractCentralityConstraint,
+                                <:AbstractPhylogenyConstraintEstimator})
+    return true
+end
+function fitted_on_rows(x::AbstractVector)
+    return any(fitted_on_rows, x)
 end
 """
     rows_needed(set::ProgrammeAllocationSet)
 
-The rows a programme set reads at a step: `nothing`, every row folded, when it carries a tracking error or a ceiling that reads the head's rows ([`risk_reads_rows`](@ref)); `0` otherwise.
+The rows a programme set reads at a step: `nothing`, every row folded, when any slot reads the head's rows — a ceiling that reads them ([`risk_reads_rows`](@ref)), a tracking error, a centrality or phylogeny estimator ([`fitted_on_rows`](@ref)), an exposure row ([`exposure_keyed`](@ref)), a return floor, or a Calibration Rule in a norm ceiling or a penalty ([`calibrated`](@ref)); `0` otherwise.
 
 # Related
 
@@ -287,7 +617,14 @@ The rows a programme set reads at a step: `nothing`, every row folded, when it c
   - [`risk_reads_rows`](@ref)
 """
 function rows_needed(set::ProgrammeAllocationSet)
-    return (risk_reads_rows(set.r) || !isnothing(set.tr)) ? nothing : 0
+    reads = risk_reads_rows(set.r) ||
+            !isnothing(set.tr) ||
+            fitted_on_rows(set.cte) ||
+            fitted_on_rows(set.ple) ||
+            exposure_keyed(set.lcse) ||
+            !isnothing(set.ret) ||
+            any(calibrated, (set.l2c, set.lpc, set.linfc, set.l1, set.l2, set.lp, set.linf))
+    return reads ? nothing : 0
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -588,541 +925,5 @@ function assert_geometry_admits_set(proj::Union{<:EntropicProjection, <:TsallisP
     end
     return nothing
 end
-"""
-    set_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet, w::AbstractVector, X)
-    set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet, w::AbstractVector, X)
-
-Adds the constraints of a resolved Allocation Set to a model that already carries `w`, `k`, the scales and the observation count: the budget one and the weight bounds on both kinds, and on the programme set every admissible kind through the shared builders, the turnover ceiling measured from `w`, the risk ceiling and the tracking error over `X`.
-
-The bare projection model of [`project`](@ref) is one caller; a JuMP head that takes the set as its programme's feasible region is another.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `set`: The Allocation Set, resolved.
-  - `w`: The Price-Adjusted Allocation the step trades from, the reference of the turnover ceiling.
-  - `X`: The rows of returns the head holds through the period, `observations × assets`, or `nothing`.
-
-# Validation
-
-  - A covariance ceiling whose covariance is fitted, or a tracking error, with `X === nothing`. An `ArgumentError` is thrown: the rows reach a projection inside an Online Update alone.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`ProgrammeAllocationSet`](@ref)
-  - [`BoundedAllocationSet`](@ref)
-  - [`set_weight_constraints!`](@ref)
-  - [`set_linear_weight_constraints!`](@ref)
-  - [`_set_turnover_constraints!`](@ref)
-  - [`set_tracking_error_constraints!`](@ref)
-  - [`set_mip_constraints!`](@ref)
-  - [`set_allocation_risk_ceiling!`](@ref)
-"""
-function set_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet,
-                                         ::AbstractVector, ::Any)::Nothing
-    set_allocation_set_bounds!(model, set.wb)
-    return nothing
-end
-function set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet,
-                                         w::AbstractVector, X)::Nothing
-    set_allocation_set_bounds!(model, set.wb)
-    set_linear_weight_constraints!(model, set.lcs, :lcs_ineq_, :lcs_eq_)
-    set_mip_constraints!(model, set.wb, set.card, set.gcard, nothing, set.lt, set.st,
-                         nothing, set.ss)
-    if !isnothing(set.tn)
-        _set_turnover_constraints!(model, Turnover(; w = w, val = set.tn))
-    end
-    pr = allocation_set_prior(set, X)
-    set_allocation_risk_ceiling!(model, set.r, set, pr)
-    if !isnothing(set.tr)
-        set_tracking_error_constraints!(model, 1, pr, set.tr)
-    end
-    return nothing
-end
-"""
-    add_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet, w::AbstractVector, X)
-    add_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet, w::AbstractVector, X)
-
-Adds the constraints of a resolved Allocation Set to a JuMP head's model mid-assembly, the arm of the Allocation Set Constraint a [`FollowTheLeader`](@ref) rule appends to its held optimiser.
-
-The head's own builders have already registered the model's named entries — its weight bounds, its budget, its turnover and tracking-error terms under their indices — so this arm adds the set's rows without a name where the bare projection model names them: the bounds and the budget of one as anonymous constraints, the linear constraints under the `:aset_` prefix, the turnover ceiling and the tracking error at the first index the model has not used, the risk ceiling under the `:aset_` namespace with the head's `w` registered there, so its entries never meet the head's own measures'. Every row is the same inequality [`set_allocation_set_constraints!`](@ref) writes, so the leader's feasible region is the set intersected with whatever the head carries itself. The tracking error is written over the head's rows `X` and their count, not the selection's, which the model's own observation count and net-return expression describe.
-
-A MIP kind of the set — cardinality, a threshold, a group cardinality — registers the model's indicator variables, which one model holds once, so a MIP kind is stated in one home: on the set, or on the held optimiser.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `set`: The Allocation Set, resolved.
-  - `w`: The Price-Adjusted Allocation the step trades from, the reference of the turnover ceiling.
-  - `X`: The rows of returns the head holds through the period, `observations × assets`, or `nothing`.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`set_allocation_set_constraints!`](@ref)
-  - [`AllocationSetConstraint`](@ref)
-  - [`FollowTheLeader`](@ref)
-"""
-function add_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet,
-                                         ::AbstractVector, ::Any)::Nothing
-    add_allocation_set_bounds!(model, set.wb)
-    return nothing
-end
-function add_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet,
-                                         w::AbstractVector, X)::Nothing
-    add_allocation_set_bounds!(model, set.wb)
-    set_linear_weight_constraints!(model, set.lcs, :aset_lcs_ineq_, :aset_lcs_eq_)
-    set_mip_constraints!(model, set.wb, set.card, set.gcard, nothing, set.lt, set.st,
-                         nothing, set.ss)
-    if !isnothing(set.tn)
-        _set_turnover_constraints!(model, Turnover(; w = w, val = set.tn),
-                                   free_state_index(model, :t_tn_))
-    end
-    pr = allocation_set_prior(set, X)
-    set_allocation_risk_ceiling!(model, set.r, set, pr; prefix = :aset_)
-    if !isnothing(set.tr)
-        add_allocation_tracking_error!(model, set.tr, pr.X)
-    end
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Adds an Allocation Set's weight bounds and its budget of one to a model that already names its own: the same three inequalities [`set_allocation_set_bounds!`](@ref) writes, as anonymous constraints.
-
-# Validation
-
-  - `Σ lb ≤ 1 ≤ Σ ub` over the resolved bounds, through [`assert_feasible_bounds`](@ref).
-
-# Related
-
-  - [`add_allocation_set_constraints!`](@ref)
-  - [`set_allocation_set_bounds!`](@ref)
-"""
-function add_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds)::Nothing
-    assert_feasible_bounds(wb)
-    w = get_w(model)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    if w_finite_flag(wb.lb)
-        JuMP.@constraint(model, sc * (w ⊖ k * wb.lb) >= 0)
-    end
-    if w_finite_flag(wb.ub)
-        JuMP.@constraint(model, sc * (w ⊖ k * wb.ub) <= 0)
-    end
-    JuMP.@constraint(model, sc * (sum(w) - k) == 0)
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-The first index `i` at which the Model State entry `name` is not registered, so a builder keyed by an index can add its term beside a head's own.
-
-# Related
-
-  - [`add_allocation_set_constraints!`](@ref)
-  - [`state_set!`](@ref)
-"""
-function free_state_index(model::JuMP.Model, name::Symbol)
-    i = 1
-    while state_has(model, Symbol(""), name, i)
-        i += 1
-    end
-    return i
-end
-"""
-    add_allocation_tracking_error!(model::JuMP.Model, tr::TrackingError, X::AbstractMatrix)
-
-Adds an Allocation Set's tracking error to a JuMP head's model as anonymous constraints over the head's rows `X`: the deviation `X w − k b` from the benchmark series, its norm in the error's own `alg` — the `L1` norm as a norm-one cone, the `L2` and squared-`L2` norms as a second-order cone, the `p`-norm as `T` power cones, the `∞`-norm as a norm-infinity cone — and the ceiling `err` scaled by the row count as the head's own builders scale it.
-
-# Related
-
-  - [`add_allocation_set_constraints!`](@ref)
-  - [`set_tracking_error_constraints!`](@ref)
-"""
-function add_allocation_tracking_error!(model::JuMP.Model, tr::TrackingError,
-                                        X::AbstractMatrix)::Nothing
-    w = get_w(model)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    T = size(X, 1)
-    wb = tracking_benchmark(tr.tr, X)
-    dev = JuMP.@expression(model, X * w - wb * k)
-    t = JuMP.@variable(model)
-    f = add_allocation_tracking_cone!(model, tr.alg, dev, t, T, tr.err, sc)
-    JuMP.@constraint(model, sc * (t - f * k) <= 0)
-    return nothing
-end
-"""
-    add_allocation_tracking_cone!(model::JuMP.Model, alg, dev, t, T::Integer, err::Number, sc)
-
-The cone of one tracking-error norm over the deviation `dev` and its bound variable `t`, answering the ceiling's scale factor for `T` rows.
-
-# Related
-
-  - [`add_allocation_tracking_error!`](@ref)
-"""
-function add_allocation_tracking_cone!(model::JuMP.Model, ::L1Norm, dev, t, T::Integer,
-                                       err::Number, sc)
-    JuMP.@constraint(model, [sc * t; sc * dev] in JuMP.MOI.NormOneCone(1 + T))
-    return err * T
-end
-function add_allocation_tracking_cone!(model::JuMP.Model,
-                                       alg::Union{<:L2Norm, <:SquaredL2Norm}, dev, t,
-                                       T::Integer, err::Number, sc)
-    JuMP.@constraint(model, [sc * t; sc * dev] in JuMP.SecondOrderCone())
-    return tracking_error_soc_factor(alg, err, T)
-end
-function add_allocation_tracking_cone!(model::JuMP.Model, alg::LpNorm, dev, t, T::Integer,
-                                       err::Number, sc)
-    @argcheck(alg.p > 1,
-              DomainError(alg.p,
-                          "`LpNorm.p` is $(alg.p), and the tracking error is the `p`-norm of the deviation, which the model states with a power cone of exponent `1 / p`, so `1 < p` must hold. State a value greater than `1`."))
-    p_inv = inv(alg.p)
-    r = JuMP.@variable(model, [1:T])
-    for i in 1:T
-        JuMP.@constraint(model,
-                         [sc * r[i], sc * t, sc * dev[i]] in JuMP.MOI.PowerCone(p_inv))
-    end
-    JuMP.@constraint(model, sc * (sum(r) - t) == 0)
-    scale = T - alg.ddof
-    return err * (alg.p == 3 ? cbrt(scale) : scale^p_inv)
-end
-function add_allocation_tracking_cone!(model::JuMP.Model, alg::LInfNorm, dev, t, T::Integer,
-                                       err::Number, sc)
-    JuMP.@constraint(model, [sc * t; sc * dev] in JuMP.MOI.NormInfinityCone(1 + T))
-    return err * (T - alg.ddof)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Adds an Allocation Set's weight bounds and its budget of one to the model: the bounds through [`set_weight_constraints!`](@ref) with no budget group, so a negative lower bound builds the long-short decomposition without pinning either side's budget, and then `Σw = k` through [`set_budget_constraints!`](@ref).
-
-# Validation
-
-  - `Σ lb ≤ 1 ≤ Σ ub` over the resolved bounds, through [`assert_feasible_bounds`](@ref).
-
-# Related
-
-  - [`set_allocation_set_constraints!`](@ref)
-  - [`BoundedAllocationSet`](@ref)
-  - [`ProgrammeAllocationSet`](@ref)
-"""
-function set_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds)::Nothing
-    assert_feasible_bounds(wb)
-    set_weight_constraints!(model, wb, nothing, nothing)
-    set_budget_constraints!(model, 1, get_w(model))
-    return nothing
-end
-"""
-    set_projection_objective!(model::JuMP.Model, proj::EuclideanProjection, q::AbstractVector)
-    set_projection_objective!(model::JuMP.Model, proj::EntropicProjection, q::AbstractVector)
-    set_projection_objective!(model::JuMP.Model, proj::GramProjection, q::AbstractVector)
-    set_projection_objective!(model::JuMP.Model, proj::TsallisProjection, q::AbstractVector)
-    set_projection_objective!(model::JuMP.Model, proj::LogBarrierProjection, q::AbstractVector)
-
-Sets the projection programme's objective in the geometry's divergence from the raw step `q`: the Euclidean distance through a second-order cone, the relative entropy ``\\sum_i w_i \\log (w_i / q_i)`` through a relative-entropy cone over the positive entries of `q` with the zero entries pinned at zero, the Gram norm ``\\lVert G (\\boldsymbol{w} - \\boldsymbol{q}) \\rVert`` with ``G^\\intercal G = A`` through a second-order cone, the Tsallis divergence ``-\\sum_i w_i^\\alpha / \\alpha + \\sum_i q_i^{\\alpha - 1} w_i`` through one power cone per positive entry, and the Itakura–Saito divergence ``-\\sum_i \\log w_i + \\sum_i w_i / q_i`` through one exponential cone per positive entry; under both barriers a zero entry of `q` is pinned at zero, as under the entropic arm.
-
-The Euclidean and Gram arms minimise the norm rather than its square, which has the same minimiser and keeps the programme conic on every solver. The two barrier arms drop the terms constant in `w`, so their objective value is the divergence up to a constant, with the same minimiser.
-
-# Validation
-
-  - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref): `all(>= 0, q)` and `sum(q) > 0`. A `DomainError` is thrown otherwise.
-  - Under [`GramProjection`](@ref): `proj.A` is not `nothing`. An `ArgumentError` is thrown otherwise: the rule binds the matrix.
-
-# Related
-
-  - [`project`](@ref)
-  - [`ProgrammeAllocationSet`](@ref)
-"""
-function set_projection_objective!(model::JuMP.Model, ::EuclideanProjection,
-                                   q::AbstractVector)::Nothing
-    w = get_w(model)
-    sc = get_constraint_scale(model)
-    so = get_objective_scale(model)
-    JuMP.@variable(model, t_proj)
-    JuMP.@constraint(model, proj_soc, [sc * t_proj; sc * (w - q)] in JuMP.SecondOrderCone())
-    JuMP.@objective(model, Min, so * t_proj)
-    return nothing
-end
-function set_projection_objective!(model::JuMP.Model, ::EntropicProjection,
-                                   q::AbstractVector)::Nothing
-    @argcheck(all(x -> x >= zero(x), q),
-              DomainError(q,
-                          "the entropic projection is defined on non-negative raw steps alone: `log w` is undefined below zero"))
-    @argcheck(sum(q) > zero(eltype(q)),
-              DomainError(q,
-                          "the entropic projection needs a positive entry to normalise: a raw step of zeros has no projection onto the simplex"))
-    w = get_w(model)
-    sc = get_constraint_scale(model)
-    so = get_objective_scale(model)
-    pos = findall(x -> x > zero(x), q)
-    zer = findall(iszero, q)
-    JuMP.@variable(model, t_proj)
-    # `w_i log(w_i / q_i)` with `q_i = 0` is finite at `w_i = 0` alone: a zero entry stays
-    # zero, as it does under the closed form.
-    if !isempty(zer)
-        JuMP.@constraint(model, proj_zero, sc * w[zer] .== 0)
-    end
-    JuMP.@constraint(model, proj_rec,
-                     [sc * t_proj; sc * q[pos]; sc * w[pos]] in
-                     JuMP.MOI.RelativeEntropyCone(1 + 2 * length(pos)))
-    JuMP.@objective(model, Min, so * t_proj)
-    return nothing
-end
-function set_projection_objective!(model::JuMP.Model, proj::GramProjection,
-                                   q::AbstractVector)::Nothing
-    @argcheck(!isnothing(proj.A),
-              ArgumentError("a GramProjection projects in the norm of a Gram matrix the rule binds at each step, and this one has none bound: it is the rule's geometry, not a caller's."))
-    G = LinearAlgebra.cholesky(LinearAlgebra.Symmetric(proj.A)).U
-    w = get_w(model)
-    sc = get_constraint_scale(model)
-    so = get_objective_scale(model)
-    JuMP.@variable(model, t_proj)
-    JuMP.@constraint(model, proj_soc,
-                     [sc * t_proj; sc * (G * (w - q))] in JuMP.SecondOrderCone())
-    JuMP.@objective(model, Min, so * t_proj)
-    return nothing
-end
-function set_projection_objective!(model::JuMP.Model, proj::TsallisProjection,
-                                   q::AbstractVector)::Nothing
-    pos, w, sc, so = barrier_objective_entries(model, q)
-    a = proj.alpha
-    JuMP.@variable(model, t_proj[1:length(pos)])
-    # `t_i ≤ w_i^α` is the power cone `w_i^α · 1^(1 − α) ≥ |t_i|`.
-    for (i, j) in enumerate(pos)
-        JuMP.@constraint(model, [sc * w[j], sc, sc * t_proj[i]] in JuMP.MOI.PowerCone(a))
-    end
-    obj = LinearAlgebra.dot(so .* q[pos] .^ (a - 1), w[pos]) - (so / a) * sum(t_proj)
-    JuMP.set_objective(model, JuMP.MIN_SENSE, obj)
-    return nothing
-end
-function set_projection_objective!(model::JuMP.Model, ::LogBarrierProjection,
-                                   q::AbstractVector)::Nothing
-    pos, w, sc, so = barrier_objective_entries(model, q)
-    JuMP.@variable(model, t_proj[1:length(pos)])
-    # `t_i ≤ log w_i` is the exponential cone `1 · exp(t_i) ≤ w_i`.
-    for (i, j) in enumerate(pos)
-        JuMP.@constraint(model,
-                         [sc * t_proj[i], sc, sc * w[j]] in JuMP.MOI.ExponentialCone())
-    end
-    obj = LinearAlgebra.dot(so .* inv.(q[pos]), w[pos]) - so * sum(t_proj)
-    JuMP.set_objective(model, JuMP.MIN_SENSE, obj)
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-The entries a barrier objective is written over: refuses a raw step with a negative entry or none positive, pins every zero entry of `q` at zero, and answers the positive indices with the model's `w` and its two scales.
-
-# Related
-
-  - [`set_projection_objective!`](@ref)
-  - [`TsallisProjection`](@ref)
-  - [`LogBarrierProjection`](@ref)
-"""
-function barrier_objective_entries(model::JuMP.Model, q::AbstractVector)
-    @argcheck(all(x -> x >= zero(x), q),
-              DomainError(q,
-                          "a barrier projection is defined on non-negative raw steps alone: the potential is undefined below zero"))
-    @argcheck(sum(q) > zero(eltype(q)),
-              DomainError(q,
-                          "a barrier projection needs a positive entry: a raw step of zeros has no projection, because a zero stays zero under the potential"))
-    w = get_w(model)
-    sc = get_constraint_scale(model)
-    for i in findall(iszero, q)
-        JuMP.@constraint(model, sc * w[i] == 0)
-    end
-    return findall(x -> x > zero(x), q), w, sc, get_objective_scale(model)
-end
-"""
-    projection_solver(proj::AbstractProjectionGeometry, set::ProgrammeAllocationSet)
-    projection_solver(proj::GramProjection, set::AbstractAllocationSet)
-    projection_solver(proj::GramProjection, set::ProgrammeAllocationSet)
-    projection_solver(proj::GramProjection, set::BoundedAllocationSet)
-    projection_solver(proj::AbstractProjectionGeometry, set::BoundedAllocationSet)
-
-The solver a projection programme runs on: the geometry's own when it carries one, the set's otherwise. A scalar-root geometry on the bounded set has no programme to run and is refused by name; [`project`](@ref) never reaches it.
-
-# Related
-
-  - [`GramProjection`](@ref)
-  - [`ProgrammeAllocationSet`](@ref)
-  - [`project`](@ref)
-"""
-function projection_solver(::AbstractProjectionGeometry, set::ProgrammeAllocationSet)
-    return set.slv
-end
-function projection_solver(proj::GramProjection, ::AbstractAllocationSet)
-    return proj.slv
-end
-function projection_solver(proj::GramProjection, ::ProgrammeAllocationSet)
-    return proj.slv
-end
-function projection_solver(proj::GramProjection, ::BoundedAllocationSet)
-    return proj.slv
-end
-function projection_solver(proj::AbstractProjectionGeometry, ::BoundedAllocationSet)
-    return throw(ArgumentError("a `$(nameof(typeof(proj)))` onto a BoundedAllocationSet is a scalar root, not a programme: no solver is read for it."))
-end
-"""
-    allocation_set_ready(set::AbstractAllocationSet, X)
-    allocation_set_ready(set::ProgrammeAllocationSet, X)
-
-Whether a set's constraints can be formed on the rows `X` the step holds: `nothing` when they can, and the reason for a Held Step when they cannot — a programme set that fits its prior on the rows, while the head holds fewer than two, because a covariance of one observation does not exist.
-
-# Related
-
-  - [`ProgrammeAllocationSet`](@ref)
-  - [`projection_programme`](@ref)
-  - [`HeldStep`](@ref)
-"""
-function allocation_set_ready(::AbstractAllocationSet, ::Any)
-    return nothing
-end
-function allocation_set_ready(set::ProgrammeAllocationSet, X)
-    if isnothing(rows_needed(set)) && !isnothing(X) && size(X, 1) < 2
-        return "the set's prior estimator fits on the head's rows and a covariance of one observation does not exist, so the step trades nothing until the head holds two"
-    end
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-The projection programme: a bare model with `w`, `k = 1`, the set's scales and the observation count of the step's rows, the set's constraints from [`set_allocation_set_constraints!`](@ref) with `w` as the turnover reference, and the geometry's objective from [`set_projection_objective!`](@ref), solved on [`projection_solver`](@ref).
-
-A solved programme answers its weights. A failed one, or one whose constraints cannot be formed on the step's rows ([`allocation_set_ready`](@ref)), is the Held Step: the record goes to the current [`ProjectionStep`](@ref) through [`record_held_step!`](@ref), and the answer is a copy of `w`, the book the fund already holds.
-
-# Arguments
-
-  - `proj`: The geometry.
-  - `set`: The set, resolved.
-  - `q`: The raw step.
-  - `w`: The Price-Adjusted Allocation the step trades from.
-
-# Returns
-
-  - `w'::Vector`: The projected allocation, or `w` copied on a Held Step.
-
-# Related
-
-  - [`project`](@ref)
-  - [`HeldStep`](@ref)
-  - [`optimise_JuMP_model!`](@ref)
-"""
-function projection_programme(proj::AbstractProjectionGeometry, set::AbstractAllocationSet,
-                              q::AbstractVector, w::AbstractVector)
-    X = projection_step_rows()
-    reason = allocation_set_ready(set, X)
-    if !isnothing(reason)
-        record_held_step!(reason, nothing)
-        return copy(w)
-    end
-    model = JuMP.Model()
-    set_model_scales!(model, projection_scale(set, :sc), projection_scale(set, :so))
-    set_model_observations!(model, isnothing(X) ? 0 : size(X, 1))
-    JuMP.@expression(model, k, 1)
-    wv = state_set!(model, Symbol(""), :w,
-                    JuMP.@variable(model, [1:length(q)], base_name = "w"))
-    set_allocation_set_constraints!(model, set, w, X)
-    set_projection_objective!(model, proj, q)
-    res = optimise_JuMP_model!(model, projection_solver(proj, set))
-    if res.success
-        return JuMP.value.(wv)
-    end
-    record_held_step!("the projection onto the `$(nameof(typeof(set)))` in the `$(nameof(typeof(proj)))` geometry did not solve, and the step trades nothing",
-                      res.trials)
-    return copy(w)
-end
-"""
-    projection_scale(set::ProgrammeAllocationSet, f::Symbol)
-    projection_scale(set::BoundedAllocationSet, f::Symbol)
-
-The constraint scale `:sc` or the objective scale `:so` a projection programme registers on its model: the programme set's own, and one on the bounded set, which carries none.
-
-# Related
-
-  - [`projection_programme`](@ref)
-  - [`set_model_scales!`](@ref)
-"""
-function projection_scale(set::ProgrammeAllocationSet, f::Symbol)
-    return getfield(set, f)
-end
-function projection_scale(::BoundedAllocationSet, ::Symbol)
-    return 1
-end
-"""
-    project(proj::GramProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
-    project(proj::EuclideanProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
-    project(proj::EntropicProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
-    project(proj::GramProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
-    project(proj::TsallisProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
-    project(proj::LogBarrierProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
-
-The programme arms of the Constrained Update: every pair but the scalar roots on the bounded set is the bare-model programme of [`projection_programme`](@ref).
-
-# Validation
-
-  - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref): `all(>= 0, lb)` over the resolved bounds. A `DomainError` is thrown otherwise. Under the same three geometries the programme's answer passes through [`clip_at_zero`](@ref), so a leg the solver closed to within its tolerance below zero is zero to the next step.
-
-# Related
-
-  - [`project`](@ref)
-  - [`projection_programme`](@ref)
-  - [`ProgrammeAllocationSet`](@ref)
-  - [`GramProjection`](@ref)
-"""
-function project(proj::GramProjection, set::BoundedAllocationSet, q::AbstractVector,
-                 w::AbstractVector)
-    return projection_programme(proj, set, q, w)
-end
-function project(proj::EuclideanProjection, set::ProgrammeAllocationSet, q::AbstractVector,
-                 w::AbstractVector)
-    return projection_programme(proj, set, q, w)
-end
-function project(proj::EntropicProjection, set::ProgrammeAllocationSet, q::AbstractVector,
-                 w::AbstractVector)
-    @argcheck(all(x -> x >= zero(x), set.wb.lb),
-              DomainError(set.wb.lb,
-                          "the entropic projection admits no negative lower bound: `log w` is undefined below zero"))
-    return clip_at_zero(projection_programme(proj, set, q, w))
-end
-function project(proj::GramProjection, set::ProgrammeAllocationSet, q::AbstractVector,
-                 w::AbstractVector)
-    return projection_programme(proj, set, q, w)
-end
-function project(proj::Union{<:TsallisProjection, <:LogBarrierProjection},
-                 set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
-    @argcheck(all(x -> x >= zero(x), set.wb.lb),
-              DomainError(set.wb.lb,
-                          "a barrier projection admits no negative lower bound: the potential is undefined below zero"))
-    return clip_at_zero(projection_programme(proj, set, q, w))
-end
-"""
-    blend_projection(proj::EuclideanProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
-    blend_projection(proj::EuclideanProjection, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector)
-
-The second projection of an [`ExpertMixture`](@ref)'s blend onto the head's set: skipped by dispatch on a [`BoundedAllocationSet`](@ref), where a blend of bounded allocations is bounded and the projection would be the identity, and [`project`](@ref) on every other set, where it is the repair a turnover ceiling or a MIP kind needs.
-
-# Related
-
-  - [`ExpertMixture`](@ref)
-  - [`project`](@ref)
-"""
-function blend_projection(::EuclideanProjection, ::BoundedAllocationSet, q::AbstractVector,
-                          ::AbstractVector)
-    return q
-end
-function blend_projection(proj::EuclideanProjection, set::AbstractAllocationSet,
-                          q::AbstractVector, w::AbstractVector)
-    return project(proj, set, q, w)
-end
 export ProgrammeAllocationSet, TsallisProjection, LogBarrierProjection
-public set_allocation_set_constraints!, mirror_step
+public mirror_step

@@ -392,7 +392,7 @@ function online_selection_row!(opt::OnlinePortfolioSelection, st, w::AbstractVec
     x = one(eltype(r)) .+ r
     rows = isnothing(X) ? nothing : sample_buffer(X)
     (st, w), held = with_projection_step(() -> online_update!(opt.alg, st, w, x, rows, set),
-                                         rows, ts; nx = nx)
+                                         rows, ts; nx = nx, strict = opt.strict)
     return st, w, X, report_held_steps(held, ts)
 end
 """

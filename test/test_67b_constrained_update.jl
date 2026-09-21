@@ -11,6 +11,28 @@ Gram programme on the bare simplex matches a hand-written quadratic programme.
 =#
 using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, Clarabel,
       HiGHS, Pajarito, JuMP
+# Two custom terms with the set as their owner (#1206).
+struct FirstAtMost <: PortfolioOptimisers.CustomJuMPConstraint
+    ub::Float64
+end
+function PortfolioOptimisers.add_custom_constraint!(model::JuMP.Model, c::FirstAtMost,
+                                                    ::Any, ::Any)
+    w = PortfolioOptimisers.get_w(model)
+    k = PortfolioOptimisers.get_k(model)
+    sc = PortfolioOptimisers.get_constraint_scale(model)
+    JuMP.@constraint(model, sc * (w[1] - c.ub * k) <= 0)
+    return nothing
+end
+struct FirstCosts <: PortfolioOptimisers.CustomJuMPObjective
+    c::Float64
+end
+function PortfolioOptimisers.add_custom_objective_term!(model::JuMP.Model, ::Any,
+                                                        t::FirstCosts, ::Any, ::Any)
+    w = PortfolioOptimisers.get_w(model)
+    PortfolioOptimisers.add_to_objective_penalty!(model,
+                                                  JuMP.@expression(model, t.c * w[1]))
+    return nothing
+end
 @testset "Online portfolio selection: the Constrained Update seam" begin
     po = PortfolioOptimisers
     OPS = po.OnlinePortfolioSelection
@@ -41,15 +63,16 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test_throws DimensionMismatch GramProjection(; slv = slv, A = ones(2, 3))
         @test_throws UndefKeywordError ProgrammeAllocationSet()
         @test_throws TypeError ProgrammeAllocationSet(; slv = nothing)
-        @test_throws DomainError ProgrammeAllocationSet(; slv = slv, tn = -0.1)
+        @test_throws TypeError ProgrammeAllocationSet(; slv = slv, tn = -0.1)
         @test_throws DomainError ProgrammeAllocationSet(; slv = slv, card = 0)
         @test_throws ArgumentError ProgrammeAllocationSet(; slv = slv, r = Variance())
         @test_throws Exception ProgrammeAllocationSet(; slv = slv,
                                                       wb = WeightBoundsEstimator())
-        @test_throws TypeError ProgrammeAllocationSet(; slv = slv,
-                                                      tr = TrackingError(;
-                                                                         tr = ReturnsTracking(;
-                                                                                              w = zeros(3))))
+        @test isa(ProgrammeAllocationSet(; slv = slv,
+                                         tr = TrackingError(;
+                                                            tr = ReturnsTracking(;
+                                                                                 w = zeros(3)))),
+                  ProgrammeAllocationSet)
         # The NewtonStep slot admits the Gram geometry and no other rule's does.
         @test isa(NewtonStep(; proj = GramProjection(; slv = slv)).proj, GramProjection)
         @test_throws TypeError MirrorDescent(; proj = GramProjection(; slv = slv))
@@ -103,20 +126,23 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                                                                          3,
                                                                                                                          3)))))))
         # A view slices what has an asset axis and carries the rest.
-        set = ProgrammeAllocationSet(; slv = slv, tn = [0.1, 0.2, 0.3], card = 2)
+        set = ProgrammeAllocationSet(; slv = slv,
+                                     tn = Turnover(; w = zeros(3), val = [0.1, 0.2, 0.3]),
+                                     card = 2)
         v = po.port_opt_view(set, [1, 3])
-        @test v.tn == [0.1, 0.3] && v.card == 2 && v.slv === slv
+        @test v.tn.val == [0.1, 0.3] && v.card == 2 && v.slv === slv
         # Resolution turns the name-keyed constraints into values.
         rs = resolve(ProgrammeAllocationSet(; slv = slv,
                                             sets = UniverseSets(;
                                                                 dict = Dict("nx" =>
                                                                                 ["A", "B",
                                                                                  "C"])),
-                                            lcs = LinearConstraintEstimator(;
-                                                                            val = :(A + B <=
-                                                                                    0.8))),
+                                            lcse = LinearConstraintEstimator(;
+                                                                             val = :(A +
+                                                                                     B <=
+                                                                                     0.8))),
                      3)
-        @test isa(rs.lcs, po.LinearConstraint)
+        @test isa(rs.lcse, po.LinearConstraint)
     end
 
     @testset "Parity 1 and 2: the scalar roots against the sort and normalisation" begin
@@ -143,10 +169,10 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                                    ["A",
                                                                                     "B",
                                                                                     "C"])),
-                                               lcs = LinearConstraintEstimator(;
-                                                                               val = :(A +
-                                                                                       B <=
-                                                                                       0.99))),
+                                               lcse = LinearConstraintEstimator(;
+                                                                                val = :(A +
+                                                                                        B <=
+                                                                                        0.99))),
                         3)
         @test isapprox(po.project(EuclideanProjection(), slack, q, wh),
                        po.project(EuclideanProjection(), bset, q, wh); atol = 1e-7)
@@ -177,9 +203,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                                    ["A",
                                                                                     "B",
                                                                                     "C"])),
-                                               lcs = LinearConstraintEstimator(;
-                                                                               val = :(A <=
-                                                                                       0.2))),
+                                               lcse = LinearConstraintEstimator(;
+                                                                                val = :(A <=
+                                                                                        0.2))),
                         3)
         wt = po.project(EuclideanProjection(), tight, q, wh)
         @test wt[1] ≈ 0.2 atol = 1e-7
@@ -252,14 +278,18 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
 
     @testset "The turnover ceiling, the covariance cone, the tracking error and the MIP kinds" begin
         # The ceiling is per asset, measured from the Price-Adjusted Allocation.
-        tset = resolve(ProgrammeAllocationSet(; slv = slv, tn = 0.1), 3)
+        tset = resolve(ProgrammeAllocationSet(; slv = slv,
+                                              tn = Turnover(; w = zeros(3), val = 0.1)), 3)
         wt = po.project(EuclideanProjection(), tset, [1.0, 0.0, 0.0], wh)
         @test maximum(abs.(wt .- wh)) ≈ 0.1 atol = 1e-6
         @test isapprox(wt, [0.4, 0.3, 0.3]; atol = 1e-6)
         # A ceiling of zero pins the book: the projection is the book itself.
         @test isapprox(po.project(EuclideanProjection(),
-                                  resolve(ProgrammeAllocationSet(; slv = slv, tn = 0.0), 3),
-                                  [1.0, 0.0, 0.0], wh), wh; atol = 1e-6)
+                                  resolve(ProgrammeAllocationSet(; slv = slv,
+                                                                 tn = Turnover(;
+                                                                               w = zeros(3),
+                                                                               val = 0.0)),
+                                          3), [1.0, 0.0, 0.0], wh), wh; atol = 1e-6)
         # The covariance cone, from a matrix on `r`: the step meets the ceiling.
         S = [4.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0] .* 1e-4
         vset = resolve(ProgrammeAllocationSet(; slv = slv,
@@ -315,7 +345,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                 tr = TrackingError(;
                                                                    tr = WeightsTracking(;
                                                                                         w = fill(0.25,
-                                                                                                 4)),
+                                                                                                 4),
+                                                                                        fixed = true),
                                                                    err = 0.003)))
         rt = optimise(topt, rd)
         @test isa(rt.retcode, OptimisationSuccess)
@@ -346,7 +377,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
 
     @testset "The Held Step" begin
         # A cap of 0.4 and a ceiling of 0.01 from a book at 0.7 cannot both hold.
-        hset = resolve(ProgrammeAllocationSet(; slv = slv, tn = 0.01,
+        hset = resolve(ProgrammeAllocationSet(; slv = slv,
+                                              tn = Turnover(; w = zeros(3), val = 0.01),
                                               wb = WeightBounds(; lb = 0, ub = 0.4)), 3)
         book = [0.7, 0.2, 0.1]
         (wheld, held) = po.with_projection_step(() -> po.project(EuclideanProjection(),
@@ -369,7 +401,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         rdh = ReturnsResult(; nx = ["A", "B", "C"], X = Rh,
                             ts = [Date(2021, 1, 1), Date(2021, 1, 2), Date(2021, 1, 3)])
         hopt = OPS(; alg = NewtonStep(), w0 = [0.4, 0.3, 0.3],
-                   set = ProgrammeAllocationSet(; slv = slv, tn = 0.01,
+                   set = ProgrammeAllocationSet(; slv = slv,
+                                                tn = Turnover(; w = zeros(3), val = 0.01),
                                                 wb = WeightBounds(; lb = 0, ub = 0.4)),
                    fb = EqualWeighted())
         res1 = @test_logs (:warn, r"Held Step at 2021-01-01") match_mode=:any optimise(hopt,
@@ -433,7 +466,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test isa(rf.retcode.res, po.HeldStep)
         # A programme the start cannot meet — a book the turnover ceiling cannot bring under
         # the cap — holds the start as given and warns, as a row's Held Step does.
-        tset0 = ProgrammeAllocationSet(; slv = slv, tn = 0.01,
+        tset0 = ProgrammeAllocationSet(; slv = slv,
+                                       tn = Turnover(; w = zeros(4), val = 0.01),
                                        wb = WeightBounds(; lb = 0, ub = 0.4))
         @test (@test_logs (:warn, r"Held Step at the start") match_mode=:any seed(OPS(;
                                                                                       alg = BuyAndHold(),
@@ -451,7 +485,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                    ConstantRebalancedPortfolio(; w = [0.0, 1.0])]
         x = [1.2, 0.8]
         w = [0.5, 0.5]
-        tn = resolve(ProgrammeAllocationSet(; slv = slv, tn = 0.1), 2)
+        tn = resolve(ProgrammeAllocationSet(; slv = slv,
+                                            tn = Turnover(; w = zeros(2), val = 0.1)), 2)
         step(alg, set) = first(po.with_projection_step(() -> po.online_update!(ExpertMixture(;
                                                                                              experts = experts,
                                                                                              alg = alg),
@@ -497,22 +532,20 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                                      settings = RiskMeasureSettings(;
                                                                                                                     ub = Frontier(;
                                                                                                                                   N = 3))))
-        @test_throws ArgumentError ProgrammeAllocationSet(; slv = slv,
-                                                          r = Variance(;
-                                                                       rc = LinearConstraintEstimator(;
-                                                                                                      val = :(A <=
-                                                                                                              0.5)),
-                                                                       settings = RiskMeasureSettings(;
-                                                                                                      ub = 1e-3)))
         cvar = ConditionalValueatRisk(; settings = RiskMeasureSettings(; ub = 0.02))
         mdd = MaximumDrawdown(; settings = RiskMeasureSettings(; ub = 0.05))
         @test isnothing(po.rows_needed(ProgrammeAllocationSet(; slv = slv, r = cvar)))
         @test po.risk_reads_rows(cvar) && po.risk_reads_rows(Variance())
         @test !po.risk_reads_rows(nothing) && !po.risk_reads_rows(Variance(; sigma = I(3)))
+        @test po.risk_reads_rows(Variance(; sigma = I(3),
+                                          rc = LinearConstraintEstimator(;
+                                                                         val = :(A <= 0.5))))
+        @test po.risk_reads_rows([Variance(; sigma = I(3)), cvar])
         # A two-argument view, the read-out's, carries a tail measure unchanged.
         @test po.port_opt_view(ProgrammeAllocationSet(; slv = slv, r = cvar), [1, 3]).r ===
               cvar
-        # The set is a Risk Constraint Owner: its solver, and no risk-contribution rows.
+        # The set is a Risk Constraint Owner: its solver, and its risk-contribution rows
+        # resolved over its sets.
         cset = resolve(ProgrammeAllocationSet(; slv = slv, r = cvar), 4)
         @test isa(cset, po.AbstractProgrammeAllocationSet)
         @test isa(cset, po.RiskConstraintOwner) && isa(cset, po.RiskBoundOwner)
@@ -629,13 +662,491 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test occursin("RiskConstraintOwner", string(@doc(po.RiskConstraintOwner)))
         @test occursin("any", string(@doc(ProgrammeAllocationSet)))
     end
+    @testset "The optimiser's vocabulary on the set (#1206)" begin
+        # Every constraint kind of `JuMPOptimiser` under the optimiser's names and bounds,
+        # the direct objective penalties, the semidefinite kinds, and the builder order of
+        # `assemble_jump_model!` on both arms.
+        sets3 = UniverseSets(;
+                             dict = Dict("nx" => ["A", "B", "C"],
+                                         "nf" => ["MTUM", "VLUE", "QUAL"]))
+        tn3(v; fixed = false) = Turnover(; w = zeros(3), val = v, fixed = fixed)
+        ub_of(ub) = RiskMeasureSettings(; ub = ub)
+        cvar = ConditionalValueatRisk(; settings = ub_of(0.02))
+        mdd = MaximumDrawdown(; settings = ub_of(0.05))
+        rng = StableRNG(23)
+        T = 40
+        R = 0.02 .* randn(rng, T, 3)
+        R[:, 1] .*= 3
+        q3 = [0.8, 0.15, 0.05]
+        w3 = fill(1 / 3, 3)
+        inside(f) = first(po.with_projection_step(f, R, 1; nx = ["A", "B", "C"]))
+        proj(set; q = q3, w = w3) = inside(() -> po.project(EuclideanProjection(), set, q,
+                                                            w))
+        free = proj(pset)
+        @testset "Construction: the names, the bounds and the refusals" begin
+            # A bare number is not a turnover, as it is not on the optimiser.
+            @test_throws TypeError ProgrammeAllocationSet(; slv = slv, tn = 0.1)
+            @test_throws MethodError ProgrammeAllocationSet(; slv = slv, lcs = nothing)
+            @test_throws MethodError ProgrammeAllocationSet(; slv = slv, gcard = nothing)
+            # Every new slot takes the optimiser's bound.
+            full = ProgrammeAllocationSet(; slv = slv, sets = sets3,
+                                          tn = [tn3(0.1), tn3([0.1, 0.2, 0.3])],
+                                          tr = [TrackingError(;
+                                                              tr = ReturnsTracking(;
+                                                                                   w = zeros(T)),
+                                                              err = 0.01),
+                                                TrackingError(;
+                                                              tr = WeightsTracking(;
+                                                                                   w = w3),
+                                                              err = 0.01)], r = [cvar, mdd],
+                                          gbgt = BudgetRange(; lb = nothing, ub = 1.4),
+                                          wb = WeightBounds(; lb = -0.2, ub = 1), scard = 1,
+                                          smtx = [1.0 0.0 0.0; 0.0 1.0 1.0], l2c = 0.9,
+                                          linfc = 0.9, l1 = 0.1,
+                                          l2 = L2Regularisation(; val = 0.1),
+                                          cte = CentralityConstraint(),
+                                          ple = IntegerPhylogenyEstimator(;
+                                                                          pl = NetworkEstimator(),
+                                                                          B = 1),
+                                          ret = ArithmeticReturn(;
+                                                                 settings = JuMPReturnsSettings(;
+                                                                                                lb = 0.0)))
+            @test fieldnames(typeof(full))[1:4] == (:pe, :slv, :r, :wb)
+            @test isnothing(po.rows_needed(full))
+            @test po.rows_needed(ProgrammeAllocationSet(; slv = slv, sbgt = 0.2,
+                                                        wb = WeightBounds(; lb = -0.2,
+                                                                          ub = 1),
+                                                        l2c = 0.9, l1 = 0.1)) == 0
+            # A precomputed centrality or phylogeny row reads no rows; an estimator does.
+            @test po.rows_needed(ProgrammeAllocationSet(; slv = slv,
+                                                        ple = po.IntegerPhylogeny(;
+                                                                                  A = [0 1 0;
+                                                                                       1 0 0;
+                                                                                       0 0 0],
+                                                                                  B = 1))) ==
+                  0
+            @test isnothing(po.rows_needed(ProgrammeAllocationSet(; slv = slv,
+                                                                  cte = CentralityConstraint())))
+            # A Calibration Rule in a penalty reads the prior, so it reads the rows.
+            @test isnothing(po.rows_needed(ProgrammeAllocationSet(; slv = slv,
+                                                                  l1 = RateRadius())))
+            # The name-keyed guard covers the turnover and the selection matrices.
+            @test_throws po.IsNothingError ProgrammeAllocationSet(; slv = slv,
+                                                                  tn = TurnoverEstimator(;
+                                                                                         w = zeros(3),
+                                                                                         val = 0.1))
+            @test_throws po.IsNothingError ProgrammeAllocationSet(; slv = slv, scard = 1,
+                                                                  smtx = AssetSetsMatrixEstimator(;
+                                                                                                  val = "nf"))
+            # The sub-group shape checks are the optimiser's: the sub-grouped matrix is
+            # checked against `sgmtx`, the matrix its builder pairs it with (a defect the
+            # optimiser's constructor carried, which read `smtx` there).
+            two = linear_constraints(LinearConstraintEstimator(;
+                                                               val = [:(A <= 1), :(B <= 1)]),
+                                     sets3)
+            @test isa(ProgrammeAllocationSet(; slv = slv, sgcarde = two,
+                                             sgmtx = [1.0 0.0 0.0; 0.0 1.0 1.0]),
+                      ProgrammeAllocationSet)
+            @test_throws DimensionMismatch ProgrammeAllocationSet(; slv = slv,
+                                                                  sgcarde = two,
+                                                                  smtx = [1.0 0.0 0.0;
+                                                                          0.0 1.0 1.0],
+                                                                  sgmtx = Matrix{Float64}(I,
+                                                                                          3,
+                                                                                          3))
+            @test_throws DimensionMismatch JuMPOptimiser(; slv = slv, sgcarde = two,
+                                                         smtx = [1.0 0.0 0.0; 0.0 1.0 1.0],
+                                                         sgmtx = Matrix{Float64}(I, 3, 3))
+            @test_throws ArgumentError ProgrammeAllocationSet(; slv = slv, scard = 1)
+            @test_throws po.IsEmptyError ProgrammeAllocationSet(; slv = slv,
+                                                                r = RiskMeasure[])
+            @test_throws po.IsEmptyError ProgrammeAllocationSet(; slv = slv,
+                                                                tn = Turnover[])
+            @test_throws po.IsEmptyError ProgrammeAllocationSet(; slv = Solver[])
+            @test_throws Exception ProgrammeAllocationSet(; slv = slv, gbgt = -1,
+                                                          wb = WeightBounds(; lb = -1,
+                                                                            ub = 1))
+            # The sub-group and the sub-grouped slots are viewed and resolved apart when
+            # they differ, and once when they are the same object.
+            apart = ProgrammeAllocationSet(; slv = slv, sets = sets3, scard = 1,
+                                           smtx = [1.0 0.0 0.0; 0.0 1.0 1.0], sgcarde = two,
+                                           sgmtx = [1.0 1.0 0.0; 0.0 0.0 1.0],
+                                           slt = Threshold(0.05), sglt = Threshold(0.02),
+                                           sst = Threshold(0.01), sgst = Threshold(0.03))
+            va = po.port_opt_view(apart, [1, 3])
+            @test va.smtx == [1.0 0.0; 0.0 1.0] && va.sglt.val == 0.02 && va.sst.val == 0.01
+            ra = resolve(apart, 3)
+            @test ra.sgmtx == [1.0 1.0 0.0; 0.0 0.0 1.0] &&
+                  ra.smtx == [1.0 0.0 0.0; 0.0 1.0 1.0]
+            @test ra.slt.val == 0.05 && ra.sglt.val == 0.02 && ra.sgst.val == 0.03
+            @test_throws Exception ProgrammeAllocationSet(; slv = slv, l2c = -1)
+            # The gross budget is refused where the bounds forbid shorts, as on the
+            # optimiser.
+            @test_throws Exception ProgrammeAllocationSet(; slv = slv,
+                                                          gbgt = BudgetRange(; lb = nothing,
+                                                                             ub = 1.4))
+            # A view slices every per-asset slot and carries the rest.
+            v = po.port_opt_view(ProgrammeAllocationSet(; slv = slv,
+                                                        tn = tn3([0.1, 0.2, 0.3]), card = 2,
+                                                        l2c = 0.9), [1, 3])
+            @test v.tn.val == [0.1, 0.3] && v.card == 2 && v.l2c == 0.9
+            # Resolution turns every name-keyed slot into a value, the turnover included.
+            rs = resolve(ProgrammeAllocationSet(; slv = slv, sets = sets3,
+                                                tn = TurnoverEstimator(; w = zeros(3),
+                                                                       val = ["A" => 0.1],
+                                                                       dval = 0.5),
+                                                scard = 1,
+                                                smtx = AssetSetsMatrixEstimator(;
+                                                                                val = "nf"),
+                                                lcse = LinearConstraintEstimator(;
+                                                                                 val = :(A +
+                                                                                         B <=
+                                                                                         0.8))),
+                         3)
+            @test isa(rs.tn, Turnover) && rs.tn.val == [0.1, 0.5, 0.5]
+            @test isa(rs.smtx, AbstractMatrix) && isa(rs.lcse, po.LinearConstraint)
+        end
+        @testset "The turnover and the tracking kinds" begin
+            # A turnover object: the reference is the step's book unless fixed.
+            @test isapprox(proj(resolve(ProgrammeAllocationSet(; slv = slv, tn = tn3(0.1)),
+                                        3); q = [1.0, 0.0, 0.0], w = wh), [0.4, 0.3, 0.3];
+                           atol = 1e-6)
+            fixed = resolve(ProgrammeAllocationSet(; slv = slv,
+                                                   tn = Turnover(; w = [0.6, 0.2, 0.2],
+                                                                 val = 0.05, fixed = true)),
+                            3)
+            wfx = proj(fixed; q = [1.0, 0.0, 0.0], w = wh)
+            @test maximum(abs.(wfx .- [0.6, 0.2, 0.2])) <= 0.05 + 1e-6
+            @test maximum(abs.(wfx .- wh)) > 0.05
+            # A vector of turnovers: every ceiling binds.
+            two = resolve(ProgrammeAllocationSet(; slv = slv,
+                                                 tn = [tn3([0.1, 1.0, 1.0]),
+                                                       tn3([1.0, 0.05, 1.0])]), 3)
+            wtwo = proj(two; q = [1.0, 0.0, 0.0], w = wh)
+            @test abs(wtwo[1] - wh[1]) <= 0.1 + 1e-6 && abs(wtwo[2] - wh[2]) <= 0.05 + 1e-6
+            # A returns benchmark: the tracking error over the head's rows.
+            bench = R * [0.2, 0.3, 0.5]
+            rtr = resolve(ProgrammeAllocationSet(; slv = slv,
+                                                 tr = TrackingError(;
+                                                                    tr = ReturnsTracking(;
+                                                                                         w = bench),
+                                                                    err = 0.002)), 3)
+            wr = proj(rtr)
+            @test sqrt(sum(abs2, R * wr - bench) / (T - 1)) <= 0.002 * (1 + 1e-6)
+            @test !isapprox(wr, free; atol = 1e-4)
+            # A weights benchmark that is not fixed tracks the step's book; a fixed one
+            # tracks the caller's.
+            wt_fixed = proj(resolve(ProgrammeAllocationSet(; slv = slv,
+                                                           tr = TrackingError(;
+                                                                              tr = WeightsTracking(;
+                                                                                                   w = [0.2,
+                                                                                                        0.3,
+                                                                                                        0.5],
+                                                                                                   fixed = true),
+                                                                              err = 0.002)),
+                                    3))
+            @test isapprox(wt_fixed, wr; atol = 1e-5)
+            wt_book = proj(resolve(ProgrammeAllocationSet(; slv = slv,
+                                                          tr = TrackingError(;
+                                                                             tr = WeightsTracking(;
+                                                                                                  w = [0.2,
+                                                                                                       0.3,
+                                                                                                       0.5]),
+                                                                             err = 0.002)),
+                                   3))
+            @test sqrt(sum(abs2, R * (wt_book - w3)) / (T - 1)) <= 0.002 * (1 + 1e-6)
+            @test !isapprox(wt_book, wt_fixed; atol = 1e-4)
+            # A vector of tracking errors, and a risk tracking error with the set as the
+            # owner of its inner builder.
+            wv = proj(resolve(ProgrammeAllocationSet(; slv = slv,
+                                                     tr = [TrackingError(;
+                                                                         tr = ReturnsTracking(;
+                                                                                              w = bench),
+                                                                         err = 0.002),
+                                                           TrackingError(;
+                                                                         tr = WeightsTracking(;
+                                                                                              w = [0.2,
+                                                                                                   0.3,
+                                                                                                   0.5],
+                                                                                              fixed = true),
+                                                                         err = 0.003,
+                                                                         alg = LInfNorm())]),
+                              3))
+            @test sqrt(sum(abs2, R * wv - bench) / (T - 1)) <= 0.002 * (1 + 1e-6)
+            @test maximum(abs, R * wv - bench) <= 0.003 * (T - 1) * (1 + 1e-6)
+            rte = RiskTrackingError(; r = Variance(), tr = WeightsTracking(; w = w3),
+                                    err = 1e-5)
+            wrt = proj(resolve(ProgrammeAllocationSet(; slv = slv, tr = rte), 3))
+            @test dot(wrt - w3, cov(R), wrt - w3) <= 1e-5 * (1 + 1e-4)
+            @test !isapprox(wrt, free; atol = 1e-3)
+        end
+        @testset "The ceilings, the budgets, the norm ceilings and the return floor" begin
+            # A vector of ceilings: every one binds.
+            wc = proj(resolve(ProgrammeAllocationSet(; slv = slv, r = [cvar, mdd]), 3))
+            @test expected_risk(cvar, wc, R) <= 0.02 * (1 + 1e-4)
+            @test expected_risk(mdd, wc, R) <= 0.05 * (1 + 1e-4)
+            # Two matrix ceilings on a set that reads no rows, each its own cone.
+            S = cov(R)
+            wm = po.project(EuclideanProjection(),
+                            resolve(ProgrammeAllocationSet(; slv = slv,
+                                                           r = [Variance(; sigma = S,
+                                                                         settings = ub_of(0.5 *
+                                                                                          dot(free,
+                                                                                              S,
+                                                                                              free))),
+                                                                StandardDeviation(;
+                                                                                  sigma = S,
+                                                                                  settings = ub_of(0.9 *
+                                                                                                   sqrt(dot(free,
+                                                                                                            S,
+                                                                                                            free))))]),
+                                    3), q3, w3)
+            @test dot(wm, S, wm) <= 0.5 * dot(free, S, free) * (1 + 1e-4)
+            # The short and gross budgets under a negative bound.
+            ls = resolve(ProgrammeAllocationSet(; slv = slv,
+                                                wb = WeightBounds(; lb = -1, ub = 1),
+                                                gbgt = BudgetRange(; lb = nothing,
+                                                                   ub = 1.2)), 3)
+            wls = proj(ls; q = [1.2, 0.3, -0.5])
+            @test sum(abs, wls) <= 1.2 * (1 + 1e-6)
+            @test sum(wls) ≈ 1 atol = 1e-8
+            wsb = proj(resolve(ProgrammeAllocationSet(; slv = slv,
+                                                      wb = WeightBounds(; lb = -1, ub = 1),
+                                                      sbgt = BudgetRange(; lb = nothing,
+                                                                         ub = 0.05)), 3);
+                       q = [1.2, 0.3, -0.5])
+            @test sum(x -> max(-x, 0), wsb) <= 0.05 * (1 + 1e-6)
+            # The norm ceilings: a cap on the largest weight, on the 2-norm and on a p-norm.
+            @test maximum(proj(resolve(ProgrammeAllocationSet(; slv = slv, linfc = 0.5), 3))) <=
+                  0.5 * (1 + 1e-6)
+            @test norm(proj(resolve(ProgrammeAllocationSet(; slv = slv, l2c = 0.7), 3))) <=
+                  0.7 * (1 + 1e-6)
+            @test norm(proj(resolve(ProgrammeAllocationSet(; slv = slv,
+                                                           lpc = LpRegularisation(; p = 3,
+                                                                                  val = 0.6)),
+                                    3)), 3) <= 0.6 * (1 + 1e-6)
+            # The return floor: the prior's expected return of the answer meets the number.
+            mu = vec(mean(R; dims = 1))
+            lb = 0.5 * (maximum(mu) + dot(free, mu))
+            wret = proj(resolve(ProgrammeAllocationSet(; slv = slv,
+                                                       ret = ArithmeticReturn(;
+                                                                              settings = JuMPReturnsSettings(;
+                                                                                                             lb = lb))),
+                                3))
+            @test dot(wret, mu) >= lb * (1 - 1e-6)
+            @test !isapprox(wret, free; atol = 1e-4)
+        end
+        @testset "The penalties, the custom terms and the phylogeny kinds" begin
+            # An l2 penalty pulls toward uniform; an l1 penalty is a constant on the
+            # long-only simplex.
+            wl2 = proj(resolve(ProgrammeAllocationSet(; slv = slv,
+                                                      l2 = L2Regularisation(; val = 0.5)),
+                               3))
+            @test maximum(wl2) < maximum(free) && minimum(wl2) > minimum(free)
+            @test sum(wl2) ≈ 1 atol = 1e-8
+            @test isapprox(proj(resolve(ProgrammeAllocationSet(; slv = slv, l1 = 0.3), 3)),
+                           free; atol = 1e-5)
+            @test !isapprox(proj(resolve(ProgrammeAllocationSet(; slv = slv,
+                                                                lp = LpRegularisation(;
+                                                                                      p = 3,
+                                                                                      val = 0.5)),
+                                         3)), free; atol = 1e-4)
+            @test !isapprox(proj(resolve(ProgrammeAllocationSet(; slv = slv, linf = 0.5),
+                                         3)), free; atol = 1e-4)
+            # A custom constraint and a custom objective term, the set as their owner.
+            wcc = proj(resolve(ProgrammeAllocationSet(; slv = slv, ccnt = FirstAtMost(0.1)),
+                               3))
+            @test wcc[1] <= 0.1 + 1e-6
+            wco = proj(resolve(ProgrammeAllocationSet(; slv = slv, cobj = FirstCosts(0.2)),
+                               3))
+            @test wco[1] < free[1] && sum(wco) ≈ 1
+            # Centrality rows fitted on the rows.
+            wce = proj(resolve(ProgrammeAllocationSet(; slv = slv,
+                                                      cte = CentralityConstraint(; B = 0.3,
+                                                                                 comp = <=)),
+                               3))
+            @test sum(wce) ≈ 1 atol = 1e-8
+            # The integer phylogeny: at most one asset per linked pair.
+            wip = inside(() -> po.project(EuclideanProjection(),
+                                          resolve(ProgrammeAllocationSet(; slv = mip,
+                                                                         ple = IntegerPhylogenyEstimator(;
+                                                                                                         pl = NetworkEstimator(),
+                                                                                                         B = 1)),
+                                                  3), q3, w3))
+            @test count(x -> x > 1e-6, wip) <= 2
+            # The semidefinite phylogeny: the lifted `W` and its rows on the projection,
+            # pinned by the penalty, and the variance ceiling under it takes the
+            # semidefinite form.
+            sdp = SemiDefinitePhylogenyEstimator(; pl = ClustersEstimator(), p = 10.0)
+            m = JuMP.Model()
+            po.set_model_scales!(m, 1, 1)
+            po.set_model_observations!(m, T)
+            JuMP.@expression(m, k, 1)
+            JuMP.@variable(m, w[1:3])
+            inside(() -> po.set_allocation_set_constraints!(m,
+                                                            resolve(ProgrammeAllocationSet(;
+                                                                                           slv = slv,
+                                                                                           ple = sdp),
+                                                                    3), w3, R))
+            @test haskey(m, :W) && haskey(m, :sdp_plg_1) && haskey(m, :op)
+            # With every pair linked `W` is diagonal and `p · tr(W) = p (Σ|w|)²`, a constant
+            # on the long-only simplex as `‖w‖₁` is: the step is the free one. A phylogeny
+            # that links one pair pins `W₁₂` alone, and the penalty then prices holding
+            # both, so the smaller leg shrinks.
+            wsdp = proj(resolve(ProgrammeAllocationSet(; slv = slv, ple = sdp), 3))
+            @test isapprox(wsdp, free; atol = 1e-5)
+            wpair = proj(resolve(ProgrammeAllocationSet(; slv = slv,
+                                                        ple = po.SemiDefinitePhylogeny(;
+                                                                                       A = [0 1 0;
+                                                                                            1 0 0;
+                                                                                            0 0 0],
+                                                                                       p = 10.0)),
+                                 3))
+            @test sum(wpair) ≈ 1 atol = 1e-6
+            @test wpair[2] < free[2] - 1e-3
+            m2 = JuMP.Model()
+            po.set_model_scales!(m2, 1, 1)
+            po.set_model_observations!(m2, 0)
+            JuMP.@expression(m2, k, 1)
+            JuMP.@variable(m2, w[1:3])
+            po.set_allocation_set_constraints!(m2,
+                                               resolve(ProgrammeAllocationSet(; slv = slv,
+                                                                              r = Variance(;
+                                                                                           sigma = cov(R),
+                                                                                           settings = ub_of(1e-3)),
+                                                                              ple = po.SemiDefinitePhylogeny(;
+                                                                                                             A = [0 1 0;
+                                                                                                                  1 0 0;
+                                                                                                                  0 0 0],
+                                                                                                             p = 10.0)),
+                                                       3), w3, nothing)
+            @test haskey(m2, :W) &&
+                  haskey(m2, :set_risk_sdp_1) &&
+                  !haskey(m2, :set_risk_soc_1)
+            # A Variance with risk-contribution rows reads the rows and builds through the
+            # shared semidefinite builder.
+            rcv = Variance(; rc = LinearConstraintEstimator(; val = :(A <= 0.5)),
+                           settings = ub_of(1e-3))
+            @test isnothing(po.rows_needed(ProgrammeAllocationSet(; slv = slv, r = rcv,
+                                                                  sets = sets3)))
+            wrc = proj(resolve(ProgrammeAllocationSet(; slv = slv, r = rcv, sets = sets3),
+                               3))
+            @test sum(wrc) ≈ 1 atol = 1e-6
+            # An exposure row through pinned loadings: the rows carry no factor returns.
+            M = [1.0 0.0 0.2; 0.5 0.5 0.0; 0.0 1.0 0.7]
+            ece = ExposureConstraintEstimator(;
+                                              lce = LinearConstraintEstimator(;
+                                                                              val = "MTUM <= 0.3"),
+                                              space = FactorSpace(;
+                                                                  re = Regression(; M = M)))
+            eset = ProgrammeAllocationSet(; slv = slv, sets = sets3, lcse = ece)
+            @test isnothing(po.rows_needed(eset))
+            @test po.exposure_keyed(eset.lcse) && !po.exposure_keyed(nothing)
+            wex = proj(resolve(eset, 3))
+            @test dot(M[:, 1], wex) <= 0.3 + 1e-6
+            @test !isapprox(wex, free; atol = 1e-4)
+        end
+        @testset "The order and the leader's arm" begin
+            # The bare model names its entries as a head's model does, and the builders
+            # ran in the head's order: the tracking term precedes the risk ceiling.
+            m = JuMP.Model()
+            po.set_model_scales!(m, 1, 1)
+            po.set_model_observations!(m, T)
+            JuMP.@expression(m, k, 1)
+            JuMP.@variable(m, w[1:3])
+            inside(() -> po.set_allocation_set_constraints!(m,
+                                                            resolve(ProgrammeAllocationSet(;
+                                                                                           slv = slv,
+                                                                                           tn = tn3(0.1),
+                                                                                           tr = TrackingError(;
+                                                                                                              tr = WeightsTracking(;
+                                                                                                                                   w = w3),
+                                                                                                              err = 0.01),
+                                                                                           r = cvar,
+                                                                                           l2c = 0.9,
+                                                                                           l1 = 0.1),
+                                                                    3), w3, R))
+            @test haskey(m, :tn_1) && haskey(m, :t_tr_1) && haskey(m, :cvar_risk_1_ub)
+            @test haskey(m, :t_l1) && haskey(m, :op)
+            # Variables are indexed in the order they were created: the tracking term's
+            # precedes the ceiling's.
+            vidx(v::JuMP.VariableRef) = JuMP.index(v).value
+            vidx(v::AbstractArray) = vidx(first(v))
+            @test vidx(m[:t_tn_1]) < vidx(m[:t_tr_1]) < vidx(m[:t_l1]) < vidx(m[:var_1])
+            # The leader's arm writes the same kinds beside the head's own, under the
+            # `:aset_` prefix where a builder takes one and at free indices otherwise.
+            rd = ReturnsResult(; nx = ["A", "B", "C"], X = R,
+                               ts = Date(2020, 1, 1) .+ Day.(0:(T - 1)))
+            lead = FollowTheLeader(;
+                                   opt = MeanRisk(; obj = MaximumReturn(),
+                                                  opt = JuMPOptimiser(;
+                                                                      pe = EmpiricalPrior(),
+                                                                      slv = slv,
+                                                                      tn = tn3(0.5),
+                                                                      ret = LogarithmicReturn())))
+            aset = ProgrammeAllocationSet(; slv = slv, tn = tn3(0.5),
+                                          tr = TrackingError(;
+                                                             tr = ReturnsTracking(;
+                                                                                  w = R *
+                                                                                      [0.2,
+                                                                                       0.3,
+                                                                                       0.5]),
+                                                             err = 0.003),
+                                          r = ConditionalValueatRisk(;
+                                                                     settings = ub_of(0.03)),
+                                          wb = WeightBounds(; lb = -0.2, ub = 1),
+                                          gbgt = BudgetRange(; lb = nothing, ub = 1.2),
+                                          l2 = L2Regularisation(; val = 0.1),
+                                          ple = SemiDefinitePhylogenyEstimator(;
+                                                                               pl = ClustersEstimator(),
+                                                                               p = 10.0))
+            lres = optimise(OPS(; alg = lead, set = aset), rd)
+            @test isa(lres.retcode, OptimisationSuccess)
+            @test isnothing(lres.retcode.res)
+            @test expected_risk(cvar, lres.w, R) <= 0.03 * (1 + 1e-4)
+            @test sum(abs, lres.w) <= 1.2 * (1 + 1e-6)
+            @test sqrt(sum(abs2, R * lres.w - R * [0.2, 0.3, 0.5]) / (T - 1)) <=
+                  0.003 * (1 + 1e-4)
+            # A benchmark series over the fold is cut to the rows folded so far.
+            cut = po.prefix_tracking_benchmark(TrackingError(;
+                                                             tr = ReturnsTracking(;
+                                                                                  w = collect(1.0:5.0)),
+                                                             err = 0.1), 3)
+            @test cut.tr.w == [1.0, 2.0, 3.0] && cut.err == 0.1
+            @test po.prefix_tracking_benchmark(nothing, 3) === nothing
+            @test !isapprox(lres.w,
+                            optimise(OPS(; alg = lead,
+                                         set = ProgrammeAllocationSet(; slv = slv)), rd).w;
+                            atol = 1e-3)
+            # A leader that builds its own long and short parts: the set's budgets are
+            # written over them, a floored range included.
+            lsopt = MeanRisk(; obj = MaximumReturn(),
+                             opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
+                                                 wb = WeightBounds(; lb = -1, ub = 1),
+                                                 sbgt = BudgetRange(; lb = nothing,
+                                                                    ub = 0.5),
+                                                 ret = LogarithmicReturn()))
+            lsres = optimise(OPS(; alg = FollowTheLeader(; opt = lsopt),
+                                 set = ProgrammeAllocationSet(; slv = slv,
+                                                              wb = WeightBounds(; lb = -1,
+                                                                                ub = 1),
+                                                              sbgt = BudgetRange(;
+                                                                                 lb = 0.05,
+                                                                                 ub = 0.2))),
+                             rd)
+            @test isa(lsres.retcode, OptimisationSuccess) && isnothing(lsres.retcode.res)
+            short = sum(x -> max(-x, 0), lsres.w)
+            @test 0.05 * (1 - 1e-4) <= short <= 0.2 * (1 + 1e-4)
+        end
+    end
     @testset "Docs and the search seam" begin
         @test occursin("Held Step", string(@doc(po.HeldStep)))
         @test occursin("per-asset", string(@doc(ProgrammeAllocationSet)))
         @test occursin("before", string(@doc(NewtonStep)))
         @test occursin("K + 1", string(@doc(ExpertMixture)))
         io = IOBuffer()
-        show(io, MIME"text/plain"(), ProgrammeAllocationSet(; slv = slv, tn = 0.1))
+        show(io, MIME"text/plain"(),
+             ProgrammeAllocationSet(; slv = slv, tn = Turnover(; w = zeros(3), val = 0.1)))
         @test occursin("ProgrammeAllocationSet", String(take!(io)))
     end
 end

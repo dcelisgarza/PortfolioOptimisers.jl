@@ -288,7 +288,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         #    rows whose leader is the second asset, the constrained leader sits at the
         #    ceiling, [0.55, 0.45, 0], the mix [0.525, 0.475, 0] does not, and the second
         #    projection repairs it.
-        tset = resolve(ProgrammeAllocationSet(; slv = slv, tn = 0.2), 3)
+        tset = resolve(ProgrammeAllocationSet(; slv = slv,
+                                              tn = Turnover(; w = zeros(3), val = 0.2)), 3)
         wt = [0.5, 0.5, 0.0]
         xt = [1.5, 0.5, 1.0]
         book = wt .* xt ./ dot(wt, xt)
@@ -345,7 +346,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         # constraint, a variance ceiling read on the head's rows, a tracking error in
         # every norm, and a turnover beside the head's own turnover, at a free index.
         lset = ProgrammeAllocationSet(; slv = slv,
-                                      lcs = LinearConstraintEstimator(; val = :(A <= 0.3)),
+                                      lcse = LinearConstraintEstimator(; val = :(A <= 0.3)),
                                       sets = UniverseSets(;
                                                           dict = Dict("nx" =>
                                                                           ["A", "B", "C"])))
@@ -385,7 +386,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         for alg in (L1Norm(), L2Norm(), SquaredL2Norm(), LpNorm(; p = 3), LInfNorm())
             eset = ProgrammeAllocationSet(; slv = slv,
                                           tr = TrackingError(; err = 1e-6, alg = alg,
-                                                             tr = WeightsTracking(; w = b3)))
+                                                             tr = WeightsTracking(; w = b3,
+                                                                                  fixed = true)))
             res_e = optimise(OPS(; alg = FollowTheLeader(; opt = logopt()), set = eset),
                              rd3)
             @test !isa(res_e.retcode.res, po.HeldStep)
@@ -398,7 +400,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         # `factory`: both ceilings hold from the drifted previous target.
         tnopt = logopt(; tn = Turnover(; val = 0.05, w = b3))
         htn = OPS(; alg = FollowTheLeader(; opt = tnopt),
-                  set = ProgrammeAllocationSet(; slv = slv, tn = 0.3))
+                  set = ProgrammeAllocationSet(; slv = slv,
+                                               tn = Turnover(; w = zeros(3), val = 0.3)))
         rtn = optimise(htn, rd3)
         @test !isa(rtn.retcode.res, po.HeldStep)
         prev = optimise(htn, rows(rd3, 1:(T2 - 1))).w

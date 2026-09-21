@@ -307,3 +307,153 @@ function set_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
     end
     return nothing
 end
+"""
+    assert_subgroup_mip_fields(scard, smtx, slt, sst)
+
+Refuses a sub-group MIP field set whose shapes do not agree, at the constructor of every owner that carries the four slots: [`JuMPOptimiser`](@ref) and [`ProgrammeAllocationSet`](@ref).
+
+A `TimeDependent` in any slot is not a term, so the four are left to the per-fold substitution check.
+
+# Validation
+
+  - If `scard` is an `Integer`: `scard > 0` and finite; `smtx` is a matrix or an [`AssetSetsMatrixEstimator`](@ref); `slt` and `sst` are scalar or `nothing`.
+  - If `scard` is a vector: every entry `> 0` and finite; `smtx` is a vector of the same length; a vector `slt` or `sst` is non-empty and of the same length.
+  - If `scard` is `nothing` and `slt` or `sst` is scalar: `smtx` is a matrix or an estimator.
+  - If `scard` is `nothing` and `slt` or `sst` is a vector: `smtx` is a non-empty vector, and each vector threshold has its length.
+
+# Related
+
+  - [`set_smip_constraints!`](@ref)
+  - [`assert_subgrouped_mip_fields`](@ref)
+"""
+function assert_subgroup_mip_fields(scard, smtx, slt, sst)::Nothing
+    if any(x -> isa(x, TimeDependent), (scard, smtx, slt, sst))
+        return nothing
+    end
+    if isa(scard, Integer)
+        assert_nonempty_gt0_finite_val(scard, :scard)
+        @argcheck(isa(smtx, MatNum_ASetMatE),
+                  ArgumentError("smtx must be a MatNum_ASetMatE when scard is an Integer, got $(typeof(smtx))"))
+        @argcheck(isa(slt, Option{<:BtE_Bt}),
+                  ArgumentError("slt must be a scalar BtE_Bt or nothing when scard is an Integer, got $(typeof(slt))"))
+        @argcheck(isa(sst, Option{<:BtE_Bt}),
+                  ArgumentError("sst must be a scalar BtE_Bt or nothing when scard is an Integer, got $(typeof(sst))"))
+    elseif isa(scard, VecInt)
+        assert_nonempty_gt0_finite_val(scard, :scard)
+        @argcheck(isa(smtx, AbstractVector),
+                  ArgumentError("smtx must be an AbstractVector when scard is a VecInt, got $(typeof(smtx))"))
+        @argcheck(length(scard) == length(smtx),
+                  DimensionMismatch("scard ($(length(scard))) must match smtx ($(length(smtx)))"))
+        if isa(slt, AbstractVector)
+            @argcheck(!isempty(slt), IsEmptyError("slt cannot be empty"))
+            @argcheck(length(scard) == length(slt),
+                      DimensionMismatch("scard ($(length(scard))) must match slt ($(length(slt)))"))
+        end
+        if isa(sst, AbstractVector)
+            @argcheck(!isempty(sst), IsEmptyError("sst cannot be empty"))
+            @argcheck(length(scard) == length(sst),
+                      DimensionMismatch("scard ($(length(scard))) must match sst ($(length(sst)))"))
+        end
+    elseif isnothing(scard) && (isa(slt, BtE_Bt) || isa(sst, BtE_Bt))
+        @argcheck(isa(smtx, MatNum_ASetMatE),
+                  ArgumentError("smtx must be a MatNum_ASetMatE when slt or sst is a scalar BtE_Bt, got $(typeof(smtx))"))
+    elseif isnothing(scard) && (isa(slt, AbstractVector) || isa(sst, AbstractVector))
+        @argcheck(isa(smtx, AbstractVector),
+                  ArgumentError("smtx must be an AbstractVector when slt or sst is a vector, got $(typeof(smtx))"))
+        @argcheck(!isempty(smtx), IsEmptyError("smtx cannot be empty"))
+        if isa(slt, AbstractVector)
+            @argcheck(!isempty(slt), IsEmptyError("slt cannot be empty"))
+            @argcheck(length(slt) == length(smtx),
+                      DimensionMismatch("slt ($(length(slt))) must match smtx ($(length(smtx)))"))
+        end
+        if isa(sst, AbstractVector)
+            @argcheck(!isempty(sst), IsEmptyError("sst cannot be empty"))
+            @argcheck(length(sst) == length(smtx),
+                      DimensionMismatch("sst ($(length(sst))) must match smtx ($(length(smtx)))"))
+        end
+    end
+    return nothing
+end
+"""
+    assert_subgrouped_mip_fields(sgcarde, sgmtx, sglt, sgst)
+
+Refuses a sub-grouped cardinality field set whose shapes do not agree, at the constructor of every owner that carries the four slots: [`JuMPOptimiser`](@ref) and [`ProgrammeAllocationSet`](@ref). The builder pairs `sgcarde` with `sgmtx`, so a precomputed [`LinearConstraint`](@ref) is checked against the rows of `sgmtx`.
+
+A `TimeDependent` in any slot is not a term, so the four are left to the per-fold substitution check.
+
+# Validation
+
+  - If `sgcarde` is scalar: `sgmtx` is a matrix or an estimator; `sglt` and `sgst` are scalar or `nothing`; a [`LinearConstraint`](@ref) against a matrix `sgmtx` has as many rows as `sgmtx`.
+  - If `sgcarde` is a vector: non-empty; `sgmtx` a non-empty vector of the same length; a vector `sglt` or `sgst` non-empty and of the same length; each precomputed pair agrees in rows.
+  - If `sgcarde` is `nothing` and `sglt` or `sgst` is scalar: `sgmtx` is a matrix or an estimator.
+  - If `sgcarde` is `nothing` and `sglt` or `sgst` is a vector: `sgmtx` is a non-empty vector, and each vector threshold has its length.
+
+# Related
+
+  - [`set_smip_constraints!`](@ref)
+  - [`assert_subgroup_mip_fields`](@ref)
+"""
+function assert_subgrouped_mip_fields(sgcarde, sgmtx, sglt, sgst)::Nothing
+    if any(x -> isa(x, TimeDependent), (sgcarde, sgmtx, sglt, sgst))
+        return nothing
+    end
+    if isa(sgcarde, LcE_Lc)
+        @argcheck(isa(sgmtx, MatNum_ASetMatE),
+                  ArgumentError("sgmtx must be a MatNum_ASetMatE when sgcarde is a scalar LcE_Lc, got $(typeof(sgmtx))"))
+        @argcheck(isa(sglt, Option{<:BtE_Bt}),
+                  ArgumentError("sglt must be a scalar BtE_Bt or nothing when sgcarde is a scalar LcE_Lc, got $(typeof(sglt))"))
+        @argcheck(isa(sgst, Option{<:BtE_Bt}),
+                  ArgumentError("sgst must be a scalar BtE_Bt or nothing when sgcarde is a scalar LcE_Lc, got $(typeof(sgst))"))
+        if isa(sgcarde, LinearConstraint) && isa(sgmtx, MatNum)
+            N = size(sgmtx, 1)
+            N_ineq = !isnothing(sgcarde.ineq) ? length(sgcarde.B_ineq) : 0
+            N_eq = !isnothing(sgcarde.eq) ? length(sgcarde.B_eq) : 0
+            @argcheck(N == N_ineq + N_eq,
+                      DimensionMismatch("sgmtx rows ($N) must equal N_ineq + N_eq ($(N_ineq + N_eq))"))
+        end
+    elseif isa(sgcarde, AbstractVector)
+        @argcheck(!isempty(sgcarde), IsEmptyError("sgcarde cannot be empty"))
+        @argcheck(isa(sgmtx, AbstractVector),
+                  ArgumentError("sgmtx must be an AbstractVector when sgcarde is a vector, got $(typeof(sgmtx))"))
+        @argcheck(!isempty(sgmtx), IsEmptyError("sgmtx cannot be empty"))
+        @argcheck(length(sgcarde) == length(sgmtx),
+                  DimensionMismatch("sgcarde ($(length(sgcarde))) must match sgmtx ($(length(sgmtx)))"))
+        if isa(sglt, AbstractVector)
+            @argcheck(!isempty(sglt), IsEmptyError("sglt cannot be empty"))
+            @argcheck(length(sgcarde) == length(sglt),
+                      DimensionMismatch("sgcarde ($(length(sgcarde))) must match sglt ($(length(sglt)))"))
+        end
+        if isa(sgst, AbstractVector)
+            @argcheck(!isempty(sgst), IsEmptyError("sgst cannot be empty"))
+            @argcheck(length(sgcarde) == length(sgst),
+                      DimensionMismatch("sgcarde ($(length(sgcarde))) must match sgst ($(length(sgst)))"))
+        end
+        for (sgc, smt) in zip(sgcarde, sgmtx)
+            if isa(sgc, LinearConstraint) && isa(smt, MatNum)
+                N = size(smt, 1)
+                N_ineq = !isnothing(sgc.ineq) ? length(sgc.B_ineq) : 0
+                N_eq = !isnothing(sgc.eq) ? length(sgc.B_eq) : 0
+                @argcheck(N == N_ineq + N_eq,
+                          DimensionMismatch("smt rows ($N) must equal N_ineq + N_eq ($(N_ineq + N_eq))"))
+            end
+        end
+    elseif isnothing(sgcarde) && (isa(sglt, BtE_Bt) || isa(sgst, BtE_Bt))
+        @argcheck(isa(sgmtx, MatNum_ASetMatE),
+                  ArgumentError("sgmtx must be a MatNum_ASetMatE when sglt or sgst is a scalar BtE_Bt, got $(typeof(sgmtx))"))
+    elseif isnothing(sgcarde) && (isa(sglt, AbstractVector) || isa(sgst, AbstractVector))
+        @argcheck(isa(sgmtx, AbstractVector),
+                  ArgumentError("sgmtx must be an AbstractVector when sglt or sgst is a vector, got $(typeof(sgmtx))"))
+        @argcheck(!isempty(sgmtx), IsEmptyError("sgmtx cannot be empty"))
+        if isa(sglt, AbstractVector)
+            @argcheck(!isempty(sglt), IsEmptyError("sglt cannot be empty"))
+            @argcheck(length(sglt) == length(sgmtx),
+                      DimensionMismatch("sglt ($(length(sglt))) must match sgmtx ($(length(sgmtx)))"))
+        end
+        if isa(sgst, AbstractVector)
+            @argcheck(!isempty(sgst), IsEmptyError("sgst cannot be empty"))
+            @argcheck(length(sgst) == length(sgmtx),
+                      DimensionMismatch("sgst ($(length(sgst))) must match sgmtx ($(length(sgmtx)))"))
+        end
+    end
+    return nothing
+end
