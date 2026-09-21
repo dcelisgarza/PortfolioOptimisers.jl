@@ -1513,23 +1513,6 @@ function held_path_turnover(pred::MultiPeriodPredictionResult)
     return sum(sum(abs, view(W0, f, :) - view(W1, f - 1, :)) for f in 2:F) / (F - 1)
 end
 """
-    resolve_turnover(turnover::Nothing, x::Number)
-    resolve_turnover(turnover::Number, x::Number)
-
-The turnover a summary writes: the number a caller read off a weight path, or `NaN` in the number type of `x` when the caller holds none.
-
-# Related
-
-  - [`summarise_returns`](@ref)
-  - [`held_path_turnover`](@ref)
-"""
-function resolve_turnover(::Nothing, x::Number)
-    return oftype(x, NaN)
-end
-function resolve_turnover(turnover::Number, ::Number)
-    return turnover
-end
-"""
     summarise_returns(ret::VecNum, turnover::Option{<:Number}; periods_per_year::Number = 252,
                       alpha::Number = 0.05, compound::Bool = false,
                       benchmark::Option{<:VecNum} = nothing) -> PerformanceSummaryResult
@@ -1590,7 +1573,7 @@ function summarise_returns(ret::VecNum, turnover::Option{<:Number};
     return PerformanceSummaryResult(T, ann, alpha, compound, ann_ret, ann_vol, sharpe,
                                     sharpe_se, sortino, calmar, max_dd, cvar_val,
                                     excess_ret, tracking_error, information_ratio,
-                                    resolve_turnover(turnover, ann_ret))
+                                    isnothing(turnover) ? oftype(ann_ret, NaN) : turnover)
 end
 function performance_summary(w::ArrNum, X::MatNum, fees::Option{<:Fees} = nothing;
                              kwargs...)::PerformanceSummaryResult

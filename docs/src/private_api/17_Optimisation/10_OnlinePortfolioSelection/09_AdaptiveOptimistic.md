@@ -1,12 +1,11 @@
 ```@meta
-Description = "Online selection rules: the adaptive subgradient and the optimistic step, private API of PortfolioOptimisers.jl: diagonal_geometry, assert_diagonal_bound, …"
+Description = "Online selection rules: the adaptive subgradient and the optimistic step, private API of PortfolioOptimisers.jl: DiagonalProjection, AdaptiveSubgradientState, …"
 ```
 
 # Online selection rules: the adaptive subgradient and the optimistic step: private API
 
 ```@docs
-PortfolioOptimisers.diagonal_geometry
-PortfolioOptimisers.assert_diagonal_bound
+PortfolioOptimisers.DiagonalProjection
 PortfolioOptimisers.AdaptiveSubgradientState
 PortfolioOptimisers.predictor_state_view
 PortfolioOptimisers.copy_predictor_state

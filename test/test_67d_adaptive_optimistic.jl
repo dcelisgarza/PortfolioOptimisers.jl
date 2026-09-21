@@ -68,11 +68,11 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
 
     @testset "Construction and the refusals" begin
         ag = AdaptiveSubgradient()
-        @test ag.eta == 1 / sqrt(2) && ag.delta == 0 && isa(ag.proj, DiagonalProjection)
-        @test isnothing(ag.proj.h) && isa(ag.obj, LogWealth)
+        @test ag.eta == 1 / sqrt(2) && ag.delta == 0 && isa(ag.obj, LogWealth)
         @test_throws DomainError AdaptiveSubgradient(; eta = 0)
         @test_throws DomainError AdaptiveSubgradient(; delta = -0.1)
-        @test_throws TypeError AdaptiveSubgradient(; proj = EuclideanProjection())
+        # The rule builds its geometry at the step (ADR 0168): no `proj` slot to fill.
+        @test_throws MethodError AdaptiveSubgradient(; proj = EuclideanProjection())
         # The objective slot is the first-order rule's: a Risk Loss reads the head's rows.
         @test po.rows_needed(AdaptiveSubgradient(; obj = RiskLoss(; window = 5))) == 5
         @test po.rows_needed(OptimisticStep(;
@@ -80,9 +80,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
                                                                      obj = RiskLoss(;
                                                                                     window = 6)))) ==
               6
-        @test_throws DomainError DiagonalProjection(; h = [1.0, 0.0])
-        @test_throws ArgumentError po.project(DiagonalProjection(), simplex2, [0.6, 0.4],
-                                              [0.5, 0.5])
+        @test_throws DomainError po.DiagonalProjection([1.0, 0.0])
+        @test_throws MethodError po.DiagonalProjection()
         @test po.projection_geometry(ag) == EuclideanProjection()
         os = OptimisticStep()
         @test isa(os.alg, MirrorDescent) && isa(os.predictor, LastGradient)
@@ -129,7 +128,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
                 @test isapprox(e, qp_projection(q, ones(5), lb, ub); atol = 1e-7)
                 set = resolve(BoundedAllocationSet(; wb = wb), 5)
                 @test po.project(EuclideanProjection(), set, q, q) ≈ e
-                @test po.project(DiagonalProjection(; h = h), set, q, q) == w
+                @test po.project(po.DiagonalProjection(h), set, q, q) == w
             end
             @test isapprox(po.bounded_quadratic_projection(q,
                                                            WeightBounds(; lb = zeros(5),
@@ -218,8 +217,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
                                               wb = WeightBounds(; lb = 0.05, ub = 0.4)), N)
         h = [1.5, 0.7, 2.0, 1.1]
         q = [0.6, -0.1, 0.4, 0.3]
-        @test isapprox(po.project(DiagonalProjection(; h = h), pset, q, q),
-                       po.project(DiagonalProjection(; h = h), resolve(cap, N), q, q);
+        @test isapprox(po.project(po.DiagonalProjection(h), pset, q, q),
+                       po.project(po.DiagonalProjection(h), resolve(cap, N), q, q);
                        atol = 1e-6)
         r = optimise(OPS(; alg = AdaptiveSubgradient(),
                          set = ProgrammeAllocationSet(; slv = slv, tn = 0.02)),

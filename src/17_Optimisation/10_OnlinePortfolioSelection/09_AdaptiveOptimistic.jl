@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The diagonal Projection Geometry: the raw step is projected onto the Allocation Set in the norm of a positive diagonal matrix, ``\\min \\tfrac{1}{2} (\\boldsymbol{w} - \\boldsymbol{q})^\\intercal \\mathrm{diag}(\\boldsymbol{h}) (\\boldsymbol{w} - \\boldsymbol{q})``.
 
-It is the geometry of the diagonal adaptive subgradient method (Duchi, Hazan and Singer 2011), whose proximal term is ``\\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{w}_t \\rVert^2_{H_t}`` with ``H_t = \\delta I + \\mathrm{diag}(\\boldsymbol{s}_t)`` the accrued gradient mass. The weight vector is the rule's: [`AdaptiveSubgradient`](@ref) binds its carrier's ``\\boldsymbol{h}_t`` onto the geometry's `h` slot at every step through [`diagonal_geometry`](@ref), as [`NewtonStep`](@ref) binds its Gram matrix onto [`GramProjection`](@ref), and a geometry with no weights bound refuses to project. [`EuclideanProjection`](@ref) is the case ``\\boldsymbol{h} = \\boldsymbol{1}``: on a [`BoundedAllocationSet`](@ref) the projection is the weighted scalar root ``w_i = \\mathrm{clip}(q_i - \\theta / h_i, lb_i, ub_i)`` with ``\\theta`` the budget's root, which shares its bisection with the Euclidean one ([`bounded_quadratic_projection`](@ref)) and costs what it costs; on a [`ProgrammeAllocationSet`](@ref) it is the weighted quadratic programme through a second-order cone, on the set's solver. The Start Allocation is projected before any gradient is seen, where no mass has accrued, so [`projection_geometry`](@ref) answers [`EuclideanProjection`](@ref) for it. A negative lower bound is admitted, as under the Euclidean geometry.
+It is the geometry of the diagonal adaptive subgradient method (Duchi, Hazan and Singer 2011), whose proximal term is ``\\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{w}_t \\rVert^2_{H_t}`` with ``H_t = \\delta I + \\mathrm{diag}(\\boldsymbol{s}_t)`` the accrued gradient mass. The weight vector is the rule's: [`AdaptiveSubgradient`](@ref) constructs the geometry from its carrier's ``\\boldsymbol{h}_t`` at every step, as [`NewtonStep`](@ref) binds its Gram matrix onto [`GramProjection`](@ref). [`EuclideanProjection`](@ref) is the case ``\\boldsymbol{h} = \\boldsymbol{1}``: on a [`BoundedAllocationSet`](@ref) the projection is the weighted scalar root ``w_i = \\mathrm{clip}(q_i - \\theta / h_i, lb_i, ub_i)`` with ``\\theta`` the budget's root, which shares its bisection with the Euclidean one ([`bounded_quadratic_projection`](@ref)) and costs what it costs; on a [`ProgrammeAllocationSet`](@ref) it is the weighted quadratic programme through a second-order cone, on the set's solver. The Start Allocation is projected before any gradient is seen, where no mass has accrued, so [`projection_geometry`](@ref) answers [`EuclideanProjection`](@ref) for it. A negative lower bound is admitted, as under the Euclidean geometry.
 
 # Fields
 
@@ -11,22 +11,20 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    DiagonalProjection(;
-        h::Option{<:AbstractVector} = nothing
-    ) -> DiagonalProjection
+    DiagonalProjection(h::AbstractVector) -> DiagonalProjection
 
-Keywords correspond to the struct's fields. `h` is bound by the rule, never by the caller.
+The positional argument is the struct's field. The rule constructs the geometry at each step; a caller never holds one.
 
 ## Validation
 
-  - If `h` is given: `all(> 0, h)`. A `DomainError` is thrown otherwise.
+  - `all(> 0, h)`. A `DomainError` is thrown otherwise.
 
 # Examples
 
 ```jldoctest
-julia> DiagonalProjection()
+julia> PortfolioOptimisers.DiagonalProjection([1.0, 2.0])
 DiagonalProjection
-  h ┴ nothing
+  h ┴ Vector{Float64}: [1.0, 2.0]
 ```
 
 # Related
@@ -35,67 +33,27 @@ DiagonalProjection
   - [`EuclideanProjection`](@ref)
   - [`AdaptiveSubgradient`](@ref)
   - [`project`](@ref)
-  - [`diagonal_geometry`](@ref)
 
 # References
 
   - $(ref_dict[:duchi2011])
 """
-struct DiagonalProjection{T1 <: Option{<:AbstractVector}} <: AbstractProjectionGeometry
+struct DiagonalProjection{T1 <: AbstractVector} <: AbstractProjectionGeometry
     """
-    The diagonal of the norm the projection is taken in, bound by the rule at each step, or `nothing` before the rule binds one.
+    The diagonal of the norm the projection is taken in, the rule's accrued gradient mass at the step.
     """
     h::T1
-    function DiagonalProjection(h::Option{<:AbstractVector})
-        if !isnothing(h)
-            @argcheck(all(x -> x > zero(x), h),
-                      DomainError(h,
-                                  "the diagonal of the projection norm must be positive"))
-        end
+    function DiagonalProjection(h::AbstractVector)
+        @argcheck(all(x -> x > zero(x), h),
+                  DomainError(h, "the diagonal of the projection norm must be positive"))
         return new{typeof(h)}(h)
     end
-end
-function DiagonalProjection(; h::Option{<:AbstractVector} = nothing)::DiagonalProjection
-    return DiagonalProjection(h)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-The geometry an adaptive rule projects in at this step: a [`DiagonalProjection`](@ref) with the rule's current weight vector bound onto its `h` slot.
-
-# Related
-
-  - [`DiagonalProjection`](@ref)
-  - [`AdaptiveSubgradient`](@ref)
-  - [`gram_geometry`](@ref)
-"""
-function diagonal_geometry(::DiagonalProjection, h::AbstractVector)
-    return DiagonalProjection(; h = h)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Refuses a [`DiagonalProjection`](@ref) with no weight vector bound: it is the rule's geometry, not a caller's.
-
-# Related
-
-  - [`DiagonalProjection`](@ref)
-  - [`project`](@ref)
-"""
-function assert_diagonal_bound(proj::DiagonalProjection)::Nothing
-    @argcheck(!isnothing(proj.h),
-              ArgumentError("a DiagonalProjection projects in the norm of a diagonal the rule binds at each step, and this one has none bound: it is the rule's geometry, not a caller's."))
-    return nothing
 end
 """
     project(proj::DiagonalProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
     project(proj::DiagonalProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
 
 The diagonal arms of the Constrained Update: the weighted scalar root of [`bounded_quadratic_projection`](@ref) on the bounded set, on every bound, the simplex included, because the weights break the sort; and the bare-model programme of [`projection_programme`](@ref) on the programme set.
-
-# Validation
-
-  - `proj.h` is not `nothing`. An `ArgumentError` is thrown otherwise.
 
 # Related
 
@@ -106,17 +64,14 @@ The diagonal arms of the Constrained Update: the weighted scalar root of [`bound
 """
 function project(proj::DiagonalProjection, set::BoundedAllocationSet, q::AbstractVector,
                  ::AbstractVector)
-    assert_diagonal_bound(proj)
     return bounded_quadratic_projection(q, set.wb, proj.h)
 end
 function project(proj::DiagonalProjection, set::ProgrammeAllocationSet, q::AbstractVector,
                  w::AbstractVector)
-    assert_diagonal_bound(proj)
     return projection_programme(proj, set, q, w)
 end
 function set_projection_objective!(model::JuMP.Model, proj::DiagonalProjection,
                                    q::AbstractVector)::Nothing
-    assert_diagonal_bound(proj)
     w = get_w(model)
     sc = get_constraint_scale(model)
     so = get_objective_scale(model)
@@ -177,7 +132,7 @@ H_t = \\delta I + \\mathrm{diag}(\\boldsymbol{s}_t)\\,,\\\\
 \\end{align}
 ```
 
-the raw step ``\\boldsymbol{w}_t + \\eta \\boldsymbol{x}_t / (\\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle (\\delta + \\boldsymbol{s}_t))`` followed by the projection onto the Allocation Set **in the norm of ``H_t``**, the [`DiagonalProjection`](@ref) the rule binds its weights onto at every step. The regret is ``O(\\sum_i \\lVert \\boldsymbol{g}_{1:T, i} \\rVert_2)`` (Corollary 6 at ``\\eta = 1 / \\sqrt{2}`` on a set of ``\\ell_\\infty`` diameter one), small when the gradients are sparse or a few assets carry most of their mass, and never worse than online gradient descent's ``O(\\sqrt{T N})`` by more than a constant. The rule is [`NewtonStep`](@ref) one rank down: the full-matrix variant of the paper is the Newton carrier under a square root, and the diagonal keeps the step at ``O(N)``.
+the raw step ``\\boldsymbol{w}_t + \\eta \\boldsymbol{x}_t / (\\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle (\\delta + \\boldsymbol{s}_t))`` followed by the projection onto the Allocation Set **in the norm of ``H_t``**, the [`DiagonalProjection`](@ref) the rule constructs from its accrued gradient mass at every step. The regret is ``O(\\sum_i \\lVert \\boldsymbol{g}_{1:T, i} \\rVert_2)`` (Corollary 6 at ``\\eta = 1 / \\sqrt{2}`` on a set of ``\\ell_\\infty`` diameter one), small when the gradients are sparse or a few assets carry most of their mass, and never worse than online gradient descent's ``O(\\sqrt{T N})`` by more than a constant. The rule is [`NewtonStep`](@ref) one rank down: the full-matrix variant of the paper is the Newton carrier under a square root, and the diagonal keeps the step at ``O(N)``.
 
 The per-coordinate normalisation cancels the first gradient exactly, so the first raw step is a uniform shift of the Start Allocation; the projection in the norm of ``H_1 = \\delta I + \\mathrm{diag}(\\lvert \\boldsymbol{g}_1 \\rvert)`` then lets the assets with the smaller gradient absorb more of the shift back, so the first step moves weight toward the assets that rose the most, and is a no-op only when every price relative is equal. At `delta = 0`, the paper's default, the projection's diagonal is the gradient mass alone, which is positive from the first row in every asset whose price relative is positive; a price relative of zero in an asset that has never moved gives that asset no mass, and the projection refuses it. A zero gradient — a [`RiskLoss`](@ref) while the head holds fewer than two rows — is a zero step: no mass accrues, and the iterate is projected in the Euclidean geometry, as the zero step of every first-order rule is.
 
@@ -190,11 +145,10 @@ $(DocStringExtensions.FIELDS)
     AdaptiveSubgradient(;
         eta::Real = 1 / sqrt(2),
         delta::Real = 0,
-        proj::DiagonalProjection = DiagonalProjection(),
         obj::AbstractOnlineObjective = LogWealth()
     ) -> AdaptiveSubgradient
 
-Keywords correspond to the struct's fields. The defaults are the paper's, and the `proj` slot is bound to the rule's own geometry. `obj` is the slot of [`MirrorDescent`](@ref): log wealth, or a [`RiskLoss`](@ref) over the head's rows, whose gradient [`loss_gradient`](@ref) answers at the iterate; the rule's `rows_needed` is the objective's.
+Keywords correspond to the struct's fields. The defaults are the paper's. The rule projects in its own geometry, a [`DiagonalProjection`](@ref) it constructs at each step, so it holds no `proj` slot. `obj` is the slot of [`MirrorDescent`](@ref): log wealth, or a [`RiskLoss`](@ref) over the head's rows, whose gradient [`loss_gradient`](@ref) answers at the iterate; the rule's `rows_needed` is the objective's.
 
 ## Validation
 
@@ -207,8 +161,6 @@ julia> AdaptiveSubgradient()
 AdaptiveSubgradient
     eta ┼ Float64: 0.7071067811865475
   delta ┼ Int64: 0
-   proj ┼ DiagonalProjection
-        │   h ┴ nothing
     obj ┴ LogWealth()
 ```
 
@@ -225,8 +177,7 @@ AdaptiveSubgradient
 
   - $(ref_dict[:duchi2011])
 """
-struct AdaptiveSubgradient{T1 <: Real, T2 <: Real, T3 <: DiagonalProjection,
-                           T4 <: AbstractOnlineObjective} <:
+struct AdaptiveSubgradient{T1 <: Real, T2 <: Real, T3 <: AbstractOnlineObjective} <:
        AbstractOnlinePortfolioSelectionAlgorithm
     """
     Learning rate. Larger reacts faster and is less stable.
@@ -237,25 +188,18 @@ struct AdaptiveSubgradient{T1 <: Real, T2 <: Real, T3 <: DiagonalProjection,
     """
     delta::T2
     """
-    $(field_dict[:proj])
-    """
-    proj::T3
-    """
     The objective the gradient is taken of: log wealth, or a Risk Loss over the head's rows.
     """
-    obj::T4
-    function AdaptiveSubgradient(eta::Real, delta::Real, proj::DiagonalProjection,
-                                 obj::AbstractOnlineObjective)
+    obj::T3
+    function AdaptiveSubgradient(eta::Real, delta::Real, obj::AbstractOnlineObjective)
         @argcheck(eta > zero(eta), DomainError(eta, "eta must be positive"))
         @argcheck(delta >= zero(delta), DomainError(delta, "delta must be non-negative"))
-        return new{typeof(eta), typeof(delta), typeof(proj), typeof(obj)}(eta, delta, proj,
-                                                                          obj)
+        return new{typeof(eta), typeof(delta), typeof(obj)}(eta, delta, obj)
     end
 end
 function AdaptiveSubgradient(; eta::Real = 1 / sqrt(2), delta::Real = 0,
-                             proj::DiagonalProjection = DiagonalProjection(),
                              obj::AbstractOnlineObjective = LogWealth())::AdaptiveSubgradient
-    return AdaptiveSubgradient(eta, delta, proj, obj)
+    return AdaptiveSubgradient(eta, delta, obj)
 end
 function rows_needed(alg::AdaptiveSubgradient)
     return rows_needed(alg.obj)
@@ -289,7 +233,7 @@ function online_update!(alg::AdaptiveSubgradient, st::AdaptiveSubgradientState,
     st.s .= hypot.(st.s, g)
     h = alg.delta .+ st.s
     q = w .- alg.eta .* g ./ h
-    wn = project(diagonal_geometry(alg.proj, h), set, q, wh)
+    wn = project(DiagonalProjection(h), set, q, wh)
     return AdaptiveSubgradientState(st.n + 1, st.s), wn
 end
 """
@@ -852,6 +796,6 @@ function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::Abstrac
     return OptimisticStepState(t, v, u, st.w0, s, res, m, ps),
            iszero(alpha) ? played : reprojection(md.proj, set, played, wh)
 end
-export DiagonalProjection, AdaptiveSubgradient, OptimisticStep, LastGradient, MeanGradient,
-       ForecastGradient, HintResidualRate
+export AdaptiveSubgradient, OptimisticStep, LastGradient, MeanGradient, ForecastGradient,
+       HintResidualRate
 public AbstractGradientPredictor, predictor_state_seed, predict_gradient!
