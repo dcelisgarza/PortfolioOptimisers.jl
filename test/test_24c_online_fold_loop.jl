@@ -1,20 +1,21 @@
 #=
-The fold loop takes the online step, issue #969, against the decision of #870 (ADR 0140).
+The fold loop takes the online step, issue #969, against the decision of #870 (ADR 0140),
+with the declaration moved onto the scheme's type by #1211 (ADR 0167).
 
-A walk-forward declares its Fold Fit in `ff`, and `OnlineStep()` sends `fold_loop` down a
-third arm: warm up once on the first training window, fold each fold's new rows into one
-threaded estimator, and read it out where a refit would have run. Two identities are the
-contract. The expanding one — the map's closing test's first half — says the online run
-reaches the weights of `expand_train = true` fold for fold, over a panel with a listing and a
-delisting, through a JuMP optimiser and a hierarchical one. The capped one says a rolling
-batch scheme equals the online scheme with the prior's buffer capped at the window. Around
-them sit the derivation of `expand_train`, the purge, the refusals, the ordering, and the
-public read-out entry.
+An Online Scheme — `OnlineIndexWalkForward(w, t)`, the walk-forward wrapped in `Online` by its
+function constructor — sends `fold_loop` down a third arm: warm up once on the first training
+window, fold each fold's new rows into one threaded estimator, and read it out where a refit
+would have run. Two identities are the contract. The expanding one — the map's closing test's
+first half — says the online run reaches the weights of `expand_train = true` fold for fold,
+over a panel with a listing and a delisting, through a JuMP optimiser and a hierarchical one.
+The capped one says a rolling batch scheme equals the online scheme with the prior's buffer
+capped at the window. Around them sit the constructors, the purge, the refusals, the
+ordering, and the public read-out entry.
 
 The fixture is synthetic, because the identities are structural and a solver run over eight
 assets is what keeps the JuMP families cheap.
 =#
-@testset "Online fold loop: the walk-forward declares its Fold Fit" begin
+@testset "Online fold loop: the walk-forward wrapped in `Online` steps" begin
     using Test, PortfolioOptimisers, Clarabel, StableRNGs, Statistics, Dates, LinearAlgebra,
           FLoops
     po = PortfolioOptimisers
@@ -50,7 +51,7 @@ assets is what keeps the JuMP families cheap.
         return isa(opt, RiskBudgeting) ? 5e-5 : (solved ? 1e-5 : 1e-10)
     end
     batch_cv = IndexWalkForward(w, t; purged_size = p, expand_train = true)
-    online_cv = IndexWalkForward(w, t; purged_size = p, ff = OnlineStep())
+    online_cv = OnlineIndexWalkForward(w, t; purged_size = p)
 
     @testset "The expanding identity, over a panel with a listing and a delisting" begin
         fams = (mr, RiskBudgeting(; opt = jopt), hrp,
@@ -86,7 +87,7 @@ assets is what keeps the JuMP families cheap.
 
     @testset "The capped identity: a rolling scheme equals an online one with a capped prior" begin
         rolling = IndexWalkForward(w + p, t; purged_size = p)
-        stepped = IndexWalkForward(w + p, t; purged_size = p, ff = OnlineStep())
+        stepped = OnlineIndexWalkForward(w + p, t; purged_size = p)
         @test all(length.(split(rolling, rd).train_idx) .== w)
         for (opt, capped) in ((mr,
                                MeanRisk(;
@@ -107,7 +108,7 @@ assets is what keeps the JuMP families cheap.
 
     @testset "The date form" begin
         bd = DateWalkForward(w, t; period = Day(1), purged_size = p, expand_train = true)
-        od = DateWalkForward(w, t; period = Day(1), purged_size = p, ff = OnlineStep())
+        od = OnlineDateWalkForward(w, t; period = Day(1), purged_size = p)
         @test split(od, rd).train_idx == split(bd, rd).train_idx
         for opt in (mr, hrp)
             b = cross_val_predict(opt, rdg, bd)
@@ -139,34 +140,70 @@ assets is what keeps the JuMP families cheap.
         end
     end
 
-    @testset "`expand_train` derives from the Fold Fit" begin
+    @testset "The function constructors are the only door, and the window knob is set" begin
+        # A plain scheme keeps the released default, stated by the caller.
         @test IndexWalkForward(252, 21).expand_train == false
-        @test isnothing(IndexWalkForward(252, 21).ff)
-        @test IndexWalkForward(252, 21; ff = OnlineStep()).expand_train == true
         @test IndexWalkForward(252, 21; expand_train = true).expand_train == true
-        @test IndexWalkForward(252, 21; expand_train = true, ff = OnlineStep()).expand_train
-        @test_throws ArgumentError IndexWalkForward(252, 21; expand_train = false,
-                                                    ff = OnlineStep())
         @test DateWalkForward(252, 21).expand_train == false
-        @test DateWalkForward(252, 21; ff = OnlineStep()).expand_train == true
-        @test_throws ArgumentError DateWalkForward(252, 21; expand_train = false,
-                                                   ff = OnlineStep())
-        # The refusal names the composition that gives a rolling window computed online.
+        @test !hasfield(typeof(IndexWalkForward(252, 21)), :ff)
+        # The constructor wraps the scheme with the window knob `true`, and forwards the
+        # rest of the keywords.
+        o = OnlineIndexWalkForward(252, 21; purged_size = 2, pws = DriftedWeights())
+        @test isa(o, Online{<:IndexWalkForward, Nothing})
+        @test o.est.expand_train == true
+        @test o.est.purged_size == 2
+        @test isa(o.est.pws, DriftedWeights)
+        @test isnothing(o.max_history)
+        od = OnlineDateWalkForward(252, 21; period = Day(1), purged_size = 2)
+        @test isa(od, Online{<:DateWalkForward, Nothing})
+        @test od.est.expand_train == true
+        oh = OnlineHindsightSplit(; start = 5)
+        @test isa(oh, Online{<:HindsightSplit, Nothing})
+        @test oh.est.prefix == true && oh.est.start == 5
+        # The window mismatch cannot be written: the knob is not a keyword of the
+        # constructor, and neither is the wrapper's cap.
+        @test_throws MethodError OnlineIndexWalkForward(252, 21; expand_train = false)
+        @test_throws MethodError OnlineIndexWalkForward(252, 21; expand_train = true)
+        @test_throws MethodError OnlineDateWalkForward(252, 21; expand_train = false)
+        @test_throws MethodError OnlineHindsightSplit(; prefix = false)
+        @test_throws MethodError OnlineIndexWalkForward(252, 21; max_history = 10)
+        # `Online(cv)` by hand is refused by name, for every scheme, and the message points
+        # at the constructors.
+        for cv in
+            (IndexWalkForward(252, 21; expand_train = true), DateWalkForward(252, 21),
+             HindsightSplit(), KFold(), batch_cv)
+            err = try
+                Online(cv)
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, ArgumentError)
+            @test occursin("OnlineIndexWalkForward", err.msg)
+        end
+        @test_throws ArgumentError Online(; est = IndexWalkForward(252, 21))
+        # An Online Scheme in an estimator slot is refused at the warm-up, by name.
         err = try
-            IndexWalkForward(252, 21; purged_size = 2, expand_train = false,
-                             ff = OnlineStep())
+            po.update_online_estimator(online_cv)
             nothing
         catch e
             e
         end
-        @test isa(err, ArgumentError) && occursin("max_history = 250", err.msg)
-        # The switch is read by its verb, and every other scheme answers `nothing`.
-        @test po.fold_fit(online_cv) == OnlineStep()
-        @test isnothing(po.fold_fit(batch_cv))
-        @test isnothing(po.fold_fit(KFold()))
-        @test isnothing(po.fold_fit(split(online_cv, rd)))
-        @test po.fold_fit(MultipleRandomised(online_cv; seed = 1)) == OnlineStep()
-        @test isnothing(po.fold_fit(nothing))
+        @test isa(err, ArgumentError) && occursin("`cv` argument", err.msg)
+        # The predicate is read off the type, and every other scheme answers `false`.
+        @test po.folds_are_stepped(online_cv)
+        @test !po.folds_are_stepped(batch_cv)
+        @test !po.folds_are_stepped(KFold())
+        @test !po.folds_are_stepped(split(online_cv, rd))
+        @test po.folds_are_stepped(MultipleRandomised(online_cv; seed = 1))
+        @test !po.folds_are_stepped(MultipleRandomised(batch_cv; seed = 1))
+        @test !po.folds_are_stepped(nothing)
+        @test !po.folds_are_stepped(HindsightSplit())
+        @test po.folds_are_stepped(OnlineHindsightSplit())
+        # The scheme verbs forward to the wrapped walk-forward.
+        @test split(online_cv, rd).train_idx == split(online_cv.est, rd).train_idx
+        @test n_splits(online_cv, rd) == n_splits(online_cv.est, rd)
+        @test po.fold_evaluation(online_cv) == po.fold_evaluation(online_cv.est)
     end
 
     @testset "A state at entry is refused, before any solve, and the error names the field" begin
@@ -318,18 +355,18 @@ assets is what keeps the JuMP families cheap.
             @test isa(err, ArgumentError)
             @test occursin("enters `optimise`", err.msg)
             @test occursin(path, err.msg)
-            @test occursin("ff = OnlineStep()", err.msg)
+            @test occursin("OnlineIndexWalkForward", err.msg)
         end
         # A fallback chain takes the generic door, and the walk reaches the chain's head.
         err = refusal(() -> optimise(MeanRisk(; opt = JuMPOptimiser(; pe = ope, slv = slv),
                                               fb = InverseVolatility()), rd))
         @test isa(err, ArgumentError) && occursin("`opt.pe`", err.msg)
-        # The fold loop's batch arms, once at the door: a walk-forward with no Fold Fit,
+        # The fold loop's batch arms, once at the door: a plain walk-forward,
         # and a combinatorial scheme.
         for cv in (batch_cv, CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2))
             err = refusal(() -> cross_val_predict(iv, rd, cv))
             @test isa(err, ArgumentError)
-            @test occursin("declares no Fold Fit", err.msg) && occursin("`pe`", err.msg)
+            @test occursin("not an Online Scheme", err.msg) && occursin("`pe`", err.msg)
         end
         # The online arm resolves the same estimators, and reads them out through
         # `optimise(opt)` without meeting the door.
@@ -343,18 +380,19 @@ assets is what keeps the JuMP families cheap.
                            rd), po.OptimisationResult)
     end
 
-    @testset "Ordering: the online arm runs in order and says so" begin
+    @testset "Ordering: the online arm runs in order and announces nothing" begin
         # A `MeanRisk` needs no previous weights, so its batch run takes the parallel arm
-        # and says nothing; the online run emits `cv_online_info` and never the sequential
-        # message.
+        # and says nothing; the online run says nothing either, because an Online Scheme is
+        # chosen by name through its constructor and there is no accident to report.
         @test_logs cross_val_predict(mr, rd, batch_cv)
-        @test_logs (:info, po.cv_online_info()) cross_val_predict(mr, rd, online_cv)
-        # An optimiser that needs the previous weights still takes the online arm first.
+        @test_logs cross_val_predict(mr, rd, online_cv)
+        # An optimiser that needs the previous weights still takes the online arm first,
+        # and only the batch run, which the loop made sequential on its own, says so.
         tn = MeanRisk(;
                       opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
                                           tn = Turnover(; w = fill(inv(N), N), val = 0.5)))
         @test_logs (:info, po.cv_sequential_info()) cross_val_predict(tn, rd, batch_cv)
-        @test_logs (:info, po.cv_online_info()) cross_val_predict(tn, rd, online_cv)
+        @test_logs cross_val_predict(tn, rd, online_cv)
         @test isapprox(weights(cross_val_predict(tn, rd, online_cv)),
                        weights(cross_val_predict(tn, rd, batch_cv)); atol = 1e-5)
         # Under a multiple-randomised scheme every path threads its own sliced estimator,
@@ -363,9 +401,7 @@ assets is what keeps the JuMP families cheap.
         mo = MultipleRandomised(online_cv; subset_size = 5, n_subsets = 2, seed = 7)
         @test split(mo, rd).asset_idx == split(mb, rd).asset_idx
         b = cross_val_predict(mr, rdg, mb)
-        o = @test_logs (:info, po.cv_online_info()) (:info, po.cv_online_info()) cross_val_predict(mr,
-                                                                                                   rdg,
-                                                                                                   mo)
+        o = @test_logs cross_val_predict(mr, rdg, mo)
         for (pathb, patho) in zip(b.pred, o.pred)
             @test length(patho.pred) == length(pathb.pred)
             for (pb, po_) in zip(pathb.pred, patho.pred)
@@ -394,8 +430,8 @@ assets is what keeps the JuMP families cheap.
         end
         threaded(p) = p.res.jr.pa.tn.w
         sfd = SelfFinancingDrift()
-        online_d = IndexWalkForward(w, t; purged_size = p, ff = OnlineStep(), wd = sfd,
-                                    pws = DriftedWeights())
+        online_d = OnlineIndexWalkForward(w, t; purged_size = p, wd = sfd,
+                                          pws = DriftedWeights())
         batch_d = IndexWalkForward(w, t; purged_size = p, expand_train = true, wd = sfd,
                                    pws = DriftedWeights())
         for (cvo, cvb) in ((online_cv, batch_cv), (online_d, batch_d))
@@ -448,7 +484,7 @@ assets is what keeps the JuMP families cheap.
 
     @testset "The search and the Pipeline take the loop at their doors" begin
         # The search took the loop in #1020 and the Pipeline in #1022, so no door refuses a
-        # Fold Fit any more; the Pipeline's identities are pinned in test_24f.
+        # Online Scheme any more; the Pipeline's identities are pinned in test_24f.
         pgrid = ["opt.l1" => range(; start = 0.0005, stop = 0.001, length = 2)]
         @test isa(search_cross_validation(MeanRisk(;
                                                    opt = JuMPOptimiser(;

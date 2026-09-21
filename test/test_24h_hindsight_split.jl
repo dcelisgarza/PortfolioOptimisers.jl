@@ -35,7 +35,7 @@ and be-the-leader collapses onto the static comparator.
         hs = HindsightSplit()
         @test hs.prefix && hs.start == 1
         @test isa(hs, po.WalkForwardEstimator)
-        @test isnothing(po.fold_fit(hs))
+        @test !po.folds_are_stepped(hs)
         @test po.fold_evaluation(hs) ==
               (; wd = nothing, pws = nothing, fa = nothing, store_weight_path = false,
                strict = false)
@@ -116,6 +116,40 @@ and be-the-leader collapses onto the static comparator.
         ew3 = cross_val_predict(EqualWeighted(), rd3, IndexWalkForward(2, 1))
         @test ew3.mrd.ts == one.mrd.ts
         @test isnan(log_wealth_regret(ew3, one).path_length)
+    end
+
+    @testset "The online form is the prefix split fold for fold (ADR 0167)" begin
+        # `OnlineHindsightSplit` is the prefix split wrapped in `Online`: the training
+        # windows are nested prefixes, so the loop warms up on `1:start`, folds row `t`,
+        # reads out and scores row `t`. The read-out after rows `1:t` equals the batch fit
+        # over `1:t`, so the be-the-leader comparator is the batch one fold for fold, and
+        # the Result carries the threaded estimator where the batch one carries none.
+        for start in (1, 2)
+            oh = OnlineHindsightSplit(; start = start)
+            @test oh.est.prefix && oh.est.start == start
+            @test split(oh, rd3).train_idx ==
+                  split(HindsightSplit(; start = start), rd3).train_idx
+            batch = cross_val_predict(BestConstantRebalancedPortfolio(), rd3,
+                                      HindsightSplit(; start = start))
+            online = cross_val_predict(BestConstantRebalancedPortfolio(), rd3, oh)
+            @test online.mrd.ts == batch.mrd.ts
+            @test length(online.pred) == length(batch.pred)
+            for (po_, pb) in zip(online.pred, batch.pred)
+                @test isapprox(po_.res.w, pb.res.w; atol = 1e-8)
+                @test po_.rd.X == pb.rd.X
+            end
+            @test isnothing(batch.opt)
+            @test !isnothing(online.opt)
+        end
+        # A JuMP leader steps too, from the row where its covariance exists.
+        batch_mr = cross_val_predict(bcrp_mr, rd3, HindsightSplit(; start = 2))
+        online_mr = cross_val_predict(bcrp_mr, rd3, OnlineHindsightSplit(; start = 2))
+        for (po_, pb) in zip(online_mr.pred, batch_mr.pred)
+            @test isapprox(po_.res.w, pb.res.w; atol = 1e-6)
+        end
+        # The row-alone split has no online form: `prefix` is not a keyword.
+        @test_throws MethodError OnlineHindsightSplit(; prefix = false)
+        @test_throws ArgumentError Online(HindsightSplit(; prefix = false))
     end
 
     @testset "The stacked fold weights embed by name" begin

@@ -111,11 +111,11 @@ vcat(res.pred, res2.pred) ≈ cross_val_predict(mr, rd_{T+k}, cv).pred   # fold 
 
 to the tolerance of the moment layer and of the solver for the weights, and exactly for the carrier the read-out rebuilds, a capped run included. `res` is never written — `Resume` copies every state at entry — so one Result resumes any number of times, and a terminal view never spoils a later continuation.
 
-The re-entry checks four things, each an `ArgumentError` by name. The scheme is a walk-forward with a Fold Fit, and it adds at least one fold. **Timestamps are required**: the carrier and the state must both hold them, and every held timestamp must equal its row of the carrier — `state.ts == rd.ts[(r - h + 1):r]` for `r` the last training end and `h` the held count — which pins the prefix exactly over the held span, under a cap or not; an index-only caller attaches a synthetic calendar, `ts = Date(1) .+ Day.(0:(T - 1))`. And **a partial last fold is terminal**: with `reduce_test = true` the old run's last fold is the first part of a full window of the longer run, so it can be neither skipped nor completed. Resume the same Result terminally with `reduce_test = true` for the live view of the leftover rows, and again with `reduce_test = false` when the rows arrive.
+The re-entry checks four things, each an `ArgumentError` by name. The scheme is an Online Scheme, and it adds at least one fold. **Timestamps are required**: the carrier and the state must both hold them, and every held timestamp must equal its row of the carrier — `state.ts == rd.ts[(r - h + 1):r]` for `r` the last training end and `h` the held count — which pins the prefix exactly over the held span, under a cap or not; an index-only caller attaches a synthetic calendar, `ts = Date(1) .+ Day.(0:(T - 1))`. And **a partial last fold is terminal**: with `reduce_test = true` the old run's last fold is the first part of a full window of the longer run, so it can be neither skipped nor completed. Resume the same Result terminally with `reduce_test = true` for the live view of the leftover rows, and again with `reduce_test = false` when the rows arrive.
 
 Every state is an immutable struct of arrays, names, integers and a timestamp vector, so a Result of an online run round-trips through the stdlib `Serialization` as it stands, and a deserialised Result resumes to the same weights. That format is bound to the Julia version that wrote it, and no other format is provided.
 
-A batch Result, a [`PopulationPredictionResult`](@ref) (a [`MultipleRandomised`](@ref) run), a scheme that is not a walk-forward, a scheme with no Fold Fit, and a search are refused by name. A [`Pipeline`](@ref) host resumes on the same terms, through the state its row owner keeps.
+A batch Result, a [`PopulationPredictionResult`](@ref) (a [`MultipleRandomised`](@ref) run), a scheme that is not a walk-forward, a walk-forward that is not an Online Scheme, and a search are refused by name. A [`Pipeline`](@ref) host resumes on the same terms, through the state its row owner keeps.
 
 # Fields
 
@@ -134,7 +134,7 @@ $(DocStringExtensions.FIELDS)
 # Related
 
   - [`MultiPeriodPredictionResult`](@ref)
-  - [`OnlineStep`](@ref)
+  - [`OnlineIndexWalkForward`](@ref)
   - [`online_folds`](@ref)
   - [`cross_val_predict`](@ref)
   - [`Base.vcat(a::MultiPeriodPredictionResult, b::MultiPeriodPredictionResult)`](@ref)
@@ -148,7 +148,7 @@ struct Resume{T1}
     res::T1
     function Resume(res::MultiPeriodPredictionResult)
         @argcheck(!isnothing(res.opt),
-                  ArgumentError("`Resume` continues an online run, and this Result carries no estimator (`res.opt === nothing`), so it is a batch run and there is nothing to continue. Run the walk-forward with `ff = OnlineStep()`, and resume the Result it returns."))
+                  ArgumentError("`Resume` continues an online run, and this Result carries no estimator (`res.opt === nothing`), so it is a batch run and there is nothing to continue. Run the walk-forward as an Online Scheme (`OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit`), and resume the Result it returns."))
         return new{typeof(res)}(res)
     end
 end
@@ -178,21 +178,23 @@ function assert_time_dependent_fold_count(r::Resume, n::Integer,
     return assert_time_dependent_fold_count(r.res.opt, n, all_binds)
 end
 """
+    assert_resume_scheme(::Online{<:WalkForwardEstimator})
     assert_resume_scheme(cv::WFCVER)
     assert_resume_scheme(cv::CVER)
 
-Refuses a scheme a [`Resume`](@ref) cannot re-enter, by name: one that is not a walk-forward, and a walk-forward with no Fold Fit.
+Refuses a scheme a [`Resume`](@ref) cannot re-enter, by name: one that is not a walk-forward, and a walk-forward that is not an Online Scheme. Each refusal is a method on the refused type, so dispatch decides it and the message names the cause.
 
 # Related
 
   - [`Resume`](@ref)
-  - [`fold_fit`](@ref)
-  - [`OnlineStep`](@ref)
+  - [`folds_are_stepped`](@ref)
+  - [`OnlineIndexWalkForward`](@ref)
 """
-function assert_resume_scheme(cv::WFCVER)::Nothing
-    @argcheck(!isnothing(fold_fit(cv)),
-              ArgumentError("`Resume` continues the online arm of the fold loop, and this walk-forward declares no Fold Fit, so every fold would refit from its training window and there is no state to continue. Set `ff = OnlineStep()` on the scheme, the same one the Result came from."))
+function assert_resume_scheme(::Online{<:WalkForwardEstimator})::Nothing
     return nothing
+end
+function assert_resume_scheme(cv::WFCVER)::Nothing
+    return throw(ArgumentError("`Resume` continues the online arm of the fold loop, and this walk-forward is not an Online Scheme, so every fold would refit from its training window and there is no state to continue. Build the scheme the Result came from with `OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit`."))
 end
 function assert_resume_scheme(cv::CVER)::Nothing
     return throw(ArgumentError("`Resume` continues an online walk-forward, and a `$(typeof(cv).name.name)` is not one: only a walk-forward threads one estimator from fold to fold, so only a walk-forward has a fold to continue from. A `MultipleRandomised` run is a population of paths, and its resume is not established."))
@@ -285,23 +287,6 @@ function assert_resume_full_fold(test_idx::VecInt, pred::PredictionResult, ts)::
     return nothing
 end
 """
-    cv_resume_info(n_old::Integer, n::Integer)
-
-Build the informational message emitted when a cross-validation run resumes from a Result, the counterpart of [`cv_online_info`](@ref) for the resumed arm of [`online_folds`](@ref).
-
-# Returns
-
-  - `msg::String`: The message.
-
-# Related
-
-  - [`Resume`](@ref)
-  - [`cv_online_info`](@ref)
-"""
-function cv_resume_info(n_old::Integer, n::Integer)
-    return "Resuming cross-validation online from fold $(n_old + 1) of $(n): the scheme enumerates $(n) fold(s) over the extended history, the first $(n_old) end where the Result's estimator stopped and are skipped, and the estimator the Result carries is copied and folded from its last training end through the rest, in order. The Result returned holds the new folds only; `vcat` it onto the old one to score the whole run."
-end
-"""
     online_folds(fit_fold, r::Resume, n::Integer, ::Type{ElT}; rd, train_idx, test_idx, fold_view, pws)
 
 The resumed arm of [`fold_loop`](@ref): continue an online walk-forward from the folds its Result holds.
@@ -335,13 +320,11 @@ Taken when the estimator slot holds a [`Resume`](@ref). It resolves the declarat
   - [`thread_online_folds!`](@ref)
   - [`resume_fold_count`](@ref)
   - [`copy_states`](@ref)
-  - [`cv_resume_info`](@ref)
 """
 function online_folds(fit_fold, r::Resume, n::Integer, ::Type{ElT}; rd, train_idx, test_idx,
                       fold_view = nothing, pws = nothing) where {ElT}
     res = r.res
     n_old = resume_fold_count(res.opt, rd, train_idx)
-    @info(cv_resume_info(n_old, n))
     assert_resume_folds(n_old, n)
     last_end = last(train_idx[n_old])
     assert_resume_full_fold(test_idx[n_old], res.pred[end], carrier_timestamps(rd))
@@ -379,7 +362,7 @@ The doors that take an optimiser in the estimator slot take a [`Resume`](@ref) t
 
   - `r`: The declaration, holding the Result to continue.
   - $(arg_dict[:rd])
-  - `cv`: The scheme the Result came from, a walk-forward with `ff = OnlineStep()`.
+  - `cv`: The scheme the Result came from, an Online Scheme.
   - `cols`: The asset view of the carrier.
   - `ex`: Unread; the resumed arm runs in order.
   - `id`: The identifier the Result carries.

@@ -432,7 +432,7 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
             v = po.port_opt_view(o, [1, 2, 4])
             @test length(optimise(v).w) == 3
             # A walk-forward at test_size = 1 through the online arm.
-            cv = IndexWalkForward(5, 1; expand_train = true, ff = OnlineStep())
+            cv = OnlineIndexWalkForward(5, 1)
             pred = cross_val_predict(opt, rows(rd, 1:12), cv)
             @test isapprox(pred.pred[1].res.w, optimise(opt, rows(rd, 1:5)).w; atol = 1e-14)
         end

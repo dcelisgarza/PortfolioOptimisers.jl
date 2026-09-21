@@ -47,7 +47,7 @@ assets is what keeps the JuMP families cheap.
     rows(r, i) = po.port_opt_view(r, i, :)
     weights(res) = [pr.res.w for pr in res.pred]
     weight_tol(opt) = isa(opt, po.JuMPOptimisationEstimator) ? 1e-5 : 1e-10
-    online_cv = IndexWalkForward(w, t; purged_size = p, ff = OnlineStep())
+    online_cv = OnlineIndexWalkForward(w, t; purged_size = p)
     batch_cv = IndexWalkForward(w, t; purged_size = p, expand_train = true)
     # The old history ends at a fold boundary, so its last fold is full.
     T0 = 140
@@ -116,11 +116,8 @@ assets is what keeps the JuMP families cheap.
         old = cross_val_predict(tn, rd_T, online_cv)
         new = cross_val_predict(Resume(old), rd, online_cv)
         @test new.pred[1].res.jr.pa.tn.w == old.pred[end].res.w
-        # And the emitted message says the run resumed.
-        n = n_splits(online_cv, rd)
-        @test_logs (:info, po.cv_resume_info(length(old.pred), n)) cross_val_predict(Resume(old),
-                                                                                     rd,
-                                                                                     online_cv)
+        # And the resumed arm announces nothing: a `Resume` is declared by name.
+        @test_logs cross_val_predict(Resume(old), rd, online_cv)
     end
 
     @testset "A capped run, whose buffer holds no total" begin
@@ -139,7 +136,7 @@ assets is what keeps the JuMP families cheap.
     end
 
     @testset "The date form anchors on the whole ts" begin
-        od = DateWalkForward(w, t; period = Day(1), purged_size = p, ff = OnlineStep())
+        od = OnlineDateWalkForward(w, t; period = Day(1), purged_size = p)
         for opt in (mr, hrp)
             old = cross_val_predict(opt, rdg_T, od)
             new = cross_val_predict(Resume(old), rdg, od)
@@ -149,8 +146,8 @@ assets is what keeps the JuMP families cheap.
 
     @testset "A Weight Drift threads the held weights across the seam" begin
         sfd = SelfFinancingDrift()
-        online_d = IndexWalkForward(w, t; purged_size = p, ff = OnlineStep(), wd = sfd,
-                                    pws = DriftedWeights())
+        online_d = OnlineIndexWalkForward(w, t; purged_size = p, wd = sfd,
+                                          pws = DriftedWeights())
         old = cross_val_predict(tn, rd_T, online_d)
         new = cross_val_predict(Resume(old), rd, online_d)
         one = cross_val_predict(tn, rd, online_d)
@@ -179,8 +176,8 @@ assets is what keeps the JuMP families cheap.
         @test length(last_.pred) == length(one.pred) - length(old.pred) - 1
         # A terminal view of the leftover rows never spoils the continuation.
         term = cross_val_predict(Resume(old), rows(rd, 1:150),
-                                 IndexWalkForward(w, t; purged_size = p, ff = OnlineStep(),
-                                                  reduce_test = true))
+                                 OnlineIndexWalkForward(w, t; purged_size = p,
+                                                        reduce_test = true))
         @test length(term.pred[end].rd.ts) == 10
         same_weights(vcat(old, cross_val_predict(Resume(old), rd, online_cv)), one, tn)
     end
@@ -215,11 +212,11 @@ assets is what keeps the JuMP families cheap.
                        msg(() -> Resume(cross_val_predict(mr, rd_T, batch_cv))))
         mo = MultipleRandomised(online_cv; subset_size = 4, n_subsets = 2, seed = 7)
         @test_throws ArgumentError Resume(cross_val_predict(mr, rd_T, mo))
-        # A scheme that is not a walk-forward, one with no Fold Fit, and a population
+        # A scheme that is not a walk-forward, one that is not an Online Scheme, and a population
         # scheme.
         @test_throws ArgumentError cross_val_predict(Resume(old), rd, KFold())
         @test_throws ArgumentError cross_val_predict(Resume(old), rd, batch_cv)
-        @test occursin("no Fold Fit",
+        @test occursin("not an Online Scheme",
                        msg(() -> cross_val_predict(Resume(old), rd, batch_cv)))
         @test_throws ArgumentError cross_val_predict(Resume(old), rd, mo)
         @test_throws ArgumentError cross_val_predict(Resume(old), rd,
@@ -264,11 +261,10 @@ assets is what keeps the JuMP families cheap.
                        msg(() -> cross_val_predict(Resume(old), altered_rd, online_cv)))
         # A changed scheme moves the last training end.
         @test_throws ArgumentError cross_val_predict(Resume(old), rd,
-                                                     IndexWalkForward(w, t; purged_size = 5,
-                                                                      ff = OnlineStep()))
+                                                     OnlineIndexWalkForward(w, t;
+                                                                            purged_size = 5))
         # A partial last fold is terminal, and the message names the two-resume workaround.
-        reduced = IndexWalkForward(w, t; purged_size = p, ff = OnlineStep(),
-                                   reduce_test = true)
+        reduced = OnlineIndexWalkForward(w, t; purged_size = p, reduce_test = true)
         part = cross_val_predict(mr, rows(rd, 1:150), reduced)
         @test length(part.pred[end].rd.ts) == 10
         @test_throws ArgumentError cross_val_predict(Resume(part), rd, reduced)

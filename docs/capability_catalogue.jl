@@ -1397,8 +1397,9 @@ const CATALOGUE = [Section("Core abstractions",
                                          [Cap(:IndexWalkForward, :DateWalkForward),
                                           Cap(:HindsightSplit;
                                               label = "Hindsight split [`HindsightSplit`](@ref) trains each fold on its own test row, the prefix through it or the row alone, so an estimator run through it is a per-row Hindsight Comparator"),
-                                          Cap(:OnlineStep;
-                                              label = "Fold Fit [`OnlineStep`](@ref) fits each fold by the online step, threading one estimator from fold to fold"),
+                                          Cap(:OnlineIndexWalkForward,
+                                              :OnlineDateWalkForward, :OnlineHindsightSplit;
+                                              label = "Online Scheme [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref) and [`OnlineHindsightSplit`](@ref) wrap a scheme in [`Online`](@ref), so the loop fits each fold by the online step, threading one estimator from fold to fold"),
                                           Cap(:Resume;
                                               label = "Resume [`Resume`](@ref) continues an online walk-forward from its Result over the full history extended, and `vcat` stacks the two Results")]),
                                    Cap(:MultipleRandomised, :MultipleRandomisedResult;
@@ -1414,7 +1415,7 @@ const CATALOGUE = [Section("Core abstractions",
                             Cap(:OptimisationCrossValidation),
                             Cap(:NumberSubsetsEstimator, :SubsetSizeEstimator),
                             Section("Covariance forecast evaluation",
-                                    [Prose("[`covariance_forecast_evaluation`](@ref) judges a covariance estimator's, or a prior's, forecast on the returns realised after it, step by step over a walk-forward, in batch when the scheme refits and online when it declares a Fold Fit. The test rows are centred on the location the forecast is about, read off the estimator, and the diagnostics are kept per step so the summary, the comparison and the re-projection are verbs over one Result."),
+                                    [Prose("[`covariance_forecast_evaluation`](@ref) judges a covariance estimator's, or a prior's, forecast on the returns realised after it, step by step over a walk-forward, in batch when the scheme refits and online when it is an Online Scheme. The test rows are centred on the location the forecast is about, read off the estimator, and the diagnostics are kept per step so the summary, the comparison and the re-projection are verbs over one Result."),
                                      Group(Cap(:covariance_forecast_evaluation),
                                            [Cap(:CovarianceForecastEvaluationResult),
                                             Cap(:covariance_forecast_step;

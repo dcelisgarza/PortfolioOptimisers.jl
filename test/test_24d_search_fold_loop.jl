@@ -4,7 +4,7 @@ decision of #871 (ADR 0141).
 
 `search_cross_validation` builds candidate `i` through the grid's lenses and scores it through
 `fit_and_predict(opt_i, rd, gscv.cv; ex = SequentialEx())`, one row per fold, whatever the
-scheme's Fold Fit. The map's closing test's second half is the identity: a grid search over an
+scheme's fit. The map's closing test's second half is the identity: a grid search over an
 online walk-forward reads the matrix of the same search over the batch expanding walk-forward
 and picks the same column, through a JuMP optimiser and a hierarchical one, and the randomised
 search under the same seed inherits it. Around it sit what the route changed in batch (a
@@ -43,7 +43,7 @@ The fixture is the online fold loop's, because the identities are structural.
     w, t, p = 60, 20, 3
     rows(r, i) = po.port_opt_view(r, i, :)
     batch_cv = IndexWalkForward(w, t; purged_size = p, expand_train = true)
-    online_cv = IndexWalkForward(w, t; purged_size = p, ff = OnlineStep())
+    online_cv = OnlineIndexWalkForward(w, t; purged_size = p)
     r = ConditionalValueatRisk()
     # The identity's grids tune the weight bounds, which bind and so move the winner well
     # clear of the tolerance; the plain grids elsewhere tune the L1 penalty.
@@ -134,10 +134,10 @@ The fixture is the online fold loop's, because the identities are structural.
         end
         # And the online search reads the same threaded matrix.
         o = search_cross_validation(tn,
-                                    gs(IndexWalkForward(w, t; purged_size = p,
-                                                        ff = OnlineStep(),
-                                                        wd = SelfFinancingDrift(),
-                                                        pws = DriftedWeights()), jgrid), rd)
+                                    gs(OnlineIndexWalkForward(w, t; purged_size = p,
+                                                              wd = SelfFinancingDrift(),
+                                                              pws = DriftedWeights()),
+                                       jgrid), rd)
         @test isapprox(o.test_scores, res.test_scores; atol = 1e-5)
         @test o.idx == res.idx
     end
@@ -194,10 +194,10 @@ The fixture is the online fold loop's, because the identities are structural.
                 e
             end
             @test isa(err, ArgumentError) && occursin(path, err.msg)
-            @test occursin(if isnothing(po.fold_fit(cv))
-                               "search_cross_validation"
-                           else
+            @test occursin(if po.folds_are_stepped(cv)
                                "online arm"
+                           else
+                               "search_cross_validation"
                            end, err.msg)
         end
         @test_throws ArgumentError po.assert_search_entry(warm, batch_cv)
@@ -294,7 +294,7 @@ The fixture is the online fold loop's, because the identities are structural.
         pres = search_cross_validation(pipe, gs(mb, grid), rd)
         dres = search_cross_validation(mr, gs(mb, ["opt.l1" => grid[1][2]]), rd)
         @test isapprox(pres.test_scores, dres.test_scores; atol = 1e-8)
-        # The door takes a Fold Fit since #1022, and picks the batch candidate; test_24f pins
+        # The door takes an Online Scheme since #1022, and picks the batch candidate; test_24f pins
         # the Pipeline's identities.
         ores = search_cross_validation(pipe, gs(online_cv, grid), rd)
         @test isapprox(ores.test_scores, res.test_scores; atol = 1e-6)
@@ -315,7 +315,7 @@ The fixture is the online fold loop's, because the identities are structural.
         @test fres.idx == 2
     end
 
-    @testset "9. Executor: a search over `OnlineStep` with a threaded executor" begin
+    @testset "9. Executor: a search over an Online Scheme with a threaded executor" begin
         seq = search_cross_validation(mr, gs(online_cv, jgrid; ex = FLoops.SequentialEx()),
                                       rdg)
         thr = search_cross_validation(mr, gs(online_cv, jgrid; ex = FLoops.ThreadedEx()),

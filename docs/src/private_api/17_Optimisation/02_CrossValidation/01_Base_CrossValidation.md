@@ -41,7 +41,7 @@ run_folds
 advance_previous_fold
 folds_are_time_ordered
 fold_evaluation
-fold_fit
+folds_are_stepped
 investable_fold_view
 fold_fees
 threads_weights

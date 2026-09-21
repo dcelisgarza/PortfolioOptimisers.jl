@@ -831,13 +831,13 @@ end
 
 Evaluate a covariance forecast out of sample over a walk-forward, in batch or online.
 
-One verb through the one fold loop. Per fold the callback reads the forecast and its location off the fold's estimator — a refit over the training window when the fold carries one, the threaded state when the scheme declares a Fold Fit of [`OnlineStep`](@ref) — and scores it on the test rows through [`covariance_forecast_step`](@ref). The batch expanding, batch rolling, online expanding and online rolling forms are therefore the four compositions the walk-forward and the [`Online`](@ref) wrapper already express: `expand_train = true`, `expand_train = false`, `ff = OnlineStep()`, and `ff = OnlineStep()` with `Online(est; max_history = w)`. The verb reads none of them, so the online run reaches the batch expanding run's rows fold for fold, to the tolerance of the estimator's own fold, and the date form, the purge and a listing or delisting come for free.
+One verb through the one fold loop. Per fold the callback reads the forecast and its location off the fold's estimator — a refit over the training window when the fold carries one, the threaded state when the scheme is an Online Scheme — and scores it on the test rows through [`covariance_forecast_step`](@ref). The batch expanding, batch rolling, online expanding and online rolling forms are therefore the four compositions the walk-forward and the [`Online`](@ref) wrapper already express: `expand_train = true`, `expand_train = false`, `OnlineIndexWalkForward(…)`, and `OnlineIndexWalkForward(…)` with `Online(est; max_history = w)`. The verb reads none of them, so the online run reaches the batch expanding run's rows fold for fold, to the tolerance of the estimator's own fold, and the date form, the purge and a listing or delisting come for free.
 
-The estimator is threaded as the configuration alone. Under `OnlineStep()` the loop warms one estimator up on the first training window and folds each fold's new rows into it, so an estimator entering with a state, or one that cannot fold, is refused at the door by name; wrap such an estimator in [`Online`](@ref) to fold it from a buffer, and the read-out is then a batch fit over the buffer's rows.
+The estimator is threaded as the configuration alone. Under an Online Scheme the loop warms one estimator up on the first training window and folds each fold's new rows into it, so an estimator entering with a state, or one that cannot fold, is refused at the door by name; wrap such an estimator in [`Online`](@ref) to fold it from a buffer, and the read-out is then a batch fit over the buffer's rows.
 
 # Arguments
 
-  - `est`: The covariance estimator, or the prior estimator whose `sigma` is the forecast; either may be wrapped in [`Online`](@ref) under `ff = OnlineStep()`, to fold from a buffer and, with `max_history`, over a rolling window.
+  - `est`: The covariance estimator, or the prior estimator whose `sigma` is the forecast; either may be wrapped in [`Online`](@ref) under an Online Scheme, to fold from a buffer and, with `max_history`, over a rolling window.
   - $(arg_dict[:rd])
   - `cv`: The walk-forward, index or date form, or its split.
   - `w`: The test portfolios on the full universe: `nothing` for inverse volatility recomputed from each step's forecast, a vector for one static portfolio, a vector of vectors for several.
@@ -848,8 +848,8 @@ The estimator is threaded as the configuration alone. Under `OnlineStep()` the l
 
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
   - The scheme's folds are not shuffled, through [`assert_unshuffled_folds`](@ref).
-  - An [`Online`](@ref) at the root is handed a scheme that declares a Fold Fit. An `ArgumentError` is thrown otherwise: a batch fold would never seed the buffer.
-  - Everything [`covariance_forecast_step`](@ref) refuses at a step, and everything the fold loop's online arm refuses at entry under `OnlineStep()`.
+  - An [`Online`](@ref) at the root is handed an Online Scheme. An `ArgumentError` is thrown otherwise: a batch fold would never seed the buffer.
+  - Everything [`covariance_forecast_step`](@ref) refuses at a step, and everything the fold loop's online arm refuses at entry under an Online Scheme.
 
 # Returns
 
@@ -865,7 +865,8 @@ The estimator is threaded as the configuration alone. Under `OnlineStep()` the l
   - [`forecast_location`](@ref)
   - [`IndexWalkForward`](@ref)
   - [`DateWalkForward`](@ref)
-  - [`OnlineStep`](@ref)
+  - [`OnlineIndexWalkForward`](@ref)
+  - [`OnlineDateWalkForward`](@ref)
   - [`Online`](@ref)
 """
 function covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator,
@@ -875,8 +876,8 @@ function covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator
                                         target::AbstractRealisedTarget = RealisedCovariance(),
                                         store_forecasts::Bool = false)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    @argcheck(!isa(est, Online) || !isnothing(fold_fit(cv)),
-              ArgumentError("`Online($(typeof(est.est).name.name))` declares a refit from a sample buffer, which only the fold loop's online arm seeds and threads, and this scheme declares no Fold Fit, so every fold would refit the estimator from its training window and the buffer would never exist. Declare `ff = OnlineStep()` on the scheme, or hand the evaluation the estimator unwrapped."))
+    @argcheck(!isa(est, Online) || folds_are_stepped(cv),
+              ArgumentError("`Online($(typeof(est.est).name.name))` declares a refit from a sample buffer, which only the fold loop's online arm seeds and threads, and this scheme is not an Online Scheme, so every fold would refit the estimator from its training window and the buffer would never exist. Run the evaluation under `OnlineIndexWalkForward` or `OnlineDateWalkForward`, or hand it the estimator unwrapped."))
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)

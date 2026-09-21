@@ -1,5 +1,5 @@
 ```@meta
-Description = "The online step, private API of PortfolioOptimisers.jl: Online_Option, Onl, SampleBufferState, assert_sample_buffer_state, assert_buffer_mask_shape, …"
+Description = "The online step, private API of PortfolioOptimisers.jl: Online_Option, Onl, CVE_Onl, SampleBufferState, assert_sample_buffer_state, assert_buffer_mask_shape, …"
 ```
 
 # The online step: private API
@@ -7,6 +7,7 @@ Description = "The online step, private API of PortfolioOptimisers.jl: Online_Op
 ```@docs
 PortfolioOptimisers.Online_Option
 PortfolioOptimisers.Onl
+PortfolioOptimisers.CVE_Onl
 PortfolioOptimisers.SampleBufferState
 PortfolioOptimisers.assert_sample_buffer_state
 PortfolioOptimisers.assert_buffer_mask_shape

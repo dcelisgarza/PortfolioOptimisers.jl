@@ -64,7 +64,7 @@ N = size(rd_rev.X, 2)
 #=
 The roster below is two benchmark rules, three rules that follow the winner and three that
 follow the loser. Every rule runs through the same head and the same walk-forward: twenty
-warm-up rows, then one row per fold with the Fold Fit [`OnlineStep`](@ref), so each fold is
+warm-up rows, then one row per fold under the Online Scheme [`OnlineIndexWalkForward`](@ref), so each fold is
 one update and one read-out. [`UniversalPortfolio`](@ref) samples its constant portfolios at
 construction and needs the universe size, and a seed pins the draw.
 =#
@@ -77,7 +77,7 @@ rules = ["Buy and hold" => BuyAndHold(),
          "Moving-average reversion" => MovingAverageReversion(),
          "Robust median reversion" => RobustMedianReversion()]
 
-cv = IndexWalkForward(20, 1; ff = OnlineStep())
+cv = OnlineIndexWalkForward(20, 1)
 online(alg, rd) = cross_val_predict(OnlinePortfolioSelection(; alg = alg), rd, cv)
 wealth(pred) = prod(1 .+ pred.mrd.X)
 
@@ -180,9 +180,8 @@ The identity of the target survives; the wealth does not.
 =#
 
 opt = OnlinePortfolioSelection(; alg = PassiveAggressiveMeanReversion())
-cv5 = IndexWalkForward(20, 5; ff = OnlineStep())
-cv5d = IndexWalkForward(20, 5; ff = OnlineStep(), wd = SelfFinancingDrift(),
-                        pws = DriftedWeights())
+cv5 = OnlineIndexWalkForward(20, 5)
+cv5d = OnlineIndexWalkForward(20, 5; wd = SelfFinancingDrift(), pws = DriftedWeights())
 
 every_row = preds_rev["Passive-aggressive mean reversion"]
 block = cross_val_predict(opt, rd_rev, cv5)
@@ -274,8 +273,8 @@ vocabulary through a solver. The evaluation surface is [`log_wealth_regret`](@re
   - [The online portfolio selection example](../examples/3_optimisers/18_Online_Portfolio_Selection.md)
     — the roster on real prices in a walk-forward with a turnover fee, the search, the regret
     table, and the weight path and the discrete allocation of a rule.
-  - [The online walk-forward](09_Online_Walk_Forward.md) — the Fold Fit every run on this page
-    declares.
+  - [The online walk-forward](09_Online_Walk_Forward.md) — the Online Scheme every run on this page
+    runs through.
   - [Validation and tuning](05_Validation_and_Tuning.md) — the walk-forward and the search.
   - [Optimisers](02_Optimisers.md) — the naive family the head belongs to.
 =#

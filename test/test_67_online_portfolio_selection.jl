@@ -141,13 +141,13 @@ end
             @test optimise(o).w == a.w
         end
         # A walk-forward at test_size = 1 holds the same path as the prototype, one row on.
-        cv = IndexWalkForward(5, 1; expand_train = true, ff = OnlineStep())
+        cv = OnlineIndexWalkForward(5, 1)
         pred = cross_val_predict(OPS(; alg = PassiveAggressiveMeanReversion()), rd, cv)
         p = PT.pamr(X)
         @test isapprox(pred.pred[1].res.w, p.weights[6, :]; atol = 1e-14)
         # A block of k rows is k updates and one read-out: the fold's target is the
         # Next-Period Allocation as of the block's end.
-        cv5 = IndexWalkForward(5, 5; expand_train = true, ff = OnlineStep())
+        cv5 = OnlineIndexWalkForward(5, 5)
         pred5 = cross_val_predict(OPS(; alg = PassiveAggressiveMeanReversion()), rd, cv5)
         @test isapprox(pred5.pred[1].res.w, p.weights[6, :]; atol = 1e-14)
         cvb = IndexWalkForward(5, 5; expand_train = true)
@@ -326,7 +326,7 @@ end
         @test_throws ArgumentError optimise(opt)
         @test_throws ArgumentError po.online_readout(o)
         @test_throws ArgumentError po.update_online_estimator(Online(opt; max_history = 5))
-        cv = IndexWalkForward(5, 1; ff = OnlineStep())
+        cv = OnlineIndexWalkForward(5, 1)
         @test_throws ArgumentError cross_val_predict(o, rd, cv)
         # `Resume` re-enters from the timestamps the state holds.
         pr = cross_val_predict(opt, rows(rd, 1:20), cv)
@@ -520,9 +520,8 @@ end
     @testset "Fees: the head, the four naive heads, and the loop's door" begin
         fees = Fees(; l = 0.01)
         tnfees = Fees(; tn = Turnover(; w = zeros(N), val = 0.02), l = 0.001)
-        cv = IndexWalkForward(5, 1; expand_train = true, ff = OnlineStep())
-        cvd = IndexWalkForward(5, 1; expand_train = true, ff = OnlineStep(),
-                               pws = DriftedWeights())
+        cv = OnlineIndexWalkForward(5, 1)
+        cvd = OnlineIndexWalkForward(5, 1; pws = DriftedWeights())
         cvb = IndexWalkForward(5, 3)
         # The Result carries the fee, the fold charges it, and a fee-free head is unchanged.
         for (opt, optf) in ((OPS(; alg = ExponentiatedGradient()),
@@ -626,7 +625,7 @@ end
         s = sprint(show, MIME("text/plain"), opt)
         @test occursin("BuyAndHold", s) && !occursin("cache", s)
         # The search addresses a rule's knob by path.
-        cv = IndexWalkForward(5, 1; expand_train = true, ff = OnlineStep())
+        cv = OnlineIndexWalkForward(5, 1)
         gs = GridSearchCrossValidation(["alg.me.alg.window" => [3, 5]]; cv = cv,
                                        r = MeanReturn(; flag = true))
         res = search_cross_validation(OPS(; alg = MovingAverageReversion()), gs, rd)

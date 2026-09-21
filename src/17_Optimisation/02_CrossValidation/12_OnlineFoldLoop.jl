@@ -49,28 +49,6 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
                             w_prev = w_prev)
 end
 """
-    cv_online_info()
-
-Build the informational message emitted when a cross-validation run takes the online arm.
-[`online_folds`](@ref) is the only site that emits it, as [`run_folds`](@ref) is the only site
-that emits [`cv_sequential_info`](@ref), and it states the one fact that sent the run there:
-the scheme declares a Fold Fit.
-
-# Returns
-
-  - `msg::String`: The message.
-
-# Related
-
-  - [`online_folds`](@ref)
-  - [`cv_sequential_info`](@ref)
-  - [`fold_fit`](@ref)
-  - [`OnlineStep`](@ref)
-"""
-function cv_online_info()
-    return "Running cross-validation online because the scheme declares a Fold Fit (fold_fit(cv) == OnlineStep()). The loop warms one estimator up on the first training window, folds each fold's new observations into it, and reads it out where a refit would have run, so the folds run in order and the estimator is threaded from fold to fold. To refit every fold from its training window, and to run the folds in parallel where the optimiser allows it, leave the scheme's `ff` unset."
-end
-"""
     thread_online_folds!(predictions, fit_fold, est, folds, prev; rd, train_idx, last_end, pws)
 
 Fold and read out the folds `folds` of a walk-forward, threading `est` from one to the next.
@@ -117,10 +95,12 @@ end
     online_folds(fit_fold, est, n::Integer, ::Type{ElT}; rd, train_idx, test_idx, fold_view, pws)
 
 Run `n` folds of a walk-forward by the online step, threading one estimator from fold to
-fold, and emit [`cv_online_info`](@ref).
+fold.
 
-This is the third arm of [`fold_loop`](@ref), taken when the scheme declares a Fold Fit
-([`fold_fit`](@ref)). It does five things, in order.
+This is the third arm of [`fold_loop`](@ref), taken when the scheme is an Online Scheme
+([`folds_are_stepped`](@ref)). It announces nothing: the scheme is chosen by name through its
+constructor, so there is no accident to report, where [`run_folds`](@ref) reports a
+sequential run the loop took on its own. It does five things, in order.
 
  1. It refuses an estimator that is not the configuration alone, through
     [`assert_online_entry`](@ref): one carrying a partial-fit state at entry, because the
@@ -189,12 +169,11 @@ resolve, the carrier, and the training window, which is `nothing` here. `ElT` is
   - [`update_online_estimator`](@ref)
   - [`partial_fit!`](@ref)
   - [`fit_and_predict`](@ref)
-  - [`OnlineStep`](@ref)
+  - [`OnlineIndexWalkForward`](@ref)
   - [`Resume`](@ref)
 """
 function online_folds(fit_fold, est, n::Integer, ::Type{ElT}; rd, train_idx,
                       test_idx = nothing, fold_view = nothing, pws = nothing) where {ElT}
-    @info(cv_online_info())
     assert_online_entry(est)
     assert_online_fee_source(est, pws)
     (est, rd) = isnothing(fold_view) ? (est, rd) : fold_view(1)

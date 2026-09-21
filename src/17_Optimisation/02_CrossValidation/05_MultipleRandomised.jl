@@ -93,7 +93,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     MultipleRandomised(
-        cv::WalkForwardEstimator;
+        cv::WalkForward_Onl;
         subset_size::SubsetSizeE = 1,
         n_subsets::NumberSubsetsE = 2,
         max_comb::Integer = 1_000_000_000,
@@ -155,7 +155,7 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:seed])
     """
     seed
-    function MultipleRandomised(cv::WalkForwardEstimator, subset_size::SubsetSizeE,
+    function MultipleRandomised(cv::WalkForward_Onl, subset_size::SubsetSizeE,
                                 n_subsets::NumberSubsetsE, max_comb::Integer,
                                 window_size::Option{<:WindowSizeE}, rng::Random.AbstractRNG,
                                 seed::Option{<:Integer})
@@ -179,7 +179,7 @@ $(DocStringExtensions.FIELDS)
                                                                    window_size, rng, seed)
     end
 end
-function MultipleRandomised(cv::WalkForwardEstimator; subset_size::SubsetSizeE = 1,
+function MultipleRandomised(cv::WalkForward_Onl; subset_size::SubsetSizeE = 1,
                             n_subsets::NumberSubsetsE = 2,
                             max_comb::Integer = 1_000_000_000,
                             window_size::Option{<:WindowSizeE} = nothing,
@@ -615,7 +615,7 @@ end
 
 Fit and predict along a sequence of (train, test, asset) triples, respecting sequential constraints.
 
-The path runs through [`fold_loop`](@ref), which takes each fold's asset-subset view of `(opt, rd)` and resolves the fold's time-dependent entries. The path runs sequentially when the optimiser needs the previous fold's weights, and in parallel over `ex` otherwise. A time-dependent optimiser alone does not force sequential execution, because its per-fold values are known upfront. `cv` is the scheme the path belongs to, handed on so the loop reads its Fold Fit ([`fold_fit`](@ref)): under an [`OnlineStep`](@ref) the path's estimator is sliced to the subset once and threaded through the path's folds.
+The path runs through [`fold_loop`](@ref), which takes each fold's asset-subset view of `(opt, rd)` and resolves the fold's time-dependent entries. The path runs sequentially when the optimiser needs the previous fold's weights, and in parallel over `ex` otherwise. A time-dependent optimiser alone does not force sequential execution, because its per-fold values are known upfront. `cv` is the scheme the path belongs to, handed on so the loop reads whether it steps ([`folds_are_stepped`](@ref)): under an Online Scheme the path's estimator is sliced to the subset once and threaded through the path's folds.
 
 # Arguments
 
@@ -714,24 +714,24 @@ function fold_evaluation(cv::MultipleRandomised)
     return fold_evaluation(cv.cv)
 end
 """
-    fold_fit(cv::MultipleRandomised)
+    folds_are_stepped(cv::MultipleRandomised)
 
-Read the Fold Fit of a [`MultipleRandomised`](@ref).
+Whether the paths of a [`MultipleRandomised`](@ref) are fitted by the online step.
 
-The scheme carries no switch of its own. Each of its paths is an inner walk-forward, so it inherits the Fold Fit from the scheme in its `cv` field, as it inherits its evaluation switches. Under an [`OnlineStep`](@ref) each path slices the estimator to its asset subset once and threads it through the path's folds.
+The scheme has no online form of its own. Each of its paths is an inner walk-forward, so it answers for the scheme in its `cv` field, as it does for its evaluation switches: `MultipleRandomised(OnlineIndexWalkForward(…); …)` steps, and each path slices the estimator to its asset subset once and threads it through the path's folds.
 
 # Returns
 
-  - `ff::Option{<:AbstractFoldFit}`: The inner walk-forward's Fold Fit.
+  - `flag::Bool`: Whether the inner walk-forward is an Online Scheme.
 
 # Related
 
-  - [`fold_fit`](@ref)
+  - [`folds_are_stepped`](@ref)
   - [`fold_evaluation`](@ref)
   - [`MultipleRandomised`](@ref)
   - [`path_fit_and_predict`](@ref)
 """
-function fold_fit(cv::MultipleRandomised)
-    return fold_fit(cv.cv)
+function folds_are_stepped(cv::MultipleRandomised)
+    return folds_are_stepped(cv.cv)
 end
 export MultipleRandomised, MultipleRandomisedResult

@@ -381,7 +381,7 @@ A walk-forward that declares a Fold Fit (`ff = OnlineStep()`) sends the loop dow
 
   - `pipe`: The pipeline.
   - `data`: Price- or returns-level input data ([`Prices_RR`](@ref)).
-  - `cv::CVER`: Cross-validation scheme with contiguous, non-combinatorial folds. Defaults to `KFold()`. [`folds_are_time_ordered`](@ref) decides whether its folds thread the previous fold's weights, and [`fold_fit`](@ref) whether the folds refit or fold.
+  - `cv::CVER`: Cross-validation scheme with contiguous, non-combinatorial folds. Defaults to `KFold()`. [`folds_are_time_ordered`](@ref) decides whether its folds thread the previous fold's weights, and [`folds_are_stepped`](@ref) whether the folds refit or fold.
   - `ex`: FLoops executor controlling parallelism. Defaults to `FLoops.ThreadedEx()`.
   - `id`: Identifier stored on the result.
 

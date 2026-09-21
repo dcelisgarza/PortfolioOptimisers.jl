@@ -178,7 +178,7 @@ and is held to the family's promises:
     end
 
     @testset "1. The batch-online identity at every block size, and Resume" begin
-        cv = IndexWalkForward(5, 1; ff = OnlineStep())
+        cv = OnlineIndexWalkForward(5, 1)
         for (name, alg) in roster
             opt = OPS(; alg = alg)
             # Static panel: four partitions of the same eighteen rows and one of all forty.
@@ -280,8 +280,8 @@ and is held to the family's promises:
 
     @testset "3. The fee-charged, drifted walk-forward and the hindsight comparators" begin
         fees = Fees(; tn = Turnover(; w = fill(1 / N, N), val = 0.001))
-        cv = IndexWalkForward(20, 1; ff = OnlineStep(), pws = DriftedWeights(),
-                              wd = SelfFinancingDrift())
+        cv = OnlineIndexWalkForward(20, 1; pws = DriftedWeights(),
+                                    wd = SelfFinancingDrift())
         rdt = cut(rd, 21:T)
         bcrp = predict(optimise(BestConstantRebalancedPortfolio(), rdt), rdt)
         best_stock = Pipeline(;
@@ -317,9 +317,7 @@ and is held to the family's promises:
         end
         # A turnover fee on the family requires the drifted book at the loop's door.
         @test_throws ArgumentError cross_val_predict(OPS(; alg = BuyAndHold(), fees = fees),
-                                                     rd,
-                                                     IndexWalkForward(20, 1;
-                                                                      ff = OnlineStep()))
+                                                     rd, OnlineIndexWalkForward(20, 1))
     end
 
     @testset "4. The two-regime diagnostic of the user guide reproduces" begin
@@ -343,7 +341,7 @@ and is held to the family's promises:
         end
         rd_rev = synthetic_market(:reverting)
         rd_trend = synthetic_market(:trending)
-        cv = IndexWalkForward(20, 1; ff = OnlineStep())
+        cv = OnlineIndexWalkForward(20, 1)
         wealth(alg, r) = prod(1 .+ cross_val_predict(OPS(; alg = alg), r, cv).mrd.X)
         # The chapter's numbers: the reversion rules are a total bet on the market's
         # property, and the winner rules sit together on both markets.
@@ -410,8 +408,8 @@ and is held to the family's promises:
     end
 
     @testset "6. The weight path renders, and a read-out reaches the finite allocation" begin
-        cv = IndexWalkForward(20, 1; ff = OnlineStep(), pws = DriftedWeights(),
-                              wd = SelfFinancingDrift(), store_weight_path = true)
+        cv = OnlineIndexWalkForward(20, 1; pws = DriftedWeights(),
+                                    wd = SelfFinancingDrift(), store_weight_path = true)
         pred = cross_val_predict(OPS(; alg = PassiveAggressiveMeanReversion()), rd, cv)
         is_plot(x) = x isa Plots.Plot || x isa Plots.AbstractLayout
         @test is_plot(plot_composition(pred; N = 4))

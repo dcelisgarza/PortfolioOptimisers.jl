@@ -210,7 +210,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                            atol = 1e-6)
         end
         # ... and the head under the online step walks the same folds.
-        cvo = IndexWalkForward(k, 1; expand_train = true, ff = OnlineStep())
+        cvo = OnlineIndexWalkForward(k, 1)
         predo = cross_val_predict(ftl, rd, cvo)
         for i in 1:4
             @test isapprox(predo.pred[i].res.w, pred.pred[i].res.w; atol = 1e-6)

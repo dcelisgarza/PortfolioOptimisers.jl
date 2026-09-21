@@ -17,7 +17,7 @@ needs_previous_weights(p::Pipeline)
 
 `cross_val_predict` over a `Pipeline` fits the whole workflow per fold and predicts on each test window. It is also the fold loop that consumes [`TimeDependent`](@ref) schedules in a pipeline ("swap, then inject"): schedules are swapped for their per-fold values *before* `fit` runs, so injection never sees a schedule and `fit`/[`run_step`](@ref) never learn about folds.
 
-A scheme that declares a Fold Fit sends the loop down its online arm, where the pipeline is warmed up once, folded fold by fold through [`partial_fit!`](@ref), and read out through `fit(pipe)`; `Online(pipe)` takes the same doors as the declared refit. See [the Pipeline's online step](06_OnlinePipeline.md).
+An Online Scheme sends the loop down its online arm, where the pipeline is warmed up once, folded fold by fold through [`partial_fit!`](@ref), and read out through `fit(pipe)`; `Online(pipe)` takes the same doors as the declared refit. See [the Pipeline's online step](06_OnlinePipeline.md).
 
 ```@docs
 cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)

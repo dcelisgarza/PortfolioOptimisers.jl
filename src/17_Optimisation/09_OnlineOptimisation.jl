@@ -449,7 +449,7 @@ Three refusals, all before any solve. A [`TimeDependent`](@ref) schedule of opti
   - [`online_folds`](@ref)
   - [`assert_stateless_schedule`](@ref)
   - [`online_entry_state`](@ref)
-  - [`OnlineStep`](@ref)
+  - [`OnlineIndexWalkForward`](@ref)
 """
 function online_entry_state(::TimeDependent)
     # A schedule's entries are batch configuration, resolved per fold; the loop threads no

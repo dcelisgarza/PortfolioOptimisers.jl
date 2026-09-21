@@ -3,7 +3,7 @@ The covariance forecast evaluation, issue #1023, against the decision of #873 (A
 
 One verb through the one fold loop: `covariance_forecast_evaluation(est, rd, cv)` scores a
 covariance estimator's, or a prior's, forecast on the test rows of every fold, in batch when
-the walk-forward refits and online when it declares `ff = OnlineStep()`. Around the verb sit
+the walk-forward refits and online when it is an Online Scheme. Around the verb sit
 the per-step kernel and its parity with the reference implementation's, the two realised
 targets, the location the test rows are centred on, the online and rolling identities over a
 panel with a listing and a delisting, the date form, the summary against the reference's
@@ -37,7 +37,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
                         pnl = AssetPanel(; amsk = amsk, emsk = copy(amsk)))
     w, h, p = 60, 5, 2
     batch_cv = IndexWalkForward(w, h; purged_size = p, expand_train = true)
-    online_cv = IndexWalkForward(w, h; purged_size = p, ff = OnlineStep())
+    online_cv = OnlineIndexWalkForward(w, h; purged_size = p)
     finite_max(a, b) = maximum(abs, filter(!isnan, a .- b))
     columns = (:mahalanobis_ratio, :diagonal_ratio, :qlike, :frobenius,
                :standardised_return, :portfolio_qlike)
@@ -225,7 +225,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
 
     @testset "The rolling identity through Online(est; max_history = w)" begin
         rolling = IndexWalkForward(w + p, h; purged_size = p)
-        stepped = IndexWalkForward(w + p, h; purged_size = p, ff = OnlineStep())
+        stepped = OnlineIndexWalkForward(w + p, h; purged_size = p)
         @test all(length.(split(rolling, rd).train_idx) .== w)
         for (est, r) in
             ((Covariance(), rd), (GeneralCovariance(), rd), (EmpiricalPrior(), rd),
@@ -244,7 +244,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
 
     @testset "The date form" begin
         bd = DateWalkForward(w, h; period = Day(1), purged_size = p, expand_train = true)
-        od = DateWalkForward(w, h; period = Day(1), purged_size = p, ff = OnlineStep())
+        od = OnlineDateWalkForward(w, h; period = Day(1), purged_size = p)
         bi = cfe(Covariance(), rdg, batch_cv)
         b = cfe(Covariance(), rdg, bd)
         o = cfe(Covariance(), rdg, od)
@@ -441,7 +441,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         # The verb.
         @test_throws po.IsNothingError cfe(Covariance(), ReturnsResult(; nx = nx), batch_cv)
         e = @test_throws ArgumentError cfe(po.Online(Covariance()), rd, batch_cv)
-        @test occursin("declares no Fold Fit", e.value.msg)
+        @test occursin("not an Online Scheme", e.value.msg)
         # The loop starts cold: a state at entry is refused by name.
         e = @test_throws ArgumentError cfe(po.partial_fit!(Covariance(), X[1:10, :]), rd,
                                            online_cv)

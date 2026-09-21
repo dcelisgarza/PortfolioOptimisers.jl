@@ -254,7 +254,7 @@ the worked step the paper prints for five assets at its defaults.
             c = copy(o.cache)
             @test c.st.me.cache !== o.cache.st.me.cache
             # A walk-forward at test_size = 1 through the online arm.
-            cv = IndexWalkForward(5, 1; expand_train = true, ff = OnlineStep())
+            cv = OnlineIndexWalkForward(5, 1)
             pred = cross_val_predict(opt, rows(rd, 1:12), cv)
             @test isapprox(pred.pred[1].res.w, optimise(opt, rows(rd, 1:5)).w; atol = 1e-14)
         end

@@ -1225,6 +1225,8 @@ So wrap an estimator whose estimate has **no** exact incremental fold of its own
 
 A wrapper and a [`TimeDependent`](@ref) schedule do not wrap each other, and the difference in *when* they resolve is the whole reason. Neither `Online(TimeDependent(…))` nor a schedule whose entry or `default` is an `Online` is admissible: a wrapper reached through a schedule entry would be resolved at no fold at all, or re-seeded at every fold, throwing away the buffer the step threads. They compose the other way round, and both ways are ordinary. An estimator an `Online` wraps may hold schedules of its own, which survive the seeding untouched and resolve per fold afterwards; and one host may hold a wrapper in one field and a schedule in another, each resolving at its own time. The two field scans are disjoint by construction — a field holding one is invisible to the other's candidate list — so neither resolution can reach the other's wrapper.
 
+**On a scheme the same word declares an Online Scheme.** `Online{<:WalkForwardEstimator}` wraps a walk-forward whose folds the loop fits by the online step instead of a refit: it warms one estimator up on the first training window, folds each fold's new observations into it, and reads it out where a refit would have run. It is built by the scheme's function constructor alone — [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref), [`OnlineHindsightSplit`](@ref) — which takes the scheme's keywords minus its window knob and sets that knob `true`, because a fold cannot un-fold an observation; `Online(cv)` written by hand is refused by name. On a scheme the wrapper is **not** transient: nothing resolves it away, the loop reads it at every fold, and every door decides on its type. It carries no `max_history`, because a window is the estimator's to declare through the wrapper on the prior.
+
 `max_history` caps that buffer, and the cap **is** the window. An uncapped buffer answers exactly what a batch fit over every observation folded so far answers, and a capped one answers exactly what a batch fit over the last `max_history` observations answers — for the estimate itself and for every consumer that reads the observations, the scenario risk measures among them, so CVaR, EVaR and CDaR. There is one rule and no special case: a buffer means the batch verb over the buffer's rows. An estimator left unwrapped is unaffected, folds exactly, and stays fitted over every observation.
 
 # Fields
@@ -1241,6 +1243,7 @@ $(DocStringExtensions.FIELDS)
 ## Validation
 
   - `est` is not an `Online`. An `ArgumentError` is thrown otherwise.
+  - `est` is not a cross-validation scheme: an Online Scheme is built by its function constructor. An `ArgumentError` naming the constructors is thrown otherwise.
   - `est` has a `cache` field. An `ArgumentError` is thrown otherwise.
   - `max_history > 0` when it is not `nothing`. A `DomainError` is thrown otherwise.
 
@@ -1267,6 +1270,9 @@ Online
   - [`update_online_estimator`](@ref)
   - [`online_fields`](@ref)
   - [`TimeDependent`](@ref)
+  - [`OnlineIndexWalkForward`](@ref)
+  - [`OnlineDateWalkForward`](@ref)
+  - [`OnlineHindsightSplit`](@ref)
 """
 struct Online{T1, T2} <: AbstractEstimator
     """
@@ -1287,6 +1293,17 @@ struct Online{T1, T2} <: AbstractEstimator
         end
         return new{typeof(est), typeof(max_history)}(est, max_history)
     end
+    # The Online Scheme path. Only the function constructors of the walk-forwards call it,
+    # with the window knob already set, so the wrapped scheme is expanding by construction
+    # and no value is checked here.
+    function Online{T1, T2}(cv::T1,
+                            max_history::T2) where {T1 <: CrossValidationEstimator,
+                                                    T2 <: Nothing}
+        return new{T1, T2}(cv, max_history)
+    end
+end
+function Online(cv::CrossValidationEstimator; kwargs...)
+    return throw(ArgumentError("`Online` on a scheme is an Online Scheme, and one is built by its function constructor alone — `OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit` — never by wrapping a `$(typeof(cv).name.name)` by hand. Each constructor takes its scheme's keywords minus the window knob and sets that knob `true`, because a fold cannot un-fold an observation, so an online run is expanding by construction. A scheme with no constructor of its own has no online form."))
 end
 function Online(::Online, args...; kwargs...)
     return throw(ArgumentError("est cannot be an Online: wrappers do not nest. One wrapper declares one buffer, and an estimator it wraps may carry wrappers of its own — they resolve at the same warm-up — but they belong in its fields, not inside this one."))
@@ -1353,6 +1370,21 @@ The required-field twin of [`Online_Option`](@ref), exactly as [`TD`](@ref) is o
   - [`online_fields`](@ref)
 """
 const Onl{X} = Union{<:Online, X}
+"""
+    const CVE_Onl = Union{<:CrossValidationEstimator, <:Online{<:CrossValidationEstimator}}
+
+Alias for a cross-validation scheme, plain or an Online Scheme.
+
+An Online Scheme is an [`Online`](@ref) around a walk-forward, built by the scheme's function constructor — [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref), [`OnlineHindsightSplit`](@ref) — and it is not a `CrossValidationEstimator` by supertype, because a struct has one. Every door that takes a scheme binds on this alias, or on one built from it, so the wrapped form reaches the same doors as the plain one; the fold loop then reads [`folds_are_stepped`](@ref) off its type.
+
+# Related
+
+  - [`CrossValidationEstimator`](@ref)
+  - [`Online`](@ref)
+  - [`CVER`](@ref)
+  - [`folds_are_stepped`](@ref)
+"""
+const CVE_Onl = Union{<:CrossValidationEstimator, <:Online{<:CrossValidationEstimator}}
 """
     online_candidate_fields(x)
 
@@ -1543,7 +1575,7 @@ end
 
 Refuse an estimator holding an [`Online`](@ref) at the door of a batch fit, by name.
 
-A wrapper is a declaration the online arm of the fold loop resolves at its warm-up, and a batch fit — a plain [`optimise`](@ref), or a fold of a scheme that declares no Fold Fit — runs no warm-up, so the wrapper would reach `prior(pe, X)` unresolved and meet a `MethodError` naming the whole type. The refusal names the dotted path [`online_wrapper_path`](@ref) finds and the two exits: an [`OnlineStep`](@ref) on a walk-forward, or the estimator unwrapped. A root that is itself a wrapper is refused by the door that admits one — [`covariance_forecast_evaluation`](@ref), and the Pipeline's — so this reads the path alone.
+A wrapper is a declaration the online arm of the fold loop resolves at its warm-up, and a batch fit — a plain [`optimise`](@ref), or a fold of a scheme that is not an Online Scheme — runs no warm-up, so the wrapper would reach `prior(pe, X)` unresolved and meet a `MethodError` naming the whole type. The refusal names the dotted path [`online_wrapper_path`](@ref) finds and the two exits: an Online Scheme ([`OnlineIndexWalkForward`](@ref) and its siblings), or the estimator unwrapped. A root that is itself a wrapper is refused by the door that admits one — [`covariance_forecast_evaluation`](@ref), and the Pipeline's — so this reads the path alone.
 
 # Arguments
 
@@ -1564,7 +1596,7 @@ A wrapper is a declaration the online arm of the fold loop resolves at its warm-
 function assert_batch_entry(est, door::AbstractString)
     path = online_wrapper_path(est)
     @argcheck(isnothing(path),
-              ArgumentError("`$(typeof(est).name.name)` enters $(door) holding an `Online` at `$(path)`, and a batch fit cannot resolve it: `Online` declares the sample buffer the fold loop's online arm seeds at its warm-up and folds the wrapped estimator's rows into, and nothing else seeds one, so the wrapper would reach the batch verb unresolved. Declare `ff = OnlineStep()` on a walk-forward and run the estimator through it, or set `$(path)` to the estimator it wraps and let the batch fit refit it from its rows."))
+              ArgumentError("`$(typeof(est).name.name)` enters $(door) holding an `Online` at `$(path)`, and a batch fit cannot resolve it: `Online` declares the sample buffer the fold loop's online arm seeds at its warm-up and folds the wrapped estimator's rows into, and nothing else seeds one, so the wrapper would reach the batch verb unresolved. Run the estimator through an Online Scheme — `OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit` — or set `$(path)` to the estimator it wraps and let the batch fit refit it from its rows."))
     return nothing
 end
 """
@@ -1633,6 +1665,9 @@ end
 function update_online_estimator(o::Online)
     est = rebuild_estimator(o.est, (; cache = online_state_seed(o.est, o.max_history)))
     return update_online_estimator(est)
+end
+function update_online_estimator(o::Online{<:CrossValidationEstimator})
+    return throw(ArgumentError("`Online($(typeof(o.est).name.name))` is an Online Scheme, and it reached the warm-up in an estimator slot: a scheme seeds no sample buffer, because it is the `cv` argument of the cross-validation door, not a field of the estimator that runs through it."))
 end
 
 """

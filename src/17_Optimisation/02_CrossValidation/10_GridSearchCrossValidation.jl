@@ -69,11 +69,11 @@ Performs grid search cross-validation for portfolio optimisation estimators. Ite
 
 # Details
 
-  - Refuses an estimator carrying a partial-fit state once, before any candidate is built, through [`assert_search_entry`](@ref): the search tunes the configuration alone, and under an [`OnlineStep`](@ref) the whole entry check of the online arm runs at the door.
+  - Refuses an estimator carrying a partial-fit state once, before any candidate is built, through [`assert_search_entry`](@ref): the search tunes the configuration alone, and under an Online Scheme the whole entry check of the online arm runs at the door.
   - Fixes the folds once through [`pin_draw`](@ref), so a scheme whose `split` draws at random scores every candidate over the same folds.
   - Iterates over all parameter combinations in the grid, in parallel over `gscv.ex`.
   - Scores each candidate through [`fit_and_predict`](@ref)`(opt_i, rd, gscv.cv; ex = SequentialEx())`, the one fold loop every cross-validation entry point runs, so the candidate runs the scheme it declared: a walk-forward threads the previous fold's weights through the scheme's `pws`, and resolves a [`TimeDependent`](@ref) schedule per fold, exactly as [`fit_and_predict`](@ref)`(opt, rd, cv)` does. The folds inside a candidate run in sequence.
-  - Under an [`OnlineStep`](@ref), every candidate warms up cold on the first training window and steps through the folds, so the online search reads the matrix of the batch expanding search to the tolerance of the moment layer and of the solver, and picks the same column. Nothing is shared between candidates and nothing is reset.
+  - Under an Online Scheme, every candidate warms up cold on the first training window and steps through the folds, so the online search reads the matrix of the batch expanding search to the tolerance of the moment layer and of the solver, and picks the same column. Nothing is shared between candidates and nothing is reset.
   - Writes one row per fold, in `split`'s enumeration order, through [`write_candidate_scores!`](@ref). Under a [`MultipleRandomised`](@ref) the loop returns one series per path, and [`score_rows`](@ref) lays each path's scores back onto its split rows.
   - Selects the optimal parameter set based on cross-validation scores, through [`finite_candidate_index`](@ref): the scorer is handed the candidates that finished every fold, and a candidate that failed one can never win. The result keeps the **raw** score matrix, so its columns line up with the grid and a reader sees which fold failed. A failed step holds `NaN` at that row, the column never reaches the scorer, and every later step of the candidate still runs and scores.
 

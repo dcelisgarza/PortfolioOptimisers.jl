@@ -30,11 +30,16 @@ function Base.split(res::CrossValidationResult, args...)
     return res
 end
 """
-    CVER = Union{<:CrossValidationEstimator, <:CrossValidationResult}
+    CVER = Union{<:CVE_Onl, <:CrossValidationResult}
 
-Union of all cross-validation estimators and result types.
+Union of all cross-validation schemes, plain or online, and result types.
+
+# Related
+
+  - [`CVE_Onl`](@ref)
+  - [`CrossValidationResult`](@ref)
 """
-const CVER = Union{<:CrossValidationEstimator, <:CrossValidationResult}
+const CVER = Union{<:CVE_Onl, <:CrossValidationResult}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -2205,23 +2210,22 @@ function fold_evaluation(::Any)
             strict = false)
 end
 """
-    fold_fit(cv)
+    folds_are_stepped(cv)
 
-Read the Fold Fit of a cross-validation scheme: how [`fold_loop`](@ref) fits each fold.
+Whether [`fold_loop`](@ref) fits each fold of `cv` by the online step, or by a refit from the fold's training window.
 
-`nothing` means a refit from the fold's training window, which is the released behaviour and what every scheme answers unless it states otherwise. A walk-forward carries the switch in its `ff` field and answers it through a method of its own; a [`MultipleRandomised`](@ref) forwards to the walk-forward it wraps; a split result, a k-fold, a combinatorial scheme, a [`HindsightSplit`](@ref) — whose fold reads its test row and is refit by construction — and a call site that holds no scheme reach this fallback. An [`OnlineStep`](@ref) sends the loop down its online arm.
+`false` is a refit every fold, which is what every scheme answers unless it is an Online Scheme: an [`Online`](@ref) around a walk-forward, built by [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref) or [`OnlineHindsightSplit`](@ref), answers `true` through a method of its own, and a [`MultipleRandomised`](@ref) answers for the walk-forward it wraps. A plain scheme, a split result, and a call site that holds no scheme reach this fallback.
 
 The method is per type and takes the scheme itself, so inference reads the answer from the type of `cv`, exactly as [`fold_evaluation`](@ref) and [`folds_are_time_ordered`](@ref) do, and the arm that cannot run is eliminated.
 
 # Related
 
-  - [`AbstractFoldFit`](@ref)
-  - [`OnlineStep`](@ref)
+  - [`Online`](@ref)
   - [`fold_evaluation`](@ref)
   - [`folds_are_time_ordered`](@ref)
   - [`fold_loop`](@ref)
 """
-fold_fit(::Any) = nothing
+folds_are_stepped(::Any) = false
 """
     fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
               ::Type{ElT} = PredictionResult; rd, train_idx, test_idx,
@@ -2247,14 +2251,14 @@ The callback takes the one [`Fold`](@ref) record, so a call site names what it r
 (`fold.est`, `fold.train`) instead of relying on the position of an argument.
 
 [`assert_time_dependent_fold_count`](@ref) runs once, before the loop, and so does
-[`assert_batch_entry`](@ref) when the scheme declares no Fold Fit: the batch arms refit
+[`assert_batch_entry`](@ref) when the scheme is not an Online Scheme: the batch arms refit
 every fold from its training window and run no warm-up, so an [`Online`](@ref) anywhere
 in `est` would reach `prior(pe, X)` unresolved, and it is refused by name instead — once,
 here, rather than up to once per fold on the workers of `ex`.
 
 This is also the one site that decides how the folds run, and it has three arms. The
-online arm, [`online_folds`](@ref), is taken first, when the scheme declares a Fold Fit
-([`fold_fit`](@ref)): the loop then warms one estimator up on the first training window,
+online arm, [`online_folds`](@ref), is taken first, when the scheme is an Online Scheme
+([`folds_are_stepped`](@ref)): the loop then warms one estimator up on the first training window,
 folds each fold's new rows into it, and hands the callback a [`Fold`](@ref) whose `train` is
 `nothing` — steps 2 and 3 run on a per-fold copy of the threaded estimator, so a schedule and
 the previous weights still reach the fold. Otherwise a run is sequential only when two
@@ -2270,7 +2274,7 @@ value a call site computes. All are decided by the *types* of `cv` and `est`, so
 folds the conjunction and eliminates the arm that cannot run. A `Bool` keyword cannot do
 this: its value survives only by constant propagation, which one call hop loses, and the
 sequential arm is then inferred even where it can never run. The two path-level sites enumerate an inner walk-forward; the optimiser's passes the
-[`MultipleRandomised`](@ref) it runs, which forwards its Fold Fit, and the Pipeline's holds no
+[`MultipleRandomised`](@ref) it runs, which answers for the walk-forward it wraps, and the Pipeline's holds no
 scheme and omits `cv`; `folds_are_time_ordered(nothing)` answers `true`.
 
 `ElT` is the per-fold result element type: a single
@@ -2293,7 +2297,7 @@ multi-path combinatorial scheme. It is positional for the reason given in
   - [`run_folds`](@ref)
   - [`parallel_folds`](@ref)
   - [`assert_unshuffled_folds`](@ref)
-  - [`fold_fit`](@ref)
+  - [`folds_are_stepped`](@ref)
   - [`folds_are_time_ordered`](@ref)
   - [`fit_and_predict`](@ref)
   - [`cross_val_predict`](@ref)
@@ -2306,8 +2310,8 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
     if td_flag
         assert_time_dependent_fold_count(est, n)
     end
-    if isnothing(fold_fit(cv))
-        assert_batch_entry(est, "the fold loop under a scheme that declares no Fold Fit")
+    if !folds_are_stepped(cv)
+        assert_batch_entry(est, "the fold loop under a scheme that is not an Online Scheme")
     end
     prev_w_flag = needs_previous_weights(est)
     # The per-fold copy. `esti` is the fold's estimator before resolution: the configuration
@@ -2336,7 +2340,7 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
     # run. A `Bool` keyword would leave the `run_folds` arm inferred, and its
     # abstractly-typed `predictions[i - 1]` is a runtime dispatch. See the ADR 0067
     # amendments.
-    return if !isnothing(fold_fit(cv))
+    return if folds_are_stepped(cv)
         online_folds(resolve, est, n, ElT; rd = rd, train_idx = train_idx,
                      test_idx = test_idx, fold_view = fold_view, pws = pws)
     elseif folds_are_time_ordered(cv) && prev_w_flag

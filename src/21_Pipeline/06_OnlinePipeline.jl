@@ -26,7 +26,7 @@ A wrapper is a declaration the online arm's warm-up resolves; `fit(pipe, data)` 
   - [`update_online_estimator`](@ref)
 """
 function run_step(o::Online, ::PipelineContext)
-    return throw(ArgumentError("an `Online($(typeof(o.est).name.name))` step is a declaration the online arm of the fold loop resolves at its warm-up, and `fit(pipe, data)` has none: run the pipeline through a scheme with `ff = OnlineStep()`, or hand the step the plain estimator."))
+    return throw(ArgumentError("an `Online($(typeof(o.est).name.name))` step is a declaration the online arm of the fold loop resolves at its warm-up, and `fit(pipe, data)` has none: run the pipeline through an Online Scheme (`OnlineIndexWalkForward` or `OnlineDateWalkForward`), or hand the step the plain estimator."))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -374,12 +374,12 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The entry checks of a Pipeline's cross-validation door: no holdout, and an `Online(pipe)` root only under a scheme that declares a Fold Fit, because the wrapper resolves at the online arm's warm-up and a batch scheme has none.
+The entry checks of a Pipeline's cross-validation door: no holdout, and an `Online(pipe)` root only under an Online Scheme, because the wrapper resolves at the online arm's warm-up and a batch scheme has none.
 
 # Related
 
   - [`assert_no_holdout`](@ref)
-  - [`fold_fit`](@ref)
+  - [`folds_are_stepped`](@ref)
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
 """
 function assert_pipeline_door(pipe::Pipeline, ::Any)
@@ -388,8 +388,8 @@ function assert_pipeline_door(pipe::Pipeline, ::Any)
 end
 function assert_pipeline_door(o::Online{<:Pipeline}, cv)
     assert_no_holdout(o.est)
-    @argcheck(!isnothing(fold_fit(cv)),
-              ArgumentError("`Online(pipe)` declares a refit from a buffer the online arm of the fold loop seeds at its warm-up, and this scheme declares no Fold Fit, so every fold refits from its training window already. Set `ff = OnlineStep()` on the scheme, or hand the door the plain pipeline."))
+    @argcheck(folds_are_stepped(cv),
+              ArgumentError("`Online(pipe)` declares a refit from a buffer the online arm of the fold loop seeds at its warm-up, and this scheme is not an Online Scheme, so every fold refits from its training window already. Build the scheme with `OnlineIndexWalkForward` or `OnlineDateWalkForward`, or hand the door the plain pipeline."))
     return nothing
 end
 """
@@ -398,7 +398,7 @@ end
 
 Run a walk-forward over `Online(pipe)`, the declared refit of a [`Pipeline`](@ref) from an input-carrier buffer.
 
-The same doors as the pipeline's, with the wrapper threaded through the fold loop: the online arm resolves it at warm-up into a pipeline carrying a [`PipelineBufferState`](@ref), every fold appends its new rows to the buffer, and the read-out is `fit(pipe, buffer)`. So the run is exact for every configuration at batch cost — the window-valued steps the host route refuses included — and with `max_history = w` it equals the rolling batch walk-forward with warm-up `w + purged_size`. A scheme with no Fold Fit is refused by name, because the wrapper resolves only at the online arm's warm-up.
+The same doors as the pipeline's, with the wrapper threaded through the fold loop: the online arm resolves it at warm-up into a pipeline carrying a [`PipelineBufferState`](@ref), every fold appends its new rows to the buffer, and the read-out is `fit(pipe, buffer)`. So the run is exact for every configuration at batch cost — the window-valued steps the host route refuses included — and with `max_history = w` it equals the rolling batch walk-forward with warm-up `w + purged_size`. A scheme that is not an Online Scheme is refused by name, because the wrapper resolves only at the online arm's warm-up.
 
 # Related
 

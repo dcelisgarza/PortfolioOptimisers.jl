@@ -40,15 +40,20 @@ Six facts measured on `dev` at `ca03684ff5` shaped the decision.
    static Bool, neither of which the library carries: `Val` appears only as a method selector,
    and Static.jl is not a dependency.
 4. **`Online` is one struct with one supertype.** `Online{T1, T2} <: AbstractEstimator` holds
-   `est` and `max_history`. A struct has one supertype, so `Online(cv)` cannot be a
-   `WalkForwardEstimator`, and eight bounds name that family: `MultipleRandomised(cv::WalkForwardEstimator)`
-   three times, `cv::WFCVER` five times, and the `NonCombOptCV` alias. The library already widens
-   an estimator slot to admit a wrapper by a Union alias, `Online_Option{X}`.
-5. **`Online(IndexWalkForward(252, 21))` constructs today.** `CrossValidationEstimator <: AbstractEstimator`,
-   so the generic `Online(est::AbstractEstimator)` accepts a scheme, and the value then fails at
-   the first door with a `MethodError` on the `WFCVER` bound that names the whole type and no
-   cause — the shape [#1033](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1033)
-   removed from the estimator doors.
+   `est` and `max_history`. A struct has one supertype, so `Online(cv)` is neither a
+   `WalkForwardEstimator` nor a `CrossValidationEstimator`, and the scheme doors bind on
+   both: the root alias `CVER` (seven doors), `WFCVER` (five), `NonCombOptCV`,
+   `MultipleRandomised(cv::WalkForwardEstimator)` three times, and the `cv` field of the two
+   search structs (four signatures). Three alias edits and one new alias cover them. The library
+   already widens an estimator slot to admit a wrapper by a Union alias, `Online_Option{X}`.
+   (The decision first counted eight bounds; the build measured these.)
+5. **`Online(IndexWalkForward(252, 21))` is refused today for the wrong reason.**
+   `CrossValidationEstimator <: AbstractEstimator`, so the generic `Online(est)` admits a scheme
+   by bound, and its inner constructor then refuses it because a scheme has no `cache` field —
+   a message about a sample buffer, which is not the cause. The inner constructor is also the
+   struct's only `new` path, so a scheme wrapper needs a private inner constructor of its own.
+   (The decision first said the value constructs and fails at a door with a `MethodError`; it
+   reasoned about the bound without constructing the value, and the build corrected it.)
 6. **A `HindsightSplit` with `prefix = true` is a nested-prefix scheme.** Fold `t` trains on
    rows `1:t` and tests on row `t` (`04_WalkForward.jl`, `split(hs::HindsightSplit, rd)`), so the
    online arm serves it as it serves an expanding walk-forward: warm up on `1:start`, fold row
@@ -67,9 +72,9 @@ A scheme takes the online step by being wrapped in `Online`, the one word the es
 already uses. The wrapper is the existing struct: an **Online Scheme** is an
 `Online{<:WalkForwardEstimator, Nothing}`, an `AbstractEstimator` whose `est` is the scheme and
 whose `max_history` is `nothing`. On a scheme the wrapper is **not transient**: nothing resolves
-it away, and the loop reads it at every fold. `split`, `n_splits`, `fold_evaluation`,
-`folds_are_time_ordered` and `show` forward to `est`. The eight walk-forward bounds widen with one
-Union alias in the shape of `Online_Option`, so a `MultipleRandomised` wraps an Online Scheme as
+it away, and the loop reads it at every fold. `split`, `n_splits` and `fold_evaluation` forward
+to `est`; `folds_are_time_ordered` and `show` need no method. The scheme bounds widen with
+Union aliases in the shape of `Online_Option`, so a `MultipleRandomised` wraps an Online Scheme as
 it wraps a plain one, `MultipleRandomised(OnlineIndexWalkForward(252, 21); subset_size = 5)`, and
 the loop reads `MultipleRandomised{<:Online}` by dispatch where `fold_fit` forwarded. There is no
 `OnlineMultipleRandomised`.
@@ -93,7 +98,9 @@ on the prior.
 
 `Online(cv)` on any `CrossValidationEstimator` **by hand is refused by name**, by a method on
 that type that points at the three constructors. The method closes fact 5 in the same stroke: a
-scheme never reaches the generic estimator constructor.
+scheme never reaches the generic estimator constructor or its `cache` check. The constructors
+build the wrapper through a private inner constructor, `Online{T1, T2}(cv, nothing)` bound to
+`T1 <: CrossValidationEstimator`, which checks no value because the knob is already set.
 
 ### The window knobs are the caller's, and the tag family goes
 
@@ -113,15 +120,20 @@ parallel one. An Online Scheme is chosen by name through its constructor, and a 
 declared by name in the estimator slot, so neither has anything to announce: `cv_resume_info`
 goes with it, and both arms run silent.
 
-### Every refusal is a method on the refused type
+### Every refusal is decided by the scheme's type, and thrown by name
 
-The arm, the search door, the covariance-forecast door, the Pipeline door and `Resume`'s door
-read the scheme's type. Where a combination is refused — a wrapped estimator under a plain
-scheme, `Resume` under a plain scheme, `Online(est)` handed to the covariance-forecast evaluation
-under a plain scheme, `Online(pipe)` under a plain scheme — the refusal is a method on the
-refused type that throws by name, so dispatch decides it and the message names the cause,
-as issue #1033 asked. A `MethodError` from a bound stands where its text is already the
-answer: a keyword the constructor does not take.
+One per-type predicate, `folds_are_stepped(cv)`, replaces `fold_fit`: `false` for every scheme,
+`true` for `Online{<:WalkForwardEstimator}`, and a `MultipleRandomised` answers for the
+walk-forward it wraps. It is the third of the loop's per-type predicates beside
+`folds_are_time_ordered` and `needs_previous_weights`, so inference folds the route and
+eliminates the dead arm, as ADR 0067's amendments describe. The arm, the search door, the
+covariance-forecast door and the Pipeline door read it; `Resume`'s door is three methods, one
+per refused type. Where a combination is refused — a wrapped estimator under a plain scheme,
+`Resume` under a plain scheme, `Online(est)` handed to the covariance-forecast evaluation under
+a plain scheme, `Online(pipe)` under a plain scheme, `Online(cv)` by hand, an Online Scheme in
+an estimator slot at warm-up — the throw names the cause, as issue #1033 asked. A `MethodError`
+from a bound stands where its text is already the answer: a keyword the constructor does not
+take.
 
 ### A clean break
 
@@ -164,8 +176,11 @@ that returns another type, which is the shape refused below.
   entries lose the old spelling, and the `Online` wrapper gains its third referent: on an
   estimator it seeds a refit buffer, on a Pipeline it declares the workflow's refit, on a scheme
   it makes the loop step.
-- The build owes: the three constructors, exported; the Union alias and the eight widenings; the
-  five forwarding methods; the by-name refusal of `Online(::CrossValidationEstimator)`; the
+- The build owes: the three constructors, exported; the aliases `CVE_Onl` (in `15_Online.jl`,
+  because `01_Base_CrossValidation.jl` is over the size gate's 500 code lines) and
+  `WalkForward_Onl`, with `CVER`, `WFCVER`, `NonCombOptCV`, the `MultipleRandomised` bounds and
+  the search fields widened on them; the forwarding methods `split`, `n_splits` and
+  `fold_evaluation` (`folds_are_time_ordered` and `show` need none); the by-name refusal of `Online(::CrossValidationEstimator)`; the
   removal of `ff`, `OnlineStep`, `AbstractFoldFit`, `fold_fit`, `resolve_expand_train` and
   `assert_fold_fit_expands` with their private-API entries; the removal of `cv_online_info` and
   `cv_resume_info`, their private-API entries, the three `@test_logs` in `test_24c` and the one
@@ -179,5 +194,8 @@ that returns another type, which is the shape refused below.
   contract still, with `OnlineIndexWalkForward(w, t; purged_size = p)` on the online side.
 - `OnlineHindsightSplit` is recorded as parity by rule and no speed gain on the usual
   comparators; a timing assertion on it is not owed.
+- Built by [#1211](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1211). The
+  three facts above marked as corrected by the build are the premises the decision got wrong;
+  none moved a ruling.
 - No released number moves: a bare `IndexWalkForward(252, 21)` resolves `expand_train` to `false`
   as before, and the batch arms are untouched.

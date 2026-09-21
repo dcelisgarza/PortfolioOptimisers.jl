@@ -7,14 +7,14 @@ Description = "The online walk-forward in PortfolioOptimisers.jl: warm one estim
 
 A walk-forward refits every fold from its training window, so on an expanding window each
 fold re-reads every row the fold before it read. The online step does the reading once. A
-walk-forward that declares the **Fold Fit** [`OnlineStep`](@ref) warms one estimator up on
+walk-forward wrapped in `Online` — the **Online Scheme** [`OnlineIndexWalkForward`](@ref) builds — warms one estimator up on
 the first training window, folds each later fold's *new* rows into it, and reads it out where
 a refit would have run. The folds are the same folds; only the fit of each one changes, and
 the run reaches the weights of the batch expanding-window walk-forward fold for fold.
 
 The rule is one keyword:
 
-> `IndexWalkForward(w, t; ff = OnlineStep())`
+> `OnlineIndexWalkForward(w, t)`
 
 Every layer above the moments takes the step. A prior folds its moments and carries its rows;
 an optimiser forwards the rows to its prior and, at read-out, rebuilds the carrier and runs the
@@ -59,7 +59,7 @@ N = size(rd.X, 2)
 The prior carries a [`CoveragePolicy`](@ref) on both moments, so each cell is fitted on the
 observations it has and an asset enters the universe when it lists. Its moments fold exactly
 under the policy. The two schemes below cut identical windows: an online run is expanding by
-construction — a fold cannot un-fold a row — so `OnlineStep()` derives `expand_train = true`.
+construction — a fold cannot un-fold a row — so `OnlineIndexWalkForward` sets `expand_train = true`.
 =#
 
 cvg = CoveragePolicy()
@@ -68,7 +68,7 @@ pe = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg),
 hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe))
 
 batch = IndexWalkForward(100, 40; purged_size = 3, expand_train = true)
-online = IndexWalkForward(100, 40; purged_size = 3, ff = OnlineStep())
+online = OnlineIndexWalkForward(100, 40; purged_size = 3)
 
 b = cross_val_predict(hrp, rd, batch)
 o = cross_val_predict(hrp, rd, online)
@@ -124,7 +124,7 @@ window is the estimator's. A rolling batch scheme of window `w + p` with purge `
 =#
 
 rolling = IndexWalkForward(103, 40; purged_size = 3)
-stepped = IndexWalkForward(103, 40; purged_size = 3, ff = OnlineStep())
+stepped = OnlineIndexWalkForward(103, 40; purged_size = 3)
 hrp_cap = HierarchicalRiskParity(;
                                  opt = HierarchicalOptimiser(;
                                                              pe = Online(pe;

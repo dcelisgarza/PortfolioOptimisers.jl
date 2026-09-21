@@ -11,8 +11,8 @@ window the cost of the whole run therefore grows with the square of the number o
 the moments of fold `i` are recomputed from scratch when almost all of their input is the
 input of fold `i - 1`.
 
-The library's answer is a **Fold Fit**. A walk-forward that declares
-[`OnlineStep`](@ref) warms one estimator up on the first training window, folds each later
+The library's answer is an **Online Scheme**: the walk-forward wrapped in `Online`, built by
+[`OnlineIndexWalkForward`](@ref). It warms one estimator up on the first training window, folds each later
 fold's *new* rows into it, and reads it out where a refit would have run. The estimator is
 threaded from fold to fold, and the run reaches the weights of the batch expanding-window
 walk-forward fold for fold. Nothing in the enumeration of folds changes; only the fit of
@@ -29,7 +29,7 @@ the moments takes the step through it:
     its own is calibrated on the prior result it is handed.
   - A **JuMP head builds a fresh model at every read-out**: the solve is the step's cost,
     and no model is kept warm.
-  - The **walk-forward declares the Fold Fit**, and the online arm threads the estimator
+  - The **scheme's type declares the step**, and the online arm threads the estimator
     from a cold start.
   - A **search scores every candidate through the one fold loop**, online and batch alike.
   - A **Pipeline is a host**: its row-local steps fold, its universe steps view, and a step
@@ -40,7 +40,7 @@ A member with no exact recursion is wrapped: `Online(est; max_history)` seeds a 
 that the read-out refits from, and its cap is the rolling window.
 
 !!! tip "When to reach for this"
-    Reach for `ff = OnlineStep()` on any expanding walk-forward, because it costs nothing in
+    Reach for `OnlineIndexWalkForward` in place of any expanding walk-forward, because it costs nothing in
     accuracy: the run equals the batch one fold for fold. Reach for it for the *clock* when
     the prior carries a `CoveragePolicy` and the head's read-out is cheap — a hierarchical or
     a naive optimiser — because that is where the batch fit is itself a recursion over the
@@ -115,13 +115,13 @@ end
 #=
 The two walk-forwards enumerate the same folds. The batch one expands its training window,
 which is what an online run does by construction — a fold cannot un-fold an observation — so
-`OnlineStep()` derives `expand_train = true` and the two schemes cut identical windows. Both
+`OnlineIndexWalkForward` sets `expand_train = true` and the two schemes cut identical windows. Both
 purge three rows before each test window.
 =#
 
 w, t, p = 100, 40, 3
 batch = IndexWalkForward(w, t; purged_size = p, expand_train = true)
-online = IndexWalkForward(w, t; purged_size = p, ff = OnlineStep())
+online = OnlineIndexWalkForward(w, t; purged_size = p)
 
 (; train_idx, test_idx) = split(batch, rd)
 (train_idx == split(online, rd).train_idx, train_idx, [first(i):last(i) for i in test_idx])
@@ -261,7 +261,7 @@ trains over `w` rows, and the capped online run reads out over exactly those row
 =#
 
 rolling = IndexWalkForward(w + p, t; purged_size = p)
-stepped = IndexWalkForward(w + p, t; purged_size = p, ff = OnlineStep())
+stepped = OnlineIndexWalkForward(w + p, t; purged_size = p)
 cap(pe) = Online(pe; max_history = w)
 
 hrp_cap = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = cap(pe)))
@@ -280,7 +280,7 @@ and they nest.
 
 ## 6. A search picks the batch candidate
 
-A search scores every candidate through the one fold loop, and does not read the Fold Fit.
+A search scores every candidate through the one fold loop, whatever the scheme's fit.
 The grid tunes the weight bounds, which bind and so separate the candidates; the two
 searches score identical matrices and pick the same column.
 =#
@@ -298,11 +298,11 @@ s_o = search_cross_validation(hrp, gs(online), rd)
  s_o.idx == s_b.idx, s_o.val_grid[s_o.idx])
 
 #=
-Under `OnlineStep` the fold axis is sequential whatever executor the search is handed,
+Under an Online Scheme the fold axis is sequential whatever executor the search is handed,
 because fold `i` reads the state fold `i - 1` left; the candidate axis is the one that gains
 from threads, and `GridSearchCrossValidation`'s `ex` stays on it.
 
-`RandomisedSearchCrossValidation` is also compatible with `OnlineStep` as it wraps an instance
+`RandomisedSearchCrossValidation` is also compatible with an Online Scheme as it wraps an instance
 of `GridSearchCrossValidation` and samples from the search space.
 
 ## 7. A run resumes from its Result
@@ -431,7 +431,7 @@ the ratio falls only as the moment fit grows into it.
 
 ## 10. What to take away
 
-  - `IndexWalkForward(w, t; ff = OnlineStep())` is the whole declaration. The folds are the
+  - `OnlineIndexWalkForward(w, t)` is the whole declaration. The folds are the
     walk-forward's and do not change; the fit of each fold does. The scheme derives the
     expanding window, and a rolling window is `Online(pe; max_history = w)` on the
     estimator.
@@ -442,7 +442,7 @@ the ratio falls only as the moment fit grows into it.
   - A member with no recursion is wrapped in `Online`, refits from its buffer, and matches
     the batch fit over the same rows exactly. A host folds what folds and refits the rest,
     so the online estimator is the batch estimator.
-  - A search does not read the Fold Fit; a Result resumes a run over the history extended;
+  - A search scores through the same loop whatever the fit; a Result resumes a run over the history extended;
     a Pipeline is a host of the step on the same terms.
   - The seam's real benefit is accuracy: the fold is a Welford recursion, and it holds its
     digits on a level where the textbook formula does not. Its speed shows through the loop

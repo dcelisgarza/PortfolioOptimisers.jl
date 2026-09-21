@@ -294,7 +294,7 @@ end
                 :AbstractEntropyPoolingTailViewEstimator,
                 :AbstractEntropyPoolingViewEstimator, :AbstractEstimator,
                 :AbstractFactorFamilyBasis, :AbstractFeatureCollapseAlgorithm,
-                :AbstractFeeAmortisation, :AbstractFoldFit, :AbstractForecastUnit,
+                :AbstractFeeAmortisation, :AbstractForecastUnit,
                 :AbstractHierarchicalClusteringAlgorithm, :AbstractHighOrderPriorEstimator,
                 :AbstractJuMPResult, :AbstractLoadingsRegressionResult,
                 :AbstractMIPIndicators, :AbstractMIPSpace, :AbstractNetworkEstimator,

@@ -48,7 +48,7 @@ what keeps the JuMP families cheap.
     hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = EmpiricalPrior()))
     w, t, p = 60, 20, 3
     batch_cv = IndexWalkForward(w, t; purged_size = p, expand_train = true)
-    online_cv = IndexWalkForward(w, t; purged_size = p, ff = OnlineStep())
+    online_cv = OnlineIndexWalkForward(w, t; purged_size = p)
     rows(d, i) = po.pipeline_data_view(d, i)
     weight_tol(pipe) = isa(pipe.steps[end], po.JuMPOptimisationEstimator) ? 1e-5 : 1e-10
     same_carrier(a, b) = isequal(a.nx, b.nx) &&
@@ -353,7 +353,7 @@ what keeps the JuMP families cheap.
         @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-5)
                   for (pb, po_) in zip(b.pred, o.pred))
         bd = DateWalkForward(w, t; period = Day(1), purged_size = p, expand_train = true)
-        od = DateWalkForward(w, t; period = Day(1), purged_size = p, ff = OnlineStep())
+        od = OnlineDateWalkForward(w, t; period = Day(1), purged_size = p)
         b = cross_val_predict(pipes[2], pr, bd)
         o = cross_val_predict(pipes[2], pr, od)
         @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
@@ -393,7 +393,7 @@ what keeps the JuMP families cheap.
                         steps = (PriceGapFill(; fill = MeanValue()), PricesToReturns(),
                                  EmpiricalPrior(), hrp))
         rolling = IndexWalkForward(w + p, t; purged_size = p)
-        capped = IndexWalkForward(w + p, t; purged_size = p, ff = OnlineStep())
+        capped = OnlineIndexWalkForward(w + p, t; purged_size = p)
         b = cross_val_predict(pipe, pr, rolling)
         o = cross_val_predict(po.Online(pipe; max_history = w), pr, capped)
         @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
@@ -578,7 +578,7 @@ what keeps the JuMP families cheap.
         # An Online(pipe) under a batch scheme, and an Online step at a fold-less fit.
         hpipe = Pipeline(; steps = (prep..., EmpiricalPrior(), hrp))
         msg = refusal(() -> cross_val_predict(po.Online(hpipe), pr, batch_cv))
-        @test occursin("no Fold Fit", msg)
+        @test occursin("not an Online Scheme", msg)
         msg = refusal(() -> fit(Pipeline(;
                                          steps = (prep..., po.Online(EmpiricalPrior()),
                                                   hrp)), pr))

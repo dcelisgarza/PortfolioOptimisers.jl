@@ -72,7 +72,7 @@ that compounded best. A reversion rule at its default threshold would be at a co
 ## 3. The roster in a walk-forward with a turnover fee
 
 The walk-forward warms the head up on the first sixty rows and then folds one row per fold
-with the Fold Fit [`OnlineStep`](@ref), so every fold is one update and one read-out. A
+under the Online Scheme [`OnlineIndexWalkForward`](@ref), so every fold is one update and one read-out. A
 turnover fee on this family must be measured against the book the fund actually held, and
 the scheme's `pws = DriftedWeights()` is that pairing: the loop threads the drifted book into
 the next fold's fee, and the fold loop refuses a `tn` fee on this family without it. The fee
@@ -80,7 +80,7 @@ is ten basis points per unit of turnover.
 =#
 
 fees = Fees(; tn = Turnover(; w = fill(1 / N, N), val = 0.001))
-cv = IndexWalkForward(60, 1; ff = OnlineStep(), pws = DriftedWeights())
+cv = OnlineIndexWalkForward(60, 1; pws = DriftedWeights())
 
 rules = ["Buy and hold" => BuyAndHold(),
          "Constant rebalanced" => ConstantRebalancedPortfolio(),
@@ -100,7 +100,7 @@ rebalanced to the target every row and charged nothing — and the gap between t
 columns is the fee's.
 =#
 
-cv0 = IndexWalkForward(60, 1; ff = OnlineStep())
+cv0 = OnlineIndexWalkForward(60, 1)
 free = Dict(name => cross_val_predict(OnlinePortfolioSelection(; alg = alg), rd, cv0)
             for (name, alg) in rules)
 

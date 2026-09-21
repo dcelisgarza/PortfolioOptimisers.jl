@@ -98,7 +98,7 @@ $(DocStringExtensions.FIELDS)
 
     GridSearchCrossValidation(
         p::MultiGSCVValType_VecMultiGSCVValType;
-        cv::CrossValidationEstimator = KFold(),
+        cv::CVE_Onl = KFold(),
         r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
         scorer::CrossValSearchScorer = HighestMeanScore(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
@@ -188,8 +188,7 @@ GridSearchCrossValidation
                                                 <:AbstractDict{<:Any, <:AbstractVector},
                                                 <:AbstractVector{<:AbstractDict{<:Any,
                                                                                 <:AbstractVector}}},
-                                       cv::CrossValidationEstimator,
-                                       r::AbstractBaseRiskMeasure,
+                                       cv::CVE_Onl, r::AbstractBaseRiskMeasure,
                                        scorer::CrossValSearchScorer,
                                        ex::FLoops.Transducers.Executor, train_score::Bool,
                                        kwargs::NamedTuple)
@@ -232,7 +231,7 @@ function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
                                             <:AbstractDict{<:Any, <:AbstractVector},
                                             <:AbstractVector{<:AbstractDict{<:Any,
                                                                             <:AbstractVector}}};
-                                   cv::CrossValidationEstimator = KFold(),
+                                   cv::CVE_Onl = KFold(),
                                    r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                                    scorer::CrossValSearchScorer = HighestMeanScore(),
                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
@@ -257,7 +256,7 @@ $(DocStringExtensions.FIELDS)
                  AbstractDict{<:GSCVKey, <:RSCVVal},
                  AbstractVector{<:AbstractDict{<:GSCVKey,
                                                <:RSCVVal}}};
-        cv::CrossValidationEstimator = KFold(),
+        cv::CVE_Onl = KFold(),
         r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
         scorer::CrossValSearchScorer = HighestMeanScore(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
@@ -365,8 +364,7 @@ RandomisedSearchCrossValidation
                                                       <:AbstractVector{<:AbstractVector{<:Pair}},
                                                       <:AbstractDict,
                                                       <:AbstractVector{<:AbstractDict}},
-                                             cv::CrossValidationEstimator,
-                                             r::AbstractBaseRiskMeasure,
+                                             cv::CVE_Onl, r::AbstractBaseRiskMeasure,
                                              scorer::CrossValSearchScorer,
                                              ex::FLoops.Transducers.Executor,
                                              n_iter::Integer, rng::Random.AbstractRNG,
@@ -418,7 +416,7 @@ function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair},
                                                   <:AbstractVector{<:AbstractVector{<:Pair}},
                                                   <:AbstractDict,
                                                   <:AbstractVector{<:AbstractDict}};
-                                         cv::CrossValidationEstimator = KFold(),
+                                         cv::CVE_Onl = KFold(),
                                          r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                                          scorer::CrossValSearchScorer = HighestMeanScore(),
                                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
@@ -569,7 +567,7 @@ end
 
 Refuse an estimator that is not the configuration alone at the door of a search, once, before any candidate is built.
 
-A search scores every candidate through the one fold loop, and a lens is applied before that loop's warm-up, so a cold estimator seeds one state per candidate and nothing is shared or reset. A warm one is refused by name here rather than inside the candidate loop, where the workers of `gscv.ex` would raise it up to once per candidate. Under every Fold Fit the walk is [`online_entry_state`](@ref), because a search tunes the configuration alone whatever the scheme does with it; under an [`OnlineStep`](@ref) it is the whole [`assert_online_entry`](@ref), so a schedule on a stateful field is refused at the door too.
+A search scores every candidate through the one fold loop, and a lens is applied before that loop's warm-up, so a cold estimator seeds one state per candidate and nothing is shared or reset. A warm one is refused by name here rather than inside the candidate loop, where the workers of `gscv.ex` would raise it up to once per candidate. Under a plain scheme the walk is [`online_entry_state`](@ref), because a search tunes the configuration alone whatever the scheme does with it; under an Online Scheme it is the whole [`assert_online_entry`](@ref), so a schedule on a stateful field is refused at the door too.
 
 # Arguments
 
@@ -579,17 +577,17 @@ A search scores every candidate through the one fold loop, and a lens is applied
 # Validation
 
   - No `cache` in the tree of `est` holds a state. An `ArgumentError` naming the field is thrown otherwise.
-  - Under an [`OnlineStep`](@ref), everything [`assert_online_entry`](@ref) refuses.
+  - Under an Online Scheme, everything [`assert_online_entry`](@ref) refuses.
 
 # Related
 
   - [`search_cross_validation`](@ref)
   - [`online_entry_state`](@ref)
   - [`assert_online_entry`](@ref)
-  - [`fold_fit`](@ref)
+  - [`folds_are_stepped`](@ref)
 """
 function assert_search_entry(est, cv)
-    if !isnothing(fold_fit(cv))
+    if folds_are_stepped(cv)
         assert_online_entry(est)
     else
         path = online_entry_state(est)

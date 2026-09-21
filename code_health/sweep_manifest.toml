@@ -66,7 +66,7 @@
 "src/01_Base/12_NormError.jl" = { map = 1, units = 8, algorithm = 2, swept = true, bindings = ["L1Norm", "L2Norm", "LInfNorm", "LpNorm", "NormError", "SquaredL2Norm", "norm_error", "norm_factor"] }
 "src/01_Base/13_KappaLog.jl" = { map = 1, units = 1, algorithm = 0, swept = true, bindings = ["kappa_log"] }
 "src/01_Base/14_PartialFit.jl" = { map = 1, units = 10, swept = false }
-"src/01_Base/15_Online.jl" = { map = 1, units = 45, swept = false }
+"src/01_Base/15_Online.jl" = { map = 1, units = 46, swept = false }
 "src/01_Base/16_CoveragePolicy.jl" = { map = 1, units = 24, swept = false }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true, bindings = ["MaxValue", "MeanValue", "MedianValue", "MinValue", "ModeValue", "Num_VecToScaM", "PROPAGATABLE_CONTRACTS", "PROP_TAG_CHANNELS", "PROP_TAG_MACRO_NAMES", "PROP_TAG_NAMES", "ProdValue", "StandardisedValue", "StdValue", "SumValue", "VarValue", "VectorToScalarMeasure", "_wprop", "check_prop_tag_macros", "check_propagatable_contracts", "concrete_typed_array", "concrete_typed_array_if_abstract", "cprop", "dot_scalar", "extract_field_name", "factory", "factory_child", "forward_flatten_path", "forward_nonnothing", "forward_properties", "forward_walk_expr", "fourth_moment_index_generator", "fprop", "get_window", "is_doc_macro", "is_prop_tag_call", "nothing_scalar_array_getindex", "nothing_scalar_array_getindex_odd_order", "nothing_scalar_array_view", "nothing_scalar_array_view_odd_order", "obs_weights_view", "obs_weights_view", "peel_prop_tags", "port_opt_view", "port_opt_view", "port_opt_view", "port_opt_view", "pprop", "prop_channel_active", "prop_channel_pairs", "prop_tag", "prop_tag_expr", "propagatable", "propagatable_bare_name", "propagatable_contract_violations", "propagatable_find_struct", "propagatable_keywords", "propagatable_parse_body", "propagatable_register!", "resolve_deferred_quantities", "traverse_concrete_subtypes", "try_field_name", "vec_to_real_measure", "vprop", "wprop", "⊕", "⊖", "⊗", "⊘", "⊙"] }
 "src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 34, swept = false }
@@ -286,10 +286,10 @@
 "src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { map = 12, units = 19, swept = false }
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { map = 12, units = 3, swept = false }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { map = 12, units = 2, swept = false }
-"src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { map = 12, units = 4, swept = false }
+"src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { map = 12, units = 3, swept = false }
 "src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { map = 12, units = 19, swept = false }
 "src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { map = 12, units = 6, swept = false }
-"src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { map = 12, units = 16, swept = false }
+"src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { map = 12, units = 15, swept = false }
 "src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl" = { map = 12, units = 8, swept = false }
 "src/17_Optimisation/03_NaiveOptimisation.jl" = { map = 10, units = 28, swept = false }
 "src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl" = { map = 10, units = 16, swept = false }
