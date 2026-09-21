@@ -136,7 +136,7 @@ Investable Mask, `wb`, `retcode` and `fb`. `pr` is the prior result when the hea
 and `nothing` otherwise, in **both** arms, so the batch–online identity holds on the whole Result
 and not on `w` alone. No path and no state ride on the Result. The per-row path over a window is
 the product of the walk-forward the library already has —
-`WalkForward(; train_size = 1, test_size = 1, fit = OnlineStep())` is `T` read-outs at `O(N)`
+`OnlineIndexWalkForward(1, 1)` is `T` read-outs at `O(N)`
 each, drifted, fee-charged, scored and plotted through the existing machinery — and a path on the
 Result would be a second, unscored copy of it whose shape differed between the arms. This rules the
 online half of #312: **a weight sequence is a walk-forward's product, never an optimisation
