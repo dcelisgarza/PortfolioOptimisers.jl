@@ -189,7 +189,7 @@
           │      │           │        pr ┼ LowOrderPrior
           │      │           │           │       X ┼ 252×4 Matrix{Float64}
           │      │           │           │     o_X ┼ nothing
-          │      │           │           │      mu ┼ Vector{Float64}: [-0.0005703954772857034, 0.002111454811964477, 0.0005954569768867713, 0.00038875642679489644]
+          │      │           │           │      mu ┼ Vector{Float64}: [-0.0005703954772857469, 0.0021114548119633187, 0.0005954569768867563, 0.0003887564267948162]
           │      │           │           │   sigma ┼ 4×4 Matrix{Float64}
           │      │           │           │    chol ┼ nothing
           │      │           │           │       w ┼ nothing
@@ -224,13 +224,13 @@
           │      │           │           │            │     fee ┼ Bool: true
           │      │           │           │            │     mic ┴ Bool: true
           │      │           │           │        ucs ┼ nothing
-          │      │           │           │         mu ┴ Vector{Float64}: [-0.0005703954772857034, 0.002111454811964477, 0.0005954569768867713, 0.00038875642679489644]
+          │      │           │           │         mu ┴ Vector{Float64}: [-0.0005703954772857469, 0.0021114548119633187, 0.0005954569768867563, 0.0003887564267948162]
           │      │           │       sca ┼ SumScalariser()
           │      │           │      imsk ┴ nothing
           │      │   retcode ┼ OptimisationSuccess
           │      │           │   res ┴ Dict{Any, Any}: Dict{Any, Any}()
           │      │       sol ┼ JuMPOptimisationSolution
-          │      │           │   w ┴ Vector{Float64}: [7.224724136926423e-7, 0.13660786446524628, 0.6133269234160638, 0.25006448964627637]
+          │      │           │   w ┴ Vector{Float64}: [7.224724120183358e-7, 0.1366078644652344, 0.6133269234160328, 0.2500644896463209]
           │      │     model ┼ A JuMP Model
           │      │           │ ├ solver: Clarabel
           │      │           │ ├ objective_sense: MIN_SENSE
@@ -286,7 +286,7 @@
           │      │           │        pr ┼ LowOrderPrior
           │      │           │           │       X ┼ 252×3 Matrix{Float64}
           │      │           │           │     o_X ┼ nothing
-          │      │           │           │      mu ┼ Vector{Float64}: [0.0007720709986441312, 0.0003452652641646169, 0.0002454684124146688]
+          │      │           │           │      mu ┼ Vector{Float64}: [0.0007720709986443381, 0.000345265264164617, 0.00024546841241466886]
           │      │           │           │   sigma ┼ 3×3 Matrix{Float64}
           │      │           │           │    chol ┼ nothing
           │      │           │           │       w ┼ nothing
@@ -321,13 +321,13 @@
           │      │           │           │            │     fee ┼ Bool: true
           │      │           │           │            │     mic ┴ Bool: true
           │      │           │           │        ucs ┼ nothing
-          │      │           │           │         mu ┴ Vector{Float64}: [0.0007720709986441312, 0.0003452652641646169, 0.0002454684124146688]
+          │      │           │           │         mu ┴ Vector{Float64}: [0.0007720709986443381, 0.000345265264164617, 0.00024546841241466886]
           │      │           │       sca ┼ SumScalariser()
           │      │           │      imsk ┴ nothing
           │      │   retcode ┼ OptimisationSuccess
           │      │           │   res ┴ Dict{Any, Any}: Dict{Any, Any}()
           │      │       sol ┼ JuMPOptimisationSolution
-          │      │           │   w ┴ Vector{Float64}: [0.9999999015969661, 5.634352526167618e-8, 4.205950873643811e-8]
+          │      │           │   w ┴ Vector{Float64}: [0.9999999015969563, 5.634353086413191e-8, 4.205951281454964e-8]
           │      │     model ┼ A JuMP Model
           │      │           │ ├ solver: Clarabel
           │      │           │ ├ objective_sense: MIN_SENSE
@@ -414,7 +414,7 @@
 │    UNH │    0.0 % │  3.483 % │    0.0 % │          1.144 % │
 │    WMT │  9.355 % │  4.863 % │  9.355 % │          7.507 % │
 │    XOM │  4.725 % │  3.285 % │  4.725 % │          6.301 % │
-└────────┴──────────┴──────────┴──────────┴──────────────────┘</code></pre><h2 id="6.-Visualising-the-compositions"><a class="docs-heading-anchor" href="#6.-Visualising-the-compositions">6. Visualising the compositions</a><a id="6.-Visualising-the-compositions-1"></a><a class="docs-heading-anchor-permalink" href="#6.-Visualising-the-compositions" title="Permalink"></a></h2><p>The stacked-bar composition makes the diversifying effect of the meta-optimisers visible against the plain minimum-variance benchmark.</p><p>Composition of the benchmark and the three meta-optimisers.</p><pre id="c-7d4c8915"><code class="nohighlight hljs line-numbers"><span class="code-lines"><span class="line"><span class="line-num" aria-hidden="true"></span><span class="julia-keyword">using</span> StatsPlots, GraphRecipes</span><span class="line"><span class="line-num" aria-hidden="true"></span><a class="julia-ref" href="../../../public_api/22_Plotting/#PortfolioOptimisers.plot_stacked_bar_composition"><span class="julia-funcall">plot_stacked_bar_composition</span></a>([res_bench, res_nco, res_stk, res_ssr], rd)</span></span></code></pre><img src="997774ea.svg" alt="Example block output"/><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../12_Clustering_Mixed_Risks_And_Constraints/">« Clustering optimisers with mixed risks and constraints</a><a class="docs-footer-nextpage" href="../14_Subset_Resampling_and_Cross_Validation/">Subset resampling and cross-validation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Monday 21 September 2026 12:18">Monday 21 September 2026</span>. Using Julia version 1.13.0.</p></section><footer class="modal-card-foot"></footer></div></div></div><div class="ref-tips" hidden><div class="ref-tip" data-for="../../../public_api/03_InputData/11_PricesToReturns/#PortfolioOptimisers.prices_to_returns"><code class="ref-tip-sig nohighlight"><span class="julia-funcall">prices_to_returns</span>(
+└────────┴──────────┴──────────┴──────────┴──────────────────┘</code></pre><h2 id="6.-Visualising-the-compositions"><a class="docs-heading-anchor" href="#6.-Visualising-the-compositions">6. Visualising the compositions</a><a id="6.-Visualising-the-compositions-1"></a><a class="docs-heading-anchor-permalink" href="#6.-Visualising-the-compositions" title="Permalink"></a></h2><p>The stacked-bar composition makes the diversifying effect of the meta-optimisers visible against the plain minimum-variance benchmark.</p><p>Composition of the benchmark and the three meta-optimisers.</p><pre id="c-7d4c8915"><code class="nohighlight hljs line-numbers"><span class="code-lines"><span class="line"><span class="line-num" aria-hidden="true"></span><span class="julia-keyword">using</span> StatsPlots, GraphRecipes</span><span class="line"><span class="line-num" aria-hidden="true"></span><a class="julia-ref" href="../../../public_api/22_Plotting/#PortfolioOptimisers.plot_stacked_bar_composition"><span class="julia-funcall">plot_stacked_bar_composition</span></a>([res_bench, res_nco, res_stk, res_ssr], rd)</span></span></code></pre><img src="b9a7b920.svg" alt="Example block output"/><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../12_Clustering_Mixed_Risks_And_Constraints/">« Clustering optimisers with mixed risks and constraints</a><a class="docs-footer-nextpage" href="../14_Subset_Resampling_and_Cross_Validation/">Subset resampling and cross-validation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Monday 21 September 2026 14:40">Monday 21 September 2026</span>. Using Julia version 1.13.0.</p></section><footer class="modal-card-foot"></footer></div></div></div><div class="ref-tips" hidden><div class="ref-tip" data-for="../../../public_api/03_InputData/11_PricesToReturns/#PortfolioOptimisers.prices_to_returns"><code class="ref-tip-sig nohighlight"><span class="julia-funcall">prices_to_returns</span>(
     pr<span class="julia-operator">::</span><span class="julia-type">PricesResult</span>;
     ret_method<span class="julia-operator">::</span><span class="julia-type">Symbol</span> <span class="julia-keyword">=</span> <span class="julia-symbol">:</span><span class="julia-symbol">simple</span>,
     padding<span class="julia-operator">::</span><span class="julia-type">Bool</span> <span class="julia-keyword">=</span> <span class="julia-number">false</span>,
