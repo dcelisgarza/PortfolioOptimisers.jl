@@ -181,7 +181,12 @@ const NOT_A_CHOICE = Dict{Symbol, Symbol}(
                                           # risk measure; the marker is how one builder body
                                           # serves both twins.
                                           :NetReturnsRiskSeries => :internal,
-                                          :DrawdownRiskSeries => :internal)
+                                          :DrawdownRiskSeries => :internal,
+                                          # The geometry token `AdaptiveSubgradient`
+                                          # constructs from its accrued gradient mass at
+                                          # every step (ADR 0168). The capability is the
+                                          # rule; a caller never holds the token.
+                                          :DiagonalProjection => :internal)
 
 """
     CATALOGUE

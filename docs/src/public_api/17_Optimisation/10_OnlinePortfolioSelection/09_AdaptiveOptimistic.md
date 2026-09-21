@@ -1,5 +1,5 @@
 ```@meta
-Description = "Online selection rules: the adaptive subgradient and the optimistic step, public API of PortfolioOptimisers.jl: AdaptiveSubgradient, AbstractGradientPredictor, …"
+Description = "Online selection rules: the adaptive subgradient and the optimistic step, public API of PortfolioOptimisers.jl: AdaptiveSubgradient, …"
 ```
 
 # Online selection rules: the adaptive subgradient and the optimistic step

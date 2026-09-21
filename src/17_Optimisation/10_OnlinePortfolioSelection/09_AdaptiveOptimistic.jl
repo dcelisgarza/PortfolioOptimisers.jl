@@ -23,7 +23,7 @@ The positional argument is the struct's field. The rule constructs the geometry 
 
 ```jldoctest
 julia> PortfolioOptimisers.DiagonalProjection([1.0, 2.0])
-DiagonalProjection
+PortfolioOptimisers.DiagonalProjection
   h ┴ Vector{Float64}: [1.0, 2.0]
 ```
 

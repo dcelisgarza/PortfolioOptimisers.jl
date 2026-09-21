@@ -18,7 +18,7 @@ A type held inside an Estimator that selects or modifies its computational behav
 An Algorithm that carries no field, and whose only job is to name the branch a caller takes. Dispatch on the type is the whole of its behaviour: `SpectralDenoise` selects the spectral branch of `denoise!`. Most subtypes of `AbstractAlgorithm` are selector tags.
 
 **Open Family**
-An abstract type whose docstring carries an `# Interfaces` section, so a subtype written anywhere, a private path included, dispatches on the methods the section names. It is the one justification for a unit that would otherwise be inlined: a function with one method and one caller, or an abstract type with one concrete subtype, stays only as a hand-written entry in the allow-list of the census that gates trivial units, and that entry is admissible only on an Open Family. The section is a precondition, not an exemption, because every abstract type that parents a concrete type carries one. ADR 0168.
+An abstract type whose docstring carries an `# Interfaces` section, so a subtype written anywhere, a private path included, dispatches on the methods the section names. It is one justification, beside a realistic future application, for an abstract type with one concrete subtype that nothing codes against: such a type stays only as a hand-written entry in the allow-list of the census that gates dead-end units, and the entry names the section or the application. The section is a precondition, not an exemption, because every abstract type that parents a concrete type carries one. ADR 0168.
 *Avoid*: an exported or `public` type, which is a narrower thing — the section is the route to a `public` declaration (ADR 0154), not the other way round.
 
 **Result**

@@ -246,6 +246,36 @@ already carries the shape and names the symbol the caller passed.
   function prior(pr::AbstractPriorResult, args...; kwargs...) = pr  # passthrough
   ```
 
+## A unit that offers nothing but indirection is inlined
+
+A unit is a dead-end when it has **one method**, a body that is **one depth-one forward**, and
+**at most one reference** in `src/` and `ext/` outside its own definition (ADR 0168). A depth-one
+forward is a bare argument, a literal, a field of an argument, or one call whose callee is a name
+and whose arguments are each of those, a global name, a splat or a keyword forward. Such a unit
+is a name between a caller and the expression it forwards to, and it is inlined at that caller. A
+unit with no reference at all is dead and is deleted. The shape is one method, one caller, and a
+body that only constructs the geometry token the caller could construct itself.
+
+Everything wider earns its keep, because it reduces its caller's complexity, keeps the caller's
+inferred type concrete, or names a rule the caller would otherwise restate:
+
+- **Two methods are dispatch.** A `Nothing`/value pair and a two-family pair save the caller an
+  `isa` branch. They are never candidates, whatever their bodies hold.
+- **A decision, an operator, an index, a nested call, a comprehension or a string template is
+  logic the unit owns.** A ternary that picks a formulation, a message template, an accessor
+  that slices, and a helper that names one rule all stay.
+- **A public forward is public API.** A user's call is a use the census cannot see, so it is
+  flagged and kept by an allow-list entry, and the list shows every public forward the library
+  carries.
+
+The type-level case is an abstract type with one concrete subtype that nothing codes against: no
+dispatch on it, no field bound, no union alias. It stays when it has a realistic future
+application, and the allow-list is where that application is named.
+
+`test/test_70_trivial_unit_census.jl` is the census and the allow-list. A flagged name outside
+the list fails the build, and an entry whose name is no longer flagged is stale and fails too, so
+the list can only shrink on its own.
+
 ## Return Type Annotations
 
 - See `.github/instructions/julia-return-types.instructions.md` for full guidelines.

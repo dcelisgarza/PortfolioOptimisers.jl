@@ -55,47 +55,59 @@ Six facts measured on `dev` at `d96073d819` shaped the decision.
 
 ### The rule
 
-A unit is removed when all three hold.
+A unit is a dead-end, and is removed, when all three hold.
 
-1. Its body is trivial: every method of the function is one expression, of any form. A call, a
-   constructor, a field access, a comparison and a ternary all count, so a one-caller accessor
-   and a `Nothing`/value pair are trivial as a forwarding wrapper is.
-2. It has at most one reference in `src/` and `ext/` outside its own definitions. A reference in
-   value position, such as `map(f, xs)`, counts as a call does. A call from `test/`, `docs/`,
-   `examples/` or `user_guide/` is not a use: the direct tests of an inlined unit move to its
-   caller, and a unit with no reference in `src/` or `ext/` at all is dead.
-3. It has no live dispatch: two or more methods that differ, on a call site that admits two or
-   more types, as `gram_geometry` has on `NewtonStep.proj`.
+1. It has **one method**. Two methods are dispatch: a `Nothing`/value pair and a two-family pair
+   save their caller an `isa` branch and keep the caller's inferred type concrete, so they are
+   never candidates, whatever their bodies hold. `gram_geometry` on `NewtonStep.proj` is the
+   shape, and so is `carrier_asset_names` over a `Nothing` and a returns carrier.
+2. Its body is **one depth-one forward**: a bare argument, a literal, a field of an argument, or
+   one call (or constructor) whose callee is a name and whose arguments are each of those, a
+   global name, a splat of one or a keyword forward. `diagonal_geometry`, whose body is
+   `DiagonalProjection(; h = h)`, is the shape. A decision, an operator, an index, a nested
+   call, a comprehension or a string template is logic the unit owns: a ternary that picks a
+   formulation, a message template, an accessor that slices and a helper that names one rule
+   all reduce their caller's complexity, and every one of them stays.
+3. It has **at most one reference** in `src/` and `ext/` outside its own definition. A
+   reference in value position, such as `map(f, xs)`, counts as a call does. A call from `test/`,
+   `docs/`, `examples/` or `user_guide/` is not a use: the direct tests of an inlined unit move
+   to its caller, and a unit with no reference in `src/` or `ext/` at all is dead.
 
-A named step with real logic and one caller is not trivial and stays. The complexity gate forces
-such splits, and the rule does not undo them.
+A unit that offers nothing but indirection is the whole of the target. Anything that reduces
+complexity, keeps a caller's inferred type concrete, or is simple and convenient earns its keep,
+and the complexity gate forces most named steps into existence in the first place.
 
-An abstract type with one concrete subtype is the type-level case of the same rule. It is removed,
-and its subtype takes the supertype.
+The type-level case is an abstract type with one concrete subtype that **nothing codes against**:
+no method dispatches on it, no field is bound to it, and no union alias names it, so its only
+reference is the subtype's own declaration. Such a type stays when it has a realistic future
+application, a second member the family is shaped for, and the allow-list is where that
+application is named. A type any code reads through is an abstraction the code is written
+against, and is never a candidate.
 
-### The exceptions, and the brake
+### The brake
 
-An **Open Family** justifies a single-method entry and a single-subtype abstract type. Its mark is
-the `# Interfaces` section of the abstract type's docstring, which names the methods a subtype
-defines, so a subtype anywhere, private path included, dispatches on them. The section is a
-**precondition, not an exemption**: the census flags every candidate, and a name is kept only by
-a hand-written entry in the gate's allow-list. The gate fails on an allow-listed abstract type
-whose docstring has no `# Interfaces` section. Because fact 6 makes the section near-universal,
-the allow-list entry is the whole of the brake, and the reviewer of that edit is the maintainer.
+The census flags every candidate, and a name is kept only by a hand-written entry in the gate's
+allow-list, each with a one-line reason: for a function, the reason it is simple and convenient;
+for an abstract type, the future application or the `# Interfaces` section that already states
+its contract. The entry is the whole of the brake, and the reviewer of that edit is the
+maintainer. An entry whose name is no longer flagged is stale and fails the gate, so the list can
+only shrink on its own.
 
-An exported trivial forwarder is public API, and a user's call is a use the census cannot see. It
-is flagged all the same and kept by an allow-list entry, so the list shows every public forwarder
-the library carries. `performance_summary(w, X, fees; kwargs...)`, whose body forwards to the
-series method, is the shape.
+A public forward is public API, and a user's call is a use the census cannot see. It is flagged
+all the same and kept by an allow-list entry, so the list shows every public forward the library
+carries: the descriptor factories, the risk-measure aliases and the out-of-place arm of
+`matrix_processing_algorithm` are the shapes.
 
 ### The gate
 
-A new census test parses `src/` and `ext/` with JuliaSyntax and walks `subtypes` from the root. It
-lists every function whose methods are all one expression and whose name has at most one
-reference, and every abstract type with one concrete subtype, and fails on any name outside its
-allow-list. Two shapes are not candidates: a constructor method named after its type, the
-library's keyword-constructor idiom, and a method that extends another module's function, such
-as `Base.show`, which is an interface by definition.
+`test/test_70_trivial_unit_census.jl` parses `src/` and `ext/` with the parser
+`code_health/CodeHealth.jl` holds, which is JuliaSyntax, and resolves every name against the
+loaded module. It lists every one-method function whose body is a depth-one forward and whose
+name has at most one reference, and every abstract type with one concrete subtype and no
+reference outside the declarations, and fails on any name outside its allow-list and on any
+allow-list entry that is no longer flagged. Two shapes are not candidates: a constructor method
+named after its type, the library's keyword-constructor idiom, and a method that extends another
+module's function, such as `Base.show`, which is an interface by definition.
 
 ### The three named units
 
@@ -136,6 +148,17 @@ gate.
    unit needs a name so its justification can be checked.
 9. **A map with a sub-issue per directory, or folding the census into the sweep** — refused for
    this pass. The removals share three files, and one branch pays no merge contention.
+10. **Every one-expression unit as a candidate, a ternary and a `Nothing`/value pair included** —
+    the rule as first drafted, refused during the build. The wide reading flagged the
+    formulation pickers of the entropy-pooling tail views, the per-term projection of a
+    re-based constraint row, the group view of a tensor Panel Field and every `Nothing`/value
+    accessor pair, each of which reduces its caller's complexity or keeps its inferred type
+    concrete. Only a unit that offers nothing but indirection is a dead-end, and the rule above
+    says so.
+11. **Every single-subtype abstract type removed, its subtype taking the supertype** — refused
+    during the build for the same reason. A type nothing codes against and with no realistic
+    second member is the only dead-end; a family shaped for a second member stays, and names it
+    on the allow-list.
 
 ## Consequences
 
@@ -147,9 +170,10 @@ gate.
   public API entry and catalogue entry removed and a private API entry added; the `proj` field of
   `AdaptiveSubgradient` removed from the struct, the constructor, the docstring and the test that
   reads it; the `return_types` measurement of `summarise_returns` and, on a pass, the ternary;
-  the census over the whole library and the removal of every flagged unit, with each touched
-  file's sweep manifest row and private API page corrected; the rule in the instructions file
-  and its `STANDARDS.md` row.
+  the census over the whole library and the removal of every dead-end it flags, with each
+  touched file's sweep manifest row and private API page corrected; the rule in the
+  instructions file and its `STANDARDS.md` row. Under the rule above the census found one
+  dead-end beyond the three named units, the no-op `set_budget_costs!`, and no abstract type.
 - Built by [#1212](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1212).
 - No released number moves. `AdaptiveSubgradient` and `DiagonalProjection` are on `dev` alone,
   and the removal of the `proj` keyword is a clean break with no deprecation, as ADR 0167 made
