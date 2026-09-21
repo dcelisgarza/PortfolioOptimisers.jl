@@ -19,12 +19,14 @@ found the two sentences give one constraint two homes;
 
 - **The projected optimum is not the leader.** Follow the leader is `argmax_{w ∈ K} Σ_s log⟨w, x_s⟩`
   over the decision set `K`; its regret theorems are stated on `K`. On sixty rows of three assets
-  — the first two co-moving, the third independent, the first with the best drift — and a cap of
-  `0.5`, the unconstrained leader is `[1, 0, 0]`; the leader solved on the capped set is
-  `[0.5, 0, 0.5]`, log wealth `+0.069` over the rows; the unconstrained leader projected onto the
-  capped set in the Euclidean geometry is `[0.5, 0.25, 0.25]`, log wealth `−0.063`. The projection
-  spreads the excess equally where the constrained solve moves it to the independent asset, and
-  the projected answer loses money on rows the constrained one profits on.
+  on a two-period cycle — returns `+0.05 / −0.02`, `+0.044 / −0.026` and `−0.01 / +0.03` on odd
+  and even rows, so the first two co-move, the second with the lower drift, and the third moves
+  against them — and a cap of `0.5`, the unconstrained leader is `[1, 0, 0]`; the leader solved on
+  the capped set is `[0.5, 0, 0.5]`, log wealth `0.744` over the rows; the unconstrained leader
+  projected onto the capped set in the Euclidean geometry is `[0.5, 0.25, 0.25]`, log wealth
+  `0.717`. The projection spreads the excess equally where the constrained solve moves it all to
+  the asset in anti-phase, and the projected answer grows less over every pair of rows. The fixture
+  is the one `test/test_67c_follow_the_leader.jl` pins, and the two numbers are its.
 - **Every JuMP head already admits an extra constraint object.** The shared model assembly of the
   JuMP heads ends with `add_custom_constraint!(model, opt.ccnt, optimiser, attrs)`
   (`src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl`), so a `CustomJuMPConstraint` on

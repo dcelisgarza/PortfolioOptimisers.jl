@@ -7,7 +7,10 @@ pattern-matching and risk-aversion aggregations as configurations.
 
 Parity: follow the leader equals a walk-forward at `test_size = 1` over `MeanRisk` under
 `LogarithmicReturn` with an expanding window, fold for fold; the selectors are checked
-against their papers' definitions on hand fixtures; the four tests ADR 0164 owes are here.
+against their papers' definitions on hand fixtures; the four tests ADR 0164 owes are here; the
+log-optimal programme is written by hand as an exponential cone per row, which pins the
+exp-concave leader of Hazan and Kale at its value against the mean log return, and the corner
+leader the solver-free fixed point stops short of at its default budget.
 =#
 using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, Clarabel,
       HiGHS, Pajarito, JuMP
@@ -243,6 +246,53 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test optimise(named, rd).w[1] <= 0.1 + 1e-8
         # Outside a step the carrier is named by column.
         @test po.leader_carrier(R[1:3, :]).nx == ["1", "2", "3", "4"]
+        # The log-optimal programme by hand, an exponential cone per row, with an optional
+        # squared penalty on the weights against the SUM of the logs.
+        function hand_logopt(Xr; l2 = 0.0)
+            m = JuMP.Model(Clarabel.Optimizer)
+            JuMP.set_silent(m)
+            JuMP.set_optimizer_attribute(m, "tol_gap_abs", 1e-12)
+            JuMP.set_optimizer_attribute(m, "tol_gap_rel", 1e-12)
+            JuMP.set_optimizer_attribute(m, "tol_feas", 1e-12)
+            n, d = size(Xr)
+            JuMP.@variable(m, 0 <= b[1:d] <= 1)
+            JuMP.@variable(m, u[1:n])
+            JuMP.@constraint(m, sum(b) == 1)
+            for i in 1:n
+                JuMP.@constraint(m, [u[i], 1.0, dot(Xr[i, :], b)] in MOI.ExponentialCone())
+            end
+            JuMP.@objective(m, Max, sum(u) - l2 * dot(b, b))
+            JuMP.optimize!(m)
+            return JuMP.value.(b)
+        end
+        # The exp-concave leader of Hazan and Kale: the paper's ½‖w‖² against the sum of the
+        # logs is 1 / (2n) against their mean, so the squared regularisation at that value is
+        # the leader on n rows, and the same value is not it on another n.
+        for t in (10, 25)
+            hk = hand_logopt(X[1:t, :]; l2 = 0.5)
+            ec = FollowTheLeader(;
+                                 opt = logopt(;
+                                              l2 = L2Regularisation(; val = 0.5 / t,
+                                                                    alg = QuadRiskExpr())))
+            @test isapprox(optimise(OPS(; alg = ec), rows(rd, 1:t)).w, hk; atol = 1e-6)
+            fixed = FollowTheLeader(;
+                                    opt = logopt(;
+                                                 l2 = L2Regularisation(; val = 0.5,
+                                                                       alg = QuadRiskExpr())))
+            @test !isapprox(optimise(OPS(; alg = fixed), rows(rd, 1:t)).w, hk; atol = 1e-2)
+        end
+        # A leader on a corner: the solved form is exact, and the solver-free default's fixed
+        # point stops short of it at its budget, where a lower `tol` under a larger `iters`
+        # closes the gap. Row 30 of the fixture drops two assets.
+        w30 = hand_logopt(X[1:30, :])
+        @test count(<(1e-6), w30) == 2
+        @test isapprox(optimise(ftl, rows(rd, 1:30)).w, w30; atol = 1e-6)
+        wfp = optimise(OPS(; alg = FollowTheLeader()), rows(rd, 1:30)).w
+        @test maximum(abs.(wfp .- w30)) > 1e-2
+        long = FollowTheLeader(;
+                               opt = BestConstantRebalancedPortfolio(; iters = 2_000_000,
+                                                                     tol = 1e-16))
+        @test isapprox(optimise(OPS(; alg = long), rows(rd, 1:30)).w, w30; atol = 1e-5)
     end
 
     @testset "The Allocation Set Constraint (ADR 0164)" begin
