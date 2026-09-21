@@ -109,9 +109,9 @@ is unchanged behind its new selector.
 `cv_online_info`, the message the online arm emits once at entry, is removed. Its sibling
 `cv_sequential_info` stands because it reports a fact the caller did not choose: a sequential
 run the loop took on its own, from `needs_previous_weights`, where the caller expected a
-parallel one. An Online Scheme is chosen by name through its constructor, so there is nothing
-to announce, and the arm runs silent. `cv_resume_info` is unchanged; it reports the folds a
-resume skipped, a count the caller cannot read off the call.
+parallel one. An Online Scheme is chosen by name through its constructor, and a `Resume` is
+declared by name in the estimator slot, so neither has anything to announce: `cv_resume_info`
+goes with it, and both arms run silent.
 
 ### Every refusal is a method on the refused type
 
@@ -167,9 +167,9 @@ that returns another type, which is the shape refused below.
 - The build owes: the three constructors, exported; the Union alias and the eight widenings; the
   five forwarding methods; the by-name refusal of `Online(::CrossValidationEstimator)`; the
   removal of `ff`, `OnlineStep`, `AbstractFoldFit`, `fold_fit`, `resolve_expand_train` and
-  `assert_fold_fit_expands` with their private-API entries; the removal of `cv_online_info`, its
-  private-API entry, the three `@test_logs` in `test_24c` that expect it and the
-  cross-reference in `cv_resume_info`'s docstring; the dispatch that replaces every
+  `assert_fold_fit_expands` with their private-API entries; the removal of `cv_online_info` and
+  `cv_resume_info`, their private-API entries, the three `@test_logs` in `test_24c` and the one
+  in `test_24g` that expect them; the dispatch that replaces every
   `isnothing(fold_fit(cv))` read (`01_Base_CrossValidation.jl`, `05_MultipleRandomised.jl`,
   `09_Base_SearchCrossValidation.jl`, `13_CovarianceForecastEvaluation.jl`, `15_Resume.jl`,
   `21_Pipeline/06_OnlinePipeline.jl`, `01_Base/15_Online.jl`); the `Online` docstring's paragraph
