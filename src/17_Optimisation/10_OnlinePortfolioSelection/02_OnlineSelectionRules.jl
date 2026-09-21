@@ -639,7 +639,7 @@ r_{t, k} &= \\langle \\boldsymbol{h}_k(t), \\boldsymbol{x}_t \\rangle\\,,\\quad
 
 Under [`BuyAndHold`](@ref), the default, ``\\boldsymbol{p}_{t+1} \\propto \\boldsymbol{p}_t \\odot \\boldsymbol{r}_t`` is the wealth-weighted mixture every paper writes as `BAH_W`, and the mixture over sampled constant rebalanced portfolios is Cover's universal portfolio ([`UniversalPortfolio`](@ref)). [`ExponentiatedGradient`](@ref) and [`NewtonStep`](@ref) on the slot are the online gradient and online Newton updates over the expert-return vector; the Newton weighting over `K` experts carries a `K × K` Gram, so two thousand sampled experts cost a `2000 × 2000` solve a row.
 
-The weighting's step is projected onto the **Expert Set** on `eset`, the Allocation Set over the `K` experts, in the weighting's own Projection Geometry: `nothing`, the default, is the bare `K`-simplex, a no-op for the multiplicative weightings and the Euclidean scalar root for a Newton weighting; a given [`BoundedAllocationSet`](@ref) broadcasts a scalar bound over the experts and takes one entry per expert from a vector bound, so a cap on `eset` caps the trust in any one expert. The blend ``\\sum_k p_{t+1, k} \\boldsymbol{h}_k(t+1)`` is then projected onto the head's Allocation Set once more, in the mixture's own Euclidean geometry on `proj`, with the mixture's Price-Adjusted Allocation as the reference; on a [`BoundedAllocationSet`](@ref) a blend of bounded allocations is bounded and the projection would be the identity, so [`blend_projection`](@ref) skips it by dispatch and the default configuration solves nothing; on a [`ProgrammeAllocationSet`](@ref) it is the repair a turnover ceiling under a weighting other than buy-and-hold, or a MIP kind, needs, and the mixture pays `K + 1` programmes per period, its experts' and its own, beside the `K × K` Gram of a Newton weighting. The mixture reads nothing of a given Start Allocation: the head holds it for one period and it is replaced by the experts' mix. Each expert's own Rule State starts where its rule starts — a constant rebalanced portfolio at its own `w`, a rule that reads `w` at the Start Allocation — so a sampled expert's wealth is Cover's ``S_t(\\boldsymbol{b})`` from the first row ([`expert_start_allocation`](@ref)). The weight vector over the experts starts at `p0`, the mixture's own Start Allocation over them, uniform by default, and a given `p0` is projected once onto the Expert Set in the weighting's geometry at the seed, as the head's `w0` is onto the Allocation Set, so a start outside the set is made feasible and never refused.
+The weighting's step is projected onto the **Expert Set** on `eset`, the Allocation Set over the `K` experts, in the weighting's own Projection Geometry: `nothing`, the default, is the bare `K`-simplex, a no-op for the multiplicative weightings and the Euclidean scalar root for a Newton weighting; a given [`BoundedAllocationSet`](@ref) broadcasts a scalar bound over the experts and takes one entry per expert from a vector bound, so a cap on `eset` caps the trust in any one expert. The blend ``\\sum_k p_{t+1, k} \\boldsymbol{h}_k(t+1)`` is then projected onto the head's Allocation Set once more, in the mixture's own Euclidean geometry on `proj`, with the mixture's Price-Adjusted Allocation as the reference; on a [`BoundedAllocationSet`](@ref) a blend of bounded allocations is bounded and the projection would be the identity, so [`blend_projection`](@ref) skips it by dispatch and the default configuration solves nothing; on a [`ProgrammeAllocationSet`](@ref) it is the repair a turnover ceiling under a weighting other than buy-and-hold, or a MIP kind, needs, and the mixture pays `K + 1` programmes per period, its experts' and its own, beside the `K × K` Gram of a Newton weighting. The mixture reads nothing of a given Start Allocation: the head holds it for one period and it is replaced by the experts' mix. Each expert's own Rule State starts where its rule starts — a constant rebalanced portfolio at its own `w`, a rule that reads `w` at the Start Allocation — so a sampled expert's wealth is Cover's ``S_t(\\boldsymbol{b})`` from the first row ([`expert_start_allocation`](@ref)). The weight vector over the experts starts at `p0`, the mixture's own Start Allocation over them, uniform by default, and the start, given or uniform, is projected once onto the Expert Set in the weighting's geometry at the seed, as the head's `w0` is onto the Allocation Set, so a start outside the set — a given one, or the uniform one under a bound it violates — is made feasible and never refused.
 
 `grad` is the **Gradient Point**: under [`OwnPoint`](@ref), the default, every expert reads its gradient at its own iterate; under [`BlendPoint`](@ref) every first-order expert reads it at the mixture's played blend ``\\boldsymbol{w}_t`` while stepping from its own iterate, the shared gradient ``\\nabla f_t(\\boldsymbol{w}_t)`` of Zhang, Lu and Zhou (2018) and Zhao, Zhang, Zhang and Zhou (2020), and a rule with no gradient ignores the point. Under the blend point and [`ExponentiatedGradient`](@ref) as the weighting the mixture's weight update is the exponentially weighted forecaster on the linearised loss ``\\langle \\nabla f_t(\\boldsymbol{w}_t), \\boldsymbol{h}_k(t) \\rangle`` exactly, wherever the second projection is the identity, because ``\\langle \\boldsymbol{p}_t, \\boldsymbol{r}_t \\rangle = \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` there: [`Ader`](@ref) and [`Sword`](@ref) construct that mixture over a geometric grid of first-order experts.
 
@@ -666,7 +666,7 @@ Keywords correspond to the struct's fields. A `nothing` `p0` starts the weightin
 
   - `experts` is non-empty. An `IsEmptyError` is thrown otherwise.
   - `rows_needed(alg) == 0`: the weighting is applied to the expert-return vector, for which no rows are held. An `ArgumentError` is thrown otherwise.
-  - `p0`: non-empty, finite and of length `length(experts)`, when given; it is projected onto the Expert Set at the seed, so it need not lie in it.
+  - `p0`: non-empty, finite and of length `length(experts)`, when given; the start, given or uniform, is projected onto the Expert Set at the seed, so it need not lie in it.
   - `eset`, when given, holds a [`WeightBounds`](@ref) and no `sets`: an expert has no name for a [`WeightBoundsEstimator`](@ref) to resolve over. An `ArgumentError` is thrown otherwise.
 
 ## View parameters
@@ -790,16 +790,28 @@ end
 function rule_state_seed(alg::ExpertMixture, w::AbstractVector)
     K = length(alg.experts)
     h = [expert_start_allocation(e, w) for e in alg.experts]
-    p = if isnothing(alg.p0)
-        fill(one(eltype(w)) / K, K)
-    else
-        # The start over the experts meets the Expert Set once, in the weighting's geometry,
-        # as the head's `w0` meets the Allocation Set; the set is bounded, so no step is open.
-        project(projection_geometry(alg.alg), expert_allocation_set(alg.eset, K, eltype(w)),
-                alg.p0, alg.p0)
-    end
+    p = expert_start_weights(alg, K, eltype(w))
     return ExpertMixtureState(0, map(k -> rule_state_seed(alg.experts[k], h[k]), 1:K), h,
                               rule_state_seed(alg.alg, p), p)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The weight vector over the `K` experts an [`ExpertMixture`](@ref) starts from: its `p0`, or the uniform vector when `p0` is `nothing`, projected once onto the Expert Set in the weighting's geometry, as the head's `w0` is onto the Allocation Set, so a start outside the set — a given one, or the uniform one under a bound it violates — is made feasible and never refused. On the bare simplex the uniform start lies in the set and the projection is skipped, so the default start is exactly uniform.
+
+# Related
+
+  - [`ExpertMixture`](@ref)
+  - [`expert_allocation_set`](@ref)
+  - [`project`](@ref)
+"""
+function expert_start_weights(alg::ExpertMixture, K::Integer, datatype::DataType)
+    p0 = something(alg.p0, fill(one(datatype) / K, K))
+    if isnothing(alg.p0) && isnothing(alg.eset)
+        return p0
+    end
+    return project(projection_geometry(alg.alg),
+                   expert_allocation_set(alg.eset, K, datatype), p0, p0)
 end
 """
     expert_start_allocation(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector)

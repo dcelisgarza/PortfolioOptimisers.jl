@@ -157,7 +157,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The self-confident rate of Orseau, Lattimore and Legg (2017, Theorems 5 and 6): ``\\eta_t = \\sqrt{2 \\log N / C_{1, t-1}}``, read from the running first-order excess ``C_{1, t} = \\sum_{s \\leq t} \\max_i \\left( x_{s, i} / \\langle \\boldsymbol{w}_s, \\boldsymbol{x}_s \\rangle - 1 \\right)``, which the rule's carrier keeps for it beside ``\\log N``.
 
-The statistic is non-decreasing, so the rate is non-increasing and may be updated online, as the paper notes; with it Theorem 6's regret of the Soft-Bayes step — [`ExpectationMaximisation`](@ref); on a [`MirrorDescent`](@ref) the rate is the paper's online correction carried over, with no bound of its own — against every constant rebalanced portfolio is ``\\min(C_1, 2 \\sqrt{C_1 \\log N} + \\sqrt{2 T \\log N / C_1})``, small when one asset is the best predictor for long stretches and never worse than ``O(\\sqrt{T \\log N})``. The rate is capped at `eta_max`, because the statistic is zero before the first row and the theorem's rate lies in ``(0, 1)``; the paper states no cap, and the default is the interval's end. The excess is measured at the allocation the rule played, so the mix of a [`MirrorDescent`](@ref) with a positive `alpha` is what it reads.
+Theorem 6 bounds the regret of the Soft-Bayes step — [`ExpectationMaximisation`](@ref) — against every constant rebalanced portfolio by ``\\min(C_1, 2 \\sqrt{C_1 \\log N} + \\sqrt{2 T \\log N / C_1})`` at the fixed rate ``\\sqrt{2 \\log N / C_1}`` with ``C_1`` the whole run's excess, small when one asset is the best predictor for long stretches and never worse than ``O(\\sqrt{T \\log N})``. The statistic is non-decreasing, so the rate is non-increasing and can be read online from the running excess, as the paper notes; the paper states no bound for the online rate, and on a [`MirrorDescent`](@ref) the rate is the paper's online correction carried over, with no bound of its own. On the Soft-Bayes step the online form's pull towards the Start Allocation is capped at ``\\sqrt{t / (t + 1)}`` under this rate ([`correction_ratio_cap`](@ref)), because the rate holds still while the mixture predicts well and would otherwise let a weight decay exponentially. The rate is capped at `eta_max`, because the statistic is zero before the first row and the theorem's rate lies in ``(0, 1)``; the paper states no cap, and the default is the interval's end. The excess is measured at the allocation the rule played, so the mix of a [`MirrorDescent`](@ref) with a positive `alpha` is what it reads.
 
 # Fields
 
@@ -185,6 +185,8 @@ SelfConfidentRate
 
   - [`AbstractLearningRateSchedule`](@ref)
   - [`MirrorDescent`](@ref)
+  - [`ExpectationMaximisation`](@ref)
+  - [`correction_ratio_cap`](@ref)
 
 # References
 
@@ -220,6 +222,9 @@ function learning_rate(sched::SelfConfidentRate, ::Integer, st)
         return sched.eta_max
     end
     return min(sqrt(2 * st.s[2] / c), sched.eta_max)
+end
+function correction_ratio_cap(::SelfConfidentRate, t::Integer)
+    return sqrt(t / (t + 1))
 end
 """
 $(DocStringExtensions.TYPEDEF)

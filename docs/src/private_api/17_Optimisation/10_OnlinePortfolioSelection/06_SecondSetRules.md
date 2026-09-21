@@ -11,5 +11,6 @@ PortfolioOptimisers.lagged_window_correlation
 PortfolioOptimisers.anticorrelation_claims
 PortfolioOptimisers.wealth_transfer
 PortfolioOptimisers.ExpectationMaximisationState
+PortfolioOptimisers.correction_ratio_cap
 PortfolioOptimisers.CumulativeWealthState
 ```

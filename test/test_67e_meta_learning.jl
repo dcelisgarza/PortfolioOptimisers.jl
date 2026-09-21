@@ -65,6 +65,17 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
                              eset = BoundedAllocationSet(; wb = WeightBounds(0.3, 0.7)),
                              p0 = [1.0, 0.0])
         @test po.rule_state_seed(mixc, fill(1 / N, N)).p ≈ [0.7, 0.3]
+        # The uniform start meets a bound it violates at the seed too, so the first
+        # period's mix honours the Expert Set: a floor of 0.6 on the first expert.
+        mixu = ExpertMixture(; experts = [GradientProjection(), BuyAndHold()],
+                             eset = BoundedAllocationSet(;
+                                                         wb = WeightBounds([0.6, 0.0], 1)))
+        @test po.rule_state_seed(mixu, fill(1 / N, N)).p ≈ [0.6, 0.4]
+        ou = po.partial_fit!(OPS(; alg = mixu), rows(rd, 1:1))
+        @test ou.cache.st.p[1] >= 0.6 - 1e-12
+        # The bare default is untouched: exactly uniform.
+        @test po.rule_state_seed(ExpertMixture(; experts = mixu.experts), fill(1 / N, N)).p ==
+              [0.5, 0.5]
         @test_throws DimensionMismatch ExpertMixture(; experts = [BuyAndHold()],
                                                      p0 = [0.5, 0.5])
         @test_throws DomainError ExpertMixture(; experts = [BuyAndHold()], p0 = [Inf])

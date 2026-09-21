@@ -55,17 +55,17 @@ end
     @testset "Confidence weighted mean reversion" begin
         # The paper's Algorithm 1 in its 2013 linear form, written out on full matrices.
         function cwmr_paper(X, phi, eps, var::Bool)
-            T, N = size(X)
-            mu = fill(1 / N, N)
-            S = Matrix(I, N, N) / N^2
-            W = zeros(T + 1, N)
+            nr, na = size(X)
+            mu = fill(1 / na, na)
+            S = Matrix(I, na, na) / na^2
+            W = zeros(nr + 1, na)
             W[1, :] .= mu
-            for t in 1:T
+            for t in 1:nr
                 x = X[t, :]
                 M = dot(mu, x)
                 V = dot(x, S * x)
-                Wt = dot(x, S * ones(N))
-                xbar = dot(ones(N), S * x) / dot(ones(N), S * ones(N))
+                Wt = dot(x, S * ones(na))
+                xbar = dot(ones(na), S * x) / dot(ones(na), S * ones(na))
                 if var
                     a = 2phi * V^2 - 2phi * xbar * V * Wt
                     b = 2phi * eps * V - 2phi * V * M + V - xbar * Wt
@@ -77,14 +77,14 @@ end
                 end
                 d = b^2 - 4a * c
                 lam = d < 0 ? 0.0 : max(0.0, (-b + sqrt(d)) / (2a), (-b - sqrt(d)) / (2a))
-                mu = po.project_simplex(mu - lam * S * (x - xbar * ones(N)))
+                mu = po.project_simplex(mu - lam * S * (x - xbar * ones(na)))
                 if var
                     S = inv(inv(S) + 2lam * phi * diagm(x .^ 2))
                 else
                     u = (-lam * phi * V + sqrt(lam^2 * phi^2 * V^2 + 4V)) / 2
                     S = inv(inv(S) + lam * (phi / u) * diagm(x .^ 2))
                 end
-                S = S ./ (N^2 * tr(S))
+                S = S ./ (na^2 * tr(S))
                 W[t + 1, :] .= mu
             end
             return W
@@ -140,50 +140,63 @@ end
 
     @testset "Anti-correlation" begin
         # The paper's transfer written out with loops, on the last 2w rows of log relatives.
+        # The helper's locals carry their own names: an assignment to `T` or `N` in a nested
+        # function writes the testset's local.
         function anticor_paper(w, rows, wn)
-            T = size(rows, 1)
-            L = log.(1 .+ rows[(T - 2wn + 1):T, :])
+            nr = size(rows, 1)
+            L = log.(1 .+ rows[(nr - 2wn + 1):nr, :])
             L1, L2 = L[1:wn, :], L[(wn + 1):(2wn), :]
-            N = length(w)
+            na = length(w)
             mu1, mu2 = vec(mean(L1; dims = 1)), vec(mean(L2; dims = 1))
             s1, s2 = vec(std(L1; dims = 1)), vec(std(L2; dims = 1))
-            cor = zeros(N, N)
-            for i in 1:N, j in 1:N
+            cor = zeros(na, na)
+            for i in 1:na, j in 1:na
                 cv = sum((L1[:, i] .- mu1[i]) .* (L2[:, j] .- mu2[j])) / (wn - 1)
                 cor[i, j] = (s1[i] == 0 || s2[j] == 0) ? 0.0 : cv / (s1[i] * s2[j])
             end
-            claim = zeros(N, N)
-            for i in 1:N, j in 1:N
+            claim = zeros(na, na)
+            for i in 1:na, j in 1:na
                 if i != j && mu2[i] >= mu2[j] && cor[i, j] > 0
                     claim[i, j] = cor[i, j] +
                                   (cor[i, i] < 0 ? abs(cor[i, i]) : 0.0) +
                                   (cor[j, j] < 0 ? abs(cor[j, j]) : 0.0)
                 end
             end
-            transfer = zeros(N, N)
-            for i in 1:N
+            transfer = zeros(na, na)
+            for i in 1:na
                 s = sum(claim[i, :])
                 if s > 0
                     transfer[i, :] .= w[i] .* claim[i, :] ./ s
                 end
             end
-            return [w[i] - sum(transfer[i, :]) + sum(transfer[:, i]) for i in 1:N]
+            return [w[i] - sum(transfer[i, :]) + sum(transfer[:, i]) for i in 1:na]
         end
+        # The paper's algorithm box: the transfers start from the wealth held at the end of
+        # the period, `b̂_t = b_t ⊙ x_t / ⟨b_t, x_t⟩`, and before 2w rows the box returns it.
+        Wbah = libpath(BuyAndHold())
         for wn in (2, 3, 5)
             alg = AntiCorrelation(; window = wn)
             @test po.rows_needed(alg) == 2wn
             W = libpath(alg)
             w = copy(w0)
             for t in 1:T
-                q = t < 2wn ? w : anticor_paper(w, R[1:t, :], wn)
+                wh = w .* X[t, :] ./ dot(w, X[t, :])
+                q = t < 2wn ? wh : anticor_paper(wh, R[1:t, :], wn)
                 @test isapprox(W[t + 1, :], q; atol = 1e-12)
                 @test isapprox(sum(W[t + 1, :]), 1; atol = 1e-12)
                 @test all(W[t + 1, :] .>= -1e-15)
                 w = W[t + 1, :]
             end
-            # The rule holds until 2w rows are held, and moves at the first full window.
-            @test W[2wn, :] == w0
-            @test !isapprox(W[2wn + 1, :], w0; atol = 1e-6)
+            # The rule is buy-and-hold until 2w rows are held, and moves at the first full
+            # window.
+            @test isapprox(W[1:(2wn), :], Wbah[1:(2wn), :]; atol = 1e-14)
+            @test !isapprox(W[2wn + 1, :], Wbah[2wn + 1, :]; atol = 1e-6)
+            # The paper's prose starts the transfers from the allocation the period started
+            # from, `b_t`, which is not the step taken: on the first full window the two
+            # bases differ by the period's price drift.
+            wt = W[2wn, :]
+            @test !isapprox(W[2wn + 1, :], anticor_paper(wt, R[1:(2wn), :], wn);
+                            atol = 1e-6)
         end
         # A hand window: asset 1's first-window column tracks asset 2's second-window
         # column, and asset 1 grew at least as much over the latest window, so wealth
@@ -202,11 +215,15 @@ end
         q = po.wealth_transfer(fill(1 / 3, 3), claim)
         @test q[2] > 1 / 3 && q[1] < 1 / 3 && q[3] == 1 / 3
         @test isapprox(sum(q), 1; atol = 1e-15)
-        # Through the update on returns whose log relatives are that window.
+        # Through the update on returns whose log relatives are that window: the transfers
+        # start from the wealth held after the last row, so the held allocation is adjusted
+        # by that row's relative first.
         rows3 = expm1.(L)
-        _, w3 = step(AntiCorrelation(; window = 3), fill(1 / 3, 3), 1 .+ rows3[end, :],
-                     rows3)
-        @test isapprox(w3, q; atol = 1e-12)
+        x3 = 1 .+ rows3[end, :]
+        wh3 = fill(1 / 3, 3) .* x3 ./ dot(fill(1 / 3, 3), x3)
+        _, w3 = step(AntiCorrelation(; window = 3), fill(1 / 3, 3), x3, rows3)
+        @test isapprox(w3, po.wealth_transfer(wh3, claim); atol = 1e-12)
+        @test !isapprox(w3, q; atol = 1e-6)
         @test isnothing(po.rule_state_seed(AntiCorrelation(), w0))
         @test_throws DomainError AntiCorrelation(; window = 1)
         @test_throws TypeError AntiCorrelation(; proj = EntropicProjection())
@@ -248,6 +265,59 @@ end
             @test isapprox(sum(wn), 1; atol = 1e-14)
             wd = wn
         end
+        # Under the self-confident rate the online form's pull is capped at √(t / (t + 1)),
+        # the paper's ceiling for that rate. On the fixture the rate sits at its cap of one
+        # over the whole run, so the plain form would pull nothing and every step would be
+        # Cover's mixture; under the ceiling every weight keeps at least O(1/t) of its
+        # start. The hand recursion reads the running excess C₁ at the played allocation.
+        function softbayes_sc(X, eta_max; cap)
+            nr, na = size(X)
+            W = zeros(nr + 1, na)
+            W[1, :] .= 1 / na
+            C1 = 0.0
+            rate(c) = c > 0 ? min(sqrt(2 * log(na) / c), eta_max) : eta_max
+            for t in 1:nr
+                w = W[t, :]
+                x = X[t, :]
+                eta_t = rate(C1)
+                g = x ./ dot(w, x)
+                q = w .* (1 - eta_t .+ eta_t .* g)
+                C1 += maximum(g) - 1
+                ratio = rate(C1) / eta_t
+                if cap
+                    ratio = min(ratio, sqrt(t / (t + 1)))
+                end
+                W[t + 1, :] .= ratio .* q .+ (1 - ratio) ./ na
+            end
+            return W
+        end
+        salg = ExpectationMaximisation(; eta = SelfConfidentRate())
+        Ws = libpath(salg)
+        @test isapprox(Ws, softbayes_sc(X, 1.0; cap = true); atol = 1e-14)
+        @test !isapprox(Ws, softbayes_sc(X, 1.0; cap = false); atol = 1e-6)
+        @test all(all(Ws[t + 1, :] .>= (1 - sqrt(t / (t + 1))) / N) for t in 1:T)
+        @test po.correction_ratio_cap(SelfConfidentRate(), 3) == sqrt(3 / 4)
+        @test po.correction_ratio_cap(0.3, 3) == 1
+        @test po.correction_ratio_cap(DecayRate(0.3), 3) == 1
+        # The falling regime: returns five times the fixture's take the running excess past
+        # 2 log N, so the rate leaves its cap and falls, and the same recursion holds.
+        R5 = 5 .* R
+        X5 = 1 .+ R5
+        rd5 = ReturnsResult(; nx = nx, X = R5, ts = ts)
+        W5 = zeros(T + 1, N)
+        W5[1, :] .= 1 / N
+        for t in 1:T
+            W5[t + 1, :] .= optimise(OPS(; alg = salg), rows(rd5, 1:t)).w
+        end
+        @test isapprox(W5, softbayes_sc(X5, 1.0; cap = true); atol = 1e-13)
+        st5 = po.rule_state_seed(salg, w0)
+        w5 = copy(w0)
+        etas = Float64[]
+        for t in 1:T
+            push!(etas, po.learning_rate(salg.eta, t, st5))
+            st5, w5 = po.online_update!(salg, st5, w5, X5[t, :], nothing, simplex)
+        end
+        @test etas[end] < 1 && issorted(etas; rev = true)
         @test_throws DomainError ExpectationMaximisation(; eta = 0)
         @test_throws DomainError ExpectationMaximisation(; eta = 1)
         @test_throws TypeError ExpectationMaximisation(; proj = EntropicProjection())

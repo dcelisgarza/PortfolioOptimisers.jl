@@ -156,7 +156,7 @@ $(DocStringExtensions.FIELDS)
     """
     n
     """
-    The diagonal of ``\\Sigma_t``, the belief covariance over the weights, one entry per asset, written in place; seeded at ``1 / N^2`` per asset and rescaled to trace ``1 / N^2`` after every step, as the paper's algorithm states.
+    The diagonal of ``\\Sigma_t``, the belief covariance over the weights, one entry per asset, written in place; seeded at ``1 / N^2`` per asset, the paper's ``I / N^2``, whose trace is ``1 / N``, and rescaled to trace ``1 / N^2`` after every step, as the paper's algorithm box states, so the first step shrinks the belief's trace by ``N`` and every later step keeps it. The paper's prose rescales the largest entry to ``1 / N^2`` instead, which keeps the seed's scale; the two differ by ``6 \\times 10^{-5}`` on a five-asset fixture of 2 % returns, and the box is the rule built here.
     """
     sigma
 end
@@ -309,12 +309,12 @@ zero where either standard deviation is, asset ``i`` claims a transfer to ``j \\
 ```math
 \\begin{align}
 \\mathrm{claim}_{i \\to j} &= M_{\\mathrm{cor}}(i, j) + \\max(0, -M_{\\mathrm{cor}}(i, i)) + \\max(0, -M_{\\mathrm{cor}}(j, j))\\,,\\quad
-\\mathrm{transfer}_{i \\to j} = w_{t, i} \\frac{\\mathrm{claim}_{i \\to j}}{\\sum_j \\mathrm{claim}_{i \\to j}}\\,,\\\\
-w_{t+1, i} &= w_{t, i} - \\sum_{j \\neq i} \\mathrm{transfer}_{i \\to j} + \\sum_{j \\neq i} \\mathrm{transfer}_{j \\to i}\\,.
+\\mathrm{transfer}_{i \\to j} = \\hat{w}_{t, i} \\frac{\\mathrm{claim}_{i \\to j}}{\\sum_j \\mathrm{claim}_{i \\to j}}\\,,\\\\
+w_{t+1, i} &= \\hat{w}_{t, i} - \\sum_{j \\neq i} \\mathrm{transfer}_{i \\to j} + \\sum_{j \\neq i} \\mathrm{transfer}_{j \\to i}\\,,
 \\end{align}
 ```
 
-An asset's own negative autocorrelation raises every claim it takes part in. The transfers conserve the budget and move at most ``w_{t, i}`` out of asset ``i``, so the raw step lies in the simplex by construction and the rule projects nothing on the default Allocation Set; on a stated set the step is projected in the Euclidean geometry, the `proj` slot's bound, which is the identity wherever the step already lies in the set. Until the head holds ``2 w`` rows the rule continues from the allocation it is handed. The correlation is recomputed from the rows the head holds every period and nothing else is carried, so the rule's carrier is `nothing` and `rows_needed` is ``2 w``. The paper's headline is the uniform buy-and-hold mixture of this rule over `window` in `2:30`, the [`ExpertMixture`](@ref) over those experts.
+with ``\\hat{\\boldsymbol{w}}_t = \\boldsymbol{w}_t \\odot \\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` the Price-Adjusted Allocation, the wealth held in every asset at the end of the period. An asset's own negative autocorrelation raises every claim it takes part in. The transfers move the wealth held, not the allocation the period started from: an asset gives at most what it holds, the budget is conserved, and the raw step lies in the simplex by construction, so the rule projects nothing on the default Allocation Set; on a stated set the step is projected in the Euclidean geometry, the `proj` slot's bound, which is the identity wherever the step already lies in the set. Until the head holds ``2 w`` rows the rule answers the wealth held, which is buy-and-hold. The paper's prose writes the same transfers from the allocation the period started from, ``\\boldsymbol{w}_t``, which rebalances to it before every transfer and to the uniform allocation before the first full window; the paper's algorithm box takes the wealth held as its input, returns it before the first full window and starts every transfer from it, and the box is the rule built here. The correlation is recomputed from the rows the head holds every period and nothing else is carried, so the rule's carrier is `nothing` and `rows_needed` is ``2 w``. The paper's headline is the uniform buy-and-hold mixture of this rule over `window` in `2:30`, the [`ExpertMixture`](@ref) over those experts.
 
 # Fields
 
@@ -423,7 +423,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The allocation after the transfers a claim matrix names: each asset moves its held weight out in proportion to its claims, and receives what the others move to it, so the budget is conserved.
+The allocation after the transfers a claim matrix names, from the wealth `w` held in every asset: each asset moves its wealth out in proportion to its claims, and receives what the others move to it, so the budget is conserved and no asset gives more than it holds.
 
 # Related
 
@@ -446,15 +446,17 @@ function online_update!(alg::AntiCorrelation, st, w::AbstractVector, x::Abstract
                         rows, set::AbstractAllocationSet)
     wn = alg.window
     T = size(rows, 1)
+    # The transfers move the wealth held at the end of the period, the paper's `b̂_t`.
+    wh = price_adjusted_allocation(w, x)
     q = if T < 2 * wn
-        w
+        wh
     else
         L = log1p.(view(rows, (T - 2 * wn + 1):T, :))
         cor, mu2 = lagged_window_correlation(view(L, 1:wn, :),
                                              view(L, (wn + 1):(2 * wn), :))
-        wealth_transfer(w, anticorrelation_claims(cor, mu2))
+        wealth_transfer(wh, anticorrelation_claims(cor, mu2))
     end
-    return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
+    return st, project(alg.proj, set, q, wh)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -517,7 +519,7 @@ w_{t+1, i} &= w_{t, i} \\left( 1 - \\eta_t + \\eta_t\\, g_{t, i} \\right) \\frac
 \\end{align}
 ```
 
-a fixed-share pull towards the Start Allocation whenever the rate falls, with ``\\eta_t`` and ``\\eta_{t+1}`` read off the `eta` slot through [`learning_rate`](@ref) before and after the row; at a constant rate the pull vanishes and the update is the plain step exactly, and under a schedule that names a restart the update of that period answers the Start Allocation with the carrier back at its seed and the period count kept. The regret against every constant rebalanced portfolio is ``O(\\sqrt{T N \\log N})`` for every non-negative price sequence — no lower bound on the price relatives and no gradient bound, which the exponentiated gradient's bound needs — at ``\\bar{\\eta} = \\sqrt{\\log N / (T m)}``, ``\\eta = \\bar{\\eta} / (1 + \\bar{\\eta})``, with ``m \\leq N`` the number of assets that are ever the period's best. The raw step is positive wherever ``w_t`` is, so on the default Allocation Set the projection is the identity; the `proj` slot is bound to [`EuclideanProjection`](@ref), the geometry nearest the chi-squared one on a stated set. As the weighting of an [`ExpertMixture`](@ref) it is Soft-Bayes over the experts, the setting the 2017 paper is written for.
+a fixed-share pull towards the Start Allocation whenever the rate falls, with ``\\eta_t`` and ``\\eta_{t+1}`` read off the `eta` slot through [`learning_rate`](@ref) before and after the row, and the ratio capped at [`correction_ratio_cap`](@ref), one for every rate but the self-confident one; at a constant rate the pull vanishes and the update is the plain step exactly, and under a schedule that names a restart the update of that period answers the Start Allocation with the carrier back at its seed and the period count kept. The form is stated for a rate that never rises, and every schedule the slot admits falls or restarts. Under [`SelfConfidentRate`](@ref) the ratio is capped at ``\\sqrt{t / (t + 1)}``, the ceiling the 2017 paper advises for that rate, because its rate holds still while the mixture predicts well and the plain form would let a weight decay exponentially; the cap keeps every weight above ``O(1/t)`` of its start, and it is the identity under ``\\eta_t \\propto 1 / \\sqrt{t}``. The regret against every constant rebalanced portfolio is ``O(\\sqrt{T N \\log N})`` for every non-negative price sequence — no lower bound on the price relatives and no gradient bound, which the exponentiated gradient's bound needs — at ``\\bar{\\eta} = \\sqrt{\\log N / (T m)}``, ``\\eta = \\bar{\\eta} / (1 + \\bar{\\eta})``, with ``m \\leq N`` the number of assets that are ever the period's best. The first-order self-confident bound, ``\\min(C_1, 2 \\sqrt{C_1 \\log N} + \\sqrt{2 T \\log N / C_1})`` at the fixed rate ``\\eta = \\sqrt{2 \\log N / C_1}`` with ``C_1 = \\sum_t \\max_i (g_{t, i} - 1)`` over the whole run, is this step's as well; [`SelfConfidentRate`](@ref) reads that rate online from the running ``C_1``, for which the 2017 paper states no bound. The raw step is positive wherever ``w_t`` is, so on the default Allocation Set the projection is the identity; the `proj` slot is bound to [`EuclideanProjection`](@ref), the geometry nearest the chi-squared one on a stated set. As the weighting of an [`ExpertMixture`](@ref) it is Soft-Bayes over the experts, the setting the 2017 paper is written for.
 
 # Fields
 
@@ -585,6 +587,21 @@ end
 function rule_state_seed(alg::ExpectationMaximisation, w::AbstractVector)
     return ExpectationMaximisationState(0, copy(w), schedule_state_seed(alg.eta, w))
 end
+"""
+    correction_ratio_cap(eta::Real, t::Integer)
+    correction_ratio_cap(sched::AbstractLearningRateSchedule, t::Integer)
+
+The ceiling on the ratio ``\\eta_{t+1} / \\eta_t`` that the online correction of [`ExpectationMaximisation`](@ref) applies at period `t`: one for a number and for every Learning-Rate Schedule that names none, so the pull towards the Start Allocation is the rate's own fall and nothing more, and ``\\sqrt{t / (t + 1)}`` under [`SelfConfidentRate`](@ref), whose rate holds still while the mixture predicts well and would let the weight of a bad predictor decay exponentially; under the ceiling no weight falls below ``O(1/t)`` of its start, so an expert that turns good late is still found.
+
+# Related
+
+  - [`ExpectationMaximisation`](@ref)
+  - [`SelfConfidentRate`](@ref)
+  - [`learning_rate`](@ref)
+"""
+function correction_ratio_cap(::Union{<:Real, <:AbstractLearningRateSchedule}, ::Integer)
+    return 1
+end
 function online_update!(alg::ExpectationMaximisation, st::ExpectationMaximisationState,
                         w::AbstractVector, x::AbstractVector, ::Any,
                         set::AbstractAllocationSet)
@@ -598,7 +615,8 @@ function online_update!(alg::ExpectationMaximisation, st::ExpectationMaximisatio
     g = x ./ LinearAlgebra.dot(w, x)
     q = w .* (one(eta_t) - eta_t .+ eta_t .* g)
     stn = ExpectationMaximisationState(t, st.w1, schedule_update!(alg.eta, st.s, w, x))
-    ratio = learning_rate(alg.eta, t + 1, stn) / eta_t
+    ratio = min(learning_rate(alg.eta, t + 1, stn) / eta_t,
+                correction_ratio_cap(alg.eta, t))
     if !isone(ratio)
         q .= ratio .* q .+ (one(ratio) - ratio) .* st.w1
     end

@@ -88,7 +88,7 @@ end
 
 Singer's (1997) switching portfolio: the [`ExpertMixture`](@ref) under [`SwitchingWeighting`](@ref) over the `N` single-asset [`ConstantRebalancedPortfolio`](@ref)s of the pinned universe (SP).
 
-The paper's portfolio is the Bayesian mix of a hidden process that holds one stock and switches to another with probability ``\\gamma`` each period; the mixture's weight over the unit experts is that posterior, and its blend is the weight vector itself. The degeneracies as rules: at `gamma = 0` the mixture is [`BuyAndHold`](@ref), and at `gamma = (N - 1) / N` it is the uniform constant rebalanced portfolio. A view of the head onto a subset of the assets drops no expert, so the unit expert of an excluded asset has nothing to hold on the view and the view is refused; construct the portfolio over the assets it will run on.
+The paper's portfolio is the Bayesian mix of a hidden process that holds one stock and switches to another with probability ``\\gamma`` each period; the mixture's weight over the unit experts is that posterior, and its blend is the weight vector itself. The degeneracies as rules: at `gamma = 0` the mixture is [`BuyAndHold`](@ref), and at `gamma = (N - 1) / N` it is the uniform constant rebalanced portfolio. A view of the head onto a subset of the assets drops no expert: the unit expert of an excluded asset has no mass on the kept assets, so its constant rebalanced portfolio becomes the uniform allocation over them, and the view runs with one uniform expert per excluded asset in place of the switching portfolio over the kept assets. Construct the portfolio over the assets it will run on.
 
 # Arguments
 

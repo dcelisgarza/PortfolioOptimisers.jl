@@ -336,7 +336,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
 
         # The slot on `ExpectationMaximisation`: the online form reads eta_t before the row
         # and eta_{t+1} after it, on the carrier the row wrote, so the pull follows the
-        # self-confident rate's fall; at a constant rate it is the plain step.
+        # self-confident rate's fall, capped at √(t / (t + 1)) under this rate; at a constant
+        # rate it is the plain step.
         em = ExpectationMaximisation(; eta = SelfConfidentRate(; eta_max = 0.5))
         w = fill(0.25, N)
         st = po.rule_state_seed(em, w)
@@ -348,10 +349,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
             cn = c + maximum(x ./ dot(w, x)) - 1
             eta_n = min(sqrt(2 * log(N) / cn), 0.5)
             plain = w .* (1 - eta_t .+ eta_t .* x ./ dot(w, x))
+            ratio = min(eta_n / eta_t, sqrt(t / (t + 1)))
             st, wn = po.online_update!(em, st, w, x, nothing, simplex)
-            @test isapprox(wn,
-                           plain .* (eta_n / eta_t) .+ (1 - eta_n / eta_t) .* fill(0.25, N);
-                           atol = 1e-14)
+            @test isapprox(wn, plain .* ratio .+ (1 - ratio) .* fill(0.25, N); atol = 1e-14)
             @test isapprox(st.s[1], cn; atol = 1e-13)
             c, w = cn, wn
         end

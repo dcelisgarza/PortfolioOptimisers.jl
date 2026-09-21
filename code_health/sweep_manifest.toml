@@ -348,12 +348,12 @@
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { map = 10, units = 3, swept = false }
 "src/17_Optimisation/09_OnlineOptimisation.jl" = { map = 10, units = 20, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { map = 10, units = 45, swept = false }
-"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { map = 10, units = 18, swept = false }
+"src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { map = 10, units = 19, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { map = 10, units = 21, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { map = 10, units = 15, swept = false }
 "src/18_ExpectedReturns.jl" = { map = 8, units = 24, algorithm = 5, swept = true, bindings = ["ExpectedReturn", "ExpectedReturnRiskRatio", "PerfRM", "PerformanceSummaryResult", "PrRM", "brinson_attribution", "excess_statistics", "expected_ratio", "expected_return", "expected_return", "expected_risk", "expected_risk", "expected_risk", "expected_risk", "expected_risk_ret_ratio", "expected_risk_ret_sric", "expected_sric", "held_path_turnover", "performance_summary", "prrm_prediction_message", "sric_penalty", "summarise_returns", "supports_precomputed_returns", "term_fees"] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { map = 10, units = 27, swept = false }
-"src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { map = 10, units = 19, swept = false }
+"src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { map = 10, units = 20, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { map = 10, units = 33, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { map = 10, units = 29, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { map = 10, units = 17, swept = false }
