@@ -288,6 +288,31 @@ nothing raises `@error "File exists but no references were collected"` in
         end
     end
 
+    # A conflict resolved by hand inside `References.bib` can drop the tail of an entry,
+    # and three entries lost theirs that way: the key still matched by text above, the
+    # Docs build failed on the parse, and nothing here saw it. An entry is the text from
+    # one `@type{key,` to the next; it is well formed when its braces balance, its last
+    # non-blank line is the closing `}`, and it carries a `title`, a `year` and an `author`
+    # or `editor`. That is read as text, so no bibliography parser joins the test
+    # environment, and it catches the truncation the build would otherwise report.
+    @testset "every References.bib entry is well formed" begin
+        bib_text = read(BIB, String)
+        starts = [m.offset for m in eachmatch(r"^@\w+\{"m, bib_text)]
+        push!(starts, lastindex(bib_text) + 1)
+        for (a, b) in zip(starts[1:(end - 1)], starts[2:end])
+            entry = bib_text[a:prevind(bib_text, b)]
+            key = match(r"^@\w+\{([A-Za-z0-9_]+),", entry)
+            @test !isnothing(key)
+            label = isnothing(key) ? entry[1:min(end, 40)] : key.captures[1]
+            depth = count(==('{'), entry) - count(==('}'), entry)
+            @test depth == 0 || label
+            @test endswith(strip(entry), "}") || label
+            @test occursin(r"^\s*title\s*="m, entry) || label
+            @test occursin(r"^\s*year\s*="m, entry) || label
+            @test occursin(r"^\s*(author|editor)\s*="m, entry) || label
+        end
+    end
+
     # A bullet under `# References` must be one interpolation of `ref_dict`, optionally
     # followed by a locator such as `Chapter 2.`. Anything else is a pasted copy of the
     # reference prose, which is what this table exists to stop.

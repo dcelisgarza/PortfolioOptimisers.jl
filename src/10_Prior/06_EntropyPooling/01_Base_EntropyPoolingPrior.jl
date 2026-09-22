@@ -340,7 +340,7 @@ This route does not raise on an infeasible view set. [`entropy_pooling`](@ref) s
                                               iterations = 10_000, outer_iterations = 50)))
     ```
 
-    `Optim` reaches this package as an internal binding, so the block names it through `PortfolioOptimisers`. A non-empty `args` replaces the `Optim.Fminbox(; mu0 = 1e-5)` that [`entropy_pooling`](@ref) supplies, so carry it yourself. See issues #573 and #574.
+    `Optim` reaches this package as an internal binding, so the block names it through `PortfolioOptimisers`. A non-empty `args` replaces the `Optim.Fminbox(; mu0 = 1e-5)` that [`entropy_pooling`](@ref) supplies, so carry it yourself.
 
 # Fields
 

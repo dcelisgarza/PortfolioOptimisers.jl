@@ -369,6 +369,45 @@ and is held to the family's promises:
                                cv)
         @test log_wealth_regret(mar, bcrp).regret < -1
         @test 0 < log_wealth_regret(up, bcrp).regret < (5 - 1) * log(481)
+        # The chapter's later sections, one number each. The forecast is the bet: the same
+        # update fed a recent-mean forecast off a prior makes the opposite bet to the
+        # moving-average one, and the two rows of its table are mirror images.
+        recent = PriorExpectedReturns(;
+                                      pe = EmpiricalPrior(;
+                                                          me = ExpWeightedExpectedReturns(;
+                                                                                          decay = 0.9,
+                                                                                          min_obs = 1)))
+        @test wealth(ForecastReversion(; me = recent), rd_rev) < 0.05
+        @test wealth(ForecastReversion(; me = recent), rd_trend) > 500
+        # The three interior geometries land within two percent of each other at one rate;
+        # the Tsallis step reaches 1.465 where the entropic one reaches 1.452.
+        eg_rev = wealth(ExponentiatedGradient(), rd_rev)
+        ts_rev = wealth(MirrorDescent(; proj = TsallisProjection()), rd_rev)
+        @test isapprox(ts_rev, 1.465; rtol = 0.01)
+        @test isapprox(ts_rev, eg_rev; rtol = 0.02)
+        @test isapprox(wealth(MirrorDescent(; proj = LogBarrierProjection()), rd_rev),
+                       eg_rev; rtol = 0.02)
+        # The leader over a matched sample is the one rule that wins on both markets.
+        matched = FollowTheLeader(; sel = NearestNeighbourMatch(; window = 2))
+        @test isapprox(wealth(matched, rd_rev), 2.85; rtol = 0.02)
+        @test wealth(matched, rd_trend) > 1000
+        # Dynamic regret: be-the-leader walks a path of 73 and the reversion rule is still
+        # 0.18 ahead of it; the best stock of each row walks 577 and no rule is within
+        # twenty of it.
+        btl = cross_val_predict(BestConstantRebalancedPortfolio(), rdt, HindsightSplit())
+        best_stock = Pipeline(;
+                              steps = (ScoreSelector(; score = MeanReturn(; flag = true),
+                                                     rule = RankRule(; best = 1)),
+                                       EqualWeighted()))
+        per_row = cross_val_predict(best_stock, rdt, HindsightSplit(; prefix = false))
+        r_btl = log_wealth_regret(mar, btl)
+        r_row = log_wealth_regret(mar, per_row)
+        @test isapprox(r_btl.regret, -0.18; atol = 0.02)
+        @test isapprox(r_btl.path_length, 73.0; rtol = 0.01)
+        @test isapprox(r_row.regret, 19.9; rtol = 0.02)
+        @test isapprox(r_row.path_length, 577.0; rtol = 0.01)
+        crp = cross_val_predict(OPS(; alg = ConstantRebalancedPortfolio()), rd_rev, cv)
+        @test isapprox(log_wealth_regret(crp, btl).regret, 2.54; rtol = 0.02)
     end
 
     @testset "5. The prototype's corrections hold on the shipped code" begin

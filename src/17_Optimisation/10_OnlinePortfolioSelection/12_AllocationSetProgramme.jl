@@ -375,7 +375,7 @@ end
 """
     set_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds, sbgt = nothing, gbgt = nothing)
 
-Adds an Allocation Set's weight bounds, its budget of one and its short and gross budgets to the model: the bounds through [`set_weight_constraints!`](@ref) with no net budget, so a negative lower bound builds the long-short decomposition without pinning its long side — under [`JuMPOptimiser`](@ref) a net budget with no short budget pins the long side to it, which forbids every short, and ADR 0159 admits a long-short set — the short budget on its short side and the gross budget on its leverage through the same builder, and then `Σw = k` through [`set_budget_constraints!`](@ref).
+Adds an Allocation Set's weight bounds, its budget of one and its short and gross budgets to the model: the bounds through [`set_weight_constraints!`](@ref) with no net budget, so a negative lower bound builds the long-short decomposition without pinning its long side — under [`JuMPOptimiser`](@ref) a net budget with no short budget pins the long side to it, which forbids every short, and an Allocation Set admits a long-short book — the short budget on its short side and the gross budget on its leverage through the same builder, and then `Σw = k` through [`set_budget_constraints!`](@ref).
 
 # Validation
 

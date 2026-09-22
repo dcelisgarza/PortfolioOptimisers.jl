@@ -1,6 +1,6 @@
 #=
 ```@meta
-Description = "Online portfolio selection on real prices in PortfolioOptimisers.jl: the roster in a fee-charging walk-forward, a rate search and the regret table."
+Description = "Online portfolio selection on real prices in PortfolioOptimisers.jl: the roster under a turnover fee, a schedule, a mixture, a risk loss and a risk ceiling."
 ```
 
 # Online portfolio selection
@@ -10,8 +10,10 @@ halves of the family bet on, on two synthetic markets. This example runs the fam
 prices: the benchmark, follow-the-winner and follow-the-loser rules of the roster through a
 walk-forward that charges a turnover fee against the book the fund held, a search over a
 rule's rate, the regret table against the three hindsight comparators, a step projected onto
-a constrained Allocation Set through a solver, and the weight path and discrete allocation of
-a rule's Result, which are the same post-processing every optimiser's Result takes.
+a constrained Allocation Set through a solver, a rate that is a schedule, a mixture over the
+roster, a step on a risk measure and a risk ceiling on the set, and the weight path and
+discrete allocation of a rule's Result, which are the same post-processing every optimiser's
+Result takes.
 
 !!! tip "When to reach for this"
     Reach for the family when you want a solver-free portfolio that reacts to every price
@@ -236,7 +238,124 @@ pretty_table(DataFrame("Set" => ["Simplex", "Capped and turnover-limited"],
                            end, resfmt], title = "Moving-average reversion on two sets")
 
 #=
-## 7. The weight path and the discrete allocation
+## 7. A schedule instead of a search
+
+Section 4 searched a rate. A rate may instead be a schedule, a value of the rule's `eta` that
+sets itself from the run: [`InverseSquareRootRate`](@ref) and [`DoublingTrickRate`](@ref) from
+the row count, [`SelfConfidentRate`](@ref) from the losses so far, and
+[`WindowedBestRate`](@ref) from a grid of rates scored over a trailing window, which is
+[`MAEG`](@ref) on the exponentiated gradient. None needs the horizon, and none needs a
+second pass over the data.
+=#
+
+schedules = ["Fixed rate, tuned" => tuned.opt.alg, "Windowed best rate" => MAEG(),
+             "Self-confident rate" => ExponentiatedGradient(; eta = SelfConfidentRate())]
+scheduled = Dict(name => cross_val_predict(head(alg), rd, cv) for (name, alg) in schedules)
+
+pretty_table(DataFrame("Rate" => first.(schedules),
+                       "Net wealth" => [wealth(scheduled[n]) for n in first.(schedules)],
+                       "Turnover per period" => [performance_summary(scheduled[n]).turnover
+                                                 for n in first.(schedules)]);
+             formatters = [resfmt], title = "The exponentiated gradient under three rates")
+
+#=
+The windowed schedule plays the rate that would have won the last thirty rows, and lands
+four percent below the tuned fixed rate with no search: on a panel where the search found
+that the smallest rate wins and by little, the best recent rate is mostly noise, and the
+schedule pays a little for following it. The self-confident rate falls as losses accrue and
+halves the turnover. A schedule is what to reach for when the run is the only pass there
+will be; a search is what to reach for when there is history to tune on.
+
+## 8. A mixture over the roster
+
+[`ExpertMixture`](@ref) runs any rules as experts and plays a blend of their allocations,
+weighted by a rule over the expert-return vector. The weighting is the family's own
+machinery: [`WeakAggregatingAlgorithm`](@ref) and [`AggregatingAlgorithm`](@ref) weight the
+experts by their cumulative wealth, [`TopK`](@ref) follows the `k` wealthiest, and any
+first-order rule serves. The mixture's guarantee is against its best expert, and here the
+experts are the roster's seven deterministic rules.
+=#
+
+experts = [alg for (name, alg) in rules if name != "Universal portfolio"]
+weightings = ["Weak aggregating" => WeakAggregatingAlgorithm(),
+              "Aggregating" => AggregatingAlgorithm(), "Top two" => TopK(; k = 2)]
+mixtures = Dict(name =>
+                    cross_val_predict(head(ExpertMixture(; experts = experts, alg = alg)),
+                                      rd, cv) for (name, alg) in weightings)
+
+pretty_table(DataFrame("Weighting" => first.(weightings),
+                       "Net wealth" => [wealth(mixtures[n]) for n in first.(weightings)],
+                       "Turnover per period" => [performance_summary(mixtures[n]).turnover
+                                                 for n in first.(weightings)]);
+             formatters = [resfmt],
+             title = "A mixture of the seven rules under three weightings")
+
+#=
+The guarantee is a bound of the order of the root of the row count times the log of the
+expert count, some sixty units of log wealth here, and every mixture is far inside it against
+the best expert's `1.96`; the table says what the guarantee costs on money. The blend the mixture plays is the
+weighted average of the experts' allocations, so it moves whenever any expert with weight
+moves, and the three reversion experts move nearly every row: the weak aggregating mixture
+keeps them alive on a rate that decays slowly, turns over half its book every period, and the
+fee takes it to `0.88`. The top-two weighting drops them and reaches `1.53`. A mixture is a
+hedge across rules, and the fee it pays is the turnover of its blend, not of its best expert.
+The rate-grid mixtures [`Ader`](@ref) and [`Sword`](@ref) are the same object over a grid of
+gradient-projection experts, and remove the rate the way section 7's schedules do.
+
+## 9. Risk in the loss, and risk on the set
+
+Every first-order rule steps on the log-wealth loss. [`RiskLoss`](@ref) replaces the loss
+with any risk measure evaluated over a trailing window, so the rule takes one step per row
+toward the measure's minimiser, re-estimated each row: a solver-free online minimum-variance
+portfolio. A risk gradient is small — a variance's is of the order of the daily variance —
+so the rate is stated against it and is far larger than a log-wealth rate.
+=#
+
+risk_step = MirrorDescent(; obj = RiskLoss(; r = Variance(), window = 60), eta = 50)
+risk_pred = cross_val_predict(head(risk_step), rd, cv)
+ps_eg = performance_summary(preds["Exponentiated gradient"])
+ps_risk = performance_summary(risk_pred)
+
+pretty_table(DataFrame("Loss" => ["Log wealth", "Variance over sixty rows"],
+                       "Net wealth" =>
+                           [wealth(preds["Exponentiated gradient"]), wealth(risk_pred)],
+                       "Annualised volatility" =>
+                           [ps_eg.ann_volatility, ps_risk.ann_volatility],
+                       "Max drawdown" => [ps_eg.max_drawdown, ps_risk.max_drawdown]);
+             formatters = [(v, i, j) -> if isa(v, AbstractFloat) && j > 2
+                               "$(round(v * 100; digits = 2)) %"
+                           else
+                               v
+                           end, resfmt], title = "The entropic step on two losses")
+
+#=
+The variance step brings the volatility from `22.9 %` to `19.6 %` and the drawdown with it,
+and gives up wealth for it on a panel that trended, which is the trade a minimum-variance
+portfolio makes. The other way to hold risk is on the set: a [`ProgrammeAllocationSet`](@ref)
+takes any risk measure with its `settings.ub` as a ceiling, resolved at every row against a
+prior fitted on the rows so far, and every rule's step is projected onto it. Here the
+moving-average reversion rule of section 3, which lost most of its wealth at a corner, is
+projected under a variance ceiling of ten percent annualised.
+=#
+
+ceiling = Variance(; settings = RiskMeasureSettings(; ub = (0.10 / sqrt(252))^2))
+ceiled = OnlinePortfolioSelection(; alg = MovingAverageReversion(), fees = fees,
+                                  set = ProgrammeAllocationSet(; slv = slv, r = ceiling))
+ceiled_pred = cross_val_predict(ceiled, rd, cv)
+ps_ceiled = performance_summary(ceiled_pred)
+
+(; wealth = wealth(ceiled_pred), ann_volatility = ps_ceiled.ann_volatility,
+ turnover = ps_ceiled.turnover)
+
+#=
+The ceiling turns the rule's `0.42` into `1.46` and its `51 %` volatility into `19 %`,
+above the ten percent it asked for: the ceiling binds the variance the prior expects of the
+allocation the row plays, and the realised volatility of a book that moves every row is
+higher than that of any one allocation it played. A risk ceiling on the set and a risk loss
+in the step are two different objects — the first is a constraint every rule honours, the
+second is what one rule steps on — and either takes any measure the library defines.
+
+## 10. The weight path and the discrete allocation
 
 A walk-forward's Result is the same [`MultiPeriodPredictionResult`](@ref) every optimiser
 returns, so the area plot renders the path the rule walked and the cumulative-returns

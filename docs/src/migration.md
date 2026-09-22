@@ -194,3 +194,36 @@ A result from v0.30 is **approximate** where a correction moved a number, and **
 ### [Links into the documentation](@id migration-0-31-docs)
 
 The API pages are renumbered to follow the new source layout, one page per source file. A bookmark into `api/24_Plotting`, `api/25_Aliases`, `api/19_RiskMeasures` or `api/20_Optimisation` on the `stable` site resolves to the new number (`22_Plotting`, `23_Aliases`, `16_RiskMeasures`, `17_Optimisation`) after this release; navigate from the [API introduction](@ref) rather than by number.
+
+## From v0.31 to v0.32
+
+v0.32 adds the online portfolio selection family and touches released code in four places: one name and one keyword are removed, the naive optimisers gain a `fees` field, three Results gain fields, and two released numbers move.
+
+### [Names that were removed](@id migration-0-32-removed)
+
+| Removed | Write instead |
+| --- | --- |
+| `OnlineStep`, and the `ff` keyword of `IndexWalkForward` and `DateWalkForward` | The online step is a scheme wrapped in `Online`, built by its own constructor: `OnlineIndexWalkForward(train_size, test_size; …)` and `OnlineDateWalkForward(train_size, test_size; …)` take every keyword of the plain scheme except `expand_train`, which an online run sets. `IndexWalkForward(60, 1; ff = OnlineStep())` becomes `OnlineIndexWalkForward(60, 1)`. `Online(cv)` written by hand on a scheme is refused with the three constructors named. |
+| The derived `expand_train` (`nothing` on the two walk-forwards) | `expand_train` is a plain `Bool` keyword again, `false` by default, as in v0.30. |
+| `fold_fit`, `cv_online_info`, `cv_resume_info` (unexported) | Nothing. The fold loop reads whether a scheme steps off the scheme's type, and the online arm announces nothing. |
+
+### [Renamed keywords and changed defaults](@id migration-0-32-renames)
+
+- **The naive optimisers charge fees.** `EqualWeighted`, `InverseVolatility`, `RandomWeighted` and `PreviousWeights` take `fees`, and `NaiveOptimisationResult` carries it. Keyword construction is unaffected; the positional constructor of `NaiveOptimisationResult` takes `fees` as its third argument, `NaiveOptimisationResult(pr, wb, fees, retcode, w, imsk, fb)`.
+- **`PerformanceSummaryResult`** has four more fields — `excess_ret`, `tracking_error`, `information_ratio` and `turnover` — so its positional constructor takes sixteen arguments. `performance_summary` takes a `benchmark` and fills the first three; without one they are `NaN`, and `turnover` is `nothing` without a held weight path.
+- **`plot_performance_summary`** is one method over an array, an `OptimisationResult` or a prediction Result, with `benchmark` as a keyword, where v0.31 had six arities. Every call written against v0.31 still resolves.
+- **The risk-measure builders' `opt` slot** is a `RiskConstraintOwner`: a JuMP optimiser or a programme Allocation Set. Every method keeps its argument list; a method you added under the old bound still dispatches.
+
+### [Results that move](@id migration-0-32-numbers)
+
+**Wrong in v0.31:**
+
+- A walk-forward that charged a turnover fee on a naive head priced the fee against the constructor's weights on every fold, never against the weights the fold held: buy-and-hold paid the most and a constant rebalanced portfolio paid nothing. The fee is now charged against the previous weights the loop threads, and the first fold's fee is the entry trade from the head's own start.
+
+**Approximate in v0.31:**
+
+- The t-statistic of every information-coefficient summary read the forward windows as independent rows. Under overlapping windows — `forecast_holding_period` from its second row on, `forecast_evaluation_summary` at any `step < horizon`, `exposure_ic_summary` on a block at any `horizon > 1` — it now reads a Newey–West variance at the known overlap order and reports a smaller statistic; `ic_ir` does not move.
+
+### [If you extend the library](@id migration-0-32-extending)
+
+- **A risk-measure builder** `set_risk_constraints!(model, i, r, opt, pr, …)` is called with `opt::RiskConstraintOwner`; a method bound to `RiskJuMPOptimisationEstimator` alone is not reached from a programme Allocation Set.

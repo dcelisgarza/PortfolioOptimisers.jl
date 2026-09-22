@@ -1,6 +1,6 @@
 #=
 ```@meta
-Description = "Online portfolio selection in PortfolioOptimisers.jl: solver-free rules that update from each price relative, a two-regime diagnostic and the regret table."
+Description = "Online portfolio selection in PortfolioOptimisers.jl: solver-free rules on two synthetic markets, static and dynamic regret, a forecast off a prior."
 ```
 
 # Online portfolio selection
@@ -21,8 +21,10 @@ the two halves of the family on two synthetic markets and shows what each half b
 measures every rule against three hindsight comparators, shows the one place a walk-forward
 and the batch pass part, and tunes a rate.
 
-The family is Li and Hoi's (2014) survey, in five groups; the rules this page runs are the
-groups' first members, and the full roster by group is at the end of the page.
+The family is Li and Hoi's (2014) survey, in five groups. The first four sections run the
+groups' first members; the four after them run one later member each — a forecast read
+off a prior, a second geometry, a leader over a matched sample, and dynamic regret against
+a comparator that moves every row — and the full roster by group is at the end of the page.
 =#
 
 using PortfolioOptimisers, StableRNGs, DataFrames, PrettyTables, Statistics, Dates
@@ -225,6 +227,134 @@ The tuned head is the head; run it through the walk-forward like any other. On t
 market the largest rate offered wins, because the gradient keeps pointing the same way and a
 faster step follows it sooner, and it lifts the wealth from `2.9` to `3.0`; on the reverting
 market the same search would pick the smallest, for the same reason.
+
+## 5. The forecast is the bet
+
+A follow-the-loser rule is two parts: a Price Relative Forecast and an update that moves
+toward it. [`MovingAverageReversion`](@ref) is [`ForecastReversion`](@ref) over
+[`PriceLevelExpectedReturns`](@ref) with a moving average, whose forecast is the ratio of the
+average price to the last price — below one for an asset that just rose. The same update
+takes any expected-returns estimator, and [`PriorExpectedReturns`](@ref) reads one off a
+prior: here an [`EmpiricalPrior`](@ref) whose mean is exponentially weighted toward the
+recent rows, so the forecast is the return that just happened, carried forward.
+=#
+
+recent = PriorExpectedReturns(;
+                              pe = EmpiricalPrior(;
+                                                  me = ExpWeightedExpectedReturns(;
+                                                                                  decay = 0.9,
+                                                                                  min_obs = 1)))
+forecasts = ["Moving average" => MovingAverageReversion(),
+             "Recent mean" => ForecastReversion(; me = recent)]
+
+pretty_table(DataFrame("Forecast" => first.(forecasts),
+                       "Reverting market" =>
+                           [wealth(online(a, rd_rev)) for a in last.(forecasts)],
+                       "Trending market" =>
+                           [wealth(online(a, rd_trend)) for a in last.(forecasts)]);
+             formatters = [resfmt], title = "One update, two forecasts")
+
+#=
+The two rows are mirror images. The update is the same, and the forecast is the whole bet: a
+moving-average forecast says a rise reverts, a recent-mean forecast says it continues, and
+the rule fed the second turns one unit into more than a thousand on the trending market and
+loses almost everything on the reverting one. The prior route is the general one — any
+prior's expected return is a forecast, a factor model's or a view-tilted one — and the rule
+carries no opinion of its own about what the forecast means.
+
+## 6. A second geometry
+
+Every first-order rule is one [`MirrorDescent`](@ref) step, and the geometry the step and its
+projection are taken in is the rule's `proj`. The exponentiated gradient is the entropic
+geometry, [`GradientProjection`](@ref) the Euclidean one, and [`TsallisProjection`](@ref) and
+[`LogBarrierProjection`](@ref) sit between and beyond them.
+=#
+
+geometries = ["Entropic" => ExponentiatedGradient(),
+              "Tsallis" => MirrorDescent(; proj = TsallisProjection()),
+              "Log barrier" => MirrorDescent(; proj = LogBarrierProjection()),
+              "Euclidean" => GradientProjection()]
+
+pretty_table(DataFrame("Geometry" => first.(geometries),
+                       "Reverting market" =>
+                           [wealth(online(a, rd_rev)) for a in last.(geometries)],
+                       "Trending market" =>
+                           [wealth(online(a, rd_trend)) for a in last.(geometries)]);
+             formatters = [resfmt], title = "One rate, four geometries")
+
+#=
+The three interior geometries land within two percent of each other on both markets — the
+Tsallis step reaches `1.465` on the reverting market where the entropic one reaches `1.452`
+— because each is a slow step from the uniform portfolio and the geometry only changes how
+the step is measured. The Euclidean row sits seven percent from them, at `1.36` and `2.95`,
+because one `eta` is not one step size in two geometries: an entropic step scales the
+gradient by the weight it moves, a Euclidean step does not. The geometry is chosen for what
+it keeps: a multiplicative step never leaves the interior of the simplex and a barrier step
+cannot, so a rule that must always hold every asset takes one of them, and a Euclidean step
+can reach a corner and is projected back onto the set's boundary in one clip.
+
+## 7. A leader over a matched sample
+
+The pattern-matching group is [`FollowTheLeader`](@ref) over a Sample Selector: the rule
+selects the past rows whose preceding window resembles the rows just seen, and plays the
+best constant portfolio over the selected rows alone. [`NearestNeighbourMatch`](@ref) selects
+the rows whose two-row history is nearest to the last two rows.
+=#
+
+matched = FollowTheLeader(; sel = NearestNeighbourMatch(; window = 2))
+
+(; reverting = wealth(online(matched, rd_rev)),
+ trending = wealth(online(matched, rd_trend)))
+
+#=
+This is the one rule on the page that wins on both markets, and it is the one rule that
+reads the market before it bets: on the reverting market the rows that followed a rise were
+falls, on the trending market they were further rises, and the leader over those rows is the
+opposite portfolio in the two cases. It reaches `2.85` on the reverting market and several
+thousand on the trending one, whose persistence is far stronger than any real market's. The
+price is a programme per row — a solver-free fixed point here, a solver under a
+[`ProgrammeAllocationSet`](@ref) — and a sample that is empty until enough history has
+accrued, over which the rule holds the uniform portfolio.
+
+## 8. Dynamic regret
+
+Section 2 measured every rule against one portfolio chosen in hindsight. The stronger
+comparator is a sequence: [`HindsightSplit`](@ref) is a walk-forward whose fold `t` trains on
+the rows through `t` and tests on row `t`, so any estimator run through it is a per-row
+Hindsight Comparator, and [`log_wealth_regret`](@ref) against its Result is dynamic regret,
+with the comparator's path length beside it. Under `prefix = true` the best constant
+portfolio becomes be-the-leader; under `prefix = false` the best stock becomes the best stock
+of each row.
+=#
+
+rdt = test_rows(rd_rev)
+be_the_leader = cross_val_predict(BestConstantRebalancedPortfolio(), rdt, HindsightSplit())
+per_row_stock = cross_val_predict(best_stock, rdt, HindsightSplit(; prefix = false))
+
+dynamic = DataFrame("Rule" => first.(rules))
+for (name, comp) in
+    ["Be the leader" => be_the_leader, "Best stock per row" => per_row_stock]
+    dynamic[!, name] = [log_wealth_regret(preds_rev[n], comp).regret for n in first.(rules)]
+end
+pretty_table(dynamic; formatters = [resfmt],
+             title = "Dynamic regret on the reverting market, comparator minus rule")
+
+#-
+
+(;
+ be_the_leader = log_wealth_regret(preds_rev["Constant rebalanced"], be_the_leader).path_length,
+ best_stock_per_row = log_wealth_regret(preds_rev["Constant rebalanced"], per_row_stock).path_length)
+
+#=
+Be-the-leader reads each row before it bets on it, so it beats every winner rule by about
+`2.5` of log wealth where the fixed leader of section 2 beat them by a tenth, and it walks a
+path of length `73` over the 480 rows to do so; the moving-average reversion still sits
+`0.18` ahead of it. The best stock of each row is a one-hot that jumps nearly every row, a
+path of length `577`, and no causal rule is within twenty units of log wealth of it. That is
+the reading of dynamic regret: the bound a rule carries grows with the comparator's path
+length, and a comparator that moves every row is one nothing tracks. The comparator's own
+path is what the `path_length` field reports, so a reader can state the bound the rule is
+held to.
 
 ## [The roster by group](@id user-guide-online-selection-roster)
 

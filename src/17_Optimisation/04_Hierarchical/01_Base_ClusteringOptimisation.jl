@@ -353,7 +353,7 @@ end
 
 Read the Investable Mask a hierarchical result reduced on.
 
-The core carries the mask as `imsk`, and the two leaves carry the core as `hr`. A leaf answers through the core rather than through its forwarded `res.imsk`, because the verb dispatches on the type and a forwarded property is invisible to it: without these methods the leaf falls back to `nothing`, the fold keeps the full weights, and a per-asset fee the result carries reduced is charged against them (#892).
+The core carries the mask as `imsk`, and the two leaves carry the core as `hr`. A leaf answers through the core rather than through its forwarded `res.imsk`, because the verb dispatches on the type and a forwarded property is invisible to it: without these methods the leaf falls back to `nothing`, the fold keeps the full weights, and a per-asset fee the result carries reduced is charged against them.
 
 # Arguments
 
