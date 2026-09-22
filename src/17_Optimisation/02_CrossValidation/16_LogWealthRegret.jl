@@ -336,12 +336,15 @@ function log_wealth_regret(a::PredRes_MultiPredRes, b::PredRes_MultiPredRes;
     la = log1p.(ra)
     lb = log1p.(rb)
     d = lb .- la
-    regret = sum(lb) - sum(la)
-    md = Statistics.mean(d)
+    # The running regret is summed once, so its last entry is the regret and the per-period
+    # form is that entry over the rows, as the Result's fields state.
+    cumulative = cumsum(d)
+    regret = last(cumulative)
+    md = regret / T
     v = newey_west_variance(d, lags)
     z = sqrt(T) * md / sqrt(v)
     p = 2 * Distributions.ccdf(Distributions.Normal(), abs(z))
-    return LogWealthRegretResult(regret, md, d, cumsum(d), v, z, p, lags, T, exp(sum(la)),
+    return LogWealthRegretResult(regret, md, d, cumulative, v, z, p, lags, T, exp(sum(la)),
                                  exp(sum(lb)), comparator_path_length(b, typeof(regret)))
 end
 

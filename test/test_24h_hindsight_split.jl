@@ -78,13 +78,16 @@ and be-the-leader collapses onto the static comparator.
         @test reg_s.cumulative[end] ≈ reg_s.regret
         @test length(reg_s.cumulative) == 3
         # Be-the-leader: the best constant rebalanced portfolio over the rows through `t`,
-        # played on row `t`. `u_1 = e_1`, `u_2` interior, `u_3 = e_1`.
+        # played on row `t`. `u_1 = e_1`, `u_2` interior, `u_3 = e_1`. On two assets the
+        # leader over rows 1–2 is the root of the first-order condition in `a = u_2[1]`,
+        # `0.22 / (0.98 + 0.22 a) = 0.2 / (1.1 - 0.2 a)`, which is `a = 23 / 44`; the fixed
+        # point at its default cap stops `3e-5` short of it.
         btl = cross_val_predict(BestConstantRebalancedPortfolio(), rd3, HindsightSplit())
         @test isa(btl, MultiPeriodPredictionResult)
         @test btl.mrd.ts == ts3
         u = [p.res.w for p in btl.pred]
         @test isapprox(u[1], [1.0, 0.0]; atol = 1e-8)
-        @test isapprox(u[2], [0.522693, 0.477307]; atol = 1e-5)
+        @test isapprox(u[2], [23 / 44, 21 / 44]; atol = 1e-4)
         @test isapprox(u[3], [1.0, 0.0]; atol = 1e-8)
         reg_b = log_wealth_regret(ew, btl)
         @test isapprox(reg_b.wealth_b, 1.2 * dot(u[2], [0.9, 1.1]) * 1.3)

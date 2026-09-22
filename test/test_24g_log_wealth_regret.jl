@@ -35,6 +35,9 @@ and the best stock as a top-1 `ScoreSelector` composed with `EqualWeighted`.
         @test reg.difference ≈ log1p.(b) .- log1p.(a)
         @test reg.regret ≈ sum(reg.difference)
         @test reg.regret_per_period ≈ mean(reg.difference)
+        # The running regret is summed once, so its last entry is the regret exactly.
+        @test reg.cumulative[end] == reg.regret
+        @test reg.regret_per_period == reg.regret / reg.n_periods
         @test reg.n_periods == 3
         @test reg.lags == 0
         @test reg.wealth_a ≈ prod(1 .+ a)

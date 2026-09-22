@@ -1473,7 +1473,7 @@ function excess_statistics(ret::VecNum, benchmark::VecNum, ann::Number, ::Number
     information_ratio = if tracking_error > zero(tracking_error)
         excess_ret / tracking_error
     else
-        NaN
+        oftype(excess_ret, NaN)
     end
     return excess_ret, tracking_error, information_ratio
 end

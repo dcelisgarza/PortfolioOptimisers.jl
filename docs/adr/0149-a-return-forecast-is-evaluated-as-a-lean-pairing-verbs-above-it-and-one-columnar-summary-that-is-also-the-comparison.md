@@ -298,8 +298,11 @@ each row of the two window tables derives its own, and the block method of `expo
 derives `horizon - 1`. The bare summaries take `lags` as a keyword defaulting to `0`, for a caller
 who summarises a series by hand. The untapered estimate is chosen over a tapered one at the same
 order because the order is known from the grid, not estimated from the series, and a taper
-under-weights autocovariances that are known to be there and still overstates the statistic by
-about the root of two. A long-run variance that a short series sums to a non-positive number
+under-weights autocovariances that are known to be there and still overstates the statistic, by
+about a fifth: under no skill the autocovariances fall linearly across the window, the Bartlett
+taper at that order keeps two thirds of their sum in the limit of a long window, and the
+statistic is then too large by the root of three halves, `1.15` at a window of two strides and
+`1.21` at five on the null of `test_08x`. A long-run variance that a short series sums to a non-positive number
 yields a `NaN` statistic, not a clamped one, as a zero standard deviation already did. The
 `ic_ir` columns are the per-date ratio and do not read the lag.
 
