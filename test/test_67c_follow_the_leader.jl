@@ -244,8 +244,6 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                            dict = Dict("nx" =>
                                                                                            nx)))))
         @test optimise(named, rd).w[1] <= 0.1 + 1e-8
-        # Outside a step the carrier is named by column.
-        @test po.leader_carrier(R[1:3, :]).nx == ["1", "2", "3", "4"]
         # The log-optimal programme by hand, an exponential cone per row, with an optional
         # squared penalty on the weights against the SUM of the logs.
         function hand_logopt(Xr; l2 = 0.0)
@@ -344,7 +342,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         xt = [1.5, 0.5, 1.0]
         book = wt .* xt ./ dot(wt, xt)
         @test book ≈ [0.75, 0.25, 0]
-        rowsT = R3[:, [3, 1, 2]]
+        rowsT = ReturnsResult(; nx = ["C", "A", "B"], X = R3[:, [3, 1, 2]])
         alg0 = FollowTheLeader(; opt = logopt())
         (_, w0), held0 = po.with_projection_step(() -> po.online_update!(alg0, nothing, wt,
                                                                          xt, rowsT, tset),
@@ -370,6 +368,13 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                       rowsT, bset), rowsT,
                                               1)
         @test isapprox(wb5, 0.5 .* wb0 .+ 0.5 .* wt; atol = 1e-10)
+        # The adapter views with the held optimiser, so a leader whose prior reduces to
+        # its Investable Mask keeps the set: the set, the reference and the carrier are
+        # each sliced (ADR 0170).
+        cn = po.port_opt_view(po.AllocationSetConstraint(tset, wt, nothing), [1, 2])
+        @test isnothing(cn.X) && cn.w == wt[1:2] && length(cn.set.wb.lb) == 2
+        cr = po.port_opt_view(po.AllocationSetConstraint(tset, wt, rowsT), [1, 2])
+        @test cr.X.nx == ["C", "A"] && size(cr.X.X, 2) == 2 && cr.w == wt[1:2]
         # 4. Under card = 2 the leader holds two names and the mix of it with a
         #    two-name book is projected back to two. A MIP kind on the set needs a
         #    MIP-capable solver on the held optimiser, whose model it enters.

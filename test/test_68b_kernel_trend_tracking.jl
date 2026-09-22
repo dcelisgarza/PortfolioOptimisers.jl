@@ -94,7 +94,7 @@ the worked step the paper prints for five assets at its defaults.
         alg = KernelTrendPattern(; window = w, nu = nu)
         @test alg.window == 5 && alg.nu == 0.5 && alg.path == ElasticNetPath()
         @test po.folds(alg) && isnothing(po.window_rows(alg)) && po.memory_rows(alg) == 2w
-        @test po.rows_needed(alg) == 0
+        @test po.rows_needed(alg) == 1
         # The paper's three states, row by row, on the levels the memory reaches; the
         # first prediction is the current price, and every later one is the previous row's
         # brought into the current level's units.
@@ -126,7 +126,7 @@ the worked step the paper prints for five assets at its defaults.
         # The batch over the returns is the same recursion, to rounding.
         @test maxerr(vec(mean(mf)), vec(mean(me, R))) < 1e-12
         @test maxerr(vec(mean(po.partial_fit!(me, R))), vec(mean(me, R))) < 1e-15
-        @test po.supports_partial_fit(me) && po.rows_needed(me) == 0
+        @test po.supports_partial_fit(me) && po.rows_needed(me) == 1
         # The cold start: after one row two levels exist, the fraction is zero, and the
         # prediction is the regression of the peak-and-price mix on the two levels.
         one_row = po.partial_fit!(me, R[1, :])
@@ -210,7 +210,7 @@ the worked step the paper prints for five assets at its defaults.
         @test_throws DomainError KernelTrendTracking(; q = 0)
         @test_throws ArgumentError KernelTrendTracking(;
                                                        me = Online(SimpleExpectedReturns()))
-        @test po.rows_needed(KernelTrendTracking()) == 0
+        @test po.rows_needed(KernelTrendTracking()) == 1
         @test po.rows_needed(KernelTrendTracking(; me = PriceLevelExpectedReturns())) == 4
         @test po.port_opt_view(KernelTrendTracking(; eta = 3, q = 4), [1, 2]).q == 4
         # The paper's constructor addresses every parameter.
@@ -228,9 +228,9 @@ the worked step the paper prints for five assets at its defaults.
         for alg in (KernelTrendPatternTracking(),
                     KernelTrendTracking(; me = SimpleExpectedReturns(), eta = 0.5))
             opt = OPS(; alg = alg)
-            @test po.rows_needed(opt) == 0
+            @test po.rows_needed(opt) == 1
             o = po.partial_fit!(opt, rows(rd, 1:10))
-            @test isnothing(o.cache.X) && isa(o.cache.st, po.ForecasterState)
+            @test o.cache.X.n == 1 && isa(o.cache.st, po.ForecasterState)
             o = po.partial_fit!(o, rows(rd, 11:17))
             o = po.partial_fit!(o, rows(rd, 18:18))
             a = optimise(o)

@@ -167,7 +167,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         # A zero gradient is a zero step, no mass accrues, and the projection is Euclidean.
         stz = po.rule_state_seed(alg, w)
         stz, wz = po.online_update!(AdaptiveSubgradient(; obj = RiskLoss(; window = 3)),
-                                    stz, w, x1, zeros(1, 2), simplex2)
+                                    stz, w, x1,
+                                    ReturnsResult(; nx = ["A", "B"], X = zeros(1, 2)),
+                                    simplex2)
         @test wz == w && stz.s == [0.0, 0.0] && stz.n == 1
         # Equal price relatives are the one case the first step holds.
         st0 = po.rule_state_seed(alg, w)

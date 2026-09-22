@@ -64,7 +64,7 @@ in place where it can, the value returned is the truth.
 | :--- | :--- |
 | `w` | the allocation held during the current period, over the full pinned universe |
 | `st` | the rule's private carrier, or `nothing` |
-| `X` | the rows any rule of the tree reads, a `SampleBufferState` of returns, or `nothing` |
+| `X` | the rows any rule of the tree reads, a `SampleBufferState` of returns verbatim with the rows' active masks beside them, or `nothing` |
 | `nx`, `pnl` | the asset names and the static Asset Panel, pinned by the first step |
 | `ts` | every timestamp folded, in order, unbounded |
 
@@ -106,23 +106,27 @@ wants a rule that genuinely rebalances weekly resamples the returns to weekly an
 read the *held* (drifted) weights mid-block is the start-weights, drift, turnover and fees
 ticket's question.
 
-### A non-finite return is filled with zero, once, before the buffer and the rule
+### A non-finite return is read as cash by the step, and kept as a gap for every statistic
 
-The head fills every non-finite cell of the row `r` with `0` — the Held Gap's own number, the
-position sits in cash — before it pushes the row into `X` and before it forms the price relative
-`x = 1 .+ r` the rule reads
-([ADR 0162](0162-an-online-selection-head-buffers-returns-and-starts-from-a-given-allocation-or-a-uniform-one-over-the-pinned-universe.md)).
-A cell outside the panel's active mask is filled silently, because an inactive asset has no
+The head reads every non-finite cell of the row `r` as `x = 1` — the Held Gap's own number, the
+position sits in cash — when it forms the price relative the rule reads, and pushes the row into
+`X` verbatim, `NaN` included, with the row's active mask beside it
+([ADR 0162](0162-an-online-selection-head-buffers-returns-and-starts-from-a-given-allocation-or-a-uniform-one-over-the-pinned-universe.md),
+[ADR 0170](0170-an-online-selection-head-keeps-a-non-finite-return-and-the-active-mask-in-its-rows-buffer-and-every-statistic-over-the-rows-reduces-to-its-coverage-universe.md)).
+A cell outside the panel's active mask passes silently, because an inactive asset has no
 return by definition; a cell inside it is a Held Gap and is named through the head's `strict`: a
-warning by default, a refusal under `strict`. The rule and the rows buffer therefore see finite
-rows over the full pinned universe, a re-solve on the rows sees a zero return at the gap exactly
-as `predict` scores one, and masks act at the read-out and never inside the recursion. `step_active_mask`'s
+warning by default, a refusal under `strict`. The rule therefore sees a finite `x` over the full
+pinned universe, while a statistic over the rows — a forecaster, a prior, a re-solve, a
+programme set — reads the buffer as a batch verb reads a carrier and reduces to its own Coverage
+Universe; the read-out's mask acts at the read-out. `step_active_mask`'s
 three refusals — `iv`, a panel with fields, `emsk ≠ amsk` — are reused verbatim.
 
-A consequence is that the state's `w` never carries a forced zero. An asset that is unlisted
-for a span earns what a cash-like leg earns under the rule, and when it relists its weight is
-the recursion's own — not zero, which a multiplicative rule would hold forever, and not `1/N`.
-No re-entry policy exists anywhere in the family.
+A consequence is that the state's `w` never carries a forced zero from the head. An asset that
+is unlisted for a span earns what a cash-like leg earns under the rule, and when it relists its
+weight is the recursion's own — not zero, which a multiplicative rule would hold forever, and not
+`1/N`. No re-entry policy exists anywhere in the family. A programme set that fits on the rows
+is the one exception, and ADR 0170 states it: it writes a zero at a leg its prior cannot price,
+as a batch head does, and re-admits the leg the step its prior prices it.
 
 ### A view slices every per-asset axis and renormalises every allocation
 
@@ -197,7 +201,7 @@ beside an allocation that is not, and the family's parallel route is the Causal 
   reads the held weights mid-block; this ADR leaves it the recursion's own.
 - The build tickets graduate: the head, its state and the verb; the rows buffer and
   `rows_needed`; the view and the read-out mask under a time-varying panel; the Block Step's
-  identity test at `test_size > 1`; the fill rule's Held Gap warning and refusal.
+  identity test at `test_size > 1`; the Held Gap warning and refusal.
 - `test/test_24b_optimiser_partial_fit.jl` gains the identity at `test_size = 5`;
   `test/test_62_partial_fit_state_interface_census.jl` gains the state; the Held Gap tests
   gain the step's warning and refusal.

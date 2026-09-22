@@ -9,7 +9,7 @@ Every member of the family is one recursion, `w_{t+1} = f(w_t, x_t)`, and one we
 
 **The Online Update reads the recursion's own allocation and no flag changes that**: the loop's previous weights reach the head through [`factory`](@ref) alone, into `fees` and `fb`, never into the recursion. A turnover fee on this family is measured against the fund's held book or against nothing the family does, so the fold loop's online arm refuses, by name and before any fold, a head whose `fees` carry a `tn` term when the walk-forward's Previous-Weights Source is `nothing`; `pws = DriftedWeights()` is the whole configuration. A head with no `tn` fee is not checked.
 
-**A non-finite return is filled with zero once**, before the buffer and the rule, so the rule sees `x = 1` there: silently at an asset the panel marks inactive, and as a Held Gap at an active one, a warning by default and a refusal under `strict`. The allocation never carries a forced zero, and a relisting asset re-enters at the recursion's own weight. Under a time-varying panel the read-out's Investable Mask is the last folded row's active mask: the full allocation is sliced to it and renormalised, and the Result expands it back with a zero at every non-investable asset.
+**A non-finite return is kept, and read two ways.** The rule's step sees `x = 1` there — the leg sat in cash — silently at an asset the panel marks inactive, and as a Held Gap at an active one, a warning by default and a refusal under `strict`. The rows buffer keeps the cell as `NaN` with the row's active mask beside it, and every statistic over the rows — a forecaster's mean, a Risk Loss's or a programme set's prior, a leader's re-solve — reads them as the batch verb reads a carrier and reduces to its own Coverage Universe: a plain estimator drops an asset with a gap anywhere in its window, a mask-aware one answers it from the rows it has, and a kernel over price relatives reads the gap as one. The recursion's allocation never carries a forced zero from the head, and a relisting asset re-enters at the recursion's own weight; a programme set that fits on the rows writes a zero at a leg its prior cannot price, as a batch head does, and re-admits the leg once it can. Under a time-varying panel the read-out's Investable Mask is the last folded row's active mask: the full allocation is sliced to it and renormalised, and the Result expands it back with a zero at every non-investable asset.
 
 **The Allocation Set on `set` is the Constrained Update's**: every rule's raw step is projected onto it in the rule's own Projection Geometry through [`project`](@ref). The default [`BoundedAllocationSet`](@ref) is the simplex and every projection onto it is closed form, so the default configuration solves nothing; a [`ProgrammeAllocationSet`](@ref) admits the full constraint vocabulary and its projection is a programme. A programme can fail, and the step is then a **Held Step**: the projection answers the Price-Adjusted Allocation it was handed, so the fund trades nothing that period, the rule's carrier still absorbs the row, the head warns once with the row's timestamp, and the Recursion Read-out's retcode is an [`OptimisationSuccess`](@ref) carrying the last folded row's [`HeldStep`](@ref) record, so a fallback chain never runs on a hold. A negative lower bound under an entropic rule is refused at construction.
 
@@ -274,7 +274,7 @@ Folds every row of a carrier into the head's state, in order: the Block Step, an
 
  1. Refuse what [`step_active_mask`](@ref) refuses, and resolve the Allocation Set over the pinned universe.
  2. Seed the state on the first block, or pin-and-check the carried one, through [`online_selection_pin`](@ref).
- 3. Per row, through [`online_selection_row!`](@ref): fill every non-finite cell with zero — silently where the row's active mask is `false`, as a Held Gap through the head's `strict` where it is `true` or there is no mask; push the row into the rows buffer where the tree keeps one; form `x = 1 .+ r`; call [`online_update!`](@ref) with the buffer's rows inside a [`ProjectionStep`](@ref); warn on a Held Step; record the row's active mask, timestamp and hold.
+ 3. Per row, through [`online_selection_row!`](@ref): name every non-finite cell at an active asset the recursion holds as a Held Gap through the head's `strict`, silently where the row's active mask is `false`; push the row verbatim, with its active mask, into the rows buffer where the tree keeps one; form `x` through [`price_relative`](@ref), one at a gap; call [`online_update!`](@ref) with the buffer read out as a carrier ([`rows_carrier`](@ref)) inside a [`ProjectionStep`](@ref); warn on a Held Step; record the row's active mask, timestamp and hold.
 
 # Arguments
 
@@ -355,7 +355,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-One row of the recursion: fill the row's non-finite cells, push it into the rows buffer where the tree keeps one, form the price relative `x = 1 .+ r`, and take the Online Update over the buffer's rows inside a [`ProjectionStep`](@ref), so every projection of the row reads the rows and reports a hold to the head.
+One row of the recursion: name the row's Held Gaps, push the row verbatim with its active mask into the rows buffer where the tree keeps one, form the price relative `x` through [`price_relative`](@ref), and take the Online Update over the buffer read out as a carrier inside a [`ProjectionStep`](@ref), so every projection of the row reads the rows and reports a hold to the head.
+
+The gap is read in two ways, and each reader gets the one the rest of the library gives it. The Online Update and every kernel over the price relatives read one at a gap — the leg sat in cash, the Held Gap's own reading — so the recursion stays over the full pinned universe and never carries a forced zero. Every statistic over the rows — a forecaster's mean, a Risk Loss's prior, a programme set's prior, a leader's re-solve — reads the carrier as a batch verb reads one: `NaN` where there was no return, the active mask beside it, and reduces to its own Coverage Universe, so a window over an unlisted span never meets a constant column and a relisted asset's statistic is never diluted by returns that never happened.
 
 A row one of whose projections was held is warned once, naming the row's timestamp and each hold, and answers the first [`HeldStep`](@ref) record; a row whose projections all solved answers `nothing`.
 
@@ -365,7 +367,7 @@ A row one of whose projections was held is warned once, naming the row's timesta
   - `st`: The rule's carrier.
   - `w`: The allocation held during the row's period.
   - `X`: The rows buffer, or `nothing`.
-  - `row`: The row: `r`, its returns, written in place by the fill; `amsk`, its active mask or `nothing`; `ts`, its timestamp or its index in the fold.
+  - `row`: The row: `r`, its returns verbatim; `amsk`, its active mask or `nothing`; `ts`, its timestamp or its index in the fold.
   - `nx`: The asset names, for the Held Gap message.
   - `set`: The Allocation Set, resolved.
 
@@ -376,7 +378,9 @@ A row one of whose projections was held is warned once, naming the row's timesta
 # Related
 
   - [`fold_online_selection`](@ref)
-  - [`fill_row_gaps!`](@ref)
+  - [`report_row_gaps`](@ref)
+  - [`rows_carrier`](@ref)
+  - [`price_relative`](@ref)
   - [`online_update!`](@ref)
   - [`with_projection_step`](@ref)
   - [`HeldStep`](@ref)
@@ -385,15 +389,62 @@ function online_selection_row!(opt::OnlinePortfolioSelection, st, w::AbstractVec
                                X::Option{<:SampleBufferState}, row::NamedTuple,
                                nx::Option{<:VecStr}, set::AbstractAllocationSet)
     (; r, amsk, ts) = row
-    fill_row_gaps!(r, w, amsk, nx, opt.strict)
+    report_row_gaps(r, w, amsk, nx, opt.strict)
     if !isnothing(X)
-        X = partial_fit!(X, r)
+        X = partial_fit!(X, r; active_mask = amsk)
     end
-    x = one(eltype(r)) .+ r
-    rows = isnothing(X) ? nothing : sample_buffer(X)
+    x = price_relative.(r)
+    rows = rows_carrier(X, nx)
     (st, w), held = with_projection_step(() -> online_update!(opt.alg, st, w, x, rows, set),
-                                         rows, ts; nx = nx, strict = opt.strict)
+                                         rows, ts; strict = opt.strict)
     return st, w, X, report_held_steps(held, ts)
+end
+"""
+    rows_carrier(X::Nothing, nx)
+    rows_carrier(X::SampleBufferState, nx::VecStr)
+    rows_carrier(X::SampleBufferState, nx::Nothing)
+
+The rows buffer read out as the carrier the Online Update is handed: a [`ReturnsResult`](@ref) of the buffer's rows verbatim under the pinned names, with the buffer's active masks as a time-varying Asset Panel where it records them ([`buffer_panel`](@ref)), or `nothing` when the tree keeps no rows.
+
+It is the door every statistic over the rows enters by, and it is the batch door: `prior(pe, rd)`, `mean(me, rd.X, rd.pnl)` and `optimise(opt, rd)` reduce to the Coverage Universe of the window exactly as they do on a carrier the ingestion layer built. No copy is taken; the carrier views the buffer's valid region. A buffer with no pinned names is refused by name: a Returns Result that carries rows carries their names by its own contract, so the head never meets the pair.
+
+# Validation
+
+  - `nx` is not `nothing` when the head keeps rows. An `IsNothingError` is thrown otherwise.
+
+# Related
+
+  - [`online_selection_row!`](@ref)
+  - [`buffer_panel`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
+function rows_carrier(::Nothing, ::Any)
+    return nothing
+end
+function rows_carrier(X::SampleBufferState, nx::VecStr)
+    return ReturnsResult(; nx = nx, X = sample_buffer(X), pnl = buffer_panel(X))
+end
+function rows_carrier(::SampleBufferState, ::Nothing)
+    return throw(IsNothingError("the head keeps rows and pins no asset names: a Returns Result that carries rows carries their names, so the carrier the rules read cannot be formed. Hand the head a carrier whose `nx` is set."))
+end
+"""
+    buffer_panel(X::SampleBufferState)
+
+The active masks a rows buffer holds, as the [`AssetPanel`](@ref) a carrier states them on — the same mask as the estimation mask, which is what [`step_active_mask`](@ref) admits — or `nothing` when the buffer records none, which is the static panel.
+
+# Related
+
+  - [`rows_carrier`](@ref)
+  - [`sample_buffer_kwargs`](@ref)
+"""
+function buffer_panel(X::SampleBufferState)
+    A = X.A
+    if isnothing(A)
+        return nothing
+    end
+    M = buffer_rows_view(A, (X.off + 1):(X.off + X.n))
+    return AssetPanel(; amsk = M, emsk = M)
 end
 """
     row_timestamp(ts::Nothing, t::Integer, n::Integer)
@@ -432,13 +483,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Fills every non-finite entry of one row of returns with zero, in place, naming the Held Gaps.
+Names the Held Gaps of one row of returns, and writes nothing.
 
-A cell the row's active mask marks inactive is filled silently, because an inactive asset has no return by definition. A cell at an active asset, or at any asset when there is no mask, is a Held Gap where the recursion's weight is non-zero, reported through [`strict_diagnostic`](@ref) with [`held_gap_msg`](@ref): a warning by default, a refusal under `strict`.
+A non-finite cell the row's active mask marks inactive is passed in silence, because an inactive asset has no return by definition. One at an active asset, or at any asset when there is no mask, is a Held Gap where the recursion's weight is non-zero, reported through [`strict_diagnostic`](@ref) with [`held_gap_msg`](@ref): a warning by default, a refusal under `strict`. The row is not filled: the buffer keeps the cell as it is, and the Online Update reads it as one through [`price_relative`](@ref).
 
 # Arguments
 
-  - `r`: The row, written in place.
+  - `r`: The row.
   - `w`: The allocation held during the row's period.
   - `amsk`: The row's active mask, or `nothing`.
   - `nx`: The asset names, for the message, or `nothing`.
@@ -451,20 +502,18 @@ A cell the row's active mask marks inactive is filled silently, because an inact
 # Related
 
   - [`fold_online_selection`](@ref)
+  - [`price_relative`](@ref)
   - [`held_gap_msg`](@ref)
 """
-function fill_row_gaps!(r::AbstractVector, w::AbstractVector,
-                        amsk::Option{<:AbstractVector{<:Bool}}, nx::Option{<:VecStr},
-                        strict::Bool)::Nothing
+function report_row_gaps(r::AbstractVector, w::AbstractVector,
+                         amsk::Option{<:AbstractVector{<:Bool}}, nx::Option{<:VecStr},
+                         strict::Bool)::Nothing
     held = Tuple{Int, Int}[]
     for i in eachindex(r)
-        if isfinite(r[i])
+        if isfinite(r[i]) || (!isnothing(amsk) && !amsk[i]) || iszero(w[i])
             continue
         end
-        if (isnothing(amsk) || amsk[i]) && !iszero(w[i])
-            push!(held, (1, i))
-        end
-        r[i] = zero(eltype(r))
+        push!(held, (1, i))
     end
     if !isempty(held)
         strict_diagnostic(held_gap_msg(held, nx), strict)

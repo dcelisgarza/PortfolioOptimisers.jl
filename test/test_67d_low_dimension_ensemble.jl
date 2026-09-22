@@ -204,13 +204,14 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, StatsBas
         alg = LowDimensionEnsemblePortfolio(; N = N, gamma = gamma, xi = xi, slv = slv,
                                             pe = pe)
         W6 = R[10:15, :]
+        rd6 = rows(rd, 10:15)
         pr = prior(pe, W6)
         xhat = 1 .+ pr.mu
         S = pr.sigma
         # A reference allocation away from uniform, so the fee binds.
         wref = [0.5, 0.3, 0.1, 0.1]
         set = po.resolve_allocation_set(BoundedAllocationSet(), N, false, Float64)
-        b = po.leader_allocation(alg.opt, W6, wref, set, W6)
+        b = po.leader_allocation(alg.opt, rd6, wref, set, rd6)
         @test isapprox(sum(b), 1; atol = 1e-8)
         @test minimum(b) >= -1e-8
         obj(b) = -dot(xhat, b) + gamma * dot(b, S, b) + xi * norm(b .- wref, 1)
@@ -225,22 +226,36 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, StatsBas
         # less from `wref` than without it.
         alg0 = LowDimensionEnsemblePortfolio(; N = N, gamma = gamma, xi = 0, slv = slv,
                                              pe = pe)
-        b0 = po.leader_allocation(alg0.opt, W6, wref, set, W6)
+        b0 = po.leader_allocation(alg0.opt, rd6, wref, set, rd6)
         @test norm(b .- wref, 1) <= norm(b0 .- wref, 1) + 1e-8
         # The variance term pulls towards the variance-minimising direction: at a large
         # risk aversion the answer moves away from the argmax.
         algg = LowDimensionEnsemblePortfolio(; N = N, gamma = 500, xi = 0, slv = slv,
                                              pe = pe)
-        bg = po.leader_allocation(algg.opt, W6, wref, set, W6)
+        bg = po.leader_allocation(algg.opt, rd6, wref, set, rd6)
         @test obj(bg) >= obj(b0) - 1e-9
         @test !isapprox(bg, b0; atol = 1e-3)
         # Without fee and variance the programme is the one-hot argmax of the forecast.
         alg00 = LowDimensionEnsemblePortfolio(; N = N, gamma = 0, xi = 0, slv = slv,
                                               pe = pe)
-        b00 = po.leader_allocation(alg00.opt, W6, wref, set, W6)
+        b00 = po.leader_allocation(alg00.opt, rd6, wref, set, rd6)
         onehot = zeros(N)
         onehot[argmax(xhat)] = 1
         @test isapprox(b00, onehot; atol = 1e-6)
+        # The prior reduces to the Coverage Universe of its window and expands both moments
+        # with NaN outside it, as every prior does (ADR 0117): an asset with a gap anywhere
+        # in the window is left out, and the fit over the rest is the fit on the reduced
+        # carrier, draw for draw.
+        Rn = copy(R[1:12, :])
+        Rn[1:3, 4] .= NaN
+        prn = prior(pe, ReturnsResult(; nx = nx, X = Rn))
+        @test isnan(prn.mu[4]) && all(isfinite, prn.mu[1:3])
+        @test all(isnan, prn.sigma[4, :]) && all(isnan, prn.sigma[:, 4])
+        @test all(isfinite, prn.sigma[1:3, 1:3])
+        @test po.investable_mask(prn) == [true, true, true, false]
+        pr3 = prior(pe, ReturnsResult(; nx = nx[1:3], X = Rn[:, 1:3]))
+        @test prn.mu[1:3] == pr3.mu && prn.sigma[1:3, 1:3] == pr3.sigma
+        @test size(prn.X) == (12, 4) && isnan(prn.X[1, 4])
     end
 
     @testset "The head" begin
@@ -261,7 +276,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, StatsBas
         X = 1 .+ R
         wh = prev .* X[T, :] ./ dot(prev, X[T, :])
         set = po.resolve_allocation_set(BoundedAllocationSet(), N, false, Float64)
-        bhand = po.leader_allocation(alg.opt, R[(T - 5):T, :], wh, set, R)
+        bhand = po.leader_allocation(alg.opt, rows(rd, (T - 5):T), wh, set, rd)
         @test isapprox(res.w, bhand; atol = 1e-6)
         # The head's set enters the programme.
         wcap = optimise(OPS(; alg = alg,

@@ -373,6 +373,30 @@ end
         JuMP.@variable(m2, w[1:3])
         po.set_allocation_set_constraints!(m2, bset, wh, nothing)
         @test JuMP.num_constraints(m2; count_variable_in_set_constraints = true) == 3
+        # A set prior that cannot price an asset the model trades is refused by name; one
+        # that prices every asset, and a set that fits none, pass (ADR 0170).
+        Rn = 0.02 .* randn(StableRNG(5), 12, 3)
+        Rn[:, 1] .= NaN
+        rdn = ReturnsResult(; nx = ["A", "B", "C"], X = Rn)
+        prn = prior(EmpiricalPrior(), rdn)
+        @test isnothing(po.assert_set_prior_priced(nothing, rdn))
+        @test isnothing(po.assert_set_prior_priced(prn, nothing))
+        rdn23 = po.port_opt_view(rdn, [2, 3])
+        @test isnothing(po.assert_set_prior_priced(prior(EmpiricalPrior(), rdn23), rdn23))
+        @test_throws ArgumentError po.assert_set_prior_priced(prn, rdn)
+        err = try
+            po.assert_set_prior_priced(prn, rdn)
+        catch e
+            e
+        end
+        @test occursin("\"A\"", err.msg) && occursin("CoveragePolicy", err.msg)
+        @test isnothing(po.prior_investable_mask(nothing))
+        @test po.prior_investable_mask(prn) == [false, true, true]
+        @test_throws po.IsNothingError po.programme_investable_reduction(trues(3), bset,
+                                                                         nothing, prn)
+        @test_throws po.IsNothingError po.programme_investable_reduction(trues(3), bset,
+                                                                         rdn, nothing)
+        @test_throws po.IsNothingError po.resolve_allocation_set_rows(tset, prn, nothing)
     end
 
     @testset "The Held Step" begin
@@ -569,13 +593,14 @@ end
         T, N = 60, 4
         R = 0.02 .* randn(rng, T, N)
         R[:, 1] .*= 3
+        rdR = ReturnsResult(; nx = ["A", "B", "C", "D"], X = R)
         q4 = [0.9, 0.05, 0.03, 0.02]
         w4 = fill(0.25, 4)
         free = po.project(EuclideanProjection(),
                           resolve(ProgrammeAllocationSet(; slv = slv), 4), q4, w4)
         @test expected_risk(cvar, free, R) > 0.02
         (wc, hc) = po.with_projection_step(() -> po.project(EuclideanProjection(), cset, q4,
-                                                            w4), R, 1)
+                                                            w4), rdR, 1)
         @test isempty(hc)
         @test expected_risk(cvar, wc, R) <= 0.02 * (1 + 1e-4)
         @test expected_risk(cvar, wc, R) >= 0.02 * (1 - 1e-2)
@@ -584,7 +609,7 @@ end
         # route as the tail measures, which agrees with the cone the matrix route writes.
         mset = resolve(ProgrammeAllocationSet(; slv = slv, r = mdd), 4)
         (wm, hm) = po.with_projection_step(() -> po.project(EuclideanProjection(), mset, q4,
-                                                            w4), R, 1)
+                                                            w4), rdR, 1)
         @test isempty(hm)
         @test expected_risk(mdd, wm, R) <= 0.05 * (1 + 1e-4)
         @test !isapprox(wm, free; atol = 1e-3)
@@ -601,7 +626,7 @@ end
                                                                                           ub = vub))),
                        4)
         (wf, _) = po.with_projection_step(() -> po.project(EuclideanProjection(), vfit, q4,
-                                                           w4), R, 1)
+                                                           w4), rdR, 1)
         @test isapprox(wf, po.project(EuclideanProjection(), vmat, q4, w4); atol = 1e-5)
         @test dot(wf, S, wf) <= vub * (1 + 1e-4)
         # The measure's `rke` is cleared and its expression joins no objective: the model
@@ -617,7 +642,7 @@ end
         po.set_allocation_set_constraints!(m,
                                            resolve(ProgrammeAllocationSet(; slv = slv,
                                                                           r = rke), 4), w4,
-                                           R)
+                                           rdR)
         @test haskey(m, :cvar_risk_1_ub) && !haskey(m, :risk_vec)
         # A measure that needs a quantity the prior does not carry is refused by name.
         kset = resolve(ProgrammeAllocationSet(; slv = slv,
@@ -627,7 +652,7 @@ end
                        4)
         @test_throws ArgumentError po.with_projection_step(() -> po.project(EuclideanProjection(),
                                                                             kset, q4, w4),
-                                                           R, 1)
+                                                           rdR, 1)
         # Through a head: the tail ceiling holds on every step, and the fold before two
         # rows is the Held Step every fitted ceiling takes.
         rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = R,
@@ -677,9 +702,10 @@ end
         T = 40
         R = 0.02 .* randn(rng, T, 3)
         R[:, 1] .*= 3
+        rdR = ReturnsResult(; nx = ["A", "B", "C"], X = R)
         q3 = [0.8, 0.15, 0.05]
         w3 = fill(1 / 3, 3)
-        inside(f) = first(po.with_projection_step(f, R, 1; nx = ["A", "B", "C"]))
+        inside(f) = first(po.with_projection_step(f, rdR, 1))
         proj(set; q = q3, w = w3) = inside(() -> po.project(EuclideanProjection(), set, q,
                                                             w))
         free = proj(pset)
@@ -987,7 +1013,7 @@ end
                                                             resolve(ProgrammeAllocationSet(;
                                                                                            slv = slv,
                                                                                            ple = sdp),
-                                                                    3), w3, R))
+                                                                    3), w3, rdR))
             @test haskey(m, :W) && haskey(m, :sdp_plg_1) && haskey(m, :op)
             # With every pair linked `W` is diagonal and `p · tr(W) = p (Σ|w|)²`, a constant
             # on the long-only simplex as `‖w‖₁` is: the step is the free one. A phylogeny
@@ -1065,7 +1091,7 @@ end
                                                                                            r = cvar,
                                                                                            l2c = 0.9,
                                                                                            l1 = 0.1),
-                                                                    3), w3, R))
+                                                                    3), w3, rdR))
             @test haskey(m, :tn_1) && haskey(m, :t_tr_1) && haskey(m, :cvar_risk_1_ub)
             @test haskey(m, :t_l1) && haskey(m, :op)
             # Variables are indexed in the order they were created: the tracking term's

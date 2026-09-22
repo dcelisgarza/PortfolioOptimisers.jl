@@ -221,12 +221,69 @@ end
         @test_logs (:warn, r"non-finite return") optimise(opt, rows(rdh, 1:5))
         @test_throws ArgumentError optimise(OPS(; alg = ExponentiatedGradient(),
                                                 strict = true), rows(rdh, 1:5))
-        # The filled row reads x = 1 at the gap: the same answer as a zero return.
+        # The step reads x = 1 at the gap: the same answer as a zero return.
         Rz = copy(R)
         Rz[3, 2] = 0.0
         @test optimise(OPS(; alg = ExponentiatedGradient(), strict = true),
                        rows(ReturnsResult(; nx = nx, X = Rz, ts = ts), 1:5)).w ==
               @test_logs (:warn, r"non-finite return") optimise(opt, rows(rdh, 1:5)).w
+        @test po.price_relative(NaN) == 1.0 && po.price_relative(0.5) == 1.5
+        @test po.price_relative(-Inf) == 1.0
+        # The diagnostic writes nothing: the row keeps its gap.
+        rgap = [0.1, NaN, 0.2]
+        @test_logs (:warn, r"non-finite return") po.report_row_gaps(rgap, [0.5, 0.5, 0.0],
+                                                                    nothing, nx[1:3], false)
+        @test isnan(rgap[2])
+        @test_nowarn po.report_row_gaps(rgap, [0.5, 0.0, 0.5], nothing, nx[1:3], false)
+        @test_nowarn po.report_row_gaps(rgap, [0.5, 0.5, 0.0], [true, false, true], nx[1:3],
+                                        true)
+        @test_throws ArgumentError po.report_row_gaps(rgap, [0.5, 0.5, 0.0], nothing,
+                                                      nx[1:3], true)
+        # The buffer keeps the gap and the row's active mask, and the carrier the rule reads
+        # is the buffer under the pinned names with the masks as a time-varying panel.
+        ob = po.partial_fit!(OPS(; alg = MovingAverageReversion(; window = 4)),
+                             rows(rdg, 9:12))
+        B = ob.cache.X
+        @test B.n == 3 && size(B.A) == size(B.X)
+        @test isnan(po.sample_buffer(B)[1, 4]) && !B.A[B.off + 1, 4]
+        @test all(isfinite, po.sample_buffer(B)[2:3, :]) &&
+              all(B.A[(B.off + 2):(B.off + 3), :])
+        crd = po.rows_carrier(B, ob.cache.nx)
+        @test isa(crd, ReturnsResult) && crd.nx == nx && size(crd.X) == (3, 4)
+        @test crd.pnl.amsk == amsk[10:12, :] && crd.pnl.emsk == amsk[10:12, :]
+        @test isnothing(po.rows_carrier(nothing, nx)) &&
+              isnothing(po.rows_carrier(nothing, nothing))
+        @test_throws po.IsNothingError po.rows_carrier(B, nothing)
+        # The fold arm reads the current row under the last mask row of the carrier.
+        @test po.last_active_mask(crd.pnl) == amsk[12, :]
+        @test isnothing(po.last_active_mask(nothing))
+        # A moment forecaster folds the gap as a gap; a folding price-level statistic reads
+        # it as a flat level, the contract its own fold states.
+        rg = [0.1, NaN, -0.2]
+        @test po.fold_row(SimpleExpectedReturns(), rg) === rg
+        @test po.fold_row(PriceLevelExpectedReturns(; alg = ExponentialMovingAverage()),
+                          rg) == [0.1, 0.0, -0.2]
+        @test isa(optimise(OPS(; alg = KernelTrendPatternTracking()), rows(rdg, 1:30)).retcode,
+                  OptimisationSuccess)
+        @test isnothing(po.last_active_mask(AssetPanel(;
+                                                       pf = [NumericPanelField(; name = "a",
+                                                                               vals = ones(4))])))
+        # On a static panel the buffer records no mask and the carrier carries no panel.
+        os = po.partial_fit!(OPS(; alg = MovingAverageReversion(; window = 4)),
+                             rows(rd, 1:4))
+        @test isnothing(os.cache.X.A) && isnothing(po.buffer_panel(os.cache.X))
+        @test isnothing(po.rows_carrier(os.cache.X, nx).pnl)
+        # A windowed statistic over a relisted asset reads the rows it has, not filled
+        # zeros: at row 15 a plain moving average over D is undefined, so the step holds
+        # that leg, and the answer is finite.
+        mar = MovingAverageReversion(; window = 15)
+        om = po.partial_fit!(OPS(; alg = mar), rows(rdg, 1:15))
+        crd15 = po.rows_carrier(om.cache.X, nx)
+        muD = vec(mean(PriceLevelExpectedReturns(; alg = MovingAverage(; window = 15)),
+                       crd15.X, crd15.pnl; dims = 1))
+        @test isnan(muD[4]) && all(isfinite, muD[1:3])
+        mres = optimise(OPS(; alg = mar), rows(rdg, 1:15))
+        @test isa(mres.retcode, OptimisationSuccess) && all(isfinite, mres.w)
         # A delisted asset at the last row leaves the read-out; a window with every
         # asset dead answers a failure a fallback walks on from.
         res30 = optimise(opt, rows(rdg, 1:30))
@@ -265,16 +322,17 @@ end
         @test isnothing(po.partial_fit!(OPS(; alg = NewtonStep()), rows(rd, 1:3)).cache.X) ==
               true
         # A rule tree that reads every row keeps them uncapped; a forecaster that folds is
-        # carried on the Rule State and the head holds no rows for it (ADR 0158).
+        # carried on the Rule State and the head holds the current row alone for it, the row
+        # verbatim that the fold reads (ADR 0158, ADR 0170).
         pref = OPS(; alg = ForecastReversion(; me = MedianExpectedReturns()))
         @test isnothing(po.partial_fit!(pref, rows(rd, 1:9)).cache.X.max_history)
         @test po.partial_fit!(pref, rows(rd, 1:9)).cache.X.n == 9
         pfold = po.partial_fit!(OPS(;
                                     alg = ForecastReversion(; me = SimpleExpectedReturns())),
                                 rows(rd, 1:9)).cache
-        @test isnothing(pfold.X) &&
-              pfold.st isa po.ForecasterState &&
-              pfold.st.me.cache.n == 9
+        @test pfold.X.n == 1 && pfold.X.max_history == 1
+        @test pfold.st isa po.ForecasterState && pfold.st.me.cache.n == 9
+        @test pfold.st.me.cache.mu ≈ vec(mean(R[1:9, :]; dims = 1))
         # A copy aliases no array.
         c = copy(st)
         @test c.w == st.w && c.w !== st.w && c.X.X !== st.X.X && c.ts !== st.ts
@@ -477,7 +535,9 @@ end
               (3, 1)
         @test po.rows_needed(MovingAverageReversion(; window = 5)) == 4
         @test po.rows_needed(RobustMedianReversion(; window = 3)) == 2
-        @test po.rows_needed(SimpleExpectedReturns()) == 0
+        # A folding forecaster reads the current row verbatim, so the head holds one for it.
+        @test po.rows_needed(SimpleExpectedReturns()) == 1
+        @test po.rows_needed(ExponentialMovingAverageReversion()) == 1
         @test isnothing(po.rows_needed(MedianExpectedReturns()))
         @test po.rows_needed(ExpertMixture(;
                                            experts = [BuyAndHold(),

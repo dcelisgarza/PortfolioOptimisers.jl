@@ -11,7 +11,9 @@ PortfolioOptimisers.online_selection_pin
 PortfolioOptimisers.online_selection_row!
 PortfolioOptimisers.row_timestamp
 PortfolioOptimisers.report_held_steps
-PortfolioOptimisers.fill_row_gaps!
+PortfolioOptimisers.report_row_gaps
+PortfolioOptimisers.rows_carrier
+PortfolioOptimisers.buffer_panel
 PortfolioOptimisers.online_selection_readout
 PortfolioOptimisers.online_readout(::OnlinePortfolioSelection)
 PortfolioOptimisers.held_timestamps(opt::OnlinePortfolioSelection)

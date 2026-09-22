@@ -63,9 +63,12 @@ verbatim, capped by `rows_needed`. The head forms the period's price relative `x
 per row and hands it to the Online Update; every other reader of the buffer — a forecaster's
 `mean`, a Prior's `mu`, the Allocation Set's covariance, the tracking error over the rows, a
 follow-the-leader's re-solve — reads returns as it is written and needs no conversion. A
-non-finite cell is filled with `0` before the push, the Held Gap's own number, silently at an
-inactive asset and as a Held Gap at an active one, so the rule sees `x = 1` there exactly as ADR
-0157 intended. ADR 0157's table row and fill section, ADR 0158's closing sentence on the buffer,
+non-finite cell is **kept** in the buffer, with the row's active mask beside it, and the step
+reads it as `x = 1`, the Held Gap's own number, silently at an inactive asset and as a Held Gap
+at an active one, so the rule sees `x = 1` there exactly as ADR 0157 intended while every
+statistic over the buffer reads the gap as a gap
+([ADR 0170](0170-an-online-selection-head-keeps-a-non-finite-return-and-the-active-mask-in-its-rows-buffer-and-every-statistic-over-the-rows-reduces-to-its-coverage-universe.md)).
+ADR 0157's table row and fill section, ADR 0158's closing sentence on the buffer,
 and ADR 0159's tracking error are rewritten in place: `‖(X − 1) w − b‖` becomes `‖X w − b‖`.
 
 ### The head takes a Start Allocation, `w0`, and uniform is its absence
@@ -95,7 +98,7 @@ docstring says the one-period case in one sentence.
 ### The uniform start is over the pinned universe
 
 When `w0` is absent the recursion starts at `1/N` over every pinned name, unlisted ones included,
-as ADR 0157's fill already implies. An unlisted leg earns a zero return until it lists, the read-out
+as ADR 0157's cash reading of a gap already implies. An unlisted leg earns a zero return until it lists, the read-out
 slices it away and renormalises, and when it relists it holds the recursion's own weight. The cost
 is stated, not hidden: on a universe where `k` of `N` assets are unlisted at the first row, the
 recursion parks `k/N` of its weight in cash-like legs until the rule moves it, and the fund's
@@ -128,11 +131,10 @@ zeros elsewhere and accepts what their rule's geometry does with a zero.
 - ADR 0157 is rewritten in place at its state table row for `X`, its fill section and the two
   consequence lines that name the fill; ADR 0158 at its closing sentence on the buffer; ADR 0159
   at the tracking-error formula; ADR 0155 at the head's field list, which gains `w0`.
-- `CONTEXT.md` gains *Start Allocation*; *Rule State* says the buffer holds returns and the fill
-  is zero.
+- `CONTEXT.md` gains *Start Allocation*; *Rule State* says the buffer holds returns.
 - The head's first build,
   [#1161](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1161), owes: the returns
-  buffer with `x = 1 .+ r` formed at the step, the zero fill and its Held Gap warning, `w0` on
+  buffer with `x = 1 .+ r` formed at the step, the Held Gap warning, `w0` on
   the head with its pin, view and first-step projection, the one-period test on
   `ConstantRebalancedPortfolio`, the uniform start over the pinned universe with a relisting test,
   and the two docstring sentences.

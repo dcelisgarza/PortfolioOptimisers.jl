@@ -221,7 +221,8 @@ end
         rows3 = expm1.(L)
         x3 = 1 .+ rows3[end, :]
         wh3 = fill(1 / 3, 3) .* x3 ./ dot(fill(1 / 3, 3), x3)
-        _, w3 = step(AntiCorrelation(; window = 3), fill(1 / 3, 3), x3, rows3)
+        _, w3 = step(AntiCorrelation(; window = 3), fill(1 / 3, 3), x3,
+                     ReturnsResult(; nx = ["A", "B", "C"], X = rows3))
         @test isapprox(w3, po.wealth_transfer(wh3, claim); atol = 1e-12)
         @test !isapprox(w3, q; atol = 1e-6)
         @test isnothing(po.rule_state_seed(AntiCorrelation(), w0))

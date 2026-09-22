@@ -56,23 +56,72 @@ function risk_reads_rows(rs::VecRM)
     return any(risk_reads_rows, rs)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    allocation_set_prior(set::ProgrammeAllocationSet, X::Option{<:ReturnsResult})
+    allocation_set_prior(set::BoundedAllocationSet, X::Option{<:ReturnsResult})
 
-The prior result a programme set's row-reading slots are built on: `pe` fitted on the head's rows, or `nothing` when the set reads none.
+The prior result a programme set's row-reading slots are built on: `pe` fitted on the head's rows carrier as a batch prior is fitted on any carrier — the rows verbatim and the Asset Panel beside them, so the result answers `NaN` at an asset outside the prior's Coverage Universe — or `nothing` when the set reads none, and always `nothing` on a bounded set, which fits nothing.
 
 # Related
 
   - [`ProgrammeAllocationSet`](@ref)
   - [`set_allocation_set_constraints!`](@ref)
+  - [`projection_programme`](@ref)
 """
-function allocation_set_prior(set::ProgrammeAllocationSet, X)
+function allocation_set_prior(set::ProgrammeAllocationSet, X::Option{<:ReturnsResult})
     if isnothing(rows_needed(set))
         @argcheck(!isnothing(X),
                   ArgumentError("a ProgrammeAllocationSet with a slot that reads the head's rows — a ceiling built on its prior, a tracking error, a centrality or phylogeny estimator, an exposure row, a return floor or a Calibration Rule — reads them inside an Online Update alone; `project` was called with none."))
-        assert_factor_returns(set.pe, nothing)
-        return prior(set.pe, X, nothing, nothing)
+        return prior(set.pe, X)
     end
     return nothing
+end
+function allocation_set_prior(::BoundedAllocationSet, ::Option{<:ReturnsResult})
+    return nothing
+end
+"""
+    prior_investable_mask(pr::Nothing)
+    prior_investable_mask(pr::AbstractPriorResult)
+
+The Investable Mask of a programme set's prior result, or `nothing` when the set fitted none.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`projection_programme`](@ref)
+"""
+function prior_investable_mask(::Nothing)
+    return nothing
+end
+function prior_investable_mask(pr::AbstractPriorResult)
+    return investable_mask(pr)
+end
+"""
+    assert_set_prior_priced(pr::Nothing, X)
+    assert_set_prior_priced(pr::AbstractPriorResult, X::Nothing)
+    assert_set_prior_priced(pr::AbstractPriorResult, X::ReturnsResult)
+
+Refuses a programme set prior that cannot price an asset the model trades, by name.
+
+The projection programme reduces the model to the prior's Investable Mask before it builds, so its prior passes. A leader's model trades the Investable Mask of the leader's own prior, and the set's prior is fitted on the same rows: under a plain `pe` on both the two masks agree, and the check passes; a set whose `pe` is plain beside a leader whose prior is mask-aware can leave a young asset unpriced that the leader trades, and its ceiling would carry `NaN` there, so it is refused here rather than at the solver.
+
+# Related
+
+  - [`assemble_allocation_set!`](@ref)
+  - [`add_allocation_set_constraints!`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function assert_set_prior_priced(::Nothing, ::Any)::Nothing
+    return nothing
+end
+function assert_set_prior_priced(::AbstractPriorResult, ::Nothing)::Nothing
+    return nothing
+end
+function assert_set_prior_priced(pr::AbstractPriorResult, X::ReturnsResult)::Nothing
+    imsk = investable_mask(pr)
+    if isnothing(imsk)
+        return nothing
+    end
+    return throw(ArgumentError("the Allocation Set's prior cannot price $(non_investable_names(X.nx, imsk)), which the programme trades: an asset outside the set prior's Coverage Universe over the rows it was fitted on has no covariance, no mean and no loadings for a ceiling, a floor or a tracking error to read. Give the set a `pe` whose universe covers the programme's — a mask-aware one under a `CoveragePolicy`, or the held estimator's own — or shorten the window the set reads."))
 end
 """
     set_allocation_risk_ceiling!(model::JuMP.Model, r::Nothing, set::ProgrammeAllocationSet, pr, pl; prefix::Symbol = Symbol(""))

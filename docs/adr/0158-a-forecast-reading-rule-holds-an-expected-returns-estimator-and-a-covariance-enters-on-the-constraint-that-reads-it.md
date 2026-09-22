@@ -130,9 +130,12 @@ rows are that memory, held once. A folding statistic may carry a **memory** besi
 relatives on the same `PriceLevelForecastState` — so a recursion that also reads a window of
 levels (the kernel trend pattern, whose previous prediction feeds its next and whose
 trend-reverting factor reads `2w + 1` levels) folds like any other, self-contained, and the head
-holds no rows for it; the alternative, a third kind on the interface that folds *and* draws on
+holds one row for it — the current row verbatim, with its gaps and its active mask, which the
+fold reads from the head's rows carrier instead of the step's finite price relative
+([ADR 0170](0170-an-online-selection-head-keeps-a-non-finite-return-and-the-active-mask-in-its-rows-buffer-and-every-statistic-over-the-rows-reduces-to-its-coverage-universe.md));
+the alternative, a third kind on the interface that folds *and* draws on a window of
 the head's rows, would have put the same rows in two places. `rows_needed(me)` is one method per
-estimator: `0` for one that folds, `window − 1` for a windowed price-level statistic, `lag` for
+estimator: `1` for one that folds, `window − 1` for a windowed price-level statistic, `lag` for
 the lagged price, `window` for `WindowedExpectedReturns`, and unbounded for a batch-only
 estimator or Prior, which then refits on the whole prefix at `O(tN)` a step — the docs state the cost and
 `WindowedExpectedReturns(; me, window)` is the user's cap. **`Online(me)` in the slot is refused

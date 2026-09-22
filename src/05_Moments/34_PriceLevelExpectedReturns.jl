@@ -661,9 +661,9 @@ end
     rows_needed(me::WindowedExpectedReturns)
     rows_needed(alg::AbstractPriceLevelStatistic)
 
-The number of return rows an expected-returns estimator reads at a step of the online portfolio selection family, `0` for one that folds, or `nothing` when it reads every row folded so far.
+The number of return rows an expected-returns estimator reads at a step of the online portfolio selection family, `1` for one that folds, or `nothing` when it reads every row folded so far.
 
-A windowed price-level statistic over `window` levels reads `window - 1` returns, and a folding one reads none, because its state is one vector. An estimator with an exact fold of its own — one for which [`supports_partial_fit`](@ref) answers `true` — reads none either, and a [`WindowedExpectedReturns`](@ref) reads its window. Any other expected-returns estimator answers `nothing`, which is unbounded: the head keeps every row for it and it refits on the whole prefix at every step, at `O(tN)` a step after `t` rows. [`ForecastReversion`](@ref) forwards to its slots, and the head takes the maximum over its rule tree.
+A windowed price-level statistic over `window` levels reads `window - 1` returns, and a folding one reads the current row alone, because its state is one vector and the row it folds is the head's row verbatim — its gaps and its active mask included — which the head hands it as a one-row carrier rather than the finite price relative of the step. An estimator with an exact fold of its own — one for which [`supports_partial_fit`](@ref) answers `true` — reads the current row on the same terms, and a [`WindowedExpectedReturns`](@ref) reads its window. Any other expected-returns estimator answers `nothing`, which is unbounded: the head keeps every row for it and it refits on the whole prefix at every step, at `O(tN)` a step after `t` rows. [`ForecastReversion`](@ref) forwards to its slots, and the head takes the maximum over its rule tree.
 
 # Related
 
@@ -676,13 +676,13 @@ function rows_needed(me::PriceLevelExpectedReturns)
     return rows_needed(me.alg)
 end
 function rows_needed(me::AbstractExpectedReturnsEstimator)
-    return supports_partial_fit(me) ? 0 : nothing
+    return supports_partial_fit(me) ? 1 : nothing
 end
 function rows_needed(me::WindowedExpectedReturns)
     return me.window
 end
 function rows_needed(alg::AbstractPriceLevelStatistic)
-    return folds(alg) ? 0 : window_rows(alg)
+    return folds(alg) ? 1 : window_rows(alg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

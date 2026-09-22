@@ -89,7 +89,7 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         @test maxerr(vec(mean(po.partial_fit!(me, R))), vec(mean(me, R))) < 1e-15
         @test po.supports_partial_fit(me) &&
               !po.supports_partial_fit(PriceLevelExpectedReturns())
-        @test po.rows_needed(me) == 0 && isnothing(po.window_rows(me.alg))
+        @test po.rows_needed(me) == 1 && isnothing(po.window_rows(me.alg))
         @test_throws ArgumentError po.partial_fit!(PriceLevelExpectedReturns(), R[1, :])
         @test_throws ArgumentError mean(me)
         # The reweighted relative: seeded at the first relative, so the forecast after the
@@ -217,14 +217,15 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
     end
 
     @testset "The fold-or-refit of a forecaster on the Rule State" begin
-        # A folding forecaster is carried; the head holds no rows for it.
+        # A folding forecaster is carried; the head holds the current row alone for it,
+        # the row verbatim that the fold reads (ADR 0170).
         for me in (SimpleExpectedReturns(),
                    ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 1),
                    PriceLevelExpectedReturns(; alg = ExponentialMovingAverage()))
             opt = OPS(; alg = ForecastReversion(; me = me))
-            @test po.rows_needed(opt) == 0
+            @test po.rows_needed(opt) == 1
             o = po.partial_fit!(opt, rows(rd, 1:9))
-            @test isnothing(o.cache.X)
+            @test o.cache.X.n == 1 && o.cache.X.max_history == 1
             @test isa(o.cache.st, po.ForecasterState)
             @test isnothing(po.online_entry_state(me))
             # The folded forecast equals the batch forecast over the same rows.
@@ -280,7 +281,7 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         base = ForecastReversion(; me = SimpleExpectedReturns())
         scaled = ForecastReversion(; me = SimpleExpectedReturns(), scale = MovingAverage())
         @test optimise(OPS(; alg = base), flat).w == optimise(OPS(; alg = scaled), flat).w
-        @test po.rows_needed(scaled) == 4 && po.rows_needed(base) == 0
+        @test po.rows_needed(scaled) == 4 && po.rows_needed(base) == 1
         # On real data the preconditioner moves the step, and the answer stays feasible.
         ws = optimise(OPS(; alg = scaled), rd).w
         @test sum(ws) ≈ 1 && all(ws .>= 0)
@@ -295,8 +296,7 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         q = w .+ lam .* D .* dev
         st = po.rule_state_seed(scaled, w)
         for t in 1:5
-            st, w2 = po.online_update!(scaled, st, w, X[t, :], t == 5 ? rowsX : R[1:t, :],
-                                       set)
+            st, w2 = po.online_update!(scaled, st, w, X[t, :], rows(rd, 1:t), set)
             t == 5 && @test w2 ≈ po.project_simplex(q)
         end
         # The constructors fill the paper's statistic and defaults.
@@ -333,15 +333,16 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         # The default saturates: all wealth on the asset with the largest centred forecast.
         ppt = PeakPriceTracking()
         @test ppt.eps == 100 && ppt.me.alg.window == 5
-        _, w100 = po.online_update!(ppt, nothing, w, X[5, :], rowsX, set)
+        _, w100 = po.online_update!(ppt, nothing, w, X[5, :], rows(rd, 1:5), set)
         @test w100 == (1:N .== argmax(dev))
         # Well below one the step has length `eps` before the projection and spreads.
         small = ForecastTracking(; eps = 0.05)
-        _, ws = po.online_update!(small, nothing, w, X[5, :], rowsX, set)
+        _, ws = po.online_update!(small, nothing, w, X[5, :], rows(rd, 1:5), set)
         @test ws ≈ po.project_simplex(w .+ 0.05 .* dev ./ norm(dev))
         @test count(>(0), ws) > 1
         # A flat forecast holds.
-        _, wh = po.online_update!(ForecastTracking(), nothing, w, X[5, :], zeros(5, N), set)
+        _, wh = po.online_update!(ForecastTracking(), nothing, w, X[5, :],
+                                  ReturnsResult(; nx = nx, X = zeros(5, N)), set)
         @test wh == w
         # The constructors of the composite papers.
         aictr = AdaptiveInputCompositeTrend()
@@ -372,10 +373,10 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         v = 10 .* (gg .- mean(gg))
         lam = 10 * 10 * 0.001
         q = what .+ sign.(v) .* max.(abs.(v) .- lam, 0)
-        _, wt = po.online_update!(tco, nothing, w, x, R[5:5, :], set)
+        _, wt = po.online_update!(tco, nothing, w, x, rows(rd, 5:5), set)
         @test wt ≈ po.project_simplex(q)
         _, wexp = po.online_update!(TransactionCostOptimisation(; gamma = 1), nothing, w, x,
-                                    R[5:5, :], set)
+                                    rows(rd, 5:5), set)
         @test wexp ≈ what
         # TCO-2 reads the moving average.
         tco2 = TransactionCostOptimisation(; me = PriceLevelExpectedReturns())
@@ -391,7 +392,7 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
               sspo.zeta == 500 &&
               sspo.iters == 10_000 &&
               sspo.tol == 1e-4
-        _, wsp = po.online_update!(sspo, nothing, w, x, R[1:5, :], set)
+        _, wsp = po.online_update!(sspo, nothing, w, x, rows(rd, 1:5), set)
         @test sum(wsp) ≈ 1 && all(wsp .>= 0)
         # The iterate solves the penalised programme's optimality up to the tolerance: the
         # scaled iterate projects to the asset with the largest generalised return.
@@ -402,7 +403,7 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
                                                                             me = CustomValueExpectedReturns(;
                                                                                                             val = fill(-2.0,
                                                                                                                        N))),
-                                                   nothing, w, x, R[1:5, :], set)
+                                                   nothing, w, x, rows(rd, 1:5), set)
     end
 
     @testset "Every forecast-reading rule takes the head's verbs" begin
@@ -519,7 +520,7 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         load = LocalAdaptiveLearning(; eps = 1.05)
         xl = 1 .+ vec(mean(load.me, R[1:5, :]))
         dev = xl .- mean(xl)
-        _, wl = po.online_update!(load, nothing, w, X[5, :], R[1:5, :], set)
+        _, wl = po.online_update!(load, nothing, w, X[5, :], rows(rd, 1:5), set)
         @test wl ≈
               po.project_simplex(w .+ max(0, (1.05 - dot(w, xl)) / sum(abs2, dev)) .* dev)
         @test !(wl ≈
@@ -549,7 +550,7 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
             end
         end
         _, wsp = po.online_update!(ShortTermSparsePortfolio(), nothing, w4, X[11, :],
-                                   R[7:11, :], set)
+                                   rows(rd, 7:11), set)
         @test wsp == po.project_simplex(500 .* bstop)
         @test kstop < 1000 && maxerr(bstop, b) > 0.5
     end

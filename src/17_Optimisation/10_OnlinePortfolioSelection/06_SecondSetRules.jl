@@ -314,7 +314,7 @@ w_{t+1, i} &= \\hat{w}_{t, i} - \\sum_{j \\neq i} \\mathrm{transfer}_{i \\to j} 
 \\end{align}
 ```
 
-with ``\\hat{\\boldsymbol{w}}_t = \\boldsymbol{w}_t \\odot \\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` the Price-Adjusted Allocation, the wealth held in every asset at the end of the period. An asset's own negative autocorrelation raises every claim it takes part in. The transfers move the wealth held, not the allocation the period started from: an asset gives at most what it holds, the budget is conserved, and the raw step lies in the simplex by construction, so the rule projects nothing on the default Allocation Set; on a stated set the step is projected in the Euclidean geometry, the `proj` slot's bound, which is the identity wherever the step already lies in the set. Until the head holds ``2 w`` rows the rule answers the wealth held, which is buy-and-hold. The paper's prose writes the same transfers from the allocation the period started from, ``\\boldsymbol{w}_t``, which rebalances to it before every transfer and to the uniform allocation before the first full window; the paper's algorithm box takes the wealth held as its input, returns it before the first full window and starts every transfer from it, and the box is the rule built here. The correlation is recomputed from the rows the head holds every period and nothing else is carried, so the rule's carrier is `nothing` and `rows_needed` is ``2 w``. The paper's headline is the uniform buy-and-hold mixture of this rule over `window` in `2:30`, the [`ExpertMixture`](@ref) over those experts.
+with ``\\hat{\\boldsymbol{w}}_t = \\boldsymbol{w}_t \\odot \\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` the Price-Adjusted Allocation, the wealth held in every asset at the end of the period. An asset's own negative autocorrelation raises every claim it takes part in. The transfers move the wealth held, not the allocation the period started from: an asset gives at most what it holds, the budget is conserved, and the raw step lies in the simplex by construction, so the rule projects nothing on the default Allocation Set; on a stated set the step is projected in the Euclidean geometry, the `proj` slot's bound, which is the identity wherever the step already lies in the set. Until the head holds ``2 w`` rows the rule answers the wealth held, which is buy-and-hold. The paper's prose writes the same transfers from the allocation the period started from, ``\\boldsymbol{w}_t``, which rebalances to it before every transfer and to the uniform allocation before the first full window; the paper's algorithm box takes the wealth held as its input, returns it before the first full window and starts every transfer from it, and the box is the rule built here. The correlation is recomputed from the rows the head holds every period and nothing else is carried, so the rule's carrier is `nothing` and `rows_needed` is ``2 w``. The paper's headline is the uniform buy-and-hold mixture of this rule over `window` in `2:30`, the [`ExpertMixture`](@ref) over those experts. The two windows are a kernel over price relatives, so a gap in the head's rows reads as one there, the leg sat in cash, exactly as the step reads the period's gap ([`price_relative`](@ref)); an asset unlisted over part of a window therefore enters the correlation with a flat log return over that part.
 
 # Fields
 
@@ -443,15 +443,17 @@ function wealth_transfer(w::AbstractVector, claim::AbstractMatrix)
     return q
 end
 function online_update!(alg::AntiCorrelation, st, w::AbstractVector, x::AbstractVector,
-                        rows, set::AbstractAllocationSet)
+                        rows::Option{<:ReturnsResult}, set::AbstractAllocationSet)
     wn = alg.window
-    T = size(rows, 1)
+    T = isnothing(rows) ? 0 : size(rows.X, 1)
     # The transfers move the wealth held at the end of the period, the paper's `b̂_t`.
     wh = price_adjusted_allocation(w, x)
     q = if T < 2 * wn
         wh
     else
-        L = log1p.(view(rows, (T - 2 * wn + 1):T, :))
+        # The windows are a kernel over price relatives, so a gap reads as one: the leg
+        # sat in cash, as the step reads it (see [`price_relative`](@ref)).
+        L = log.(price_relative.(view(rows.X, (T - 2 * wn + 1):T, :)))
         cor, mu2 = lagged_window_correlation(view(L, 1:wn, :),
                                              view(L, (wn + 1):(2 * wn), :))
         wealth_transfer(wh, anticorrelation_claims(cor, mu2))

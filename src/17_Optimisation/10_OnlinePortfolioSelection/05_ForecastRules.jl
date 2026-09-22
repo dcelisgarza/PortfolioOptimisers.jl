@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The carrier of a forecast-reading rule whose forecaster folds: the expected-returns estimator on the rule's `me` slot, carrying its own Partial Fit State.
 
-A forecaster with an exact fold — [`SimpleExpectedReturns`](@ref), [`ExpWeightedExpectedReturns`](@ref), a [`PriceLevelExpectedReturns`](@ref) over a folding statistic, a [`PriorExpectedReturns`](@ref) over a prior that folds — is folded on every row and read from its state, so the head holds no rows for it; one with no exact fold is refit on the rows the head holds and the rule's carrier is `nothing`. [`supports_partial_fit`](@ref) is the question, asked once at the seed.
+A forecaster with an exact fold — [`SimpleExpectedReturns`](@ref), [`ExpWeightedExpectedReturns`](@ref), a [`PriceLevelExpectedReturns`](@ref) over a folding statistic, a [`PriorExpectedReturns`](@ref) over a prior that folds — is folded on every row and read from its state, so the head holds one row for it — the row verbatim, with its gaps and its active mask, which the fold reads instead of the step's finite price relative; one with no exact fold is refit on the rows the head holds and the rule's carrier is `nothing`. [`supports_partial_fit`](@ref) is the question, asked once at the seed.
 
 # Fields
 
@@ -114,12 +114,14 @@ end
 
 The Price Relative Forecast `x̂ = 1 .+ mu` of a rule's forecaster after the row `x`, by the fold-or-refit rule: a forecaster on a [`ForecasterState`](@ref) is folded on the row and read from its state; one with none is refit on the rows the head holds, which include the row, or on the row alone when the head holds none. A forecast is **flat** — one in every asset, which every rule's step holds on — where the forecaster has fewer rows than [`forecast_min_rows`](@ref) or answers a non-finite entry ([`flat_where_undefined`](@ref)).
 
+Both arms read the head's rows carrier as the batch verb reads one, gaps and active mask included. The refit arm is `mean(me, rd.X, rd.pnl)`, which reduces to the Coverage Universe of the window: a plain forecaster answers `NaN`, and so holds, at an asset with a gap anywhere in the window, and a mask-aware one answers it from the rows it has. The fold arm folds the carrier's last row — the current row verbatim — with its active mask, so a plain moment forecaster's running statistic is `NaN` from the first gap on, the Coverage Universe of the prefix, and a mask-aware one freezes, resets or re-admits by its own policy; a folding price-level statistic reads the gap as a flat level ([`fold_row`](@ref)). Outside the head, with no carrier, the fold arm folds the finite `x .- 1` and the refit arm the row alone.
+
 # Arguments
 
   - `me`: The forecaster on the rule's slot.
   - `st`: The rule's carrier, or `nothing`.
   - `x`: The price relative of the row.
-  - `rows`: The returns the head holds through the row, or `nothing`.
+  - `rows`: The rows carrier the head holds through the row, a [`ReturnsResult`](@ref), or `nothing`.
 
 # Returns
 
@@ -133,19 +135,65 @@ The Price Relative Forecast `x̂ = 1 .+ mu` of a rule's forecaster after the row
   - [`refit_rows`](@ref)
 """
 function forecast_relative(me::AbstractExpectedReturnsEstimator, ::Nothing,
-                           x::AbstractVector, rows)
-    X = refit_rows(rows, x)
+                           x::AbstractVector, rows::Option{<:ReturnsResult})
+    X, pnl = refit_rows(rows, x)
     if size(X, 1) < forecast_min_rows(me)
         return nothing, fill(one(eltype(x)), length(x))
     end
     return nothing,
-           flat_where_undefined(one(eltype(x)) .+ vec(Statistics.mean(me, X; dims = 1)))
+           flat_where_undefined(one(eltype(x)) .+
+                                vec(Statistics.mean(me, X, pnl; dims = 1)))
 end
 function forecast_relative(::AbstractExpectedReturnsEstimator, st::ForecasterState,
-                           x::AbstractVector, rows)
+                           x::AbstractVector, ::Nothing)
     me = partial_fit!(st.me, x .- one(eltype(x)))
     return ForecasterState(me),
            flat_where_undefined(one(eltype(x)) .+ vec(Statistics.mean(me)))
+end
+function forecast_relative(::AbstractExpectedReturnsEstimator, st::ForecasterState,
+                           x::AbstractVector, rows::ReturnsResult)
+    r = fold_row(st.me, view(rows.X, size(rows.X, 1), :))
+    me = partial_fit!(st.me, r; active_mask = last_active_mask(rows.pnl))
+    return ForecasterState(me),
+           flat_where_undefined(one(eltype(x)) .+ vec(Statistics.mean(me)))
+end
+"""
+    fold_row(me::AbstractExpectedReturnsEstimator, r::AbstractVector)
+    fold_row(me::PriceLevelExpectedReturns, r::AbstractVector)
+
+The row a folding forecaster folds: the head's row verbatim, gaps included, for a moment estimator, whose fold reads a gap as a gap; and the row with every gap read as a zero return for a [`PriceLevelExpectedReturns`](@ref), whose folding statistic is an exact recursion over price levels that its own contract asks the caller to fill before the fold — the level did not move, the same reading the step takes through [`price_relative`](@ref). A moment estimator's answer at a gapped asset is `NaN` and holds the leg; a folding price-level statistic keeps a level there and never leaves it undefined, so a relisted asset re-enters its recursion warm rather than never.
+
+# Related
+
+  - [`forecast_relative`](@ref)
+  - [`price_relative`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function fold_row(::AbstractExpectedReturnsEstimator, r::AbstractVector)
+    return r
+end
+function fold_row(::PriceLevelExpectedReturns, r::AbstractVector)
+    return [isfinite(v) ? v : zero(v) for v in r]
+end
+"""
+    last_active_mask(pnl::Nothing)
+    last_active_mask(pnl::AssetPanel)
+
+The active mask of the last row of a rows carrier's Asset Panel, or `nothing` under no panel or a static one: the mask the fold arm of [`forecast_relative`](@ref) folds the current row under.
+
+# Related
+
+  - [`forecast_relative`](@ref)
+  - [`panel_is_static`](@ref)
+"""
+function last_active_mask(::Nothing)
+    return nothing
+end
+function last_active_mask(pnl::AssetPanel)
+    if panel_is_static(pnl)
+        return nothing
+    end
+    return view(pnl.amsk, size(pnl.amsk, 1), :)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -194,26 +242,26 @@ function flat_where_undefined(xhat::AbstractVector)
     return [isfinite(v) ? v : one(v) for v in xhat]
 end
 """
-    refit_rows(rows::AbstractMatrix, x::AbstractVector)
+    refit_rows(rows::ReturnsResult, x::AbstractVector)
     refit_rows(rows::Nothing, x::AbstractVector)
 
-The returns a stateless forecaster is refit on: the rows the head holds, or the current row alone as a one-row matrix when the head holds none.
+The returns a stateless forecaster is refit on, beside the Asset Panel that explains them: the rows carrier's `X` and `pnl`, or the current row alone as a one-row matrix and no panel when the head holds none.
 
 # Related
 
   - [`forecast_relative`](@ref)
 """
-function refit_rows(rows::AbstractMatrix, ::AbstractVector)
-    return rows
+function refit_rows(rows::ReturnsResult, ::AbstractVector)
+    return rows.X, rows.pnl
 end
 function refit_rows(::Nothing, x::AbstractVector)
-    return reshape(x .- one(eltype(x)), 1, :)
+    return reshape(x .- one(eltype(x)), 1, :), nothing
 end
 """
     scale_relative(scale::Nothing, x::AbstractVector, rows)
     scale_relative(scale::AbstractPriceLevelStatistic, x::AbstractVector, rows)
 
-The diagonal preconditioner of a [`ForecastReversion`](@ref) step: `nothing` for the identity, or the Price Relative Forecast of the `scale` statistic read from the rows the head holds.
+The diagonal preconditioner of a [`ForecastReversion`](@ref) step: `nothing` for the identity, or the Price Relative Forecast of the `scale` statistic read from the rows the head holds, one at an asset the statistic cannot answer ([`flat_where_undefined`](@ref)), so the step on that leg is unscaled.
 
 # Related
 
@@ -223,9 +271,12 @@ The diagonal preconditioner of a [`ForecastReversion`](@ref) step: `nothing` for
 function scale_relative(::Nothing, ::AbstractVector, ::Any)
     return nothing
 end
-function scale_relative(scale::AbstractPriceLevelStatistic, x::AbstractVector, rows)
+function scale_relative(scale::AbstractPriceLevelStatistic, x::AbstractVector,
+                        rows::Option{<:ReturnsResult})
     me = PriceLevelExpectedReturns(; alg = scale)
-    return one(eltype(x)) .+ vec(Statistics.mean(me, refit_rows(rows, x); dims = 1))
+    X, pnl = refit_rows(rows, x)
+    return flat_where_undefined(one(eltype(x)) .+
+                                vec(Statistics.mean(me, X, pnl; dims = 1)))
 end
 """
     scale_rows(scale::Nothing)
@@ -275,7 +326,7 @@ $(DocStringExtensions.FIELDS)
         proj::EuclideanProjection = EuclideanProjection()
     ) -> ForecastReversion
 
-Keywords correspond to the struct's fields. `rows_needed` is the larger of the forecaster's and the scale's, so the head holds the rows either reads; a forecaster that folds reads none.
+Keywords correspond to the struct's fields. `rows_needed` is the larger of the forecaster's and the scale's, so the head holds the rows either reads; a forecaster that folds reads the current row alone.
 
 ## Validation
 

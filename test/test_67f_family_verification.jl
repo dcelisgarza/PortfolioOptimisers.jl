@@ -194,21 +194,12 @@ and is held to the family's promises:
             ofull, _ = stepped(opt, rd, fill(5, 8))
             @test optimise(ofull).w == optimise(opt, rd).w
             # Time-varying panel: the same partitions over the unlisting and the delisting.
-            # A Risk Loss over the default prior meets the unlisted leg's constant column
-            # and fails in the covariance's repair, as its docstring states; over a prior
-            # whose covariance skips the repair it runs.
-            tv = alg
-            if isa(alg, MirrorDescent) && isa(alg.obj, RiskLoss)
-                @test_throws ArgumentError optimise(opt, rows(rdg, 1:30))
-                tv = MirrorDescent(;
-                                   obj = RiskLoss(; window = 5,
-                                                  pe = EmpiricalPrior(;
-                                                                      ce = PortfolioOptimisersCovariance(;
-                                                                                                         mp = MatrixProcessing(;
-                                                                                                                               pdm = nothing)))))
-            end
-            optg = OPS(; alg = tv)
+            # Every statistic over the rows reads the gap as a gap and reduces to its
+            # Coverage Universe, so a Risk Loss over the default prior runs over the
+            # unlisted span without meeting a constant column (ADR 0170).
+            optg = opt
             bg = optimise(optg, rows(rdg, 1:30))
+            @test isa(bg.retcode, OptimisationSuccess) && all(isfinite, bg.w)
             @test bg.w[2] == 0 && bg.imsk == amsk[30, :]
             for blocks in ([10, 7, 13], fill(1, 30), [30], fill(5, 6))
                 og, _ = stepped(optg, rdg, blocks)
@@ -225,6 +216,32 @@ and is held to the family's promises:
             v = po.port_opt_view(ofull, [1, 3])
             @test length(optimise(v).w) == 2
         end
+        # A leader with a second-moment head over the unlisted span: the re-solve reduces
+        # to its prior's Investable Mask, so D is zero while the window straddles the
+        # listing and holds again once the window clears it (issue #1237).
+        ftl = FollowTheLeader(; opt = MeanRisk(; opt = JuMPOptimiser(; slv = slv)),
+                              sel = LastRows(; W = 15))
+        l15 = optimise(OPS(; alg = ftl), rows(rdg, 1:15))
+        @test isa(l15.retcode, OptimisationSuccess) && l15.w[4] == 0
+        @test isa(optimise(OPS(; alg = ftl), rows(rdg, 1:8)).retcode, OptimisationSuccess)
+        l30 = optimise(OPS(; alg = ftl), rows(rdg, 1:30))
+        @test isa(l30.retcode, OptimisationSuccess) && l30.w[4] > 0 && l30.w[2] == 0
+        # A programme set with a fitted ceiling under any rule: the projection runs on the
+        # set prior's Investable Mask and writes a zero at the unlisted leg.
+        pset = ProgrammeAllocationSet(; slv = slv,
+                                      r = Variance(;
+                                                   settings = RiskMeasureSettings(;
+                                                                                  ub = 1e-2)))
+        c15 = optimise(OPS(; alg = ExponentiatedGradient(), set = pset), rows(rdg, 1:15))
+        @test isa(c15.retcode, OptimisationSuccess) && c15.w[4] == 0
+        @test isapprox(sum(c15.w), 1; atol = 1e-6)
+        tset = ProgrammeAllocationSet(; slv = slv,
+                                      tr = TrackingError(; err = 0.05,
+                                                         tr = WeightsTracking(;
+                                                                              w = fill(0.25,
+                                                                                       4))))
+        t15 = optimise(OPS(; alg = ExponentiatedGradient(), set = tset), rows(rdg, 1:15))
+        @test isa(t15.retcode, OptimisationSuccess) && t15.w[4] == 0
     end
 
     @testset "2. Every rule on a programme set with a turnover ceiling and a cardinality bound" begin

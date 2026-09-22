@@ -150,14 +150,14 @@ end
 """
     prior(pe::LowDimensionEnsemblePrior, X::MatNum, F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
 
-The low-dimension ensemble prior of the rows: the kernel-weighted one-step forecast of the price relatives less one as `mu`, and the aggregated predictive covariance as `sigma`, over every row handed in.
+The low-dimension ensemble prior of the rows: the kernel-weighted one-step forecast of the price relatives less one as `mu`, and the aggregated predictive covariance as `sigma`, over every row handed in. The fit reduces to the Coverage Universe of the window first, as every prior does — an asset with a non-finite return, or an inactive row of the panel, anywhere in the window is left out — and both moments are expanded back to the full universe with `NaN` outside it, so a consumer's Investable Mask reads the departure and the rows carried keep every column as given.
 
 # Arguments
 
   - `pe`: The ensemble prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor returns matrix (ignored).
-  - `pnl`: Asset Panel (ignored).
+  - `pnl`: Asset Panel, whose active mask enters the Coverage Universe.
   - $(arg_dict[:dims])
   - `kwargs...`: Ignored.
 
@@ -167,17 +167,20 @@ The low-dimension ensemble prior of the rows: the kernel-weighted one-step forec
 
 # Returns
 
-  - `pr::LowOrderPrior`: The rows as given, the forecast mean and the predictive covariance.
+  - `pr::LowOrderPrior`: The rows as given, the forecast mean and the predictive covariance, `NaN` outside the Coverage Universe.
 
 # Related
 
   - [`LowDimensionEnsemblePrior`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
+  - [`coverage_reduction`](@ref)
+  - [`expand_moment`](@ref)
 """
 function prior(pe::LowDimensionEnsemblePrior, X::MatNum, ::Option{<:MatNum} = nothing,
-               ::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
-    X = dims_oriented(dims, X)
+               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
+    Xf = dims_oriented(dims, X)
+    cmsk, X = coverage_reduction(Xf, pnl)
     T, N = size(X)
     @argcheck(T >= 3,
               ArgumentError("the low-dimension ensemble needs at least three observations, got $T: two regression pairs are the fewest whose regressor covariance exists"))
@@ -215,7 +218,8 @@ function prior(pe::LowDimensionEnsemblePrior, X::MatNum, ::Option{<:MatNum} = no
     # Symmetrised to the bit, so a consumer's Hermitian check holds; a matrix product need
     # not be.
     sigma = (sigma .+ transpose(sigma)) ./ 2
-    return LowOrderPrior(; X = X, mu = mu, sigma = posdef(pe.pdm, sigma))
+    return LowOrderPrior(; X = Xf, mu = expand_moment(mu, cmsk, 1),
+                         sigma = expand_moment(posdef(pe.pdm, sigma), cmsk))
 end
 
 export LowDimensionEnsemblePrior

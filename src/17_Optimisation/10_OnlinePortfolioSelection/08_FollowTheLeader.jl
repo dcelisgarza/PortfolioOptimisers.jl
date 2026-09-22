@@ -9,13 +9,13 @@ Every solved row of the online selection literature is one programme over a samp
 
 In order to implement a new selector, subtype `AbstractSampleSelector` with the paper's parameters as part of the struct, and implement:
 
-  - `select_rows(sel::AbstractSampleSelector, X::AbstractMatrix) -> AbstractVector{<:Integer}`: The indices of the rows of `X` the rule re-solves on, `X` the price relatives the head holds through the period, `observations × assets`, in time order. An empty vector is the empty selection.
+  - `select_rows(sel::AbstractSampleSelector, X::AbstractMatrix) -> AbstractVector{<:Integer}`: The indices of the rows of `X` the rule re-solves on, `X` the price relatives the head holds through the period, `observations × assets`, in time order, one at a gap ([`price_relative`](@ref)): a selector is a kernel over price relatives, so a window that straddles a listing is compared as a window in which that leg sat in cash, the same number the step reads there. An empty vector is the empty selection.
   - `rows_needed(sel::AbstractSampleSelector) -> Union{Nothing, Integer}`: The rows the selector reads at a step, `nothing` for every row folded so far.
 
 ## Arguments
 
   - `sel`: The selector.
-  - `X`: The price relatives, `1 .+ r`, every row the head holds.
+  - `X`: The price relatives, `1 .+ r` and one at a gap, every row the head holds.
 
 ## Returns
 
@@ -636,15 +636,20 @@ It wraps the resolved set, the step's Price-Adjusted Allocation and the head's r
 
 $(DocStringExtensions.FIELDS)
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets: `set` through its own view, against the carrier's unreduced returns matrix where there is one, as a tracking estimator's view asks; `w` sliced; `X` through the carrier's view. The held estimator's reduction to its Investable Mask views its `ccnt` with the rest of the optimiser, so the set the leader honours travels with the reduced programme instead of being dropped, as a custom constraint with no view is.
+
 # Related
 
   - [`FollowTheLeader`](@ref)
   - [`add_allocation_set_constraints!`](@ref)
   - [`CustomJuMPConstraint`](@ref)
   - [`AbstractAllocationSet`](@ref)
+  - [`investable_reduction`](@ref)
 """
-struct AllocationSetConstraint{T1 <: AbstractAllocationSet, T2 <: AbstractVector, T3} <:
-       CustomJuMPConstraint
+struct AllocationSetConstraint{T1 <: AbstractAllocationSet, T2 <: AbstractVector,
+                               T3 <: Option{<:ReturnsResult}} <: CustomJuMPConstraint
     """
     The Allocation Set, resolved over the pinned universe.
     """
@@ -654,7 +659,7 @@ struct AllocationSetConstraint{T1 <: AbstractAllocationSet, T2 <: AbstractVector
     """
     w::T2
     """
-    The rows of returns the head holds through the period, or `nothing`.
+    The rows carrier the head holds through the period, a [`ReturnsResult`](@ref), or `nothing`.
     """
     X::T3
 end
@@ -662,6 +667,14 @@ function add_custom_constraint!(model::JuMP.Model, ccnt::AllocationSetConstraint
                                 ::Any)::Nothing
     add_allocation_set_constraints!(model, ccnt.set, ccnt.w, ccnt.X)
     return nothing
+end
+function port_opt_view(c::AllocationSetConstraint{<:Any, <:Any, Nothing}, i, args...)
+    return AllocationSetConstraint(port_opt_view(c.set, i, args...), c.w[i], nothing)
+end
+function port_opt_view(c::AllocationSetConstraint{<:Any, <:Any, <:ReturnsResult}, i,
+                       args...)
+    return AllocationSetConstraint(port_opt_view(c.set, i, c.X.X), c.w[i],
+                                   port_opt_view(c.X, i))
 end
 """
     const LeaderOptimiser = Union{<:BestConstantRebalancedPortfolio, <:JuMPOptimisationEstimator}
@@ -686,6 +699,8 @@ The solver-free default runs Cover's fixed point, whose stop rule reads the chan
 **The re-solve takes the head's Allocation Set as its feasible region.** The update forms the step's Price-Adjusted Allocation, wraps the resolved set, that allocation and the head's rows into an [`AllocationSetConstraint`](@ref), appends it to the held JuMP estimator's `ccnt` for the solve, threads the allocation through [`factory`](@ref) as a fold loop does — so a turnover term or a fee on `opt` reads the same book — and takes the optimum as it is, with no projection: the projected leader is not the leader. The solver-free [`BestConstantRebalancedPortfolio`](@ref) has no model to add to, so a [`BoundedAllocationSet`](@ref) goes into its `wb` and `sets` and the answer is its repaired fixed point, and a [`ProgrammeAllocationSet`](@ref) is refused by name at the head's construction: the constrained leader under a programme set is [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref).
 
 **Only the damped mix is projected**, in the Euclidean geometry on `proj`, with the Price-Adjusted Allocation as the reference: the identity on every static convex kind, the repair a turnover ceiling or a MIP kind needs on the day the mix leaves the set, skipped by type on a [`BoundedAllocationSet`](@ref) and at `gamma = 0`. An empty selection, or one too small for the estimator — a JuMP head fits a covariance and needs two rows — answers the uniform portfolio projected onto the set in the same geometry, as the papers do; [`LastRows`](@ref) re-solves on the rows it has until its window fills, and a pattern-matching selector has no candidate until `window + 1` rows exist. A re-solve that does not succeed after the held estimator's own fallback chain is a Held Step: the update answers the Price-Adjusted Allocation, so the fund trades nothing that period.
+
+**Under a time-varying panel the re-solve is the batch path.** The selected rows reach the estimator as the head's rows carrier viewed at them — returns verbatim, `NaN` where there was no return, the active mask beside them — so the estimator reduces to its own universe as it does on any carrier and writes a zero at every asset outside it: the Coverage Universe of the selected rows for the solver-free leader and any prior-free head, the Investable Mask of its prior for a JuMP head. A leg unlisted for part of the selection is outside a plain estimator's universe until the selection clears the span, which a [`Prefix`](@ref) never does and a [`LastRows`](@ref) does once its window has passed the listing; a mask-aware prior admits it from its own warm-up. The selector itself is a kernel over price relatives and reads a gap as one, the leg sat in cash, so a window that straddles a listing is compared as such rather than dropped. The damped mix and the projection read the zero the leader answers at such a leg exactly as they read a zero the recursion parked.
 
 # Fields
 
@@ -810,23 +825,6 @@ function leader_min_rows(opt::LeaderOptimiser)
     return max(holds_second_moment(opt) ? 2 : 1, fit_min_rows(opt))
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-The carrier a [`FollowTheLeader`](@ref) rule hands its estimator: the selected rows of returns under the names the current [`ProjectionStep`](@ref) pins, or the column indices as names outside a step.
-
-# Related
-
-  - [`FollowTheLeader`](@ref)
-  - [`projection_step_names`](@ref)
-"""
-function leader_carrier(R::AbstractMatrix)
-    nx = projection_step_names()
-    if isnothing(nx)
-        nx = string.(axes(R, 2))
-    end
-    return ReturnsResult(; nx = nx, X = R)
-end
-"""
     append_custom_constraint(ccnt::Nothing, c::CustomJuMPConstraint)
     append_custom_constraint(ccnt::CustomJuMPConstraint, c::CustomJuMPConstraint)
     append_custom_constraint(ccnt::AbstractVector{<:CustomJuMPConstraint}, c::CustomJuMPConstraint)
@@ -848,12 +846,14 @@ function append_custom_constraint(ccnt::AbstractVector{<:CustomJuMPConstraint},
     return vcat(ccnt, c)
 end
 """
-    leader_allocation(opt::BestConstantRebalancedPortfolio, R::AbstractMatrix, w::AbstractVector, set::BoundedAllocationSet, X)
-    leader_allocation(opt::JuMPOptimisationEstimator, R::AbstractMatrix, w::AbstractVector, set::AbstractAllocationSet, X)
+    leader_allocation(opt::BestConstantRebalancedPortfolio, rd::ReturnsResult, w::AbstractVector, set::BoundedAllocationSet, X)
+    leader_allocation(opt::JuMPOptimisationEstimator, rd::ReturnsResult, w::AbstractVector, set::AbstractAllocationSet, X)
 
-The leader: the held estimator re-solved on the selected rows `R` under the head's set, or `nothing` on a Held Step.
+The leader: the held estimator re-solved on the selected rows, the carrier `rd`, under the head's set, or `nothing` on a Held Step.
 
-The solver-free arm takes the bounded set's `wb` and `sets` onto the fixed point's own slots and answers the repaired fixed point. The JuMP arm threads the Price-Adjusted Allocation `w` through [`factory`](@ref), appends the [`AllocationSetConstraint`](@ref) over the set, `w` and the head's rows `X` to the estimator's `ccnt`, and takes the optimum as it is; a result whose retcode is not an [`OptimisationSuccess`](@ref) records a Held Step through [`record_held_step!`](@ref) with the solver's trials and answers `nothing`.
+`rd` is the head's rows carrier viewed at the selected rows — the returns verbatim, `NaN` where there was no return, under the pinned names and the buffer's Asset Panel — so the estimator runs the batch path it runs on any carrier: a prior-free head reduces to the Coverage Universe of the selected rows, a prior-fitting one to the Investable Mask of its prior, and both answer a zero at every asset outside it. A leg unlisted for part of the selection is therefore outside a plain estimator's universe until the selection clears the span, which a [`Prefix`](@ref) selection never does, and inside a mask-aware prior's from its own warm-up.
+
+The solver-free arm takes the bounded set's `wb` and `sets` onto the fixed point's own slots and answers the repaired fixed point. The JuMP arm threads the Price-Adjusted Allocation `w` through [`factory`](@ref), appends the [`AllocationSetConstraint`](@ref) over the set, `w` and the head's rows carrier `X` to the estimator's `ccnt`, and takes the optimum as it is; a result whose retcode is not an [`OptimisationSuccess`](@ref) records a Held Step through [`record_held_step!`](@ref) with the solver's trials and answers `nothing`.
 
 # Related
 
@@ -861,35 +861,36 @@ The solver-free arm takes the bounded set's `wb` and `sets` onto the fixed point
   - [`AllocationSetConstraint`](@ref)
   - [`HeldStep`](@ref)
 """
-function leader_allocation(opt::BestConstantRebalancedPortfolio, R::AbstractMatrix,
+function leader_allocation(opt::BestConstantRebalancedPortfolio, rd::ReturnsResult,
                            w::AbstractVector, set::BoundedAllocationSet, ::Any)
     bcrp = BestConstantRebalancedPortfolio(; wb = set.wb, fees = opt.fees, sets = set.sets,
                                            wf = opt.wf, fb = opt.fb, iters = opt.iters,
                                            tol = opt.tol, strict = opt.strict,
                                            cache = opt.cache)
-    return optimise(factory(bcrp, w), leader_carrier(R)).w
+    return optimise(factory(bcrp, w), rd).w
 end
-function leader_allocation(opt::JuMPOptimisationEstimator, R::AbstractMatrix,
-                           w::AbstractVector, set::AbstractAllocationSet, X)
+function leader_allocation(opt::JuMPOptimisationEstimator, rd::ReturnsResult,
+                           w::AbstractVector, set::AbstractAllocationSet,
+                           X::Option{<:ReturnsResult})
     opt = factory(opt, w)
     ccnt = append_custom_constraint(opt.opt.ccnt, AllocationSetConstraint(set, w, X))
     opt = Accessors.@set opt.opt.ccnt = ccnt
-    res = optimise(opt, leader_carrier(R))
+    res = optimise(opt, rd)
     if isa(res.retcode, OptimisationSuccess)
         return res.w
     end
-    record_held_step!("the follow-the-leader programme of the `$(nameof(typeof(opt)))` did not solve on the $(size(R, 1)) selected rows, and the step trades nothing",
+    record_held_step!("the follow-the-leader programme of the `$(nameof(typeof(opt)))` did not solve on the $(size(rd.X, 1)) selected rows, and the step trades nothing",
                       res.retcode.res)
     return nothing
 end
 function online_update!(alg::FollowTheLeader, st, w::AbstractVector, x::AbstractVector,
-                        rows, set::AbstractAllocationSet)
+                        rows::ReturnsResult, set::AbstractAllocationSet)
     wh = price_adjusted_allocation(w, x)
-    idx = select_rows(alg.sel, one(eltype(rows)) .+ rows)
+    idx = select_rows(alg.sel, price_relative.(rows.X))
     wstar = if length(idx) < leader_min_rows(alg.opt)
         project(alg.proj, set, fill(one(eltype(w)) / length(w), length(w)), wh)
     else
-        leader_allocation(alg.opt, rows[idx, :], wh, set, rows)
+        leader_allocation(alg.opt, port_opt_view(rows, idx, :), wh, set, rows)
     end
     if isnothing(wstar)
         return st, copy(wh)

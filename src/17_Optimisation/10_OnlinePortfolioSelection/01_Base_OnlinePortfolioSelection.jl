@@ -9,7 +9,7 @@ A rule is the one thing that varies across the online portfolio selection family
 
 In order to implement a new rule, subtype `AbstractOnlinePortfolioSelectionAlgorithm` with the paper's parameters and a `proj` slot as part of the struct, and implement the following methods:
 
-  - `online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet) -> Tuple`: The Online Update: from the rule's carrier `st`, the allocation `w` held during the period, the finite price relative `x` of the period and the rows the head holds through it, answer `(st', w')`, the carrier and the allocation for the next period. `st` is written in place where the rule can, and `w'` is always a new vector. A first-order rule also implements the seven-argument form, whose last argument is the Gradient Point an [`ExpertMixture`](@ref) hands it; the generic method drops the point.
+  - `online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet) -> Tuple`: The Online Update: from the rule's carrier `st`, the allocation `w` held during the period, the finite price relative `x` of the period and the rows carrier the head holds through it, answer `(st', w')`, the carrier and the allocation for the next period. `st` is written in place where the rule can, and `w'` is always a new vector. A first-order rule also implements the seven-argument form, whose last argument is the Gradient Point an [`ExpertMixture`](@ref) hands it; the generic method drops the point.
   - `rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector)`: The carrier before the first update, or `nothing` for a rule that carries nothing; `w` is the Start Allocation, whose length and element type the carrier takes.
   - `rows_needed(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> Union{Nothing, Integer}`: The number of rows the rule reads at a step: `0` for one that reads none, `nothing` for one that reads every row folded so far.
   - `projection_geometry(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> AbstractProjectionGeometry`: The geometry the head projects the Start Allocation in, the rule's `proj` slot by default.
@@ -21,8 +21,8 @@ A rule whose carrier holds a per-asset axis also implements `port_opt_view(st, i
   - `alg`: The concrete rule.
   - `st`: The rule's private carrier, or `nothing`.
   - `w`: The allocation held during the period, over the full pinned universe, summing to one.
-  - `x`: The price relative of the period, `1 .+ r`, finite at every asset.
-  - `rows`: The rows of returns the head holds through the period, `observations × assets`, or `nothing` when the rule reads none.
+  - `x`: The price relative of the period, [`price_relative`](@ref) of the row: `1 .+ r`, and one at a gap, so it is finite at every asset.
+  - `rows`: The rows carrier the head holds through the period, a [`ReturnsResult`](@ref) whose `X` is the rows of returns verbatim, `NaN` where there was no return, under the pinned names and the buffer's Asset Panel; or `nothing` when the rule reads none. A statistic over it — a forecaster's mean, a prior, a re-solve — reads it as the batch verb reads a carrier, and reduces to its own Coverage Universe; a kernel over the price relatives reads a gap as one through [`price_relative`](@ref).
   - `set`: The head's Allocation Set, which the rule projects onto through [`project`](@ref).
 
 ## Returns
@@ -517,7 +517,7 @@ end
 
 The Online Update: one row of the online portfolio selection recursion, written once per rule.
 
-Takes the rule, its private carrier `st`, the allocation `w` held during the period, the finite price relative `x` of that period, the rows the head holds through it, and the head's Allocation Set; answers `(st', w')`, the carrier and the allocation for the next period. The carrier is written in place where the rule can, `nothing` is a legal carrier, and `w'` is always a new vector, because the projection allocates one — so a `w` that is a view after [`port_opt_view`](@ref) is never written.
+Takes the rule, its private carrier `st`, the allocation `w` held during the period, the finite price relative `x` of that period, the rows carrier the head holds through it, and the head's Allocation Set; answers `(st', w')`, the carrier and the allocation for the next period. The carrier is written in place where the rule can, `nothing` is a legal carrier, and `w'` is always a new vector, because the projection allocates one — so a `w` that is a view after [`port_opt_view`](@ref) is never written.
 
 Every rule takes the same two halves — the unconstrained step to a raw vector, then [`project`](@ref) onto the set in the rule's geometry — and a rule that reads `w` continues from whatever it is handed, the Start Allocation on the first row.
 
@@ -528,8 +528,8 @@ The seven-argument form names the **Gradient Point**: an [`ExpertMixture`](@ref)
   - `alg`: The rule.
   - `st`: The rule's carrier, or `nothing`.
   - `w`: The allocation held during the period.
-  - `x`: The price relative of the period, `1 .+ r`.
-  - `rows`: The returns the head holds through the period, or `nothing`.
+  - `x`: The price relative of the period, `1 .+ r`, one at a gap.
+  - `rows`: The rows carrier the head holds through the period, a [`ReturnsResult`](@ref) of the rows verbatim, or `nothing`.
   - `set`: The Allocation Set, resolved.
   - `point`: The Gradient Point, the allocation a first-order rule evaluates its gradient at, or `nothing` for its own iterate.
 
@@ -549,6 +549,19 @@ function online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st,
                         w::AbstractVector, x::AbstractVector, rows,
                         set::AbstractAllocationSet, ::Option{<:AbstractVector})
     return online_update!(alg, st, w, x, rows, set)
+end
+"""
+    price_relative(r::Number)
+
+The price relative of one return, `1 + r`, and one at a gap: a non-finite return is a period in which the leg sat in cash, the Held Gap's own reading, so the Online Update sees a finite `x` at every asset and a kernel over the rows reads the same number there.
+
+# Related
+
+  - [`online_update!`](@ref)
+  - [`online_selection_row!`](@ref)
+"""
+function price_relative(r::Number)
+    return isfinite(r) ? one(r) + r : one(r)
 end
 """
     rule_state_seed(::AbstractOnlinePortfolioSelectionAlgorithm, ::AbstractVector)
@@ -688,9 +701,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The step a projection runs inside: the rows the head holds through the period, the pinned asset names, the row's timestamp, and the Held Steps recorded so far.
+The step a projection runs inside: the rows carrier the head holds through the period, the row's timestamp, and the Held Steps recorded so far.
 
-The Online Update's projection is `project(proj, set, q, w)`, four arguments and no more, so a programme set's covariance cone and tracking error — which read the head's rows — and the Held Step's record — which the head must see — travel outside the signature, on the task-scoped [`PROJECTION_STEP`](@ref). The head opens one step per row through [`with_projection_step`](@ref), around the whole Online Update, so every projection of that row — a mixture's experts' and its own blend's — reads one set of rows and writes one log. A rule that re-solves an optimisation estimator on the rows it selects, [`FollowTheLeader`](@ref), reads the names here too, so the carrier it hands the estimator is named as the head's was. Outside a step, a projection reads no rows and reports a hold as a warning.
+The Online Update's projection is `project(proj, set, q, w)`, four arguments and no more, so a programme set's covariance cone and tracking error — which read the head's rows — and the Held Step's record — which the head must see — travel outside the signature, on the task-scoped [`PROJECTION_STEP`](@ref). The head opens one step per row through [`with_projection_step`](@ref), around the whole Online Update, so every projection of that row — a mixture's experts' and its own blend's — reads one carrier and writes one log. The carrier is the one the update itself is handed, a [`ReturnsResult`](@ref) of the rows verbatim under the pinned names and the buffer's Asset Panel, so a programme set fits its prior at the same door a batch head does ([`rows_carrier`](@ref)). Outside a step, a projection reads no rows and reports a hold as a warning.
 
 # Fields
 
@@ -700,18 +713,15 @@ $(DocStringExtensions.FIELDS)
 
   - [`PROJECTION_STEP`](@ref)
   - [`with_projection_step`](@ref)
+  - [`rows_carrier`](@ref)
   - [`HeldStep`](@ref)
   - [`project`](@ref)
 """
-struct ProjectionStep{T1, T2, T3}
+struct ProjectionStep{T1, T2}
     """
-    The rows of returns the head holds through the period, `observations × assets`, or `nothing`.
+    The rows carrier the head holds through the period, a [`ReturnsResult`](@ref) of the rows verbatim, or `nothing`.
     """
     rows::T1
-    """
-    The pinned asset names, or `nothing`.
-    """
-    nx::T3
     """
     The row's timestamp, or its index in the fold.
     """
@@ -739,7 +749,7 @@ const PROJECTION_STEP = ScopedValue{Union{Nothing, ProjectionStep}}(nothing)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Runs `f()` inside a [`ProjectionStep`](@ref) over `rows` at `ts`, the names `nx` pinned and the head's `strict` carried, and answers `(f(), held)`: the update's result and the Held Steps its projections recorded, an empty vector when every programme solved.
+Runs `f()` inside a [`ProjectionStep`](@ref) over the rows carrier `rows` at `ts`, the head's `strict` carried, and answers `(f(), held)`: the update's result and the Held Steps its projections recorded, an empty vector when every programme solved.
 
 # Related
 
@@ -747,8 +757,8 @@ Runs `f()` inside a [`ProjectionStep`](@ref) over `rows` at `ts`, the names `nx`
   - [`ProjectionStep`](@ref)
   - [`fold_online_selection`](@ref)
 """
-function with_projection_step(f, rows, ts; nx = nothing, strict::Bool = false)
-    step = ProjectionStep(rows, nx, ts, strict, HeldStep[])
+function with_projection_step(f, rows::Option{<:ReturnsResult}, ts; strict::Bool = false)
+    step = ProjectionStep(rows, ts, strict, HeldStep[])
     out = Base.ScopedValues.with(f, PROJECTION_STEP => step)
     return out, step.held
 end
@@ -788,20 +798,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The asset names the current [`ProjectionStep`](@ref) pins, or `nothing` outside a step or under a carrier with none.
-
-# Related
-
-  - [`ProjectionStep`](@ref)
-  - [`FollowTheLeader`](@ref)
-"""
-function projection_step_names()
-    step = PROJECTION_STEP[]
-    return isnothing(step) ? nothing : step.nx
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 The head's `strict` flag the current [`ProjectionStep`](@ref) carries, or `false` outside a step.
 
 # Related
@@ -833,7 +829,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The Partial Fit State of an [`OnlinePortfolioSelection`](@ref) head: a Rule State beside the rows held once, the Fold Context pinned by the first step, and every timestamp folded.
 
-The pair `(st, w)` is the Rule State, the unit the family recurses over. The rows any rule of the tree reads are held once, on this state, as a [`SampleBufferState`](@ref) of **returns** — the Returns Result's rows verbatim, a non-finite cell filled with zero before the push — capped by the rule tree's [`rows_needed`](@ref), and `nothing` for a tree that reads none. The timestamps are never capped, so [`Resume`](@ref) works for a carrier-free rule. The last folded row's active mask is the Investable Mask the read-out reduces on, `nothing` under a static panel; the recursion itself keeps the full `w` and never carries a forced zero.
+The pair `(st, w)` is the Rule State, the unit the family recurses over. The rows any rule of the tree reads are held once, on this state, as a [`SampleBufferState`](@ref) of **returns** — the Returns Result's rows verbatim, `NaN` where there was no return, and the row's active mask beside them under a time-varying panel — capped by the rule tree's [`rows_needed`](@ref), and `nothing` for a tree that reads none. The head reads the buffer out as a [`ReturnsResult`](@ref) at every row ([`rows_carrier`](@ref)), so a statistic over the rows reduces to its Coverage Universe as a batch fit over the same window does. The timestamps are never capped, so [`Resume`](@ref) works for a carrier-free rule. The last folded row's active mask is the Investable Mask the read-out reduces on, `nothing` under a static panel; the recursion itself keeps the full `w` and never carries a forced zero.
 
 # Fields
 
@@ -887,7 +883,7 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
     """
     st
     """
-    The rows of returns any rule of the tree reads, a [`SampleBufferState`](@ref) capped by [`rows_needed`](@ref), or `nothing` when the tree reads none.
+    The rows of returns any rule of the tree reads, a [`SampleBufferState`](@ref) of the rows verbatim and their active masks, capped by [`rows_needed`](@ref), or `nothing` when the tree reads none.
     """
     X
     """
