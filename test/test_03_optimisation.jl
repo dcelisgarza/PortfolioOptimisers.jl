@@ -367,7 +367,8 @@ end
         end
     end
     @testset "A repaired vector keeps its budget and lands in the bounds" begin
-        for wf in (IterativeWeightFinaliser(), JuMPWeightFinaliser(; slv = slv))
+        for wf in (IterativeWeightFinaliser(), EuclideanWeightFinaliser(),
+                   EntropicWeightFinaliser(), JuMPWeightFinaliser(; slv = slv))
             w = PortfolioOptimisers.opt_weight_bounds(wf, wb, copy(w0))
             @test isapprox(sum(w), sum(w0))
             @test all(wb.lb .- 1e-8 .<= w .<= wb.ub .+ 1e-8)
@@ -377,15 +378,119 @@ end
         @test PortfolioOptimisers.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv), wb,
                                                     copy(wok)) == wok
     end
-    @testset "An unsatisfiable bound set still reports success" begin
-        # `finalise_weight_bounds` tests finiteness alone, so an exhausted iterative loop
-        # returns a bound-violating vector under a success code.
+    @testset "An unsatisfiable bound set reports failure" begin
+        # `Σ lb = 1.2` cannot hold a budget of one, so no finaliser can meet the bounds.
         wbi = WeightBounds(; lb = fill(0.3, 4), ub = fill(0.9, 4))
+        for wf in (IterativeWeightFinaliser(), EuclideanWeightFinaliser(),
+                   EntropicWeightFinaliser())
+            retcode, w = PortfolioOptimisers.finalise_weight_bounds(wf, wbi, copy(w0))
+            @test isa(retcode, OptimisationFailure)
+            @test w ≈ wbi.lb
+        end
         retcode, w = PortfolioOptimisers.finalise_weight_bounds(IterativeWeightFinaliser(),
-                                                                wbi, copy(w0))
+                                                                wb, copy(w0))
         @test isa(retcode, OptimisationSuccess)
-        @test !all(wbi.lb .<= w)
-        @test isapprox(sum(w), sum(w0))
+        @test !PortfolioOptimisers.weights_meet_bounds(wb, [NaN, 0.5, 0.25, 0.25], 1.0)
+    end
+    @testset "The iterative loop falls back to the projection when it cannot converge" begin
+        opt = PortfolioOptimisers.opt_weight_bounds
+        proj = PortfolioOptimisers.euclidean_weight_projection
+        # A stall: after the clip no weight lies strictly inside its bounds, so the clipped
+        # mass has nowhere to go, and the loop sat at `[0.5, 0.5, 0.0]` for any `iter`.
+        # A long-short divergence: the loop spread mass over a sum of mixed signs. The third
+        # case is the worst of a random census, where the loop reached `[277, -515, 933,
+        # -694]`.
+        cases = ((WeightBounds(; lb = 0.0, ub = 0.4), [0.6, 0.4, 0.0], [0.4, 0.4, 0.2]),
+                 (WeightBounds(; lb = -0.3, ub = 0.5), [0.9, 0.6, -0.5], [0.5, 0.5, 0.0]),
+                 (WeightBounds(; lb = [-0.026, -0.103, -0.1837, -0.1388],
+                               ub = [0.0554, 0.44, 0.1866, 0.4171]),
+                  [0.703, -0.5214, 1.3316, -0.5132], [0.0554, 0.3749, 0.1866, 0.3831]))
+        for (wbc, wc, wp) in cases,
+            wf in (IterativeWeightFinaliser(), IterativeWeightFinaliser(; iter = 10_000),
+                   EuclideanWeightFinaliser(), EntropicWeightFinaliser())
+
+            w = opt(wf, wbc, copy(wc))
+            @test isapprox(w, wp; atol = 1e-4)
+            @test w == proj(wc, wbc)
+            @test isa(first(PortfolioOptimisers.finalise_weight_bounds(wf, wbc, copy(wc))),
+                      OptimisationSuccess)
+        end
+        # A loop that reaches the bounds keeps its own answer, which keeps the ratio of the
+        # free weights and so differs from the projection.
+        wbr = WeightBounds(; lb = 0.0, ub = 0.5)
+        @test opt(IterativeWeightFinaliser(), wbr, [0.9, 0.09, 0.01]) ≈ [0.5, 0.45, 0.05]
+        @test opt(EuclideanWeightFinaliser(), wbr, [0.9, 0.09, 0.01]) ≈ [0.5, 0.29, 0.21]
+    end
+    @testset "A scalar bound is tested against every weight" begin
+        # `map` over a scalar bound and a vector stopped after the first weight, so a first
+        # weight inside its bounds returned the vector untouched.
+        wbs = WeightBounds(; lb = 0.0, ub = 0.4)
+        for wf in (IterativeWeightFinaliser(), EuclideanWeightFinaliser(),
+                   EntropicWeightFinaliser(), JuMPWeightFinaliser(; slv = slv))
+            w = PortfolioOptimisers.opt_weight_bounds(wf, wbs, [0.1, 0.8, 0.1])
+            @test isapprox(sum(w), 1.0)
+            @test all(-1e-8 .<= w .<= 0.4 + 1e-8)
+        end
+    end
+    @testset "The Euclidean projection holds any budget and an absent bound" begin
+        proj = PortfolioOptimisers.euclidean_weight_projection
+        for s in (1.0, 0.5, 0.0, -0.3, 2.0)
+            wbl = WeightBounds(; lb = [-0.5, -0.4, -0.3, -0.6], ub = [0.9, 0.6, 0.7, 0.8])
+            wc = [1.5, -1.0, 0.4, -0.9] .+ (s - 0.0) / 4
+            w = PortfolioOptimisers.opt_weight_bounds(EuclideanWeightFinaliser(), wbl, wc)
+            @test isapprox(sum(w), s; atol = 1e-12)
+            @test PortfolioOptimisers.weights_meet_bounds(wbl, w, s)
+        end
+        # The projection is the programme of the squared absolute error, in closed form.
+        wbj = WeightBounds(; lb = fill(0.1, 4), ub = fill(0.3, 4))
+        wj = [0.6, 0.25, 0.1, 0.05]
+        wq = PortfolioOptimisers.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv,
+                                                                       alg = SquaredAbsoluteErrorWeightFinaliser()),
+                                                   wbj, copy(wj))
+        @test proj(wj, wbj) ≈ [0.3, 0.3, 0.225, 0.175]
+        # Clarabel solves the cone to about `5e-6`.
+        @test isapprox(proj(wj, wbj), wq; atol = 1e-4)
+        # An absent bound is no constraint on its side.
+        @test proj([0.7, 0.4, -0.1], WeightBounds(; lb = nothing, ub = 0.5)) ≈
+              [0.5, 0.5, 0.0]
+        @test proj([0.7, 0.4, -0.1], WeightBounds(; lb = 0.0, ub = nothing)) ≈
+              [0.65, 0.35, 0.0]
+        wu = [0.25, 0.25, 0.5]
+        @test PortfolioOptimisers.opt_weight_bounds(EuclideanWeightFinaliser(),
+                                                    WeightBounds(; lb = 0.0, ub = 0.5),
+                                                    wu) === wu
+    end
+    @testset "The entropic projection keeps the ratios of the free weights" begin
+        opt = PortfolioOptimisers.opt_weight_bounds
+        ent = PortfolioOptimisers.entropic_weight_projection
+        euc = PortfolioOptimisers.euclidean_weight_projection
+        # Where the loop reaches the bounds, the entropic projection is its exact limit.
+        wbr = WeightBounds(; lb = 0.0, ub = 0.5)
+        @test opt(EntropicWeightFinaliser(), wbr, [0.9, 0.09, 0.01]) ≈ [0.5, 0.45, 0.05]
+        @test opt(EntropicWeightFinaliser(), wb, copy(w0)) ≈
+              opt(IterativeWeightFinaliser(), wb, copy(w0))
+        wq = [0.35, 0.3, 0.2, 0.1, 0.05]
+        wbq = WeightBounds(; lb = fill(0.08, 5), ub = fill(0.28, 5))
+        w = opt(EntropicWeightFinaliser(), wbq, wq)
+        free = findall(wbq.lb .< w .< wbq.ub)
+        @test length(free) >= 2
+        @test all(isapprox.(w[free] ./ wq[free], w[free[1]] / wq[free[1]]))
+        @test sum(w) ≈ 1
+        # An absent bound is no constraint on its side.
+        @test ent([0.7, 0.3], WeightBounds(; lb = nothing, ub = 0.5)) ≈ [0.5, 0.5]
+        @test ent([0.9, 0.1], WeightBounds(; lb = 0.2, ub = nothing)) ≈ [0.8, 0.2]
+        # Outside its domain it is the Euclidean projection: a zero weight that must take
+        # mass (the stall of the loop), a negative weight, a negative lower bound, a budget
+        # that is not positive, and a budget equal to `Σ lb`.
+        for (wbc, wc) in ((WeightBounds(; lb = 0.0, ub = 0.4), [0.6, 0.4, 0.0]),
+                          (WeightBounds(; lb = -0.3, ub = 0.5), [0.9, 0.6, -0.5]),
+                          (WeightBounds(; lb = -0.3, ub = 0.5), [0.9, 0.1, 0.0]),
+                          (WeightBounds(; lb = -0.5, ub = 0.5), [0.7, -0.2, -0.5]),
+                          (WeightBounds(; lb = [0.5, 0.3, 0.2], ub = 0.8), [0.7, 0.2, 0.1]))
+            @test ent(wc, wbc) == euc(wc, wbc)
+            @test PortfolioOptimisers.weights_meet_bounds(wbc, ent(wc, wbc), sum(wc))
+        end
+        @test ent([0.6, 0.4, 0.0], WeightBounds(; lb = 0.0, ub = 0.4)) ≈ [0.4, 0.4, 0.2]
     end
     @testset "The relative formulations write eps into a zero weight" begin
         wz = [0.6, 0.4, 0.0, 0.0]

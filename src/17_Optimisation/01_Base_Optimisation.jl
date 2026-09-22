@@ -2233,6 +2233,8 @@ In order to implement a new strategy that works seamlessly with the library, sub
 # Related
 
   - [`IterativeWeightFinaliser`](@ref)
+  - [`EuclideanWeightFinaliser`](@ref)
+  - [`EntropicWeightFinaliser`](@ref)
   - [`JuMPWeightFinaliser`](@ref)
 """
 abstract type WeightFinaliser <: AbstractAlgorithm end
@@ -2243,7 +2245,9 @@ Iteratively projects weights into the feasible region defined by weight bounds.
 
 Each pass clips the weights to the bounds, then redistributes the clipped mass over the entries that lie strictly inside the bounds, in proportion to their own weights. The pass ends by rescaling the vector to the budget it started with, so the sum is preserved. Passes run until the bounds hold or until `iter` passes are done. An absent bound is read as `typemin` or `typemax` of the weight element type.
 
-The bounds are not guaranteed on exit. A bound set that no rescaled vector can satisfy exhausts the passes and returns the last vector: four assets summing to `1` under `lb = 0.3` return `[0.25, 0.25, 0.25, 0.25]`. [`finalise_weight_bounds`](@ref) tests finiteness alone, so such a vector is reported as an [`OptimisationSuccess`](@ref).
+The redistribution keeps the ratios of the free weights, so the answer differs from the Euclidean projection of [`EuclideanWeightFinaliser`](@ref). The loop can fail to reach the bounds. It stalls when no weight lies strictly inside its bounds, for example `[0.6, 0.4, 0.0]` under `ub = 0.4`, and it can diverge on long-short bounds. If the last pass still breaks a bound, or is not finite, the finaliser returns the Euclidean projection of the input instead, which is `[0.4, 0.4, 0.2]` in that example. A loop that reaches the bounds keeps its own answer.
+
+A bound set that cannot hold the budget has no feasible vector: four assets summing to `1` under `lb = 0.3` return their lower bounds, and [`finalise_weight_bounds`](@ref) reports an [`OptimisationFailure`](@ref).
 
 # Fields
 
@@ -2272,6 +2276,8 @@ IterativeWeightFinaliser
 # Related
 
   - [`WeightFinaliser`](@ref)
+  - [`EuclideanWeightFinaliser`](@ref)
+  - [`EntropicWeightFinaliser`](@ref)
   - [`JuMPWeightFinaliser`](@ref)
 """
 @concrete struct IterativeWeightFinaliser <: WeightFinaliser
@@ -2447,12 +2453,14 @@ end
 """
     opt_weight_bounds(wf::JuMPWeightFinaliser, wb::WeightBounds, wi::VecNum) -> VecNum
     opt_weight_bounds(wf::IterativeWeightFinaliser, wb::WeightBounds, w::VecNum) -> VecNum
+    opt_weight_bounds(wf::EuclideanWeightFinaliser, wb::WeightBounds, w::VecNum) -> VecNum
+    opt_weight_bounds(wf::EntropicWeightFinaliser, wb::WeightBounds, w::VecNum) -> VecNum
 
 Move a weight vector into the bounds `wb`, keeping the budget it already carries.
 
 The bounds themselves are not changed. Weights that already satisfy the bounds are returned unchanged, without a solve.
 
-The [`JuMPWeightFinaliser`](@ref) method builds the programme of its `alg` (see [`set_clustering_weight_finaliser_alg!`](@ref)) and solves it. A failed solve warns and falls back to a default [`IterativeWeightFinaliser`](@ref). The [`IterativeWeightFinaliser`](@ref) method clips and redistributes instead, and may exhaust its passes with the bounds still violated.
+The [`JuMPWeightFinaliser`](@ref) method builds the programme of its `alg` (see [`set_clustering_weight_finaliser_alg!`](@ref)) and solves it. A failed solve warns and falls back to a default [`IterativeWeightFinaliser`](@ref). The [`IterativeWeightFinaliser`](@ref) method clips and redistributes instead, and returns the Euclidean projection if its passes end with a bound still broken. The [`EuclideanWeightFinaliser`](@ref) method returns the Euclidean projection ([`euclidean_weight_projection`](@ref)). The [`EntropicWeightFinaliser`](@ref) method returns the entropic projection ([`entropic_weight_projection`](@ref)), or the Euclidean one where the entropic one is not defined.
 
 # Arguments
 
@@ -2469,15 +2477,16 @@ The [`JuMPWeightFinaliser`](@ref) method builds the programme of its `alg` (see 
   - [`WeightBounds`](@ref)
   - [`JuMPWeightFinaliser`](@ref)
   - [`IterativeWeightFinaliser`](@ref)
+  - [`EuclideanWeightFinaliser`](@ref)
+  - [`EntropicWeightFinaliser`](@ref)
   - [`finalise_weight_bounds`](@ref)
 """
 function opt_weight_bounds(wf::JuMPWeightFinaliser, wb::WeightBounds, wi::VecNum)
-    lb = wb.lb
-    ub = wb.ub
-    if !(!isnothing(lb) && any(map((x, y) -> x > y, lb, wi)) ||
-         !isnothing(ub) && any(map((x, y) -> x < y, ub, wi)))
+    if !weights_break_bounds(wb, wi)
         return wi
     end
+    lb = wb.lb
+    ub = wb.ub
     model = JuMP.Model()
     JuMP.@expression(model, sc, wf.sc)
     JuMP.@expression(model, so, wf.so)
@@ -2497,45 +2506,14 @@ function opt_weight_bounds(wf::JuMPWeightFinaliser, wb::WeightBounds, wi::VecNum
         opt_weight_bounds(IterativeWeightFinaliser(), wb, wi)
     end
 end
-function opt_weight_bounds(wf::IterativeWeightFinaliser, wb::WeightBounds, w::VecNum)
-    lb = wb.lb
-    ub = wb.ub
-    if isnothing(lb)
-        lb = typemin(eltype(w))
-    end
-    if isnothing(ub)
-        ub = typemax(eltype(w))
-    end
-    if !(any(map((x, y) -> x > y, lb, w)) || any(map((x, y) -> x < y, ub, w)))
-        return w
-    end
-    iter = wf.iter
-    s1 = sum(w)
-    for _ in 1:iter
-        if !(any(map((x, y) -> x > y, lb, w)) || any(map((x, y) -> x < y, ub, w)))
-            break
-        end
-        old_w = copy(w)
-        w = max.(min.(w, ub), lb)
-        idx = w .< ub .&& w .> lb
-        w_add = sum(max.(old_w ⊖ ub, zero(eltype(w))))
-        w_sub = sum(min.(old_w ⊖ lb, zero(eltype(w))))
-        delta = w_add + w_sub
-        if !iszero(delta)
-            w[idx] += delta * w[idx] / sum(w[idx])
-        end
-        w *= s1 / sum(w)
-    end
-    return w
-end
 """
     finalise_weight_bounds(wf::WeightFinaliser, wb::WeightBounds, w::VecNum)
 
 Apply weight finalisation to enforce bounds and determine the optimisation return code.
 
-Runs [`opt_weight_bounds`](@ref) with the given finaliser and bounds, then returns a success or failure return code based on whether all weights are finite.
+Runs [`opt_weight_bounds`](@ref) with the given finaliser and bounds. The return code is an [`OptimisationSuccess`](@ref) if the weights are finite, lie in the bounds and keep the budget of the input, each to a tolerance ([`weights_meet_bounds`](@ref)), and an [`OptimisationFailure`](@ref) otherwise. A failure lets the fallback chain run.
 
-Finiteness is the whole test. A vector that still violates the bounds — which an [`IterativeWeightFinaliser`](@ref) returns when it exhausts its passes — is reported as an [`OptimisationSuccess`](@ref).
+A bound set that cannot hold the budget, `Σ lb > sum(w)` or `Σ ub < sum(w)`, always fails.
 
 # Arguments
 
@@ -2555,8 +2533,9 @@ Finiteness is the whole test. A vector that still violates the bounds — which 
   - [`OptimisationFailure`](@ref)
 """
 function finalise_weight_bounds(wf::WeightFinaliser, wb::WeightBounds, w::VecNum)
+    s = sum(w)
     w = opt_weight_bounds(wf, wb, w)
-    retcode = if !any(!isfinite, w)
+    retcode = if weights_meet_bounds(wb, w, s)
         OptimisationSuccess()
     else
         OptimisationFailure(; res = "Failure to set bounds\n$wf\n$wb.")

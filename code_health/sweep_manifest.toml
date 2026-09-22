@@ -365,6 +365,7 @@
 "src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { map = 10, units = 5, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { map = 10, units = 12, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { map = 10, units = 24, swept = false }
+"src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { map = 10, units = 6, swept = false }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { map = 8, units = 28, swept = false }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { map = 8, units = 38, swept = false }
 "src/20_AssetSelection.jl" = { map = 8, units = 30, algorithm = 11, swept = true, bindings = ["AbstractRedundancyAlgorithm", "AbstractSelectionRule", "ClusterGroups", "CompleteAssetSelector", "CorrelationComponents", "PairwiseCorrelation", "QuantileRule", "RankRule", "RedundancySelector", "ScoreSelector", "ThresholdRule", "assert_correlation_threshold", "assert_scoreable", "assert_selection_action", "assert_tail_counts", "asset_scores", "correlation_components", "drop_scores", "groups_argbest", "redundancy_keep", "redundancy_keep", "redundancy_keep", "redundancy_keep", "requires_score", "rule_keep", "select_assets", "select_assets", "select_assets", "tail_action_mask", "tail_mask"] }

@@ -770,7 +770,7 @@ The per-fold information handed to a function-form Time-Dependent Input: the fol
 A struct, rather than a bare function, that computes a Time-Dependent Input's per-fold value from the Time-Dependent Context. Its parameters are data, and it declares a previous-weights need as a trait. A member declares what it returns: a constraint value, or an optimiser.
 
 **Weight Finaliser**
-A post-solve adjustment forcing weights into the feasible region: `IterativeWeightFinaliser` (projection) or `JuMPWeightFinaliser` (re-solve).
+A post-solve adjustment forcing weights into the feasible region at the budget they carry: `IterativeWeightFinaliser` (the default, a redistribution that keeps the ratios of the free weights and falls back to the Euclidean projection when it cannot reach the bounds), `EuclideanWeightFinaliser` (the exact Euclidean projection), `EntropicWeightFinaliser` (the exact entropic projection for long-only weights, which keeps the ratios of the free weights) or `JuMPWeightFinaliser` (re-solve).
 
 **Turnover**
 The change in the portfolio relative to a reference, either the previous weights or a static target. Usable as a soft penalty or a hard constraint.
