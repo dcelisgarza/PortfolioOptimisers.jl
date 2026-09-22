@@ -347,3 +347,55 @@ in a schedule. What the optimiser-position bounds (`TD_OptE_Opt`, and the pipeli
 `TD_OptE_Opt_Inferable`) accept is unchanged too — they name
 `TimeDependent{<:TimeDependentOptimiserCallable}`, so a constraint callable is still rejected
 there statically.
+
+## Amendment (2026-09-22)
+
+A schedule an online step *reads* is resolved before the fold's rows are folded, not after.
+
+The decision above resolves a schedule once per fold, in the fold loop's `resolve`, which runs
+just before the callback fits the fold. On every batch arm that is the whole story: the fold
+refits from its training window, and the swap precedes the fit.
+
+The online arm folds first and resolves second. `thread_online_folds!` folds the fold's new rows
+into the threaded estimator, and only then calls `fit_fold`, whose `resolve` does the swap. That
+order is harmless for every field a schedule could reach until now, because
+`assert_stateless_schedule` already refuses a schedule on the one stateful field
+(`pe`), and every other scheduled field — a weight bound, a fee, a fallback — is read by the
+programme the fold's read-out solves and never by the buffer the step fills.
+
+[`OnlinePortfolioSelection`](../../src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl)
+breaks that. Its step *is* the optimisation: every row's raw update is projected onto the
+Allocation Set on `set`. With `set` admitting a schedule (#1243, decision 4 of map #1213), fold
+`i`'s rows would fold against an unresolved schedule and only the read-out would see entry `i`.
+
+The ruling is the first of the three options #1243 put:
+
+1. **Swap before the fold.** `thread_online_folds!` and the warm-up take the step through
+   `online_step_fold(est, ctx, rd)`, which resolves the schedules the step reads, folds the rows
+   inside them, and answers the estimator with those schedules still in place. The loop threads
+   the **unresolved** estimator on, so fold `i + 1` resolves from the schedule and not from entry
+   `i`, and a `Resume` re-enters the same way. The fold's `TimeDependentContext` is written in
+   one place, `fold_context`, which the loop's per-fold copy and the arm's step both call, so
+   fold `i` reads the same record twice over. The arm asks `is_time_dependent` on the estimator
+   it threads, once per run, and builds no context where there is no schedule.
+2. Refusing a scheduled `set` under an Online Scheme was rejected: it withholds the capability
+   from the scheme the family exists for.
+3. Reading the set per row inside the head was rejected: it duplicates the loop's job in the head.
+
+`online_step_fold` defaults to `partial_fit!`, so the order changes for one family and for no
+other. The rule a new family inherits is on the default's docstring: a family whose online step
+reads a scheduled field takes its own method; a family whose read-out reads it does not.
+
+Two consequences follow for the head.
+
+- `rows_needed` answers over the whole schedule, because the rows buffer is sized once when the
+  state is seeded and read by every fold. A vector schedule answers the maximum over its entries
+  and its `default`; a callable answers `nothing`, unbounded, because its entries do not exist
+  before the fold does.
+- `time_dependent_field_defaults` gains `set = BoundedAllocationSet()`, so a fold-less solve runs
+  the default Allocation Set. Without the entry a fold-less solve would reset `set` to `nothing`,
+  which its bound does not admit.
+
+Per-field schedules *inside* an Allocation Set stay out of scope: they need
+`time_dependent_fields` to descend one level, which contradicts the top-level rule above. The
+shape a caller uses instead is a schedule of whole sets, or a callable that builds the fold's set.

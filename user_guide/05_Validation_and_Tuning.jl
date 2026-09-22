@@ -88,9 +88,22 @@ per-asset weight cap tightens as a walk-forward advances:
 
 wf = IndexWalkForward(126, 42)
 n = n_splits(wf, rd)
-caps = TimeDependent([WeightBounds(; lb = 0.0, ub = ub) for ub in range(0.35, 0.2, n)])
+bounds = [WeightBounds(; lb = 0.0, ub = ub) for ub in range(0.35, 0.2, n)]
+caps = TimeDependent(bounds)
 mr_caps = MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = caps))
 pred_caps = cross_val_predict(mr_caps, rd, wf)
+
+#=
+An [`OnlinePortfolioSelection`](@ref) head schedules its allocation set the same way, and the set
+is the one scheduled input its update reads at every row. The loop swaps entry `i` in before it
+folds fold `i`'s rows, so every row of fold `i` is held inside entry `i`, and so are the weights
+the fold reports. Each entry is a whole allocation set, so to vary one bound and hold the rest you
+write the whole set out, or build it inside a function of the fold's context:
+=#
+
+caps_online = TimeDependent([BoundedAllocationSet(; wb = wb) for wb in bounds])
+ops_caps = OnlinePortfolioSelection(; alg = ExponentiatedGradient(), set = caps_online)
+pred_ops = cross_val_predict(ops_caps, rd, OnlineIndexWalkForward(126, 42))
 
 #=
 A schedule's values may be whole optimisers — so the *strategy itself* switches per fold — and

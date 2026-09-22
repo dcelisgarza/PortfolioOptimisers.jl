@@ -23,7 +23,7 @@ $(DocStringExtensions.FIELDS)
 
     OnlinePortfolioSelection(;
         alg::AbstractOnlinePortfolioSelectionAlgorithm = ExponentiatedGradient(),
-        set::AbstractAllocationSet = BoundedAllocationSet(),
+        set::TD{<:AbstractAllocationSet} = BoundedAllocationSet(),
         w0::Option{<:AbstractVector} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
         fb::TDO_Option{<:OptE_Opt} = nothing,
@@ -31,14 +31,14 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:OnlinePortfolioSelectionState} = nothing
     ) -> OnlinePortfolioSelection
 
-Keywords correspond to the struct's fields. `fees` and `fb` may hold a [`TimeDependent`](@ref) per-fold schedule; `alg`, `set`, `w0` and `strict` are static.
+Keywords correspond to the struct's fields. `set`, `fees` and `fb` may hold a [`TimeDependent`](@ref) per-fold schedule; `alg`, `w0` and `strict` are static.
 
 ## Validation
 
   - `w0`: non-empty and finite, when given; it is projected onto the set at the first step, so it need not lie in it.
-  - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(set.sets)`.
-  - Everything [`assert_geometry_admits_set`](@ref) refuses: a negative lower bound under an entropic rule.
-  - Everything [`assert_rule_admits_set`](@ref) refuses: a solver-free leader under a programme set.
+  - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(set.sets)`. A schedule on `set` is held to it per entry.
+  - Everything [`assert_geometry_admits_set`](@ref) refuses: a negative lower bound under an entropic rule. A schedule on `set` is held to it per entry.
+  - Everything [`assert_rule_admits_set`](@ref) refuses: a solver-free leader under a programme set. A schedule on `set` is held to it per entry.
   - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
@@ -96,7 +96,7 @@ OnlinePortfolioSelection
     """
     alg
     """
-    The Allocation Set every allocation of the recursion lies in.
+    The Allocation Set every allocation of the recursion lies in, or a [`TimeDependent`](@ref) schedule of one per fold. Entry `i` is fold `i`'s complete set: the fold loop swaps it in before the fold's rows are folded, so the rows of fold `i` step inside entry `i`, and the read-out reports it.
     """
     set
     """
@@ -120,31 +120,36 @@ OnlinePortfolioSelection
     """
     cache
     function OnlinePortfolioSelection(alg::AbstractOnlinePortfolioSelectionAlgorithm,
-                                      set::AbstractAllocationSet,
+                                      set::TD{<:AbstractAllocationSet},
                                       w0::Option{<:AbstractVector},
                                       fees::TD_Option{<:FeesE_Fees},
                                       fb::TDO_Option{<:OptE_Opt}, strict::Bool,
                                       cache::Option{<:OnlinePortfolioSelectionState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :OnlinePortfolioSelection)
-        assert_geometry_admits_set(projection_geometry(alg), set)
-        assert_rule_admits_set(alg, set)
+        if !isa(set, TimeDependent)
+            # A schedule holds no set of its own, so the two set refusals and the fee's
+            # read of `set.sets` run per entry, in the substitution pass below.
+            assert_geometry_admits_set(projection_geometry(alg), set)
+            assert_rule_admits_set(alg, set)
+            if isa(fees, FeesEstimator)
+                @argcheck(!isnothing(set.sets),
+                          IsNothingError("set.sets cannot be nothing when fees is a FeesEstimator"))
+            end
+        end
         if !isnothing(w0)
             assert_nonempty(w0, :w0)
             assert_finite(w0, :w0)
         end
-        if isa(fees, FeesEstimator)
-            @argcheck(!isnothing(set.sets),
-                      IsNothingError("set.sets cannot be nothing when fees is a FeesEstimator"))
-        end
         assert_time_dependent_substitution(OnlinePortfolioSelection,
-                                           (; alg, set, w0, fees, fb, strict), (;))
+                                           (; alg, set, w0, fees, fb, strict),
+                                           online_portfolio_selection_td_defaults())
         return new{typeof(alg), typeof(set), typeof(w0), typeof(fees), typeof(fb),
                    typeof(strict), typeof(cache)}(alg, set, w0, fees, fb, strict, cache)
     end
 end
 function OnlinePortfolioSelection(;
                                   alg::AbstractOnlinePortfolioSelectionAlgorithm = ExponentiatedGradient(),
-                                  set::AbstractAllocationSet = BoundedAllocationSet(),
+                                  set::TD{<:AbstractAllocationSet} = BoundedAllocationSet(),
                                   w0::Option{<:AbstractVector} = nothing,
                                   fees::TD_Option{<:FeesE_Fees} = nothing,
                                   fb::TDO_Option{<:OptE_Opt} = nothing,
@@ -152,8 +157,24 @@ function OnlinePortfolioSelection(;
                                   cache::Option{<:OnlinePortfolioSelectionState} = nothing)::OnlinePortfolioSelection
     return OnlinePortfolioSelection(alg, set, w0, fees, fb, strict, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`OnlinePortfolioSelection`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. `fees` and `fb` default to `nothing` and are omitted; `set` does not, so a fold-less solve runs the default Allocation Set rather than no set at all.
+
+# Related
+
+  - [`OnlinePortfolioSelection`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function online_portfolio_selection_td_defaults()::NamedTuple
+    return (; set = BoundedAllocationSet())
+end
 function time_dependent_field_defaults(::OnlinePortfolioSelection)::NamedTuple
-    return (;)
+    return online_portfolio_selection_td_defaults()
 end
 """
     factory(opt::OnlinePortfolioSelection, w::VecNum)
@@ -197,9 +218,33 @@ function non_investable_universe(opt::OnlinePortfolioSelection, ::VecStr)
     return opt
 end
 """
+    rows_needed(td::TimeDependent)
+
+The rows a per-fold schedule of Allocation Sets needs: the maximum over every entry a vector schedule holds and over its explicit `default`, and `nothing` — unbounded — for a callable.
+
+The buffer is sized once, when the state is seeded, and it is never resized, so the cap must answer for every fold and not for the one the seed runs in. A callable's entries do not exist before the fold does, so the cap keeps every row folded so far and no fold's set can read a row the cap dropped.
+
+# Related
+
+  - [`rows_needed`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`OnlinePortfolioSelection`](@ref)
+"""
+function rows_needed(td::TimeDependent)
+    v = td.val
+    if !isa(v, AbstractVector)
+        return nothing
+    end
+    need = mapreduce(rows_needed, rows_needed_max, v)
+    d = td.default
+    return isa(d, AbstractAllocationSet) ? rows_needed_max(need, rows_needed(d)) : need
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 The rows the head's buffer keeps: the maximum over the rule tree and the Allocation Set, `nothing` being unbounded.
+
+A schedule on `set` answers over every entry it holds, because the buffer is sized once and read by every fold.
 
 # Related
 
@@ -208,6 +253,27 @@ The rows the head's buffer keeps: the maximum over the rule tree and the Allocat
 """
 function rows_needed(opt::OnlinePortfolioSelection)
     return rows_needed_max(rows_needed(opt.alg), rows_needed(opt.set))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The head's Allocation Set outside every fold loop: its own, or the fold-less value of a schedule on `set`.
+
+A schedule is defined over the folds of a cross-validation scheme, so a [`partial_fit!`](@ref) a caller takes by hand — and the Causal Pass, whose reset has already run — steps inside the schedule's `default`, else inside [`BoundedAllocationSet`](@ref).
+
+# Related
+
+  - [`OnlinePortfolioSelection`](@ref)
+  - [`fold_online_selection`](@ref)
+  - [`time_dependent_reset_value`](@ref)
+"""
+function static_allocation_set(opt::OnlinePortfolioSelection)
+    set = opt.set
+    return if isa(set, TimeDependent)
+        time_dependent_reset_value(set, online_portfolio_selection_td_defaults(), :set, opt)
+    else
+        set
+    end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -281,6 +347,7 @@ Folds every row of a carrier into the head's state, in order: the Block Step, an
   - `opt`: The head.
   - `cache`: The state, or `nothing` before the first row.
   - `rd`: The carrier of the block, `observations × assets`.
+  - `set`: The block's Allocation Set, before resolution over the pinned universe. It defaults to the head's own, and the fold loop's online arm passes the fold's entry of a schedule (see [`online_step_fold`](@ref)).
 
 # Validation
 
@@ -301,10 +368,11 @@ Folds every row of a carrier into the head's state, in order: the Block Step, an
 """
 function fold_online_selection(opt::OnlinePortfolioSelection,
                                cache::Option{<:OnlinePortfolioSelectionState},
-                               rd::ReturnsResult)
+                               rd::ReturnsResult,
+                               set::AbstractAllocationSet = static_allocation_set(opt))
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     amsk = step_active_mask(rd)
-    set = resolve_allocation_set(opt.set, size(rd.X, 2), opt.strict, eltype(rd.X))
+    set = resolve_allocation_set(set, size(rd.X, 2), opt.strict, eltype(rd.X))
     state = online_selection_pin(opt, cache, rd, set)
     w, st, X, n = state.w, state.st, state.X, state.n
     last_amsk = state.amsk
@@ -551,6 +619,39 @@ function partial_fit!(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, 
                                                     <:Option{<:OnlinePortfolioSelectionState}},
                       rd::ReturnsResult)
     return rebuild_estimator(opt, (; cache = fold_online_selection(opt, opt.cache, rd)))
+end
+"""
+    online_step_fold(opt::OnlinePortfolioSelection, ctx::TimeDependentContext, rd::ReturnsResult)
+
+Folds the fold's rows into the head inside the fold's own Allocation Set.
+
+The head is the one family whose online step *is* the optimisation: every row's raw step is projected onto `set`, so a schedule there is read by the step and not by the read-out alone. The entry is resolved here, one fold before the read-out resolves the rest, and the head the loop threads on keeps the schedule, so fold `i + 1` resolves from the schedule and not from entry `i`. The state is the only field the step writes, so carrying it back is a rebind of `cache`.
+
+# Arguments
+
+  - `opt`: The head the loop threads, with its schedules unresolved.
+  - `ctx`: The fold's context.
+  - `rd`: The carrier of the rows the fold has gained.
+
+# Returns
+
+  - `opt`: The head, with its `cache` rebound and its schedules unresolved.
+
+# Related
+
+  - [`OnlinePortfolioSelection`](@ref)
+  - [`online_step_fold`](@ref)
+  - [`fold_online_selection`](@ref)
+  - [`thread_online_folds!`](@ref)
+"""
+function online_step_fold(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                        <:Any,
+                                                        <:Option{<:OnlinePortfolioSelectionState}},
+                          ctx::TimeDependentContext, rd::ReturnsResult)
+    set = opt.set
+    set = isa(set, TimeDependent) ? time_dependent_value(set, ctx) : set
+    return rebuild_estimator(opt,
+                             (; cache = fold_online_selection(opt, opt.cache, rd, set)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

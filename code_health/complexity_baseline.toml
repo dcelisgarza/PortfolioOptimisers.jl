@@ -243,10 +243,10 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { cyc = 9, cog = 14, arg = 10, cyc_sum = 54, cog_sum = 53, arg_sum = 74, macros = [] }
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { cyc = 7, cog = 11, arg = 3, cyc_sum = 15, cog_sum = 18, arg_sum = 9, macros = [] }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 6, cog_sum = 6, arg_sum = 16, macros = [] }
-"src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { cyc = 3, cog = 3, arg = 11, cyc_sum = 9, cog_sum = 6, arg_sum = 37, macros = [] }
+"src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { cyc = 3, cog = 3, arg = 12, cyc_sum = 14, cog_sum = 8, arg_sum = 62, macros = [] }
 "src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { cyc = 7, cog = 11, arg = 7, cyc_sum = 63, cog_sum = 35, arg_sum = 130, macros = [] }
 "src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { cyc = 4, cog = 5, arg = 4, cyc_sum = 11, cog_sum = 9, arg_sum = 14, macros = [] }
-"src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { cyc = 4, cog = 5, arg = 9, cyc_sum = 34, cog_sum = 16, arg_sum = 41, macros = [] }
+"src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { cyc = 4, cog = 5, arg = 10, cyc_sum = 34, cog_sum = 16, arg_sum = 42, macros = [] }
 "src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl" = { cyc = 5, cog = 6, arg = 7, cyc_sum = 32, cog_sum = 25, arg_sum = 22, macros = [] }
 "src/17_Optimisation/03_NaiveOptimisation.jl" = { cyc = 3, cog = 3, arg = 10, cyc_sum = 65, cog_sum = 36, arg_sum = 78, macros = ["@propagatable"] }
 "src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl" = { cyc = 3, cog = 2, arg = 11, cyc_sum = 29, cog_sum = 17, arg_sum = 46, macros = ["@forward_properties", "@propagatable"] }

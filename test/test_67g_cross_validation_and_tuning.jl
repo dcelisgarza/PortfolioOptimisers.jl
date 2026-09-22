@@ -14,8 +14,8 @@ Eight groups:
     state is viewed by asset rather than refitted;
  3. both searches tune the head, over a rule knob, over the allocation set, and over the
     rule itself;
- 4. a `TimeDependent` schedule reaches `fees` and `fb`, and is refused by type on the four
-    fields that carry the recursion;
+ 4. a `TimeDependent` schedule reaches `fees`, `fb` and the Allocation Set, and is refused
+    by type on the two fields that carry the recursion;
  5. a learning-rate schedule varies the rate per period, which is the family's own time
     dependence (ADR 0165);
  6. the downstream readers — `Resume`, `performance_summary` and `log_wealth_regret` —
@@ -155,19 +155,71 @@ Eight groups:
                                                         default = nothing)), rd, cv)
         p0 = cross_val_predict(OPS(; alg = BuyAndHold()), rd, cv)
         @test all(<(0), pf.mrd.X .- p0.mrd.X)
-        # The four fields that carry the recursion refuse a schedule by their type bound,
+        # The Allocation Set is problem definition too, and it is the one scheduled field
+        # the recursion's *step* reads: every row's raw step is projected onto it. So the
+        # fold loop resolves it one fold ahead of the read-out, before the fold's rows are
+        # folded, and fold `i` steps inside entry `i` (#1243).
+        ubs = collect(range(0.65, 0.26, K))
+        sets = [BoundedAllocationSet(; wb = WeightBounds(; lb = 0.0, ub = u)) for u in ubs]
+        caps = TimeDependent(sets; default = BoundedAllocationSet())
+        w0 = [0.7, 0.1, 0.1, 0.1]
+        capped = cross_val_predict(OPS(; alg = BuyAndHold(), set = caps, w0 = w0), rd, cv)
+        @test isa(capped, MultiPeriodPredictionResult)
+        # Fold `i`'s allocation honours entry `i`'s cap, and the cap tightens fold by fold.
+        @test all(i -> maximum(capped.pred[i].res.w) <= ubs[i] + 1e-8, 1:K)
+        # The cap is read by the step and not by the read-out alone: the same run at the
+        # loosest entry alone leaves every fold above the tight folds' caps, so a run that
+        # folded its rows under entry 1 could not answer what this one answers.
+        loose = cross_val_predict(OPS(; alg = BuyAndHold(), set = first(sets), w0 = w0), rd,
+                                  cv)
+        @test all(i -> maximum(loose.pred[i].res.w) > ubs[i] + 1e-8, 4:K)
+        # A callable entry is resolved the same way, and its rows cap is `nothing` —
+        # uncapped — because its entries do not exist before the fold does.
+        cb = TimeDependent(; val = ctx -> sets[ctx.i], default = BoundedAllocationSet())
+        @test isnothing(po.rows_needed(cb))
+        cbres = cross_val_predict(OPS(; alg = BuyAndHold(), set = cb, w0 = w0), rd, cv)
+        @test isapprox(cbres.pred[end].res.w, capped.pred[end].res.w; atol = 1e-12)
+        # A vector schedule's rows cap is the maximum over its entries, so a buffer sized
+        # at the seed still holds what a later entry reads.
+        @test iszero(po.rows_needed(caps))
+        # Outside a fold loop the schedule is inert: the fold-less solve runs the
+        # schedule's own `default`, which is the simplex, so no cap binds.
+        @test maximum(optimise(OPS(; alg = BuyAndHold(), set = caps, w0 = w0), rd).w) >
+              ubs[end]
+        # The batch arm takes the same schedule, as it takes every other one.
+        @test isa(cross_val_predict(OPS(; alg = BuyAndHold(), set = caps, w0 = w0), rd,
+                                    IndexWalkForward(20, 5)), MultiPeriodPredictionResult)
+        # `Resume` re-enters a scheduled run: the Result carries the head with its schedule
+        # unresolved, so the resumed folds resolve from the schedule and not from the entry
+        # the last run stopped in. The schedule is the callable one, because a vector states
+        # one entry per fold and the short run enumerates fewer folds than the full one.
+        short = cross_val_predict(OPS(; alg = BuyAndHold(), set = cb, w0 = w0),
+                                  rows(rd, 1:45), cv)
+        @test isa(short.opt.set, TimeDependent)
+        @test isapprox(cross_val_predict(Resume(short), rd, cv).pred[end].res.w,
+                       cbres.pred[end].res.w; atol = 1e-12)
+        # A vector schedule states one entry per fold, and the loop counts them.
+        @test_throws DimensionMismatch cross_val_predict(OPS(; alg = BuyAndHold(),
+                                                             set = TimeDependent(sets[1:2];
+                                                                                 default = BoundedAllocationSet())),
+                                                         rd, cv)
+        # Each entry is held to the set refusals, at construction, one entry at a time.
+        @test_throws DomainError OPS(; alg = ExponentiatedGradient(),
+                                     set = TimeDependent([BoundedAllocationSet(),
+                                                          BoundedAllocationSet(;
+                                                                               wb = WeightBounds(;
+                                                                                                 lb = -0.1,
+                                                                                                 ub = 1.0))];
+                                                         default = BoundedAllocationSet()))
+        # The two fields that carry the recursion refuse a schedule by their type bound,
         # which is the enforcement the design rules ask for: a schedule replaces the
-        # field's value every fold, and the state is threaded through these four.
+        # field's value every fold, and the state is threaded through both (ADR 0155,
+        # ADR 0162).
         @test_throws TypeError OPS(;
                                    alg = TimeDependent(;
                                                        val = [ExponentiatedGradient(),
                                                               NewtonStep()],
                                                        default = ExponentiatedGradient()))
-        @test_throws TypeError OPS(; alg = ExponentiatedGradient(),
-                                   set = TimeDependent(;
-                                                       val = [BoundedAllocationSet(),
-                                                              BoundedAllocationSet()],
-                                                       default = BoundedAllocationSet()))
         @test_throws TypeError OPS(; alg = ExponentiatedGradient(),
                                    w0 = TimeDependent(;
                                                       val = [fill(inv(N), N),

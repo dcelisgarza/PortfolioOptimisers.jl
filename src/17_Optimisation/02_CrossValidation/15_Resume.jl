@@ -321,8 +321,8 @@ Taken when the estimator slot holds a [`Resume`](@ref). It resolves the declarat
   - [`resume_fold_count`](@ref)
   - [`copy_states`](@ref)
 """
-function online_folds(fit_fold, r::Resume, n::Integer, ::Type{ElT}; rd, train_idx, test_idx,
-                      fold_view = nothing, pws = nothing) where {ElT}
+function online_folds(fit_fold, r::Resume, n::Integer, ::Type{ElT}, path_id = nothing; rd,
+                      train_idx, test_idx, fold_view = nothing, pws = nothing) where {ElT}
     res = r.res
     n_old = resume_fold_count(res.opt, rd, train_idx)
     assert_resume_folds(n_old, n)
@@ -334,8 +334,8 @@ function online_folds(fit_fold, r::Resume, n::Integer, ::Type{ElT}; rd, train_id
     end
     predictions = Vector{ElT}(undef, n - n_old)
     est = thread_online_folds!(predictions, fit_fold, copy_states(res.opt), (n_old + 1):n,
-                               prev; rd = rd, train_idx = train_idx, last_end = last_end,
-                               pws = pws)
+                               prev; rd = rd, train_idx = train_idx, test_idx = test_idx,
+                               n = n, last_end = last_end, pws = pws, path_id = path_id)
     return predictions, est
 end
 """

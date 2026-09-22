@@ -106,7 +106,8 @@ optimise(est).w == weights(o)[2]
 The loop starts cold. An estimator that already holds a state throws at warm-up, and so does a
 [`TimeDependent`](@ref) schedule on the prior or on the optimiser itself, because such a schedule
 replaces the value the loop threads the state through. A schedule on any other field works as it
-does in batch.
+does in batch, and one the step itself reads, such as an [`OnlinePortfolioSelection`](@ref) head's
+allocation set, is swapped in before the fold's rows are folded.
 
 The step folds the active mask of the panel with the rows, and nothing else of the panel. A panel
 whose estimation mask is narrower than its active mask throws at warm-up, and so does one that
