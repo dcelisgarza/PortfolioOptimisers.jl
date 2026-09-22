@@ -39,12 +39,21 @@ both pick the best single asset and the parity test says nothing about the fixed
         @test fp.w ≈ [0.5, 0.5]
         @test fp.converged
         @test fp.log_wealth ≈ 4 * log(1.075)
-        # On the symmetric example the uniform start is the fixed point already, so one
-        # step converges; on the fixture a budget of one takes one step and stops short.
+        # On the symmetric example the uniform start is the fixed point already, so its
+        # certificate is met before any step; on the fixture a budget of one takes one step
+        # and stops short.
         fp1 = po.cover_fixed_point(Xh, 1, 1e-12)
-        @test fp1.converged && fp1.iterations == 1
+        @test fp1.converged && fp1.iterations == 0
+        @test fp1.gap <= 1e-12
         fpx = po.cover_fixed_point(1 .+ X, 1, 1e-12)
         @test !fpx.converged && fpx.iterations == 1
+        # The certificate bounds the shortfall from the optimum from above, at every budget.
+        fps = po.cover_fixed_point(1 .+ X, 100_000, 1e-14)
+        for k in (1, 10, 100)
+            fpk = po.cover_fixed_point(1 .+ X, k, 1e-12)
+            @test fps.log_wealth - fpk.log_wealth <= fpk.gap
+            @test fpk.gap > 0
+        end
         # The type is derived from the data, never forced.
         fp32 = po.cover_fixed_point(Float32.(Xh), 100, 1.0f-6)
         @test eltype(fp32.w) === Float32
@@ -56,6 +65,7 @@ both pick the best single asset and the parity test says nothing about the fixed
         @test isa(res, po.NaiveOptimisationResult)
         @test isa(res.retcode, OptimisationSuccess)
         @test res.retcode.res.converged
+        @test 0 <= res.retcode.res.gap <= 1e-12 * max(1, abs(log_wealth(res.w)))
         @test sum(res.w) ≈ 1
         @test all(res.w .>= 0)
         # Interior: the pumping pair shares the book, the noise assets are dropped.

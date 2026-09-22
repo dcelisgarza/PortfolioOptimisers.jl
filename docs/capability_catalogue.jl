@@ -1049,7 +1049,7 @@ const CATALOGUE = [Section("Core abstractions",
                                      Cap(:InverseVolatility), Cap(:EqualWeighted),
                                      Cap(:RandomWeighted), Cap(:PreviousWeights),
                                      Cap(:BestConstantRebalancedPortfolio;
-                                         label = "The best constant rebalanced portfolio in hindsight, by Cover's fixed point and no solver, [`BestConstantRebalancedPortfolio`](@ref)"),
+                                         label = "The best constant rebalanced portfolio in hindsight, by Cover's fixed point and no solver, [`BestConstantRebalancedPortfolio`](@ref); the exact and the bounded one is [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref)"),
                                      Section("Naive optimisation features",
                                              [Cap(:WeightBoundsEstimator, :UniformValues,
                                                   :WeightBounds),

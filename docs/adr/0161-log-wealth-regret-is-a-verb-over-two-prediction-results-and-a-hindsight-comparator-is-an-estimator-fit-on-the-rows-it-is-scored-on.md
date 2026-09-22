@@ -103,7 +103,9 @@ The docs name the literature's two oracles as recipes of that rule, and state th
 
 One naive head ships beside the rule: `BestConstantRebalancedPortfolio <:
 NaiveOptimisationEstimator`, Cover's (1984) fixed point with `iters` and `tol` fields at the
-prototype's defaults, simplex only, taking the naive family's fields (`wb` through the finaliser,
+prototype's defaults, stopping on the duality-gap certificate `T log(max_i g_i)` over its
+multipliers `g_i`, which bounds the shortfall of its log wealth from the optimum, so that
+`converged` means the log wealth is within `tol` even at a corner (#1252), simplex only, taking the naive family's fields (`wb` through the finaliser,
 `cache` as a `ReturnsBufferState` under ADR 0137's batch read-out, `fees` under ADR 0160, `fb`,
 `strict`). It is the solver-free comparator for a caller with no JuMP solver, the parity
 cross-check the seams ledger ran, and the solver-free `opt` of `FollowTheLeader` on the default

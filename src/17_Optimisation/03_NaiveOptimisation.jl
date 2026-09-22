@@ -1003,7 +1003,9 @@ Where:
   - $(math_dict[:T])
   - ``w_i^{(k)}``: Weight of asset ``i`` at iteration ``k``, started from ``1/N``.
 
-The objective is concave on the simplex, so its maximum is global. The multiplier of an asset is the average ratio of its price relative to the portfolio's own; an asset that beats the portfolio on average grows, and at a fixed point every held asset has multiplier one, which is the first-order condition. The iteration is a minorise–maximise scheme, so the log wealth is non-decreasing at every step, and it stops when the change in log wealth falls below `tol` relative to its size, or after `iters` steps. A weight that starts at zero stays at zero, so the uniform start is what lets every asset compete.
+The objective is concave on the simplex, so its maximum is global. The multiplier of an asset is the average ratio of its price relative to the portfolio's own; an asset that beats the portfolio on average grows, and at a fixed point every held asset has multiplier one, which is the first-order condition. The iteration is a minorise–maximise scheme, so the log wealth is non-decreasing at every step. A weight that starts at zero stays at zero, so the uniform start is what lets every asset compete.
+
+The iteration stops on a certificate, or after `iters` steps. The certificate is ``T \\log \\max_i g_i`` over the multipliers ``g_i`` of the current weights. By concavity and Jensen's inequality it bounds from above the shortfall of the log wealth from the optimum, and it reaches zero at the optimum, a corner included. So `converged = true` means that the log wealth is within `tol * max(1, |log wealth|)` of the optimum. The certificate bounds the log wealth, not the weights. At a leader that holds no weight on an asset, the weight of that asset decays sublinearly, so the default budget can stop first and report `converged = false`. The result's `retcode.res` carries `converged`, `iterations` and the certificate `gap`. The exact form, on a solver, is [`MeanRisk`](@ref)`(; obj = MaximumReturn(), opt = JuMPOptimiser(; slv, ret = LogarithmicReturn()))`: one exponential cone per row, exact to the solver's tolerance, and the only form that honours a bound.
 
 The head is simplex-only. The fixed point knows no bound other than the simplex, so a `wb` that binds is imposed by the weight finaliser `wf` **after** the fixed point: the returned weights are then a repair of the unconstrained optimum, not the constrained one. A bounded or constrained Hindsight Comparator is [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref), with the bounds stated on its optimiser. The default bounds are the simplex, and the finaliser leaves the fixed point untouched.
 
@@ -1111,7 +1113,7 @@ BestConstantRebalancedPortfolio
     """
     iters
     """
-    Convergence tolerance on the relative change in log wealth between two iterations.
+    Convergence tolerance on the certificate of the shortfall in log wealth from the optimum, relative to the log wealth.
     """
     tol
     """
@@ -1170,52 +1172,59 @@ end
 
 Run Cover's fixed-point iteration for the best constant rebalanced portfolio over a matrix of price relatives.
 
-The kernel of [`BestConstantRebalancedPortfolio`](@ref), on a bare matrix so it can be tested against the closed form on a hand example and reused by a rule that re-solves it. Starts from the uniform portfolio and multiplies each weight by the average ratio of its price relative to the portfolio's, renormalising after every step; stops when the change in log wealth is at most `tol * max(1, |log wealth|)`, or after `iters` steps.
+The kernel of [`BestConstantRebalancedPortfolio`](@ref), on a bare matrix so it can be tested against the closed form on a hand example and reused by a rule that re-solves it. Starts from the uniform portfolio and multiplies each weight by the average ratio of its price relative to the portfolio's, renormalising after every step. Before each step it reads the duality-gap certificate ``T \\log \\max_i g_i`` over the multipliers ``g_i``, an upper bound on the shortfall of the log wealth from the optimum, and it stops when the certificate is at most `tol * max(1, |log wealth|)`, or after `iters` steps.
 
 # Arguments
 
   - `X`: Price relatives, `observations × assets`, every entry positive.
   - `iters`: Maximum number of iterations.
-  - `tol`: Relative tolerance on the change in log wealth.
+  - `tol`: Relative tolerance on the certificate of the shortfall in log wealth.
 
 # Returns
 
-  - `fp::NamedTuple`: `w`, the weights on the simplex; `log_wealth`, ``\\sum_t \\log(\\boldsymbol{x}_t^{\\intercal} \\boldsymbol{w})``; `converged`, whether the tolerance was met; `iterations`, the number of multiplicative steps taken.
+  - `fp::NamedTuple`: `w`, the weights on the simplex; `log_wealth`, ``\\sum_t \\log(\\boldsymbol{x}_t^{\\intercal} \\boldsymbol{w})``; `gap`, the certificate at `w`, which bounds the optimal log wealth minus `log_wealth`; `converged`, whether the certificate met the tolerance; `iterations`, the number of multiplicative steps taken, zero when the uniform start already meets it.
 
 # Related
 
   - [`BestConstantRebalancedPortfolio`](@ref)
 """
 function cover_fixed_point(X::MatNum, iters::Integer, tol::Number)
-    N = size(X, 2)
+    T, N = size(X)
     w = fill(one(eltype(X)) / N, N)
-    p = X * w
-    lw = sum(log, p)
+    wc = w
+    local lw, gap
     converged = false
     iterations = 0
-    for _ in 1:iters
-        iterations += 1
-        # Cover's multiplicative fixed point: the mean over observations of each asset's
-        # price relative against the portfolio's own, then renormalise onto the simplex.
-        w = w .* vec(Statistics.mean(X ./ p; dims = 1))
-        w ./= sum(w)
-        p = X * w
-        lw_new = sum(log, p)
-        if abs(lw_new - lw) <= tol * max(one(lw_new), abs(lw_new))
-            lw = lw_new
-            converged = true
+    for k in 0:iters
+        # The certificate is read at `wc`, the weights the kernel returns. Cover's multiplier
+        # of each asset is the mean over observations of its price relative against the
+        # portfolio's own. By concavity and Jensen's inequality the largest one bounds the
+        # shortfall, `lw* - lw <= T log(max_j g_j)`, and the bound reaches zero at the
+        # optimum, a corner included, where every multiplier is at most one.
+        wc = w
+        p = X * wc
+        lw = sum(log, p)
+        g = vec(Statistics.mean(X ./ p; dims = 1))
+        gap = max(zero(lw), T * log(maximum(g)))
+        iterations = k
+        converged = gap <= tol * max(one(lw), abs(lw))
+        if converged
             break
         end
-        lw = lw_new
+        # The multiplicative step, renormalised onto the simplex. The step after the last
+        # certificate of the budget is not returned.
+        w = wc .* g
+        w ./= sum(w)
     end
-    return (; w = w, log_wealth = lw, converged = converged, iterations = iterations)
+    return (; w = wc, log_wealth = lw, gap = gap, converged = converged,
+            iterations = iterations)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run the best constant rebalanced portfolio optimisation.
 
-Internal dispatch called by [`optimise`](@ref). Reduces the optimiser and the returns data to the Coverage Universe of the window with [`coverage_reduction`](@ref), forms the price relatives `1 .+ rd.X`, runs [`cover_fixed_point`](@ref) from the uniform portfolio, then applies weight bounds through the finaliser. [`NaiveOptimisationResult`](@ref) expands the weights back onto the full asset universe. The return code is the finaliser's; a successful one carries the fixed point's `converged` flag and iteration count in its `res`, so a run that stopped at `iters` is read off the result rather than guarded.
+Internal dispatch called by [`optimise`](@ref). Reduces the optimiser and the returns data to the Coverage Universe of the window with [`coverage_reduction`](@ref), forms the price relatives `1 .+ rd.X`, runs [`cover_fixed_point`](@ref) from the uniform portfolio, then applies weight bounds through the finaliser. [`NaiveOptimisationResult`](@ref) expands the weights back onto the full asset universe. The return code is the finaliser's; a successful one carries the fixed point's `converged` flag, iteration count and certificate `gap` in its `res`, so a run that stopped at `iters` is read off the result rather than guarded.
 
 # Related
 
@@ -1248,7 +1257,7 @@ function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; dim
     if isa(retcode, OptimisationSuccess)
         retcode = OptimisationSuccess(;
                                       res = (; converged = fp.converged,
-                                             iterations = fp.iterations))
+                                             iterations = fp.iterations, gap = fp.gap))
     end
     return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = cmsk, fb = nothing)

@@ -117,8 +117,9 @@ The guarantee is stated against a comparator chosen in hindsight, so the measure
 rule. Fit the comparator on the rows the strategy was scored on, and predict it in sample over
 those same rows. Three comparators cover the literature. The best constant rebalanced portfolio is
 [`BestConstantRebalancedPortfolio`](@ref), Cover's (1984) fixed point, which needs no solver. It
-is the portfolio [`MeanRisk`](@ref) reaches under a [`LogarithmicReturn`](@ref) and a
-maximum-return objective. The best stock is a top-one [`ScoreSelector`](@ref) on log wealth
+stops at a budget of steps, so it is exact only to the precision of this page's tables. The
+exact portfolio is [`MeanRisk`](@ref) under a [`LogarithmicReturn`](@ref) and a maximum-return
+objective, on a solver. The best stock is a top-one [`ScoreSelector`](@ref) on log wealth
 followed by [`EqualWeighted`](@ref), through a [`Pipeline`](@ref). The uniform constant rebalanced
 portfolio is a causal member of the family, run through the same walk-forward.
 =#

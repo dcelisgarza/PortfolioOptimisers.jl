@@ -280,17 +280,29 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
             @test !isapprox(optimise(OPS(; alg = fixed), rows(rd, 1:t)).w, hk; atol = 1e-2)
         end
         # A leader on a corner: the solved form is exact, and the solver-free default's fixed
-        # point stops short of it at its budget, where a lower `tol` under a larger `iters`
-        # closes the gap. Row 30 of the fixture drops two assets.
+        # point stops short of it at its budget, where a larger `iters` closes the gap. Row 30
+        # of the fixture drops two assets.
         w30 = hand_logopt(X[1:30, :])
         @test count(<(1e-6), w30) == 2
         @test isapprox(optimise(ftl, rows(rd, 1:30)).w, w30; atol = 1e-6)
-        wfp = optimise(OPS(; alg = FollowTheLeader()), rows(rd, 1:30)).w
+        wfp = @test_logs (:warn, r"stopped at `iters = 20000`") match_mode = :any optimise(OPS(;
+                                                                                               alg = FollowTheLeader()),
+                                                                                           rows(rd,
+                                                                                                1:30)).w
         @test maximum(abs.(wfp .- w30)) > 1e-2
-        long = FollowTheLeader(;
-                               opt = BestConstantRebalancedPortfolio(; iters = 2_000_000,
-                                                                     tol = 1e-16))
-        @test isapprox(optimise(OPS(; alg = long), rows(rd, 1:30)).w, w30; atol = 1e-5)
+        # The flag is the certificate's: at the budget it reads `false`, and the certificate
+        # bounds the shortfall of the log wealth from the leader's.
+        r30 = optimise(BestConstantRebalancedPortfolio(), rows(rd, 1:30))
+        @test !r30.retcode.res.converged
+        @test log_wealth(w30, X[1:30, :]) - log_wealth(r30.w, X[1:30, :]) <=
+              r30.retcode.res.gap
+        # Under a budget that lets the certificate meet `tol`, the weights reach the leader.
+        long = BestConstantRebalancedPortfolio(; iters = 10_000_000)
+        rl = optimise(long, rows(rd, 1:30))
+        @test rl.retcode.res.converged
+        @test isapprox(rl.w, w30; atol = 1e-8)
+        @test isapprox(optimise(OPS(; alg = FollowTheLeader(; opt = long)), rows(rd, 1:30)).w,
+                       w30; atol = 1e-8)
     end
 
     @testset "The Allocation Set Constraint (ADR 0164)" begin
