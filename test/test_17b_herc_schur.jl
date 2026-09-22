@@ -229,3 +229,57 @@ end
     w2 /= sum(w2)
     @test isapprox(res2.w, w2)
 end
+@testset "MonotonicSchurComplement returns the weights of the gamma it reports" begin
+    # An 8-asset one-factor panel. The search runs over the natural leaf order, so no
+    # clustering choice moves the numbers.
+    function schur_fixture(seed, ls, is)
+        rng = StableRNG(seed)
+        F = randn(rng, 200, 1) * 0.01
+        B = randn(rng, 8, 1) * ls
+        E = randn(rng, 200, 8) * 0.01 * is
+        return prior(EmpiricalPrior(), F * B' + E)
+    end
+    items = [collect(1:8)]
+    wb = WeightBounds(; lb = zeros(8), ub = ones(8))
+    function nm_weights(pr, gamma)
+        p = SchurComplementParams(; gamma = gamma, alg = NonMonotonicSchurComplement(),
+                                  flag = false)
+        return PortfolioOptimisers.schur_complement_weights(pr, items, wb, p)[1]
+    end
+    # (seed, loading scale, idiosyncratic scale, maximum gamma, turning point). The
+    # turning points are those of an independent implementation of the same search,
+    # with the same scan grid. The cases cover: the variance rises from gamma = 0, still
+    # falls at the top of the range, and turns inside the range twice.
+    for (seed, ls, is, g, gtp) in ((1, 0.5, 0.5, 0.5, 0.0), (2, 0.5, 0.5, 0.5, 0.5),
+                                   (2, 0.5, 0.5, 1.0, 0.9554687499999999), (2, 1.0, 0.5, 0.5, 0.3765625))
+        pr = schur_fixture(seed, ls, is)
+        p = SchurComplementParams(; gamma = g,
+                                  alg = MonotonicSchurComplement(;
+                                                                 N = ceil(Int, g / 0.1) + 1))
+        w, gamma, _ = @test_logs min_level = Logging.Warn PortfolioOptimisers.schur_complement_weights(pr,
+                                                                                                       items,
+                                                                                                       wb,
+                                                                                                       p)
+        @test isapprox(gamma, gtp; atol = 1e-12)
+        @test w == nm_weights(pr, gamma)
+    end
+
+    # No midpoint passes the test: the incumbent and its own weights are the answer.
+    obj(x) = (fill(x, 1), x <= 0.2 ? 1 - x : 2.0)
+    @test (@test_logs min_level = Logging.Warn PortfolioOptimisers.schur_complement_binary_search(obj,
+                                                                                                  0.2,
+                                                                                                  0.4,
+                                                                                                  0.8,
+                                                                                                  [0.5])) ==
+          ([0.5], 0.2)
+    @test (@test_logs (:warn, r"did not converge") PortfolioOptimisers.schur_complement_binary_search(obj,
+                                                                                                      0.2,
+                                                                                                      0.4,
+                                                                                                      0.8,
+                                                                                                      [0.5],
+                                                                                                      1e-4,
+                                                                                                      1)) ==
+          ([0.5], 0.2)
+    # The scan needs both ends of the range.
+    @test_throws DomainError MonotonicSchurComplement(; N = 1)
+end

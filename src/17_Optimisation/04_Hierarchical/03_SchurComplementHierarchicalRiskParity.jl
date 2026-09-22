@@ -160,11 +160,13 @@ struct NonMonotonicSchurComplement <: SchurComplementAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Searches ``[0, \\gamma]`` for the value that gives the lowest portfolio variance.
+Caps ``\\gamma`` at the largest value in ``[0, \\gamma]`` up to which the portfolio variance falls monotonically from ``\\gamma = 0``.
 
-Portfolio variance is not monotonic in the Schur complement parameter: it falls, then rises again. This algorithm scans `N` values across the range, stops at the first one whose variance is no lower than its predecessor, and bisects the bracket around that turning point to `tol`. The allocation then runs at the value it found, which is at most the [`SchurComplementParams`](@ref)`.gamma` the caller asked for.
+Portfolio variance is not monotonic in the Schur complement parameter: it falls, then rises again. This algorithm scans `N` evenly spaced values across the range, stops at the first one whose variance is no lower than its predecessor, and bisects the bracket around that turning point to `tol`. The allocation then runs at the value it found, which is at most the [`SchurComplementParams`](@ref)`.gamma` the caller asked for.
 
-The objective is the variance ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}`` in every case, including when the measure is a [`StandardDeviation`](@ref). The search also runs with the positive-definite repair **off**, so a ``\\gamma`` whose augmented block is not positive definite scores an infinite variance and is passed over rather than raising.
+The value found is the **first** turning point, not the global minimum over the range. Past the turning point, the variance can fall again to a lower value, but a portfolio there is no longer one that a monotone path from [`HierarchicalRiskParity`](@ref) reaches.
+
+The objective is the variance ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}`` in every case, including when the measure is a [`StandardDeviation`](@ref). The search also runs with the positive-definite repair **off**, so a ``\\gamma`` whose augmented block is not positive definite scores an infinite variance. That counts as a rise, so the monotone range ends before it.
 
 # Fields
 
@@ -183,7 +185,7 @@ Keywords correspond to the struct's fields. `iter` defaults to `nothing`, which 
 
 ## Validation
 
-  - `N > 0`.
+  - `N > 1`: the scan needs both ends of the range.
   - `tol > 0`.
   - If `iter` is given: `iter > 0`.
 
@@ -213,7 +215,7 @@ Keywords correspond to the struct's fields. `iter` defaults to `nothing`, which 
     strict
     function MonotonicSchurComplement(N::Integer, tol::Number, iter::Option{<:Integer},
                                       strict::Bool)
-        @argcheck(N > 0, DomainError(N, "N must be > 0"))
+        @argcheck(N > 1, DomainError(N, "N must be > 1"))
         @argcheck(tol > 0, DomainError(tol, "tol must be > 0"))
         if !isnothing(iter)
             @argcheck(iter > 0, DomainError(iter, "iter must be > 0"))
@@ -870,13 +872,14 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
 end
 """
     schur_complement_binary_search(objective::Function, lgamma::Number, hgamma::Number,
-                                   lrisk::Number, tol::Number = 1e-4,
+                                   lrisk::Number, lw::Option{<:VecNum},
+                                   tol::Number = 1e-4,
                                    iter::Option{<:Integer} = nothing,
                                    strict::Bool = false) -> Tuple
 
-Bisect a bracket that holds the variance-minimising ``\\gamma``.
+Bisect a bracket that holds the turning point of the portfolio variance in ``\\gamma``.
 
-[`MonotonicSchurComplement`](@ref)'s coarse scan hands over a bracket in which the portfolio variance stops falling. This method halves that bracket until it is narrower than `tol`, keeping the midpoint only when its variance beats both the current lower end and the point one `tol` below it.
+[`MonotonicSchurComplement`](@ref)'s coarse scan hands over a bracket in which the portfolio variance stops falling. This method halves that bracket until it is narrower than `tol`. It keeps the midpoint only when its variance beats both the current lower end and the point one `tol` below it, so the lower end always stays inside the range where the variance falls.
 
 # Arguments
 
@@ -884,18 +887,20 @@ Bisect a bracket that holds the variance-minimising ``\\gamma``.
   - `lgamma`: Lower end of the bracket, and the incumbent.
   - `hgamma`: Upper end of the bracket.
   - `lrisk`: The variance already measured at `lgamma`. It is the value a midpoint must beat.
+  - `lw`: The weight vector already computed at `lgamma`.
   - `tol`: Width at which the bracket is narrow enough, and the step used for the one-sided derivative test.
   - `iter`: Iteration budget. `nothing` derives one from the bracket and `tol`.
   - `strict`: Whether a bracket that never narrows to `tol` raises rather than warns.
 
 # Returns
 
-  - `(w, gamma)::Tuple`: The weight vector of the best ``\\gamma`` seen, and that ``\\gamma``.
+  - `(w, gamma)::Tuple`: The lower end of the last bracket, and the weight vector computed at it.
 
 # Details
 
-  - The returned `w` is the weight vector of the **last** midpoint evaluated, which is the incumbent's whenever the loop ends by narrowing the bracket.
-  - Failing to narrow within `iter` is reported through [`strict_diagnostic`](@ref), so the search returns its incumbent rather than failing.
+  - The returned `w` is always the weight vector of the returned `gamma`. A midpoint the test rejects never replaces the incumbent's weights.
+  - When no midpoint passes the test, the incumbent `lgamma` is the answer. The coarse scan measured that the variance falls up to it.
+  - Failing to narrow within `iter` is reported through [`strict_diagnostic`](@ref), so the search returns its incumbent rather than failing. The default budget always narrows the bracket, because each iteration halves it.
 
 # Related
 
@@ -904,39 +909,40 @@ Bisect a bracket that holds the variance-minimising ``\\gamma``.
   - [`SchurComplementHierarchicalRiskParity`](@ref)
 """
 function schur_complement_binary_search(objective::Function, lgamma::Number, hgamma::Number,
-                                        lrisk::Number, tol::Number = 1e-4,
+                                        lrisk::Number, lw::Option{<:VecNum},
+                                        tol::Number = 1e-4,
                                         iter::Option{<:Integer} = nothing,
                                         strict::Bool = false)
-    w = nothing
     if isnothing(iter)
         iter = ceil(Int, log2((hgamma - lgamma) / tol) * 4 + 10)
     end
     for _ in 1:iter
-        mgamma = (lgamma + hgamma) * 0.5
-        w, risk, hrisk = objective(mgamma)..., objective(mgamma - tol)[2]
+        mgamma = (lgamma + hgamma) / 2
+        mw, risk = objective(mgamma)
+        hrisk = objective(mgamma - tol)[2]
         if risk <= lrisk && risk <= hrisk
-            # If risk at midpoint is lower than at the lower bound and lower than the risk just below the midpoint, we can update the lower bound to the midpoint.
-            lgamma = mgamma
-            lrisk = risk
-            if (hgamma - lgamma) <= tol
-                # Return if the difference between upper and lower bounds is within the tolerance.
-                return w, lgamma
-            end
+            # The variance still falls at the midpoint: it becomes the incumbent.
+            lgamma, lrisk, lw = mgamma, risk, mw
         else
-            # Else we update the upper bound to the midpoint.
+            # The turning point lies below the midpoint. The incumbent keeps its weights.
             hgamma = mgamma
+        end
+        if hgamma - lgamma <= tol
+            return lw, lgamma
         end
     end
     msg = "Binary search did not converge within the specified tolerance: tol => $tol"
     strict_diagnostic(msg, strict)
-    return w, lgamma
+    return lw, lgamma
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Search ``[0, \\gamma]`` for the variance-minimising Schur complement parameter, then allocate at it.
+Search ``[0, \\gamma]`` for the turning point of the portfolio variance, then allocate at it.
 
 Scans `params.alg.N` values across the range and stops at the first one whose portfolio variance is no lower than its predecessor. It then bisects the bracket around that turning point with [`schur_complement_binary_search`](@ref). When the variance is still falling at the top of the range, that top value is used. Every evaluation delegates to the [`NonMonotonicSchurComplement`](@ref) method with the positive-definite repair off, so a ``\\gamma`` that fails scores an infinite variance.
+
+The returned weight vector is always the one computed at the returned ``\\gamma``.
 
 # Related
 
@@ -961,36 +967,37 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
     end
     nm_params = SchurComplementParams(; r = r, gamma = max_gamma, pdm = params.pdm,
                                       alg = NonMonotonicSchurComplement(), flag = false)
+    # `wx`, not `w`: a closure that assigns a name the enclosing function also assigns
+    # rebinds the enclosing variable, so each call would overwrite the scan's weights.
     function objective(x::Number)
-        w = schur_complement_weights(pr, items, wb, nm_params, x)[1]
-        risk = isnothing(w) ? typemax(eltype(X)) : LinearAlgebra.dot(w, r.sigma, w)
-        return w, risk
+        wx = schur_complement_weights(pr, items, wb, nm_params, x)[1]
+        risk = isnothing(wx) ? typemax(eltype(X)) : LinearAlgebra.dot(wx, r.sigma, wx)
+        return wx, risk
     end
+    (; tol, iter, strict) = params.alg
     gammas = range(zero(max_gamma), max_gamma; length = params.alg.N)
-    risks = fill(typemax(eltype(X)), size(gammas))
-    w, risk = objective(gammas[1])
-    risks[1] = risk
-    # First binary search, finds the point at which the risk starts to increase with gamma, if it exists.
+    # The two previous scan points, `i - 2` and `i - 1`, with their weights.
+    w2, risk2 = w1, risk1 = objective(gammas[1])
     for i in 2:length(gammas)
         w, risk = objective(gammas[i])
-        risks[i] = risk
-        if risk >= risks[i - 1]
-            # Turning point is strictly between [gammas[i-2], gammas[i]].
-            lidx = max(1, i - 2)
+        if risk >= risk1
+            # The turning point lies in [gammas[i - 2], gammas[i]], or in
+            # [gammas[1], gammas[2]] when the variance rises at the first step.
+            lidx, lw, lrisk = i == 2 ? (1, w1, risk1) : (i - 2, w2, risk2)
             wi, gi = schur_complement_binary_search(objective, gammas[lidx], gammas[i],
-                                                    risks[lidx], params.alg.tol,
-                                                    params.alg.iter, params.alg.strict)
+                                                    lrisk, lw, tol, iter, strict)
             return wi, gi, r
         end
+        w2, risk2 = w1, risk1
+        w1, risk1 = w, risk
     end
-    # If there's no turning point in the range of gammas, check the derivative at the last gamma.
-    if risk <= objective(max_gamma - params.alg.tol)[2]
-        return w, max_gamma, r
+    # No turning point in the scan: check the derivative at the last gamma.
+    if risk1 <= objective(max_gamma - tol)[2]
+        return w1, max_gamma, r
     end
-    # If the turning point exists and was not found within the range, or the last gamma, it is between the last two gammas.
-    wi, gi = schur_complement_binary_search(objective, gammas[end - 1], gammas[end],
-                                            risks[end - 1], params.alg.tol, params.alg.iter,
-                                            params.alg.strict)
+    # The turning point lies between the last two gammas.
+    wi, gi = schur_complement_binary_search(objective, gammas[end - 1], gammas[end], risk2,
+                                            w2, tol, iter, strict)
     return wi, gi, r
 end
 """
