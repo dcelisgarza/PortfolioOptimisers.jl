@@ -151,19 +151,22 @@ code span, an inline LaTeX expression, and the target of a markdown link.
 
 ## The Gate
 
-[`test/test_72_literate_prose_census.jl`](../../test/test_72_literate_prose_census.jl) reads the
-prose of the Literate sources and holds each page to its row in
-[`code_health/literate_prose_baseline.toml`](../../code_health/literate_prose_baseline.toml). A
-count may fall and may not rise. A page whose count stands above its row fails, a page with a count
-above zero and no row fails, and a page whose every count is zero carries no row, so the baseline
-empties as the pages are rewritten. The reader is
-[`code_health/literate_prose.jl`](../../code_health/literate_prose.jl), which the census includes
-rather than copies. The rules the census cannot read hold by review, in the sense of
-[`STANDARDS.md`](../../STANDARDS.md).
+[`test/test_72_prose_census.jl`](../../test/test_72_prose_census.jl) reads the prose of all four
+corpora and holds each text to its row in
+[`code_health/prose_baseline.toml`](../../code_health/prose_baseline.toml). A count may fall and
+may not rise. A text whose count stands above its row fails, a text with a count above zero and no
+row fails, and a text whose every count is zero carries no row, so the baseline empties as the
+texts are rewritten. The reader is [`code_health/prose.jl`](../../code_health/prose.jl), which the
+census includes rather than copies. The rules the census cannot read hold by review, in the sense
+of [`STANDARDS.md`](../../STANDARDS.md).
 
-**The census reads the Literate sources alone today.** The other three corpora hold by review until
-the build ticket of ADR 0171 widens the reader, the store and the census to them, and
-[`STANDARDS.md`](../../STANDARDS.md) records that part as unenforced until it lands.
+**Three shapes of text feed one set of counters.** A Literate source gives its `#= … =#` blocks and
+every comment line that opens with a `#` and a space at column zero. A Markdown page gives its own lines. The catalogue gives the
+body of every double-quoted string literal on a line that is neither a `#` comment nor part of a
+triple-quoted block, which is how
+[`test/test_71_process_citation_census.jl`](../../test/test_71_process_citation_census.jl) reads
+the same file. A triple-quoted block there documents `Cap`, `Section` and `Group` to a contributor
+and never renders.
 
 **What it counts.** One column per rule, named in the row: `emdash` and `endash` for rule 13,
 `curly` for rule 19, `notjust` for rule 9, `aivocab` for rule 7, `fancy_is` for rule 8, `filler`
@@ -185,7 +188,7 @@ the rule asks for. The rules still hold on the other sense, and a reader applies
 **Scanning one file.** Run
 
 ```bash
-julia --project=code_health code_health/literate_prose.jl scan <file>...
+julia --project=code_health code_health/prose.jl scan <file>...
 ```
 
 before and after a rewrite. It prints each file's counts and the row the baseline would carry for

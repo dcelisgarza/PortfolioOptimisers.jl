@@ -1,30 +1,34 @@
 #!/usr/bin/env julia
 #
-# The Literate-prose half of the documentation gates.
+# The user-facing-prose half of the documentation gates.
 #
-#     julia --project=code_health code_health/literate_prose.jl scan examples/00_Examples.jl
-#     julia --project=code_health code_health/literate_prose.jl scan
-#     julia --project=code_health code_health/literate_prose.jl refresh
+#     julia --project=code_health code_health/prose.jl scan examples/00_Examples.jl
+#     julia --project=code_health code_health/prose.jl scan
+#     julia --project=code_health code_health/prose.jl refresh
 #
-# It reads the prose of every file under `examples/**/*.jl` and `user_guide/*.jl` and counts the
-# rules of `.github/instructions/julia-prose.instructions.md` that a parser can read. The
-# counts of one page are its row in `code_health/literate_prose_baseline.toml`. A count may fall
-# and may not rise, a page with a count above zero needs a row, and a page whose every counted rule
-# is at zero carries no row at all, so the baseline empties as the rewrites of map #1218 land.
+# It reads the prose of every text a user reads as a page and counts the rules of
+# `.github/instructions/julia-prose.instructions.md` that a parser can read. Four corpora carry
+# that prose, and ADR 0171 names them: the Literate sources under `examples/**/*.jl` and
+# `user_guide/*.jl`, the hand-written Markdown pages under `docs/src/**/*.md` outside
+# `docs/src/contribute/`, `README.md`, and `docs/capability_catalogue.jl`.
 #
-# `test/test_72_literate_prose_census.jl` is the gate. It includes this file, so the suite and a
-# rewrite session read the prose with one reader and cannot drift. `scan` is what a rewrite session
-# runs on its own pages before and after the rewrite. `refresh` writes the whole baseline, which
-# generates it once. A rewrite session does NOT refresh: fourteen rewrite tickets run in parallel,
-# and two sessions that each write the whole file lose one of the two writes. It pastes the row the
-# census prints for its own pages instead.
+# The counts of one text are its row in `code_health/prose_baseline.toml`. A count may fall and may
+# not rise, a text with a count above zero needs a row, and a text whose every counted rule is at
+# zero carries no row at all, so the baseline empties as the rewrites of map #1218 land.
+#
+# `test/test_72_prose_census.jl` is the gate. It includes this file, so the suite and a rewrite
+# session read the prose with one reader and cannot drift. `scan` is what a rewrite session runs on
+# its own texts before and after the rewrite. `refresh` writes the whole baseline, which generates
+# it once. A rewrite session does NOT refresh: rewrite tickets run in parallel, and two sessions
+# that each write the whole file lose one of the two writes. It pastes the row the census prints
+# for its own texts instead.
 #
 # This script reads TEXT and loads only `TOML`, as every census in this repository does. It parses
 # no Julia and loads no package under measurement, so it costs well under a second over the corpus.
 
 using TOML
 
-const NAME = "literate_prose_baseline.toml"
+const NAME = "prose_baseline.toml"
 const DIR = @__DIR__
 const REPO_ROOT = normpath(joinpath(DIR, ".."))
 
@@ -46,7 +50,7 @@ const COUNTED = ("emdash" => "rule 13", "endash" => "rule 13", "curly" => "rule 
                  "verdict" => "a check is a number")
 
 """
-The column that records the prose word count. It carries no limit: a page is long because it covers
+The column that records the prose word count. It carries no limit: a text is long because it covers
 more ground, and the paragraph rule is what holds its length down.
 """
 const WORDS = "words"
@@ -77,18 +81,55 @@ const PATTERNS = Dict("emdash" => r"—", "endash" => r"–", "curly" => r"[“�
                       "verdict" =>
                           r"\bto the bit\b|\bby construction\b|\bhonest\w*\b|\b(?:the|each) identity\b(?! matrix)|\bagrees?\b"i)
 
-# --- reading the prose of a page -------------------------------------------
+# --- reading the prose of one text ----------------------------------------
 #
-# Literate renders two things as markdown: a `#= ... =#` block, and a line whose first two
+# Three corpora, three shapes, one set of counters.
+#
+# A Literate source renders two things as markdown: a `#= ... =#` block, and a line whose first two
 # characters are `# `. A `##` comment at column zero renders as a `#` INSIDE a code cell, so it is
 # code and not prose. A line that carries the `#src` trailer never reaches an output at all, and
 # `test/test_71_process_citation_census.jl` skips it for the same reason.
+#
+# A Markdown page needs no such step. Its lines are the page.
+#
+# The catalogue holds its prose in double-quoted string literals, and ADR 0171 decision 11 states
+# that rule.
+
+"""
+    text_kind(path) -> Symbol
+
+Which of the three readers one text needs. `:catalogue` for `docs/capability_catalogue.jl`,
+`:markdown` for a `.md` page, and `:literate` for every other `.jl` source.
+"""
+function text_kind(path::AbstractString)
+    if endswith(path, "capability_catalogue.jl")
+        return :catalogue
+    end
+    if endswith(path, ".md")
+        return :markdown
+    end
+    return :literate
+end
+
+"""
+    is_mirror(path) -> Bool
+
+Whether `path` is a mirror page under `docs/src/public_api/` or `docs/src/private_api/`. Two lines
+of such a page are derived text, and *What the rule does not read* of
+`.github/instructions/julia-prose.instructions.md` keeps this rule off them: the H1, whose shape
+ADR 0128 fixes, and the `Description` line, which `docs/page_metadata.jl` derives and
+`test/test_64_docs_page_metadata_census.jl` gates.
+"""
+function is_mirror(path::AbstractString)
+    s = replace(path, '\\' => '/')
+    return occursin("docs/src/public_api/", s) || occursin("docs/src/private_api/", s)
+end
 
 """
     markdown_lines(text) -> Vector{String}
 
-The lines of `text` that Literate renders as markdown, in order, with the comment markers removed.
-A `#src` line is dropped.
+The lines of a Literate source that Literate renders as markdown, in order, with the comment
+markers removed. A `#src` line is dropped.
 """
 function markdown_lines(text::AbstractString)
     acc = String[]
@@ -122,28 +163,63 @@ function markdown_lines(text::AbstractString)
 end
 
 """
-    unfenced(lines) -> Vector{String}
+    catalogue_lines(text) -> Vector{String}
 
-`lines` with every fenced block removed. The `Description` line of a ````` ```@meta ````` block survives as
-its text alone: the docs build renders it into the page's metadata, so a reader reads it, and
-`test/test_64_docs_page_metadata_census.jl` already holds it to a shape.
+The prose of `docs/capability_catalogue.jl`: the body of every double-quoted string literal that
+sits on a line which is neither a `#` comment nor part of a triple-quoted block. ADR 0171 decision
+11 states the rule, and `test/test_71_process_citation_census.jl` reads the same file the same way.
+A triple-quoted block there documents `Cap`, `Section` and `Group` to a contributor and never
+renders, so it is skipped for the reason a `#` comment is.
 """
-function unfenced(lines)
+function catalogue_lines(text::AbstractString)
     acc = String[]
-    fence, meta = false, false
+    indoc = false
+    for ln in split(text, '\n')
+        ticks = length(findall("\"\"\"", ln))
+        if ticks >= 2
+            # A triple-quoted block that opens and closes on one line.
+            continue
+        elseif ticks == 1
+            indoc = !indoc
+            continue
+        end
+        if indoc
+            continue
+        end
+        if startswith(lstrip(ln), "#")
+            continue
+        end
+        for m in eachmatch(r"\"((?:[^\"\\]|\\.)*)\"", ln)
+            push!(acc, replace(String(m.captures[1]), "\\\"" => "\""))
+        end
+    end
+    return acc
+end
+
+"""
+    unfenced(lines; meta = true) -> Vector{String}
+
+`lines` with every fenced block removed. With `meta = true` the `Description` line of a
+````` ```@meta ````` block survives as its text alone: the docs build renders it into the page's
+metadata, so a reader reads it, and `test/test_64_docs_page_metadata_census.jl` already holds it to
+a shape. On a mirror page that line is derived, so the census reads it with `meta = false`.
+"""
+function unfenced(lines; meta::Bool = true)
+    acc = String[]
+    fence, inmeta = false, false
     for ln in lines
         s = lstrip(ln)
         if startswith(s, "```")
             if fence
-                fence, meta = false, false
+                fence, inmeta = false, false
             else
                 fence = true
-                meta = startswith(s, "```@meta")
+                inmeta = meta && startswith(s, "```@meta")
             end
             continue
         end
         if fence
-            if meta
+            if inmeta
                 m = match(r"^\s*Description\s*=\s*\"(.*)\"\s*$", ln)
                 m === nothing || push!(acc, String(m.captures[1]))
             end
@@ -152,6 +228,20 @@ function unfenced(lines)
         push!(acc, ln)
     end
     return acc
+end
+
+"""
+    drop_first_h1(lines) -> Vector{String}
+
+`lines` without the first H1. ADR 0128 fixes the H1 of a mirror page, so the prose rule does not
+read it. Every other heading of that page is written prose, and rule 17 reads it.
+"""
+function drop_first_h1(lines)
+    i = findfirst(ln -> match(r"^#\s+\S", ln) !== nothing, lines)
+    if i === nothing
+        return collect(lines)
+    end
+    return [ln for (j, ln) in enumerate(lines) if j != i]
 end
 
 """
@@ -173,10 +263,24 @@ end
 """
     prose(path) -> Vector{String}
 
-The prose of one Literate source: every line a reader reads, cleaned of what the rule does not
-govern. This is the one reader. The census and a rewrite session's scan both call it.
+The prose of one text: every line a reader reads, cleaned of what the rule does not govern. This is
+the one reader. The census and a rewrite session's scan both call it.
 """
-prose(path::AbstractString) = readable.(unfenced(markdown_lines(read(path, String))))
+function prose(path::AbstractString)
+    text = read(path, String)
+    kind = text_kind(path)
+    if kind === :catalogue
+        # A string literal carries no fenced block and no page furniture.
+        return readable.(catalogue_lines(text))
+    end
+    lines = kind === :literate ? markdown_lines(text) : String.(split(text, '\n'))
+    mirror = is_mirror(path)
+    lines = unfenced(lines; meta = !mirror)
+    if mirror
+        (lines = drop_first_h1(lines))
+    end
+    return readable.(lines)
+end
 
 # --- the counts a line carries ---------------------------------------------
 
@@ -293,7 +397,7 @@ end
 """
     counts(path; glossary = glossary_pattern(glossary_terms())) -> Dict{String, Int}
 
-Every column of one page's row. A column that is absent from a row is zero, so a row shrinks as a
+Every column of one text's row. A column that is absent from a row is zero, so a row shrinks as a
 rewrite lands.
 """
 function counts(path::AbstractString; glossary = glossary_pattern(glossary_terms()))
@@ -311,11 +415,20 @@ function counts(path::AbstractString; glossary = glossary_pattern(glossary_terms
 end
 
 """
+The paths under `docs/src/` the census never reads. `contribute/` is written for a contributor, and
+the other four are written by the docs build from the Literate sources and from the catalogue, so
+they are not in the tree and a defect in one is fixed at its source.
+`test/test_71_process_citation_census.jl` skips the same five.
+"""
+const DOCS_SKIP = ("contribute", "examples", "user_guide", "capability_catalogue.md",
+                   "TypeHierarchy.md")
+
+"""
     pages(; root = REPO_ROOT) -> Vector{String}
 
-Every file the rule governs, as a path relative to `root`: `examples/**/*.jl` and
-`user_guide/*.jl`. The glob is the `applyTo` line of
-`.github/instructions/julia-prose.instructions.md`.
+Every text the rule governs, as a path relative to `root`. The four corpora are the `applyTo` line
+of `.github/instructions/julia-prose.instructions.md`: `examples/**/*.jl` and `user_guide/*.jl`,
+the hand-written pages under `docs/src/**/*.md`, `README.md`, and `docs/capability_catalogue.jl`.
 """
 function pages(; root::AbstractString = REPO_ROOT)
     acc = String[]
@@ -331,13 +444,32 @@ function pages(; root::AbstractString = REPO_ROOT)
             endswith(f, ".jl") && push!(acc, relpath(joinpath(guide, f), root))
         end
     end
+    docs = joinpath(root, "docs", "src")
+    if isdir(docs)
+        for (dir, _, files) in walkdir(docs), f in files
+            if !(endswith(f, ".md"))
+                continue
+            end
+            # The skip list is read off the path relative to `docs/src`, so a directory and a file
+            # are told apart by their place in it. `walkdir` walks what it read, so a filter on the
+            # directory list it hands back does not prune the walk.
+            parts = splitpath(relpath(joinpath(dir, f), docs))
+            if any(part -> part in DOCS_SKIP, parts)
+                continue
+            end
+            push!(acc, relpath(joinpath(dir, f), root))
+        end
+    end
+    for p in ("README.md", joinpath("docs", "capability_catalogue.jl"))
+        isfile(joinpath(root, p)) && push!(acc, p)
+    end
     return sort!(acc)
 end
 
 """
     measure(; root = REPO_ROOT) -> Dict{String, Dict{String, Int}}
 
-One row per page, keyed by the path the baseline names.
+One row per text, keyed by the path the baseline names.
 """
 function measure(; root::AbstractString = REPO_ROOT)
     glossary = glossary_pattern(glossary_terms(; root = root))
@@ -350,7 +482,7 @@ binding(row) = Dict(k => row[k] for k in first.(COUNTED) if row[k] > 0)
 """
     row_text(path, row) -> String
 
-The baseline line for one page, which is what the census prints for a page that fails. A count at
+The baseline line for one text, which is what the census prints for a text that fails. A count at
 zero is absent from the line, and `words` always prints.
 """
 function row_text(path::AbstractString, row)
@@ -362,8 +494,8 @@ end
 """
     rises(row, recorded) -> Vector{Pair{String, Pair{Int, Int}}}
 
-Every column of one page that stands above its recorded ceiling, as `column => recorded => now`. An
-absent column is a ceiling of zero.
+Every column of one text that stands above its recorded ceiling, as `column => recorded => now`.
+An absent column is a ceiling of zero.
 """
 function rises(row, recorded)
     acc = Pair{String, Pair{Int, Int}}[]
@@ -405,14 +537,15 @@ end
 """
     baseline_text(m; root = REPO_ROOT) -> String
 
-The whole baseline file, with one row per page whose counted rules are not all at zero.
+The whole baseline file, with one row per text whose counted rules are not all at zero.
 """
 function baseline_text(m; root::AbstractString = REPO_ROOT)
     io = IOBuffer()
-    println(io, "# Generated by code_health/literate_prose.jl. Do not edit by hand.")
-    println(io, "# One row per Literate page that still carries a counted rule of")
-    println(io, "# .github/instructions/julia-prose.instructions.md. A count may fall and")
-    println(io, "# may not rise, and a page whose every count is zero carries no row.")
+    println(io, "# Generated by code_health/prose.jl. Do not edit by hand.")
+    println(io, "# One row per text a user reads as a page that still carries a counted")
+    println(io, "# rule of .github/instructions/julia-prose.instructions.md. A count may")
+    println(io,
+            "# fall and may not rise, and a text whose every count is zero carries no row.")
     println(io, "# An absent count is zero. `words` is context and carries no limit.")
     println(io, "# ADR 0171.")
     println(io)
@@ -434,8 +567,8 @@ end
 """
     scan(paths; root = REPO_ROOT)
 
-Print the counts of each page in `paths`, and the row the baseline would carry for it. This is what
-a rewrite session runs on its own pages, before and after the rewrite.
+Print the counts of each text in `paths`, and the row the baseline would carry for it. This is
+what a rewrite session runs on its own texts, before and after the rewrite.
 """
 function scan(paths; root::AbstractString = REPO_ROOT)
     glossary = glossary_pattern(glossary_terms(; root = root))
@@ -464,7 +597,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     elseif verb == "scan"
         scan(length(ARGS) > 1 ? ARGS[2:end] : pages())
     else
-        println(stderr, "Usage: literate_prose.jl [scan [file...] | refresh]")
+        println(stderr, "Usage: prose.jl [scan [file...] | refresh]")
         exit(2)
     end
 end

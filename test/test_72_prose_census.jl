@@ -1,20 +1,32 @@
 #=
-The prose of an example or a user-guide page is written for a reader, and
-`.github/instructions/julia-prose.instructions.md` states what it must do. Part of that
-rule is a list: a character, a word, a phrase, a heading shape. A list is read by a parser, and a
-rule a parser reads is a rule a review does not have to hold in its head.
+The prose a user reads as a page is written for a reader, and
+`.github/instructions/julia-prose.instructions.md` states what it must do. Part of that rule is a
+list: a character, a word, a phrase, a heading shape. A list is read by a parser, and a rule a
+parser reads is a rule a review does not have to hold in its head.
 
-This file is the gate for the readable part. `code_health/literate_prose.jl` is the reader, and it
-is included rather than copied, so a rewrite session's scan and this census cannot drift. A rewrite
-session runs
+This file is the gate for the readable part. It reads all four corpora ADR 0171 names: the Literate
+sources under `examples/` and `user_guide/`, the hand-written Markdown pages under `docs/src/`
+outside `docs/src/contribute/`, `README.md`, and `docs/capability_catalogue.jl`.
+`code_health/prose.jl` is the reader, and it is included rather than copied, so a rewrite session's
+scan and this census cannot drift. A rewrite session runs
 
-    julia --project=code_health code_health/literate_prose.jl scan <its pages>
+    julia --project=code_health code_health/prose.jl scan <its texts>
 
 before and after its rewrite, and pastes the row the scan prints.
 
-The baseline is PER PAGE and never a library total. Fourteen rewrite tickets run in parallel, and a
-library total is one number that two sessions each lower to a different value, after which a merge
-keeps one of the two writes. A per-page row is touched by one session alone.
+The baseline is PER TEXT and never a library total. Rewrite tickets run in parallel, and a library
+total is one number that two sessions each lower to a different value, after which a merge keeps
+one of the two writes. A per-text row is touched by one session alone.
+
+Three shapes of text feed one set of counters. A Literate source renders a `#= ... =#` block and a
+`# ` comment at column zero. A Markdown page is its own lines. The catalogue holds its prose in
+double-quoted string literals, which is how `test_71_process_citation_census.jl` reads the same
+file.
+
+Two lines of a mirror page under `docs/src/public_api/` or `docs/src/private_api/` are derived
+text, and this census does not read them: the H1, whose shape ADR 0128 fixes, and the `Description`
+line, which `docs/page_metadata.jl` derives. `test_64_docs_page_metadata_census.jl` holds both, and
+one line carries one gate.
 
 The rules a parser cannot read hold by review: rules 10, 11, 27, 28 and 32 of the `unslop` skill,
 and the self-audit that closes a rewrite. This census makes no claim about them.
@@ -30,14 +42,14 @@ gives: `include` defines methods, and a method defined inside one top-level stat
 visible to a call in that same statement. The module wrapper keeps the reader's names out of the
 worker module.
 =#
-module LiterateProse
-include(joinpath(@__DIR__, "..", "code_health", "literate_prose.jl"))
+module Prose
+include(joinpath(@__DIR__, "..", "code_health", "prose.jl"))
 end
 
-@testset "Literate prose census: every page is at or below its row" begin
+@testset "Prose census: every text is at or below its row" begin
     using Test
 
-    P = LiterateProse
+    P = Prose
     root = normpath(joinpath(@__DIR__, ".."))
 
     #=
@@ -93,6 +105,132 @@ end
             # The em dash inside a code span is code, and the one in the paragraph is prose.
             @test P.counts(path; glossary = glossary)["emdash"] == 1
         end
+    end
+
+    @testset "a Markdown page is read as its own lines" begin
+        text = """
+        ```@meta
+        Description = "A page that is about one thing."
+        ```
+
+        # A heading
+
+        A paragraph, and an em dash — outside the fenced block below.
+
+        ```@docs
+        MeanRisk
+        ```
+
+        ```julia
+        w = 1 # an em dash — in a code cell
+        ```
+        """
+        mktempdir() do dir
+            path = joinpath(dir, "page.md")
+            write(path, text)
+            joined = join(P.prose(path), "\n")
+            @test occursin("A page that is about one thing.", joined)
+            @test occursin("# A heading", joined)
+            @test occursin("A paragraph, and an em dash", joined)
+            # The `@docs` block and the code cell never reach the rule.
+            @test !occursin("MeanRisk", joined)
+            @test !occursin("code cell", joined)
+            @test P.counts(path; glossary = glossary)["emdash"] == 1
+        end
+    end
+
+    #=
+    A mirror page carries two derived lines, and `test_64_docs_page_metadata_census.jl` owns both.
+    The census reads neither, so one line carries one gate. Every other heading of that page is
+    written prose, and rule 17 reads it.
+    =#
+    @testset "the derived lines of a mirror page are not read" begin
+        text = """
+        ```@meta
+        Description = "Asset selection, public API of PortfolioOptimisers.jl: ScoreSelector, …"
+        ```
+
+        # Asset Selection Under A Rule
+
+        ## Scoring Assets With A Rule
+
+        A paragraph a contributor wrote.
+        """
+        mktempdir() do dir
+            mirror = joinpath(dir, "docs", "src", "public_api")
+            mkpath(mirror)
+            path = joinpath(mirror, "20_AssetSelection.md")
+            write(path, text)
+            joined = join(P.prose(path), "\n")
+            @test !occursin("public API of PortfolioOptimisers", joined)
+            @test !occursin("# Asset Selection Under A Rule", joined)
+            @test occursin("## Scoring Assets With A Rule", joined)
+            # The H1 is title case and is not counted. The H2 below it is.
+            @test P.counts(path; glossary = glossary)["title_case"] == 1
+            @test P.is_mirror(path)
+        end
+        # The same two lines on a page that is not a mirror are written prose, and the rule reads
+        # them.
+        mktempdir() do dir
+            path = joinpath(dir, "20_AssetSelection.md")
+            write(path, text)
+            joined = join(P.prose(path), "\n")
+            @test occursin("public API of PortfolioOptimisers", joined)
+            @test occursin("# Asset Selection Under A Rule", joined)
+            @test P.counts(path; glossary = glossary)["title_case"] == 2
+            @test !P.is_mirror(path)
+        end
+    end
+
+    #=
+    The catalogue's prose is its double-quoted string literals, which is ADR 0171 decision 11 and
+    is how `test_71_process_citation_census.jl` reads the same file. A `#` comment and a
+    triple-quoted block there are written for a contributor and never render.
+    =#
+    @testset "the catalogue is read as its string literals" begin
+        text = """
+        # A comment with an em dash — for a contributor.
+
+        \"\"\"
+            Cap(names...)
+
+        A docstring with an em dash — for a contributor.
+        \"\"\"
+        struct Cap end
+
+        const CATALOGUE = [Section("Core abstractions",
+                                   [Group("Priors", [Cap(:EmpiricalPrior)],
+                                          Prose("A prior carries an em dash — here."))])]
+        """
+        mktempdir() do dir
+            path = joinpath(dir, "capability_catalogue.jl")
+            write(path, text)
+            lines = P.prose(path)
+            joined = join(lines, "\n")
+            @test "Core abstractions" in lines
+            @test occursin("A prior carries an em dash", joined)
+            @test !occursin("for a contributor", joined)
+            # A `Symbol` name is not a string, so no `Cap` name reaches the counters.
+            @test !occursin("EmpiricalPrior", joined)
+            @test P.counts(path; glossary = glossary)["emdash"] == 1
+        end
+    end
+
+    @testset "the corpus is the four the rule names" begin
+        ps = P.pages(; root = root)
+        @test "examples/00_Examples.jl" in ps
+        @test "user_guide/00_User_Guide.jl" in ps
+        @test joinpath("docs", "src", "migration.md") in ps
+        @test joinpath("docs", "src", "public_api", "13_Fees.md") in ps
+        @test "README.md" in ps
+        @test joinpath("docs", "capability_catalogue.jl") in ps
+        # A contributor text is outside the rule, and so is a page the docs build writes.
+        @test !any(p -> occursin(joinpath("docs", "src", "contribute"), p), ps)
+        @test !any(p -> occursin(joinpath("docs", "src", "examples"), p), ps)
+        @test !any(p -> occursin(joinpath("docs", "src", "user_guide"), p), ps)
+        @test !any(p -> endswith(p, "capability_catalogue.md"), ps)
+        @test !any(p -> endswith(p, "TypeHierarchy.md"), ps)
+        @test allunique(ps)
     end
 
     @testset "the characters of rule 13 and rule 19" begin
@@ -165,7 +303,7 @@ end
 
     @testset "the ratchet binds, and a row prints itself" begin
         #=
-        The gate below reds only on a page that rose, so a green suite says nothing about the
+        The gate below reds only on a text that rose, so a green suite says nothing about the
         comparison itself. These four cases drive it on rows written by hand.
         =#
         row = Dict{String, Int}(c => 0 for c in P.COLUMNS)
@@ -173,7 +311,7 @@ end
         row["verdict"] = 1
         row[P.WORDS] = 900
 
-        # An absent column is a ceiling of zero, so a page with no row at all must be clean.
+        # An absent column is a ceiling of zero, so a text with no row at all must be clean.
         @test P.rises(row, Dict{String, Int}()) ==
               ["emdash" => (0 => 4), "verdict" => (0 => 1)]
         # A count at its ceiling is not a rise, and a count under it is not either.
@@ -186,11 +324,11 @@ end
         @test P.rises(big, Dict("emdash" => 4, "verdict" => 1, "words" => 900)) ==
               Pair{String, Pair{Int, Int}}[]
 
-        # The row a failing page prints holds its counts above zero, and `words` last.
+        # The row a failing text prints holds its counts above zero, and `words` last.
         @test P.row_text("examples/x.jl", row) ==
               "\"examples/x.jl\" = { emdash = 4, verdict = 1, words = 900 }"
-        # A page whose every counted rule is at zero has an empty binding, which is what tells the
-        # gate to ask for its row to be deleted.
+        # A text whose every counted rule is at zero has an empty binding, which is what tells
+        # the gate to ask for its row to be deleted.
         clean = Dict{String, Int}(c => 0 for c in P.COLUMNS)
         clean[P.WORDS] = 500
         @test isempty(P.binding(clean))
@@ -198,39 +336,41 @@ end
     end
 
     #=
-    The gate. Every page of the corpus is measured, and each count is held to its row. A count may
-    fall and may not rise. A page whose every counted rule is at zero carries no row, so the
-    baseline empties as the rewrites land, and a row that names no page is a rename left behind.
+    The gate. Every text of the four corpora is measured, and each count is held to its row. A
+    count may fall and may not rise. A text whose every counted rule is at zero carries no row, so
+    the baseline empties as the rewrites land, and a row that names no text is a rename left
+    behind.
     =#
-    @testset "every page is at or below its row" begin
+    @testset "every text is at or below its row" begin
         recorded = P.read_baseline(; root = root)
         measured = P.measure(; root = root)
 
         @test !isempty(measured)
 
         risen = String[]
-        for page in sort!(collect(keys(measured)))
-            row = measured[page]
-            ceiling = get(recorded, page, Dict{String, Int}())
+        for text in sort!(collect(keys(measured)))
+            row = measured[text]
+            ceiling = get(recorded, text, Dict{String, Int}())
             rs = P.rises(row, ceiling)
             isempty(rs) && continue
-            push!(risen, page)
+            push!(risen, text)
             for (column, (old, now)) in rs
-                println("  $page: $column rose to $now, over a ceiling of $old.")
+                println("  $text: $column rose to $now, over a ceiling of $old.")
             end
             println("  Paste this row into code_health/", P.NAME, ":")
-            println("    ", P.row_text(page, row))
+            println("    ", P.row_text(text, row))
         end
         if !isempty(risen)
             println("A counted rule of .github/instructions/julia-prose.instructions.md ",
-                    "rose on $(length(risen)) page(s). A count may fall and may not rise. Rewrite ",
-                    "the prose, or paste the printed row when a count fell elsewhere on the page.")
+                    "rose on $(length(risen)) text(s). A count may fall and may not rise. ",
+                    "Rewrite the prose, or paste the printed row when a count fell elsewhere in ",
+                    "the text.")
         end
         @test risen == String[]
 
         dead = sort!([p for p in keys(recorded) if !haskey(measured, p)])
         if !isempty(dead)
-            println("Rows in code_health/", P.NAME, " that name no page. Delete them:")
+            println("Rows in code_health/", P.NAME, " that name no text. Delete them:")
             for p in dead
                 println("    ", p)
             end
@@ -241,7 +381,7 @@ end
                        for p in keys(recorded)
                        if haskey(measured, p) && isempty(P.binding(measured[p]))])
         if !isempty(spent)
-            println("Pages whose every counted rule is now zero. Delete their rows from ",
+            println("Texts whose every counted rule is now zero. Delete their rows from ",
                     "code_health/", P.NAME,
                     ", so the baseline empties as the rewrites land:")
             for p in spent
