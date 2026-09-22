@@ -387,7 +387,7 @@ Meta-optimisers (`NestedClustered`, `Stacking`, `SubsetResampling`) build asset 
   - [`optimise(::Pipeline)`](@ref)
 """
 function port_opt_view(::Pipeline, args...; kwargs...)
-    return throw(ArgumentError("a Pipeline cannot be sub-selected with port_opt_view: its asset universe is fitted state, so wrapping a Pipeline inside a meta-optimiser is unsupported (ADR 0028). A meta-optimiser may be used as the optimisation step of a Pipeline instead."))
+    return throw(ArgumentError("a Pipeline cannot be sub-selected with port_opt_view: its asset universe is fitted state, so wrapping a Pipeline inside a meta-optimiser is unsupported. A meta-optimiser may be used as the optimisation step of a Pipeline instead."))
 end
 """
 $(DocStringExtensions.TYPEDEF)

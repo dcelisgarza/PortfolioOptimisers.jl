@@ -17,8 +17,7 @@
 
     ------------------------------------------------------------- what is scanned
 
-    Four corpora, each read as TEXT so the census loads no package and costs well under a
-    second:
+    Four corpora are read as TEXT, so the census loads no package:
 
       - `src/**/*.jl` and `ext/**/*.jl`: every line inside a triple-quoted block. The
         toggle is the one `test_26_docs.jl` uses for section order, so a plain
@@ -35,10 +34,20 @@
         zero and every line of a `#= ... =#` block, minus a line that carries the `#src`
         trailer, which Literate drops from every output.
 
-    The error text of a `throw` is NOT in scope. The rule's own title and scope name
-    docstrings and pages; an error message reaches the user through the REPL and not
-    through a page, and five of them on `main` cite an ADR by number. Whether that text
-    joins the scope is the maintainer's call, and this census takes the rule as written.
+    A fifth corpus is the error text of `src/` and `ext/`. An error message reaches the user
+    through the REPL, so it is as user-facing as a page, and the rule names it in its scope.
+    The docstring toggle cannot read it: an error literal sits indented inside its `throw`,
+    and a column does not tell it from any other string. So this corpus is read by
+    `Meta.parseall`, which loads no package either. It is every string literal, and every
+    literal part of an interpolated string, inside one of:
+
+      - a call to `throw`, `error` or `rethrow`, or to a name that ends in `Error` or
+        `Exception`, such as `ArgumentError(…)` and `DomainError(…)`;
+      - an `@argcheck` or an `@assert`, whose message is the error text;
+      - the value of a `const` whose name ends in `_remedy` or `_message`, which is a
+        remedy that more than one error interpolates.
+
+    A message that is built in a local variable and thrown later is not read.
 
     ------------------------------------------------------------- what is a citation
 
@@ -95,6 +104,49 @@
         return acc
     end
 
+    # The error text of a source file: every string literal inside a call that raises, an
+    # `@argcheck` or an `@assert`, or the value of a `const` named `*_remedy` or
+    # `*_message`. A hit names the line of the statement that holds the literal.
+    function callee(ex)
+        f = ex.args[1]
+        f isa Symbol && return f
+        (Meta.isexpr(f, :.) && f.args[end] isa QuoteNode) && return f.args[end].value
+        return nothing
+    end
+    function raises(ex)
+        if Meta.isexpr(ex, :call)
+            f = callee(ex)
+            f isa Symbol || return false
+            return f in (:throw, :error, :rethrow) ||
+                   endswith(string(f), "Error") ||
+                   endswith(string(f), "Exception")
+        elseif Meta.isexpr(ex, :macrocall)
+            return ex.args[1] in (Symbol("@argcheck"), Symbol("@assert"))
+        elseif Meta.isexpr(ex, :const) && Meta.isexpr(ex.args[1], :(=))
+            name = ex.args[1].args[1]
+            return name isa Symbol && occursin(r"_(remedy|message)$", string(name))
+        end
+        return false
+    end
+    function error_text_hits(file)
+        acc, line = String[], Ref(0)
+        function walk(ex, inerr)
+            if ex isa LineNumberNode
+                line[] = ex.line
+            elseif ex isa String
+                m = match(CITATION, ex)
+                (inerr && !isnothing(m)) &&
+                    push!(acc, "$(relpath(file, ROOT)):$(line[]): $(m.match)")
+            elseif ex isa Expr
+                inerr = inerr || raises(ex)
+                foreach(a -> walk(a, inerr), ex.args)
+            end
+            return nothing
+        end
+        walk(Meta.parseall(read(file, String); filename = file), false)
+        return acc
+    end
+
     # A whole file, line by line, minus a `#` comment line, which never renders.
     function page_hits(file; comments = true)
         acc = String[]
@@ -131,6 +183,24 @@
             append!(offenders, docstring_hits(f))
         end
         @test offenders == String[]
+    end
+
+    @testset "src and ext error text" begin
+        offenders = String[]
+        for dir in ("src", "ext"), f in files_under(joinpath(ROOT, dir), ".jl")
+            append!(offenders, error_text_hits(f))
+        end
+        @test offenders == String[]
+        # The scan reads what it claims: a `throw`, an `@argcheck`, an interpolated literal
+        # and a remedy `const` each yield a hit, and a string outside them yields none.
+        probe = joinpath(mktempdir(), "probe.jl")
+        write(probe, """
+                     const x_remedy = "see ADR 0001"
+                     f(a) = a > 0 || throw(ArgumentError("a \$(a) breaks ADR 0002"))
+                     g(a) = @argcheck(a > 0, DomainError(a, "see #1234"))
+                     h() = println("ADR 0003")
+                     """)
+        @test length(error_text_hits(probe)) == 3
     end
 
     @testset "hand-written docs pages" begin

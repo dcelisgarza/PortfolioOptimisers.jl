@@ -420,7 +420,7 @@ struct StringDistanceConfig
     min_score::Float64
     function StringDistanceConfig(dist::StringDistances.StringDistance, min_score::Real)
         @argcheck(min_score > 0,
-                  ArgumentError("min_score must be positive; got $(min_score). A value above 1 legitimately disables suggestions, but a zero or negative threshold admits every candidate with any nonzero similarity, making `did_you_mean` echo a real asset name for near-miss probes and defeating the info-leak-safe boundary (ADR 0026)."))
+                  ArgumentError("min_score must be positive; got $(min_score). A value above 1 legitimately disables suggestions, but a zero or negative threshold admits every candidate with any nonzero similarity, making `did_you_mean` echo a real asset name for near-miss probes. A suggestion must never reveal which asset names exist to a caller who guesses."))
         return new(dist, min_score)
     end
 end

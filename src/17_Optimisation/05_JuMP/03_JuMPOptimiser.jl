@@ -1601,7 +1601,7 @@ Internal machinery — not part of the user-facing API.
 function pipe_route(cfg::JuMPOptimiser, ::Val{:mu_ucs}, v)
     @argcheck(isa(cfg.ret, ArithmeticReturn),
               ArgumentError(if isa(cfg.ret, VecJRE)
-                                "cannot route a mean uncertainty set into $(length(cfg.ret)) return terms: a set is a neighbourhood of the one quantity it was calibrated on (ADR 0050), so it cannot be broadcast across terms. Name the set in the `ucs` field of the term it belongs to."
+                                "cannot route a mean uncertainty set into $(length(cfg.ret)) return terms: a set is a neighbourhood of the one quantity it was calibrated on, so it cannot be broadcast across terms. Name the set in the `ucs` field of the term it belongs to."
                             else
                                 "cannot route a mean uncertainty set into a $(Base.typename(typeof(cfg.ret)).wrapper); expected returns uncertainty requires an ArithmeticReturn return estimator"
                             end))

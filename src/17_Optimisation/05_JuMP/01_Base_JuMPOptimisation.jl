@@ -406,7 +406,7 @@ function add_custom_objective_term!(::JuMP.Model, ::Any, cobj::CustomJuMPObjecti
 
                                    PortfolioOptimisers.add_custom_objective_term!(model::JuMP.Model, obj, cobj::$(nameof(typeof(cobj))), optimiser, attrs)
 
-                               and contribute the term with `add_to_objective_penalty!(model, expr)`. A reward is a negative contribution; the optimisation sense is applied for you. See ADR 0036."""))
+                               and contribute the term with `add_to_objective_penalty!(model, expr)`. A reward is a negative contribution; the optimisation sense is applied for you."""))
 end
 """
     add_custom_objective_term!(model::JuMP.Model, obj, cobjs::VecJuMPObj, optimiser, attrs)
@@ -462,7 +462,7 @@ function add_custom_constraint!(::JuMP.Model, ccnt::CustomJuMPConstraint, ::Any,
 
                                    PortfolioOptimisers.add_custom_constraint!(model::JuMP.Model, ccnt::$(nameof(typeof(ccnt))), optimiser, attrs)
 
-                               Scale the constraint by `get_constraint_scale(model)` and multiply any constant bound by `get_k(model)`. See ADR 0008."""))
+                               Scale the constraint by `get_constraint_scale(model)` and multiply any constant bound by `get_k(model)`, the homogenisation variable, so that the bound holds against the unrescaled weights under a ratio objective."""))
 end
 """
     add_custom_constraint!(model::JuMP.Model, ccnts::VecJuMPConstr, optimiser, attrs)

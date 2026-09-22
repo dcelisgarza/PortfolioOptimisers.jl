@@ -447,7 +447,7 @@ Two, and they are the two ways a caller can ask for loadings that were never com
   - [`assert_prior_regression`](@ref)
   - [`constraint_space_basis`](@ref)
 """
-const prior_regression_remedy = "No regression was ever computed: wrapping estimators forward `rr` and the factor block `fpr` (ADR 0046), so nesting order does not matter, but nothing in the chain produces loadings (e.g. `EntropyPoolingPrior(; pe = EmpiricalPrior())`). Put an estimator that produces them at the bottom, such as `FactorPrior`."
+const prior_regression_remedy = "No regression was ever computed: wrapping estimators forward `rr` and the factor block `fpr` from the prior they wrap, so nesting order does not matter, but nothing in the chain produces loadings (e.g. `EntropyPoolingPrior(; pe = EmpiricalPrior())`). Put an estimator that produces them at the bottom, such as `FactorPrior`."
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
