@@ -71,7 +71,9 @@ it inline, so the reset and the first fold cannot drift apart.
 `fold_active` folds the active assets alone: it slices the carried statistic, the memory and the
 relative to them, calls the recursion once, and writes the answer back. The active assets are the
 row's Coverage Universe, so the kernel pattern's regression pools the live assets and no dead one
-reaches an `lu`. A row on which no asset is active folds nothing.
+reaches an `lu`. A row on which no asset is active folds nothing, and it resets every asset,
+because every asset is inactive: a state that meets such a row carries the cold seed alone
+afterwards, however warm it was.
 
 The reduction lives in the caller rather than in each statistic, so `fold_statistic` keeps its
 three-argument and four-argument shapes and a statistic added later is mask-aware for free.

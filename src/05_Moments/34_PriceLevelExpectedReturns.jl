@@ -879,7 +879,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 One row of a folding statistic's recursion over the active assets alone, written back into the carried statistic.
 
-`stat` already carries the cold seed at every asset the mask turns off, so an inactive asset keeps that seed and re-enters the recursion cold when it relists. The active assets are the row's Coverage Universe, and the recursion reads them alone: a statistic that couples the assets — the kernel trend pattern's regression — therefore pools the live assets and needs no mask of its own. A row on which no asset is active folds nothing.
+`stat` already carries the cold seed at every asset the mask turns off, so an inactive asset keeps that seed and re-enters the recursion cold when it relists. The active assets are the row's Coverage Universe, and the recursion reads them alone: a statistic that couples the assets — the kernel trend pattern's regression — therefore pools the live assets and needs no mask of its own. A row on which no asset is active folds nothing, and the answer is the cold seed at every asset, because the caller has already written it at every inactive one.
 
 # Arguments
 
@@ -1083,7 +1083,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 The Asset Panel method of the expected return of a price-level statistic.
 
-A **folding** statistic is mask-aware, so it overrides the reduce-and-expand root of the verb and reads the panel's active mask itself. The answer therefore lives on the whole universe rather than on the Coverage Universe: an asset that lists inside the window is answered from the levels it has, and it is `NaN` only while it has folded none. A **windowed** statistic takes the root: it is fitted on the Coverage Universe of the window and expanded with `NaN` outside it.
+A **folding** statistic is mask-aware, so it overrides the reduce-and-expand root of the verb and reads the panel's active mask itself. The answer therefore lives on the whole universe rather than on the Coverage Universe: an asset that lists inside the window is answered from the levels it has, and it is `NaN` only while it has folded none. A **windowed** statistic takes the root: it is fitted on the Coverage Universe of the window and expanded with `NaN` outside it. A composite statistic is windowed even where it holds a folding member, so it answers `NaN` at an asset with a gap anywhere in its window while the bare member re-admits that asset one row after the gap.
 
 # Arguments
 
@@ -1110,7 +1110,14 @@ function Statistics.mean(me::PriceLevelExpectedReturns, X::MatNum,
         return expand_moment(Statistics.mean(me, Xc; dims = dims, kwargs...), cmsk, dims)
     end
     amsk, _ = panel_moment_masks(pnl)
-    return Statistics.mean(me, X; dims = dims, active_mask = amsk, kwargs...)
+    # A panel's masks are `observations × assets` whatever `dims` says, and the mask-aware
+    # verb reads a mask shaped as `X` is, so a transposed sample takes a transposed mask.
+    return Statistics.mean(me, X; dims = dims,
+                           active_mask = if isnothing(amsk) || isone(dims)
+                               amsk
+                           else
+                               permutedims(amsk)
+                           end, kwargs...)
 end
 """
     Statistics.mean(me::PriceLevelExpectedReturns; kwargs...)

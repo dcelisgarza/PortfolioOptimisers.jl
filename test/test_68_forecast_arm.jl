@@ -190,6 +190,29 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         @test isequal(vec(mean(ktp, Rg, pnlg)), vec(mean(kg)))
         # The count pays the state's interface beside the statistic and the memory.
         @test po.port_opt_view(gf.cache, [2]).nu == [3] && copy(gf.cache).nu == gf.cache.nu
+        # A row on which no asset is active resets every asset, however warm the state was:
+        # the recursion runs on nothing and the cold seed is what is left.
+        warm = po.partial_fit!(emag, Rg[4:6, :]; active_mask = trues(3, 2))
+        @test all(>(0), warm.cache.nu)
+        wiped = po.partial_fit!(warm, Rg[4, :]; active_mask = falses(2))
+        @test wiped.cache.nu == [0, 0] &&
+              wiped.cache.stat == po.cold_statistic(emag.alg, ones(2))
+        @test all(isnan, vec(mean(wiped)))
+        # A panel carries its masks as `observations × assets` whatever `dims` says, so the
+        # mask-aware arm reads the same answer from a transposed sample.
+        @test isequal(vec(mean(emag, permutedims(Rg), pnlg; dims = 2)),
+                      vec(mean(emag, Rg, pnlg; dims = 1)))
+        @test isequal(vec(mean(ktp, permutedims(Rg), pnlg; dims = 2)),
+                      vec(mean(ktp, Rg, pnlg; dims = 1)))
+        @test isequal(vec(mean(maw, permutedims(Rg), pnlg; dims = 2)),
+                      vec(mean(maw, Rg, pnlg; dims = 1)))
+        # A composite is windowed even where it holds a folding member, so it keeps the
+        # Coverage-Universe reading and holds the relisted asset the bare member re-admits.
+        cmp = PriceLevelExpectedReturns(;
+                                        alg = TrendSwitch(;
+                                                          rising = ExponentialMovingAverage()))
+        @test !po.folds(cmp.alg)
+        @test isnan(vec(mean(cmp, Rg, pnlg))[2]) && isfinite(vec(mean(gf))[2])
     end
 
     @testset "The composite statistics of the later papers" begin
