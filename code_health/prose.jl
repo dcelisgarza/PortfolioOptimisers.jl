@@ -450,9 +450,10 @@ function pages(; root::AbstractString = REPO_ROOT)
             if !(endswith(f, ".md"))
                 continue
             end
-            # The skip list is read off the path relative to `docs/src`, so a directory and a file
-            # are told apart by their place in it. `walkdir` walks what it read, so a filter on the
-            # directory list it hands back does not prune the walk.
+            # One skip list names two directories and two files, and reading it off the path
+            # relative to `docs/src` covers both in one test. A `filter!` on the directory list
+            # `walkdir` hands back would prune the walk, as `test_71` does it, but it reaches the
+            # directories alone.
             parts = splitpath(relpath(joinpath(dir, f), docs))
             if any(part -> part in DOCS_SKIP, parts)
                 continue
