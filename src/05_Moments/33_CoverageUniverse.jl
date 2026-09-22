@@ -992,7 +992,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 function coverage_panel_moment(f::F, est, ::CoveragePolicy, X::MatNum,
                                pnl::Option{<:AssetPanel}, ::E; dims::Int = 1,
                                kwargs...) where {F, E}
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return f(est, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """

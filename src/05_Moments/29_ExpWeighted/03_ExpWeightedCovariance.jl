@@ -501,7 +501,7 @@ This estimator is mask-aware, so it overrides the reduce-and-expand root of the 
 """
 function Statistics.cov(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.cov(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
@@ -536,7 +536,7 @@ This is the covariance of the same call, rescaled to a unit diagonal, and it rea
 """
 function Statistics.cor(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.cor(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
@@ -571,7 +571,7 @@ This is the diagonal of the covariance of the same call, and it reads the panel'
 """
 function Statistics.var(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.var(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
@@ -606,7 +606,7 @@ This is the square root of the diagonal of the covariance of the same call, and 
 """
 function Statistics.std(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.std(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
@@ -643,7 +643,7 @@ This is the diagonal of the covariance of the same call, read after each observa
 """
 function variance_series(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
                          dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return variance_series(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """

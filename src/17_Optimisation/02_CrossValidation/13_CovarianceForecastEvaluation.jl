@@ -338,7 +338,7 @@ end
 function forecast_location(ce::Union{<:ExpWeightedCovariance,
                                      <:RegimeAdjustedExpWeightedCovariance}, X::MatNum,
                            pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return forecast_location(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 function forecast_location(ce::Covariance)

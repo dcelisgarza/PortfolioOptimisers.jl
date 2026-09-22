@@ -461,7 +461,7 @@ This estimator is mask-aware, so it overrides the reduce-and-expand root of the 
 """
 function Statistics.var(ce::ExpWeightedVariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.var(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
@@ -496,7 +496,7 @@ This is the square root of the variance of the same call, and it reads the panel
 """
 function Statistics.std(ce::ExpWeightedVariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.std(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
@@ -533,7 +533,7 @@ This is the variance of the same call, read after each observation, and it reads
 """
 function variance_series(ce::ExpWeightedVariance, X::MatNum, pnl::Option{<:AssetPanel};
                          dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return variance_series(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """

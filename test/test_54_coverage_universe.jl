@@ -464,6 +464,24 @@ end
                                      active_mask = permutedims(pnl_full.amsk)),
                   permutedims(PO.variance_series(ewv, X0, pnl_full)))
 
+    # The panel arm turns the mask where the caller turns the sample, so the same panel
+    # names the same statistic through the transposed orientation. An arm that handed the
+    # panel's mask through unturned met a `T × N` mask with an `N × T` sample and threw a
+    # `DimensionMismatch` at `dims = 2` alone, for every verb of every member (issue #1249).
+    Xt = permutedims(Xhol)
+    for pnl in (pnl_full, pnl_inactive),
+        (ce, verbs) in
+        ((rac, (Statistics.cov, Statistics.cor, Statistics.var, Statistics.std)),
+         (ewv, (Statistics.var, Statistics.std)),
+         (ewc, (Statistics.cov, Statistics.cor, Statistics.var, Statistics.std)))
+
+        for verb in verbs
+            @test isequal(vec(verb(ce, Xt, pnl; dims = 2)), vec(verb(ce, Xhol, pnl)))
+        end
+        @test isequal(PO.variance_series(ce, Xt, pnl; dims = 2),
+                      permutedims(PO.variance_series(ce, Xhol, pnl)))
+    end
+
     # No panel, and a static panel, both take the estimator's unmasked path.
     @test isequal(PO.variance_series(ewv, X0, nothing), PO.variance_series(ewv, X0))
     @test isequal(Statistics.var(ewc, X0, nothing), Statistics.var(ewc, X0))

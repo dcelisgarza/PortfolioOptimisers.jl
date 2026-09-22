@@ -171,6 +171,18 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test cb == co
         @test cb[3] ≈ mean(Xg[31:60, 3])
         @test cb[1] ≈ mean(Xg[1:60, 1])
+        # The panel arm of the location turns the mask where the caller turns the sample.
+        # A mask-aware estimator reads a mask shaped as its sample is, so an arm that
+        # handed the panel's mask through unturned threw at `dims = 2` alone (issue #1249).
+        # The panel spans the whole sample, so the window here is the whole sample too.
+        Xgt = permutedims(Xg)
+        for ce in (Covariance(; cvg = CoveragePolicy()),
+                   ExpWeightedCovariance(; decay = 0.94, min_obs = 4),
+                   RegimeAdjustedExpWeightedCovariance(; decay = 0.94, min_obs = 4,
+                                                       regime_min_obs = 2))
+            @test isequal(vec(po.forecast_location(ce, Xgt, rdg.pnl; dims = 2)),
+                          vec(po.forecast_location(ce, Xg, rdg.pnl)))
+        end
         # The fallback for an estimator with no location of its own is the finite column
         # mean of the window.
         @test po.forecast_location(NoLocationCovariance(), Xg[1:60, :])[3] ≈

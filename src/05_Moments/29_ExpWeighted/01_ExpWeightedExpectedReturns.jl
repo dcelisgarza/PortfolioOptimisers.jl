@@ -386,7 +386,7 @@ This estimator is mask-aware, so it overrides the reduce-and-expand root of the 
 """
 function Statistics.mean(me::ExpWeightedExpectedReturns, X::MatNum,
                          pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.mean(me, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """

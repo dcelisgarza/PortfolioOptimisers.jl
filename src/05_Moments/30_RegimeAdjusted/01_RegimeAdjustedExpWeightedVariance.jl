@@ -1646,19 +1646,19 @@ The panel travels as the third positional argument, and this method unpacks it o
 """
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    amsk, emsk = panel_moment_masks(pnl)
+    amsk, emsk = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.var(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
                           kwargs...)
 end
 function Statistics.std(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    amsk, emsk = panel_moment_masks(pnl)
+    amsk, emsk = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.std(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
                           kwargs...)
 end
 function variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
                          pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    amsk, emsk = panel_moment_masks(pnl)
+    amsk, emsk = dims_oriented(dims, panel_moment_masks(pnl)...)
     return variance_series(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
                            kwargs...)
 end

@@ -1109,15 +1109,10 @@ function Statistics.mean(me::PriceLevelExpectedReturns, X::MatNum,
         cmsk, Xc = coverage_reduction(X, pnl; dims = dims)
         return expand_moment(Statistics.mean(me, Xc; dims = dims, kwargs...), cmsk, dims)
     end
-    amsk, _ = panel_moment_masks(pnl)
     # A panel's masks are `observations × assets` whatever `dims` says, and the mask-aware
     # verb reads a mask shaped as `X` is, so a transposed sample takes a transposed mask.
-    return Statistics.mean(me, X; dims = dims,
-                           active_mask = if isnothing(amsk) || isone(dims)
-                               amsk
-                           else
-                               permutedims(amsk)
-                           end, kwargs...)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
+    return Statistics.mean(me, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
     Statistics.mean(me::PriceLevelExpectedReturns; kwargs...)
