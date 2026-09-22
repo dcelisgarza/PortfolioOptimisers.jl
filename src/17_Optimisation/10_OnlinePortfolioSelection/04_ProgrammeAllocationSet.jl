@@ -848,7 +848,7 @@ end
     project(proj::TsallisProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
     project(proj::LogBarrierProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
 
-The barrier arms of the Constrained Update on the bounded set: the scalar root of [`barrier_projection`](@ref) in the geometry's mirror image, on every bound, the simplex included, because neither potential has a closed form there.
+The barrier arms of the Constrained Update on the bounded set: the scalar root of [`barrier_projection`](@ref) in the geometry's mirror image, on every bound, the simplex included, because neither potential has a closed form there. A root whose allocation misses the budget in floating point is the Held Step ([`budget_or_held_step`](@ref)): under the log barrier a raw entry of `1e-20` has the base `1e20`, and the multiplier that brings it to a share of the budget cancels against that base.
 
 # Validation
 
@@ -863,15 +863,16 @@ The barrier arms of the Constrained Update on the bounded set: the scalar root o
   - [`LogBarrierProjection`](@ref)
 """
 function project(proj::TsallisProjection, set::BoundedAllocationSet, q::AbstractVector,
-                 ::AbstractVector)
+                 w::AbstractVector)
     assert_barrier_raw_step(q, set.wb)
     a = proj.alpha
-    return barrier_projection(q .^ (a - 1), m -> m^inv(a - 1), set.wb)
+    return budget_or_held_step(barrier_projection(q .^ (a - 1), m -> m^inv(a - 1), set.wb),
+                               w, proj, set)
 end
-function project(::LogBarrierProjection, set::BoundedAllocationSet, q::AbstractVector,
-                 ::AbstractVector)
+function project(proj::LogBarrierProjection, set::BoundedAllocationSet, q::AbstractVector,
+                 w::AbstractVector)
     assert_barrier_raw_step(q, set.wb)
-    return barrier_projection(inv.(q), inv, set.wb)
+    return budget_or_held_step(barrier_projection(inv.(q), inv, set.wb), w, proj, set)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

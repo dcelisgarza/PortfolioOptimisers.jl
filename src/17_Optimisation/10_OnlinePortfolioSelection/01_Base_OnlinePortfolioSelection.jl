@@ -56,7 +56,7 @@ In order to implement a new geometry, subtype `AbstractProjectionGeometry` and i
   - `proj`: The geometry.
   - `set`: The Allocation Set, its bounds resolved to vectors.
   - `q`: The raw step of the rule, before the projection.
-  - `w`: The Price-Adjusted Allocation the step trades from, the reference a turnover ceiling on a [`ProgrammeAllocationSet`](@ref) reads and the allocation a Held Step answers; the bounded set does not read it.
+  - `w`: The Price-Adjusted Allocation the step trades from, the reference a turnover ceiling on a [`ProgrammeAllocationSet`](@ref) reads and the allocation a Held Step answers; the bounded set reads it only on a Held Step.
 
 ## Returns
 
@@ -209,7 +209,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The Allocation Set of weight bounds alone: `Σw = 1` and `lb ≤ w ≤ ub`, with no solver field, because every projection onto it is closed form.
 
-The default, `BoundedAllocationSet()`, is the simplex. Every projection onto the set is closed form: under the simplex bounds the sort of Duchi and co-authors in the Euclidean geometry and plain normalisation in the entropic one, and under any other bound a scalar root — `w = clip(q − θ, lb, ub)` for the `θ` that restores the budget, or `w = clip(q / Z, lb, ub)` for the `Z` that does — found by bisection. A negative lower bound is admitted under the Euclidean geometry and refused under the entropic one, whose `log w` is undefined below zero.
+The default, `BoundedAllocationSet()`, is the simplex. Every projection onto the set is closed form: under the simplex bounds the sort of Duchi and co-authors in the Euclidean geometry and plain normalisation in the entropic one, and under any other bound a scalar root — `w = clip(q − θ, lb, ub)` for the `θ` that restores the budget, or `w = clip(t q, lb, ub)` for the `t` that does — found exactly from the kinks of the budget. A negative lower bound is admitted under the Euclidean geometry and refused under the entropic one, whose `log w` is undefined below zero.
 
 # Fields
 
@@ -327,23 +327,24 @@ end
 
 Projects a rule's raw step onto the Allocation Set in the rule's Projection Geometry.
 
-The one dispatch of the Constrained Update. On the bounded set under the simplex bounds, the Euclidean arm is the sort of Duchi and co-authors ([`project_simplex`](@ref)) and the entropic arm is normalisation; under any other bound each arm is a scalar root, `clip(q − θ, lb, ub)` ([`bounded_quadratic_projection`](@ref) at unit weights) and `clip(q / Z, lb, ub)`, found by bisection through [`bounded_root`](@ref). The entropic arm refuses a raw step with a negative entry, a step with no positive entry at all, which no normalisation puts on the simplex, and a negative lower bound.
+The one dispatch of the Constrained Update. On the bounded set under the simplex bounds, the Euclidean arm is the sort of Duchi and co-authors ([`project_simplex`](@ref)) and the entropic arm is normalisation; under any other bound each arm is a scalar root, `clip(q − θ, lb, ub)` ([`bounded_quadratic_projection`](@ref) at unit weights) and `clip(t q, lb, ub)`, found exactly from the kinks of the budget through [`breakpoint_root`](@ref). A root whose allocation still misses the budget in floating point is the Held Step ([`budget_or_held_step`](@ref)). The entropic arm refuses a raw step with a negative entry, a step with no positive entry at all, which no normalisation puts on the simplex, a step whose zeros hold their floors while the caps of its positive entries do not reach the budget, and a negative lower bound.
 
 # Arguments
 
   - `proj`: The geometry.
   - `set`: The set, its bounds resolved.
   - `q`: The raw step.
-  - `w`: The Price-Adjusted Allocation the step trades from, unread by the bounded set.
+  - `w`: The Price-Adjusted Allocation the step trades from, the answer of a Held Step.
 
 # Validation
 
+  - `all(isfinite, q)`. A `DomainError` is thrown otherwise.
   - `Σ lb ≤ 1 ≤ Σ ub` over the resolved bounds. An `ArgumentError` is thrown otherwise.
-  - Under [`EntropicProjection`](@ref), `all(>= 0, q)`, `sum(q) > 0` and `all(>= 0, lb)`. A `DomainError` is thrown otherwise.
+  - Under [`EntropicProjection`](@ref), `all(>= 0, q)`, `sum(q) > 0`, `all(>= 0, lb)` and `Σ_{q_i > 0} ub_i + Σ_{q_i = 0} lb_i ≥ 1`. A `DomainError` is thrown otherwise.
 
 # Returns
 
-  - `w'::Vector`: The projected allocation, a new vector.
+  - `w'::Vector`: The projected allocation, a new vector, or `w` copied on a Held Step.
 
 # Related
 
@@ -351,16 +352,18 @@ The one dispatch of the Constrained Update. On the bounded set under the simplex
   - [`BoundedAllocationSet`](@ref)
   - [`project_simplex`](@ref)
 """
-function project(::EuclideanProjection, set::BoundedAllocationSet, q::AbstractVector,
-                 ::AbstractVector)
+function project(proj::EuclideanProjection, set::BoundedAllocationSet, q::AbstractVector,
+                 w::AbstractVector)
     wb = set.wb
     if simplex_bounds(wb)
+        assert_finite_raw_step(q)
         return project_simplex(q)
     end
-    return bounded_quadratic_projection(q, wb)
+    return budget_or_held_step(bounded_quadratic_projection(q, wb), w, proj, set)
 end
-function project(::EntropicProjection, set::BoundedAllocationSet, q::AbstractVector,
-                 ::AbstractVector)
+function project(proj::EntropicProjection, set::BoundedAllocationSet, q::AbstractVector,
+                 w::AbstractVector)
+    assert_finite_raw_step(q)
     @argcheck(all(x -> x >= zero(x), q),
               DomainError(q,
                           "the entropic projection is defined on non-negative raw steps alone: `log w` is undefined below zero"))
@@ -376,24 +379,69 @@ function project(::EntropicProjection, set::BoundedAllocationSet, q::AbstractVec
               DomainError(wb.lb,
                           "the entropic projection admits no negative lower bound: `log w` is undefined below zero"))
     assert_feasible_bounds(wb)
-    # `Σ clip(q / Z, lb, ub)` falls from `Σ ub` to `Σ lb` as `Z` grows, and the plain
-    # normalisation `Z = s` is where it would sit unclipped; the root is bracketed by
-    # widening from there.
-    f = z -> sum(clamp.(q ./ z, wb.lb, wb.ub))
-    lo = s
-    hi = s
-    while f(lo) < one(s)
-        lo /= 2
-    end
-    while f(hi) > one(s)
-        hi *= 2
-    end
-    return clamp.(q ./ bounded_root(f, lo, hi), wb.lb, wb.ub)
+    # A zero entry sits at its floor at every scale, so the positive entries must reach the
+    # budget at their caps.
+    @argcheck(sum(ifelse.(q .> zero(s), wb.ub, wb.lb)) >= one(s),
+              DomainError(q,
+                          "the zeros of the raw step stay at their floors under the entropic projection, and the caps of the remaining assets do not reach the budget"))
+    # `Σ clip(t q, lb, ub)` is piecewise linear and non-decreasing in the scale `t`, with its
+    # kinks at `lb / q` and `ub / q`; the root is taken in `-t`, where it is non-increasing.
+    t = -breakpoint_root(u -> sum(clamp.(-u .* q, wb.lb, wb.ub)),
+                         [-wb.lb ./ q; -wb.ub ./ q])
+    return budget_or_held_step(clamp.(t .* q, wb.lb, wb.ub), w, proj, set)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The projection of a raw step onto a bounded set in the norm of a positive diagonal `h`, ``\\min \\tfrac{1}{2} \\sum_i h_i (w_i - q_i)^2`` subject to the budget and the bounds: the scalar root ``w_i = \\mathrm{clip}(q_i - \\theta / h_i, lb_i, ub_i)`` at the ``\\theta`` that restores the budget, found by bisection through [`bounded_root`](@ref). At `h = 1`, the default, it is the Euclidean arm of [`project`](@ref) off the simplex bounds; with the gradient mass of [`AdaptiveSubgradient`](@ref) it is the [`DiagonalProjection`](@ref) on every bound.
+Refuses a raw step with a non-finite entry: no projection of an infinite or undefined step lies on the budget.
+
+# Related
+
+  - [`project`](@ref)
+  - [`bounded_quadratic_projection`](@ref)
+"""
+function assert_finite_raw_step(q::AbstractVector)::Nothing
+    @argcheck(all(isfinite, q),
+              DomainError(q,
+                          "the projection is defined on finite raw steps alone: an infinite or `NaN` entry has no projection onto the budget"))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The projected allocation `wn` when it meets the budget, or the Held Step otherwise: the record goes to the current [`ProjectionStep`](@ref) through [`record_held_step!`](@ref), and the answer is a copy of `w`, as a failed [`projection_programme`](@ref) answers.
+
+A scalar root is exact on every input its bracket can resolve in floating point, and a barrier geometry's root can lose its budget to cancellation where a base is far larger than the step it restores. That loss is caught here, and not returned as an allocation off the budget.
+
+# Arguments
+
+  - `wn`: The projected allocation.
+  - `w`: The Price-Adjusted Allocation the step trades from.
+  - `proj`: The geometry, named in the record.
+  - `set`: The set, named in the record.
+
+# Returns
+
+  - `w'::Vector`: `wn`, or `w` copied on a Held Step.
+
+# Related
+
+  - [`project`](@ref)
+  - [`HeldStep`](@ref)
+"""
+function budget_or_held_step(wn::AbstractVector, w::AbstractVector,
+                             proj::AbstractProjectionGeometry, set::AbstractAllocationSet)
+    if isapprox(sum(wn), one(eltype(wn)))
+        return wn
+    end
+    record_held_step!("the projection onto the `$(nameof(typeof(set)))` in the `$(nameof(typeof(proj)))` geometry did not meet the budget in floating point, its allocation sums to $(sum(wn)), and the step trades nothing",
+                      nothing)
+    return copy(w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The projection of a raw step onto a bounded set in the norm of a positive diagonal `h`, ``\\min \\tfrac{1}{2} \\sum_i h_i (w_i - q_i)^2`` subject to the budget and the bounds: the scalar root ``w_i = \\mathrm{clip}(q_i - \\theta / h_i, lb_i, ub_i)`` at the ``\\theta`` that restores the budget, found exactly from the kinks of the budget through [`breakpoint_root`](@ref). At `h = 1`, the default, it is the Euclidean arm of [`project`](@ref) off the simplex bounds; with the gradient mass of [`AdaptiveSubgradient`](@ref) it is the [`DiagonalProjection`](@ref) on every bound.
 
 # Arguments
 
@@ -403,6 +451,7 @@ The projection of a raw step onto a bounded set in the norm of a positive diagon
 
 # Validation
 
+  - `all(isfinite, q)`. A `DomainError` is thrown otherwise.
   - `Σ lb ≤ 1 ≤ Σ ub` over the resolved bounds. An `ArgumentError` is thrown otherwise.
 
 # Returns
@@ -412,26 +461,80 @@ The projection of a raw step onto a bounded set in the norm of a positive diagon
 # Related
 
   - [`project`](@ref)
-  - [`bounded_root`](@ref)
+  - [`breakpoint_root`](@ref)
   - [`EuclideanProjection`](@ref)
   - [`DiagonalProjection`](@ref)
 """
 function bounded_quadratic_projection(q::AbstractVector, wb::WeightBounds,
                                       h::AbstractVector = fill(one(eltype(q)), length(q)))
+    assert_finite_raw_step(q)
     assert_feasible_bounds(wb)
-    # `Σ clip(q − θ / h, lb, ub)` falls from `Σ ub` to `Σ lb` as `θ` runs from
-    # `min h (q − ub)` to `max h (q − lb)`, so the budget's root is bracketed there.
-    lo = minimum(h .* (q .- wb.ub))
-    hi = maximum(h .* (q .- wb.lb))
-    theta = bounded_root(t -> sum(clamp.(q .- t ./ h, wb.lb, wb.ub)), lo, hi)
+    # `Σ clip(q − θ / h, lb, ub)` is piecewise linear and non-increasing in `θ`, with its
+    # kinks at `h (q − ub)` and `h (q − lb)`.
+    theta = breakpoint_root(t -> sum(clamp.(q .- t ./ h, wb.lb, wb.ub)),
+                            [h .* (q .- wb.ub); h .* (q .- wb.lb)])
     return clamp.(q .- theta ./ h, wb.lb, wb.ub)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The root of a non-increasing budget function `f` on `[lo, hi]` where it crosses one, by bisection to the interval's floating-point resolution.
+The root of a non-increasing, piecewise linear budget function `f` where it crosses one, found exactly from its kinks `x`.
 
-The projections onto a bounded set are each a clip of the raw step at one scalar, and the budget is monotone in that scalar, so a bisection between a value where the budget is at least one and one where it is at most one finds the scalar to machine precision in some sixty steps.
+The Euclidean, diagonal and entropic projections onto a bounded set are each a clip of the raw step at one scalar, linear in that scalar between the kinks where an asset reaches a bound. A binary search over the sorted kinks finds the two that bracket the root, and the line through them is the root. The search reads the kinks and not a bracket's width, so a raw step whose entries span hundreds of binades is as exact as one near the simplex. A kink at an infinite bound is no kink, and the budget is linear past the last finite one, so a root there is the line through that kink and a second point on the same side.
+
+# Arguments
+
+  - `f`: The budget as a function of the scalar, non-increasing and linear between kinks.
+  - `x`: The kinks. The non-finite ones are dropped.
+
+# Returns
+
+  - `r`: The scalar at which `f` crosses one.
+
+# Related
+
+  - [`project`](@ref)
+  - [`bounded_quadratic_projection`](@ref)
+"""
+function breakpoint_root(f, x::AbstractVector)
+    x = sort!(filter(isfinite, x))
+    if isempty(x)
+        push!(x, zero(eltype(x)))
+    end
+    # The last kink at which the budget is still at least one, `0` and `n + 1` standing for
+    # the linear tails below the first kink and above the last.
+    lo, hi = 0, length(x) + 1
+    while hi - lo > 1
+        mid = (lo + hi) ÷ 2
+        f(x[mid]) >= one(eltype(x)) ? (lo = mid) : (hi = mid)
+    end
+    a, b = breakpoint_segment(x, lo, hi)
+    fa, fb = f(a), f(b)
+    return fa == fb ? a : a + (fa - one(fa)) * (b - a) / (fa - fb)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The segment of [`breakpoint_root`](@ref)'s budget that holds the root, from the kinks `x[lo]` and `x[hi]`. An index past either end is a linear tail, and a second point on it is taken one kink's magnitude, at least one, beyond the last kink.
+
+# Related
+
+  - [`breakpoint_root`](@ref)
+"""
+function breakpoint_segment(x::AbstractVector, lo::Integer, hi::Integer)
+    if lo == 0
+        return x[1] - max(one(x[1]), abs(x[1])), x[1]
+    elseif hi > length(x)
+        return x[end], x[end] + max(one(x[end]), abs(x[end]))
+    end
+    return x[lo], x[hi]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The root of a non-increasing budget function `f` on `[lo, hi]` where it crosses one, by bisection until the bracket collapses to adjacent floating-point values.
+
+A barrier geometry's projection onto a bounded set is a clip of the raw step at one scalar, and the budget is monotone in that scalar but not linear, so it is bisected. The cap on the halvings is [`bisection_cap`](@ref) of the bracket's type, the count in which a bracket spanning the type's whole range collapses, so no bracket stops short of its resolution.
 
 # Arguments
 
@@ -446,9 +549,11 @@ The projections onto a bounded set are each a clip of the raw step at one scalar
 
   - [`project`](@ref)
   - [`BoundedAllocationSet`](@ref)
+  - [`breakpoint_root`](@ref)
+  - [`bisection_cap`](@ref)
 """
 function bounded_root(f, lo, hi)
-    for _ in 1:200
+    for _ in 1:bisection_cap(typeof((lo + hi) / 2))
         mid = (lo + hi) / 2
         if mid == lo || mid == hi
             break
@@ -460,6 +565,24 @@ function bounded_root(f, lo, hi)
         end
     end
     return (lo + hi) / 2
+end
+"""
+    bisection_cap(::Type{T}) where {T <: AbstractFloat}
+    bisection_cap(::Type)
+
+The number of halvings in which a bisection bracket of type `T` collapses to adjacent values of `T`, from the widest bracket the type holds: its normal binades, `exponent(floatmax(T)) - exponent(floatmin(T))`, and twice its precision, which covers the significand and the subnormal binades below `floatmin(T)`. It is 2151 for `Float64`, 301 for `Float32` and 51 for `Float16`.
+
+The cap only guards [`bounded_root`](@ref): on a floating-point type the collapse check ends the loop first. Any other type takes the cap of `Float64`. The loop does not need a tight cap there: an AD dual and a quantity with units compare by their values, so the collapse check still ends the loop, and a `Rational` bracket never collapses, so no cap can be derived from it.
+
+# Related
+
+  - [`bounded_root`](@ref)
+"""
+function bisection_cap(::Type{T}) where {T <: AbstractFloat}
+    return exponent(floatmax(T)) - exponent(floatmin(T)) + 2 * precision(T)
+end
+function bisection_cap(::Type)
+    return bisection_cap(Float64)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

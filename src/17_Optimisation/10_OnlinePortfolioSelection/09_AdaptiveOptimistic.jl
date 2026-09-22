@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The diagonal Projection Geometry: the raw step is projected onto the Allocation Set in the norm of a positive diagonal matrix, ``\\min \\tfrac{1}{2} (\\boldsymbol{w} - \\boldsymbol{q})^\\intercal \\mathrm{diag}(\\boldsymbol{h}) (\\boldsymbol{w} - \\boldsymbol{q})``.
 
-It is the geometry of the diagonal adaptive subgradient method (Duchi, Hazan and Singer 2011), whose proximal term is ``\\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{w}_t \\rVert^2_{H_t}`` with ``H_t = \\delta I + \\mathrm{diag}(\\boldsymbol{s}_t)`` the accrued gradient mass. The weight vector is the rule's: [`AdaptiveSubgradient`](@ref) constructs the geometry from its carrier's ``\\boldsymbol{h}_t`` at every step, as [`NewtonStep`](@ref) binds its Gram matrix onto [`GramProjection`](@ref). [`EuclideanProjection`](@ref) is the case ``\\boldsymbol{h} = \\boldsymbol{1}``: on a [`BoundedAllocationSet`](@ref) the projection is the weighted scalar root ``w_i = \\mathrm{clip}(q_i - \\theta / h_i, lb_i, ub_i)`` with ``\\theta`` the budget's root, which shares its bisection with the Euclidean one ([`bounded_quadratic_projection`](@ref)) and costs what it costs; on a [`ProgrammeAllocationSet`](@ref) it is the weighted quadratic programme through a second-order cone, on the set's solver. The Start Allocation is projected before any gradient is seen, where no mass has accrued, so [`projection_geometry`](@ref) answers [`EuclideanProjection`](@ref) for it. A negative lower bound is admitted, as under the Euclidean geometry.
+It is the geometry of the diagonal adaptive subgradient method (Duchi, Hazan and Singer 2011), whose proximal term is ``\\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{w}_t \\rVert^2_{H_t}`` with ``H_t = \\delta I + \\mathrm{diag}(\\boldsymbol{s}_t)`` the accrued gradient mass. The weight vector is the rule's: [`AdaptiveSubgradient`](@ref) constructs the geometry from its carrier's ``\\boldsymbol{h}_t`` at every step, as [`NewtonStep`](@ref) binds its Gram matrix onto [`GramProjection`](@ref). [`EuclideanProjection`](@ref) is the case ``\\boldsymbol{h} = \\boldsymbol{1}``: on a [`BoundedAllocationSet`](@ref) the projection is the weighted scalar root ``w_i = \\mathrm{clip}(q_i - \\theta / h_i, lb_i, ub_i)`` with ``\\theta`` the budget's root, which shares its root with the Euclidean one ([`bounded_quadratic_projection`](@ref)) and costs what it costs; on a [`ProgrammeAllocationSet`](@ref) it is the weighted quadratic programme through a second-order cone, on the set's solver. The Start Allocation is projected before any gradient is seen, where no mass has accrued, so [`projection_geometry`](@ref) answers [`EuclideanProjection`](@ref) for it. A negative lower bound is admitted, as under the Euclidean geometry.
 
 # Fields
 
@@ -53,7 +53,7 @@ end
     project(proj::DiagonalProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
     project(proj::DiagonalProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
 
-The diagonal arms of the Constrained Update: the weighted scalar root of [`bounded_quadratic_projection`](@ref) on the bounded set, on every bound, the simplex included, because the weights break the sort; and the bare-model programme of [`projection_programme`](@ref) on the programme set.
+The diagonal arms of the Constrained Update: the weighted scalar root of [`bounded_quadratic_projection`](@ref) on the bounded set, on every bound, the simplex included, because the weights break the sort, with a root that misses the budget in floating point as the Held Step ([`budget_or_held_step`](@ref)); and the bare-model programme of [`projection_programme`](@ref) on the programme set.
 
 # Related
 
@@ -63,8 +63,9 @@ The diagonal arms of the Constrained Update: the weighted scalar root of [`bound
   - [`projection_programme`](@ref)
 """
 function project(proj::DiagonalProjection, set::BoundedAllocationSet, q::AbstractVector,
-                 ::AbstractVector)
-    return bounded_quadratic_projection(q, set.wb, proj.h)
+                 w::AbstractVector)
+    return budget_or_held_step(bounded_quadratic_projection(q, set.wb, proj.h), w, proj,
+                               set)
 end
 function project(proj::DiagonalProjection, set::ProgrammeAllocationSet, q::AbstractVector,
                  w::AbstractVector)

@@ -504,6 +504,82 @@ end
               [0.7, 0.2, 0.1, 0.0]
     end
 
+    @testset "The solver-free roots on raw steps across many binades (#1258)" begin
+        cset = resolve(BoundedAllocationSet(; wb = WeightBounds(; lb = 0, ub = 0.4)), 4)
+        book = fill(0.25, 4)
+        dproj = po.DiagonalProjection([1.0, 2, 3, 4])
+        # The kinks of the budget, not a bracket's width, fix the root, so a step whose
+        # entries span hundreds of binades is exact.
+        for e in (1e-55, 1e-60, 1e-62, 1e-70, 1e-300)
+            v = [1, e, e, e]
+            @test po.project(EntropicProjection(), cset, v, book) ≈ [0.4, 0.2, 0.2, 0.2]
+            @test po.project(EuclideanProjection(), cset, v, book) ≈ [0.4, 0.2, 0.2, 0.2]
+        end
+        @test po.project(EuclideanProjection(), cset, [1e300, -1e300, 0.3, 0.4], book) ≈
+              [0.4, 0.0, 0.25, 0.35]
+        @test po.project(dproj, cset, [1e300, -1e300, 0.3, 0.4], book) ≈
+              [0.4, 0.0, 0.3 - 0.4 / 7, 0.4 - 0.3 / 7]
+        # An infinite bound is no kink: the budget is linear past the last finite one.
+        free = resolve(BoundedAllocationSet(;
+                                            wb = WeightBounds(; lb = nothing, ub = nothing)),
+                       4)
+        v = [0.9, 0.05, 0.03, 0.5]
+        @test po.project(EuclideanProjection(), free, v, book) ≈ v .- (sum(v) - 1) / 4
+        @test po.project(EntropicProjection(),
+                         resolve(BoundedAllocationSet(;
+                                                      wb = WeightBounds(; lb = 0,
+                                                                        ub = nothing)), 4),
+                         v, book) ≈ v ./ sum(v)
+        @test po.project(EuclideanProjection(),
+                         resolve(BoundedAllocationSet(;
+                                                      wb = WeightBounds(; lb = -0.2,
+                                                                        ub = nothing)), 4),
+                         [0.9, 0.05, -1.0, 0.5], book) ≈
+              [0.9 - 0.25 / 3, 0.05 - 0.25 / 3, -0.2, 0.5 - 0.25 / 3]
+        # A zero stays at its floor under the entropic projection, so caps that cannot reach
+        # the budget are refused, as the barrier arms refuse them.
+        @test_throws DomainError po.project(EntropicProjection(), cset, [1.0, 0, 0, 0],
+                                            book)
+        @test_throws DomainError po.project(EntropicProjection(), cset, [1.0, 2, 0, 0],
+                                            book)
+        # A non-finite raw step has no projection.
+        @test_throws DomainError po.project(EntropicProjection(), cset, [Inf, 1, 1, 1],
+                                            book)
+        @test_throws DomainError po.project(EuclideanProjection(), cset,
+                                            [NaN, 0.3, 0.3, 0.4], book)
+        @test_throws DomainError po.project(EuclideanProjection(),
+                                            resolve(BoundedAllocationSet(), 4),
+                                            [NaN, 0.3, 0.3, 0.4], book)
+        @test_throws DomainError po.project(dproj, cset, [Inf, 0.3, 0.3, 0.4], book)
+        # A barrier base of `1e20` cancels the multiplier that brings it to a share of the
+        # budget: the root misses the budget, and the step is held, not returned off it.
+        for (proj, v) in ((LogBarrierProjection(), [1, 1e-20, 1e-20, 1e-20]),
+                          (LogBarrierProjection(), [1, 1e-70, 1e-70, 1e-70]),
+                          (TsallisProjection(; alpha = 0.5), [1, 1e-70, 1e-70, 1e-70]))
+            (wheld, held) = po.with_projection_step(() -> po.project(proj, cset, v, book),
+                                                    nothing, Date(2020, 1, 1))
+            @test wheld == book && !(wheld === book)
+            @test length(held) == 1
+            @test occursin("did not meet the budget", held[1].reason)
+            @test isnothing(held[1].trials)
+        end
+        @test (@test_logs (:warn, r"Held Step outside") po.project(LogBarrierProjection(),
+                                                                   cset,
+                                                                   [1, 1e-20, 1e-20, 1e-20],
+                                                                   book)) == book
+        # The root is exact on an ordinary step, and no step is held.
+        (wn, held) = po.with_projection_step(() -> po.project(LogBarrierProjection(), cset,
+                                                              [0.5, 0.3, 0.1, 0.1], book),
+                                             nothing, Date(2020, 1, 1))
+        @test isempty(held) && sum(wn) ≈ 1 && all(0 .<= wn .<= 0.4)
+        # The barrier bisection halves a bracket as often as its type has binades and bits.
+        @test po.bisection_cap(Float64) == 2151
+        @test po.bisection_cap(Float32) == 301
+        @test po.bisection_cap(Float16) == 51
+        @test po.bisection_cap(Rational{Int}) == 2151
+        @test po.bisection_cap(Int) == 2151
+    end
+
     @testset "The mixture's second projection (ADR 0163)" begin
         experts = [ConstantRebalancedPortfolio(; w = [1.0, 0.0]),
                    ConstantRebalancedPortfolio(; w = [0.0, 1.0])]

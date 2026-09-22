@@ -7,8 +7,13 @@ Description = "Online portfolio selection: the family, the geometry, the set and
 ```@docs
 PortfolioOptimisers.simplex_bounds
 PortfolioOptimisers.assert_feasible_bounds
+PortfolioOptimisers.assert_finite_raw_step
+PortfolioOptimisers.budget_or_held_step
 PortfolioOptimisers.bounded_quadratic_projection
+PortfolioOptimisers.breakpoint_root
+PortfolioOptimisers.breakpoint_segment
 PortfolioOptimisers.bounded_root
+PortfolioOptimisers.bisection_cap
 PortfolioOptimisers.project_simplex
 PortfolioOptimisers.gram_geometry
 PortfolioOptimisers.HeldStep
