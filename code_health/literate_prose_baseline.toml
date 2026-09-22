@@ -57,9 +57,6 @@ glossary_terms = 173
 "examples/5_validation_tuning/04_Time_Dependent_Constraints.jl" = { emdash = 47, bold_label = 2, mechanism = 8, words = 2278 }
 "examples/5_validation_tuning/05_Train_Test_Split.jl" = { emdash = 17, mechanism = 1, verdict = 7, words = 1269 }
 "examples/5_validation_tuning/06_Time_Dependent_Optimisers.jl" = { emdash = 45, endash = 2, bold_label = 2, mechanism = 2, verdict = 1, words = 1930 }
-"examples/5_validation_tuning/07_Calibrated_Risk_Measures.jl" = { glossary = 1, verdict = 3, words = 2402 }
-"examples/5_validation_tuning/08_Weight_Drift_and_Held_Weights.jl" = { emdash = 5, glossary = 6, verdict = 1, words = 1863 }
-"examples/5_validation_tuning/09_Online_Walk_Forward.jl" = { emdash = 25, bold_label = 8, glossary = 6, mechanism = 34, verdict = 18, words = 2666 }
 "examples/6_post_processing/01_Finite_Allocation.jl" = { emdash = 11, glossary = 1, verdict = 1, words = 456 }
 "examples/6_post_processing/02_Plotting_and_Reporting.jl" = { emdash = 9, bold_label = 1, words = 414 }
 "examples/6_post_processing/03_Performance_Attribution.jl" = { emdash = 12, endash = 1, notjust = 2, words = 804 }

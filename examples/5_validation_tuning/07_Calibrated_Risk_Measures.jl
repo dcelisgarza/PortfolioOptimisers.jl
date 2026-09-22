@@ -1,34 +1,36 @@
 #=
 ```@meta
-Description = "Calibrated risk measures in PortfolioOptimisers.jl: a rule that computes alpha from the sample in front of it instead of a fixed number."
+Description = "Calibrated risk measures in PortfolioOptimisers.jl: a rule that computes alpha from the sample it is given instead of a fixed number."
 ```
 
 # Calibrated risk measures: a rule in place of a number
 
-`alpha = 0.05` is a statement about the *probability* of the tail. It is not a statement about
-the number of observations the tail holds. Over one year of daily data the 5% tail holds about
-13 observations; over five years it holds about 63. The number a caller states once therefore
-means something different on every sample it meets, and a cross-validation over folds of
-unequal length meets a different sample on every fold.
+`alpha = 0.05` is a statement about the *probability* of the tail. It says nothing about the
+number of observations the tail holds. Over one year of daily data the 5% tail holds about 13
+observations, and over five years it holds about 63. A number you state once means something
+different on every sample it meets, and a cross-validation over folds of unequal length meets a
+different sample on every fold.
 
-A **calibration slot** takes either kind of statement. It takes the number itself, and it takes
-a **Calibration Rule**, which computes the number from the prior result of the sample in front
-of it. The rule runs inside [`factory`](@ref), the verb an optimiser calls once per fit, so a
-cross-validation refits the quantity on every fold and no other part of the model moves.
+A calibration slot takes either statement. It takes the number itself, and it takes a
+calibration rule, an object that computes the number from the prior result of the sample it is
+given. The rule runs inside [`factory`](@ref), the verb an optimiser calls once per fit, so a
+cross-validation recomputes the quantity on every fold and nothing else about the model changes.
 
 Every `alpha`, `beta`, `kappa`, ambiguity radius and Esfahani-Kuhn tail weight the library carries
 is a calibration slot.
 
-This example shows the slot from the caller's side.
+This example shows the slot from the caller's side. Section 1 loads the data, and each section
+after it takes one reading.
 
- 1. A stated number and a rule side by side on the same measure.
- 2. The refit per fold, over folds of unequal length.
- 3. Three of the rules that ship, and the reading that makes each one the right choice.
- 4. The travelling pair, where `alpha` resolves first and its number reaches the ``\kappa`` rule.
- 5. The two tail-decay rules, which read one sample and answer per end and for both ends.
- 6. A plain function as a rule, which is the case that has no type.
- 7. The slot bounds, which refuse a rule of the wrong family at construction.
- 8. The ambiguity radius and the tail weight of the distributionally robust measure.
+ 2. A stated number and a rule side by side on the same measure.
+ 3. The refit per fold, over folds of unequal length.
+ 4. Three of the rules the library carries, and the reading that makes each one the right choice.
+ 5. The two slots that resolve together, where `alpha` resolves first and its number reaches the
+    ``\kappa`` rule.
+ 6. The two tail-decay rules, which read one sample and answer per end and for both ends.
+ 7. A plain function as a rule, which is the case that has no type.
+ 8. The slot bounds, which refuse a rule of the wrong family at construction.
+ 9. The ambiguity radius and the tail weight of the distributionally robust measure.
 
 The regularisation coefficients `l1`, `linf`, [`L2Regularisation`](@ref) and
 [`LpRegularisation`](@ref) are ambiguity radii too, and they take the same rule family. They
@@ -56,8 +58,8 @@ end;
 #=
 ## 1. Setting up
 
-Five years of daily data give enough length for the folds to differ from each other by a
-meaningful amount, which is the whole point of the demonstration.
+Five years of daily data give the training windows enough room to differ in length. A rule reads
+the length, so it answers differently on each fold.
 =#
 
 using CSV, TimeSeries, Clarabel
@@ -89,7 +91,7 @@ cvar_stated = ConditionalValueatRisk(; alpha = 0.05)
 cvar_rule = ConditionalValueatRisk(; alpha = ScenarioCount(; n = 25))
 
 #=
-What the slot stores is the rule itself, so a reader of the slot sees what the caller wrote.
+The slot stores the rule itself, so reading the slot back gives you what you wrote.
 =#
 
 cvar_rule.alpha
@@ -98,17 +100,17 @@ cvar_rule.alpha
 [`ScenarioCount`](@ref) states the tail's population rather than its probability: `alpha = n / T`
 leaves `n` observations in the tail whatever the sample length is.
 
-A rule needs a prior result, because it reads the sample size and the moments off one. So the
-number appears when [`factory`](@ref) runs, which is the verb the optimiser calls on the measure
-once it has fitted the prior.
+A rule needs a prior result, because it reads the sample size and the moments off one. The number
+therefore appears when [`factory`](@ref) runs, which is the verb the optimiser calls on the
+measure once it has fitted the prior.
 =#
 
 pr = prior(EmpiricalPrior(), rd)
 println("resolved alpha over the whole sample = $(factory(cvar_rule, pr).alpha)")
 
 #=
-The value-level entry point has no prior result to resolve against, so it refuses the rule and
-names the way out rather than guessing a number.
+Call `expected_risk` on a matrix of returns and the rule has no prior result to read, so the call
+refuses the rule and names what to pass instead of guessing a number.
 =#
 
 w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))
@@ -119,7 +121,7 @@ catch e
 end
 
 #=
-Passing the prior result instead resolves the rule and evaluates the measure.
+Pass the prior result instead. The rule resolves, and the measure evaluates.
 =#
 
 println("calibrated risk = $(expected_risk(cvar_rule, w0, pr))")
@@ -128,8 +130,8 @@ println("stated risk     = $(expected_risk(cvar_stated, w0, pr))")
 #=
 ## 3. The refit per fold
 
-This is the reason the slot widened. [`IndexWalkForward`](@ref) with `expand_train = true` grows
-the training window one test block at a time, so the folds are of unequal length by construction.
+[`IndexWalkForward`](@ref) with `expand_train = true` grows the training window one test block at
+a time, so every fold trains on a window of a different length.
 =#
 
 iwf = IndexWalkForward(252, 63; expand_train = true)
@@ -138,8 +140,8 @@ println("number of folds = $(length(iwf_res.train_idx))")
 
 #=
 `factory` is the verb the optimiser itself calls, so resolving a measure against a fold's own
-prior reports the measure that fold optimises. This is the shortest honest way to read the
-number, and the library needs no accessor for it.
+prior gives you the measure that fold optimises. You read the number this way, and the library
+carries no accessor for it.
 =#
 
 fold_prior(idx) = prior(EmpiricalPrior(), rd.X[idx, :])
@@ -147,7 +149,7 @@ resolved(r, idx, key) = getproperty(factory(r, fold_prior(idx)), key)
 
 #=
 The stated `alpha` is one number for every fold. The rule's `alpha` falls as the window grows,
-and the tail's population is what stays fixed.
+and the count of observations in the tail stays fixed.
 =#
 
 fold_table = DataFrame(:fold => 1:length(iwf_res.train_idx),
@@ -160,8 +162,8 @@ fold_table.tail_count_rule = fold_table.alpha_rule .* fold_table.T
 pretty_table(fold_table; formatters = [numfmt])
 
 #=
-The measure goes into a [`MeanRisk`](@ref) unchanged, and the cross-validation refits it per fold
-without being told that anything is being calibrated.
+We put the measure into a [`MeanRisk`](@ref) unchanged. The cross-validation refits it on every
+fold, and nothing tells the optimiser that a slot holds a rule.
 =#
 
 mr_rule = MeanRisk(; r = cvar_rule, opt = JuMPOptimiser(; slv = slv))
@@ -171,7 +173,7 @@ pred_rule = cross_val_predict(mr_rule, rd, iwf)
 pred_stated = cross_val_predict(mr_stated, rd, iwf)
 
 #=
-Both run to the same folds, so the out-of-sample series are comparable.
+Both runs use the same folds, so the out-of-sample series are comparable.
 =#
 
 var_rm = LowOrderMoment(; alg = SecondMoment())
@@ -179,8 +181,8 @@ println("calibrated out-of-sample variance = $(expected_risk(var_rm, pred_rule))
 println("stated out-of-sample variance     = $(expected_risk(var_rm, pred_stated))")
 
 #=
-Fold by fold, the level the rule produced sits beside the out-of-sample risk of each run. The two
-runs differ only in the measure the folds priced.
+The next table puts the level the rule produced next to the out-of-sample risk of each run, fold
+by fold. The two runs differ only in the measure the folds priced.
 =#
 
 fold_risk = DataFrame(:fold => 1:length(iwf_res.train_idx),
@@ -191,7 +193,7 @@ fold_risk = DataFrame(:fold => 1:length(iwf_res.train_idx),
 pretty_table(fold_risk; formatters = [numfmt])
 
 #=
-The weights the calibrated run held, one column per fold.
+The next table holds the weights of the calibrated run, one column per fold.
 =#
 
 pretty_table(hcat(DataFrame(:tickers => rd.nx),
@@ -201,7 +203,7 @@ pretty_table(hcat(DataFrame(:tickers => rd.nx),
 #=
 ## 4. Three of the rules
 
-Eleven rules ship over the five families. Five of them compute a significance level or a
+The library carries eleven rules over the five families. Five of them compute a significance level or a
 deformation parameter, and three of those five are the ones this section reads. Each answers a
 different question about the sample.
 
@@ -262,15 +264,15 @@ pretty_table(weight_table; formatters = [numfmt])
 #=
 The rate is unchanged, because it never reads the weights.
 
-## 5. The travelling pair
+## 5. The two slots that resolve together
 
 [`RelativisticValueatRisk`](@ref) carries two calibration slots, `alpha` and `kappa`.
 [`EntropyBudget`](@ref) states the price of the deformation directly: [`RRM`](@ref) multiplies its
 dual variable by `kappa_log(inv(alpha * T), kappa)`, and the rule returns the ``\kappa`` that
 meets a stated value of that coefficient.
 
-The rule therefore reads its sibling `alpha`. `alpha` resolves first, and the number it produced
-travels to the ``\kappa`` rule, so the pair resolves in one pass over the measure.
+The rule therefore reads its sibling `alpha`. `alpha` resolves first, and the ``\kappa`` rule
+reads the number it produced, so both slots resolve in one pass over the measure.
 =#
 
 rlvar_rule = RelativisticValueatRisk(; alpha = ScenarioCount(; n = 25),
@@ -290,9 +292,10 @@ pretty_table(pair_table; formatters = [numfmt])
 
 #=
 The `kappa` column is flat and the `kappa_stated_alpha` column is not, and the reason is the
-handover. The coefficient reads `inv(alpha * T)`, and a scenario count fixes `alpha * T` at the
-count itself, so the budget buys the same deformation on every fold. A stated `alpha` lets
-`alpha * T` grow with the window, so the same budget buys a different deformation each time.
+order the two slots resolve in. The coefficient reads `inv(alpha * T)`, and a scenario count
+fixes `alpha * T` at the count itself, so the budget gives the same deformation on every fold. A
+stated `alpha` lets `alpha * T` grow with the window, so the same budget gives a different
+deformation each time.
 
 The rule carries one check, and it is not a range check on the ``\kappa`` it returns. The
 coefficient reaches only the band between ``\ln(u)`` and ``\sinh(\ln(u))``, so a target outside
@@ -317,8 +320,8 @@ index and returns its reciprocal, which is the ``\kappa`` whose deformed exponen
 that rate.
 
 [`RelativisticValueatRiskRange`](@ref) carries a ``\kappa`` slot at each end, so one measure
-holds both answers. Each end carries a travelling pair of its own: `kappa_a` reads `alpha`, and
-`kappa_b` reads `beta`.
+holds both answers. Each end resolves a pair of its own: `kappa_a` reads `alpha`, and `kappa_b`
+reads `beta`.
 =#
 
 hill_range = RelativisticValueatRiskRange(; kappa_a = HillTailDecay(),
@@ -338,9 +341,9 @@ pretty_table(decay_table; formatters = [numfmt])
 The two rows are the difference between the two rules. The Hill row holds two numbers, because
 the rule keeps the sign of the end and reads the loss tail under `kappa_a` and the gain tail
 under `kappa_b`. The Radial row holds one number twice, because the rule whitens each observation
-and reads a distance, and a distance has no sign. The two Hill numbers part because the sample is
-skewed. A sample with no skew carries one index at both ends, and two estimates of it then differ
-by their own noise alone.
+and reads a distance, and a distance has no sign. The two Hill numbers differ because the sample
+is skewed. A sample with no skew carries one index at both ends, and two estimates of it then
+differ by their own noise alone.
 =#
 
 println("pooled skewness = $(skewness(vec(pr.X)))")
@@ -352,7 +355,7 @@ number is the index of the whole cross-section's radius.
 
 The rule refits per fold on the same terms every other rule does. The two ends move apart by a
 different amount on every window, and which end carries the heavier tail is a property of the
-window rather than a law of the record.
+window, not of the whole record.
 =#
 
 decay_fold = DataFrame(:fold => 1:length(iwf_res.train_idx),
@@ -380,21 +383,21 @@ end
 #=
 ## 7. A plain function as a rule
 
-A rule is run by calling it, so a callable struct and a plain function are the same thing to the
-resolver. A closure over a caller's own data is the case that has no type, and it is the shortest
-way to state a one-off rule. The signature is `(key, pr, w, slv, ctx)`:
+The library runs a rule by calling it, so a callable struct and a plain function reach it on the
+same terms. A closure over your own data is the case that has no type, and it is the shortest way
+to state a one-off rule. The signature is `(key, pr, w, slv, ctx)`:
 
   - `key`: name of the slot being resolved;
   - `pr`: prior result the rule reads the sample size and the moments off;
   - `w`: effective observation weights, or `nothing`;
   - `slv`: effective solver, or `nothing`;
-  - `ctx`: a [`CalibrationContext`](@ref), which carries what the site knows and `key` does not:
-    the significance level of a sibling slot, the series the owner prices, and the norm order of
-    the constraint the quantity stands in. A rule that reads none of the three names the type and
-    ignores it, as this one does.
+  - `ctx`: a [`CalibrationContext`](@ref), which carries what the slot's owner knows and `key`
+    does not: the significance level of a sibling slot, the series the owner prices, and the norm
+    order of the constraint the quantity stands in. A rule that reads none of the three names the
+    type and ignores it, as this one does.
 
-`key` earns its keep on a Range measure, where one function serves both ends and reads its own
-budget for each.
+`key` matters on a Range measure, where one function serves both ends and reads its own budget
+for each.
 =#
 
 tail_budget = Dict(:alpha => 25, :beta => 50)
@@ -406,7 +409,7 @@ println("alpha = $(vrr_res.alpha), beta = $(vrr_res.beta)")
 
 #=
 Every Range measure defaults `beta` to `alpha`. The rule states the method and the slot states
-the end, so one rule serves both ends and the occupant crosses unchanged.
+the end, so one rule serves both ends and `beta` holds the object `alpha` holds.
 =#
 
 owa_range = OrderedWeightsArrayConditionalValueatRiskRange(; alpha = count_rule.alpha)
@@ -416,8 +419,8 @@ println("beta is a $(typeof(owa_range.beta).name.name), same rule = $(owa_range.
 ## 8. The slot bounds refuse a rule of the wrong family
 
 Each slot's type bound names the one rule family that computes the quantity the slot holds. A
-deformation rule in a significance slot is therefore refused at construction, before any data is
-in sight, and no guard method is written for it.
+deformation rule in a significance slot therefore fails at construction, before any data reaches
+the measure, and the library writes no guard method for it.
 =#
 
 try
@@ -445,14 +448,14 @@ around the empirical one. Its `r` is the radius of that ball and its `l` is the 
 tail term, and both are calibration slots beside `alpha`. So one measure can refit all three
 quantities per fold.
 
-Four radius rules ship. The two below are the two this section runs.
+The library carries four radius rules. The two below are the two this section runs.
 
   - [`ConcentrationRadius`](@ref) is the Blanchet-Kang-Murthy form: a scale in the units of the
     returns times the square root of a chi-squared quantile over the sample size. A wider universe
-    buys a wider ball at a fixed confidence level, and a longer sample shrinks it. `scale = nothing`
+    gives a wider ball at a fixed confidence level, and a longer sample shrinks it. `scale = nothing`
     reads the average asset volatility off the prior result.
   - [`RateRadius`](@ref) is `c / sqrt(T)`. The rate is the part of the form to trust and `c` is the
-    part to calibrate, so a cross-validation over `c` is the honest route to a radius.
+    part to calibrate, so you set a radius by cross-validating over `c`.
 
 The other two answer a question these two do not. [`DimensionalRateRadius`](@ref) shrinks the
 ball at the rate the number of assets sets rather than at the square-root rate of the sample
@@ -463,7 +466,7 @@ terms the two below do, and the
 [regularisation example](../4_constraints_costs/07_Regularisation.md) runs them, because the
 slots that separate them are the four penalty coefficients of [`JuMPOptimiser`](@ref).
 
-The tail-weight family ships one rule, [`TailTermParity`](@ref), which prices the tail term of
+The tail-weight family holds one rule, [`TailTermParity`](@ref), which prices the tail term of
 the loss at a stated multiple of its mean term. A caller's own function serves the slot too,
 which is the case section 7 covers.
 =#
@@ -488,9 +491,9 @@ pretty_table(amb_table; formatters = [numfmt])
 #=
 The rate radius falls with every fold, because the window only grows. The concentration radius does
 not, and the reason is its scale: `scale = nothing` reads the average asset volatility off the
-fold's own prior, so a window that takes in a more volatile period buys a wider ball even though it
-is longer. A radius is in the units of the returns, and this is what reading those units off the
-sample looks like.
+fold's own prior, so a window that takes in a more volatile period gives a wider ball even though it
+is longer. A radius is in the units of the returns, and the rule reads those units off the fold it
+is given.
 
 The `l` column is a ratio of two scales the rule reads off the fold, so it moves with both. The
 numerator is the mean loss of the pooled cross-section, and the denominator is the mean
@@ -509,12 +512,13 @@ println("robust out-of-sample variance = $(expected_risk(var_rm, pred_drcvar))")
 ## 10. What to take away
 
   - A calibration slot takes a number or a rule, and nothing else about the measure changes.
-  - The rule resolves inside [`factory`](@ref), so a cross-validation refits it per fold and
-    `factory(r, pr)` is how a caller reads the number a fold produced.
-  - The rule states the question. A scenario count fixes the tail's population, a rate lets it grow
-    with the square root of the record, and an entropy budget fixes the price of a deformation.
-  - `alpha` and ``\kappa`` travel together, so a scenario count on `alpha` holds the entropy band
-    still and a stated `alpha` does not.
+  - The rule resolves inside [`factory`](@ref), so a cross-validation refits it per fold, and you
+    read the number a fold produced with `factory(r, pr)`.
+  - The rule states the question. A scenario count fixes the count of observations in the tail, a
+    rate lets that count grow with the square root of the record, and an entropy budget fixes the
+    price of a deformation.
+  - `alpha` and ``\kappa`` resolve in one pass, `alpha` first, so a scenario count on `alpha`
+    holds the entropy band still and a stated `alpha` does not.
   - The two tail-decay rules read two different quantities. [`HillTailDecay`](@ref) answers per
     end, and [`RadialTailDecay`](@ref) answers once for both.
   - A plain function of `(key, pr, w, slv, ctx)` is a rule, which covers the one-off case in every
