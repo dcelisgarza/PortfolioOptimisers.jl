@@ -27,7 +27,7 @@ off a prior, a second geometry, a leader over a matched sample, and dynamic regr
 a comparator that moves every row — and the full roster by group is at the end of the page.
 =#
 
-using PortfolioOptimisers, StableRNGs, DataFrames, PrettyTables, Statistics, Dates
+using PortfolioOptimisers, StableRNGs, DataFrames, PrettyTables, Statistics, Dates, Clarabel
 
 resfmt = (v, i, j) -> isa(v, AbstractFloat) ? "$(round(v; digits = 3))" : v;
 
@@ -356,6 +356,35 @@ length, and a comparator that moves every row is one nothing tracks. The compara
 path is what the `path_length` field reports, so a reader can state the bound the rule is
 held to.
 
+Neither of those two is the comparator the definition of dynamic regret names, which is the
+best sequence under a path-length budget: be-the-leader is one sequence at its own path
+length, and the best stock of each row is the sequence no budget binds.
+[`budgeted_hindsight_path`](@ref) solves for the sequence itself, as one programme over the
+rows — the log wealth of a path, on the simplex at every row, under a budget on the summed
+length of its steps — and answers one fold per row, so the regret verb reads it as it reads
+any other comparator. At be-the-leader's own path length the two are not the same object.
+=#
+
+slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+             settings = Dict("verbose" => false))
+crp = preds_rev["Constant rebalanced"]
+L = log_wealth_regret(crp, be_the_leader).path_length
+budgeted = budgeted_hindsight_path(rdt, L; slv = slv)
+budgeted_reg = log_wealth_regret(crp, budgeted)
+
+(; be_the_leader = log_wealth_regret(crp, be_the_leader).regret,
+ budgeted = budgeted_reg.regret, path_length = budgeted_reg.path_length)
+
+#=
+The budget binds, so the path length is the `73` be-the-leader walked, and the regret against
+the best sequence of that length is `10.1` where be-the-leader's was `2.5`: the leader's
+steps are the drift of a running average, and the same length spent where a switch pays the
+most buys another `7.6` of log wealth over 480 rows. The moving-average reversion that sat
+`0.18` ahead of be-the-leader sits `7.4` behind this comparator. At the best stock's path
+length of `577` the budget is slack and the two coincide, and at a budget of zero the path is
+the fixed leader of section 2, so one verb spans the three comparators of the literature and
+every budget between them.
+
 ## [The roster by group](@id user-guide-online-selection-roster)
 
 Every rule is a value of the head's `alg` slot. The groups are Li and Hoi's (2014), and the
@@ -414,3 +443,6 @@ and [`performance_summary`](@ref) with a benchmark.
 #src - New guide page for #1165 on map #1148. Fixtures follow the prototype's two-regime
 #src   construction (research/prototypes/run_novel.jl § 09) at N = 5, T = 500, StableRNG.
 #src - Numbers in the prose are re-measured from the run; see the resolution comment on #1165.
+#src - Section 8 budgeted path (#1216): measured 2026-09-22 at be-the-leader's length 73.02 the
+#src   budgeted regret vs the uniform CRP is 10.13 (be-the-leader 2.54), path length 73.02; at the
+#src   best stock's 577.0 the two coincide at 22.65. The 480 × 5 solve takes about 20 s.
