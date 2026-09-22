@@ -395,8 +395,9 @@ return through [`PriorExpectedReturns`](@ref). Every rule's step is projected on
 Allocation Set in the rule's own geometry: the default [`BoundedAllocationSet`](@ref) is the
 simplex and closed form, and a [`ProgrammeAllocationSet`](@ref) admits the full constraint
 vocabulary through a solver. The evaluation surface is [`log_wealth_regret`](@ref), the
-[`HindsightSplit`](@ref) that makes any estimator a per-row Hindsight Comparator, and
-[`performance_summary`](@ref) with a benchmark.
+[`HindsightSplit`](@ref) that makes any estimator a per-row Hindsight Comparator,
+[`budgeted_hindsight_path`](@ref), the best comparator sequence under a path-length budget,
+and [`performance_summary`](@ref) with a benchmark.
 
 ## Where to go next
 

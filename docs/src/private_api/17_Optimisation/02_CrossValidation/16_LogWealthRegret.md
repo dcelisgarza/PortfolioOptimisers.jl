@@ -11,4 +11,8 @@ PortfolioOptimisers.fold_target
 PortfolioOptimisers.fold_held
 PortfolioOptimisers.stacked_fold_weights
 PortfolioOptimisers.comparator_path_length
+PortfolioOptimisers.path_norm_epigraph!
+PortfolioOptimisers.path_weight_bounds
+PortfolioOptimisers.path_row_constraints!
+PortfolioOptimisers.path_budget_constraint!
 ```
