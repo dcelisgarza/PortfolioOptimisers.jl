@@ -307,26 +307,45 @@ Neither per-row comparator above is it — be-the-leader is one point at its own
 the per-period minimiser is the unbudgeted limit — and the PR #1204 review measured the gap on
 the pumping fixture of `test_24g` (#1216): at be-the-leader's own path length `7.59` the budgeted
 optimum's regret is `3.280` against be-the-leader's `3.095`, and at the per-period minimiser's
-`55.15` the two coincide. It ships as a verb, `budgeted_hindsight_path(rd, L; p = 2, wb, sets,
-strict, slv) -> MultiPeriodPredictionResult`: one concave programme over the whole panel,
-`T × N` variables, an exponential cone per row for the log and a norm cone of order `p` per
-step for the path, with the weight bounds of `BestConstantRebalancedPortfolio`'s vocabulary on
-every row. Its answer is a path, so it is neither a Hindsight Comparator (whose answer is one
-allocation) nor a `HindsightSplit` (whose folds refit); it returns one fold per row, each a
-`NaiveOptimisationResult` predicted over its row, so `log_wealth_regret` reads it unchanged and
-reports `P_T = L` beside the regret at `p = 2`. A programme no solver solved carries `NaN` on
-every fold and the trials in an `OptimisationFailure`, as a failed walk-forward fold does.
+`55.15` the two coincide. It ships as an estimator under the Hindsight Comparator rule of ADR 0161,
+`BudgetedHindsightPath(; L, p = 2, wb, sets, strict, slv) <: OptimisationEstimator`:
+`optimise(est, rd)` solves one concave programme over the whole panel, `T × N` variables, an
+exponential cone per row for the log and a norm cone of order `p` per step for the path, with the
+weight bounds of `BestConstantRebalancedPortfolio`'s vocabulary on every row, and answers a
+`BudgetedHindsightPathResult` that holds the path itself (`w`, `rows × assets`), the rows'
+Investable Masks, the resolved bounds, the rows' names and clock, and the return code.
+`predict(res, rd)` over the same rows answers one fold per row, each a `NaiveOptimisationResult`
+predicted over its row, so `log_wealth_regret` reads it unchanged and reports `P_T = L` beside the
+regret at `p = 2`; a panel with other names, clock or row count is refused, because the path is
+bound to its rows. A fit no solver solved carries `NaN` on every investable entry and the trials in
+an `OptimisationFailure`, and the door walks `est.fb`, bound to another `BudgetedHindsightPath`.
+The estimator is a plain `OptimisationEstimator`, not a `NonFiniteAllocationOptimisationEstimator`,
+so the fold loops refuse it by type: a path is not a fold's allocation.
 
-Three calls were the maintainer's. It is a verb and not an estimator, because `optimise` answers
-an optimisation result and `predict` one fold, and a path fits neither door. The default norm is
-the Euclidean one, because that is the norm `path_length` reports, so the budget and the reported
-length are one number by default; `p = 1`, `p = Inf` and any `p > 1` through the power cone are
-one keyword away, and the docstring says the reported length stays Euclidean under them. The
+A missing return at `(t, i)` is a row on which asset `i` is not investable: its allocation is
+fixed at zero, the row's budget, bounds and log read the finite entries alone, and the fold carries
+the row's mask, so `predict` views the row at it and names no Held Gap. A delisting inside the panel
+is a forced step, charged to the path length as any other step is. A row with no finite return is
+refused, because its budget of one cannot be met.
+
+Three calls were the maintainer's. It is an estimator and not a verb, because the Hindsight
+Comparator is one rule, `predict(optimise(est, rd), rd)`, and a verb would be a second door for the
+same rule; the maintainer chose the estimator over the verb the first build shipped. The default
+norm is the Euclidean one, because that is the norm `path_length` reports, so the budget and the
+reported length are one number by default; `p = 1`, `p = Inf` and any `p > 1` through the power cone
+are one keyword away, and the docstring says the reported length stays Euclidean under them. The
 head's Allocation Set is honoured through its bounds alone, `wb` and `sets` as
 `BestConstantRebalancedPortfolio` takes them, because a `ProgrammeAllocationSet` writes its
 constraints for one `w` on the model registry and a `T × N` programme has no such slot; a
 programme set on the path is a widening, not a defect. The Lagrangian form, a penalty on the
 path length in place of the budget, is the same programme with one term moved and is not built.
+
+Two numerical facts shaped the programme. The steps are explicit variables, `d_t = u_t − u_{t−1}`,
+because the interior-point solver stalled on the example's 940-row panel with the differences
+written into the cones and solved with them written out. A tight budget on a long panel still
+puts most step cones at their apex, where Clarabel reports insufficient progress whatever its
+regularisation, and SCS reaches it in seconds; the docstring says so, and the example runs the
+path on a solver vector with the first-order solver as the fallback.
 
 ### The survey's metrics are a benchmark keyword and four fields
 

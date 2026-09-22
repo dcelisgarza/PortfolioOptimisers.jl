@@ -12,7 +12,12 @@ PortfolioOptimisers.fold_held
 PortfolioOptimisers.stacked_fold_weights
 PortfolioOptimisers.comparator_path_length
 PortfolioOptimisers.path_norm_epigraph!
-PortfolioOptimisers.path_weight_bounds
+PortfolioOptimisers.row_bound_view
 PortfolioOptimisers.path_row_constraints!
 PortfolioOptimisers.path_budget_constraint!
+PortfolioOptimisers.row_coverage_mask
+PortfolioOptimisers.row_universe_error
+PortfolioOptimisers.path_row_masks
+PortfolioOptimisers.assert_path_rows
+PortfolioOptimisers.path_row_fold
 ```

@@ -177,6 +177,29 @@ log_wealth(res) = sum(log1p, rdt.X * res.w)
 
 #-
 
+#=
+The fourth comparator moves. [`BudgetedHindsightPath`](@ref) is the best sequence of
+allocations whose summed step length is at most a budget `L`, the comparator dynamic regret
+is defined against, and it is an estimator under the same rule as the others: fit on the rows,
+predicted over them, one fold per row. A full switch between two single assets costs `√2` of
+Euclidean path length, so the budget below buys the comparator five such switches over the
+940 rows. The fit is one programme of 940 exponential cones and 939 step cones; at a budget
+this tight most steps sit at their apex, where the interior-point solver stalls short of its
+tolerance, so the fit runs on a solver vector and falls through to the first-order solver.
+=#
+
+using SCS
+
+slv_path = [slv,
+            Solver(; name = :scs, solver = SCS.Optimizer,
+                   settings = Dict("verbose" => 0, "eps_abs" => 1e-5, "eps_rel" => 1e-5,
+                                   "max_iters" => 200_000),
+                   check_sol = (; allow_local = true, allow_almost = true))]
+budgeted = predict(optimise(BudgetedHindsightPath(; L = 5 * sqrt(2), slv = slv_path), rdt),
+                   rdt)
+
+#-
+
 best_stock = Pipeline(;
                       steps = (ScoreSelector(; score = MeanReturn(; flag = true),
                                              rule = RankRule(; best = 1)), EqualWeighted()))
@@ -184,7 +207,7 @@ comparators = ["Best CRP" => predict(bcrp_jump, rdt),
                "Best stock" => predict(fit(best_stock, rdt), rdt),
                "Uniform CRP" => cross_val_predict(OnlinePortfolioSelection(;
                                                                            alg = ConstantRebalancedPortfolio()),
-                                                  rd, cv)]
+                                                  rd, cv), "Budgeted path" => budgeted]
 
 regret = DataFrame("Rule" => first.(rules))
 for (name, comp) in comparators
@@ -193,6 +216,11 @@ end
 pretty_table(regret; formatters = [resfmt],
              title = "Log-wealth regret net of fees, comparator minus rule")
 
+#-
+
+(; path_length = log_wealth_regret(preds["Buy and hold"], budgeted).path_length,
+ wealth = wealth(budgeted), best_crp = prod(1 .+ comparators[1][2].rd.X))
+
 #=
 Positive is a comparator that won. The comparators are fee-free and the rules are net of
 the fee, so every entry is a little above the family's own accounting, and the reversion
@@ -200,6 +228,14 @@ rules, which paid the most, sit furthest from every comparator; the winner rules
 a few hundredths of the uniform portfolio they started from, which is what a slow step from
 it buys. Negative regret is expected and is not a defect, and the `p` the Result carries
 against a hindsight comparator is optimistic by construction.
+
+The budgeted path is the comparator that moves, and five switches are worth four units of
+log wealth over the best constant portfolio: it spends its budget where a switch pays the
+most, and grows a unit to about `200` where the best constant portfolio grows it to `3.6`,
+so every rule's regret against it is the static number plus four. The path length the
+Result reports is the budget, to the first-order solver's tolerance, because the budget
+binds; a looser budget buys a longer path and a larger regret, and a budget of zero is the
+best constant portfolio again.
 
 ## 6. A constrained update
 
@@ -399,3 +435,7 @@ pretty_table(DataFrame("Asset" => rd.nx, "Target weight" => capped_pred.pred[end
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
 #src - New example for #1165 on map #1148. Prose numbers re-measured from the run; see the
 #src   resolution comment on #1165.
+#src - Section 5 budgeted path (#1216): measured 2026-09-22 at `L = 5√2` on the 940 × 20 panel,
+#src   wealth 198.4 (best CRP 3.60), path length 7.094 (SCS at 1e-5), regret 4.62 on the winner
+#src   rules and 6.1–7.8 on the reversion rules. Clarabel stalls (INSUFFICIENT_PROGRESS) at this
+#src   budget, and the vector falls through to SCS in about 16 s in total.

@@ -359,17 +359,19 @@ held to.
 Neither of those two is the comparator the definition of dynamic regret names, which is the
 best sequence under a path-length budget: be-the-leader is one sequence at its own path
 length, and the best stock of each row is the sequence no budget binds.
-[`budgeted_hindsight_path`](@ref) solves for the sequence itself, as one programme over the
+[`BudgetedHindsightPath`](@ref) solves for the sequence itself, as one programme over the
 rows — the log wealth of a path, on the simplex at every row, under a budget on the summed
-length of its steps — and answers one fold per row, so the regret verb reads it as it reads
-any other comparator. At be-the-leader's own path length the two are not the same object.
+length of its steps. It is an estimator under the same Hindsight Comparator rule as the
+others: fit on the rows it is scored on, predicted over them, one fold per row, so the
+regret verb reads it as it reads any other comparator. At be-the-leader's own path length
+the two are not the same object.
 =#
 
 slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false))
 crp = preds_rev["Constant rebalanced"]
 L = log_wealth_regret(crp, be_the_leader).path_length
-budgeted = budgeted_hindsight_path(rdt, L; slv = slv)
+budgeted = predict(optimise(BudgetedHindsightPath(; L = L, slv = slv), rdt), rdt)
 budgeted_reg = log_wealth_regret(crp, budgeted)
 
 (; be_the_leader = log_wealth_regret(crp, be_the_leader).regret,
@@ -425,7 +427,7 @@ Allocation Set in the rule's own geometry: the default [`BoundedAllocationSet`](
 simplex and closed form, and a [`ProgrammeAllocationSet`](@ref) admits the full constraint
 vocabulary through a solver. The evaluation surface is [`log_wealth_regret`](@ref), the
 [`HindsightSplit`](@ref) that makes any estimator a per-row Hindsight Comparator,
-[`budgeted_hindsight_path`](@ref), the best comparator sequence under a path-length budget,
+[`BudgetedHindsightPath`](@ref), the best comparator sequence under a path-length budget,
 and [`performance_summary`](@ref) with a benchmark.
 
 ## Where to go next

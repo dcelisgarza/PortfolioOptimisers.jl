@@ -26,7 +26,7 @@ Arguments correspond to the struct's fields, in the order they are declared. The
   - [`CovarianceForecastComparisonResult`](@ref)
   - [`BestConstantRebalancedPortfolio`](@ref)
   - [`HindsightSplit`](@ref)
-  - [`budgeted_hindsight_path`](@ref)
+  - [`BudgetedHindsightPath`](@ref)
 """
 @concrete struct LogWealthRegretResult <: AbstractResult
     """
@@ -293,7 +293,7 @@ The Result also carries the comparator's **path length** ``P_T = \\sum_{t \\geq 
   - **Be-the-leader**: `cross_val_predict(est, rd, HindsightSplit())`, the best constant rebalanced portfolio over the rows through ``t`` played on row ``t``: ``u_1 = (1, 0)``, ``u_2 \\approx (0.523, 0.477)``, ``u_3 = (1, 0)``, wealth ``1.2 \\cdot 0.995 \\cdot 1.3 \\approx 1.553``, ``P_T \\approx 1.35``.
   - **Per-period minimiser**: the top-1 [`ScoreSelector`](@ref) under [`MeanReturn`](@ref)`(; flag = true)` composed with [`EqualWeighted`](@ref) through `HindsightSplit(; prefix = false)`, one-hot on each row's best asset, wealth ``1.2 \\cdot 1.1 \\cdot 1.3 = 1.716``, ``P_T = 2 \\sqrt{2}``.
 
-The path length reads the comparator's per-fold targets, embedded by asset name on the union of the folds' universes through [`stacked_fold_weights`](@ref), and it is `NaN` when the comparator is one prediction result, which holds one target and no path. The bound reads the other way too: the regret at a **given** budget ``L`` is the gap to the best sequence whose path length is at most ``L``, which neither be-the-leader nor the per-period minimiser is, and [`budgeted_hindsight_path`](@ref) builds that sequence as one fold per row for this verb to read.
+The path length reads the comparator's per-fold targets, embedded by asset name on the union of the folds' universes through [`stacked_fold_weights`](@ref), and it is `NaN` when the comparator is one prediction result, which holds one target and no path. The bound reads the other way too: the regret at a **given** budget ``L`` is the gap to the best sequence whose path length is at most ``L``, which neither be-the-leader nor the per-period minimiser is, and [`BudgetedHindsightPath`](@ref) fits that sequence, whose prediction result is one fold per row for this verb to read.
 
 No scorer and no summary column ship for regret. A hyperparameter search ranks on [`MeanReturn`](@ref)`(; flag = true)`, which is log wealth per period and orders candidates as regret against any fixed comparator would; the performance summary reads one series and holds no comparator.
 
@@ -316,7 +316,7 @@ No scorer and no summary column ship for regret. A hyperparameter search ranks o
 
   - [`LogWealthRegretResult`](@ref)
   - [`HindsightSplit`](@ref)
-  - [`budgeted_hindsight_path`](@ref)
+  - [`BudgetedHindsightPath`](@ref)
   - [`BestConstantRebalancedPortfolio`](@ref)
   - [`covariance_forecast_compare`](@ref)
   - [`newey_west_variance`](@ref)
@@ -391,16 +391,33 @@ function path_norm_epigraph!(model::JuMP.Model, t, x, p::Number)::Nothing
     return nothing
 end
 """
-    path_row_constraints!(model::JuMP.Model, u, z, x, wb::WeightBounds)
+    row_bound_view(b::Number, m::AbstractVector{Bool})
+    row_bound_view(b::VecNum, m::AbstractVector{Bool})
 
-Write one row of the budgeted path programme: the budget `Σ u = 1`, the resolved bounds `lb ≤ u ≤ ub` where they are finite, and the exponential cone `z ≤ log⟨u, x⟩`.
+One side of a resolved weight bound on the investable assets of a row: a scalar bound is every asset's and passes through, and a vector bound is viewed at the row's mask.
+
+# Related
+
+  - [`path_row_constraints!`](@ref)
+"""
+function row_bound_view(b::Number, ::AbstractVector{Bool})
+    return b
+end
+function row_bound_view(b::VecNum, m::AbstractVector{Bool})
+    return view(b, m)
+end
+"""
+    path_row_constraints!(model::JuMP.Model, u, z, x, m::AbstractVector{Bool}, wb::WeightBounds)
+
+Write one row of the budgeted path programme on the row's investable assets: the budget `Σ u = 1`, the resolved bounds `lb ≤ u ≤ ub` where they are finite, and the exponential cone `z ≤ log⟨u, x⟩`, all over the assets `m` keeps; the allocation of every other asset is fixed at zero, because a row with no price relative for an asset cannot hold it.
 
 # Arguments
 
   - `model`: The bare model.
   - `u`: The row's allocation variables, one per asset.
   - `z`: The row's log-wealth variable.
-  - `x`: The row's price relatives.
+  - `x`: The row's price relatives, finite where `m` holds.
+  - `m`: The row's Investable Mask, the Coverage Universe of the one-row window.
   - $(arg_dict[:wb])
 
 # Returns
@@ -409,18 +426,26 @@ Write one row of the budgeted path programme: the budget `Σ u = 1`, the resolve
 
 # Related
 
-  - [`budgeted_hindsight_path`](@ref)
+  - [`BudgetedHindsightPath`](@ref)
   - [`path_budget_constraint!`](@ref)
+  - [`row_bound_view`](@ref)
 """
-function path_row_constraints!(model::JuMP.Model, u, z, x, wb::WeightBounds)::Nothing
-    JuMP.@constraint(model, sum(u) == 1)
+function path_row_constraints!(model::JuMP.Model, u, z, x, m::AbstractVector{Bool},
+                               wb::WeightBounds)::Nothing
+    ui = view(u, m)
+    JuMP.@constraint(model, sum(ui) == 1)
     if w_finite_flag(wb.lb)
-        JuMP.@constraint(model, u ⊖ wb.lb >= 0)
+        JuMP.@constraint(model, ui ⊖ row_bound_view(wb.lb, m) >= 0)
     end
     if w_finite_flag(wb.ub)
-        JuMP.@constraint(model, u ⊖ wb.ub <= 0)
+        JuMP.@constraint(model, ui ⊖ row_bound_view(wb.ub, m) <= 0)
     end
-    JuMP.@constraint(model, [z, 1, LinearAlgebra.dot(x, u)] in JuMP.MOI.ExponentialCone())
+    JuMP.@constraint(model,
+                     [z, 1, LinearAlgebra.dot(view(x, m), ui)] in
+                     JuMP.MOI.ExponentialCone())
+    for i in findall(!, m)
+        JuMP.fix(u[i], 0; force = true)
+    end
     return nothing
 end
 """
@@ -441,7 +466,7 @@ Write the path-length budget of the budgeted path programme: one epigraph variab
 
 # Related
 
-  - [`budgeted_hindsight_path`](@ref)
+  - [`BudgetedHindsightPath`](@ref)
   - [`path_row_constraints!`](@ref)
 """
 function path_budget_constraint!(model::JuMP.Model, u, L::Number, p::Number)::Nothing
@@ -450,61 +475,20 @@ function path_budget_constraint!(model::JuMP.Model, u, L::Number, p::Number)::No
         return nothing
     end
     s = JuMP.@variable(model, [1:(T - 1)])
+    d = JuMP.@variable(model, [1:(T - 1), 1:size(u, 2)])
     for t in 2:T
-        path_norm_epigraph!(model, s[t - 1], view(u, t, :) - view(u, t - 1, :), p)
+        JuMP.@constraint(model, view(d, t - 1, :) .== view(u, t, :) - view(u, t - 1, :))
+        path_norm_epigraph!(model, s[t - 1], view(d, t - 1, :), p)
     end
     JuMP.@constraint(model, sum(s) <= L)
     return nothing
 end
 """
-    path_weight_bounds(wb::WeightBoundsEstimator, sets::UniverseSets, N::Integer, strict::Bool, datatype::DataType)
-    path_weight_bounds(wb::WeightBoundsEstimator, sets::Nothing, N::Integer, strict::Bool, datatype::DataType)
-    path_weight_bounds(wb::Option{<:WeightBounds}, sets::Option{<:UniverseSets}, N::Integer, strict::Bool, datatype::DataType)
+$(DocStringExtensions.TYPEDEF)
 
-Resolve the weight bounds a budgeted path is solved on, through [`weight_bounds_constraints`](@ref), and refuse by name a [`WeightBoundsEstimator`](@ref) handed no `sets`, which it cannot be resolved without.
+The best comparator sequence under a path-length budget: the estimator whose fit on a panel is the path of per-row allocations with the largest log wealth among those whose summed step length is at most `L`.
 
-# Arguments
-
-  - $(arg_dict[:wb])
-  - $(arg_dict[:sets])
-  - `N`: Number of assets.
-  - $(arg_dict[:strict])
-  - `datatype`: Number type of the resolved bounds.
-
-# Validation
-
-  - A `WeightBoundsEstimator` needs `sets`. An `IsNothingError` is thrown otherwise.
-
-# Returns
-
-  - `wb::WeightBounds`: The resolved bounds.
-
-# Related
-
-  - [`budgeted_hindsight_path`](@ref)
-  - [`weight_bounds_constraints`](@ref)
-"""
-function path_weight_bounds(wb::WeightBoundsEstimator, sets::UniverseSets, N::Integer,
-                            strict::Bool, datatype::DataType)
-    return weight_bounds_constraints(wb, sets; N = N, strict = strict, datatype = datatype)
-end
-function path_weight_bounds(::WeightBoundsEstimator, ::Nothing, ::Integer, ::Bool,
-                            ::DataType)
-    return throw(IsNothingError("`sets` cannot be nothing when `wb` is a WeightBoundsEstimator"))
-end
-function path_weight_bounds(wb::Option{<:WeightBounds}, sets::Option{<:UniverseSets},
-                            N::Integer, strict::Bool, datatype::DataType)
-    return weight_bounds_constraints(wb, sets; N = N, strict = strict, datatype = datatype)
-end
-"""
-    budgeted_hindsight_path(rd::ReturnsResult, L::Number; p::Number = 2,
-                            wb::Option{<:WbE_Wb} = WeightBounds(),
-                            sets::Option{<:UniverseSets} = nothing, strict::Bool = false,
-                            slv::Slv_VecSlv) -> MultiPeriodPredictionResult
-
-The best comparator sequence under a path-length budget: the path of per-row allocations whose log wealth over `rd` is the largest among those whose summed step length is at most `L`.
-
-Dynamic regret at a budget is the gap to this path, the comparator of Zinkevich's (2003) Definition 7, and neither per-row comparator a [`HindsightSplit`](@ref) builds is it: be-the-leader is one point at its own path length, and the per-period minimiser is the unbudgeted limit. The verb solves one concave programme over the whole panel, `T × N` variables, so its answer is a path and not one allocation; it is returned as a multi-period prediction result of one fold per row, which [`log_wealth_regret`](@ref) reads unchanged as the comparator, reporting the path's Euclidean length beside the regret.
+Dynamic regret at a budget is the gap to this path, the comparator of Zinkevich's (2003) Definition 7, and neither per-row comparator a [`HindsightSplit`](@ref) builds is it: be-the-leader is one point at its own path length, and the per-period minimiser is the unbudgeted limit. The estimator is the Hindsight Comparator rule of [`log_wealth_regret`](@ref) as every other comparator is: `predict(optimise(est, rd_test), rd_test)` is its prediction result over the rows it was fit on, one fold per row, which the regret verb reads unchanged and whose Euclidean path length it reports beside the regret. [`optimise`](@ref) answers a [`BudgetedHindsightPathResult`](@ref), which holds the path itself, and [`predict`](@ref) answers the folds, refusing any rows but the fit's.
 
 # Mathematical definition
 
@@ -524,82 +508,420 @@ Where:
   - ``L``: The path-length budget.
   - ``p``: The norm order of the budget.
 
-Each row is one exponential cone on the resolved bounds through [`path_row_constraints!`](@ref), and each step of the path is one norm cone of order `p` through [`path_budget_constraint!`](@ref). At `L = 0` the path is constant and the answer is the best constant rebalanced portfolio in hindsight, [`BestConstantRebalancedPortfolio`](@ref) under the same bounds; at any `L` that the per-period minimiser's own path length does not exceed, the budget is slack and the answer is that minimiser, one-hot on each row's best asset under the simplex bounds. Between the two, the path spends the budget where a switch buys the most log wealth, and the regret against it is the regret at that budget. The Lagrangian form, a penalty on the path length in place of the budget, is the same programme with one term moved and is not built.
+The fit is one concave programme over the whole panel, `T × N` variables: each row is one exponential cone on the resolved bounds through [`path_row_constraints!`](@ref), and each step of the path is one norm cone of order `p` through [`path_budget_constraint!`](@ref). At `L = 0` the path is constant and the answer is the best constant rebalanced portfolio in hindsight, [`BestConstantRebalancedPortfolio`](@ref) under the same bounds; at any `L` that the per-period minimiser's own path length does not exceed, the budget is slack and the answer is that minimiser, one-hot on each row's best asset under the simplex bounds. Between the two, the path spends the budget where a switch buys the most log wealth, and the regret against it is the regret at that budget. The Lagrangian form, a penalty on the path length in place of the budget, is the same programme with one term moved and is not built.
 
-The budget is stated in the norm of order `p`, and [`LogWealthRegretResult`](@ref) reports the path length in the Euclidean norm whatever `p` is, so the two numbers agree at `p = 2` alone. A comparator fit on the rows it is scored on is a Hindsight Comparator, and the test of [`log_wealth_regret`](@ref) against it is optimistic by construction.
+Every row of the path is a one-row fit, and its Investable Mask is the Coverage Universe of that window, as [`coverage_mask`](@ref) derives it: an asset is in the row when its return is finite and the Asset Panel's active mask is `true` there, and a static panel or none reads finiteness alone. This is the universe a [`HindsightSplit`](@ref)`(; prefix = false)` fold fits on, so the two per-row comparators agree on what a row can hold. An asset outside a row's universe has its allocation fixed at zero there, the row's budget, bounds and log read the assets in it alone, and the result carries the masks, so `predict` views each row at its own and no Held Gap is named. An asset that delists inside the panel is therefore sold on its last row whatever the budget, and that forced step is charged to the path length as any other step is. A row with no asset in its universe is refused, because its budget of one cannot be met.
 
-# Arguments
+The budget is stated in the norm of order `p`, and [`LogWealthRegretResult`](@ref) reports the path length in the Euclidean norm whatever `p` is, so the two numbers agree at `p = 2` alone. A tight budget on a long panel puts most step cones at their apex, where an interior-point solver can stall short of its tolerance and report insufficient progress; a first-order solver reaches such a programme, so a solver vector with one as the fallback is the robust `slv` on a panel of many rows. A comparator fit on the rows it is scored on is a Hindsight Comparator, and the test of [`log_wealth_regret`](@ref) against it is optimistic by construction.
 
-  - $(arg_dict[:rd]) Its returns matrix is the panel the path is solved over, and its rows are the folds of the answer.
-  - `L`: The path-length budget, `0 <= L`.
-  - `p`: The norm order of the budget, `1 <= p`.
-  - $(arg_dict[:wb])
-  - $(arg_dict[:sets])
-  - $(arg_dict[:strict])
-  - $(arg_dict[:slv])
+# Fields
 
-# Validation
+$(DocStringExtensions.FIELDS)
 
-  - `!isnothing(rd.X)`, and every entry of `rd.X` is finite: the programme reads every row, so a missing return has no price relative to read. An `ArgumentError` is thrown on a non-finite entry.
+# Constructors
+
+    BudgetedHindsightPath(;
+        L::Number,
+        slv::Slv_VecSlv,
+        p::Number = 2,
+        wb::Option{<:WbE_Wb} = WeightBounds(),
+        sets::Option{<:UniverseSets} = nothing,
+        strict::Bool = false,
+        fb::Option{<:BudgetedHindsightPath} = nothing
+    ) -> BudgetedHindsightPath
+
+Keywords correspond to the struct's fields. `L` and `slv` are required: a budget has no default, and the fit is a programme.
+
+## Validation
+
   - `0 <= L` and `1 <= p`. A `DomainError` is thrown otherwise.
   - A vector `slv` is not empty. An `IsEmptyError` is thrown otherwise.
-  - A `WeightBoundsEstimator` `wb` comes with `sets`. An `IsNothingError` is thrown otherwise, by [`path_weight_bounds`](@ref).
+  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
 
-# Returns
+## View parameters
 
-  - `path::MultiPeriodPredictionResult`: One fold per row of `rd`, each a [`PredictionResult`](@ref) whose [`NaiveOptimisationResult`](@ref) holds that row's allocation of the path on the resolved bounds, predicted over that row alone. A programme that no solver of `slv` solved carries `NaN` allocations and an [`OptimisationFailure`](@ref) naming the trials, on every fold, as a failed fold of a walk-forward does.
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
+# Examples
+
+```jldoctest
+julia> BudgetedHindsightPath(; L = 5 * sqrt(2), slv = Solver(; solver = nothing))
+BudgetedHindsightPath
+       L ┼ Float64: 7.0710678118654755
+       p ┼ Int64: 2
+      wb ┼ WeightBounds
+         │   lb ┼ Float64: 0.0
+         │   ub ┴ Float64: 1.0
+    sets ┼ nothing
+  strict ┼ Bool: false
+     slv ┼ Solver
+         │          name ┼ String: ""
+         │        solver ┼ nothing
+         │      settings ┼ nothing
+         │     check_sol ┼ @NamedTuple{}: NamedTuple()
+         │   add_bridges ┴ Bool: true
+      fb ┴ nothing
+```
 
 # Related
 
+  - [`BudgetedHindsightPathResult`](@ref)
+  - [`optimise`](@ref)
+  - [`predict`](@ref)
   - [`log_wealth_regret`](@ref)
-  - [`LogWealthRegretResult`](@ref)
   - [`HindsightSplit`](@ref)
   - [`BestConstantRebalancedPortfolio`](@ref)
-  - [`MultiPeriodPredictionResult`](@ref)
-  - [`path_weight_bounds`](@ref)
-  - [`path_row_constraints!`](@ref)
-  - [`path_budget_constraint!`](@ref)
+  - [`port_opt_view`](@ref)
 
 # References
 
   - $(ref_dict[:zinkevich2003])
 """
-function budgeted_hindsight_path(rd::ReturnsResult, L::Number; p::Number = 2,
-                                 wb::Option{<:WbE_Wb} = WeightBounds(),
-                                 sets::Option{<:UniverseSets} = nothing,
-                                 strict::Bool = false, slv::Slv_VecSlv)
-    @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    @argcheck(all(isfinite, rd.X),
-              ArgumentError("every entry of `rd.X` must be finite: the budgeted path reads every row of the panel, so a missing return has no price relative to read."))
-    @argcheck(L >= zero(L), DomainError(L, "`L` must be non-negative"))
-    @argcheck(p >= one(p), DomainError(p, "`p` must be at least one"))
-    if isa(slv, VecSlv)
-        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
+@propagatable @concrete struct BudgetedHindsightPath <: OptimisationEstimator
+    """
+    The path-length budget, `0 <= L`.
+    """
+    L
+    """
+    The norm order of the budget, `1 <= p`.
+    """
+    p
+    """
+    $(field_dict[:wb])
+    """
+    @vprop wb
+    """
+    $(field_dict[:sets])
+    """
+    @vprop sets
+    """
+    $(field_dict[:strict_opt])
+    """
+    strict
+    """
+    $(field_dict[:slv])
+    """
+    slv
+    """
+    Fallback estimator, another `BudgetedHindsightPath` that [`optimise`](@ref) runs when the fit fails, or `nothing`.
+    """
+    fb
+    function BudgetedHindsightPath(L::Number, p::Number, wb::Option{<:WbE_Wb},
+                                   sets::Option{<:UniverseSets}, strict::Bool,
+                                   slv::Slv_VecSlv, fb::Option{<:BudgetedHindsightPath})
+        @argcheck(L >= zero(L), DomainError(L, "`L` must be non-negative"))
+        @argcheck(p >= one(p), DomainError(p, "`p` must be at least one"))
+        if isa(slv, VecSlv)
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
+        end
+        if isa(wb, WeightBoundsEstimator)
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
+        end
+        return new{typeof(L), typeof(p), typeof(wb), typeof(sets), typeof(strict),
+                   typeof(slv), typeof(fb)}(L, p, wb, sets, strict, slv, fb)
     end
+end
+function BudgetedHindsightPath(; L::Number, slv::Slv_VecSlv, p::Number = 2,
+                               wb::Option{<:WbE_Wb} = WeightBounds(),
+                               sets::Option{<:UniverseSets} = nothing, strict::Bool = false,
+                               fb::Option{<:BudgetedHindsightPath} = nothing)::BudgetedHindsightPath
+    return BudgetedHindsightPath(L, p, wb, sets, strict, slv, fb)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The fit of a [`BudgetedHindsightPath`](@ref): the path itself, one allocation per row of the panel it was solved over, with the rows' Investable Masks, the resolved bounds, the rows' names and clock, and the return code.
+
+The path is bound to its rows, so [`predict`](@ref) answers one fold per row over those rows alone, and refuses a returns result whose names, clock or row count differ. A fit no solver solved carries `NaN` on every investable entry and an [`OptimisationFailure`](@ref) naming the trials.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    BudgetedHindsightPathResult(;
+        w::MatNum,
+        wb::WeightBounds,
+        retcode::OptimisationReturnCode,
+        imsk::Option{<:BitMatrix} = nothing,
+        nx::Option{<:AbstractVector} = nothing,
+        ts::Option{<:AbstractVector} = nothing,
+        fb::Option{<:FbChain} = nothing
+    ) -> BudgetedHindsightPathResult
+
+Keywords correspond to the struct's fields. The type is a Result, so [`optimise`](@ref) builds it and a caller reads it; it validates nothing of its own.
+
+# Related
+
+  - [`BudgetedHindsightPath`](@ref)
+  - [`predict`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`log_wealth_regret`](@ref)
+"""
+@concrete struct BudgetedHindsightPathResult <: OptimisationResult
+    """
+    The path, `rows × assets`, one allocation per row on the full universe, with an exact zero at every non-investable entry and `NaN` on a failed fit.
+    """
+    w
+    """
+    The resolved weight bounds the path was solved on.
+    """
+    wb
+    """
+    $(field_dict[:retcode])
+    """
+    retcode
+    """
+    The rows' Investable Masks, `rows × assets`, each row the Coverage Universe of its one-row window, or `nothing` when every row covers every asset.
+    """
+    imsk
+    """
+    The asset names of the panel the path was solved over, or `nothing` when it carried none.
+    """
+    nx
+    """
+    The clock of the panel the path was solved over, or `nothing` when it carried none.
+    """
+    ts
+    """
+    The fallback chain [`optimise`](@ref) walked to reach this result, or `nothing` when the first fit answered.
+    """
+    fb
+    function BudgetedHindsightPathResult(w::MatNum, wb::WeightBounds,
+                                         retcode::OptimisationReturnCode,
+                                         imsk::Option{<:BitMatrix},
+                                         nx::Option{<:AbstractVector},
+                                         ts::Option{<:AbstractVector},
+                                         fb::Option{<:FbChain})
+        return new{typeof(w), typeof(wb), typeof(retcode), typeof(imsk), typeof(nx),
+                   typeof(ts), typeof(fb)}(w, wb, retcode, imsk, nx, ts, fb)
+    end
+end
+function BudgetedHindsightPathResult(; w::MatNum, wb::WeightBounds,
+                                     retcode::OptimisationReturnCode,
+                                     imsk::Option{<:BitMatrix} = nothing,
+                                     nx::Option{<:AbstractVector} = nothing,
+                                     ts::Option{<:AbstractVector} = nothing,
+                                     fb::Option{<:FbChain} = nothing)::BudgetedHindsightPathResult
+    return BudgetedHindsightPathResult(w, wb, retcode, imsk, nx, ts, fb)
+end
+"""
+    factory(res::BudgetedHindsightPathResult, fb::Option{<:FbChain})
+
+Rebuild a budgeted path result with the fallback chain `fb` that [`optimise`](@ref) walked, every other field unchanged.
+
+# Related
+
+  - [`BudgetedHindsightPathResult`](@ref)
+  - [`FbChain`](@ref)
+"""
+function factory(res::BudgetedHindsightPathResult, fb::Option{<:FbChain})
+    return BudgetedHindsightPathResult(res.w, res.wb, res.retcode, res.imsk, res.nx, res.ts,
+                                       fb)
+end
+"""
+    row_coverage_mask(rd::ReturnsResult, t::Integer) -> Option{BitVector}
+
+The Coverage Universe of row `t` of `rd` alone, through [`coverage_mask`](@ref) on the one-row view, with the empty-universe refusal restated to name the row.
+
+# Related
+
+  - [`path_row_masks`](@ref)
+  - [`coverage_mask`](@ref)
+"""
+function row_coverage_mask(rd::ReturnsResult, t::Integer)
+    rdt = port_opt_view(rd, t:t, :)
+    try
+        return coverage_mask(rdt.X, rdt.pnl)
+    catch err
+        throw(row_universe_error(err, t))
+    end
+end
+"""
+    row_universe_error(err::IsEmptyError, t::Integer) -> IsEmptyError
+    row_universe_error(err::Exception, t::Integer) -> Exception
+
+The error [`row_coverage_mask`](@ref) throws for row `t`: the empty Coverage Universe of [`coverage_mask`](@ref) restated to name the row, and any other error as it is.
+
+# Related
+
+  - [`row_coverage_mask`](@ref)
+"""
+function row_universe_error(::IsEmptyError, t::Integer)
+    return IsEmptyError("row $t of `rd.X` has no asset in its Coverage Universe, so the path cannot hold its budget of one there: every return is non-finite or every asset is inactive on that row.")
+end
+row_universe_error(err::Exception, ::Integer) = err
+"""
+    path_row_masks(rd::ReturnsResult) -> Option{BitMatrix}
+
+The Investable Mask of every row of a budgeted path: row `t` is the Coverage Universe of the one-row window `t` through [`coverage_mask`](@ref), `true` at every asset whose return is finite and whose Asset Panel active mask is `true` on that row, so a delisted or unlisted asset is out of the row as it is out of a `HindsightSplit(; prefix = false)` fold's fit. `nothing` when every row covers every asset.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - Every row has at least one asset in its Coverage Universe. An `IsEmptyError` naming the row is thrown otherwise, because the row's budget of one cannot be met.
+
+# Returns
+
+  - `msk::Option{BitMatrix}`: The masks, `rows × assets`, or `nothing`.
+
+# Related
+
+  - [`BudgetedHindsightPath`](@ref)
+  - [`row_coverage_mask`](@ref)
+  - [`path_row_constraints!`](@ref)
+"""
+function path_row_masks(rd::ReturnsResult)
+    T, N = size(rd.X)
+    msk = trues(T, N)
+    for t in 1:T
+        cm = row_coverage_mask(rd, t)
+        if !isnothing(cm)
+            msk[t, :] = cm
+        end
+    end
+    return all(msk) ? nothing : msk
+end
+
+"""
+    _optimise(est::BudgetedHindsightPath, rd::ReturnsResult; dims::Int = 1, kwargs...) -> BudgetedHindsightPathResult
+
+Solve the budgeted path programme of [`BudgetedHindsightPath`](@ref) over the rows of `rd`. [`optimise`](@ref) is the door, and it walks `est.fb` on a failure.
+
+# Arguments
+
+  - `est`: The estimator.
+  - $(arg_dict[:rd]) Its returns matrix is the panel the path is solved over.
+  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets, so `dims == 2` throws `ConflictingArgumentError`.
+  - `kwargs`: Ignored.
+
+# Validation
+
+  - `!isnothing(rd.X)`. An `IsNothingError` is thrown otherwise.
+  - Every row has at least one asset in its Coverage Universe, through [`path_row_masks`](@ref).
+
+# Returns
+
+  - `res::BudgetedHindsightPathResult`: The path, or the failure.
+
+# Related
+
+  - [`BudgetedHindsightPath`](@ref)
+  - [`BudgetedHindsightPathResult`](@ref)
+  - [`path_row_masks`](@ref)
+  - [`path_row_constraints!`](@ref)
+  - [`path_budget_constraint!`](@ref)
+  - [`optimise_JuMP_model!`](@ref)
+"""
+function _optimise(est::BudgetedHindsightPath, rd::ReturnsResult; dims::Int = 1, kwargs...)
+    @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
+    assert_returns_result_dims(dims)
     X = one(eltype(rd.X)) .+ rd.X
     T, N = size(X)
-    wb = path_weight_bounds(wb, sets, N, strict, eltype(X))
+    imsk = path_row_masks(rd)
+    msk = isnothing(imsk) ? trues(T, N) : imsk
+    wb = weight_bounds_constraints(est.wb, est.sets; N = N, strict = est.strict,
+                                   datatype = eltype(X))
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, false)
     u = JuMP.@variable(model, [1:T, 1:N])
     z = JuMP.@variable(model, [1:T])
-    # One scalar row per fold rather than a JuMP container, which JET reads through the
+    # One scalar row per period rather than a JuMP container, which JET reads through the
     # container closure and reports a builtin call on.
     for t in 1:T
-        path_row_constraints!(model, view(u, t, :), z[t], view(X, t, :), wb)
+        path_row_constraints!(model, view(u, t, :), z[t], view(X, t, :), view(msk, t, :),
+                              wb)
     end
-    path_budget_constraint!(model, u, L, p)
+    path_budget_constraint!(model, u, est.L, est.p)
     JuMP.@objective(model, Max, sum(z))
-    res = optimise_JuMP_model!(model, slv)
+    res = optimise_JuMP_model!(model, est.slv)
     W, retcode = if res.success
         JuMP.value.(u), OptimisationSuccess()
     else
         fill(eltype(X)(NaN), T, N), OptimisationFailure(; res = res.trials)
     end
-    folds = [predict(NaiveOptimisationResult(; pr = nothing, wb = wb, retcode = retcode,
-                                             w = W[t, :], fb = nothing),
-                     port_opt_view(rd, t:t, :)) for t in 1:T]
-    return MultiPeriodPredictionResult(; pred = folds)
+    # A fixed variable's value is the solver's zero; the gap's is exact.
+    W[.!msk] .= zero(eltype(W))
+    return BudgetedHindsightPathResult(; w = W, wb = wb, retcode = retcode, imsk = imsk,
+                                       nx = rd.nx, ts = rd.ts)
+end
+"""
+    predict(res::BudgetedHindsightPathResult, rd::ReturnsResult) -> MultiPeriodPredictionResult
+
+The prediction result of a budgeted path over the rows it was solved on: one fold per row, each a [`PredictionResult`](@ref) whose [`NaiveOptimisationResult`](@ref) holds that row's allocation on the resolved bounds, with the row's Investable Mask when the row has a missing return, predicted over that row alone.
+
+The path is bound to its rows, so `rd` must be the panel the path was solved over: the same names, the same clock and the same row count. `predict(optimise(est, rd_test), rd_test)` is then the Hindsight Comparator rule of [`log_wealth_regret`](@ref), and the regret verb reads the folds unchanged.
+
+# Arguments
+
+  - `res`: The fit.
+  - $(arg_dict[:rd]) The panel the path was solved over.
+
+# Validation
+
+  - `rd` carries the names, the clock and the row count of `res`. An `ArgumentError` is thrown otherwise: a path over other rows is another fit.
+
+# Returns
+
+  - `pred::MultiPeriodPredictionResult`: One fold per row.
+
+# Related
+
+  - [`BudgetedHindsightPath`](@ref)
+  - [`BudgetedHindsightPathResult`](@ref)
+  - [`log_wealth_regret`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+"""
+function StatsAPI.predict(res::BudgetedHindsightPathResult, rd::ReturnsResult)
+    assert_path_rows(res, rd)
+    return MultiPeriodPredictionResult(;
+                                       pred = [path_row_fold(res, rd, t)
+                                               for t in axes(res.w, 1)])
+end
+"""
+    assert_path_rows(res::BudgetedHindsightPathResult, rd::ReturnsResult)
+
+Refuse a returns result that is not the panel a budgeted path was solved over: the names, the clock and the row count must be the fit's, because the path is bound to its rows. An `ArgumentError` is thrown otherwise.
+
+# Related
+
+  - [`predict`](@ref)
+  - [`BudgetedHindsightPathResult`](@ref)
+"""
+function assert_path_rows(res::BudgetedHindsightPathResult, rd::ReturnsResult)::Nothing
+    same = !isnothing(rd.X) &&
+           size(rd.X, 1) == size(res.w, 1) &&
+           isequal(rd.nx, res.nx) &&
+           isequal(rd.ts, res.ts)
+    @argcheck(same,
+              ArgumentError("the path was solved over other rows: `predict` reads the panel the `BudgetedHindsightPath` was fit on, with the same asset names, timestamps and row count, because the path is bound to its rows. Fit the estimator on the rows to score."))
+    return nothing
+end
+"""
+    path_row_fold(res::BudgetedHindsightPathResult, rd::ReturnsResult, t::Integer) -> PredictionResult
+
+One fold of a budgeted path's prediction result: row `t`'s allocation as a [`NaiveOptimisationResult`](@ref) on the resolved bounds, predicted over row `t` of `rd` alone. A row with a gap carries its Investable Mask, so `predict` views the row and the weights at it and never reads the gap; a row with none carries `nothing`, as a full-universe fit does.
+
+# Related
+
+  - [`predict`](@ref)
+  - [`BudgetedHindsightPathResult`](@ref)
+"""
+function path_row_fold(res::BudgetedHindsightPathResult, rd::ReturnsResult, t::Integer)
+    mt = isnothing(res.imsk) || all(view(res.imsk, t, :)) ? nothing : res.imsk[t, :]
+    wt = isnothing(mt) ? res.w[t, :] : res.w[t, mt]
+    return predict(NaiveOptimisationResult(; pr = nothing, wb = res.wb,
+                                           retcode = res.retcode, w = wt, imsk = mt,
+                                           fb = nothing), port_opt_view(rd, t:t, :))
 end
 
-export log_wealth_regret, LogWealthRegretResult, budgeted_hindsight_path
+export log_wealth_regret, LogWealthRegretResult, BudgetedHindsightPath,
+       BudgetedHindsightPathResult
