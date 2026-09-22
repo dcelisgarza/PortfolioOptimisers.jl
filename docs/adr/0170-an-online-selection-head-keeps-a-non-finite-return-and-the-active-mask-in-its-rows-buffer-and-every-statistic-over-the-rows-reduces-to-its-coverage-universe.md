@@ -97,14 +97,16 @@ mask-aware one answers it from the rows it has. A plain folding moment estimator
 statistic is `NaN` from the first gap on, the Coverage Universe of the prefix. Either is honest.
 The filled mean was neither.
 
-One folding family keeps the cash reading: a `PriceLevelExpectedReturns` over a folding
-statistic. Its recursion runs over price levels — an exponential average, a peak, a kernel trend
-with a memory of levels and an elastic-net polish — and its `partial_fit!` contract already says
-a non-finite entry is a Held Gap the caller fills before the fold, because a level that goes
-undefined never recovers and a regression over a memory with a `NaN` throws. The fold arm
-therefore hands it the row with each gap read as a zero return (`fold_row`), the level did not
-move, and a relisted asset re-enters that recursion warm. A mask-aware fold for these statistics
-— a reset at an inactive row so a relisting starts cold — is the follow-up named below.
+One folding family took the cash reading when this ADR was written: a
+`PriceLevelExpectedReturns` over a folding statistic. Its recursion runs over price levels — an
+exponential average, a peak, a kernel trend with a memory of levels and an elastic-net polish —
+so a level that goes undefined never recovers and a regression over a memory with a `NaN` throws.
+The head therefore handed it the row with each gap read as a zero return, and a relisted asset
+re-entered that recursion warm. That family now reads the mask itself:
+[ADR 0172](0172-a-folding-price-level-statistic-resets-an-asset-the-active-mask-turns-off-and-answers-nan-below-its-first-folded-level.md)
+resets an asset the mask turns off, folds the active assets of the row alone, and answers `NaN`
+until the asset has folded a level, so the fold arm hands every forecaster the row verbatim and
+the hook that filled it is gone.
 
 ### A folding forecaster reads the current row, so the head holds one row for it
 
@@ -180,8 +182,9 @@ instead of dropping it.
   which the roster's `LowDimensionEnsemblePortfolio` found the moment its leader met a `NaN`;
   it now reduces to the Coverage Universe and expands both moments, as every prior does.
 - A mask-aware fold for the price-level statistics — a reset at an inactive row so a relisting
-  starts cold, as `ExpWeightedExpectedReturns` does — is the missing piece for a caller who
-  wants a folding price-level forecast to re-admit a late lister cold; it is a follow-up on the
-  moment layer, not this head:
-  [#1238](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1238).
+  starts cold, as `ExpWeightedExpectedReturns` does — was the missing piece for a caller who
+  wants a folding price-level forecast to re-admit a late lister cold. It was a follow-up on the
+  moment layer rather than on this head, and
+  [ADR 0172](0172-a-folding-price-level-statistic-resets-an-asset-the-active-mask-turns-off-and-answers-nan-below-its-first-folded-level.md)
+  settles it: [#1238](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1238).
 - Issue #1237.

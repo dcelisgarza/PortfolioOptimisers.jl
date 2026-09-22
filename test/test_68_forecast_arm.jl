@@ -119,6 +119,79 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         @test_throws DomainError ReweightedPriceRelative(; theta = 0)
     end
 
+    @testset "A folding statistic under an active mask: the reset, the count, the arms" begin
+        # Two assets over six rows, the second unlisted over the first three.
+        Rg = [0.010 -0.020
+              -0.015 0.030
+              0.020 -0.010
+              -0.005 0.012
+              0.008 -0.004
+              -0.011 0.021]
+        amskg = trues(6, 2)
+        amskg[1:3, 2] .= false
+        Rg[.!amskg] .= NaN
+        pnlg = AssetPanel(; amsk = amskg, emsk = copy(amskg))
+        emag = PriceLevelExpectedReturns(; alg = ExponentialMovingAverage(; alpha = 0.5))
+        # The relisted asset reads its own rows alone, and the listed one reads every row.
+        gf = po.partial_fit!(emag, Rg; active_mask = amskg)
+        @test gf.cache.n == 6 && gf.cache.nu == [6, 3]
+        @test vec(mean(gf))[2] ≈ vec(mean(emag, Rg[4:6, 2:2]))[1]
+        @test vec(mean(gf))[1] ≈ vec(mean(emag, Rg[:, 1:1]))[1]
+        # Below the warm-up the asset carries no forecast, so the step holds its leg.
+        cold3 = po.partial_fit!(emag, Rg[1:3, :]; active_mask = amskg[1:3, :])
+        @test cold3.cache.nu == [3, 0] && isnan(vec(mean(cold3))[2])
+        @test po.flat_where_undefined(1 .+ vec(mean(cold3)))[2] == 1
+        # The Asset Panel arm of the batch verb is that fold, so the two arms agree.
+        @test isequal(vec(mean(emag, Rg, pnlg)), vec(mean(gf)))
+        # With no mask a gap is a delisting, because nothing states otherwise.
+        @test isequal(vec(mean(po.partial_fit!(emag, Rg))), vec(mean(gf)))
+        # A windowed statistic takes the root of the seam instead: the Coverage Universe of
+        # the window, `NaN` outside it, and no mask of its own.
+        maw = PriceLevelExpectedReturns(; alg = MovingAverage(; window = 3))
+        muw = vec(mean(maw, Rg, pnlg))
+        @test isnan(muw[2]) && isfinite(muw[1])
+        @test_throws ArgumentError mean(maw, Rg; active_mask = amskg)
+        @test_throws DimensionMismatch po.partial_fit!(emag, Rg[1, :]; active_mask = [true])
+        @test_throws DimensionMismatch mean(emag, Rg; active_mask = amskg[:, 1:1])
+        # A holiday inside a listing is a flat level: the mask admits the asset, its return
+        # is not there, the level did not move, and the fold warms nothing.
+        hol = copy(Rg[4:6, :])
+        hol[2, 1] = NaN
+        hf = po.partial_fit!(emag, hol; active_mask = trues(3, 2))
+        @test hf.cache.nu == [2, 3]
+        flat = po.partial_fit!(po.partial_fit!(emag, hol[1:1, :]), zeros(1, 2))
+        @test po.partial_fit!(emag, hol[1:2, :]; active_mask = trues(2, 2)).cache.stat[1] ≈
+              flat.cache.stat[1]
+        # A row on which no asset is active folds nothing and leaves every asset cold.
+        dead = po.partial_fit!(emag, Rg[4:4, :]; active_mask = falses(1, 2))
+        @test dead.cache.nu == [0, 0] && all(isnan, vec(mean(dead)))
+        # The cold seed is the carried value that makes each recursion answer its own seed.
+        x1 = 1 .+ Rg[4, :]
+        @test po.cold_statistic(ExponentialMovingAverage(), x1) == ones(2)
+        @test po.cold_statistic(ReweightedPriceRelative(), x1) == x1
+        @test po.cold_statistic(KernelTrendPattern(), x1) == x1
+        for alg in (ExponentialMovingAverage(), ReweightedPriceRelative())
+            @test po.fold_statistic(alg, nothing, x1) ==
+                  po.fold_statistic(alg, po.cold_statistic(alg, x1), x1)
+        end
+        # The reweighted relative seeds at the row's own relative, so a relisting that
+        # started warm would read a different number.
+        rprg = PriceLevelExpectedReturns(; alg = ReweightedPriceRelative(; theta = 0.7))
+        @test vec(mean(po.partial_fit!(rprg, Rg; active_mask = amskg)))[2] ≈
+              vec(mean(rprg, Rg[4:6, 2:2]))[1]
+        # A statistic that couples the assets pools the live ones alone, so the fold over
+        # the masked panel is the fold over the Coverage Universe of the row.
+        ktp = PriceLevelExpectedReturns(; alg = KernelTrendPattern(; window = 2))
+        kf = po.partial_fit!(ktp, Rg[1:3, :]; active_mask = amskg[1:3, :])
+        @test isnan(vec(mean(kf))[2]) && all(isone, kf.cache.hist[:, 2])
+        @test vec(mean(kf))[1] ≈ vec(mean(ktp, Rg[1:3, 1:1]))[1]
+        kg = po.partial_fit!(ktp, Rg; active_mask = amskg)
+        @test all(isfinite, vec(mean(kg))) && kg.cache.nu == [6, 3]
+        @test isequal(vec(mean(ktp, Rg, pnlg)), vec(mean(kg)))
+        # The count pays the state's interface beside the statistic and the memory.
+        @test po.port_opt_view(gf.cache, [2]).nu == [3] && copy(gf.cache).nu == gf.cache.nu
+    end
+
     @testset "The composite statistics of the later papers" begin
         P = levels(X[(end - 3):end, :])
         # The truncated exponential average, unnormalised, weights falling with age, and

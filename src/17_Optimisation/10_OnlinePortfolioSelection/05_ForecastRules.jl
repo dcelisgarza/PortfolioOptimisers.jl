@@ -114,7 +114,7 @@ end
 
 The Price Relative Forecast `x̂ = 1 .+ mu` of a rule's forecaster after the row `x`, by the fold-or-refit rule: a forecaster on a [`ForecasterState`](@ref) is folded on the row and read from its state; one with none is refit on the rows the head holds, which include the row, or on the row alone when the head holds none. A forecast is **flat** — one in every asset, which every rule's step holds on — where the forecaster has fewer rows than [`forecast_min_rows`](@ref) or answers a non-finite entry ([`flat_where_undefined`](@ref)).
 
-Both arms read the head's rows carrier as the batch verb reads one, gaps and active mask included. The refit arm is `mean(me, rd.X, rd.pnl)`, which reduces to the Coverage Universe of the window: a plain forecaster answers `NaN`, and so holds, at an asset with a gap anywhere in the window, and a mask-aware one answers it from the rows it has. The fold arm folds the carrier's last row — the current row verbatim — with its active mask, so a plain moment forecaster's running statistic is `NaN` from the first gap on, the Coverage Universe of the prefix, and a mask-aware one freezes, resets or re-admits by its own policy; a folding price-level statistic reads the gap as a flat level ([`fold_row`](@ref)). Outside the head, with no carrier, the fold arm folds the finite `x .- 1` and the refit arm the row alone.
+Both arms read the head's rows carrier as the batch verb reads one, gaps and active mask included. The refit arm is `mean(me, rd.X, rd.pnl)`, which reduces to the Coverage Universe of the window: a plain forecaster answers `NaN`, and so holds, at an asset with a gap anywhere in the window, and a mask-aware one answers it from the rows it has. The fold arm folds the carrier's last row — the current row verbatim — with its active mask, so a plain moment forecaster's running statistic is `NaN` from the first gap on, the Coverage Universe of the prefix, and a mask-aware one freezes, resets or re-admits by its own policy; a folding price-level statistic resets the asset the mask turns off and answers `NaN` until it has folded a level, so a relisting starts cold. Outside the head, with no carrier, the fold arm folds the finite `x .- 1` and the refit arm the row alone.
 
 # Arguments
 
@@ -152,28 +152,10 @@ function forecast_relative(::AbstractExpectedReturnsEstimator, st::ForecasterSta
 end
 function forecast_relative(::AbstractExpectedReturnsEstimator, st::ForecasterState,
                            x::AbstractVector, rows::ReturnsResult)
-    r = fold_row(st.me, view(rows.X, size(rows.X, 1), :))
-    me = partial_fit!(st.me, r; active_mask = last_active_mask(rows.pnl))
+    me = partial_fit!(st.me, view(rows.X, size(rows.X, 1), :);
+                      active_mask = last_active_mask(rows.pnl))
     return ForecasterState(me),
            flat_where_undefined(one(eltype(x)) .+ vec(Statistics.mean(me)))
-end
-"""
-    fold_row(me::AbstractExpectedReturnsEstimator, r::AbstractVector)
-    fold_row(me::PriceLevelExpectedReturns, r::AbstractVector)
-
-The row a folding forecaster folds: the head's row verbatim, gaps included, for a moment estimator, whose fold reads a gap as a gap; and the row with every gap read as a zero return for a [`PriceLevelExpectedReturns`](@ref), whose folding statistic is an exact recursion over price levels that its own contract asks the caller to fill before the fold — the level did not move, the same reading the step takes through [`price_relative`](@ref). A moment estimator's answer at a gapped asset is `NaN` and holds the leg; a folding price-level statistic keeps a level there and never leaves it undefined, so a relisted asset re-enters its recursion warm rather than never.
-
-# Related
-
-  - [`forecast_relative`](@ref)
-  - [`price_relative`](@ref)
-  - [`partial_fit!`](@ref)
-"""
-function fold_row(::AbstractExpectedReturnsEstimator, r::AbstractVector)
-    return r
-end
-function fold_row(::PriceLevelExpectedReturns, r::AbstractVector)
-    return [isfinite(v) ? v : zero(v) for v in r]
 end
 """
     last_active_mask(pnl::Nothing)

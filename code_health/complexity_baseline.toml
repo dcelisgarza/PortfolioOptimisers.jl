@@ -126,8 +126,8 @@ commit = "0ecb3ce47c"
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 55, cog_sum = 54, arg_sum = 45, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { cyc = 6, cog = 8, arg = 3, cyc_sum = 58, cog_sum = 61, arg_sum = 49, macros = [] }
 "src/05_Moments/33_CoverageUniverse.jl" = { cyc = 7, cog = 12, arg = 8, cyc_sum = 106, cog_sum = 70, arg_sum = 209, macros = [] }
-"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { cyc = 8, cog = 14, arg = 4, cyc_sum = 78, cog_sum = 61, arg_sum = 73, macros = [] }
-"src/05_Moments/35_CompositePriceLevelStatistics.jl" = { cyc = 7, cog = 10, arg = 5, cyc_sum = 65, cog_sum = 57, arg_sum = 59, macros = [] }
+"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { cyc = 9, cog = 14, arg = 5, cyc_sum = 94, cog_sum = 77, arg_sum = 94, macros = [] }
+"src/05_Moments/35_CompositePriceLevelStatistics.jl" = { cyc = 7, cog = 10, arg = 5, cyc_sum = 66, cog_sum = 57, arg_sum = 61, macros = [] }
 "src/05_Moments/36_RankOneCovariance.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 6, cog_sum = 4, arg_sum = 9, macros = [] }
 "src/06_Distance/01_Base_Distance.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 3, cog_sum = 2, arg_sum = 2, macros = [] }
 "src/06_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
@@ -308,7 +308,7 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { cyc = 4, cog = 3, arg = 6, cyc_sum = 57, cog_sum = 30, arg_sum = 96, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { cyc = 7, cog = 10, arg = 7, cyc_sum = 64, cog_sum = 53, arg_sum = 59, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { cyc = 10, cog = 11, arg = 38, cyc_sum = 57, cog_sum = 39, arg_sum = 81, macros = [] }
-"src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { cyc = 3, cog = 4, arg = 8, cyc_sum = 81, cog_sum = 39, arg_sum = 140, macros = [] }
+"src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { cyc = 3, cog = 4, arg = 8, cyc_sum = 85, cog_sum = 40, arg_sum = 146, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 56, cog_sum = 26, arg_sum = 107, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 84, cog_sum = 28, arg_sum = 132, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { cyc = 5, cog = 4, arg = 6, cyc_sum = 82, cog_sum = 38, arg_sum = 113, macros = [] }

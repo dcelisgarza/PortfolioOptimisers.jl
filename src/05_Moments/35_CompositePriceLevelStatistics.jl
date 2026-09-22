@@ -845,6 +845,8 @@ where ``\\hat{\\boldsymbol{z}}_{t}`` is the [`ElasticNetPath`](@ref) regression 
 
 The regression pools the assets as observations, so it is not homogeneous in each asset's level alone: it is read on the reconstructed price path, whose last level is one for every asset, so that the assets enter in comparable units. The paper regresses on raw prices, where an asset quoted at a hundred times another's dominates the fit.
 
+Under an active mask the fit takes the live assets alone, because [`partial_fit!`](@ref) folds the row's Coverage Universe and holds the rest. An asset the mask turns off leaves the memory flat over its dead span, so the levels it brings back when it relists are its relisting level repeated: the window peak is then the peak of the levels the asset has, which is the paper's own truncation, and the fit reads one flat column for it until the memory fills again.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -952,6 +954,9 @@ function trend_reverting_fraction(P::AbstractMatrix)
     end
     return count / (m * N)
 end
+function cold_statistic(::KernelTrendPattern, x::AbstractVector)
+    return collect(x)
+end
 function fold_statistic(alg::KernelTrendPattern, stat::Option{<:AbstractVector},
                         hist::AbstractMatrix, x::AbstractVector)
     P = price_levels(hist .- one(eltype(hist)))
@@ -959,8 +964,9 @@ function fold_statistic(alg::KernelTrendPattern, stat::Option{<:AbstractVector},
     Pw = view(P, max(1, L - alg.window + 1):L, :)
     ptilde = vec(maximum(Pw; dims = 1))
     # The previous prediction was made in units of the previous level; the current level is
-    # one, so it is divided by the row's relative.
-    prev = isnothing(stat) ? one(eltype(x)) : stat ./ x
+    # one, so it is divided by the row's relative. The cold seed is the row's relative, so
+    # that an asset the fold has just reset enters at a prediction of one.
+    prev = (isnothing(stat) ? cold_statistic(alg, x) : stat) ./ x
     y = alg.nu .* ptilde .+ (one(alg.nu) - alg.nu) .* prev
     Pt = permutedims(Pw)
     yhat = max.(Pt * elastic_net_path(alg.path, Pt, y), zero(eltype(y)))

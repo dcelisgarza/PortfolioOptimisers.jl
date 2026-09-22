@@ -257,12 +257,14 @@ end
         # The fold arm reads the current row under the last mask row of the carrier.
         @test po.last_active_mask(crd.pnl) == amsk[12, :]
         @test isnothing(po.last_active_mask(nothing))
-        # A moment forecaster folds the gap as a gap; a folding price-level statistic reads
-        # it as a flat level, the contract its own fold states.
+        # The fold arm hands the row verbatim: a moment forecaster folds the gap as a
+        # gap, and a folding price-level statistic reads the mask itself, so it resets the
+        # gapped asset and answers `NaN` for it until the asset quotes again.
         rg = [0.1, NaN, -0.2]
-        @test po.fold_row(SimpleExpectedReturns(), rg) === rg
-        @test po.fold_row(PriceLevelExpectedReturns(; alg = ExponentialMovingAverage()),
-                          rg) == [0.1, 0.0, -0.2]
+        pl = po.partial_fit!(PriceLevelExpectedReturns(; alg = ExponentialMovingAverage()),
+                             rg)
+        @test pl.cache.nu == [1, 0, 1] && isnan(vec(mean(pl))[2])
+        @test all(isfinite, vec(mean(po.partial_fit!(pl, [0.0, 0.05, 0.0]))))
         @test isa(optimise(OPS(; alg = KernelTrendPatternTracking()), rows(rdg, 1:30)).retcode,
                   OptimisationSuccess)
         @test isnothing(po.last_active_mask(AssetPanel(;

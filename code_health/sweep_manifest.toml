@@ -174,7 +174,7 @@
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { map = 3, units = 16, swept = false }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { map = 3, units = 15, swept = false }
 "src/05_Moments/33_CoverageUniverse.jl" = { map = 3, units = 43, swept = false }
-"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { map = 3, units = 24, swept = false }
+"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { map = 3, units = 28, swept = false }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { map = 3, units = 14, swept = false }
 "src/05_Moments/36_RankOneCovariance.jl" = { map = 3, units = 3, swept = false }
 "src/06_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true, bindings = ["AbstractDistanceAlgorithm", "AbstractDistanceEstimator", "CanonicalDistance", "CorrelationDistance", "LogDistance", "SimpleAbsoluteDistance", "SimpleDistance", "VariationInfoDistance"] }
@@ -357,7 +357,7 @@
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { map = 10, units = 23, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { map = 10, units = 15, swept = false }
 "src/18_ExpectedReturns.jl" = { map = 8, units = 24, algorithm = 5, swept = true, bindings = ["ExpectedReturn", "ExpectedReturnRiskRatio", "PerfRM", "PerformanceSummaryResult", "PrRM", "brinson_attribution", "excess_statistics", "expected_ratio", "expected_return", "expected_return", "expected_risk", "expected_risk", "expected_risk", "expected_risk", "expected_risk_ret_ratio", "expected_risk_ret_sric", "expected_sric", "held_path_turnover", "performance_summary", "prrm_prediction_message", "sric_penalty", "summarise_returns", "supports_precomputed_returns", "term_fees"] }
-"src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { map = 10, units = 29, swept = false }
+"src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { map = 10, units = 28, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { map = 10, units = 20, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { map = 10, units = 34, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { map = 10, units = 28, swept = false }

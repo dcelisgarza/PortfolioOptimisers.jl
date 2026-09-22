@@ -14,7 +14,6 @@ PortfolioOptimisers.holds_second_moment
 PortfolioOptimisers.flat_where_undefined
 PortfolioOptimisers.refit_rows
 PortfolioOptimisers.last_active_mask
-PortfolioOptimisers.fold_row
 PortfolioOptimisers.scale_relative
 PortfolioOptimisers.scale_rows
 ```

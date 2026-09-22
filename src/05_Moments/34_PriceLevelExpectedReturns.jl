@@ -7,6 +7,8 @@ Every statistic is read on the reconstructed price path: the level of the last o
 
 Over the first rows a windowed statistic **truncates its window** to the levels available, as the reversion papers' reference implementations do: with `window = 5` and two returns folded, the statistic reads three levels. A folding statistic starts from its seed at the first row. A composite statistic truncates every window it holds the same way.
 
+A folding statistic is **mask-aware**: [`partial_fit!`](@ref) reads the active mask of the row, folds the active assets alone, and resets an inactive asset to [`cold_statistic`](@ref), so a relisting starts cold rather than warm. An asset that has folded no level since its last reset is `NaN` at the read-out. The reduction is the caller's, so a statistic that couples the assets reads the active assets alone and needs no mask of its own.
+
 # Interfaces
 
 In order to implement a new price-level statistic, subtype `AbstractPriceLevelStatistic` with all its parameters as part of the struct, and implement the following methods:
@@ -15,6 +17,7 @@ In order to implement a new price-level statistic, subtype `AbstractPriceLevelSt
   - `window_rows(alg::AbstractPriceLevelStatistic) -> Union{Nothing, Integer}`: The number of return rows the batch form reads to reconstruct its levels, `window - 1` for a statistic over `window` levels, and `nothing` for one that reads every row it is handed. The default reads `alg.window - 1`.
   - `folds(alg::AbstractPriceLevelStatistic) -> Bool`: `true` when the statistic is an exact recursion over price relatives, carried by [`fold_statistic`](@ref). The default is `false`.
   - `fold_statistic(alg::AbstractPriceLevelStatistic, stat, x::AbstractVector) -> AbstractVector`: For a folding statistic, the recursion: from the carried statistic `stat` in relative terms (`nothing` before the first row) and the price relative `x` of the row, the statistic after the row, as a new vector.
+  - `cold_statistic(alg::AbstractPriceLevelStatistic, x::AbstractVector) -> AbstractVector`: For a folding statistic, the carried statistic before the first row, in the units the recursion reads it: the value that makes the recursion answer its own seed. The default is one in every asset.
   - `memory_rows(alg::AbstractPriceLevelStatistic) -> Integer`: The number of relatives a folding statistic carries as its memory, `0` for one whose recursion reads the carried vector alone, which is the default. A statistic with a memory implements the four-argument `fold_statistic(alg, stat, hist, x)` instead, `hist` being the last `memory_rows(alg)` relatives, the row's own last, or fewer over the first rows.
 
 ## Arguments
@@ -428,7 +431,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The Partial Fit State of a [`PriceLevelExpectedReturns`](@ref) whose statistic folds: the statistic in units of the last level, one entry per asset, the number of rows folded, and the memory of a statistic that carries one.
+The Partial Fit State of a [`PriceLevelExpectedReturns`](@ref) whose statistic folds: the statistic in units of the last level, one entry per asset, the number of rows folded, the number of levels each asset has folded since its last reset, and the memory of a statistic that carries one.
 
 # Fields
 
@@ -447,6 +450,10 @@ $(DocStringExtensions.FIELDS)
     """
     n
     """
+    The number of levels each asset has folded since its last reset, `assets × 1`. An asset at zero carries the cold seed, and the read-out answers `NaN` for it.
+    """
+    nu
+    """
     The folded statistic divided by the current level, `assets × 1`: the Price Relative Forecast.
     """
     stat
@@ -459,11 +466,11 @@ function merge_states(::PriceLevelForecastState, ::PriceLevelForecastState)
     return throw(ArgumentError("a `PriceLevelForecastState` is not merged: the recursion it carries is order-dependent, so two states folded on different rows have no common continuation. Fold the rows of one into the other."))
 end
 function Base.copy(x::PriceLevelForecastState)
-    return PriceLevelForecastState(x.n, copy(x.stat),
+    return PriceLevelForecastState(x.n, copy(x.nu), copy(x.stat),
                                    isnothing(x.hist) ? nothing : copy(x.hist))
 end
 function port_opt_view(x::PriceLevelForecastState, i, args...)
-    return PriceLevelForecastState(x.n, x.stat[i],
+    return PriceLevelForecastState(x.n, x.nu[i], x.stat[i],
                                    isnothing(x.hist) ? nothing : x.hist[:, i])
 end
 """
@@ -765,6 +772,38 @@ function price_level_statistic(alg::ReweightedPriceRelative, P::AbstractMatrix)
     return fold_levels(alg, P)
 end
 """
+    cold_statistic(alg::AbstractPriceLevelStatistic, x::AbstractVector)
+    cold_statistic(alg::ReweightedPriceRelative, x::AbstractVector)
+    cold_statistic(alg::KernelTrendPattern, x::AbstractVector)
+
+The carried statistic of a folding statistic before its first row, in the units its own recursion reads: the value that makes [`fold_statistic`](@ref) answer the seed the statistic states.
+
+The exponential moving average seeds its forecast at one and reads the carried vector as it stands, so its cold seed is one in every asset. The reweighted relative seeds at the row's own relative, and the kernel trend pattern divides the carried prediction by that relative to bring it into the current level's units, so both seed at `x`.
+
+This is the value [`partial_fit!`](@ref) writes at an asset the active mask turns off, so that a relisting re-enters the recursion cold.
+
+# Arguments
+
+  - `alg`: The folding statistic.
+  - `x`: The price relative of the row, `1 .+ r`.
+
+# Returns
+
+  - `stat::Vector`: The cold seed per asset, a new vector.
+
+# Related
+
+  - [`AbstractPriceLevelStatistic`](@ref)
+  - [`fold_statistic`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function cold_statistic(::AbstractPriceLevelStatistic, x::AbstractVector)
+    return fill(one(eltype(x)), length(x))
+end
+function cold_statistic(::ReweightedPriceRelative, x::AbstractVector)
+    return collect(x)
+end
+"""
     fold_statistic(alg::ExponentialMovingAverage, stat, x::AbstractVector)
     fold_statistic(alg::ReweightedPriceRelative, stat, x::AbstractVector)
     fold_statistic(alg::KernelTrendPattern, stat, hist::AbstractMatrix, x::AbstractVector)
@@ -795,14 +834,86 @@ The exponential moving average steps ``\\hat{\\boldsymbol{x}}' = \\alpha + (1 - 
 """
 function fold_statistic(alg::ExponentialMovingAverage, stat::Option{<:AbstractVector},
                         x::AbstractVector)
-    prev = isnothing(stat) ? one(eltype(x)) : stat
+    prev = isnothing(stat) ? cold_statistic(alg, x) : stat
     return alg.alpha .+ (one(alg.alpha) - alg.alpha) .* prev ./ x
 end
 function fold_statistic(alg::ReweightedPriceRelative, stat::Option{<:AbstractVector},
                         x::AbstractVector)
-    prev = isnothing(stat) ? x : stat
+    prev = isnothing(stat) ? cold_statistic(alg, x) : stat
     gamma = alg.theta .* x ./ (alg.theta .* x .+ prev)
     return gamma .+ (one(eltype(gamma)) .- gamma) .* prev ./ x
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+One row of a folding statistic's recursion, at the arity its memory asks for: the three-argument [`fold_statistic`](@ref) for a statistic that carries no memory, and the four-argument one for a statistic that carries one.
+
+# Arguments
+
+  - `alg`: The folding statistic.
+  - `stat`: The carried statistic, or `nothing` before the first row.
+  - `hist`: The carried memory with the row appended, or `nothing`.
+  - `x`: The price relative of the row, `1 .+ r`.
+
+# Returns
+
+  - `stat'::AbstractVector`: The statistic after the row, a new vector.
+
+# Related
+
+  - [`fold_statistic`](@ref)
+  - [`fold_active`](@ref)
+  - [`fold_levels`](@ref)
+"""
+function fold_statistic_row(alg::AbstractPriceLevelStatistic,
+                            stat::Option{<:AbstractVector}, hist::Option{<:AbstractMatrix},
+                            x::AbstractVector)
+    return if isnothing(hist)
+        fold_statistic(alg, stat, x)
+    else
+        fold_statistic(alg, stat, hist, x)
+    end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+One row of a folding statistic's recursion over the active assets alone, written back into the carried statistic.
+
+`stat` already carries the cold seed at every asset the mask turns off, so an inactive asset keeps that seed and re-enters the recursion cold when it relists. The active assets are the row's Coverage Universe, and the recursion reads them alone: a statistic that couples the assets — the kernel trend pattern's regression — therefore pools the live assets and needs no mask of its own. A row on which no asset is active folds nothing.
+
+# Arguments
+
+  - `alg`: The folding statistic.
+  - `stat`: The carried statistic, the cold seed at every inactive asset.
+  - `hist`: The carried memory with the row appended, or `nothing`.
+  - `x`: The price relative of the row, one at every asset the fold holds.
+  - `active`: The active assets of the row.
+
+# Returns
+
+  - `stat'::AbstractVector`: The statistic after the row, a new vector.
+
+# Related
+
+  - [`fold_statistic_row`](@ref)
+  - [`cold_statistic`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function fold_active(alg::AbstractPriceLevelStatistic, stat::AbstractVector,
+                     hist::Option{<:AbstractMatrix}, x::AbstractVector,
+                     active::AbstractVector{<:Bool})
+    if all(active)
+        return fold_statistic_row(alg, stat, hist, x)
+    end
+    i = findall(active)
+    if isempty(i)
+        return copy(stat)
+    end
+    y = fold_statistic_row(alg, stat[i], isnothing(hist) ? nothing : hist[:, i], x[i])
+    out = similar(stat, promote_type(eltype(stat), eltype(y)))
+    copyto!(out, stat)
+    out[i] = y
+    return out
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -829,11 +940,7 @@ function fold_levels(alg::AbstractPriceLevelStatistic, P::AbstractMatrix)
     for t in 2:size(P, 1)
         x = view(P, t, :) ./ view(P, t - 1, :)
         hist = push_memory(alg, hist, x)
-        stat = if isnothing(hist)
-            fold_statistic(alg, stat, x)
-        else
-            fold_statistic(alg, stat, hist, x)
-        end
+        stat = fold_statistic_row(alg, stat, hist, x)
     end
     return isnothing(stat) ? P[end, :] : stat .* P[end, :]
 end
@@ -916,23 +1023,29 @@ function spatial_median(P::AbstractMatrix, iters::Integer, tol::Real)
     return y
 end
 """
-    Statistics.mean(me::PriceLevelExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.mean(me::PriceLevelExpectedReturns, X::MatNum; dims::Int = 1,
+                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 
 Compute the expected return as the ratio of a price-level statistic to the last price, less one.
 
-The levels are reconstructed with [`price_levels`](@ref) from the last [`window_rows`](@ref) rows of `X` — every row for a folding statistic — or from every row when `X` holds fewer, the statistic on `me.alg` is read through [`price_level_statistic`](@ref), and the answer is the statistic less one, because the last level is one.
+A **windowed** statistic reconstructs the levels with [`price_levels`](@ref) from the last [`window_rows`](@ref) rows of `X`, or from every row when `X` holds fewer, reads the statistic on `me.alg` through [`price_level_statistic`](@ref), and answers the statistic less one, because the last level is one. It reads no active mask: the Asset Panel seam reduces it to the Coverage Universe of its window.
+
+A **folding** statistic runs its own recursion over the rows through [`partial_fit!`](@ref), from a cold state, under `active_mask`. The batch and the fold are therefore the same code over the same rows, so they agree exactly, and the batch reads a gap and a relisting as the fold does: an asset the mask turns off starts cold when it relists, and an asset that has folded no level is `NaN`.
 
 # Arguments
 
   - `me`: The estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
+  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. A windowed statistic refuses one.
   - $(arg_dict[:ignkwargs])
 
 # Validation
 
   - $(val_dict[:dims])
   - `X` holds at least one observation. An `IsEmptyError` is thrown otherwise.
+  - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`. A `DimensionMismatch` is thrown otherwise.
+  - `me.alg` folds when `active_mask` is given. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -943,21 +1056,68 @@ The levels are reconstructed with [`price_levels`](@ref) from the last [`window_
   - [`PriceLevelExpectedReturns`](@ref)
   - [`price_levels`](@ref)
   - [`price_level_statistic`](@ref)
+  - [`partial_fit!`](@ref)
 """
-function Statistics.mean(me::PriceLevelExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
-    X = dims_oriented(dims, X)
+function Statistics.mean(me::PriceLevelExpectedReturns, X::MatNum; dims::Int = 1,
+                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    X, amsk = dims_oriented(dims, X, active_mask)
     @argcheck(size(X, 1) >= 1,
               IsEmptyError("X must hold at least one observation to reconstruct a price level"))
-    need = window_rows(me.alg)
-    k = isnothing(need) ? size(X, 1) : min(size(X, 1), need)
-    P = price_levels(view(X, (size(X, 1) - k + 1):size(X, 1), :))
-    mu = price_level_statistic(me.alg, P) .- one(eltype(P))
+    @argcheck(isnothing(amsk) || size(X) == size(amsk),
+              DimensionMismatch("size(X) ($(size(X))) must match size(active_mask) ($(size(amsk)))"))
+    mu = if folds(me.alg)
+        vec(Statistics.mean(partial_fit!(PriceLevelExpectedReturns(; alg = me.alg), X;
+                                         dims = 1, active_mask = amsk)))
+    else
+        @argcheck(isnothing(amsk),
+                  ArgumentError("`$(typeof(me.alg).name.name)` is a windowed statistic with no recursion to reset, so it reads no active mask: the Asset Panel seam reduces it to the Coverage Universe of its window."))
+        need = window_rows(me.alg)
+        k = isnothing(need) ? size(X, 1) : min(size(X, 1), need)
+        P = price_levels(view(X, (size(X, 1) - k + 1):size(X, 1), :))
+        price_level_statistic(me.alg, P) .- one(eltype(P))
+    end
     return dims == 1 ? reshape(mu, 1, :) : reshape(mu, :, 1)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The Asset Panel method of the expected return of a price-level statistic.
+
+A **folding** statistic is mask-aware, so it overrides the reduce-and-expand root of the verb and reads the panel's active mask itself. The answer therefore lives on the whole universe rather than on the Coverage Universe: an asset that lists inside the window is answered from the levels it has, and it is `NaN` only while it has folded none. A **windowed** statistic takes the root: it is fitted on the Coverage Universe of the window and expanded with `NaN` outside it.
+
+# Arguments
+
+  - `me`: The estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:ignkwargs])
+
+# Returns
+
+  - `mu::Matrix{<:Number}`: The expected return, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
+
+# Related
+
+  - [`PriceLevelExpectedReturns`](@ref)
+  - [`panel_moment_masks`](@ref)
+  - [`Statistics.mean(me::AbstractExpectedReturnsEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.mean(me::PriceLevelExpectedReturns, X::MatNum,
+                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    if !folds(me.alg)
+        cmsk, Xc = coverage_reduction(X, pnl; dims = dims)
+        return expand_moment(Statistics.mean(me, Xc; dims = dims, kwargs...), cmsk, dims)
+    end
+    amsk, _ = panel_moment_masks(pnl)
+    return Statistics.mean(me, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
     Statistics.mean(me::PriceLevelExpectedReturns; kwargs...)
 
 Reads the expected return out of the state a folding statistic carries: the folded statistic less one, shaped `(1, N)`.
+
+An asset that has folded no level since its last reset carries the cold seed rather than a forecast, so the read-out answers `NaN` for it, as [`ExpWeightedExpectedReturns`](@ref) answers below its `min_obs`. Every folding statistic truncates to the levels it holds, so one folded level is enough, and the `NaN` names an asset the mask has turned off or one that has quoted nothing yet.
 
 # Validation
 
@@ -971,7 +1131,9 @@ Reads the expected return out of the state a folding statistic carries: the fold
 """
 function Statistics.mean(me::PriceLevelExpectedReturns; kwargs...)
     state = partial_fit_cache(me)
-    return reshape(state.stat .- one(eltype(state.stat)), 1, :)
+    mu = state.stat .- one(eltype(state.stat))
+    mu[iszero.(state.nu)] .= NaN
+    return reshape(mu, 1, :)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -989,16 +1151,37 @@ function assert_folding_statistic(alg::AbstractPriceLevelStatistic)::Nothing
     return nothing
 end
 """
-    partial_fit!(me::PriceLevelExpectedReturns, x::VecNum; kwargs...)
-    partial_fit!(me::PriceLevelExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    partial_fit!(me::PriceLevelExpectedReturns, x::VecNum;
+                 active_mask::Option{<:AbstractVector{<:Bool}} = nothing, kwargs...)
+    partial_fit!(me::PriceLevelExpectedReturns, X::MatNum; dims::Int = 1,
+                 active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 
-Folds one row of returns, or a block of them in order, into the state a folding statistic carries, seeding it on the first row.
+Folds one row of returns, or a block of them in order, into the state a folding statistic carries, seeding it on the first row and resetting an asset the active mask turns off.
 
-The row is turned into the price relative `1 .+ x`, appended to the memory of a statistic that carries one through [`push_memory`](@ref), and handed to [`fold_statistic`](@ref); a non-finite entry is a Held Gap the caller fills before the fold, and reaches the recursion as it is.
+An asset is **valid** at a row when its return is finite and the mask admits it, which is the condition the exponentially weighted family reads. With no mask the finite assets are the active ones, so a gap is a delisting rather than a holiday, because nothing else states which it is.
+
+# Algorithm
+
+ 1. Read the valid assets and the active ones, and refuse a mask with no entry per asset.
+ 2. Turn the row into the price relative `1 .+ x`, at one wherever the asset is not valid: the level did not move, which is the reading a holiday inside a listing takes.
+ 3. Append the relative to the memory of a statistic that carries one through [`push_memory`](@ref), and flatten the memory of every inactive asset to one, so that its levels carry nothing from before the delisting.
+ 4. Write [`cold_statistic`](@ref) at every inactive asset, and at every asset that has folded no level, so that a relisting re-enters the recursion cold.
+ 5. Fold the active assets alone with [`fold_active`](@ref).
+ 6. Add one to the count of every valid asset, zero the count of every inactive one, and add one to the number of rows folded.
+
+# Arguments
+
+  - `me`: The estimator.
+  - `x`: One row of returns, one entry per asset.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `active_mask`: The active mask of the Asset Panel at this row, or over the block, or `nothing`.
+  - $(arg_dict[:ignkwargs])
 
 # Validation
 
   - `me.alg` folds. An `ArgumentError` is thrown otherwise, through [`assert_folding_statistic`](@ref).
+  - If `active_mask` is not `nothing`, it holds one entry per asset. A `DimensionMismatch` is thrown otherwise.
   - $(val_dict[:dims])
 
 # Returns
@@ -1010,29 +1193,45 @@ The row is turned into the price relative `1 .+ x`, appended to the memory of a 
   - [`PriceLevelExpectedReturns`](@ref)
   - [`PriceLevelForecastState`](@ref)
   - [`fold_statistic`](@ref)
+  - [`fold_active`](@ref)
+  - [`cold_statistic`](@ref)
   - [`supports_partial_fit`](@ref)
 """
 function partial_fit!(me::PriceLevelExpectedReturns{<:Any,
                                                     <:Option{<:PriceLevelForecastState}},
-                      x::VecNum; kwargs...)
+                      x::VecNum; active_mask::Option{<:AbstractVector{<:Bool}} = nothing,
+                      kwargs...)
     assert_folding_statistic(me.alg)
-    prev = isnothing(me.cache) ? nothing : me.cache.stat
-    n = isnothing(me.cache) ? 0 : me.cache.n
-    xr = one(eltype(x)) .+ x
-    hist = push_memory(me.alg, isnothing(me.cache) ? nothing : me.cache.hist, xr)
-    stat = if isnothing(hist)
-        fold_statistic(me.alg, prev, xr)
-    else
-        fold_statistic(me.alg, prev, hist, xr)
+    @argcheck(isnothing(active_mask) || length(active_mask) == length(x),
+              DimensionMismatch("the active mask must have one entry per asset, but the row has $(length(x)) entries and the mask has $(length(active_mask))."))
+    state = me.cache
+    finite = isfinite.(x)
+    active = isnothing(active_mask) ? finite : collect(active_mask)
+    valid = finite .& active
+    xr = ifelse.(valid, one(eltype(x)) .+ x, one(eltype(x)))
+    hist = push_memory(me.alg, isnothing(state) ? nothing : state.hist, xr)
+    if !isnothing(hist) && !all(active)
+        hist[:, .!active] .= one(eltype(hist))
     end
-    return Accessors.@reset me.cache = PriceLevelForecastState(n + 1, stat, hist)
+    nu = isnothing(state) ? zeros(Int, length(x)) : state.nu
+    cold = cold_statistic(me.alg, xr)
+    prev = isnothing(state) ? cold : ifelse.(active .& .!iszero.(nu), state.stat, cold)
+    stat = fold_active(me.alg, prev, hist, xr, active)
+    n = isnothing(state) ? 0 : state.n
+    return Accessors.@reset me.cache = PriceLevelForecastState(n + 1,
+                                                               ifelse.(active, nu .+ valid,
+                                                                       zero(eltype(nu))),
+                                                               stat, hist)
 end
 function partial_fit!(me::PriceLevelExpectedReturns{<:Any,
                                                     <:Option{<:PriceLevelForecastState}},
-                      X::MatNum; dims::Int = 1, kwargs...)
-    X = dims_oriented(dims, X)
+                      X::MatNum; dims::Int = 1,
+                      active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    X, amsk = dims_oriented(dims, X, active_mask)
     for i in axes(X, 1)
-        me = partial_fit!(me, view(X, i, :); kwargs...)
+        me = partial_fit!(me, view(X, i, :);
+                          active_mask = isnothing(amsk) ? nothing : view(amsk, i, :),
+                          kwargs...)
     end
     return me
 end
@@ -1044,4 +1243,4 @@ end
 export PriceLevelExpectedReturns, MovingAverage, ExponentialMovingAverage, SpatialMedian,
        WindowPeak, LaggedPrice, ReweightedPriceRelative
 public AbstractPriceLevelStatistic, PriceLevelForecastState, price_level_statistic,
-       fold_statistic, rows_needed, window_rows, folds, memory_rows
+       fold_statistic, cold_statistic, rows_needed, window_rows, folds, memory_rows
