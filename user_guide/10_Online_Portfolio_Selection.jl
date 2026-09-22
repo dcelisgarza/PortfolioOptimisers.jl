@@ -356,7 +356,7 @@ Be-the-leader reads each row before it bets on it, so it beats every winner rule
 log wealth, where the fixed leader of section 2 beat them by a tenth. It walks a path of length
 `73` over the 480 rows to do so, and the moving-average reversion still sits `0.18` ahead of it.
 The best stock of each row holds one asset and jumps on nearly every row. It walks a path of length
-`577`, and no causal rule comes within twenty units of log wealth of it.
+`577`, and no causal rule comes within nineteen units of log wealth of it.
 
 That is how you read dynamic regret. The bound a rule carries grows with the path length of the
 comparator, and no rule tracks a comparator that moves on every row. The `path_length` field
