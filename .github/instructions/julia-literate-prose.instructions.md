@@ -103,16 +103,27 @@ A short page carries none of them and is complete without.
 
 ## The Gate
 
-A census under `test/` reads the prose of every file this file governs and holds each page to its
-row in a generated baseline under `code_health/`. A count may fall and may not rise. A page with no
-row fails, and a page whose every count is zero needs no row. Until that census lands the rule
-holds by review, in the sense of [`STANDARDS.md`](../../STANDARDS.md).
+[`test/test_72_literate_prose_census.jl`](../../test/test_72_literate_prose_census.jl) reads the
+prose of every file this file governs and holds each page to its row in
+[`code_health/literate_prose_baseline.toml`](../../code_health/literate_prose_baseline.toml). A
+count may fall and may not rise. A page whose count stands above its row fails, a page with a count
+above zero and no row fails, and a page whose every count is zero carries no row, so the baseline
+empties as the pages are rewritten. The reader is
+[`code_health/literate_prose.jl`](../../code_health/literate_prose.jl), which the census includes
+rather than copies. The rules the census cannot read hold by review, in the sense of
+[`STANDARDS.md`](../../STANDARDS.md).
 
-**What it counts.** Rule 13, rule 19, rule 9, rule 16, rule 17 and rule 18. Rule 7 and rule 23
-whole. Rule 8 without "features". Rule 26 without "vector", "surface", "primitive", "harness" and
-"ratchet". Rule 31 without "leverage" and "leveraged". The strings of the two sections above, and the multi-word bold
-terms of [`CONTEXT.md`](../../CONTEXT.md) in their capitalised form. It records the prose word
-count of a page as a column with no limit.
+**What it counts.** One column per rule, named in the row: `emdash` and `endash` for rule 13,
+`curly` for rule 19, `notjust` for rule 9, `aivocab` for rule 7, `fancy_is` for rule 8, `filler`
+for rule 23, `metaphor` for rule 26, `plainword` for rule 31, `bold_label` for rule 16,
+`title_case` for rule 17 and `emoji` for rule 18. Rule 7 and rule 23 are read whole. Rule 8 is read
+without "features". Rule 26 is read without "vector", "surface", "primitive", "harness" and
+"ratchet". Rule 31 is read without "leverage" and "leveraged". `glossary` counts the multi-word
+bold terms of [`CONTEXT.md`](../../CONTEXT.md) in their capitalised form, read off that file at
+every run so the list never goes stale, and `mechanism` counts the strings of *A page names a type
+by its identifier and a concept in plain words*. `verdict` counts the strings of *A check is a
+number the reader reads, never a verdict*. `words` records the prose word count of the page and
+carries no limit.
 
 **Why those words are exempt.** This library writes "the expected returns vector", "a Pareto
 surface", "a feature matrix" and "a leveraged portfolio", and each of those is the concrete word
@@ -120,8 +131,19 @@ the rule asks for. The rules still hold on the other sense, and a reader applies
 11, 27, 28 and 32 and the self-audit are applied.
 
 **What it does not read.** A `#src` line, which is an authoring note and not a rendered page, and
-which the process-citation census skips for the same reason. A line of Julia, a fenced code block
-and a LaTeX expression.
+which the process-citation census skips for the same reason. A line of Julia, a `##` comment, which
+renders inside a code cell, a fenced code block, an inline code span, an inline LaTeX expression
+and the target of a markdown link. The `Description` line of a ` ```@meta ` block is prose and is
+read.
 
-**Scanning one page.** The census exposes a function that reads one file and prints its counts, so
-a rewrite session measures a page before and after its rewrite without running the suite.
+**Scanning one page.** Run
+
+```bash
+julia --project=code_health code_health/literate_prose.jl scan <file>...
+```
+
+before and after a rewrite. It prints each page's counts and the row the baseline would carry for
+it, and it measures and writes nothing else. Paste that row into the baseline for the pages you
+rewrote, and delete the row of a page whose counts all reached zero. Do not run `refresh`, which
+writes the whole file: rewrite tickets run in parallel, and two sessions that each write the whole
+file lose one of the two writes.
