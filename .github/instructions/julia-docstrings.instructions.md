@@ -197,7 +197,7 @@ The rule's Scope is every page a library user reaches without opening `docs/adr/
 
 The prose of a docstring reads as a person wrote it for a reader. The `unslop` skill states the patterns that mark generated text, and every rule of the skill holds on the prose in this section's Scope. **The skill is the Authority for the patterns.** This section cites it by name, copies none of its rules, and names a rule of the skill by the number the skill gives it.
 
-**Scope.** The docstrings of `src/**/*.jl` and `ext/**/*.jl`, the dictionary values of [`src/01_Base/01_DocstringDictionaries.jl`](../../src/01_Base/01_DocstringDictionaries.jl) that they interpolate, and the hand-written Markdown pages under `docs/src/` outside `docs/src/contribute/`. The Literate sources of the examples and the user guide, and the `Prose` text of the Capability Catalogue, are outside this section.
+**Scope.** The docstrings of `src/**/*.jl` and `ext/**/*.jl`, the dictionary values of [`src/01_Base/01_DocstringDictionaries.jl`](../../src/01_Base/01_DocstringDictionaries.jl) that they interpolate, and the hand-written Markdown pages under `docs/src/` outside `docs/src/contribute/`. The `Prose` text of the Capability Catalogue is outside this section. The Literate sources of the examples and the user guide are outside it too, and [`.github/instructions/julia-literate-prose.instructions.md`](julia-literate-prose.instructions.md) owns their prose.
 
 **What the pass reads.** The prose alone: the summary paragraph, the sentences of every section, the text of every bullet and of every admonition. It does not read a code span, a `jldoctest` block, a LaTeX expression, a heading a template of this file fixes, or a `# References` bullet, which `ref_dict` writes.
 
