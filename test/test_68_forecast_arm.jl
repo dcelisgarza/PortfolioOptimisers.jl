@@ -310,6 +310,25 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         @test copy(cold).me === cold.me
         # A view forwards to the prior's own view.
         @test isa(po.port_opt_view(pa, [1, 2]), PriorExpectedReturns)
+        # A constant column: the default prior's positive-definite repair throws although
+        # `mu` is defined, and a covariance without the repair answers the sample mean.
+        Rc = copy(R)
+        Rc[:, 2] .= 0
+        rdc = ReturnsResult(; nx = nx, X = Rc, ts = ts)
+        @test_throws ArgumentError mean(pa, Rc)
+        @test_throws ArgumentError optimise(OPS(; alg = ForecastReversion(; me = pa)), rdc)
+        norep = PriorExpectedReturns(;
+                                     pe = EmpiricalPrior(;
+                                                         ce = PortfolioOptimisersCovariance(;
+                                                                                            mp = MatrixProcessing(;
+                                                                                                                  pdm = nothing))))
+        @test vec(mean(norep, Rc)) ≈ vec(mean(Rc; dims = 1))
+        res = optimise(OPS(; alg = ForecastReversion(; me = norep)), rdc)
+        @test sum(res.w) ≈ 1 && all(isfinite, res.w)
+        # A window bounds the rows the head holds for the adapter.
+        wme = WindowedExpectedReturns(; me = pa, window = 10)
+        @test po.rows_needed(ForecastReversion(; me = wme)) == 10
+        @test vec(mean(wme, R)) ≈ vec(mean(pa, R[(end - 9):end, :]))
     end
 
     @testset "The fold-or-refit of a forecaster on the Rule State" begin

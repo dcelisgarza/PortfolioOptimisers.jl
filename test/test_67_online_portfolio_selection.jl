@@ -407,6 +407,13 @@ end
         @test_throws DomainError MovingAverage(; window = 1)
         @test_throws DomainError SpatialMedian(; iters = 0)
         @test_throws DomainError ConstantRebalancedPortfolio(; w = [0.5, -0.5])
+        # Every Allocation Set has a budget of one, so a target off it would scale the
+        # expert's first-period return in a mixture.
+        @test_throws DomainError ConstantRebalancedPortfolio(; w = [2, 0])
+        @test_throws DomainError ConstantRebalancedPortfolio(; w = [0.5, 0.4])
+        @test ConstantRebalancedPortfolio(; w = [1, 0]).w == [1, 0]
+        @test po.port_opt_view(ConstantRebalancedPortfolio(; w = [0.2, 0.3, 0.5]), [1, 3]).w ≈
+              [2 / 7, 5 / 7]
         @test_throws Exception ExpertMixture(;
                                              experts = AbstractOnlinePortfolioSelectionAlgorithm[])
         @test_throws ArgumentError ExpertMixture(; experts = [BuyAndHold()],

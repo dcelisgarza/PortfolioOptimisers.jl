@@ -74,6 +74,7 @@ Keywords correspond to the struct's fields. A `nothing` `w` is the uniform portf
 ## Validation
 
   - `w`: non-empty, and every element is non-negative and finite, when it is given.
+  - `sum(w) ≈ 1` when `w` is given, because every Allocation Set has a budget of one. Raises a `DomainError`.
 
 ## View parameters
 
@@ -114,6 +115,10 @@ struct ConstantRebalancedPortfolio{T1 <: Option{<:AbstractVector},
                                          proj::EuclideanProjection)
         if !isnothing(w)
             assert_nonempty_nonneg_finite_val(w, :w)
+            s = sum(w)
+            @argcheck(isapprox(s, one(s)),
+                      DomainError(s,
+                                  "every Allocation Set has a budget of one, so the constant rebalanced portfolio's `w` must sum to one, got sum(w) = $s"))
         end
         return new{typeof(w), typeof(proj)}(w, proj)
     end
@@ -817,7 +822,7 @@ end
     expert_start_allocation(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector)
     expert_start_allocation(alg::ConstantRebalancedPortfolio, w::AbstractVector)
 
-The allocation an expert of an [`ExpertMixture`](@ref) holds during the first period: the Start Allocation for a rule that reads `w`, and the constant rebalanced portfolio's own `w`, so a sampled expert's wealth is Cover's ``S_t(\\boldsymbol{b}) = \\prod_{s \\leq t} \\langle \\boldsymbol{b}, \\boldsymbol{x}_s \\rangle`` from the first row. The head itself holds the Start Allocation for that period either way. The constant portfolio's `w` is answered in the numeric type the head's allocation and it promote to, so a target given as integers — the one-hot experts of a switching portfolio — seeds a carrier that holds the allocation a programme set projects it to.
+The allocation an expert of an [`ExpertMixture`](@ref) holds during the first period: the Start Allocation for a rule that reads `w`, and the constant rebalanced portfolio's own `w`, so a sampled expert's wealth is Cover's ``S_t(\\boldsymbol{b}) = \\prod_{s \\leq t} \\langle \\boldsymbol{b}, \\boldsymbol{x}_s \\rangle`` from the first row. The head itself holds the Start Allocation for that period either way. The expert's `w` sums to one, as its constructor checks, but it is not projected onto the Allocation Set before the first period: a `w` that a bound of the set excludes, such as a one-hot allocation under a cap, is the expert's allocation for that period, and the first update replaces it with its projection, so it moves the expert weighting by one row. The constant portfolio's `w` is answered in the numeric type the head's allocation and it promote to, so a target given as integers — the one-hot experts of a switching portfolio — seeds a carrier that holds the allocation a programme set projects it to.
 
 # Related
 
