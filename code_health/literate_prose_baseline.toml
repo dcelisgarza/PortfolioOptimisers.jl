@@ -75,6 +75,3 @@ glossary_terms = 173
 "user_guide/05_Validation_and_Tuning.jl" = { emdash = 8, words = 465 }
 "user_guide/06_Post_Processing.jl" = { emdash = 2, glossary = 1, words = 220 }
 "user_guide/07_Choosing_a_Strategy.jl" = { emdash = 7, notjust = 1, words = 373 }
-"user_guide/08_Point_in_Time_Universe.jl" = { emdash = 22, bold_label = 2, glossary = 13, mechanism = 3, words = 1488 }
-"user_guide/09_Online_Walk_Forward.jl" = { emdash = 16, glossary = 2, mechanism = 13, verdict = 7, words = 1163 }
-"user_guide/10_Online_Portfolio_Selection.jl" = { emdash = 27, endash = 1, glossary = 13, mechanism = 2, verdict = 4, words = 2481 }

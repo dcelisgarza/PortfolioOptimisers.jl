@@ -1,28 +1,26 @@
 #=
 ```@meta
-Description = "How PortfolioOptimisers.jl handles assets that list, delist or go quiet mid-sample: the point-in-time universe, end to end."
+Description = "Assets that list, delist or go quiet mid-sample: the point-in-time universe, from a gapped price table to a walk-forward."
 ```
 
 # The point-in-time universe
 
 Real asset universes move. A company lists halfway through your sample, another is acquired and
-stops quoting, a third is suspended for a month. `PortfolioOptimisers.jl` handles this
-end to end, and the rule it follows is one line:
+stops quoting, a third is suspended for a month. `PortfolioOptimisers.jl` answers all three cases
+with one rule. A layer either handles the missing asset, or it throws an error that names it.
 
-> **Handle it, or throw a named error.**
+A layer that can state a correct answer for a missing asset does so, and its docstring says how.
+A layer that cannot throws, instead of returning a number that is wrong. Nothing in the library
+drops an asset without telling you, back-fills a price, or reads a gap as a zero return.
 
-A layer that can state a correct answer for a missing asset does so, and says how in its
-docstring. A layer that cannot refuses loudly, by name, rather than returning a number that is
-quietly wrong. There is no third option: nothing in the library silently drops an asset, back-fills
-a price, or treats a gap as a zero return.
+You ingest a gapped table with the call a clean table takes. [`prices_to_returns`](@ref) on a raw
+price table runs the ingestion layer. The layer reads the first and the last quote of each asset,
+its listing span, carries every gap into the returns, and hands back a [`ReturnsResult`](@ref)
+whose [`AssetPanel`](@ref) states the universe. You never build a returns matrix or a mask by
+hand.
 
-The way in is the same call a clean table takes. [`prices_to_returns`](@ref) on a raw price table
-runs the **ingestion layer**: it reads each asset's **Listing Span** off the gaps, carries every
-gap into the returns, and hands back a [`ReturnsResult`](@ref) whose [`AssetPanel`](@ref) states
-the universe. You never build a returns matrix or a mask by hand.
-
-This page shows both halves — what handles a gap, and what refuses one — and finishes with a
-walk-forward over a universe that changes inside the window.
+This page shows what handles a gap and what refuses one. It ends with a walk-forward over a
+universe that changes inside the window.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, Clarabel, Statistics, LinearAlgebra
@@ -32,10 +30,10 @@ X = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.csv.gz")); timestam
 #=
 ## 1. A gapped price table, and the one call that ingests it
 
-Below, one asset lists 60 observations into the sample, another delists 40 observations before
-the end, and a third is suspended for a month in the middle. Everything else is untouched. The
-gaps are punched into the **prices**, which is how they arrive from a data vendor — `NaN` or
-`missing`, the layer reads both as one absence.
+We gap the prices below. One asset lists 60 observations into the sample, another delists 40
+observations before the end, and a third is suspended for a month in the middle. Everything else
+is untouched. The gaps sit in the prices, which is how a data vendor sends them. A gap is `NaN` or
+`missing`, and the layer reads both as one absence.
 =#
 
 nx = string.(colnames(X))
@@ -52,19 +50,19 @@ rd = prices_to_returns(Xg)
 (size(rd.X), count(!isfinite, rd.X))
 
 #=
-The conversion deleted nothing: every asset keeps its column, every date but the first keeps
-its row, and a missing return is a `NaN` in the returns matrix. That is the whole convention at
-the returns level — there is no sentinel value and no imputation. A return reads two consecutive
-prices, so a run of `k` gapped prices leaves the `k + 1` returns that read one of them
-non-finite, and the gap never spreads to a neighbouring asset.
+The conversion deleted nothing. Every asset keeps its column, every date but the first keeps its
+row, and a missing return is a `NaN` in the returns matrix. There is no sentinel value and no
+imputation. A return reads two consecutive prices, so a run of `k` gapped prices leaves the
+`k + 1` returns that read one of them non-finite. The gap never spreads to a neighbouring asset.
 
 ## 2. The panel states the universe
 
-What the layer adds is the [`AssetPanel`](@ref) in `rd.pnl`. Its **active mask** `amsk` is the
-**Span Rule** read off each price column: a leading run of gaps is an asset not yet listed, a
-trailing run is a delisting, and an interior run is a suspension on an asset that is still
-listed. Its **estimation mask** `emsk` is the active mask intersected with finiteness. The two
-differ exactly on a suspension: the asset is in the universe, and it has no return.
+The layer also builds the [`AssetPanel`](@ref) in `rd.pnl`. Its active mask `amsk` says when each
+asset is in the universe, and the layer reads it off the gaps of each price column. A leading run
+of gaps is an asset not yet listed, a trailing run is a delisting, and an interior run is a
+suspension on an asset that is still listed. Its estimation mask `emsk` is the active mask and
+finiteness together. The two masks differ on a suspension, where the asset is in the universe and
+has no return.
 =#
 
 amsk = Matrix(rd.pnl.amsk)
@@ -73,26 +71,28 @@ emsk = Matrix(rd.pnl.emsk)
  for j in (late, dead, halt)]
 
 #=
-The late lister is active from its first *return*, one observation after its first price; the
-delisted asset is active up to its last; the suspended asset is active throughout and estimable
-everywhere but inside the halt. Reading the span **once over the whole table** is what makes it
-a fact about the instruments rather than a judgement a window made: a walk-forward fold below
-sees a delisting that straddles its window end as an asset that is still held, not one that was
-never listed.
+The late lister is active from its first return, one observation after its first price. The
+delisted asset is active up to its last. The suspended asset is active throughout, and it is
+estimable everywhere but inside the halt. The layer reads the span once over the whole table, so
+the span describes the instrument and does not change with the window. Take a walk-forward fold
+whose window ends inside the delisting, as one below does. That fold reads the delisted asset as
+one you still hold, and not as one that was never listed.
 
-`prices_to_returns(Xg)` is the friendliest spelling of two steps. [`price_ingestion`](@ref)
-assembles the price carrier — unifying the gap spellings, joining factor and benchmark series
-onto the asset clock, collapsing to a lower frequency if asked, and reading the span — and
-[`PricesToReturns`](@ref) converts it. Write the two steps when you need any of those: the
-[data preprocessing example](../examples/1_foundations/02_Data_Preprocessing.md) walks each one.
+`prices_to_returns(Xg)` is the short spelling of two steps. [`price_ingestion`](@ref) builds the
+ingested price table. It unifies the two gap spellings, joins factor and benchmark series onto the
+asset clock, collapses to a lower frequency if you ask for one, and reads the span.
+[`PricesToReturns`](@ref) converts that table to returns. Write the two steps when you need any of
+those options. The [data preprocessing example](../examples/1_foundations/02_Data_Preprocessing.md)
+walks each one.
 
-## 3. The prior answers, and the mask is derived from its answer
+## 3. The prior answers, and the mask follows from its answer
 
-A Prior Estimator fits on the assets it can estimate and returns a result on the **full** asset
+A prior estimator fits on the assets it can estimate, and it returns a result over the full asset
 universe. An asset it could not estimate carries `NaN` in `mu` and on the diagonal of `sigma`.
 
-The Investable Mask is never stored as a field. It is *derived* from the result, which is what
-keeps it from going stale: there is one definition, and every consumer applies it.
+The investable mask, the assets a result can weight, is not stored in a field. Every consumer
+reads it off the result with the one test below, so there is one definition and it cannot go
+stale.
 =#
 
 pr = prior(EmpiricalPrior(), rd)
@@ -101,17 +101,18 @@ imsk = isfinite.(pr.mu) .& isfinite.(diag(pr.sigma))
 (nx[.!imsk], pr.mu[late], pr.mu[dead], pr.mu[halt])
 
 #=
-All three are outside the mask over this window: the Coverage Universe asks for a finite return
-*and* an active mask at every observation of the window, so an asset that is absent for any part
-of it is not estimable over the whole of it. The suspended asset is excluded by its Held Gap, not
-by its listing — over a window that misses the halt, it is back in.
+All three assets are outside the mask over this window. The assets a window can estimate, its
+coverage universe, are the ones with a finite return and an active mask at every observation of
+the window. An asset that is absent for any part of the window is not estimable over the whole of
+it. The suspension, and not the listing, is what keeps the third asset out. Over a window that
+misses the halt it is back in.
 
 ## 4. An optimiser reduces once, and expands back
 
-Every optimiser family reduces to the investable assets at its entry — after the prior fit and
-before the clustering, the sampling or the solve — then expands the solved weights back into a
-vector of the full length. The weight of an asset that was not investable is **exactly** zero,
-not a small number the solver happened to land on.
+Every optimiser family reduces to the investable assets at its entry, after the prior fit and
+before the clustering, the sampling or the solve. It then expands the solved weights back into a
+vector of the full length. The weight of an asset that was not investable is zero, and not a small
+number the solver landed on.
 =#
 
 slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
@@ -123,8 +124,8 @@ res = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv)), rd)
 (length(res.w), res.w[late], res.w[dead], res.w[halt], sum(res.w))
 
 #=
-The same holds for the hierarchical families, which reduce before they cluster, so a gap never
-reaches a distance matrix:
+The hierarchical families do the same. They reduce before they cluster, so a gap never reaches a
+distance matrix.
 =#
 
 res_hrp = optimise(HierarchicalRiskParity(), rd)
@@ -134,9 +135,9 @@ res_hrp = optimise(HierarchicalRiskParity(), rd)
 #=
 ## 5. What refuses, and what the refusal says
 
-A **plain moment estimator** has no correct answer for a gapped sample. It is handed a matrix
-and nothing else — no mask, no panel, no way to tell a holiday from a delisting — so it refuses
-rather than guessing. This is the second half of the rule, and it is what the error looks like:
+A plain moment estimator has no correct answer for a gapped sample. It reads a matrix and nothing
+else. It has no mask, no panel, and no way to tell a holiday from a delisting, so it throws
+instead of guessing. The cell below prints the error.
 =#
 
 try
@@ -146,12 +147,12 @@ catch err
 end
 
 #=
-The message names the count, the first offending entry, and the two ways forward: fit through a
-prior, which reduces and expands, or use a mask-aware estimator, which reads the active mask of
-an Asset Panel.
+The message names the count of non-finite entries, the first of them, and the two ways forward.
+You fit through a prior, which reduces and expands, or you use a mask-aware estimator, which reads
+the active mask of an `AssetPanel`.
 
-The other named refusal is the empty universe. If a window leaves no asset investable at all
-there is nothing to weight, and the library says so rather than returning an empty portfolio:
+The second error is the empty universe. A window that leaves no asset investable has nothing to
+weight, so the library throws instead of returning an empty portfolio.
 =#
 
 Xdead = copy(rd.X)
@@ -166,11 +167,11 @@ end
 #=
 ## 6. A declared listing calendar states what the prices cannot
 
-A price series can be perfectly finite while the asset is still untradeable — a suspension with
-stale quotes, a holding period after a corporate action, a name you have excluded from the
-mandate. The prices alone cannot express that. A caller holding a listing calendar hands it to
-[`PriceIngestion`](@ref) as `span`, `price observations × assets`, and it replaces the Span
-Rule's answer outright: the layer never second-guesses a calendar it was given.
+A price series can be finite while the asset is untradeable. A suspension can carry stale quotes,
+a corporate action can start a holding period, and your mandate can exclude a name. The prices
+alone say none of that. If you hold a listing calendar, pass it to [`PriceIngestion`](@ref) as
+`span`, sized `price observations × assets`. It replaces what the layer read off the gaps, and the
+layer never overrides a calendar you gave it.
 =#
 
 calendar = trues(T, N)
@@ -185,15 +186,15 @@ res_cal = optimise(EqualWeighted(), rd_cal)
  sum(res_cal.w))
 
 #=
-Every return is finite, and the asset still holds zero: the declared calendar excluded it on its
-own. A caller who holds the calendar *and* the gaps gets both — the calendar states who is
-listed when, and the conversion still carries the gaps into `emsk`.
+Every return is finite, and the asset still holds zero. The calendar alone excluded it. If you
+hold a calendar and gapped prices, you get both answers. The calendar states which asset is listed
+when, and the conversion still carries the gaps into `emsk`.
 
 ## 7. A walk-forward over a universe that changes
 
-This is the case the whole chain exists for. Each fold derives the Coverage Universe of **its
-own** training window, so the universe is allowed to differ from fold to fold, and each fold's
-weights come back on the caller's full universe with zeros where that fold could not trade.
+Each fold reads the coverage universe of its own training window, so the universe can differ from
+fold to fold. Each fold's weights come back over your full universe, with a zero where that fold
+could not trade.
 =#
 
 cv = IndexWalkForward(120, 40)
@@ -202,30 +203,31 @@ mpr = cross_val_predict(HierarchicalRiskParity(), rd, cv)
 [(count(isnothing(p.res.imsk) ? trues(N) : p.res.imsk), sum(p.res.w)) for p in mpr.pred]
 
 #=
-The first two folds' training windows straddle the late listing and the halt, so both are out;
-the third window sits inside the young asset's listed life and after the halt, so only the
-suspended asset's Held Gap keeps it out there. `imsk` is `nothing` when every asset was
-investable, which is the all-investable path taking no reduction at all rather than a vector of
+The training windows of the first two folds straddle the late listing and the halt, so both assets
+are out of those folds. The third window sits inside the listed life of the young asset and after
+the halt, so only the suspension keeps an asset out there. `imsk` is `nothing` when every asset
+was investable, because a fold that reduces nothing stores nothing, rather than a vector of
 `true`.
 
-The delisting is never in a training window — it falls inside the third fold's *test* window.
-The library names that as a **Held Gap** when it scores the fold: the weight held in an asset
-that stops quoting is zeroed once, and the missing weight sits in cash. It is not renormalised
-away, because that would silently re-lever the book. Pass `strict = true` to refuse instead.
-Stitching the folds gives an out-of-sample series that carries a number at every observation,
-even though the universe moved underneath it.
+The delisting never falls in a training window. It falls in the test window of the third fold,
+where the fold already holds the asset. The score zeroes that weight once, on the observation
+where the asset stops quoting, and the weight it held sits in cash from there on. The score leaves
+the other weights alone, because renormalising them would raise your exposure. Pass
+`strict = true` to throw there instead. The stitched folds give an out-of-sample series with a
+number at every observation, over a universe that moved.
 =#
 
 (length(mpr.mrd.X), all(isfinite, mpr.mrd.X),
  expected_risk(LowOrderMoment(; alg = SecondMoment()), mpr))
 
 #=
-A fill or a filter — [`PriceGapFill`](@ref) to state a price across the halt,
-[`MissingDataFilter`](@ref) to drop an asset too sparse to trust — is a **Universe Policy**: it
-is fitted on each fold's training window and replayed by name, or a fold would be scored against
-a universe the future chose. So it runs inside a [`Pipeline`](@ref) over the **price carrier**,
-and the conversion is the step after it. Folds are then cut on the price clock, which is why the
-carrier is built once, outside the pipeline, and the pipeline starts from it:
+A fill and a filter change the universe itself. [`PriceGapFill`](@ref) states a price across the
+halt, and [`MissingDataFilter`](@ref) drops an asset too sparse to trust. Each one is fitted on
+the training window of a fold and replayed by name on the test window, or the fold would be scored
+against a universe the future chose. Each one therefore runs inside a [`Pipeline`](@ref) over the
+ingested price table, and the conversion to returns is the step after it. The folds are cut on the
+price clock, so we build the ingested price table once, outside the pipeline, and the pipeline
+starts from it.
 =#
 
 pr_g = price_ingestion(PriceIngestion(), Xg)
@@ -238,17 +240,17 @@ mpr_pipe = cross_val_predict(pipe, pr_g, cv)
  for p in mpr_pipe.pred]
 
 #=
-The fill states a **Held Price** across the halt — the last quote, carried forward, bounded by
-the Listing Span so it never invents a price before the late listing or after the delisting —
-and the suspended asset is back in every fold; the third now reduces nothing at all. The late
-lister is still out of the two windows that straddle its listing, and the delisting is still a
-Held Gap in the third fold's test window: the span put them there, and a fill cannot move them.
+The fill carries the last quote forward across the halt, and it stays inside the listing span, so
+it never states a price before the late listing or after the delisting. The suspended asset is
+back in every fold, and the third fold now reduces nothing. The late lister is still out of the
+two windows that straddle its listing, and the third fold still zeroes the delisted asset in its
+test window. Both cases follow from the listing span, which a fill does not change.
 
 ## Where to go next
 
   - [Data preprocessing and the ingestion layer](../examples/1_foundations/02_Data_Preprocessing.md)
-    — each piece of the layer in turn: unify, join, span, carry, fill, drop.
-  - [Data and priors](01_Data_and_Priors.md) — the prior that does the reducing here.
-  - [Optimisers](02_Optimisers.md) — the families that reduce and expand.
-  - [Validation and tuning](05_Validation_and_Tuning.md) — the cross-validation this page ran.
+    covers each step of the layer in turn: unify, join, span, carry, fill, drop.
+  - [Data and priors](01_Data_and_Priors.md) covers the prior that reduces here.
+  - [Optimisers](02_Optimisers.md) covers the families that reduce and expand.
+  - [Validation and tuning](05_Validation_and_Tuning.md) covers the cross-validation this page ran.
 =#
