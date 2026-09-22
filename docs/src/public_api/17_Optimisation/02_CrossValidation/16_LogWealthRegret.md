@@ -1,5 +1,5 @@
 ```@meta
-Description = "Log-wealth regret against a comparator, public API of PortfolioOptimisers.jl: LogWealthRegretResult, log_wealth_regret, BudgetedHindsightPath, BudgetedHindsightPathResult."
+Description = "Log-wealth regret against a comparator, public API of PortfolioOptimisers.jl: LogWealthRegretResult, log_wealth_regret, BudgetedHindsightPath, …"
 ```
 
 # Log-wealth regret against a comparator
