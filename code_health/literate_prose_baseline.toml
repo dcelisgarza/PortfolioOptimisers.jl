@@ -39,7 +39,6 @@ glossary_terms = 173
 "examples/3_optimisers/13_Meta_Optimisers.jl" = { emdash = 11, words = 594 }
 "examples/3_optimisers/14_Subset_Resampling_and_Cross_Validation.jl" = { emdash = 5, notjust = 1, glossary = 1, verdict = 2, words = 832 }
 "examples/3_optimisers/15_Near_Optimal_Centering.jl" = { emdash = 4, aivocab = 1, words = 503 }
-"examples/3_optimisers/16_Feature_Distance_Clustering.jl" = { emdash = 47, bold_label = 5, glossary = 10, mechanism = 21, verdict = 6, words = 3452 }
 "examples/3_optimisers/17_Panel_Fed_Clustering.jl" = { emdash = 11, glossary = 2, mechanism = 5, verdict = 2, words = 1386 }
 "examples/3_optimisers/18_Online_Portfolio_Selection.jl" = { emdash = 13, glossary = 5, mechanism = 1, verdict = 2, words = 2042 }
 "examples/4_constraints_costs/01_Budget_Constraints.jl" = { aivocab = 1, filler = 2, words = 1027 }
@@ -64,7 +63,6 @@ glossary_terms = 173
 "examples/7_putting_it_together/02_Profile_Desk_Monthly.jl" = { emdash = 7, words = 305 }
 "examples/7_putting_it_together/03_Profile_Institutional.jl" = { emdash = 5, aivocab = 1, verdict = 1, words = 287 }
 "examples/7_putting_it_together/04_Profile_Factor_Views.jl" = { emdash = 9, endash = 3, notjust = 1, words = 573 }
-"examples/7_putting_it_together/05_Cross_Sectional_Factor_Model.jl" = { emdash = 21, bold_label = 2, glossary = 7, mechanism = 7, verdict = 1, words = 2318 }
 "examples/7_putting_it_together/06_Cross_Sectional_Factor_Pipeline.jl" = { emdash = 6, aivocab = 1, glossary = 4, mechanism = 8, verdict = 2, words = 635 }
 "examples/7_putting_it_together/07_Forecast_Evaluation.jl" = { emdash = 36, bold_label = 3, glossary = 11, mechanism = 11, verdict = 3, words = 3289 }
 "user_guide/00_User_Guide.jl" = { emdash = 16, bold_label = 1, verdict = 2, words = 623 }

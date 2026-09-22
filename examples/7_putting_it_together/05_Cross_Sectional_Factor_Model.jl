@@ -5,36 +5,36 @@ Description = "A cross-sectional factor model in PortfolioOptimisers.jl, end to 
 
 # Cross-sectional factor model, end to end
 
-Every other factor example on this site fits a factor model **through time**: it regresses each
+Every other factor example on this site fits a factor model through time. It regresses each
 asset's return series on a set of observed factor series, one regression per asset. This page
-fits one **across the cross-section**. At each observation it regresses that day's returns of
-every asset on the *lagged* traits of those assets — their size, their value, their industry —
-and the coefficients it recovers are the factor returns of that day. Nobody supplies a factor
-series; the fit produces one.
+fits one across the cross-section instead. At each observation it regresses that day's returns of
+every asset on the lagged traits of those assets, such as their size, their value and their
+industry. The coefficients it recovers are the factor returns of that day. Nobody supplies a
+factor series, because the fit produces one.
 
-That change of direction is what a point-in-time **Asset Panel** buys. A panel is a stack of
-**Panel Fields** — market capitalisation, book equity, an industry label — each indexed by
-observation and asset, and it travels on the returns carrier as `rd.pnl`. The panel is where the
-factor *exposures* come from, so the model can carry factors nobody publishes a series for.
+A point-in-time asset panel is what lets the fit run in that direction. A panel is a stack of
+named fields, such as market capitalisation, book equity and an industry label, each indexed by
+observation and asset. It travels with the returns as `rd.pnl`. The panel is where the factor
+exposures come from, so the model can carry a factor that nobody publishes a series for.
 
-The page runs the whole route on a synthetic panel drawn from a factor model we know, so every
-claim below is checkable against an answer fixed before the estimator ran:
+We run the whole route on a synthetic panel drawn from a factor model we wrote, so you can check
+every number below against an answer fixed before the estimator ran.
 
  1. Build the panel, and the traits it was drawn from.
  2. Fit a [`CrossSectionalFactorPrior`](@ref) on it.
- 3. Check what the fit recovered, and the identities it makes exact.
- 4. Hand the prior's own factor model to two **orthogonal uncertainty sets**, and watch the book
-    leave the directions the factors do not span.
+ 3. Read what the fit recovered, and the three quantities it reproduces to machine precision.
+ 4. Hand the prior's own factor model to two orthogonal uncertainty sets, and watch the book leave
+    the directions the factors do not span.
  5. Run the same optimiser through a [`WalkForward`](@ref) under a factor mandate.
- 6. Read a predicted and a realised **factor attribution** off the answer.
+ 6. Read a predicted and a realised factor attribution off the answer.
 
 !!! tip "When to reach for this"
-    Reach for a cross-sectional factor model when your conviction lives in **asset traits** rather
-    than in factor series — when you can say "cheap companies beat expensive ones" but have no
-    published value-factor return to regress on. It is also the only route here that admits a
-    universe whose membership *changes*: assets list and delist, and the panel says which pair is
-    live at which observation. If you already hold factor series, [`FactorPrior`](@ref) is the
-    simpler tool.
+    Reach for a cross-sectional factor model when your conviction lives in asset traits rather
+    than in factor series, so that you can say that cheap companies beat expensive ones but hold
+    no published value-factor return to regress on. It is also the one route here that admits a
+    universe whose membership changes. Assets list and delist, and the panel says which pair of an
+    observation and an asset is live. If you already hold factor series, [`FactorPrior`](@ref) is
+    the simpler tool.
 =#
 
 using PortfolioOptimisers, StableRNGs, Statistics, LinearAlgebra, Dates, PrettyTables,
@@ -45,20 +45,19 @@ numfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. A synthetic Asset Panel, and the model it was drawn from
+## 1. A synthetic asset panel, and the model it was drawn from
 
-The generator below draws nine factors — a market factor, four industries and four styles — and
-gives every asset a fixed trait vector: a market beta, a one-hot industry membership and four
-style loadings. Returns are that trait vector through the factor returns, plus an idiosyncratic
-shock and a small per-asset alpha.
+The generator below draws nine factors, one market factor, four industries and four styles. It
+gives every asset a fixed trait vector holding a market beta, a one-hot industry membership and
+four style loadings. An asset's return is that trait vector through the factor returns, plus an
+idiosyncratic shock and a small alpha of its own.
 
-The Panel Fields are then built as *noisy functions of the same traits*. Log market
-capitalisation tracks the size trait, book-to-price tracks the value trait, and so on. That is
-what makes the panel an acceptance test rather than a demonstration: a fit that recovers the
-traits from the fields has recovered something we can name.
+The fields are then built as noisy functions of the same traits. Log market capitalisation tracks
+the size trait, book-to-price tracks the value trait, and so on for the rest. The truth is fixed
+before the fit runs, so you can name what the fit recovers rather than take the output on trust.
 
-A fifth of the assets **list late**, so the panel's active mask is not all-`true` and the
-universe is genuinely point-in-time.
+A fifth of the assets list late, so the panel's active mask is not all `true`, and the universe
+changes membership inside the sample.
 =#
 
 function synthetic_panel(; T = 500, N = 80, seed = 661_001)
@@ -121,8 +120,8 @@ rd = syn.rd
 T, N = size(rd.X)
 
 #=
-The panel rides the carrier. `rd.X` is the returns, `rd.pnl` is the panel, and the active mask
-says which pair is live.
+The panel travels with the returns. `rd.X` is the returns, `rd.pnl` is the panel, and the active
+mask says which pair of an observation and an asset is live.
 =#
 
 pretty_table(DataFrame("Assets" => N, "Observations" => T,
@@ -133,32 +132,32 @@ pretty_table(DataFrame("Assets" => N, "Observations" => T,
 #=
 ## 2. The prior
 
-A [`CrossSectionalFactorPrior`](@ref) is specified by its **Factor Exposures** — one per factor,
-each naming the family it belongs to. Four kinds ship, and three of them appear here:
+You specify a [`CrossSectionalFactorPrior`](@ref) by its factor exposures, one per factor, each
+naming the family it belongs to. Four kinds ship, and three of them appear here.
 
-  - [`ConstantExposure`](@ref) is a column of ones, the market intercept. Here we use a
+  - [`ConstantExposure`](@ref) is a column of ones, the market intercept. We use a
     [`CompositeExposure`](@ref) over [`EWMarketBeta`](@ref) instead, so the market exposure is the
     asset's own estimated beta rather than one.
-  - [`OneHotExposure`](@ref) turns a categorical Panel Field into a block of indicator columns,
-    one per level.
-  - [`CompositeExposure`](@ref) scores one or more **Descriptors** across the cross-section. A
-    Descriptor is the trait itself — [`LogMarketCap`](@ref), [`BookToPrice`](@ref) — and the
-    exposure standardises it.
+  - [`OneHotExposure`](@ref) turns a categorical field into a block of indicator columns, one per
+    level.
+  - [`CompositeExposure`](@ref) scores one or more descriptors across the cross-section. A
+    descriptor is the trait itself, such as [`LogMarketCap`](@ref) or [`BookToPrice`](@ref), and
+    the exposure standardises it.
 
-Three further pieces of the specification are worth naming, because each one changes the answer:
+Three further parts of the specification change the answer, so each is worth naming.
 
- 1. `families = ["industry" => nothing]` puts the industry block under a **zero-sum re-basis**.
-    An industry block sums to one for every asset, so it is collinear with a market factor whose
+ 1. `families = ["industry" => nothing]` puts the industry block under a zero-sum re-basis. An
+    industry block sums to one for every asset, so it is collinear with a market factor whose
     exposure is a beta near one. The constraint is what identifies the members.
  2. `neutralise = ["style" => "industry"]` removes the benchmark-weighted overlap of the style
-    family with the industry family, so a style factor return is not an industry bet in disguise.
- 3. `wa = BlendedInverseVarianceWeights(...)` makes the regression a **two-pass** fit: the first
-    pass estimates residual variances, the second re-weights by them.
+    family with the industry family, so a style factor return is not an industry bet under
+    another name.
+ 3. `wa = BlendedInverseVarianceWeights(...)` makes the regression a two-pass fit. The first pass
+    estimates the residual variances, and the second re-weights by them.
 
-Finally, `rfe` supplies an **alpha forecast**. It scores the `signal` field, which no exposure
-reads, and `lambda`/`c` split the forecast into the part the factors span and the part they do
-not. The second part lands in `rr.b`, and that is the whole reason the orthogonal sets of §4
-have anything to bite on.
+`rfe` supplies an alpha forecast. It scores the `signal` field, which no exposure reads, and
+`lambda` and `c` split the forecast into the part the factors span and the part they do not. The
+second part lands in `rr.b`, and it is what the orthogonal sets of section 4 act on.
 =#
 
 style(d) = CompositeExposure(; descriptors = [d], family = "style")
@@ -190,14 +189,14 @@ pretty_table(DataFrame("Factor" => rr.nf, "Family" => rr.fam);
              title = "The nine factors the fit produced, and their families")
 
 #=
-The result is an ordinary [`LowOrderPrior`](@ref) over the **full** asset universe, so every
-consumer in the library takes it unchanged. What is new is the block on `rr`: a
-[`CrossSectionalFactorModel`](@ref) carrying the exposure history `Ms`, the realised factor
+The result is an ordinary [`LowOrderPrior`](@ref) over the whole asset universe, so every consumer
+in the library takes it unchanged. The new part is the block on `rr`. It is a
+[`CrossSectionalFactorModel`](@ref), and it holds the exposure history `Ms`, the realised factor
 returns, the idiosyncratic returns and variances, the regression and benchmark weights, and the
 family basis.
 
-The fit keeps the tail of the observation axis — the window left after the Descriptors' warm-up
-and the exposure lag.
+The fit keeps the tail of the observation axis, which is the window left after the warm-up of the
+descriptors and the exposure lag.
 =#
 
 pretty_table(DataFrame("Fit rows" => size(pr.X, 1), "Warm-up rows" => T - size(pr.X, 1),
@@ -206,14 +205,14 @@ pretty_table(DataFrame("Fit rows" => size(pr.X, 1), "Warm-up rows" => T - size(p
              formatters = [numfmt], title = "What the fit kept")
 
 #=
-## 3. What the fit recovered, and what it makes exact
+## 3. What the fit recovered, and what it reproduces exactly
 
-Two different claims live here, and they need different tests.
+Two different claims live here, and each needs its own measurement.
 
-The **recovery** is statistical. The Panel Fields are noisy functions of the traits, so a fitted
-exposure correlates with the truth rather than equalling it. The one exception is the industry
-block: a one-hot exposure of a known classification is the classification, so it is recovered
-exactly.
+The recovery is statistical. The fields are noisy functions of the traits, so a fitted exposure
+correlates with the truth rather than equalling it. The industry block is the exception. A one-hot
+exposure of a known classification is the classification itself, so the fitted block and the true
+block hold the same numbers.
 =#
 
 active = findall(view(rd.pnl.amsk, T, :))
@@ -228,9 +227,10 @@ pretty_table(DataFrame("One-hot industry loadings recovered exactly" =>
                            rr.M[active, industry_k] == syn.B[active, industry_k]))
 
 #=
-The **systematic return** of a pair is the quantity the model actually asserts about an asset. A
-single factor return is identified only up to the basis the family constraint chose, but
-`Ms[t - lag] · f_t` is basis-free, and it is comparable with the generator's own.
+The systematic return of one observation and one asset is the quantity the model states about
+that asset. A single factor return is identified only up to the basis the family constraint chose,
+and `Ms[t - lag] · f_t` does not depend on that basis, so you can compare it with the generator's
+own.
 =#
 
 ## The systematic return of every eligible pair, fitted against the generator's own.
@@ -262,11 +262,11 @@ pretty_table(DataFrame("corr(systematic return)" => cor(sys_fit, sys_true),
              title = "The systematic return and the idiosyncratic level")
 
 #=
-The **identities**, by contrast, are constructions rather than estimates, and they hold at machine
-precision. Three of them need only public fields:
+The next three quantities are constructions rather than estimates, so the residual the cell prints
+for each one sits at the level of machine precision. All three read public fields.
 
  1. The lagged exposures through the factor returns, plus the idiosyncratic return, reproduce the
-    asset's return exactly. This is the reconciliation the fit is built to satisfy.
+    asset's return. The fit is built to satisfy this reconciliation.
  2. The covariance square root reproduces the covariance.
  3. `mu` is the loadings through the factor mean, plus the orthogonal part of the alpha forecast.
 =#
@@ -300,9 +300,9 @@ pretty_table(DataFrame("max |Ms*f + eps - X|" => recon, "Pairs" => recon_pairs,
              formatters = [numfmt], title = "Three identities the fit makes exact")
 
 #=
-The zero-sum re-basis is exact too. Under the constraint, the benchmark-weighted sum of the
-industry family's factor returns is zero at every observation, relative to the size of its own
-terms.
+The zero-sum re-basis is a construction as well. Under the constraint, the benchmark-weighted sum
+of the industry family's factor returns is zero at every observation, measured against the size of
+its own terms. The cell below prints the largest of those relative sums.
 =#
 
 ## The benchmark-weighted sum of a family's factor returns, relative to the size of its
@@ -340,22 +340,21 @@ pretty_table(DataFrame("max relative benchmark-weighted industry return" => zero
 #=
 ## 4. Two orthogonal uncertainty sets
 
-Here is the idea the rest of this page builds to. The factor model splits the asset space in two:
-the directions the loadings **span**, where the model has something to say, and the
-**Orthogonal Subspace**, where it has nothing. A portfolio that bets in the second half is
-betting on estimation error.
+The factor model splits the asset space in two. The loadings span one part, where the model has
+something to say. The rest is the orthogonal subspace, the directions the loadings do not reach,
+where the model says nothing. A portfolio that bets in the second part bets on estimation error.
 
-[`OrthogonalUncertaintySet`](@ref) reads the factor model off the optimisation's **own** prior
-result and confines the uncertainty to that second half. One estimator produces two sets:
+[`OrthogonalUncertaintySet`](@ref) reads the factor model off the prior result of the optimisation
+it runs in, and confines the uncertainty to that second part. One estimator gives two sets.
 
-  - a low-rank **norm ball** on the mean, whose radius is `sqrt(χ²_r)` at the rank `r` of the
-    complement, and
-  - a **compact covariance set**, `(κ, C, Q)`, whose worst-case variance is
-    `w'Σw + κ·min_z ‖Cw − Qz‖²` — a quadratic term the variance consumer adds directly, with no
-    lifted semidefinite block. `Q` is an orthonormal basis of the subspace the penalty **spares**,
-    which is the weighted factor span.
+  - A low-rank norm ball on the mean. Its radius is `sqrt(χ²_r)` at the rank `r` of the
+    complement.
+  - A compact covariance set, `(κ, C, Q)`, whose worst-case variance is
+    `w'Σw + κ·min_z ‖Cw − Qz‖²`. The variance consumer adds that quadratic term directly, and no
+    lifted semidefinite block enters the model. `Q` is an orthonormal basis of the subspace the
+    penalty leaves alone, which is the weighted factor span.
 
-Both are fitted from the prior we already have.
+We fit both from the prior we already have.
 =#
 
 mu_set = mu_ucs(OrthogonalUncertaintySet(), pr)
@@ -367,8 +366,8 @@ pretty_table(DataFrame("Rank of the factor span" => size(sigma_set.Q, 2),
              title = "The geometry the two sets share")
 
 #=
-The natural reading of a book is then: how much of it lies **outside** the spared subspace? That
-is `‖(I − QQᵀ)Cw‖ / ‖Cw‖`, and it is the number the two sweeps below move.
+The number to read off a book is then how much of it lies outside the subspace the penalty leaves
+alone. That number is `‖(I − QQᵀ)Cw‖ / ‖Cw‖`, and the two sweeps below move it.
 =#
 
 universe = UniverseSets(; dict = Dict("nx" => rd.nx, "ncf" => rr.nf))
@@ -393,11 +392,11 @@ function book(; radius = 0.0, kappa = 1.0, obj = MinimumRisk(), constraint = not
 end
 
 #=
-### The covariance radius moves the book smoothly
+### The covariance radius moves the book by degrees
 
-`κ` scales a **quadratic** penalty on the orthogonal component, so raising it squeezes the book
-out of the Orthogonal Subspace gradually. The minimum-risk book below starts with 91% of its
-metric-scaled weight outside the factor span, and ends with a tenth of a percent of it.
+`κ` scales a quadratic penalty on the orthogonal component, so raising it moves the book out of
+the orthogonal subspace one step at a time. The minimum-risk book below starts with 91% of its
+metric-scaled weight outside the factor span and ends with a tenth of a percent of it.
 =#
 
 kappa_grid = [0.0, 1.0, 10.0, 100.0, 1_000.0, 10_000.0]
@@ -421,21 +420,21 @@ pretty_table(DataFrame("kappa" => kappa_grid,
 #=
 ### Calibrating the covariance radius instead of stating it
 
-The sweep above is the honest way to explore `κ`, and it is also an admission: the numbers in
-`kappa_grid` were chosen by hand, and nothing in the data suggested them. `κ` can instead be
-**sized from the sample**, by a rule of [`AbstractCompactRadiusAlgorithm`](@ref) placed in the
-same field. The estimator resolves it inside the fit, where the metric, the loadings block and
-the factor span are all in hand, and the set that comes out carries a plain number.
+The sweep above explores `κ` by hand, and the numbers in `kappa_grid` came from nowhere in the
+data. You can size `κ` from the sample instead, by putting a rule of
+[`AbstractCompactRadiusAlgorithm`](@ref) in the same field. The estimator resolves the rule inside
+the fit, where the metric, the loadings block and the factor span are all available, and the set
+that comes out carries a plain number.
 
 Two rules ship, and they answer two different questions.
 
-  - [`ResidualInflation`](@ref) treats `κ` as a **confidence level**. The penalty lives exactly
-    where the idiosyncratic variance lives, so the question is how far the *estimate* of that
-    variance can sit from the truth, and a variance has a chi-squared bound. Under this model's
-    default metric the answer is dimensionless — it is the relative inflation itself.
-  - [`VarianceFraction`](@ref) treats `κ` as a **magnitude with a unit**. It sizes the penalty so
-    that a reference portfolio pays a stated fraction of its nominal variance, which is a number a
-    desk can argue about: *robustify by ten percent*.
+  - [`ResidualInflation`](@ref) reads `κ` as a confidence level. The penalty sits where the
+    idiosyncratic variance sits, so the question is how far the estimate of that variance can sit
+    from the truth, and a variance has a chi-squared bound. Under this model's default metric the
+    answer carries no unit, because it is the relative inflation itself.
+  - [`VarianceFraction`](@ref) reads `κ` as a magnitude with a unit. It sizes the penalty so that
+    a reference portfolio pays a stated fraction of its nominal variance. A desk can argue about a
+    number of that kind, because it says what fraction of the variance the penalty is worth.
 =#
 
 calibrated = ["Stated" => 100.0, "ResidualInflation()" => ResidualInflation(),
@@ -464,29 +463,28 @@ pretty_table(DataFrame("kappa" => first.(calibrated),
                            end], title = "A radius the sample chose")
 
 #=
-The two rules land in different places, and the gap between them is the whole reading.
-`ResidualInflation` returns about `0.13` here — three orders of magnitude below the `100.0` the
-sweep above needed to move the book — and that is the point rather than a defect: a chi-squared
-bound on a residual variance is a statement about *estimation error*, and over this sample that
-error is small. A radius that size barely moves the book, and the table says so: 90% of the
-metric-scaled weight still sits outside the factor span. `VarianceFraction` is the rule to reach
-for when you want the book to *move*, because it is sized against the nominal variance rather
-than against the sampling error, and it is linear in `f` — the `f = 0.5` row is exactly five
-times the `f = 0.1` row.
+The two rules land in different places, and the gap between them is what to read. Here
+`ResidualInflation` returns about `0.13`, three orders of magnitude below the `100.0` the sweep
+above needed to move the book. That is what the rule measures rather than a defect in it. A
+chi-squared bound on a residual variance measures estimation error, and over this sample that
+error is small. A radius of that size moves the book very little, and the table shows 90% of the
+metric-scaled weight still outside the factor span. Reach for `VarianceFraction` when you want the
+book to move, because it is sized against the nominal variance rather than against the sampling
+error. It is also linear in `f`, so the `f = 0.5` row is five times the `f = 0.1` row.
 
-Neither answer is more correct than the other. They price different things, and stating `100.0`
-prices a third thing that nothing in the sample asked for. What the rules buy is that the number
-now moves with the data instead of holding still across every fold.
+Neither answer is more correct than the other. The two rules price different things, and stating
+`100.0` prices a third thing that nothing in the sample asked for. What a rule buys you is a
+number that moves with the data instead of holding still across every fold.
 
-`VarianceFraction` reads a reference portfolio, and `w0` admits a weight vector or any
-non-finite-allocation optimiser — the optimiser carries its own solver, so nothing extra is
-threaded into the fit. `nothing` reads the equal-weight book.
+`VarianceFraction` reads a reference portfolio. `w0` takes a weight vector or any optimiser that
+is not a finite allocation, and such an optimiser carries its own solver, so the fit needs nothing
+more. `nothing` reads the equal-weight book.
 
-Two notes on where each rule applies. `ResidualInflation` reads the idiosyncratic variances off
-`rr.esigma`, so it refuses a block fitted without a residual term; `VarianceFraction` reads none
-and serves that block too. And `ResidualInflation`'s own `q` defaults to the estimator's, so one
-confidence level governs both axes unless you state otherwise — the two are tail probabilities
-over different errors, but they tighten in the same direction.
+Each rule applies in a different place. `ResidualInflation` reads the idiosyncratic variances off
+`rr.esigma`, so it refuses a block fitted without a residual term. `VarianceFraction` reads none
+of them and serves that block as well. `ResidualInflation`'s own `q` defaults to the estimator's,
+so one confidence level governs both axes unless you state otherwise. The two are tail
+probabilities over different errors, and they tighten in the same direction.
 =#
 
 vf_book = book(; kappa = VarianceFraction(; f = 0.1, w0 = InverseVolatility()))
@@ -500,10 +498,10 @@ pretty_table(DataFrame("Reference" => ["Equal weight (default)", "InverseVolatil
 #=
 ### The radius is also searchable
 
-Nothing above had to be chosen in advance. `kappa` is a plain field, so its lens path
-`"ucs.kappa"` is a key a search grid ranges over, and the grid may hold **rules beside numbers**:
-each candidate is fitted per fold, and the walk-forward score decides. That is the third route,
-after stating a size and calibrating one.
+You do not have to choose any of this in advance. `kappa` is a plain field, so its lens path
+`"ucs.kappa"` is a key a search grid ranges over, and one grid can hold rules and numbers
+together. Each candidate is fitted per fold, and the walk-forward score decides between them. That
+is the third route, after stating a size and after calibrating one.
 
 ```julia
 grid = ["r.ucs.kappa" => [0.0, 1.0, 100.0, ResidualInflation(), VarianceFraction(; f = 0.1)]]
@@ -512,12 +510,12 @@ search_cross_validation(mr, GridSearchCrossValidation(grid; cv = IndexWalkForwar
 =#
 
 #=
-### The mean radius is a threshold, not a dial
+### The mean radius is a threshold, not a setting you tune
 
-The mean set behaves differently, and the difference is worth understanding. Its penalty is a
-**norm**, `−κ‖Lᵀw‖`, and a norm is not differentiable at zero. So any strictly positive radius
-drives the orthogonal component to exactly zero, and raising it further changes nothing. The
-maximum-return book below pays for that with 5 bp of expected return and goes from 10 names to 73.
+The mean set behaves differently. Its penalty is the norm `−κ‖Lᵀw‖`, and a norm is not
+differentiable at zero, so any radius above zero drives the orthogonal component to zero. Raising
+the radius after that changes nothing. The maximum-return book below pays 5 bp of expected return
+for it, and it goes from 10 names to 73.
 =#
 
 radius_grid = [0.0, 0.5, 1.0, 2.0, 4.0, mu_set.kappa]
@@ -542,25 +540,25 @@ pretty_table(DataFrame("Radius" => radius_grid,
 
 #=
 !!! note "The tangency objective and a mean uncertainty set"
-    [`MaximumRatio`](@ref) solves a homogenised problem in a scaled variable `k`, and a mean
+    [`MaximumRatio`](@ref) solves a homogenised problem in a scaled variable `k`. A mean
     uncertainty set wide enough that no feasible portfolio's worst case beats `rf` leaves nothing
-    to pin that scale: the objective is then non-positive along every ray and its supremum sits at
-    the origin. `MaximumRatio` writes a floor `k >= kmin` for exactly this, so the constraints
-    stay meaningful and the recovered weights keep the mandate. A `k` that comes back **on** the
-    floor is the signal that there was no tangency portfolio to find, and that the weights beside
-    it maximise the return expression at that scale rather than the ratio. The books on this page
-    use [`MinimumRisk`](@ref) and [`MaximumReturn`](@ref), whose scale is fixed at one, so the
+    to pin that scale. The objective is then non-positive along every ray, and its supremum sits
+    at the origin. `MaximumRatio` writes a floor `k >= kmin` for this case, so the constraints
+    keep their meaning and the recovered weights keep the mandate. A `k` that comes back on the
+    floor tells you that there was no tangency portfolio to find, and that the weights beside it
+    maximise the return expression at that scale rather than the ratio. The books on this page use
+    [`MinimumRisk`](@ref) and [`MaximumReturn`](@ref), whose scale is fixed at one, so the
     question does not arise for them.
 
 ## 5. A walk-forward, under a factor mandate
 
-Nothing above is worth much if it only holds on the sample it was fitted on. A
-[`WalkForward`](@ref) refits everything per fold: the prior refits on the fold's own rows, the two
-uncertainty sets refit against **that fold's** factor model, and a factor-exposure constraint
-written in a factor **name** is re-based through the loadings the fold actually fitted.
+Everything above was fitted on one sample. A [`WalkForward`](@ref) refits all of it per fold. The
+prior refits on the fold's own rows, the two uncertainty sets refit against that fold's factor
+model, and a factor-exposure constraint written in a factor name is re-based through the loadings
+the fold fitted.
 
-The mandate below is one line of the constraint grammar — `"size >= 0.10"` — wrapped in an
-[`ExposureConstraintEstimator`](@ref) that declares the space the name lives in.
+The mandate below is one line of the constraint grammar, `"size >= 0.10"`, wrapped in an
+[`ExposureConstraintEstimator`](@ref) that names the space the factor name lives in.
 =#
 
 mandate = ExposureConstraintEstimator(;
@@ -596,16 +594,16 @@ pretty_table(DataFrame("Fold" => eachindex(folds.pred),
              title = "Every fold refits the prior, both sets and the mandate")
 
 #=
-Three things to read off that table. The fold loadings differ from the full-sample loadings, so
-the prior really did refit. The share outside the span differs per fold, so the sets really were
-rebuilt against each fold's own factor model. And the size exposure is `0.1` in every fold: the
-mandate binds exactly, in a basis that was refitted underneath it.
+Read three columns off that table. The fold loadings differ from the full-sample loadings, so the
+prior refit on each fold. The share outside the span differs per fold, so each fold's sets were
+built against that fold's own factor model. The size exposure is `0.1` in every fold, so the
+mandate binds at its bound in a basis that was refitted under it.
 
 ## 6. Factor attribution
 
-The last question is where the book's risk and return actually came from.
-[`factor_attribution`](@ref) answers it twice. The **predicted** decomposition reads the prior's
-own moments; the **realised** one reads a return series and decomposes what happened.
+The last question is where the book's risk and return came from. [`factor_attribution`](@ref)
+answers it twice. The predicted decomposition reads the prior's own moments. The realised one
+reads a return series and decomposes what happened.
 =#
 
 final = book(; kappa = 100.0, constraint = mandate)
@@ -613,17 +611,17 @@ predicted = factor_attribution(final.w, final.pa.pr; assets = true)
 
 #=
 The realised call needs returns. Our panel lists a fifth of its assets late, so a held asset can
-carry a non-finite return at an observation before it listed. `strict = false` warns and zeroes
-those pairs rather than refusing; `strict = true` would refuse. The warning is the point — it
-names the assets and counts the pairs, so an understated total is never silent.
+carry a non-finite return at an observation before it listed. Under `strict = false` the call
+warns and zeroes those pairs, and under `strict = true` it raises. Read the warning, because it
+names the assets and counts the pairs, so you can see when the total is understated.
 =#
 
 realised = factor_attribution(final.w, final.pa.pr, rd.X; assets = true, strict = false)
 
 #=
-Both decompositions are exact: the systematic, idiosyncratic and unattributed parts sum to the
-portfolio's own volatility and return, and the per-factor contributions sum to the systematic
-part.
+The cell below prints five residuals per decomposition. It measures the systematic, idiosyncratic
+and unattributed parts against the portfolio's own volatility and return, and the per-factor
+contributions against the systematic part. Each residual sits at the level of machine precision.
 =#
 
 function attribution_residuals(a)
@@ -671,12 +669,13 @@ pretty_table(DataFrame("Family" => rr.fam, "Factor" => rr.nf,
 ## Where to go next
 
   - [Cross-sectional factor model through a Pipeline](06_Cross_Sectional_Factor_Pipeline.md)
-    reaches the very same weights with the panel entering as a Pipeline Data Slot.
-  - [Reading a Return Forecast before an optimiser sees it](07_Forecast_Evaluation.md) scores the
-    `rfe` of §2 out of sample, against what actually happened next, and compares it with another.
-  - [Factor priors](../2_moments_priors/04_Factor_Priors.md) is the time-series counterpart of §2.
+    reaches the same weights with the panel entering as a pipeline data slot.
+  - [Reading a return forecast before an optimiser sees it](07_Forecast_Evaluation.md) scores the
+    `rfe` of section 2 out of sample, against what happened next, and compares it with another.
+  - [Factor priors](../2_moments_priors/04_Factor_Priors.md) is the counterpart of section 2
+    through time.
   - [Uncertainty sets](../2_moments_priors/09_Uncertainty_Sets.md) covers the box, ellipsoidal and
-    norm-ball shapes the orthogonal sets of §4 specialise.
+    norm-ball shapes that the orthogonal sets of section 4 specialise.
   - [Factor exposure constraints](../4_constraints_costs/10_Factor_Exposure_Constraints.md) is the
-    full grammar behind the one-line mandate of §5.
+    full grammar behind the one-line mandate of section 5.
 =#
