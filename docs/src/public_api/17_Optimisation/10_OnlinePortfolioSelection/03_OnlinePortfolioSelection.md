@@ -15,6 +15,7 @@ optimise(opt::OnlinePortfolioSelection; kwargs...)
 PortfolioOptimisers.partial_fit!(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:PortfolioOptimisers.Option{<:PortfolioOptimisers.OnlinePortfolioSelectionState}}, rd::ReturnsResult)
 factory(opt::OnlinePortfolioSelection, w::VecNum)
 PortfolioOptimisers.port_opt_view(opt::OnlinePortfolioSelection, i, args...)
+Online(::OnlinePortfolioSelection, args...)
 _optimise(opt::OnlinePortfolioSelection, rd::ReturnsResult; dims::Int = 1, kwargs...)
 PortfolioOptimisers.rows_needed(opt::OnlinePortfolioSelection)
 ```

@@ -7,7 +7,7 @@ the head: every splitting scheme, both searches, and both kinds of time dependen
 is the library's only optimiser whose read-out is its own recursion (ADR 0155) and whose
 Result carries no carrier (ADR 0158), so each seam is asserted rather than assumed.
 
-Seven groups:
+Eight groups:
 
  1. every scheme the library ships reaches the head, batch and stepped alike;
  2. `MultipleRandomised` crosses an asset subset with the stepped walk-forward, and the
@@ -20,7 +20,9 @@ Seven groups:
     dependence (ADR 0165);
  6. the downstream readers — `Resume`, `performance_summary` and `log_wealth_regret` —
     consume a stepped run;
- 7. a search scores the head in sample, over every arm that writes a train score (#1240).
+ 7. a search scores the head in sample, over every arm that writes a train score (#1240);
+ 8. the head refuses `Online(head)` and refuses to own a Pipeline's rows, and the routes
+    those two messages name all work (#1241, #1242).
 =#
 
 @testset "Online portfolio selection: cross-validation and tuning" begin
@@ -290,5 +292,79 @@ Seven groups:
         @test_throws IsNothingError expected_risk(r, res1)
         @test_throws IsNothingError expected_risk(ConditionalValueatRisk(), res1)
         @test isfinite(expected_risk(r, res1, rd.X))
+    end
+
+    @testset "8. The two refusals the head owes, and the routes they name (#1241, #1242)" begin
+        # `Online(est)` declares a refit from a buffer. For a head both of its settings are
+        # a batch walk-forward that runs today, so the wrapper adds no answer and is
+        # refused at the construction door (ADR 0155). Every spelling reaches it.
+        @test_throws ArgumentError Online(eg())
+        @test_throws ArgumentError Online(eg(); max_history = 20)
+        @test_throws ArgumentError Online(; est = eg())
+        # The refusal names the two schemes that give the two answers.
+        msg = try
+            Online(eg())
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("IndexWalkForward", msg)
+        @test occursin("OnlineIndexWalkForward", msg)
+        # The seed the refusal used to live on is gone: the head now falls to the generic
+        # seed, which no caller can reach, because no `Online` can hold a head.
+        @test isa(po.online_state_seed(eg(), nothing), po.SampleBufferState)
+
+        # The uncapped refit is the expanding walk-forward, and its allocation is the
+        # online arm's exactly: both take the same single-row updates from `w0`.
+        wp(res) = reduce(vcat, transpose(p.w) for p in res.res)
+        wo = wp(cross_val_predict(eg(), rd, OnlineIndexWalkForward(20, 1)))
+        we = wp(cross_val_predict(eg(), rd, IndexWalkForward(20, 1; expand_train = true)))
+        @test wo == we
+        # The capped refit is the rolling walk-forward, which is the recursion restarted
+        # from `w0` inside each window, and it differs from the online arm.
+        wc = wp(cross_val_predict(eg(), rd, IndexWalkForward(20, 1)))
+        @test size(wc) == size(wo)
+        @test wc != wo
+
+        # A head does not own a Pipeline's rows: its read-out is the recursion, so it
+        # rebuilds no carrier for the universe steps to refit over. The head folded every
+        # row and then died at the read-out; it is now refused at both doors.
+        sel = ScoreSelector(; score = SCM(), rule = RankRule(; best = 3))
+        bare() = Pipeline(; steps = [:opt => eg()])
+        with_sel() = Pipeline(; steps = [:sel => sel, :opt => eg()])
+        for p in (bare, with_sel)
+            @test_throws ArgumentError po.assert_online_entry(p())
+            @test_throws ArgumentError partial_fit!(p(), rows(rd, 1:1))
+            @test_throws ArgumentError cross_val_predict(p(), rd,
+                                                         OnlineIndexWalkForward(20, 5))
+        end
+
+        # A carrier would not mend it either: the read-out expresses a selection as a view
+        # of the owner's state, and a view of a recursion is not the recursion over those
+        # columns. The allocation is a path, the projection couples the columns, and the
+        # wealth factor reads every one of them. Two rules show the gap at two sizes.
+        function view_gap(alg, idx)
+            h = OPS(; alg = alg)
+            for t in 1:size(rd.X, 1)
+                h = partial_fit!(h, rows(rd, t:t))
+            end
+            wv = optimise(po.port_opt_view(h, idx, rd.X)).w
+            wcol = optimise(OPS(; alg = alg), po.port_opt_view(rd, :, idx)).w
+            return maximum(abs, wv - wcol)
+        end
+        @test view_gap(AntiCorrelation(), [2, 4]) > 0.4
+        @test view_gap(AdaptiveSubgradient(), [1, 3]) > 1e-2
+
+        # And the routes the messages name all work. A prior step in front makes the prior
+        # the row owner; `Online(pipe)` refits every step and equals the batch fit.
+        @test isa(cross_val_predict(Pipeline(;
+                                             steps = [:pe => EmpiricalPrior(),
+                                                      :opt => eg()]), rd,
+                                    OnlineIndexWalkForward(20, 5)),
+                  PortfolioOptimisers.AbstractPredictionResult)
+        op = po.update_online_estimator(Online(with_sel()))
+        for t in 1:size(rd.X, 1)
+            op = partial_fit!(op, rows(rd, t:t))
+        end
+        @test fit(op).ctx.opt.w == fit(with_sel(), rd).ctx.opt.w
     end
 end

@@ -124,10 +124,54 @@ runs at the first step and after it is kept, so a hand-called step on a reordere
 refused by name and not folded silently, and the timestamps serve
 [ADR 0144](0144-an-online-runs-result-carries-the-threaded-estimator-and-resume-re-enters-the-fold-loop-from-the-folds-it-holds.md)'s
 `Resume`. `merge_states` refuses, naming order-dependence: an online update is not a sufficient
-statistic for its block. `Online(head)` is refused by name as the prior-holding hosts refuse it —
-the family never refits from a buffer, and a window is the rule's field. The field list of the
-state, the one verb a rule writes, the block step, and what a step does with a `NaN` price
-relative are ADR 0157's.
+statistic for its block. The field list of the state, the one verb a rule writes, the block step,
+and what a step does with a `NaN` price relative are ADR 0157's.
+
+### `Online(head)` is refused at the construction door, because it adds no answer
+
+`Online` declares a refit from a buffer, so `Online(head)` would run the Causal Pass over
+the buffer at every fold. Both of its settings are a batch walk-forward the library already runs,
+measured over the SP500 panel of `examples/` for seven rules of the tree:
+
+| the wrapper | the scheme that already gives it | the allocation |
+| --- | --- | --- |
+| `Online(head)` | `IndexWalkForward(…; expand_train = true)` | the online arm's, to the last bit |
+| `Online(head; max_history = w)` | `IndexWalkForward(w, test_size)` | the recursion restarted from `w0` in each window |
+
+Both columns were run against their hand-taken folds and agreed to `0.0` in every weight, and the
+expanding walk-forward cost 12 to 110 times the online arm over 300 rows. So the wrapper is a
+slower spelling of two routes that exist, and the refusal takes nothing from a caller.
+
+The door is the **constructor**, not the warm-up. A wrapper reaches the warm-up from an estimator
+field alone, and every field that could hold one already refuses a wrapped head by its own type
+bound, so a refusal at the warm-up is a sentence no caller ever reads. The constructor is the
+earliest point and the only reachable one. `online_state_seed` therefore writes no method for the
+head.
+
+### A head does not own a Pipeline's rows
+
+A Pipeline's row owner is its prior step, else its optimisation step, and the read-out
+reconstitutes the carrier from the owner before it refits the universe steps over it
+(ADR 0142). A head owns no rows in that sense, and two separate things stop it:
+
+1. **It holds no carrier.** Its read-out is the recursion, so it rebuilds nothing, and a rule
+   whose tree reads no rows holds no rows at all — `rows_needed` is `0` for most of the tree, and
+   the rows buffer is then absent rather than short.
+2. **A carrier would not be enough.** The read-out expresses a universe step's selection as a
+   **view** of the owner's state over the surviving columns, and promises the view equals the
+   batch fit over those columns. That promise holds for a prior, whose estimate over columns is
+   the submatrix of the estimate over all of them. It fails for a recursion: the allocation is a
+   path, the projection couples the columns, and the wealth factor `⟨w, x⟩` reads every one of
+   them. Measured over four of eight columns, the view differs from the run over those columns by
+   `1.0` in a weight for `AntiCorrelation`, `1.05e-2` for `GradientProjection` and `2.5e-5` for
+   `ExponentiatedGradient`.
+
+So the head is refused by name where the pipeline is entered — at the fold loop's door and at the
+first hand-driven fold — and the message names the two routes that give the batch answer: a prior
+step before the head, which makes the prior the row owner, or `Online(pipe)`, which refits every
+step over the observations folded so far and was measured to reproduce the batch fit exactly. The
+asset-subset path is untouched and stays exact, because `MultipleRandomised` takes its view once,
+at the warm-up, so the recursion runs on the chosen columns from the first row.
 
 ### The Result is `NaiveOptimisationResult`, and a weight sequence is not an OptimisationResult
 
@@ -202,3 +246,11 @@ Derived from the rulings above, not decided separately:
   the hindsight benchmarks. The build tickets graduate once those land.
 - #312's online half is answered here; its critical-line half stays on map #304.
 - `test/test_24b_optimiser_partial_fit.jl`'s identity gains its first exact case.
+- #1242 closes: the `Online(head)` refusal moves from `online_state_seed`, which no caller could
+  reach, to the constructor, and the seed method goes. The head's private API page loses its row
+  and the public page gains one.
+- #1241 closes: a Pipeline whose row owner is a head is refused at the fold loop's door
+  (`assert_online_owner`) and at the first hand-driven fold (`fold_pipeline_owner`), where it
+  folded every row and then died at the read-out. `returns_result` is written for no head.
+- `test/test_67g_cross_validation_and_tuning.jl` gains the group that locks both refusals and the
+  routes they name.

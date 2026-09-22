@@ -1244,6 +1244,7 @@ $(DocStringExtensions.FIELDS)
 
   - `est` is not an `Online`. An `ArgumentError` is thrown otherwise.
   - `est` is not a cross-validation scheme: an Online Scheme is built by its function constructor. An `ArgumentError` naming the constructors is thrown otherwise.
+  - `est` is not an [`OnlinePortfolioSelection`](@ref) head: a refit of a head is a batch walk-forward, and both of the wrapper's settings are one the library already runs. An `ArgumentError` naming them is thrown otherwise.
   - `est` has a `cache` field. An `ArgumentError` is thrown otherwise.
   - `max_history > 0` when it is not `nothing`. A `DomainError` is thrown otherwise.
 

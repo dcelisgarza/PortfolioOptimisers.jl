@@ -356,14 +356,21 @@ end
 """
     assert_online_owner(owner, name::AbstractString)
 
-Refuses a row owner that cannot fold, by name: a [`TimeDependent`](@ref) schedule, and an optimisation step [`assert_online_entry`](@ref) refuses. A precomputed result never reaches the walk, because a result is not a step: it enters a pipeline only as a schedule's entry, and the schedule is refused first.
+Refuses a row owner that cannot fold, by name: a [`TimeDependent`](@ref) schedule, an [`OnlinePortfolioSelection`](@ref) head, and an optimisation step [`assert_online_entry`](@ref) refuses. A precomputed result never reaches the walk, because a result is not a step: it enters a pipeline only as a schedule's entry, and the schedule is refused first.
+
+The head is refused for the read-out, not for the fold. Its read-out is its own recursion, so it rebuilds no carrier ([`online_readout`](@ref)), and the Pipeline's read-out reconstitutes one from the row owner before it refits the universe steps over it. Two things are missing, and a carrier would mend only the first. A rule whose tree reads no rows holds none, so there is nothing to rebuild the carrier from. And the read-out expresses a selection as a view of the owner's state, which for a recursion is not the run over those columns: the allocation is a path, the projection couples the columns, and the wealth factor reads every one of them.
 
 # Related
 
   - [`assert_online_entry(p::Pipeline)`](@ref)
+  - [`fold_pipeline_owner`](@ref)
+  - [`online_readout`](@ref)
 """
 function assert_online_owner(::AbstractPriorEstimator, ::AbstractString)
     return nothing
+end
+function assert_online_owner(::OnlinePortfolioSelection, name::AbstractString)
+    return throw(ArgumentError("the `$(name)` step is an `OnlinePortfolioSelection` head and owns the rows of the online step, because no prior step precedes it: the head's read-out is its own recursion, so it holds no carrier for `fit(pipe)` to reconstitute the universe steps over, and a rule whose tree reads no rows holds none at all. Nor would a carrier be enough: a universe step's selection is read out as a view of the owner's state, and a view of a recursion is not the recursion over those columns. Put a prior step before the head, whose rows the read-out reads, or declare a refit with `Online(pipe)`, which fits every step over the observations folded so far."))
 end
 function assert_online_owner(::TimeDependent, name::AbstractString)
     return throw(ArgumentError("the `$(name)` step is a `TimeDependent` schedule of optimisers and owns the rows of the online step, because no prior step precedes it: a schedule swaps the estimator that carries the state every fold, so the optimiser a fold is handed never saw the rows folded before it. Put a prior step before it, whose state the loop threads while the schedule swaps a stateless step, or schedule a field that carries no state, or refit every fold with `ff = nothing`."))
@@ -666,14 +673,18 @@ end
 """
     fold_pipeline_owner(pe::AbstractPriorEstimator, cache, rd::ReturnsResult)
     fold_pipeline_owner(opt::OptimisationEstimator, cache, rd::ReturnsResult)
+    fold_pipeline_owner(opt::OnlinePortfolioSelection, cache, rd::ReturnsResult)
 
 Folds a block into the row owner of a [`Pipeline`](@ref) and records the Pipeline's own context where the owner keeps none.
 
 A prior owner is folded through [`fold_prior`](@ref), first, because the Pipeline's context takes its cap from the buffer the prior seeds, exactly as an optimiser's does ([`fold_returns`](@ref)). The factor column is owned once, on the same terms: the context keeps it only when the prior's tree never reads it. An optimisation owner is itself a host and folds through its own step, and the Pipeline records nothing beside it.
 
+An [`OnlinePortfolioSelection`](@ref) head is refused here, which is the door of a hand-driven run as [`assert_online_owner`](@ref) is the door of the fold loop. The reason is the read-out, and it is stated there.
+
 # Related
 
   - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
+  - [`assert_online_owner`](@ref)
   - [`fold_prior`](@ref)
   - [`fold_context`](@ref)
 """
@@ -686,6 +697,9 @@ function fold_pipeline_owner(pe::AbstractPriorEstimator,
 end
 function fold_pipeline_owner(opt::OptimisationEstimator, ::Nothing, rd::ReturnsResult)
     return partial_fit!(opt, rd), nothing
+end
+function fold_pipeline_owner(::OnlinePortfolioSelection, ::Nothing, ::ReturnsResult)
+    return throw(ArgumentError("an `OnlinePortfolioSelection` head owns the rows of this `Pipeline`, because no prior step precedes it, and a head cannot own them: its read-out is its own recursion, so `fit(pipe)` is left with no carrier to reconstitute the universe steps over, and a view of a recursion is not the recursion over the columns a universe step keeps. Put a prior step before the head, whose rows the read-out reads, or declare a refit with `Online(pipe)`, which fits every step over the observations folded so far. The fold loop names the same two routes at its own door."))
 end
 """
     fit(pipe::Pipeline)

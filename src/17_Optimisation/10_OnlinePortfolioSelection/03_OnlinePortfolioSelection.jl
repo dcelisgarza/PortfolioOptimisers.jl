@@ -705,17 +705,20 @@ function held_timestamps(opt::OnlinePortfolioSelection)
     return isnothing(opt.cache) ? nothing : opt.cache.ts
 end
 """
-    online_state_seed(opt::OnlinePortfolioSelection, max_history)
+    Online(::OnlinePortfolioSelection, args...; kwargs...)
 
-Refuses `Online(head)` by name: the family never refits from a buffer, a rule's window is the rule's own field, and the head's rows buffer is already capped by the rule tree's need.
+Refuses `Online(head)` at the construction door, naming the three routes that give the two answers the wrapper would give.
+
+[`Online`](@ref) declares a refit from a buffer, and for a head both of its settings are a batch walk-forward the library already runs. Uncapped, the refit is the expanding walk-forward, whose allocation equals the online arm's exactly, because both take the same sequence of single-row updates from `w0`; it pays a pass over every row folded so far where the online arm pays one row. Capped, the refit is the rolling walk-forward, whose allocation is the recursion restarted from `w0` inside each window. So the wrapper adds no answer, and the refusal costs the caller nothing.
 
 # Related
 
   - [`Online`](@ref)
-  - [`online_state_seed`](@ref)
+  - [`OnlineIndexWalkForward`](@ref)
+  - [`IndexWalkForward`](@ref)
 """
-function online_state_seed(::OnlinePortfolioSelection, ::Option{<:Integer})
-    return throw(ArgumentError("`Online` does not wrap an `OnlinePortfolioSelection` head: the family never refits from a buffer, a rule's window is the rule's own field, and the head's rows buffer is capped by what its rule tree reads. Hand the head to the fold loop's online arm as it is."))
+function Online(::OnlinePortfolioSelection, args...; kwargs...)
+    return throw(ArgumentError("`Online` does not wrap an `OnlinePortfolioSelection` head: the wrapper declares a refit from a buffer, and for a head both of its settings are a batch walk-forward that runs today. Uncapped, the refit is `IndexWalkForward(train_size, test_size; expand_train = true)`, whose allocation is the online arm's to the last bit and which pays a pass over every row folded so far. Capped at `max_history = w`, it is `IndexWalkForward(w, test_size)`, the recursion restarted from `w0` inside each window. Step the head with `OnlineIndexWalkForward`, or refit it with whichever of those two you meant."))
 end
 """
     fees_carry_turnover(fees::Nothing)
