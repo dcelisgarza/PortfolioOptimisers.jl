@@ -952,7 +952,7 @@ KernelTrendTracking
        │       │     path ┼ ElasticNetPath
        │       │          │   theta ┼ Float64: 0.99
        │       │          │   ratio ┼ Float64: 0.001
-       │       │          │   iters ┼ Int64: 1000
+       │       │          │   iters ┼ Int64: 10000
        │       │          │     tol ┴ Float64: 1.0e-10
    eta ┼ Int64: 1000
      q ┼ Int64: 6
@@ -1030,9 +1030,9 @@ function online_update!(alg::KernelTrendTracking, st, w::AbstractVector, x::Abst
     return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
 end
 """
-    KernelTrendPatternTracking(; window::Integer = 5, nu::Real = 0.5, theta::Real = 0.99, q::Real = 6, eta::Real = 1000, proj::EuclideanProjection = EuclideanProjection())
+    KernelTrendPatternTracking(; window::Integer = 5, nu::Real = 0.5, theta::Real = 0.99, iters::Integer = 10_000, tol::Real = 1e-10, q::Real = 6, eta::Real = 1000, proj::EuclideanProjection = EuclideanProjection())
 
-The kernel-based trend pattern tracking of Lai, Yang, Wu and Fang (2018): a [`KernelTrendTracking`](@ref) whose forecast is the [`KernelTrendPattern`](@ref) over `window` levels, its initial state mixed by `nu` and its intermediate state read off an [`ElasticNetPath`](@ref) at `theta` (KTPT).
+The kernel-based trend pattern tracking of Lai, Yang, Wu and Fang (2018): a [`KernelTrendTracking`](@ref) whose forecast is the [`KernelTrendPattern`](@ref) over `window` levels, its initial state mixed by `nu` and its intermediate state read off an [`ElasticNetPath`](@ref) at `theta`, with at most `iters` sweeps stopped at `tol` (KTPT).
 
 The paper's sensitivity study is flat over `eta` from 800 to 1300, which is the saturation the step's docstring states; `q` around 6 is where it reports the wealth stable. The statistic folds with a memory, so the head holds no rows for this rule.
 
@@ -1048,7 +1048,7 @@ KernelTrendTracking
        │       │     path ┼ ElasticNetPath
        │       │          │   theta ┼ Float64: 0.99
        │       │          │   ratio ┼ Float64: 0.001
-       │       │          │   iters ┼ Int64: 1000
+       │       │          │   iters ┼ Int64: 10000
        │       │          │     tol ┴ Float64: 1.0e-10
    eta ┼ Int64: 1000
      q ┼ Int64: 6
@@ -1067,10 +1067,12 @@ KernelTrendTracking
   - $(ref_dict[:lai2018ktpt])
 """
 function KernelTrendPatternTracking(; window::Integer = 5, nu::Real = 0.5,
-                                    theta::Real = 0.99, q::Real = 6, eta::Real = 1000,
+                                    theta::Real = 0.99, iters::Integer = 10_000,
+                                    tol::Real = 1e-10, q::Real = 6, eta::Real = 1000,
                                     proj::EuclideanProjection = EuclideanProjection())::KernelTrendTracking
     alg = KernelTrendPattern(; window = window, nu = nu,
-                             path = ElasticNetPath(; theta = theta))
+                             path = ElasticNetPath(; theta = theta, iters = iters,
+                                                   tol = tol))
     return KernelTrendTracking(; me = PriceLevelExpectedReturns(; alg = alg), eta = eta,
                                q = q, proj = proj)
 end
@@ -1205,7 +1207,7 @@ The short-term sparse portfolio optimisation of Lai, Yang, Fang and Wu (2018): a
 
 # Mathematical definition
 
-With ``\\hat{\\boldsymbol{x}}_{t+1}`` the Price Relative Forecast — the window peak over the last price by default, so ``\\hat{\\boldsymbol{x}} \\geq \\boldsymbol{1}`` — the objective reads ``\\boldsymbol{\\phi}_t = -(1.1 \\log \\hat{\\boldsymbol{x}}_{t+1} + \\boldsymbol{1})`` and solves
+With ``\\hat{\\boldsymbol{x}}_{t+1}`` the Price Relative Forecast — the window peak over the last price by default, so ``\\hat{\\boldsymbol{x}} \\geq \\boldsymbol{1}`` — the objective reads ``\\boldsymbol{\\phi}_t = -(1.1 \\log \\hat{\\boldsymbol{x}}_{t+1} + \\boldsymbol{1})``. The paper states the programme
 
 ```math
 \\begin{align}
@@ -1213,7 +1215,7 @@ With ``\\hat{\\boldsymbol{x}}_{t+1}`` the Price Relative Forecast — the window
 \\end{align}
 ```
 
-by the iteration, seeded at ``\\boldsymbol{b} = \\boldsymbol{g} = \\boldsymbol{w}_t`` and ``\\rho = 0``,
+and runs the iteration, seeded at ``\\boldsymbol{b} = \\boldsymbol{g} = \\boldsymbol{w}_t`` and ``\\rho = 0``,
 
 ```math
 \\begin{align}
@@ -1223,7 +1225,15 @@ by the iteration, seeded at ``\\boldsymbol{b} = \\boldsymbol{g} = \\boldsymbol{w
 \\end{align}
 ```
 
-until ``\\lvert \\boldsymbol{1}^\\intercal \\boldsymbol{b} - 1 \\rvert < \\texttt{tol}`` or `iters` steps, and ``\\boldsymbol{w}_{t+1} = \\mathrm{Proj}(\\zeta \\boldsymbol{b})``. The fixed matrix is inverted once in closed form through the Sherman–Morrison identity, so every iteration is ``O(N)``. The augmented Lagrangian is proved to have a saddle point in the paper; the final step is the Euclidean projection of a **scaled** iterate, and the scale ``\\zeta`` is what makes the answer sparse. The budget residual changes sign as the dual variable adapts, so the paper's `tol = 1e-4` is met at a zero crossing after a few hundred to a few thousand iterations, while the iterate is still moving by tenths; the scaled projection of that point and of the point `iters` steps later can land on different assets. The answer at the paper's tolerance is the paper's; a tolerance the crossings never reach runs every one of the `iters` steps.
+until ``\\lvert \\boldsymbol{1}^\\intercal \\boldsymbol{b} - 1 \\rvert < \\texttt{tol}`` or `iters` steps, and ``\\boldsymbol{w}_{t+1} = \\mathrm{Proj}(\\zeta \\boldsymbol{b})``. The fixed matrix is inverted once in closed form through the Sherman–Morrison identity, so every iteration is ``O(N)``. The iteration couples ``\\boldsymbol{b}`` and ``\\boldsymbol{g}`` by a quadratic term with no multiplier, so its fixed point does not solve the stated programme but
+
+```math
+\\begin{align}
+\\min_{\\boldsymbol{b}, \\boldsymbol{g}} \\; \\langle \\boldsymbol{b}, \\boldsymbol{\\phi}_t \\rangle + \\lambda \\lVert \\boldsymbol{g} \\rVert_1 + \\tfrac{\\lambda}{2 \\gamma} \\lVert \\boldsymbol{b} - \\boldsymbol{g} \\rVert^2 \\quad \\text{s.t.} \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{b} = 1\\,,
+\\end{align}
+```
+
+where ``\\lVert \\boldsymbol{b} - \\boldsymbol{g} \\rVert_\\infty \\leq \\gamma`` at the optimum, because ``\\boldsymbol{g}`` is the soft threshold of ``\\boldsymbol{b}`` at ``\\gamma``. Both programmes are bounded only when ``\\max \\boldsymbol{\\phi}_t - \\min \\boldsymbol{\\phi}_t \\leq 2 \\lambda``, that is ``\\max \\hat{\\boldsymbol{x}} / \\min \\hat{\\boldsymbol{x}} \\leq e^{1 / 1.1}`` at the defaults. The dual step ``\\eta`` is small, so the iterate reaches that fixed point after thousands to hundreds of thousands of steps, more than `iters`. The augmented Lagrangian is proved to have a saddle point in the paper; the final step is the Euclidean projection of a **scaled** iterate, and the scale ``\\zeta`` is what makes the answer sparse. The budget residual changes sign as the dual variable adapts, so the paper's `tol = 1e-4` is met at a zero crossing after a few hundred to a few thousand iterations, while the iterate is still moving by tenths; the scaled projection of that point and of the point `iters` steps later can land on different assets. The answer at the paper's tolerance is the paper's; a tolerance the crossings never reach runs every one of the `iters` steps.
 
 # Fields
 

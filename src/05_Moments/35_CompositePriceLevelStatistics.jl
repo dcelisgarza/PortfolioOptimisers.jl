@@ -649,7 +649,7 @@ For a response ``\\boldsymbol{y}`` over the assets and the columns ``\\boldsymbo
 \\end{align}
 ```
 
-by cyclic coordinate descent, each coordinate in turn being ``z_k = S(\\boldsymbol{P}_k^\\intercal \\boldsymbol{r}_k, \\lambda \\vartheta) / (\\lVert \\boldsymbol{P}_k \\rVert^2 + \\lambda (1 - \\vartheta))`` with ``\\boldsymbol{r}_k`` the residual without column ``k`` and ``S`` the soft threshold. Every coefficient is zero from ``\\lambda_{\\max} = \\max_k \\lvert \\boldsymbol{P}_k^\\intercal \\boldsymbol{y} \\rvert / \\vartheta`` up. The path runs from ``\\lambda_{\\max}`` down to ``\\lambda_{\\max} \\cdot \\texttt{ratio}`` on a log scale, so its middle point is ``\\lambda_{\\max} \\sqrt{\\texttt{ratio}}``, and the coefficients are solved there alone, seeded at zero: the problem has as many columns as the window has levels, so the rest of the path costs nothing to skip. The columns are the levels of consecutive periods, nearly collinear, where the sweeps alone converge slowly; each sweep therefore ends with the exact solve of [`elastic_net_polish`](@ref) on the sign pattern it left, accepted as the optimum when the optimality conditions hold, which the strict convexity makes sufficient, so the sweeps only have to find the active set. `ratio` is the floor the paper that defines the path uses; `theta = 0.99` is the kernel trend pattern's, nearly the lasso and strictly convex.
+by cyclic coordinate descent, each coordinate in turn being ``z_k = S(\\boldsymbol{P}_k^\\intercal \\boldsymbol{r}_k, \\lambda \\vartheta) / (\\lVert \\boldsymbol{P}_k \\rVert^2 + \\lambda (1 - \\vartheta))`` with ``\\boldsymbol{r}_k`` the residual without column ``k`` and ``S`` the soft threshold. Every coefficient is zero from ``\\lambda_{\\max} = \\max_k \\lvert \\boldsymbol{P}_k^\\intercal \\boldsymbol{y} \\rvert / \\vartheta`` up. The path runs from ``\\lambda_{\\max}`` down to ``\\lambda_{\\max} \\cdot \\texttt{ratio}`` on a log scale, so its middle point is ``\\lambda_{\\max} \\sqrt{\\texttt{ratio}}``, and the coefficients are solved there alone, seeded at zero: the problem has as many columns as the window has levels, so the rest of the path costs nothing to skip. The columns are the levels of consecutive periods, nearly collinear, where the sweeps alone converge slowly; each sweep therefore ends with the exact solve of [`elastic_net_polish`](@ref) on the sign pattern it left, accepted as the optimum when the optimality conditions hold, which the strict convexity makes sufficient, so the sweeps only have to find the active set. They find it slowly: on random collinear panels shaped like the kernel trend pattern's, a cap of 1000 sweeps left about three in five unpolished, and the default of 10 000 polished every one; an exit at `tol` or at `iters` returns the last sweep, which is not the optimum. `ratio` is the floor the paper that defines the path uses; `theta = 0.99` is the kernel trend pattern's, nearly the lasso and strictly convex.
 
 # Fields
 
@@ -657,7 +657,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ElasticNetPath(; theta::Real = 0.99, ratio::Real = 1e-3, iters::Integer = 1000, tol::Real = 1e-10) -> ElasticNetPath
+    ElasticNetPath(; theta::Real = 0.99, ratio::Real = 1e-3, iters::Integer = 10_000, tol::Real = 1e-10) -> ElasticNetPath
 
 Keywords correspond to the struct's fields.
 
@@ -675,7 +675,7 @@ julia> ElasticNetPath()
 ElasticNetPath
   theta ┼ Float64: 0.99
   ratio ┼ Float64: 0.001
-  iters ┼ Int64: 1000
+  iters ┼ Int64: 10000
     tol ┴ Float64: 1.0e-10
 ```
 
@@ -718,7 +718,7 @@ struct ElasticNetPath{T1 <: Real, T2 <: Real, T3 <: Integer, T4 <: Real} <:
                                                                              iters, tol)
     end
 end
-function ElasticNetPath(; theta::Real = 0.99, ratio::Real = 1e-3, iters::Integer = 1000,
+function ElasticNetPath(; theta::Real = 0.99, ratio::Real = 1e-3, iters::Integer = 10_000,
                         tol::Real = 1e-10)::ElasticNetPath
     return ElasticNetPath(theta, ratio, iters, tol)
 end
@@ -872,7 +872,7 @@ KernelTrendPattern
     path ┼ ElasticNetPath
          │   theta ┼ Float64: 0.99
          │   ratio ┼ Float64: 0.001
-         │   iters ┼ Int64: 1000
+         │   iters ┼ Int64: 10000
          │     tol ┴ Float64: 1.0e-10
 ```
 

@@ -32,7 +32,7 @@ the worked step the paper prints for five assets at its defaults.
         path = ElasticNetPath()
         @test path.theta == 0.99 &&
               path.ratio == 1e-3 &&
-              path.iters == 1000 &&
+              path.iters == 10_000 &&
               path.tol == 1e-10
         # Orthonormal columns have the closed form `S(Pᵀy, λϑ) / (1 + λ(1 − ϑ))`.
         Q = Matrix(qr(randn(rng, 8, 3)).Q)[:, 1:3]
@@ -72,6 +72,18 @@ the worked step the paper prints for five assets at its defaults.
         # Without the polish the sweeps alone reach the same point, slowly.
         slow = ElasticNetPath(; iters = 200_000, tol = 1e-16)
         @test isapprox(po.elastic_net_path(slow, P, y), z; atol = 1e-8)
+        # #1259: on collinear columns a cap of 1000 sweeps can stop before the sweeps find the
+        # optimum's sign pattern, and the last sweep is tenths away from the optimum; the
+        # default cap reaches the pattern and returns the polished optimum.
+        rng2 = StableRNG(2)
+        P = 1 .+ 0.02 .* randn(rng2, 4, 5)
+        y = P[:, end] .* (1 .+ 0.03 .* randn(rng2, 4))
+        lam = maximum(abs, P' * y) / path.theta * sqrt(path.ratio)
+        zcap = po.elastic_net_path(ElasticNetPath(; iters = 1000), P, y)
+        z = po.elastic_net_path(path, P, y)
+        @test isnothing(po.elastic_net_polish(P, y, zcap, lam, path.theta))
+        @test po.elastic_net_polish(P, y, z, lam, path.theta) ≈ z
+        @test maxerr(zcap, z) > 0.5
         @test_throws DomainError ElasticNetPath(; theta = 0)
         @test_throws DomainError ElasticNetPath(; theta = 1.1)
         @test_throws DomainError ElasticNetPath(; ratio = 1)
@@ -201,10 +213,20 @@ the worked step the paper prints for five assets at its defaults.
         @test wh == u
         flat_rd = ReturnsResult(; nx = nx, X = zeros(12, N))
         @test optimise(OPS(; alg = KernelTrendPatternTracking()), flat_rd).w ≈ u
-        # At the default the answer through the statistic is one-hot on real data.
+        # At the default the answer through the statistic is one-hot on real data, unless two
+        # kernel-scaled forecasts are within `1 / eta`. The default cap reaches the polished
+        # path, so a larger cap gives the same answer (#1259). On rows 1:18 two assets are
+        # within `1 / eta`; a cap of 1000 sweeps gave a one-hot answer there, from a path the
+        # sweeps had not solved.
         opt = OPS(; alg = KernelTrendPatternTracking())
         wo = optimise(opt, rows(rd, 1:18)).w
-        @test count(>(1e-12), wo) == 1 && sum(wo) ≈ 1
+        @test wo ≈ optimise(OPS(; alg = KernelTrendPatternTracking(; iters = 10^7)),
+                   rows(rd, 1:18)).w
+        @test count(>(1e-12), wo) == 2 && sum(wo) ≈ 1
+        @test count(>(1e-12), optimise(opt, rows(rd, 1:20)).w) == 1
+        @test count(>(1e-12),
+                    optimise(OPS(; alg = KernelTrendPatternTracking(; iters = 1000)),
+                             rows(rd, 1:18)).w) == 1
         # Validation and the forecaster slot.
         @test_throws DomainError KernelTrendTracking(; eta = 0)
         @test_throws DomainError KernelTrendTracking(; q = 0)
@@ -214,14 +236,17 @@ the worked step the paper prints for five assets at its defaults.
         @test po.rows_needed(KernelTrendTracking(; me = PriceLevelExpectedReturns())) == 4
         @test po.port_opt_view(KernelTrendTracking(; eta = 3, q = 4), [1, 2]).q == 4
         # The paper's constructor addresses every parameter.
-        k = KernelTrendPatternTracking(; window = 3, nu = 0.4, theta = 0.9, q = 5,
-                                       eta = 900)
+        k = KernelTrendPatternTracking(; window = 3, nu = 0.4, theta = 0.9, iters = 50,
+                                       tol = 1e-6, q = 5, eta = 900)
         @test k.me.alg.window == 3 &&
               k.me.alg.nu == 0.4 &&
               k.me.alg.path.theta == 0.9 &&
+              k.me.alg.path.iters == 50 &&
+              k.me.alg.path.tol == 1e-6 &&
               k.q == 5 &&
               k.eta == 900
         @test isa(KernelTrendPatternTracking().me.alg, KernelTrendPattern)
+        @test KernelTrendPatternTracking().me.alg.path == ElasticNetPath()
     end
 
     @testset "The head's verbs" begin

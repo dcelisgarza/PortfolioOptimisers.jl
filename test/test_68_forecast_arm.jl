@@ -668,6 +668,21 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
                                    rows(rd, 7:11), set)
         @test wsp == po.project_simplex(500 .* bstop)
         @test kstop < 1000 && maxerr(bstop, b) > 0.5
+        # #1259: the fixed point is the optimum of the coupled programme the docstring states,
+        # not of the paper's. Its closed form gives the asset at `min φ` the remainder and
+        # every other asset `(λ − (φᵢ − min φ)) / (λ / γ)`.
+        for _ in 10_001:1_000_000
+            rhs = a .* g .+ (0.005 - rho) .- phi
+            b = rhs ./ a .- 0.005 * sum(rhs) / (a * (a + 0.005 * N))
+            g = sign.(b) .* max.(abs.(b) .- 0.01, 0)
+            rho += 0.005 * (sum(b) - 1)
+        end
+        kmin = argmin(phi)
+        b2 = (0.5 .- (phi .- phi[kmin])) ./ a
+        b2[kmin] = 1 - (sum(b2) - b2[kmin])
+        @test maximum(phi) - minimum(phi) <= 2 * 0.5
+        @test isapprox(b, b2; atol = 1e-8)
+        @test maxerr(b, g) ≈ 0.01
     end
 
     @testset "Show and the search seam" begin
