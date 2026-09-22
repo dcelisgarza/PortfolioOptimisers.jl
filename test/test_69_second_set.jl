@@ -225,6 +225,27 @@ end
                      ReturnsResult(; nx = ["A", "B", "C"], X = rows3))
         @test isapprox(w3, po.wealth_transfer(wh3, claim); atol = 1e-12)
         @test !isapprox(w3, q; atol = 1e-6)
+        # The logarithm of a price relative is `log1p` of the return. The correlation
+        # cancels the mean of each window, so a small return that loses its precision in
+        # `1 + r` moves the step: on this window the two kernels are 6e-11 apart, and the
+        # rule takes the accurate one. A gap reads as a flat log return on that kernel.
+        Rt = 1.0e-7 .* randn(StableRNG(1), 6, N)
+        Rt[2, N] = NaN
+        Lt = log1p.(ifelse.(isfinite.(Rt), Rt, zero(eltype(Rt))))
+        cort, mu2t = po.lagged_window_correlation(view(Lt, 1:3, :), view(Lt, 4:6, :))
+        xt = po.price_relative.(Rt[6, :])
+        wht = po.price_adjusted_allocation(w0, xt)
+        qt = po.wealth_transfer(wht, po.anticorrelation_claims(cort, mu2t))
+        _, wt3 = step(AntiCorrelation(; window = 3), w0, xt,
+                      ReturnsResult(; nx = nx, X = Rt))
+        @test wt3 == po.project(EuclideanProjection(), simplex, qt, wht)
+        Ll = log.(po.price_relative.(Rt))
+        corl, mu2l = po.lagged_window_correlation(view(Ll, 1:3, :), view(Ll, 4:6, :))
+        @test !isapprox(wt3,
+                        po.project(EuclideanProjection(), simplex,
+                                   po.wealth_transfer(wht,
+                                                      po.anticorrelation_claims(corl, mu2l)),
+                                   wht); atol = 1e-12)
         @test isnothing(po.rule_state_seed(AntiCorrelation(), w0))
         @test_throws DomainError AntiCorrelation(; window = 1)
         @test_throws TypeError AntiCorrelation(; proj = EntropicProjection())
