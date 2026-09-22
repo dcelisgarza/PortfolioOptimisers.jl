@@ -1,5 +1,5 @@
 ```@meta
-Description = "Expected Risk, private API of PortfolioOptimisers.jl: MatNum_Pr, RkRatioRM, resolve_risk_inputs, original_returns, resolve_factor_risk_inputs, …"
+Description = "Expected Risk, private API of PortfolioOptimisers.jl: MatNum_Pr, RkRatioRM, missing_returns_carrier_message, resolve_risk_inputs, original_returns, …"
 ```
 
 # Expected Risk: private API

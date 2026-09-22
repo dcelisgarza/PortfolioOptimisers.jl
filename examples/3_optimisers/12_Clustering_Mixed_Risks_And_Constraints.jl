@@ -5,22 +5,23 @@ Description = "Clustering optimisers with mixed risk measures, scalarisers, cons
 
 # Clustering optimisers with mixed risks and constraints
 
-This example turns the clustering optimiser chapter into a deeper playground for two things
-that are easy to miss in the overview:
+The clustering optimiser page covers one risk measure at a time and no constraints. This
+page covers two things it leaves out:
 
-  - clustering optimisers can mix risk measures and scalarisers across the hierarchy;
-  - the hierarchical optimiser can still carry constraints and fees while the cluster logic
-    does the diversification work.
+  - a clustering optimiser takes several risk measures at once, and a different one at each
+    level of the hierarchy;
+  - the hierarchical optimiser still takes weight bounds and fees while the clustering does
+    the spreading.
 
-We use the same S&P 500 slice as the rest of the examples, then compare a plain HRP solve,
-several mixed-risk HERC variants, and a constrained HERC solve.
+We use the same S&P 500 slice as the rest of the examples. We solve a plain HRP, several
+mixed-risk HERC runs, and one HERC run under a weight cap.
 
 !!! tip "When to reach for this"
-    Reach for mixed-risk clustering optimisers when no single risk measure captures what you
-    care about and you still want the hierarchy to do the diversification — for example
-    combining a tail measure with variance, or treating intra-cluster and inter-cluster risk
-    differently. The clustering structure keeps the allocation robust while the scalariser
-    controls how the mixed risk terms combine.
+    Reach for a mixed-risk clustering optimiser when one risk measure does not cover what you
+    want to control and you still want the hierarchy to spread the money. You might combine a
+    tail measure with variance, or measure risk inside a cluster one way and between clusters
+    another. The tree keeps the allocation stable, and the scalariser sets how the risk terms
+    combine into one number.
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -36,7 +37,7 @@ end;
 #=
 ## 1. Data and clustering
 
-We compute the prior and cluster hierarchy once, then reuse them across all the examples.
+We compute the prior and the tree once, and every run below reads the same two.
 =#
 
 using CSV, TimeSeries, DataFrames, Clarabel
@@ -55,11 +56,11 @@ opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
 #=
 ## 2. HRP with mixed risk measures
 
-[`HierarchicalRiskParity`](@ref) accepts either a single risk measure or a vector of them.
-When we pass a vector, the scalariser chooses how to combine the inner risk terms.
+[`HierarchicalRiskParity`](@ref) takes one risk measure or a vector of them. When you pass a
+vector, the scalariser sets how the risk terms combine into the one number the split uses.
 
-Here we mix tail risk and variance, then sweep a few scalarisers to show that the hierarchy
-really is responding to the combination rule rather than to a single hidden default.
+The cell below pairs a tail measure with variance and runs four scalarisers over that pair.
+Read the four weight columns against each other.
 =#
 
 r_mix = [ConditionalValueatRisk(),
@@ -76,12 +77,11 @@ pretty_table(DataFrame(; :assets => rd.nx, :Sum => hrp_sum.w, :Max => hrp_max.w,
 #=
 ## 3. HERC with mixed inner and outer risks
 
-[`HierarchicalEqualRiskContribution`](@ref) lets the inner and outer levels use different
-risk measures and scalarisers. That makes it the cleanest place to show the "mixed risk"
-idea: the hierarchy can treat intra-cluster and inter-cluster risk differently.
+[`HierarchicalEqualRiskContribution`](@ref) takes a risk measure and a scalariser at each of
+its two levels, so it can measure risk inside a cluster one way and between clusters another.
 
-We pair the same mixed risk vector at both levels, then vary the scalariser to show the
-contrast between additive, max, min, and log-sum-exp aggregation.
+We pass the same pair of risk measures at both levels and run the same four scalarisers, which
+add the terms, take the largest, take the smallest, and take a smooth largest.
 =#
 
 herc_sum = optimise(HierarchicalEqualRiskContribution(; opt = opt, ri = r_mix, ro = r_mix,
@@ -103,9 +103,10 @@ pretty_table(DataFrame(; :assets => rd.nx, :Sum => herc_sum.w, :Max => herc_max.
                        :Min => herc_min.w, :LogSumExp => herc_lse.w); formatters = [resfmt])
 
 #=
-The scalariser choice can dominate the solution when one risk measure is consistently larger
-than the other. That is why the max and min solutions can collapse toward the portfolio that
-is effectively minimising the dominating term.
+One risk measure can be larger than the other over most of the assets. The max and the min
+scalariser then read that one measure almost everywhere, and their columns sit close to the
+portfolio that minimises it alone. The next plot stacks the eight allocations of sections 2
+and 3.
 =#
 
 using StatsPlots, GraphRecipes
@@ -115,11 +116,10 @@ plot_stacked_bar_composition([hrp_sum, hrp_max, hrp_min, hrp_lse, herc_sum, herc
 #=
 ## 4. Constrained HERC
 
-The hierarchical optimiser itself can still carry weight bounds and fees. This version keeps
-the same mixed risk structure, but asks the optimiser to stay inside a bounded, fee-aware
-universe. We set a 10% cap (`ub = 0.1`) deliberately tight enough to bind: the unconstrained
-HERC already concentrates around 13% in the largest names, so the cap pulls them down — watch
-the largest holdings in the comparison below.
+The hierarchical optimiser takes weight bounds and fees. This run keeps the same pair of risk
+measures and adds both. We set the cap at 10%, `ub = 0.1`, which is tighter than the largest
+weight the unconstrained HERC gives, near 13%. Read the largest holdings of the two columns
+below against each other.
 =#
 
 opt_constrained = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv,
@@ -134,8 +134,9 @@ pretty_table(DataFrame(; :assets => rd.nx, :Unconstrained => herc_sum.w,
                        :Constrained => herc_constrained.w); formatters = [resfmt])
 
 #=
-The risk-contribution view shows how the hierarchy spreads risk rather than capital.
-Populate the covariance via [`factory`](@ref) before calling [`plot_risk_contribution`](@ref).
+The next plot draws the risk contributions of the constrained portfolio. The hierarchy
+spreads the risk, not the money. [`factory`](@ref) fills the covariance of the risk measure
+before [`plot_risk_contribution`](@ref) reads it.
 =#
 
 rv = factory(Variance(), pr)
@@ -144,13 +145,13 @@ plot_risk_contribution(rv, herc_constrained, rd)
 #=
 ## Summary
 
-Clustering optimisers give you a hierarchical lever on diversification.
+A clustering optimiser spreads the money through the tree, and you set how it measures risk.
 
-  - [`HierarchicalRiskParity`](@ref) responds to the scalariser when you mix risk measures.
-  - [`HierarchicalEqualRiskContribution`](@ref) lets inner and outer levels use different
-    risk terms and different scalarisers.
-  - [`HierarchicalOptimiser`](@ref) can still carry practical constraints like weight bounds
-    and fees while the hierarchy does the allocation.
+  - [`HierarchicalRiskParity`](@ref) gives different weights under each scalariser once you
+    mix risk measures.
+  - [`HierarchicalEqualRiskContribution`](@ref) takes a different risk measure and a different
+    scalariser inside a cluster and between clusters.
+  - [`HierarchicalOptimiser`](@ref) takes weight bounds and fees while the tree allocates.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

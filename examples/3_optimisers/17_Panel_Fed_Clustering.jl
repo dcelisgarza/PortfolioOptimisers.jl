@@ -5,28 +5,29 @@ Description = "Clustering on a fundamentals panel in PortfolioOptimisers.jl: bui
 
 # Clustering on a fundamentals panel
 
-[Feature matrices as a distance source](16_Feature_Distance_Clustering.md) builds its panel from
-a classification, which is one Panel Field per level and nothing else. A real desk has more than
-a taxonomy: it has a **fundamentals table**, one row per asset and one column per reported
-quantity, arriving with gaps and on wildly different scales.
+[Feature matrices as a distance source](16_Feature_Distance_Clustering.md) builds its panel
+from a classification. That panel holds one named quantity per asset for each level of the
+classification, and each named quantity is a field. A fundamentals table is the harder case. It
+holds one row per asset and one column per reported quantity, it arrives with gaps, and its
+columns run over ranges that differ by orders of magnitude.
 
-This example takes that table end to end. A caller builds an [`AssetPanel`](@ref) with
-[`asset_panel`](@ref), names the Panel Fields it wants clustered on with a
-[`FeatureDistance`](@ref), and runs [`HierarchicalRiskParity`](@ref) through a
-cross-validation. Three things that a taxonomy never raises come up on the way:
+This page takes such a table from the raw numbers to a backtest. You build an
+[`AssetPanel`](@ref) with [`asset_panel`](@ref), name the fields to cluster on with a
+[`FeatureDistance`](@ref), and run [`HierarchicalRiskParity`](@ref) under a cross-validation.
+A classification raises none of the three questions that come up on the way.
 
- 1. **Blanks.** A table with gaps needs a fill policy, and the policy that is legal depends on
-    whether the field has an observation axis.
- 2. **Scale.** The panel stores what you give it. A distance over columns on different scales is
-    dominated by the largest, so the standardisation is the caller's and it happens before the
-    panel is built.
- 3. **What was reported at all.** The fill leaves an **observed mask** behind, and the selector
-    can put it in the matrix as a feature in its own right.
+ 1. **Blanks.** A table with gaps needs a fill policy, and which policies you may use depends on
+    whether the field carries an observation axis.
+ 2. **Scale.** The panel stores what you give it. A distance over columns on different scales
+    reads the largest column and little else, so you standardise the table yourself, before you
+    build the panel.
+ 3. **What was reported at all.** The fill records which cells held a value, and the selector
+    can put that record into the matrix as a feature of its own.
 
 !!! note "The numbers are illustrative"
-    The fundamentals below are hand-written to have the shape and the awkwardness of a real
-    table — mixed scales, a few gaps, one field almost empty. They are not vendor data and no
-    conclusion about these companies follows from them.
+    The fundamentals below are written by hand. They have the shape of a real table and its
+    awkwardness: mixed scales, a few gaps, and one field that is almost empty. They are not
+    vendor data, and nothing follows from them about these companies.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -35,9 +36,9 @@ using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, 
 #=
 ## 1. The universe and the table
 
-The same twenty-name S&P 500 slice as the other optimiser examples, and five reported
-quantities per asset: log market capitalisation, book-to-price, gross profitability, leverage
-and dividend yield. `NaN` marks a cell the table does not carry.
+We use the same twenty-name S&P 500 slice as the other optimiser examples, with five
+reported quantities per asset: log market capitalisation, book-to-price, gross profitability,
+leverage and dividend yield. `NaN` marks a cell the table does not carry.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 1260):end]
@@ -82,9 +83,9 @@ pretty_table(fundamentals;
              title = "The reported table, gaps included")
 
 #=
-The asset order of a table is not the asset order of the returns, and the panel is keyed by
-position rather than by name. Line the table up against `rd0.nx` once, here, rather than
-trusting two orders to agree.
+The assets of the table are not in the order of the assets of the returns, and the panel
+reads a row by its position, not by its name. Put the table into the order of `rd0.nx` once,
+in the cell below, rather than assuming the two orders match.
 =#
 
 row_of = Dict(a => i for (i, a) in pairs(fundamentals.Asset))
@@ -95,14 +96,15 @@ println("The table is aligned to the returns: ", tbl.Asset == rd0.nx)
 #=
 ## 2. Scale is the caller's, and it happens before the panel
 
-An [`AssetPanel`](@ref) stores what it is given. Nothing in the library standardises a Panel
-Field, and that is deliberate: what a column *means* — a level, a ratio, a rank, a log — decides
-what a sensible transform is, and the library will not guess.
+An [`AssetPanel`](@ref) stores what you give it. Nothing in the library standardises a
+field, and that is a decision rather than a gap. The right transform follows from what the
+column holds, and a level, a ratio, a rank and a logarithm each ask for a different one. The
+library does not guess which you have.
 
-It matters here because the default [`AngularDist`](@ref) is invariant to rescaling an asset's
-whole **row** and not at all to rescaling one **column**. `log_mcap` runs from 9 to 15 and
-`dividend_yield` from 0.003 to 0.043, so an unstandardised stack is a distance on market
-capitalisation with four decorations.
+It matters here because the default [`AngularDist`](@ref) does not change when you rescale the
+whole row of an asset, and it does change when you rescale one column. `log_mcap` runs from 9
+to 15 and `dividend_yield` from 0.003 to 0.043. Stack those five columns without
+standardising them and the distance you get is a distance on market capitalisation.
 =#
 
 raw_fields = ["log_mcap", "book_to_price", "gross_profitability", "leverage",
@@ -118,9 +120,9 @@ pretty_table(DataFrame("Field" => raw_fields,
              title = "Five columns, five scales")
 
 #=
-A cross-sectional z-score over the observed cells is the ordinary answer for a table of this
-shape. The blanks stay blank: standardising is not filling, and the fill policy is a separate
-decision made one step later.
+The usual transform for a table of this shape is a z-score down each column, over the cells
+that hold a value. The blanks stay blank. Standardising a column does not fill it, and the
+fill policy is the next decision, one step later.
 =#
 
 function zscore_column(v)
@@ -134,19 +136,20 @@ zfields = Dict(f => zscore_column(tbl[!, f]) for f in raw_fields)
 #=
 ## 3. Building the panel
 
-[`asset_panel`](@ref) takes the raw, blank-carrying form of each Panel Field and returns the
-panel a carrier holds. A [`NumericPanelInput`](@ref) carries one reported quantity, and
-[`panel_input`](@ref) bridges the sector classification off a [`UniverseSets`](@ref) into a
-[`CategoricalPanelInput`](@ref).
+[`asset_panel`](@ref) takes each field in its raw form, blanks and all, and returns the
+panel that a [`ReturnsResult`](@ref) then holds. A [`NumericPanelInput`](@ref) holds one
+reported quantity. [`panel_input`](@ref) reads the sector classification off a
+[`UniverseSets`](@ref) and returns a [`CategoricalPanelInput`](@ref).
 
-Every input carries a **fill policy**, and the default [`NoPanelFill`](@ref) refuses a blank
-outright. That default is the right one: a blank that reaches a carrier is a silent zero later,
-so the build makes you say what a gap means.
+Every input takes a fill policy, and the default [`NoPanelFill`](@ref) refuses a blank. That is
+the right default, because a blank that reaches the panel becomes a zero in the matrix, and a
+zero in a standardised column is the mean rather than a gap. The build asks you what a gap
+means instead.
 
-The values here have no observation axis — one number per asset — so this is a **static**
-input, and the two directional policies are refused on it. There is no earlier observation to
-carry a value from. [`ConstantPanelFill`](@ref) is what a static table takes, and after the
-z-score, `0.0` is the cross-sectional mean.
+The values here hold one number per asset and no observation axis, which makes this a static
+input. [`asset_panel`](@ref) refuses the two directional policies on such an input, because
+there is no earlier observation to carry a value from. A static table takes
+[`ConstantPanelFill`](@ref), and after the z-score `0.0` is the mean over the assets.
 =#
 
 sets = UniverseSets(; xkey = "nx",
@@ -169,10 +172,10 @@ println(directional_refusal)
 #=
 ## 4. What the panel holds
 
-The panel is static: every field is one value per asset, and there are no masks over an
-observation axis. [`feature_matrix`](@ref) stacks it to `assets × features` and
-[`feature_labels`](@ref) names the columns — one per numeric field, and one per level of the
-categorical one.
+The panel is static. Every field holds one value per asset and no field records anything
+over time. [`feature_matrix`](@ref) stacks the panel into a matrix of assets by features, and
+[`feature_labels`](@ref) names its columns. There is one column per numeric field and one per
+level of the categorical field.
 =#
 
 Z = feature_matrix(pnl)
@@ -191,12 +194,12 @@ println("The labels rebuild the matrix: ", feature_matrix(pnl, nz) == Z)
 #=
 ## 5. Clustering on named Panel Fields
 
-`sel` on the [`FeatureDistance`](@ref) names what to stack. Because the panel names its own
-fields, a selector is readable configuration rather than a column count: `["book_to_price",
-"gross_profitability"]` is a value hierarchy, `["sector"]` is the classification, and `nothing`
-is everything the panel carries.
+`sel` on the [`FeatureDistance`](@ref) names the fields to stack. The panel names its own
+fields, so you write the names rather than count columns. `["book_to_price",
+"gross_profitability"]` gives a hierarchy built on value and quality, `["sector"]` gives the
+classification, and `nothing` gives every field the panel holds.
 
-The cut is configuration and the panel is data, so one carrier serves every selector below.
+The panel is data and the selector is a setting, so the six runs below read one panel.
 =#
 
 rd = ReturnsResult(; nx = rd0.nx, X = rd0.X, ts = rd0.ts, pnl = pnl)
@@ -233,11 +236,12 @@ end
 pretty_table(cut_rows; title = "One panel, six hierarchies")
 
 #=
-Read the last column as a measure of how much outside information each cut brings. A value
-hierarchy and a size hierarchy disagree with the correlation and with each other, which is the
-whole reason to reach for a panel: they are answering a question the returns do not contain.
+The last column scores each cut against the cut the correlations give, where 1 means the two
+cuts are the same. A hierarchy built on value and one built on size each score low against the
+correlations and against each other. That is the reason to reach for a panel, because each one
+answers a question the price history does not hold.
 
-The four-way cuts themselves show it plainly.
+The next table prints the four-way cuts themselves, one column per hierarchy.
 =#
 
 pretty_table(DataFrame(["Asset" => rd.nx; "Sector" => [sector[a] for a in rd.nx];
@@ -247,12 +251,12 @@ pretty_table(DataFrame(["Asset" => rd.nx; "Sector" => [sector[a] for a in rd.nx]
 #=
 ## 6. The observed mask is a feature
 
-The fill removed the blanks, and it left behind a record of which cells were reported.
-`"name" => :observed` puts that record in the matrix as one `0`/`1` column. On a sparse table
-"reported at all" is often a sharper signal than the value that was reported, and it is one
-selector entry away.
+The fill removed the blanks and recorded which cells held a value. Write
+`"name" => :observed` in the selector and that record enters the matrix as one column of zeros
+and ones. On a table with many gaps, whether a quantity was reported can separate the assets
+more sharply than the number reported, and it costs one entry in the selector.
 
-`leverage` and `gross_profitability` each have one gap here, and `dividend_yield` two.
+`leverage` and `gross_profitability` each hold one gap here, and `dividend_yield` holds two.
 =#
 
 obs_rows = DataFrame()
@@ -272,19 +276,19 @@ println("The selector's own labels: ", feature_labels(de_reported, nothing, rd, 
 
 #=
 !!! warning "A static panel with no gaps gives a column of ones"
-    An `:observed` entry on a field that never had a blank is a constant column. That is the
-    honest reading — nothing was missing — but a constant column adds nothing to a cosine and
-    it is worth knowing you have added one.
+    An `:observed` entry on a field that held no blank gives a column of ones. The record is
+    right, because nothing was missing. A constant column moves no cosine, so you have added a
+    column that changes no distance.
 
 ## 7. Through a cross-validation
 
-Nothing above is special to the panel route: [`HierarchicalRiskParity`](@ref) takes the
-clustering estimator, and [`cross_val_predict`](@ref) walks it forward. One year of training,
-quarterly rebalances.
+The panel changes nothing downstream. [`HierarchicalRiskParity`](@ref) takes the clustering
+estimator as it always does, and [`cross_val_predict`](@ref) runs it over the folds. We train
+on one year and rebalance every quarter.
 
-A **static** panel has no observation axis, so a fold has nothing to slice on it: the same
-twenty rows describe the universe in every window. That is the property the whole route is for.
-A correlation hierarchy is refitted from scratch every fold; this one is not refitted at all.
+A static panel carries no observation axis, so a fold has nothing to cut on it. The same twenty
+rows describe the universe in every window. That is what this route is for. The fold loop
+fits a hierarchy built on the correlations again on every fold, and it fits this one once.
 =#
 
 walk = IndexWalkForward(252, 63)
@@ -327,9 +331,9 @@ pretty_table(DataFrame([backtest_row(name, p) for (name, p) in results]);
              title = "Out-of-sample, $(length(last(first(results)).pred)) quarterly rebalances")
 
 #=
-The `Mean weight change` column is the one to read. Every panel-fed hierarchy turns over less
-than the correlation one, and by a wide margin, because a table that does not move between
-folds gives a dendrogram that does not move either.
+Read the `Mean weight change` column. Each hierarchy built from the panel moves its weights
+less between rebalances than the one built from the correlations, because a table that does
+not change between folds gives a tree that does not change either.
 =#
 
 plot_portfolio_cumulative_returns(last(results[2]))
@@ -337,17 +341,17 @@ plot_portfolio_cumulative_returns(last(results[2]))
 #=
 ## 8. When the table does move
 
-A fundamentals table that is restated every quarter is a **time-varying** input: the values
-carry an observation axis, and a fold slices it alongside the returns. Nothing about the
-selector, the distance or the optimiser changes — only the rank of what goes into
-[`NumericPanelInput`](@ref).
+A fundamentals table that is restated every quarter is a time-varying input. Its values
+carry an observation axis, and a fold cuts that axis as it cuts the returns. The selector, the
+distance and the optimiser stay as they are. What changes is the shape of the array you pass
+[`NumericPanelInput`](@ref), which gains a second dimension.
 
-Two things do change, and both are consequences of having an observation axis at last:
+The observation axis brings two things with it.
 
-  - [`ForwardPanelFill`](@ref) becomes legal, and it is the policy that is safe across a fold,
-    because it only ever carries a value forward in time.
-  - The [`FeatureDistance`](@ref) needs a collapse rule, `alg`, to turn the stack of periods
-    into one distance matrix.
+  - [`ForwardPanelFill`](@ref) is now allowed, and it is the policy that is safe across a fold,
+    because it only carries a value forward in time.
+  - The [`FeatureDistance`](@ref) needs a rule, `alg`, that turns the stack of periods into one
+    distance matrix.
 =#
 
 T, N = size(rd.X)
@@ -384,14 +388,13 @@ pretty_table(DataFrame("Panel" => ["Static (§3)", "Time-varying (§8)"],
              title = "What a fold slices, and what it leaves alone")
 
 #=
-The view cut both panels to three assets, and only the time-varying one lost the observations
-outside the fold. The static panel has no observation axis to cut, so the row half of the view
-does nothing to it. Both are correct, and which one you want is a statement about the data, not
-about the library.
+The view cut both panels to three assets, and only the time-varying panel lost the
+observations outside the fold. The static panel has no observation axis, so the row half of the
+view does nothing to it. Both results are right, and which one you want follows from your data
+rather than from the library.
 
-The sector field on the time-varying panel is a static input that met a time-varying one, so
-[`asset_panel`](@ref) **lifted** it: it presents the observation axis and stores its values
-once.
+The sector field of the time-varying panel is a static input among time-varying ones.
+[`asset_panel`](@ref) gives it the observation axis of the others and stores its values once.
 =#
 
 collapse_rows = DataFrame()
@@ -423,26 +426,27 @@ pretty_table(DataFrame([backtest_row("Static panel", last(results[2])),
              title = "The same optimiser over the two panel shapes")
 
 #=
-The time-varying panel earns a better ratio here and pays for it in the last column: it turns
-over more than twice as much, because a table that is restated every day gives a dendrogram that
-moves every fold. That is the same trade the static route wins, read from the other side, and it
-is the reason the shape of the input is a modelling decision rather than a formatting one.
+The time-varying panel earns the higher ratio of the two here, and the last column is what
+it costs. It moves its weights more than twice as far between rebalances, because a table that
+is restated every day gives a tree that changes every fold. It is the same trade the static
+panel makes, read from the other side, which is why the shape of the input is a modelling
+decision rather than a question of formatting.
 
 ## 9. Summary
 
-  - [`asset_panel`](@ref) is the build seam. It takes the raw, blank-carrying table and returns
-    the [`AssetPanel`](@ref) a [`ReturnsResult`](@ref) holds.
-  - A **fill policy** is compulsory: [`NoPanelFill`](@ref) refuses a blank rather than letting a
-    silent zero through. A static input takes [`ConstantPanelFill`](@ref); the directional
-    policies need an observation axis and are refused without one.
-  - **Standardisation is the caller's**, and it happens before the panel is built. The default
-    [`AngularDist`](@ref) is invariant to rescaling a row and not to rescaling a column.
-  - `sel` names Panel Fields, so a hierarchy is configured in the table's own vocabulary. An
+  - [`asset_panel`](@ref) is where the panel is built. It takes the raw table, blanks and all,
+    and returns the [`AssetPanel`](@ref) a [`ReturnsResult`](@ref) holds.
+  - A fill policy is compulsory. [`NoPanelFill`](@ref) refuses a blank rather than let it
+    become a zero in the matrix. A static input takes [`ConstantPanelFill`](@ref), and the two
+    directional policies need an observation axis and are refused without one.
+  - You standardise the table, before the panel is built. The default [`AngularDist`](@ref)
+    does not change when you rescale a row, and it does change when you rescale a column.
+  - `sel` names fields, so you write a hierarchy in the words of your own table. An
     `:observed` entry turns "was this reported" into a feature.
-  - A **static** panel is not sliced by an observation fold, which is what makes a
-    fundamentals-fed hierarchy stop churning between rebalances. A **time-varying** panel is
-    sliced, and it needs a collapse rule.
-  - Everything downstream — [`ClustersEstimator`](@ref), [`HierarchicalRiskParity`](@ref),
-    [`cross_val_predict`](@ref) — is unchanged. The panel is data on the carrier, and only the
-    distance estimator knows it is there.
+  - A fold does not cut a static panel. That is why a hierarchy built from fundamentals does
+    not move between rebalances. A fold does cut a time-varying panel, and a time-varying
+    panel needs a collapse rule.
+  - [`ClustersEstimator`](@ref), [`HierarchicalRiskParity`](@ref) and
+    [`cross_val_predict`](@ref) are unchanged. The panel is data on the returns result, and the
+    distance estimator is the only thing that reads it.
 =#

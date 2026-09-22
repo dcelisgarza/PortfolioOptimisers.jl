@@ -1,30 +1,30 @@
 #=
 ```@meta
-Description = "Near optimal centering in PortfolioOptimisers.jl: trade a sliver of optimality for the stable analytic centre of the near-optimal region."
+Description = "Near optimal centering in PortfolioOptimisers.jl: give up a little of the objective for the analytic centre of the near-optimal region, which moves less."
 ```
 
 # Near optimal centering
 
-A classic optimiser returns the single point that *exactly* extremises its objective — the
-maximum-ratio portfolio, the minimum-variance portfolio, and so on. That point often sits on a
-knife edge: a corner solution that loads heavily on a handful of assets and shifts a lot when
-the inputs wobble. [`NearOptimalCentering`](@ref) (NOC) trades a sliver of optimality for
-stability. Instead of the extreme point, it returns the portfolio at the **analytic centre of
-the near-optimal neighbourhood** — the region of solutions that are *almost* as good as the
-optimum. The neighbourhood is parametrised by binning the efficient frontier (`bins`).
+A plain optimiser returns the one point that maximises or minimises its objective, such as
+the maximum-ratio portfolio or the minimum-variance portfolio. That point often sits in a
+corner of the feasible set. It puts most of the money on a few assets, and a small change to
+the inputs moves it a long way. [`NearOptimalCentering`](@ref), or NOC, gives up a little of
+the objective to move less. It returns the analytic centre of the near-optimal region, which
+holds the portfolios whose objective is close to the best one. `bins` sets the size of that
+region by splitting the efficient frontier into that many steps.
 
-We met NOC briefly as a frontier/surface engine in the efficient-frontier and Pareto-surface
-examples; here we focus on the behaviour that makes it its own optimiser: how its centred
-solution differs from the extreme point of the same objective.
+The efficient-frontier page and the Pareto-surface page both use NOC to trace a curve. This
+page asks a different question, which is how far the centred portfolio sits from the extreme
+point of the same objective.
 
 !!! tip "When to reach for this"
-    Reach for NOC when you like a [`MeanRisk`](@ref) objective but distrust its corner
-    solutions — when you want the spirit of "maximum risk-adjusted return" without betting the
-    book on two assets, or a more stable allocation that survives small changes in the prior.
-    Use [`UnconstrainedNearOptimalCentering`](@ref) for the plain centred portfolio, and
-    [`ConstrainedNearOptimalCentering`](@ref) when the centred solution must also satisfy the
-    problem's external constraints (at the cost of a harder solve). If you genuinely want the
-    extreme point, use [`MeanRisk`](@ref) directly.
+    Reach for NOC when the [`MeanRisk`](@ref) objective is the one you want and its corner
+    solution is not. You get a portfolio with a high risk-adjusted return that does not rest on
+    two assets, and it moves less when the prior changes. Use
+    [`UnconstrainedNearOptimalCentering`](@ref) for the plain centred portfolio, and
+    [`ConstrainedNearOptimalCentering`](@ref) when the centred portfolio must also meet the
+    constraints of the problem, which is a harder solve. If the extreme point is what you want,
+    use [`MeanRisk`](@ref).
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -51,11 +51,15 @@ rd = prices_to_returns(X)
 #=
 ## 2. Prior and solvers
 
-NOC solves a harder problem than a plain `MeanRisk` (it bins the frontier and centres within a
-neighbourhood), so a single solver configuration can fail to converge. We therefore pass a
-*vector* of solvers with decreasing `max_step_fraction`; the optimiser falls back through them
-until one succeeds. We also use the SOC-based [`StandardDeviation`](@ref) risk measure — see
-the findings note on why a plain quadratic [`Variance`](@ref) is not a good fit for NOC.
+NOC splits the frontier into bins and then centres inside a region, so it solves a harder
+problem than a plain [`MeanRisk`](@ref). One solver setting can fail to converge on it. We
+pass a vector of solvers whose `max_step_fraction` falls from one to the next, and the
+optimiser tries each in turn until one returns a solution.
+
+We also pass [`StandardDeviation`](@ref), which is NOC's default risk measure and states risk
+as a second-order cone. A plain [`Variance`](@ref) states it as a quadratic expression. NOC
+warns on a quadratic risk expression and then fails to solve on this data, so reach for
+[`StandardDeviation`](@ref) here.
 =#
 
 using Clarabel
@@ -72,8 +76,8 @@ opt = JuMPOptimiser(; pe = pr, slv = slv)
 #=
 ## 3. The reference: a `MeanRisk` corner solution
 
-First the plain maximum risk-adjusted return portfolio. This is the extreme point NOC will
-centre around.
+We first solve for the largest risk-adjusted return. This is the extreme point that NOC
+centres around.
 =#
 
 res_mr = optimise(MeanRisk(; r = StandardDeviation(), obj = MaximumRatio(; rf = rf),
@@ -82,8 +86,9 @@ res_mr = optimise(MeanRisk(; r = StandardDeviation(), obj = MaximumRatio(; rf = 
 #=
 ## 4. Unconstrained near optimal centering
 
-Now the same objective through NOC. [`UnconstrainedNearOptimalCentering`](@ref) does not impose
-the problem's external constraints on the centred solution, which keeps the solve tractable.
+The next cell runs the same objective through NOC.
+[`UnconstrainedNearOptimalCentering`](@ref) leaves the constraints of the problem off the
+centred portfolio, which keeps the solve cheap.
 =#
 
 res_noc_u = optimise(NearOptimalCentering(; r = StandardDeviation(),
@@ -93,9 +98,9 @@ res_noc_u = optimise(NearOptimalCentering(; r = StandardDeviation(),
 #=
 ## 5. Constrained near optimal centering
 
-[`ConstrainedNearOptimalCentering`](@ref) additionally requires the centred portfolio to
-satisfy the external constraints. It is a harder solve (hence the solver fallback vector), but
-keeps the result feasible with respect to whatever bounds or budgets you have imposed.
+[`ConstrainedNearOptimalCentering`](@ref) asks the centred portfolio to meet the constraints
+of the problem as well. It is the harder solve of the two, which is why section 2 passes seven
+solvers. It returns a portfolio inside whatever bounds and budgets you set.
 =#
 
 res_noc_c = optimise(NearOptimalCentering(; r = StandardDeviation(),
@@ -105,9 +110,9 @@ res_noc_c = optimise(NearOptimalCentering(; r = StandardDeviation(),
 #=
 ## 6. Comparing the allocations
 
-The contrast is the whole point. The extreme maximum-ratio portfolio piles into a couple of
-assets; both NOC variants spread the same objective across many more names by sitting at the
-centre of the near-optimal region rather than at its corner.
+Read the three weight columns against each other. The extreme maximum-ratio portfolio puts
+its money on a couple of assets. Both NOC columns hold many more, because the centre of the
+near-optimal region sits away from the corner the extreme point occupies.
 =#
 
 pretty_table(DataFrame(; :assets => rd.nx, Symbol("MaxRatio (extreme)") => res_mr.w,
@@ -115,8 +120,8 @@ pretty_table(DataFrame(; :assets => rd.nx, Symbol("MaxRatio (extreme)") => res_m
                        Symbol("NOC constrained") => res_noc_c.w); formatters = [resfmt])
 
 #=
-A quick numeric summary of the diversification difference: the largest single weight and the
-number of materially-held assets.
+The next table prints two numbers per portfolio, the largest single weight and the number of
+assets whose weight is above 0.01%.
 =#
 
 summarise(w) = (round(maximum(w) * 100; digits = 2), count(>(1e-4), w))
@@ -133,11 +138,10 @@ pretty_table(DataFrame(;
 #=
 ## 7. Visualising the compositions
 
-The stacked-bar composition shows the corner solution collapsing onto a few assets while NOC
-fans the allocation out.
+The plot stacks the three allocations, with the extreme portfolio first.
 =#
 
-# Composition: extreme MaxRatio vs the two NOC variants.
+# Composition of the extreme portfolio and the two centred ones.
 using StatsPlots, GraphRecipes
 plot_stacked_bar_composition([res_mr, res_noc_u, res_noc_c], rd)
 

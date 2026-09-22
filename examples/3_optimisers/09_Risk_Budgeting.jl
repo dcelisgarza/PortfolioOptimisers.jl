@@ -5,21 +5,21 @@ Description = "Risk budgeting in PortfolioOptimisers.jl: match per-asset or per-
 
 # Risk budgeting
 
-[`RiskBudgeting`](@ref) takes a different stance from [`MeanRisk`](@ref). Instead of trading
-expected return against risk through an objective function, it allocates *risk itself*: it
-finds the portfolio whose per-asset (or per-factor) risk contributions match a user-supplied
-budget as closely as possible. There is no objective to maximise — the budget *is* the goal.
+[`RiskBudgeting`](@ref) takes a different stance from [`MeanRisk`](@ref). It does not trade
+expected return against risk through an objective function. It divides the risk itself, and
+finds the portfolio whose per-asset or per-factor risk contributions sit as close to a budget
+you supply as they can. There is nothing to maximise. The budget is the target.
 
-The classic special case is the **equal risk contribution (ERC)** portfolio, where every
-asset contributes the same share of total risk. Risk budgeting generalises it to any budget
-vector, and to risk measured by any of the risk measures [`MeanRisk`](@ref) supports.
+The best-known special case is the equal risk contribution portfolio, or ERC, where every
+asset carries the same share of total risk. Risk budgeting extends it to any budget vector,
+and to risk measured by any of the risk measures [`MeanRisk`](@ref) accepts.
 
 !!! tip "When to reach for this"
-    Reach for risk budgeting when you care about *how risk is distributed* rather than about
-    a return/risk trade-off — diversifying risk rather than capital, avoiding the
-    concentration that minimum-variance portfolios are prone to, or expressing a conviction
-    as "this sleeve should carry 30% of the risk". If you instead want the best return for a
-    given risk budget, use [`MeanRisk`](@ref).
+    Reach for risk budgeting when you care about where the risk sits rather than about the
+    trade-off between return and risk. It spreads risk rather than capital, so it avoids the
+    concentration a minimum-variance portfolio often shows, and it lets you state a view such as
+    "this group of assets carries 30% of the risk". If you want the best return for a given
+    amount of risk instead, use [`MeanRisk`](@ref).
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -35,7 +35,7 @@ end;
 #=
 ## 1. ReturnsResult data
 
-We use one year of S&P 500 constituents, and (for the factor section) the factor returns.
+We use one year of S&P 500 constituents. Section 4 adds the factor returns.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -44,8 +44,8 @@ X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :D
 rd = prices_to_returns(X)
 
 #=
-Since every optimisation below shares the same data, we precompute the prior statistics once
-with [`EmpiricalPrior`](@ref) and reuse them, rather than recomputing them on every call.
+Every optimisation below reads the same data, so we compute the prior statistics once with
+[`EmpiricalPrior`](@ref) and hand them to each optimiser.
 =#
 
 using Clarabel
@@ -56,8 +56,8 @@ pr = prior(EmpiricalPrior(), rd)
 opt = JuMPOptimiser(; pe = pr, slv = slv)
 
 #=
-We budget *variance* risk throughout this example, but any [`MeanRisk`](@ref)-compatible risk
-measure works — the risk being budgeted is whatever risk measure you pass.
+We budget variance throughout this example. Any risk measure [`MeanRisk`](@ref) accepts works
+here, and the budget divides whichever measure you pass.
 =#
 
 r = Variance()
@@ -66,13 +66,13 @@ N = length(rd.nx)
 #=
 ## 2. Asset risk budgeting
 
-[`AssetRiskBudgeting`](@ref) allocates risk across assets. The budget is supplied through the
-`rkb` keyword as a [`RiskBudget`](@ref); the vector does not need to be normalised. The
-`alg` keyword selects the formulation — [`LogRiskBudgeting`](@ref) (a log-barrier, the
-default) or [`MixedIntegerRiskBudgeting`](@ref) (which needs a mixed-integer solver).
+[`AssetRiskBudgeting`](@ref) divides risk across assets. You pass the budget through the
+`rkb` keyword as a [`RiskBudget`](@ref), and the vector does not have to sum to one. The
+`alg` keyword picks the formulation. [`LogRiskBudgeting`](@ref) is a log-barrier and the
+default, and [`MixedIntegerRiskBudgeting`](@ref) needs a mixed-integer solver.
 
-Two budgets: an **equal** budget (the ERC portfolio) and a **linearly increasing** budget
-that asks later assets to carry progressively more of the risk.
+The next cell builds two budgets. The equal budget gives the ERC portfolio. The linearly
+increasing budget asks each asset to carry more of the risk than the asset before it.
 =#
 
 ## Equal risk contribution across assets.
@@ -88,8 +88,8 @@ rb_inc = RiskBudgeting(; r = r, opt = opt,
 res_eq, res_inc = optimise(rb_eq), optimise(rb_inc)
 
 #=
-To verify the budgets were met, we compute the realised risk contributions. The risk measure
-must be parametrised with the prior covariance via [`factory`](@ref) before evaluating it.
+The next cells compute the realised risk contributions, which you read against the budgets we
+asked for. [`factory`](@ref) first fills the risk measure with the covariance of the prior.
 =#
 
 rf = factory(r, pr)
@@ -103,11 +103,11 @@ pretty_table(DataFrame(; :assets => rd.nx, Symbol("Eq weight") => res_eq.w,
                        Symbol("Incr risk") => rc_inc); formatters = [resfmt])
 
 #=
-The equal-budget portfolio puts an identical $1/N$ share of variance on every asset, while
-the increasing-budget portfolio"s risk contributions rise monotonically across the assets —
-exactly the budgets we asked for.
+Read the two risk columns of the table. The equal-budget portfolio carries the same $1/N$
+share of variance on every asset. The risk contributions of the increasing-budget portfolio
+rise from the first asset to the last.
 
-The risk-contribution bar plot makes the contrast immediate.
+The bar plot below draws the risk contributions of the equal-budget portfolio.
 =#
 
 using StatsPlots, GraphRecipes
@@ -115,7 +115,7 @@ using StatsPlots, GraphRecipes
 plot_risk_contribution(rf, res_eq, rd)
 
 #=
-And the increasing-budget portfolio:
+The next plot draws the increasing-budget portfolio.
 =#
 
 plot_risk_contribution(rf, res_inc, rd)
@@ -124,19 +124,18 @@ plot_risk_contribution(rf, res_inc, rd)
 ## 3. Relaxed risk budgeting
 
 [`RelaxedRiskBudgeting`](@ref) (RRB) replaces the non-convex risk-parity constraint with a
-second-order-cone relaxation. It needs neither a logarithm nor integer variables, so it is
-cheaper to solve — useful at scale. It is variance-specific (the SOC is built on the Cholesky
-factor of the covariance), so it takes no `r`. Three variants trade exactness for
-regularisation: [`BasicRelaxedRiskBudgeting`](@ref),
+second-order cone relaxation. It uses no logarithm and no integer variable, so a solver
+handles it faster, which matters on a large universe. It builds the cone on the Cholesky
+factor of the covariance, so it works on variance alone and takes no `r`. Three algorithms trade
+exactness for regularisation: [`BasicRelaxedRiskBudgeting`](@ref),
 [`RegularisedRelaxedRiskBudgeting`](@ref), and
 [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref).
 
-Being a *relaxation*, RRB does not adhere to the target risk budget as tightly as the exact
-log-barrier or mixed-integer formulations of section 2 — in pathological cases (ill-conditioned
-covariance, extreme budgets) the realised contributions can deviate noticeably. In exchange,
-the convex SOC formulation composes cleanly with additional constraints, making it the
-friendlier choice when the risk budget is one objective among several rather than a hard
-requirement. Reach for [`RiskBudgeting`](@ref) when strict adherence is essential.
+A relaxation does not hold the target budget as tightly as the exact log-barrier and
+mixed-integer formulations of section 2. Where the covariance is ill-conditioned or the budget
+is extreme, the realised contributions can sit well away from the target. In exchange the
+problem stays convex, so further constraints add to it directly. That suits a risk budget that
+is one goal among several. Use [`RiskBudgeting`](@ref) when the budget has to hold.
 =#
 
 rba_eq = AssetRiskBudgeting(; rkb = RiskBudget(; val = fill(1.0, N)))
@@ -147,11 +146,10 @@ rrb_reg = RelaxedRiskBudgeting(; opt = opt, rba = rba_eq,
 res_b, res_r = optimise(rrb_basic), optimise(rrb_reg)
 
 #=
-Comparing the relaxed solutions against the exact log-barrier ERC of section 2 shows the
-price of the relaxation: on this dataset the relaxed portfolios are noticeably more
-concentrated than the exact ERC, so the realised risk contributions spread away from the
-flat $1/N$ target. The relaxation buys tractability, not an exact risk-parity solution —
-check the realised contributions when you use it.
+The next table prints the realised contributions of the two relaxed portfolios next to the
+exact log-barrier ERC of section 2. On this data the relaxed portfolios put more of their weight on
+fewer assets, and their risk contributions spread away from the flat $1/N$ target. Read the
+contributions yourself whenever you use a relaxed form.
 =#
 
 rc_b = risk_contribution(rf, res_b.w, pr.X);
@@ -187,9 +185,9 @@ pretty_table(DataFrame(; :assets => rd.nx, Symbol("Log ERC risk") => rc_eq,
 #=
 ## 4. Factor risk budgeting
 
-[`FactorRiskBudgeting`](@ref) allocates risk across *factors* rather than assets, via a
-regression of asset returns onto factor returns. It needs the factor returns, but not the
-factor prior so we should use use a [`EmpiricalPrior`](@ref).
+[`FactorRiskBudgeting`](@ref) divides risk across factors rather than assets. It regresses the
+asset returns onto the factor returns. It needs the factor returns, and it does not need a
+factor prior, so an [`EmpiricalPrior`](@ref) is enough.
 =#
 
 F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -203,18 +201,19 @@ frb = RiskBudgeting(; r = Variance(), opt = optf,
                     rba = FactorRiskBudgeting(; rkb = RiskBudget(; val = fill(1.0, Nf))))
 
 #=
-Because `re` here is a regression *estimator* ([`StepwiseRegression`](@ref) by default), the
-factor model has to be fit while building the model, so the returns data must be passed to
-[`optimise`](@ref) even though the prior is precomputed. (If you instead pass a precomputed
-[`Regression`](@ref) *result* as `re`, no data is needed — and a clear error tells you if
-you missed passing `rd` when it's required.)
+`re` here is a regression estimator, [`StepwiseRegression`](@ref) by default. An estimator
+fits the factor model as the optimiser builds the problem, so you pass the returns data to
+[`optimise`](@ref) even though the prior is already computed. Pass a [`Regression`](@ref)
+result as `re` instead and the data is not needed. If you leave `rd` out where it is needed,
+the error names what is missing.
 =#
 
 res_frb = optimise(frb, rdf)
 
 #=
-The factor risk contributions (the trailing entry is the intercept/idiosyncratic term)
-cluster near the equal $1/N_f$ target across the five factors.
+The next table prints the factor risk contributions. The last row is the intercept, which
+carries the risk the factors do not explain. Read the five factor rows against the equal
+$1/N_f$ target.
 =#
 
 rfk = factory(Variance(), prf)
@@ -229,12 +228,12 @@ plot_factor_risk_contribution(rfk, res_frb, rdf)
 #=
 ## Summary
 
-Risk budgeting targets a *distribution of risk* rather than a return/risk trade-off:
+Risk budgeting targets where the risk sits, not the trade-off between return and risk.
 
-  - [`AssetRiskBudgeting`](@ref) spreads risk across assets — equal budgets give the ERC
-    portfolio, arbitrary budgets express convictions about where risk should sit.
-  - [`RelaxedRiskBudgeting`](@ref) is the cheaper convex alternative; verify the realised
-    contributions, as the relaxation need not reproduce exact risk parity.
-  - [`FactorRiskBudgeting`](@ref) budgets risk across factors instead of assets, at the cost
-    of needing the returns data at optimise time.
+  - [`AssetRiskBudgeting`](@ref) divides risk across assets. An equal budget gives the ERC
+    portfolio, and any other budget states where you want the risk to sit.
+  - [`RelaxedRiskBudgeting`](@ref) is convex and cheaper to solve. Read the realised
+    contributions, because a relaxation need not reach exact risk parity.
+  - [`FactorRiskBudgeting`](@ref) divides risk across factors instead of assets, and it needs
+    the returns data at optimise time.
 =#
