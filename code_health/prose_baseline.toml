@@ -131,12 +131,6 @@ glossary_terms = 173
 "examples/6_post_processing/01_Finite_Allocation.jl" = { emdash = 11, glossary = 1, verdict = 1, words = 456 }
 "examples/6_post_processing/02_Plotting_and_Reporting.jl" = { emdash = 9, bold_label = 1, words = 414 }
 "examples/6_post_processing/03_Performance_Attribution.jl" = { emdash = 12, endash = 1, notjust = 2, words = 804 }
-"examples/7_putting_it_together/01_Profile_Retail_Daily.jl" = { emdash = 6, words = 294 }
-"examples/7_putting_it_together/02_Profile_Desk_Monthly.jl" = { emdash = 7, words = 305 }
-"examples/7_putting_it_together/03_Profile_Institutional.jl" = { emdash = 5, aivocab = 1, verdict = 1, words = 287 }
-"examples/7_putting_it_together/04_Profile_Factor_Views.jl" = { emdash = 9, endash = 3, notjust = 1, words = 573 }
-"examples/7_putting_it_together/06_Cross_Sectional_Factor_Pipeline.jl" = { emdash = 6, aivocab = 1, glossary = 4, mechanism = 8, verdict = 2, words = 635 }
-"examples/7_putting_it_together/07_Forecast_Evaluation.jl" = { emdash = 36, bold_label = 3, glossary = 11, mechanism = 11, verdict = 3, words = 3289 }
 "user_guide/00_User_Guide.jl" = { emdash = 16, bold_label = 1, verdict = 2, words = 623 }
 "user_guide/01_Data_and_Priors.jl" = { emdash = 15, endash = 2, glossary = 1, words = 581 }
 "user_guide/02_Optimisers.jl" = { emdash = 21, aivocab = 1, glossary = 1, words = 1022 }

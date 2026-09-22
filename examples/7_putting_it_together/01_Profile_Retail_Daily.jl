@@ -5,24 +5,26 @@ Description = "An end-to-end profile in PortfolioOptimisers.jl: a retail investo
 
 # Profile: retail, daily
 
-The earlier examples each isolate one piece of the pipeline. The *putting-it-together* profiles
-run the whole pipeline end to end for a concrete investor, so you can see how the choices
-compose. This first profile is a **retail investor rebalancing daily** with a small account: the
-constraints are compute, trading cost, and capital, not sophistication.
+Each earlier example covers one part of the pipeline. A profile page runs the whole pipeline once,
+for one investor, so you can see how the choices fit together. This first profile rebalances a
+small retail account every day. Compute, trading cost and the size of the account set the limits
+here, and none of them rewards a more elaborate model.
 
-The reasoning, following the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md):
+The [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md) asks which limits
+bind. Four do, for this investor.
 
-  - **Compute is cheap but frequent** — rebalancing every day rules out heavy optimisations; a
-    single convex solve is right.
-  - **Trading is the enemy** — daily turnover compounds costs, so we cap turnover and charge fees
-    explicitly, letting the optimiser trade only when it is worth it.
-  - **The account is small** — discretisation matters, so finite allocation is not an afterthought.
-  - **Robustness over edge** — a tight weight cap buys diversification and stability.
+  - The rebalance is daily, so you pay for the optimisation every trading day. One convex solve is
+    enough.
+  - Trading cost compounds when you trade every day. We cap how far each weight may move and
+    charge a fee on what the book holds, so the optimiser sees both.
+  - The account is small, so one whole share is a large part of a position. The finite allocation
+    at the end moves the weights you hold away from the weights you solved for.
+  - A cap of 15% per name spreads the book over more names and holds it there between rebalances.
 
 !!! tip "When to reach for this"
-    This is the template for any cost- and capital-constrained, high-frequency book: keep the
-    optimisation light, control turnover and fees at the optimiser, and finish with a finite
-    allocation sized to the real account.
+    Reach for this profile when trading cost and account size bind harder than the model does. Keep
+    the optimisation to one convex solve, hold turnover and fees inside the optimiser, and size the
+    last step to the cash you have.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -39,8 +41,8 @@ end;
 #=
 ## 1. Data and current book
 
-We use the S&P 500 slice, and assume the investor currently holds an equal-weight book — the
-reference point turnover is measured against.
+We read the S&P 500 slice and take the investor's current book to be equal weight. The turnover
+budget in the next section measures every target weight against that book.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -58,8 +60,10 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
 #=
 ## 2. The optimisation
 
-One light convex solve: minimum risk, a 15% per-name cap for diversification, a daily turnover
-budget against the current book, and explicit fees so trades must justify their cost.
+One convex solve carries all four choices. The objective is minimum risk. The weight bounds cap
+each name at 15%. The turnover budget holds each target weight within 0.05 of the weight the
+investor holds today. The fee is proportional to each long position, and the optimiser carries it
+in the objective.
 =#
 
 retail = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -74,13 +78,13 @@ pretty_table(DataFrame("Asset" => rd.nx, "Current" => current_book, "Target" => 
              title = "Retail daily target — capped, low-turnover, net of fees")
 
 #=
-The cap and turnover budget keep the book diversified and close to where it started, so the daily
-rebalance is small and cheap.
+Compare the two weight columns. Every target sits at or below the 15% cap, and none of them is
+further than 0.05 from its current weight, so the trade list for the day is short.
 
 ## 3. Finite allocation
 
-The account is \$10,000. [`GreedyAllocation`](@ref) converts the target into whole shares — no MIP
-solver, instant, which suits a daily cadence.
+The account holds \$10,000. [`GreedyAllocation`](@ref) turns the target weights into whole shares.
+It runs no mixed-integer solve, so it is cheap enough to run every day.
 =#
 
 alloc = optimise(GreedyAllocation(),

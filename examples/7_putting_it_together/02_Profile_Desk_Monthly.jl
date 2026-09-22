@@ -5,25 +5,28 @@ Description = "An end-to-end profile in PortfolioOptimisers.jl: a professional d
 
 # Profile: desk, monthly
 
-The second profile is a **professional desk rebalancing monthly**. The trade-offs invert the
-[retail profile](01_Profile_Retail_Daily.md): rebalancing infrequently means each decision can
-afford real compute and real analysis, and turnover matters far less. The edge here comes from a
-*view* and from exploring the whole risk/return trade-off rather than from cost control.
+The second profile rebalances a professional desk once a month. Every limit that binds in the
+[retail profile](01_Profile_Retail_Daily.md) loosens here. A monthly decision can pay for a long
+computation, and a month of return covers more trading cost than a day of it does. What this desk
+has instead is a house view, and the time to look at the whole risk-return trade-off before it
+picks a book.
 
-The reasoning, following the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md):
+The [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md) asks which limits
+bind. Four of them answer differently here.
 
-  - **Compute is abundant, decisions are rare** — a monthly cadence justifies a richer prior and a
-    full frontier sweep.
-  - **The desk has a view** — it encodes a house thesis with an [`EntropyPoolingPrior`](@ref)
-    rather than taking the sample moments at face value.
-  - **Explore, then choose** — instead of one objective, it traces the efficient frontier and
-    selects the risk-adjusted (tangency) book.
-  - **Budget is substantial** — an exact [`DiscreteAllocation`](@ref) is affordable.
+  - Compute is cheap next to a month of return, so we fit a richer prior and sweep a whole
+    frontier.
+  - The desk holds a view, so we state it as a constraint on the mean and fit an
+    [`EntropyPoolingPrior`](@ref) rather than take the sample mean as given.
+  - One objective returns one book. We trace the efficient frontier first and choose the
+    risk-adjusted point from it.
+  - The book is large enough to pay for an exact whole-share allocation, so we use
+    [`DiscreteAllocation`](@ref).
 
 !!! tip "When to reach for this"
-    This is the template for a research-driven, lower-frequency book: invest the compute in a
-    better prior and a frontier sweep, pick a point deliberately, and allocate exactly. Turnover
-    and fee control matter less when you trade rarely.
+    Reach for this profile when you trade rarely and can spend the time on the model instead. Put
+    that time into the prior and the frontier, choose a point on it, and allocate with a
+    mixed-integer solve. Turnover and fee control matter less when you trade once a month.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
@@ -40,9 +43,11 @@ end;
 #=
 ## 1. Data and the house view
 
-The desk's thesis: healthcare will outperform energy. It encodes that as an entropy-pooling view,
-reweighting the empirical scenarios so the prior reflects the conviction (see
-[Entropy Pooling](../2_moments_priors/07_Entropy_Pooling.md)).
+The desk expects healthcare to outperform energy. We state that as a view on the mean, and
+[`EntropyPoolingPrior`](@ref) turns it into a new set of weights over the historical scenarios. A
+scenario that supports the view carries more weight, and the rest carry less.
+[Entropy Pooling](../2_moments_priors/07_Entropy_Pooling.md) covers the method that finds those
+weights.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -65,8 +70,9 @@ rf = 4.2 / 100 / 252
 #=
 ## 2. The efficient frontier
 
-With compute to spare, the desk traces the whole frontier on the view-tilted prior — minimum-risk
-books across a sweep of return targets — rather than committing to a single objective up front.
+We solve for minimum risk fifteen times, once at each of fifteen lower bounds on the return. The
+fifteen books trace the efficient frontier of the prior that carries the view. The plot shows what
+each step up in return costs in risk.
 =#
 
 frontier = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -81,8 +87,9 @@ plot_efficient_frontier(frontier.w, pr; rt = frontier.ret)
 #=
 ## 3. Choosing the book
 
-From the frontier, the desk takes the risk-adjusted optimum — the [`MaximumRatio`](@ref)
-(tangency) portfolio on the same view-tilted prior.
+The frontier shows the trade-off, and the desk still has to pick one point on it. We solve once
+more with [`MaximumRatio`](@ref), which maximises the ratio of return above the risk-free rate to
+risk. That book is the tangency point of the frontier.
 =#
 
 desk = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
@@ -95,8 +102,10 @@ pretty_table(DataFrame("Asset" => rd.nx, "Tangency weight" => desk.w);
 #=
 ## 4. Exact finite allocation
 
-On a \$500,000 book the rounding is small but the desk wants the provably-best whole-share book, so
-it uses [`DiscreteAllocation`](@ref) with a MIP solver ([HiGHS](https://github.com/jump-dev/HiGHS.jl)).
+The book holds \$500,000, so rounding to whole shares moves each weight by very little.
+[`DiscreteAllocation`](@ref) is still the right choice at this frequency. It solves a
+mixed-integer problem with [HiGHS](https://github.com/jump-dev/HiGHS.jl) for the whole-share book
+closest to the target, and its solve time is a few seconds once a month.
 =#
 
 mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,

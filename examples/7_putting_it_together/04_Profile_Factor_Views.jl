@@ -5,32 +5,33 @@ Description = "An end-to-end profile in PortfolioOptimisers.jl: a desk with fact
 
 # Profile: factor-views desk
 
-The fourth profile is a **factor-aware desk that trades on factor views**. Where the
-[desk monthly profile](02_Profile_Desk_Monthly.md) expressed a thesis directly on assets
-("healthcare beats energy") through entropy pooling, this desk holds its convictions in
-**factor space** — momentum will be rewarded, value will be rewarded — and lets a factor model
-propagate those views to every asset. It then runs the resulting posterior through a *constrained*
-optimiser, because a factor tilt left unchecked concentrates hard into whatever names load on the
-favoured factors.
+The fourth profile holds its views on factors rather than on assets. The
+[desk monthly profile](02_Profile_Desk_Monthly.md) stated a thesis about two sectors, healthcare
+over energy, and entropy pooling turned it into a prior. This desk states what it expects momentum
+and value to earn, and a factor model carries those two numbers to every asset through the
+regression of assets on factors. The posterior then goes into an optimiser with caps on it,
+because on a factor view the optimiser puts its weight on whatever loads most on the favoured
+factors, and that is a small number of names.
 
-This is the pattern that the [advanced Black–Litterman](../2_moments_priors/06_Advanced_Black_Litterman.md)
-page builds up variant by variant, assembled here end-to-end as a reusable book: a
-[`FactorBlackLittermanPrior`](@ref), real sector constraints, and an exact allocation.
+The [advanced Black-Litterman](../2_moments_priors/06_Advanced_Black_Litterman.md) page builds
+this prior one variant at a time. This page puts it to work in a whole book, with a
+[`FactorBlackLittermanPrior`](@ref), sector caps and an exact allocation.
 
-The reasoning, following the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md):
+The [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md) asks which limits
+bind. Three bind on this desk.
 
-  - **The edge is a factor call, not a stock call** — the desk has a view on *factor premia*, so it
-    encodes it where it belongs and propagates it through the factor regression.
-  - **A raw factor tilt is dangerous** — momentum and value concentrate, so the book is wrapped in
-    per-asset and per-sector caps that make the tilt expressible but bounded.
-  - **Risk-adjusted, then allocated** — it takes the tangency ([`MaximumRatio`](@ref)) book on the
-    posterior and turns it into whole shares with an exact MIP allocation.
+  - The view is about what a factor earns, so we write it against the factor names and let the
+    regression carry it to the assets.
+  - Momentum and value load on few names over this slice, so we give the optimiser a cap on each
+    asset and a cap on each of the two sectors the view favours.
+  - The book is large, so we take the risk-adjusted book with [`MaximumRatio`](@ref) and turn it
+    into whole shares with a mixed-integer solve.
 
 !!! tip "When to reach for this"
-    This is the template for a factor-driven book: when your conviction is about *factors*
-    (momentum, value, quality, size, low-vol) rather than individual names, put the view in factor
-    space with a factor Black–Litterman prior, then constrain the optimiser so the factor tilt
-    diversifies into a real portfolio instead of a handful of high-loading names.
+    Reach for this profile when your view is about a factor, such as momentum, value, quality,
+    size or low volatility, rather than about a name. Write the view against the factors with a
+    factor Black-Litterman prior, then cap the optimiser, so the view spreads over the universe
+    instead of landing on the few names that load hardest.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
@@ -47,10 +48,11 @@ end;
 #=
 ## 1. Data, factors, and the factor view
 
-We load the S&P 500 slice together with its factor block (`MTUM`, `QUAL`, `SIZE`, `USMV`, `VLUE`),
-declare an asset `UniverseSets` with sector groups (for the sector caps) and a factor `UniverseSets` (for
-the views), and write the desk's thesis as factor-premia views: momentum earns 5 bps/day and value
-earns 3 bps/day.
+We load the S&P 500 slice together with its factor block, `MTUM`, `QUAL`, `SIZE`, `USMV` and
+`VLUE`. Two `UniverseSets` follow. The asset one names the sectors the caps refer to. The factor
+one names the assets and the factors in the column order of `rd.F`, which is the order
+[`FactorBlackLittermanPrior`](@ref) reads them in. The view itself is two numbers: momentum earns
+5 basis points a day, and value earns 3.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -70,12 +72,12 @@ tau = 1 / size(rd.X, 1)
 factor_views = LinearConstraintEstimator(; val = ["MTUM == 0.0005", "VLUE == 0.0003"])
 
 #=
-## 2. The factor Black–Litterman posterior
+## 2. The factor Black-Litterman posterior
 
-[`FactorBlackLittermanPrior`](@ref) takes the factor views, maps them through the asset-on-factor
-regression, and returns a standard asset-space posterior `(mu, sigma)`. We keep the idiosyncratic
-residual variance (`rsd = true`) so the posterior covariance is the full asset risk, not only its
-factor-explained part.
+[`FactorBlackLittermanPrior`](@ref) regresses the assets on the factors, applies the two views to
+the factor means, and returns a posterior `mu` and `sigma` over the assets. With `rsd = true` the
+posterior covariance keeps the residual variance of each regression, so it measures the whole risk
+of an asset rather than the part the factors explain.
 =#
 
 prior_est = FactorBlackLittermanPrior(; pe = EmpiricalPrior(), rsd = true,
@@ -88,11 +90,10 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
 rf = 4.2 / 100 / 252
 
 #=
-## 3. Why the constraints are not optional
+## 3. What the caps are for
 
-Left unconstrained beyond a per-name cap, the tangency book on this posterior piles into the
-sectors that load on the favoured factors. We solve it once with only a 15% per-asset cap to see
-the raw tilt, then read off the sector totals.
+A cap on each asset does not spread the book across sectors. We solve the risk-adjusted book once
+with a 15% cap on each asset and nothing else, then add up the weight each sector holds.
 =#
 
 raw = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
@@ -108,15 +109,15 @@ pretty_table(raw_sectors; formatters = [resfmt],
              title = "Sector weights with only a per-asset cap")
 
 #=
-The raw book leans heavily into healthcare and energy — the factor tilt expressed through the
-names that load on momentum and value on this slice. That is the conviction working, but it is also
-an undiversified book.
+The healthcare and energy rows hold nearly all of the book, and the tech row holds none of it.
+Those are the sectors whose names load on momentum and value over this slice. The two views reached the assets through
+the regression, and the book that came back holds few names.
 
 ## 4. The constrained desk book
 
-So the desk caps the two sectors the tilt favours — healthcare at 35% and energy at 25% — on top of
-the 15% per-asset bound. The factor view still drives the *selection*, but the caps force it to
-spread.
+So the desk caps the two sectors the view favours, healthcare at 35% and energy at 25%, on top of
+the 15% cap on each asset. The view still chooses which names to hold. The caps decide how much of
+the book any one sector may take.
 =#
 
 desk = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
@@ -137,14 +138,14 @@ pretty_table(DataFrame("Asset" => rd.nx, "Weight" => desk.w); formatters = [resf
              title = "Factor-views desk — constrained tangency book")
 
 #=
-Both sector caps bind: healthcare comes down to 35% and energy to 25%, and the freed weight spreads
-into the rest of the universe. The book is still a factor-view portfolio — it just diversifies the
-tilt instead of betting it all on the highest-loading names.
+Compare the two sector tables. Healthcare and energy sit at their caps in the second one, and the
+weight that left them went to the rest of the universe. The third table gives the whole book, name
+by name.
 
 ## 5. Exact finite allocation
 
-On a \$1,000,000 book the desk wants the provably-best whole-share allocation, so it uses
-[`DiscreteAllocation`](@ref) with a MIP solver ([HiGHS](https://github.com/jump-dev/HiGHS.jl)).
+The book holds \$1,000,000. [`DiscreteAllocation`](@ref) solves a mixed-integer problem with
+[HiGHS](https://github.com/jump-dev/HiGHS.jl) for the whole-share book closest to the target.
 =#
 
 mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,

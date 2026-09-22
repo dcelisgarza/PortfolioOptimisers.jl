@@ -6,23 +6,22 @@ Description = "The cross-sectional factor model through a Pipeline in PortfolioO
 # Cross-sectional factor model through a Pipeline
 
 The [deep dive](05_Cross_Sectional_Factor_Model.md) built a cross-sectional factor model, fitted
-two orthogonal uncertainty sets from it and solved a constrained book, by wiring the estimators
-into a [`JuMPOptimiser`](@ref) by hand. This page reaches **the same weights** through a
+two orthogonal uncertainty sets from it, and solved a constrained book, by wiring the estimators
+into one [`JuMPOptimiser`](@ref) by hand. This page reaches the same weights through a
 [`Pipeline`](@ref), and it is short because almost nothing has to change.
 
-The reason it is short is the answer to the question this page exists to settle: **the point-in-time
-Asset Panel needs no Pipeline Data Slot of its own.** The panel rides `rd.pnl` on the returns
-carrier, and `:returns` is a slot the Pipeline already has. So:
+The reason it is short is the answer to the question this page exists to settle. The panel of
+point-in-time fields needs no slot of its own in the pipeline. It travels on `rd`, the returns
+result, which the pipeline already routes as its `:returns` slot. Three things follow.
 
-  - No new slot, and no declaration. A step that needs the panel reads the carrier it was already
-    handed.
-  - Every step that slices the carrier slices the panel with it, because both go through the same
-    view contract.
-  - A fold slices the panel before the Pipeline sees the data, through that same contract.
+  - You declare no new slot. A step that needs the panel reads the returns result it is handed.
+  - A step that takes a subset of the assets takes the same subset of the panel, because one view
+    of the returns result covers both.
+  - A fold takes its subset before the pipeline sees the data, through that same view.
 
-What the Pipeline *does* add is that the three pieces become three named steps, and the middle one
-— the uncertainty set — reads the `:prior` slot the first step wrote. That is the route the
-hand-wired version hides inside the optimiser.
+What the pipeline adds is three named steps in place of one call. The middle step, the uncertainty
+set, reads the `:prior` slot that the first step wrote. The hand-wired version does the same thing
+inside the optimiser, where you cannot see it.
 =#
 
 using PortfolioOptimisers, StableRNGs, Statistics, LinearAlgebra, Dates, PrettyTables,
@@ -35,10 +34,10 @@ end;
 #=
 ## 1. The same panel, and the same specification
 
-The generator and the estimator below are the deep dive's, unchanged and at the same seed, so the
-book this page solves is the book that page solved. Read
-[§1 and §2 there](05_Cross_Sectional_Factor_Model.md) for what each piece is; here they are just
-the input.
+The generator and the estimator below are the deep dive's, unchanged and at the same seed, so this
+page solves the book that page solved. Sections 1 and 2 of
+[the deep dive](05_Cross_Sectional_Factor_Model.md) say what each piece is. Here they are the
+input.
 =#
 
 function synthetic_panel(; T = 500, N = 80, seed = 661_001)
@@ -111,8 +110,7 @@ pe = CrossSectionalFactorPrior(; factors = factors, families = ["industry" => no
                                c = 1.0)
 
 #=
-The panel is already on the carrier, so it is already in the `:returns` slot. Nothing below
-mentions it again.
+The panel travels on `rd`, so it is already in the `:returns` slot. Nothing below names it again.
 =#
 
 pretty_table(DataFrame("Carrier" => string(nameof(typeof(rd))),
@@ -122,14 +120,15 @@ pretty_table(DataFrame("Carrier" => string(nameof(typeof(rd))),
 #=
 ## 2. The hand-wired route
 
-This is the deep dive's §5 book: a minimum-risk portfolio under both orthogonal sets and a factor
-mandate written in a factor name. Everything is a field of one [`JuMPOptimiser`](@ref).
+This is the book of the deep dive's fifth section, a minimum-risk portfolio under both orthogonal
+sets, with a mandate written against a factor name. Every piece is a field of one
+[`JuMPOptimiser`](@ref).
 
-The universe the mandate is written against is read off the estimator with
-[`cross_sectional_factor_sets`](@ref), before any fit: it declares the factor axis the fit will
-produce, one-hot industry levels included, under the `ncf` key, and one plain group per Factor
-Family. The one-hot levels are read off the panel, so nothing here hand-types a list that a change
-of the panel's industry levels would leave stale.
+[`cross_sectional_factor_sets`](@ref) reads the universe the mandate is written against off the
+estimator, before any fit. It declares the factor axis the fit will produce, one-hot industry
+levels included, under the `ncf` key, and one plain group per factor family. It reads the one-hot
+levels off the panel, so nothing here types out a list that a change to the panel's industry
+levels would leave stale.
 =#
 
 solver = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
@@ -151,16 +150,16 @@ direct = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs), obj = Mini
 #=
 ## 3. The Pipeline route
 
-Three steps, and each one is a piece the hand-wired optimiser held in a field:
+Three steps, and each one is a piece the hand-wired optimiser held in a field.
 
- 1. The **prior** step is the estimator itself. It writes the `:prior` slot.
- 2. The **uncertainty** step is the same [`OrthogonalUncertaintySet`](@ref), wrapped in a
-    [`PipelineStep`](@ref) because a computed uncertainty-set result cannot say on its own which
-    parameter it bounds. `target = :both` derives the mean set and the covariance set from a single
-    [`ucs`](@ref) call — and, crucially, it reads the `:prior` slot the first step wrote, which is
-    what makes the sets orthogonal to *this* optimisation's own factor model.
- 3. The **optimisation** step carries no `pe` and no `ucs` of its own. The Pipeline injects the two
-    slots into it.
+ 1. The prior step is the estimator itself. It writes the `:prior` slot.
+ 2. The uncertainty step is the same [`OrthogonalUncertaintySet`](@ref), wrapped in a
+    [`PipelineStep`](@ref), because a computed uncertainty-set result cannot say on its own which
+    parameter it bounds. `target = :both` derives the mean set and the covariance set from one
+    [`ucs`](@ref) call. It also reads the `:prior` slot the first step wrote, so the two sets come
+    out orthogonal to the factor model of this optimisation rather than to some other one.
+ 3. The optimisation step carries no `pe` and no `ucs` of its own. The pipeline puts the two slots
+    into it.
 =#
 
 pipe = Pipeline(;
@@ -187,10 +186,12 @@ pretty_table(DataFrame("Step" => collect(piped.names),
              title = "What each step put in which slot")
 
 #=
-## 4. The two routes agree
+## 4. Comparing the two routes
 
-Not approximately — the Pipeline runs the same estimators on the same data in the same order, so
-the weights are identical to the last bit.
+Both routes run the same estimators on the same data in the same order. The table prints the
+largest difference between the two weight vectors, the sum of the pipeline's weights, the number
+of names it holds, and its exposure to size. A largest difference of zero means the two routes
+returned the same weight for every name.
 =#
 
 pretty_table(DataFrame("max |w_pipeline - w_direct|" => maximum(abs, piped.w - direct.w),
@@ -199,12 +200,13 @@ pretty_table(DataFrame("max |w_pipeline - w_direct|" => maximum(abs, piped.w - d
              formatters = [numfmt], title = "The Pipeline reaches the deep dive's book")
 
 #=
-## 5. And they agree fold by fold
+## 5. Fold by fold
 
-The same holds under cross-validation, which is the claim that matters: a fold slices the carrier
-— and the panel on it — before either route sees the data, so both refit the prior, both refit the
-two uncertainty sets against that fold's own factor model, and both re-base the mandate through
-the loadings the fold actually fitted.
+The same comparison holds under cross-validation. A fold takes its subset of `rd`, panel included,
+before either route sees the data. Both routes then refit the prior, refit the two uncertainty
+sets against that fold's own factor model, and express the mandate through the loadings that fold
+fitted. The first table prints the largest weight difference for each fold, and the second the
+largest difference between the returns the two routes predict.
 =#
 
 walk = IndexWalkForward(252, 63)
@@ -240,6 +242,6 @@ pretty_table(DataFrame("max |predicted returns difference|" =>
     version of every estimator on this page.
   - [Pipelines](../5_validation_tuning/03_Pipelines.md) covers the slots, the routing and the
     hyper-parameter search this page only touches.
-  - [Reading a Return Forecast before an optimiser sees it](07_Forecast_Evaluation.md) scores the
-    Return Forecast this page's prior carries, before any optimiser acts on it.
+  - [Reading a return forecast before an optimiser sees it](07_Forecast_Evaluation.md) scores the
+    return forecast this page's prior carries, before any optimiser acts on it.
 =#

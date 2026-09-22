@@ -5,25 +5,26 @@ Description = "An end-to-end profile in PortfolioOptimisers.jl: an institutional
 
 # Profile: institutional
 
-The third profile is an **institutional mandate** — a large, benchmarked book hemmed in by rules.
-Where the [retail profile](01_Profile_Retail_Daily.md) optimised for cost and the
-[desk profile](02_Profile_Desk_Monthly.md) optimised for a view, this one optimises *within
-constraints*: concentration limits, sector caps, and a tracking-error budget against a benchmark.
-The size makes exact execution worthwhile.
+The third profile runs a large benchmarked book under a written mandate. The
+[retail profile](01_Profile_Retail_Daily.md) optimised against cost and the
+[desk profile](02_Profile_Desk_Monthly.md) optimised on a view. This one optimises inside a set of
+rules: a cap on each name, a cap on each sector, and a limit on how far the book may drift from
+its benchmark. The prior is the plain empirical one, and the rules do most of the work.
 
-The reasoning, following the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md):
+The [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md) asks which limits
+bind. Three bind on this mandate.
 
-  - **The mandate is the boss** — per-name caps, sector limits, and a benchmark tracking-error
-    ceiling are hard requirements, exactly what the [`JuMPOptimiser`](@ref) constraint keywords
-    express.
-  - **Benchmarked** — this is enhanced indexing: minimise risk but stay within a tracking-error
-    budget of the benchmark (see [Turnover and Tracking](../4_constraints_costs/05_Turnover_and_Tracking.md)).
-  - **Large and precise** — a big book justifies an exact [`DiscreteAllocation`](@ref).
+  - The mandate's caps are hard limits, not preferences. Each one is a keyword on the
+    [`JuMPOptimiser`](@ref).
+  - The book is measured against a benchmark, so we add a bound on the tracking error to the risk
+    we minimise.
+    [Turnover and Tracking](../4_constraints_costs/05_Turnover_and_Tracking.md) covers that bound.
+  - The book is large, so an exact [`DiscreteAllocation`](@ref) is worth its solve time.
 
 !!! tip "When to reach for this"
-    This is the template for a constrained, benchmarked institutional book: stack the mandate's
-    rules as `JuMPOptimiser` keywords, bound tracking error to the benchmark, and allocate exactly.
-    The constraints, not the prior, are doing most of the work.
+    Reach for this profile when a mandate, rather than a forecast, decides what the book may hold.
+    Write each rule as a `JuMPOptimiser` keyword, bound the tracking error against the benchmark,
+    and allocate with a mixed-integer solve.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
@@ -40,8 +41,8 @@ end;
 #=
 ## 1. Data, benchmark, and groups
 
-The benchmark is an equal-weight book; the sectors are named so the mandate's sector caps can
-reference them.
+The benchmark is an equal-weight book. We also name the sectors, because the mandate's sector cap
+is written against a sector name.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -64,8 +65,9 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
 #=
 ## 2. The constrained optimisation
 
-Minimum risk, subject to the full mandate: a 10% per-name cap, an energy sector limit, and a
-tracking-error budget against the benchmark. Every rule is a keyword on the [`JuMPOptimiser`](@ref).
+We minimise risk under the whole mandate. `wb` caps each name at 10%, `lcse` holds energy at or
+below 20%, and `tr` keeps the book within 0.005 tracking error of the benchmark. Each rule is one
+keyword on the [`JuMPOptimiser`](@ref).
 =#
 
 institutional = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -89,15 +91,15 @@ pretty_table(DataFrame("Sector" => ["tech", "energy", "healthcare"],
              title = "Institutional book — capped, energy-limited, benchmark-tracking")
 
 #=
-The book respects every rule: no name above 10%, energy under its cap, and the whole portfolio
-stays within the tracking-error budget of the benchmark — diversified by construction rather than
-by a single objective.
+The table gives the benchmark weight and the mandate weight for each of the three named sectors.
+Read the energy row against the 20% the mandate sets. The per-name cap and the tracking-error
+bound do not show in a sector table, and the full weight table in the next section shows them.
 
 ## 3. Exact finite allocation
 
-On a \$10,000,000 book, [`DiscreteAllocation`](@ref) with a MIP solver
-([HiGHS](https://github.com/jump-dev/HiGHS.jl)) turns the target into whole shares with negligible
-residual cash.
+The book holds \$10,000,000. [`DiscreteAllocation`](@ref) solves a mixed-integer problem with
+[HiGHS](https://github.com/jump-dev/HiGHS.jl) for the whole-share book closest to the target. The
+title of the table prints the cash left over, the cost of rounding to whole shares.
 =#
 
 mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,
