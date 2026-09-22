@@ -138,14 +138,16 @@ plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), cv_bench)
 plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), cv_ssr)
 
 #=
-The scorer returns the prediction closest to the median of the population, so you do not
-choose a fold by hand. The two cells below print the `id` of the prediction it returned. A
-population built from one [`cross_val_predict`](@ref) stream carries no identifier per fold,
-so both print `nothing` here.
+The scorer returns the path closest to the median of the population, so you do not choose a
+path by hand. The two cells below print the `id` of the path it returned. A population
+numbers its paths by position, and each population here holds one
+[`cross_val_predict`](@ref) stream, so both print `1`. A population of many paths, such as
+the one [`CombinatorialCrossValidation`](@ref) returns, gives the `id` of the path the scorer
+selected.
 =#
 
-println("Median benchmark fold id = $(median_bench.id)")
-println("Median SSR fold id = $(median_ssr.id)")
+println("Median benchmark path id = $(median_bench.id)")
+println("Median SSR path id = $(median_ssr.id)")
 
 #=
 ## 4. Efficient frontier of a meta-optimiser
@@ -295,13 +297,9 @@ A meta-optimiser helps when one fit over every asset moves too far from window t
 #src - Narrative holds: SubsetResampling spreads weight the most (JNJ 20.5% vs 37% for MinVar),
 #src   and at every frontier point the SSR max weight sits well below the plain MeanRisk max
 #src   (75% vs 100% at the most aggressive point) — the "bagging smooths the frontier" point lands.
-#src - FINDING (record-only → validation/meta rollup): section 3 prints
-#src   `Median benchmark fold id = nothing` and `Median SSR fold id = nothing`.
-#src   `NearestQuantilePrediction` runs without error, but the selected result's `.id` is
-#src   `nothing` when the `PopulationPredictionResult` wraps a single `cross_val_predict` stream,
-#src   so the "representative fold without hand-picking" narrative surfaces no usable id. Either
-#src   populate `.id` on this path or soften the prose — needs a look at how
-#src   `NearestQuantilePrediction` / `PopulationPredictionResult` carry fold identifiers.
+#src - RESOLVED (#1250): section 3 printed `nothing` for both ids, because a population built
+#src   by hand from `cross_val_predict` streams carried no `id`. `PopulationPredictionResult`
+#src   now gives a member without an `id` its position, so both cells print `1`.
 #src - No solver warnings or plotting deprecations observed.
 #src - Section 5 (Deferred Quantity, added for #286) checked in the test env with `julia -t 1`,
 #src   BLAS 1, one Clarabel solver: refit-vs-sliced covariance difference 9.87e-5 against a

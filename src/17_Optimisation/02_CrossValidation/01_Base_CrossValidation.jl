@@ -1231,6 +1231,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields. An empty `pred` is admitted: a population from which every path was dropped is a valid, if empty, answer.
 
+## Every member carries an `id`
+
+A member whose `id` is `nothing` takes its position in `pred` as its `id`, through [`population_ids`](@ref). The schemes that make a population already number their paths that way, so the rule changes nothing for them. It gives an identifier to a population built by hand from [`cross_val_predict`](@ref) streams, so the path that [`NearestQuantilePrediction`](@ref) or [`sort_by_measure`](@ref) selects names its place in the population. A member that already carries an `id` keeps it.
+
 # Related
 
   - [`PredictionResult`](@ref)
@@ -1244,6 +1248,7 @@ Keywords correspond to the struct's fields. An empty `pred` is admitted: a popul
     """
     pred
     function PopulationPredictionResult(pred::VecPredRes_MultiPredRes)
+        pred = population_ids(pred)
         return new{typeof(pred)}(pred)
     end
 end
@@ -1344,8 +1349,7 @@ The ranking direction comes from [`bigger_is_better`](@ref), which **throws** on
   - [`expected_risk`](@ref)
 """
 function sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)
-    pred = filter(x -> all(y -> isa(y.res.retcode, OptimisationSuccess), x.pred),
-                  ppred.pred)
+    pred = successful_members(ppred)
     rks = [expected_risk(r, x; kwargs...) for x in pred]
     fin = isfinite.(rks)
     idx = findall(fin)
@@ -1388,8 +1392,7 @@ A path whose measure is not finite takes no part: it is dropped before the quant
 function quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM,
                              q::Real; r_kwargs::NamedTuple = (;),
                              q_kwargs::NamedTuple = (;), sign::Integer = 1)
-    pred = filter(x -> all(y -> isa(y.res.retcode, OptimisationSuccess), x.pred),
-                  ppred.pred)
+    pred = successful_members(ppred)
     rks = [sign*expected_risk(r, p; r_kwargs...) for p in pred]
     fin = findall(isfinite, rks)
     rks = rks[fin]

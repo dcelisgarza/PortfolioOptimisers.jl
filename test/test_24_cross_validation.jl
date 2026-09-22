@@ -930,6 +930,30 @@
         # the quantile is taken over the finite members, so it does not throw
         @test PortfolioOptimisers.quantile_by_measure(ppred, MaximumDrawdown(), 0.5) isa
               MultiPeriodPredictionResult
+
+        #=
+        Issue #1250: a population built by hand from `cross_val_predict` streams numbers its
+        members, so the path a scorer selects names its place instead of `nothing`.
+        =#
+        @test isnothing(quiet.id)
+        @test [p.id for p in ppred.pred] == [1, 2, 3]
+        sel = NearestQuantilePrediction(; r = MaximumDrawdown())(ppred)
+        @test sel.id isa Integer
+        @test ppred.pred[sel.id] === sel
+        # the rebuilt member keeps its folds
+        @test ppred.pred[1].pred === quiet.pred
+        @test ppred.pred[1].mrd.X == quiet.mrd.X
+        # a member that carries an id keeps it, and a lone stream is member 1
+        named = MultiPeriodPredictionResult(; pred = loud.pred, id = 7)
+        @test [p.id for p in PopulationPredictionResult(; pred = [quiet, named]).pred] ==
+              [1, 7]
+        @test NearestQuantilePrediction(; r = MaximumDrawdown())(PopulationPredictionResult(;
+                                                                                            pred = [quiet])).id ==
+              1
+        # a population with every id is not copied, and a lone fold needs no id
+        @test PopulationPredictionResult(; pred = ppred.pred).pred === ppred.pred
+        fold = quiet.pred[1]
+        @test PopulationPredictionResult(; pred = [fold]).pred[1] === fold
     end
     @testset "Cross val predict" begin
         w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))

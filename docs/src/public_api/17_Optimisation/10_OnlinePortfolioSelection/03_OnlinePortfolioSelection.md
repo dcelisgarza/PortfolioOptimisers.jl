@@ -1,5 +1,5 @@
 ```@meta
-Description = "The online portfolio selection head, public API of PortfolioOptimisers.jl: OnlinePortfolioSelection, optimise, partial_fit!, factory, port_opt_view, …"
+Description = "The online portfolio selection head, public API of PortfolioOptimisers.jl: OnlinePortfolioSelection, optimise, partial_fit!, factory, port_opt_view, Online, …"
 ```
 
 # The online portfolio selection head
