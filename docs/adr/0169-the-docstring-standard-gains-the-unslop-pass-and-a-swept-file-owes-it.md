@@ -36,12 +36,14 @@ said that this reopens the sweep's documentation tickets.
 section cites the skill by name, copies none of its rules, and names a rule by the number the skill
 gives it. Two live copies drift, and the skill's numbering is stable by its own statement.
 
-**2. The Scope is the standard's own, less the Literate sources.** The rule reaches the docstrings
-of `src/**/*.jl` and `ext/**/*.jl`, the dictionary values of
-`src/01_Base/01_DocstringDictionaries.jl` that they interpolate, and the hand-written Markdown
-pages under `docs/src/` outside `docs/src/contribute/`. The Literate sources and the catalogue's
-`Prose` stay outside it, because #1219 decides them, and a rule written here first would either
-duplicate that decision or contradict it.
+**2. The Scope is the standard's own, less every text a user reads as a page.** The rule reaches
+the docstrings of `src/**/*.jl` and `ext/**/*.jl` and the dictionary values of
+`src/01_Base/01_DocstringDictionaries.jl` that they interpolate. Every text a user reads as a page
+stays outside it: the Literate sources, the hand-written Markdown pages under `docs/src/`,
+`README.md` and the `Prose` text of the Capability Catalogue. ADR 0171 owns them, because #1219
+and #1239 decide their voice and their vocabulary, and a rule written here would either duplicate
+that decision or contradict it. A docstring is the one text this Scope keeps that a user reads on
+a page, and it reaches that page through `@docs`, not as written page prose.
 
 **3. Three points of contact with the standard are stated, and no more.** A template of the
 standard fixes the shape of a section, and the skill's rules apply to the sentences inside it, so
@@ -108,9 +110,10 @@ pointer before the pass, as ADR 0085 accepted for its own window.
 checked, because a rewrite of a sentence that is about to change is wasted. A ticket's resolution
 names what the skill's self-audit found and changed.
 
-**The docstring sweep and the Literate sweep meet at the standard.** If #1219 puts the Literate
-rule in `julia-docstrings.instructions.md`, the two sections sit side by side and the Scope
-sentence of this one already names the boundary.
+**The docstring sweep and the prose sweep meet at the boundary this Scope draws.** #1219 put the
+prose rule in its own file, and #1239 widened that file to every text a user reads as a page. The
+two standards therefore divide by what a text is, not by where it lives: this one owns a docstring
+and the dictionary value it interpolates, and ADR 0171 owns the page.
 
 **A dictionary value changes many docstrings at once.** A pass over
 `src/01_Base/01_DocstringDictionaries.jl` rewrites text that every interpolating docstring

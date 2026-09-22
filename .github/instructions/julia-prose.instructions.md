@@ -1,16 +1,29 @@
 ---
-applyTo: 'examples/**/*.jl, user_guide/*.jl'
+applyTo: 'examples/**/*.jl, user_guide/*.jl, docs/src/**/*.md, README.md, docs/capability_catalogue.jl'
 ---
 
-# Literate Prose Guidelines for PortfolioOptimisers.jl
+# User-Facing Prose Guidelines for PortfolioOptimisers.jl
 
-The examples and the user guide are built by Literate from the Julia sources under `examples/` and
-`user_guide/`. This file governs their **prose**: the text of every `#= … =#` block, every comment
-line that Literate renders as Markdown, and the `Description` line of a ` ```@meta ` block. A line of Julia, a fenced code
-block, a LaTeX expression, an `@ref` link and a `#src` line are outside it.
+This file governs the **prose a user reads as a page**. Four corpora carry it.
 
-A reader runs the cells of a page in order. The prose between two cells says what the next cell
-does, or what the last output shows.
+- **The Literate sources** under `examples/` and `user_guide/`, from which the docs build renders
+  the examples and the user guide. Their prose is the text of every `#= … =#` block, every comment
+  line that Literate renders as Markdown, and the `Description` line of a ` ```@meta ` block.
+- **The hand-written Markdown pages** under `docs/src/`, outside `docs/src/contribute/`, which is
+  written for a contributor. Their prose is the text of the page.
+- **`README.md`**, the repository front page. It is the one user-facing text at the root; every
+  other Markdown file there is written for a contributor.
+- **`docs/capability_catalogue.jl`**, from which the docs build renders the Capability Catalogue.
+  Its prose is the text of every `Prose`, every `Note`, every `Cap` label, every `Section` title
+  and every `Group` head that is a string. A `Cap` with no label takes its sentence from the type's
+  docstring, which [`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) owns.
+
+A line of Julia, a fenced code block, a LaTeX expression, an `@ref` link and a `#src` line are
+outside this file. So is a docstring, which reaches a page through `@docs` and which the docstring
+standard owns. *What the rule does not read* below states the rest.
+
+On a Literate page a reader runs the cells in order, and the prose between two cells says what the
+next cell does, or what the last output shows.
 
 ---
 
@@ -30,8 +43,8 @@ word `to`.
 **How to apply it.** Invoke `/unslop` on the file. When the skill cannot be invoked, read its rules
 and apply them by hand. Rewrite the prose, keep the meaning, and end with the skill's self-audit,
 "What makes this obviously AI generated?". A pass changes prose alone: a line of Julia, a `#src`
-line, an `@ref` link, an admonition's indentation and a fenced block stay as they are, and the
-outputs of the page do not move.
+line, an `@ref` link, an `@docs` block, an admonition's indentation and a fenced block stay as they
+are, and the outputs of a page do not move.
 
 ---
 
@@ -43,6 +56,11 @@ outputs of the page do not move.
 - **`we` names what the page's cells do.** "We fit the prior on the first training window."
 - **The impersonal third person names what the library does.** "`prices_to_returns` carries every
   gap into the returns."
+
+**Three rules of this file read a page a reader runs, and a text with no cells is outside them.**
+They are `we` for the page's cells, *A paragraph carries one job* below, and *The page's furniture*
+below. `you` for the reader and the impersonal third person for the library hold on every text this
+file governs, and so does every other rule here.
 
 ---
 
@@ -78,8 +96,8 @@ batch run to the bit, by construction."
 
 ## A paragraph carries one job
 
-A paragraph between two cells says what the next cell does, or what the last output shows. It
-restates neither the code nor the number the cell prints.
+This section reads a page a reader runs. A paragraph between two cells says what the next cell
+does, or what the last output shows. It restates neither the code nor the number the cell prints.
 
 A page carries no word band. A page is long because it covers more ground, and the paragraph rule
 is what keeps it from being long because it repeats itself.
@@ -88,8 +106,8 @@ is what keeps it from being long because it repeats itself.
 
 ## The page's furniture
 
-Three elements are permitted on any page, expected on a long one with many sections, and required
-on none.
+This section reads a page a reader runs. Three elements are permitted on any such page, expected on
+a long one with many sections, and required on none.
 
 - The `!!! tip "When to reach for this"` admonition under the H1, which says when a reader reaches
   for the estimator and what to reach for instead.
@@ -101,10 +119,40 @@ A short page carries none of them and is complete without.
 
 ---
 
+## What the rule does not read
+
+**Derived text.** The rule reads written prose. A text that a script derives, or that another
+census holds to a shape, is outside it, because two gates over one line disagree sooner or later.
+Two such texts exist, and a page's path tells them apart, as
+[`test/test_64_docs_page_metadata_census.jl`](../../test/test_64_docs_page_metadata_census.jl)
+already does:
+
+- **The H1 of a mirror page** under `docs/src/public_api/` or `docs/src/private_api/`, whose shape
+  ADR 0128 fixes and which ends in `: public API` or `: private API`.
+- **The `Description` line of a mirror page**, which `docs/page_metadata.jl` derives from the names
+  the page hosts, and which
+  [`test/test_64_docs_page_metadata_census.jl`](../../test/test_64_docs_page_metadata_census.jl)
+  fails when it drifts from that derivation.
+
+The `Description` line of a Literate page and of a hand-written page is written prose, and the rule
+reads it.
+
+**Generated pages.** `docs/src/examples/**`, `docs/src/user_guide/**`,
+`docs/src/capability_catalogue.md` and `docs/src/TypeHierarchy.md` are written by the docs build
+and are not in the tree. Their sources are the Literate files and `docs/capability_catalogue.jl`,
+and a defect in one is fixed at its source.
+
+**Markup and code.** A `#src` line, which is an authoring note and not a rendered page, and which
+the process-citation census skips for the same reason. A line of Julia. A `##` comment in a
+Literate source, which renders inside a code cell. A fenced code block, an `@docs` block, an inline
+code span, an inline LaTeX expression, and the target of a markdown link.
+
+---
+
 ## The Gate
 
 [`test/test_72_literate_prose_census.jl`](../../test/test_72_literate_prose_census.jl) reads the
-prose of every file this file governs and holds each page to its row in
+prose of the Literate sources and holds each page to its row in
 [`code_health/literate_prose_baseline.toml`](../../code_health/literate_prose_baseline.toml). A
 count may fall and may not rise. A page whose count stands above its row fails, a page with a count
 above zero and no row fails, and a page whose every count is zero carries no row, so the baseline
@@ -112,6 +160,10 @@ empties as the pages are rewritten. The reader is
 [`code_health/literate_prose.jl`](../../code_health/literate_prose.jl), which the census includes
 rather than copies. The rules the census cannot read hold by review, in the sense of
 [`STANDARDS.md`](../../STANDARDS.md).
+
+**The census reads the Literate sources alone today.** The other three corpora hold by review until
+the build ticket of ADR 0171 widens the reader, the store and the census to them, and
+[`STANDARDS.md`](../../STANDARDS.md) records that part as unenforced until it lands.
 
 **What it counts.** One column per rule, named in the row: `emdash` and `endash` for rule 13,
 `curly` for rule 19, `notjust` for rule 9, `aivocab` for rule 7, `fancy_is` for rule 8, `filler`
@@ -122,7 +174,7 @@ without "features". Rule 26 is read without "vector", "surface", "primitive", "h
 bold terms of [`CONTEXT.md`](../../CONTEXT.md) in their capitalised form, read off that file at
 every run so the list never goes stale, and `mechanism` counts the strings of *A page names a type
 by its identifier and a concept in plain words*. `verdict` counts the strings of *A check is a
-number the reader reads, never a verdict*. `words` records the prose word count of the page and
+number the reader reads, never a verdict*. `words` records the prose word count of the text and
 carries no limit.
 
 **Why those words are exempt.** This library writes "the expected returns vector", "a Pareto
@@ -130,20 +182,14 @@ surface", "a feature matrix" and "a leveraged portfolio", and each of those is t
 the rule asks for. The rules still hold on the other sense, and a reader applies them, as rules 10,
 11, 27, 28 and 32 and the self-audit are applied.
 
-**What it does not read.** A `#src` line, which is an authoring note and not a rendered page, and
-which the process-citation census skips for the same reason. A line of Julia, a `##` comment, which
-renders inside a code cell, a fenced code block, an inline code span, an inline LaTeX expression
-and the target of a markdown link. The `Description` line of a ` ```@meta ` block is prose and is
-read.
-
-**Scanning one page.** Run
+**Scanning one file.** Run
 
 ```bash
 julia --project=code_health code_health/literate_prose.jl scan <file>...
 ```
 
-before and after a rewrite. It prints each page's counts and the row the baseline would carry for
-it, and it measures and writes nothing else. Paste that row into the baseline for the pages you
-rewrote, and delete the row of a page whose counts all reached zero. Do not run `refresh`, which
+before and after a rewrite. It prints each file's counts and the row the baseline would carry for
+it, and it measures and writes nothing else. Paste that row into the baseline for the files you
+rewrote, and delete the row of a file whose counts all reached zero. Do not run `refresh`, which
 writes the whole file: rewrite tickets run in parallel, and two sessions that each write the whole
 file lose one of the two writes.

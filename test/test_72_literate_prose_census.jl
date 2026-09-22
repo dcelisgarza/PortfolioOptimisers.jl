@@ -1,6 +1,6 @@
 #=
 The prose of an example or a user-guide page is written for a reader, and
-`.github/instructions/julia-literate-prose.instructions.md` states what it must do. Part of that
+`.github/instructions/julia-prose.instructions.md` states what it must do. Part of that
 rule is a list: a character, a word, a phrase, a heading shape. A list is read by a parser, and a
 rule a parser reads is a rule a review does not have to hold in its head.
 
@@ -222,7 +222,7 @@ end
             println("    ", P.row_text(page, row))
         end
         if !isempty(risen)
-            println("A counted rule of .github/instructions/julia-literate-prose.instructions.md ",
+            println("A counted rule of .github/instructions/julia-prose.instructions.md ",
                     "rose on $(length(risen)) page(s). A count may fall and may not rise. Rewrite ",
                     "the prose, or paste the printed row when a count fell elsewhere on the page.")
         end
