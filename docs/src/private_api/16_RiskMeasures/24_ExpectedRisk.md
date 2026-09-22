@@ -7,6 +7,7 @@ Description = "Expected Risk, private API of PortfolioOptimisers.jl: MatNum_Pr, 
 ```@docs
 MatNum_Pr
 RkRatioRM
+missing_returns_carrier_message
 resolve_risk_inputs
 original_returns
 resolve_factor_risk_inputs

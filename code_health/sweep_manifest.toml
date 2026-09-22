@@ -277,7 +277,7 @@
 "src/16_RiskMeasures/21_MedianAbsoluteDeviationRisk.jl" = { map = 9, units = 12, swept = false }
 "src/16_RiskMeasures/22_NonOptimisationRiskMeasures.jl" = { map = 9, units = 10, swept = false }
 "src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { map = 9, units = 6, swept = false }
-"src/16_RiskMeasures/24_ExpectedRisk.jl" = { map = 9, units = 26, swept = false }
+"src/16_RiskMeasures/24_ExpectedRisk.jl" = { map = 9, units = 27, swept = false }
 "src/16_RiskMeasures/25_RiskMeasureTools.jl" = { map = 9, units = 7, swept = false }
 "src/17_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 126, swept = false }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 69, swept = false }
@@ -288,7 +288,7 @@
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { map = 12, units = 1, swept = false }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { map = 12, units = 6, swept = false }
 "src/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { map = 12, units = 2, swept = false }
-"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { map = 12, units = 19, swept = false }
+"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { map = 12, units = 21, swept = false }
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { map = 12, units = 3, swept = false }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { map = 12, units = 2, swept = false }
 "src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { map = 12, units = 3, swept = false }

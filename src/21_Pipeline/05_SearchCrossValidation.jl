@@ -246,8 +246,12 @@ function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation
             # sequence, through the same loop every other entry point runs.
             local predictions = cross_val_predict(pipei, data, scheme;
                                                   ex = FLoops.SequentialEx())
-            write_candidate_scores!(test_scores, train_scores, i, predictions, rows, r, sgn,
-                                    gscv.kwargs)
+            # The window is `nothing` here: a Pipeline's steps transform the data per
+            # fold, so the returns the optimiser was handed are not the returns the split
+            # names. See [`candidate_train_score`](@ref), whose `Nothing` arm scores
+            # through the carrier, which is what every arm did before.
+            write_candidate_scores!(test_scores, train_scores, i, predictions, rows,
+                                    nothing, r, sgn, gscv.kwargs)
         end
     end
     opt_idx = finite_candidate_index(gscv.scorer, test_scores)
@@ -310,7 +314,8 @@ function search_cross_validation(pipe::Pipeline,
         if gscv.train_score
             for (p, path) in enumerate(predictions.pred)
                 for (j, fp) in enumerate(path.pred)
-                    train_scores[p][j, i] = sgn * expected_risk(r, fp.res; gscv.kwargs...)
+                    train_scores[p][j, i] = sgn * candidate_train_score(r, fp.res, nothing,
+                                                                        gscv.kwargs)
                 end
             end
         end

@@ -107,7 +107,15 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     else
         nothing
     end
-    let opt = opt, test_scores = test_scores, train_scores = train_scores
+    # One view per fold, built once for the whole search rather than per candidate. It is
+    # read only for a result that carries no carrier of its own; see
+    # [`candidate_train_score`](@ref).
+    train_X = if gscv.train_score
+        [fold_train_returns(cv, rd, k) for k in eachindex(cv.train_idx)]
+    else
+        nothing
+    end
+    let opt = opt, test_scores = test_scores, train_scores = train_scores, train_X = train_X
         FLoops.@floop gscv.ex for (i, (lenses, vals)) in
                                   enumerate(zip(lens_grid, val_grid))
             local opti = opt
@@ -118,8 +126,8 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
             # sequence, through the same loop every other entry point runs.
             local predictions = fit_and_predict(opti, rd, scheme;
                                                 ex = FLoops.SequentialEx())
-            write_candidate_scores!(test_scores, train_scores, i, predictions, rows, r, sgn,
-                                    gscv.kwargs)
+            write_candidate_scores!(test_scores, train_scores, i, predictions, rows,
+                                    train_X, r, sgn, gscv.kwargs)
         end
     end
     opt_idx = finite_candidate_index(gscv.scorer, test_scores)
@@ -181,6 +189,20 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     else
         nothing
     end
+    # A combinatorial `path_ids` is a matrix, one row per test block of a fold, so a path's
+    # entries are Cartesian and the fold is the **column**. The folds of a path arrive in
+    # that order, measured against `res.pr.X` of each prediction. `train_X` is read only for
+    # a result that carries no carrier of its own; see [`candidate_train_score`](@ref).
+    path_folds = if gscv.train_score
+        [[I[2] for I in findall(==(p), cv.path_ids)] for p in 1:M]
+    else
+        nothing
+    end
+    train_X = if gscv.train_score
+        [fold_train_returns(cv, rd, k) for k in eachindex(cv.train_idx)]
+    else
+        nothing
+    end
     for (i, (lenses, vals)) in enumerate(zip(lens_grid, val_grid))
         opti = opt
         for (lens, val) in zip(lenses, vals)
@@ -192,8 +214,10 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
         test_scores[:, i] = sgn * expected_risk(r, predictions; gscv.kwargs...)
         if gscv.train_score
             for (p, path) in enumerate(predictions.pred)
-                train_scores[p][:, i] = [sgn * expected_risk(r, fp.res; gscv.kwargs...)
-                                         for fp in path.pred]
+                train_scores[p][:, i] = [sgn * candidate_train_score(r, fp.res,
+                                                                     train_X[path_folds[p][t]],
+                                                                     gscv.kwargs)
+                                         for (t, fp) in enumerate(path.pred)]
             end
         end
     end

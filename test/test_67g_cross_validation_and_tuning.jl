@@ -7,7 +7,7 @@ the head: every splitting scheme, both searches, and both kinds of time dependen
 is the library's only optimiser whose read-out is its own recursion (ADR 0155) and whose
 Result carries no carrier (ADR 0158), so each seam is asserted rather than assumed.
 
-Six groups:
+Seven groups:
 
  1. every scheme the library ships reaches the head, batch and stepped alike;
  2. `MultipleRandomised` crosses an asset subset with the stepped walk-forward, and the
@@ -19,7 +19,8 @@ Six groups:
  5. a learning-rate schedule varies the rate per period, which is the family's own time
     dependence (ADR 0165);
  6. the downstream readers — `Resume`, `performance_summary` and `log_wealth_regret` —
-    consume a stepped run.
+    consume a stepped run;
+ 7. a search scores the head in sample, over every arm that writes a train score (#1240).
 =#
 
 @testset "Online portfolio selection: cross-validation and tuning" begin
@@ -212,5 +213,82 @@ Six groups:
         reg = log_wealth_regret(one, bah)
         @test isa(reg, LogWealthRegretResult)
         @test length(reg.difference) == length(one.mrd.X)
+    end
+
+    @testset "7. A search scores the head in sample (#1240)" begin
+        # The head is the library's only optimiser whose Result carries no carrier (ADR
+        # 0155 rules `pr = nothing` in both arms), so the train score had no returns to
+        # read and every `train_score = true` search raised a `MethodError`. The search now
+        # hands the fold its own training window, which is the same data every other head
+        # keeps on `res.pr`.
+        r = MeanReturn(; flag = true)
+        for cv in (IndexWalkForward(20, 5), KFold(; n = 3),
+                   IndexWalkForward(20, 5; expand_train = true), OnlineIndexWalkForward(20, 5))
+            res = search_cross_validation(eg(),
+                                          GridSearchCrossValidation(["alg.eta" =>
+                                                                         [0.05, 0.2]];
+                                                                    cv = cv, r = r,
+                                                                    train_score = true), rd)
+            @test isa(res.train_scores, Matrix)
+            @test size(res.train_scores) == size(res.test_scores)
+            @test all(isfinite, res.train_scores)
+        end
+
+        # A randomised asset path draws a subset per fold, so the window is taken at the
+        # fold's own columns as well as its own rows.
+        mr = search_cross_validation(eg(),
+                                     GridSearchCrossValidation(["alg.eta" => [0.05, 0.2]];
+                                                               cv = MultipleRandomised(IndexWalkForward(20,
+                                                                                                        5);
+                                                                                       subset_size = 3,
+                                                                                       n_subsets = 2,
+                                                                                       seed = 1),
+                                                               r = r, train_score = true),
+                                     rd)
+        @test all(isfinite, mr.train_scores)
+
+        # The combinatorial arm keeps one matrix per recombined path, and its folds are
+        # read off the columns of a matrix-shaped `path_ids`.
+        cb = search_cross_validation(eg(),
+                                     GridSearchCrossValidation(["alg.eta" => [0.05, 0.2]];
+                                                               cv = CombinatorialCrossValidation(;
+                                                                                                 n_folds = 5,
+                                                                                                 n_test_folds = 2),
+                                                               r = r, train_score = true),
+                                     rd)
+        @test isa(cb.train_scores, Vector{<:Matrix})
+        @test all(m -> all(isfinite, m), cb.train_scores)
+
+        # The randomised search forwards to the grid search, so it scores in sample too.
+        rs = search_cross_validation(eg(),
+                                     RandomisedSearchCrossValidation(["alg.eta" =>
+                                                                          [0.05, 0.1, 0.2]];
+                                                                     cv = IndexWalkForward(20,
+                                                                                           5),
+                                                                     r = r, n_iter = 2,
+                                                                     seed = 1,
+                                                                     train_score = true),
+                                     rd)
+        @test all(isfinite, rs.train_scores)
+
+        # The window handed in is the fold's own, not the whole panel: the score of the
+        # first fold equals the risk of that fold's weights over rows 1:20 alone.
+        cv = IndexWalkForward(20, 5)
+        sp = split(cv, rd)
+        pd = cross_val_predict(eg(), rd, cv)
+        one = search_cross_validation(eg(),
+                                      GridSearchCrossValidation(["alg.eta" => [0.05]];
+                                                                cv = cv, r = r,
+                                                                train_score = true), rd)
+        @test one.train_scores[1, 1] ==
+              expected_risk(r, pd.pred[1].res, view(rd.X, sp.train_idx[1], :))
+
+        # A value-level caller who hands no carrier in is refused by name rather than by a
+        # `MethodError`, and the same call with a carrier answers.
+        res1 = optimise(eg(), rd)
+        @test isnothing(res1.pr)
+        @test_throws IsNothingError expected_risk(r, res1)
+        @test_throws IsNothingError expected_risk(ConditionalValueatRisk(), res1)
+        @test isfinite(expected_risk(r, res1, rd.X))
     end
 end

@@ -42,6 +42,8 @@ For a leaf measure, the generic entry consults [`risk_input_kind`](@ref) and dis
   - [`WeightsReturnsFeesInput`](@ref): calls `r(w, X, fees)`.
   - [`WeightsInput`](@ref): calls `r(w)` (ignores `X` and `fees`).
 
+The first two kinds read a return series, so a `nothing` carrier is refused by name through [`IsNothingError`](@ref), and the message states the four ways out. The third reads none, so a carrier-free call to it answers. The refusal is what a caller meets who takes the result-based entry below on a result that carries no carrier of its own, which is every optimiser whose fit reads no returns to keep.
+
 These are the constant-weight methods: the one vector `w` weighs every observation. The `w::MatNum` methods below read a **weight path** instead, one row of weights per observation, which is what a fold scored under a Weight Drift held. The weight argument's type is the picker, so a vector reads one target and a matrix reads a path.
 
 Composite and container forms keep explicit methods:
@@ -85,11 +87,36 @@ The prior-taking methods therefore reduce the prior, the weights and the fees on
   - [`resolve_risk_inputs`](@ref)
   - [`assert_resolved_slots`](@ref)
   - [`assert_calibrated_slots`](@ref)
+  - [`IsNothingError`](@ref)
 """
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, args...; kwargs...)
     assert_resolved_slots(r)
     assert_calibrated_slots(r)
     return expected_risk(risk_input_kind(r), r, w, args...; kwargs...)
+end
+"""
+    missing_returns_carrier_message(r::AbstractBaseRiskMeasure)
+
+The message a returns-reading measure is refused a `nothing` carrier with.
+
+Written once, because the refusal is taken at two doors — a single weight target and a weight path — and a message restated at each would drift. It names the measure and the four calls that carry a carrier, two off a weight vector and two off an [`OptimisationResult`](@ref).
+
+# Arguments
+
+  - `r`: The measure that was given no carrier.
+
+# Returns
+
+  - `msg::String`: The refusal message.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`IsNothingError`](@ref)
+  - [`risk_input_kind`](@ref)
+"""
+function missing_returns_carrier_message(r::AbstractBaseRiskMeasure)
+    return "`$(nameof(typeof(r)))` is evaluated on a return series, and no returns carrier was given. Either the call named none, or the result it was taken from carries none of its own. Pass one: `expected_risk(r, w, X)` or `expected_risk(r, res, X)` for a returns matrix, `expected_risk(r, w, pr)` or `expected_risk(r, res, pr)` for a prior result."
 end
 """
     expected_risk(rs::VecBaseRM, w::VecNum, args...; sca::Scalariser = SumScalariser(),
@@ -136,6 +163,18 @@ end
 function expected_risk(::WeightsInput, r::AbstractBaseRiskMeasure, w::VecNum, args...;
                        kwargs...)
     return r(w)
+end
+# The two kinds above read a return series, so a `nothing` carrier reaches no method of
+# theirs. The call that lands here is the documented `expected_risk(r, res)` on a result
+# that carries no carrier of its own: `result_investable_view` falls back to `res.pr`, and
+# `nothing` arrives as `X`. Without this method that call raised a `MethodError` naming the
+# kind singleton, which names neither the measure nor the missing argument. It is refused by
+# name on the same terms as an unstated slot, and it states the ways out. `WeightsInput` is
+# absent: it reads no series, so its `args...` method already answers a carrier-free call.
+function expected_risk(::Union{<:NetReturnsInput, <:WeightsReturnsFeesInput},
+                       r::AbstractBaseRiskMeasure, w::VecNum, X::Nothing = nothing,
+                       fees::Option{<:Fees} = nothing; kwargs...)
+    return throw(IsNothingError(missing_returns_carrier_message(r)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -425,6 +464,13 @@ end
 function expected_risk(::WeightsInput, r::AbstractBaseRiskMeasure, w::MatNum, args...;
                        kwargs...)
     return throw(ArgumentError("`$(typeof(r))` declares `WeightsInput`, so its kernel reads `w` as one cross-section of weights and is called as `r(w)`. A `w::MatNum` is a weight path, one row of weights per observation, which is a different quantity and not a wider input to that kernel.\nScore this measure against the target weight vector, `w::VecNum`, which is the first row of the path.\nGot\nsize(w) => $(size(w))"))
+end
+# The carrier-free refusal of the `VecNum` block, for a weight path. Only `NetReturnsInput`
+# needs it: the other two kinds refuse **any** path above, through an `args...` method that
+# a carrier-free call already reaches, and that refusal is the more fundamental one.
+function expected_risk(::NetReturnsInput, r::AbstractBaseRiskMeasure, w::MatNum,
+                       X::Nothing = nothing, fees::Option{<:Fees} = nothing; kwargs...)
+    return throw(IsNothingError(missing_returns_carrier_message(r)))
 end
 # The three ratio composites split by type for the same reason their `VecNum` twins do:
 # `NonOptimisationRiskRatio` names `sca1` and `sca2`, and `RiskRatio` carries neither.

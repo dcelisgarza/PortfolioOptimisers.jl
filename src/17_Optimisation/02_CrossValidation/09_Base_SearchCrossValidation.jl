@@ -657,10 +657,87 @@ function score_rows(cvr::MultipleRandomisedResult)
     end
 end
 """
+    fold_train_returns(cv::CrossValidationResult, rd::ReturnsResult, k::Integer)
+    fold_train_returns(cv::MultipleRandomisedResult, rd::ReturnsResult, k::Integer)
+
+View out of `rd` the returns that fold `k` of `cv` was fitted on.
+
+The rows are the fold's own `train_idx`. The columns are every asset, except under a [`MultipleRandomised`](@ref), whose folds each run on a drawn subset of the universe and which records that subset on `asset_idx`. So the view is the returns the fold's own `optimise` call was handed, which is what an optimiser that keeps its carrier stores on the result's `pr`: measured over the eleven schemes the library ships, `res.pr.X` of a fold equals this view element for element.
+
+[`candidate_train_score`](@ref) reads it, and only for a result that carries no carrier of its own.
+
+# Arguments
+
+  - `cv`: The search's split.
+  - `rd`: The returns the search ran over.
+  - `k`: The fold's index into `cv.train_idx`.
+
+# Returns
+
+  - `X::SubArray`: The fold's training returns.
+
+# Related
+
+  - [`candidate_train_score`](@ref)
+  - [`write_candidate_scores!`](@ref)
+  - [`MultipleRandomised`](@ref)
+  - [`search_cross_validation`](@ref)
+"""
+function fold_train_returns(cv::CrossValidationResult, rd::ReturnsResult, k::Integer)
+    return view(rd.X, cv.train_idx[k], :)
+end
+function fold_train_returns(cv::MultipleRandomisedResult, rd::ReturnsResult, k::Integer)
+    return view(rd.X, cv.train_idx[k], cv.asset_idx[k])
+end
+"""
+    candidate_train_score(r, res::OptimisationResult, X::MatNum, kwargs)
+    candidate_train_score(r, res::OptimisationResult, X::Nothing, kwargs)
+
+Score a fold's fitted result over its own training sample.
+
+A result that carries a carrier is scored through it, so the figure resolves the measure exactly as the fit did: an unstated slot falls back to the carrier's own field, and a **Deferred Quantity** is fitted. This is the call the search has always made, and it is kept for every such result, because a bare matrix would opt out of that resolution and would refuse a measure like [`Variance`](@ref) whose `sigma` the carrier fills.
+
+A result that carries **none** is scored over `X`, the fold's own training returns from [`fold_train_returns`](@ref). Before this the fallback yielded `nothing` and the call raised a `MethodError`, so no such result could be scored at all — which is every optimiser whose fit reads no returns to keep, the online portfolio selection family first among them.
+
+`X` is `nothing` where the search holds no trustworthy window, which today is the [`Pipeline`](@ref)'s own search alone: its steps transform the data per fold, so the returns the optimiser was handed are not the returns the split names, and a selector narrows the universe by a rule the split does not record. That arm therefore scores through the carrier whatever the result holds, which is what every arm did before, and a carrier-free result under a Pipeline still meets the refusal.
+
+A result that exposes no `pr` property at all keeps the refusal [`extract_pr`](@ref) already gave it.
+
+# Arguments
+
+  - `r`: The risk measure the search scores with.
+  - `res`: The fold's fitted result.
+  - `X`: The fold's training returns, or `nothing` where the search holds none.
+  - `kwargs`: The keyword arguments forwarded to [`expected_risk`](@ref).
+
+# Returns
+
+  - `score::Real`: The result's risk over its own training sample.
+
+# Related
+
+  - [`fold_train_returns`](@ref)
+  - [`write_candidate_scores!`](@ref)
+  - [`expected_risk`](@ref)
+  - [`extract_pr`](@ref)
+"""
+function candidate_train_score(r, res::OptimisationResult, X::MatNum, kwargs)
+    return if hasproperty(res, :pr) && isnothing(res.pr)
+        expected_risk(r, res, X; kwargs...)
+    else
+        expected_risk(r, res; kwargs...)
+    end
+end
+function candidate_train_score(r, res::OptimisationResult, ::Nothing, kwargs)
+    return expected_risk(r, res; kwargs...)
+end
+"""
     write_candidate_scores!(test_scores::MatNum, train_scores::Option{<:MatNum}, i::Integer,
-                            predictions::MultiPeriodPredictionResult, rows, r, sgn, kwargs)
+                            predictions::MultiPeriodPredictionResult, rows, train_X, r, sgn,
+                            kwargs)
     write_candidate_scores!(test_scores::MatNum, train_scores::Option{<:MatNum}, i::Integer,
-                            predictions::PopulationPredictionResult, rows, r, sgn, kwargs)
+                            predictions::PopulationPredictionResult, rows, train_X, r, sgn,
+                            kwargs)
 
 Write the per-fold scores of candidate `i` into column `i` of a search's score matrices.
 
@@ -673,6 +750,7 @@ The candidate's predictions are what [`fit_and_predict`](@ref) returned over the
   - `i`: The candidate's column.
   - `predictions`: The candidate's predictions over the scheme.
   - `rows`: The rows the predictions fill, from [`score_rows`](@ref).
+  - `train_X`: One training view per fold, from [`fold_train_returns`](@ref), indexed by the same row the scores are written at, or `nothing` when the search records no train score.
   - `r`: The risk measure the search scores with.
   - `sgn`: The sign that orients `r` so that higher is better.
   - `kwargs`: The keyword arguments forwarded to [`expected_risk`](@ref).
@@ -680,6 +758,8 @@ The candidate's predictions are what [`fit_and_predict`](@ref) returned over the
 # Related
 
   - [`score_rows`](@ref)
+  - [`fold_train_returns`](@ref)
+  - [`candidate_train_score`](@ref)
   - [`search_cross_validation`](@ref)
   - [`expected_risk`](@ref)
   - [`bigger_is_better`](@ref)
@@ -687,21 +767,25 @@ The candidate's predictions are what [`fit_and_predict`](@ref) returned over the
 """
 function write_candidate_scores!(test_scores::MatNum, train_scores::Option{<:MatNum},
                                  i::Integer, predictions::MultiPeriodPredictionResult, rows,
-                                 r, sgn, kwargs)
+                                 train_X, r, sgn, kwargs)
     for (j, p) in zip(rows, predictions.pred)
         test_scores[j, i] = sgn * expected_risk(r, p; kwargs...)
         if !isnothing(train_scores)
-            train_scores[j, i] = sgn * expected_risk(r, p.res; kwargs...)
+            # A whole `train_X` of `nothing` is a caller that holds no trustworthy window
+            # for any fold, not a fold without one, so it is read before the index rather
+            # than through it.
+            X = isnothing(train_X) ? nothing : train_X[j]
+            train_scores[j, i] = sgn * candidate_train_score(r, p.res, X, kwargs)
         end
     end
     return nothing
 end
 function write_candidate_scores!(test_scores::MatNum, train_scores::Option{<:MatNum},
                                  i::Integer, predictions::PopulationPredictionResult, rows,
-                                 r, sgn, kwargs)
+                                 train_X, r, sgn, kwargs)
     for (path, path_rows) in zip(predictions.pred, rows)
-        write_candidate_scores!(test_scores, train_scores, i, path, path_rows, r, sgn,
-                                kwargs)
+        write_candidate_scores!(test_scores, train_scores, i, path, path_rows, train_X, r,
+                                sgn, kwargs)
     end
     return nothing
 end
