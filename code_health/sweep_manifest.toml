@@ -4,7 +4,12 @@
 #   map    the child map of #404 that owns the file. `[map]` below names the thirteen.
 #   units  the file's count of documented units. `test/test_45_sweep_census.jl` holds the
 #          definition and the three checks that read this file.
-#   swept  whether the file has passed its child map's three-condition sweep.
+#   swept  whether the file has passed the first three conditions of its child map's sweep: its
+#          documentation states the mathematics, its code agrees with that statement, and its
+#          lines are covered or exempted. The fourth condition, that its prose passes `/unslop`,
+#          is carried by the file's sweep ticket and moves this flag neither way. The flag arms
+#          the gates of the docstring standard, so a swept file keeps it while its prose is
+#          re-read.
 #
 # A row whose `swept` is true carries two more keys:
 #

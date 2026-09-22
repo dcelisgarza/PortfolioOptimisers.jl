@@ -77,8 +77,10 @@ order the file needs. `test/test_47_alias_and_module_census.jl` demands exactly 
 
 **A file whose row reads `swept = true` is held to the swept standard now.** Its addition owes a
 `# Algorithm` section where the docstring standard demands one, no `# Details` section, a `Where:`
-bullet that interpolates `math_dict` rather than copying it, and `# Related` on a dispatch alias.
-`test/test_26_docs.jl` holds all four, and it holds the row's `algorithm` count as a floor. Raise
+bullet that interpolates `math_dict` rather than copying it, `# Related` on a dispatch alias, and
+prose that passes `/unslop`.
+`test/test_26_docs.jl` holds the first four and no gate holds the pass, which holds by review. The
+test also holds the row's `algorithm` count as a floor. Raise
 that count in the same commit when the new unit carries the section.
 
 **A new file has no coverage row yet.** The gate ratchets `misses` per file, so a file with no row

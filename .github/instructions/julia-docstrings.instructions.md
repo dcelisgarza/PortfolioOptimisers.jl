@@ -193,6 +193,27 @@ The rule's Scope is every page a library user reaches without opening `docs/adr/
 
 ---
 
+## The prose passes `/unslop`
+
+The prose of a docstring reads as a person wrote it for a reader. The `unslop` skill states the patterns that mark generated text, and every rule of the skill holds on the prose in this section's Scope. **The skill is the Authority for the patterns.** This section cites it by name, copies none of its rules, and names a rule of the skill by the number the skill gives it.
+
+**Scope.** The docstrings of `src/**/*.jl` and `ext/**/*.jl`, the dictionary values of [`src/01_Base/01_DocstringDictionaries.jl`](../../src/01_Base/01_DocstringDictionaries.jl) that they interpolate, and the hand-written Markdown pages under `docs/src/` outside `docs/src/contribute/`. The Literate sources of the examples and the user guide, and the `Prose` text of the Capability Catalogue, are outside this section.
+
+**What the pass reads.** The prose alone: the summary paragraph, the sentences of every section, the text of every bullet and of every admonition. It does not read a code span, a `jldoctest` block, a LaTeX expression, a heading a template of this file fixes, or a `# References` bullet, which `ref_dict` writes.
+
+**Where this file and the skill meet.**
+
+- A template of this file fixes the shape of a section, and the skill's rules apply to the sentences inside it. A `# Fields` bullet, a `Where:` bullet and a `# Related` entry are list entries by template. Rule 33 asks each to carry its articles and its verb, and it does not ask it to become a paragraph.
+- A dictionary value is one text with many users. It is rewritten once, in its dictionary, and every docstring that interpolates it changes with it.
+- Rules 20 and 22 describe a chat reply. They never arise in a docstring.
+- Every other rule applies as written.
+
+**How to apply it.** Invoke `/unslop` on the file. When the skill cannot be invoked, read its rules and apply them by hand. Rewrite the prose, keep the meaning, and end with the skill's self-audit, "What makes this obviously AI generated?". A pass changes prose alone: a line of code, a `jldoctest` block and its output, a LaTeX expression and an interpolated key stay as they are.
+
+**The Gate.** None. The rules that matter most, such as rules 27, 28 and 32, are judgements that no parser reads, so the rule holds by review, in the sense of [`STANDARDS.md`](../../STANDARDS.md). A file whose sweep-manifest row reads `swept = true` owes the pass, and the file's sweep ticket carries it.
+
+---
+
 ## Section Structure for Types (abstract and concrete)
 
 ### Abstract types
