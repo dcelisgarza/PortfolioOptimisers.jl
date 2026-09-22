@@ -1039,6 +1039,8 @@ A cross-validator whose training set contains its test row by design: fold `t` t
 
 The scheme is a walk-forward in every other respect: its folds are a timeline, it carries the Weight Drift, the Previous-Weights Source, the Fee Clock and the two flags of [`IndexWalkForward`](@ref), and [`fold_evaluation`](@ref) reads them. Its online form is [`OnlineHindsightSplit`](@ref), the prefix split under which the training windows are nested and the loop steps; the row-alone split has none.
 
+A fold can train on one row: every fold of the row-alone split does, and so does the first fold of the prefix split at `start = 1`. The corrected covariance of one row is `NaN`, so a JuMP estimator under the default [`EmpiricalPrior`](@ref) throws there, in the `Posdef` step of its [`MatrixProcessing`](@ref). A comparator whose programme reads no covariance, such as [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref), fits one row under a prior that takes the uncorrected covariance and skips that step, `EmpiricalPrior(; ce = PortfolioOptimisersCovariance(; ce = Covariance(; ce = GeneralCovariance(; ce = StatsBase.SimpleCovariance())), mp = MatrixProcessing(; pdm = nothing)))`. The covariance of one row is then the zero matrix, and the log-optimal programme does not read it. [`BestConstantRebalancedPortfolio`](@ref) fits no prior and needs none of this.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)

@@ -6,7 +6,7 @@ fields of `LogWealthRegretResult`, and the benchmark and turnover fields of
 and be-the-leader collapses onto the static comparator.
 =#
 @testset "Hindsight split and the dynamic-regret surface" begin
-    using PortfolioOptimisers, Test, LinearAlgebra, Statistics, Dates, Clarabel
+    using PortfolioOptimisers, Test, LinearAlgebra, Statistics, StatsBase, Dates, Clarabel
     po = PortfolioOptimisers
     # A prediction result over a bare return series, on the timestamps handed in, with the
     # weights and names a fold would carry.
@@ -101,6 +101,32 @@ and be-the-leader collapses onto the static comparator.
         @test btl_mr.mrd.ts == ts3[2:3]
         @test isapprox(btl_mr.pred[1].res.w, u[2]; atol = 1e-4)
         @test isapprox(btl_mr.pred[2].res.w, u[3]; atol = 1e-4)
+        # From the first row, the default prior's corrected covariance of one row is `NaN`
+        # and its `Posdef` step throws. The prior the docstring of `HindsightSplit` names
+        # fits one row, and the leader is then the same from row 1, and row by row. The
+        # interior leader of row 2 lands `1.1e-4` in norm from `23 / 44` at Clarabel's
+        # default tolerance.
+        @test_throws ArgumentError cross_val_predict(bcrp_mr, rd3, HindsightSplit())
+        pe1 = EmpiricalPrior(;
+                             ce = PortfolioOptimisersCovariance(;
+                                                                ce = Covariance(;
+                                                                                ce = GeneralCovariance(;
+                                                                                                       ce = StatsBase.SimpleCovariance())),
+                                                                mp = MatrixProcessing(;
+                                                                                      pdm = nothing)))
+        bcrp_mr1 = MeanRisk(;
+                            opt = JuMPOptimiser(; pe = pe1, slv = slv,
+                                                ret = LogarithmicReturn()),
+                            obj = MaximumReturn())
+        btl_mr1 = cross_val_predict(bcrp_mr1, rd3, HindsightSplit())
+        @test btl_mr1.mrd.ts == ts3
+        @test isapprox(btl_mr1.pred[1].res.w, [1.0, 0.0]; atol = 1e-4)
+        @test isapprox(btl_mr1.pred[2].res.w, [23 / 44, 21 / 44]; atol = 2e-4)
+        @test isapprox(btl_mr1.pred[3].res.w, [1.0, 0.0]; atol = 1e-4)
+        pp_mr1 = cross_val_predict(bcrp_mr1, rd3, HindsightSplit(; prefix = false))
+        @test isapprox(pp_mr1.pred[1].res.w, [1.0, 0.0]; atol = 1e-4)
+        @test isapprox(pp_mr1.pred[2].res.w, [0.0, 1.0]; atol = 1e-4)
+        @test isapprox(pp_mr1.pred[3].res.w, [1.0, 0.0]; atol = 1e-4)
         # The per-period minimiser: one-hot on each row's best asset, wealth Π_t max_i x_t,i,
         # path length 2√2 for two switches between corners.
         pp = cross_val_predict(best_stock, rd3, HindsightSplit(; prefix = false))
