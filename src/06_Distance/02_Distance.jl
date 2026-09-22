@@ -337,7 +337,9 @@ A [`CanonicalDistance`](@ref) `de` takes one step first: it rebuilds `de` with [
 """
 function distance(de::Distance{<:Any, <:RhoDistanceAlgorithm},
                   ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
-    return _dist_from_cor(de.alg, de.power, Statistics.cor(ce, X; dims = dims, kwargs...))
+    return _dist_from_cor(de.alg, de.power,
+                          Statistics.cor(library_covariance_estimator(ce), X; dims = dims,
+                                         kwargs...))
 end
 function distance(de::Distance{<:Any, <:CanonicalDistance},
                   ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
@@ -520,14 +522,14 @@ Which of the three routes runs is decided by `de.alg`.
 function cor_and_dist(de::Distance{<:Any, <:RhoDistanceAlgorithm},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                       kwargs...)
-    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(library_covariance_estimator(ce), X; dims = dims, kwargs...)
     return rho, _dist_from_cor(de.alg, de.power, rho)
 end
 function cor_and_dist(de::Distance{<:Any, <:VariationInfoDistance},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                       kwargs...)
     assert_dims(dims)
-    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(library_covariance_estimator(ce), X; dims = dims, kwargs...)
     return rho, distance(de, ce, X; dims = dims, kwargs...)
 end
 function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance}, ce::MutualInfoCovariance,

@@ -663,7 +663,7 @@ Two consequences of the form bound where it is usable.
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
-    sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
+    sigma = Statistics.cov(library_covariance_estimator(me.ce), X; dims = dims, kwargs...)
     T, N = size(X)
     flag = isone(dims)
     if !flag
@@ -738,7 +738,7 @@ Two consequences of the form separate this intensity from the James-Stein one.
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
-    sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
+    sigma = Statistics.cov(library_covariance_estimator(me.ce), X; dims = dims, kwargs...)
     T, N = size(X)
     flag = isone(dims)
     if !flag
@@ -829,7 +829,7 @@ Three consequences of the form separate this algorithm from the other two.
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
                          X::MatNum; dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
-    sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
+    sigma = Statistics.cov(library_covariance_estimator(me.ce), X; dims = dims, kwargs...)
     T, N = size(X)
     flag = isone(dims)
     if !flag

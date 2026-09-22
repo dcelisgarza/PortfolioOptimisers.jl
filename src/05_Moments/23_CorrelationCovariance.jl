@@ -70,11 +70,11 @@ end
 
 Compute the correlation matrix using the underlying estimator.
 
-This method delegates to `Statistics.cor(ce.ce, X; dims = dims, kwargs...)`, returning the correlation matrix as the "covariance". This is useful when a correlation matrix is required in a context that accepts a covariance estimator.
+This method delegates to `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = dims, kwargs...)`, returning the correlation matrix as the "covariance". This is useful when a correlation matrix is required in a context that accepts a covariance estimator.
 
 # Algorithm
 
- 1. Call `Statistics.cor(ce.ce, X; dims = dims, kwargs...)` and return its result.
+ 1. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = dims, kwargs...)` and return its result.
 
 The returned matrix carries a unit diagonal, so a caller that reads the diagonal for a variance
 reads ones, not variances.
@@ -96,7 +96,7 @@ reads ones, not variances.
   - [`cor(ce::CorrelationCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::CorrelationCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    return Statistics.cor(ce.ce, X; dims = dims, kwargs...)
+    return Statistics.cor(library_covariance_estimator(ce.ce), X; dims = dims, kwargs...)
 end
 """
     gap_fill_value(ce::CorrelationCovariance) -> Number
@@ -127,11 +127,11 @@ end
 
 Compute the correlation matrix using the underlying estimator.
 
-This method delegates to `Statistics.cor(ce.ce, X; dims = dims, kwargs...)`.
+This method delegates to `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = dims, kwargs...)`.
 
 # Algorithm
 
- 1. Call `Statistics.cor(ce.ce, X; dims = dims, kwargs...)` and return its result.
+ 1. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = dims, kwargs...)` and return its result.
 
 `cov` and `cor` on a [`CorrelationCovariance`](@ref) return the same matrix.
 
@@ -152,7 +152,7 @@ This method delegates to `Statistics.cor(ce.ce, X; dims = dims, kwargs...)`.
   - [`cov(ce::CorrelationCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::CorrelationCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    return Statistics.cor(ce.ce, X; dims = dims, kwargs...)
+    return Statistics.cor(library_covariance_estimator(ce.ce), X; dims = dims, kwargs...)
 end
 
 export CorrelationCovariance

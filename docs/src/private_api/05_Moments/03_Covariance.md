@@ -10,6 +10,7 @@ The covariance is an important measure of risk used in portfolio selection and p
 
 ```@docs
 show_fields(::GeneralCovariance)
+library_covariance_estimator
 ```
 
 ## Covariance

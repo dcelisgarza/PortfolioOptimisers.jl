@@ -241,6 +241,37 @@ function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = 
     end
 end
 """
+    library_covariance_estimator(ce::AbstractCovarianceEstimator) -> AbstractCovarianceEstimator
+    library_covariance_estimator(ce::StatsBase.CovarianceEstimator) -> GeneralCovariance
+
+Returns an estimator that answers every call this library makes of a nested covariance estimator.
+
+A field bound to `StatsBase.CovarianceEstimator` admits an estimator that this library does not own, such as `StatsBase.SimpleCovariance()`. The library calls a nested estimator with its own keywords, such as `iv`, `ivpa` and `active_mask`, and with an Asset Panel argument. A `StatsBase` method refuses both. [`GeneralCovariance`](@ref) answers both for any `StatsBase.CovarianceEstimator`, because [`robust_cov`](@ref) and [`robust_cor`](@ref) drop a keyword the estimator does not take. So a verb that forwards to a nested estimator calls it through this function.
+
+An estimator of the library is returned unchanged, so it still receives every keyword. An estimator that the library does not own is wrapped in a [`GeneralCovariance`](@ref) without weights, which calls it with the same `dims` and `mean` as before.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+
+# Returns
+
+  - `ce`: `ce` itself, or `GeneralCovariance(; ce = ce)`.
+
+# Related
+
+  - [`GeneralCovariance`](@ref)
+  - [`AbstractCovarianceEstimator`](@ref)
+  - [`robust_cov`](@ref)
+  - [`robust_cor`](@ref)
+"""
+function library_covariance_estimator(ce::AbstractCovarianceEstimator)
+    return ce
+end
+function library_covariance_estimator(ce::StatsBase.CovarianceEstimator)
+    return GeneralCovariance(; ce = ce)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Estimates the covariance matrix of asset returns from a centring estimator, a covariance estimator, and a moment algorithm.
@@ -417,6 +448,7 @@ The four methods of `Statistics.cov` and `Statistics.cor` that take a [`Covarian
  1. Resolve the centre `mu` from `ce.me` and `ce.w` with [`weighted_centre`](@ref), which reads `mean` when the caller gave one. `ce.w` reaches `ce.me` through [`factory`](@ref), so the centre carries the weights of the deviations.
  2. `ce.w` is `nothing`: return `ce.ce` unchanged.
  3. `ce.w` is not `nothing`: send `ce.ce` through [`factory_child`](@ref) with `ce.w`. An estimator of the library takes the weights; a `StatsBase.CovarianceEstimator` that is not one of them passes through unchanged, because no verb of this library reads its weights.
+ 4. Send the estimator of step 2 or 3 through [`library_covariance_estimator`](@ref). An estimator that the library does not own is wrapped in a [`GeneralCovariance`](@ref), so the keywords of the caller, such as `iv` and `ivpa`, do not reach a `StatsBase` method that refuses them.
 
 Step 2 is a performance guard and not a second contract. `ce.w` is a field, so its type decides the branch, and the guard keeps a windowed loop from rebuilding the estimator tree of `ce` once per window. A `ce.ce` that holds weights of its own therefore keeps them when `ce.w` is `nothing`, and loses them to `ce.w` when it is not. That is what [`factory`](@ref) does on every other path.
 
@@ -431,7 +463,7 @@ Step 2 is a performance guard and not a second contract. `ce.w` is a field, so i
 # Returns
 
   - `mu::Union{<:Number, <:ArrNum}`: Centring vector.
-  - `cel::StatsBase.CovarianceEstimator`: Inner covariance estimator, weighted by `ce.w` when it is not `nothing`.
+  - `cel::AbstractCovarianceEstimator`: Inner covariance estimator, weighted by `ce.w` when it is not `nothing`, and wrapped in a [`GeneralCovariance`](@ref) when the library does not own it.
 
 # Related
 
@@ -443,7 +475,11 @@ Step 2 is a performance guard and not a second contract. `ce.w` is a field, so i
 function covariance_centre_and_estimator(ce::Covariance, X::MatNum; dims::Int = 1,
                                          mean = nothing, kwargs...)
     mu = weighted_centre(X, ce.me, ce.w; dims = dims, mean = mean, kwargs...)
-    return mu, isnothing(ce.w) ? ce.ce : factory_child(ce.ce, ce.w)
+    return mu, library_covariance_estimator(if isnothing(ce.w)
+                                                ce.ce
+                                            else
+                                                factory_child(ce.ce, ce.w)
+                                            end)
 end
 """
     Statistics.cov(

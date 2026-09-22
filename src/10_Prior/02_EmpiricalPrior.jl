@@ -354,7 +354,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any}, X::MatNum,
     # [`resolve_fill_limit`](@ref)).
     fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
     mu = vec(Statistics.mean(pe.me, X, pnl; dims = 1, kwargs...))
-    sigma = Statistics.cov(pe.ce, X, pnl; dims = 1, kwargs...)
+    sigma = Statistics.cov(library_covariance_estimator(pe.ce), X, pnl; dims = 1, kwargs...)
     # The Scenario Cap cuts the rows the result carries and leaves the moments above it
     # alone, so the fill runs over the matrix a consumer actually reads and its share is
     # measured against that window (see [`scenario_window`](@ref)).
@@ -459,7 +459,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, X::MatNum,
     fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
     X_log = log1p.(X)
     mu = vec(Statistics.mean(pe.me, X_log, pnl; dims = 1, kwargs...))
-    sigma = Statistics.cov(pe.ce, X_log, pnl; dims = 1, kwargs...)
+    sigma = Statistics.cov(library_covariance_estimator(pe.ce), X_log, pnl; dims = 1,
+                           kwargs...)
     horizon_moments!(mu, sigma, pe.horizon)
     Xs = scenario_window(pe.max_scenarios, X)
     # The fill is on the arithmetic `X` the caller handed in, and it is taken after step 7,

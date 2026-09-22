@@ -451,7 +451,8 @@ function bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     for i in 1:(ue.n_sim)
         Xi = X[bootstrap_indices(ue.bootstrap, rng, T, ue.block_size), :]
         mus[:, i] = vec(Statistics.mean(ue.me, Xi; dims = 1, kwargs...))
-        sigmas[:, :, i] = Statistics.cov(ue.ce, Xi; dims = 1, kwargs...)
+        sigmas[:, :, i] = Statistics.cov(library_covariance_estimator(ue.ce), Xi; dims = 1,
+                                         kwargs...)
     end
     return mus, sigmas
 end
@@ -535,7 +536,8 @@ function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     rng = resolve_rng(ue.rng, ue.seed)
     for i in 1:(ue.n_sim)
         Xi = X[bootstrap_indices(ue.bootstrap, rng, T, ue.block_size), :]
-        sigmas[:, :, i] = Statistics.cov(ue.ce, Xi; dims = 1, kwargs...)
+        sigmas[:, :, i] = Statistics.cov(library_covariance_estimator(ue.ce), Xi; dims = 1,
+                                         kwargs...)
     end
     return sigmas
 end
