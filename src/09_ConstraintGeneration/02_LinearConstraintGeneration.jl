@@ -2340,20 +2340,20 @@ end
 """
     universe_axis(sets::UniverseSets, key::AbstractString) -> String
 
-Name of the axis the universe stored under `key` belongs to, read off the key itself: `"factor"` for anything carrying the `tfkey` prefix, `"asset"` otherwise. It exists only so [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref) can name the axis the user wrote in.
+Name of the axis the universe stored under `key` belongs to, read off the key itself: `"factor"` for anything carrying the `tfkey` or the `cfkey` prefix, `"asset"` otherwise. It exists only so [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref) can name the axis the user wrote in.
 
-The **key** is the evidence, for both callers, and the reason is that both resolve names against `sets.dict[key]` and nothing else: whatever axis that universe belongs to is the axis a failed lookup failed on. [`get_black_litterman_views`](@ref) takes the key from the estimator that owns the views, and [`get_linear_constraints`](@ref) from the constraint space — [`FactorSpace`](@ref) resolving at `sets.tfkey`. Reading it off the *re-basis* instead would be a second encoding of the same fact, and a worse one: a wrapped estimator carrying its own `key` overrides the space's, so a re-based row can legitimately resolve against a universe the loadings are not written in, and the message must name the universe that was searched.
+The **key** is the evidence, for both callers, and the reason is that both resolve names against `sets.dict[key]` and nothing else: whatever axis that universe belongs to is the axis a failed lookup failed on. [`get_black_litterman_views`](@ref) takes the key from the estimator that owns the views, and [`get_linear_constraints`](@ref) from the constraint space — [`FactorSpace`](@ref) resolving at the factor axis [`factor_axis_key`](@ref) reads off the loadings, `sets.tfkey` for the time-series family and `sets.cfkey` for the cross-sectional one. Reading it off the *re-basis* instead would be a second encoding of the same fact, and a worse one: a wrapped estimator carrying its own `key` overrides the space's, so a re-based row can legitimately resolve against a universe the loadings are not written in, and the message must name the universe that was searched.
 
-The **prefix** rather than equality is what makes a factor group key (`"nf_sector"`) resolve as the factor axis too, and the disjoint-prefix rule [`UniverseSets`](@ref) enforces at construction is what makes that unambiguous.
+The **prefix** rather than equality is what makes a factor group key (`"nf_sector"`, `"ncf_sector"`) resolve as the factor axis too, and the disjoint-prefix rule [`UniverseSets`](@ref) enforces at construction is what makes that unambiguous.
 
 # Algorithm
 
- 1. Return `"factor"` when `key` starts with `sets.tfkey`.
+ 1. Return `"factor"` when `key` starts with `sets.tfkey` or with `sets.cfkey`.
  2. Return `"asset"` in every other case.
 
 # Arguments
 
-  - `sets`: The [`UniverseSets`](@ref) whose `tfkey` names the factor axis.
+  - `sets`: The [`UniverseSets`](@ref) whose `tfkey` and `cfkey` name the two factor axes.
   - `key`: The key the names were resolved against.
 
 # Returns
@@ -2365,9 +2365,10 @@ The **prefix** rather than equality is what makes a factor group key (`"nf_secto
   - [`get_linear_constraints`](@ref)
   - [`get_black_litterman_views`](@ref)
   - [`UniverseSets`](@ref)
+  - [`factor_axis_key`](@ref)
 """
 function universe_axis(sets::UniverseSets, key::AbstractString)::String
-    return ifelse(startswith(key, sets.tfkey), "factor", "asset")
+    return startswith(key, sets.tfkey) || startswith(key, sets.cfkey) ? "factor" : "asset"
 end
 """
     constraint_row_length(rr, nx::VecStr) -> Int

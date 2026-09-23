@@ -268,6 +268,28 @@ end
                                            "nf" => ["mkt", "size", "value"]))
         @test PO.constraint_space_basis(FactorSpace(), ts_only, reg_reb)[2] == "nf"
         @test_throws KeyError PO.constraint_space_basis(FactorSpace(), ts_only, csfm_reb)
+        # A name the cross-sectional axis does not carry is reported against the factor
+        # universe it was searched in, under `ncf`, and not against the asset universe.
+        # A row stated at `ncf` without loadings that resolves and cancels names the same
+        # axis. Under a re-basis that row reads `empty_projected_row_msg` instead. #1273.
+        msg = try
+            linear_constraints(ExposureConstraintEstimator(;
+                                                           lce = LinearConstraintEstimator(;
+                                                                                           val = "valu <= 0.3"),
+                                                           space = FactorSpace()), sets;
+                               rr = csfm_reb, strict = true)
+        catch e
+            @test e isa ArgumentError
+            sprint(showerror, e)
+        end
+        @test occursin("not in factor universe (3 factors under key `ncf`)", msg)
+        @test occursin("did you mean `value`?", msg)
+        msg = try
+            linear_constraints("size - size <= 0.3", sets, sets.cfkey; strict = true)
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("the universe (3 factors under key `ncf`)", msg)
 
         # 2. `constraint_row_term`, at
         #    `09_ConstraintGeneration/02_LinearConstraintGeneration.jl`.

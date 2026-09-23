@@ -855,6 +855,10 @@ end
     @test PortfolioOptimisers.universe_axis(fsets, "nx") == "asset"
     @test PortfolioOptimisers.universe_axis(fsets, "nf") == "factor"
     @test PortfolioOptimisers.universe_axis(fsets, "nf_style") == "factor"
+    # The cross-sectional factor axis is a factor axis too, and `"ncf"` does not start with
+    # `"nf"`, so the key's own prefix is what names it. Issue #1273.
+    @test PortfolioOptimisers.universe_axis(fsets, "ncf") == "factor"
+    @test PortfolioOptimisers.universe_axis(fsets, "ncf_style") == "factor"
 
     # `factor_universe` raises at the point of need, naming the axis it reads and the matrix
     # it reconciles it against. It takes the key positionally, because `UniverseSets`
