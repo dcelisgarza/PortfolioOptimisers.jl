@@ -127,7 +127,7 @@ pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => prs[1].mu,
                        "FactorPrior(Step)" => prs[2].mu,
                        "FactorPrior(DimRed)" => prs[3].mu); formatters = [mmtfmt],
              title = "Expected returns",
-             source_notes = "prs[1].mu ≈ prs[1].mu ≈ prs[3].mu: $(prs[1].mu ≈ prs[1].mu ≈ prs[3].mu)")
+             source_notes = "prs[1].mu ≈ prs[2].mu ≈ prs[3].mu: $(prs[1].mu ≈ prs[2].mu ≈ prs[3].mu)")
 
 #=
 The covariances, in the `sigma` field, differ much more. A factor model tends to give a more stable covariance estimate, because the factors carry the common part of the returns and the noise of each single asset has less effect. Each covariance table carries its condition number under it. A lower condition number means a less noisy matrix, which is more stable to invert.
@@ -282,7 +282,7 @@ slv = [Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
 
 We compute the mean-standard deviation efficient frontier under the empirical prior and under the two factor priors.
 =#
-## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
+## JuMP Optimisers, we will compute the efficient frontier with 50 points for all of them.
 opts = [JuMPOptimiser(; pe = prs[1], slv = slv,
                       ret = ArithmeticReturn(;
                                              settings = JuMPReturnsSettings(;
@@ -318,7 +318,7 @@ r = StandardDeviation()
 plot_measures(ress[1].w, prs[1]; x = r, y = ExpectedReturn(; rt = ress[1].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "EmpiricalPrior", xlabel = "SD", ylabel = "Arithmetic Return",
-              colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
+              colorbar_title = "\nReturn/Risk Ratio", right_margin = 6Plots.mm)
 
 # Factor prior composition with stepwise regression.
 plot_stacked_area_composition(ress[2].w, rd.nx;
@@ -329,7 +329,7 @@ r = StandardDeviation()
 plot_measures(ress[2].w, prs[2]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "FactorPrior(Step)", xlabel = "SD", ylabel = "Arithmetic Return",
-              colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
+              colorbar_title = "\nReturn/Risk Ratio", right_margin = 6Plots.mm)
 # Factor prior composition with dimension reduction regression.
 plot_stacked_area_composition(ress[3].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
@@ -340,7 +340,7 @@ r = StandardDeviation()
 plot_measures(ress[3].w, prs[3]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "FactorPrior(DimRed)", xlabel = "SD", ylabel = "Arithmetic Return",
-              colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
+              colorbar_title = "\nReturn/Risk Ratio", right_margin = 6Plots.mm)
 
 #=
 A frontier holds many portfolios. To compare one portfolio per prior, we compute the maximum risk-adjusted return ratio portfolio under each of the three.
@@ -368,7 +368,7 @@ The factor model portfolios are more diversified than the empirical one. The fac
 
 We repeat the steps of section 3.1 with the negative skewness as the risk measure. The priors are now 4, 7 and 8, the high-order priors that hold the coskewness this measure reads.
 =#
-## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
+## JuMP Optimisers, we will compute the efficient frontier with 50 points for all of them.
 opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                       ret = ArithmeticReturn(;
                                              settings = JuMPReturnsSettings(;
@@ -385,7 +385,7 @@ opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                                                                             lb = Frontier(;
                                                                                           N = 50))))]
 
-## Mean-Risk estimators using the standard deviation.
+## Mean-Risk estimators using the negative skewness.
 mrs = [MeanRisk(; r = NegativeSkewness(), obj = MinimumRisk(), opt = opt) for opt in opts]
 
 ## Optimise
@@ -404,7 +404,7 @@ r = NegativeSkewness()
 plot_measures(ress[1].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[1].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "EmpiricalPrior", xlabel = "NegativeSkewness",
-              ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
+              ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
 # Factor prior composition with stepwise regression.
@@ -416,7 +416,7 @@ r = NegativeSkewness()
 plot_measures(ress[2].w, prs[7]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "FactorPrior(Step)", xlabel = "NegativeSkewness",
-              ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
+              ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 # Factor prior composition with dimension reduction regression.
 plot_stacked_area_composition(ress[3].w, rd.nx;
@@ -428,7 +428,7 @@ r = NegativeSkewness()
 plot_measures(ress[3].w, prs[8]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "FactorPrior(DimRed)", xlabel = "NegativeSkewness",
-              ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
+              ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
 #=
@@ -437,7 +437,7 @@ Then we solve one maximum-ratio portfolio per prior, as in section 3.1.
 opts = [JuMPOptimiser(; pe = prs[4], slv = slv), JuMPOptimiser(; pe = prs[7], slv = slv),
         JuMPOptimiser(; pe = prs[8], slv = slv)]
 
-## Mean-Risk estimators using the standard deviation.
+## Mean-Risk estimators using the negative skewness.
 mrs = [MeanRisk(; r = NegativeSkewness(), obj = MaximumRatio(; rf = 4.2 / 100 / 252),
                 opt = opt) for opt in opts]
 
@@ -457,7 +457,7 @@ Here the effect is the opposite of section 3.1. On this data the matrix of the n
 
 We repeat the steps with the kurtosis as the risk measure.
 =#
-## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
+## JuMP Optimisers, we will compute the efficient frontier with 50 points for all of them.
 opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                       ret = ArithmeticReturn(;
                                              settings = JuMPReturnsSettings(;
@@ -474,7 +474,7 @@ opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                                                                             lb = Frontier(;
                                                                                           N = 50))))]
 
-## Mean-Risk estimators using the standard deviation.
+## Mean-Risk estimators using the kurtosis.
 mrs = [MeanRisk(; r = Kurtosis(), obj = MinimumRisk(), opt = opt) for opt in opts]
 
 ## Optimise
@@ -492,7 +492,7 @@ r = Kurtosis()
 plot_measures(ress[1].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[1].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "EmpiricalPrior", xlabel = "Kurtosis", ylabel = "Arithmetic Return",
-              colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
+              colorbar_title = "\nReturn/Risk Ratio", right_margin = 6Plots.mm)
 
 # Factor prior composition with stepwise regression.
 plot_stacked_area_composition(ress[2].w, rd.nx;
@@ -503,7 +503,7 @@ r = Kurtosis()
 plot_measures(ress[2].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "FactorPrior(Step)", xlabel = "Kurtosis",
-              ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
+              ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 # Factor prior composition with dimension reduction regression.
 plot_stacked_area_composition(ress[3].w, rd.nx;
@@ -515,7 +515,7 @@ r = Kurtosis()
 plot_measures(ress[3].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "FactorPrior(DimRed)", xlabel = "Kurtosis",
-              ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
+              ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
 #=
@@ -524,9 +524,9 @@ The section ends with the maximum-ratio portfolios.
 opts = [JuMPOptimiser(; pe = prs[4], slv = slv), JuMPOptimiser(; pe = prs[7], slv = slv),
         JuMPOptimiser(; pe = prs[8], slv = slv)]
 
-## Mean-Risk estimators using the standard deviation.
-mrs = [MeanRisk(; r = NegativeSkewness(), obj = MaximumRatio(; rf = 4.2 / 100 / 252),
-                opt = opt) for opt in opts]
+## Mean-Risk estimators using the kurtosis.
+mrs = [MeanRisk(; r = Kurtosis(), obj = MaximumRatio(; rf = 4.2 / 100 / 252), opt = opt)
+       for opt in opts]
 
 ## Optimise
 ress = optimise.(mrs)
@@ -538,7 +538,7 @@ pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
 plot_stacked_bar_composition(ress, rd)
 
 #=
-The kurtosis section shows the same pattern as the negative skewness section, which follows from the higher condition numbers of the high-order moments of the factor priors. The [covariance](02_Covariance_Estimation.md) and [higher moment](03_Higher_Moment_Estimation.md) pages show ways to reduce the estimation error of these moments.
+The kurtosis portfolios follow section 3.1 and not section 3.2: the factor priors give more diversified portfolios than the empirical prior. This is so although the cokurtosis matrices of the factor priors have higher condition numbers than the empirical one. So the condition number of a high-order moment alone does not tell how a factor model changes the portfolio. The [covariance](02_Covariance_Estimation.md) and [higher moment](03_Higher_Moment_Estimation.md) pages show ways to reduce the estimation error of these moments.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
