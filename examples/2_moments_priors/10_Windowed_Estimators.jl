@@ -133,7 +133,8 @@ covid = findall(d -> Date("2020-02-19") <= d <= Date("2020-04-30"), rd.ts)
 calm = findall(d -> Date("2021-04-01") <= d <= Date("2021-06-30"), rd.ts)
 
 regime_vol = DataFrame("asset" => rd.nx,
-                       "crash (2020 Q1)" => annvol(WindowedCovariance(; window = covid)),
+                       "crash (Feb-Apr 2020)" =>
+                           annvol(WindowedCovariance(; window = covid)),
                        "calm (2021 Q2)" => annvol(WindowedCovariance(; window = calm)),
                        "full" => annvol(PortfolioOptimisersCovariance()))
 

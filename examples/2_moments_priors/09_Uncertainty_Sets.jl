@@ -163,9 +163,9 @@ most of the assets. On this data the two sets act on the weights as they do in s
 the ellipsoidal set also gives the less concentrated weights.
 
 !!! note "Both worst-case mean portfolios are at the floor of the ratio's scale"
-    With sets of this size, no portfolio has a worst-case return above `rf`. The ratio is then
-    zero or negative for every portfolio, and no tangency portfolio exists.
-    [`MaximumRatio`](@ref) solves the ratio with a scale variable `k`, and here it returns the
+    The last cell of this section prints the largest worst-case return that a long-only
+    portfolio can reach over each set, next to `rf`. When that return is below `rf`, the ratio
+    is negative for every portfolio, and no tangency portfolio exists. [`MaximumRatio`](@ref) solves the ratio with a scale variable `k`, and here it returns the
     portfolio at the floor `kmin` of that variable, so the weights still meet their constraints.
     Read them as the best worst-case return at that scale, not as a worst-case tangency
     portfolio. The nominal portfolio has a tangency portfolio, and this does not apply to it.
@@ -178,6 +178,25 @@ pretty_table(DataFrame(["Assets" => rd.nx, "Nominal" => ret_nom.w,
 
 plot_stacked_bar_composition([ret_nom, ret_box, ret_ell], rd;
                              xticks = (1:3, ["Nominal", "Box μ", "Ellipsoid μ"]))
+
+#=
+We find the long-only portfolio with the largest worst-case return over each set with
+[`MaximumReturn`](@ref) and [`NoRisk`](@ref). Over a box, the worst-case return of the weights
+`w` is `μᵀw - dᵀ|w|`, where `d` is the vector of the half-widths of the intervals. Over an
+ellipsoid it is `μᵀw - k‖Gw‖₂`, where `k` is the radius of the set and `G` is the upper
+Cholesky factor of its covariance. We print both returns next to `rf`.
+=#
+
+using LinearAlgebra
+
+wc_box(w) = dot(pr.mu, w) - dot((mu_box.ub .- mu_box.lb) ./ 2, abs.(w))
+wc_ell(w) = dot(pr.mu, w) - mu_ell.k * norm(cholesky(mu_ell.sigma).U * w)
+function best_wc(ucs)
+    return optimise(MeanRisk(; r = NoRisk(), obj = MaximumReturn(),
+                             opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                 ret = ArithmeticReturn(; ucs = ucs)))).w
+end
+(rf = rf, box = wc_box(best_wc(mu_box)), ellipsoid = wc_ell(best_wc(mu_ell)))
 
 #=
 ## 6. Other set estimators: Delta and the ARCH bootstrap
@@ -217,20 +236,21 @@ plot_stacked_bar_composition([res_nom, res_delta, res_box], rd;
                              xticks = (1:3, ["Nominal", "Delta", "Normal box"]))
 
 #=
-!!! note "A set from a block bootstrap of the returns"
-    [`ARCHUncertaintySet`](@ref) builds a set from the tails and the serial dependence of the
-    returns themselves, not from a Gaussian or a fixed fraction. It resamples the returns in
-    blocks, with [`StationaryBootstrap`](@ref), [`MovingBootstrap`](@ref) or
-    [`CircularBootstrap`](@ref), and you build it in the same way.
-    ```julia
-    ucs_arch = sigma_ucs(ARCHUncertaintySet(; alg = BoxUncertaintySetAlgorithm(),
-                                            bootstrap = StationaryBootstrap(), n_sim = 100,
-                                            seed = 1), rd.X)
-    ```
-    The bootstrap keeps the fat tails and the autocorrelation that the Normal estimator ignores,
-    and on this slice it gives a wider box than the Normal one. `UncertaintySetVariance` takes it
-    as it takes the other two sets. This page does not run it, because it resamples the returns
-    `n_sim` times and is the slowest of the three estimators.
+[`ARCHUncertaintySet`](@ref) builds a set from the tails and the serial dependence of the
+returns themselves, not from a Gaussian or a fixed fraction. It resamples the returns in blocks,
+with [`StationaryBootstrap`](@ref), [`MovingBootstrap`](@ref) or [`CircularBootstrap`](@ref),
+and fits the moments again on each of the `n_sim` resamples. We build a covariance box with it
+and print its total width next to that of the Normal box.
+=#
+
+ucs_arch = sigma_ucs(ARCHUncertaintySet(; alg = BoxUncertaintySetAlgorithm(),
+                                        bootstrap = StationaryBootstrap(), n_sim = 100,
+                                        seed = 1), rd.X)
+(arch = set_width(ucs_arch), normal = set_width(ucs_box))
+
+#=
+The bootstrap keeps the fat tails and the autocorrelation that the Normal estimator ignores.
+You pass this set to `UncertaintySetVariance` in the same way as the other two sets.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
@@ -263,3 +283,6 @@ plot_stacked_bar_composition([res_nom, res_delta, res_box], rd;
 #src   (width 0.0474 with StationaryBootstrap, n_sim=100). But n_sim=100 took ~50s on this slice, so
 #src   per the build-cost trade-off it is DESCRIBED with a non-executed snippet rather than run in
 #src   the rendered page. If the bootstrap is sped up or cached, promote it to executed code.
+#src - PROMOTED 2026-09-23 (#1228 hand-back from #1235): at 3183a91e79 the ARCH build took 1.8 s
+#src   with compilation and 0.9 s warm, so it now runs. Width 0.0464 against 0.0440 for the
+#src   Normal box.
