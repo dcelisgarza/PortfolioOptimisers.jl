@@ -1,12 +1,12 @@
 #=
 ```@meta
-Description = "Risk contribution in PortfolioOptimisers.jl: constrain where the risk sits, by asset or by factor, and compare the result across objectives."
+Description = "Risk contribution in PortfolioOptimisers.jl: bound each asset's or each factor's share of the risk, and compare the result across objectives."
 ```
 
 # Risk contribution
 
-This page is about where the risk sits, not about how much risk a portfolio takes. It covers
-two jobs:
+This page is about how the risk of a portfolio divides between its assets or its factors,
+not about how much risk it takes. It covers two jobs:
 
   - asset risk contribution under the variance measure, where the `rc` field caps what each
     asset contributes and three objective functions run against the same caps;
@@ -30,7 +30,7 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. Data
 
 We use one year of S&P 500 prices and the factor returns over the same dates. Section 4
 needs the factor returns.
@@ -112,11 +112,13 @@ end
 ## 4. Factor risk contribution optimisation
 
 [`FactorRiskContribution`](@ref) caps a named factor rather than a named asset. It regresses
-the asset returns onto the factor returns and reads the contribution of each factor off that
-regression. The regression estimator reads the factor returns as the optimiser builds the
+the asset returns onto the factor returns and computes the contribution of each factor from that
+regression. The regression estimator needs the factor returns when the optimiser builds the
 problem, so we pass `rd` to [`optimise`](@ref).
 
-The loop below runs the same three objectives against one set of factor constraints.
+The loop below runs the same three objectives against one set of factor constraints. The
+constraints cap the share of `VLUE` in the portfolio variance at 74%, keep the share of `QUAL`
+at or above -7%, and fix the share of `MTUM` at 9%. A factor can contribute a negative share.
 =#
 
 sets = UniverseSets(; dict = Dict("nx" => rd.nf))
@@ -140,8 +142,10 @@ pretty_table(factor_df; formatters = [resfmt])
 
 #=
 The table prints each factor's share of the total, so every column sums to one. The `rc`
-constraints hold on the unnormalised contributions, so a target such as `MTUM==0.09` names a
-raw contribution, and the share printed here is smaller.
+constraints bound each factor's share of the portfolio variance. The optimiser states them on a
+semidefinite relaxation, in which a matrix variable takes the place of the product of the factor
+weights with themselves. When the relaxation is not tight, the shares of the portfolio it returns
+miss the targets. On this data only the maximum-ratio column meets all three constraints.
 =#
 
 for (name, _) in obj_specs
@@ -152,13 +156,14 @@ end
 #=
 ## Summary
 
-Risk contribution answers a different question from plain mean-risk optimisation.
+The `rc` field bounds the share of the variance that each asset or factor carries, whatever
+the objective.
 
   - [`Variance`](@ref) with `rc` constraints caps the realised risk contribution of an asset
     or of a factor.
   - [`MeanRisk`](@ref) and [`FactorRiskContribution`](@ref) take the same constraints under
     different objectives, so you can compare the weights and the concentration they give.
-  - [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) print the realised
+  - [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) compute the realised
     profile, which you read against the caps you set.
 =#
 

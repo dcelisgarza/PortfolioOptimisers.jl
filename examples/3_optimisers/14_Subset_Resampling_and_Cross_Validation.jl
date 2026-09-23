@@ -36,10 +36,10 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data and shared ingredients
+## 1. Data and shared ingredients
 
-We use the same S&P 500 slice as the other optimiser examples. We compute the prior and the
-clustering once, and every cell below reads them.
+We use the data of the meta-optimiser page, one year of daily prices for twenty S&P 500 stocks.
+We compute the prior and the clustering once, and every cell below uses them.
 =#
 
 using CSV, TimeSeries, DataFrames, Clarabel, Statistics
@@ -66,7 +66,8 @@ jopto = JuMPOptimiser(; slv = slv)
 ## 2. Reference allocations
 
 We solve the plain minimum-variance portfolio and the three meta-optimisers. The
-meta-optimiser page builds the same four. Sections 3 and 4 measure them.
+meta-optimiser page builds the same four. Sections 3 and 4 take the plain optimiser and subset
+resampling further. Section 3 cross-validates both, and section 4 traces a frontier for each.
 =#
 
 res_bench = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv)))
@@ -95,8 +96,8 @@ pretty_table(DataFrame(; :assets => rd.nx, :MinVar => res_bench.w, :NCO => res_n
 
 #=
 Read the three meta-optimiser columns against the plain fit, and read the largest weight in
-each. SubsetResampling averages over many smaller universes, so its weights sit closer
-together than those of the other three. The plot below stacks the four allocations.
+each. SubsetResampling averages over many smaller universes, so its largest weight is smaller
+than in the other three columns, and it holds more assets. The plot below stacks the four allocations.
 =#
 
 using StatsPlots, GraphRecipes
@@ -140,8 +141,12 @@ plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), cv_bench)
 plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), cv_ssr)
 
 #=
+The two printed lines give the variance of the out-of-sample returns of each optimiser, with
+the five test folds joined into one series. Each plot draws the variance of every fold on its
+own.
+
 The scorer returns the path closest to the median of the population, so you do not choose a
-path by hand. The two cells below print the `id` of the path it returned. A population
+path by hand. The cell below prints the `id` of the path it returned for each optimiser. A population
 numbers its paths by position, and each population here holds one
 [`cross_val_predict`](@ref) stream, so both print `1`. A population of many paths, such as
 the one [`CombinatorialCrossValidation`](@ref) returns, gives the `id` of the path the scorer
@@ -189,22 +194,23 @@ plot(xs_m, ys_m; seriestype = :scatter, marker = (:circle, 5), label = "MeanRisk
 plot!(xs_s, ys_s; seriestype = :scatter, marker = (:diamond, 6), label = "SubsetResampling")
 
 #=
-## 5. A risk-measure slot that follows the refit
+## 5. A covariance fitted again on every subset and fold
 
 Section 3 showed that cross-validation refuses a prior computed once. It cannot refuse a
 matrix pasted into a risk measure the same way. `Variance(; sigma = S)` is a valid setting, and
-a matrix the caller measured somewhere else looks the same as one fitted on the very sample the
+a matrix you measured somewhere else looks the same as one fitted on the very sample the
 portfolio is about to be scored on.
 
-A slot that a prior fills therefore takes a second form, the estimator that computes the value
-rather than the value. That is a [`DeferredQuantity`](@ref). It resolves against the prior the
-optimisation runs on, once per subset and once per fold. What reaches the solver is still a
-plain matrix, and only the moment the matrix is computed has moved.
+A field that a prior fills therefore takes a second form, the estimator that computes the value
+rather than the value. That is a [`DeferredQuantity`](@ref). The optimiser fits it on the prior
+of each subset and each fold. What reaches the solver is still a plain matrix, and only the
+moment the matrix is computed has moved.
 
-The two forms give the same answer unless the estimator reads the universe or the window.
-Denoising reads both. It cuts the eigenvalues below a threshold it derives from the ratio of
-observations to assets, `T / N`, so the 14-asset block of a 20-asset fit is not a 14-asset
-fit.
+The two forms give the same answer unless the estimator depends on the universe or the window.
+Denoising depends on both. [`FixedDenoise`](@ref) fits a Marchenko-Pastur distribution to the
+eigenvalues of the correlation matrix, with the ratio of observations to assets, `T / N`, as its
+shape. It replaces every eigenvalue at or below the fitted edge with the mean of those
+eigenvalues. So the 14-asset block of a 20-asset fit is not a 14-asset fit.
 =#
 
 ce_dn = PortfolioOptimisersCovariance(;
@@ -221,11 +227,15 @@ println("Largest entry of the full-universe covariance   = $(maximum(abs, sigma_
 println("Refit vs sliced, on a 14-asset subset           = $(maximum(abs, sigma_refit .- sigma_slice))")
 
 #=
+The second number is the largest gap between the covariance fitted on the 14 assets and the
+block cut from the 20-asset fit. Read it against the first number, the largest entry of the
+full covariance.
+
 ### Inside a resample
 
-[`SubsetResampling`](@ref) takes its view of the problem before it computes the prior. It
-slices a matrix you state down to the assets it drew. A deferred quantity is not yet a matrix,
-so it fits on the assets of the subset.
+[`SubsetResampling`](@ref) cuts the inner optimiser down to the assets it drew before that
+optimiser computes its prior. A matrix you pass is cut to those assets. A deferred quantity is
+not yet a matrix, so it is fitted on the prior of the subset.
 =#
 
 ssr_rm = r -> SubsetResampling(; pe = pr,
@@ -241,10 +251,14 @@ pretty_table(DataFrame(; :assets => rd.nx, :pasted_matrix => res_pasted.w,
                        :deferred_estimator => res_deferred.w); formatters = [resfmt])
 
 #=
+The two columns differ only in how the covariance of each subset was made. The gap between
+them is the effect of fitting the denoised covariance on the subset instead of cutting it from
+the full fit.
+
 ### Inside a fold
 
-The same slot under cross-validation. The pasted matrix was fitted on all 252 observations,
-so every test fold sits inside it. The estimator fits on the training fold alone.
+We run the same two forms under cross-validation. The pasted matrix was fitted on all 252
+observations, so it contains every test fold. The estimator fits on the training fold alone.
 =#
 
 cv_pasted = cross_val_predict(MeanRisk(; obj = MinimumRisk(),
@@ -259,20 +273,20 @@ println("Pasted-matrix cross-val variance      = $(expected_risk(sm, cv_pasted))
 println("Deferred-estimator cross-val variance = $(expected_risk(sm, cv_deferred))")
 
 #=
-The pasted matrix gives the smaller variance. That is the warning, not the result. It was
-fitted on the observations each test fold holds, so the score it earns is one no portfolio
-could have earned at the time. Read the larger number the deferred estimator gives.
+The pasted matrix gives the smaller variance because it was fitted on the observations each
+test fold holds, so the score it earns is one no portfolio could have earned at the time. Read
+the larger number the deferred estimator gives.
 
-Every slot a prior fills works this way, which is `mu`, `sigma`, `kt` and `sk`. A measure with
-two or more such slots takes a prior estimator in `pe` instead, and one fit fills every slot
-you left unstated.
+The fields a prior fills, `mu`, `sigma`, `kt` and `sk`, all work this way. A measure with two or
+more such fields takes a prior estimator in `pe` instead, and one fit fills every field you left
+unstated.
 
 ```julia
 Kurtosis(; pe = EmpiricalPrior())                  # mu and kt from one fit
 DistributionValueatRisk(; pe = EmpiricalPrior())   # mu, sigma and chol from one fit
 ```
 
-A slot you state by hand keeps the value you gave it, and nothing checks it against the others.
+A field you state by hand keeps the value you gave it, and nothing checks it against the others.
 The docstring of each measure says so. The library warns you rather than refuse the setting,
 because a matrix measured elsewhere is a valid thing to pass.
 =#
@@ -288,7 +302,7 @@ A meta-optimiser helps when one fit over every asset moves too far from window t
     together than those of one fit.
   - A frontier sweep runs over a meta-optimiser, so you can read its whole curve against the
     curve of the plain optimiser rather than one portfolio against another.
-  - A slot a prior fills takes the estimator rather than the value, so it fits again on every
+  - A field a prior fills takes the estimator rather than the value, so it fits again on every
     subset and every fold instead of holding one answer from the whole sample.
 =#
 

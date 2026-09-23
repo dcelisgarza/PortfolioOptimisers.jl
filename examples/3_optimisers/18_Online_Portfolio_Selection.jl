@@ -7,18 +7,18 @@ Description = "Online portfolio selection on real prices in PortfolioOptimisers.
 
 The [user-guide chapter](../../user_guide/10_Online_Portfolio_Selection.md) runs the two
 halves of the family on two synthetic markets and shows what each half bets on. This page runs
-the same family on real prices, over four years of twenty S&P 500 names. Each section adds one
-piece.
+the same family on real prices, over four years of twenty S&P 500 names. Sections 3 to 10 each
+add one piece.
 
- 1. The benchmark, follow-the-winner and follow-the-loser rules, through a walk-forward that
-    charges a turnover fee against the book the fund held.
- 2. A search over the rate of one rule.
- 3. The regret of each rule against four comparators that saw the whole period.
- 4. A step projected onto a set that carries weight bounds and a turnover limit.
- 5. A rate that sets itself from the run, in place of one you search for.
- 6. A weighted average of the whole roster.
- 7. A step that reads a risk measure, and a risk ceiling on the set.
- 8. The weight path and the share count, which every optimiser's result takes.
+ 3. The benchmark, follow-the-winner and follow-the-loser rules, through a walk-forward that
+    charges a turnover fee against the weights you hold after the prices move them.
+ 4. A search over the rate of one rule.
+ 5. The regret of each rule against four comparators, three of which saw the whole period.
+ 6. A step projected onto a set that carries weight bounds and a turnover limit.
+ 7. A rate that sets itself from the run, in place of one you search for.
+ 8. A weighted average of the whole roster.
+ 9. A step that follows a risk measure, and a risk ceiling on the set.
+10. The weight path and the share count, which every optimiser's result takes.
 
 !!! tip "When to reach for this"
     Reach for the family when you want a portfolio that needs no solver, reacts to every price,
@@ -35,13 +35,13 @@ pctfmt = (v, i, j) -> isa(v, AbstractFloat) && j > 3 ? "$(round(v * 100; digits 
 resfmt = (v, i, j) -> isa(v, AbstractFloat) ? "$(round(v; digits = 3))" : v;
 
 #=
-## 1. ReturnsResult data and shared ingredients
+## 1. Data and shared ingredients
 
 A rule of this family reads one row of price relatives, `1 + r`, at a time, so it needs a
 long panel more than a wide one. We take the last thousand rows of the S&P 500 slice the other
 optimiser examples load, which is about four trading years over twenty assets. We also build
-the one solver that the hindsight comparator of section 5 and the constrained update of
-section 6 need.
+the one solver that the hindsight comparator of section 5 and the constrained sets of sections
+6 and 9 need.
 =#
 
 using CSV, TimeSeries, Clarabel
@@ -55,11 +55,11 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              check_sol = (; allow_local = true, allow_almost = true))
 
 #=
-## 2. The head and one pass over the rows
+## 2. The optimiser and one pass over the rows
 
 [`OnlinePortfolioSelection`](@ref) is a naive optimiser, and its `alg` field holds the rule.
-[`optimise`](@ref) runs that rule over every row in order, from the allocation the head starts
-at, and returns the portfolio to hold for the period after the last row. It estimates nothing
+[`optimise`](@ref) runs that rule over every row in order, from the allocation the optimiser
+starts at, and returns the portfolio to hold for the period after the last row. It estimates nothing
 and it solves nothing.
 =#
 
@@ -81,12 +81,13 @@ grew most. A reversion rule at its default threshold would hold one or two asset
 
 ## 3. The roster in a walk-forward with a turnover fee
 
-[`OnlineIndexWalkForward`](@ref) warms the head up on the first sixty rows and then gives it
-one row per fold, so each fold is one update and one allocation to hold. A turnover fee has to
-be charged against the book the fund held, not against the target it aimed at, because the
-prices move the book between rebalances. `pws = DriftedWeights()` on the scheme does that. It
-carries the book of each fold, drifted by that fold's prices, into the fee of the next one, and
-the fold loop refuses a `tn` fee on this family without it. The fee is ten basis points per
+[`OnlineIndexWalkForward`](@ref) runs the optimiser over the first sixty rows and then gives it
+one row per fold, so each fold is one update and one allocation to hold. The prices move the
+weights you hold between two rebalances, and we call the moved weights the book. A turnover fee
+has to be charged against the book, not against the target you aimed at.
+`pws = DriftedWeights()` on the scheme does that. It carries the book of each fold, drifted by
+that fold's prices, into the fee of the next one, and the walk-forward refuses a `tn` fee on
+this family without it. The fee is ten basis points per
 unit traded.
 =#
 
@@ -135,10 +136,11 @@ winner rules trade back only what the prices moved, which costs them about a poi
 over four years. A reversion rule at its default threshold rebalances toward one or two assets
 on nearly every row, and pays two thirds of its wealth for the trading.
 
-These four years trended, so the reversion rules lost money before the fee, and the fee took
-most of what was left. The user-guide chapter runs the same rules on a reverting market, where
-they turn one unit into twenty. Nothing inside a rule tells it which market it is running
-on.
+On these four years the winner rules almost doubled the money before the fee. The reversion
+rules gained less, the passive-aggressive rule lost most of its money before any fee, and the
+fee then took most of what the three had. The user-guide chapter runs the same rules on a
+synthetic reverting market, where the reversion rules end far above every other rule of its
+table. Nothing inside a rule tells it which market it is running on.
 
 ## 4. Tuning a rate
 
@@ -163,8 +165,12 @@ opposite reason.
 
 ## 5. The regret table
 
-A comparator sees the whole period. Each one below is fitted on the rows the rules were
-scored on, and then predicted over those same rows, and that is what hindsight means here.
+The table measures each rule against four comparators. They are the best constant rebalanced
+portfolio, the single stock with the highest mean log return, the uniform constant rebalanced
+portfolio, and the best path under a budget on how far it moves. Three of them see the whole
+period. Each of the three is fitted on the rows the rules were scored on and then predicted over
+those same rows, and that is what hindsight means here. The uniform portfolio is the roster's
+own rule, run through the same walk-forward with no fee.
 
 We reach the best constant rebalanced portfolio two ways. The first is [`MeanRisk`](@ref) with
 a maximum-return objective under a [`LogarithmicReturn`](@ref), solved by Clarabel. The second
@@ -200,9 +206,9 @@ predicted over them, one fold per row.
 
 Moving the whole book from one asset to another costs the square root of two in path length,
 so the budget below allows five such moves over the 940 rows. The fit is one programme with 940
-exponential cones and 939 step cones. At a budget this tight most steps sit at a point where
-the interior-point solver stalls short of its tolerance, so we pass a vector of solvers and the
-fit falls through to the first-order one.
+exponential cones and 939 step cones. At a budget this tight Clarabel, an interior-point
+solver, stalls short of its tolerance. So we pass a vector of solvers, and the fit falls through
+to SCS, a first-order solver.
 =#
 
 using SCS
@@ -242,10 +248,12 @@ pretty_table(regret; formatters = [resfmt],
 A positive entry is a comparator that beat the rule. The comparators pay no fee and the
 rules are net of one, so every entry is a little larger than the family's own accounting would
 give. The reversion rules paid the most and sit furthest from every comparator. The winner
-rules sit within a few hundredths of the uniform portfolio they started from, which is what a
+rules end within a few hundredths of the uniform portfolio they started from, which is what a
 slow step away from it gives you. A negative entry is a rule that beat the comparator, which
-happens and is not a defect. The `p` value the result carries against a hindsight comparator
-is too small to act on, because the comparator was chosen after reading the rows.
+happens and is not a defect. The result also carries `p`, the p value of a test that the rule
+and the comparator grow at the same expected log rate. Against a comparator fitted on the same
+rows, the test overstates the evidence that the comparator is better, so a small `p` there
+proves nothing.
 
 Five moves are worth four units of log wealth over the best constant portfolio. The budgeted
 path spends its budget where a move pays most. It grows one unit to about 200, where the best
@@ -257,7 +265,7 @@ again.
 
 ## 6. A constrained update
 
-The head projects the step of every rule onto the set of allocations the rule may hold. The
+The optimiser projects the step of every rule onto the set of allocations the rule may hold. The
 default set is the simplex, and that projection has a closed form. A
 [`ProgrammeAllocationSet`](@ref) takes weight bounds, linear constraints, a turnover limit, a
 risk ceiling and the other constraints the library defines, and its projection is a programme
@@ -267,8 +275,8 @@ The cell below caps the moving-average reversion rule at twenty percent per asse
 points of turnover per asset per period. The rule can no longer move the whole book onto one
 asset. Its volatility falls by almost half and its net wealth more than doubles, mostly
 because the fee no longer takes the turnover. The limit is the optimiser's own
-[`Turnover`](@ref), and the `w` we give it here is a placeholder. The head replaces it on every
-row with the allocation the step trades from.
+[`Turnover`](@ref), and the `w` we give it here is a placeholder. The optimiser replaces it on
+every row with the allocation the step trades from.
 =#
 
 capped = OnlinePortfolioSelection(; alg = MovingAverageReversion(), fees = fees,
@@ -359,8 +367,9 @@ turns over half its book every period, and the fee brings it to 0.88. The top-tw
 drops them and reaches 1.53. A mixture spreads your bet over several rules, and the fee it
 pays is the turnover of the average it plays, not the turnover of its best expert.
 
-[`Ader`](@ref) and [`Sword`](@ref) are the same object over a grid of gradient-projection
-experts. They remove the rate the way the schedules of section 7 do.
+[`Ader`](@ref) and [`Sword`](@ref) are mixtures of this kind over `K` gradient-projection
+experts whose rates double from `eta_min`, and the exponentiated gradient weights the experts.
+You choose the grid and the rate of the weighting in place of a single step rate.
 
 ## 9. Risk in the loss, and risk on the set
 
@@ -369,9 +378,9 @@ there instead, evaluated over a trailing window. The rule then takes one step pe
 the portfolio that minimises that measure, and the window moves with each row. What you get is
 a minimum-variance portfolio that needs no solver.
 
-The gradient of a risk measure is small, and the gradient of a variance is about the size of
-a daily variance. You state the rate against that gradient, so it is far larger than a rate on
-the log-wealth loss.
+The gradient of a variance is $2 \Sigma w$, which is about the size of a daily variance and
+so small. You state the rate against that gradient, so it is far larger than a rate on the
+log-wealth loss.
 =#
 
 risk_step = MirrorDescent(; obj = RiskLoss(; r = Variance(), window = 60), eta = 50)
@@ -392,15 +401,14 @@ pretty_table(DataFrame("Loss" => ["Log wealth", "Variance over sixty rows"],
                            end, resfmt], title = "The entropic step on two losses")
 
 #=
-The variance step brings the volatility from 22.9% to 19.6%, and the drawdown falls with it.
-It gives up wealth for that on a panel that trended, which is the trade a minimum-variance
-portfolio makes.
+The variance step lowers the volatility and the drawdown, and it gives up wealth for that,
+which is the trade a minimum-variance portfolio makes.
 
 The other place to put risk is the set. A [`ProgrammeAllocationSet`](@ref) takes any risk
 measure whose `settings.ub` holds a ceiling. It resolves that ceiling on every row against a
 prior fitted on the rows seen so far, and it projects the step of every rule onto the result.
 The cell below runs the moving-average reversion rule of section 3, which lost most of its
-wealth, under a variance ceiling of ten percent a year.
+wealth, under a ceiling on the daily variance equal to a volatility of ten percent a year.
 =#
 
 ceiling = Variance(; settings = RiskMeasureSettings(; ub = (0.10 / sqrt(252))^2))
@@ -414,9 +422,10 @@ ps_ceiled = performance_summary(ceiled_pred)
 
 #=
 The ceiling turns the 0.42 of the rule into 1.46, and its 51% volatility into 19%. That is
-above the ten percent the ceiling asked for. The ceiling binds the variance the prior expects
-of the one allocation the row plays. The book moves every row, and the volatility it realises
-is higher than that of any single allocation it held.
+above the ten percent the ceiling asked for. On about three rows in four the projection onto the
+set does not solve. The step is then held, so the rule trades nothing on that row and the book
+drifts with the prices. The library warns once for each held step, so read the warnings before
+you read the table.
 
 A risk ceiling on the set and a risk loss in the step are two different things. The ceiling is
 a constraint every rule meets. The loss is what one rule steps on. Both take any risk measure
@@ -460,7 +469,7 @@ pretty_table(DataFrame("Asset" => rd.nx, "Target weight" => capped_pred.pred[end
     the test for a trending or a reverting market, the regret table on synthetic markets, and
     the roster group by group.
   - [The online walk-forward](../5_validation_tuning/09_Online_Walk_Forward.md) covers the
-    fold loop that every run on this page uses.
+    walk-forward that every run on this page uses.
   - [Finite allocation](../6_post_processing/01_Finite_Allocation.md) covers the share count
     the last section takes.
 =#

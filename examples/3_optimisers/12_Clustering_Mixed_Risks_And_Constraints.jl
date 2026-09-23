@@ -13,15 +13,16 @@ page covers two things it leaves out:
   - the hierarchical optimiser still takes weight bounds and fees while the clustering does
     the spreading.
 
-We use the same S&P 500 slice as the rest of the examples. We solve a plain HRP, several
-mixed-risk HERC runs, and one HERC run under a weight cap.
+The data is one year of daily prices for twenty S&P 500 stocks. We solve four HRP runs and
+four HERC runs on one mixed pair of risk measures, one run per scalariser. One more HERC run
+takes the same pair under a 10% weight cap and a fee.
 
 !!! tip "When to reach for this"
     Reach for a mixed-risk clustering optimiser when one risk measure does not cover what you
     want to control and you still want the hierarchy to spread the money. You might combine a
     tail measure with variance, or measure risk inside a cluster one way and between clusters
     another. The tree keeps the allocation stable, and the scalariser sets how the risk terms
-    combine into one number.
+    combine.
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -57,10 +58,16 @@ opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
 ## 2. HRP with mixed risk measures
 
 [`HierarchicalRiskParity`](@ref) takes one risk measure or a vector of them. When you pass a
-vector, the scalariser sets how the risk terms combine into the one number the split uses.
+vector, the scalariser sets how the risks of the measures combine at each split.
+[`SumScalariser`](@ref) adds them. [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) use
+the measure whose risk is the largest or the smallest. [`LogSumExpScalariser`](@ref) takes a
+smooth maximum, and its `gamma` sets how close it comes to the largest.
 
-The cell below pairs a tail measure with variance and runs four scalarisers over that pair.
-Read the four weight columns against each other.
+The cell below pairs a tail measure, [`ConditionalValueatRisk`](@ref), with a variance, and runs
+the four scalarisers over that pair. The `scale` of the variance multiplies its risk by 200
+before the scalariser combines the two. That brings a daily variance to the same order of
+magnitude as a daily conditional value at risk. Read the four weight columns against each
+other.
 =#
 
 r_mix = [ConditionalValueatRisk(),
@@ -80,8 +87,8 @@ pretty_table(DataFrame(; :assets => rd.nx, :Sum => hrp_sum.w, :Max => hrp_max.w,
 [`HierarchicalEqualRiskContribution`](@ref) takes a risk measure and a scalariser at each of
 its two levels, so it can measure risk inside a cluster one way and between clusters another.
 
-We pass the same pair of risk measures at both levels and run the same four scalarisers, which
-add the terms, take the largest, take the smallest, and take a smooth largest.
+We pass the same pair of risk measures at both levels and run the same four scalarisers at
+both levels.
 =#
 
 herc_sum = optimise(HierarchicalEqualRiskContribution(; opt = opt, ri = r_mix, ro = r_mix,
@@ -103,10 +110,10 @@ pretty_table(DataFrame(; :assets => rd.nx, :Sum => herc_sum.w, :Max => herc_max.
                        :Min => herc_min.w, :LogSumExp => herc_lse.w); formatters = [resfmt])
 
 #=
-One risk measure can be larger than the other over most of the assets. The max and the min
-scalariser then read that one measure almost everywhere, and their columns sit close to the
-portfolio that minimises it alone. The next plot stacks the eight allocations of sections 2
-and 3.
+At each split the max scalariser uses the measure whose scaled risk is the larger, and the
+min scalariser uses the smaller one. When one measure is the larger at most splits, the `Max`
+column follows that measure and the `Min` column follows the other. The next plot stacks the
+eight allocations of sections 2 and 3.
 =#
 
 using StatsPlots, GraphRecipes
@@ -134,9 +141,9 @@ pretty_table(DataFrame(; :assets => rd.nx, :Unconstrained => herc_sum.w,
                        :Constrained => herc_constrained.w); formatters = [resfmt])
 
 #=
-The next plot draws the risk contributions of the constrained portfolio. The hierarchy
-spreads the risk, not the money. [`factory`](@ref) fills the covariance of the risk measure
-before [`plot_risk_contribution`](@ref) reads it.
+We plot the share of the variance of the constrained portfolio that each asset carries. It measures the variance alone, not the pair of measures the portfolio was built on.
+As on the clustering optimiser page, [`factory`](@ref) gives the variance the covariance of the
+prior before [`plot_risk_contribution`](@ref) uses it.
 =#
 
 rv = factory(Variance(), pr)

@@ -7,15 +7,15 @@ Description = "Risk budgeting in PortfolioOptimisers.jl: match per-asset or per-
 
 [`RiskBudgeting`](@ref) takes a different stance from [`MeanRisk`](@ref). It does not trade
 expected return against risk through an objective function. It divides the risk itself, and
-finds the portfolio whose per-asset or per-factor risk contributions sit as close to a budget
-you supply as they can. There is nothing to maximise. The budget is the target.
+finds the portfolio whose per-asset or per-factor risk contributions come as close to a budget
+you supply as they can.
 
 The best-known special case is the equal risk contribution portfolio, or ERC, where every
 asset carries the same share of total risk. Risk budgeting extends it to any budget vector,
 and to risk measured by any of the risk measures [`MeanRisk`](@ref) accepts.
 
 !!! tip "When to reach for this"
-    Reach for risk budgeting when you care about where the risk sits rather than about the
+    Reach for risk budgeting when you care about how the risk is divided rather than about the
     trade-off between return and risk. It spreads risk rather than capital, so it avoids the
     concentration a minimum-variance portfolio often shows, and it lets you state a view such as
     "this group of assets carries 30% of the risk". If you want the best return for a given
@@ -33,7 +33,7 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. Data
 
 We use one year of S&P 500 constituents. Section 4 adds the factor returns.
 =#
@@ -71,7 +71,7 @@ N = length(rd.nx)
 `alg` keyword picks the formulation. [`LogRiskBudgeting`](@ref) is a log-barrier and the
 default, and [`MixedIntegerRiskBudgeting`](@ref) needs a mixed-integer solver.
 
-The next cell builds two budgets. The equal budget gives the ERC portfolio. The linearly
+We build two budgets. The equal budget gives the ERC portfolio. The linearly
 increasing budget asks each asset to carry more of the risk than the asset before it.
 =#
 
@@ -84,12 +84,12 @@ rb_inc = RiskBudgeting(; r = r, opt = opt,
                        rba = AssetRiskBudgeting(; rkb = RiskBudget(; val = 1:N),
                                                 alg = LogRiskBudgeting()))
 
-## Optimise both at once with broadcasting (the prior is precomputed, so no data is needed).
+## Optimise both. The prior is precomputed, so no data is needed.
 res_eq, res_inc = optimise(rb_eq), optimise(rb_inc)
 
 #=
-The next cells compute the realised risk contributions, which you read against the budgets we
-asked for. [`factory`](@ref) first fills the risk measure with the covariance of the prior.
+We compute the realised risk contributions, which you read against the budgets we asked for.
+[`factory`](@ref) first gives the risk measure the covariance of the prior.
 =#
 
 rf = factory(r, pr)
@@ -115,7 +115,7 @@ using StatsPlots, GraphRecipes
 plot_risk_contribution(rf, res_eq, rd)
 
 #=
-The next plot draws the increasing-budget portfolio.
+We draw the same plot for the increasing-budget portfolio.
 =#
 
 plot_risk_contribution(rf, res_inc, rd)
@@ -146,10 +146,10 @@ rrb_reg = RelaxedRiskBudgeting(; opt = opt, rba = rba_eq,
 res_b, res_r = optimise(rrb_basic), optimise(rrb_reg)
 
 #=
-The next table prints the realised contributions of the two relaxed portfolios next to the
-exact log-barrier ERC of section 2. On this data the relaxed portfolios put more of their weight on
-fewer assets, and their risk contributions spread away from the flat $1/N$ target. Read the
-contributions yourself whenever you use a relaxed form.
+We print the realised contributions of the two relaxed portfolios next to the exact
+log-barrier ERC of section 2. On this data the risk contributions of the relaxed portfolios move
+away from the flat $1/N$ target, and two assets, JNJ and MRK, carry the largest shares. Check the
+contributions whenever you use a relaxed form.
 =#
 
 rc_b = risk_contribution(rf, res_b.w, pr.X);
@@ -211,9 +211,9 @@ the error names what is missing.
 res_frb = optimise(frb, rdf)
 
 #=
-The next table prints the factor risk contributions. The last row is the intercept, which
-carries the risk the factors do not explain. Read the five factor rows against the equal
-$1/N_f$ target.
+We print the factor risk contributions. The last row is the off-factor contribution, the risk
+that comes from the part of the weights with no exposure to any factor. Read the five factor
+rows against the equal $1/N_f$ target.
 =#
 
 rfk = factory(Variance(), prf)
@@ -228,10 +228,10 @@ plot_factor_risk_contribution(rfk, res_frb, rdf)
 #=
 ## Summary
 
-Risk budgeting targets where the risk sits, not the trade-off between return and risk.
+Risk budgeting sets how the risk is divided, not the trade-off between return and risk.
 
   - [`AssetRiskBudgeting`](@ref) divides risk across assets. An equal budget gives the ERC
-    portfolio, and any other budget states where you want the risk to sit.
+    portfolio, and any other budget states how you want the risk divided.
   - [`RelaxedRiskBudgeting`](@ref) is convex and cheaper to solve. Read the realised
     contributions, because a relaxation need not reach exact risk parity.
   - [`FactorRiskBudgeting`](@ref) divides risk across factors instead of assets, and it needs

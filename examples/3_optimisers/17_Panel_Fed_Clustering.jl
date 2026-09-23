@@ -36,9 +36,10 @@ using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, 
 #=
 ## 1. The universe and the table
 
-We use the same twenty-name S&P 500 slice as the other optimiser examples, with five
-reported quantities per asset: log market capitalisation, book-to-price, gross profitability,
-leverage and dividend yield. `NaN` marks a cell the table does not carry.
+We use the same twenty S&P 500 stocks as the other optimiser examples, over five years so that
+the backtests of sections 7 and 8 have room for their folds. The table holds five reported
+quantities per asset: log market capitalisation, book-to-price, gross profitability, leverage
+and dividend yield. `NaN` marks a cell the table does not carry.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 1260):end]
@@ -94,17 +95,19 @@ tbl = fundamentals[order, :]
 println("The table is aligned to the returns: ", tbl.Asset == rd0.nx)
 
 #=
-## 2. Scale is the caller's, and it happens before the panel
+## 2. You standardise the table before you build the panel
 
-An [`AssetPanel`](@ref) stores what you give it. Nothing in the library standardises a
+An [`AssetPanel`](@ref) stores what you give it. [`asset_panel`](@ref) does not standardise a
 field, and that is a decision rather than a gap. The right transform follows from what the
 column holds, and a level, a ratio, a rank and a logarithm each ask for a different one. The
-library does not guess which you have.
+panel builder does not guess which you have.
 
 It matters here because the default [`AngularDist`](@ref) does not change when you rescale the
 whole row of an asset, and it does change when you rescale one column. `log_mcap` runs from 9
-to 15 and `dividend_yield` from 0.003 to 0.043. Stack those five columns without
-standardising them and the distance you get is a distance on market capitalisation.
+to 15 and `dividend_yield` from 0.003 to 0.043, so `log_mcap` sets most of the length of every
+row. Stack the five columns without standardising them, and the angle between two rows comes
+mostly from `leverage`, the column with the widest spread. The three columns that stay under
+1.5 count for much less.
 =#
 
 raw_fields = ["log_mcap", "book_to_price", "gross_profitability", "leverage",
@@ -192,7 +195,7 @@ println("Static panel: ", PortfolioOptimisers.panel_is_static(pnl))
 println("The labels rebuild the matrix: ", feature_matrix(pnl, nz) == Z)
 
 #=
-## 5. Clustering on named Panel Fields
+## 5. Clustering on named fields
 
 `sel` on the [`FeatureDistance`](@ref) names the fields to stack. The panel names its own
 fields, so you write the names rather than count columns. `["book_to_price",
@@ -238,7 +241,7 @@ pretty_table(cut_rows; title = "One panel, six hierarchies")
 #=
 The last column scores each cut against the cut the correlations give, where 1 means the two
 cuts are the same. A hierarchy built on value and one built on size each score low against the
-correlations and against each other. That is the reason to reach for a panel, because each one
+correlations. That is the reason to reach for a panel, because each one
 answers a question the price history does not hold.
 
 The next table prints the four-way cuts themselves, one column per hierarchy.
@@ -277,8 +280,9 @@ println("The selector's own labels: ", feature_labels(de_reported, nothing, rd, 
 #=
 !!! warning "A static panel with no gaps gives a column of ones"
     An `:observed` entry on a field that held no blank gives a column of ones. The record is
-    right, because nothing was missing. A constant column moves no cosine, so you have added a
-    column that changes no distance.
+    right, because nothing was missing. A column of ones adds the same amount to every dot
+    product and to every squared norm, so it still moves the cosine between two rows. It changes
+    the distances and tells you nothing about the assets, so leave it out.
 
 ## 7. Through a cross-validation
 
@@ -287,8 +291,10 @@ estimator as it always does, and [`cross_val_predict`](@ref) runs it over the fo
 on one year and rebalance every quarter.
 
 A static panel carries no observation axis, so a fold has nothing to cut on it. The same twenty
-rows describe the universe in every window. That is what this route is for. The fold loop
-fits a hierarchy built on the correlations again on every fold, and it fits this one once.
+rows describe the universe in every window. That is what this route is for. Cross-validation
+fits both hierarchies again on every fold. The one built on the correlations changes with the
+window, and the one built on this panel comes out the same every time. Only the covariance
+that allocates inside it changes.
 =#
 
 walk = IndexWalkForward(252, 63)
@@ -341,7 +347,7 @@ plot_portfolio_cumulative_returns(last(results[2]))
 #=
 ## 8. When the table does move
 
-A fundamentals table that is restated every quarter is a time-varying input. Its values
+A fundamentals table that is restated over time is a time-varying input. Its values
 carry an observation axis, and a fold cuts that axis as it cuts the returns. The selector, the
 distance and the optimiser stay as they are. What changes is the shape of the array you pass
 [`NumericPanelInput`](@ref), which gains a second dimension.
@@ -388,13 +394,17 @@ pretty_table(DataFrame("Panel" => ["Static (§3)", "Time-varying (§8)"],
              title = "What a fold slices, and what it leaves alone")
 
 #=
-The view cut both panels to three assets, and only the time-varying panel lost the
-observations outside the fold. The static panel has no observation axis, so the row half of the
-view does nothing to it. Both results are right, and which one you want follows from your data
-rather than from the library.
+Keeping the first 100 observations and the first three assets cut both panels to three assets,
+and only the time-varying panel also lost every observation after the hundredth. The static
+panel has no observation axis, so the observation half of the view leaves it whole. Which of the
+two shapes you want follows from your data rather than from the library.
 
 The sector field of the time-varying panel is a static input among time-varying ones.
 [`asset_panel`](@ref) gives it the observation axis of the others and stores its values once.
+
+We cluster the time-varying panel under each of the four collapse rules. Then we backtest it
+with the default rule, [`LastObservation`](@ref), against the every-field hierarchy on the
+static panel of section 7.
 =#
 
 collapse_rows = DataFrame()
@@ -428,9 +438,8 @@ pretty_table(DataFrame([backtest_row("Static panel", last(results[2])),
 #=
 The time-varying panel earns the higher ratio of the two here, and the last column is what
 it costs. It moves its weights more than twice as far between rebalances, because a table that
-is restated every day gives a tree that changes every fold. It is the same trade the static
-panel makes, read from the other side, which is why the shape of the input is a modelling
-decision rather than a question of formatting.
+is restated every day gives a tree that changes every fold. The two panels also hold different
+fields, so the shape of the input is not the only difference between the two rows.
 
 ## 9. Summary
 

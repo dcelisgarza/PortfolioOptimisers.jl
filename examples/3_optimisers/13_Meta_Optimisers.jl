@@ -7,11 +7,11 @@ Description = "Meta-optimisers in PortfolioOptimisers.jl: nested clustered, stac
 
 Every optimiser so far gives weights by solving one problem. A meta-optimiser runs other
 optimisers instead. It splits the problem, solves each piece with the estimator you name, and
-puts the pieces back together. One fit over every asset rests on one set of estimates, and a
-meta-optimiser spreads that risk. It also lets you apply a different rule to a different part
-of the universe.
+puts the pieces back together. One fit over every asset depends on one set of estimates, and
+a meta-optimiser splits that dependence across several fits. It also lets you apply a different
+rule to a different part of the universe.
 
-`PortfolioOptimisers` has three, and each one has an inner slot and an outer slot.
+`PortfolioOptimisers` has three.
 
   - [`NestedClustered`](@ref), or NCO, clusters the assets, runs an inner optimiser inside
     each cluster, and runs an outer optimiser over the clusters.
@@ -20,11 +20,13 @@ of the universe.
   - [`SubsetResampling`](@ref) optimises over random subsets of the assets many times and
     averages the weights, which is bagging applied to a portfolio.
 
-Both slots take any optimisation estimator, including another meta-optimiser, so you can nest
-them as deep as you like.
+`NestedClustered` takes one inner optimiser in `opti` and an outer one in `opto`. `Stacking`
+takes a list of inner optimisers in `opti` and an outer one in `opto`. `SubsetResampling` takes
+one optimiser in `opt`. Each of these keywords takes any optimiser that gives continuous weights,
+including another meta-optimiser, so you can nest them as deep as you like.
 
 !!! tip "When to reach for this"
-    Reach for a meta-optimiser when one fit over every asset rests on more estimates than you
+    Reach for a meta-optimiser when one fit over every asset depends on more estimates than you
     trust. Use NCO when the cluster structure is sound and you want a different rule inside a
     cluster and across clusters. Use Stacking when you want several rules to share the
     decision rather than one. Use SubsetResampling when you want the weights to depend less on
@@ -43,10 +45,10 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data and shared ingredients
+## 1. Data and shared ingredients
 
-We use the same S&P 500 slice as the other optimiser examples. We build a prior, a
-clustering and a solver once, and every meta-optimiser below reads them.
+We use one year of daily prices for twenty S&P 500 stocks. We build a prior, a clustering and
+a solver once, and every meta-optimiser below uses them.
 =#
 
 using CSV, TimeSeries, DataFrames, Clarabel
@@ -61,9 +63,9 @@ pr = prior(EmpiricalPrior(), rd)
 clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
 
 #=
-The two slots take their statistics from different places, and the cell below shows how. The
-[`MeanRisk` objectives](01_MeanRisk_Objectives.md) page covers the wider point, that a slot
-takes a computed result or an estimator that computes one.
+The inner and the outer optimiser take their statistics from different places, and the cell
+below shows how. The [`MeanRisk` objectives](01_MeanRisk_Objectives.md) page covers the wider
+point, that a keyword takes a computed result or an estimator that computes one.
 
 The inner optimiser gets the prior we computed above, through `pe = pr` on its
 [`JuMPOptimiser`](@ref). It solves over the returns of the real assets, and that is what the
@@ -72,8 +74,8 @@ prior describes.
 The outer optimiser gets no prior. It solves over the returns the meta-optimiser builds, one
 series per cluster for NCO and one per inner portfolio for [`Stacking`](@ref). A prior over the
 assets does not describe those series. The outer optimiser computes what it needs from them
-when it solves, so it needs only a solver here. Pass `pe = pr` to the outer optimiser and it
-reads the asset prior in place of the statistics of those series.
+when it solves, so it needs only a solver here. The constructor refuses a computed prior on
+the outer optimiser.
 =#
 
 jopti = JuMPOptimiser(; pe = pr, slv = slv)
@@ -91,8 +93,8 @@ res_bench = optimise(MeanRisk(; obj = MinimumRisk(),
 ## 2. Nested clustered optimisation (NCO)
 
 NCO solves a minimum-variance problem inside each cluster. It then turns each cluster into
-one series of returns and solves a second minimum-variance problem over those series. The two
-slots are independent. Both hold a [`MeanRisk`](@ref) here, and either one takes a
+one series of returns and solves a second minimum-variance problem over those series. The
+inner and the outer optimiser are independent. Both hold a [`MeanRisk`](@ref) here, and either one takes a
 risk-budgeting, hierarchical or naive estimator instead.
 =#
 
@@ -135,9 +137,12 @@ res_ssr = optimise(SubsetResampling(; pe = pr,
 #=
 ## 5. Comparing the allocations
 
-All four columns below target minimum variance and get there by different routes. Read the
-three meta-optimiser columns against the plain fit, and read how far each one spreads the
-weight over the assets.
+The plain fit, NCO and subset resampling target minimum variance. The stacked portfolio
+combines three inner portfolios by minimum variance, and only one of them, the `MeanRisk` fit,
+targets minimum variance itself. On
+this data the outer fit puts all its weight on the minimum-variance member, so the `Stacking`
+column is the same as the `MinVar` column. Read the other two meta-optimiser columns against
+the plain fit, and read how far each one spreads the weight over the assets.
 =#
 
 pretty_table(DataFrame(; :assets => rd.nx, :MinVar => res_bench.w, :NCO => res_nco.w,
@@ -150,7 +155,6 @@ pretty_table(DataFrame(; :assets => rd.nx, :MinVar => res_bench.w, :NCO => res_n
 The plot stacks the same four allocations, with the plain minimum-variance fit first.
 =#
 
-# Composition of the benchmark and the three meta-optimisers.
 using StatsPlots, GraphRecipes
 plot_stacked_bar_composition([res_bench, res_nco, res_stk, res_ssr], rd)
 

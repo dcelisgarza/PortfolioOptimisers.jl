@@ -21,7 +21,7 @@ error in those estimates moves the weights less, and variance-based risk needs n
     measure and its own scalariser.
   - [`SchurComplementHierarchicalRiskParity`](@ref), or SCHRP, corrects the covariance of each
     sub-cluster with a Schur complement. At `gamma = 0` it gives HRP, and as `gamma` rises
-    toward 1 it moves toward a Markowitz allocation.
+    toward 1 it moves toward the minimum-variance portfolio.
 
 !!! tip "When to reach for this"
     Reach for a clustering optimiser when you want the correlation structure of the assets to
@@ -51,9 +51,9 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. Data
 
-We use the same S&P 500 slice as the other optimiser examples.
+We use one year of daily prices for twenty S&P 500 stocks.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -80,14 +80,12 @@ clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
 
 #=
 The two plots below show the structure every optimiser on this page acts on. The first is
-the dendrogram. The second is the correlation heatmap, reordered by the tree, with a box
-around each cluster.
+the dendrogram.
 =#
 
-# Hierarchical clustering dendrogram.
 using StatsPlots, GraphRecipes
 plot_dendrogram(clr, rd.nx)
-# Reordered correlation heatmap with cluster boundary boxes.
+# The second is the correlation heatmap, reordered by the tree, with a box around each cluster.
 plot_clusters(clr, rd.nx)
 
 #=
@@ -116,11 +114,13 @@ res_herc = optimise(HierarchicalEqualRiskContribution(; opt = opt, ri = Variance
 #=
 ## 5. Schur-complement HRP (SCHRP)
 
-SCHRP corrects the covariance of each sub-cluster with a Schur complement of the block that
-holds the covariances between clusters. `gamma` sets how much of that correction enters. At
-`gamma = 0` the result is HRP. As `gamma` rises the allocation reads more of what happens
-between clusters and moves toward a Markowitz allocation, and the tree still sets the shape.
-We run three values so you can read the change.
+SCHRP corrects the covariance of each half of a split with a Schur complement. The correction
+subtracts a term that the covariances between the two halves build, and `gamma` scales it. At
+`gamma = 0` the result is HRP. As `gamma` rises, more of the covariance between the halves
+enters, and the allocation moves toward the minimum-variance portfolio. Under the default
+[`MonotonicSchurComplement`](@ref), `gamma` is the upper end of a search. The optimiser uses
+the largest value from 0 to `gamma` up to which the variance of the portfolio keeps falling. We
+run three values so you can compare them.
 =#
 
 res_schur0 = optimise(SchurComplementHierarchicalRiskParity(; opt = opt,
@@ -139,9 +139,9 @@ res_schur9 = optimise(SchurComplementHierarchicalRiskParity(; opt = opt,
 #=
 ## 6. Comparing the allocations
 
-Every column below comes from one prior and one clustering, so the allocation rule is the
-only thing that changed. Read the SCHRP column at `gamma = 0` against the HRP column, then
-read the two columns at the higher values of `gamma`.
+Read the SCHRP column at `gamma = 0` against the HRP column, then read the two columns at the
+higher values of `gamma`. Under the search, two values of `gamma` can give almost the same
+weights, as 0.5 and 0.9 do here.
 =#
 
 pretty_table(DataFrame(; :assets => rd.nx, :HRP => res_hrp.w, :HERC => res_herc.w,
@@ -156,9 +156,9 @@ The next plot stacks the same five allocations.
 plot_stacked_bar_composition([res_hrp, res_herc, res_schur0, res_schur5, res_schur9], rd)
 
 #=
-The last plot draws the per-asset variance risk contributions of the HRP portfolio. The
-hierarchy spreads the risk, not the money. [`factory`](@ref) fills the risk measure with the
-covariance of the prior first.
+The last plot draws the share of the variance of the HRP portfolio that each asset carries.
+Read it against the HRP weights in the table above. The plot needs a variance that holds a
+covariance, and [`factory`](@ref) gives it the covariance of the prior.
 =#
 
 rv = factory(Variance(), pr)

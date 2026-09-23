@@ -38,9 +38,9 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. Data
 
-We use the same S&P 500 slice as the other optimiser examples.
+We use one year of daily prices for twenty S&P 500 stocks.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -77,7 +77,8 @@ opt = JuMPOptimiser(; pe = pr, slv = slv)
 ## 3. The reference: a `MeanRisk` corner solution
 
 We first solve for the largest risk-adjusted return. This is the extreme point that NOC
-centres around.
+centres around. `rf` is the daily risk-free rate that the ratio subtracts from the expected
+return, 4.2% a year divided by 252 trading days.
 =#
 
 res_mr = optimise(MeanRisk(; r = StandardDeviation(), obj = MaximumRatio(; rf = rf),
@@ -110,9 +111,7 @@ res_noc_c = optimise(NearOptimalCentering(; r = StandardDeviation(),
 #=
 ## 6. Comparing the allocations
 
-Read the three weight columns against each other. The extreme maximum-ratio portfolio puts
-its money on a couple of assets. Both NOC columns hold many more, because the centre of the
-near-optimal region sits away from the corner the extreme point occupies.
+Read the three weight columns against each other.
 =#
 
 pretty_table(DataFrame(; :assets => rd.nx, Symbol("MaxRatio (extreme)") => res_mr.w,
@@ -120,7 +119,7 @@ pretty_table(DataFrame(; :assets => rd.nx, Symbol("MaxRatio (extreme)") => res_m
                        Symbol("NOC constrained") => res_noc_c.w); formatters = [resfmt])
 
 #=
-The next table prints two numbers per portfolio, the largest single weight and the number of
+We print two numbers per portfolio, the largest single weight and the number of
 assets whose weight is above 0.01%.
 =#
 
@@ -136,12 +135,15 @@ pretty_table(DataFrame(;
                             summarise(res_noc_c.w)[2]]))
 
 #=
+The extreme maximum-ratio portfolio holds far fewer assets than either NOC portfolio, and its
+largest weight is larger. The centre of the near-optimal region lies away from the corner that
+the extreme point occupies.
+
 ## 7. Visualising the compositions
 
 The plot stacks the three allocations, with the extreme portfolio first.
 =#
 
-# Composition of the extreme portfolio and the two centred ones.
 using StatsPlots, GraphRecipes
 plot_stacked_bar_composition([res_mr, res_noc_u, res_noc_c], rd)
 
