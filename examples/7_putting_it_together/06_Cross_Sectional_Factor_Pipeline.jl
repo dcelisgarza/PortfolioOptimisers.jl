@@ -113,9 +113,9 @@ The panel is part of `rd`, and `rd` is already in the `:returns` slot. No code b
 again.
 =#
 
-pretty_table(DataFrame("Carrier" => string(nameof(typeof(rd))),
-                       "Panel Fields on rd.pnl" => length(rd.pnl.pf),
-                       "Slot it rides" => ":returns"))
+pretty_table(DataFrame("Type of rd" => string(nameof(typeof(rd))),
+                       "Panel fields on rd.pnl" => length(rd.pnl.pf),
+                       "Pipeline slot" => ":returns"))
 
 #=
 ## 2. The hand-wired route
@@ -197,7 +197,7 @@ returned the same weight for every name.
 pretty_table(DataFrame("max |w_pipeline - w_direct|" => maximum(abs, piped.w - direct.w),
                        "sum(w)" => sum(piped.w), "Names held" => count(>(1e-6), piped.w),
                        "Size exposure" => (transpose(direct.pa.pr.rr.M) * piped.w)[6]);
-             formatters = [numfmt], title = "The Pipeline reaches the deep dive's book")
+             formatters = [numfmt], title = "Pipeline route against the hand-wired route")
 
 #=
 ## 5. Fold by fold
@@ -228,12 +228,11 @@ pretty_table(DataFrame("Fold" => eachindex(folds_pipe.pred),
                                                                  folds_pipe.pred[i].res.w - folds_direct.pred[i].res.w)
                                                          for i in eachindex(folds_pipe.pred)],
                        "Names held" => [count(>(1e-6), p.res.w) for p in folds_pipe.pred]);
-             formatters = [numfmt],
-             title = "Fold by fold, the two routes are the same book")
+             formatters = [numfmt], title = "Largest weight difference in each fold")
 
 pretty_table(DataFrame("max |predicted returns difference|" =>
                            maximum(abs, folds_pipe.mrd.X - folds_direct.mrd.X));
-             formatters = [numfmt], title = "And so are the returns they predict")
+             formatters = [numfmt], title = "Largest difference of the predicted returns")
 
 #=
 ## Where to go next

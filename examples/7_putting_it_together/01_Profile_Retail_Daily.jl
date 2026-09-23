@@ -78,8 +78,7 @@ retail = optimise(MeanRisk(; obj = MinimumRisk(),
                                                fees = Fees(; l = 0.001))))
 
 pretty_table(DataFrame("Asset" => rd.nx, "Current" => current_book, "Target" => retail.w);
-             formatters = [resfmt],
-             title = "Retail daily target — capped, low-turnover, net of fees")
+             formatters = [resfmt], title = "Retail daily target against the current book")
 
 #=
 Compare the two weight columns. No target is further than 0.05 from its current weight, and the
