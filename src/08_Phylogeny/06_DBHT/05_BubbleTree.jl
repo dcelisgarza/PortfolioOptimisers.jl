@@ -80,9 +80,9 @@ end
              Mb::MatNum, Mv::MatNum,
              CliqList::MatNum)
 
-Compute the directed bubble hierarchy tree (DBHT) for a Maximal Planar Graph (MPG).
+Compute the directed bubble hierarchical tree (DBHT) for a Maximal Planar Graph (MPG).
 
-This function assigns directions to each separating 3-clique in the undirected bubble tree of a Planar Maximally Filtered Graph (PMFG), producing the directed bubble hierarchy tree (DBHT). The direction is determined by comparing the sum of edge weights on either side of each separating clique, enabling the identification of converging and diverging bubbles.
+This function assigns directions to each separating 3-clique in the undirected bubble tree of a Planar Maximally Filtered Graph (PMFG), producing the directed bubble hierarchical tree (DBHT). The direction is determined by comparing the sum of edge weights on either side of each separating clique, enabling the identification of converging and diverging bubbles.
 
 # Mathematical definition
 
@@ -185,7 +185,7 @@ end
 
 Obtain non-discrete and discrete clusterings from the bubble topology of the Planar Maximally Filtered Graph (PMFG).
 
-This function assigns each vertex to a cluster based on the directed bubble hierarchy tree (DBHT) structure. It computes both a non-discrete cluster membership matrix and a discrete cluster assignment vector, using the converging bubbles identified in the directed bubble tree.
+This function assigns each vertex to a cluster based on the directed bubble hierarchical tree (DBHT) structure. It computes both a non-discrete cluster membership matrix and a discrete cluster assignment vector, using the converging bubbles identified in the directed bubble tree.
 
 # Mathematical definition
 

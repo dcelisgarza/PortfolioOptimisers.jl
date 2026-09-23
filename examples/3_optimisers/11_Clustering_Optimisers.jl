@@ -71,7 +71,7 @@ A clustering optimiser needs two things you can compute once, a prior for the co
 a clustering of the assets. We compute both here and hand them to every optimiser below, so
 the only difference between the results is the allocation rule.
 
-We cluster with the Direct Bubble Hierarchy Tree algorithm, [`DBHT`](@ref), which builds the
+We cluster with the Direct Bubble Hierarchical Tree algorithm, [`DBHT`](@ref), which builds the
 tree from the distance matrix the correlations give.
 =#
 
