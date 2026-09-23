@@ -206,15 +206,16 @@ function plot_stacked_area_composition end
         nx::AbstractVector = 1:length(w),
         delta::Number = 1e-6,
         marginal::Bool = false,
-        percentage::Bool = false,
+        percentage::Bool = true,
+        erc::Bool = true,
         N::Option{<:Number} = nothing,
         sca::Scalariser = SumScalariser(),
         kwargs...
     ) -> Plot
-    plot_risk_contribution(r, w, rd::ReturnsResult, fees = nothing; delta, marginal, percentage, N, sca, kwargs...) -> Plot
-    plot_risk_contribution(r, res::OptimisationResult, rd; delta, marginal, percentage, N, sca, kwargs...) -> Plot
-    plot_risk_contribution(r, res::OptimisationResult, pr; nx, delta, marginal, percentage, N, sca, kwargs...) -> Plot
-    plot_risk_contribution(r, pred::PredictionResult, fees = nothing; delta, marginal, percentage, N, sca, kwargs...) -> Plot
+    plot_risk_contribution(r, w, rd::ReturnsResult, fees = nothing; delta, marginal, percentage, erc, N, sca, kwargs...) -> Plot
+    plot_risk_contribution(r, res::OptimisationResult, rd; delta, marginal, percentage, erc, N, sca, kwargs...) -> Plot
+    plot_risk_contribution(r, res::OptimisationResult, pr; nx, delta, marginal, percentage, erc, N, sca, kwargs...) -> Plot
+    plot_risk_contribution(r, pred::PredictionResult, fees = nothing; delta, marginal, percentage, erc, N, sca, kwargs...) -> Plot
 
 Plot per-asset risk contribution as a bar chart.
 
@@ -233,7 +234,8 @@ A fold whose scheme set neither `wd` nor `pws` carries no record, so it kept no 
   - `nx::AbstractVector = 1:length(w)`: Asset names.
   - `delta::Number = 1e-6`: Finite-difference step size for [`risk_contribution`](@ref). Must be `> 0`.
   - `marginal::Bool = false`: If `true`, compute marginal risk contribution; otherwise component.
-  - `percentage::Bool = false`: If `true`, normalise contributions to percentages.
+  - `percentage::Bool = true`: If `true`, divide the contributions by their sum, so the bars sum to one.
+  - `erc::Bool = true`: If `true`, draw a horizontal line at the mean contribution over every asset. When `marginal` is `false`, this is the height of each bar under an equal risk contribution.
   - `N::Option{<:Number} = nothing`: Maximum number of assets to display.
   - `sca::Scalariser = SumScalariser()`: Scalariser combining the measures in `r`. Inert when `r` is a single measure. Pass `res.sca` to report the figure the optimisation ran under.
 
@@ -271,13 +273,17 @@ function plot_risk_contribution end
         nf::Option{<:AbstractVector} = nothing,
         delta::Number = 1e-6,
         N::Option{<:Number} = nothing,
+        percentage::Bool = true,
+        erc::Bool = true,
         sca::Scalariser = SumScalariser(),
         kwargs...
     ) -> Plot
-    plot_factor_risk_contribution(r, res::OptimisationResult, rd; re, delta, N, sca, kwargs...) -> Plot
-    plot_factor_risk_contribution(r, pred::PredictionResult, fees = nothing; re, delta, N, sca, kwargs...) -> Plot
+    plot_factor_risk_contribution(r, res::OptimisationResult, rd; re, delta, N, percentage, erc, sca, kwargs...) -> Plot
+    plot_factor_risk_contribution(r, pred::PredictionResult, fees = nothing; re, delta, N, percentage, erc, sca, kwargs...) -> Plot
 
-Plot per-factor risk contribution as a bar chart, including the constant (idiosyncratic) term.
+Plot per-factor risk contribution as a bar chart. The last bar, `"Off-factor"`, is the off-factor contribution: the contribution of the part of the weights that has no exposure to any factor. It is not a regression intercept. See [`factor_risk_contribution`](@ref).
+
+The bars take the names in `nf`, or else in `rd.nf`, only when the names count the columns of the loadings. A dimension-reduction regression fits fewer columns than there are factors, so its bars are numbered.
 
 ## A fold
 
@@ -294,6 +300,8 @@ The fold-taking method is the twin of [`plot_risk_contribution`](@ref)'s, and it
   - `nf::Option{<:AbstractVector} = nothing`: Factor names; overrides `rd.nf` when provided.
   - `delta::Number = 1e-6`: Finite-difference step size. Must be `> 0`.
   - `N::Option{<:Number} = nothing`: Maximum number of factors to display.
+  - `percentage::Bool = true`: If `true`, divide the contributions by their sum, so the bars sum to one.
+  - `erc::Bool = true`: If `true`, draw a horizontal line at the mean contribution over every factor and the off-factor term. This is the height of each bar under an equal risk contribution.
   - `sca::Scalariser = SumScalariser()`: Scalariser combining the measures in `r`. Inert when `r` is a single measure. Pass `res.sca` to report the figure the optimisation ran under.
 
 # Validation
@@ -587,7 +595,7 @@ function plot_network end
         X::MatNum,
         nx::AbstractVector = 1:size(X, 2);
         N::Option{<:Number} = nothing,
-        percentage::Bool = false,
+        percentage::Bool = true,
         kwargs...
     ) -> Plot
     plot_centrality(cte, pr::AbstractPriorResult, nx = 1:size(pr.X,2); N, percentage, kwargs...) -> Plot
@@ -606,7 +614,7 @@ A non-investable asset is **not drawn**. The figure fits a centrality vector on 
   - `N::Option{<:Number} = nothing`: Maximum number of assets to display.
     `nothing` auto-selects via [`number_effective_assets`](@ref).
     A value in `(0, 1]` is treated as a cumulative score threshold; a value `> 1` as an asset count.
-  - `percentage::Bool = false`: If `true`, normalise scores to sum to one.
+  - `percentage::Bool = true`: If `true`, normalise scores to sum to one.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
@@ -1158,7 +1166,7 @@ function plot_cokurtosis end
         N::Option{<:Number} = nothing,
         delta::Number = 1e-6,
         marginal::Bool = false,
-        percentage::Bool = false,
+        percentage::Bool = true,
         alpha::Number = 0.05,
         kappa::Number = 0.3,
         rw = nothing,
@@ -1190,7 +1198,7 @@ Each panel takes its own side of the draw/compute rule, and this figure adds no 
   - `N::Option{<:Number} = nothing`: Forwarded to composition and risk contribution panels.
   - `delta::Number = 1e-6`: Finite-difference step for risk contribution. Must be `> 0`.
   - `marginal::Bool = false`: Marginal vs component risk contribution.
-  - `percentage::Bool = false`: Normalise risk contributions to percentages.
+  - `percentage::Bool = true`: If `true`, divide the risk contributions of panel 3 by their sum, so the bars sum to one.
   - `alpha::Number = 0.05`: Confidence level for drawdown risk lines.
   - `kappa::Number = 0.3`: Relativistic parameter for RLDaR.
   - `rw`: Observation weights for drawdown risk measures.

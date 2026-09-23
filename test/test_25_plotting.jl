@@ -96,6 +96,23 @@
     @testset "plot_factor_risk_contribution" begin
         # rd supplies both asset returns (rd.X) and factor data for regression
         @test is_plot(plot_factor_risk_contribution(r_cvr, w_rd, rd.X; rd = rd))
+        # The last bar is the off-factor contribution, not an intercept, and the factor names
+        # apply only when they count the columns of the loadings (#1290). A large `N` keeps
+        # every bar, so no bar folds into "Others".
+        p_sw = plot_factor_risk_contribution(r_cvr, w_rd, rd.X; rd = rd, N = 100)
+        @test p_sw[1][:xaxis][:ticks][2] == [rd.nf; "Off-factor"]
+        nf_ab = string.('a':'z')[1:length(rd.nf)]
+        p_nf = plot_factor_risk_contribution(r_cvr, w_rd, rd.X; rd = rd, nf = nf_ab,
+                                             N = 100)
+        @test p_nf[1][:xaxis][:ticks][2] == [nf_ab; "Off-factor"]
+        # A dimension-reduction regression fits fewer columns than there are factors, so the
+        # factor names would put a factor's name on the off-factor bar.
+        re_dr = DimensionReductionRegression()
+        k_dr = length(factor_risk_contribution(r_cvr, w_rd, rd.X; rd = rd, re = re_dr)) - 1
+        @test k_dr < length(rd.nf)
+        p_dr = plot_factor_risk_contribution(r_cvr, w_rd, rd.X; rd = rd, re = re_dr,
+                                             N = 100)
+        @test p_dr[1][:xaxis][:ticks][2] == [string.(1:k_dr); "Off-factor"]
     end
 
     @testset "plot_dendrogram" begin

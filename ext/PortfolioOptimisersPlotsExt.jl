@@ -1475,13 +1475,18 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
         throw(DomainError(N, "N must be > 0"))
     end
     rc = factor_risk_contribution(r, w, X, fees; re = re, rd = rd, delta = delta, sca = sca)
-    factor_names = if !isnothing(nf) && length(rc) <= length(nf) + 1
-        [nf; "Constant"]
-    elseif !isnothing(rd.nf) && length(rc) <= length(rd.nf) + 1
-        [rd.nf; "Constant"]
+    # The last element is the contribution of the part of `w` with no exposure to any factor,
+    # not a regression intercept, so its bar is named for that. The names apply only when they
+    # count the columns of the loadings: a dimension-reduction regression fits fewer columns
+    # than there are factors, and its bars are numbered.
+    factor_names = if !isnothing(nf) && length(rc) == length(nf) + 1
+        nf
+    elseif !isnothing(rd.nf) && length(rc) == length(rd.nf) + 1
+        rd.nf
     else
-        [string.(1:(length(rc) - 1)); "Constant"]
+        string.(1:(length(rc) - 1))
     end
+    factor_names = [factor_names; "Off-factor"]
     if percentage
         rc = rc / sum(rc)
     end
