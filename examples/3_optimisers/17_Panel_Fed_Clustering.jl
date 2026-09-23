@@ -184,12 +184,12 @@ level of the categorical field.
 Z = feature_matrix(pnl)
 nz = feature_labels(pnl)
 
-pretty_table(DataFrame("Panel Field" => [f.name for f in pnl.pf],
+pretty_table(DataFrame("Field" => [f.name for f in pnl.pf],
                        "Kind" => [string(nameof(typeof(f))) for f in pnl.pf],
                        "Columns it contributes" =>
                            [count(l -> first(l) == f.name || l == f.name, nz)
                             for f in pnl.pf]);
-             title = "Six Panel Fields, $(size(Z, 2)) feature columns")
+             title = "Six fields, $(size(Z, 2)) feature columns")
 
 println("Static panel: ", PortfolioOptimisers.panel_is_static(pnl))
 println("The labels rebuild the matrix: ", feature_matrix(pnl, nz) == Z)
@@ -266,7 +266,7 @@ obs_rows = DataFrame()
 for f in raw_fields
     m = feature_matrix(pnl, [f => :observed])
     append!(obs_rows,
-            DataFrame("Panel Field" => f, "Reported" => Int(sum(m)),
+            DataFrame("Field" => f, "Reported" => Int(sum(m)),
                       "Missing" => Int(length(m) - sum(m))))
 end
 pretty_table(obs_rows; title = "What the fill policy recorded")
@@ -375,10 +375,10 @@ pnl_tv = asset_panel([NumericPanelInput(; name = "book_to_price", vals = drift,
                       panel_input(sets, "nx_sector")])
 rd_tv = ReturnsResult(; nx = rd0.nx, X = rd0.X, ts = rd0.ts, pnl = pnl_tv)
 
-pretty_table(DataFrame("Panel" => ["Static (§3)", "Time-varying (§8)"],
+pretty_table(DataFrame("Panel" => ["Static (section 3)", "Time-varying (section 8)"],
                        "Static?" => [PortfolioOptimisers.panel_is_static(pnl),
                                      PortfolioOptimisers.panel_is_static(pnl_tv)],
-                       "Feature Matrix" => [string(size(feature_matrix(pnl))),
+                       "Feature matrix" => [string(size(feature_matrix(pnl))),
                                             string(size(feature_matrix(pnl_tv)))],
                        "After a 100-row, 3-asset view" =>
                            [string(size(feature_matrix(PortfolioOptimisers.port_opt_view(rd,

@@ -126,7 +126,7 @@ lcs = LinearConstraintEstimator(; val = ["VLUE <= 0.74", "QUAL >= -0.07", "MTUM=
 r_fac = Variance(; rc = lcs)
 
 rf_fac = factory(r_fac, pr)
-factor_df = DataFrame(; factor = [rd.nf; "Intercept"])
+factor_df = DataFrame(; factor = [rd.nf; "Off-factor"])
 factor_res = Dict{Symbol, Any}()
 
 for (name, obj) in obj_specs

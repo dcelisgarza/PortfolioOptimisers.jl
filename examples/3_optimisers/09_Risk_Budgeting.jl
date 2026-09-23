@@ -220,7 +220,7 @@ rfk = factory(Variance(), prf)
 frc = factor_risk_contribution(rfk, res_frb.w, prf.X; rd = rdf)
 frc ./= sum(frc)
 
-pretty_table(DataFrame(; :factor => [rdf.nf; "Intercept"], :risk => frc);
+pretty_table(DataFrame(; :factor => [rdf.nf; "Off-factor"], :risk => frc);
              formatters = [resfmt])
 
 plot_factor_risk_contribution(rfk, res_frb, rdf)
