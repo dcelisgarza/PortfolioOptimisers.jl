@@ -11,7 +11,7 @@ It holds the **factor observations** on the same terms again. A prior whose batc
 
 Whether the buffer records a mask, and whether it records factor rows, is fixed by its first append, exactly as the width and the element type are, and a later fold that disagrees is refused by name in both directions. A buffer holding no observations records nothing about them, so it empties and seeds afresh.
 
-Two kinds of member hold one. A **carry** folds its estimate exactly and keeps the observations because a consumer downstream reads them — [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures — so the buffer is memory rather than arithmetic. A **refit** has no recursion at all, and its read-out runs the batch verb over the buffer. Neither is a windowed estimator: [`Online`](@ref) is the configuration that seeds a buffer, and `max_history` caps what the buffer keeps and nothing else.
+An estimator whose `cache` holds this buffer is a **refit**. It has no recursion of its own, and its read-out runs the batch verb over the rows the buffer holds. [`Online`](@ref) seeds the buffer, and a wrapped estimator takes this route also when its statistic has an exact update. A **fold-and-carry** prior keeps its observations in one of these buffers too, inside a [`PriorCarryState`](@ref). That prior folds its moments exactly and keeps the rows because [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, and its buffer is seeded with no cap. `max_history` is the window of a refit: a capped buffer holds the last `max_history` observations, and the read-out is the batch fit over them.
 
 The rows are held in a backing matrix with spare capacity, so an append costs amortised `O(1)`: `off` is the number of rows before the valid region and `n` its length, and the region is moved to the front of the backing matrix only when the append would run past its end. [`sample_buffer`](@ref) reads the valid region out.
 
@@ -70,6 +70,7 @@ PortfolioOptimisers.SampleBufferState
 
   - [`AbstractPartialFitState`](@ref)
   - [`Online`](@ref)
+  - [`PriorCarryState`](@ref)
   - [`sample_buffer`](@ref)
   - [`sample_buffer_kwargs`](@ref)
   - [`factor_buffer`](@ref)
