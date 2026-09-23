@@ -190,7 +190,7 @@ res_range_d = optimise(MeanRisk(; r = r_range_default, opt = opt))
 res_range_c = optimise(MeanRisk(; r = r_range_custom, opt = opt))
 
 pretty_table(DataFrame(; :assets => rd.nx, :TailGiniRange => res_range_d.w,
-                       :CVaR_vs_WorstGain => res_range_c.w); formatters = [resfmt])
+                       :CVaR_plus_MaxReturn => res_range_c.w); formatters = [resfmt])
 
 #=
 ## 6. Maximum risk-adjusted ratio with an OWA measure
