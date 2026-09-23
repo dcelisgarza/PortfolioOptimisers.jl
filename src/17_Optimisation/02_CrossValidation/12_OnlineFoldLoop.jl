@@ -49,7 +49,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
                             w_prev = w_prev)
 end
 """
-    online_step_fold(est, ctx::Option{<:TimeDependentContext}, rd::ReturnsResult)
+    online_step_fold(est, ctx::Option{<:TimeDependentContext}, rd::Prices_RR)
 
 Folds a fold's rows into the threaded estimator, inside the fold's own values of the schedules its *step* reads.
 
@@ -61,7 +61,7 @@ The default is [`partial_fit!`](@ref), and it is the answer for every family but
 
   - `est`: The estimator the loop threads, with its schedules unresolved.
   - `ctx`: The fold's context, or `nothing`.
-  - `rd`: The carrier of the rows the fold has gained.
+  - `rd`: The carrier of the rows the fold has gained: returns, or the prices a [`Pipeline`](@ref) host threads.
 
 # Returns
 
@@ -74,10 +74,10 @@ The default is [`partial_fit!`](@ref), and it is the answer for every family but
   - [`assert_stateless_schedule`](@ref)
   - [`TimeDependentContext`](@ref)
 """
-function online_step_fold(est, ::Nothing, rd::ReturnsResult)
+function online_step_fold(est, ::Nothing, rd::Prices_RR)
     return partial_fit!(est, rd)
 end
-function online_step_fold(est, ::TimeDependentContext, rd::ReturnsResult)
+function online_step_fold(est, ::TimeDependentContext, rd::Prices_RR)
     return partial_fit!(est, rd)
 end
 """
