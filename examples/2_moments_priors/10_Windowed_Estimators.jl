@@ -7,14 +7,15 @@ Description = "Windowed moment estimators in PortfolioOptimisers.jl: compute a m
 
 Every moment estimator of the previous pages used the whole return sample, with equal weight on
 each observation. That is the right default when the process that makes the returns does not
-change, and in markets it does. Volatility comes in clusters and correlations rise in a crisis,
-so the risk of an asset today can differ a lot from its risk three years ago. A windowed estimator
-computes a moment from a chosen part of the history, or weights some observations more than
-others, instead of using the full sample with equal weights.
+change. In markets the process changes. Volatility comes in clusters and correlations rise in a
+crisis, and the risk of an asset today can differ a lot from its risk three years ago. A
+windowed estimator computes a moment from a chosen part of the history, or weights some
+observations more than others, instead of using the full sample with equal weights.
 
 Each moment estimator has a windowed form: [`WindowedExpectedReturns`](@ref),
 [`WindowedCovariance`](@ref), [`WindowedVariance`](@ref), [`WindowedCoskewness`](@ref) and
-[`WindowedCokurtosis`](@ref). Each takes two keywords.
+[`WindowedCokurtosis`](@ref). Each wraps a plain estimator of its moment, such as `ce` for the
+covariance or `me` for the mean, and adds two keywords.
 
   - `window` is an integer or a vector of indices. An integer uses the last `window`
     observations. A vector uses the observations at those indices, which is a period you pick.

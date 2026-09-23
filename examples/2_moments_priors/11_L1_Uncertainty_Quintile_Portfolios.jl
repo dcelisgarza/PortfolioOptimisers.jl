@@ -22,7 +22,7 @@ ball is the only parameter, and it sets how many assets the portfolio holds.
 | `ε` moderate | the quintile portfolio | about 20 % of the assets |
 | `ε` large | the 1/N portfolio | all the assets, with equal weights |
 
-So you get the quintile portfolio when you believe your forecast in part, and the 1/N portfolio
+You get the quintile portfolio when you believe your forecast in part, and the 1/N portfolio
 when you do not believe it at all.
 
 For that reason the library has no quintile optimiser. An ℓ1 ball is an
@@ -54,9 +54,9 @@ end;
 ## 1. Data and solver
 
 We use the same S&P 500 slice as the other examples. The worst case over an ℓ1 ball is an
-infinity norm, and an epigraph variable makes an infinity norm linear. So every ℓ1 model of this
-page is a linear program, or a mixed-integer linear program in section 7, and HiGHS solves
-both.
+infinity norm. One extra variable that bounds every entry makes an infinity norm linear. Every
+ℓ1 model of this page is a linear program, or a mixed-integer linear program in section 7,
+and HiGHS solves both.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -120,10 +120,9 @@ pretty_table(DataFrame(;
              formatters = [(v, i, j) -> isa(v, Number) ? string(round(v; sigdigits = 3)) : v])
 
 #=
-All four radii lie in `[0, 0.06]`, so do not set `ε` yourself.
-[`ActiveAssetsUncertaintyAlgorithm`](@ref) inverts the closed forms of the paper. You give it
-the number of assets you want to hold, and it finds the radius. We build the set for 20 % of
-the assets.
+You do not need to find these radii by hand. [`ActiveAssetsUncertaintyAlgorithm`](@ref)
+inverts the closed forms of the paper. You give it the number of assets you want to hold, as a
+count or as a fraction, and it finds the radius. We build the set for 20 % of the assets.
 
 !!! warning "The number of assets sets the radius, and it does not constrain the portfolio"
     `active = 0.2` selects the radius that makes 20 % of the assets active on the problem with
@@ -240,7 +239,7 @@ pretty_table(DataFrame(; asset = rd.nx[nz], weight = w_ls[nz],
              formatters = [resfmt])
 
 #=
-The table holds four long and four short positions. Corollary 7 of the paper gives each weight
+The table shows four long and four short positions. Corollary 7 of the paper gives each weight
 as `±1/(2m)`, the net exposure as zero and the gross exposure as one.
 =#
 
@@ -249,7 +248,7 @@ as `±1/(2m)`, the net exposure as zero and the gross exposure as one.
 #=
 ## 7. A budget is an upper bound
 
-This section holds for every model of the library. The long and short variables are upper
+This section applies to every model of the library. The long and short variables are upper
 bounds on the positive and negative parts of `w`, so `sbgt = 0.3` means at most 30 % short. You
 do not usually see the difference, because the objective pushes the exposure to the budget.
 
@@ -278,12 +277,11 @@ exact = quintile(L1UncertaintySet(; eps = eps_extreme); bgt = 0.0, sbgt = 0.5, x
 
 #=
 !!! warning "`xbgt` makes a linear program a mixed-integer linear program"
-    It adds a binary variable per asset for the sign of the weight, and the big-M relaxation of
-    those variables is weak. On twenty assets the solve takes seconds, and on a large universe
-    it can take too long to be of use. `card`, `lt`, `st` and fixed fees build the same binary
-    variables, so with any of them `xbgt` adds no new ones. For the radii that give the quintile
-    and 1/N portfolios, the weights are the same with and without `xbgt`. Leave it off unless
-    your problem requires full investment.
+    It adds a binary variable per asset for the sign of the weight, and the solver must search
+    over the values of those variables. On twenty assets the solve takes seconds, and on a large
+    universe it can take too long to be of use. `card`, `lt`, `st` and fixed fees build the same
+    binary variables, so with any of them `xbgt` adds no new ones. Leave it off unless your
+    problem requires full investment.
 =#
 
 #=
@@ -342,16 +340,16 @@ pretty_table(DataFrame(; asset = rd.nx[act_vol], volatility = sd_assets[act_vol]
 !!! warning "Do not put the characteristic in the outer prior"
     You can also rank on volatility if you build the prior with
     [`StandardDeviationExpectedReturns`](@ref) and give the return term no `mu`. On this page
-    the two ways give the same weights, because with `NoRisk` nothing else reads `μ`. When
-    something else reads it, they differ. Every moment risk measure centres on the prior's `μ`,
+    the two ways give the same weights, because with `NoRisk` nothing else uses `μ`. When
+    something else uses it, they differ. Every moment risk measure centres on the prior's `μ`,
     and so do the value-at-risk measures and the normalisation of [`MaximumRatio`](@ref). With a
     mean-centred risk measure in place of `NoRisk`, the measure then computes deviations about
     a vector of volatilities. The same problem gives a different portfolio, and no warning tells
-    you. The prior's `μ` holds the expected returns of the assets. A ranking is not an expected
+    you. The prior's `μ` is the vector of expected returns. A ranking is not an expected
     return, so put it in the return term.
 
-The objective maximises the characteristic. A ranking on volatility thus puts the most volatile
-assets first. The low-volatility factor of the paper needs the opposite order. If a smaller
+The objective maximises the characteristic. With a ranking on volatility, the most volatile
+assets come first. The low-volatility factor of the paper needs the opposite order. If a smaller
 value of a characteristic is better, negate it. Here we pass the `mu` field a plain vector, the
 negated volatilities.
 =#
@@ -366,7 +364,7 @@ pretty_table(DataFrame(; asset = rd.nx[act_lv], volatility = sd_assets[act_lv],
                        weight = w_lowvol[act_lv]); formatters = [resfmt])
 
 #=
-The table holds the least volatile assets with equal weights, which is the low-volatility
+The portfolio holds the least volatile assets with equal weights, which is the low-volatility
 factor. We print the range of volatility of each selection and of all the assets. The two
 selections share no asset, and the only change between the two models is the sign of the
 characteristic.
@@ -379,16 +377,17 @@ characteristic.
 #=
 ## 10. Several terms at once, and what a floor costs
 
-One model can hold a ranking and an expected return. `ret` takes a vector of return terms, as
-`r` takes a vector of risk measures. The return of the model is the weighted sum
-`Σᵢ scaleᵢ · retᵢ` of the terms. The return side has no scalariser, and none is planned.
+One model can have a term for a ranking and a term for the expected return. `ret` takes a
+vector of return terms, as `r` takes a vector of risk measures. The return of the model is the
+weighted sum `Σᵢ scaleᵢ · retᵢ` of the terms. The `sca` field of [`JuMPOptimiser`](@ref) lets
+you choose how several risk measures combine, and the return side has no such choice.
 
 A term can also stay out of that sum. Each term has a [`JuMPReturnsSettings`](@ref), and
 `rte = false` keeps the term out of the objective while its `lb` still constrains the
 portfolio. Such a term changes the feasible set and adds nothing to the objective.
 
 We use it to find what a floor on the expected return costs the low-volatility portfolio above.
-The floor term has no `mu` of its own, so it uses the prior's `μ`, which holds the expected
+The floor term has no `mu` of its own, so it uses the prior's `μ`, the vector of expected
 returns. A volatility ranking in the prior would replace that value. We solve at four floors
 and print the number of assets, the expected return and the average volatility of each
 portfolio.
@@ -416,12 +415,13 @@ constraint is active. As the floor rises, the portfolio
 holds fewer assets and their average volatility rises. That is the cost of the floor in the
 units of the first term, and neither term alone can show it.
 
-When a model has several terms, two points hold.
+When a model has several terms, two rules apply.
 
   - `scale` is a weight and does not normalise. The model sums the terms as written, so two
     terms are averaged only if you halve both. Fees follow the same sum. A term charges fees
-    only if its `fee` flag is `true`. Two such terms at `scale = 1` thus subtract the fees
-    twice. Set `fee` and `mic` to `false` on any term that is not in units of return.
+    only if its `fee` flag is `true`. Two such terms at `scale = 1` subtract the fees twice.
+    Set `fee`, and `mic`, the flag for the market impact cost, to `false` on any term that is
+    not in units of return.
   - `rte = false` serves two cases. A term that is not in units of return does not belong in
     a sum of returns. A term in units of return, such as the floor above, can also be wanted
     as a bound alone. The flag says only that the term stays out of the objective, and its
@@ -512,21 +512,22 @@ pretty_table(bench_df; formatters = [(v, i, j) -> if j == 4
                                      end])
 
 #=
-Each benchmark has the best value in the column of its own objective. GMVP has the lowest
-volatility, GMRP the highest return and MSRP the highest Sharpe ratio. GMRP holds a single
-asset, which is the portfolio at `ε → 0` in the sweep of section 4.
+Three benchmarks have the best value in the column of their own objective. GMVP has the
+lowest volatility, GMRP the highest return and MSRP the highest Sharpe ratio. MVP trades return
+against variance, and no column of the table is its objective. GMRP holds a single asset, which
+is the portfolio at `ε → 0` in the sweep of section 4.
 
 No ℓ1 portfolio has the best value in any of these three columns. 1/N and the
-inverse-volatility portfolio have the lowest returns and Sharpe ratios of the table. Each
-benchmark optimises the quantity of its own column, with the same estimates that the table
-uses, so in sample no other portfolio can beat it on that column. An ℓ1 portfolio uses `μ` only
-in part and scores lower on the columns that `μ` computes.
+inverse-volatility portfolio have the lowest returns and Sharpe ratios of the table. GMVP,
+GMRP and MSRP each optimise the quantity of their own column, with the same estimates that the
+table uses, so in sample no other portfolio can beat them on that column. An ℓ1 portfolio uses
+`μ` only in part and scores lower on the columns that `μ` computes.
 
-The last two columns, `active` and `largest`, show how concentrated each portfolio is. GMRP and MSRP put
-most of their weight in few assets, and both act on 252 days of estimates as if the estimates
-were exact. The quintile portfolio and 1/N spread equal weights over four assets and over all
-of them. The in-sample columns do not measure the risk of a concentrated portfolio. Only a test
-out of sample can show whether the spread pays, and this page does not run one. The
+The last two columns, `active` and `largest`, show how concentrated each portfolio is. GMRP and
+MSRP put most of their weight in few assets, and both act on 252 days of estimates as if the
+estimates were exact. The quintile portfolio and 1/N spread equal weights over four assets and
+over all of them. The in-sample columns do not measure the risk of a concentrated portfolio.
+Only a test out of sample can show whether the spread pays, and this page does not run one. The
 [cross validation](../5_validation_tuning/01_Cross_Validation.md) examples show how to run such a
 test.
 
@@ -546,7 +547,7 @@ test.
     problem mixed-integer.
   - The `mu` field of [`ArithmeticReturn`](@ref) ranks on any characteristic, as a vector or
     as the estimator that computes it. Put the characteristic in the return term and never in
-    the prior, whose `μ` every mean-centred risk measure reads. The objective maximises, so
+    the prior, whose `μ` every mean-centred risk measure centres on. The objective maximises, so
     negate a characteristic when a smaller value is better.
   - `ret` takes several terms and sums them with their weights. A term with `rte = false`
     stays out of the objective and keeps its `lb`, and section 10 uses one to show what a floor

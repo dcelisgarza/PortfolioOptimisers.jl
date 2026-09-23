@@ -25,9 +25,10 @@ covers both sets, and the confidence level that sets their size.
     Reach for uncertainty sets when the estimated moments are noisy, for example over a short
     window, and you want weights that allow for that noise more than you want to act on a
     forecast. A box set bounds each entry on its own. An ellipsoidal set bounds all the entries
-    together. Which of the two spreads the weights depends on what you make robust, as sections
-    4 and 5 show. If you hold views about where the moments are going, reach for a view prior
-    instead. You can also use both, because a robust risk measure works with any prior.
+    together. On this page the ellipsoidal set gives the less concentrated weights, for the
+    covariance in section 4 and for the mean in section 5. If you hold views about where the
+    moments are going, reach for a view prior instead. You can also use both, because a robust
+    risk measure works with any prior.
 =#
 
 using PortfolioOptimisers, PrettyTables, StableRNGs
@@ -154,13 +155,12 @@ ret_ell = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                                 ret = ArithmeticReturn(; ucs = mu_ell))))
 
 #=
-The weights here are the reverse of section 4. With a box mean set, the mean of each asset falls
-to the lower bound of its own interval. The worst-case maximum-ratio portfolio then puts almost
-all its weight in the asset with the best worst-case Sharpe ratio. The ellipsoidal mean set
-bounds the means together, and its worst-case penalty grows as the weights concentrate. So the
-worst-case portfolio spreads its weight almost equally over the assets. Whether a box or an
-ellipsoid concentrates the weights thus depends on whether you make the mean or the covariance
-robust.
+With a box mean set, the mean of each asset falls to the lower bound of its own interval. The
+worst-case maximum-ratio portfolio then puts almost all its weight in the asset with the best
+worst-case Sharpe ratio. The ellipsoidal mean set bounds the means together, and its worst-case
+penalty grows as the weights concentrate. The worst-case portfolio spreads its weight over
+most of the assets. On this data the two sets act on the weights as they do in section 4, where
+the ellipsoidal set also gives the less concentrated weights.
 
 !!! note "Both worst-case mean portfolios are at the floor of the ratio's scale"
     With sets of this size, no portfolio has a worst-case return above `rf`. The ratio is then
@@ -182,8 +182,9 @@ plot_stacked_bar_composition([ret_nom, ret_box, ret_ell], rd;
 #=
 ## 6. Other set estimators: Delta and the ARCH bootstrap
 
-[`NormalUncertaintySet`](@ref) resamples the returns as if they were Gaussian, and two other
-estimators exist. The simpler one is [`DeltaUncertaintySet`](@ref), a box whose intervals are a
+[`NormalUncertaintySet`](@ref) resamples the returns as if they were Gaussian, and other
+estimators exist. Two of them are [`DeltaUncertaintySet`](@ref) and
+[`ARCHUncertaintySet`](@ref). `DeltaUncertaintySet` is the simpler, a box whose intervals are a
 fixed fraction of the point estimate on each side, with no resampling. It gives the same set on
 every run and costs almost nothing to build. You choose the fraction, and the data does not
 change it. We build a covariance box with it and print its total width next to that of the
@@ -242,6 +243,10 @@ plot_stacked_bar_composition([res_nom, res_delta, res_box], rd;
 #src   worst-case mean ≈ 9.8% max (near-equal-weight, 20 nz). Covariance case is the opposite
 #src   (ellipsoid diversifies). Documented this box/ellipsoid ≠ concentrated/diversified nuance
 #src   in section 5 because it is genuinely surprising.
+#src - CORRECTED 2026-09-23 (#1228 hand-back from #1235): rerun at 3183a91e79. The ellipsoid
+#src   spreads the weights in BOTH sections, so the "opposite" above was wrong. Covariance: box
+#src   max 0.41 / 7 names, ellipsoid 0.19 / 16. Mean: box max 0.9995 / 2 names, ellipsoid 0.21 /
+#src   15. Best long-only worst-case return: box 1.21e-4, ellipsoid -6.69e-4, rf 1.67e-4.
 #src - q sweep verified monotone: box total width 0.0577 (q=0.01) > 0.0370 (q=0.10). Smaller q =
 #src   wider/more conservative. The `q` field docstring only said "Quantile parameter" — added a
 #src   set-size note there (→ #126).
