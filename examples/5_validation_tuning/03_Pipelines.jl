@@ -1,31 +1,28 @@
 #=
 ```@meta
-Description = "Pipelines in PortfolioOptimisers.jl: put data cleaning, filling and filtering inside the cross-validation loop and tune their parameters."
+Description = "Pipelines in PortfolioOptimisers.jl: fit the data cleaning, gap filling and asset filtering inside each cross-validation fold, and tune their parameters."
 ```
 
 # Pipelines
 
-Every example so far has started from a returns matrix. But a returns matrix is already the
-output of a series of decisions: which assets had enough data to keep, how the gaps in their
-price history were filled, whether returns are simple or logarithmic. Those decisions have
-hyperparameters, and until now they have been made *once*, on the full sample, before any
-cross-validation loop began.
+The earlier examples start from a returns matrix. Several choices come before that matrix:
+which assets have enough data to keep, how to fill the gaps in their prices, and whether the
+returns are simple or logarithmic. Each choice has parameters, and so far the examples made
+them once, on the full sample, before cross-validation started.
 
-That is a leak. If the imputation fill value for an asset is computed from the whole price
-history, then every "out-of-sample" test fold has already seen the future. If the surviving
-asset universe is chosen by looking at missingness across all five years, the backtest is
-quietly conditioned on knowing which assets survive.
+A choice made on the full sample uses the prices of the test windows. If a gap takes a fill
+value computed from the whole price history, the prices of every test fold enter that value.
+If you choose the assets by their missing data over all four years, the backtest keeps only
+assets that you already know have a full history.
 
-A [`Pipeline`](@ref) fixes this by making the *entire workflow* — price cleaning,
-prices-to-returns conversion, prior estimation, phylogeny, constraint generation, and
-optimisation — the unit that gets fitted. Fit a pipeline on a training window and it learns
-its preprocessing state there; predict on a test window and that state is *replayed*, never
-recomputed. Cross-validate a pipeline and the split happens on the *input* rows, so the
-cleaning steps live inside the fold.
+A [`Pipeline`](@ref) fits the whole workflow as one estimator. The workflow can clean the
+prices, convert them to returns, estimate the prior and the phylogeny, make the constraints
+and optimise. A pipeline fitted on a training window learns its preprocessing
+state from that window, and applies that state unchanged to a test window. Cross-validation of
+a pipeline splits the input rows, and every fold fits the cleaning steps again.
 
-This example builds a pipeline stage by stage, shows what each stage contributes, and then
-tunes preprocessing hyperparameters jointly with optimiser hyperparameters under
-walk-forward cross-validation.
+We build a pipeline one step at a time and show what each step changes. Then we tune the
+preprocessing parameters under walk-forward cross-validation.
 =#
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
@@ -47,9 +44,8 @@ end;
 #=
 ## 1. Setting up
 
-We use four years of daily data so that walk-forward cross-validation has enough history for
-several folds. Crucially, we start from **prices**, not returns — the pipeline is what turns
-one into the other.
+We use four years of daily data, so that walk-forward cross-validation has enough rows for
+several folds. We start from prices, not returns, because the pipeline does the conversion.
 =#
 
 using CSV, TimeSeries, DataFrames, Clarabel, Statistics, StableRNGs
@@ -65,12 +61,12 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
 #=
 ### 1.1 `PricesResult`, the price-level container
 
-[`PricesResult`](@ref) is the prices-level mirror of [`ReturnsResult`](@ref): asset prices
-plus optional factor, benchmark, and implied-volatility series. It is the input a pipeline
-expects when it starts at the price level.
+[`PricesResult`](@ref) is the price-level counterpart of [`ReturnsResult`](@ref). It stores
+the asset prices and, when you have them, factor, benchmark and implied-volatility series. A
+pipeline that starts at the price level takes one as its input.
 
-To make the cleaning steps do visible work, we punch some holes in the data: one asset loses
-most of its early history, and two others lose isolated observations.
+So that the cleaning steps change something, we delete some prices. JNJ loses the first half of its
+history, and AAPL and XOM lose one price each.
 =#
 
 vals = Matrix{Float64}(values(X))
@@ -78,10 +74,10 @@ vals[1:(end ÷ 2), 3] .= NaN    ## JNJ: missing for the first half of the sample
 vals[10, 1] = NaN              ## AAPL: an isolated gap
 vals[25, 5] = NaN              ## XOM: an isolated gap
 Xm = TimeArray(timestamp(X), vals, colnames(X))
-## The Span Rule reads a listing calendar off the prices themselves: a leading run of gaps is
-## an asset not yet listed, a trailing run is a delisting, and an interior gap is a Held Gap
-## on an asset that is still listed. [`price_ingestion`](@ref) states one for you; here we
-## read it directly, because the carrier is hand-built.
+## `listing_span` finds the listing of each asset from its prices. A run of gaps at the start
+## means that the asset is not listed yet, a run at the end means that it is delisted, and a
+## gap in between is a gap inside the listing. [`price_ingestion`](@ref) makes the span for
+## you. We call `listing_span` here because we built the prices by hand.
 span = listing_span(vals)
 pr = PricesResult(; X = Xm, span = span)
 
@@ -91,46 +87,50 @@ miss = DataFrame(; asset = string.(colnames(Xm)),
 pretty_table(miss; formatters = [resfmt])
 
 #=
-## 2. Building a pipeline stage by stage
+## 2. Building a pipeline one step at a time
 
-A pipeline is an ordered list of steps. Each step is an ordinary estimator; its *family*
-decides which slot of the pipeline context it reads and writes, so there is no wrapper
-ceremony. Steps may be named with `"name" => estimator`; unnamed steps are auto-named after
-the slot they write.
+A pipeline is an ordered list of steps, and a step is an ordinary estimator. Every step writes
+one slot of the pipeline's context, such as `:prices`, `:returns`, `:prior` or `:opt`. The
+kind of estimator decides the slot, so a step needs no wrapper. You can name a step with
+`"name" => estimator`. A step with no name takes the name of its slot, with a suffix `_1`,
+`_2` when two steps write the same slot.
 
-### 2.1 The minimal pipeline: prices to returns
+### 2.1 A pipeline from prices to returns
 
-[`PricesToReturns`](@ref) is the step form of [`prices_to_returns`](@ref). It is stateless:
-applying it to any window simply runs the conversion.
+[`PricesToReturns`](@ref) is the step form of [`prices_to_returns`](@ref). It learns nothing
+when you fit it, so it runs the same conversion on any window.
 =#
 
 pipe = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), EqualWeighted()))
 pipe.names
 
 #=
-Fitting walks the steps left to right. The result carries every step's fitted output, the
-final context, and the terminal weights.
+Fitting runs the steps from left to right. The result stores the fitted output of every step,
+the context after the last step, and the portfolio weights in `res.w`.
 =#
 
 res = fit(pipe, pr)
 pretty_table(DataFrame(; asset = res.ctx.returns.nx, weight = res.w); formatters = [resfmt])
 
 #=
-Note the row count: `T` prices become `T - 1` returns. The pipeline tracks this contraction
-for you, which matters when cross-validation windows are sized in *input* rows.
+AAPL, JNJ and XOM get no weight. A gap in the prices reaches the returns as a missing value,
+and the optimiser leaves out an asset whose returns have one.
+
+We compare the number of price rows with the number of return rows. Cross-validation of a
+pipeline sizes its windows in input rows, which are prices here, and not in returns.
 =#
 
 size(values(pr.X), 1), size(res.ctx.returns.X, 1)
 
 #=
-### 2.2 Universe selection is fitted state
+### 2.2 The choice of assets is fitted
 
-[`MissingDataFilter`](@ref) drops assets whose missing fraction exceeds `col_thr`. The
-surviving universe is **fitted state**: the training window decides it, and applying the
-fitted result to an unseen window subsets that window to the *same* assets. This is what
-keeps train weights and test returns aligned.
+[`MissingDataFilter`](@ref) drops every asset whose fraction of missing prices is above
+`col_thr`. The training window decides which assets stay, and the fitted result stores their
+names. Applied to another window, the fitted result selects the same assets there. The
+training weights and the test returns then cover the same assets.
 
-With `col_thr = 0.4`, JNJ (missing half its history) is dropped.
+JNJ misses half of its history, so `col_thr = 0.4` drops it.
 =#
 
 pipe = Pipeline(;
@@ -140,20 +140,18 @@ res = fit(pipe, pr)
 res["filter"].nx
 
 #=
-Raise the threshold and JNJ survives — the universe is a hyperparameter, and in §4 we will
-tune it rather than guess it.
+With a higher threshold, JNJ stays. The threshold is a parameter, and section 4 tunes it
+instead of fixing it by hand.
 
-!!! note "The conversion chooses no universe"
+!!! note "The conversion keeps every asset"
 
-    [`PricesToReturns`](@ref) is *stateless*: it computes a return and nothing else, deleting
-    no observation and no asset. A gap therefore reaches the returns instead of
-    taking its observation row with it, so a training window and a test window can never
-    disagree about the universe because of the conversion.
+    [`PricesToReturns`](@ref) learns nothing. It computes returns and deletes no observation
+    and no asset. A gap reaches the returns as a missing value, and its row stays. The
+    conversion therefore never gives a training window and a test window different assets.
 
-    Choosing a universe is a **Universe Policy**, and a policy is fitted: that is what a
-    [`MissingDataFilter`](@ref) step is for, and why it belongs *before* the conversion. Use
-    it when you want an asset gone; use a [`PriceGapFill`](@ref) step when you want a gap
-    inside a listing to take a price convention instead.
+    The choice of assets is fitted, and a [`MissingDataFilter`](@ref) step makes it. Put that
+    step before the conversion. Use it when you want an asset removed. Use a
+    [`PriceGapFill`](@ref) step when you want a gap inside a listing to take a price.
 =#
 
 res_lax = fit(Pipeline(;
@@ -162,20 +160,17 @@ res_lax = fit(Pipeline(;
 res_lax["filter"].nx
 
 #=
-### 2.3 Fill values are fitted state
+### 2.3 Fill values are fitted
 
-[`PriceGapFill`](@ref) states the price convention a **Held Gap** takes — a gap *inside* an
-asset's listing. Its fill values are fitted state: a test window is filled with *training*
-values, never with its own. This is the leakage-prevention exemplar.
+[`PriceGapFill`](@ref) gives a price to a gap inside the listing of an asset. It fills nothing
+outside the listing. JNJ's missing first half comes before its first price. The step leaves
+it empty and does not invent a history. The single gaps of AAPL and XOM are inside their
+listings, and the step fills them.
 
-The step is bounded by the Listing Span, which is why the carrier states one. JNJ's missing
-first half is a leading run, so it lies outside JNJ's listing and no price is written there:
-the fill cannot invent a history an asset never had. AAPL's and XOM's isolated gaps are Held
-Gaps, and those it fills.
-
-To see why the fitted state matters, fit the same step on two different windows and compare
-what it learns. [`CarriedPrice`](@ref), the default, states the **Held Price** convention: the
-gap takes the last price actually printed, which conserves wealth across the gap.
+The rule for the fill is the parameter `fill`. The default, [`CarriedPrice`](@ref), gives a
+gap the last price before it, so a holding keeps its value over the gap. When you fit the
+step, it records the last price of every asset in the field `v`. We fit the same step on two
+windows and compare the two values for AAPL.
 =#
 
 pipe_imp = Pipeline(;
@@ -192,37 +187,40 @@ fills = DataFrame(; window = ["train (1:500)", "test (501:end)"],
 pretty_table(fills)
 
 #=
-The two windows disagree — AAPL's price level is very different across them. A pipeline
-fitted on the training window carries the *train* number, and
-[`predict`](@ref) replays exactly that number on the test window. Had we fitted the fill on
-the full sample before splitting, it would have been contaminated by the test period, and
-every subsequent "out-of-sample" score would be optimistic.
+Every window learns its own last price, so the two values differ. A pipeline fitted on the
+training window stores the training value. When it predicts on a later window, it uses that
+value only for a gap at the start of the window, before the window has a price of its own. A
+later gap takes the last price of the window itself.
 
-The convention itself is configurable — `PriceGapFill(; fill = MeanValue())` versus
-`MedianValue()`, each of which states one constant for every gap of a column rather than
-carrying the last printed price — and is another hyperparameter to tune in §4.
+`PriceGapFill(; fill = MeanValue())` and `PriceGapFill(; fill = MedianValue())` give every gap
+of an asset one constant, which the step computes from the training prices. A pipeline applies
+the training constant to the test window. If you fit such a fill on the full sample before
+the split, the constant includes the test prices, and every test score then uses information
+from its own test window. Section 4 tunes the choice between the two.
 =#
 
 #=
 ## 3. The full workflow
 
-Now the whole chain from the ADR: prices → filter → fill → returns → prior → phylogeny
-constraints → weight bounds → [`MeanRisk`](@ref).
+We now build the full workflow. It filters the assets, fills the gaps, converts the prices to
+returns, estimates the prior, makes the phylogeny constraints and the weight bounds, and ends
+with a [`MeanRisk`](@ref) optimisation.
 
-Two things make this work without any plumbing:
+The pipeline connects the steps in two ways.
 
-  - **Slot routing.** Each step writes the context slot its family owns. A prior estimator
-    writes `:prior`; a phylogeny-constraint estimator writes `:constraints`.
-  - **Injection.** Immediately before the optimisation step runs, the computed slots
-    override the optimiser's *internal* configuration. The pipeline's prior replaces the
-    optimiser's default `pe`; each constraint result is routed into the optimiser field its
-    family names — `wb`, `lcse`, `cte`, `ple`, `rkb`, and the threshold fields. Where a
-    family names several fields, the step says which one: a buy-in threshold can be the long
-    or the short bound, so a [`ThresholdEstimator`](@ref) step is wrapped in a
-    [`PipelineStep`](@ref) carrying `target = :lt` or `target = :st`. An optimiser that
-    cannot receive what a step writes is refused when the pipeline is built. Every stage is
-    optional — an absent step simply lets the optimiser compute that quantity internally,
-    exactly as it does today.
+  - Every step writes the slot that its kind of estimator owns. A prior estimator writes
+    `:prior`. A phylogeny estimator and a weight-bounds estimator write `:constraints`.
+  - Before the optimisation step runs, the pipeline puts the computed slots into the
+    optimiser. The prior replaces the optimiser's `pe`. A constraint result goes to the field
+    of the optimiser that its kind names, such as `wb`, `lcse`, `cte`, `ple`, `rkb` or a
+    threshold field.
+
+A buy-in threshold can go to six different fields, so a [`ThresholdEstimator`](@ref) step
+must name one. Wrap it in a [`PipelineStep`](@ref) with a `target`, for example
+`target = :lt` for the long threshold or `target = :st` for the short threshold. If the
+optimiser has no field for a constraint step, the `Pipeline` constructor throws an error.
+Every step is optional. Without a prior step, the optimiser estimates its own prior, as it
+does outside a pipeline.
 =#
 
 pipe = Pipeline(;
@@ -237,8 +235,7 @@ res = fit(pipe, pr)
 pretty_table(DataFrame(; asset = res.ctx.returns.nx, weight = res.w); formatters = [resfmt])
 
 #=
-The weight bound is respected, and the prior was computed **once** and shared with the
-optimiser rather than recomputed inside it.
+We compare the largest weight with the upper bound of 0.4.
 =#
 
 maximum(res.w) <= 0.4 + 1e-8
@@ -246,9 +243,11 @@ maximum(res.w) <= 0.4 + 1e-8
 #=
 ### 3.1 Predicting on an unseen window
 
-[`predict`](@ref) replays the fitted preprocessing on a test window — universe subset, then the
-train-fitted fill, then the returns conversion — and hands the result to the ordinary
-weights-level prediction machinery. Scorers and risk measures carry over untouched.
+[`predict`](@ref) applies the fitted preprocessing to a test window in step order. It selects
+the training assets, fills the gaps with the rule it fitted, and converts the prices to
+returns. Then it runs the ordinary prediction from the weights. Every scorer and risk measure
+then works on the result as it does without a pipeline. The third argument gives the rows
+of the input to predict on, here the prices after row 800.
 =#
 
 T = size(values(Xm), 1)
@@ -259,17 +258,18 @@ expected_risk(ConditionalValueatRisk(), pred)
 #=
 ## 4. Tuning the whole workflow
 
-This is the point of the whole exercise. [`search_cross_validation`](@ref) splits the
-**input rows** into contiguous windows, and for each candidate fits the entire pipeline on
-the training window and scores it on the test window. Preprocessing hyperparameters are
-searched jointly with optimiser hyperparameters, and no candidate ever sees the test window
-during preprocessing.
+[`search_cross_validation`](@ref) splits the input rows into windows of consecutive rows. For
+every candidate, it fits the whole pipeline on the training window and scores it on the test
+window. One grid can hold parameters of the preprocessing and of the optimiser, and the
+preprocessing of a candidate never sees its test window.
 
-Lens keys address steps three ways:
+A key of the grid names a step in one of three ways.
 
-  - by **name** with a trailing property path — `"filter.col_thr"`;
-  - by **name** alone (or by integer position), which swaps the whole step — `"gap_fill"`;
-  - by **raw property path**, exactly as for plain optimisers — `"steps[1].col_thr"`.
+  - A step name with a property path, `"filter.col_thr"`, changes one field of that step.
+  - A step name alone, `"gap_fill"`, or the position of the step as an integer key, replaces
+    the whole step.
+  - A property path from the pipeline, `"steps[1].col_thr"`, works as it does for an
+    optimiser outside a pipeline. The path starts at `steps`.
 =#
 
 pipe = Pipeline(;
@@ -285,7 +285,8 @@ gscv = GridSearchCrossValidation(p; cv = IndexWalkForward(500, 250),
                                  r = ConditionalValueatRisk())
 tuned = search_cross_validation(pipe, gscv, pr)
 
-## Mean test score per candidate (bigger is better after the sign convention).
+## The mean test score of each candidate. The search negates a risk measure, so a bigger
+## score is better.
 scores = DataFrame(; candidate = 1:length(tuned.val_grid),
                    col_thr = [v[1] for v in tuned.val_grid],
                    gap_fill = [string(nameof(typeof(v[2].fill))) for v in tuned.val_grid],
@@ -293,7 +294,10 @@ scores = DataFrame(; candidate = 1:length(tuned.val_grid),
 pretty_table(scores)
 
 #=
-`tuned.opt` is the winning *pipeline*, ready to fit on the full sample.
+The two thresholds give the same score. In every training window, JNJ either fails the filter
+or still has missing prices, and in both cases it gets no weight. The mean fill scores higher
+than the median fill. The search keeps the first candidate with the highest mean score, and
+`tuned.opt` is that pipeline, which we fit on the full sample.
 =#
 
 tuned.idx, tuned.opt.steps[1].col_thr, nameof(typeof(tuned.opt.steps[2].fill))
@@ -303,10 +307,12 @@ pretty_table(DataFrame(; asset = final.ctx.returns.nx, weight = final.w);
              formatters = [resfmt])
 
 #=
-### 4.1 Structural search: swapping whole estimators
+### 4.1 Replacing a whole estimator
 
-Because lens values are arbitrary objects, swapping an entire step is just another grid
-value. Here we search over the *prior estimator* itself rather than one of its fields.
+A grid value can be any object, so a grid can replace a whole step. Here the grid replaces the
+prior estimator. The last step, [`EqualWeighted`](@ref), does not use the prior, so the two
+candidates give the same weights and the same score, and the search keeps the first. To
+compare two priors, end the pipeline with an optimiser that uses them.
 =#
 
 pipe_struct = Pipeline(;
@@ -327,8 +333,9 @@ tuned_struct.idx, vec(mean(tuned_struct.test_scores; dims = 1))
 #=
 ### 4.2 Randomised search
 
-[`RandomisedSearchCrossValidation`](@ref) samples the grid and then delegates to the grid
-form, exactly as it does for plain optimisers.
+[`RandomisedSearchCrossValidation`](@ref) samples candidates from the grid and then runs the
+grid search on them, as it does outside a pipeline. When you give `seed`, the search seeds a
+copy of `rng` with it.
 =#
 
 rscv = RandomisedSearchCrossValidation(p; cv = IndexWalkForward(500, 250),
@@ -338,17 +345,16 @@ tuned_rand = search_cross_validation(pipe, rscv, pr)
 size(tuned_rand.test_scores)
 
 #=
-## 5. Many paths: combinatorial and asset-resampling cross-validation
+## 5. Cross-validation with many paths
 
-The walk-forward above produces *one* backtest path. [`CombinatorialCrossValidation`](@ref) and
-[`MultipleRandomised`](@ref) produce *many* — a distribution of out-of-sample outcomes rather
-than a single number. There is one rule: they need contiguous input rows, which recombined
-groups and resampled paths do not guarantee, so a pipeline that **starts from prices** — with a
-[`PricesToReturns`](@ref) or any rolling, order-dependent step — rejects them (the
-*rolling-window rule*). A **returns-level** pipeline has no such step, so it runs them exactly
-as a plain optimiser would.
+The walk-forward search above gives one backtest path. [`CombinatorialCrossValidation`](@ref)
+and [`MultipleRandomised`](@ref) give many paths, and with them a distribution of test results
+instead of one number.
 
-So we start from returns and drop the price-level cleaning:
+A pipeline that starts from prices runs both schemes. The combinatorial scheme joins groups
+of rows that are not consecutive, and at the price level every join makes one return between
+two prices that are not neighbours. We start from returns here and drop the price-level
+cleaning, so every return comes from two consecutive prices.
 =#
 
 rd = prices_to_returns(X)
@@ -359,9 +365,10 @@ rpipe = Pipeline(;
 #=
 ### 5.1 Combinatorial paths
 
-Each split trains on its (possibly non-contiguous) groups and predicts the held-out ones; the
-per-split test groups recombine into paths. `expected_risk` over the population gives one
-realised risk per path — the spread *is* the robustness picture the scheme exists to produce.
+Every split trains on its training groups, which need not be consecutive, and predicts the
+groups it holds out. The test groups of the splits join into paths. `expected_risk` over the
+population gives one risk value per path. The spread of those values shows how much the
+result depends on the path.
 =#
 
 comb = CombinatorialCrossValidation(; n_folds = 5, n_test_folds = 2)
@@ -372,11 +379,11 @@ pretty_table(DataFrame(; path = [p.id for p in pp.pred],
                        cvar = expected_risk(cvar, pp)); formatters = [resfmt])
 
 #=
-### 5.2 Asset-resampling paths
+### 5.2 Paths over random subsets of assets
 
-[`MultipleRandomised`](@ref) draws a random asset subset per path and runs an inner
-walk-forward over it. The subset is applied to the *input*, so the pipeline fits fresh on each
-sub-universe — it never sub-selects fitted state (the restriction that used to rule this out).
+[`MultipleRandomised`](@ref) draws a random subset of assets for every path and runs an inner
+walk-forward on it. It draws from the assets with enough data in the window of that path. It
+applies the subset to the input. The pipeline then fits from the start on each subset.
 =#
 
 mr = MultipleRandomised(IndexWalkForward(500, 250); subset_size = 6, n_subsets = 4,
@@ -388,21 +395,20 @@ pretty_table(DataFrame(; path = [p.id for p in pm.pred],
              formatters = [resfmt])
 
 #=
-## 6. Boundaries
+## 6. What a pipeline does not do
 
-A few things a pipeline deliberately will not do, each with an explanatory error rather than
-a silent wrong answer:
+  - A pipeline is not an optimisation estimator. `optimise` throws an error for a pipeline, so
+    fit it with `fit`.
+  - A meta-optimiser such as [`NestedClustered`](@ref), [`Stacking`](@ref) or
+    `SubsetResampling` does not take a pipeline as an inner estimator, and its constructor
+    throws an error. The other way round works, and a meta-optimiser can be the optimisation
+    step of a pipeline.
+  - A pipeline with no optimisation step is valid, for example one that fits only a prior.
+    `predict` throws an error for it, because it has no weights.
 
-  - **Combinatorial and multiple-randomised cross-validation are price-level-restricted.** A
-    price-starting pipeline rejects them by the rolling-window rule of §5; run them on a
-    returns-level pipeline, as above.
-  - **A pipeline cannot be wrapped in a meta-optimiser** (`NestedClustered`, `Stacking`,
-    `SubsetResampling`). Those build asset sub-portfolios via an asset view of their inner
-    estimator, and a pipeline's universe is fitted state, so the view is not well defined
-    before fitting. The reverse *is* supported: a meta-optimiser makes a perfectly good
-    optimisation step of a pipeline.
-  - **Predicting without weights** — a pipeline with no terminal optimisation step is legal
-    (a prior-only pipeline is useful), but it has nothing to predict with.
+We run two calls. `split` accepts price data for a combinatorial scheme, so the first call
+returns a split and prints nothing. The second call prints the error that `optimise` gives for
+a pipeline.
 =#
 
 try
@@ -420,19 +426,18 @@ end
 #=
 ## 7. Summary
 
-A [`Pipeline`](@ref) turns an implicit, hand-tuned data-preparation prologue into an explicit,
-fitted, tunable part of the model.
+A [`Pipeline`](@ref) makes the data preparation part of the fitted model, so you can tune it.
 
-  - Steps are ordinary estimators, routed to context slots by their family.
-  - Preprocessing steps have a fit/apply contract: the training window learns the universe
-    and the imputation parameters, and unseen windows replay them.
-  - Computed slots are injected into the optimiser's configuration, so a prior is computed
-    once and shared, and each constraint lands in the optimiser field its family declares.
-  - Cross-validation splits the *input* rows, so the cleaning steps are refitted inside every
-    fold — which is precisely the leakage the pipeline exists to remove.
-  - Hyperparameters of the preprocessing and of the optimiser are searched in one grid, and
-    whole estimators can be swapped as grid values.
+  - A step is an ordinary estimator, and its kind decides the slot of the context it writes.
+  - A preprocessing step learns its state on the training window, such as the assets to keep
+    and the fill values. A prediction applies that state to the test window.
+  - The pipeline puts the fitted prior and the fitted constraints into the optimiser, so the
+    optimiser does not estimate them again.
+  - Cross-validation splits the input rows. The pipeline fits its cleaning steps again in
+    every fold, and no test window enters an asset filter or a fill constant.
+  - One grid can hold the parameters of the preprocessing and of the optimiser, and a grid
+    value can replace a whole step.
 
-See `docs/adr/0028-pipeline-workflow-estimator.md` for the design rationale and the list of
-deliberately deferred features.
+`docs/adr/0028-pipeline-workflow-estimator.md` gives the reasons for the design and lists the
+features it leaves for later.
 =#

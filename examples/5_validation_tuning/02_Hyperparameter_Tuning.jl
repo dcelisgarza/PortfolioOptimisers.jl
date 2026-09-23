@@ -5,7 +5,9 @@ Description = "Hyperparameter tuning in PortfolioOptimisers.jl: grid and randomi
 
 # Hyperparameter tuning
 
-Hyper parameter tuning is a powerful technique to choose parameters based on their performance on test folds. In this example, we will showcase the two implemented approaches implemented in PortfolioOptimisers.jl.
+Hyperparameter tuning chooses the parameters of an estimator by how they score on the test
+folds of a cross-validation. This example shows the two searches of PortfolioOptimisers.jl, a
+grid search and a randomised search.
 =#
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
@@ -27,9 +29,11 @@ end;
 #=
 ## 1. Setting up
 
-For this example, we will use 5 years of daily data. This is so that we have enough data to perform cross validation on significant amounts of data for both training and testing.
+We use the same five years of daily data as the cross-validation example.
 
-Cross validation cannot have precomputed values like we have done in previous examples. This is because the training and testing sets are generated on the fly, and the performance metrics are computed based on the results of the optimization on these sets.
+A search fits every candidate again on the training rows of every fold. The fields of the
+estimator must therefore be estimators, such as a prior estimator, and not results computed
+beforehand.
 =#
 
 using CSV, TimeSeries, DataFrames, Clarabel, Statistics, StableRNGs, Distributions
@@ -63,18 +67,25 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
               check_sol = (; allow_local = true, allow_almost = true))];
 
 #=
-## 2. Hyper parameter tuning
+## 2. Hyperparameter tuning
 
-For this tutorial we will use the [`Stacking`](@ref) estimator, but the hyper parameter tuning works for every optimisation estimator. All you need is to use the right propertynames and indexing to access the parameters you want to tune. They use Julia's built-in parsing to create the lenses used by [`Accessors.jl`](https://github.com/JuliaObjects/Accessors.jl) to update the immutable estimators.
+We tune a [`Stacking`](@ref) estimator, and the search works the same way for the other
+optimisation estimators, such as [`NestedClustered`](@ref). A key of the grid is a string with
+the property path to the parameter, such as `"opti[1].opt.l2.val"`. The search parses the
+string into an [`Accessors.jl`](https://github.com/JuliaObjects/Accessors.jl) lens, an object
+that returns a copy of the estimator with that one field changed.
 
-The parameter tuning uses a scoring function, a scoring metric (a risk measure), and an appropriate cross validation estimator. Only estimators which have a 1 to 1 ratio of training to test sets can be used, so only [`KFold`](@ref) and [`WalkForwardEstimator`](@ref) and their results can be used. This may be expanded in the future, using a similar technique for choosing the best path similarly to how it's done for the [`NestedClustered`](@ref) and [`Stacking`](@ref) estimators.
+A search needs a risk measure, `r`, to score every fold, and a cross-validation scheme, `cv`,
+which defaults to [`KFold`](@ref). It also accepts a [`WalkForwardEstimator`](@ref), a
+[`CombinatorialCrossValidation`](@ref) and a [`MultipleRandomised`](@ref). Under a
+combinatorial scheme, it scores every path instead of every fold.
 =#
 
 opt = JuMPOptimiser(; slv = slv)
-## The searches below tune an L2 regularisation coefficient. That coefficient is the `val`
-## field of an [`L2Regularisation`](@ref), and the `l2` field of [`JuMPOptimiser`](@ref)
-## holds the estimator rather than the number, so the first inner optimiser carries one and
-## the lens reaches through it.
+## The searches below tune an L2 regularisation coefficient. The coefficient is the `val`
+## field of an [`L2Regularisation`](@ref). The `l2` field of [`JuMPOptimiser`](@ref) takes
+## that estimator, not the number, so the first inner optimiser gets one, and the key of the
+## grid ends in `l2.val`.
 optl2 = JuMPOptimiser(; slv = slv, l2 = L2Regularisation())
 r = MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment()))
 st = Stacking(; opti = [MeanRisk(; opt = optl2), RiskBudgeting(; opt = opt)],
@@ -83,15 +94,24 @@ st = Stacking(; opti = [MeanRisk(; opt = optl2), RiskBudgeting(; opt = opt)],
 #=
 ### 2.1 Grid cross validation search
 
-[`GridSearchCrossValidation`](@ref) performs an exhaustive search over a specified parameter grid via [`search_cross_validation`](@ref). It evaluates the performance of each combination of parameters and selects the best one based on how each point in the grid performs on the test folds.
+[`GridSearchCrossValidation`](@ref) tries every point of a parameter grid with
+[`search_cross_validation`](@ref), and keeps the point with the best mean test score.
 
-The parameter grid can be specified as a vector of pairs where the first item is the string representation of the parameter to modify, the second is a vector with the range to try. Alternatively one can use a dictionary where the items are these pairs. The function will compute the product of the grid to create the full parameter grid. When using a dictionary, the order of the parameters is not guaranteed, but this makes no difference to the grid search, it does for the randomised search, so if using the latter use an `OrderedDict` from [`OrderedCollections`](https://github.com/JuliaCollections/OrderedCollections.jl) or a vector of vectors instead.
+A grid is a vector of pairs. The first item of a pair is the key of a parameter, and the second
+is a vector of the values to try. A dictionary of the same pairs also works. The search takes
+the product of the values in a grid. A `Dict` has no fixed order. That does not matter to a
+grid search, but it changes the samples of a randomised search. There, use an `OrderedDict`
+from [`OrderedCollections`](https://github.com/JuliaCollections/OrderedCollections.jl) or a vector.
 
-It is possible to provide a vector of grids, where each grid will be computed independently and then concatenated into a single search space. This allows for the specification of multiple different grids simultaneously.
+You can give a vector of grids. The search expands every grid on its own and joins the results
+into one list of candidates.
 
-Due to the typing system, if using a vector of vectors you have to call [`concrete_typed_array`](@ref) to ensure the correct type is inferred, alternatively use a vector of dictionaries.
+A literal vector of grids whose values have different types has an abstract element type, and
+the constructor throws a `MethodError` for it. [`concrete_typed_array`](@ref) narrows the
+element type to the union of the types of the grids, which the constructor accepts. A vector
+of dictionaries needs the same call.
 
-Here we will search three grids, the final score will reflect the best performing parameter combination among all grids.
+We search four grids, and the search keeps the best candidate over all of them.
 =#
 
 p = concrete_typed_array([["opti[2].opt.l1" =>
@@ -106,12 +126,24 @@ p = concrete_typed_array([["opti[2].opt.l1" =>
                                          MeanRisk(; opt = opt, obj = MaximumRatio())]]])
 gs_cv = GridSearchCrossValidation(p; r = r)
 #=
-Now we can run the grid search cross validation. The result returns the best optimiser, the matrix of test scores, an optional matrix of training scores, the lens and value grids of the searched parameters (in vector form), and the index of the best performing parameters. The number of points in the lens and value grids is equal to the sum of the products of each grid, `sum([3x3, 3x1, 3x1, 2x1]) == 17`.
+We run the search. The four grids give `3 × 3 + 3 + 3 + 2 = 17` candidates. The result has
+these fields.
+
+  - `opt` is the best estimator.
+  - `test_scores` has one row per fold and one column per candidate.
+  - `train_scores` is `nothing` unless you set `train_score = true`.
+  - `lens_grid` and `val_grid` give the keys and the values of every candidate.
+  - `idx` is the index of the best candidate.
+
+The best candidate has the highest mean test score. The search negates a measure for which a
+lower value is better, such as a risk measure, and keeps a ratio as it is. Here the measure is
+a ratio, and the highest mean ratio wins.
 =#
 gs_res1 = search_cross_validation(st, gs_cv, rd)
 
 #=
-We can view the best indices and lenses, and that they match the chosen optimiser.
+The table gives the keys and the values of the best candidate. The loop after it prints every
+value next to the same field read from the chosen estimator.
 =#
 
 pretty_table(DataFrame("Lens" => gs_res1.lens_grid[gs_res1.idx],
@@ -122,7 +154,7 @@ for (lens, val) in zip(gs_res1.lens_grid[gs_res1.idx], gs_res1.val_grid[gs_res1.
 end
 
 #=
-We can now optimise the best estimator on the full dataset to inspect the resulting portfolio.
+We optimise the best estimator on the full data and plot its weights.
 =#
 
 using StatsPlots, GraphRecipes
@@ -133,23 +165,41 @@ plot_composition(res_gs1, rd)
 #=
 ### 2.2 Randomised cross validation search
 
-[`RandomisedSearchCrossValidation`](@ref) performs an randomised search over a sampled parameter grid via [`search_cross_validation`](@ref). It can take the same type of grid as [`GridSearchCrossValidation`](@ref), in which case the parameters are sampled without replacement. It can also take a subtype of [`Distributions.Distribution`](https://juliastats.org/Distributions.jl/latest/types/#Distributions) instead of a vector of values, in which case any parameters given as a vector will be sampled with replacement. The property `n_iter` defines the number of samples to draw from the vectors or distributions. When sampling without replacement, the sampling is performed up until the list of candidates is exhausted, so the maximum number of samples drawn from a list is `min(n_iter, length(list))`. After the parameters have been sampled, a grid search cross validation is performed. It's also possible to provide a vector of grids, which works exactly like [`GridSearchCrossValidation`](@ref).
+[`RandomisedSearchCrossValidation`](@ref) samples values from the grid, and then runs a grid
+search over the samples with [`search_cross_validation`](@ref). It takes the same grids as
+[`GridSearchCrossValidation`](@ref). A parameter can also take a
+[`Distributions.Distribution`](https://juliastats.org/Distributions.jl/latest/types/#Distributions)
+in place of a vector of values.
 
-It is important to note that sampling uses the random state, so the order of the parameters will affect the sampling of distributions and sets of values. To ensure reproducibility, use an ordered dictionary or a vector for each grid, and don't change the order of parameters in each grid, or the order of the grids.
+The search samples every parameter on its own, and `n_iter` sets the number of samples.
+
+  - From a distribution, it draws `n_iter` values.
+  - From a vector, it draws `min(n_iter, length(v))` values. It draws without replacement,
+    unless the grid also holds a distribution. Then it draws with replacement, and it can draw
+    a value twice.
+
+Then it takes the product of the samples in every grid, as the grid search does. A vector of
+grids works as it does for [`GridSearchCrossValidation`](@ref).
+
+The search draws from one random number generator, `rng`, grid by grid and parameter by
+parameter. The order of the grids and of the parameters therefore changes the samples. To repeat a
+search, keep that order fixed, and use an ordered dictionary or a vector for every grid.
 
 #### 2.2.1 Sampling from a predefined parameter space
 
-First let's sample from the predefined parameter space. This will only sample two parameters from each grid, because all parameters were given as lists, the sampling is without replacement so parameters cannot be sampled twice.
+We sample from the same grids as before, with `n_iter = 2`. Every value is in a vector. The
+search draws two values for every parameter, without replacement.
 =#
 rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 2)
 
 #=
-As you can see the result contains `sum([2x2, 2x1, 2x1, 2x1]) == 10` gridpoints.
+The first grid has two parameters and gives `2 × 2 = 4` candidates. The other three grids
+give 2 candidates each, for `4 + 2 + 2 + 2 = 10` in total.
 =#
 rs_res1 = search_cross_validation(st, rs_cv1, rd)
 
 #=
-We can view the best indices and lenses, and that they match the chosen optimiser.
+We read the best candidate of the randomised search in the same way.
 =#
 
 pretty_table(DataFrame("Lens" => rs_res1.lens_grid[rs_res1.idx],
@@ -165,7 +215,10 @@ plot_composition(res_rs1, rd)
 #=
 #### 2.2.2 Sampling from a distribution
 
-Now let's sample from a combination of the predefined parameter space and a distribution. We will sample 5 parameters from each. We don't need [`concrete_typed_array`](@ref) in [`RandomisedSearchCrossValidation`](@ref) as due to the need to accommodate `Distributions.Distribution` the checks cannot be performed at compile time, so they are performed at runtime.
+We now mix vectors and distributions, with `n_iter = 5`. This grid needs no
+[`concrete_typed_array`](@ref). A distribution among the values makes the literal a vector of
+vectors of `Pair{String, Any}`, which [`RandomisedSearchCrossValidation`](@ref) accepts and
+checks when it runs. A grid of vectors alone still needs `concrete_typed_array`.
 =#
 p = [["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
       "opti[1].opt.l2.val" => LogUniform(0.0003, 0.1)],
@@ -177,12 +230,16 @@ p = [["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
 rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 5)
 
 #=
-The number of grid points is now `sum([3x5, 5x1, 3x1, 2x1]) = 25`, this is because vectors in a grid with a distribution are sampled with replacement (so `n_iter` samples can be taken from a vector whose length is `< n_iter`), and for vectors which are not in the same grid as a distribution sampling is done without replacement until the set is exhausted, so the number of samples is `min(n_iter, length(list))`.
+The first grid holds a distribution. The search draws 5 values from it, and 3 values with
+replacement from the vector of three. The second grid gives 5 values from its distribution.
+The third and fourth grids hold only vectors and give their 3 and 2 values. That makes
+`3 × 5 + 5 + 3 + 2 = 25` candidates. A draw with replacement can repeat a value, and then
+two candidates are the same.
 =#
 rs_res2 = search_cross_validation(st, rs_cv2, rd)
 
 #=
-We can view the best indices and lenses, and that they match the chosen optimiser.
+We read off the best candidate of the second search.
 =#
 
 pretty_table(DataFrame("Lens" => rs_res2.lens_grid[rs_res2.idx],
@@ -196,12 +253,13 @@ res_rs2 = optimise(rs_res2.opt, rd)
 plot_composition(res_rs2, rd)
 
 #=
-Comparing the three best portfolios — grid search, randomised (predefined), randomised (distribution) —
-shows how different hyperparameter budgets and sampling strategies affect the final allocation.
+The plot puts the weights of the three best portfolios side by side: the grid search, the
+randomised search over vectors, and the randomised search with distributions.
 =#
 
 plot_stacked_bar_composition([res_gs1, res_rs1, res_rs2], rd)
 
 #=
-The hyperparameter tuning can be used on any non finite optimisation estimator. In the future it will also be possible to provide a pipeline which will also allow users to tune pre-selection criteria.
+You can tune any estimator that cross-validation accepts. You can also tune a
+[`Pipeline`](@ref), and the pipelines example tunes an asset filter and a gap fill.
 =#
