@@ -7,10 +7,10 @@ Description = "Price ingestion, public API of PortfolioOptimisers.jl: PriceInges
 ## From raw prices to a prices result
 
 [`PriceIngestion`](@ref) turns raw price series into the `PricesResult` that the conversion to
-returns reads. It runs once, on the whole history, and it is not a [`Pipeline`](@ref) step. Three of
-its steps change the observations themselves. It merges the two ways a source marks an absent
-price, `missing` and a non-finite number. It joins the factor and benchmark series to the prices.
-It can also collapse the data to a lower frequency. Cross-validation cuts its folds once, on the
+returns reads. It runs once, on the whole history, and it is not a [`Pipeline`](@ref) step. It also
+spells every absent price, `missing` or a non-finite number, as `NaN`. Two of its steps change
+the observations themselves. It joins the factor and benchmark series to the prices, and it can
+collapse the data to a lower frequency. Cross-validation cuts its folds once, on the
 observations of the result, so a step that adds, removes or renumbers observations cannot run
 inside a fold. A hyperparameter that changed the test window would also give scores that you
 cannot compare. Because it sees the whole history, `PriceIngestion` also finds the listing span of

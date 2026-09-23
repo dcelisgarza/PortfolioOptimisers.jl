@@ -86,8 +86,8 @@ around each cluster.
 
 # Hierarchical clustering dendrogram.
 using StatsPlots, GraphRecipes
-# Reordered correlation heatmap with cluster boundary boxes.
 plot_dendrogram(clr, rd.nx)
+# Reordered correlation heatmap with cluster boundary boxes.
 plot_clusters(clr, rd.nx)
 
 #=

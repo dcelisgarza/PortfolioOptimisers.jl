@@ -16,7 +16,7 @@ outside that set is still transformed against it, so an asset the benchmark does
 on the same scale as one it does. An observation whose estimation set is empty returns a `NaN` at
 every asset.
 
-The benchmark weights and the group labels are **arguments** of
+The benchmark weights and the group labels are arguments of
 [`cross_sectional_transform`](@ref), never fields, so you can apply one transform with a
 different benchmark and a different classification at each call.
 [`cross_sectional_groups`](@ref) reads the labels off the codes of a

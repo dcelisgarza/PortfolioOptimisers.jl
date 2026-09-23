@@ -4,7 +4,7 @@ Description = "Asset selection, public API of PortfolioOptimisers.jl: ScoreSelec
 
 # Asset selection
 
-An asset selector removes assets from the universe, from the data. It can drop constant columns, keep the best or worst assets by a risk measure, or remove redundant assets. A selector is an ordinary preprocessing estimator of returns, and it does not depend on a pipeline. A [`Pipeline`](@ref) calls [`fit_preprocessing`](@ref) and [`apply_preprocessing`](@ref) on it, as on any other step.
+An asset selector removes assets from the returns data. It can drop constant columns, keep the best or worst assets by a risk measure, or remove redundant assets. A selector is an ordinary preprocessing estimator of returns, and it does not depend on a pipeline. A [`Pipeline`](@ref) calls [`fit_preprocessing`](@ref) and [`apply_preprocessing`](@ref) on it, as on any other step.
 
 A selector chooses its assets on the training window, and that choice is its fitted result. Applied to a later window, the fitted result keeps the same assets and does not choose again. The test window never changes the choice, so you can use a selector inside cross-validation.
 

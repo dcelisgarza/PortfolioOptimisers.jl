@@ -6,7 +6,7 @@ Description = "Pipeline cross-validation, public API of PortfolioOptimisers.jl: 
 
 ## Combinatorial cross-validation of a pipeline from prices
 
-Combinatorial cross-validation trains on groups of rows that are not contiguous. A pipeline that starts from prices runs a transform that needs contiguous rows, such as `PricesToReturns`. At each gap between two training groups, that transform computes one false return across the gap, so each training window is approximate. The test groups are contiguous, so the predictions do not change. Multiple randomised cross-validation resamples assets and not rows, so it keeps every window contiguous, and a pipeline from prices runs it exactly. A pipeline that starts from returns has no such transform, and it runs combinatorial cross-validation without the approximation.
+Combinatorial cross-validation trains on groups of rows that are not contiguous. A pipeline that starts from prices runs a transform that needs contiguous rows, such as `PricesToReturns`. At each gap between two training groups, that transform computes one false return across the gap, so each training window is approximate. The test groups are contiguous, so no false return enters the test returns. Multiple randomised cross-validation resamples assets and not rows, so it keeps every window contiguous, and a pipeline from prices runs it exactly. A pipeline that starts from returns has no such transform, and it runs combinatorial cross-validation without the approximation.
 
 ```@docs
 port_opt_view(pipe::Pipeline, i, args...; kwargs...)

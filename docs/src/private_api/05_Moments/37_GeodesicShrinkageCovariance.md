@@ -1,5 +1,5 @@
 ```@meta
-Description = "Geodesic shrinkage covariance, private API of PortfolioOptimisers.jl: AbstractCovarianceShrinkageTarget, GeodesicShrinkageTarget, shrinkage_target, geodesic_point, …"
+Description = "Geodesic shrinkage covariance, private API of PortfolioOptimisers.jl: AbstractCovarianceShrinkageTarget, GeodesicShrinkageTarget, shrinkage_target, …"
 ```
 
 # Geodesic shrinkage covariance: private API

@@ -9,8 +9,6 @@ functions on the [bubble tree](05_BubbleTree.md) page assign the assets to clust
 [`HierarchyConstruct4s`](@ref) takes the clusters and the bubble membership, and returns a linkage
 matrix in the Matlab format. [`turn_into_Hclust_merges`](@ref) converts that matrix into the format
 of `Clustering.Hclust`, and it is the only function here that uses that format.
-`test/test_13f_dbht_seam.jl` tests each function on its own, with inputs small enough to check by
-hand.
 
 ```@docs
 DendroConstruct

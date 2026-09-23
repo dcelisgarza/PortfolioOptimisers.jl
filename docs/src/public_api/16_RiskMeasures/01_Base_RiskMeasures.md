@@ -16,7 +16,7 @@ The Compatibility column says where you can use each measure:
 - `Hierarchical`: a hierarchical optimiser can use it, but it has no JuMP formulation.
 - `-`: you can use it only to analyse a portfolio.
 
-The Requirements column names the cones or variables that the measure needs, in a JuMP model or in the solver that computes it. The last column names the solver that the library recommends:
+The Requirements column names the cones or variables that the measure needs, in a JuMP model or in the solver that computes it:
 
 - `QP`: a quadratic expression.
 - `NOC`: a norm-one cone.
@@ -31,6 +31,8 @@ The Requirements column names the cones or variables that the measure needs, in 
 - `MIP`: mixed-integer variables.
 - `*`: the requirements of the risk measures it holds.
 - `-`: nothing beyond linear constraints, or not applicable.
+
+The last column names the solver that the library recommends.
 
 | Type          | Name (Alias)                                                                                                                                  | Compatibility       | Requirements   | Rec. Solver                 |
 |:------------- |:--------------------------------------------------------------------------------------------------------------------------------------------- |:------------------- |:-------------- |:--------------------------- |
@@ -51,7 +53,7 @@ The Requirements column names the cones or variables that the measure needs, in 
 | Dispersion    | SOC Exact [`Kurtosis`](@ref)                                                                                                                  | JuMP + Hierarchical | SOC, PSD       | Clarabel, SCS               |
 | Dispersion    | Direct / Squared SOC Approx [`Kurtosis`](@ref)                                                                                                | JuMP + Hierarchical | QP, SOC        | Clarabel                    |
 | Dispersion    | Sum of Squares Approx [`Kurtosis`](@ref)                                                                                                      | JuMP + Hierarchical | SOC, RSOC      | Clarabel                    |
-| Dispersion    | SOC Exact Approx [`Kurtosis`](@ref)                                                                                                           | JuMP + Hierarchical | SOC            | Clarabel                    |
+| Dispersion    | SOC Approx [`Kurtosis`](@ref)                                                                                                                 | JuMP + Hierarchical | SOC            | Clarabel                    |
 | Dispersion    | [`NegativeSkewness`](@ref)                                                                                                                    | JuMP + Hierarchical | QP, SOC        | Clarabel                    |
 | Dispersion    | Square Root [`NegativeSkewness`](@ref)                                                                                                        | JuMP + Hierarchical | SOC            | Clarabel                    |
 | Tail loss     | Exact [`ValueatRisk`](@ref) ([`VaR`](@ref))                                                                                                   | JuMP + Hierarchical | MIP            | Pajarito (Clarabel + HiGHS) |
@@ -94,7 +96,7 @@ The Requirements column names the cones or variables that the measure needs, in 
 | Dispersion    | Direct [`BrownianDistanceVariance`](@ref) ([`BDVariance`](@ref))                                                                              | JuMP + Hierarchical | QP             | Clarabel                    |
 | Dispersion    | Sum of Squares [`BrownianDistanceVariance`](@ref) ([`BDVariance`](@ref))                                                                      | JuMP + Hierarchical | QP, RSOC       | Clarabel                    |
 | Tail loss     | [`WorstRealisation`](@ref) ([`WR`](@ref))                                                                                                     | JuMP + Hierarchical | -              | Clarabel                    |
-| Tail loss     | [`Range`](@ref) ([`RG`](@ref))                                                                                                                | JuMP + Hierarchical | -              | Clarabel                    |
+| Dispersion    | [`Range`](@ref) ([`RG`](@ref))                                                                                                                | JuMP + Hierarchical | -              | Clarabel                    |
 | Turnover      | [`TurnoverRiskMeasure`](@ref) ([`TnRM`](@ref))                                                                                                | JuMP + Hierarchical | NOC            | Clarabel                    |
 | Tracking      | L1 Norm [`TrackingRiskMeasure`](@ref) ([`TrRM`](@ref))                                                                                        | JuMP + Hierarchical | NOC            | Clarabel                    |
 | Tracking      | L2 Norm [`TrackingRiskMeasure`](@ref) ([`TrRM`](@ref))                                                                                        | JuMP + Hierarchical | SOC            | Clarabel                    |

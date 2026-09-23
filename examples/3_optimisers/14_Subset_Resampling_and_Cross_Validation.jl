@@ -134,7 +134,9 @@ median_ssr = scorer(pp_ssr)
 println("MeanRisk cross-val variance = $(expected_risk(LowOrderMoment(; alg = SecondMoment()), cv_bench))")
 println("SubsetResampling cross-val variance = $(expected_risk(LowOrderMoment(; alg = SecondMoment()), cv_ssr))")
 
+# Each bar of the first plot is the variance of one test fold of the benchmark.
 plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), cv_bench)
+# Each bar of the second plot is the variance of one test fold of the resampled optimiser.
 plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), cv_ssr)
 
 #=

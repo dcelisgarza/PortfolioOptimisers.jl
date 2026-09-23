@@ -4,7 +4,7 @@ Description = "Online selection rules: the forecast-reading arm, public API of P
 
 # Online selection rules: the forecast-reading arm
 
-The rules that read a forecast of the next price relatives, which the expected returns estimator in their `me` field makes. `ForecastReversion` is the passive-aggressive reversion step, with an optional diagonal scale. Six constructors build it with the forecast of their paper: `MovingAverageReversion`, `ExponentialMovingAverageReversion`, `RobustMedianReversion`, `ReweightedPriceRelativeTracking`, `GaussianWeightingReversion` and `LocalAdaptiveLearning`.
+These rules read a forecast of the next price relatives, which the expected returns estimator in their `me` field makes. `ForecastReversion` is the passive-aggressive reversion step, with an optional diagonal scale. Six constructors build it with the forecast of their paper: `MovingAverageReversion`, `ExponentialMovingAverageReversion`, `RobustMedianReversion`, `ReweightedPriceRelativeTracking`, `GaussianWeightingReversion` and `LocalAdaptiveLearning`.
 
 `ForecastTracking` is the tracking step of fixed length, and three constructors build it: `PeakPriceTracking`, `AdaptiveInputCompositeTrend` and `TrendPromotePriceTracking`. `KernelTrendTracking` scales the tracking step with a kernel, and `KernelTrendPatternTracking` builds it. `TransactionCostOptimisation` takes a step that accounts for transaction costs and leaves small trades at zero. `ShortTermSparsePortfolio` is the sparse portfolio, which uses one of three algorithms to find the point it projects.
 

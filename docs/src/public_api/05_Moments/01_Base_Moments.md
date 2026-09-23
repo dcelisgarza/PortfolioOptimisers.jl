@@ -26,7 +26,7 @@ std(ve::AbstractVarianceEstimator, state::SampleBufferState)
 mean(me::AbstractExpectedReturnsEstimator, state::SampleBufferState)
 ```
 
-## FullMoment and semi moments
+## Full and semi moments
 
 A moment other than the expected return can use every deviation from the target, `FullMoment`, or only the deviations below the target, `SemiMoment`. An estimator that has both forms takes one of these two types in its `alg` field.
 
