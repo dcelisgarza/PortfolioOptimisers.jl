@@ -28,8 +28,7 @@ You configure both through [`MatrixProcessing`](@ref), the `mp` field of
     assets and you run anything that reads the covariance, such as mean-variance
     optimisation, risk budgeting or clustering. A lower condition number gives a more stable
     inverse, and weights that move less when the data changes a little. Compare condition
-    numbers before you settle on a technique. [`SpectralDenoise`](@ref) sets the noise
-    eigenvalues to zero and leaves a nearly singular matrix.
+    numbers before you settle on a technique.
 =#
 
 using PortfolioOptimisers, PrettyTables, LinearAlgebra

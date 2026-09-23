@@ -1,14 +1,15 @@
 #=
 ```@meta
-Description = "Drawdown risk measures in PortfolioOptimisers.jl: average, maximum and conditional drawdown at risk on the path of cumulative wealth."
+Description = "Drawdown risk measures in PortfolioOptimisers.jl: average, maximum and conditional drawdown at risk on the path of cumulative returns."
 ```
 
 # Drawdown risk measures
 
-A drawdown is how far the value of the portfolio is below its previous high at each point in time.
-The variance and the conditional value at risk (CVaR) use the distribution of the returns of single
-periods, and the order of those returns does not count. A drawdown measure uses the *path* of
-cumulative wealth, which gives the loss you would have had from any peak to any later trough.
+A drawdown is how far the running sum of the portfolio returns is below its previous high at each
+point in time. The variance and the conditional value at risk (CVaR) use the distribution of the
+returns of single periods, and the order of those returns does not count. A drawdown measure uses
+the *path* of the cumulative returns, which gives the sum of the returns from any peak to any
+later trough.
 
 This page uses four of the library's drawdown measures.
 
@@ -170,8 +171,8 @@ pretty_table(DataFrame(;
 
 #=
 Compare the two columns row by row. The minimum-variance portfolio has the lower variance, but
-the variance ignores the order of the returns, so that portfolio can still have the deeper
-drawdowns. We plot the cumulative returns of both portfolios.
+the variance ignores the order of the returns, and the four rows compare the depth of the
+drawdowns of the two portfolios. We plot the cumulative returns of both portfolios.
 =#
 
 plot(cr_var; label = "Min Variance", xlabel = "Day", ylabel = "Cumulative return",
@@ -187,7 +188,7 @@ plot!(dd_cdar; label = "Min CDaR")
 #=
 ## Summary
 
-Drawdown measures use the *path* of cumulative wealth.
+Drawdown measures use the *path* of the cumulative returns.
 
   - [`MaximumDrawdown`](@ref) depends on the worst decline alone, and its portfolio can put most
     of its weight in a few assets.

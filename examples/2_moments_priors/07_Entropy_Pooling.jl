@@ -162,9 +162,9 @@ grid forms state the view only at the points of their grid.
 
 A view over several assets whose coefficients all have one sign, such as a group, is a sum of
 the measures of its assets with positive weights, and a lower bound on it takes the same exact
-formulations. A relative view has coefficients of both signs. For the CVaR it takes the integer
-formulation, and so does an upper bound on a group, or an equality below its prior value. A grid
-holds one asset, so for the other two measures these views take
+formulations. A relative view has coefficients of both signs. A relative CVaR view takes the
+integer formulation, and so does a CVaR upper bound on a group, or a CVaR equality below the prior
+value of a group. A grid covers one asset, so on the EVaR and the RLVaR these views take
 [`SequentialEntropicValueatRiskView`](@ref) or [`SequentialRelativisticValueatRiskView`](@ref),
 which solve a convex program a few times and need no integer variable.
 [`SequentialConditionalValueatRiskView`](@ref) gives the CVaR the same option.

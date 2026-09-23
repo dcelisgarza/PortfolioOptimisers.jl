@@ -262,7 +262,8 @@ projects the constraint inside each fold, with the prior of that fold.
 
 Everything above takes the loadings from the prior, which is what `FactorSpace()` means. The space
 also has an `re` field that names the source of the loadings. It looks for loadings in the same
-order of precedence as every other factor calculation in the library. A precomputed [`Regression`](@ref) comes first, then the
+order as [`FactorRiskContribution`](@ref), [`FactorRiskBudgeting`](@ref) and
+[`factor_risk_contribution`](@ref). A precomputed [`Regression`](@ref) comes first, then the
 loadings of the prior, then a new fit from the returns.
 
 The third source lets you use a factor mandate on a prior with no loadings, such as an

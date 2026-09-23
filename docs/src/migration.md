@@ -193,11 +193,11 @@ These results keep their numbers, but their meaning changed:
 
 ### [Links into the documentation](@id migration-0-31-docs)
 
-The API pages have new numbers that follow the new source layout, one page per source file. After this release, a bookmark into `api/24_Plotting`, `api/25_Aliases`, `api/19_RiskMeasures` or `api/20_Optimisation` on the `stable` site goes to the page with the new number, which is `22_Plotting`, `23_Aliases`, `16_RiskMeasures` or `17_Optimisation`. Find a page from the [API introduction](@ref) rather than by its number.
+The API pages follow the new source layout, and each source file has a public page under `public_api/` and a private page under `private_api/`. The build writes no page under `api/`, and a bookmark into `api/24_Plotting`, `api/25_Aliases`, `api/19_RiskMeasures` or `api/20_Optimisation` on the `stable` site finds no page. The public pages are now `public_api/22_Plotting`, `public_api/23_Aliases`, and the directories `public_api/16_RiskMeasures` and `public_api/17_Optimisation`. Find a page from the [API introduction](@ref) rather than by its number.
 
 ## From v0.31 to v0.32
 
-v0.32 adds the online portfolio selection family. It also removes one name and one keyword, gives the naive optimisers a `fees` field, adds fields to three results, and moves two released numbers.
+v0.32 adds the online portfolio selection family. It also removes `OnlineStep`, the `ff` keyword and three unexported functions, gives the naive optimisers a `fees` field, adds fields to three results, and moves two released numbers.
 
 ### [Names that were removed](@id migration-0-32-removed)
 

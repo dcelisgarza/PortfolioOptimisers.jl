@@ -63,7 +63,7 @@ rd = prices_to_returns(X)
 
 Every optimisation needs statistics of the returns, such as their mean and covariance, which the library calls the prior. You can compute the prior before the optimisation and pass it in, or let the optimisation compute it. Computing it first saves time when several optimisations share one prior. Here there is only one optimisation, so we let it compute its own.
 
-The [`MeanRisk`](@ref) estimator states a mean-risk optimisation problem. It is a `JuMPOptimisationEstimator`, so it needs a solver that `JuMP` can call. We use `Clarabel`.
+The [`MeanRisk`](@ref) estimator states a mean-risk optimisation problem. The library builds that problem as a `JuMP` model, so `MeanRisk` needs a solver that `JuMP` can call. We use `Clarabel`.
 =#
 
 using Clarabel
@@ -82,7 +82,7 @@ slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 
 ### 2.2 Defining the optimisation estimator
 
-`PortfolioOptimisers` builds an optimisation out of smaller estimators, each with its own job. The first place this shows on this page is [`JuMPOptimiser`](@ref), which has the settings that every `JuMPOptimisationEstimator` shares, the solver among them.
+`PortfolioOptimisers` builds an optimisation out of smaller estimators. `MeanRisk` takes its solver, its constraints and its prior estimator from a [`JuMPOptimiser`](@ref), in its `opt` field.
 
 We create a `MeanRisk` estimator. The printed output lists many more fields of `JuMPOptimiser` and `MeanRisk` than this page uses.
 =#

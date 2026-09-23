@@ -14,11 +14,14 @@ error in those estimates moves the weights less, and variance-based risk needs n
 
 `PortfolioOptimisers` has three members of this family.
 
-  - [`HierarchicalRiskParity`](@ref), or HRP, cuts the dendrogram in two again and again, and
-    splits risk between the two halves at each cut.
-  - [`HierarchicalEqualRiskContribution`](@ref), or HERC, equalises the risk contributions
-    inside each cluster and between the clusters. Each of the two levels takes its own risk
-    measure and its own scalariser.
+  - [`HierarchicalRiskParity`](@ref), or HRP, orders the assets by the dendrogram, splits that
+    ordered list in half again and again, and splits the budget between the two halves in
+    inverse proportion to their risk.
+  - [`HierarchicalEqualRiskContribution`](@ref), or HERC, cuts the dendrogram into clusters,
+    splits the budget between the clusters down the tree's branches in inverse proportion to
+    their risk, and splits each cluster's share between its assets in inverse proportion to
+    their own risk. Despite the name, the clusters do not contribute equal risk. Each of the two
+    levels takes its own risk measure and its own scalariser.
   - [`SchurComplementHierarchicalRiskParity`](@ref), or SCHRP, corrects the covariance of each
     sub-cluster with a Schur complement. At `gamma = 0` it gives HRP, and as `gamma` rises
     toward 1 it moves toward the minimum-variance portfolio.
@@ -91,9 +94,10 @@ plot_clusters(clr, rd.nx)
 #=
 ## 3. Hierarchical risk parity (HRP)
 
-HRP cuts the dendrogram in two again and again, and splits the budget between the two halves
-of each cut in inverse proportion to their risk. We pass the shared prior and clustering
-through a [`HierarchicalOptimiser`](@ref). Variance needs no solver, so we pass none.
+HRP orders the assets by the dendrogram, splits that ordered list in half again and again, and
+splits the budget between the two halves of each split in inverse proportion to their risk. We
+pass the shared prior and clustering through a [`HierarchicalOptimiser`](@ref). Variance needs
+no solver, so we pass none.
 =#
 
 opt = HierarchicalOptimiser(; pe = pr, cle = clr)
@@ -102,10 +106,11 @@ res_hrp = optimise(HierarchicalRiskParity(; opt = opt, r = Variance()))
 #=
 ## 4. Hierarchical equal risk contribution (HERC)
 
-HERC equalises the risk contributions inside each cluster, which is the inner problem, and
-between the clusters, which is the outer problem. It takes one risk measure per level, `ri`
-and `ro`, and one scalariser per level, `scai` and `scao`. We use [`Variance`](@ref) at both
-levels.
+HERC splits the budget between the clusters down the tree's branches in inverse proportion to
+their risk, which is the outer level, and splits each cluster's share between its assets in
+inverse proportion to their own risk, which is the inner level. It takes one risk measure per
+level, `ri` and `ro`, and one scalariser per level, `scai` and `scao`. We use
+[`Variance`](@ref) at both levels.
 =#
 
 res_herc = optimise(HierarchicalEqualRiskContribution(; opt = opt, ri = Variance(),

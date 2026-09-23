@@ -13,8 +13,8 @@ with one minimal call each. For the others, see the
 [constraints and costs examples](../examples/4_constraints_costs/01_Budget_Constraints.md).
 
 We compute one empirical prior. Every call but the factor call uses it, and every call but the
-last two minimises the risk. So you can compare the portfolio under each constraint with the same
-base portfolio.
+last two minimises the risk. You can then compare the portfolio under each constraint with the
+same base portfolio.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -86,9 +86,9 @@ Put a [`LinearConstraintEstimator`](@ref) in an [`ExposureConstraintEstimator`](
 `space` keyword to [`FactorSpace`](@ref). The keyword has no default. The names in the
 constraint must be factor names of the loadings. For a time-series regression, these are the
 names that a [`UniverseSets`](@ref) holds under `tfkey`, `"nf"` by default. When the estimator
-builds the constraint, it multiplies each row by the loadings. So the optimiser receives an
-ordinary constraint on the asset weights, and you can use it with every other constraint on this
-page.
+builds the constraint, it multiplies each row by the loadings. The optimiser then receives an
+ordinary constraint on the asset weights, which you can combine with every other constraint on
+this page.
 
 The constraint needs loadings, and the loadings need factor data. [`prices_to_returns`](@ref)
 takes no factor prices, so we give them to [`price_ingestion`](@ref) as `F`. By default the
@@ -129,12 +129,14 @@ Pass the prior estimator, not a computed prior. Then the optimiser builds the co
 inside each cross-validation fold, with the loadings that the fold fitted. A row that you compute by
 hand once does not match the loadings of the later folds, and the factor exposure example measures
 how far it moves. That page also covers groups of factors, factor rows mixed with asset rows, and
-the constraints that have no factor form. A constraint has a factor form only if it is a linear row
-in `w`. So cardinality, thresholds, turnover, tracking error and fees have none. Weight bounds have
-none either, because `wb` takes a box on each asset and no linear rows. To bound a factor exposure
-from both sides, write the two rows through `lcse`. To track a factor, you need no factor form.
-[`ReturnsTracking`](@ref) takes the return series of a benchmark, and the return series of a
-factor is a column of the factor matrix.
+the constraints that have no factor form.
+
+A constraint has a factor form only if it is a linear row in `w`. Cardinality, thresholds,
+turnover, tracking error and fees have none. Weight bounds have none either, because `wb` takes a
+box on each asset and no linear rows. To bound a factor exposure from both sides, write the two
+rows through `lcse`. To track a factor, you need no factor form. [`ReturnsTracking`](@ref) takes
+the return series of a benchmark, and the return series of a factor is a column of the factor
+matrix.
 
 ## 4. Turnover
 
@@ -160,9 +162,11 @@ problem, the bound changes almost nothing, because the optimum is already inside
 
 [`Fees`](@ref) (`fees`) charges a fee in each period on the positions that you hold, at one rate
 on the long weights and at another on the short weights, with optional fixed fees. It can also
-charge a fee on the traded weights. The optimiser subtracts the fees from the return that the
-objective uses. So a fee changes the portfolio only when the objective reads the return, and a
-`MinimumRisk` portfolio does not change. The minimal form sets `l`, the rate on the long weights.
+charge a fee on the traded weights. The optimiser subtracts the fees from the expected return,
+which a return objective and a return floor use, and from the return of each period, which a risk
+measure such as [`ConditionalValueatRisk`](@ref) uses. The variance, the default risk measure of
+`MeanRisk`, uses neither, and a fee does not change the `MinimumRisk` portfolios of this page. The
+minimal form sets `l`, the rate on the long weights.
 We maximise the ratio of return to risk with [`MaximumRatio`](@ref) two times, first with no fee and
 then with a rate of 0.1% on the long weights. The two portfolios differ only by the fee.
 =#
@@ -204,9 +208,9 @@ objective function also takes the [`ObjectiveFunction`](@ref), before the estima
 optimiser throws an error when it builds the model.
 
 The library adds a custom objective term to the objective penalty, which enters the objective with
-the sign that makes the objective worse, for a minimisation and for a maximisation. So a cost is a
-positive contribution, and a reward is a negative contribution. One definition is correct under
-every objective, [`MaximumRatio`](@ref) included. The
+the sign that makes the objective worse, for a minimisation and for a maximisation. You write a
+cost as a positive contribution and a reward as a negative contribution. One definition is correct
+under every objective, [`MaximumRatio`](@ref) included. The
 [custom objectives and constraints example](../examples/4_constraints_costs/09_Custom_Objectives_and_Constraints.md)
 builds a momentum tilt and a momentum floor. It also shows the two values of the model that a
 constraint written by hand needs. [`get_constraint_scale`](@ref) returns the scale of the

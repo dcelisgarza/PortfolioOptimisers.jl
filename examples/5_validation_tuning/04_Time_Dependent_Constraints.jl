@@ -31,8 +31,8 @@ Two rules decide which value a fold gets.
     walk-forward returns its folds in calendar order, so there entry `i` applies to the `i`-th
     window in time. When the order of a scheme is not the calendar, key the value to the fold's
     indices, which the context gives you.
-  - A schedule has no effect outside a fold loop. A plain `optimise` call has no folds, so the field
-    takes its static default, or the value you give in the schedule's `default` keyword.
+  - A schedule has no effect outside a fold loop. A plain `optimise` call has no folds. There the
+    field takes its static default, or the value you give in the schedule's `default` keyword.
 
 We run one portfolio problem under four cross-validation schemes, [`IndexWalkForward`](@ref),
 [`KFold`](@ref), [`CombinatorialCrossValidation`](@ref) and [`MultipleRandomised`](@ref). Under
@@ -154,10 +154,10 @@ deleverage_struct = TimeDependent(DeleverageCap(0.35, 0.2))
 #=
 ### 2.4 When a wrong entry fails
 
-A schedule is a keyword value, so a wrong field name is an ordinary keyword error. The constructor
-also builds the optimiser once with each entry of a vector schedule in the field, so an entry that
-the field does not accept fails when you build the optimiser. A callable has no entries to test. The
-fold loop checks its value on every fold instead.
+You pass a schedule as a keyword value, and a wrong field name is an ordinary keyword error. The
+constructor also builds the optimiser once with each entry of a vector schedule in the field. An
+entry that the field does not accept fails when you build the optimiser, not when a fold runs. A
+callable has no entries to test. The fold loop checks its value on every fold instead.
 
 We put a [`Threshold`](@ref) in `card`, which takes an integer, and then `0`, which is not positive.
 =#
@@ -196,7 +196,7 @@ n_wf = n_splits(wf, rd)
 The vector schedule needs one entry per fold, so we size it with [`n_splits`](@ref). We backtest
 the four optimisers over the same walk-forward with [`cross_val_predict`](@ref) and print the
 largest weight of every fold. On every fold the loop puts the fold's value in the field and
-solves an ordinary static optimiser.
+solves the optimiser as it would without a schedule.
 =#
 mr_wf_sched = MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = deleverage(n_wf)))
 mr_wf_fn = MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = deleverage_fn))
@@ -271,8 +271,8 @@ needs no previous weights leaves the folds free to run in parallel.
 
 `KFold` splits the data into consecutive blocks of time. Fold `i` tests on block `i` and trains on
 the other blocks. A schedule works here with no change. Entry `i` is the constraint while block `i`
-is out of sample. The library does not treat these folds as a timeline, so no fold gets the
-previous fold's weights and the folds run in parallel.
+is out of sample. The library does not treat these folds as a timeline. No fold gets the previous
+fold's weights, and the folds run in parallel.
 =#
 kfold = KFold(; n = 4)
 mr_kf_sched = MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = deleverage(4)))
@@ -302,11 +302,9 @@ end
 Under [`CombinatorialCrossValidation`](@ref) a fold is a split into training and test data. The test
 data of a split is a union of several separate blocks of time. `ctx.test_idx[ctx.i]` is a vector of
 those blocks. The splits come in a combinatorial order, not a timeline, and the library does not
-make one up. A split whose test data covers several blocks has no single position in time, so any
-position the library picked would be a rule you did not choose. Entry `i` belongs to split `i` of
-`split(ccv, rd)`, which you can inspect. To tie a constraint to time under this scheme, use a
-callable that orders the split's windows, `ctx.train_idx[ctx.i]` and `ctx.test_idx[ctx.i]`, as your
-problem needs.
+make one up. Entry `i` belongs to split `i` of `split(ccv, rd)`, which you can inspect. To tie a
+constraint to time under this scheme, use a callable that orders the split's windows,
+`ctx.train_idx[ctx.i]` and `ctx.test_idx[ctx.i]`, as your problem needs.
 =#
 ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
 n_ccv = n_splits(ccv)
@@ -388,7 +386,7 @@ In both cases, size the entries to the loop that uses them.
 ### 7.1 Outer cross-validation, no inner cross-validation
 
 This is every run on the page so far. The backtest's fold loop puts each fold's value in the
-field, and each fold solves an ordinary static optimiser.
+field.
 
 ### 7.2 No outer cross-validation, inner cross-validation
 
@@ -467,7 +465,8 @@ gs_res.idx
 #=
 `gs_res.idx` is the position of the candidate with the best out-of-sample score, and
 `gs_res.val_grid[gs_res.idx]` is a tuple with that candidate in it. The search's fold loop uses
-each candidate's entries, so every candidate must have `n_splits(gs.cv, rd)` entries.
+the entries of each vector schedule among the candidates, so each of them must have
+`n_splits(gs.cv, rd)` entries.
 
 ### 7.5 Bind a schedule to the inner loop with `:nearest`
 
@@ -521,7 +520,7 @@ The weight of WMT stays at or under its cap on every fold. In the first half of 
 cap, and on the first two folds it takes a part of the weight that the cap removes from WMT. In the
 second half, the cap of JNJ binds on the folds where the baseline puts more than 15 % on it.
 
-A schedule can only be the whole value of a field, so an entry of a constraint vector cannot be a
+A schedule is always the whole value of a field. An entry of a constraint vector cannot be a
 schedule. To change some entries of a constraint vector and keep the
 others, build the fold's vector in a callable,
 `TimeDependent(ctx -> [dynamic(ctx), a_static_constraint])`. The static parts then stay in one

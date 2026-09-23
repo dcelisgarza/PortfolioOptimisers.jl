@@ -391,8 +391,9 @@ pretty_table(DataFrame(; path = [p.id for p in pp.pred],
 ### 5.2 Paths over random subsets of assets
 
 [`MultipleRandomised`](@ref) draws a random subset of assets for every path and runs an inner
-walk-forward on it. It draws from the assets with enough data in the window of that path. It
-applies the subset to the input. The pipeline then fits from the start on each subset.
+walk-forward on it. It draws only from the assets with a finite price or return at every row of
+that path's window. It applies the subset to the input. The pipeline then fits from the start on
+each subset.
 =#
 
 mr = MultipleRandomised(IndexWalkForward(500, 250); subset_size = 6, n_subsets = 4,

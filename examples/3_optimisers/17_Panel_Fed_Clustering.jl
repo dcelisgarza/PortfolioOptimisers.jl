@@ -26,8 +26,8 @@ A classification raises none of the three questions that come up on the way.
 
 !!! note "The numbers are illustrative"
     The fundamentals below are written by hand. They have the shape of a real table and its
-    awkwardness: mixed scales, a few gaps, and one field that is almost empty. They are not
-    vendor data, and nothing follows from them about these companies.
+    awkwardness: mixed scales and a few gaps. They are not vendor data, and nothing follows from
+    them about these companies.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -103,11 +103,12 @@ column holds, and a level, a ratio, a rank and a logarithm each ask for a differ
 panel builder does not guess which you have.
 
 It matters here because the default [`AngularDist`](@ref) does not change when you rescale the
-whole row of an asset, and it does change when you rescale one column. `log_mcap` runs from 9
-to 15 and `dividend_yield` from 0.003 to 0.043, so `log_mcap` sets most of the length of every
-row. Stack the five columns without standardising them, and the angle between two rows comes
-mostly from `leverage`, the column with the widest spread. The three columns that stay under
-1.5 count for much less.
+whole row of an asset, and it does change when you rescale one column. Stack the five columns
+without standardising them, and `log_mcap` is the largest entry of every row, so every row
+points mostly along the `log_mcap` axis. A difference in `log_mcap` between two assets then
+changes the length of a row more than its direction. The angle between two rows comes mostly
+from `leverage`, the column with the widest spread, and the three columns that stay under 1.5
+count for much less.
 =#
 
 raw_fields = ["log_mcap", "book_to_price", "gross_profitability", "leverage",
@@ -151,7 +152,7 @@ means instead.
 
 The values here hold one number per asset and no observation axis, which makes this a static
 input. [`asset_panel`](@ref) refuses the two directional policies on such an input, because
-there is no earlier observation to carry a value from. A static table takes
+they carry a value along the observation axis, and there is none. A static table takes
 [`ConstantPanelFill`](@ref), and after the z-score `0.0` is the mean over the assets.
 =#
 
@@ -241,7 +242,7 @@ pretty_table(cut_rows; title = "One panel, six hierarchies")
 #=
 The last column scores each cut against the cut the correlations give, where 1 means the two
 cuts are the same. A hierarchy built on value and one built on size each score low against the
-correlations. That is the reason to reach for a panel, because each one
+correlations. That is a reason to reach for a panel, because each one
 answers a question the price history does not hold.
 
 The next table prints the four-way cuts themselves, one column per hierarchy.

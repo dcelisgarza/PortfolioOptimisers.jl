@@ -30,8 +30,9 @@ estimator. We call that estimator the source of the network. Two families of con
     covariance. The semidefinite phylogeny constraint and the centrality constraint are convex.
     The integer phylogeny constraint needs a mixed-integer solver.
 
-One parameter decides which assets count as related, and its value sets how strong each constraint
-is. It is the `sep` field of a [`NetworkEstimator`](@ref), and section 2 covers it.
+One parameter decides which assets count as related, and its value sets how strong a phylogeny
+constraint is. It is the `sep` field of a [`NetworkEstimator`](@ref), and section 2 covers it.
+Section 4.1 shows which centrality scores it changes.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -74,9 +75,9 @@ build the graph from the prior.
 
 ### 2.1 How far apart two assets can be and still count as related
 
-The graph shows only which assets share an edge. Each constraint below also needs to know how far
+The graph shows only which assets share an edge. A phylogeny constraint also needs to know how far
 apart two assets can be and still count as related. The `sep` field of the
-[`NetworkEstimator`](@ref) sets that distance. It decides how much of the universe each
+[`NetworkEstimator`](@ref) sets that distance. It decides how much of the universe a phylogeny
 constraint treats as one bet.
 
 A separation measures how far apart two assets are in the graph. The library has two, and they
@@ -141,8 +142,8 @@ hline!(hop_pairs; label = "HopCount shells (n = 1…8)", linestyle = :dash, colo
 The largest useful budget for either separation is the diameter of the graph, the longest of the
 shortest paths between two assets. [`separation_matrix`](@ref) returns the separation of every
 pair, and [`separation_budget`](@ref) returns the budget that a separation resolves to. The
-constraints call both functions to find their budget. We print the diameter in both units, the
-shortest edge, and the budgets that two `PathLength` settings resolve to.
+phylogeny constraints call both functions to find their budget. We print the diameter in both
+units, the shortest edge, and the budgets that two `PathLength` settings resolve to.
 =#
 
 sep_matrix = separation_matrix(PathLength(), NetworkEstimator(), pr.X)
@@ -300,7 +301,7 @@ a turnover. [`IntegerPhylogenyEstimator`](@ref) sets a hard limit on how many as
 each neighbourhood of the network. A neighbourhood is an asset and the assets related to it, or a
 cluster when the source is a clustering estimator. The constraint needs a mixed-integer solver,
 because it uses binary variables. [Cardinality and threshold](03_Cardinality_and_Threshold.md) shows
-how to set one up.
+how to set up a mixed-integer solver.
 
 ### 3.1 The separation sets the strength of the constraint
 

@@ -8,22 +8,18 @@ Description = "Online portfolio selection rules on two synthetic markets, with s
 Most optimisers met so far fit moments, and those that take a solver, such as `MeanRisk`, then
 solve a programme. Most rules of the online portfolio selection family do neither. A rule of the family is one recursion,
 `w_{t+1} = f(w_t, x_t)`. It takes the price relative `x_t = 1 + r_t` the market just realised and
-moves the allocation from it. Most rules use no covariance, no expected return and no solver.
+moves the allocation from it.
 
 [`OnlinePortfolioSelection`](@ref) is the naive optimiser that runs a rule. In batch it makes one
 causal pass over the rows. It goes through every row in order from the start allocation, and it
 returns the portfolio for the period after the last row. Its online updates are the same
-recursion one row at a time, so a walk-forward at `test_size = 1` and the batch pass give the same
+recursion one row at a time. A walk-forward at `test_size = 1` and the batch pass give the same
 weights.
 
 Many rules carry a guarantee that holds on every price sequence, with no statistical assumption.
 The wealth of such a rule cannot fall far behind the best constant portfolio chosen in hindsight.
 That guarantee is a bound, and it is not a return. The follow-the-loser rules carry no such
 guarantee.
-
-This page runs the two halves of the family on two synthetic markets and shows what each half
-bets on. It then measures every rule against three hindsight comparators, shows the one place a
-walk-forward and the batch pass differ, and tunes a rate.
 
 The rules fall into the five groups of Li and Hoi's (2014) survey. Sections 1 to 4 run two
 benchmarks, three follow-the-winner rules and three follow-the-loser rules, and measure them.
@@ -72,9 +68,9 @@ N = size(rd_rev.X, 2)
 #=
 The roster below is two benchmark rules, three rules that follow the winner and three that follow
 the loser. We run every rule through `OnlinePortfolioSelection` and the same walk-forward. It
-takes twenty warm-up rows, then one row per fold under [`OnlineIndexWalkForward`](@ref), so each
-fold adds one row and returns one portfolio. [`UniversalPortfolio`](@ref) samples its constant portfolios when
-you construct it, so it needs the universe size, and a seed pins the draw.
+takes twenty warm-up rows, then one row per fold under [`OnlineIndexWalkForward`](@ref). Each fold
+adds one row and returns one portfolio. [`UniversalPortfolio`](@ref) samples its constant
+portfolios when you construct it. It needs the universe size for that, and a seed fixes the draw.
 =#
 
 rules = ["Buy and hold" => BuyAndHold(),
@@ -99,11 +95,10 @@ pretty_table(DataFrame("Rule" => first.(rules),
              title = "Terminal wealth from a unit start, 480 periods")
 
 #=
-The two halves of the table behave differently. The benchmarks and the follow-the-winner
-rules land within a factor of each other on both markets. The constant rebalanced portfolio, the
-exponentiated gradient, the Newton step and the universal portfolio sit close together on each
-market. Each of them moves slowly away from a
-constant portfolio, and a constant portfolio is what their guarantee is stated against.
+The constant rebalanced portfolio, the exponentiated gradient, the Newton step and the universal
+portfolio sit close together on each market. Each of them moves slowly away from a constant
+portfolio, and a constant portfolio is what their guarantee is stated against. Buy and hold ends
+within a factor of them on both markets.
 
 A follow-the-loser rule is a bet on one property of the market. Where prices revert, the rule buys
 every fall and is paid for it on the next row, and the reversion rules end far above the other
@@ -111,14 +106,13 @@ rules of the table. Where prices trend, the same rule buys every fall into a fur
 rule loses almost all of its start. Nothing in the rule finds out which market it is in, and both
 results come from the same update.
 
-Read the table before you run a reversion rule on money. Run a winner rule and a loser rule side
-by side on the market at hand, and use the pair as a test of whether that market reverts or
-trends.
+Run a winner rule and a loser rule side by side on the market at hand, and use the pair as a test
+of whether that market reverts or trends.
 
 ## 2. The regret table
 
-The guarantee is stated against a comparator chosen in hindsight, so the measurement follows one
-rule. Fit the comparator on the rows the strategy was scored on, and predict it in sample over
+The guarantee is stated against a comparator chosen in hindsight, and you measure such a
+comparator in two steps. Fit it on the rows the strategy was scored on, and predict it in sample over
 those same rows. Three comparators cover the literature. The best constant rebalanced portfolio is
 [`BestConstantRebalancedPortfolio`](@ref), Cover's (1984) fixed point, which needs no solver. It
 stops at a budget of steps, so it is exact only to the precision of this page's tables. You can
@@ -159,7 +153,7 @@ pretty_table(regret_table(rd_trend, preds_trend); formatters = [resfmt],
 
 #=
 [`log_wealth_regret`](@ref) returns the log terminal wealth of the comparator less the log
-terminal wealth of the strategy, so a positive entry is a comparator that won. A negative entry is
+terminal wealth of the strategy. A positive entry means the comparator won. A negative entry is
 expected and is not a defect. The bound says that a rule cannot fall far behind the best constant
 portfolio, and it says nothing about the rule pulling ahead of it. A causal rule that follows the
 structure of the market does pull ahead, as every reversion rule on the reverting market does
@@ -169,7 +163,7 @@ The best stock in hindsight is a weaker comparator than the best constant rebala
 the `Best stock` column never stands above the `Best CRP` column. On the trending market the two columns are equal,
 because the best constant portfolio there holds one asset.
 
-The Result also carries a per-row difference series and a Newey-West test of it. The comparator
+`log_wealth_regret` also returns a per-row difference series and a Newey-West test of it. The comparator
 saw those rows and was chosen to win on this one sequence, so its `p` is optimistic. Read it as a
 rank, and not as a probability.
 
@@ -211,7 +205,7 @@ The portfolio the fold returns is the portfolio the pass returns over the same r
 fund holds at the end of the block is not. It has drifted away from the target, and the next
 update of the rule uses its own target, never the drifted book. The gap in wealth comes from how
 often the rule rebalances. A reversion rule that rebalances on every row is paid on every
-reversal, and one that rebalances every fifth row is paid on every fifth reversal, so it ends with
+reversal. One that rebalances every fifth row is paid on every fifth reversal and ends with
 less. The drift takes a little more. Neither path is
 wrong. A rule is designed for the rebalancing frequency its paper ran it at, and `test_size` is
 that frequency.
@@ -244,8 +238,8 @@ allocation toward that forecast. [`MovingAverageReversion`](@ref) is [`ForecastR
 over [`PriceLevelExpectedReturns`](@ref) with a moving average. Its forecast is the ratio of the
 average price to the last price, which is below one for an asset that just rose. The same update
 takes any expected-returns estimator. [`PriorExpectedReturns`](@ref) takes one from a prior, here an
-[`EmpiricalPrior`](@ref) whose mean weights the recent rows most, so the forecast for the next row
-is the average return of about the last ten rows, carried forward.
+[`EmpiricalPrior`](@ref) whose mean weights the recent rows most. The forecast for the next row is
+then the average return of about the last ten rows, carried forward.
 =#
 
 recent = PriorExpectedReturns(;
@@ -264,19 +258,20 @@ pretty_table(DataFrame("Forecast" => first.(forecasts),
              formatters = [resfmt], title = "One update, two forecasts")
 
 #=
-The two rows invert each other. The update is the same in both, so the forecast alone decides the
-result. A moving-average forecast says that a rise reverts. A recent-mean forecast says that a
-rise continues, so the rule that uses it gains on the trending market and loses on the reverting
+The two rows invert each other. The update is the same in both, and only the forecast differs. A
+moving-average forecast says that a rise reverts. A recent-mean forecast says that a rise
+continues, and the rule that uses it gains on the trending market and loses on the reverting
 one. The prior route is the general one, because the expected return of any prior is a forecast,
 a factor model's or a view-tilted one.
 
-## 6. A second geometry
+## 6. Four geometries of one step
 
-Every first-order rule is one [`MirrorDescent`](@ref) step, and `proj` holds the geometry the step
-and its projection are taken in. The exponentiated gradient takes the entropic geometry, and
-[`GradientProjection`](@ref) takes the Euclidean one. [`LogBarrierProjection`](@ref) lies beyond the
-entropic geometry, on the side away from the Euclidean one, and [`TsallisProjection`](@ref) lies
-between the entropic geometry and the log barrier.
+[`MirrorDescent`](@ref) is one first-order step, and `proj` sets the geometry the step and its
+projection are taken in. The exponentiated gradient is a `MirrorDescent` in the entropic
+geometry, and [`GradientProjection`](@ref) is one in the Euclidean geometry.
+[`LogBarrierProjection`](@ref) lies beyond the entropic geometry, on the side away from the
+Euclidean one, and [`TsallisProjection`](@ref) lies between the entropic geometry and the log
+barrier.
 =#
 
 geometries = ["Entropic" => ExponentiatedGradient(),
@@ -318,7 +313,8 @@ matched = FollowTheLeader(; sel = NearestNeighbourMatch(; window = 2))
 
 #=
 It is the one rule on the page that ends well ahead of the constant rebalanced portfolio on both
-markets, and it is the one rule that looks at the market before it bets. On the reverting market the rows that followed a rise were falls. On the
+markets, and the one rule that selects past rows by how closely their history matches the last
+two rows. On the reverting market the rows that followed a rise were falls. On the
 trending market they were further rises. The leader over those rows is the opposite portfolio in
 the two cases. The trending market here has a persistence far stronger than that of any real
 market.
@@ -332,9 +328,10 @@ enough rows have accrued, and the rule holds the uniform portfolio over those ro
 Section 2 measured every rule against one portfolio chosen in hindsight. A sequence of portfolios
 is the stronger comparator. [`HindsightSplit`](@ref) is a walk-forward whose fold `t` trains on the
 rows through `t` and tests on row `t`, so an estimator run through it is a comparator refitted at
-every row. [`log_wealth_regret`](@ref) against its Result is dynamic regret, and it reports the
-path length of the comparator beside it. Under `prefix = true` the best constant portfolio becomes
-be-the-leader. Under `prefix = false` the best stock becomes the best stock of each row.
+every row. [`log_wealth_regret`](@ref) against its result is dynamic regret, and it reports the
+path length of the comparator beside it. Under `prefix = true` the best constant portfolio is
+refitted at each row on the rows up to and including that row, and is called be-the-leader. Under
+`prefix = false` the best stock becomes the best stock of each row.
 =#
 
 rdt = test_rows(rd_rev)
@@ -356,11 +353,11 @@ pretty_table(dynamic; formatters = [resfmt],
  best_stock_per_row = log_wealth_regret(preds_rev["Constant rebalanced"], per_row_stock).path_length)
 
 #=
-Be-the-leader sees each row before it bets on it, so it beats every winner rule by far more than
-the fixed leader of section 2 did. The path lengths above show how far each comparator moves, and
-the moving-average reversion still ends ahead of be-the-leader. The best stock of each row holds
-one asset and jumps on nearly every row. Its path is far longer, and no causal rule comes near
-it.
+Be-the-leader is fitted on each row before it is scored on it. It beats every winner rule by far
+more than the fixed leader of section 2 did. The path lengths above show how far each comparator
+moves, and the moving-average reversion still ends ahead of be-the-leader. The best stock of each
+row holds one asset and jumps on nearly every row. Its path is far longer, and no causal rule
+comes near it.
 
 That is how you read dynamic regret. The bound a rule carries grows with the path length of the
 comparator, and no rule tracks a comparator that moves on every row. The `path_length` field
@@ -371,10 +368,10 @@ best sequence under a budget on the path length. Be-the-leader is one sequence a
 length, and the best stock of each row is the sequence no budget binds.
 [`BudgetedHindsightPath`](@ref) solves for the sequence itself, as one programme over the rows. It
 maximises the log wealth of a path that sits on the simplex at every row, under a budget on the
-summed length of its steps. It follows the same rule as the other comparators. It is fitted on the
-rows it is scored on, predicted over them, one fold per row, so [`log_wealth_regret`](@ref) takes
-it as it takes any other comparator. At the path length be-the-leader walked, the two are
-different paths.
+summed length of its steps. It is measured as the best constant portfolio of section 2 is. It is
+fitted on the rows it is scored on and predicted over them, one fold per row, and
+[`log_wealth_regret`](@ref) takes it as it takes any other comparator. At the path length
+be-the-leader walked, the two are different paths.
 =#
 
 slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
@@ -391,10 +388,11 @@ budgeted_reg = log_wealth_regret(crp, budgeted)
 The budget binds, so the path length equals the one be-the-leader walked. The regret against the
 best sequence of that length is far larger than the regret against be-the-leader. The steps of the
 leader are the drift of a running average, and the same length of path, spent where a switch pays
-the most, buys much more log wealth. At the path length of the best stock of each row the budget
-is slack, and the two comparators are the same path. At a budget of zero the path is the fixed
-leader of section 2. One estimator therefore covers the fixed leader, the best stock of each row,
-and every budget between them.
+the most, buys much more log wealth. The `BudgetedHindsightPath` docstring states the two ends of
+the budget. At the path length of the best stock of each row or above it, the budget is slack and
+the path is the best stock of each row. At a budget of zero the path cannot move, and it is the
+fixed leader of section 2, the best constant rebalanced portfolio. One estimator therefore covers
+the fixed leader, the best stock of each row, and every budget between them.
 
 ## [The roster by group](@id user-guide-online-selection-roster)
 

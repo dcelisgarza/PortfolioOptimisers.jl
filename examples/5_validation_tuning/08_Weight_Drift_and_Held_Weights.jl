@@ -131,11 +131,8 @@ pretty_table(summary_df; formatters = [numfmt])
 
 #=
 Under the drift the series earns less and has less risk on every line of the table. On the
-worst-drawdown line, less risk is a number closer to zero, because a drawdown is negative. Both
-directions have the same cause. A position that has grown is a larger share of the book than the
-optimiser gave it, and a position that has shrunk is a smaller one. The drifted book is what the
-fund holds once prices have moved, not the book the optimiser chose. On this universe it earns a
-little less and moves a little less.
+worst-drawdown line, less risk is a number closer to zero, because a drawdown is negative. The
+drifted book is what the fund holds once prices have moved, not the book the optimiser chose.
 
 Neither series is the "correct" one. The target series answers *what did this rule decide*, and the
 drifted series answers *what would a fund holding that decision have earned*. The two questions
@@ -157,9 +154,9 @@ A drifted fold has a held-weights record, [`HeldWeightsResult`](@ref), in the `h
 [`PredictionResult`](@ref). A fold that did not drift has `nothing` there, so code that needs a
 path can tell the two cases apart without looking at a number.
 
-The record holds four things: the asset returns the fold was scored over, the weight path when the
-scheme stored it, the weights held after the last observation, and the drift scheme that produced
-them.
+The record has five fields: the asset returns the fold was scored over, the weight path when the
+scheme stored it, the weights the drift started from, the weights held after the last observation,
+and the drift scheme that produced them.
 =#
 
 hw = pred_held.pred[1].hw

@@ -67,9 +67,9 @@ return net of the fee, less two times the variance. The weight bounds cap each n
 turnover budget keeps each target weight within 0.05 of the weight the investor has today. The
 fee is 0.1% of each unit of weight traded, and the solve deducts it from the expected return.
 
-The objective has to use the return. The fee is a deduction from the return, so a minimum-risk
-objective would ignore it. A fee on each long position would not work either, because a
-fully-invested long-only book pays the same total fee whatever its weights are.
+A minimum-risk objective would ignore the fee, as the tip says. A fee on each long position would
+not work either, because a fully-invested long-only book pays the same total fee whatever its
+weights are.
 =#
 
 retail = optimise(MeanRisk(; obj = MaximumUtility(),

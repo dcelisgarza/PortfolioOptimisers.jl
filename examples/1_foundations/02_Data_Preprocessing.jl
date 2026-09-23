@@ -11,8 +11,10 @@ trading halt or a stale quote leaves a flat or missing stretch in the middle. Ex
 different holiday calendars, so the dates of two assets do not line up.
 
 Two functions prepare such a table for the rest of the library. [`price_ingestion`](@ref) treats
-`missing` and `NaN` as the same absent price, joins and collapses the series, and states each
-asset's listing span, the observations between its listing and its delisting. It takes the span
+`missing` and `NaN` as the same absent price. By default it puts any factor and benchmark series
+on the dates of the price table, and it collapses the series to a lower frequency only when you
+give [`PriceIngestion`](@ref) a non-empty `collapse_args`. It states each asset's listing span,
+the observations between its listing and its delisting. It takes the span
 from the whole table. A run of gaps at the start of an asset's column means the asset was not yet
 listed, a run at the end means it was delisted, and a run in the middle is a suspension of an asset
 that stayed listed. [`prices_to_returns`](@ref) then computes the returns and keeps every gap in
@@ -132,8 +134,9 @@ pretty_table(DataFrame(;
 #=
 ## 5. State a price convention across the halts
 
-Every later step can work with the gaps left in. An optimiser leaves out of a window every asset
-with a gap in that window. If you want to state what the price was during a halt, use
+Every later step can work with the gaps left in. An optimiser uses only the assets whose return
+is finite on every observation of a window, the coverage universe of that window, and gives the
+other assets no weight. If you want to state what the price was during a halt, use
 [`PriceGapFill`](@ref). It is a universe policy, fitted on a training window and applied to later
 windows. It fills held gaps only, so it never writes a price before an asset listed or after it
 delisted.
@@ -164,7 +167,7 @@ date.
 ## 6. Drop what has too few prices
 
 Asset 3 is missing for about 63% of the window. Keeping it costs nothing, because an optimiser
-leaves it out of every window where the library cannot estimate it. If you want it gone from the
+leaves it out of every window whose coverage universe excludes it. If you want it gone from the
 universe, use [`MissingDataFilter`](@ref), the only step that deletes an asset or an observation.
 It is a universe policy too. We fit it on the table, and the fit records the assets that pass the
 threshold. Applied to a later window, the filter keeps those assets and does not choose
@@ -178,12 +181,11 @@ println("Assets kept after the 50% column filter: $(length(mdf.nx)) of $N")
 ## 7. Optimise on the result
 
 A [`ReturnsResult`](@ref) that holds a panel goes into the rest of the package like any other,
-with no extra arguments. The optimiser uses the panel and gives no weight to an asset it cannot
-estimate on the window.
+with no extra arguments. The optimiser finds the coverage universe of the window from the returns
+and the panel.
 
-We optimise on both tables to show what the fill changes. An optimiser keeps an asset only when its
-return is finite on every observation of the window, which is the coverage universe. The scattered
-single-day gaps therefore remove most of the assets from the carried table. The fill closes the
+We optimise on both tables to show what the fill changes. The scattered single-day gaps put most
+of the assets of the carried table outside the coverage universe. The fill closes the
 held gaps and brings those assets back. Asset 3 stays out, because it was not listed at the start
 of the window, and the listing span tells a missing listing apart from a halt.
 =#
@@ -218,8 +220,9 @@ heatmap(1:N, 1:T, Float64.(ismissing.(vals)); xlabel = "Asset", ylabel = "Day",
 #=
 ## Summary
 
-  - [`price_ingestion`](@ref) treats `missing` and `NaN` as one absent price, joins and
-    collapses the series, and computes each asset's listing span from the whole table.
+  - [`price_ingestion`](@ref) treats `missing` and `NaN` as one absent price, puts any factor and
+    benchmark series on the dates of the price table by default, collapses the series only under
+    a non-empty `collapse_args`, and computes each asset's listing span from the whole table.
   - [`prices_to_returns`](@ref) computes the returns and keeps every gap. The
     [`AssetPanel`](@ref) it returns states which assets the library can estimate on which dates.
   - [`PriceGapFill`](@ref) fills a held gap with a price convention and writes nothing outside the

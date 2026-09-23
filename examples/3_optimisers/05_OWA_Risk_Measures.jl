@@ -182,7 +182,7 @@ from `owa_cvar` and `owa_wr`.
 ## Default range: tail Gini losses vs tail Gini gains.
 r_range_default = OrderedWeightsArrayRange()
 
-## Custom range: CVaR losses vs worst realisation gains.
+## Custom range: CVaR of the losses plus the largest return.
 T_obs = T
 r_range_custom = OrderedWeightsArrayRange(; w1 = owa_cvar(T_obs), w2 = owa_wr(T_obs))
 
@@ -241,7 +241,6 @@ plot_stacked_bar_composition(lcrm_results, rd)
   - The closed-form functions, such as `owa_gmd`, `owa_tg` and `owa_cvar`, return a weight
     vector that you pass to [`OrderedWeightsArray`](@ref). Building the weights needs no
     solver.
-  - Every optimisation on this page used the default formulation, `ApproxOrderedWeightsArray`.
   - `owa_l_moment_crm` with `NormalisedConstantRelativeRiskAversion` sets the weight on the
     worst returns through `g`. With its default `k = 2` it gives the Gini mean difference
     portfolio.

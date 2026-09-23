@@ -172,10 +172,10 @@ Here the constraints act on the sum of the weights of each set.
   - `slt` and `sst` are the minimum sizes of a long and of a short set sum.
 
 The sets are the three clusters of `clusters1`. The first problem minimises the conditional
-value at risk with `scard = 1`. The second maximises the ratio with `scard = 2`, set thresholds
-and no budget constraint. The count of active sets tests each set sum with `!iszero`, so a set
-whose sum is a solver residual near zero counts as active, and the count can be larger than
-`scard`.
+value at risk with `scard = 1`. The second maximises the ratio with `scard = 2`, set thresholds,
+no budget and a short budget of 1. The count of active sets tests each set sum with `!iszero`,
+so a set whose sum is a solver residual near zero counts as active, and the count can be larger
+than `scard`.
 =#
 
 res_set_1 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(),

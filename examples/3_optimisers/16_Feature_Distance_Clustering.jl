@@ -178,9 +178,9 @@ different industries at `1/3`, and two that share nothing at `0.5`.
 
 ### 2.2 The clustering it produces
 
-The panel is data rather than configuration, so it goes on the [`ReturnsResult`](@ref) with the
-returns. The distance estimator goes into an ordinary [`ClustersEstimator`](@ref) through its `de`
-keyword, and [`clusterise`](@ref) takes the panel from the [`ReturnsResult`](@ref) you pass it.
+The panel goes on the [`ReturnsResult`](@ref) with the returns, like any other input data. The
+distance estimator goes into an ordinary [`ClustersEstimator`](@ref) through its `de` keyword,
+and [`clusterise`](@ref) takes the panel from the [`ReturnsResult`](@ref) you pass it.
 =#
 
 rd = ReturnsResult(; nx = rd0.nx, X = rd0.X, ts = rd0.ts, pnl = pnl)
@@ -490,7 +490,9 @@ println("S is cos(πD): ", S_fea ≈ cos.(π .* D_fea))
 
 A panel is static or time-varying, and the whole panel is one shape. A static panel carries no
 mask, and every field is `assets` or `assets × labels`. A time-varying panel leads every field
-with an observation axis, and carries an active mask and an estimation mask beside the fields.
+with an observation axis, and carries two `observations × assets` masks of `true` and `false`
+beside the fields. The active mask marks when each asset was in the universe, and the
+estimation mask marks the active cells a fit may use.
 [`feature_matrix`](@ref) follows the shape. A static panel stacks to `assets × features`, and a
 time-varying one to `observations × assets × features`.
 
@@ -623,7 +625,7 @@ what separated pairs inside one sector. Cutting to two levels of one field moves
 well. An asset in neither kept level has a feature row of zeros, so the largest distance reaches
 `1.0` rather than the `0.5` a full partition gives.
 
-The selector lives on the estimator, so the cut is configuration and the panel stays data.
+The selector is a field of the estimator, so you change the cut without rebuilding the panel.
 =#
 
 de_coarse = FeatureDistance(; sel = ["sector"])
@@ -841,7 +843,7 @@ Two settings close the gap, and each is one keyword.
 
 ## 9. A walk-forward backtest
 
-The reason to reach for a classification panel is what it does to the turnover. A correlation
+A second reason to reach for a classification panel is what it does to the turnover. A correlation
 hierarchy refits from scratch every fold and moves whenever the covariance moves. A classification
 does not move at all. The cells below walk forward over five years with one-year training windows
 and quarterly rebalances.

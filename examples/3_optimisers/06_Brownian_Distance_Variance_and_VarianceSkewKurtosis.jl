@@ -9,17 +9,17 @@ Some risk measures respond to parts of the return distribution that the variance
 conditional value at risk do not measure. This page shows two of them.
 
   - [`BrownianDistanceVariance`](@ref) measures the dispersion of the portfolio returns with
-    their distance variance, the Brownian distance covariance of the return series with
-    itself. It is built from the distance between the returns of every pair of days, not
-    from their deviations about the mean, so it captures non-linear structure that the
-    variance misses.
+    an upper bound on their distance variance, the Brownian distance covariance of the return
+    series with itself. It is built from the absolute differences between the returns of
+    every pair of days, not from their deviations about the mean.
   - [`VarianceSkewKurtosis`](@ref) combines the variance, the skewness and the kurtosis in one
     objective. Its model is a semidefinite relaxation with one large positive semidefinite
     matrix, so a first-order solver such as SCS suits it.
 
 !!! tip "When to reach for this"
-    Reach for `BrownianDistanceVariance` when you want a measure of dispersion that captures
-    non-linear structure in the return series. Reach for `VarianceSkewKurtosis` when the
+    Reach for `BrownianDistanceVariance` when you want a measure of dispersion built from the
+    differences between pairs of returns, not from their deviations about the mean. Reach for
+    `VarianceSkewKurtosis` when the
     third and fourth moments of the portfolio return matter, for example when the assets
     have fat tails or skewed payoffs that mean-variance optimisation ignores.
 
@@ -175,8 +175,8 @@ res_vsk_heavy = optimise(MeanRisk(; r = r_vsk_heavy, opt = opt_ho), rd)
 
 #=
 We print the two portfolios side by side. The larger scales double the skewness and kurtosis
-terms of the objective. On these 50 daily returns both terms are at least 500 times smaller
-than the variance term, so the two columns differ by less than 0.1 of a percentage point.
+terms of the objective. The two columns differ by less than 0.1 of a percentage point, so
+doubling the two scales changes little on these 50 daily returns.
 =#
 
 pretty_table(DataFrame(; :assets => rd.nx, :VarianceSkewKurtosis => res_vsk.w,

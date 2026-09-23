@@ -8,14 +8,14 @@ Description = "How PortfolioOptimisers.jl handles assets that list, delist or st
 Real asset universes move. A company lists halfway through your sample, another is acquired and
 stops quoting, a third is suspended for a month. `PortfolioOptimisers.jl` answers all three cases
 with one rule. Each estimator and function of the library either handles the missing asset, or
-throws an error that names it.
+throws an error that says why it cannot.
 
 One that can state a correct answer for a missing asset does so, and its docstring says how. One
 that cannot throws, instead of returning a number that is wrong. Nothing in the library
 drops an asset without telling you, back-fills a price, or reads a gap as a zero return.
 
 You ingest a gapped table with the call a clean table takes. [`prices_to_returns`](@ref) on a raw
-price table runs the ingestion layer. The layer reads the first and the last quote of each asset,
+price table runs the ingestion layer. The layer finds the first and the last quote of each asset,
 its listing span, carries every gap into the returns, and hands back a [`ReturnsResult`](@ref)
 whose [`AssetPanel`](@ref) states the universe. You never build a returns matrix or a mask by
 hand.
@@ -34,7 +34,7 @@ X = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.csv.gz")); timestam
 We gap the prices below. One asset lists 60 observations into the sample, another delists 40
 observations before the end, and a third is suspended for a month in the middle. Everything else
 is untouched. The gaps sit in the prices, which is how a data vendor sends them. A gap is `NaN` or
-`missing`, and the layer reads both as one absence.
+`missing`, and the layer stores both as `NaN`.
 =#
 
 nx = string.(colnames(X))
@@ -60,7 +60,7 @@ never spreads to a neighbouring asset.
 ## 2. The panel states the universe
 
 The layer also builds the [`AssetPanel`](@ref) in `rd.pnl`. Its active mask `amsk` says when each
-asset is in the universe, and the layer reads it off the gaps of each price column. A leading run
+asset is in the universe, and the layer builds it from the gaps of each price column. A leading run
 of gaps is an asset not yet listed, a trailing run is a delisting, and an interior run is a
 suspension on an asset that is still listed. Its estimation mask `emsk` is the active mask and
 finiteness together. The two masks differ on a suspension, where the asset is in the universe and
@@ -75,14 +75,14 @@ emsk = Matrix(rd.pnl.emsk)
 #=
 The late lister is active from its first return, one observation after its first price. The
 delisted asset is active up to its last. The suspended asset is active throughout, and it is
-estimable everywhere but inside the halt. The layer reads the span once over the whole table, so
+estimable everywhere but inside the halt. The layer finds the span once over the whole table, so
 the span describes the instrument and does not change with the window. Take a walk-forward fold
-whose window ends inside the delisting, as one below does. That fold reads the delisted asset as
-one you still hold, and not as one that was never listed.
+whose test window ends inside the delisting, as one below does. That fold treats the delisted asset
+as one you still hold, and not as one that was never listed.
 
 `prices_to_returns(Xg)` is the short spelling of two steps. [`price_ingestion`](@ref) builds the
 ingested price table. It unifies the two gap spellings, joins factor and benchmark series onto the
-asset clock, collapses to a lower frequency if you ask for one, and reads the span.
+asset clock, collapses to a lower frequency if you ask for one, and finds the span.
 [`PricesToReturns`](@ref) converts that table to returns. Write the two steps when you need any of
 those options. The [data preprocessing example](../examples/1_foundations/02_Data_Preprocessing.md)
 walks each one.
@@ -134,7 +134,7 @@ res_hrp = optimise(HierarchicalRiskParity(), rd)
 (res_hrp.w[late], res_hrp.w[dead], res_hrp.w[halt], sum(res_hrp.w))
 
 #=
-## 5. What refuses, and what the refusal says
+## 5. The two errors a gap can cause
 
 A plain moment estimator has no correct answer for a gapped sample. It reads a matrix and nothing
 else. It has no mask, no panel, and no way to tell a holiday from a delisting, so it throws
@@ -166,7 +166,7 @@ catch err
 end
 
 #=
-## 6. A declared listing calendar states what the prices cannot
+## 6. A listing calendar you pass in
 
 A price series can be finite while the asset is untradeable. A suspension can carry stale quotes,
 a corporate action can start a holding period, and your mandate can exclude a name. The prices
@@ -193,7 +193,7 @@ when, and the conversion still carries the gaps into `emsk`.
 
 ## 7. A walk-forward over a universe that changes
 
-Each fold reads the coverage universe of its own training window, so the universe can differ from
+Each fold fits on the coverage universe of its own training window, so the universe can differ from
 fold to fold. Each fold's weights come back over your full universe, with a zero where that fold
 could not trade.
 =#

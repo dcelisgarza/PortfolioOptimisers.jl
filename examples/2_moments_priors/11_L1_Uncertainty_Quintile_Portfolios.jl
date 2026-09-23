@@ -25,7 +25,8 @@ ball is the only parameter, and it sets how many assets the portfolio holds.
 You get the quintile portfolio when you believe your forecast in part, and the 1/N portfolio
 when you do not believe it at all.
 
-For that reason the library has no quintile optimiser. An ℓ1 ball is an
+Because the quintile portfolio is the solution of a robust problem, the library has no
+quintile optimiser. An ℓ1 ball is an
 [uncertainty set](09_Uncertainty_Sets.md), so the quintile portfolio is a [`MeanRisk`](@ref)
 problem with an ℓ1 `ucs`, and every constraint of the library applies to it. This page computes
 the sweep over `ε` behind the table above, the models of the paper, a ranking on a
@@ -55,8 +56,8 @@ end;
 
 We use the same S&P 500 slice as the other examples. The worst case over an ℓ1 ball is an
 infinity norm. One extra variable that bounds every entry makes an infinity norm linear. Every
-ℓ1 model of this page is a linear program, or a mixed-integer linear program in section 7,
-and HiGHS solves both.
+ℓ1 model of this page is a linear program, or a mixed-integer linear program in sections 7 and
+8, and HiGHS solves both.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -246,11 +247,12 @@ as `±1/(2m)`, the net exposure as zero and the gross exposure as one.
 (net = sum(w_ls), gross = sum(abs, w_ls))
 
 #=
-## 7. A budget is an upper bound
+## 7. The short and gross budgets are upper bounds
 
-This section applies to every model of the library. The long and short variables are upper
-bounds on the positive and negative parts of `w`, so `sbgt = 0.3` means at most 30 % short. You
-do not usually see the difference, because the objective pushes the exposure to the budget.
+This section applies to every model built on a `JuMPOptimiser`. A number for `bgt` fixes the net
+exposure `sum(w)`. The long and short variables are upper bounds on the positive and negative
+parts of `w`, so `sbgt = 0.3` means at most 30 % short. You do not usually see the difference,
+because the objective pushes the exposure to the budget.
 
 You see it at a very large radius. Past the radius at which every asset is active, the
 worst-case return of the 50/50 portfolio is negative. The paper still holds that portfolio,
@@ -290,7 +292,8 @@ exact = quintile(L1UncertaintySet(; eps = eps_extreme); bgt = 0.0, sbgt = 0.5, x
 A market-neutral portfolio needs `βᵀw = 0` and a fixed gross exposure, and it leaves the net
 exposure free. `bgt` and `sbgt` constrain the net and the gross exposure together, so they
 cannot fix the gross exposure at one and leave the net free. `gbgt` constrains the gross
-exposure alone. You need it here, because without a gross constraint the problem is unbounded.
+exposure alone, so we use it here. Without it, only the weight bounds of `-1` and `1` limit the
+gross exposure.
 `gbgt` bounds the gross exposure unless `xbgt = true`, so we set both.
 
 The paper notes that the active assets no longer follow the order of the ranking here, so no
@@ -518,10 +521,10 @@ against variance, and no column of the table is its objective. GMRP holds a sing
 is the portfolio at `ε → 0` in the sweep of section 4.
 
 No ℓ1 portfolio has the best value in any of these three columns. 1/N and the
-inverse-volatility portfolio have the lowest returns and Sharpe ratios of the table. GMVP,
-GMRP and MSRP each optimise the quantity of their own column, with the same estimates that the
-table uses, so in sample no other portfolio can beat them on that column. An ℓ1 portfolio uses
-`μ` only in part and scores lower on the columns that `μ` computes.
+inverse-volatility portfolio have the lowest returns and Sharpe ratios of the table. The three
+benchmarks optimise their own column on the same estimates that the table uses, so in sample no
+other portfolio can beat them there. An ℓ1 portfolio uses `μ` only in part and scores lower on
+the columns that `μ` computes.
 
 The last two columns, `active` and `largest`, show how concentrated each portfolio is. GMRP and
 MSRP put most of their weight in few assets, and both act on 252 days of estimates as if the
@@ -543,8 +546,8 @@ test.
     that number.
   - A ball scaled by the volatility of each asset gives inverse-volatility weights where the
     plain ball gives equal weights, and the objective and the constraints stay the same.
-  - A budget bounds the exposure and does not fix it. `xbgt = true` fixes it and makes the
-    problem mixed-integer.
+  - A number for `bgt` fixes the net exposure. `sbgt` and `gbgt` bound the short and the gross
+    exposure and do not fix them. `xbgt = true` fixes them and makes the problem mixed-integer.
   - The `mu` field of [`ArithmeticReturn`](@ref) ranks on any characteristic, as a vector or
     as the estimator that computes it. Put the characteristic in the return term and never in
     the prior, whose `μ` every mean-centred risk measure centres on. The objective maximises, so

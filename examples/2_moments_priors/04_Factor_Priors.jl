@@ -120,7 +120,7 @@ plot_factor_sigma(prs[2], rd)
 #=
 We compare the first three priors.
 
-The note under the table prints whether their expected returns, in the `mu` field, are equal within the default tolerance of `≈`. Expected returns are uncertain and sensitive to noise, and this is one reason not to rely much on them. The [expected returns page](01_Expected_Returns_Estimation.md) shows estimators that reduce that noise.
+The note under the table prints whether their expected returns, in the `mu` field, are equal within the default tolerance of `≈`.
 =#
 
 pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => prs[1].mu,
@@ -130,7 +130,7 @@ pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => prs[1].mu,
              source_notes = "prs[1].mu ≈ prs[2].mu ≈ prs[3].mu: $(prs[1].mu ≈ prs[2].mu ≈ prs[3].mu)")
 
 #=
-The covariances, in the `sigma` field, differ much more. In a factor model the factors carry the common part of the returns, and the noise of each single asset has less effect on the covariance. Each covariance table carries its condition number under it. A lower condition number means that inverting the matrix amplifies its errors less.
+The note prints `true`, so on this data the three priors give the same expected returns. The [expected returns page](01_Expected_Returns_Estimation.md) shows estimators that reduce the noise of expected returns. The covariances, in the `sigma` field, differ. In a factor model the factors carry the common part of the returns, and the noise of each single asset has less effect on the covariance. Each covariance table carries its condition number under it. A lower condition number means that inverting the matrix amplifies its errors less.
 
 A factor prior also stores a sparser Cholesky factor, with better numerical properties than the plain one, in the `chol` field of the prior result. When it is present, the optimisers use it in place of the Cholesky factor of `sigma` in the `SecondOrderCone` constraint of the variance and standard deviation formulations.
 =#
@@ -232,7 +232,7 @@ plot_coskewness(prs[4], rd)
 plot_coskewness(prs[7], rd)
 
 #=
-We print the cokurtosis matrix of the same three priors. The [higher moment page](03_Higher_Moment_Estimation.md) shows why the raw cokurtosis is singular. The default processing makes it positive definite, and the condition number under each table measures that correction more than the data.
+We print the cokurtosis matrix of the same three priors. The [higher moment page](03_Higher_Moment_Estimation.md) shows why the raw cokurtosis is singular. The default processing replaces a matrix that is not positive definite with the nearest correlation matrix, rescaled to the same diagonal, and the condition number under each table shows how close to singular the result is.
 =#
 pretty_table(DataFrame([nx2 prs[4].kt], ["Assets^2"; nx2]); formatters = [hmmtfmt],
              title = "HighOrderPriorEstimator Cokurtosis",
@@ -445,7 +445,7 @@ pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
 plot_stacked_bar_composition(ress, rd)
 
 #=
-Here the effect is the opposite of section 3.1. On this data the matrix of the negative spectral slices of the coskewness has a lower condition number under the empirical prior than under the factor priors. The higher moments are more sensitive to noise, and a factor model does not always reduce it.
+Here the factor priors give less diversified portfolios than the empirical prior, the opposite of section 3.1. On this data the matrix of the negative spectral slices of the coskewness has a lower condition number under the empirical prior than under the factor priors. The higher moments are more sensitive to noise, and a factor model does not always reduce it.
 
 ### 3.3 Mean-kurtosis optimisation
 

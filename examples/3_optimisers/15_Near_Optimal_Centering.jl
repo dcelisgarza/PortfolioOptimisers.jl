@@ -21,10 +21,10 @@ point of the same objective.
     Reach for NOC when the [`MeanRisk`](@ref) objective is the one you want and its corner
     solution is not. You get a portfolio with a high risk-adjusted return that does not rest on
     two assets, and it moves less when the prior changes. Use
-    [`UnconstrainedNearOptimalCentering`](@ref) for the plain centred portfolio, and
-    [`ConstrainedNearOptimalCentering`](@ref) when the centred portfolio must also meet the
-    constraints of the problem, which is a harder solve. If the extreme point is what you want,
-    use [`MeanRisk`](@ref).
+    [`UnconstrainedNearOptimalCentering`](@ref) when weight bounds and budgets are the only
+    constraints the centred portfolio must meet, and [`ConstrainedNearOptimalCentering`](@ref)
+    when it must also meet the linear, cardinality, turnover and other constraints you set,
+    which is a harder solve. If the extreme point is what you want, use [`MeanRisk`](@ref).
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -88,8 +88,9 @@ res_mr = optimise(MeanRisk(; r = StandardDeviation(), obj = MaximumRatio(; rf = 
 ## 4. Unconstrained near optimal centering
 
 The next cell runs the same objective through NOC.
-[`UnconstrainedNearOptimalCentering`](@ref) leaves the constraints of the problem off the
-centred portfolio, which keeps the solve cheap.
+[`UnconstrainedNearOptimalCentering`](@ref) keeps the weight bounds and the budgets on the
+centred portfolio and leaves the other constraints of the problem off it, which keeps the solve
+cheap.
 =#
 
 res_noc_u = optimise(NearOptimalCentering(; r = StandardDeviation(),
@@ -99,9 +100,11 @@ res_noc_u = optimise(NearOptimalCentering(; r = StandardDeviation(),
 #=
 ## 5. Constrained near optimal centering
 
-[`ConstrainedNearOptimalCentering`](@ref) asks the centred portfolio to meet the constraints
-of the problem as well. It is the harder solve of the two, which is why section 2 passes seven
-solvers. It returns a portfolio inside whatever bounds and budgets you set.
+[`ConstrainedNearOptimalCentering`](@ref) asks the centred portfolio to meet every constraint
+of the problem, the linear, cardinality, turnover and other constraints you set on the optimiser
+as well as the bounds and budgets. It is the harder solve of the two, which is why section 2
+passes seven solvers. This page sets no constraint beyond the default bounds and budget, so here
+both variants centre under the same bounds.
 =#
 
 res_noc_c = optimise(NearOptimalCentering(; r = StandardDeviation(),

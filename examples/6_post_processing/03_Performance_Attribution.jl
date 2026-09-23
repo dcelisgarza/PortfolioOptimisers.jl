@@ -8,7 +8,7 @@ Description = "Performance attribution in PortfolioOptimisers.jl: cumulative ret
 An optimiser gives you weights. It does not tell you how the portfolio behaves. Before you trust an
 allocation, you measure what it would have done: how wealth would have grown, how deep and how long
 the drawdowns were, which assets the risk comes from, and how much the fees take from the return.
-None of these is an objective of the optimisation. You compute them after `optimise`, and they
+None of these is what the portfolios below optimise. You compute them after `optimise`, and they
 take any weights: the output of an optimiser, a benchmark, a portfolio you already hold, or equal
 weights.
 
@@ -81,8 +81,7 @@ port_ret = [name => rd.X * w for (name, w) in books]
   - `true` multiplies them, `cumprod(1 .+ X)`. This is the relative, or geometric,
     multiple of wealth, which is what an investor who reinvests gets.
 
-[`absolute_cumulative_returns`](@ref) and [`relative_cumulative_returns`](@ref) compute each of the
-two directly. The table prints the last compounded multiple of wealth of each portfolio.
+The table prints the last compounded multiple of wealth of each portfolio.
 =#
 
 final_wealth = [name => cumulative_returns(r, true)[end] for (name, r) in port_ret]

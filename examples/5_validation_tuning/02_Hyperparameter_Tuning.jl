@@ -217,8 +217,9 @@ plot_composition(res_rs1, rd)
 
 We now mix vectors and distributions, with `n_iter = 5`. This grid needs no
 [`concrete_typed_array`](@ref). A distribution among the values makes the literal a vector of
-vectors of `Pair{String, Any}`, which [`RandomisedSearchCrossValidation`](@ref) accepts and
-checks when it runs. A grid of vectors alone still needs `concrete_typed_array`.
+vectors of `Pair{String, Any}`, which the constructor of [`RandomisedSearchCrossValidation`](@ref)
+accepts. The constructor checks that every value is a vector or a distribution. A grid of vectors
+alone still needs `concrete_typed_array`.
 =#
 p = [["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
       "opti[1].opt.l2.val" => LogUniform(0.0003, 0.1)],

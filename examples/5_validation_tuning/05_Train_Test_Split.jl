@@ -151,12 +151,11 @@ To prevent this, make the split part of the workflow, so that the fit cannot see
 #=
 ## 4. The split as the first pipeline step
 
-[`TrainTestSplit`](@ref) cuts the data slot that the pipeline input filled, here the prices,
-and passes the training window to every later step. Its fitted result also keeps the held-out
-window, which `fit_predict` uses in section 5.
+[`TrainTestSplit`](@ref) cuts the data that you give the pipeline, here the prices, and passes
+the training window to every later step. Its fitted result also keeps the held-out window, which `fit_predict` uses in section 5.
 
 The step takes the name `"split"` when you give it none. The filter and the gap fill both
-write the prices slot, so they take the names `"prices_1"` and `"prices_2"`.
+change the prices, so they take the names `"prices_1"` and `"prices_2"`.
 =#
 
 pipe = Pipeline(;
@@ -183,7 +182,8 @@ DataFrame(;
 #=
 ### 4.1 The split must be the first step
 
-A `TrainTestSplit` must be the first step, because then no step before it sees the test rows. A
+A `TrainTestSplit` must be the first step, so that every other step is fitted on the training
+window alone. A
 [`MissingDataFilter`](@ref) fitted before the split would use the held-out rows to choose the
 assets. A [`PriceGapFill`](@ref) fitted before it would compute its fill values from them.
 Their fitted state would then depend on the test rows.

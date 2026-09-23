@@ -81,8 +81,8 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 
 ### 3.1 Equally weighted sum
 
-Some risk measures can hold their own prior statistics, and the optimisation uses those before
-the ones in the prior result. We use this to minimise the variance under several covariance
+Some risk measures can hold their own prior statistics, and the optimisation uses those instead
+of the ones in the prior result. We use this to minimise the variance under several covariance
 matrices at once.
 
 We compute the prior once, and define five covariance estimators.

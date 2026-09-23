@@ -5,8 +5,9 @@ Description = "A cross-sectional factor model in PortfolioOptimisers.jl, end to 
 
 # Cross-sectional factor model, end to end
 
-Every other factor example on this site fits a factor model through time. It regresses each
-asset's return series on a set of observed factor series, one regression per asset. This page
+Apart from the two pages after this one, every factor example on this site fits a factor model
+through time. It regresses each asset's return series on a set of observed factor series, one
+regression per asset. This page
 fits one across the cross-section instead. At each observation it regresses that day's returns of
 every asset on the lagged traits of those assets, such as their size, their value and their
 industry. The coefficients it recovers are the factor returns of that day. Nobody supplies a
@@ -29,12 +30,11 @@ every number below against an answer fixed before the estimator ran.
  6. Compute a predicted and a realised factor attribution of the book.
 
 !!! tip "When to reach for this"
-    Reach for a cross-sectional factor model when your conviction lives in asset traits rather
-    than in factor series, so that you can say that cheap companies beat expensive ones but hold
+    Reach for a cross-sectional factor model when your view is about asset traits rather than
+    factor series, so that you can say that cheap companies beat expensive ones but hold
     no published value-factor return to regress on. It is also the one route here that admits a
-    universe whose membership changes. Assets list and delist, and the panel says which pair of an
-    observation and an asset is live. If you already hold factor series, [`FactorPrior`](@ref) is
-    the simpler tool.
+    universe whose membership changes, as assets list and delist. If you already hold factor
+    series, [`FactorPrior`](@ref) is the simpler tool.
 =#
 
 using PortfolioOptimisers, StableRNGs, Statistics, LinearAlgebra, Dates, PrettyTables,
@@ -48,9 +48,10 @@ end;
 ## 1. A synthetic asset panel, and the model it was drawn from
 
 The generator below draws nine factors, one market factor, four industries and four styles. It
-gives every asset a fixed trait vector holding a market beta, a one-hot industry membership and
-four style loadings. An asset's return is that trait vector through the factor returns, plus an
-idiosyncratic shock and a small alpha of its own.
+gives every asset a fixed trait vector of a market beta, four industry columns and four style
+loadings. The industry columns are 1 for the asset's own industry and 0 for the other three. An
+asset's return is that trait vector through the factor returns, plus an idiosyncratic shock and a
+small alpha of its own.
 
 The fields are then built as noisy functions of the same traits. Log market capitalisation tracks
 the size trait, book-to-price tracks the value trait, and so on for the rest. Because the truth is
@@ -133,7 +134,8 @@ pretty_table(DataFrame("Assets" => N, "Observations" => T,
 ## 2. The prior
 
 You specify a [`CrossSectionalFactorPrior`](@ref) by its factor exposures, one per factor, each
-naming the family it belongs to. Four kinds ship, and three of them appear here.
+naming the family it belongs to. Four kinds ship. The list below names three, and the fit uses
+two of them, `OneHotExposure` and `CompositeExposure`.
 
   - [`ConstantExposure`](@ref) is a column of ones, the market intercept. We use a
     [`CompositeExposure`](@ref) over [`EWMarketBeta`](@ref) instead, so the market exposure is the
@@ -211,8 +213,6 @@ pretty_table(DataFrame("Fit rows" => size(pr.X, 1), "Warm-up rows" => T - size(p
 
 #=
 ## 3. What the fit recovered, and what it reproduces exactly
-
-This section makes two different claims, and each needs its own measurement.
 
 The recovery is statistical. Because the fields are noisy functions of the traits, a fitted exposure
 correlates with the truth rather than equalling it. The industry block is the exception. A one-hot
@@ -352,8 +352,9 @@ where the model says nothing. A portfolio that bets in the second part bets on e
 [`OrthogonalUncertaintySet`](@ref) takes the factor model from the prior result of the optimisation
 it runs in, and confines the uncertainty to that second part. One estimator gives two sets.
 
-  - A low-rank norm ball on the mean. Its radius is `sqrt(χ²_r)` at the rank `r` of the
-    complement.
+  - A low-rank norm ball on the mean. By default its radius is the square root of the 0.95
+    quantile of a chi-squared distribution whose degrees of freedom are the dimension `r` of the
+    orthogonal subspace.
   - A compact covariance set, `(κ, C, Q)`, whose worst-case variance is `w'Σw + κ·min_z ‖Cw − Qz‖²`.
     The optimiser writes the variance and the penalty with two second-order cone constraints and
     needs no semidefinite constraint. `Q` is an orthonormal basis of the subspace the penalty leaves
@@ -439,8 +440,7 @@ Two rules ship, and they answer two different questions.
     truth, and a variance has a chi-squared bound. Under this model's default metric the answer has
     no unit, because it is the relative inflation itself.
   - [`VarianceFraction`](@ref) treats `κ` as a magnitude with a unit. It sizes the penalty so that
-    a reference portfolio pays a stated fraction of its nominal variance. A desk can argue about a
-    number of that kind, because it states the penalty as a fraction of the variance.
+    a reference portfolio pays a stated fraction of its nominal variance.
 =#
 
 calibrated = ["Stated" => 100.0, "ResidualInflation()" => ResidualInflation(),
@@ -471,12 +471,13 @@ pretty_table(DataFrame("kappa" => first.(calibrated),
 #=
 The two rules give very different radii. Here
 `ResidualInflation` returns about `0.13`, three orders of magnitude below the `100.0` the sweep
-above needed to move the book. That is what the rule measures rather than a defect in it. A
+above needed to move the book. A
 chi-squared bound on a residual variance measures estimation error, and over this sample that
 error is small. A radius of that size moves the book very little, and the table shows 90% of the
 metric-scaled weight still outside the factor span. Reach for `VarianceFraction` when you want the
 book to move, because it is sized against the nominal variance rather than against the sampling
-error. It is also linear in `f`, so the `f = 0.5` row is five times the `f = 0.1` row.
+error. It is also linear in `f`, so the resolved radius of the `f = 0.5` row is five times that of
+the `f = 0.1` row.
 
 `ResidualInflation` sizes the radius from the sampling error of the residual variance.
 `VarianceFraction` sizes it from the nominal variance. A stated `100.0` comes from neither, and it
@@ -488,7 +489,9 @@ solver. `nothing` uses the equal-weight book.
 
 The two rules also apply to different factor models. `ResidualInflation` needs the idiosyncratic
 variances in `rr.esigma`, and it raises an error on a factor model fitted without them.
-`VarianceFraction` does not use them and works on such a model as well. The `q` of
+`VarianceFraction` does not use them, but the set's default metric,
+[`InverseIdiosyncraticVarianceMetric`](@ref), inverts them and raises the same error. On such a
+model, give the set `metric = IdentityMetric()` as well. The `q` of
 `ResidualInflation` defaults to the `q` of the `OrthogonalUncertaintySet`, so one confidence level
 sizes both the mean set and the covariance set unless you set them apart. The two `q`s are tail
 probabilities of different errors, and a smaller `q` gives a larger radius in both sets.
@@ -506,13 +509,13 @@ pretty_table(DataFrame("Reference" => ["Equal weight (default)", "InverseVolatil
 ### The radius is also searchable
 
 You do not have to choose any of this in advance. `kappa` is a plain field, so a search grid can
-range over it with the key `"r.ucs.kappa"` on this page's optimiser, and one grid can hold rules and
-numbers together. Each candidate is fitted per fold, and the walk-forward score decides between
-them. That is the third route, after stating a size and after calibrating one.
+range over it with the key `"r.ucs.kappa"` on the `strategy` optimiser of section 5, and one grid
+can hold rules and numbers together. Each candidate is fitted per fold, and the walk-forward score
+decides between them. That is the third route, after stating a size and after calibrating one.
 
 ```julia
 grid = ["r.ucs.kappa" => [0.0, 1.0, 100.0, ResidualInflation(), VarianceFraction(; f = 0.1)]]
-search_cross_validation(mr, GridSearchCrossValidation(grid; cv = IndexWalkForward(252, 63)), rd)
+search_cross_validation(strategy, GridSearchCrossValidation(grid; cv = IndexWalkForward(252, 63)), rd)
 ```
 =#
 

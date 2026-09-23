@@ -5,9 +5,9 @@ Description = "Turnover and tracking in PortfolioOptimisers.jl, each as a constr
 
 # Turnover and tracking
 
-Turnover and tracking bound the distance of the weights from a reference. Turnover is the
-distance from your current weights when you rebalance, and tracking is the distance from a
-benchmark. Each comes in two forms. The constraint form, a keyword of the
+Turnover is the distance of the weights from a reference weight vector, such as your current
+weights when you rebalance. Tracking is the distance of the portfolio returns from the returns of
+a benchmark. Each comes in two forms. The constraint form, a keyword of the
 [`JuMPOptimiser`](@ref), keeps the distance under a limit. The risk measure form makes the
 distance the quantity you minimise.
 

@@ -17,7 +17,7 @@ where a refit would have run. We call the step that adds rows to a fitted estima
 and [`partial_fit!`](@ref) is the function that makes it. The online run gives the weights of the
 batch expanding-window walk-forward, fold by fold.
 
-Each estimator above the moments passes the update down.
+The list below says what each part of a run does in an online walk-forward.
 
   - A prior updates its moment estimators with the new rows, and it keeps the rows themselves,
     because a prior result holds `X` for the scenario risk measures.
@@ -42,8 +42,9 @@ A prior with no update formula, such as [`FactorPrior`](@ref), goes in `Online` 
 buffer each time it computes weights. The cap on the buffer gives a rolling window.
 
 !!! tip "When to reach for this"
-    Reach for `OnlineIndexWalkForward` in place of any expanding walk-forward, because it costs
-    nothing in accuracy. The run gives the weights of the batch run, fold by fold. Reach for it
+    Reach for `OnlineIndexWalkForward` in place of an expanding walk-forward whose data and
+    estimators the update accepts, because it costs nothing in accuracy. The run gives the weights
+    of the batch run, fold by fold. Sections 2 and 3 show inputs the update refuses. Reach for it
     for speed when the prior has a `CoveragePolicy` and the optimiser computes its weights
     cheaply, as a hierarchical or a naive optimiser does, because there the batch fit itself
     runs row by row. Reach for it whenever you will continue a run, because the result of an
@@ -83,7 +84,7 @@ last. The universe therefore moves inside the window, and an online update must 
 write the listing calendar out as a fact about the instruments, and the returns are `NaN`
 wherever an asset is not listed. The [`AssetPanel`](@ref) takes the calendar as its active mask.
 We set the estimation mask to the active one, because the online update takes the active mask
-alone. Section 2 says why.
+alone. Section 2 shows the error that a narrower estimation mask throws.
 =#
 
 function synthetic_panel(; T = 300, N = 8, K = 2, seed = 20260912)
@@ -360,7 +361,8 @@ The update is a Welford recursion, and Welford is not the textbook one-pass form
 and a spread near one, the textbook formula subtracts two large numbers and loses most of its
 digits. The recursion updates around the running mean and loses none. You meet that case as soon
 as you update with a level, such as a price, rather than a change. The batch estimator centres
-the rows first and is exact, and the update gives the same answer.
+the rows before it multiplies them, so it avoids that subtraction. We take it as the reference,
+and the cell prints the largest entrywise difference between it and each of the two formulas.
 =#
 
 rng = StableRNG(987654321)
@@ -430,10 +432,8 @@ gain_df = DataFrame(; prior = ["plain", "plain", "policy", "policy"],
 pretty_table(gain_df; formatters = [numfmt])
 
 #=
-Compare the `policy` rows with the `plain` rows. A prior without a `CoveragePolicy` gains nothing
-through either optimiser. With such a prior, reach for the update for the accuracy of section 8
-and for the resume of section 7, not for the speed. The `policy` prior through
-`HierarchicalRiskParity` is the case that saves time. Through `MeanRisk` the solve is the cost.
+With a prior that has no `CoveragePolicy`, reach for the update for the accuracy of section 8 and
+for the resume of section 7, not for the speed.
 
 ## 10. What to take away
 

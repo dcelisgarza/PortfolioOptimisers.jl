@@ -229,8 +229,8 @@ The stacked areas show the weights at each point of the `MeanRisk` frontier.
 plot_stacked_area_composition(resM.w, rd.nx)
 
 #=
-The `MeanRisk` frontier holds five assets at its low-risk end and one at its high-return end. In
-the same plot for the NOC frontier, all 20 assets keep a weight above 0.01 % at every point.
+The `MeanRisk` frontier holds a few assets at its low-risk end and one at its high-return end.
+Compare the number of coloured bands at each end with the same plot for the NOC frontier below.
 =#
 
 plot_stacked_area_composition(resN.w, rd.nx)

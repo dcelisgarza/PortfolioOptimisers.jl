@@ -139,9 +139,11 @@ res_ssr = optimise(SubsetResampling(; pe = pr,
 
 The plain fit, NCO and subset resampling target minimum variance. The stacked portfolio
 combines three inner portfolios by minimum variance, and only one of them, the `MeanRisk` fit,
-targets minimum variance itself. On
-this data the outer fit puts all its weight on the minimum-variance member, so the `Stacking`
-column is the same as the `MinVar` column. Read the other two meta-optimiser columns against
+targets minimum variance itself. The outer fit measures the variance of each mix on the same
+rows and with the same covariance estimator as that inner fit, and every long-only mix of the
+three members is a portfolio the inner fit could have chosen. No mix has a lower variance, so
+on any returns the outer fit puts all its weight on the minimum-variance member, and the
+`Stacking` column is the `MinVar` column. Read the other two meta-optimiser columns against
 the plain fit, and read how far each one spreads the weight over the assets.
 =#
 

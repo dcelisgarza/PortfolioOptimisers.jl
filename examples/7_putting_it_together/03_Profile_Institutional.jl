@@ -8,19 +8,19 @@ Description = "An end-to-end profile in PortfolioOptimisers.jl: an institutional
 The third profile runs a large benchmarked book under a written mandate. The
 [retail profile](01_Profile_Retail_Daily.md) optimised against cost and the
 [desk profile](02_Profile_Desk_Monthly.md) optimised on a view. This one optimises inside a set of
-rules: a cap on each name, a cap on each sector, and a limit on how far the book may drift from
-its benchmark. The prior is the plain empirical one, and the rules do most of the work.
+rules: a cap on each name, a cap on the energy sector, and a limit on how far the book may drift from
+its benchmark. The prior is the plain empirical one.
 
-Under the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md), this
-mandate has three binding limits.
+Of the limits in the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md),
+three shape this mandate's choices.
 
   - The mandate's caps are hard limits, not preferences. Each one is a keyword on the
     [`JuMPOptimiser`](@ref).
   - The book is measured against a benchmark, so we bound the tracking error while we minimise
     risk. [Turnover and Tracking](../4_constraints_costs/05_Turnover_and_Tracking.md) covers that
     bound.
-  - The book is large enough to pay for the solve time of an exact
-    [`DiscreteAllocation`](@ref).
+  - The mandate invests \$10,000,000, and [`DiscreteAllocation`](@ref) turns it into whole shares
+    with a mixed-integer solve.
 
 !!! tip "When to reach for this"
     Reach for this profile when a mandate, rather than a forecast, decides what the book may hold.
@@ -66,8 +66,8 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
 #=
 ## 2. The constrained optimisation
 
-We minimise risk under the whole mandate. `wb` caps each name at 10%, `lcse` holds energy at or
-below 20%, and `tr` keeps the book within 0.005 tracking error of the benchmark. Each rule is one
+We minimise risk under the whole mandate. `wb` caps each name at 10%, `lcse` caps energy at 20%,
+and `tr` bounds the tracking error against the benchmark at 0.005. Each rule is one
 keyword on the [`JuMPOptimiser`](@ref).
 =#
 

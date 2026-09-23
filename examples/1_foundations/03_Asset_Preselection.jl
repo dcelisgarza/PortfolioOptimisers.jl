@@ -16,7 +16,8 @@ preprocessing estimator and needs no pipeline. A [`Pipeline`](@ref) runs it thro
 [`fit_preprocessing`](@ref) and [`apply_preprocessing`](@ref), as it runs a prior estimator through
 [`prior`](@ref). The library has three kinds:
 
-  - [`CompleteAssetSelector`](@ref) drops every asset whose column holds a `missing` or a `NaN`.
+  - [`CompleteAssetSelector`](@ref) drops every asset with a non-finite return at any observation
+    of the window.
   - [`ScoreSelector`](@ref) scores every asset with a risk measure and keeps the assets a rule
     admits. [`ZeroVarianceFilter`](@ref) is a named case of it.
   - [`RedundancySelector`](@ref) drops assets whose returns repeat the information of other
@@ -50,8 +51,8 @@ end;
 #=
 ## 1. The data
 
-We take twenty S&P 500 names over the last 1000 trading days. The correlations of real data matter
-in section 5, where two algorithms that sound the same give different answers.
+We take twenty S&P 500 names over the last 1000 trading days. Section 5 needs the correlations of
+real data, because on them the two redundancy algorithms keep different assets.
 =#
 
 using CSV, TimeSeries
@@ -153,7 +154,7 @@ pretty_table(DataFrame(rows))
 #=
 The direction of the ranking changes with the measure. `ConditionalValueatRisk` is better when
 smaller, so `best = 5` returns the five defensive names. `MeanReturn` is better when bigger, so
-the same rule returns the five growth names. You pass no flag for the direction.
+the same rule returns the five growth names.
 =#
 
 DataFrame(; rule = ["best = 5", "worst = 5"],
@@ -181,7 +182,7 @@ DataFrame(; rule = ["best = 5", "worst = 5"],
 under its own name. A constant column has zero variance, adds nothing to a portfolio, and makes a
 covariance matrix singular. We set the returns of one asset to zero, and the filter drops it.
 
-[`CompleteAssetSelector`](@ref) drops the assets with missing values in the returns. Use it when a
+[`CompleteAssetSelector`](@ref) drops the assets with a non-finite return. Use it when a
 pipeline receives a `ReturnsResult` directly, so the [`MissingDataFilter`](@ref) that works on
 prices never runs.
 =#
@@ -237,25 +238,22 @@ dup_kept = fit_preprocessing(RedundancySelector(; alg = PairwiseCorrelation(; t 
 ("AAPL" in dup_kept, "AAPL_copy" in dup_kept, length(dup_kept))
 
 #=
-## 5. Redundancy: two algorithms, two different answers
+## 5. Redundancy: pairwise pruning and connected components
 
 [`RedundancySelector`](@ref) has two parts. `alg` decides which assets are redundant, and `score`
 decides which member of a redundant group stays. If you leave `score` as `nothing`, the
 correlation algorithms keep the asset with the lowest summary correlation to the rest of the
 universe, the least redundant one.
 
-The two correlation algorithms sound as if they do the same thing, but they give different
-answers.
-
 [`PairwiseCorrelation`](@ref) is greedy and is the default. It visits the pairs of assets from the
 most correlated to the least, and drops the worse asset of each pair, until no pair that remains
-has a correlation above `t`. That is what the threshold states.
+has a correlation above `t`.
 
 [`CorrelationComponents`](@ref) follows the correlations from one asset to the next. The assets
 are the nodes of a graph, and each correlation above the threshold is an edge. Each connected
-component of the graph keeps one asset. If `ρ(A,B) = 0.97` and `ρ(B,C) = 0.97` but
-`ρ(A,C) = 0.10`, the three assets form one component, and the algorithm drops two of them, although
-`A` and `C` are uncorrelated. We call such a sequence of edges a chain.
+component of the graph keeps one asset. At `t = 0.7`, if `ρ(A,B) = 0.80` and `ρ(B,C) = 0.81` but
+`ρ(A,C) = 0.32`, the three assets form one component, and the algorithm drops two of them, although
+`A` and `C` are weakly correlated. We call such a sequence of edges a chain.
 
 Chains form on real data too. We run both algorithms at the same threshold and print the largest
 correlation between two assets the greedy algorithm keeps.
@@ -285,16 +283,15 @@ because two assets that move together carry the same information whatever the si
 correlation.
 
 The largest correlation the greedy algorithm keeps is below the threshold, and the last column names
-the assets that the components algorithm drops in addition. The greedy algorithm keeps every pair
-below the threshold and keeps more assets. The components algorithm keeps one asset from each group
-of correlated assets, and drops more. Choose the one whose rule you want.
+the assets that the components algorithm drops in addition. Choose the one whose rule you want.
 
 ### 5.1 Clustering as the grouping rule
 
 [`ClusterGroups`](@ref) forms the groups with [`clusterise`](@ref), so any clustering method of
-the library can define which assets are redundant: hierarchical linkage, DBHT, and the estimators
-of the optimal number of clusters. It has no default rule for which asset stays, so it needs a
-`score`, and the second cell prints the error you get without one.
+the library can define which assets are redundant: hierarchical linkage, the Direct Bubble
+Hierarchical Tree ([`DBHT`](@ref)), and the estimators of the optimal number of clusters. It has no
+default rule for which asset stays, so it needs a `score`, and the second cell prints the error you
+get without one.
 =#
 
 clustered = RedundancySelector(; alg = ClusterGroups(), score = SCM())
@@ -331,9 +328,9 @@ DataFrame(; universe = ["fitted on train", "replayed on test", "test window's ow
                     join(would_have_chosen, ", ")])
 
 #=
-The universe applied to the test window is the one chosen on the training window, not the one the
-test window would choose. The difference between the two is the look-ahead bias that fitting on
-one window and applying to the next prevents.
+The second row, the universe applied to the test window, is the one fitted on the training window.
+The last row is the choice the test window would make from the returns it is scored on, and using
+it would be look-ahead bias.
 
 ### 6.1 The pipeline checks the order of its steps
 

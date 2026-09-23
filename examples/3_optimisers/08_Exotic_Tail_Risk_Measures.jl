@@ -3,7 +3,7 @@
 Description = "Tail risk measures beyond CVaR in PortfolioOptimisers.jl: EVaR, RLVaR, power-norm VaR and the VaR ranges that weight the extreme tail harder."
 ```
 
-# Exotic tail risk measures: beyond CVaR
+# Tail risk measures that weight the worst losses more than CVaR
 
 [`ConditionalValueatRisk`](@ref), CVaR, is the most common coherent tail measure. It is the
 expected loss over the worst fraction ``\alpha`` of outcomes. Because it averages over the tail,
@@ -31,8 +31,8 @@ takes the tail fraction ``\alpha`` as CVaR does.
 !!! tip "When to reach for this"
     Reach for these measures when CVaR does not penalise the *extreme* tail enough. They suit
     you when the few worst outcomes matter more than the mean of the worst 5 %, and you want a
-    measure that still counts more than the single worst day. Raise ``\kappa`` for
-    RLVaR or ``p`` for PNVaR to move from a measure close to EVaR toward the worst case.
+    measure that still counts more than the single worst day. Raise ``\kappa`` for RLVaR to
+    move from EVaR toward the worst case, or ``p`` for PNVaR to move from CVaR toward it.
 
 !!! note "A conic solver is enough"
     EVaR needs the exponential cone, and RLVaR and PNVaR need the power cone. Clarabel

@@ -5,10 +5,10 @@ Description = "Online portfolio selection on real prices in PortfolioOptimisers.
 
 # Online portfolio selection
 
-The [user-guide chapter](../../user_guide/10_Online_Portfolio_Selection.md) runs the two
-halves of the family on two synthetic markets and shows what each half bets on. This page runs
-the same family on real prices, over four years of twenty S&P 500 names. Sections 3 to 10 each
-add one piece.
+The [user-guide chapter](../../user_guide/10_Online_Portfolio_Selection.md) compares the
+follow-the-winner and the follow-the-loser rules on two synthetic markets. This page runs the
+same family on real prices, over four years of twenty S&P 500 names. Sections 3 to 10 each add
+one piece.
 
  3. The benchmark, follow-the-winner and follow-the-loser rules, through a walk-forward that
     charges a turnover fee against the weights you hold after the prices move them.
@@ -21,12 +21,13 @@ add one piece.
 10. The weight path and the share count, which every optimiser's result takes.
 
 !!! tip "When to reach for this"
-    Reach for the family when you want a portfolio that needs no solver, reacts to every price,
-    and holds a bound on how far it can fall behind the best constant portfolio chosen with
-    hindsight. It also tells you whether a market trended or reverted, and you assume neither
-    beforehand. Run a follow-the-winner rule beside a follow-the-loser rule before you put
-    money on the second, because a reversion rule bets on one property of the market and on
-    nothing else.
+    Reach for the family when you want a portfolio that reacts to every price and, under most
+    rules, needs no solver. Several follow-the-winner rules carry a bound, under the rate and
+    the projection their paper states, on how far they can fall behind the best constant
+    portfolio chosen with hindsight. The follow-the-loser rules carry none. The family also
+    tells you whether a market trended or reverted, and you assume neither beforehand. Run a
+    follow-the-winner rule beside a follow-the-loser rule before you put money on the second,
+    because a reversion rule bets on one property of the market and on nothing else.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames, Statistics
@@ -130,8 +131,10 @@ pretty_table(summary_table(preds, free); formatters = [pctfmt, resfmt],
              title = "The roster fee-free and net of a 10 bp turnover fee, $(length(preds["Buy and hold"].pred)) periods")
 
 #=
-The fee applies to the turnover column. Buy and hold trades nothing after the first fold,
-so both of its wealth columns hold the same number. The constant rebalanced portfolio and the
+The fee applies to the turnover column. That column is the mean, over the rebalances, of the
+sum of the absolute weight changes, so a turnover of 100 % moves half the book from some assets
+to others. Buy and hold trades nothing after the first fold, so both of its wealth columns hold
+the same number. The constant rebalanced portfolio and the
 winner rules trade back only what the prices moved, which costs them about a point of wealth
 over four years. A reversion rule at its default threshold rebalances toward one or two assets
 on nearly every row, and pays two thirds of its wealth for the trading.
@@ -145,8 +148,9 @@ table. Nothing inside a rule tells it which market it is running on.
 ## 4. Tuning a rate
 
 The parameters of a rule are fields, and a search names one by its path. The score here is
-[`MeanReturn`](@ref) with `flag = true`, the mean log return per period. It ranks the
-candidates in the same order as the regret against any fixed comparator would.
+[`MeanReturn`](@ref) with `flag = true`, the mean log return per period. The user-guide
+chapter gives the reason it ranks the candidates in the same order as the regret against any
+fixed comparator.
 =#
 
 grid = GridSearchCrossValidation(["alg.eta" => [0.01, 0.05, 0.2, 0.5, 1.0]]; cv = cv,
@@ -258,8 +262,9 @@ proves nothing.
 Five moves are worth four units of log wealth over the best constant portfolio. The budgeted
 path spends its budget where a move pays most. It grows one unit to about 200, where the best
 constant portfolio grows it to 3.6, so the regret of every rule against it is its regret
-against the static comparator plus four. The path length the result reports equals the budget,
-to the tolerance of the first-order solver, because the budget binds. A larger budget allows
+against the static comparator plus four. Read the path length the cell prints against the
+budget, `L = 5√2`, about 7.07. SCS is a first-order solver that stops at a tolerance, so the
+two need not be equal. A larger budget allows
 a longer path and a larger regret, and a budget of zero gives the best constant portfolio
 again.
 
@@ -355,10 +360,9 @@ pretty_table(DataFrame("Weighting" => first.(weightings),
              title = "A mixture of the seven rules under three weightings")
 
 #=
-The bound grows with the square root of the number of rows times the logarithm of the number
-of experts, which is about sixty units of log wealth here. The best expert reached 1.96, and
-every mixture sits far inside the bound against it. The table says what the bound costs in
-money.
+At its default rate of one, the aggregating weighting is the wealth weighting, and before fees
+its log wealth falls at most the logarithm of the number of experts, about 1.95, behind its
+best expert. That bound covers the aggregating weighting alone.
 
 A mixture plays the weighted average of its experts' allocations, so it trades whenever an
 expert that carries weight trades, and the three reversion experts trade on nearly every row.
@@ -375,8 +379,8 @@ You choose the grid and the rate of the weighting in place of a single step rate
 
 A first-order rule steps on the log-wealth loss. [`RiskLoss`](@ref) puts a risk measure
 there instead, evaluated over a trailing window. The rule then takes one step per row toward
-the portfolio that minimises that measure, and the window moves with each row. What you get is
-a minimum-variance portfolio that needs no solver.
+the portfolio that minimises that measure, and the window moves with each row. The step needs
+no solver.
 
 The gradient of a variance is $2 \Sigma w$, which is about the size of a daily variance and
 so small. You state the rate against that gradient, so it is far larger than a rate on the
@@ -444,12 +448,11 @@ pretty_table(DataFrame("Set" => ["Simplex", "Volatility ceiling of 25 %"],
              title = "Moving-average reversion under a risk ceiling")
 
 #=
-The ceiling binds on 813 of the 940 folds. In the median fold the largest weight falls from
-the whole book to about half of it. The realised volatility is above the ceiling, because the
-ceiling bounds the variance of the prior fitted on past rows and not the variance of the rows
+The realised volatility is above the ceiling, because the ceiling bounds the variance of the
+prior fitted on past rows and not the variance of the rows
 that follow. The rule still moves about half of its book to other assets every period, and it
-ends with less wealth than on the simplex. A risk ceiling limits the risk of the book. It does
-not change what the rule bets on.
+ends with less wealth than on the simplex. A risk ceiling bounds the variance the prior gives
+each target allocation. It does not change what the rule bets on.
 
 A risk ceiling on the set and a risk loss in the step are two different things. The ceiling is
 a constraint every rule meets. The loss is what one rule steps on. Both take any risk measure

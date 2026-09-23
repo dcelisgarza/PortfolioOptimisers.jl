@@ -222,9 +222,6 @@ The three variants take views that the base model cannot.
     aversion of an implied equilibrium.
   - [`AugmentedBlackLittermanPrior`](@ref) combines asset views and factor views in one
     posterior.
-
-Each returns a posterior over the assets, and you give it to an optimiser as you give the base
-model. The variants differ in what the views are about and in how the views reach the assets.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

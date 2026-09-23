@@ -19,7 +19,7 @@ a cross-validation recomputes the quantity on every fold, and the rest of the mo
 Every `alpha`, `beta` and `kappa` of a risk measure, and every ambiguity radius and Esfahani-Kuhn
 tail weight, is a calibration slot.
 
-This example shows the slot from the caller's side. Section 1 loads the data, and each section
+This example shows the slot as you use it. Section 1 loads the data, and each section
 after it shows one use of a slot.
 
  2. A stated number and a rule side by side on the same measure.
@@ -239,8 +239,8 @@ rule_table.rate_tail = rule_table.rate .* rule_table.T
 pretty_table(rule_table; formatters = [numfmt])
 
 #=
-The two columns of tail populations show the difference between the two rules. The scenario
-count keeps its population flat, and the rate lets it grow with the square root of the record.
+Under the scenario count the tail population `count_tail` is flat, and under the rate
+`rate_tail` grows with the square root of `T`.
 
 Observation weights separate the two rules a second time. A measure that has `w` passes those
 weights to the rule, and [`ScenarioCount`](@ref) divides by Kish's effective sample size rather
@@ -295,10 +295,10 @@ The `kappa` column is flat and the `kappa_stated_alpha` column is not. The coeff
 the same deformation on every fold. A stated `alpha` lets `alpha * T` grow with the window, so
 the same budget gives a different deformation each time.
 
-The rule has one check, and it is not a range check on the ``\kappa`` it returns. The
-coefficient reaches only the band between ``\ln(u)`` and ``\sinh(\ln(u))``, so a target outside
-that band has no root at all. The band moves with `alpha` and with the sample, and the refusal
-names both.
+The rule has one check, and it is not a range check on the ``\kappa`` it returns. With
+``u = 1/(\alpha T)``, the first argument of `kappa_log` above, the coefficient reaches only the
+band between ``\ln(u)`` and ``\sinh(\ln(u))``, so no ``\kappa`` meets a target outside that band.
+The band moves with `alpha` and with the sample, and the refusal names both.
 =#
 
 try
@@ -336,7 +336,7 @@ decay_table = DataFrame(:rule => ["HillTailDecay", "RadialTailDecay"],
 pretty_table(decay_table; formatters = [numfmt])
 
 #=
-The two rows show the difference between the two rules. The Hill row has two numbers, because
+The Hill row has two numbers, because
 the rule keeps the sign of the end and estimates the loss tail under `kappa_a` and the gain tail
 under `kappa_b`. The Radial row has one number twice, because the rule whitens each observation
 and measures a distance, and a distance has no sign. The two Hill numbers differ because the
@@ -347,9 +347,8 @@ differ by their own noise alone.
 println("pooled skewness = $(skewness(vec(pr.X)))")
 
 #=
-The two rules measure two different quantities, so their numbers are not two estimates of one thing.
-The Hill number is the index of one column's own tail after standardisation, and the Radial
-number is the index of the whole cross-section's radius.
+The Hill number is the tail index that the standardised columns share, estimated from the pool of
+every column's values, and the Radial number is the index of the whole cross-section's radius.
 
 The rule refits per fold, as every other rule does. The two ends move apart by a different
 amount on every window, and which end has the heavier tail is a property of the
@@ -406,8 +405,8 @@ vrr_res = factory(vrr, fold_prior(first_idx))
 println("alpha = $(vrr_res.alpha), beta = $(vrr_res.beta)")
 
 #=
-Every Range measure defaults `beta` to `alpha`. The rule states the method and the slot states
-the end, so one rule serves both ends and `beta` holds the object `alpha` holds.
+Every Range measure that has a `beta` defaults it to `alpha`. The rule states the method and the
+slot states the end, so one rule serves both ends, and `beta` is the same object as `alpha`.
 =#
 
 owa_range = OrderedWeightsArrayConditionalValueatRiskRange(; alpha = count_rule.alpha)
@@ -465,8 +464,8 @@ them, because the slots that separate them are the four penalty coefficients of
 [`JuMPOptimiser`](@ref).
 
 The tail-weight family has one rule, [`TailTermParity`](@ref), which prices the tail term of
-the loss at a stated multiple of its mean term. A caller's own function serves the slot too,
-which is the case section 7 covers.
+the loss at a stated multiple of its mean term. A function you write works in the slot too, in
+the form section 7 shows.
 =#
 
 drcvar = DistributionallyRobustConditionalValueatRisk(; alpha = count_rule.alpha,
@@ -516,7 +515,8 @@ println("robust out-of-sample variance = $(expected_risk(var_rm, pred_drcvar))")
     rate lets that count grow with the square root of the record, and an entropy budget fixes the
     price of a deformation.
   - `alpha` resolves before ``\kappa``, in one pass. A scenario count on `alpha` fixes
-    `alpha * T`, so it holds the entropy band still, and a stated `alpha` does not.
+    `alpha * T`, so the same entropy budget gives the same ``\kappa`` on every fold, and a stated
+    `alpha` does not.
   - The two tail-decay rules measure two different quantities. [`HillTailDecay`](@ref) answers per
     end, and [`RadialTailDecay`](@ref) answers once for both.
   - A plain function of `(key, pr, w, slv, ctx)` is a rule, which covers the one-off case in every

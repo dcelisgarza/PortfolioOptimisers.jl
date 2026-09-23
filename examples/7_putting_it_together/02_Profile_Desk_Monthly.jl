@@ -5,20 +5,20 @@ Description = "An end-to-end profile in PortfolioOptimisers.jl: a professional d
 
 # Profile: desk, monthly
 
-The second profile rebalances a professional desk once a month. Every limit that binds in the
-[retail profile](01_Profile_Retail_Daily.md) loosens here. A monthly decision can pay for a long
-computation, and a month of return covers more trading cost than a day of it does. What this desk
-has instead is a house view, and the time to look at the whole risk-return trade-off before it
-picks a book.
+The second profile rebalances the book of a professional desk once a month. Every limit that
+binds in the [retail profile](01_Profile_Retail_Daily.md) loosens here. A monthly decision can pay
+for a long computation, and a month of return covers more trading cost than a day of it does. What
+this desk has instead is a house view, and the time to look at the whole risk-return trade-off
+before it picks a book.
 
 Three of the limits in the
 [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md) change for this desk.
 
-  - Compute is cheap next to a month of return, so we fit a richer prior, trace the whole
-    efficient frontier, and choose the risk-adjusted point on it.
+  - A monthly rebalance leaves time for a slower computation, so we trace the whole efficient
+    frontier with fifteen solves and then take its tangency point.
   - The desk has a view, so we state it as a constraint on the mean and fit an
     [`EntropyPoolingPrior`](@ref) rather than take the sample mean as given.
-  - The book is large enough to pay for an exact whole-share allocation, so we use
+  - A monthly decision can wait for a mixed-integer solve, so we buy whole shares with
     [`DiscreteAllocation`](@ref).
 
 !!! tip "When to reach for this"

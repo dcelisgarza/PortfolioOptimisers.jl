@@ -17,7 +17,7 @@ keyword covers, you can write a term into the JuMP model yourself, in one of two
 
 Each keyword takes one estimator or a vector of them. The library calls the function with your
 estimator as an argument, so Julia picks your method by the type of the estimator. A custom term
-is therefore a struct that holds its data, and one method. If you subtype one of the two types
+is a struct that holds its data, and one method. If you subtype one of the two types
 and write no method, the optimisation throws an error that names the missing method. This page
 builds both kinds of term, shows the two rules that keep a constraint correct, and combines
 several terms in one problem. The [constraints and costs
@@ -155,7 +155,7 @@ pretty_table(DataFrame("λ (momentum price)" => lambdas,
 
 #=
 The term is homogeneous of degree one in `w`. If you multiply the weights by a number, the term
-is multiplied by the same number, as the expected return is. The term therefore stays correct
+is multiplied by the same number, as the expected return is. The term stays correct
 when a ratio objective rescales the weights. A constraint needs more care with that rescaling,
 which section 5 shows.
 
@@ -285,7 +285,7 @@ pretty_table(DataFrame("Requested floor" => first.(k_compare),
 ## 6. Composing several custom pieces
 
 Both keywords take a vector of estimators, and the library applies them in order, with one
-method call for each. You can therefore combine custom terms without one struct for all of them.
+method call for each. You can combine custom terms without one struct for all of them.
 
 First, a band from two constraints. A cap is the floor with the inequality reversed, and a floor
 and a cap together keep the exposure inside a band. We define the cap, then give both

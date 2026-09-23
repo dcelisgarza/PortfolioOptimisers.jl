@@ -109,8 +109,8 @@ pe = CrossSectionalFactorPrior(; factors = factors, families = ["industry" => no
                                c = 1.0)
 
 #=
-The panel is part of `rd`, and `rd` is already in the `:returns` slot. No code below names the panel
-again.
+The panel is part of `rd`, and `rd` is already in the `:returns` slot, so no step of the pipeline
+below names the panel.
 =#
 
 pretty_table(DataFrame("Type of rd" => string(nameof(typeof(rd))),
@@ -154,8 +154,8 @@ route, and the third is the optimiser without them.
 
  1. The prior step is the estimator itself. It writes the `:prior` slot.
  2. The uncertainty step is the same [`OrthogonalUncertaintySet`](@ref), wrapped in a
-    [`PipelineStep`](@ref), because a computed uncertainty-set result cannot say on its own which
-    parameter it bounds. `target = :both` derives the mean set and the covariance set from one
+    [`PipelineStep`](@ref), because an uncertainty-set step must declare which parameters it
+    bounds. `target = :both` derives the mean set and the covariance set from one
     [`ucs`](@ref) call. It also uses the `:prior` slot that the first step wrote, so the two sets
     are orthogonal to the factor model of this optimisation and not to some other one.
  3. The optimisation step has no `pe` and no `ucs` of its own. The pipeline passes the two slots to

@@ -234,6 +234,7 @@ Risk budgeting sets how the risk is divided, not the trade-off between return an
     portfolio, and any other budget states how you want the risk divided.
   - [`RelaxedRiskBudgeting`](@ref) is convex and cheaper to solve. Read the realised
     contributions, because a relaxation need not reach exact risk parity.
-  - [`FactorRiskBudgeting`](@ref) divides risk across factors instead of assets, and it needs
-    the returns data at optimise time.
+  - [`FactorRiskBudgeting`](@ref) divides risk across factors instead of assets. Unless `re`
+    holds a [`Regression`](@ref) result or the prior carries its own loadings, it needs the
+    returns data at optimise time.
 =#

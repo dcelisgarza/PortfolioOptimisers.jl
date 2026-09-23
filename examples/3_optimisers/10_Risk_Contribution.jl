@@ -14,8 +14,9 @@ not about how much risk it takes. It covers two jobs:
 
 !!! tip "When to reach for this"
     Reach for a risk contribution workflow when the weights are not what you want to control.
-    It shows you how concentrated the realised risk is, it caps what one asset or one factor
-    contributes, and it lets you hold those caps fixed while you change the objective.
+    It shows you how concentrated the realised risk is, it lets you ask for a bound on what one
+    asset or one factor contributes, and it lets you hold those bounds fixed while you change
+    the objective.
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -69,7 +70,9 @@ opt_asset = JuMPOptimiser(; pe = pr, slv = slv, sets = sets_asset)
 
 [`risk_contribution`](@ref) splits the total risk of a portfolio into one contribution per
 asset. Risk budgeting asks for a whole budget. The `rc` field of [`Variance`](@ref) instead
-caps a contribution directly, and the cell below caps every asset at 20% of the total risk.
+bounds each contribution, and the cell below asks for every asset at or below 20% of the total
+risk. The optimiser states these bounds on a relaxation, which section 4 describes, so read the
+realised shares in the table.
 
 The loop then solves the same constraints under three objectives, so you can read how the
 objective moves the weights while the caps stay put.
@@ -156,11 +159,11 @@ end
 #=
 ## Summary
 
-The `rc` field bounds the share of the variance that each asset or factor carries, whatever
-the objective.
+The `rc` field bounds each asset's or each factor's share of the variance, whatever the
+objective.
 
-  - [`Variance`](@ref) with `rc` constraints caps the realised risk contribution of an asset
-    or of a factor.
+  - [`Variance`](@ref) with `rc` constraints states the bounds on a semidefinite relaxation, so
+    a solve can succeed and still return weights whose realised shares miss a bound.
   - [`MeanRisk`](@ref) and [`FactorRiskContribution`](@ref) take the same constraints under
     different objectives, so you can compare the weights and the concentration they give.
   - [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) compute the realised

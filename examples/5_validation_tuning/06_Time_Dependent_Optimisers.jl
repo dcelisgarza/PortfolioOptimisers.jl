@@ -14,10 +14,8 @@ values are whole optimisers is a schedule of optimisers, and you can put it in t
  2. In a field that takes an optimiser. That is a fallback `fb`, the inner or outer optimiser of a
     meta-optimiser, or the optimisation step of a [`Pipeline`](@ref).
 
-The constraint page states which inputs can change from fold to fold, and the same rule holds here.
-The choice of optimiser is part of the problem a fold solves, so it can change. The solvers, the
-random number generators and the cross-validation scheme of a meta-optimiser control how a fold is
-solved, and they stay static.
+The constraint page states which inputs can change from fold to fold. The choice of optimiser is
+one of them, because it is part of the problem a fold solves.
 
 A field that takes an optimiser differs from a constraint field in one way. A constraint field has
 a static default, which a solve with no folds uses. A required optimiser field has none. A schedule
@@ -96,8 +94,9 @@ pretty_table(DataFrame(:fold => 1:n, :ran => [which_strategy(pred_cal, i) for i 
              formatters = [resfmt])
 #=
 The odd folds ran the capped minimum-variance strategy. The even folds ran the aggressive one, with
-more concentrated weights. Nothing after the fold loop depends on which optimiser a fold ran.
-`cross_val_predict` joins the predictions, and the plots draw them, as they do for one optimiser.
+more concentrated weights. Nothing after the loop that runs one optimisation per fold, the fold
+loop, depends on which optimiser a fold ran. `cross_val_predict` joins the predictions, and the
+plots draw them, as they do for one optimiser.
 
 A schedule of optimisers must have one entry per fold of the loop that uses it. The loop checks the
 length when it splits the data, before any fold runs, so a schedule of two entries fails here.
@@ -110,10 +109,9 @@ end
 #=
 ## 3. A solve with no folds
 
-A constraint schedule has no effect outside a fold loop, because its field takes its static
-default. A field that takes an optimiser has no static default. So `optimise` on a schedule with no
-`default` has no optimiser to run, and it throws a [`TimeDependentDefaultError`](@ref). The message
-says that a schedule is defined only over the folds of a cross-validation scheme.
+`optimise` on a schedule with no `default` has no optimiser to run, and it throws a
+[`TimeDependentDefaultError`](@ref). The message says that a schedule is defined only over the
+folds of a cross-validation scheme.
 =#
 try
     optimise(calendar, rd)

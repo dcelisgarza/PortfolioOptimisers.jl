@@ -131,9 +131,10 @@ the optimised portfolio on its test fold in `rd`.
 
 You can index `pred` to get one fold. The property `mrd` joins the returns of all the folds
 into one [`PredictionReturnsResult`](@ref), and the property `res` gives the vector of the
-optimisation results of the folds. The test folds cover all the rows once, because a purge and
-an embargo remove only training rows. We compare the timestamps of `mrd` with the timestamps of
-the returns.
+optimisation results of the folds. The test folds cover all the rows once. `KFold` can drop
+training rows next to a test fold: `purged_size` rows on each side of it, the purge, and
+`embargo_size` more rows after it, the embargo. Both are zero here, and neither drops a test row.
+We compare the timestamps of `mrd` with the timestamps of the returns.
 =#
 
 println("isequal(kfold_pred.mrd.ts, rd.ts) = $(isequal(kfold_pred.mrd.ts, rd.ts))")
@@ -285,7 +286,7 @@ median_pred_min_variance === cfold_pred.pred[median_pred_min_variance.id]
 isequal(median_pred_min_variance.mrd.ts, rd.ts)
 
 #=
-### 2.3 WalkForward
+### 2.3 Walk-forward
 
 There are two walk-forward schemes, [`IndexWalkForward`](@ref) and [`DateWalkForward`](@ref).
 The first sizes its windows in rows. The second sizes them in dates, and you can use Julia's
@@ -431,7 +432,7 @@ We run the new scheme with the turnover constraint.
 date_tn_walkforward_pred = cross_val_predict(mr, rd, date_walk_forward)
 
 #=
-The date walk-forward has 15 folds, and the table has one column for each.
+The table has one column per fold.
 =#
 
 pretty_table(hcat(DataFrame(:tickers => rd.nx),

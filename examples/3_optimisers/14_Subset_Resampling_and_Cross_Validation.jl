@@ -196,7 +196,7 @@ plot!(xs_s, ys_s; seriestype = :scatter, marker = (:diamond, 6), label = "Subset
 #=
 ## 5. A covariance fitted again on every subset and fold
 
-Section 3 showed that cross-validation refuses a prior computed once. It cannot refuse a
+Section 3 said that cross-validation refuses a prior computed once. It cannot refuse a
 matrix pasted into a risk measure the same way. `Variance(; sigma = S)` is a valid setting, and
 a matrix you measured somewhere else looks the same as one fitted on the very sample the
 portfolio is about to be scored on.
@@ -273,9 +273,11 @@ println("Pasted-matrix cross-val variance      = $(expected_risk(sm, cv_pasted))
 println("Deferred-estimator cross-val variance = $(expected_risk(sm, cv_deferred))")
 
 #=
-The pasted matrix gives the smaller variance because it was fitted on the observations each
-test fold holds, so the score it earns is one no portfolio could have earned at the time. Read
-the larger number the deferred estimator gives.
+The two runs differ in two ways. The pasted matrix was fitted on the observations each test
+fold holds, so its score is one no portfolio could have earned at the time. The deferred
+estimator also fits each training fold at a smaller `T / N` than the 252 rows of the pasted fit
+give, and `T / N` is the shape of the denoising fit. Read the deferred estimator's number as
+the one a portfolio could have earned.
 
 The fields a prior fills, `mu`, `sigma`, `kt` and `sk`, all work this way. A measure with two or
 more such fields takes a prior estimator in `pe` instead, and one fit fills every field you left
@@ -286,9 +288,10 @@ Kurtosis(; pe = EmpiricalPrior())                  # mu and kt from one fit
 DistributionValueatRisk(; pe = EmpiricalPrior())   # mu, sigma and chol from one fit
 ```
 
-A field you state by hand keeps the value you gave it, and nothing checks it against the others.
-The docstring of each measure says so. The library warns you rather than refuse the setting,
-because a matrix measured elsewhere is a valid thing to pass.
+A field you state by hand keeps the value you gave it. The constructor checks the shape of each
+field, not whether their values match, and the docstring of each such measure warns you of that.
+The library does not refuse the setting, because a matrix measured elsewhere is a valid thing to
+pass.
 =#
 
 #=

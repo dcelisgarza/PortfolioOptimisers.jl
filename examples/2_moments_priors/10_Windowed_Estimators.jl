@@ -5,9 +5,11 @@ Description = "Windowed moment estimators in PortfolioOptimisers.jl: compute a m
 
 # Windowed moment estimators
 
-Every moment estimator of the previous pages used the whole return sample, with equal weight on
-each observation. That is the right default when the process that makes the returns does not
-change. In markets the process changes. Volatility comes in clusters and correlations rise in a
+The estimators of the [expected returns](01_Expected_Returns_Estimation.md),
+[covariance](02_Covariance_Estimation.md) and [higher moment](03_Higher_Moment_Estimation.md)
+pages used the whole return sample, with equal weight on each observation. That is the right
+default when the process that makes the returns does not change. In markets the process
+changes. Volatility comes in clusters and correlations rise in a
 crisis, and the risk of an asset today can differ a lot from its risk three years ago. A
 windowed estimator computes a moment from a chosen part of the history, or weights some
 observations more than others, instead of using the full sample with equal weights.
@@ -78,9 +80,9 @@ pretty_table(vol_table; formatters = [resfmt],
 
 #=
 On this slice the 60-day estimate is well above the 504-day and full-sample estimates for most
-assets, because the last months were more volatile than the four-year average. A longer window
-moves each estimate toward the full-sample number. A short window follows a change of regime
-fast but carries more noise. A long window carries less noise but follows a change slowly.
+assets, because the last months were more volatile than the four-year average. A short window
+follows a change of regime fast but carries more noise. A long window carries less noise but
+follows a change slowly.
 =#
 
 #=
@@ -193,10 +195,9 @@ weights less predictable.
 #=
 ## 6. Moving a window through time
 
-The estimator computes one window per call. A trailing window computed at every date shows how a
-moment changes over time, and you write the loop that moves the window. We compute the 252-day
-trailing volatility of AAPL at each date from day 252 on, and plot the series. The full-sample
-estimate gives one number for the whole period.
+A trailing window computed at every date shows how a moment changes over time. We compute the
+252-day trailing volatility of AAPL at each date from day 252 on, and plot the series. The
+full-sample estimate gives one number for the whole period.
 =#
 
 roll = 252

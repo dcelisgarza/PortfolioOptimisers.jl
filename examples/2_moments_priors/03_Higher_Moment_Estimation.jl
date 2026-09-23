@@ -22,7 +22,7 @@ uses.
 !!! tip "When to reach for this"
     Reach for higher moment estimation when you optimise against a risk measure that reads the
     skew or the tails, such as [`NegativeSkewness`](@ref), [`Kurtosis`](@ref) and their
-square-root forms, or when you build a Pareto surface over them. When you do, denoise the
+    square-root forms, or when you build a Pareto surface over them. When you do, denoise the
     higher moments. The raw cokurtosis is numerically singular, and
     denoising lowers its condition number by many orders of magnitude. If your risk measures
     need no tensors, you do not need this page.
@@ -61,10 +61,11 @@ rd = prices_to_returns(X)
 
 We build three high-order priors that differ only in how they process `V` and the cokurtosis.
 `V` is the positive semidefinite matrix that the library builds from the negative eigenvalues of
-the slices of the coskewness, and `kt` is the cokurtosis matrix. The first prior keeps the raw
-estimates. The second applies [`FixedDenoise`](@ref). The third applies the default
-[`Denoise`](@ref) and then [`LoGo`](@ref) sparsification. We then compare the condition numbers
-of `V` and of `kt`.
+the slices of the coskewness, and `kt` is the cokurtosis matrix. The first prior applies only the
+default [`Posdef`](@ref) step, which replaces a matrix that is not positive definite with the
+nearest correlation matrix, rescaled to the same diagonal. The second also applies
+[`FixedDenoise`](@ref). The third also applies the default [`Denoise`](@ref) and then
+[`LoGo`](@ref) sparsification. We then compare the condition numbers of `V` and of `kt`.
 =#
 
 hopes = ["Vanilla" => HighOrderPriorEstimator(),
@@ -91,8 +92,8 @@ prs = [k => prior(pe, rd) for (k, pe) in hopes]
 
 #=
 A condition number near ``10^{15}`` means that the matrix is numerically singular, and an
-optimisation that reads it is ill-posed. In the table, compare the raw cokurtosis with the
-denoised and the sparsified ones.
+optimisation that reads it is ill-posed. In the table, compare the cokurtosis of the first prior
+with the denoised and the sparsified ones.
 =#
 
 pretty_table(DataFrame(; :estimator => [k for (k, _) in prs],
@@ -105,18 +106,19 @@ pretty_table(DataFrame(; :estimator => [k for (k, _) in prs],
 
 [`plot_coskewness`](@ref) draws the coskewness matrix as a heatmap, and
 [`plot_cokurtosis`](@ref) draws the eigenvalues of the cokurtosis matrix. We draw each for the
-raw prior and for the denoised prior. The matrix processing acts on `V` and not on the
-coskewness, so the two heatmaps are the same. The raw cokurtosis has a block of eigenvalues near
-zero. [`FixedDenoise`](@ref) replaces the eigenvalues below its noise threshold with their mean,
+first prior and for the denoised prior. The matrix processing acts on `V` and not on the
+coskewness, so the two heatmaps are the same. The cokurtosis of the first prior has a block of
+eigenvalues near zero. [`FixedDenoise`](@ref) replaces the eigenvalues below its noise threshold
+with their mean,
 and the table of section 2 shows the condition number fall by many orders of magnitude.
 =#
 
 using StatsPlots, GraphRecipes
-# The coskewness of the raw prior.
+# The coskewness of the first prior.
 plot_coskewness(prs[1].second, rd)
 # The coskewness of the denoised prior.
 plot_coskewness(prs[2].second, rd)
-# The eigenvalues of the raw cokurtosis.
+# The eigenvalues of the cokurtosis of the first prior.
 plot_cokurtosis(prs[1].second, rd)
 # The eigenvalues of the denoised cokurtosis.
 plot_cokurtosis(prs[2].second, rd)

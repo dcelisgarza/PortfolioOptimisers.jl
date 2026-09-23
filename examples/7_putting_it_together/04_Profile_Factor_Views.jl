@@ -9,8 +9,7 @@ The fourth profile states its views on factors rather than on assets. The
 [desk monthly profile](02_Profile_Desk_Monthly.md) stated a thesis about two sectors, healthcare
 over energy, and entropy pooling turned it into a prior. This desk states what it expects momentum
 and value to earn, and a factor model takes those two numbers to every asset through the
-regression of assets on factors. The posterior then goes into an optimiser with caps on it,
-because without sector caps the risk-adjusted book puts most of its weight into two sectors.
+regression of assets on factors. The posterior then goes into an optimiser with caps on it.
 
 The [advanced Black-Litterman](../2_moments_priors/06_Advanced_Black_Litterman.md) page builds
 this prior one variant at a time. This page puts it to work in a whole book, with a
@@ -23,14 +22,13 @@ For this desk, three limits of the
     regression take it to the assets.
   - With only a cap on each asset, the book on this view puts most of its weight into two
     sectors. We give the optimiser a cap on each asset and a cap on each of those two sectors.
-  - We take the risk-adjusted book with [`MaximumRatio`](@ref). The book is large, so we turn it
-    into whole shares with a mixed-integer solve.
+  - We take the risk-adjusted book with [`MaximumRatio`](@ref), and turn it into whole shares with
+    a mixed-integer solve.
 
 !!! tip "When to reach for this"
     Reach for this profile when your view is about a factor, such as momentum, value, quality,
     size or low volatility, rather than about a name. Write the view against the factors with a
-    factor Black-Litterman prior, then cap the optimiser, so that the view cannot put most of the
-    book into one or two sectors.
+    factor Black-Litterman prior, then cap the sectors in the optimiser.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
@@ -113,8 +111,7 @@ The healthcare and energy rows take most of the book, and the tech row takes non
 ## 4. The constrained desk book
 
 The desk caps those two sectors, healthcare at 35% and energy at 25%, on top of the 15% cap on
-each asset. The optimiser still chooses which names to buy. The caps decide how much of the book
-any one sector can take.
+each asset. The optimiser still chooses which names to buy, and tech has no sector cap.
 =#
 
 desk = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),

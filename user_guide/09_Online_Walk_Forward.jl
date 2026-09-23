@@ -124,11 +124,14 @@ each fold refits over its whole window.
 A [`FactorPrior`](@ref) is a regression, and the library has no update formula for one. Wrap it
 in [`Online`](@ref). The wrapper puts a buffer of rows in the `cache` of the prior, each fold
 appends its new rows to the buffer, and the prior is fitted over the buffer in the ordinary way.
-The buffer holds the rows the batch fold uses, so the two runs return the same weights.
+The buffer holds the rows the batch fold uses, so the two runs return the same weights. The
+wrapper also takes a prior that has an update formula, and the cell below wraps the
+`EmpiricalPrior` of section 1.
 
 `max_history` caps that buffer, and the cap is how you ask for a rolling window online. The loop
-only expands, so the window belongs to the estimator. A batch scheme with window `w + p` and purge
-`p` trains over `w` rows, and a buffer capped at `w` fits over those same `w` rows.
+only expands the training window. You set a rolling window on the estimator, not on the scheme. A
+batch scheme with window `w + p` and purge `p` trains over `w` rows, and a buffer capped at `w`
+fits over those same `w` rows.
 =#
 
 rolling = IndexWalkForward(103, 40; purged_size = 3)
@@ -142,8 +145,9 @@ weights(cross_val_predict(hrp_cap, rd, stepped)) ==
 weights(cross_val_predict(hrp, rd, rolling))
 
 #=
-You write the same estimator online that you write in batch. An estimator updates each part that
-has an update formula, and refits each other part from the rows it keeps.
+The cell prints `true`. The buffer capped at 100 rows gives every weight of the rolling batch
+walk-forward. You write the same estimator online that you write in batch. An estimator updates
+each part that has an update formula, and refits each other part from the rows it keeps.
 
 ## 3. Where the online update is faster, and where it is not
 
@@ -172,11 +176,12 @@ hrp_plain = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = Empirica
 (; plain = ratio(hrp_plain), policy = ratio(hrp))
 
 #=
-The second gain is accuracy. The update is a Welford recursion, and not the textbook one-pass
-formula `(Σ xxᵀ − n μμᵀ) / (n − 1)`. The difference shows as soon as you update with a level
+A ratio below one means the online run took less time than the batch run. The update has a second
+gain, accuracy. The update is a Welford recursion, and not the textbook one-pass formula
+`(Σ xxᵀ − n μμᵀ) / (n − 1)`. The difference shows as soon as you update with a level
 instead of a change, such as a series with a mean near one thousand and a spread near one. The
 textbook formula subtracts two large numbers and loses digits. The recursion updates around the
-running mean, and it returns what the batch estimator returns, which centres the rows first.
+running mean, and the batch estimator centres the rows before it multiplies them.
 =#
 
 Z = randn(StableRNG(987654321), 50, 4) .+ 1000.0
@@ -190,6 +195,9 @@ folded = foldl(partial_fit!, eachrow(Z); init = Covariance())
 (maximum(abs, cov(folded) - exact), maximum(abs, textbook(Z) - exact))
 
 #=
+The first number is the largest difference between the recursion and the batch covariance, and
+the second is the largest difference between the textbook formula and the batch covariance.
+
 With the default covariance of `EmpiricalPrior`, reach for the update for that accuracy and for
 the resume below, and not for the speed. With a `CoveragePolicy` and an optimiser that computes
 its weights cheaply, such as `HierarchicalRiskParity`, reach for it for the speed as well.
@@ -211,8 +219,8 @@ res_2 = cross_val_predict(Resume(res_1), rd, online)            # the full histo
 (length(res_1.pred), length(res_2.pred), weights(vcat(res_1, res_2)) == weights(o))
 
 #=
-`Resume` copies every state when it starts, so it never writes to `res_1`, and one result resumes
-any number of times.
+`Resume` works on a copy of every state. `res_1` does not change, and you can resume it any number
+of times.
 
 ## Where to go next
 

@@ -115,9 +115,8 @@ pretty_table(DataFrame("Allocation" => ["Single shares", "Lots of 10"],
 ## 5. The budget sets the rounding error
 
 A rounding error too small to matter on a large account is large on a small one. We allocate the
-same target with budgets of \$100,000, \$25,000 and \$5,000, and the table prints the rounding error
-of each. On a small account, the choice of allocation method and of lot size changes the portfolio
-you hold the most.
+same target with budgets of \$100,000, \$25,000 and \$5,000, and the table prints the cash left over
+and the rounding error of each.
 =#
 
 budgets = [100_000.0, 25_000.0, 5_000.0]

@@ -65,8 +65,8 @@ Description = "PortfolioOptimisers.jl is a portfolio optimisation (portfolio opt
 # PortfolioOptimisers.jl
 
 `PortfolioOptimisers.jl` is a portfolio optimisation (portfolio optimization) library for Julia.
-Every component is an immutable estimator you compose, so a prior, a risk measure or a
-constraint swaps out without touching the optimiser.
+Every component is an immutable estimator you compose, and you swap a prior, a risk measure or a
+constraint by passing a different one to the constructor that takes it.
 
 !!! danger
 
@@ -186,7 +186,7 @@ slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
              check_sol = (; allow_local = true, allow_almost = true))
 ```
 
-Every optimiser that solves a mathematical program takes a [`JuMPOptimiser`](@ref), which holds the solvers and the constraints that these optimisers share. A `JuMPOptimiser` takes one [`Solver`](@ref), or a vector of them that it tries in order.
+`MeanRisk` and many other optimisers that solve a mathematical program take a [`JuMPOptimiser`](@ref), which defines the solvers and the constraints that these optimisers share. A `JuMPOptimiser` takes one [`Solver`](@ref), or a vector of them that it tries in order. [`DiscreteAllocation`](@ref), which we use below, takes a `Solver` directly.
 
 ```@example 0_index
 opt = JuMPOptimiser(; slv = slv);

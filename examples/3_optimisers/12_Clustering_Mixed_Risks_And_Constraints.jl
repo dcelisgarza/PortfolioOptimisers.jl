@@ -21,8 +21,7 @@ takes the same pair under a 10% weight cap and a fee.
     Reach for a mixed-risk clustering optimiser when one risk measure does not cover what you
     want to control and you still want the hierarchy to spread the money. You might combine a
     tail measure with variance, or measure risk inside a cluster one way and between clusters
-    another. The tree keeps the allocation stable, and the scalariser sets how the risk terms
-    combine.
+    another. The scalariser sets how the risk terms combine.
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -158,7 +157,7 @@ A clustering optimiser spreads the money through the tree, and you set how it me
     mix risk measures.
   - [`HierarchicalEqualRiskContribution`](@ref) takes a different risk measure and a different
     scalariser inside a cluster and between clusters.
-  - [`HierarchicalOptimiser`](@ref) takes weight bounds and fees while the tree allocates.
+  - [`HierarchicalOptimiser`](@ref) takes weight bounds and fees for either optimiser.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

@@ -175,8 +175,8 @@ Five parameters shape the pairing, and the rest of the page uses them by name.
   - `ppy` is the number of periods in a year. The book statistics further down are annualised with
     it.
 
-Every statistic is a function over the result rather than a field on it, so you can change the
-parameters of one statistic without running the fit again.
+Every statistic is a function that takes the result, so you can change the parameters of one
+statistic without running the fit again.
 =#
 
 horizon, lag, step, min_count, ppy = 5, 1, 5, 10, 252
@@ -209,11 +209,12 @@ observations, and statistics taken over different samples are not a comparison.
 
 The fix is to cut both forecasts to the sample they share, and [`forecast_evaluation_align`](@ref)
 does it. Every evaluation's dates run `lo:step:hi` on the block's rows, so the grid two of them
-share starts where the later one becomes scorable and ends where the earlier one stops. The call
+share runs from the later of the two first dates, in steps of `step`, up to the earlier of the two
+last dates. The call
 rebuilds each result on that grid and leaves its forecast, target and universe alone, with no
 re-pairing, no refit and no blank. It refuses a pair that does not answer one question, which is a
 pair differing in target, horizon, lag, step, `min_count`, `ppy` or universe, for the same reason
-the summary does. A shared grid does not make two questions one.
+the summary does.
 =#
 
 fe_signal, fe_trait = forecast_evaluation_align([raw_signal, raw_trait])
@@ -330,9 +331,8 @@ with a turnover constraint does.
     Every hit rate therefore sits over the same sample as the mean printed beside it.
 
 [`forecast_quantile_spread`](@ref) asks the same question more coarsely. Buy the top fraction of
-the cross-section, sell the bottom, and measure what the difference earned. Reach for it when the
-worry is that a book's return comes from the middle of the distribution rather than from the tails
-the forecast is most confident about.
+the cross-section, sell the bottom, and measure what the difference earned. Reach for it to check
+whether the tails the forecast is most confident about earn a return of their own.
 =#
 
 qs_signal = forecast_quantile_spread(fe_signal; quantiles = (0.1, 0.2))
@@ -361,7 +361,7 @@ plot_forecast_cumulative_returns(fe_signal;
 ## 5. Is the magnitude right?
 
 The first two questions are about order. A forecast can order the cross-section perfectly and
-still be a hundred times too large, and an optimiser that maximises expected return will act on
+still be ten times too large, and an optimiser that maximises expected return will act on
 the exaggeration.
 
 [`forecast_calibration`](@ref) gives the scale. Its `slope` is a weighted regression of the
@@ -370,10 +370,10 @@ of the whole evaluation. A slope of one says the forecast's units are already th
 A slope of a tenth says the forecast is ten times too large. A slope near zero says the magnitude
 carries no information, whatever the order does.
 
-The intercept is fixed rather than fitted, because the cross-sectional mean of the target is what
-the factor model is for, and the forecast is only ever asked about the deviation from it. Like the
-coverage, the calibration applies no `min_count`. It pools the pairs of every date into one sample,
-so a thin cross-section contributes few pairs rather than an unreliable number.
+The intercept is fixed at zero, because the cross-sectional mean of the target is what the factor
+model is for, and the forecast is only ever asked about the deviation from it. Like the coverage,
+the calibration applies no `min_count`. It pools the pairs of every date into one sample, so a thin
+cross-section adds only its few pairs to that sample and never a statistic of its own.
 =#
 
 cal_signal = forecast_calibration(fe_signal, csfm)
@@ -539,9 +539,9 @@ pretty_table(DataFrame("Tail" => ["10%", "20%"],
              formatters = [numfmt], title = "Quantile spread, the second axis")
 
 #=
-The figure draws ten of the thirty columns, the ones that share a scale. `n_bins` and
-`mean_n_scored` are counts in the tens, and on one axis they would leave a Sharpe ratio too small
-to read, so they stay in the table above.
+The figure draws ten headline columns of the thirty, and the spread Sharpe ratio at each of the
+two tails, because this summary carries the quantile block. The columns have different units, so
+compare the two forecasts inside each group of bars.
 =#
 
 plot_forecast_evaluation_summary(fs; size = (900, 500))

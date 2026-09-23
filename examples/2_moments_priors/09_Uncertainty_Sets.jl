@@ -57,8 +57,9 @@ pr = prior(EmpiricalPrior(), rd)
 ## 2. Building covariance uncertainty sets
 
 We build two covariance uncertainty sets with a [`NormalUncertaintySet`](@ref), a box and an
-ellipsoid. The estimator resamples the returns, so we fix the random number generator to make
-the run repeatable.
+ellipsoid. The box draws random covariance matrices from the Wishart law that normal returns
+imply, so we fix the random number generator to make the run repeatable. At its default the
+ellipsoid takes its radius from a chi-square quantile and draws nothing.
 =#
 
 ucs_box = sigma_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(), rng = StableRNG(1),
@@ -110,9 +111,8 @@ res_ell = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs_ell),
                             obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pr, slv = slv)))
 
 #=
-The table puts the weights of the three portfolios side by side. The box set bounds the error of
-each covariance entry on its own, and the ellipsoidal set bounds the errors of all the entries
-together. On this data the ellipsoidal set gives the less concentrated weights.
+The table puts the weights of the three portfolios side by side. On this data the ellipsoidal
+set gives the less concentrated weights.
 =#
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Nominal" => res_nom.w,
@@ -156,19 +156,19 @@ ret_ell = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 
 #=
 With a box mean set, the mean of each asset falls to the lower bound of its own interval. The
-worst-case maximum-ratio portfolio then puts almost all its weight in the asset with the best
-worst-case Sharpe ratio. The ellipsoidal mean set bounds the means together, and its worst-case
+worst-case portfolio then puts almost all its weight in the asset with the highest worst-case
+return. The ellipsoidal mean set bounds the means together, and its worst-case
 penalty grows as the weights concentrate. The worst-case portfolio spreads its weight over
-most of the assets. On this data the two sets act on the weights as they do in section 4, where
-the ellipsoidal set also gives the less concentrated weights.
+most of the assets.
 
-!!! note "Both worst-case mean portfolios are at the floor of the ratio's scale"
+!!! note "Neither worst-case mean portfolio is a tangency portfolio"
     The last cell of this section prints the largest worst-case return that a long-only
     portfolio can reach over each set, next to `rf`. When that return is below `rf`, the ratio
     is negative for every portfolio, and no tangency portfolio exists. [`MaximumRatio`](@ref) solves the ratio with a scale variable `k`, and here it returns the
     portfolio at the floor `kmin` of that variable, so the weights still meet their constraints.
     Read them as the best worst-case return at that scale, not as a worst-case tangency
-    portfolio. The nominal portfolio has a tangency portfolio, and this does not apply to it.
+    portfolio. The nominal problem has a tangency portfolio, so this note does not apply to
+    the nominal column.
 =#
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Nominal" => ret_nom.w,
@@ -201,10 +201,10 @@ end
 #=
 ## 6. Other set estimators: Delta and the ARCH bootstrap
 
-[`NormalUncertaintySet`](@ref) resamples the returns as if they were Gaussian, and other
-estimators exist. Two of them are [`DeltaUncertaintySet`](@ref) and
+[`NormalUncertaintySet`](@ref) builds its sets from the sampling laws that normal returns imply,
+and other estimators exist. Two of them are [`DeltaUncertaintySet`](@ref) and
 [`ARCHUncertaintySet`](@ref). `DeltaUncertaintySet` is the simpler, a box whose intervals are a
-fixed fraction of the point estimate on each side, with no resampling. It gives the same set on
+fixed fraction of the point estimate on each side, with no sampling. It gives the same set on
 every run and costs almost nothing to build. You choose the fraction, and the data does not
 change it. We build a covariance box with it and print its total width next to that of the
 Normal box of section 2.
@@ -249,8 +249,10 @@ ucs_arch = sigma_ucs(ARCHUncertaintySet(; alg = BoxUncertaintySetAlgorithm(),
 (arch = set_width(ucs_arch), normal = set_width(ucs_box))
 
 #=
-The bootstrap keeps the fat tails and the autocorrelation that the Normal estimator ignores.
-You pass this set to `UncertaintySetVariance` in the same way as the other two sets.
+On this data the ARCH box is a little wider than the Normal box. The block bootstrap draws from
+the observed returns, so their fat tails and autocorrelation enter the set, and the Normal
+estimator ignores both. You pass this set to `UncertaintySetVariance` in the same way as the
+other two sets.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

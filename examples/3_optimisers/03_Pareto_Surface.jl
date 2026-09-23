@@ -135,7 +135,8 @@ does not give the whole surface, but it gives a useful range of values.
 
 `NearOptimalCentering` does not return the optimal `MeanRisk` portfolio. It returns the portfolio
 at the analytic centre of a region around the optimum. The size of the region comes from splitting
-the efficient frontier into bins. We use the automatic bins here, and you can set them by hand.
+the efficient frontier into bins. We keep the default number of bins, the number of observations
+divided by the number of assets, and you can set it with the `bins` field.
 =#
 
 ## Risk-free rate of 4.2/100/252
