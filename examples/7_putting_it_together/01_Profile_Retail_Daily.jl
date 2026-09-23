@@ -11,20 +11,22 @@ small retail account every day. Compute, trading cost and the size of the accoun
 here, and none of them rewards a more elaborate model.
 
 Of the limits in the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md),
-three shape this investor's choices.
+four shape this investor's choices.
 
   - The rebalance is daily, so you pay for the optimisation every trading day. One convex solve is
     enough.
   - Trading cost compounds when you trade every day. We cap how far each weight can move from the
-    current book, and we give the optimiser a fee on each long position.
+    current book, and we charge a fee on every unit of weight traded. A trade then happens only
+    where its expected gain is larger than its fee.
+  - A cap of 8% per name limits how much of the book one name can take.
   - The account is small, so one whole share is a large part of a position. The finite allocation
     at the end moves the weights you hold away from the weights you solved for.
 
 !!! tip "When to reach for this"
     Reach for this profile when trading cost and account size bind harder than the model does. Keep
-    the optimisation to one convex solve, bound the turnover inside the optimiser, and size the
-    last step to the cash you have. A fee changes the weights only under an objective or a
-    constraint that uses the portfolio return.
+    the optimisation to one convex solve, put the turnover bound and the trading fee inside the
+    optimiser, and size the last step to the cash you have. The fee is a deduction from the
+    portfolio return, so it changes the weights only under an objective that uses that return.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -60,29 +62,60 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
 #=
 ## 2. The optimisation
 
-One convex solve takes all the choices. The objective is minimum risk. The weight bounds cap each
-name at 15%. The turnover budget keeps each target weight within 0.05 of the weight the investor
-has today. The fee is proportional to each long position.
+One convex solve takes all the choices. The objective is [`MaximumUtility`](@ref), the expected
+return net of the fee, less two times the variance. The weight bounds cap each name at 8%. The
+turnover budget keeps each target weight within 0.05 of the weight the investor has today. The
+fee is 0.1% of each unit of weight traded, and the solve deducts it from the expected return.
 
-Two of these choices do not change this book. With an equal-weight book of 20 names and a budget
-of 0.05, no weight can pass 10%, so the turnover budget, not the 15% cap, sets the largest
-position. The fee enters only the portfolio return. A minimum-risk objective with the default
-variance does not use that return, so the fee does not change the weights.
+The objective has to use the return. The fee is a deduction from the return, so a minimum-risk
+objective would ignore it. A fee on each long position would not work either, because a
+fully-invested long-only book pays the same total fee whatever its weights are.
 =#
 
-retail = optimise(MeanRisk(; obj = MinimumRisk(),
+retail = optimise(MeanRisk(; obj = MaximumUtility(),
                            opt = JuMPOptimiser(; pe = pr, slv = slv,
-                                               wb = WeightBounds(; lb = 0.0, ub = 0.15),
+                                               wb = WeightBounds(; lb = 0.0, ub = 0.08),
                                                tn = Turnover(; w = current_book,
                                                              val = 0.05),
-                                               fees = Fees(; l = 0.001))))
+                                               fees = Fees(;
+                                                           tn = Turnover(; w = current_book,
+                                                                         val = 0.001)))))
 
 pretty_table(DataFrame("Asset" => rd.nx, "Current" => current_book, "Target" => retail.w);
              formatters = [resfmt], title = "Retail daily target against the current book")
 
 #=
-Compare the two weight columns. No target is further than 0.05 from its current weight, and the
-largest target is the 10% that the turnover budget permits.
+Compare the two weight columns. No target is further than 0.05 from its current weight or above
+the 8% cap, and most names keep their current weight.
+
+We solve the same problem two more times, once without the fee and once without the cap, to show
+what each of them changes.
+=#
+
+no_fee = optimise(MeanRisk(; obj = MaximumUtility(),
+                           opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                               wb = WeightBounds(; lb = 0.0, ub = 0.08),
+                                               tn = Turnover(; w = current_book,
+                                                             val = 0.05))))
+no_cap = optimise(MeanRisk(; obj = MaximumUtility(),
+                           opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                               tn = Turnover(; w = current_book,
+                                                             val = 0.05),
+                                               fees = Fees(;
+                                                           tn = Turnover(; w = current_book,
+                                                                         val = 0.001)))))
+
+books = [retail, no_fee, no_cap]
+pretty_table(DataFrame("Book" => ["Retail", "Without the fee", "Without the cap"],
+                       "Turnover" => [sum(abs, b.w - current_book) for b in books],
+                       "Largest weight" => [maximum(b.w) for b in books],
+                       "Names traded" =>
+                           [count(>(1e-4), abs.(b.w - current_book)) for b in books]);
+             formatters = [resfmt], title = "What the fee and the cap change")
+
+#=
+Without the fee, the book trades more than twice as much and in more names. Without the cap, the
+largest weight goes past 8%.
 
 ## 3. Finite allocation
 
@@ -107,7 +140,13 @@ plot_stacked_bar_composition([retail], rd; xticks = (1:1, ["Retail daily"]))
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
 #src - New end-to-end profile (7_putting_it_together). Verified on kaimon (f102cae9): full pipeline
-#src   EmpiricalPrior → MeanRisk(MinimumRisk, wb ub=0.15, tn val=0.05 vs equal-weight, Fees l=0.001)
-#src   → GreedyAllocation $10k. Result maxw 10% (cap binds), 14 names, leftover $2.99.
+#src   EmpiricalPrior → MeanRisk → GreedyAllocation $10k.
+#src - #1286 (2026-09-23): the first version used MinimumRisk, ub=0.15 and Fees(l=0.001). Neither
+#src   the fee nor the cap changed the book: a MinimumRisk variance objective ignores the return the
+#src   fee is deducted from, a long fee costs a fully-invested long-only book `l` whatever `w` is,
+#src   and turnover 0.05 on 1/20 caps every weight at 0.10. Now MaximumUtility, ub=0.08 and a
+#src   turnover fee of 0.001. Bare run: retail turnover 0.30, maxw 0.08 (cap binds), 8 of 20
+#src   names traded; without the fee 0.72 and 20 traded; without the cap maxw 0.10. All three
+#src   OptimisationSuccess. GreedyAllocation $10k: 17 names, leftover $10.00.
 #src - Composes blocks verified in 4_constraints_costs (wb/turnover/fees) and 6_post_processing
 #src   (GreedyAllocation). No new API; the value is the integrated narrative.
