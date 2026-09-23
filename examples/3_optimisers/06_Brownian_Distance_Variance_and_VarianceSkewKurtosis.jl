@@ -175,8 +175,8 @@ res_vsk_heavy = optimise(MeanRisk(; r = r_vsk_heavy, opt = opt_ho), rd)
 
 #=
 We print the two portfolios side by side. The larger scales double the skewness and kurtosis
-terms of the objective. The two columns differ by less than 0.1 of a percentage point, so
-doubling the two scales changes little on these 50 daily returns.
+terms of the objective. On these 50 daily returns, the weights move by up to about three
+percentage points. `JNJ` grows, and `PEP` and `MRK` shrink.
 =#
 
 pretty_table(DataFrame(; :assets => rd.nx, :VarianceSkewKurtosis => res_vsk.w,
