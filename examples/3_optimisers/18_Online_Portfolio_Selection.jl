@@ -407,25 +407,49 @@ which is the trade a minimum-variance portfolio makes.
 The other place to put risk is the set. A [`ProgrammeAllocationSet`](@ref) takes any risk
 measure whose `settings.ub` holds a ceiling. It resolves that ceiling on every row against a
 prior fitted on the rows seen so far, and it projects the step of every rule onto the result.
-The cell below runs the moving-average reversion rule of section 3, which lost most of its
-wealth, under a ceiling on the daily variance equal to a volatility of ten percent a year.
+
+Choose a ceiling the set can meet. A variance ceiling below the variance of the least volatile
+long-only portfolio leaves the programme with no solution. The step is then held, and the rule
+trades nothing on that row. On this panel that floor rises above fifteen percent a year on
+2020-03-12 and stays above it to the last row, because from then on the prior of the rows seen
+so far includes the crash of March 2020. At a ceiling of ten percent a year, the programme has
+no solution on about four folds in five.
+
+We run the moving-average reversion rule of section 3, which lost most of its wealth, under a
+ceiling on the daily variance equal to a volatility of twenty-five percent a year. No row of the
+panel has a floor that high. The last column counts the held steps from the retcode of each
+fold, which carries a record for a held row and `nothing` otherwise.
 =#
 
-ceiling = Variance(; settings = RiskMeasureSettings(; ub = (0.10 / sqrt(252))^2))
+ceiling = Variance(; settings = RiskMeasureSettings(; ub = (0.25 / sqrt(252))^2))
 ceiled = OnlinePortfolioSelection(; alg = MovingAverageReversion(), fees = fees,
                                   set = ProgrammeAllocationSet(; slv = slv, r = ceiling))
 ceiled_pred = cross_val_predict(ceiled, rd, cv)
 ps_ceiled = performance_summary(ceiled_pred)
+held_steps(pred) = count(p -> !isnothing(p.res.retcode.res), pred.pred)
 
-(; wealth = wealth(ceiled_pred), ann_volatility = ps_ceiled.ann_volatility,
- turnover = ps_ceiled.turnover)
+pretty_table(DataFrame("Set" => ["Simplex", "Volatility ceiling of 25 %"],
+                       "Terminal wealth" =>
+                           [wealth(preds["Moving-average reversion"]), wealth(ceiled_pred)],
+                       "Annualised volatility" =>
+                           [ps_free.ann_volatility, ps_ceiled.ann_volatility],
+                       "Turnover per period" => [ps_free.turnover, ps_ceiled.turnover],
+                       "Held steps" => [held_steps(preds["Moving-average reversion"]),
+                                        held_steps(ceiled_pred)]);
+             formatters = [(v, i, j) -> if isa(v, AbstractFloat) && j > 2
+                               "$(round(v * 100; digits = 2)) %"
+                           else
+                               v
+                           end, resfmt],
+             title = "Moving-average reversion under a risk ceiling")
 
 #=
-The ceiling turns the 0.42 of the rule into 1.46, and its 51% volatility into 19%. That is
-above the ten percent the ceiling asked for. On about three rows in four the projection onto the
-set does not solve. The step is then held, so the rule trades nothing on that row and the book
-drifts with the prices. The library warns once for each held step, so read the warnings before
-you read the table.
+The ceiling binds on 813 of the 940 folds. In the median fold the largest weight falls from
+the whole book to about half of it. The realised volatility is above the ceiling, because the
+ceiling bounds the variance of the prior fitted on past rows and not the variance of the rows
+that follow. The rule still moves about half of its book to other assets every period, and it
+ends with less wealth than on the simplex. A risk ceiling limits the risk of the book. It does
+not change what the rule bets on.
 
 A risk ceiling on the set and a risk loss in the step are two different things. The ceiling is
 a constraint every rule meets. The loss is what one rule steps on. Both take any risk measure
@@ -481,3 +505,11 @@ pretty_table(DataFrame("Asset" => rd.nx, "Target weight" => capped_pred.pred[end
 #src   wealth 198.4 (best CRP 3.60), path length 7.094 (SCS at 1e-5), regret 4.62 on the winner
 #src   rules and 6.1–7.8 on the reversion rules. Clarabel stalls (INSUFFICIENT_PROGRESS) at this
 #src   budget, and the vector falls through to SCS in about 16 s in total.
+#src - Section 9 risk ceiling (#1289): measured 2026-09-23. The long-only minimum volatility on
+#src   the expanding sample prior exceeds 10 % on 753 of 999 rows, 15 % from 2020-03-12 to the
+#src   end, 20 % from 2020-03-20 to 2021-01-11, and peaks at 22.6 % on 2020-04-22; every Held
+#src   Step at a ceiling was that infeasibility, not a solver failure. At 10 % the cell held 752
+#src   of 940 folds (the count of `held_steps`; the issue counted 719) and printed wealth 1.46
+#src   from a book that mostly drifted. At 25 %: no held fold, ex-ante volatility at the ceiling
+#src   (within 1e-3) on 813 of 940 folds, median largest weight 0.53 against 1.0 on the simplex,
+#src   wealth 0.367, volatility 28.3 %, turnover 0.994 (`sum(abs, dw)`, so half the book).
