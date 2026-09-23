@@ -5,40 +5,38 @@ Description = "Reproduce the quintile and 1/N portfolios as robust optimisations
 
 # ℓ1 uncertainty sets: the quintile and 1/N portfolios
 
-Two of the most stubbornly popular portfolios in practice have no theory behind them. The
-**1/N portfolio** puts `1/N` in every asset and ignores the market entirely. The **quintile
-portfolio** sorts assets by some characteristic — momentum, value, low volatility — and
-equally longs the top 20%, sometimes shorting the bottom 20%. Both are routinely dismissed as
-naive, and both routinely beat the theory-based portfolios they are compared against.
+Two portfolios that practitioners use a lot have no theory behind them. The 1/N portfolio puts
+a weight of `1/N` in each asset and uses no data. The quintile portfolio sorts the assets on a
+characteristic, such as momentum or low volatility, and holds the top 20 % with equal weights.
+Some versions also short the bottom 20 %. Both look naive, and both often do better than the
+portfolios that come from theory.
 
-Zhou & Palomar [quintile](@cite) show they are not naive at all. They are the **exact
-solutions** of a robust optimisation problem: maximise the worst-case characteristic when the
-true characteristic lies somewhere in an ℓ1 ball around your estimate. The ball's radius `ε`
-is the *only* dial, and it decides how many assets you hold:
+Zhou and Palomar [quintile](@cite) show that both are the exact solutions of a robust
+optimisation problem. The problem maximises the worst-case characteristic of the portfolio,
+when the true characteristic lies in an ℓ1 ball around your estimate. The radius `ε` of the
+ball is the only parameter, and it sets how many assets the portfolio holds.
 
 | radius | portfolio | active assets |
 |:--|:--|:--|
-| `ε → 0` | trust the estimate completely | 1 (the single best asset) |
-| `ε` moderate | quintile portfolio | ~20% |
-| `ε` large | give up on the estimate | all of them, equally weighted (1/N) |
+| `ε → 0` | the best single asset | 1 |
+| `ε` moderate | the quintile portfolio | about 20 % of the assets |
+| `ε` large | the 1/N portfolio | all the assets, with equal weights |
 
-So the quintile portfolio is what you get when you *half* believe your return forecast, and
-the 1/N portfolio is what you get when you do not believe it at all. Neither is a heuristic;
-they are the answers to a question nobody realised they were asking.
+So you get the quintile portfolio when you believe your forecast in part, and the 1/N portfolio
+when you do not believe it at all.
 
-Because of that, this library ships **no quintile optimiser**. An ℓ1 ball is an
-[uncertainty set](09_Uncertainty_Sets.md), so the quintile portfolio is an ordinary
-[`MeanRisk`](@ref) problem with a particular `ucs` — and it composes with every constraint in
-the library for free. This page is a deep dive: the ε sweep that produces the table
-above, all of the paper's models, ranking on a characteristic other than return, and the
-classical portfolios the paper benchmarks against.
+For that reason the library has no quintile optimiser. An ℓ1 ball is an
+[uncertainty set](09_Uncertainty_Sets.md), so the quintile portfolio is a [`MeanRisk`](@ref)
+problem with an ℓ1 `ucs`, and every constraint of the library applies to it. This page computes
+the sweep over `ε` behind the table above, the models of the paper, a ranking on a
+characteristic other than return, and the portfolios from theory that the paper compares with.
 
 !!! tip "When to reach for this"
-    Reach for an ℓ1 set when you have a *ranking* you half-trust. Its ergonomics are unusual:
-    rather than tuning `ε` (which has no meaningful scale — see section 3), you say how many
-    assets you want to hold and let [`ActiveAssetsUncertaintyAlgorithm`](@ref) solve for the
-    radius. Reach for a [box or ellipsoidal set](09_Uncertainty_Sets.md) instead when you want
-    to be robust to the *magnitude* of estimation error rather than to the ranking.
+    Reach for an ℓ1 set when you have a ranking that you trust in part. Do not set `ε`
+    yourself, because its scale comes from the data, as section 3 shows. Give the number of
+    assets you want to hold, and [`ActiveAssetsUncertaintyAlgorithm`](@ref) finds the radius.
+    Reach for a [box or ellipsoidal set](09_Uncertainty_Sets.md) instead when the size of the
+    estimation error matters to you more than the order of the ranking.
 =#
 
 using PortfolioOptimisers, PrettyTables, StatsPlots, Statistics, LinearAlgebra, HiGHS,
@@ -55,9 +53,10 @@ end;
 #=
 ## 1. Data and solver
 
-The same S&P 500 slice as the other examples. Every model on this page is a **linear
-program** — the worst case over an ℓ1 ball is an infinity norm, and an infinity norm is linear
-once epigraphed — so HiGHS is all we need. No conic solver, no quadratic term.
+We use the same S&P 500 slice as the other examples. The worst case over an ℓ1 ball is an
+infinity norm, and an epigraph variable makes an infinity norm linear. So every ℓ1 model of this
+page is a linear program, or a mixed-integer linear program in section 7, and HiGHS solves
+both.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -73,18 +72,19 @@ slv = Solver(; name = :highs, solver = HiGHS.Optimizer,
 N = size(rd.X, 2)
 
 #=
-## 2. The recipe
+## 2. The model
 
-Three pieces do the work:
+The model has three parts.
 
-  - [`ArithmeticReturn`](@ref) with a `ucs` — makes the return *worst-case* rather than nominal.
-  - [`MaximumReturn`](@ref) — the objective. There is no risk term in this problem at all.
-  - [`NoRisk`](@ref) — says so explicitly.
+  - [`ArithmeticReturn`](@ref) with a `ucs` makes the return the worst case over the set,
+    instead of the nominal return.
+  - [`MaximumReturn`](@ref) is the objective. The problem has no risk term.
+  - [`NoRisk`](@ref) is the risk measure that states this.
 
-That last one deserves a word. `MeanRisk` requires a risk measure, so without `NoRisk` the
-default [`Variance`](@ref) would be built and then thrown away by the objective — dragging
-second-order cone constraints into a linear program and forcing a conic solver on it.
-`NoRisk` contributes nothing and keeps the problem an LP.
+`MeanRisk` needs a risk measure. Without `NoRisk` it builds the default [`Variance`](@ref),
+which the objective does not use. The variance still adds second-order cone constraints to the
+problem, and a conic solver is then necessary. `NoRisk` adds nothing to the model, so the
+problem stays a linear program.
 =#
 
 function quintile(ucs; kwargs...)
@@ -96,16 +96,16 @@ end
 long_only(ucs) = quintile(ucs; bgt = 1.0, wb = WeightBounds(; lb = 0.0, ub = 1.0)).w;
 
 #=
-## 3. The radius has no scale — so do not pick it by hand
+## 3. The scale of the radius comes from the data
 
-`ε` is dimensionally a *sum of characteristic differences*, so its scale is inherited from the
-data rather than being a property of the model. On the daily returns below the interesting
-values live around `10⁻³`; on annualised returns everything shifts by ~250×. There is no
-memorable "sensible" number, and the intuition you have for percentages is actively
-misleading: `ε = 0.05` *looks* like a modest 5% of something, but here it is close to the top
-of the range and gives essentially the 1/N portfolio.
+`ε` has the units of a sum of differences of the characteristic, so its scale comes from the
+data and not from the model. On these daily returns the useful values are near `10⁻³`, and on
+annualised returns they are about 250 times larger. No single value suits every data set. A
+value such as `ε = 0.05` looks like a small 5 %, but here it is near the top of the range and
+gives almost the 1/N portfolio.
 
-Watch what the whole useful range actually looks like:
+We print the radius that gives each of four portfolios, which hold one asset, 20 % of the
+assets, half of them and all of them.
 =#
 
 mu_sorted = sort(pr.mu; rev = true)
@@ -120,17 +120,16 @@ pretty_table(DataFrame(;
              formatters = [(v, i, j) -> isa(v, Number) ? string(round(v; sigdigits = 3)) : v])
 
 #=
-The entire span from "one asset" to "all of them" lives inside `[0, 0.06]`. This is why you
-should not tune `ε` directly, and why [`ActiveAssetsUncertaintyAlgorithm`](@ref) exists: it
-inverts the paper's closed forms so you specify the thing you actually have an opinion about —
-*how many assets do I want to hold?* — and it solves for the radius.
+All four radii lie in `[0, 0.06]`, so do not set `ε` yourself.
+[`ActiveAssetsUncertaintyAlgorithm`](@ref) inverts the closed forms of the paper. You give it
+the number of assets you want to hold, and it finds the radius. We build the set for 20 % of
+the assets.
 
-!!! warning "It is a calibration, not a constraint"
-    `active = 0.2` selects the radius that would activate 20% of assets on the *bare* problem
-    (budget and sign constraints, nothing else). Add weight bounds, cardinality, or sector
-    constraints — which is the entire point of this being an uncertainty set — and the realised
-    count can differ. It is a unit conversion for an opaque parameter, not a promise. If you
-    need a hard bound on the number of holdings, use `card`.
+!!! warning "The number of assets sets the radius, and it does not constrain the portfolio"
+    `active = 0.2` selects the radius that makes 20 % of the assets active on the problem with
+    only the budget and the sign constraints. If you add weight bounds, a cardinality constraint
+    or sector constraints, the number of active assets can differ. If you need a hard bound on
+    the number of assets, use `card`.
 =#
 
 ue = CharacteristicUncertaintySet(; pe = EmpiricalPrior(),
@@ -140,11 +139,12 @@ ue = CharacteristicUncertaintySet(; pe = EmpiricalPrior(),
 mu_ucs(ue, rd)
 
 #=
-## 4. The ε sweep: one dial, three portfolios
+## 4. The sweep over ε
 
-This is the paper's central claim, reproduced. We sweep the radius from "trust the estimate"
-to "distrust it entirely" and watch the portfolio walk from a single asset to 1/N — with the
-quintile portfolio sitting in the middle, not as an approximation but as the exact optimum.
+We compute the radius for each count of active assets from 1 to `N`, solve the long-only
+portfolio at each radius, and print six of the rows. As the radius grows, the portfolio moves
+from a single asset to 1/N. The quintile portfolio is the exact optimum at a radius between the
+two.
 =#
 
 targets = 1:N
@@ -166,9 +166,9 @@ pretty_table(sweep_df[[1, 2, 4, 8, 12, 20], :];
                            end])
 
 #=
-The realised active count tracks the request exactly, and the largest weight falls as `1/m` —
-the portfolio is always *equally weighted over its active set*, which is the quintile
-construction. Plotted against the radius:
+Read the `active` column against `q`, and `max_weight` against `1/q`. On each printed row they
+are equal, so the portfolio holds equal weights over its active assets, as the quintile
+portfolio does. We plot the number of active assets against the radius.
 =#
 
 plot(sweep_df.eps, sweep_df.active; label = "active assets",
@@ -178,16 +178,18 @@ hline!([N]; label = "1/N portfolio", linestyle = :dash)
 hline!([round(Int, 0.2 * N)]; label = "quintile (20%)", linestyle = :dash)
 
 #=
-## 5. Equal weights or inverse volatility? The `scaled` flag
+## 5. Equal weights or inverse volatility
 
-The ball above assumes every asset's characteristic is estimated equally badly. That is a
-strong assumption — a volatile asset's mean return is obviously harder to pin down than a
-placid one's. Scaling the ball by each asset's volatility (`scaled = true`, the paper's `A₁`
-set) encodes that, and the optimum changes shape: active assets are no longer equally
-weighted but weighted **inversely to their volatility**.
+The ball above assumes the same error in the estimate of each asset's characteristic. But the
+mean return of a volatile asset is harder to estimate than that of a calm one. The set `A₁` of
+the paper scales the ball by the volatility of each asset. The active assets then take weights
+in inverse proportion to their volatility, instead of equal weights. Only the shape of the ball
+changes, and the objective and the constraints stay the same.
 
-The remarkable part is that nothing about the *problem* changed — only the geometry of the
-ball. Inverse-volatility weighting falls out.
+With the estimator, `scaled = true` on [`L1UncertaintySetAlgorithm`](@ref) gives this set.
+Here we build the set directly and pass the volatilities as `sd`. We solve both portfolios at
+the quintile radius, and print their weights next to the inverse-volatility weights that Lemma
+9 of the paper predicts.
 =#
 
 sd_hat = sqrt.(diag(pr.sigma))
@@ -205,22 +207,23 @@ pretty_table(DataFrame(; asset = rd.nx[act], volatility = sd_hat[act],
              formatters = [resfmt])
 
 #=
-`inverse_vol` matches `predicted` to the digit — that is Lemma 9 of the paper, and it is an
-*equality*, not an approximation. Push the radius up and you get the full inverse-volatility
-portfolio over the whole universe, the counterpart of 1/N:
+Compare the `inverse_vol` column with `predicted`. Lemma 9 of the paper states that the two are
+equal, and the table prints the same digits in both. At a larger radius every asset is active,
+and the weights are the inverse-volatility weights of all the assets, the counterpart of 1/N.
+The cell prints `true` if the weights are within `1e-6` of those.
 =#
 
 w_iv_all = long_only(L1UncertaintySet(; eps = gs(N) * 1.5, sd = sd_hat))
 isapprox(w_iv_all, (1 ./ sd_hat) ./ sum(1 ./ sd_hat); atol = 1e-6)
 
 #=
-## 6. Long-short: the dollar-neutral quintile
+## 6. The dollar-neutral long-short quintile
 
-Short the bottom as well as longing the top. In the paper this needs Lemma 5's
-antisymmetric-pairing argument to become tractable; here it is just a budget. `bgt = 0` makes
-the portfolio dollar-neutral, `sbgt = 0.5` puts half the gross exposure on each side, and the
-antisymmetric structure — the i-th best paired against the i-th worst, at equal and opposite
-weights — *emerges from the LP* rather than being imposed.
+The long-short quintile portfolio is long the top assets and short the bottom ones. The paper
+needs the antisymmetric pairing of its Lemma 5 to solve it. Here it takes two budgets. `bgt = 0`
+makes the portfolio dollar-neutral, and `sbgt = 0.5` puts half the gross exposure on each side.
+In the solution, the i-th best asset is long and the i-th worst is short, at equal and opposite
+weights, and no constraint of the model imposes that pairing.
 =#
 
 function f(m)
@@ -237,24 +240,25 @@ pretty_table(DataFrame(; asset = rd.nx[nz], weight = w_ls[nz],
              formatters = [resfmt])
 
 #=
-Four long, four short, every weight `±1/(2m)`, net zero and gross one — Corollary 7, exactly.
+The table holds four long and four short positions. Corollary 7 of the paper gives each weight
+as `±1/(2m)`, the net exposure as zero and the gross exposure as one.
 =#
 
 (net = sum(w_ls), gross = sum(abs, w_ls))
 
 #=
-## 7. Budgets bound; they do not pin
+## 7. A budget is an upper bound
 
-Here is a property of the library worth knowing regardless of this page. The long and short
-variables are *upper bounds* on the positive and negative parts of `w`, so `sbgt = 0.3` means
-**at most** 30% short. Usually that is invisible, because the objective pushes against the
-budget and the bound binds anyway.
+This section holds for every model of the library. The long and short variables are upper
+bounds on the positive and negative parts of `w`, so `sbgt = 0.3` means at most 30 % short. You
+do not usually see the difference, because the objective pushes the exposure to the budget.
 
-It stops being invisible at extreme radii. Past the point where every asset is active, the
-paper keeps holding its 50/50 portfolio even though the worst-case return has gone *negative*
-— its `‖w‖₁ = 1` is a full-investment mandate. The relaxed problem would rather hold cash.
-Since an all-zero portfolio is never a useful answer, the library reports it as a structured
-failure rather than returning it:
+You see it at a very large radius. Past the radius at which every asset is active, the
+worst-case return of the 50/50 portfolio is negative. The paper still holds that portfolio,
+because its constraint `‖w‖₁ = 1` requires full investment. The problem here only bounds the
+exposure, so its optimum is to hold nothing. A portfolio of zeros is of no use, and the library
+returns an optimisation failure instead. The cell prints `true` if the return code is an
+`OptimisationFailure`.
 =#
 
 eps_extreme = f(N ÷ 2) * 1.5
@@ -263,8 +267,8 @@ relaxed = quintile(L1UncertaintySet(; eps = eps_extreme); bgt = 0.0, sbgt = 0.5,
 isa(relaxed.jr.retcode, PortfolioOptimisers.OptimisationFailure)
 
 #=
-Setting `xbgt = true` pins the decomposition exactly, reproducing the paper's mandate — you
-stay fully invested and accept the loss:
+With `xbgt = true` the long and the short parts of `w` equal their budgets, as in the paper. The
+portfolio stays fully invested and takes the worst-case loss.
 =#
 
 exact = quintile(L1UncertaintySet(; eps = eps_extreme); bgt = 0.0, sbgt = 0.5, xbgt = true,
@@ -273,25 +277,27 @@ exact = quintile(L1UncertaintySet(; eps = eps_extreme); bgt = 0.0, sbgt = 0.5, x
  active = count(>(1e-6), abs.(exact.w)))
 
 #=
-!!! warning "`xbgt` turns an LP into a MILP"
-    It needs a sign indicator per asset and the big-M relaxation is weak. On twenty assets
-    that costs seconds; on a real universe it can be prohibitive. It reuses the long/short
-    binaries that `card`, `lt`/`st` and fixed fees already build, so it is free to add
-    alongside them — but on its own it introduces them. Inside the radius range that produces
-    the quintile and 1/N portfolios the two agree exactly, so leave it off unless the
-    full-investment mandate is genuinely part of your problem.
+!!! warning "`xbgt` makes a linear program a mixed-integer linear program"
+    It adds a binary variable per asset for the sign of the weight, and the big-M relaxation of
+    those variables is weak. On twenty assets the solve takes seconds, and on a large universe
+    it can take too long to be of use. `card`, `lt`, `st` and fixed fees build the same binary
+    variables, so with any of them `xbgt` adds no new ones. For the radii that give the quintile
+    and 1/N portfolios, the weights are the same with and without `xbgt`. Leave it off unless
+    your problem requires full investment.
 =#
 
 #=
-## 8. Market-neutral: gross pinned, net free
+## 8. A market-neutral portfolio with a fixed gross exposure
 
-A market-neutral portfolio wants `βᵀw = 0` and a fixed gross exposure — but says *nothing*
-about the net. That combination is what `gbgt` is for: `bgt` and `sbgt` constrain net and
-gross only together, so they cannot express "gross = 1, net free". (Without a gross constraint
-the problem is unbounded, so this is not optional.)
+A market-neutral portfolio needs `βᵀw = 0` and a fixed gross exposure, and it leaves the net
+exposure free. `bgt` and `sbgt` constrain the net and the gross exposure together, so they
+cannot fix the gross exposure at one and leave the net free. `gbgt` constrains the gross
+exposure alone. You need it here, because without a gross constraint the problem is unbounded.
+`gbgt` bounds the gross exposure unless `xbgt = true`, so we set both.
 
-The paper notes the quintile *ranking* structure breaks down here — the active set no longer
-follows a simple ordering — but the problem itself stays perfectly convex.
+The paper notes that the active assets no longer follow the order of the ranking here, so no
+closed form gives the weights. The solver still solves the problem, which `xbgt = true` makes a
+mixed-integer linear program.
 =#
 
 beta = vec(cor(rd.X, mean(rd.X; dims = 2)))
@@ -304,19 +310,20 @@ w_mn = quintile(L1UncertaintySet(; eps = 0.002); bgt = nothing, gbgt = 1.0, xbgt
 (gross = sum(abs, w_mn), net = sum(w_mn), market_exposure = dot(beta, w_mn))
 
 #=
-Gross is pinned at 1, market exposure is 0, and the net floats to whatever the optimum wants —
-the combination that was previously inexpressible.
+The gross exposure is one and the market exposure is zero. The net exposure is whatever the
+optimum gives.
 
-## 9. The characteristic need not be a return
+## 9. A characteristic other than a return
 
-The paper is explicit that "expected return" is incidental: the construction works for *any*
-per-asset characteristic, and its Table III ranks on estimated volatility instead.
+The paper states that the construction works for any characteristic of an asset, and its Table
+III ranks the assets on their estimated volatility.
 
-The characteristic belongs to the **return term**, so that is where it goes.
-[`ArithmeticReturn`](@ref)'s `mu` slot takes the vector itself, or — as here — the estimator
-that computes it, which is resolved against the optimisation's own prior when the model is
-built. Naming the estimator rather than pasting a vector is what lets the ranking
-refit per cross-validation fold and per meta-optimiser subset:
+Put the characteristic in the return term. The `mu` field of [`ArithmeticReturn`](@ref) takes
+the vector, or the estimator that computes it, as here. The optimiser computes the vector from
+its own prior when it builds the model. If you give the estimator instead of a vector, the
+ranking is computed again for each cross-validation fold and for each subset of a
+meta-optimiser. We rank on volatility and print the volatility and the weight of each active
+asset.
 =#
 
 w_vol = optimise(MeanRisk(; r = NoRisk(), obj = MaximumReturn(),
@@ -333,20 +340,20 @@ pretty_table(DataFrame(; asset = rd.nx[act_vol], volatility = sd_assets[act_vol]
 
 #=
 !!! warning "Do not put the characteristic in the outer prior"
-    An earlier version of this page ranked on volatility by building the *prior* on
-    [`StandardDeviationExpectedReturns`](@ref) and leaving the term bare. On this page the two
-    routes agree to the last bit, because `NoRisk` means nothing else reads `μ`. They stop
-    agreeing the moment anything does: every moment risk measure centres on the prior's `μ`,
-    as do the value-at-risk family and [`MaximumRatio`](@ref)'s normalisation. Swap `NoRisk`
-    for a mean-centred measure and the hijack silently measures deviation about a vector of
-    *volatilities*: the same nominal problem then solves to a different portfolio, and nothing
-    warns. The prior's `μ` is the universe's expected returns; a ranking is not one, so it
-    rides on the term.
+    You can also rank on volatility if you build the prior with
+    [`StandardDeviationExpectedReturns`](@ref) and give the return term no `mu`. On this page
+    the two ways give the same weights, because with `NoRisk` nothing else reads `μ`. When
+    something else reads it, they differ. Every moment risk measure centres on the prior's `μ`,
+    and so do the value-at-risk measures and the normalisation of [`MaximumRatio`](@ref). With a
+    mean-centred risk measure in place of `NoRisk`, the measure then computes deviations about
+    a vector of volatilities. The same problem gives a different portfolio, and no warning tells
+    you. The prior's `μ` holds the expected returns of the assets. A ranking is not an expected
+    return, so put it in the return term.
 
-Mind the direction. The objective *maximises* the characteristic, so ranking on volatility
-puts the **most** volatile assets first — the opposite of the Low Volatility factor the paper
-is chasing. A characteristic is only "attractive" if larger is better; when it is not, negate
-it. The `mu` slot takes a plain vector too:
+The objective maximises the characteristic. A ranking on volatility thus puts the most volatile
+assets first. The low-volatility factor of the paper needs the opposite order. If a smaller
+value of a characteristic is better, negate it. Here we pass the `mu` field a plain vector, the
+negated volatilities.
 =#
 
 lowvol = ArithmeticReturn(; mu = -sd_assets, ucs = L1UncertaintySet(; eps = 0.05))
@@ -359,9 +366,10 @@ pretty_table(DataFrame(; asset = rd.nx[act_lv], volatility = sd_assets[act_lv],
                        weight = w_lowvol[act_lv]); formatters = [resfmt])
 
 #=
-That is the Low Volatility factor: the quietest names in the universe, equally weighted.
-Compare the two selections — they are disjoint, and they come from the same machinery with a
-minus sign between them.
+The table holds the least volatile assets with equal weights, which is the low-volatility
+factor. We print the range of volatility of each selection and of all the assets. The two
+selections share no asset, and the only change between the two models is the sign of the
+characteristic.
 =#
 
 (ranked_on_high_vol = round.(extrema(sd_assets[act_vol]); sigdigits = 3),
@@ -371,20 +379,19 @@ minus sign between them.
 #=
 ## 10. Several terms at once, and what a floor costs
 
-A ranking is one thing to want and an expected return is another, and an optimiser takes
-**both**: `ret` accepts a vector of return terms, exactly as `r` accepts a vector of risk
-measures. The model's return expression is their weighted sum `Σᵢ scaleᵢ · retᵢ` — there is no
-scalariser on this side and there is not going to be one.
+One model can hold a ranking and an expected return. `ret` takes a vector of return terms, as
+`r` takes a vector of risk measures. The return of the model is the weighted sum
+`Σᵢ scaleᵢ · retᵢ` of the terms. The return side has no scalariser, and none is planned.
 
-The interesting term is the one that stays **out** of that sum. Every term carries a
-[`JuMPReturnsSettings`](@ref) bundle, and setting `rte = false` keeps the term out of the
-objective while its own `lb` still binds. That is a **constraint-only** return term: it shapes
-the feasible set and is never rewarded.
+A term can also stay out of that sum. Each term has a [`JuMPReturnsSettings`](@ref), and
+`rte = false` keeps the term out of the objective while its `lb` still constrains the
+portfolio. Such a term changes the feasible set and adds nothing to the objective.
 
-So the low-volatility quintile above can be asked what it costs to keep a floor under the
-portfolio's ordinary expected return. The floor term states no `mu` of its own, so it falls
-back to the prior's — the real expected returns, which is exactly the quantity the hijack
-would have overwritten:
+We use it to find what a floor on the expected return costs the low-volatility portfolio above.
+The floor term has no `mu` of its own, so it uses the prior's `μ`, which holds the expected
+returns. A volatility ranking in the prior would replace that value. We solve at four floors
+and print the number of assets, the expected return and the average volatility of each
+portfolio.
 =#
 
 floor_term(lb) = ArithmeticReturn(; settings = JuMPReturnsSettings(; rte = false, lb = lb))
@@ -404,28 +411,27 @@ pretty_table(DataFrame(; floor = ["none", "0.05 %", "0.10 %", "0.15 %"],
              formatters = [resfmt])
 
 #=
-The floor binds exactly — the realised expected return sits on it at every level — and the
-price is paid in the currency the first term is denominated in: the portfolio holds fewer
-names and louder ones as the floor rises. That is the trade the two terms were written to
-price, and neither term could express it alone.
+At each of the three floors, the `expected_return` column equals the floor, so the floor
+constraint is active. As the floor rises, the portfolio
+holds fewer assets and their average volatility rises. That is the cost of the floor in the
+units of the first term, and neither term alone can show it.
 
-Two things to keep in mind when a model carries several terms:
+When a model has several terms, two points hold.
 
-  - **`scale` is a weight, not a normalisation.** The terms are summed as written, so two
-    terms are not averaged unless you halve both. Fees follow the same arithmetic: a term
-    charges them only if its `fee` flag says so, so two flagged terms at `scale = 1` subtract
-    the fees twice. That is a statement about the configuration, not a defect — set `fee` and
-    `mic` to `false` on any term that is not in return units.
-  - **`rte = false` covers two different wants.** A term that is not in return units has no
-    business in a sum of returns; and a term that *is* in return units, like the floor above,
-    may still be wanted as a bound alone. The flag says only "this term does not enter the
-    objective" — its `lb` binds either way.
+  - `scale` is a weight and does not normalise. The model sums the terms as written, so two
+    terms are averaged only if you halve both. Fees follow the same sum. A term charges fees
+    only if its `fee` flag is `true`. Two such terms at `scale = 1` thus subtract the fees
+    twice. Set `fee` and `mic` to `false` on any term that is not in units of return.
+  - `rte = false` serves two cases. A term that is not in units of return does not belong in
+    a sum of returns. A term in units of return, such as the floor above, can also be wanted
+    as a bound alone. The flag says only that the term stays out of the objective, and its
+    `lb` constrains the portfolio in both cases.
 
-## 11. Composing with constraints
+## 11. The quintile portfolio with other constraints
 
-None of the above is special-cased, which is the whole reason the quintile portfolio is an
-uncertainty set rather than an optimiser. Every constraint in the library still applies. Cap
-each position at 15% and the quintile spreads out to obey it:
+Section 2 built the quintile portfolio as a `MeanRisk` model, and a weight bound constrains it
+as it constrains any other model. We cap each weight at 15 %, and print the number of active
+assets and the largest weight with and without the cap.
 =#
 
 eps_q = (ladder(4) + ladder(5)) / 2
@@ -439,19 +445,20 @@ pretty_table(DataFrame(; portfolio = ["unconstrained", "capped at 15%"],
              formatters = [resfmt])
 
 #=
-Note the active count moved away from the requested four — exactly the calibration caveat from
-section 3. The radius still says "four assets"; the weight cap says otherwise, and the cap
-wins.
+With the cap, the portfolio no longer holds the four assets that the radius was chosen for. This
+is the case of the warning in section 3. The radius gives four assets on the problem without
+the cap, and the cap changes the problem.
 
 ## 12. The benchmarks
 
-The paper's motivation is that these heuristics beat the theory-based portfolios. Those are
-all ordinary `MeanRisk` recipes. Note that GMRP — maximise return, no risk term — is the same
-`NoRisk` trick from section 2, and is the `ε → 0` limit of everything above.
+The paper compares these portfolios with four portfolios from theory, and each is a `MeanRisk`
+model. GMVP is the global minimum variance portfolio, MVP the mean-variance portfolio, MSRP the
+maximum Sharpe ratio portfolio and GMRP the global maximum return portfolio. GMRP maximises
+return with no risk term. It uses `NoRisk` as section 2 does, and it is the limit of the ℓ1
+portfolios as `ε → 0`.
 
-Three of the four carry a genuine variance term, so HiGHS is not enough for them — unlike
-every ℓ1 model on this page, which is why the rest of the page never needed a conic solver.
-Clarabel covers all four.
+Three of the four have a variance term, which needs a conic solver, so we solve all four with
+Clarabel. The ℓ1 models of this page have no variance term, and HiGHS solves them.
 =#
 
 cslv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
@@ -473,9 +480,9 @@ benchmarks = Dict("GMVP (min variance)" =>
                       MeanRisk(; opt = lo_opt(), r = Variance(), obj = MaximumRatio()));
 
 #=
-Solve them, and line the results up against the ℓ1 portfolios from this page. The paper's
-comparison is in-sample on the same estimates every portfolio was built from — it is a
-description of what each objective *does*, not a claim about out-of-sample performance.
+We solve the four and put them in one table with the ℓ1 portfolios of this page. As in the
+paper, the comparison is in sample, on the same estimates that built every portfolio. It shows
+what each objective does, and it says nothing about performance out of sample.
 =#
 
 ## `ladder(N)` is the exact radius at which the last asset joins, so it sits on the knife edge
@@ -505,44 +512,43 @@ pretty_table(bench_df; formatters = [(v, i, j) -> if j == 4
                                      end])
 
 #=
-Every objective wins its own column and nothing else: GMVP takes the lowest volatility, GMRP
-the highest return, MSRP the best ratio. GMRP is worth a second look — it holds a **single
-asset** at 100%, which is exactly the `ε → 0` corner of section 4. Maximum return with no
-robustness *is* the degenerate end of this page's sweep.
+Each benchmark has the best value in the column of its own objective. GMVP has the lowest
+volatility, GMRP the highest return and MSRP the highest Sharpe ratio. GMRP holds a single
+asset, which is the portfolio at `ε → 0` in the sweep of section 4.
 
-The ℓ1 portfolios lose every column, and the two extreme ones lose badly: 1/N and inverse-vol
-post the *lowest* returns and Sharpes in the table. This is not a defect being glossed over —
-it is arithmetic. Each benchmark is maximising the very quantity it is scored on, against the
-very estimates the score is computed from, so it cannot be beaten on its own metric in sample.
-A portfolio that half-ignores `μ` by construction will always look worse on a `μ`-derived
-column here.
+No ℓ1 portfolio has the best value in any of these three columns. 1/N and the
+inverse-volatility portfolio have the lowest returns and Sharpe ratios of the table. Each
+benchmark optimises the quantity of its own column, with the same estimates that the table
+uses, so in sample no other portfolio can beat it on that column. An ℓ1 portfolio uses `μ` only
+in part and scores lower on the columns that `μ` computes.
 
-The last two columns are where the ℓ1 portfolios are actually saying something. GMRP bets
-everything on one asset and MSRP puts 67% in its largest position; both are inferences drawn
-from 252 days of data as though they were certain. The quintile spreads across four names at
-25% each, and 1/N across all twenty. That concentration is the risk the in-sample columns
-cannot price, and the trade only pays out of sample — which this page does not test. See the
-[cross validation](../5_validation_tuning/01_Cross_Validation.md) examples for the machinery that
-does.
+The last two columns, `active` and `largest`, show how concentrated each portfolio is. GMRP and MSRP put
+most of their weight in few assets, and both act on 252 days of estimates as if the estimates
+were exact. The quintile portfolio and 1/N spread equal weights over four assets and over all
+of them. The in-sample columns do not measure the risk of a concentrated portfolio. Only a test
+out of sample can show whether the spread pays, and this page does not run one. The
+[cross validation](../5_validation_tuning/01_Cross_Validation.md) examples show how to run such a
+test.
 
-## 13. Takeaways
+## 13. What to take away
 
-  - The quintile and 1/N portfolios are **exact solutions** of a robust optimisation problem,
-    not heuristics. `ε` is the only dial and it decides how many assets you hold.
-  - This library has **no quintile optimiser** on purpose. It is
-    `MeanRisk(; r = NoRisk(), obj = MaximumReturn())` over an ℓ1 `ucs`, so it composes with
-    every constraint you already know.
-  - Do not tune `ε`. It has no scale. Use [`ActiveAssetsUncertaintyAlgorithm`](@ref) and say
-    how many assets you want — but treat it as a calibration, not a guarantee.
-  - `scaled = true` swaps equal weighting for inverse-volatility weighting by changing only
-    the *geometry of the ball*.
-  - Budgets **bound** realised exposure rather than pinning it; `xbgt` pins them, at the price
-    of a MILP.
-  - The characteristic need not be a return — [`ArithmeticReturn`](@ref)'s `mu` slot ranks on
-    whatever you put in it, including the estimator that computes it. Put it on the **term**,
-    never in the outer prior, whose `μ` every mean-centred risk measure reads. Mind the
-    direction: the objective maximises, so negate any characteristic where smaller is better.
-  - `ret` takes **several terms**, summed with weights. A term with `rte = false`
-    stays out of the objective and keeps its own `lb`, which is how you price what a floor on
-    one quantity costs in another.
+  - The quintile and 1/N portfolios are the exact solutions of a robust optimisation problem
+    over an ℓ1 ball. The radius `ε` sets how many assets the portfolio holds.
+  - The library has no quintile optimiser. The quintile portfolio is
+    `MeanRisk(; r = NoRisk(), obj = MaximumReturn())` with an ℓ1 `ucs`, so every constraint of
+    the library applies to it.
+  - The scale of `ε` comes from the data. Give the number of assets to
+    [`ActiveAssetsUncertaintyAlgorithm`](@ref) instead, and expect other constraints to change
+    that number.
+  - A ball scaled by the volatility of each asset gives inverse-volatility weights where the
+    plain ball gives equal weights, and the objective and the constraints stay the same.
+  - A budget bounds the exposure and does not fix it. `xbgt = true` fixes it and makes the
+    problem mixed-integer.
+  - The `mu` field of [`ArithmeticReturn`](@ref) ranks on any characteristic, as a vector or
+    as the estimator that computes it. Put the characteristic in the return term and never in
+    the prior, whose `μ` every mean-centred risk measure reads. The objective maximises, so
+    negate a characteristic when a smaller value is better.
+  - `ret` takes several terms and sums them with their weights. A term with `rte = false`
+    stays out of the objective and keeps its `lb`, and section 10 uses one to show what a floor
+    on the expected return costs.
 =#
