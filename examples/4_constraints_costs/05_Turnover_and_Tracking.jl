@@ -97,6 +97,7 @@ candidate portfolio, to find how far that portfolio is from the current weights.
 res_min_turnover = optimise(MeanRisk(; r = TurnoverRiskMeasure(; w = equal_weight),
                                      obj = MinimumRisk(),
                                      opt = JuMPOptimiser(; pe = pr, slv = slv)))
+drift(res_min_turnover.w)
 
 #=
 ## 4. Tracking a benchmark
