@@ -30,8 +30,8 @@ estimator. We call that estimator the source of the network. Two families of con
     covariance. The semidefinite phylogeny constraint and the centrality constraint are convex.
     The integer phylogeny constraint needs a mixed-integer solver.
 
-One parameter decides which assets count as related, and you must choose its value with care. It
-is the `sep` field of a [`NetworkEstimator`](@ref), and section 2 covers it.
+One parameter decides which assets count as related, and its value sets how strong each constraint
+is. It is the `sep` field of a [`NetworkEstimator`](@ref), and section 2 covers it.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -122,8 +122,10 @@ relates every pair at that distance at once. We call the pairs that one more hop
 The `PathLength` rows fall in the gaps between the hop shells, and the smallest `dmax` relates
 fewer pairs than `HopCount(; n = 1)`.
 
-A radius measures the same neighbourhood in smaller steps. Use `PathLength` when one hop shell
-relates more pairs than you want the constraint to cover.
+A `dmax` is a radius. It relates each asset to every asset within that distance of it along the
+graph. The radius changes in steps as small as you like, and a hop count changes only a whole hop
+shell at a time. Use `PathLength` when one hop shell relates more pairs than you want the
+constraint to cover.
 
 We plot the count of related pairs against `dmax`, with a dashed line at the count of each hop
 budget.
@@ -179,9 +181,10 @@ relates no more than the whole connected component.
 A [`PhylogenyPanel`](@ref) also uses a `sep`, through the `NetworkEstimator` in its `pl` field. The
 panel does not build a constraint. It builds a proximity matrix, which scores how close each asset
 is to each other asset. The `decay` field of [`Proximity`](@ref) sets how that score falls with
-distance, and a [`LinearDecay`](@ref) reaches zero at the budget of `sep`. The default
-`PathLength()` suits a panel, and it relates every pair in a constraint. `sep` and `decay` are
-fields of different types, and neither sets the other.
+distance. A [`LinearDecay`](@ref) falls by one for each unit of separation and reaches 1 at the
+budget of `sep`, and a pair past the budget scores zero. `PathLength()` with no `dmax` suits a
+panel, but in a constraint it relates every pair. `sep` and `decay` are fields of different types,
+and neither sets the other.
 
 ### 2.3 When you cannot state the budget in advance
 
@@ -228,7 +231,7 @@ pretty_table(DataFrame("Fold" => ["$(first(f))–$(last(f))" for f in folds],
 #=
 The fixed `dmax = 1.0107` is the 0.25 quantile of the separations over the whole year. The second
 column shows that one radius relates a different number of pairs in each fold. The constraint
-then has a different strength in each fold, and no message tells you. The fourth column shows that
+then has a different strength in each fold. The fourth column shows that
 the rule relates the same number of pairs in every fold. The third column shows the radius that the
 rule moves to keep that number.
 
@@ -276,9 +279,10 @@ of the pairs.
 
 ## 3. Phylogeny constraints
 
-A [`SemiDefinitePhylogenyEstimator`](@ref) forbids the joint holding of two related assets. It
-writes the constraint as a semidefinite relaxation, and the problem stays convex. We pass it
-through `ple` and compare the minimum-risk weights with the baseline weights.
+A [`SemiDefinitePhylogenyEstimator`](@ref) is a convex relaxation of the rule "hold no two related
+assets". It does not forbid a joint holding. It removes the diversification benefit between
+related assets from the variance that the optimiser minimises, and the problem stays convex. We
+pass it through `ple` and compare the minimum-risk weights with the baseline weights.
 =#
 
 res_phylo = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -339,15 +343,15 @@ pretty_table(DataFrame("Separation" => ["none (baseline)"; first.(sep_sweep)],
 #=
 The table shows two facts to know before you tune `sep`.
 
-First, a tighter phylogeny constraint concentrates the weights. A wider separation forbids more
-pairs of holdings, and the optimiser holds fewer assets. The largest weight rises as the
+First, a tighter phylogeny constraint concentrates the weights. A wider separation relates more
+pairs, and the optimiser holds fewer assets. The largest weight rises as the
 constraint becomes tighter. To spread the weights as well, use `ple` together with an upper bound
 on the weights or a [regularisation](07_Regularisation.md) term.
 
 Second, the bare `PathLength()` row shows the cost of the setting in the warning of section 2.2.
-The constraint forbids every reachable pair, and the only feasible portfolio holds one asset at
-100 % weight. The result reports `OptimisationSuccess`. When a portfolio under a phylogeny
-constraint holds a single asset, check `sep` first.
+The constraint relates every reachable pair. The optimiser then gets no diversification benefit
+from any pair, and the minimum-risk portfolio puts 100 % of the weight in one asset. When a
+portfolio under a phylogeny constraint holds a single asset, check `sep` first.
 
 ## 4. Centrality constraints
 
@@ -389,8 +393,8 @@ example degree, eigenvector, closeness and betweenness centrality, and each one 
 kind of connection.
 
 The algorithm also decides whether the score uses the edge weights of the network. Through
-[`centrality_polarity`](@ref), each algorithm declares the polarity that its edge weights must
-have, which is a distance or a similarity. The shortest-path measures need distances, and
+[`centrality_polarity`](@ref), five of the algorithms declare the polarity that their edge weights
+must have, which is a distance or a similarity. The shortest-path measures need distances, and
 [`EigenvectorCentrality`](@ref) needs similarities. The library builds the graph to match.
 
 A clustering source always gives the unweighted graph. So do [`DegreeCentrality`](@ref), which is
@@ -528,8 +532,8 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 
 #=
 The three phylogeny bars show one constraint at three settings of `sep`. The bar of the bare
-`PathLength()` is a single block, because a constraint that relates every pair leaves one asset in
-the portfolio.
+`PathLength()` is a single block, because the minimum-risk portfolio holds one asset when the
+constraint relates every pair.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

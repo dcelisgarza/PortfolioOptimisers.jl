@@ -19,9 +19,11 @@ equation string. When the model fits the loadings again, that string uses loadin
 model no longer has.
 
 [`ExposureConstraintEstimator`](@ref) writes that equation for you. It wraps what the `lcse`
-keyword accepts, and it declares the [`AbstractConstraintSpace`](@ref) that you write the
-rows in. [`FactorSpace`](@ref) is the space that looks up the names on the factor axis and maps
-each row through the loadings of the prior. We call that mapping the projection. It happens
+keyword accepts. Its `space` field, an [`AbstractConstraintSpace`](@ref), states which names the
+rows use and how the library maps them onto the asset weights. The factor axis is the ordered list
+of factor names in the returns data, and section 2 declares it. With [`FactorSpace`](@ref), the
+library looks up the names of each row on the factor axis and maps the row through the loadings of
+the prior. We call that mapping the projection. It happens
 when the library generates the constraint, and the optimiser gets an ordinary
 [`LinearConstraint`](@ref) on the asset weights. Every optimiser built on [`JuMPOptimiser`](@ref)
 accepts it and needs no knowledge of factors.
@@ -90,13 +92,14 @@ A factor exposure constraint needs a prior that fits a regression, because the p
 the loadings of that regression. [`FactorPrior`](@ref) fits one, and [`EmpiricalPrior`](@ref)
 does not. The loadings are in the `rr` field of the prior result.
 
-The constraint uses the loadings `rr.M`, not `rr.L`. Under a
-[`DimensionReductionRegression`](@ref) one linear map relates the two. A risk decomposition, such
-as [`FactorRiskContribution`](@ref) or [`FactorRiskBudgeting`](@ref), uses `L`, the orthogonal
-basis in which the prior estimated the covariance. A constraint uses `M`, because you write a
-constraint in names, and only the columns of `M` have factor names. The columns of `L` are principal
-components. We fit the prior and print the size of `M`, one row per asset and one column per
-factor.
+The constraint uses the loadings `rr.M`, not `rr.L`. A risk decomposition, such as
+[`FactorRiskContribution`](@ref) or [`FactorRiskBudgeting`](@ref), uses `L`. Under a
+[`DimensionReductionRegression`](@ref), `L` holds the loadings on the retained principal
+components, and one linear map relates `L` to `M`. The default regression of
+[`FactorPrior`](@ref), which this page uses, is a [`StepwiseRegression`](@ref). It does not set `L`,
+and `rr.L` then returns `M`. A constraint always uses `M`, because you write a constraint in names,
+and only the columns of `M` have factor names. We fit the prior and print the size of `M`, one row
+per asset and one column per factor.
 =#
 
 pr = prior(FactorPrior(), rd)
