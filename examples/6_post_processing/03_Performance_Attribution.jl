@@ -166,7 +166,7 @@ pretty_table(DataFrame(;
                                 round(cumulative_returns(net_ret, true)[end]; digits = 4),
                                 round(single_period_fee; digits = 5),
                                 round(calc_total_fees(w_ratio, 252, fees); digits = 4)]);
-             title = "Fee drag on the maximum-ratio book (5 bps per rebalance)")
+             title = "Fee drag on the maximum-ratio book (5 bps per period on the long positions)")
 
 #=
 ## 6. Risk attribution
