@@ -5,43 +5,42 @@ Description = "Tail risk measures beyond CVaR in PortfolioOptimisers.jl: EVaR, R
 
 # Exotic tail risk measures: beyond CVaR
 
-[`ConditionalValueatRisk`](@ref) (CVaR) is the workhorse coherent tail measure — the expected
-loss in the worst ``\alpha`` fraction of outcomes. But it averages over the tail, so two
-distributions with the same tail *average* but very different tail *shapes* look identical to
-it. The library ships a family of coherent tail measures that weight the extreme tail more
-aggressively than CVaR:
+[`ConditionalValueatRisk`](@ref), CVaR, is the most common coherent tail measure. It is the
+expected loss over the worst fraction ``\alpha`` of outcomes. Because it averages over the tail,
+two distributions with the same tail *average* and very different tail *shapes* have the same
+CVaR. The library has a family of coherent tail measures that weight the largest losses more
+than CVaR does.
 
-  - [`EntropicValueatRisk`](@ref) (EVaR) — the tightest coherent upper bound on Value-at-Risk,
-    built from the exponential moment-generating function. It is more conservative than CVaR
-    and is solved over the **exponential cone**.
-  - [`RelativisticValueatRisk`](@ref) (RLVaR) — a coherent generalisation of EVaR via the
-    Kaniadakis (``\kappa``-deformed) entropy, parametrised by ``\kappa \in (0, 1)``. It
-    *interpolates* between EVaR (as ``\kappa \to 0``) and the worst realisation (as
-    ``\kappa \to 1``), giving a continuous dial on how hard the extreme tail is penalised.
-    Solved over the **power cone**.
-  - [`PowerNormValueatRisk`](@ref) (PNVaR) — generalises EVaR by replacing the
-    moment-generating function with a power-norm, parametrised by a power ``p \ge 1``. Also
-    solved over the **power cone**, and likewise approaches the worst realisation as ``p``
+  - [`EntropicValueatRisk`](@ref), EVaR, is the tightest upper bound on VaR and CVaR that the
+    Chernoff inequality gives, built from the moment-generating function of the losses. It is
+    at least as large as CVaR, and the solver works over the **exponential cone**.
+  - [`RelativisticValueatRisk`](@ref), RLVaR, generalises EVaR with the Kaniadakis entropy,
+    which has a deformation parameter ``\kappa \in (0, 1)``. It moves from EVaR as
+    ``\kappa \to 0`` to the worst realisation as ``\kappa \to 1``, so ``\kappa`` sets how much
+    the largest losses count. The solver works over the **power cone**.
+  - [`PowerNormValueatRisk`](@ref), PNVaR, generalises EVaR by replacing the
+    moment-generating function with a power norm of power ``p \ge 1``. The solver also works
+    over the **power cone**, and the measure also moves toward the worst realisation as ``p``
     grows.
-  - [`GenericValueatRiskRange`](@ref) — composes *any* two of these measures into a two-sided
-    range: one measure on the loss side, another on the gain side.
+  - [`GenericValueatRiskRange`](@ref) combines *any* two of these measures into a range, one
+    measure on the losses and another on the gains.
 
-These measures sit in a conservativeness ladder, ``\mathrm{CVaR} \le \mathrm{EVaR} \le
-\mathrm{RLVaR}``, and all share the confidence level ``\alpha`` with CVaR.
+The measures are ordered, ``\mathrm{CVaR} \le \mathrm{EVaR} \le \mathrm{RLVaR}``, and each
+takes the tail fraction ``\alpha`` as CVaR does.
 
 !!! tip "When to reach for this"
-    Reach for these when CVaR does not punish the *extreme* tail enough — when you care about
-    the worst few outcomes more than the average of the worst 5%, but want to stay coherent
-    and convex rather than jumping to a raw worst-realisation objective. The ``\kappa`` (RLVaR)
-    and ``p`` (PNVaR) parameters are the dial: turn them up to move continuously from
-    EVaR-like behaviour toward worst-case behaviour.
+    Reach for these measures when CVaR does not penalise the *extreme* tail enough. They suit
+    you when the few worst outcomes matter more than the mean of the worst 5 %, and you want a
+    measure that still counts more than the single worst day. Raise ``\kappa`` for
+    RLVaR or ``p`` for PNVaR to move from a measure close to EVaR toward the worst case.
 
-!!! note "Conic solver, not a special one"
-    EVaR needs the exponential cone; RLVaR and PNVaR need the power cone. **Clarabel supports
-    both**, so unlike `VarianceSkewKurtosis` (which needs SCS for PSD cones) these need no
-    special solver — the optimiser's Clarabel handles them directly. The measures also accept
-    an `slv` field, which is only needed when you evaluate them standalone with
-    [`expected_risk`](@ref) (as we do below), not when they are the objective of a `MeanRisk`.
+!!! note "A conic solver is enough"
+    EVaR needs the exponential cone, and RLVaR and PNVaR need the power cone. **Clarabel
+    supports both**, so the Clarabel solver in `opt` handles both cones, and no other solver
+    is needed. The [previous page](06_Brownian_Distance_Variance_and_VarianceSkewKurtosis.md)
+    solves `VarianceSkewKurtosis` with SCS, because it builds a large semidefinite problem.
+    These measures also take an `slv` field. You need it only when you evaluate a measure alone with [`expected_risk`](@ref), as we do below, and not when the
+    measure is the objective of a `MeanRisk`.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames, Statistics
@@ -79,9 +78,8 @@ opt = JuMPOptimiser(; pe = pr, slv = slv)
 #=
 ## 2. Minimising each tail measure
 
-Each measure drops into [`MeanRisk`](@ref) with no extra wiring; the optimiser's Clarabel
-solves the exponential/power cones. We use the default confidence level (`alpha = 0.05`),
-the default `kappa = 0.3` for RLVaR, and the default `p = 2.0` for PNVaR.
+[`MeanRisk`](@ref) takes each measure as it takes any other. We use the defaults: `alpha = 0.05` for every measure,
+`kappa = 0.3` for RLVaR and `p = 2.0` for PNVaR.
 =#
 
 measures = ["CVaR" => ConditionalValueatRisk(), "EVaR" => EntropicValueatRisk(),
@@ -94,9 +92,8 @@ pretty_table(DataFrame(hcat(rd.nx, [r.w for r in results]...),
                        [:assets; Symbol.(names_r)...]); formatters = [resfmt])
 
 #=
-The allocations differ: the more conservative measures (EVaR, RLVaR) push harder into the
-names that protect against the *worst* days, not just the worst-5%-on-average days, so they
-concentrate differently from CVaR.
+The portfolios differ. CVaR reads the mean of the worst 5 % of days, and EVaR and RLVaR also
+weight the *worst* of those days more, so they choose different assets.
 =#
 
 using StatsPlots, GraphRecipes
@@ -105,11 +102,9 @@ plot_stacked_bar_composition(results, rd)
 #=
 ## 3. How different is each measure from CVaR?
 
-The sharp way to see that these are genuinely different objectives is to **cross-evaluate**:
-take each minimum-risk portfolio and measure its realised risk under *every* measure. The
-diagonal should be the smallest entry in its column (each portfolio is best at minimising its
-own measure), and within any row the values should climb CVaR → EVaR → RLVaR → PNVaR — the
-conservativeness ladder. We pass `slv` here because we are evaluating the measures standalone.
+We evaluate each minimum-risk portfolio under *every* measure. Each row of the table is one
+portfolio, and each column one measure. We pass `slv` here, because we evaluate the measures
+alone.
 =#
 
 evals = ["CVaR" => ConditionalValueatRisk(), "EVaR" => EntropicValueatRisk(; slv = slv),
@@ -123,17 +118,16 @@ end
 pretty_table(cross; formatters = [resfmt])
 
 #=
-Reading the table: each portfolio attains the lowest value of the measure it was built to
-minimise (the diagonal), confirming the four measures are not interchangeable. And every row
-increases left to right — for the same portfolio, EVaR is larger than CVaR and RLVaR larger
-still, because each measure puts more weight on the most extreme losses.
+In each column, the smallest value is on the diagonal, where the portfolio minimised that
+measure. So a portfolio that is best under one measure is not best under another. Along each row
+CVaR ≤ EVaR ≤ RLVaR, because each puts more weight on the largest losses than the one before
+it. PNVaR sits where its `p` places it.
 
-## 4. RLVaR as a dial: from EVaR to the worst realisation
+## 4. The parameter ``\kappa`` of RLVaR, from EVaR to the worst realisation
 
-The most useful intuition for [`RelativisticValueatRisk`](@ref) is that ``\kappa`` slides it
-continuously between two familiar measures. We hold one portfolio fixed (the CVaR-minimising
-one) and evaluate RLVaR across ``\kappa``, alongside EVaR and [`WorstRealisation`](@ref) as
-the two limits.
+``\kappa`` moves [`RelativisticValueatRisk`](@ref) between two measures you know. We take one
+portfolio, the one that minimises CVaR, and evaluate RLVaR on it for five values of ``\kappa``.
+We also evaluate EVaR and [`WorstRealisation`](@ref), the two limits.
 =#
 
 w_fixed = results[1].w   ## CVaR-minimising portfolio
@@ -146,10 +140,9 @@ wr_ref = expected_risk(WorstRealisation(), w_fixed, rd.X)
 pretty_table(DataFrame(; :kappa => kappas, :RLVaR => rlvar_curve); formatters = [resfmt])
 
 #=
-As ``\kappa \to 0`` the RLVaR matches EVaR, and as ``\kappa \to 1`` it matches the worst
-realisation — the curve climbs monotonically between the two limits. That is the whole point
-of RLVaR: a single coherent measure that you can tune from "tight upper bound on VaR" all the
-way to "the single worst day", without ever leaving the convex world.
+RLVaR rises with ``\kappa``. We plot the curve with EVaR and the worst realisation as
+horizontal lines. The plot shows RLVaR near EVaR at ``\kappa = 0.01`` and near the worst
+realisation at ``\kappa = 0.99``.
 =#
 
 plot(kappas, rlvar_curve; seriestype = :path, marker = (:circle, 5), label = "RLVaR(κ)",
@@ -159,10 +152,10 @@ hline!([evar_ref]; label = "EVaR", linestyle = :dash)
 hline!([wr_ref]; label = "Worst realisation", linestyle = :dot)
 
 #=
-## 5. PowerNorm Value-at-Risk: the `p` dial
+## 5. The power `p` of the power-norm VaR
 
-[`PowerNormValueatRisk`](@ref) plays a similar game through its power ``p \ge 1``: larger `p`
-pushes the measure toward the worst realisation. We evaluate it on the same fixed portfolio.
+[`PowerNormValueatRisk`](@ref) has a power ``p \ge 1`` with a similar effect. A larger `p`
+moves the measure toward the worst realisation. We evaluate it on the same portfolio.
 =#
 
 ps = [2.0, 4.0, 10.0]
@@ -171,17 +164,17 @@ pnvar_curve = [expected_risk(PowerNormValueatRisk(; slv = slv, p = p), w_fixed, 
 pretty_table(DataFrame(; :p => ps, :PNVaR => pnvar_curve); formatters = [resfmt])
 
 #=
-PNVaR also climbs toward the worst realisation as `p` grows. We start the sweep at `p = 2`
-deliberately: although the constructor permits `p = 1`, the power-cone formulation degenerates
-at that boundary and the solver stalls (see the findings note in the source).
+PNVaR rises with `p`. We start at `p = 2` on purpose. The
+constructor accepts `p = 1`, but the power cone degenerates at that value, and the solver stops
+without a solution.
 
-## 6. Two-sided control with `GenericValueatRiskRange`
+## 6. Both tails with `GenericValueatRiskRange`
 
-[`GenericValueatRiskRange`](@ref) composes any two `XatRisk` measures into a range: a
-loss-side measure on the returns plus a gain-side measure on the negated returns. This lets
-you treat downside and upside *asymmetrically* — for example, an aggressive EVaR on the loss
-side (punish bad tails hard) with a milder CVaR on the gain side. We compare it against the
-symmetric [`ConditionalValueatRiskRange`](@ref).
+[`GenericValueatRiskRange`](@ref) combines any two of these tail measures into a range. One measure
+reads the returns for the losses, and the other reads the negated returns for the gains. So you
+can treat the two tails *differently*, for example with EVaR on the losses, which penalises large
+losses more, and CVaR on the gains. We compare it with the symmetric
+[`ConditionalValueatRiskRange`](@ref).
 =#
 
 r_asym = GenericValueatRiskRange(; loss = EntropicValueatRisk(),
@@ -193,11 +186,11 @@ pretty_table(DataFrame(; :assets => rd.nx, :EVaR_loss_CVaR_gain => res_asym.w,
                        :CVaR_range => res_sym.w); formatters = [resfmt])
 
 #=
-The asymmetric range tilts the portfolio toward names whose *downside* tail is well behaved,
-while the symmetric CVaR range treats both sides with the same measure.
+The asymmetric range weights the largest losses more than the symmetric CVaR range does, and it
+reads the gains with CVaR, as the symmetric range does. Compare the two columns to see what the
+change on the loss side does to the weights.
 
-A final composition plot of the four single-sided measures from section 2 makes the family's
-differences concrete: each coherent tail measure produces a recognisably different allocation.
+We plot the four portfolios of section 2 again, with the name of each measure under its bar.
 =#
 
 plot_stacked_bar_composition(results, rd; xticks = ([1, 2, 3, 4], names_r))
@@ -205,19 +198,19 @@ plot_stacked_bar_composition(results, rd; xticks = ([1, 2, 3, 4], names_r))
 #=
 ## Summary
 
-Beyond CVaR, the library offers a ladder of coherent tail measures that weight the extreme
-tail progressively harder:
+The library has a family of coherent tail measures that weight the largest losses more than CVaR
+does.
 
-  - [`EntropicValueatRisk`](@ref) is the tight coherent upper bound on VaR (exponential cone).
-  - [`RelativisticValueatRisk`](@ref) generalises EVaR and dials continuously from EVaR
-    (``\kappa \to 0``) to the worst realisation (``\kappa \to 1``) via the power cone.
-  - [`PowerNormValueatRisk`](@ref) offers the same kind of dial through ``p \ge 1``.
-  - [`GenericValueatRiskRange`](@ref) composes any two of them into an asymmetric two-sided
-    measure.
+  - [`EntropicValueatRisk`](@ref) is the Chernoff upper bound on VaR and CVaR, over the
+    exponential cone.
+  - [`RelativisticValueatRisk`](@ref) generalises EVaR, and ``\kappa`` moves it from EVaR
+    (``\kappa \to 0``) to the worst realisation (``\kappa \to 1``), over the power cone.
+  - [`PowerNormValueatRisk`](@ref) moves toward the worst realisation as its power
+    ``p \ge 1`` grows.
+  - [`GenericValueatRiskRange`](@ref) combines any two of them into one measure of both
+    tails, with a different measure on each side.
 
-All are convex and solved by Clarabel's exponential/power cones — no special solver needed.
-Reach for them when the *shape* of the extreme tail matters and CVaR's tail-averaging is too
-blunt.
+Every one of them is convex, and Clarabel solved all of them on this page.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

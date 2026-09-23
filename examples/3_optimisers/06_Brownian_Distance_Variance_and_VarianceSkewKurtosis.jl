@@ -1,39 +1,36 @@
 #=
 ```@meta
-Description = "BrownianDistanceVariance and VarianceSkewKurtosis in PortfolioOptimisers.jl: risk measures for non-linear dependence and higher moments."
+Description = "BrownianDistanceVariance and VarianceSkewKurtosis in PortfolioOptimisers.jl: a dispersion measure built from distances, and a measure of the higher moments."
 ```
 
-# Specialist risk measures: BrownianDistanceVariance and VarianceSkewKurtosis
+# `BrownianDistanceVariance` and `VarianceSkewKurtosis`
 
-Some risk measures capture dependence structure or higher-order moment interactions that
-variance and CVaR miss. Two such specialist measures are:
+Some risk measures read parts of the return distribution that the variance and CVaR do not.
+This page shows two of them.
 
-  - [`BrownianDistanceVariance`](@ref) — measures non-linear dependence between portfolio
-    returns and a reference via the Brownian (distance) covariance framework. It is zero if
-    and only if the returns are *statistically independent* of the reference; variance can be
-    zero while Brownian Distance Variance is not. It builds a T×T pairwise distance matrix
-    so it scales quadratically in observations, not in assets.
-  - [`VarianceSkewKurtosis`](@ref) — a composite that combines variance (penalises
-    dispersion), negative skewness (penalises asymmetry), and kurtosis (penalises heavy
-    tails) into a single objective. It uses large PSD cones so it's best to use a solver that
-    supports first-order algorithms such as SCS.
+  - [`BrownianDistanceVariance`](@ref) measures the dispersion of the portfolio returns with
+    their distance variance, the Brownian distance covariance of the return series with
+    itself. It is built from the distance between the returns of every pair of days, not
+    from their deviations about the mean, so it reads non-linear structure that the variance
+    does not see.
+  - [`VarianceSkewKurtosis`](@ref) combines the variance, the skewness and the kurtosis in one
+    objective. Its model is a semidefinite relaxation with one large positive semidefinite
+    matrix, so a first-order solver such as SCS suits it.
 
 !!! tip "When to reach for this"
-    `BrownianDistanceVariance` is useful when you suspect the return distribution has
-    non-linear dependence with a factor or benchmark and want that captured in the
-    objective. Reach for `VarianceSkewKurtosis` when the third and fourth moments of the
-    portfolio return matter — e.g. when you are allocating into assets with fat tails or
-    skewed payoffs and standard mean-variance is blind to the shape of the distribution.
+    Reach for `BrownianDistanceVariance` when you want a measure of dispersion that reads
+    non-linear structure in the return series. Reach for `VarianceSkewKurtosis` when the
+    third and fourth moments of the portfolio return matter, for example when the assets
+    have fat tails or skewed payoffs that mean-variance optimisation does not see.
 
-!!! warning "Solver compatibility and dataset sizing"
-    - `BrownianDistanceVariance` builds an O(T²) distance matrix inside the model — the
-    number of auxiliary variables grows quadratically with observations. This example uses a
-    50-observation slice to keep the model small.
-    - `VarianceSkewKurtosis` requires **SCS** (or another solver that handles polynomial PSD
-    cones). It will fail silently or produce wrong results with a continuous-only solver
-    like Clarabel. The high-order prior (`HighOrderPriorEstimator`) must also be used, as
-    it pre-computes the coskewness and cokurtosis tensors the risk measure needs. This
-    example also uses a 50-observation slice for the same reason.
+!!! warning "Solvers and the size of the sample"
+    - `BrownianDistanceVariance` builds a `T × T` distance matrix inside the model, so the
+    number of extra variables grows with the square of the number of observations. This
+    example uses 50 observations to keep the model small.
+    - `VarianceSkewKurtosis` builds a large semidefinite problem. This example solves it
+    with **SCS**, and you can use another solver that handles large semidefinite problems.
+    It also needs a [`HighOrderPriorEstimator`](@ref), which computes the coskewness and the
+    cokurtosis that the risk measure reads. This example uses the same 50 observations.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames
@@ -49,12 +46,10 @@ end;
 using CSV, TimeSeries, Clarabel, SCS
 
 #=
-## 1. Shared data — 50-observation slice
+## 1. The data: 50 observations
 
-Both measures in this example use the same short 50-observation slice.
-`BrownianDistanceVariance` builds an O(T²) distance matrix, so T is the binding
-constraint on model size. `VarianceSkewKurtosis` needs a `HighOrderPriorEstimator`
-whose coskewness/cokurtosis computation also scales with T.
+Both measures use the last 50 daily returns. The number of returns `T` sets the size of the
+model of `BrownianDistanceVariance`.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 50):end]
@@ -77,23 +72,21 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 opt = JuMPOptimiser(; pe = pr, slv = slv)
 
 #=
-## 2. Brownian Distance Variance
-=#
+## 2. Brownian distance variance
 
-### 2.1 Default formulation
+### 2.1 `alg2`: the absolute distances
 
-#=
-[`BrownianDistanceVariance`](@ref) uses a Norm-1 cone constraint by default
-(`NormOneConeBrownianDistanceVariance`). The T×T distance matrix is linearised via
-auxiliary variables so Clarabel can handle it as a conic programme.
+By default [`BrownianDistanceVariance`](@ref) writes the absolute distances with a norm-one
+cone, `NormOneConeBrownianDistanceVariance`. The model holds each entry of the distance matrix
+as an extra variable and bounds it with that cone.
 =#
 
 res_bdvar = optimise(MeanRisk(; r = BrownianDistanceVariance(), opt = opt))
 
 #=
-An alternative formulation (`IneqBrownianDistanceVariance`) uses inequality constraints
-rather than a cone. On small problems the results are equivalent; on larger problems the
-inequality form may be faster because it avoids a large cone.
+The other value of `alg2`, `IneqBrownianDistanceVariance`, writes the absolute distances with
+linear inequalities instead of a cone. On a large problem it can be faster, because it avoids a
+large cone.
 =#
 
 res_bdvar_ineq = optimise(MeanRisk(;
@@ -102,11 +95,12 @@ res_bdvar_ineq = optimise(MeanRisk(;
                                    opt = opt))
 
 #=
-### 2.2 Alternative formulations
+### 2.2 `alg1`: the sum of squares
 
-A second formulation switch controls the **rank constraint** used for the distance matrix:
-`QuadRiskExpr` (default) or `RSOCRiskExpr`. The latter uses a rotated second-order cone
-and can be faster for very dense problems.
+A second choice, `alg1`, sets how the model writes the sum of the squared distances. The
+default, `QuadRiskExpr`, writes it as a quadratic expression. `RSOCRiskExpr` writes it with a
+rotated second-order cone, which can be faster on a dense problem. We print the weights of the
+three formulations side by side.
 =#
 
 res_bdvar_rsoc = optimise(MeanRisk(; r = BrownianDistanceVariance(; alg1 = RSOCRiskExpr()),
@@ -117,12 +111,12 @@ pretty_table(DataFrame(; :assets => rd.nx, :BDVar_default => res_bdvar.w,
              formatters = [resfmt])
 
 #=
-The three formulations produce the same portfolio — the differences are only in how the
-conic model is assembled, not in what it optimises.
+The three columns hold the same portfolio. The formulations differ in how they build the model,
+not in what the model optimises.
 
-The composition plot shows that Brownian Distance Variance concentrates into a different
-set of names than plain variance minimisation, reflecting its sensitivity to non-linear
-dependence rather than just squared-deviation spread.
+We also minimise the variance, and plot the two portfolios. The Brownian distance variance
+reads the distances between the returns of pairs of days, and the variance reads the squared
+deviations about the mean, so the two portfolios can differ.
 =#
 
 res_var = optimise(MeanRisk(; r = Variance(), opt = opt))
@@ -135,8 +129,8 @@ plot_stacked_bar_composition([res_var, res_bdvar], rd)
 
 ### 3.1 High-order prior and SCS solver
 
-`VarianceSkewKurtosis` requires SCS and a `HighOrderPriorEstimator` prior. We reuse the
-same 50-observation slice already loaded in section 1.
+We solve `VarianceSkewKurtosis` with SCS, and compute its prior with
+`HighOrderPriorEstimator` on the same 50 observations as section 1.
 =#
 
 pr_ho = prior(HighOrderPriorEstimator(), rd)
@@ -148,14 +142,15 @@ opt_ho = JuMPOptimiser(; pe = pr_ho, slv = scs_slv)
 #=
 ### 3.2 Default composite
 
-[`VarianceSkewKurtosis`](@ref) combines three sub-measures:
+[`VarianceSkewKurtosis`](@ref) combines three measures.
 
-  - [`Variance`](@ref) — penalises dispersion.
-  - [`Skewness`](@ref) (negative skewness convention) — penalises left-skewed returns.
-  - [`Kurtosis`](@ref) — penalises fat tails.
+  - [`Variance`](@ref) penalises dispersion.
+  - [`Skewness`](@ref) enters with a negative sign, so a larger skewness lowers the risk, and
+    returns skewed to the left raise it.
+  - [`Kurtosis`](@ref) penalises fat tails.
 
-The default scales are 1:1:1. Scaling one component higher makes the objective more
-sensitive to that moment.
+Each measure has a scale of 1 by default. A larger scale gives that moment more weight in the
+objective. We optimise with the default scales and print the return code.
 =#
 
 res_vsk = optimise(MeanRisk(; r = VarianceSkewKurtosis(), opt = opt_ho), rd)
@@ -164,10 +159,9 @@ println("VarianceSkewKurtosis retcode: $(res_vsk.retcode)")
 #=
 ### 3.3 Custom component scales
 
-Passing custom [`Skewness`](@ref) and [`Kurtosis`](@ref) with scaled
-settings (`MaxRiskMeasureSettings` for skewness and [`RiskMeasureSettings`](@ref) for
-kurtosis) lets you control how much each higher-moment penalty
-contributes relative to variance.
+To set how much each higher moment counts next to the variance, pass your own `Skewness` and
+`Kurtosis` with a scale in their settings. The skewness takes `MaxRiskMeasureSettings`, and the
+kurtosis takes [`RiskMeasureSettings`](@ref). We give both a scale of 2.
 =#
 
 r_vsk_heavy = VarianceSkewKurtosis(;
@@ -180,8 +174,8 @@ r_vsk_heavy = VarianceSkewKurtosis(;
 res_vsk_heavy = optimise(MeanRisk(; r = r_vsk_heavy, opt = opt_ho), rd)
 
 #=
-Compare the two allocations. Heavier skewness/kurtosis penalties push the optimiser further
-away from fat-tailed or left-skewed names.
+We print the two portfolios side by side. With the larger scales, the objective penalises fat
+tails and returns skewed to the left more, relative to the variance.
 =#
 
 pretty_table(DataFrame(; :assets => rd.nx, :VarianceSkewKurtosis => res_vsk.w,
@@ -190,8 +184,8 @@ pretty_table(DataFrame(; :assets => rd.nx, :VarianceSkewKurtosis => res_vsk.w,
 #=
 ### 3.4 Comparison with plain variance (SCS)
 
-We compare the VSK portfolio against a plain minimum-variance portfolio solved with SCS on
-the same 50-observation prior, so the only difference is the risk measure.
+We also minimise the variance with SCS on the same prior, so that only the risk measure differs,
+and plot the three portfolios.
 =#
 
 res_var_scs = optimise(MeanRisk(; r = Variance(), opt = opt_ho))
@@ -201,12 +195,11 @@ plot_stacked_bar_composition([res_var_scs, res_vsk, res_vsk_heavy], rd)
 #=
 ## Summary
 
-  - [`BrownianDistanceVariance`](@ref) uses a 50-observation slice with Clarabel.
-    It captures non-linear dependence via a quadratic T×T distance matrix; keep T small
-    (the O(T²) model size is the limiting factor, not the number of assets).
-  - [`VarianceSkewKurtosis`](@ref) must use **SCS** (polynomial PSD cones). Pair it with
-    [`HighOrderPriorEstimator`](@ref) and a short observation window to keep the
-    higher-moment tensor computation feasible.
+  - The [`BrownianDistanceVariance`](@ref) portfolios solved with Clarabel on 50 returns. Keep
+    `T` small, because the size of the model grows with the square of `T`.
+  - The [`VarianceSkewKurtosis`](@ref) portfolios solved with **SCS**, because the model is a
+    large semidefinite problem. Pair it with [`HighOrderPriorEstimator`](@ref), whose
+    coskewness and cokurtosis grow with the number of assets.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

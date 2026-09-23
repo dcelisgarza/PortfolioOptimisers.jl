@@ -5,14 +5,16 @@ Description = "Sweep a Pareto surface in PortfolioOptimisers.jl: trade off retur
 
 # Pareto surface
 
-This example kicks up the complexity a couple of notches. We will introduce a new optimisation estimator, `NearOptimalCentering` optimiser.
+This page extends the efficient frontier to two risk measures and the return. We compute the
+surface with [`NearOptimalCentering`](@ref), which the
+[efficient-frontier](02_Efficient_Frontier.md) page introduced.
 
 !!! tip "When to reach for this"
-    Reach for a Pareto surface when a single risk/return frontier is not enough because you
-    are trading off *more than two* competing criteria at once (e.g. two different risk
-    measures alongside return). Where the efficient frontier sweeps a curve, this sweeps a
-    surface/volume/hypervolume, exposing the full set of non-dominated portfolios. It builds directly on the
-    efficient-frontier example — reach for that first if two criteria suffice.
+    Reach for a Pareto surface when one frontier of risk and return is not enough, because you
+    trade off *more than two* criteria at once, such as two risk measures and the return. The
+    efficient frontier is a curve. With three criteria, the portfolios that no other portfolio
+    beats on every criterion form a surface, and with more they form a hypersurface. Read the
+    efficient-frontier example first, and use it if two criteria are enough.
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -33,9 +35,9 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. Data
 
-We will use the same data as the previous example.
+We use the same data as the previous example.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -47,11 +49,11 @@ pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 rd = prices_to_returns(X)
 
 #=
-## 2. Preparing solvers for pareto surface
+## 2. Solvers for the Pareto surface
 
-The pareto surface is a generalisation of the efficient frontier, in fact, we can even think of hypersurfaces if we provide more parameters, but that would be difficult to visualise, so we will stick to a 2D surface in 3D space.
-
-We'll provide a vector of solvers because the optimisation type we'll be using is more complex, and will contain various constraints.
+The optimisation on this page is harder and holds more constraints, so we pass a vector of seven
+solvers. The first uses the default settings, and the next six set
+`max_step_fraction` from 0.95 down to 0.70 in steps of 0.05.
 =#
 
 using Clarabel
@@ -78,13 +80,16 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
               check_sol = (; allow_local = true, allow_almost = true))];
 
 #=
-## 3. High order prior statistics
+## 3. High-order prior statistics
 
-We will once again precompute the prior statistics because otherwise they'd have to be recomputed a few times.
+We compute the prior once, because the page uses it several times.
 
-We will be using high order risk measures, so we need to compute high order moments, we can do this with a `HighOrderPriorEstimator`, which needs a prior estimator that computes low order moments. Since we are only using a year of data, we will denoise our positive definite matrices by eliminating the eigenvalues corresponding to random noise. Denoising the non-positive definite matrix for the data we're using creates a negative square root, so we will not denoise it.
-
-Note how many options this estimator contains.
+The risk measures on this page are of high order, so the prior needs the high-order moments.
+[`HighOrderPriorEstimator`](@ref) computes them, and it takes a second prior estimator for the
+low-order moments. One year of data is short, so we denoise the positive definite matrices, the
+covariance and the cokurtosis. [`SpectralDenoise`](@ref) sets to zero the eigenvalues that random
+noise explains. The coskewness gives a matrix that is not positive definite, and on this data its
+denoised form puts a negative number under a square root, so we leave it as it is.
 =#
 
 dn = Denoise(; alg = SpectralDenoise(;))
@@ -100,31 +105,39 @@ pe = HighOrderPriorEstimator(;
                              ske = Coskewness())
 
 #=
-Let's compute the prior statistics.
+We compute the prior.
 =#
 
 pr = prior(pe, rd)
 
 #=
-In order to generate a pareto surface/hyper-surface, we need more dimensions than we've previously explored. We can do this by adding more risk measure sweeps (and taking their product) to generate a mesh. `PortfolioOptimisers` does this internally and generally, but we will limit ourselves to two risk measures. This will generate a 2D surface which we can visualise in 3D.
+A Pareto surface needs more dimensions than a frontier. Each risk measure with a range of bounds
+adds one, and the product of the ranges gives a mesh of points. The library builds the mesh for
+any number of risk measures. More measures give a hypersurface, which is hard to plot, so we use
+two, which give a 2D surface that we plot in 3D.
 
-We will use the square root `NegativeSkewness` and `Kurtosis`.
+The two measures are the square root of the negative skewness, [`NegativeSkewness`](@ref), and
+the square root of the kurtosis, [`Kurtosis`](@ref).
 =#
 
 r1 = NegativeSkewness()
 r2 = Kurtosis()
 
 #=
-## 4. Near optimal centering pareto surface
+## 4. The Pareto surface with near-optimal centring
 
-First we need to get the bounds of our pareto surface. We can do this in many different ways, the simplest are:
+First we find the bounds of the surface. There are many ways to find them, and the two simplest
+are:
 
-  - Minimise the risk using both risk measures simultaneously subject to optional constraints.
-  - Maximise the return, utility or ratio subject to optional constraints.
+  - Minimise the risk under both risk measures at once, with any constraints you choose.
+  - Maximise the return, the utility or the ratio, with any constraints you choose.
 
-We will simply maximise the risk-return ratio for both risk measures on their own with no added constraints. This will not give a complete surface, but it will give us a reasonable range of values.
+We maximise the risk-return ratio under each risk measure alone, with no other constraints. This
+does not give the whole surface, but it gives a useful range of values.
 
-The `NearOptimalCentering` estimator will not return the portfolio which satisfies the traditional `MeanRisk` constraints, but rather a portfolio which is at the centre of an analytical region (neighbourhood) around the optimal solution. The region is parametrised by binning the efficient frontier, we will use the automatic bins here, but it is possible to define them manually.
+`NearOptimalCentering` does not return the optimal `MeanRisk` portfolio. It returns the portfolio
+at the analytic centre of a region around the optimum. The size of the region comes from splitting
+the efficient frontier into bins. We use the automatic bins here, and you can set them by hand.
 =#
 
 ## Risk-free rate of 4.2/100/252
@@ -135,23 +148,29 @@ opt1 = NearOptimalCentering(; r = r1, obj = obj, opt = opt)
 opt2 = NearOptimalCentering(; r = r2, obj = obj, opt = opt)
 
 #=
-Note the number of options in the estimator. In particular the `alg` property. Which in this case means the `NearOptimalCentering` alg will not have any external constraints applied to it.
+The printout lists the fields of the estimator. Its `alg` field is
+`UnconstrainedNearOptimalCentering()`, so the centring step applies only the weight bounds and the
+budgets of the optimiser.
 
-Let's optimise the portfolios.
+We optimise the two portfolios.
 =#
 
 res1 = optimise(opt1)
 res2 = optimise(opt2)
 
 #=
-In order to allow for multiple risk measures in optimisations, certain measures can take different parameters. In this case, `NegativeSkewness` and `Kurtosis` take the moment matrices, which are used to compute the risk measures. We can use the `factory` function to create a new risk measure with the same parameters as the original, but with the moment matrices from the prior. Other risk measures require a solver, and this function is also used in those cases.
+`expected_risk` needs the moment matrices inside the measure, and `NegativeSkewness` and
+`Kurtosis` hold none yet. `factory` returns a copy of a risk measure with those matrices taken
+from the prior. For a risk measure that needs a solver, it fills that in too.
 =#
 
 r1 = factory(r1, pr)
 r2 = factory(r2, pr)
 
 #=
-Let's compute the risk bounds for the pareto surface. We need to compute four risks because we have two risk measures and two optimisations. This will let us pick the lower and upper bounds for each risk measure, as we explore the pareto surface from one optimisation to the other.
+We compute the risk bounds of the surface. Two risk measures on two portfolios give four risks.
+From them we take the lower and the upper bound of each risk measure, so the surface spans the
+space between the two portfolios.
 =#
 
 sk_rk1 = expected_risk(r1, res1.w, pr.X);
@@ -160,9 +179,13 @@ sk_rk2 = expected_risk(r1, res2.w, pr.X);
 kt_rk2 = expected_risk(r2, res2.w, pr.X);
 
 #=
-We will now create new risk measures bounded by these values. We will also use factories from the get-go. The optimisation procedure prioritises the parameters in the risk measures over the ones in the prior. This lets users provide the same risk measure with different parameters in the same optimisation. We will use two ranges of 5. The total number of points in the pareto surface will be the product of the points of each range.
+We build new risk measures with these bounds, and pass each one through `factory` immediately. The
+optimisation uses the parameters of a risk measure before those of the prior, so you can give the
+same risk measure twice with different parameters. Each range has 5 values, and the surface has
+one point per pair of values.
 
-Since we don't know which `sk_rk1` or `sk_r2`, `kt_rk1` or `kt_rk2` is bigger or smaller, we need to use `min`, `max`.
+We do not know which of `sk_rk1` and `sk_rk2` is the larger, or which of `kt_rk1` and `kt_rk2`,
+so we use `min` and `max`.
 =#
 
 r1 = factory(NegativeSkewness(;
@@ -181,38 +204,45 @@ r2 = factory(Kurtosis(;
                                                                 stop = max(kt_rk1, kt_rk2),
                                                                 length = 5))), pr);
 #=
-Now we only need to maximise the return given both risk measures. Internally, the optimisation will generate the mesh as a product of the ranges in the order in which the risk measures were provided. This also works with the `MeanRisk` estimator, in fact, `NearOptimalCentering` uses it internally.
+We maximise the return under both risk measures. The optimisation builds the mesh as the product
+of the ranges, in the order in which you give the risk measures. `MeanRisk` builds the mesh the
+same way, and `NearOptimalCentering` solves `MeanRisk` problems to find its region.
 
-Since we are using an unconstrained `NearOptimalCentering`, the risk bound constraints will not be satisfied by the solution. If we wish to satisfy them, we can provide `alg = ConstrainedNearOptimalCentering()`, but would also make the optimisations harder, which may cause them to fail.
+Our `NearOptimalCentering` is the unconstrained variant, so its portfolios need not stay inside
+the risk bounds. To keep them inside, set `alg` to [`ConstrainedNearOptimalCentering`](@ref).
+The optimisations are then harder, and some of them can fail.
 =#
 
 opt3 = NearOptimalCentering(; r = [r1, r2], obj = MaximumReturn(), opt = opt)
 
 #=
-See how `r` is a vector of risk measures with populated properties. We can now optimise the portfolios.
+In the printout, `r` is a vector of two risk measures, each with its bounds and its moment
+matrices filled in. We optimise the portfolios.
 =#
 
 res3 = optimise(opt3)
 
 #=
-As expected, there are `5 × 5 = 25` solutions. Thankfully there are no warnings about failed optimisations, so there is no need to check the solutions.
+The result holds `5 × 5 = 25` portfolios, one per pair of bounds.
 
-The `NearOptimalCentering` estimator contains various return codes because it may need to compute some `MeanRisk` optimisations, it has a `retcode` which summarises whether all other optimisations succeeded. We can check this to make sure it was a success.
+Its `retcode` shows whether every inner `MeanRisk` problem succeeded.
 =#
 
 isa(res3.retcode, OptimisationSuccess)
 
 #=
-## 5. Visualising the pareto surface
+## 5. Visualising the Pareto surface
 
-Let's view how the weights evolve along the pareto surface.
+The stacked areas show the weights at each of the 25 points of the surface.
 =#
 
 using StatsPlots, GraphRecipes
 plot_stacked_area_composition(res3.w, rd.nx)
 
 #=
-Now we can view the pareto surface. For the z-axis and colourbar, we will use the conditional drawdown at risk to return ratio.
+We plot the Pareto surface. The z-axis and the colour both show the ratio of the return, net of
+the risk-free rate, to the conditional drawdown at risk, CDaR. The CDaR is not one of the two
+optimised measures. We use it to compare the portfolios on a third risk.
 =#
 
 plot_measures(res3.w, pr; x = r1, y = r2,
@@ -224,7 +254,7 @@ plot_measures(res3.w, pr; x = r1, y = r2,
               zlabel = "CDaR/Return")
 
 #=
-We can view it in 2D as well.
+We plot the same surface in 2D, with the ratio as the colour.
 =#
 
 plot_measures(res3.w, pr; x = r1, y = r2,

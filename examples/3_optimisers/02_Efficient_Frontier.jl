@@ -5,27 +5,24 @@ Description = "Trace the efficient frontier in PortfolioOptimisers.jl: the whole
 
 # Efficient frontier
 
-A single [`MeanRisk`](@ref) objective returns *one* portfolio. The **efficient frontier** is the
-whole curve: the set of portfolios that earn the most return for each level of risk (equivalently,
-that take the least risk for each level of return). Instead of committing to one risk/return point
-up front, you trace the entire trade-off and choose by eye, hand it to a stakeholder, or feed the
-sweep to a downstream selection rule.
+A single [`MeanRisk`](@ref) optimisation returns *one* portfolio. The efficient frontier is the whole
+curve of portfolios that earn the most return for each level of risk. They are also the
+portfolios that take the least risk for each level of return. You compute the whole trade-off
+first, and then choose a point on it.
 
-This example does three things the [`MeanRisk` objectives](01_MeanRisk_Objectives.md) page does
-not. First, it shows the frontier traced from **both** directions — minimising risk at a return
-floor, and maximising return at a risk ceiling — and that they recover the same curve. Second, it
-introduces the [`Frontier`](@ref) helper, which computes the sweep bounds automatically. Third, it
-contrasts the extreme [`MeanRisk`](@ref) frontier with the **centred** frontier produced by
-[`NearOptimalCentering`](@ref), which trades a sliver of optimality for a more diversified, stable
-allocation at every point.
+This page adds three things to the [`MeanRisk` objectives](01_MeanRisk_Objectives.md) page. It
+computes the frontier from both directions, once by minimising risk above a return floor and once
+by maximising return below a risk ceiling, and plots the two on one chart. It introduces
+[`Frontier`](@ref), which finds the bounds of the frontier for you. It then compares the
+[`MeanRisk`](@ref) frontier with the centred frontier of [`NearOptimalCentering`](@ref), which gives
+up a little of the objective for a portfolio that holds more assets at each point.
 
 !!! tip "When to reach for this"
-    Reach for an efficient frontier when you do not want to commit to a single risk/return
-    point up front — you want to *see the whole trade-off curve* and choose a portfolio by
-    eye, hand it to a stakeholder, or feed the sweep to a downstream selection rule. It is
-    the natural next step once you understand the [`MeanRisk`](@ref) objectives: instead of
-    one objective value, you sweep the risk/return frontier. For more than two competing
-    criteria, see the [Pareto surface](03_Pareto_Surface.md) example.
+    Reach for an efficient frontier when you do not want to fix one point of risk and return
+    in advance. You see the whole curve and choose a portfolio on it, or pass its points to a
+    rule that selects one. Read the [`MeanRisk`](@ref) objectives page first, since each point
+    of a frontier is one of those optimisations. For more than two criteria, see the
+    [Pareto surface](03_Pareto_Surface.md) example.
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -46,9 +43,9 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. Data
 
-We use the same S&P 500 slice as the other optimiser examples.
+We use the same data as the previous example.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -62,21 +59,21 @@ rd = prices_to_returns(X)
 #=
 ## 2. Two directions, four combinations
 
-There are two mutually exclusive ways to trace a frontier:
+You compute a frontier in one of two directions.
 
-  - **Minimise risk** subject to a *lower bound on return* — sweep the return floor upward.
-  - **Maximise return** subject to an *upper bound on risk* — sweep the risk ceiling upward.
+  - Minimise risk with a *lower bound on the return*, and raise the bound from point to point.
+  - Maximise return with an *upper bound on the risk*, and raise the bound from point to point.
 
-Each bound can be supplied **explicitly** (a `range` of numbers you pick) or as a
-[`Frontier`](@ref) object, which inspects the problem, finds the feasible extremes, and lays out
-the sweep for you. That is the four combinations — two directions × explicit/automatic bounds — and
-they all have their uses. The two directions trace the *same* curve; the choice is about which
-quantity is more natural to pin in your problem.
+Each bound can be a `range` of numbers that you choose, or a [`Frontier`](@ref), which finds the
+lowest and the highest feasible value and spaces the points between them. Two directions and two
+kinds of bound give four combinations, and this page uses `Frontier` in both directions. The two
+directions give the *same* curve, so choose the one whose quantity is easier to set in your
+problem.
 
-We will use the [`ConditionalValueatRisk`](@ref) measure throughout, and precompute the prior once
-so every optimisation reuses it. Since we run many optimisations and cannot assume a single solver
-configuration converges at every point, we pass a *vector* of solver settings and let the optimiser
-fall back through them.
+We use [`ConditionalValueatRisk`](@ref) as the risk measure on the whole page, and compute the
+prior once and share it across every optimisation. One solver setting can fail to converge at some points of a
+frontier, so we pass a vector of two solvers. When the first fails, the optimiser tries the
+second.
 =#
 
 using Clarabel
@@ -92,11 +89,11 @@ pr = prior(EmpiricalPrior(), rd)
 rf = 4.2 / 100 / 252
 
 #=
-### Direction A — minimise risk along a return floor
+### Direction A: minimise risk above a return floor
 
-We minimise CVaR (the default objective) while a [`Frontier`](@ref) sweeps the return lower bound,
-giving a 30-point frontier. The lower bound lives on the *return* side, so it is set through
-[`ArithmeticReturn`](@ref)'s `lb`.
+We minimise the CVaR, because `MinimumRisk` is the default objective, and a [`Frontier`](@ref)
+of 30 points sets the lower bound on the return. The bound is on the *return*, so it goes in the settings of
+[`ArithmeticReturn`](@ref), as `lb`.
 =#
 
 optA = JuMPOptimiser(; pe = pr, slv = slv,
@@ -107,26 +104,27 @@ optA = JuMPOptimiser(; pe = pr, slv = slv,
 resA = optimise(MeanRisk(; opt = optA, r = r))
 
 #=
-`retcode` and `sol` are now *vectors* — one entry per frontier point. We had no warnings about
-failed optimisations, but let's confirm every point solved.
+`retcode` and `sol` now hold one entry per point of the frontier. We check that every point
+solved.
 =#
 
 all(x -> isa(x, OptimisationSuccess), resA.retcode)
 
 #=
-The weights evolve smoothly from the low-risk end (diversified) toward the high-return end
-(concentrated) as we walk up the frontier.
+The table has one column of weights per point. From point 1 to point 30 the portfolio moves from
+many assets at the low-risk end to few assets at the high-return end.
 =#
 
 pretty_table(DataFrame([rd.nx hcat(resA.w...)], Symbol.([:assets; 1:30]));
              formatters = [resfmt])
 
 #=
-### Direction B — maximise return under a risk ceiling
+### Direction B: maximise return below a risk ceiling
 
-The dual route: maximise return while a [`Frontier`](@ref) sweeps an *upper bound on CVaR*. The
-bound now lives on the *risk* side, so it is attached to the risk measure through its
-[`RiskMeasureSettings`](@ref). Everything else is identical.
+We maximise the return, and a [`Frontier`](@ref) of 30 points sets an *upper bound on the CVaR*.
+The bound is on the *risk*, so it goes in the settings of the risk measure,
+[`RiskMeasureSettings`](@ref), as `ub`. The prior and the solvers stay the same, and the last line
+checks that every point solved.
 =#
 
 optB = JuMPOptimiser(; pe = pr, slv = slv)
@@ -138,9 +136,9 @@ resB = optimise(MeanRisk(; opt = optB, obj = MaximumReturn(),
 all(x -> isa(x, OptimisationSuccess), resB.retcode)
 
 #=
-The two directions trace the same trade-off curve. Computing the CVaR and the arithmetic return of
-each point lets us overlay them: the risk-floor sweep and the return-ceiling sweep land on top of
-one another (up to where the automatic bounds place their points).
+We compute the CVaR and the arithmetic return of each point of both frontiers, and plot the two
+on one chart. The points of both directions lie on one curve. They sit at different places along
+it, because each `Frontier` spaces its points over a different quantity.
 =#
 
 rcvar = factory(ConditionalValueatRisk(), pr)
@@ -160,16 +158,16 @@ plot!(xs_B, ys_B; seriestype = :scatter, marker = (:cross, 7),
 #=
 ## 3. The `MeanRisk` frontier vs the `NearOptimalCentering` frontier
 
-The frontier above is built from *extreme* points — each one exactly extremises the objective, and
-the high-return end loads heavily on a couple of names. [`NearOptimalCentering`](@ref) (NOC) traces
-a **centred** frontier instead: at each point it returns the portfolio at the analytic centre of
-the near-optimal neighbourhood rather than the corner. The result sits just inside the extreme
-frontier — slightly less optimal, noticeably more diversified and more stable to changes in the
-prior. (NOC's neighbourhood-centring behaviour is dissected on its own
-[page](15_Near_Optimal_Centering.md); here we only use it as a frontier engine.)
+Each point of the frontier above lies at the *edge* of the set of feasible portfolios, because it
+is the exact optimum of its problem. [`NearOptimalCentering`](@ref),
+NOC for short, computes a centred frontier instead. At each point it returns the portfolio at the
+analytic centre of the set of near-optimal portfolios, not the one at its edge. That portfolio
+gives up a little of the objective, holds more assets, and moves less when the prior changes. The
+[NOC page](15_Near_Optimal_Centering.md) shows how it finds the centre. Here we use it only to
+compute a frontier.
 
-NOC solves a harder problem than plain `MeanRisk`, so a single solver configuration can fail to
-converge. We give it a richer fallback vector with decreasing `max_step_fraction`.
+NOC solves a harder problem than `MeanRisk`, so one solver setting can fail to converge. We give it
+seven solvers, whose `max_step_fraction` falls from 0.99 to 0.7.
 =#
 
 slv_noc = [Solver(; name = Symbol("clarabel$i"), solver = Clarabel.Optimizer,
@@ -178,8 +176,8 @@ slv_noc = [Solver(; name = Symbol("clarabel$i"), solver = Clarabel.Optimizer,
            for (i, f) in enumerate((0.99, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7))]
 
 #=
-For an apples-to-apples comparison we build *both* frontiers over the same 15-point return-floor
-sweep — only the optimiser changes.
+We build *both* frontiers with the same return floor, a `Frontier` of 15 points, so that only the
+optimiser differs.
 =#
 
 ret15 = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = Frontier(; N = 15)))
@@ -190,15 +188,17 @@ resN = optimise(NearOptimalCentering(;
                                                          ret = ret15), r = r))
 
 #=
-NOC summarises its many internal `MeanRisk` solves into a single `retcode`; let's confirm success.
+NOC solves many `MeanRisk` problems and returns one `retcode` for all of them. We check that it is
+a success.
 =#
 
 isa(resN.retcode, OptimisationSuccess)
 
 #=
-The diversification difference is the point. We tabulate, at each frontier point, the largest
-single weight: NOC consistently holds a lower maximum weight — it fans the allocation out — except
-at the high-return end, where both frontiers are forced into the same return-maximising corner.
+We print the largest single weight at each point of both frontiers. A lower number means that the
+portfolio spreads its weight over more assets. The NOC column is lower at most points. The two
+columns come close at the high-return end, where both frontiers approach the one portfolio that
+maximises the return.
 =#
 
 maxw(ws) = [round(maximum(w) * 100; digits = 1) for w in ws]
@@ -207,9 +207,10 @@ pretty_table(DataFrame("point" => 1:15, "MeanRisk max w %" => maxw(resM.w),
              title = "Largest single weight along each frontier")
 
 #=
-Plotted on the risk/return plane, the NOC frontier sits *inside* (to the upper-left of) the
-`MeanRisk` frontier: for a given return it accepts a little more CVaR, the price of sitting at the
-centre of the near-optimal region rather than at its edge.
+We plot both frontiers with the CVaR on the x-axis and the return on the y-axis. The NOC frontier
+lies *inside* the `MeanRisk` frontier, to its right, because for a given return it takes a little
+more CVaR. That extra CVaR is the cost of a portfolio at the centre of the near-optimal set instead
+of at its edge.
 =#
 
 xs_M = [expected_risk(rcvar, w, pr.X) for w in resM.w]
@@ -222,14 +223,13 @@ plot(xs_M, ys_M; seriestype = :scatter, marker = (:circle, 5), label = "MeanRisk
 plot!(xs_N, ys_N; seriestype = :scatter, marker = (:diamond, 6), label = "NOC (centred)")
 
 #=
-The composition along each frontier makes the same story visual: the `MeanRisk` frontier collapses
-onto a handful of names as it climbs, while the NOC frontier keeps more assets in play for longer.
+The stacked areas show the weights at each point of the `MeanRisk` frontier.
 =#
 
 plot_stacked_area_composition(resM.w, rd.nx)
 
 #=
-The same sweep under NOC — visibly more names carried up the frontier.
+The same plot for the NOC frontier holds more assets further up the frontier.
 =#
 
 plot_stacked_area_composition(resN.w, rd.nx)
@@ -237,10 +237,10 @@ plot_stacked_area_composition(resN.w, rd.nx)
 #=
 ## 4. Visualising the frontier
 
-The efficient frontier is a special case of a Pareto front, and [`plot_measures`](@ref) draws it on
-any pair of risk/return axes. There are optional keyword parameters for the risk measure on the
-X-axis, Y-axis, Z-axis, and colourbar. Here we put CVaR on the X-axis, the arithmetic return on the
-Y-axis, and colour by the risk-return ratio.
+The efficient frontier is a special case of a Pareto front, and [`plot_measures`](@ref) plots one
+on any pair of axes. Keywords set the measure on the x-axis, the y-axis, the z-axis and the colour
+bar. Here the CVaR is on the x-axis, the arithmetic return on the y-axis, and the colour shows the
+risk-return ratio.
 =#
 
 plot_measures(resA.w, resA.pr; x = r, y = ExpectedReturn(; rt = resA.ret),
@@ -249,8 +249,9 @@ plot_measures(resA.w, resA.pr; x = r, y = ExpectedReturn(; rt = resA.ret),
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
 
 #=
-Because `plot_measures` works on *any* pair of measures, the same call plots arbitrary Pareto
-fronts — we can even use the ratio of two risk measures as the colourbar.
+`plot_measures` takes *any* pair of measures, so you can view the same 30 portfolios on other
+axes. Here the y-axis is the CDaR, and the colour is the ratio of the CDaR to the CVaR. These
+portfolios do not minimise the CDaR, so this plot is not a front of the CVaR against the CDaR.
 =#
 
 plot_measures(resA.w, resA.pr; x = r, y = ConditionalDrawdownatRisk(),

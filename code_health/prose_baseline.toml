@@ -82,14 +82,6 @@ glossary_terms = 173
 "docs/src/public_api/21_Pipeline/03_Pipeline.md" = { emdash = 4, words = 95 }
 "docs/src/public_api/21_Pipeline/04_PredictionCV.md" = { glossary = 1, words = 258 }
 "docs/src/public_api/21_Pipeline/06_OnlinePipeline.md" = { emdash = 2, mechanism = 3, words = 111 }
-"examples/3_optimisers/01_MeanRisk_Objectives.jl" = { emdash = 17, endash = 2, words = 926 }
-"examples/3_optimisers/02_Efficient_Frontier.jl" = { emdash = 17, words = 957 }
-"examples/3_optimisers/03_Pareto_Surface.jl" = { emdash = 1, filler = 2, words = 956 }
-"examples/3_optimisers/04_Multiple_Risk_Measures.jl" = { emdash = 6, filler = 1, words = 1132 }
-"examples/3_optimisers/05_OWA_Risk_Measures.jl" = { emdash = 6, notjust = 1, words = 875 }
-"examples/3_optimisers/06_Brownian_Distance_Variance_and_VarianceSkewKurtosis.jl" = { emdash = 9, title_case = 1, words = 660 }
-"examples/3_optimisers/07_Drawdown_Risk_Measures.jl" = { emdash = 5, aivocab = 1, words = 520 }
-"examples/3_optimisers/08_Exotic_Tail_Risk_Measures.jl" = { emdash = 12, notjust = 1, bold_label = 1, words = 925 }
 "examples/4_constraints_costs/01_Budget_Constraints.jl" = { aivocab = 1, filler = 2, words = 1027 }
 "examples/4_constraints_costs/02_Linear_Group_Constraints.jl" = { emdash = 18, glossary = 1, words = 646 }
 "examples/4_constraints_costs/03_Cardinality_and_Threshold.jl" = { emdash = 1, words = 405 }

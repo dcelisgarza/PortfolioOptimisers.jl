@@ -5,29 +5,28 @@ Description = "The MeanRisk objectives in PortfolioOptimisers.jl: minimum risk, 
 
 # `MeanRisk` objectives
 
-[`MeanRisk`](@ref) is the workhorse optimiser: it casts portfolio selection as an explicit
-trade-off between expected return and risk, and an **objective function** decides *which* point on
-that trade-off you get. The same estimator, prior and risk measure can produce four very different
-portfolios depending on the objective:
+[`MeanRisk`](@ref) trades expected return against risk, and its objective, the `obj` field,
+picks the point on that trade-off that you get. With one prior and one risk measure, the four
+objectives give four different portfolios.
 
-  - [`MinimumRisk`](@ref) — ignore return, take the least-risk portfolio.
-  - [`MaximumReturn`](@ref) — ignore risk, take the highest-return portfolio (a corner solution).
-  - [`MaximumRatio`](@ref) — maximise the risk-adjusted ratio (return over risk, net of the
-    risk-free rate) — the tangency portfolio.
-  - [`MaximumUtility`](@ref) — maximise `return − l · risk`, where the risk-aversion `l` dials
-    continuously between the return-seeking and risk-averse ends.
+  - [`MinimumRisk`](@ref) ignores return and takes the portfolio with the least risk.
+  - [`MaximumReturn`](@ref) ignores risk and takes the portfolio with the highest return, which
+    is a corner solution.
+  - [`MaximumRatio`](@ref) maximises the ratio of return, net of the risk-free rate, to risk.
+    This is the tangency portfolio.
+  - [`MaximumUtility`](@ref) maximises `return − l · risk`. The risk aversion `l` moves the
+    portfolio between the high-return end and the low-risk end.
 
-This page runs all four against a common benchmark, confirms each does what it claims, and shows how
-`MaximumUtility`'s risk-aversion parameter sweeps between the extremes.
+This page runs all four next to a benchmark. It shows how the risk aversion of `MaximumUtility`
+changes the portfolio, and then prints the risk, return and ratio of each portfolio.
 
 !!! tip "When to reach for this"
-    [`MeanRisk`](@ref) is the workhorse optimiser: reach for it whenever you want to express
-    a portfolio as an explicit *trade-off between expected return and risk* and let a single
-    objective pick the point — minimise risk, maximise return, maximise the risk-adjusted
-    ratio, or maximise a risk-averse utility. If you instead want to *allocate risk itself*
-    rather than trade it against return, see [`RiskBudgeting`](@ref); if you want the whole
-    trade-off curve rather than one point, see the [efficient-frontier](02_Efficient_Frontier.md)
-    example.
+    Reach for [`MeanRisk`](@ref) when you want a portfolio that trades expected return against
+    risk, with one objective to pick the point. The objective can minimise risk, maximise
+    return, maximise the risk-adjusted ratio, or maximise a utility that penalises risk. If you
+    want to allocate the risk itself instead of trading it against return, see
+    [`RiskBudgeting`](@ref). If you want the whole curve of the trade-off instead of one point,
+    see the [efficient-frontier](02_Efficient_Frontier.md) example.
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -48,9 +47,10 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. Data
 
-We use the same S&P 500 slice as the other optimiser examples.
+We load the last 253 days of the S&P 500 prices that the other optimiser examples use, and
+compute their returns.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -64,12 +64,11 @@ rd = prices_to_returns(X)
 #=
 ## 2. The four objectives
 
-We will hold the risk measure fixed and vary only the objective. For the risk measure we reach for
-the **semi–standard deviation** — and here we meet a consequence of the package's design
-philosophy: an entire class of risk measures is expressed as a single
-[`LowOrderMoment`](@ref) parametrised by an internal algorithm. SemiMoment–standard deviation is the
-second lower partial moment (`SemiMoment()`) rendered as a second-order cone expression
-([`SOCRiskExpr`](@ref)).
+We hold the risk measure fixed and change only the objective. The risk measure is the
+semi-standard deviation, and the library has no type of that name. We build it from
+[`LowOrderMoment`](@ref), which covers a whole class of risk measures. `SecondMoment` selects the
+second moment, `SemiMoment()` keeps only the returns below the mean, and
+[`SOCRiskExpr`](@ref) takes the square root as a second-order cone expression.
 =#
 
 using Clarabel
@@ -80,9 +79,8 @@ slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 r = LowOrderMoment(; alg = SecondMoment(; alg1 = SemiMoment(), alg2 = SOCRiskExpr()))
 
 #=
-Since every optimisation runs on the same data, we precompute the prior statistics once with
-[`EmpiricalPrior`](@ref) and pass the result to [`JuMPOptimiser`](@ref), so they are not recomputed
-on every call.
+Every optimisation below runs on the same data, so we compute the prior once with
+[`EmpiricalPrior`](@ref) and pass the result to [`JuMPOptimiser`](@ref). No call computes it again.
 =#
 
 pr = prior(EmpiricalPrior(), rd)
@@ -90,22 +88,21 @@ opt = JuMPOptimiser(; pe = pr, slv = slv)
 
 #=
 !!! note "Precomputed result vs estimator"
-    Passing `pe = pr` — the *result* of `prior(...)` — fixes the statistics once and reuses them
-    on every `optimise` call, which is why we need not pass the returns data again. But you can
-    instead hand the optimiser the **estimator itself**, `pe = EmpiricalPrior()`, and call
-    `optimise(model, rd)`; the prior is then recomputed from whatever data the optimiser is
-    given. Most examples here precompute for speed because they solve repeatedly on one fixed
-    slice, but the estimator form is the one to reach for whenever the data changes underneath
-    the optimiser:
+    `pe = pr` passes the *result* of `prior(...)`. The optimiser reuses those statistics on
+    every `optimise` call, so we do not pass the returns data again. You can instead pass the
+    estimator, `pe = EmpiricalPrior()`, and call `optimise(model, rd)`. The optimiser then
+    computes the prior from the data you give it. Most examples here precompute the prior
+    because they solve many times on one fixed window. Use the estimator form when the data
+    changes between calls.
 
-    - **Cross-validation** refits on each training fold, so it *requires* the estimator form — a precomputed result (fit on the whole sample) would leak the test data into training, and is therefore disallowed.
-    - **Meta-optimisers** ([`Stacking`](@ref), [`NestedClustered`](@ref)) feed their *outer* optimiser synthetic returns assembled from the inner solves, where a precomputed asset-level prior is meaningless; that slot takes an estimator.
+    - Cross-validation fits the optimiser again on each training fold, so it needs the estimator form. A result fitted on the whole sample has already seen the test data, and the library does not accept one.
+    - The meta-optimisers [`Stacking`](@ref) and [`NestedClustered`](@ref) give their *outer* optimiser synthetic returns that they build from the inner solves. The assets of the outer optimiser are the inner portfolios, so a prior computed on the original assets does not apply, and that field takes an estimator.
 
-    Both are shown in the [meta-optimisers](13_Meta_Optimisers.md) and
-    [subset resampling / cross-validation](14_Subset_Resampling_and_Cross_Validation.md) examples.
+    The [meta-optimisers](13_Meta_Optimisers.md) and
+    [subset resampling and cross-validation](14_Subset_Resampling_and_Cross_Validation.md)
+    examples show each case.
 
-Now the four objectives. Only the `obj` field changes — same prior, same risk measure, same
-optimiser.
+We build one `MeanRisk` per objective. Only the `obj` field differs between them.
 =#
 
 ## Minimum risk
@@ -119,9 +116,8 @@ mr3 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
 mr4 = MeanRisk(; r = r, obj = MaximumReturn(), opt = opt)
 
 #=
-We optimise each. Because the prior is precomputed, we do not pass the returns data. For a
-reference point we also compute an [`InverseVolatility`](@ref) benchmark — a naive, solver-free
-allocation that ignores both objective and expected returns.
+We optimise each one. As a reference we also compute an [`InverseVolatility`](@ref) benchmark. It
+needs no solver, and it uses neither an objective nor the expected returns.
 =#
 
 res1 = optimise(mr1)
@@ -131,8 +127,10 @@ res4 = optimise(mr4)
 res0 = optimise(InverseVolatility(; pe = pr))
 
 #=
-The weights side by side. Reading left to right, the benchmark spreads evenly, minimum-risk hugs
-the low-volatility names, and maximum-return collapses onto the single highest-return asset.
+The table prints the weights side by side. The benchmark gives each asset a weight in
+proportion to the inverse of its volatility, so every asset gets one. The minimum-risk portfolio
+holds mostly assets with low volatility, and the maximum-return portfolio puts all its weight in
+the asset with the highest expected return.
 =#
 
 pretty_table(DataFrame(; :assets => rd.nx, :benchmark => res0.w, :MinimumRisk => res1.w,
@@ -142,13 +140,14 @@ pretty_table(DataFrame(; :assets => rd.nx, :benchmark => res0.w, :MinimumRisk =>
 #=
 ## 3. Risk aversion: tuning `MaximumUtility`
 
-[`MinimumRisk`](@ref) and [`MaximumReturn`](@ref) are the two extremes of the trade-off.
-[`MaximumUtility`](@ref) interpolates between them: it maximises `return − l · risk`, so the
-risk-aversion `l` is the dial. As `l → 0` utility chases return (toward the maximum-return corner);
-as `l` grows large the risk term dominates (toward the minimum-risk portfolio). The default is
-`l = 2`.
+[`MinimumRisk`](@ref) and [`MaximumReturn`](@ref) are the two ends of the trade-off, and
+[`MaximumUtility`](@ref) moves between them. It maximises `return − l · risk`, so the risk
+aversion `l` sets the point. As `l → 0` the utility favours return, and the portfolio moves toward
+the maximum-return corner. As `l` grows, the risk term dominates, and the portfolio moves toward
+the minimum-risk portfolio. The default is `l = 2`.
 
-We sweep a range of `l` and read off the realised risk and return of each portfolio.
+We optimise for five values of `l` and print the risk, return and ratio of each portfolio.
+Section 4 explains the call that computes them.
 =#
 
 lambdas = [1, 2, 8, 32, 128]
@@ -166,9 +165,9 @@ pretty_table(DataFrame(; Symbol("risk aversion l") => [s[1] for s in sweep],
              title = "MaximumUtility: higher l ⇒ lower risk and lower return")
 
 #=
-Both risk and return fall monotonically as `l` rises — the portfolio slides down the frontier from
-the return-seeking end toward the minimum-risk end. Plotting the realised (risk, return) of each
-step traces that path explicitly.
+Risk and return both fall as `l` rises, so the portfolio moves down the efficient frontier from
+the high-return end toward the minimum-risk end. We plot the risk and return of each
+portfolio to show that path.
 =#
 
 using StatsPlots, GraphRecipes
@@ -179,30 +178,29 @@ plot([s[2] for s in sweep], [s[3] for s in sweep]; seriestype = :path,
      label = "l = " * join(string.(lambdas), ", "))
 
 #=
-## 4. Confirming the objectives
+## 4. The risk, return and ratio of each portfolio
 
-To check each objective did what it says on the tin, we compute the risk, return and risk-return
-ratio of every portfolio. There are individual functions ([`expected_risk`](@ref),
-[`expected_return`](@ref), [`expected_ratio`](@ref)), but [`expected_risk_ret_ratio`](@ref) returns
-all three at once, which is what we use here.
+We compute the risk, the return and the risk-return ratio of every portfolio.
+[`expected_risk`](@ref), [`expected_return`](@ref) and [`expected_ratio`](@ref) compute one each,
+and [`expected_risk_ret_ratio`](@ref) returns all three at once, so we use it here.
 
-Any function that computes the expected portfolio return needs to know *which* return type to use;
-we stay consistent with the return measure used in each optimisation.
+A function that computes the expected return of a portfolio needs to know *which* return measure
+to use. We use the one that each optimisation used.
 
-A result carries everything needed to answer that question itself. `res.r` is the risk measure the
-optimisation ran under and `res.ret` the return term, both stored **resolved** — a deferred
-estimator has already been fitted, and a slot the caller left unstated has already taken the prior's
-field. `res.sca` is the scalariser. So the whole call can be read off the result:
+The result of an optimisation holds what the call needs. `res.r` is the risk measure of the
+optimisation and `res.ret` its return measure. The result stores both as the optimisation used
+them. If you gave an estimator, the result holds the fitted measure, and if you left a field unset,
+the result holds the value the optimiser took from the prior. `res.sca` is the scalariser. So the
+call takes all its arguments from the result:
 
 ```julia
 expected_risk_ret_ratio(res.r, res.ret, res.w, res.pr; sca = res.sca, rf = rf)
 ```
 
-That is the route to prefer. Naming the measure by hand still works, but the figure then matches the
-optimisation only if we name the *same* measure **and** the same scalariser — and `fees` and `rf`
-carry the same responsibility. The benchmark below is the exception that shows the rule: a naive
-optimisation resolves no measure and no return term, so it has neither `r` nor `ret` to hand back
-and we must name both ourselves.
+Prefer this form. You can name the measure by hand, but the number then matches the optimisation
+only if you name the *same* measure and the same scalariser, and pass the same `fees` and `rf`.
+The benchmark is the exception. [`InverseVolatility`](@ref) uses no risk measure and no return
+measure, so its result has no `r` or `ret`, and we name both ourselves.
 =#
 
 rk1, rt1, rr1 = expected_risk_ret_ratio(res1.r, res1.ret, res1.w, res1.pr; sca = res1.sca,
@@ -216,8 +214,9 @@ rk4, rt4, rr4 = expected_risk_ret_ratio(res4.r, res4.ret, res4.w, res4.pr; sca =
 rk0, rt0, rr0 = expected_risk_ret_ratio(r, ArithmeticReturn(), res0.w, res0.pr; rf = rf);
 
 #=
-The table confirms it: `MinimumRisk` posts the lowest risk, `MaximumRatio` the highest ratio, and
-`MaximumReturn` the highest return — each column extremised on its own objective.
+In the table, `rk` is the risk, `rt` the return and `rr` the risk-return ratio. Read each
+objective off the column it optimises. `MinimumRisk` has the lowest `rk`, `MaximumRatio` the
+highest `rr`, and `MaximumReturn` the highest `rt`.
 =#
 
 pretty_table(DataFrame(;
@@ -230,27 +229,30 @@ pretty_table(DataFrame(;
 #=
 ## 5. Visualising the objectives
 
-The stacked-bar composition contrasts the five allocations at a glance — note how the
-return-driven objectives concentrate while the benchmark and minimum-risk books spread out.
+The stacked bars show the weights of the five portfolios. The objectives that maximise return or
+ratio put their weight in few assets, and the benchmark and the minimum-risk portfolio spread it
+over many.
 =#
 
 plot_stacked_bar_composition([res0, res1, res2, res3, res4], rd)
 
 #=
-The return histogram for the minimum-risk portfolio shows the distribution of daily returns and the
-VaR / CVaR tail-risk markers.
+The histogram shows the daily returns of the minimum-risk portfolio, with lines at its mean, its
+VaR, its CVaR and several other risk levels.
 =#
 
 plot_histogram(res1, rd)
 
 #=
-Drawdown time series for the minimum-risk portfolio.
+The drawdown plot shows how far the minimum-risk portfolio stands below its last peak on each
+day.
 =#
 
 plot_drawdowns(res1, rd)
 
 #=
-Per-asset semi-standard-deviation risk contribution for the minimum-risk portfolio.
+The last plot shows how much each asset adds to the semi-standard deviation of the minimum-risk
+portfolio.
 =#
 
 plot_risk_contribution(r, res1, rd)
