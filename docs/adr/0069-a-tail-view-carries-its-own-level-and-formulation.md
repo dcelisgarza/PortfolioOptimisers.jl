@@ -253,3 +253,82 @@ the cube root of the machine epsilon. On the census fixture the binding window h
 `7e-12`, and the five windows that did not bind held `0.011` or more above it. `sbar = T` restricts
 nothing. On that fixture it reached the least divergence of the census to `3e-8` on all four views,
 in 2 to 4 seconds each.
+
+## Amendment (2026-09-23) — from [#1264](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1264)
+
+Issue #1264 found that `GridEntropicValueatRiskView` missed an upper bound by 60%, and that
+nothing reported it. The row of a grid point was divided by its largest coefficient, so the
+coefficients sat in `(0, 1]`, and the bound was `alpha / sc`. At a small dual variable `sc` is of
+the order `1e10`, and the bound fell to `1.5e-11`. The whole row was then inside the feasibility
+tolerance of the conic solver, about `1e-7`. The solver took that row as met by a posterior near
+the prior, and the selector picked the grid point whose row it could ignore. The anchor was not
+at fault: it converged to the dual variable of the posterior of least divergence.
+
+### Every upper-bound row reads against one
+
+The row of grid point `k` reaches the model divided by its bound `b_k`:
+
+```julia
+c = c ./ b
+Mk = M * (maximum(c) - one(b))
+sc1 * (dot(c, pw) - one(b) - Mk * (one(b) - y[k])) <= 0
+```
+
+The solver then meets the row to its tolerance relative to the bound, not relative to the largest
+coefficient. The posterior sums to one, so the left hand side never exceeds `maximum(c)`, and
+`maximum(c) - 1` is the smallest constant that releases the row. The data fix it, row by row.
+
+On the fixture of the census of #1254, an upper bound at half the prior EVaR, the posterior met the
+view to `1.2e-10` at the divergence of a scan over the dual variable of one-row tilts, `0.08822`.
+The solve took 2.6 s. Two floors on the scaled bound were measured and refused. A floor at `1e-7`
+still missed the view by 15%. A floor at `cbrt(eps)` met it, but it dropped the grid point of least
+divergence and raised the divergence by 2.5%. The relativistic grid met its view on that fixture
+before the change, with its smallest bound at `1.1e-7`. It takes the same rows, because its rows are
+scaled the same way.
+
+The largest constant on that fixture is `6.8e10`. Pajarito fixes the binary vector before its last
+conic solve, so the tolerance on integrality does not reach the selected row there. A solver that
+does not fix it can open a slack of the constant times that tolerance on the selected row.
+
+### `M` is a multiplier
+
+`M` stays on `GridEntropicValueatRiskView` and `GridRelativisticValueatRiskView`, and it now
+multiplies the constant of each row. Its default moves from `10` to `1`, and its domain from
+`M > 0` to `M >= 1`, because a multiplier below one cuts off a posterior the view admits. A
+multiplier above one gives the released rows headroom for a posterior that sums to one only to the
+solver's tolerance. It also widens the slack the tolerance on integrality can open on the selected
+row. A caller who passed an `M` below one now meets a `DomainError`.
+
+### An upper-bound grid point needs a positive bound
+
+The upper-bound half keeps a point only when its row is finite and its bound is positive. The
+coefficients are positive and the posterior sums to one, so an upper-bound row with a bound at or
+below zero holds at no posterior. The bound of an entropic row underflows to zero where its
+coefficients overflow, and the bound of a relativistic row is at or below zero where the target
+lies below what the point can reach. The error of an upper-bound half that keeps no point names both
+causes. Before this change the solver reported that case as infeasible, so the error comes earlier
+and names the cause, and it is not a new refusal.
+
+The lower-bound half keeps every finite point. A lower-bound row with a bound at or below zero holds
+at every posterior, so it changes no answer. A filter there would only add a refusal where every
+point is like that, and the grid is centred on the point the posterior attains, so such a grid
+states a view the prior already meets.
+
+### The lower-bound half keeps the norm scale
+
+The rows of the lower-bound half go through `add_ep_constraint!`, which divides a row by its norm.
+They are not divided by their bound, because they do not show the defect. A measurement over 13
+settings covered the fixture of #1254, grids widened to `pct = 0.97` and `K = 41`, and the fixtures of
+`test_12h`, with bounds down to `5.1e-11`. No row with a small bound was violated, and those rows were
+slack at the posterior by factors up to `9.6e7`. Every negative residual sat at the one binding row,
+whose bound was `6e-3` or more, and it was `1.7e-8` of that bound or less. A posterior that meets a
+lower bound moves mass toward the largest loss, where every row takes its largest coefficient, so a
+row that binds has a bound of at least the prior probability of that loss.
+
+Division by the bound gave the same posterior where it solved, and it did harm elsewhere. The dual
+of `OptimEntropyPooling` failed with `Inf` or `NaN` in 7 of the 13 settings, and took 8 to 25 times
+more function evaluations in the others. Clarabel stopped at `SLOW_PROGRESS` where a bound was near
+`1e-10`, which includes the fine grid of the existing test.
+
+A check after the solve, that the posterior statistic meets the target, was considered and refused.
+It would set a tolerance on a residual, which this library does not set (#573).

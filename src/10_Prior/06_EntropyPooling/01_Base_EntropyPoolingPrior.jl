@@ -1490,7 +1490,7 @@ Grid formulation of an entropic value-at-risk view [EPTail](@cite).
 
 `GridEntropicValueatRiskView` writes the view on a grid of values of the EVaR dual variable, built around the value that attains the prior EVaR of the asset. A lower-bound view is a set of linear constraints and needs no integer variable. An upper-bound or equality view selects one grid point with a binary vector and a big-``M`` relaxation, and needs a solver that handles mixed-integer exponential cone programs.
 
-Rows reach the model divided by their largest coefficient, so the coefficients sit in `(0, 1]`, the posterior sums to one, and the left-hand side is bounded by one whatever the data. The default `M` clears that bound by an order of magnitude.
+Each row of the upper-bound block reaches the model divided by its bound, so it reads against one at every grid point. Read at its own scale, the row of a small dual variable is smaller than a solver's feasibility tolerance, and the solver takes it as met by any posterior. The rows of the lower-bound block keep their own scale: a posterior that meets a lower bound moves mass toward the largest loss, so a row with a small bound is slack by far more than the tolerance. The big-M constant of each row is the smallest that releases it, which the data fix, and `M` multiplies it.
 
 The answer is approximate in both directions. A lower-bound view holds at the grid points and may fall short between them, and an upper-bound view holds at one grid point and may be conservative. Widen `pct` or raise `K` when the posterior value misses the target, and prefer [`ConicEntropicValueatRiskView`](@ref) whenever the view admits it.
 
@@ -1518,12 +1518,13 @@ So ``\\mathrm{EVaR}_{\\alpha}(X) \\geq \\bar{e}`` holds exactly when the objecti
 \\end{align}
 ```
 
-and for an upper-bound view, with ``\\boldsymbol{y}`` a binary selector and ``M`` a big constant:
+and for an upper-bound view, with ``\\boldsymbol{y}`` a binary selector, and each row divided by its bound ``\\alpha`` so that it reads against one:
 
 ```math
 \\begin{align}
 &\\boldsymbol{1}^{\\intercal} \\boldsymbol{y} = 1\\\\
-&\\dfrac{\\sum_{j=1}^{T} w_{j} \\exp(x_{j}/\\bar{z}_{k})}{\\exp(\\bar{e}/\\bar{z}_{k})} \\leq \\alpha + M(1 - y_{k})\\,, &\\forall\\, k = 1,\\ldots,K\\\\
+&\\dfrac{\\sum_{j=1}^{T} w_{j} \\exp(x_{j}/\\bar{z}_{k})}{\\alpha \\exp(\\bar{e}/\\bar{z}_{k})} \\leq 1 + M M_{k} (1 - y_{k})\\,, &\\forall\\, k = 1,\\ldots,K\\\\
+&M_{k} = \\max_{j} \\dfrac{\\exp(x_{j}/\\bar{z}_{k})}{\\alpha \\exp(\\bar{e}/\\bar{z}_{k})} - 1\\,, &\\forall\\, k = 1,\\ldots,K\\\\
 &\\boldsymbol{y} \\in \\{0,1\\}^{K}\\,.
 \\end{align}
 ```
@@ -1540,7 +1541,8 @@ Where:
   - ``\\bar{z}_{k}``: Dual variable of the ``k``-th grid point.
   - ``K``: Number of grid points.
   - ``\\boldsymbol{y}``: ``K \\times 1`` binary selector, one entry per grid point.
-  - ``M``: Big-M constant.
+  - ``M_{k}``: Smallest big-M constant that releases the row of the ``k``-th grid point. The weights sum to one, so the left hand side of the row never exceeds its largest coefficient.
+  - ``M``: Big-M multiplier.
 
 An equality view carries both blocks.
 
@@ -1549,7 +1551,7 @@ An equality view carries both blocks.
     GridEntropicValueatRiskView(;
         pct::Number = 0.5,
         K::Integer = 11,
-        M::Number = 10,
+        M::Number = 1,
         iters::Integer = 50,
         tol::Number = 1e-10,
         tilt_iters::Integer = 200
@@ -1561,7 +1563,7 @@ Keywords correspond to the struct's fields.
 
   - `0 < pct < 1`.
   - $(val_dict[:ep_gridK])
-  - `M > 0`.
+  - `M >= 1`.
   - `iters >= 1`.
   - `tol >= 0`.
   - `tilt_iters >= 1`.
@@ -1573,7 +1575,7 @@ julia> GridEntropicValueatRiskView()
 GridEntropicValueatRiskView
          pct ┼ Float64: 0.5
            K ┼ Int64: 11
-           M ┼ Int64: 10
+           M ┼ Int64: 1
        iters ┼ Int64: 50
          tol ┼ Float64: 1.0e-10
   tilt_iters ┴ Int64: 200
@@ -1620,7 +1622,7 @@ GridEntropicValueatRiskView
                                          tol::Number, tilt_iters::Integer)
         assert_unit_interval(pct, :pct)
         assert_ep_grid_size(K)
-        @argcheck(M > zero(M), DomainError(M, "M must be > 0"))
+        @argcheck(M >= one(M), DomainError(M, "M must be >= 1"))
         @argcheck(iters >= one(iters), DomainError(iters, "iters must be >= 1"))
         @argcheck(tol >= zero(tol), DomainError(tol, "tol must be >= 0"))
         @argcheck(tilt_iters >= one(tilt_iters),
@@ -1629,7 +1631,7 @@ GridEntropicValueatRiskView
                    typeof(tilt_iters)}(pct, K, M, iters, tol, tilt_iters)
     end
 end
-function GridEntropicValueatRiskView(; pct::Number = 0.5, K::Integer = 11, M::Number = 10,
+function GridEntropicValueatRiskView(; pct::Number = 0.5, K::Integer = 11, M::Number = 1,
                                      iters::Integer = 50, tol::Number = 1e-10,
                                      tilt_iters::Integer = 200)::GridEntropicValueatRiskView
     return GridEntropicValueatRiskView(pct, K, M, iters, tol, tilt_iters)
@@ -1802,7 +1804,7 @@ Grid formulation of a relativistic value-at-risk view.
 
 `GridRelativisticValueatRiskView` writes the view on a grid of points of the primal programme of RLVaR, centred on the point a posterior that meets the view attains. A lower-bound view is a set of linear constraints and needs no integer variable. An upper-bound or equality view selects one grid point with a binary vector and a big-``M`` relaxation, and needs a solver that handles mixed-integer exponential cone programs.
 
-Rows reach the model divided by their largest coefficient, so the coefficients sit in `(0, 1]`, the posterior sums to one, and the left-hand side is bounded by one whatever the data. The default `M` clears that bound by an order of magnitude.
+Each row of the upper-bound block reaches the model divided by its bound, so it reads against one at every grid point. Read at its own scale, the row of a small dual variable is smaller than a solver's feasibility tolerance, and the solver takes it as met by any posterior. The rows of the lower-bound block keep their own scale: a posterior that meets a lower bound moves mass toward the largest loss, so a row with a small bound is slack by far more than the tolerance. The big-M constant of each row is the smallest that releases it, which the data fix, and `M` multiplies it. The upper-bound block drops a grid point whose bound is at or below zero, because its row holds at no posterior. The lower-bound block keeps it: its row holds at every posterior.
 
 It accepts `==`, `>=` and `<=`, one asset per view. The view is normalised so its coefficient is one, which flips the operator when the coefficient is negative, so this formulation restricts neither the operator nor the sign.
 
@@ -1839,12 +1841,14 @@ The objective is linear in ``\\boldsymbol{w}`` once ``t`` and ``z`` are fixed, w
 \\end{align}
 ```
 
-and for an upper-bound view, with ``\\boldsymbol{y}`` a binary selector and ``M`` a big constant:
+and for an upper-bound view, with ``\\boldsymbol{y}`` a binary selector, and each row divided by its bound ``b_{k}`` so that it reads against one:
 
 ```math
 \\begin{align}
 &\\boldsymbol{1}^{\\intercal} \\boldsymbol{y} = 1\\\\
-&T \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(\\bar{t}_{k} - x_{j},\\, \\bar{z}_{k}) \\leq \\bar{\\vartheta} - \\bar{t}_{k} - \\bar{z}_{k} \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right) + M(1 - y_{k})\\,, &\\forall\\, k = 1,\\ldots,K\\\\
+&b_{k} = \\bar{\\vartheta} - \\bar{t}_{k} - \\bar{z}_{k} \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right)\\,, &\\forall\\, k = 1,\\ldots,K\\\\
+&\\dfrac{T}{b_{k}} \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(\\bar{t}_{k} - x_{j},\\, \\bar{z}_{k}) \\leq 1 + M M_{k} (1 - y_{k})\\,, &\\forall\\, k = 1,\\ldots,K\\\\
+&M_{k} = \\max_{j} \\dfrac{T}{b_{k}} \\varphi_{\\kappa}(\\bar{t}_{k} - x_{j},\\, \\bar{z}_{k}) - 1\\,, &\\forall\\, k = 1,\\ldots,K\\\\
 &\\boldsymbol{y} \\in \\{0,1\\}^{K}\\,.
 \\end{align}
 ```
@@ -1868,7 +1872,9 @@ Where:
   - ``\\bar{t}_{k}``, ``\\bar{z}_{k}``: Shift and dual variable of the ``k``-th grid point.
   - ``K``: Number of grid points.
   - ``\\boldsymbol{y}``: ``K \\times 1`` binary selector, one entry per grid point.
-  - ``M``: Big-M constant.
+  - ``b_{k}``: Bound of the row of the ``k``-th grid point. The upper-bound block drops a point whose bound is at or below zero.
+  - ``M_{k}``: Smallest big-M constant that releases the row of the ``k``-th grid point. The weights sum to one, so the left hand side of the row never exceeds its largest coefficient.
+  - ``M``: Big-M multiplier.
 
 An equality view carries both blocks. Every grid point is a feasible point of the primal programme, so the upper-bound block is never violated: it can only be tighter than the view asks. The lower-bound block holds at the grid points and may fall short between them, so prefer [`ConicRelativisticValueatRiskView`](@ref) whenever the view admits it.
 
@@ -1877,7 +1883,7 @@ An equality view carries both blocks. Every grid point is a feasible point of th
     GridRelativisticValueatRiskView(;
         pct::Number = 0.5,
         K::Integer = 11,
-        M::Number = 10,
+        M::Number = 1,
         iters::Integer = 50,
         tol::Number = 1e-10,
         tilt_iters::Integer = 200
@@ -1889,7 +1895,7 @@ Keywords correspond to the struct's fields.
 
   - `0 < pct < 1`.
   - $(val_dict[:ep_gridK])
-  - `M > 0`.
+  - `M >= 1`.
   - `iters >= 1`.
   - `tol >= 0`.
   - `tilt_iters >= 1`.
@@ -1901,7 +1907,7 @@ julia> GridRelativisticValueatRiskView()
 GridRelativisticValueatRiskView
          pct ┼ Float64: 0.5
            K ┼ Int64: 11
-           M ┼ Int64: 10
+           M ┼ Int64: 1
        iters ┼ Int64: 50
          tol ┼ Float64: 1.0e-10
   tilt_iters ┴ Int64: 200
@@ -1953,7 +1959,7 @@ GridRelativisticValueatRiskView
                                              tilt_iters::Integer)
         assert_unit_interval(pct, :pct)
         assert_ep_grid_size(K)
-        @argcheck(M > zero(M), DomainError(M, "M must be > 0"))
+        @argcheck(M >= one(M), DomainError(M, "M must be >= 1"))
         @argcheck(iters >= one(iters), DomainError(iters, "iters must be >= 1"))
         @argcheck(tol >= zero(tol), DomainError(tol, "tol must be >= 0"))
         @argcheck(tilt_iters >= one(tilt_iters),
@@ -1963,7 +1969,7 @@ GridRelativisticValueatRiskView
     end
 end
 function GridRelativisticValueatRiskView(; pct::Number = 0.5, K::Integer = 11,
-                                         M::Number = 10, iters::Integer = 50,
+                                         M::Number = 1, iters::Integer = 50,
                                          tol::Number = 1e-10,
                                          tilt_iters::Integer = 200)::GridRelativisticValueatRiskView
     return GridRelativisticValueatRiskView(pct, K, M, iters, tol, tilt_iters)
@@ -2279,7 +2285,7 @@ A group of **entropic value at risk** views, with the significance level and for
 
 A `prior(...)` reference inside `views` is replaced by the prior entropic value at risk at this group's `alpha`, so a view stated against the prior moves with the level.
 
-`alg` is where the grid of dual variables and the big-M constant live: a [`GridEntropicValueatRiskView`](@ref) in this field gives these views their own `pct`, `K` and `M`, so views at different significance levels can take different grids.
+`alg` is where the grid of dual variables and the big-M multiplier live: a [`GridEntropicValueatRiskView`](@ref) in this field gives these views their own `pct`, `K` and `M`, so views at different significance levels can take different grids.
 
 # Fields
 
@@ -2318,7 +2324,7 @@ EntropicValueatRiskView
        alg ┼ GridEntropicValueatRiskView
            │          pct ┼ Float64: 0.8
            │            K ┼ Int64: 21
-           │            M ┼ Int64: 10
+           │            M ┼ Int64: 1
            │        iters ┼ Int64: 50
            │          tol ┼ Float64: 1.0e-10
            │   tilt_iters ┴ Int64: 200
@@ -2392,7 +2398,7 @@ A group of **relativistic value at risk** views, with the significance level, th
 
 A `prior(...)` reference inside `views` is replaced by the prior relativistic value at risk at this group's `alpha` and `kappa`, so a view stated against the prior moves with both.
 
-`alg` is where the grid of primal points and the big-M constant live: a [`GridRelativisticValueatRiskView`](@ref) in this field gives these views their own `pct`, `K` and `M`, so views at different significance levels can take different grids.
+`alg` is where the grid of primal points and the big-M multiplier live: a [`GridRelativisticValueatRiskView`](@ref) in this field gives these views their own `pct`, `K` and `M`, so views at different significance levels can take different grids.
 
 # Fields
 

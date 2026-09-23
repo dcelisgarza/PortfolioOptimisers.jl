@@ -81,7 +81,7 @@ end
 
 Build one scaled row of the grid formulation of an entropic value-at-risk view.
 
-`ep_evar_grid_row` returns the coefficients of `exp((x - ebar) / z)` divided by their largest entry, together with the reciprocal of that entry, which the right hand side must be multiplied by. Scaling the row keeps the coefficients in `(0, 1]` however small `z` is, which is what lets the big-M constant of [`GridEntropicValueatRiskView`](@ref) be a plain number rather than a function of the data.
+`ep_evar_grid_row` returns the coefficients of `exp((x - ebar) / z)` divided by their largest entry, together with the reciprocal of that entry, which the right hand side must be multiplied by. Scaling the row keeps the coefficients in `(0, 1]` however small `z` is, so the row does not overflow before it is built. The bound `alpha * isc` then falls far below one at a small `z`, so an upper-bound row reaches the model divided by that bound too, by [`add_ep_tail_view!`](@ref). A lower-bound row keeps the norm scale of [`ep_add_grid_tail_view!`](@ref).
 
 # Algorithm
 
@@ -104,6 +104,8 @@ Build one scaled row of the grid formulation of an entropic value-at-risk view.
 
   - [`GridEntropicValueatRiskView`](@ref)
   - [`GridEntropicValueatRiskViewConstraint`](@ref)
+  - [`add_ep_tail_view!`](@ref)
+  - [`ep_add_grid_tail_view!`](@ref)
   - [`ep_tail_views!`](@ref)
 """
 function ep_evar_grid_row(x::VecNum, ebar::Number, z::Number)
@@ -343,7 +345,7 @@ end
 
 Build one scaled row of the grid formulation of a relativistic value-at-risk view.
 
-`ep_rlvar_grid_row` returns the coefficients `T * phi(t - x, z)` divided by their largest entry, together with the target of the row divided by that same entry. Scaling the row keeps the coefficients in `(0, 1]` however small `z` is, which is what lets the big-M constant of [`GridRelativisticValueatRiskView`](@ref) be a plain number rather than a function of the data.
+`ep_rlvar_grid_row` returns the coefficients `T * phi(t - x, z)` divided by their largest entry, together with the target of the row divided by that same entry. Scaling the row keeps the coefficients in `(0, 1]` however small `z` is, so the row does not overflow before it is built. The target then falls far below one at a small `z`, so an upper-bound row reaches the model divided by that target too, by [`add_ep_tail_view!`](@ref). A lower-bound row keeps the norm scale of [`ep_add_grid_tail_view!`](@ref).
 
 # Arguments
 
@@ -363,6 +365,8 @@ Build one scaled row of the grid formulation of a relativistic value-at-risk vie
 
   - [`GridRelativisticValueatRiskView`](@ref)
   - [`GridRelativisticValueatRiskViewConstraint`](@ref)
+  - [`add_ep_tail_view!`](@ref)
+  - [`ep_add_grid_tail_view!`](@ref)
   - [`ep_tail_views!`](@ref)
 
 # References
@@ -1774,15 +1778,10 @@ and one further row on ``\\varepsilon = \\sum_{i} \\dfrac{\\gamma_{i}}{\\alpha} 
   - ``s_{c1} \\left(\\bar{c} - \\varepsilon\\right) \\leq 0`` under `:geq`.
   - ``s_{c1} \\left(\\varepsilon - \\bar{c}\\right) \\leq 0`` under `:leq`.
 
-The [`GridEntropicValueatRiskViewConstraint`](@ref) method registers two rows:
+The [`GridEntropicValueatRiskViewConstraint`](@ref) and [`GridRelativisticValueatRiskViewConstraint`](@ref) methods register two rows each, over the row of each grid point divided by its bound:
 
   - ``s_{c1} \\left(\\sum_{k=1}^{K} y_{k} - 1\\right) = 0``.
-  - ``s_{c1} \\left(\\sum_{j=1}^{T} c_{k,\\,j} p_{j} - \\alpha \\iota_{k} - M (1 - y_{k})\\right) \\leq 0``, ``\\forall\\, k = 1,\\ldots,K``.
-
-The [`GridRelativisticValueatRiskViewConstraint`](@ref) method registers two rows:
-
-  - ``s_{c1} \\left(\\sum_{k=1}^{K} y_{k} - 1\\right) = 0``.
-  - ``s_{c1} \\left(\\sum_{j=1}^{T} c_{k,\\,j} p_{j} - b_{k} - M (1 - y_{k})\\right) \\leq 0``, ``\\forall\\, k = 1,\\ldots,K``.
+  - ``s_{c1} \\left(\\sum_{j=1}^{T} \\dfrac{c_{k,\\,j}}{b_{k}} p_{j} - 1 - M M_{k} (1 - y_{k})\\right) \\leq 0``, ``\\forall\\, k = 1,\\ldots,K``, with ``M_{k} = \\max_{j} c_{k,\\,j} / b_{k} - 1``.
 
 Where:
 
@@ -1804,8 +1803,9 @@ Where:
   - ``\\varepsilon``: Left hand side of an integer conditional value-at-risk view, the coefficient-weighted sum of the per-asset posterior CVaRs.
   - ``K``: Number of grid points the carrier holds.
   - ``c_{k,\\,j}``: Scaled coefficient of observation ``j`` at grid point ``k``, from [`ep_evar_grid_row`](@ref) or [`ep_rlvar_grid_row`](@ref).
-  - ``\\iota_{k}``, ``b_{k}``: Scaled target of grid point ``k``, from those same two functions.
-  - ``M``: Big-M constant the grid carrier holds.
+  - ``b_{k}``: Scaled bound of grid point ``k``, from those same two functions. It is ``\\alpha`` times the reciprocal that [`ep_evar_grid_row`](@ref) returns, and the target that [`ep_rlvar_grid_row`](@ref) returns.
+  - ``M_{k}``: Smallest big-M constant that releases the row of grid point ``k``.
+  - ``M``: Big-M multiplier the grid carrier holds.
 
 ## Relaxation
 
@@ -1827,7 +1827,9 @@ The sequential method is a **restriction** of the view, tightened by re-solves.
 
  6. **Tightness.** The bound is tight where the grid holds the point the posterior itself attains. [`ep_evar_anchor`](@ref) and [`ep_rlvar_anchor`](@ref) put the centre of the grid on that point. Where the anchor does not converge the grid falls back to the prior's point, and the posterior statistic can land strictly below the target. Widen `pct` or raise `K` there.
 
-``M`` releases the rows of the grid points the selector does not pick. A row's coefficients sit in ``(0, 1]`` and ``\\boldsymbol{p}`` sums to one, so the left hand side never exceeds one and the default ``M`` of both carriers clears it. An ``M`` below that bound restricts the model further, in the same direction.
+A row reads against one because its bound ``b_{k}`` falls far below a solver's feasibility tolerance where the dual variable is small. Read at that scale, the whole row is inside the tolerance, the solver takes it as met by any posterior, and the selector can pick that grid point with the view unmet.
+
+``M M_{k}`` releases the rows of the grid points the selector does not pick. ``\\boldsymbol{p}`` sums to one, so the left hand side of row ``k`` never exceeds ``\\max_{j} c_{k,\\,j} / b_{k}``, and ``M_{k}`` is the smallest constant that clears it. An ``M`` below one would cut off a posterior the view admits, so ``M \\geq 1``. An ``M`` above one gives the released rows headroom for a posterior that sums to one only to the solver's tolerance, but it also widens the slack that the tolerance on integrality opens on the selected row, so the default is ``M = 1``.
 
 The other half of a grid view is a **relaxation**, and it does not reach this function. A lower-bound view asks at ``K`` points a condition that must hold everywhere, so the posterior statistic holds at the grid points and can fall short between them. [`ep_add_evar_view!`](@ref) and [`ep_add_rlvar_view!`](@ref) file those rows into the entropy pooling constraint dictionary rather than into the model.
 
@@ -1963,10 +1965,14 @@ function add_ep_tail_view!(model::JuMP.Model, pw, tv::GridEntropicValueatRiskVie
     JuMP.@constraint(model, sc1 * (sum(y) - one(alpha)) == 0)
     for (k, zk) in pairs(z)
         c, isc = ep_evar_grid_row(x, rhs, zk)
+        # The bound `alpha * isc` falls below a solver's feasibility tolerance at a small `z`,
+        # and a row read at that scale is met by any posterior. Divided by its bound, every
+        # row reads against one. `c` peaks at one, so `M * (ib - 1)` releases the row.
+        # Issue #1264.
+        ib = inv(alpha * isc)
         JuMP.@constraint(model,
-                         sc1 *
-                         (LinearAlgebra.dot(c, pw) - alpha * isc - M * (one(alpha) - y[k])) <=
-                         0)
+                         sc1 * (ib * LinearAlgebra.dot(c, pw) - one(alpha) -
+                                M * (ib - one(alpha)) * (one(alpha) - y[k])) <= 0)
     end
     return nothing
 end
@@ -1978,9 +1984,11 @@ function add_ep_tail_view!(model::JuMP.Model, pw,
     JuMP.@constraint(model, sc1 * (sum(y) - one(alpha)) == 0)
     for k in 1:K
         c, b = ep_rlvar_grid_row(x, rhs, t[k], z[k], alpha, kappa)
+        # As for the entropic value at risk: divided by its bound, every row reads against one.
+        ib = inv(b)
         JuMP.@constraint(model,
-                         sc1 * (LinearAlgebra.dot(c, pw) - b - M * (one(alpha) - y[k])) <=
-                         0)
+                         sc1 * (ib * LinearAlgebra.dot(c, pw) - one(b) -
+                                M * (ib - one(b)) * (one(b) - y[k])) <= 0)
     end
     return nothing
 end
@@ -2604,9 +2612,9 @@ Lower one entropic value-at-risk view into the constraints its formulation needs
  1. [`ConicEntropicValueatRiskView`](@ref) checks the three preconditions below, then appends one [`ConicEntropicValueatRiskViewConstraint`](@ref) carrying `x`, `coef`, `alpha` and `rhs`.
  2. [`GridEntropicValueatRiskView`](@ref) checks that the view names one asset, and normalises `w` to sum to one, giving `wi`.
  3. It builds the grid `z` of dual variables with [`ep_evar_grid`](@ref).
- 4. It keeps the points whose row is finite, giving `keep`, and raises where `keep` is empty.
+ 4. It keeps the points whose row is finite, giving `keep`, and raises where `keep` is empty. For the upper-bound half it keeps only the points whose bound is positive, and raises where none is.
  5. For the lower-bound half of the view, it builds the row of each kept point with [`ep_evar_grid_row`](@ref), and adds it to `epc` under `:ineq` with [`add_ep_constraint!`](@ref), negated so the row reads as the `<=` sense that key states.
- 6. For the upper-bound half of the view, it appends one [`GridEntropicValueatRiskViewConstraint`](@ref) carrying `x`, the kept grid, `alpha`, `rhs` and the big-M constant `M`.
+ 6. For the upper-bound half of the view, it appends one [`GridEntropicValueatRiskViewConstraint`](@ref) carrying `x`, the kept grid, `alpha`, `rhs` and the big-M multiplier `M`.
  7. [`SequentialEntropicValueatRiskView`](@ref) orients the view and splits its assets with [`ep_sequential_sides`](@ref), builds a [`SequentialEntropicValueatRiskViewConstraint`](@ref) with an empty surrogate row, reads its first row from the prior `w` with [`ep_sequential_start`](@ref), and appends it.
 
 # Arguments
@@ -2630,7 +2638,7 @@ Lower one entropic value-at-risk view into the constraints its formulation needs
 # Validation
 
   - [`ConicEntropicValueatRiskView`](@ref) needs coefficients of one sign, an operator other than `<=`, and, for an equality, a target at or above the prior value of the left hand side.
-  - [`GridEntropicValueatRiskView`](@ref) needs one asset, and at least one grid point whose row is finite. [`ep_evar_grid_row`](@ref) overflows at a dual variable near zero. The grid sits there when `pct` approaches one, and wholly there when `alpha * T` falls below one, because [`ep_evar`](@ref)'s minimiser is then at the end of its bracket. The points it overflows at are dropped, and a grid that keeps none of them raises.
+  - [`GridEntropicValueatRiskView`](@ref) needs one asset, and at least one grid point whose row is finite, and whose bound is positive where the view carries an upper-bound half. [`ep_evar_grid_row`](@ref) overflows at a dual variable near zero, and its bound underflows to zero there. The grid sits there when `pct` approaches one, and wholly there when `alpha * T` falls below one, because [`ep_evar`](@ref)'s minimiser is then at the end of its bracket. Those points are dropped, and a grid that keeps none of them raises.
 
 # Returns
 
@@ -2677,11 +2685,12 @@ function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
         c, isc = ep_evar_grid_row(x, rhs, zk)
         return c, alpha * isc
     end
-    # `exp((x - rhs) / z)` overflows at a dual variable near zero. The grid sits there when
-    # `pct` approaches one, and wholly there when `alpha * T` falls below one, because the
-    # minimiser is then at the end of its bracket.
+    # `exp((x - rhs) / z)` overflows at a dual variable near zero, and the bound of its row
+    # underflows to zero there. The grid sits there when `pct` approaches one, and wholly
+    # there when `alpha * T` falls below one, because the minimiser is then at the end of its
+    # bracket.
     z = ep_add_grid_tail_view!(epc, z, op, row,
-                               () -> "View `$(eqn)` builds no finite grid point. The row of every dual variable the grid spans overflows, which happens when `alpha` ($(alpha)) leaves fewer than one observation in the tail, and when `pct` ($(pct)) approaches one. Raise `alpha`, or narrow `pct`.")
+                               () -> "View `$(eqn)` builds no usable grid point. The row of every dual variable the grid spans overflows, or its bound underflows to zero, which happens when `alpha` ($(alpha)) leaves fewer than one observation in the tail, and when `pct` ($(pct)) approaches one. Raise `alpha`, or narrow `pct`.")
     if op == :leq || op == :eq
         push!(tvs, GridEntropicValueatRiskViewConstraint(x, z, alpha, rhs, M))
     end
@@ -2704,18 +2713,23 @@ end
 """
     ep_add_grid_tail_view!(epc::AbstractDict, grid::AbstractVector, op::Symbol, row, msg)
 
-Keep the finite points of a tail view grid, and add the rows of its lower-bound half.
+Keep the usable points of a tail view grid, and add the rows of its lower-bound half.
 
-`ep_add_grid_tail_view!` is the scaffold shared by [`GridEntropicValueatRiskView`](@ref) and [`GridRelativisticValueatRiskView`](@ref). Both build a grid of points, drop the points whose row is not finite, and add one linear row per kept point. They differ in what a point is and in how its row is built, and both reach the scaffold through `row`.
+`ep_add_grid_tail_view!` is the scaffold shared by [`GridEntropicValueatRiskView`](@ref) and [`GridRelativisticValueatRiskView`](@ref). Both build a grid of points, drop the points whose row is not usable, and add one linear row per kept point. They differ in what a point is and in how its row is built, and both reach the scaffold through `row`.
 
 A point whose row is not finite is not a grid point, because a non-finite coefficient reaches the solver as `NaN * x[j]`. The caller's `msg` names the setting that put the whole grid there.
+
+The upper-bound half also drops a point whose bound is at or below zero. Its coefficients are positive and the posterior sums to one, so its row holds at no posterior. The lower-bound half keeps such a point: its row holds at every posterior, so it costs nothing and changes no answer.
+
+The rows of the lower-bound half keep the norm scale of [`add_ep_constraint!`](@ref). A row whose bound is small sits at the small end of the grid, and there the row is slack by many orders of magnitude at a posterior that meets a lower bound, because that posterior moves mass toward the largest loss, where every row takes its largest coefficient. Division by the bound would put coefficients of the order of the reciprocal of that bound into the dual that [`OptimEntropyPooling`](@ref) solves.
 
 # Algorithm
 
  1. Build the row of every point with `row`, and keep the points whose coefficients and whose right-hand side are all finite.
  2. Raise with `msg` where no point is kept.
  3. Where the view carries a lower-bound half, add the row of each kept point to `epc` under `:ineq` with [`add_ep_constraint!`](@ref), negated so the row reads as the `<=` sense that key states.
- 4. Return the kept points, which the caller carries into the tail view constraint of the upper-bound half.
+ 4. Where the view carries an upper-bound half, keep only the points whose right-hand side is positive, and raise with `msg` where none is kept.
+ 5. Return the kept points, which the caller carries into the tail view constraint of the upper-bound half.
 
 # Arguments
 
@@ -2727,34 +2741,36 @@ A point whose row is not finite is not a grid point, because a non-finite coeffi
 
 # Validation
 
-  - At least one point of the grid has a finite row. A grid that keeps no point raises an `ArgumentError` carrying `msg()`.
+  - At least one point of the grid has a finite row, and, where the view carries an upper-bound half, at least one such row has a positive bound. A grid that keeps no point raises an `ArgumentError` carrying `msg()`.
 
 # Returns
 
-  - `grid::AbstractVector`: Points of the grid whose row is finite.
+  - `grid::AbstractVector`: Points of the grid whose row is finite and, where the view carries an upper-bound half, whose bound is positive.
 
 # Related
 
   - [`ep_add_evar_view!`](@ref)
   - [`ep_add_rlvar_view!`](@ref)
   - [`add_ep_constraint!`](@ref)
+  - [`add_ep_tail_view!`](@ref)
+  - [`OptimEntropyPooling`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 """
 function ep_add_grid_tail_view!(epc::AbstractDict, grid::AbstractVector, op::Symbol, row,
                                 msg)
-    keep = filter(eachindex(grid)) do k
-        c, b = row(grid[k])
-        return all(isfinite, c) && isfinite(b)
-    end
+    rows = map(row, grid)
+    keep = findall(r -> all(isfinite, r[1]) && isfinite(r[2]), rows)
     @argcheck(!isempty(keep), ArgumentError(msg()))
-    grid = grid[keep]
     if op == :geq || op == :eq
-        for g in grid
-            c, b = row(g)
-            add_ep_constraint!(epc, reshape(-c, 1, :), [-b], :ineq)
-        end
+        foreach(r -> add_ep_constraint!(epc, reshape(-r[1], 1, :), [-r[2]], :ineq),
+                view(rows, keep))
     end
-    return grid
+    # An upper-bound row whose bound is at or below zero holds at no posterior. Issue #1264.
+    if op != :geq
+        keep = filter(k -> rows[k][2] > zero(rows[k][2]), keep)
+        @argcheck(!isempty(keep), ArgumentError(msg()))
+    end
+    return grid[keep]
 end
 """
     ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
@@ -2774,9 +2790,9 @@ Lower one relativistic value-at-risk view into the constraints its formulation n
  1. [`ConicRelativisticValueatRiskView`](@ref) checks the three preconditions below, then appends one [`ConicRelativisticValueatRiskViewConstraint`](@ref) carrying `x`, `coef`, `alpha`, `kappa` and `rhs`.
  2. [`GridRelativisticValueatRiskView`](@ref) checks that the view names one asset, and normalises `w` to sum to one, giving `wi`.
  3. It builds the grid `t`, `z` of primal points with [`ep_rlvar_grid`](@ref).
- 4. It keeps the points whose row is finite, giving `keep`, and raises where `keep` is empty.
+ 4. It keeps the points whose row is finite, giving `keep`, and raises where `keep` is empty. For the upper-bound half it keeps only the points whose bound is positive, and raises where none is.
  5. For the lower-bound half of the view, it builds the row of each kept point with [`ep_rlvar_grid_row`](@ref), and adds it to `epc` under `:ineq` with [`add_ep_constraint!`](@ref), negated so the row reads as the `<=` sense that key states.
- 6. For the upper-bound half of the view, it appends one [`GridRelativisticValueatRiskViewConstraint`](@ref) carrying `x`, the kept grid, `alpha`, `kappa`, `rhs` and the big-M constant `M`.
+ 6. For the upper-bound half of the view, it appends one [`GridRelativisticValueatRiskViewConstraint`](@ref) carrying `x`, the kept grid, `alpha`, `kappa`, `rhs` and the big-M multiplier `M`.
  7. [`SequentialRelativisticValueatRiskView`](@ref) orients the view and splits its assets with [`ep_sequential_sides`](@ref), builds a [`SequentialRelativisticValueatRiskViewConstraint`](@ref) with an empty surrogate row, reads its first row from the prior `w` with [`ep_sequential_start`](@ref), and appends it.
 
 # Arguments
@@ -2801,7 +2817,7 @@ Lower one relativistic value-at-risk view into the constraints its formulation n
 # Validation
 
   - [`ConicRelativisticValueatRiskView`](@ref) needs coefficients of one sign, an operator other than `<=`, and, for an equality, a target at or above the prior value of the left hand side.
-  - [`GridRelativisticValueatRiskView`](@ref) needs one asset, and at least one grid point whose row is finite. [`ep_rlvar_tail`](@ref) overflows at a dual variable near zero, which is where the grid sits when `kappa` approaches one; the points it overflows at are dropped, and a grid that keeps none of them raises.
+  - [`GridRelativisticValueatRiskView`](@ref) needs one asset, and at least one grid point whose row is finite, and whose bound is positive where the view carries an upper-bound half. [`ep_rlvar_tail`](@ref) overflows at a dual variable near zero, which is where the grid sits when `kappa` approaches one. The bound `rhs - t - z * ln_kappa(1 / (alpha * T))` of a point is at or below zero where the target lies below what the point can reach. Those points are dropped, and a grid that keeps none of them raises.
 
 # Returns
 
@@ -2852,9 +2868,10 @@ function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
         return ep_rlvar_grid_row(x, rhs, g[1], g[2], alpha, kappa)
     end
     # `ep_rlvar_tail` overflows at a dual variable near zero, which is where the grid sits
-    # when `kappa` approaches one.
+    # when `kappa` approaches one. An upper-bound point whose bound is at or below zero is
+    # dropped too.
     grid = ep_add_grid_tail_view!(epc, collect(zip(t, z)), op, row,
-                                  () -> "View `$(eqn)` builds no finite grid point at `kappa = $(kappa)`. The tail function overflows at every dual variable the grid spans; state the view at a smaller `kappa`.")
+                                  () -> "View `$(eqn)` builds no usable grid point at `kappa = $(kappa)`. The tail function overflows at every dual variable the grid spans, or the bound of every row is at or below zero because the target lies below what each point can reach. State the view at a smaller `kappa`, or at a larger target.")
     if op == :leq || op == :eq
         push!(tvs,
               GridRelativisticValueatRiskViewConstraint(x, first.(grid), last.(grid), alpha,
@@ -3298,7 +3315,7 @@ The `alg` field of a view group picks the formulation. A single formulation appl
 
 A significance level is part of the statistic, not a detail of the solve: the conditional value at risk at 1% and at 10% are different numbers on the same series. So the level lives on the view rather than on the estimator. `var_views`, `cvar_views`, `evar_views` and `rlvar_views` each take one [`ValueatRiskView`](@ref), [`ConditionalValueatRiskView`](@ref), [`EntropicValueatRiskView`](@ref) or [`RelativisticValueatRiskView`](@ref), or a vector of them, and each group carries the `alpha` its equations are read under. A [`RelativisticValueatRiskView`](@ref) carries a `kappa` as well, on the same reasoning: the deformation parameter is part of the statistic. A `prior(...)` reference inside a group is replaced by the prior value at *that* group's level.
 
-A tail view group also carries `alg`, the formulation. For [`EntropicValueatRiskView`](@ref) that is where the grid of dual variables and the big-M constant live, so a [`GridEntropicValueatRiskView`](@ref) there gives one group its own `pct`, `K` and `M`. [`ValueatRiskView`](@ref) has no such field: a value at risk view is linear in the posterior probabilities, so there is no formulation to choose.
+A tail view group also carries `alg`, the formulation. For [`EntropicValueatRiskView`](@ref) that is where the grid of dual variables and the big-M multiplier live, so a [`GridEntropicValueatRiskView`](@ref) there gives one group its own `pct`, `K` and `M`. [`ValueatRiskView`](@ref) has no such field: a value at risk view is linear in the posterior probabilities, so there is no formulation to choose.
 
 # Examples
 
