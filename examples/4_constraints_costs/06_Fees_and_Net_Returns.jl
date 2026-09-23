@@ -5,21 +5,20 @@ Description = "Fees and net returns in PortfolioOptimisers.jl: proportional, fix
 
 # Fees and net returns
 
-Every trade and every position costs something, and a portfolio that looks good *gross* can be
-mediocre *net*. `PortfolioOptimisers.jl` models costs with [`Fees`](@ref) — proportional and
-fixed charges on long and short positions, plus a turnover-based component — and lets you both
-**optimise net of fees** (the optimiser trades expected return against cost) and **evaluate** a
-portfolio's net return after the fact with [`calc_net_returns`](@ref).
+A portfolio with a good return before costs can have a poor return after them. A [`Fees`](@ref)
+contains the costs: proportional and fixed charges on long and short positions, and a charge on
+turnover. You can optimise net of fees, so that the optimiser weighs the expected return against
+the cost. You can also compute the returns of a portfolio after costs with
+[`calc_net_returns`](@ref).
 
-This closes the constraints-and-costs group: where [Turnover and Tracking](05_Turnover_and_Tracking.md)
-charged for *moving*, this page charges for *holding*.
+[Turnover and tracking](05_Turnover_and_Tracking.md) bounds how far the weights move. This page
+charges for the positions, and section 5 names the charge on trades.
 
 !!! tip "When to reach for this"
-    Reach for fees whenever costs are material to the decision, not just the reporting: high-fee
-    instruments, asymmetric long/short costs, or a strategy whose gross edge is thin enough that
-    fees decide whether it is worth running. Use the per-asset or per-group form to make the
-    optimiser *prefer cheap exposure*, and `calc_net_returns` to check that a candidate book still
-    earns its keep after costs.
+    Reach for fees when costs change the decision: instruments with high fees, different costs
+    on the long and the short side, or a strategy with a return before costs so small that the
+    fees can remove it. Use the per-asset or per-group form so the optimiser prefers the cheaper
+    assets, and `calc_net_returns` to find the return of a candidate book after costs.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -34,7 +33,10 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. Data
+
+We load one year of S&P 500 prices, fit an empirical prior, and optimise a maximum-ratio
+portfolio with no fees as the baseline.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -51,15 +53,14 @@ res_base = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                              opt = JuMPOptimiser(; pe = pr, slv = slv)))
 
 #=
-## 2. Fees erase returns
+## 2. What a fee costs this portfolio
 
-The starkest way to see why fees matter: take the unconstrained maximum-ratio book and look at
-its gross return against its return *net* of a proportional fee. [`calc_fees`](@ref) reports the
-cost of holding a weight vector as a **pair**: the charge every observation carries, and the
-one-off charge the first observation carries alone. [`calc_net_returns`](@ref) deducts both from
-the gross returns. `l`, `s` and `tn` are rates per period, so a fee built from them alone has a
-zero one-off half; `fl` and `fs` are the terms that fill it. A flat 0.2% long fee on this book
-costs about as much per day as the strategy earns — the net edge nearly vanishes.
+We compare the mean daily return of the baseline before and after a long fee of 0.2% per period.
+[`calc_fees`](@ref) returns the cost of holding a weight vector as a pair: the charge on every
+observation, and, with the default `fa`, a one-time charge on the first observation only.
+[`calc_net_returns`](@ref) deducts both from the returns. `l`, `s` and `tn` are rates per
+period, so a fee made from them alone has a one-time charge of zero. `fl` and `fs` are the
+one-time charges. Compare the fee cost of every day with the gross daily return in the table.
 =#
 
 fee = Fees(; l = 0.002)
@@ -77,9 +78,9 @@ pretty_table(DataFrame("Quantity" => ["Gross daily return", "Fee cost, every day
 #=
 ## 3. Optimising net of fees
 
-Passing `fees` to the [`JuMPOptimiser`](@ref) makes the optimiser maximise the ratio *after*
-costs, so it only takes exposure whose return justifies its fee. A uniform [`Fees`](@ref) charges
-the same rate everywhere (`l` for long, `s` for short positions).
+With `fees` on the [`JuMPOptimiser`](@ref), the optimiser maximises the ratio after costs, so
+the fee of each position counts against its expected return. A [`Fees`](@ref) with a number in
+`l` charges the same rate on every long position, and `s` does the same for short positions.
 =#
 
 res_fee = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
@@ -87,12 +88,13 @@ res_fee = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                                 fees = Fees(; l = 0.002))))
 
 #=
-## 4. Differential fees steer the allocation
+## 4. A fee on one sector
 
-Costs are rarely uniform — some instruments are expensive to hold. A [`FeesEstimator`](@ref)
-(the estimator counterpart of [`Fees`](@ref)) accepts per-asset or per-group rates over an
-[`UniverseSets`](@ref), exactly like the linear constraints. Charging a punitive fee on the sector
-the baseline loved makes the optimiser walk away from it.
+A [`FeesEstimator`](@ref) takes rates per asset or per group, by name through a
+[`UniverseSets`](@ref), as the linear constraints do. A [`Fees`](@ref) takes only a number or a
+vector, so a rate by name needs the estimator. We charge a long fee of 2% on healthcare, the
+sector with the largest weight in the baseline, and print the weight of healthcare in the two
+portfolios.
 =#
 
 sets = UniverseSets(;
@@ -114,21 +116,20 @@ pretty_table(DataFrame("Portfolio" => ["Baseline", "Healthcare fee 2%"],
              title = "A targeted fee steers exposure away from a sector")
 
 #=
-## 5. Fixed fees need a MIP solver
+## 5. Fixed fees need a mixed-integer solver
 
-Proportional fees (`l`, `s`) are convex and solve with Clarabel. **Fixed** fees (`fl`, `fs`) — a
-flat charge incurred only *if* a position is opened — are semi-continuous (zero or the fee), the
-same structure as thresholds and cardinality. They require a mixed-integer-capable solver
-([Pajarito](https://github.com/jump-dev/Pajarito.jl) + [HiGHS](https://github.com/jump-dev/HiGHS.jl));
-handed to a continuous-only solver the problem fails to solve rather than returning a wrong
-answer. See [Budget Constraints](01_Budget_Constraints.md) for the MIP setup. Fees also carry a
-turnover component (the `tn` field), tying the holding cost here to the trading cost in
-[Turnover and Tracking](05_Turnover_and_Tracking.md).
+The proportional fees, `l` and `s`, are convex, and Clarabel solves them. The fixed fees, `fl`
+and `fs`, are a flat charge on each position the portfolio holds. Each one is either zero or the
+whole fee, which is the same structure as a threshold or a cardinality constraint. They need a
+mixed-integer solver, as section 6 of [Linear and group
+constraints](02_Linear_Group_Constraints.md) explains. A `Fees` also has a `tn` field, a charge
+on the turnover from a reference weight vector, which puts a price on the change that [Turnover
+and tracking](05_Turnover_and_Tracking.md) limits.
 
-## 6. Comparing the books
+## 6. Comparing the portfolios
 
-Gross-optimal, net-optimal, and fee-steered — same prior and objective, different cost
-assumptions.
+We print and plot the three portfolios: the baseline, the portfolio optimised with a 0.2% long
+fee, and the portfolio with a 2% fee on healthcare.
 =#
 
 results = [res_base, res_fee, res_diff]

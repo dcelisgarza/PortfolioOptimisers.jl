@@ -1,22 +1,23 @@
 #=
 ```@meta
-Description = "Nested clustered optimisation with constraints and fees at the inner, outer and final layers of NestedClustered in PortfolioOptimisers.jl."
+Description = "Nested clustered optimisation in PortfolioOptimisers.jl: weight bounds on the inner, outer and final layers of NestedClustered, and a fee on the clusters."
 ```
 
 # Nested clustered optimisation with layered constraints and fees
 
-This example shows how to apply constraints at three distinct layers of
-[`NestedClustered`](@ref):
+This example puts weight bounds on three layers of [`NestedClustered`](@ref).
 
-  - the inner optimisation within each cluster,
-  - the outer optimisation across synthetic cluster portfolios,
-  - and a final overall optimisation pass on the full universe.
+  - The inner optimisation inside each cluster.
+  - The outer optimisation over the cluster portfolios, the portfolio that each inner
+    optimisation makes of its cluster.
+  - The final weights of the assets over the whole universe.
 
-It also shows how fees can be attached to the nested stage and to the final overall stage.
+It also puts a fee on `NestedClustered`. The fee reduces the returns of each cluster portfolio
+before the outer optimisation sees them.
 
 !!! tip "When to reach for this"
-    Reach for this when you want cluster structure for robustness, but still need practical
-    controls (fees and weight limits) at more than one stage of the nested workflow.
+    Reach for this when a mandate caps an asset inside its cluster, a whole cluster, or an asset
+    in the final portfolio.
 =#
 
 using PortfolioOptimisers, PrettyTables, StableRNGs
@@ -32,11 +33,12 @@ end;
 #=
 ## 1. Data and shared setup
 
-We use one year of S&P 500 data and compute clusters once. Then we compare three nested setups:
+We use one year of S&P 500 prices and compute the clusters once. Then we compare three
+portfolios.
 
-  - inner-only weight bounds,
-  - inner + outer bounds plus fees in the nested stage,
-  - direct overall asset bounds on [`NestedClustered`](@ref).
+  - Weight bounds on the inner optimisations only.
+  - Weight bounds on the inner and the outer optimisations, and a fee.
+  - The same, and bounds on the final asset weights, given to [`NestedClustered`](@ref).
 =#
 
 using CSV, TimeSeries, DataFrames, Clarabel
@@ -58,15 +60,18 @@ pr = prior(EmpiricalPrior(), rd)
 clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
 
 #=
-## 2. Layering constraints in NCO
+## 2. Constraints at each layer
 
-The nested workflow solves:
+`NestedClustered` solves two kinds of problem.
 
-  - an inner [`MeanRisk`](@ref) within each cluster, then
-  - an outer [`MeanRisk`](@ref) on synthetic cluster returns.
+  - An inner [`MeanRisk`](@ref) in each cluster.
+  - An outer [`MeanRisk`](@ref) over the returns of the cluster portfolios, one series per
+    cluster.
 
-The key wiring rule remains the same: the **outer optimiser must not** consume the
-asset-level prior directly; it works on synthetic cluster returns.
+The outer `JuMPOptimiser` takes no `pe`, because it works on the returns of the cluster
+portfolios and not on the assets. The inner bound caps each weight inside a cluster at 35%. The
+outer bound caps the weight of each cluster at 62%. The final bound caps each asset at 20% of
+the whole portfolio.
 =#
 
 jopti_inner = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = 0.0, ub = 0.35))
@@ -87,9 +92,9 @@ res_inner_outer = optimise(NestedClustered(; pe = pr, cle = clr, fees = Fees(; l
 
 wb_overall_assets = WeightBounds(; lb = fill(0.0, length(rd.nx)),
                                  ub = fill(0.20, length(rd.nx)))
-# The direct `NestedClustered(wb = ...)` bound always applies to the final aggregated asset
-# weights. Per-asset vectors are used here to vary the cap by asset; a scalar bound is
-# equivalent to the vector spelling of the same number repeated across every asset.
+# The `wb` of `NestedClustered` bounds the final asset weights. We give it one bound per asset,
+# which is how you give each asset its own cap. Here every cap is `0.20`, so a scalar bound of
+# `0.20` gives the same constraint.
 
 res_nested_overall = optimise(NestedClustered(; pe = pr, cle = clr, wb = wb_overall_assets,
                                               fees = Fees(; l = 0.001),
@@ -104,11 +109,11 @@ pretty_table(DataFrame(; :assets => rd.nx, :InnerOnlyWB => res_inner.w,
              formatters = [resfmt])
 
 #=
-The following audit confirms where the constraints are active.
+For each portfolio, we print three numbers next to the bound of their layer.
 
-  - Inner bound (`0.35`) applies to each cluster-level solve.
-  - Outer bound (`0.62`) applies to cluster allocation weights.
-  - Overall bound (`0.20`) can be applied directly in [`NestedClustered`](@ref), applied here using per-asset vector bounds.
+  - The largest weight inside any cluster, against the inner bound, `0.35`.
+  - The largest weight of a cluster, against the outer bound, `0.62`.
+  - The largest final asset weight, against the final bound, `0.20`.
 =#
 
 inner_local_max(res) = maximum(maximum(ri.w) for ri in res.resi)
@@ -129,11 +134,9 @@ audit = DataFrame(:Metric => ["Max inner local weight", "Max outer cluster weigh
 pretty_table(audit; formatters = [resfmt])
 
 #=
-These runs isolate layer placement:
-
-  - inner bounds shape per-cluster compositions,
-  - outer bounds shape allocation across clusters,
-  - direct `NestedClustered(wb = ...)` bounds constrain the final aggregated asset weights.
+The first portfolio puts no bound on the outer optimisation, so its largest cluster weight can
+be above `0.62`, and only the first two portfolios can have a final asset weight above `0.20`.
+We plot the three portfolios.
 =#
 
 using StatsPlots, GraphRecipes
@@ -142,15 +145,12 @@ plot_stacked_bar_composition([res_inner, res_inner_outer, res_nested_overall], r
                                        ["Inner WB", "Inner+Outer WB+Fees", "Overall WB"]))
 
 #=
-## Summary
+## What to take away
 
-Layered controls can be applied around [`NestedClustered`](@ref) without giving up the
-cluster-based decomposition.
-
-  - Inner `wb` controls weights inside each cluster.
-  - Outer `wb` controls allocation across synthetic cluster portfolios.
-  - Direct `NestedClustered(wb = ...)` constrains the final aggregated asset weights, whether
-    given as a scalar, a per-asset vector, or an estimator.
+  - The `wb` of `NestedClustered` bounds the final asset weights. It takes a
+    [`WeightBounds`](@ref) of numbers or of vectors, or a [`WeightBoundsEstimator`](@ref).
+  - The `fees` of `NestedClustered` reduce the returns of the cluster portfolios that the outer
+    optimisation sees.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

@@ -5,24 +5,25 @@ Description = "Turnover and tracking in PortfolioOptimisers.jl, each as a constr
 
 # Turnover and tracking
 
-The constraints so far shape *what* the portfolio holds. **Turnover** and **tracking** constrain
-how it *moves*: how far it may drift from your current book when you rebalance, and how far it may
-stray from a benchmark. Both come in two flavours in `PortfolioOptimisers.jl` — as a **constraint**
-on a [`JuMPOptimiser`](@ref), or as a **risk measure** you minimise directly — and the choice
-between them is the difference between "respect this limit" and "make this the goal".
+Turnover and tracking bound the distance of the weights from a reference. Turnover is the
+distance from your current weights when you rebalance, and tracking is the distance from a
+benchmark. Each comes in two forms. The constraint form, a keyword of the
+[`JuMPOptimiser`](@ref), keeps the distance under a limit. The risk measure form makes the
+distance the quantity you minimise.
 
-  - **Turnover** ([`Turnover`](@ref) via `tn`, or [`TurnoverRiskMeasure`](@ref)) penalises trading
-    away from a reference weight vector.
-  - **Tracking** ([`TrackingError`](@ref) via `tr`, or [`TrackingRiskMeasure`](@ref)) penalises
-    deviation from a benchmark, specified either as weights ([`WeightsTracking`](@ref)) or as a
-    benchmark return series ([`ReturnsTracking`](@ref) — e.g. an index).
+  - [`Turnover`](@ref), through the `tn` keyword, and [`TurnoverRiskMeasure`](@ref) measure the
+    change of the weights from a reference weight vector.
+  - [`TrackingError`](@ref), through the `tr` keyword, and [`TrackingRiskMeasure`](@ref) measure
+    the distance from a benchmark. The benchmark is either a weight vector,
+    [`WeightsTracking`](@ref), or a return series such as an index, [`ReturnsTracking`](@ref).
 
 !!! tip "When to reach for this"
-    Reach for **turnover** when trading is costly and you rebalance often — you want the new book
-    close to the old one. Reach for **tracking** when you are benchmarked: index replication
-    (minimise tracking error) or enhanced indexing (seek return *subject to* a tracking-error
-    budget). Use the *constraint* form when the limit is a hard mandate, the *risk-measure* form
-    when staying put / hugging the benchmark is itself the objective.
+    Reach for turnover when trading is costly and you rebalance often, so the new book must stay
+    close to the old one. Reach for tracking when your mandate judges you against a benchmark.
+    To replicate an index, minimise the tracking error. To beat it within a limit, maximise the
+    return with a tracking-error budget. Use the constraint form for a limit that a mandate
+    sets, and the risk measure form when staying near the current book or the benchmark is the
+    goal itself.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -39,8 +40,8 @@ end;
 #=
 ## 1. Data and a benchmark
 
-We use the S&P 500 slice, and two benchmarks: an equal-weight book (a weight vector) and the
-S&P 500 index itself (a return series).
+The data is one year of S&P 500 prices, with two benchmarks. One is the equal-weight book, which
+is a weight vector. The other is the S&P 500 index, which is a return series.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -61,10 +62,11 @@ equal_weight = fill(1 / N, N)
 #=
 ## 2. Turnover as a constraint
 
-[`Turnover`](@ref) (`tn`) limits how far the weights may move from a reference book `w` — your
-current holdings — so a rebalance stays cheap. We seek the maximum-ratio portfolio but anchor it
-at the equal-weight book and tighten the per-name turnover budget `val`. A smaller budget keeps
-the result closer to where we started.
+[`Turnover`](@ref), through `tn`, limits how far each weight may move from a reference weight
+vector `w`, which is normally your current holdings. `val` is the largest change it allows for
+each asset. We maximise the ratio with the equal-weight book as the reference, for four values
+of `val`. For each result we print the sum of the absolute changes from the equal-weight book,
+and the largest weight.
 =#
 
 turnover_vals = [0.005, 0.02, 0.1, 0.5]
@@ -84,10 +86,10 @@ pretty_table(DataFrame("Turnover budget" => turnover_vals,
 #=
 ## 3. Turnover as a risk measure
 
-[`TurnoverRiskMeasure`](@ref) makes *minimising* turnover the objective rather than a side
-constraint. Minimising turnover from the current book with no other pull simply returns the
-current book — useful as one term in a multi-objective problem, or to measure the trading cost of
-a target.
+[`TurnoverRiskMeasure`](@ref) makes the turnover the quantity to minimise. With no other term,
+the minimum is the reference book itself, so the result is the equal-weight book. The measure is
+useful as one term of a problem with more than one risk measure. You can also compute it for a
+candidate portfolio, to find how far that portfolio is from the current weights.
 =#
 
 res_min_turnover = optimise(MeanRisk(; r = TurnoverRiskMeasure(; w = equal_weight),
@@ -97,10 +99,11 @@ res_min_turnover = optimise(MeanRisk(; r = TurnoverRiskMeasure(; w = equal_weigh
 #=
 ## 4. Tracking a benchmark
 
-[`TrackingRiskMeasure`](@ref) minimises the tracking error to a benchmark. With a
-[`WeightsTracking`](@ref) benchmark it reproduces that book exactly; with a
-[`ReturnsTracking`](@ref) benchmark — here the S&P 500 index return series — it builds the
-*replicating* portfolio from our 20 assets that best tracks the index.
+With [`TrackingRiskMeasure`](@ref) we minimise the tracking error to a benchmark. A
+[`WeightsTracking`](@ref) benchmark is a portfolio of the same assets, so the minimum is that
+portfolio. A [`ReturnsTracking`](@ref) benchmark, here the return series of the S&P 500 index,
+gives the portfolio of our 20 assets whose returns have the smallest tracking error to the
+index.
 =#
 
 res_replicate_ew = optimise(MeanRisk(;
@@ -121,12 +124,14 @@ pretty_table(DataFrame("Asset" => rd.nx, "Replicate EW" => res_replicate_ew.w,
              title = "Pure tracking: equal-weight book vs index replication")
 
 #=
-## 5. Enhanced indexing: tracking as a constraint
+## 5. Tracking as a constraint
 
-The more interesting case is *enhanced indexing* — seek return, but stay within a tracking-error
-budget of the benchmark. [`TrackingError`](@ref) (`tr`) bounds the tracking error to `err`. We
-maximise the ratio while tightening `err` against the equal-weight benchmark: a small `err` hugs
-the benchmark, a large one frees the optimiser to chase return.
+To beat a benchmark within a limit, you maximise the return with the tracking error at or below
+a budget. [`TrackingError`](@ref), through `tr`, keeps the tracking error at or below `err`.
+`err` is in the units of the tracking error, which is a norm of the return differences, not a
+distance between weights. We maximise the ratio against the equal-weight benchmark with four
+values of `err`. A small `err` keeps the portfolio near the benchmark, and a large one gives the
+optimiser more room to raise the return.
 =#
 
 err_vals = [0.0005, 0.001, 0.005, 0.02]
@@ -145,12 +150,17 @@ pretty_table(DataFrame("Tracking-error budget" => err_vals,
              title = "Tighter tracking-error budget hugs the benchmark")
 
 #=
-The tracking error itself can be measured with different norms — [`L1Norm`](@ref) (absolute,
-sparse), [`LpNorm`](@ref) (general p-norm), [`LInfNorm`](@ref) (worst single deviation) —
-passed as the `alg`, so you can choose whether to penalise the total drift or the largest single
-bet away from the benchmark.
+The `alg` field of [`TrackingError`](@ref) sets the norm of the tracking error, which acts on
+the series of differences between the portfolio returns and the benchmark returns. The default
+is [`L2Norm`](@ref). [`L1Norm`](@ref) uses the sum of the absolute differences, [`LpNorm`](@ref)
+a p-norm of them, and [`LInfNorm`](@ref) the largest difference in one period. Each `alg`
+divides its norm by a factor of the number of observations, and `err` is in the units of that
+result. With `L1Norm` the result is the mean absolute difference.
 
 ## 6. Comparing the approaches
+
+We plot four of the portfolios: the equal-weight replica, two tracking-error budgets and one
+turnover limit.
 =#
 
 results = [res_replicate_ew, track_res[1], track_res[3], turnover_res[2]]

@@ -5,11 +5,13 @@ Description = "Regularisation in PortfolioOptimisers.jl: L1, L2, Lp and L-infini
 
 # Regularisation
 
-This example shows one of the simplest ways to improve the robustness of portfolios, regularisation penalties.
+This example shows regularisation, a penalty on a norm of the weights that the optimiser adds to
+the objective.
 
-Section 2 states every coefficient as a number. Section 3 puts a **Calibration Rule** in the same
-slots, which computes the number from the sample in front of it, and it adds the three norm
-ceilings `l2c`, `lpc` and `linfc` that bound a norm rather than price one.
+Section 2 gives every penalty coefficient as a number. Section 3 replaces the number with a
+calibration rule, an estimator that computes the coefficient from the sample. It also adds the
+three norm ceilings, `l2c`, `lpc` and `linfc`, which bound a norm of the weights in place of a
+penalty on it.
 =#
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
@@ -43,9 +45,10 @@ summary_row = (data, j) -> begin
 end
 
 #=
-## 1. Setting up
+## 1. Data
 
-We will use the same data as the previous example.
+The data is one year of S&P 500 prices. We fit an empirical prior, and give the optimiser seven
+Clarabel settings to try in turn.
 =#
 
 using CSV, TimeSeries, DataFrames, Clarabel
@@ -82,16 +85,28 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 #=
 ## 2. Regularised portfolios
 
-The optimal regularisation penalty value depends on the data, the investor preferences, and type of regularisation. The specific choice of penalty value is so volatile that it can only be estimated via grid search cross-validation or similar techniques, but the "optimal" (to some definition of optimal) value will also change over time as the market conditions change. Therefore, we will simply show how to set up and solve a regularised portfolio optimisation problem, without attempting to find the optimal penalty value.
+The coefficient that suits a problem depends on the data and on the norm, and it changes as the
+data changes. You can search for it with cross-validation, or compute it from the sample with a
+calibration rule, as section 3 shows. This section sets up and solves regularised problems, and
+does not search for the best value.
 
-We will use the same small penalty for all regularisations to illustrate how they differ.
+We use the same coefficient, `4e-4`, for every regularisation, so you can compare them.
 
-  - L1 regularisation (also known as Lasso regularisation) adds a penalty proportional to the sum of the absolute values of the portfolio weights. This encourages sparsity in the portfolio, leading to fewer assets being selected.
-  - L2 regularisation (also known as Ridge regularisation) adds a penalty proportional to the sum of the squares of the portfolio weights. This discourages large weights and promotes diversification.
-  - Lp regularisation via [`LpRegularisation`](@ref) adds a penalty proportional to the p-norm of the portfolio weights, where `p > 1` is a positive real number.
-  - L-Inf regularisation adds a penalty proportional to the maximum absolute value of the portfolio weights. This limits the influence of any single asset in the portfolio.
+  - L1 regularisation, also called Lasso, adds a penalty proportional to the sum of the absolute
+    values of the weights. It pushes small weights to zero, so the portfolio holds fewer assets.
+  - L2 regularisation, [`L2Regularisation`](@ref), adds a penalty proportional to the 2-norm of
+    the weights, the square root of the sum of their squares. It penalises large weights and
+    spreads the portfolio over more assets. Other values of its `alg` penalise the square of the
+    2-norm, which is the Ridge penalty.
+  - Lp regularisation, [`LpRegularisation`](@ref), adds a penalty proportional to the p-norm of
+    the weights, for a finite `p` greater than 1.
+  - L-Inf regularisation adds a penalty proportional to the largest absolute weight. It limits
+    the size of the largest position.
 
 ### 2.1 Efficient frontier
+
+For each regularisation we compute an efficient frontier of 50 portfolios, with weights between
+`-1` and `1`, a short budget of 1 and a budget of 1.
 =#
 
 opts = [JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
@@ -128,62 +143,63 @@ nocs = [MeanRisk(; opt = opt) for opt in opts]
 ress = optimise.(nocs)
 
 #=
-Let's plot the efficient frontiers.
+For each regularisation we plot the weights along the frontier, and the frontier itself in the
+plane of variance and return, coloured by the ratio of return to risk.
 =#
 using StatsPlots, GraphRecipes
 
 r = Variance()
-# No regularisation portfolio weights.
+# Weights along the frontier with no regularisation.
 plot_stacked_area_composition(ress[1].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
                                         title = "No regularisation", legend = :outerright))
-# No regularisation frontier.
+# Frontier with no regularisation.
 plot_measures(ress[1].w, pr; x = r, y = ExpectedReturn(; rt = ress[1].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "No regularisation", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
-# L1 regularisation portfolio weights. As expected, the portfolio is sparsified, with fewer assets with non-zero weight.
+# Weights with L1 regularisation. Fewer assets hold a weight than with no regularisation.
 plot_stacked_area_composition(ress[2].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
                                         title = "L1 regularisation", legend = :outerright))
-# L1 regularisation frontier. The sparsification makes the pareto front non-smooth.
+# Frontier with L1 regularisation. It is not smooth, because assets enter and leave the portfolio along it.
 plot_measures(ress[2].w, pr; x = r, y = ExpectedReturn(; rt = ress[2].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "L1 regularisation", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
-# L2 regularisation portfolio weights. Even values of p-norms smooth out the weights, leading to more diversified portfolios. The higher the value, the more highly penalised larger deviations from the mean weight become. This is similar to how moments of even order behave.
+# Weights with L2 regularisation. The budget fixes the sum of the weights, so the 2-norm is smallest when every weight equals the mean weight. The penalty pulls the weights toward it and spreads the portfolio over more assets.
 plot_stacked_area_composition(ress[3].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
                                         title = "L2 regularisation", legend = :outerright))
-# L2 regularisation frontier.
+# Frontier with L2 regularisation.
 plot_measures(ress[3].w, pr; x = r, y = ExpectedReturn(; rt = ress[3].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "L2 regularisation", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
-# Lp regularisation portfolio weights. The higher the value of p, the closer the behaviour is to L-Inf regularisation, where the maximum absolute weight is penalised. This leads to portfolios where all weights are more similar in magnitude, but does not smear the negative weights into positive values like the L2 norm.
+# Weights with Lp regularisation, p = 5. As p grows, the penalty comes closer to the L-Inf penalty on the largest absolute weight, and the weights come closer to each other in size. In the plot the short weights stay negative, where the L2 penalty turns some of them positive.
 plot_stacked_area_composition(ress[4].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
                                         title = "Lp (p = 5) regularisation",
                                         legend = :outerright))
-# Lp regularisation frontier.
+# Frontier with Lp regularisation, p = 5.
 plot_measures(ress[4].w, pr; x = r, y = ExpectedReturn(; rt = ress[4].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Lp (p = 5) regularisation", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
-# L-Inf regularisation portfolio weights.
+# Weights with L-Inf regularisation.
 plot_stacked_area_composition(ress[5].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
                                         title = "L-Inf regularisation",
                                         legend = :outerright))
-# L-Inf regularisation frontier.
+# Frontier with L-Inf regularisation.
 plot_measures(ress[5].w, pr; x = r, y = ExpectedReturn(; rt = ress[5].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "L-Inf regularisation", xlabel = "Variance",
@@ -193,7 +209,8 @@ plot_measures(ress[5].w, pr; x = r, y = ExpectedReturn(; rt = ress[5].ret),
 #=
 ### 2.2 Minimum risk portfolios
 
-Lets view only the minimum risk portfolios for each regularisation to get more insight into what regularisation does.
+We now solve only the minimum risk portfolio of each regularisation. The table prints the
+weights, and its last row is the number of effective assets of each portfolio.
 =#
 
 opts = [JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
@@ -215,38 +232,49 @@ pretty_table(DataFrame(:Assets => rd.nx, :No_Reg => ress[1].w, :L1 => ress[2].w,
              summary_row_labels = ["# Eff. Assets"])
 
 #=
-The effect of each regularisation depends on the relative values of the objective function with respect to the value of the relevant norm of the optimised portfolio weights multiplied by the penalty.
+How much a penalty changes the weights depends on its size against the rest of the objective.
+The penalty is the coefficient times the norm of the weights, and the objective here is the
+risk.
 
-Generally, regularised portfolios tend to have more effective assets than unregularised ones. The number of effective assets is different to the sparsity in that it measures the concentration of weights as `1/(w ⋅ w)`, rather than counting the number of non-zero (or near zero) weights. Usually, the larger the number of effective assets, the more diversified the portfolio. Sparsity is a non-smooth measure, while the number of effective assets is smooth, so a portfolio can have higher sparsity and still have a larger number of effective assets.
+The number of effective assets, [`number_effective_assets`](@ref), is `1/(w ⋅ w)`. It measures
+how concentrated the weights are, and it is not a count of the weights that are not zero. A
+portfolio that holds fewer assets can still have more effective assets, if its weights are more
+even. A larger number of effective assets means a less concentrated portfolio.
 
-It is possible to combine multiple regularisation penalties in the same optimisation problem by simultaneously specifying multiple regularisation keywords in the `JuMPOptimiser`. This can be useful to combine the benefits of different regularisations, such as sparsity and diversification, but can make the optimisation more difficult to solve and interpret.
+You can combine penalties: give more than one of the regularisation keywords to the
+`JuMPOptimiser`. For example, an L1 and an L2 penalty together ask for fewer assets and for more
+even weights. Each penalty you add is one more coefficient to choose.
 =#
 
 #=
 ## 3. A rule in place of a penalty value
 
-Every coefficient section 2 states as a number is a **calibration slot**. A slot takes the number
-itself, and it takes a **Calibration Rule**, which computes the number from the prior result of
-the sample in front of it. The rule resolves where the model is built, so a cross-validation over
-folds of unequal length refits the coefficient on every fold and nothing else about the optimiser
-moves. The [calibration example](../5_validation_tuning/07_Calibrated_Risk_Measures.md) shows the
-slot on a risk measure. This section reads all seven slots this example owns.
+Each penalty coefficient of section 2 can be a calibration rule in place of a number. A
+calibration rule is an estimator that computes the coefficient from the prior of the sample it
+gets. `l1` and `linf` take the rule directly, and [`L2Regularisation`](@ref) and
+[`LpRegularisation`](@ref) take it in their `val`. The optimiser computes the coefficient when
+it builds the model. In a cross-validation, each fold therefore gets a coefficient from its own
+training sample, and the rest of the optimiser stays the same. The [calibration
+example](../5_validation_tuning/07_Calibrated_Risk_Measures.md) uses a rule in a risk measure.
+This section covers the four penalties and the three norm ceilings.
 
-The four penalty coefficients are **ambiguity radii**. A norm penalty is the support function of
-a ball in the dual of the penalised norm, so its coefficient is the radius of that ball and its
-slot takes a rule of the ambiguity-radius family.
+The four penalty coefficients are ambiguity radii. Take a ball of return distributions around
+the sample, with distance measured in the dual of the penalised norm. The worst case of the
+objective over that ball is the objective plus a penalty on the norm of the weights, and the
+coefficient of the penalty is the radius of the ball. The penalties therefore take the rules
+that compute a radius.
 
-The three norm ceilings `l2c`, `lpc` and `linfc` bound a norm rather than price one, so they are
-a different quantity and their slots take a family of their own, the norm-ceiling rules. A
-ceiling is a diversification statement: its reciprocal is a floor on the effective number of
-assets.
+The three norm ceilings, `l2c`, `lpc` and `linfc`, bound a norm of the weights in place of a
+penalty on it. A ceiling is not a radius, so the ceilings take a different family of rules. A
+ceiling on a norm of the weights sets a floor on an effective number of assets, as section 3.3
+shows.
 
-### 3.1 One rule reads the slot it stands in
+### 3.1 A rule whose value depends on the penalty
 
-[`DualNormRadius`](@ref) returns the sampling error of the mean vector, measured in the ground
-metric of the slot. The ground metric is the dual of the norm the slot penalises, so the rule
-reads the slot's own key and answers a different number for every key. Every other radius rule
-returns one number for every slot.
+[`DualNormRadius`](@ref) returns the sampling error of the mean returns, measured in the dual of
+the norm that the penalty uses. It therefore gives a different number for each penalty, where
+the other radius rules of the library give the same number for every penalty. We call the rule
+with the key of each penalty and print the four radii.
 =#
 
 numfmt = (v, i, j) -> begin
@@ -266,15 +294,16 @@ radius_table = DataFrame(:slot => ["l1", "linf", "l2, val", "lp, val, p = 5"],
 pretty_table(radius_table; formatters = [numfmt])
 
 #=
-The `l1` and `linf` rows are the reading to take away. One rule, one sample and one confidence
-level give two coefficients an order of magnitude apart, because an L1 penalty is priced in the
-∞-norm of the error and an L-Inf penalty in its 1-norm. The `lp` row needs the penalty's own `p`,
-because no key can name the conjugate order. The rule holds no order of its own: the penalty
-site states it in a `CalibrationContext`, and the `lp5` context above stands in for that site
-because the rule runs outside it here.
+Compare the `l1` and `linf` rows. The rule, the sample and the confidence level are the same,
+but the two coefficients are about an order of magnitude apart. The L1 penalty uses the ∞-norm
+of the error, and the L-Inf penalty uses its 1-norm. The `lp` row needs the `p` of the penalty,
+because its dual order `q = p / (p - 1)` depends on it. When the optimiser builds the model, it
+gives the rule this `p` in a [`CalibrationContext`](@ref). Here we call the rule ourselves, so
+we pass `lp5`, a context with `p = 5`.
 
-The slot takes the rule, and the coefficient appears when the model is built. The two runs below
-differ only in what stands in `l1`, and they hold the same weights.
+Next we give the rule to `l1` of one optimiser, and the number that it computes to `l1` of a
+second optimiser. Both use a confidence level of 0.95, so both models get the same coefficient.
+The cell prints the largest difference between the two sets of weights.
 =#
 
 l1_rule = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1),
@@ -286,12 +315,12 @@ res_num = optimise(MeanRisk(; opt = l1_num))
 println("largest weight difference = $(maximum(abs, res_rule.w - res_num.w))")
 
 #=
-### 3.2 Two rates, and the one the universe sets
+### 3.2 Radii that fall as the sample grows
 
-[`RateRadius`](@ref) shrinks the ball as `c / sqrt(T)`, which is the rate a sample mean's own
-error falls at. [`DimensionalRateRadius`](@ref) shrinks it at the rate the number of assets sets,
-which is far slower over a wide universe: the exponent is `1 / max(N, 2)` rather than `1 / 2`.
-The table reads both rules over three windows of the same record.
+[`RateRadius`](@ref) returns `c / sqrt(T)`, so the radius falls at the rate of the error of a
+sample mean. [`DimensionalRateRadius`](@ref) falls as `T` to the power `-1 / max(N, 2)`, where
+`N` is the number of assets. Over a wide universe this is much slower than the power `-1 / 2`.
+We compute both rules on three windows of the same price history, of 252, 630 and 1260 days.
 =#
 
 X_all = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)
@@ -309,21 +338,24 @@ end
 pretty_table(rate_table; formatters = [numfmt])
 
 #=
-The rate radius falls by the square root of the ratio of the lengths. The dimensional radius
-barely moves, and it does not fall monotonically either: over this universe the exponent is
-`1 / 20`, so a fivefold record buys almost nothing, and what movement the column holds comes from
-the scale the rule reads off each window rather than from the length of it.
+The rate radius falls by the square root of the ratio of the window lengths. The dimensional
+radius changes little, and it does not always fall. With 20 assets its power is `-1 / 20`, so a
+window five times longer lowers it by less than 8%. The rule also multiplies by a scale that it
+computes from each window, the mean standard deviation of the assets, and that scale causes the
+rest of the change.
 
 ### 3.3 The three norm ceilings
 
-[`EffectiveAssetFloor`](@ref) is the one rule of the ceiling family. It states a fraction of the
-universe to hold effective, and returns the ceiling on the norm that meets it. The order-`p`
-effective number of assets is `(sum(abs.(w) .^ p))^(1 / (1 - p))`, and the ceiling is the number
-that holds it at or above `fraction * N`.
+[`EffectiveAssetFloor`](@ref) is the one rule for the ceilings. You give it a fraction of the
+universe, and it returns the ceiling on the norm that keeps the effective number of assets at or
+above `m = fraction * N`. The effective number of assets of order `p` is `(sum(abs.(w) .^ p))^(1
+/ (1 - p))`. The ceiling is `m^(1 / p - 1)`, which is `1 / sqrt(m)` for `p = 2` and `1 / m` for
+`p = Inf`.
 
-The order belongs to the constraint rather than to the rule, so each site states it in a
-`CalibrationContext`. A rule run outside a site needs a context that names `p`, exactly as the
-`lp` radius above did.
+The order `p` comes from the constraint, not from the rule. `l2c` uses 2, `lpc` uses the `p` of
+its [`LpRegularisation`](@ref), and `linfc` uses `Inf`. When we call the rule ourselves, we pass
+the order in a `CalibrationContext`, as we did for the `lp` radius. We print the size of the
+universe, the floor and the three ceilings.
 =#
 
 N = size(pr.X, 2)
@@ -341,7 +373,9 @@ ceiling_table = DataFrame(:slot => ["l2c", "lpc, p = 5", "linfc"],
 pretty_table(ceiling_table; formatters = [numfmt])
 
 #=
-One rule serves the three slots, and each site reads it against its own norm order.
+We give the same rule to the three ceilings of three optimisers, and compare them with an
+optimiser that has no ceiling. For each portfolio we print the effective number of assets of
+order 2, and of the order that its ceiling uses.
 =#
 
 ceil_rule = EffectiveAssetFloor(; fraction = 0.5)
@@ -366,14 +400,15 @@ effective_table = DataFrame(:ceiling => ["none", "l2c", "lpc, p = 5", "linfc"],
 pretty_table(effective_table; formatters = [numfmt])
 
 #=
-Every ceiling meets its own order's floor, which is the `n_eff_p` column. The `n_eff_2` column is
-[`number_effective_assets`](@ref), which is the order-2 reading alone, so only the `l2c` row is
-read against the order its ceiling was written for. The two columns are one number on that row
-and two numbers on the others, and that is a statement about which order the reading uses rather
-than about a ceiling that missed.
+The `n_eff_p` column is the effective number of assets of the order that each ceiling uses.
+Compare it with the floor printed above. The `n_eff_2` column is `number_effective_assets`,
+which uses order 2 on every row. The two columns are equal on the first two rows, where the
+order is 2, and differ on the other two. A value of `n_eff_2` below the floor on the `lpc` or
+`linfc` row does not mean that the ceiling failed, because that ceiling bounds a different
+order.
 
-The rule refuses a resolution whose context names no order, and the message names the three
-slots that state one.
+If the context names no order, the rule throws an error, and the message names the three
+ceilings that give one.
 =#
 
 try

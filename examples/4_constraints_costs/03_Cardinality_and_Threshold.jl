@@ -1,27 +1,25 @@
 #=
 ```@meta
-Description = "Cardinality and threshold constraints in PortfolioOptimisers.jl, from asset-level buy-in thresholds to group-of-sets cardinality."
+Description = "Cardinality and threshold constraints in PortfolioOptimisers.jl on assets, on groups of assets, on sets of assets and on groups of sets."
 ```
 
 # Cardinality and threshold
 
-This example walks from the simplest mixed-integer constraints to the most structured ones:
+This example applies cardinality and threshold constraints at four levels.
 
-1. Asset-level cardinality and buy-in thresholds: `card`, `lt`, `st`.
-2. Group cardinality over assets: `gcarde`.
-3. Set-level cardinality and thresholds: `scard`, `slt`, `sst` with `smtx`.
-4. Group-of-sets cardinality and thresholds: `sgcarde`, `sglt`, `sgst` with `sgmtx`.
-
-The core idea is simple: constraints become more structured as you move from assets to sets to groups of sets.
+1. Cardinality and minimum position sizes on assets: `card`, `lt`, `st`.
+2. Cardinality on a group of assets: `gcarde`.
+3. Cardinality and thresholds on sets of assets: `scard`, `slt`, `sst` with `smtx`.
+4. Cardinality and thresholds on groups of sets: `sgcarde`, `sglt`, `sgst` with `sgmtx`.
 
 !!! tip "When to reach for this"
-    Reach for cardinality and threshold constraints when the *number* of positions matters as
-    much as their sizes — enforcing a maximum count of holdings, a minimum buy-in so you never
-    take dust positions, or limits on how many names, sets, or groups can be active. These are
-    the tools for turning a dense optimiser solution into an implementable, sparse portfolio.
+    Reach for cardinality and threshold constraints when the number of positions matters as much
+    as their sizes: a maximum number of holdings, a minimum size for each position you open, or
+    a limit on how many names, sets or groups hold a weight. They limit how many positions the
+    solution holds.
 
-!!! tip "MIP required"
-    These constraints introduce binary variables, so they need a mixed-integer-capable solver.
+!!! tip "A mixed-integer solver is required"
+    These constraints add binary variables, so they need a mixed-integer solver.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
@@ -38,8 +36,13 @@ end
 #=
 ## 1. Setup
 
-We use the same S&P 500 slice as the rest of the examples, but with the exact asset-set
-fixtures that make the cardinality examples easy to read and, more importantly, feasible.
+We load one year of S&P 500 prices and fit a `HighOrderPriorEstimator` prior. The mixed-integer
+solver is Pajarito, which uses HiGHS for the integer part and Clarabel for the conic part.
+Pajarito can print `Warning: integral solution repeated` on some solves. This is progress
+information, and the solve still succeeds.
+
+The [`UniverseSets`](@ref) name the groups, the clusters and the industries that the constraints
+below refer to. We chose them so that every problem on this page has a solution.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -111,8 +114,10 @@ sets = UniverseSets(;
 #=
 ## 2. Asset-level: `card`, `lt`, `st`
 
-`card` limits the number of significant assets.
-`lt`/`st` are buy-in thresholds on individual long/short positions.
+`card` caps the number of assets that hold a weight. `lt` and `st` are the minimum sizes of a
+long and of a short position. We use `card` in three problems: minimum risk with `card = 3`,
+maximum ratio with `card = 3` and an L2 penalty, and a long-short maximum ratio with `card = 7`.
+The cells set no `lt` or `st`.
 =#
 
 res_card = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = mip_slv, card = 3)))
@@ -136,7 +141,9 @@ pretty_table(DataFrame(:Asset => rd.nx, :w_card => res_card.w, :w_card_l2 => res
 #=
 ## 3. Group cardinality over assets: `gcarde`
 
-`gcarde` uses linear group expressions to constrain how many assets in a named group can be active.
+`gcarde` takes linear expressions over asset and group names, and each one bounds how many
+assets of a group hold a weight. We let at most two of XOM, MRK and WMT hold a weight, and
+exactly five assets of `group2`.
 =#
 
 res_gcard = optimise(MeanRisk(;
@@ -159,10 +166,17 @@ println("  active names in group2: ",
 #=
 ## 4. Set-level: `scard`, `slt`, `sst` with `smtx`
 
-Here the constraints act on the **sum of the weights in each set**.
-- `smtx` maps assets to sets.
-- `scard` limits the number of active sets.
-- `slt`/`sst` threshold the set-level sums.
+Here the constraints act on the sum of the weights of each set.
+
+  - `smtx` maps the assets to the sets.
+  - `scard` caps the number of sets that hold a weight.
+  - `slt` and `sst` are the minimum sizes of a long and of a short set sum.
+
+The sets are the three clusters of `clusters1`. The first problem minimises the conditional
+value at risk with `scard = 1`. The second maximises the ratio with `scard = 2`, set thresholds
+and no budget constraint. The count of active sets tests each set sum with `!iszero`, so a set
+whose sum is a solver residual near zero counts as active, and the count can be larger than
+`scard`.
 =#
 
 res_set_1 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(),
@@ -195,13 +209,15 @@ pretty_table(DataFrame(:Set => ["cluster 1", "cluster 2", "cluster 3"],
 #=
 ## 5. Group-of-sets: `sgcarde`, `sglt`, `sgst` with `sgmtx`
 
-Now the constraints are defined over groups of sets, not directly over assets.
-- `sgmtx` maps assets to set groups.
-- `sgcarde` constrains cardinality over those groups.
-- `sglt`/`sgst` threshold grouped set exposures.
+Now the constraints act on groups of sets. Here each group is an industry.
 
-Feasibility still depends on the budget and the bounds, so we use the same values as the tested
-constraint block.
+  - `sgmtx` maps the assets to the groups.
+  - `sgcarde` bounds how many groups hold a weight.
+  - `sglt` and `sgst` are the minimum sizes of a long and of a short group sum.
+
+Whether a problem has a solution depends on the budget and the weight bounds as well as on these
+targets. The first problem asks for exactly four industries with a long threshold. The second is
+long-short, asks for four to six industries, and sets long and short thresholds.
 =#
 
 res_sg_1 = optimise(MeanRisk(;
@@ -249,7 +265,9 @@ pretty_table(DataFrame(:GroupSet => sets.dict["ux_industries"],
                        :group_exposure => group_exposure_2); formatters = [resfmt])
 
 #=
-## 6. Side-by-side summary
+## 6. Number of assets in each portfolio
+
+We count the assets that hold a weight in five of the portfolios.
 =#
 
 pretty_table(DataFrame("Case" => ["asset card", "asset card + l2", "gcarde", "set-level",
@@ -260,11 +278,11 @@ pretty_table(DataFrame("Case" => ["asset card", "asset card + l2", "gcarde", "se
                             count(res_sg_1.w .> 1e-10)]))
 
 #=
-## 7. Composition across constraint families
+## 7. Composition of each portfolio
 
-A final visual comparison of how each constraint family reshapes the allocation: asset-level
-cardinality collapses to a few names, while the set- and group-level constraints spread the
-budget across the structure they are defined on.
+We plot the same five portfolios. `card` limits the number of names directly. The set and group
+constraints limit the number of sets and industries, and leave the choice of names inside them
+to the optimiser.
 =#
 
 plot_stacked_bar_composition([res_card, res_card_l2, res_gcard, res_set_1, res_sg_1], rd;
@@ -273,13 +291,14 @@ plot_stacked_bar_composition([res_card, res_card_l2, res_gcard, res_set_1, res_s
                                         "group-of-sets"]))
 
 #=
-Takeaways:
+## Which keyword to use
 
-- Use `card`, `lt`, `st` for direct asset-level sparsity and buy-in behavior.
-- Use `gcarde` when the constraint is a linear statement over a named asset group.
-- Use `smtx` + `scard`/`slt`/`sst` when the constraint should apply to set sums.
-- Use `sgmtx` + `sgcarde`/`sglt`/`sgst` when the constraint should apply to groups of sets.
-- If the solver returns an infeasible or failed retcode, the threshold or cardinality target is too tight for the available budget and bounds.
+  - Use `card`, `lt` and `st` to cap the number of assets and to set a minimum position size.
+  - Use `gcarde` when the constraint is a linear expression over named assets and groups.
+  - Use `smtx` with `scard`, `slt` and `sst` when the constraint acts on the sums of sets.
+  - Use `sgmtx` with `sgcarde`, `sglt` and `sgst` when it acts on groups of sets.
+  - If the result carries an infeasible or failed `retcode`, check whether the budget and the
+    weight bounds you gave leave room for the threshold and cardinality targets.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

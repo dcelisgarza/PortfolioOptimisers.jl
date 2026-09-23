@@ -78,14 +78,7 @@ glossary_terms = 173
 "docs/src/public_api/21_Pipeline/03_Pipeline.md" = { emdash = 4, words = 95 }
 "docs/src/public_api/21_Pipeline/04_PredictionCV.md" = { glossary = 1, words = 258 }
 "docs/src/public_api/21_Pipeline/06_OnlinePipeline.md" = { emdash = 2, mechanism = 3, words = 111 }
-"examples/4_constraints_costs/01_Budget_Constraints.jl" = { aivocab = 1, filler = 2, words = 1027 }
-"examples/4_constraints_costs/02_Linear_Group_Constraints.jl" = { emdash = 18, glossary = 1, words = 646 }
-"examples/4_constraints_costs/03_Cardinality_and_Threshold.jl" = { emdash = 1, words = 405 }
 "examples/4_constraints_costs/04_Phylogeny_Centrality.jl" = { emdash = 38, notjust = 1, bold_label = 1, glossary = 1, mechanism = 6, verdict = 1, words = 2369 }
-"examples/4_constraints_costs/05_Turnover_and_Tracking.jl" = { emdash = 12, aivocab = 3, words = 470 }
-"examples/4_constraints_costs/06_Fees_and_Net_Returns.jl" = { emdash = 7, notjust = 1, bold_label = 1, words = 472 }
-"examples/4_constraints_costs/07_Regularisation.jl" = { glossary = 2, words = 1314 }
-"examples/4_constraints_costs/09_Custom_Objectives_and_Constraints.jl" = { emdash = 32, mechanism = 2, words = 1313 }
 "examples/4_constraints_costs/10_Factor_Exposure_Constraints.jl" = { emdash = 36, title_case = 1, mechanism = 6, verdict = 2, words = 2252 }
 "examples/5_validation_tuning/01_Cross_Validation.jl" = { emdash = 1, aivocab = 2, filler = 3, words = 1989 }
 "examples/5_validation_tuning/02_Hyperparameter_Tuning.jl" = { emdash = 2, aivocab = 1, filler = 1, words = 1006 }

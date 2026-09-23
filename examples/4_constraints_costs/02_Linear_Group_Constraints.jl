@@ -5,23 +5,24 @@ Description = "Linear and group constraints in PortfolioOptimisers.jl: weight bo
 
 # Linear and group constraints
 
-A mandate is rarely "optimise freely". You cap single-name concentration, hold sector bands,
-keep one group bigger than another, and avoid dust positions. `PortfolioOptimisers.jl` expresses
-all of these as **constraints on the [`JuMPOptimiser`](@ref)**, layered on top of whatever
-objective and prior you use. This deep dive works through the linear and group constraints —
-weight bounds, per-member vs group-sum limits, relative and sum constraints — and shows where
-the boundary to mixed-integer constraints (thresholds, cardinality) lies.
+A mandate can cap the weight of a single name, keep each sector inside a band, keep one group
+larger than another, or forbid very small positions. `PortfolioOptimisers.jl` expresses each of
+these as a constraint on the [`JuMPOptimiser`](@ref), and you can add them to any objective and
+prior. This page covers weight bounds, bounds on each member of a group and on the group's sum,
+and relative and sum constraints. Section 6 explains why thresholds and cardinality need a
+mixed-integer solver.
 
-The unifying idea is the [`UniverseSets`](@ref): you name assets and groups once, then every
-constraint refers to those names. The same `"name op value"` string grammar drives both the
-linear constraints here and the views in the [prior examples](../2_moments_priors/07_Entropy_Pooling.md).
+You name the assets and the groups once, in a [`UniverseSets`](@ref), and every constraint
+refers to those names. The views of the [prior
+examples](../2_moments_priors/07_Entropy_Pooling.md) use strings of the same `"name op value"`
+form.
 
 !!! tip "When to reach for this"
-    Reach for these whenever a real mandate dictates the shape of the book: a 5% single-name cap,
-    a 20% sector ceiling, "healthcare at least as big as energy", "no position under 2%". They
-    are convex (except thresholds and cardinality, which need a MIP solver) and compose freely
-    with any objective, risk measure, and prior. For *cost*-bearing limits — turnover, fees,
-    tracking — see the sibling pages in this group.
+    Reach for these when a mandate limits what the portfolio holds: a 5% cap on a single name, a
+    20% ceiling on a sector, "healthcare at least as large as energy", "no position under 2%".
+    All of them are convex except the thresholds and cardinality, which need a mixed-integer
+    solver. You can use them with any objective, risk measure and prior. For limits that carry a
+    cost, such as turnover, fees and tracking, see the other pages of this group.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -36,9 +37,10 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. Data
 
-The same S&P 500 slice as the other examples.
+The data is one year of S&P 500 prices. We fit an empirical prior and set up one Clarabel
+solver.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -53,8 +55,8 @@ rf = 4.2 / 100 / 252
 #=
 ## 2. Naming assets and groups
 
-[`UniverseSets`](@ref) maps names to members. The `nx` key holds every asset; the rest are the
-groups — here, sectors — that constraints will reference.
+A [`UniverseSets`](@ref) maps each name to its members. The `nx` key holds every asset. The
+other keys are the groups that the constraints refer to, which here are sectors.
 =#
 
 sets = UniverseSets(;
@@ -66,9 +68,9 @@ sets = UniverseSets(;
                                 "consumer" => ["BBY", "HD"], "industrial" => ["GE"]))
 
 #=
-Our baseline is an unconstrained maximum-ratio portfolio. On this one-year slice it is starkly
-concentrated — it piles into the two sectors with the best realised risk-adjusted return and
-ignores the rest. That makes it the perfect punching bag for constraints.
+The baseline is a maximum-ratio portfolio with the default constraints only. We print its weight
+in each sector. On this year of data it holds two sectors and nothing else, so each constraint
+below has an effect you can see.
 =#
 
 res_base = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
@@ -84,9 +86,9 @@ pretty_table(DataFrame("Sector" => sectors,
 #=
 ## 3. Weight bounds: capping concentration
 
-The simplest constraint is a per-asset bound through `wb`. A global [`WeightBounds`](@ref) with
-`ub = 0.15` forbids any single name from exceeding 15%, which forces the optimiser to hold more
-names — the book goes from a couple of positions to spread across the book.
+The simplest constraint is a bound on each weight, through `wb`. A [`WeightBounds`](@ref) with
+`ub = 0.15` keeps every weight at or below 15%. The weights sum to one, so the optimiser must
+now hold at least seven names.
 =#
 
 res_cap = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
@@ -94,14 +96,13 @@ res_cap = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                                 wb = WeightBounds(; lb = 0.0, ub = 0.15))))
 
 #=
-## 4. Per-member vs group-sum bounds — an important distinction
+## 4. A bound on each member against a bound on the group's sum
 
-There are **two different things** you might mean by "the staples bound". A
-[`WeightBoundsEstimator`](@ref) with a group key applies the bound to **each member** of the
-group; a [`LinearConstraintEstimator`](@ref) bounds the **group sum**. They are not the same:
-with four staples names, `WeightBoundsEstimator(lb = ["staples" => 0.15], ub = nothing)` forces *each*
-of them to at least 15% — 60% in total — whereas `LinearConstraintEstimator(val = ["staples >= 0.15"])`
-asks only that the four *together* reach 15%.
+"A 15% floor on staples" can mean two different constraints. A [`WeightBoundsEstimator`](@ref)
+with a group key bounds each member of the group. A [`LinearConstraintEstimator`](@ref) bounds
+the sum of the group. Staples has four names here. `WeightBoundsEstimator(lb = ["staples" =>
+0.15], ub = nothing)` holds each of the four at 15% or more, which is at least 60% in total.
+`LinearConstraintEstimator(val = ["staples >= 0.15"])` holds only their sum at 15% or more.
 =#
 
 res_member = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
@@ -122,17 +123,17 @@ pretty_table(DataFrame("Interpretation" =>
              formatters = [resfmt], title = "Same number, two very different constraints")
 
 #=
-Reach for the `WeightBoundsEstimator` form when the rule is genuinely per-name ("every position
-in this list at least/at most x"), and the `LinearConstraintEstimator` form when it is a sector
-budget.
+Use the `WeightBoundsEstimator` form when the rule is about each name: "every position in this
+list at least x". Use the `LinearConstraintEstimator` form when the rule is about the total of a
+sector.
 
 ## 5. Linear group constraints: sums and relations
 
-[`LinearConstraintEstimator`](@ref) is the general tool. Its strings combine group and asset
-names with `+`, `-`, scalar multiples, and the `==` / `<=` / `>=` operators, so you can write
-**sum caps** ("the two hot sectors together no more than 60%") and **relative** constraints
-("healthcare at least twice staples", "tech ≤ energy"). A sum cap on the baseline's two favoured
-sectors forces 40% of the book into everything it had ignored.
+A [`LinearConstraintEstimator`](@ref) string combines group and asset names with `+`, `-`,
+numbers that multiply a name, and one of `==`, `<=` and `>=`. With them you can cap a sum,
+"these two sectors together at most 60%", or relate two groups, "healthcare at least twice
+staples". We cap the two sectors of the baseline at 60% together, and hold tech at or below
+financials. At least 40% of the book must then go to sectors that the baseline did not hold.
 =#
 
 res_sum = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
@@ -148,30 +149,28 @@ pretty_table(DataFrame("Sector" => sectors,
              title = "Sum cap (healthcare + energy ≤ 60%, tech ≤ financials)")
 
 #=
-## 6. Thresholds and cardinality need a MIP solver
+## 6. Thresholds and cardinality need a mixed-integer solver
 
-Two common constraints are *not* convex and so cannot be solved by Clarabel alone:
+Two common constraints are not convex, so Clarabel cannot solve them alone.
 
-  - **Thresholds** ([`ThresholdEstimator`](@ref), the `lt` / `st` keywords) — "if you hold a
-    name at all, hold at least x" — are semi-continuous (a weight is either zero or above the
-    floor).
-  - **Cardinality** (`card`, `gcarde`) — "hold at most k names" — is combinatorial.
+  - A threshold, [`ThresholdEstimator`](@ref) through the `lt` and `st` keywords, says "if you
+    hold a name at all, hold at least x". A weight is then either zero or at least the floor.
+  - A cardinality constraint, through the `card` and `gcarde` keywords, says "hold at most k
+    names", and the solver must choose which names.
 
-Both require a mixed-integer-capable solver (e.g. [Pajarito](https://github.com/jump-dev/Pajarito.jl)
-with Clarabel as the continuous solver and [HiGHS](https://github.com/jump-dev/HiGHS.jl) for the
-MIP). Passing a threshold to a continuous-only solver returns a failed `retcode` rather than a
-silent wrong answer. See [Budget Constraints](01_Budget_Constraints.md) for the MIP solver
-setup.
+Both need a mixed-integer solver, for example Pajarito with Clarabel as the continuous solver
+and HiGHS as the mixed-integer solver. If you give a threshold to a continuous solver, the
+result carries a failed `retcode` and `NaN` weights. [Cardinality and
+threshold](03_Cardinality_and_Threshold.md) sets up such a solver.
 
-Every constraint on this page is written in *asset* names. A mandate written in **factor** names —
-"at most 10% momentum", "market-neutral to value" — is the same linear form in a different basis,
-and is covered in
-[Factor Exposure Constraints](10_Factor_Exposure_Constraints.md).
+Every constraint on this page uses asset names. A mandate in factor names, such as "at most 10%
+momentum" or "no net exposure to value", is the same linear form over the factor exposures.
+[Factor exposure constraints](10_Factor_Exposure_Constraints.md) covers it.
 
 ## 7. Comparing the constraints
 
-Same prior, same objective — each constraint reshapes the book differently. The baseline's
-two-sector concentration gives way to progressively more diversified portfolios.
+We print the weights of the four portfolios and plot them. The prior and the objective are the
+same in each, so only the constraint differs.
 =#
 
 results = [res_base, res_cap, res_groupsum, res_sum]
