@@ -4,7 +4,7 @@ Description = "Online selection rules: the second set, public API of PortfolioOp
 
 # Online selection rules: the second set
 
-The closed-form rules beyond the prototype and the weightings over an Expert Mixture's experts: the confidence weighted mean reversion with its two formulations, the anti-correlation wealth transfer, the expectation-maximisation update in its Soft-Bayes online form, the aggregating algorithm, the top-k selection, the weak aggregating algorithm, and the aggregation of exponentiated-gradient experts it constructs.
+This page has more rules with a closed-form update, and the weightings that an `ExpertMixture` can use over its experts. `ConfidenceWeightedMeanReversion` treats the weights as a Gaussian belief. It moves that belief as little as possible, so that the return of the next period is below `eps` with a given confidence. It has two formulations, `VarianceUpdate` and `StandardDeviationUpdate`. `AntiCorrelation` moves wealth from an asset to another whose recent growth lagged it and whose latest returns correlate with the earlier returns of the first asset. `ExpectationMaximisation`, the expectation-maximisation update in its online Soft-Bayes form, moves each weight towards Cover's posterior at the rate `eta`. `AggregatingAlgorithm`, `TopK` and `WeakAggregatingAlgorithm` weight experts. `AggregatingExponentialGradient` builds an expert mixture of exponentiated gradient rules under the weak aggregating algorithm.
 
 ```@docs
 PortfolioOptimisers.AbstractConfidenceUpdate

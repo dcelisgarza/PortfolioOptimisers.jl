@@ -4,32 +4,33 @@ Description = "Base Risk Measures, public API of PortfolioOptimisers.jl: RiskMea
 
 # Base Risk Measures
 
-All risk measures are defined as their whole names, however this can be unwieldy, so we also provide convenience aliases defined in [Public API → Aliases](../23_Aliases.md).
+Every risk measure has a full type name, and many also have a short alias, which the [aliases](../23_Aliases.md) page lists.
 
-All concrete risk measures can be used as functors (callable structs) to compute their associated risk quantity, according to its [`risk_input_kind`](@ref), or via [`expected_risk`](@ref).
+You can call a concrete risk measure as a function to compute its risk. [`risk_input_kind`](@ref) says what the call takes, such as the portfolio weights or a series of returns. [`expected_risk`](@ref) also computes the risk of a portfolio.
 
-## Quick-pick guide
+## Choosing a risk measure
 
-Three legal-usage classes:
+The Compatibility column says where you can use each measure:
 
-- Optimisation: JuMP formulation; usable as objective/constraint.
-- Hierarchical: clustering proxy, no JuMP formulation.
-- Non-Optimisation: analysis only.
+- `JuMP + Hierarchical`: the measure has a JuMP formulation, so a JuMP optimiser can use it as the objective or as a constraint, and a hierarchical optimiser can also use it.
+- `Hierarchical`: a hierarchical optimiser can use it, but it has no JuMP formulation.
+- `-`: you can use it only to analyse a portfolio.
 
-Table Key:
+The Requirements column names the cones or variables that the measure needs, in a JuMP model or in the solver that computes it. The last column names the solver that the library recommends:
 
-- `QP`: Quadratic programming (generates a quadratic expression).
-- `NOC`: Norm one none.
-- `SOC`: Second order cone
-- `RSOC`: Rotated second order cone.
-- `NIC`: Norm infinity cone.
-- `EC`: Exponential cone.
-- `PC`: 3D Power cone.
-- `Sym`: Symmetric matrix space.
-- `PSD`: Positive semi-definite cone.
-- `MIP`: Mixed-integer variables.
-- `*`: Carries the requirements of its inner risk measures.
-- `-`: Not applicable.
+- `QP`: a quadratic expression.
+- `NOC`: a norm-one cone.
+- `SOC`: a second-order cone.
+- `RSOC`: a rotated second-order cone.
+- `NIC`: a norm-infinity cone.
+- `EC`: an exponential cone.
+- `PC`: a three-dimensional power cone.
+- `Sym`: a symmetric matrix.
+- `SDP`: a semi-definite constraint.
+- `PSD`: a positive semi-definite cone.
+- `MIP`: mixed-integer variables.
+- `*`: the requirements of the risk measures it holds.
+- `-`: nothing beyond linear constraints, or not applicable.
 
 | Type          | Name (Alias)                                                                                                                                  | Compatibility       | Requirements   | Rec. Solver                 |
 |:------------- |:--------------------------------------------------------------------------------------------------------------------------------------------- |:------------------- |:-------------- |:--------------------------- |

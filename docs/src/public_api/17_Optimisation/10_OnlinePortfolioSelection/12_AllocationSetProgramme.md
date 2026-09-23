@@ -4,7 +4,7 @@ Description = "The programme of a programme Allocation Set, public API of Portfo
 
 # The programme of a programme Allocation Set
 
-The builders of a programme Allocation Set's model on both arms — the bare projection model of the Constrained Update, and the Allocation Set Constraint a follow-the-leader rule appends to its held optimiser — in the order a JuMP head's builders run, the second-stage resolution on the head's rows, the projection objectives in every geometry with the set's penalties folded in, and the Held Step of a programme that does not solve.
+`set_allocation_set_constraints!` adds the constraints of a `ProgrammeAllocationSet` to a JuMP model, in the order a JuMP optimiser adds them. It works on two kinds of model. The first is the projection of a raw step onto the set of allowed weights. The second is the optimisation that a follow-the-leader rule solves again at each period, which then keeps its own constraints and gains those of the set. When the projection does not solve, the rule keeps the weights it had after the price moves of the period, so it trades nothing in that period.
 
 ```@docs
 PortfolioOptimisers.set_allocation_set_constraints!

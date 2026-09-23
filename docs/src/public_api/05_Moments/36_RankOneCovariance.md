@@ -4,7 +4,7 @@ Description = "Rank-one covariance, public API of PortfolioOptimisers.jl: RankOn
 
 # Rank-one covariance
 
-The principal spectral component of a short window of price relatives, scaled so its energy trades off against the centred window's: the covariance estimate of the short-term loss-control portfolio, singular by construction.
+`RankOneCovariance` is the covariance estimate of the short-term loss-control portfolio. It keeps only the first principal component of a short window of price relatives, and scales it against the total variance of the centred window. The matrix has rank one, so it is positive semi-definite and always singular.
 
 ```@docs
 RankOneCovariance

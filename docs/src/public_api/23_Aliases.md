@@ -4,7 +4,7 @@ Description = "Aliases, public API of PortfolioOptimisers.jl: SD, UcVariance, WR
 
 # Aliases
 
-These are convenience aliases/functions.
+This page lists short names for long type names, and for a few functions.
 
 ```@docs
 SD

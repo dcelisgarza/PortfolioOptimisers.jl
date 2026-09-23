@@ -4,7 +4,7 @@ Description = "Online selection rules: the adaptive subgradient and the optimist
 
 # Online selection rules: the adaptive subgradient and the optimistic step
 
-The adaptive and optimistic rows of the family's fourth set: the diagonal adaptive subgradient method, whose per-asset rate is the gradient mass each asset has accrued and whose projection is taken in the norm of that mass, a Projection Geometry of its own; and the optimistic mirror descent, a wrapper over the first-order rule that plays two half-steps a period, the second along a Gradient Predictor's hint, with the adaptive rate that reads the hint residuals.
+This page has two first-order rules that adapt their steps. `AdaptiveSubgradient` is the diagonal adaptive subgradient method. The step size of each asset follows the gradients that asset has had so far, and the projection uses a norm weighted by those gradients. `OptimisticStep` is optimistic mirror descent. It wraps a `MirrorDescent` rule and takes two half-steps each period, the second along a guess of the next gradient. A gradient predictor makes the guess: `LastGradient`, `MeanGradient` or `ForecastGradient`. `HintResidualRate` is the adaptive step size that reads how far the guesses were from the real gradients.
 
 ```@docs
 AdaptiveSubgradient

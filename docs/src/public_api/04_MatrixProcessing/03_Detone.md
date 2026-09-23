@@ -4,9 +4,9 @@ Description = "Detone, public API of PortfolioOptimisers.jl: AbstractDetoneEstim
 
 # Detone
 
-Financial data is often responds to broad market conditions. This market-wide behaviour can obscure specific correlation signals. By removing the largest `n` eigenvalues, the idiosyncratic relationships between assets are allowed to shine through [mlp1](@cite).
+Most assets move with the market, and that common movement dominates their correlations. Detoning removes the `n` largest eigenvalues, which carry the market movement, so the correlations that remain show how the assets relate to each other apart from the market [mlp1](@cite).
 
-Detoned matrices may be non-positive definite, so they can be unsuitable for traditional optimisations, but they can be quite effective for clustering ones.
+A detoned matrix can have zero or negative eigenvalues, so it does not suit an optimisation that needs a positive definite covariance. Use it where the matrix only groups the assets, as in a clustering optimisation.
 
 ```@docs
 AbstractDetoneEstimator

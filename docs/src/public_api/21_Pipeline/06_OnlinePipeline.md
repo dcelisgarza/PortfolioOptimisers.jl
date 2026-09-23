@@ -4,7 +4,9 @@ Description = "The Pipeline's online step, public API of PortfolioOptimisers.jl:
 
 # The Pipeline's online step
 
-A [`Pipeline`](@ref) is a host of the online step. [`partial_fit!`](@ref) walks the steps in order and folds each block of observations through them into the **row owner** — the prior step, else the optimiser step — and `fit(pipe)` with no data reads the fitted [`PipelineResult`](@ref) out: it reconstitutes the carrier from the owner's rows, refits every universe step over it, views the owner's state to the surviving assets, and runs the tail as batch. A row-local step folds, a universe-only step defers to a view, and a step with no online form is refused at warm-up by name unless the pipeline declares a refit with `Online(pipe)`, whose [`PortfolioOptimisers.PipelineBufferState`](@ref) holds the input carrier and reads out by a batch fit.
+A [`Pipeline`](@ref) updates incrementally. [`partial_fit!`](@ref) passes each block of observations through the steps in order, up to the step that stores the rows: the prior step, or the optimiser step when the pipeline has no prior. `fit(pipe)` with no data returns the fitted [`PipelineResult`](@ref). It rebuilds the returns from the rows that the step stored, and refits over them every step that chooses assets. It then restricts the state of the step that stores the rows to the assets that remain, and runs the steps after it as a batch fit.
+
+A step that transforms each row on its own updates with each block. A step that only chooses assets waits until you read the result. A step with no incremental form makes the pipeline throw an error that names the step, before the first update. To run such a step, wrap the pipeline as `Online(pipe)`. Its [`PortfolioOptimisers.PipelineBufferState`](@ref) then stores the input data, and reading the result runs a batch fit over it.
 
 ```@docs
 partial_fit!(pipe::Pipeline{<:Any, <:Any, <:PortfolioOptimisers.Option{<:Union{<:PortfolioOptimisers.PipelineBufferState, <:PortfolioOptimisers.ReturnsBufferState}}}, data::Prices_RR)

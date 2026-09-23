@@ -4,11 +4,11 @@ Description = "The prior family on the partial-fit seam, public API of Portfolio
 
 # The prior family on the partial-fit seam
 
-A prior takes the online step by one of two routes, and the type of the state it carries **is** the route.
+A prior updates with `partial_fit!` in one of two ways, and the type of the state it carries shows which.
 
-A prior that folds its moments exactly carries a [`PortfolioOptimisers.PriorCarryState`](@ref): the moments come off its members' own folds and the rows are kept only because a [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, so a read-out never reads them. A prior that has no recursion carries a [`PortfolioOptimisers.SampleBufferState`](@ref), which [`Online`](@ref) seeds, and its read-out is the batch verb over the rows the buffer kept. The factor observations ride inside that same buffer, and whether the fold records them is decided by the estimator tree through [`PortfolioOptimisers.needs_factor_returns`](@ref), so the fold mirrors the batch verb's arity.
+A prior that updates its moments exactly carries a [`PortfolioOptimisers.PriorCarryState`](@ref). Its moments come from the incremental fits of its members. It stores the rows only because a [`LowOrderPrior`](@ref) holds the returns `X` for the scenario risk measures, and it reads no row to compute its result. A prior with no exact update carries a [`PortfolioOptimisers.SampleBufferState`](@ref), which [`Online`](@ref) gives it, and it computes its result with its batch fit over the rows that the buffer kept. The same buffer stores the factor returns. [`PortfolioOptimisers.needs_factor_returns`](@ref) reads the members of the prior to decide whether the update stores them, so the update takes the same arguments as the batch fit.
 
-A host that carries the observations folds every member that folds and runs the batch verb over its own rows for every member that does not, so a caller writes the estimator they would write in batch.
+A prior that stores the observations updates each member that has an incremental fit, and refits each member that has none over its own rows. You write the same estimator as for a batch fit.
 
 ```@docs
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.PriorCarryState, x::PortfolioOptimisers.VecNum)

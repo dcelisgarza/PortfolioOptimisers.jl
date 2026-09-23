@@ -4,7 +4,7 @@ Description = "Base optimisation, public API of PortfolioOptimisers.jl: Abstract
 
 # Base optimisation
 
-All optimisers are defined as their whole names, however this can be unwieldy, so we also provide convenience aliases defined in [Public API → Aliases](../23_Aliases.md).
+Every optimiser has a full type name, and many also have a short alias, which the [aliases](../23_Aliases.md) page lists.
 
 ```@docs
 AbstractOptimisationEstimator

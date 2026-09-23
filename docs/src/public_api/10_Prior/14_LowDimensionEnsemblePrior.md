@@ -4,7 +4,7 @@ Description = "Low-dimension ensemble prior, public API of PortfolioOptimisers.j
 
 # Low-dimension ensemble prior
 
-The one-step forecast of the price relatives and their predictive covariance, read off the same set of random low-dimensional lagged regressions weighted by their in-sample fit: the prior of the online low-dimension ensemble method, and a mean and covariance any programme may hold as a consistent pair.
+`LowDimensionEnsemblePrior` forecasts the next price relatives and their covariance. It fits many random low-dimensional regressions of the price relatives on their lagged values, and weights each regression by how well it fits the sample. The mean and the covariance come from the same regressions, so they are a consistent pair. It is the prior of the online low-dimension ensemble method.
 
 ```@docs
 LowDimensionEnsemblePrior

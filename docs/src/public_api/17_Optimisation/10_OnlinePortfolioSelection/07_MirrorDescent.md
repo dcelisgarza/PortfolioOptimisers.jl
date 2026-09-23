@@ -4,7 +4,9 @@ Description = "Online selection rules: mirror descent, its schedules and its gra
 
 # Online selection rules: mirror descent, its schedules and its gradient transforms
 
-The family's first-order rule, one mirror-descent step in the divergence its Projection Geometry holds, with the paper names as constructors: exponentiated gradient on the entropic map, gradient projection on the Euclidean one, and the three momentum variants; the Learning-Rate Schedules a rule may hold on `eta` in place of a number, one of which restarts the rule and one of which replays the exponentiated gradient at every rate of a set and takes the best over a window, with the two adaptive strategies of that paper as constructors; and the Gradient Transforms that rescale the exponent before the step; and the objectives the rule steps on, log wealth or a Risk Loss over the head's rows.
+`MirrorDescent` is the first-order rule. At each period it takes one mirror descent step on the gradient, in the divergence of its projection geometry. Each constructor is named after the method of one paper. `ExponentiatedGradient` uses the entropic geometry, and `GradientProjection` uses the Euclidean one. `EGE`, `EGR` and `EGA` are the exponentiated gradient with momentum, with root-mean-square scaling and with adaptive moments.
+
+In place of a fixed step size `eta`, a rule can hold a learning-rate schedule. `InverseSquareRootRate` and `SelfConfidentRate` set the step size at each period. `DoublingTrickRate` restarts the rule at each stage. `WindowedBestRate` runs the exponentiated gradient at each rate of a set, and takes the rate with the most wealth over a window. `MAEG` and `AEG` are the two adaptive strategies of the paper that defines `WindowedBestRate`. A gradient transform, such as `GradientMomentum`, rescales the gradient before the step. The rule steps on log wealth, `LogWealth`, by default, or on a risk measure over the last rows, `RiskLoss`.
 
 ```@docs
 PortfolioOptimisers.AbstractGradientTransform

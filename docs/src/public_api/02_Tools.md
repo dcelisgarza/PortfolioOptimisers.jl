@@ -4,11 +4,11 @@ Description = "Tools, public API of PortfolioOptimisers.jl: traverse_concrete_su
 
 # Tools
 
-`PortfolioOptimisers.jl` is a complex codebase which uses a variety of general purpose tools including functions, constants and types.
+This page lists the general functions, macros and types that the rest of the library uses.
 
 ## Utility functions
 
-We strive to be as type-stable, inferrable, and immutable as possible in order to improve robustness, performance, and correctness. These functions help us achieve these goals.
+`traverse_concrete_subtypes` lists the struct types under an abstract type. `concrete_typed_array` converts an array with an abstract element type into an array with a concrete element type. `factory` rebuilds an estimator with the values a fit supplies, such as the prior moments, the observation weights and the previous portfolio weights, and `factory_child` applies it to one field. `@propagatable` defines a struct and writes its `factory` and `port_opt_view` methods from the tags on its fields, which are `@fprop`, `@vprop`, `@pprop`, `@wprop` and `@cprop`. `@forward_properties` writes `getproperty` and `propertynames` for a type from a list of forwarding rules.
 
 ```@docs
 traverse_concrete_subtypes
@@ -26,7 +26,7 @@ factory_child
 
 ## View functions
 
-[`NestedClustered`](@ref) optimisations need to index the asset universe in order to produce the inner optimisations. These indexing operations are implemented as views, indexing, and custom index generators.
+[`NestedClustered`](@ref) runs one inner optimisation for each cluster of assets, so it needs each estimator, constraint and result restricted to the assets of that cluster. `port_opt_view` restricts an object to a subset of the assets. `obs_weights_view` restricts it to a subset of the observations.
 
 ```@docs
 port_opt_view(x, i, args...)
@@ -38,7 +38,7 @@ obs_weights_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator, <:Abstr
 
 ## Summary statistics
 
-Some estimators and constraints are based on summary statistics of vectors. These types are used to dispatch the appropriate functions and encapsulate auxiliary data such as weights.
+Some estimators and constraints reduce a vector to one number, such as its minimum, mean, median or maximum. Each type below names one reduction, and some of them take observation weights. `vec_to_real_measure` applies the reduction to a vector.
 
 ```@docs
 VectorToScalarMeasure

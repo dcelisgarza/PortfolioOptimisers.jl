@@ -11,54 +11,6 @@ commit = "ab7d9a42da"
 glossary_terms = 173
 
 [file]
-"docs/src/public_api/01_Base/07_Errors.md" = { filler = 1, words = 87 }
-"docs/src/public_api/01_Base/16_CoveragePolicy.md" = { glossary = 1, mechanism = 1, words = 56 }
-"docs/src/public_api/02_Tools.md" = { filler = 2, words = 102 }
-"docs/src/public_api/03_InputData/01_AssetPanel.md" = { emdash = 2, title_case = 1, glossary = 9, mechanism = 2, words = 294 }
-"docs/src/public_api/03_InputData/03_ListingSpan.md" = { emdash = 3, title_case = 1, glossary = 4, verdict = 1, words = 231 }
-"docs/src/public_api/03_InputData/04_Preprocessing.md" = { emdash = 2, bold_label = 1, words = 74 }
-"docs/src/public_api/03_InputData/05_CarrierViews.md" = { mechanism = 2, words = 17 }
-"docs/src/public_api/03_InputData/07_PriceIngestion.md" = { emdash = 5, glossary = 3, mechanism = 8, words = 357 }
-"docs/src/public_api/03_InputData/08_PriceGapFill.md" = { emdash = 2, glossary = 2, words = 221 }
-"docs/src/public_api/03_InputData/12_TrainTestSplit.md" = { emdash = 1, words = 128 }
-"docs/src/public_api/03_InputData/13_Base_AssetSelection.md" = { mechanism = 1, words = 49 }
-"docs/src/public_api/03_InputData/17_ReturnsBufferState.md" = { glossary = 1, mechanism = 1, words = 83 }
-"docs/src/public_api/03_InputData/18_PreprocessingPartialFit.md" = { mechanism = 1, words = 90 }
-"docs/src/public_api/04_MatrixProcessing/01_PosdefMatrix.md" = { filler = 1, words = 135 }
-"docs/src/public_api/05_Moments/02_SimpleExpectedReturns.md" = { glossary = 1, words = 83 }
-"docs/src/public_api/05_Moments/03_Covariance.md" = { glossary = 1, words = 133 }
-"docs/src/public_api/05_Moments/04_SimpleVariance.md" = { glossary = 1, words = 108 }
-"docs/src/public_api/05_Moments/05_Gerber/01_GerberCovariance.md" = { fancy_is = 1, metaphor = 1, words = 97 }
-"docs/src/public_api/05_Moments/32_CrossSectionalFactorModel/06_FactorFamilyBasisTransforms.md" = { glossary = 1, words = 16 }
-"docs/src/public_api/05_Moments/33_CoverageUniverse.md" = { glossary = 3, mechanism = 1, words = 135 }
-"docs/src/public_api/05_Moments/34_PriceLevelExpectedReturns.md" = { glossary = 1, words = 126 }
-"docs/src/public_api/05_Moments/36_RankOneCovariance.md" = { verdict = 1, words = 33 }
-"docs/src/public_api/10_Prior/09_AssetPanelEstimators.md" = { bold_label = 1, glossary = 1, words = 35 }
-"docs/src/public_api/10_Prior/12_PriorPartialFit.md" = { mechanism = 3, words = 148 }
-"docs/src/public_api/10_Prior/13_PriorExpectedReturns.md" = { endash = 1, mechanism = 1, words = 49 }
-"docs/src/public_api/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.md" = { endash = 2, words = 60 }
-"docs/src/public_api/17_Optimisation/02_CrossValidation/16_LogWealthRegret.md" = { emdash = 1, endash = 1, glossary = 1, words = 175 }
-"docs/src/public_api/17_Optimisation/05_JuMP/02_JuMPConstraints/11_TrackingErrorConstraints.md" = { glossary = 2, words = 19 }
-"docs/src/public_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/07_OWARiskMeasuresConstraints.md" = { glossary = 2, words = 21 }
-"docs/src/public_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/15_TurnoverRiskMeasureConstraints.md" = { glossary = 2, words = 21 }
-"docs/src/public_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/16_TrackingRiskMeasureConstraints.md" = { glossary = 2, words = 21 }
-"docs/src/public_api/17_Optimisation/09_OnlineOptimisation.md" = { emdash = 2, mechanism = 5, words = 88 }
-"docs/src/public_api/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.md" = { glossary = 4, words = 62 }
-"docs/src/public_api/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.md" = { glossary = 1, words = 38 }
-"docs/src/public_api/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.md" = { emdash = 2, glossary = 3, mechanism = 2, words = 102 }
-"docs/src/public_api/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.md" = { glossary = 1, words = 83 }
-"docs/src/public_api/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.md" = { glossary = 2, words = 73 }
-"docs/src/public_api/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.md" = { glossary = 1, words = 54 }
-"docs/src/public_api/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.md" = { glossary = 2, words = 116 }
-"docs/src/public_api/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.md" = { emdash = 2, glossary = 3, words = 93 }
-"docs/src/public_api/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.md" = { glossary = 2, words = 77 }
-"docs/src/public_api/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.md" = { glossary = 2, words = 71 }
-"docs/src/public_api/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.md" = { emdash = 2, glossary = 4, words = 70 }
-"docs/src/public_api/20_AssetSelection.md" = { emdash = 8, glossary = 1, mechanism = 1, words = 495 }
-"docs/src/public_api/21_Pipeline/01_Base_Pipeline.md" = { emdash = 2, words = 47 }
-"docs/src/public_api/21_Pipeline/03_Pipeline.md" = { emdash = 4, words = 95 }
-"docs/src/public_api/21_Pipeline/04_PredictionCV.md" = { glossary = 1, words = 258 }
-"docs/src/public_api/21_Pipeline/06_OnlinePipeline.md" = { emdash = 2, mechanism = 3, words = 111 }
 "examples/5_validation_tuning/01_Cross_Validation.jl" = { emdash = 1, aivocab = 2, filler = 3, words = 1989 }
 "examples/5_validation_tuning/02_Hyperparameter_Tuning.jl" = { emdash = 2, aivocab = 1, filler = 1, words = 1006 }
 "examples/5_validation_tuning/03_Pipelines.jl" = { emdash = 22, aivocab = 1, bold_label = 1, glossary = 4, mechanism = 4, words = 1675 }

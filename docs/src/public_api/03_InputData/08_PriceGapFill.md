@@ -6,23 +6,24 @@ Description = "Price gap fill, public API of PortfolioOptimisers.jl: CarriedPric
 
 ## The price gap fill
 
-A **Held Price** is the last priced observation of an asset, carried forward across a gap. Stating
-one is what [`PriceGapFill`](@ref) is for: it is the ingestion layer's only fill, it is off unless a
-caller adds it, and it exists to state a *price convention* across a suspension rather than to
-remove a gap — a gap is carried through the conversion, so nothing downstream needs it gone.
+[`PriceGapFill`](@ref) fills the price gaps inside the listing span of an asset. It is the only
+fill of the price data, and it runs only if you add it. Use it to state what the price was during a
+suspension or a holiday. You do not need it to remove gaps, because the conversion to returns and
+every later step accept a `NaN`.
 
-The fill is bounded by the **Listing Span**, so it touches Held Gaps alone and can never fabricate a
-price where an asset was not yet listed or has been delisted. It is fitted on a training window and
-replayed: [`CarriedPrice`](@ref) records the last observed training price, which seeds a
-carry-forward on a window that opens inside a gap, and a [`Num_VecToScaM`](@ref) records the
-reduction of that window's observed prices. A per-asset constant manufactures two moves the market
-never printed, which is why the carried price is the convention a caller reaching for a fill
-normally wants.
+The fill writes only inside the listing span, so it never makes a price before an asset is listed
+or after it is delisted. You fit it on a training window and apply it to later windows. With
+[`CarriedPrice`](@ref), the fill carries the last observed price forward across the gap. The fitted
+result stores the last price of the training window, and the fill starts from it when a later
+window opens inside a gap. With a [`Num_VecToScaM`](@ref), a fixed number or a reduction such as the
+median, the fill writes one constant per asset, computed from the observed prices of the training
+window. A constant makes two price moves that the market never made, one into the gap and one out
+of it. `CarriedPrice` makes no such moves, and it is usually the fill you want.
 
-It runs at the price level, before [`PricesToReturns`](@ref), because a carried price cannot be
-stated after the conversion: zeroing the returns a gap left non-finite discards the move across the
-gap entirely. A filled cell is therefore finite in the returns and its estimation mask entry is
-`true` — a caller who filled has said the asset traded.
+The fill runs on prices, before [`PricesToReturns`](@ref). After the conversion, the only repair is
+to set the missing returns to zero, and that loses the price move across the gap. For the prices
+`p₀, _, _, p₃`, the carried prices give the returns `0, 0, p₃/p₀ - 1`. A filled cell has a finite
+return, and its estimation mask entry is `true`, because a fill states that the asset traded.
 
 ```@docs
 CarriedPrice

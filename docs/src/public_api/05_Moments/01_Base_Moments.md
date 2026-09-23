@@ -6,9 +6,7 @@ Description = "Base moments, public API of PortfolioOptimisers.jl: AbstractCovar
 
 ## Abstract moment types and fallbacks
 
-Some optimisations and constraints make use of summary statistics. These types and functions form the base for moment estimation in `PortfolioOptimisers.jl`.
-
-They also provide generic fallbacks for the various functionality in the library.
+The abstract types below are the supertypes of the estimators of the expected returns, the variance and the covariance. The functions below are their default methods, which an estimator uses when it does not define its own.
 
 ```@docs
 AbstractCovarianceEstimator
@@ -30,7 +28,7 @@ mean(me::AbstractExpectedReturnsEstimator, state::SampleBufferState)
 
 ## FullMoment and semi moments
 
-Moments other than the expected return can be estimated using the entire spectrum of deviations (full), or only the deviations below a target (semi/downside). These types allow us to provide such functionality.
+A moment other than the expected return can use every deviation from the target, `FullMoment`, or only the deviations below the target, `SemiMoment`. An estimator that has both forms takes one of these two types in its `alg` field.
 
 ```@docs
 FullMoment

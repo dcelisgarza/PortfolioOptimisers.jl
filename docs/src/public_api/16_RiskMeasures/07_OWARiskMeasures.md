@@ -4,9 +4,9 @@ Description = "Ordered Weights Array, public API of PortfolioOptimisers.jl: Abst
 
 # Ordered Weights Array
 
-Certain risk measures can be expressed as ordered weights arrays [owa1,owa3](@cite). It is also possible to express higher Linear moments (l-moments) as linear combinations of ordered weights arrays [owa2](@cite).
+Several risk measures are ordered weighted averages. Such a measure sorts the portfolio returns, and weights each return by its rank [owa1,owa3](@cite). The higher L-moments are linear combinations of such averages [owa2](@cite).
 
-These types and functions implement the various existing formulations and risk measures representable by ordered weights arrays.
+The types and functions below build the weight vectors of these measures, and the formulations that optimise them.
 
 ```@docs
 AbstractOrderedWeightsArrayFunction

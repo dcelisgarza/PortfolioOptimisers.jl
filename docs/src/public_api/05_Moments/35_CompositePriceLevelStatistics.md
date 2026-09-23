@@ -4,7 +4,7 @@ Description = "Composite price-level statistics, public API of PortfolioOptimise
 
 # Composite price-level statistics
 
-The statistics the later papers of the forecast-reading arm add to [`PriceLevelExpectedReturns`](@ref): a truncated exponential average, a Gaussian-weighted double estimate, a statistic that switches per asset on a trend test, a radial-basis composite of several trends centred on the one with the best worst back-tested return, and the three-state kernel trend pattern that folds with a memory over an elastic-net path.
+This page has more statistics for [`PriceLevelExpectedReturns`](@ref), from later papers on online portfolio selection. They are a truncated exponential moving average, a double estimate with Gaussian weights, and a statistic that switches per asset between three others on the sign of a trend test. There is also a radial-basis mix of several trend forecasts, centred on the trend with the best worst-case return over the last `window` periods. The last is the three-state price prediction of kernel trend pattern tracking, which keeps its previous prediction and fits its first state with an elastic-net regression.
 
 ```@docs
 TruncatedExponentialMovingAverage

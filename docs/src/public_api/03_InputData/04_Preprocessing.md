@@ -6,9 +6,9 @@ Description = "Preprocessing, public API of PortfolioOptimisers.jl: fit_preproce
 
 ## Preprocessing estimators
 
-Preprocessing estimators transform price- or returns-level data under a **fit/apply contract**: [`fit_preprocessing`](@ref) learns whatever state the transformation needs from a training window — the surviving asset universe, imputation parameters, thresholds — and [`apply_preprocessing`](@ref) replays that state on unseen windows, so no information flows from test data back into the transformation.
+A preprocessing estimator transforms prices or returns in two steps. [`fit_preprocessing`](@ref) learns what the transform needs from a training window, such as the assets to keep, the values to impute or a threshold. [`apply_preprocessing`](@ref) applies that fitted result to another window, and learns nothing from it. The data of a test window never changes the transform.
 
-They are ordinary estimators and know nothing about pipelines. A [`Pipeline`](@ref) drives them through these two verbs, exactly as it drives prior estimators through [`prior`](@ref) or optimisers through [`optimise`](@ref).
+A preprocessing estimator does not depend on a pipeline. A [`Pipeline`](@ref) calls these two functions on it, as it calls [`prior`](@ref) on a prior estimator and [`optimise`](@ref) on an optimiser.
 
 ```@docs
 fit_preprocessing

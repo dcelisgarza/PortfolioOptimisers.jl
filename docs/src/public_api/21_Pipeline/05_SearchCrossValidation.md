@@ -4,7 +4,7 @@ Description = "Search cross-validation, public API of PortfolioOptimisers.jl: se
 
 # Search cross-validation
 
-Tuning a pipeline widens the search boundary to the entire workflow: preprocessing hyperparameters (imputation statistics, missing-data thresholds) are searched jointly with prior, constraint, and optimiser hyperparameters, and every candidate is fitted per fold so stateful preprocessing never sees the test window. Lens keys address steps by name (`"impute.stat"`), by position (an integer key swaps the whole step), or by raw property path (`"steps[2].stat"`).
+A search over the hyperparameters of a pipeline covers the whole workflow. It searches the preprocessing settings, such as the imputation statistic or the threshold for missing data, together with the settings of the prior, the constraints and the optimiser. Each candidate is fitted on each fold, so a fitted preprocessing step never sees the test window. A key names a setting by the name of its step, `"impute.stat"`, by position, where an integer key replaces the whole step, or by property path, `"steps[2].stat"`.
 
 ```@docs
 search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation, data::Prices_RR)

@@ -6,7 +6,7 @@ Description = "Returns result, public API of PortfolioOptimisers.jl: ReturnsResu
 
 ## Prices to returns
 
-Other than [`FiniteAllocationOptimisationEstimator`](@ref), all optimisations work based off returns data rather than price data. These functions and types are involved in computing returns.
+Every optimiser works on returns, except a [`FiniteAllocationOptimisationEstimator`](@ref), which works on prices. The types and functions below hold returns and compute them from prices.
 
 ## Types
 

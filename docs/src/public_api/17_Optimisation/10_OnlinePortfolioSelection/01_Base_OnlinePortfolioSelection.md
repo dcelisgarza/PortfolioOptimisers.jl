@@ -4,7 +4,7 @@ Description = "Online portfolio selection: the family, the geometry, the set and
 
 # Online portfolio selection: the family, the geometry, the set and the state
 
-The shared vocabulary of the online portfolio selection family: the abstract rule type every Online Selection Rule subtypes, the Projection Geometries a rule projects its raw step in, the Allocation Set the head holds, the Learning-Rate Schedule a first-order rule may hold in place of a rate, the one verb a rule writes, and the Partial Fit State the head carries.
+This page has the types and functions that every online portfolio selection rule shares. A rule goes in the `alg` field of `OnlinePortfolioSelection`, and it updates the weights after each observation. The page has the abstract type of every rule, and the projection geometries, the measures of distance in which a rule moves its raw step back into the set of allowed weights. `BoundedAllocationSet` is a set of allowed weights for the `set` field. A first-order rule can hold a learning-rate schedule in place of a fixed step size, and the abstract type of the schedules is also on this page. `online_update!` is the one function a new rule must write. The other functions start and update the state of a rule and of a schedule.
 
 ```@docs
 PortfolioOptimisers.AbstractOnlinePortfolioSelectionAlgorithm

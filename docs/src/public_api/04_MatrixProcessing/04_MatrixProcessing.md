@@ -4,18 +4,16 @@ Description = "Matrix processing, public API of PortfolioOptimisers.jl: Abstract
 
 # Matrix processing
 
-Co-moment matrices can be post-processed after being computed. These processes are often complementary but there is no set order.
-
-At the base level, we have four possible post processing steps:
+A matrix processing estimator changes a covariance or correlation matrix after it is estimated. It has four steps:
 
  1. Positive definite projection.
  2. Denoising.
  3. Detoning.
- 4. Custom process.
+ 4. A custom step that you write.
 
-The only set order is that positive definite projection should come first. This is because the other post-processing methods work best with positive definite matrices, and may use positive definite projection internally.
+Run the positive definite projection first. The other steps work best on a positive definite matrix, and the denoising and detoning steps can project the matrix again.
 
-Aside from this, there is no set canonical order, the closest to a heuristic we can justify is to denoise before detoning. The order is configured as a tuple or vector of step symbols (`:pdm`, `:dn`, `:dt`, `:alg`), applied left to right.
+For the other steps, the only order with a known reason is to denoise before you detone. You set the order as a tuple or vector of the step symbols `:pdm`, `:dn`, `:dt` and `:alg`, and the steps run from left to right. The default order is `(:pdm, :dn, :dt, :alg)`.
 
 ```@docs
 AbstractMatrixProcessingEstimator

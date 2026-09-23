@@ -4,34 +4,36 @@ Description = "The Asset Panel, public API of PortfolioOptimisers.jl: AbstractPa
 
 # The Asset Panel
 
-## The Asset Panel
+## The asset panel
 
-A **point-in-time panel** of per-asset fields — market capitalisation, a sector classification, a
-factor exposure tensor — is what [`ReturnsResult`](@ref) and [`PricesResult`](@ref) carry in their
-`pnl` slot. Each **Panel Field** owns its own values and its own observed mask, so the panel *is*
-the feature data: no carrier holds a feature matrix beside it, and the Feature Matrix a distance
-measures is derived by [`feature_matrix`](@ref) and stored nowhere.
+An asset panel holds data about each asset next to its returns or prices, such as a market
+capitalisation, a sector classification or a table of factor exposures. [`ReturnsResult`](@ref)
+and [`PricesResult`](@ref) keep it in their `pnl` field. Each field of the panel holds its own
+values and its own observed mask, which marks the cells that held data. A distance that compares
+assets by these fields reads a feature matrix, and [`feature_matrix`](@ref) builds that matrix from
+the panel each time a distance needs it. No object stores the matrix.
 
-A **Feature Selector** says which Panel Fields the matrix stacks. An entry names one Panel Field,
-one field with the levels or labels it keeps, one field with a single level or label, or one
-field's observed mask. [`feature_labels`](@ref) names each resulting column with the entry that
-selects exactly it, so a label vector is itself a selector that rebuilds the same matrix.
+A feature selector names the panel fields that the matrix stacks. Each entry of a selector names
+one of four things: a whole panel field, a field with the levels or labels to keep, a field with
+one level or label, or the observed mask of a field. [`feature_labels`](@ref) names each column of
+the matrix with the entry that selects that column alone. Pass the labels back as a selector, and you
+get the same matrix.
 
-A panel takes one of two shapes. A **static** panel indexes its Panel Fields by asset alone and
-carries no universe mask; a **time-varying** panel prepends an observation axis and carries both.
-The shape rides the type parameters, so a mask consumer dispatches rather than branches.
+A panel is static or time-varying. A static panel has no observation axis and no universe
+masks. A time-varying panel adds an observation axis, and it carries the active mask
+and the estimation mask.
 
-A blank cell never reaches a carrier. [`asset_panel`](@ref) resolves every one of them, so every
-Panel Field comes out finite, and each Panel Field that can blank carries the observed mask that
-says which cells the resolution touched.
+[`asset_panel`](@ref) builds a panel from raw fields that can hold blank cells. It fills every blank
+by the fill policy of its field, so every field of the panel is finite. A field that can hold
+blanks carries an observed mask, which is `false` at each cell that the fill wrote.
 
-The library persists no panel of its own, and it needs no format to: [`panel_dataframe`](@ref)
-renders a panel as a `DataFrames.DataFrame`, and a caller writes that with whatever they already
-use. One Panel Field name gives that field laid out as it stands, a `:long` layout gives one row
-per `(observation, asset)` filtered by the active mask, and a `:wide` layout gives one column per
-`(Panel Field column, asset)` and keeps every cell. A [`TensorPanelField`](@ref) spreads into one
-column per trailing-axis label there, under the same `"<field>=<label>"` name it takes in a
-Feature Matrix.
+The library has no file format for a panel. [`panel_dataframe`](@ref) converts a panel to a
+`DataFrames.DataFrame`, which you can write with any tool you already use. Name one panel field,
+and you get that field in the layout it has. The `:long` layout gives one row per
+`(observation, asset)` pair where the asset is active. The `:wide` layout gives one row per
+observation and one column per `(panel field column, asset)` pair, and keeps every cell. A
+[`TensorPanelField`](@ref) gives one column per label of its last axis, named `"<field>=<label>"`,
+as in a feature matrix.
 
 ## Types
 
