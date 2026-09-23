@@ -86,7 +86,7 @@ end
 
 Give the one portfolio a fold reads as its previous weights, and refuse a population.
 
-[`fold_loop`](@ref) hands the previous fold's weights to [`factory`](@ref) when `est` [`needs_previous_weights`](@ref). A term that reads them, such as a turnover, a tracking error, a fee, or a custom constraint or objective, measures the trade from **one** portfolio. A frontier sweep gives a population, one portfolio per sweep point, and each fold resolves its own span from its own data. So point `k` at one fold and point `k` at the next sit at different return levels, and no one portfolio is the previous one. The two ideas contradict each other, so the loop refuses the combination by name instead of charging the term against a portfolio it would have to choose. ADR 0174 records the decision and the alternatives it leaves open.
+[`fold_loop`](@ref) hands the previous fold's weights to [`factory`](@ref) when `est` [`needs_previous_weights`](@ref). A term that reads them, such as a turnover, a tracking error, a fee, or a custom constraint or objective, measures the trade from **one** portfolio. A frontier sweep gives a population, one portfolio per sweep point, and each fold resolves its own span from its own data. So point `k` at one fold and point `k` at the next sit at different return levels, and no one portfolio is the previous one. The two ideas contradict each other, so the loop refuses the combination by name instead of charging the term against a portfolio it would have to choose. The first fold reads no previous weights, so the refusal comes after its solve.
 
 # Arguments
 

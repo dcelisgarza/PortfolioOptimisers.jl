@@ -77,7 +77,7 @@ constraint by passing a different one to the constructor that takes it.
 - `PortfolioOptimisers.jl` is in active development, and its version is still `v0.*.*`. A `v0.X.0` release can break your code, and a `v0.X.Y` release does not. The [migration guide](@ref migration) lists each breaking change and the code to write instead.
 - The documentation is not complete.
 - Test coverage is below `95 %`. Most of the missing tests are tests of argument checks, and some less-used features have few tests or none.
-- Open an issue, a discussion or a pull request for a bug, or for a missing doc, example, feature or test.
+- Open an issue or a discussion for a bug, or for a missing doc, example, feature or test. The [contributing guidelines](@ref contributing) say how to send a change.
 
 ## Installation
 
