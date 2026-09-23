@@ -156,7 +156,7 @@ These results were wrong in v0.30:
 - A weighted pipeline holding `ImpliedVolatilityRegression` computed the realised volatility unweighted.
 - A hyperparameter search over `"opti[1].opt.l2"`. The penalty never entered the model, and the search reported success.
 - The effective-asset norm ceiling at any `p != 2`. The ceiling was weaker than asked.
-- DBHT read the wrong component of a `CartesianIndex`, so its second output was unrelated to any path. Three more DBHT defects moved clusters on a tie and on a repeated call.
+- `distance_wei`, the private shortest-path function of DBHT, returned a wrong edge count for each path in `B`, its second output. DBHT uses only the path lengths, and this defect moved no cluster. Three more DBHT defects moved clusters on a tie and on a repeated call.
 - A `KFold` run through the Pipeline passed the weights of the previous fold to the next fold, where a run of the optimiser alone did not. `FeesEstimator.tn` passed the turnover through unchanged, so every fold charged the turnover fee against old reference weights.
 - `MultipleRandomised` with a seed draws different subsets, because it now draws from the assets listed in each window.
 
@@ -172,13 +172,13 @@ These results were approximate in v0.30:
 - An upper-bound `GridRelativisticValueatRiskView`.
 - An `EntropyPoolingPrior` over a `FactorPrior` with a `StepwiseRegression`. The nested prior now fits first, so it selects the same factors as the `FactorPrior` alone.
 - Every backtest with a fixed fee, a turnover fee, or a delisting. See [Fees](@ref migration-0-31-fees).
-- A walk-forward search (`GridSearch`, `RandomisedSearch`) over an optimiser with a `TimeDependent` schedule, or with a `Turnover`, tracking or fee term that reads the previous weights. The search now scores each candidate with one run of its folds in order, and no longer fits each fold on its own.
+- A walk-forward search (`GridSearchCrossValidation`, `RandomisedSearchCrossValidation`) over an optimiser with a `TimeDependent` schedule, or with a `Turnover`, tracking or fee term that reads the previous weights. The search now scores each candidate with one run of its folds in order, and no longer fits each fold on its own.
 - A walk-forward in which a fold failed and a later fold read the previous weights. The later fold now reads the last solved fold's weights instead of raising an error.
 
 These results keep their numbers, but their meaning changed:
 
 - The `Max` and log-sum-exp scalarisers put an upper bound on `model[:risk]`, so `model[:risk]` is not the aggregate. Read the exact value with `expected_risk`.
-- `number_effective_assets` under an order-`p` norm is `(sum_i |w_i|^p)^(1/(1 - p))`.
+- The order-`p` effective number of assets behind an `lpc` ceiling is `(sum_i |w_i|^p)^(1/(1 - p))`, where v0.30 used `1 / sum_i |w_i|^p`. To ask for at least `m` such assets, set `val = m^(1/p - 1)`, not `m^(-1/p)`.
 - `res.fb` on an optimisation result holds the fallbacks that failed before the answer, as `(estimator, result)` pairs. In v0.30 it was always `nothing`.
 - Every optimisation result has `imsk`, the assets it was allowed to trade. On a table with no gaps it is all `true`.
 

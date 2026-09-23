@@ -248,7 +248,7 @@ end
         readme = opening_paragraph(read(joinpath(REPO_ROOT, "README.md"), String),
                                    "PortfolioOptimisers.jl")
         index = opening_paragraph(read(sources["index.md"], String),
-                                  "Welcome to PortfolioOptimisers.jl")
+                                  "PortfolioOptimisers.jl")
         @test !isnothing(readme)
         @test !isnothing(index)
         @test readme == index

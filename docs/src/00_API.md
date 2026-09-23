@@ -12,8 +12,10 @@ which can change at any release. The docs build reads the split from the declara
 
 [^1]: A few names are exceptions, most of them convenience methods of a function. A link to one of these methods can go to the function rather than to the exact method definition. I have found no fix other than a link to a fixed line of code, and such a link breaks when the code moves.
 
-## Features
+## Capability catalogue
 
 The [capability catalogue](@ref capability-catalogue) lists everything the package can do. It
-groups the parts by the job each one does, not by the file that holds its code. The docs build generates
-it from the package, so it cannot fall behind the code.
+groups the parts by the job each one does, not by the file that holds its code. That grouping is
+written by hand. An entry with no label of its own takes its one-line description from the first
+sentence of its docstring. The docs build and a test both fail when the package adds a type you
+can choose that the catalogue does not list.

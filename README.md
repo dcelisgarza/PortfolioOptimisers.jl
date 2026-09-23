@@ -29,7 +29,7 @@ constraint swaps out without touching the optimiser.
 - The constraints include budget, group, factor exposure, cardinality, turnover, tracking, phylogeny and centrality constraints. The costs are fees and market impact, and you can add your own JuMP expressions. See the [constraints and costs guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/04_Constraints_and_Costs).
 - You can validate a portfolio with walk-forward and combinatorial cross-validation, tune it with a grid or a randomised hyperparameter search, and join the steps of a fit in a pipeline. See the [validation and tuning guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/05_Validation_and_Tuning).
 
-The [capability catalogue](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/capability_catalogue) lists everything the library can do. The docs build generates it from the package, so it cannot fall behind the code.
+The [capability catalogue](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/capability_catalogue) lists everything the library can do. Its grouping is written by hand, and a test fails when the package adds a type you can choose that the catalogue does not list.
 
 ## Installation
 

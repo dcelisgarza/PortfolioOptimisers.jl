@@ -62,7 +62,7 @@ CurrentModule = PortfolioOptimisers
 Description = "PortfolioOptimisers.jl is a portfolio optimisation (portfolio optimization) library for Julia, built from composable immutable estimators."
 ```
 
-# Welcome to PortfolioOptimisers.jl
+# PortfolioOptimisers.jl
 
 `PortfolioOptimisers.jl` is a portfolio optimisation (portfolio optimization) library for Julia.
 Every component is an immutable estimator you compose, so a prior, a risk measure or a
