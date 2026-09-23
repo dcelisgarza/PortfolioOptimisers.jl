@@ -351,13 +351,13 @@ A long-only model needs no pinning, because it holds no short side to bound.
 
 `l`, `s` and `tn` are rates per period. Each of them charges one time per observation of a return series, and `fa` reaches none of them.
 
-`fl` and `fs` are currency amounts charged one time for the whole holding period, and the `fa` field names the clock they fall on. Both [`calc_fees`](@ref) and [`calc_asset_fees`](@ref) return a pair, `(amortised, one_time)`.
+`fl` and `fs` charge each non-zero position one time for the whole holding period, as a fraction of capital on a return series and as a currency amount in the finite allocation. The `fa` field names the clock they fall on. Both [`calc_fees`](@ref) and [`calc_asset_fees`](@ref) return a pair, `(amortised, one_time)`.
 
 A `nothing` `fa` puts the two fixed charges in `one_time`, and [`charge_fees`](@ref) subtracts that from the first observation alone. An [`AmortisedFees`](@ref) divides them by the observation count and adds them to `amortised`, so every observation carries an equal share and `one_time` is zero.
 
 The field carries no count. Every site that charges a fee knows the count it charges over and hands it in, so the count is never stored and never stale. The JuMP model states the same rule, through `:one_time_fees` and [`charge_one_time_fees`](@ref).
 
-The two clocks charge the same total over a horizon of `T` observations, which is the number [`calc_total_fees`](@ref) reports. They give a different drawdown, because one charges the whole cost on one observation and the other charges a fraction of it on each.
+The two clocks charge the same total over a horizon of `T` observations, which is the number [`calc_total_fees`](@ref) reports. They differ in where the one-off charge lands: one charges it whole on the first observation, and the other charges a `1 / T` share of it on each. So the charge of each observation differs, and so does the path of the cumulative return.
 
 # Fields
 
@@ -1435,7 +1435,7 @@ Compute total fees for portfolio weights.
 
 Sums proportional, fixed, and turnover fees for all assets. [`calc_asset_fees(w::VecNum, fees::Fees)`](@ref) splits the same total over the assets, and its sum is this number up to the order of summation.
 
-The verb returns a pair, `(amortised, one_time)`. `l`, `s` and `tn` are rates per period, so they charge on every observation and land in `amortised`. `fl` and `fs` are currency amounts charged one time for the whole holding period, so `fees.fa` decides where they land: a `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero.
+The verb returns a pair, `(amortised, one_time)`. `l`, `s` and `tn` are rates per period, so they charge on every observation and land in `amortised`. `fl` and `fs` charge each non-zero position one time for the whole holding period, as a fraction of capital on the weights this verb reads, so `fees.fa` decides where they land: a `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero.
 
 `T` is the observation count the calling site charges over, and the site always knows it, so no fee stores one. [`charge_fees`](@ref) hands the length of the series it lays the pair onto, and [`calc_total_fees`](@ref) contracts the pair to the cost of a whole holding period.
 
@@ -1685,7 +1685,7 @@ Compute total per asset fees for portfolio weights.
 
 Sums proportional, fixed, and turnover fees for all assets. Each half sums to the matching half of the pair [`calc_fees(w::VecNum, T::Number, fees::Fees)`](@ref) returns, up to the order of summation.
 
-The verb returns a pair, `(amortised, one_time)`, and **each half is itself a pair**, one entry per axis of a reduced [`Fees`](@ref): the charge of the assets that stayed, and the charge of the assets that left. `l`, `s` and `tn` are rates per period and land in `amortised`, as `lq` does on the other axis. `fl` and `fs` are currency amounts charged one time for the whole holding period, so `fees.fa` decides where they land, as it does for `flq`: a `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero. The doctest below shows all four vectors.
+The verb returns a pair, `(amortised, one_time)`, and **each half is itself a pair**, one entry per axis of a reduced [`Fees`](@ref): the charge of the assets that stayed, and the charge of the assets that left. `l`, `s` and `tn` are rates per period and land in `amortised`, as `lq` does on the other axis. `fl` and `fs` charge each non-zero position one time for the whole holding period, as a fraction of capital on the weights this verb reads, so `fees.fa` decides where they land, as it does for `flq`: a `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero. The doctest below shows all four vectors.
 
 `T` is the observation count the calling site charges over, and the site always knows it, so no fee stores one. [`charge_asset_fees`](@ref) hands the row count of the matrix it lays the pair onto, and [`calc_total_asset_fees`](@ref) contracts the pair to the cost of a whole holding period.
 
@@ -1835,7 +1835,7 @@ The fixed twin of [`calc_liquidation_fees`](@ref), and it takes no weight vector
 
 A liquidated short is a trade as much as a liquidated long, so **both sides are charged**. The verb therefore calls [`calc_fixed_fees`](@ref) twice against `flq.w`, once under `.>=` and once under `.<`, which is the pattern [`calc_one_off_fees`](@ref) spells for `fl` and `fs` with one rate serving both sides. The two selections are disjoint, so no entry is charged twice.
 
-The charge is a currency amount, so it falls one time for the whole holding period beside `fl` and `fs`, on the clock `fees.fa` names.
+The charge is fixed per position, so it falls one time for the whole holding period beside `fl` and `fs`, on the clock `fees.fa` names. It is a fraction of capital on a return series and in the JuMP model, and a currency amount in the finite allocation.
 
 # Algorithm
 
@@ -2076,13 +2076,14 @@ end
 
 Charge the terms of a fee that fall one time over a holding period.
 
-`fl` and `fs` are currency amounts charged one time for the whole holding period, and they are the only terms `fees.fa` reaches. The method carries no price, because a fixed fee is a currency amount already.
+`fl` and `fs` charge each non-zero position, and `flq` each position a forced exit sold, one time for the whole holding period. They are the only terms `fees.fa` reaches. On the weights this method reads, each charge is a fraction of capital. The method carries no price, because a fixed fee does not scale with the size of the position.
 
 # Algorithm
 
  1. Charge the long fixed term, the call of [`calc_fixed_fees`](@ref) on `fees.fl` under `.>=`.
  2. Charge the short fixed term, the call of the same name on `fees.fs` under `.<`.
- 3. Return the sum of the two terms.
+ 3. Charge the fixed forced exit, the call of [`calc_fixed_liquidation_fees`](@ref) on `fees.flq`.
+ 4. Return the sum of the three terms.
 
 # Arguments
 
@@ -2107,6 +2108,7 @@ julia> PortfolioOptimisers.calc_one_off_fees([0.5, 0.5], fees)
   - [`Fees`](@ref)
   - [`VecNum`](@ref)
   - [`calc_fixed_fees`](@ref)
+  - [`calc_fixed_liquidation_fees`](@ref)
   - [`calc_periodic_fees`](@ref)
   - [`calc_total_fees`](@ref)
   - [`calc_asset_one_off_fees`](@ref)
@@ -2127,7 +2129,7 @@ The per asset twin of [`calc_one_off_fees`](@ref). Its entries sum to that numbe
 
  1. Charge the long fixed term, the call of [`calc_asset_fixed_fees`](@ref) on `fees.fl` under `.>=`.
  2. Charge the short fixed term, the call of the same name on `fees.fs` under `.<`.
- 3. Charge the fixed forced exit, the call of [`calc_asset_fixed_liquidation_fees`](@ref) on `fees.flq`. `flq` is a currency amount charged one time, so it falls on the clock `fees.fa` names, beside `fl` and `fs`.
+ 3. Charge the fixed forced exit, the call of [`calc_asset_fixed_liquidation_fees`](@ref) on `fees.flq`. `flq` is charged one time per position, so it falls on the clock `fees.fa` names, beside `fl` and `fs`.
  4. Return the pair: the elementwise sum of the two vectors of steps 1 and 2, and the vector of step 3.
 
 # Arguments
@@ -2170,7 +2172,7 @@ end
 
 Charge the whole cost of holding a portfolio for `T` periods.
 
-[`calc_fees`](@ref) answers one observation of a return series. This verb answers the whole holding period, so it charges the per period terms `T` times and the one-off terms one time. It needs the rates, the fixed amounts and the horizon, and nothing else. `fees.fa` reaches no term here, because that field names where a one-off cost lands on a return series, and this verb reports no series. The finite allocation reads this verb to take the fees out of the cash before it allocates.
+[`calc_fees`](@ref) answers one observation of a return series. This verb answers the whole holding period, so it charges the per period terms `T` times and the one-off terms one time. It needs the rates, the fixed amounts and the horizon, and nothing else. `fees.fa` reaches no term here, because that field names where a one-off cost lands on a return series, and this verb reports no series. The finite allocation states the same rule in money, in its own variables, through [`set_allocation_fees!`](@ref) and [`allocation_fee`](@ref).
 
 # Algorithm
 
@@ -2205,6 +2207,8 @@ julia> calc_total_fees([0.5, 0.5], 252, fees)
   - [`calc_periodic_fees`](@ref)
   - [`calc_one_off_fees`](@ref)
   - [`calc_total_asset_fees`](@ref)
+  - [`set_allocation_fees!`](@ref)
+  - [`allocation_fee`](@ref)
 """
 function calc_total_fees(w::VecNum, ::Number, ::Nothing)
     return zero(eltype(w))
@@ -2222,7 +2226,7 @@ The per asset twin of [`calc_total_fees`](@ref). Its entries sum to that number,
 # Algorithm
 
  1. Charge `T` times the per period terms, the call of [`calc_asset_periodic_fees`](@ref). Both halves of its pair are scaled, because both are rates.
- 2. Charge the one-off terms one time, the call of [`calc_asset_one_off_fees`](@ref). Neither half is scaled, because both are currency amounts.
+ 2. Charge the one-off terms one time, the call of [`calc_asset_one_off_fees`](@ref). Neither half is scaled, because both are charged one time for the whole holding period.
  3. Return the pair, each axis summed with its own half: the investable total, and the liquidation total through [`add_liquidation_terms`](@ref), which answers the axis whose two terms are set independently.
 
 # Arguments

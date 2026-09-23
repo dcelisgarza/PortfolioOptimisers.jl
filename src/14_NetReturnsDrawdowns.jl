@@ -78,7 +78,7 @@ end
 
 Subtract a fee from a portfolio return series, on the clock the fee states.
 
-`l`, `s` and `tn` are rates per period, so they charge on every observation. `fl` and `fs` are currency amounts charged one time for the whole holding period, so the clock decides where in the series they land, and `fees.fa` names that clock. The length of the holding period is the length of the series, which this verb hands to [`calc_fees`](@ref).
+`l`, `s` and `tn` are rates per period, so they charge on every observation. `fl` and `fs` charge each non-zero position one time for the whole holding period, as a fraction of capital on a return series, so the clock decides where in the series they land, and `fees.fa` names that clock. The length of the holding period is the length of the series, which this verb hands to [`calc_fees`](@ref).
 
 # Algorithm
 
@@ -87,7 +87,7 @@ Subtract a fee from a portfolio return series, on the clock the fee states.
  3. Subtract `amortised` from every observation.
  4. Subtract `one_time` from the first observation alone. Under an [`AmortisedFees`](@ref) it is zero, because step 2 spread that whole cost into `amortised`, and `iszero` gates the pass away.
 
-Both clocks charge the same total when the horizon is the length of `r`. They give a different drawdown, because the first charges the whole cost on one observation and the second charges a fraction of it on each.
+Both clocks charge the same total when the horizon is the length of `r`. They differ in where the one-off charge lands: the first charges it whole on the first observation, and the second charges a share of it on each. So the net return of each observation differs, and so does the path of the cumulative return.
 
 # Arguments
 

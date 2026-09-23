@@ -188,7 +188,7 @@ Add the fixed cost of a forced exit to the model's `:one_time_fees` expression.
 
 The fixed twin of [`set_liquidation_fees!`](@ref), and a constant for the same reason: the liquidated assets are not in `w`. Unlike [`set_fixed_fees!`](@ref) it therefore needs **no binary indicator**, because whether each position is held is already known from `flq.w` rather than decided by the programme.
 
-`flq` is a currency amount charged one time for the whole holding period, so it joins `:one_time_fees` beside `fl` and `fs` through [`add_to_one_time_fees!`](@ref), and [`charge_one_time_fees`](@ref) then lands it on the clock `fees.fa` names.
+`flq` charges each position the exit sold one time for the whole holding period, as a fraction of capital in this model, so it joins `:one_time_fees` beside `fl` and `fs` through [`add_to_one_time_fees!`](@ref), and [`charge_one_time_fees`](@ref) then lands it on the clock `fees.fa` names.
 
 # Algorithm
 
