@@ -4,7 +4,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the Power-Norm Risk Measure (PRM) for a vector of portfolio returns.
 
-Solves a convex optimisation problem to compute the PRM at confidence level `alpha` with Lp-norm parameter `p`, using the specified solver(s). It warns when the value equals the largest loss of `x`. [`PowerNormValueatRisk`](@ref) states the condition in its mathematical definition.
+Solves a convex optimisation problem to compute the PRM at confidence level `alpha` with Lp-norm parameter `p`, using the specified solver(s). The value equals the largest loss of `x` under the condition that [`PowerNormValueatRisk`](@ref) states in its mathematical definition.
 
 # Arguments
 
@@ -44,21 +44,12 @@ function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
                         pvar_w[1:T] >= 0
                         pvar_v[1:T]
                     end)
-    # `xmin` is the largest loss and `mass` the probability of the observations at it. An
-    # observation of zero weight carries no probability, so it cannot set the largest loss.
-    iaT, xmin, mass = if isnothing(w)
+    iaT = if isnothing(w)
         JuMP.@constraint(model, sum(pvar_v) - pvar_t <= 0)
-        xmin = minimum(x)
-        inv(alpha * T^ip), xmin, count(==(xmin), x) / T
+        inv(alpha * T^ip)
     else
         JuMP.@constraint(model, LinearAlgebra.dot(w, pvar_v) - pvar_t <= 0)
-        xmin = minimum(view(x, w .> zero(eltype(w))))
-        inv(alpha * sum(w)^ip), xmin, LinearAlgebra.dot(w, x .== xmin) / sum(w)
-    end
-    # The measure equals the largest loss when `mass >= alpha^p`, written here in the form
-    # `alpha * (1 / mass)^(1/p) <= 1`, which is exact at `alpha * T^(1/p) = 1`.
-    if alpha * inv(mass)^inv(p) <= one(alpha)
-        @warn("The power-norm risk measure at `alpha = $alpha` and `p = $p` equals the largest loss $(-xmin) of this series of $T observations, because the observations at that loss carry a probability of $mass, which is at least `alpha^p`. For `T` equally weighted observations and no tie, this happens when `alpha * T^(1/p) <= 1`. Raise `alpha`, lower `p`, or use more observations to measure the tail beyond the largest loss.")
+        inv(alpha * sum(w)^ip)
     end
     JuMP.@constraints(model,
                       begin
@@ -147,7 +138,7 @@ Keywords correspond to the struct's fields.
 
     (r::PowerNormValueatRisk)(x::VecNum)
 
-Computes the PNVaR of a portfolio returns vector `x`. It warns when the value equals the largest loss of `x`, by the condition in the mathematical definition.
+Computes the PNVaR of a portfolio returns vector `x`. The value equals the largest loss of `x` under the condition in the mathematical definition.
 
 ## Arguments
 

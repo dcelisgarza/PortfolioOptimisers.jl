@@ -742,39 +742,35 @@
         @test PO.rolling_window_measure(rws, U, rd.X, nothing, 20; sca = MaxScalariser()) !=
               PO.rolling_window_measure(rws, U, rd.X, nothing, 20)
     end
-    @testset "The power-norm measure warns when it equals the largest loss (#1282)" begin
+    @testset "The power-norm measure is the largest loss under its condition (#1282)" begin
         rng = StableRNG(1282)
         r = PowerNormValueatRisk(; slv = slv)
-        msg = r"equals the largest loss"
-        # alpha * T^(1/p) = 0.05 * sqrt(252) < 1: the value is the largest loss.
+        # alpha * T^(1/p) = 0.05 * sqrt(252) < 1: the value is the largest loss. The
+        # docstring states the condition, and the measure does not warn.
         x = randn(rng, 252)
-        v = @test_logs (:warn, msg) match_mode = :any r(x)
-        @test isapprox(v, maximum(-x); rtol = 1e-5)
-        # alpha * T^(1/p) = 0.05 * sqrt(401) > 1 with no tie: no warning, and a smaller value.
-        x = randn(rng, 401)
         v = @test_logs min_level = Logging.Warn r(x)
-        @test v < maximum(-x)
+        @test isapprox(v, maximum(-x); rtol = 1e-5)
+        # alpha * T^(1/p) = 0.05 * sqrt(401) > 1 with no tie: a smaller value.
+        x = randn(rng, 401)
+        @test r(x) < maximum(-x)
         # A tie of two observations at the largest loss doubles its probability, and
         # 0.05 * (800 / 2)^(1/2) = 1 is on the boundary.
         x = randn(rng, 800)
         x[1:2] .= minimum(x) - 1
-        v = @test_logs (:warn, msg) match_mode = :any r(x)
-        @test isapprox(v, maximum(-x); rtol = 1e-5)
+        @test isapprox(r(x), maximum(-x); rtol = 1e-5)
         # A frequency weight of two on the largest loss acts as the same tie.
         x = randn(rng, 500)
         k = ones(Int, 500)
         k[argmin(x)] = 2
         rw = PowerNormValueatRisk(; slv = slv, w = fweights(k))
-        v = @test_logs (:warn, msg) match_mode = :any rw(x)
-        @test isapprox(v, maximum(-x); rtol = 1e-5)
-        @test_logs min_level = Logging.Warn r(x)
+        @test isapprox(rw(x), maximum(-x); rtol = 1e-5)
+        @test r(x) < maximum(-x)
         # An observation of zero weight carries no probability, so the second largest loss
         # sets the value.
         x = randn(rng, 252)
         q = ones(252)
         q[argmin(x)] = 0
         rw = PowerNormValueatRisk(; slv = slv, w = pweights(q))
-        v = @test_logs (:warn, msg) match_mode = :any rw(x)
-        @test isapprox(v, sort(-x; rev = true)[2]; rtol = 1e-5)
+        @test isapprox(rw(x), sort(-x; rev = true)[2]; rtol = 1e-5)
     end
 end

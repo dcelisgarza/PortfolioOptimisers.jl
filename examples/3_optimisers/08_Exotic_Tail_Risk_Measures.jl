@@ -172,8 +172,8 @@ PNVaR rises with `p`. Unlike RLVaR, it reaches the worst realisation at a finite
 ``T`` equally weighted observations, PNVaR equals the worst realisation when
 ``\alpha T^{1/p} \le 1``, that is when ``p \ge \log T / \log(1/\alpha)``. For our 252
 observations at ``\alpha = 0.05`` this is ``p \ge 1.85``, so the sweep stops at `p = 1.8`. At
-the default `p = 2` the measure is the worst realisation, and it warns you when you evaluate it.
-Raise `alpha` or use more observations to keep a larger `p` below that point.
+the default `p = 2` the measure is the worst realisation. Raise `alpha` or use more
+observations to keep a larger `p` below that point.
 
 We start above `p = 1` on purpose. The constructor accepts `p = 1`, but the power cone
 degenerates at that value, and the solver stops without a solution.
@@ -240,8 +240,9 @@ Every one of them is convex, and Clarabel solved all of them on this page.
 #src   degenerate boundary. The example sweeps p in {1.25,1.5,1.75,1.8} to keep the rendered
 #src   output clean.
 #src - PNVaR at T = 252, alpha = 0.05 equals WorstRealisation for every p >= log(T)/log(20) = 1.85
-#src   (#1282), and its value warns there. So sections 2 and 3 use p = 1.5, and the p-sweep stops
-#src   at 1.8. Measured: PNVaR(w_cvar) = 2.082/2.347/2.472/2.476 % against WR 2.479 %, no warning.
+#src   (#1282), and the docstring states it. So sections 2 and 3 use p = 1.5, and the
+#src   p-sweep stops at 1.8. Measured: PNVaR(w_cvar) = 2.082/2.347/2.472/2.476 % against
+#src   WR 2.479 %.
 #src - The `slv`-only-for-standalone-evaluation contract is a mild ergonomics trap: the same
 #src   measure needs `slv` for `expected_risk` but not when it is a `MeanRisk` objective. Noted
 #src   explicitly in the opening admonition so a reader who copies a measure between the two
