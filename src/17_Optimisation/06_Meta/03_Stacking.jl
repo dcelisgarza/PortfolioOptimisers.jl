@@ -465,8 +465,7 @@ function assert_special_nco_requirements(opt::Stacking)::Nothing
 end
 function assert_external_optimiser(opt::Stacking)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.pe, AbstractPriorResult),
-              ArgumentError("opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    assert_estimated_prior(opt.pe, "opt.pe")
     assert_external_optimiser(opt.opto)
     if !isnothing(opt.cv)
         assert_external_optimiser(opt.opti)

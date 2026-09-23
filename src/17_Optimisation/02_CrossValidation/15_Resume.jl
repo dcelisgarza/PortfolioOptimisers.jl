@@ -356,7 +356,7 @@ const OptimiserResume = Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any
 
 Continue an online walk-forward from a Result, over the full history extended.
 
-The doors that take an optimiser in the estimator slot take a [`Resume`](@ref) too. The carrier is viewed by `cols` as the one-shot door views it, and the estimator is not: the Result's estimator was threaded over the old run's view already, so the pinned context refuses a different one at the first delta step. The scheme is checked at the door ([`assert_resume_scheme`](@ref)) and the fold loop takes its resumed arm. The Result returned holds the new folds only, its `opt` folded through the last training end, and `id`.
+The doors that take an optimiser in the estimator slot take a [`Resume`](@ref) too. The carrier is viewed by `cols` as the one-shot door views it, and the estimator is not: the Result's estimator was threaded over the old run's view already, so the pinned context refuses a different one at the first delta step. `cross_val_predict` runs the one-shot door's checks on the Result's estimator, the scheme is checked at the door ([`assert_resume_scheme`](@ref)), and the fold loop takes its resumed arm. The Result returned holds the new folds only, its `opt` folded through the last training end, and `id`.
 
 # Arguments
 
@@ -370,6 +370,7 @@ The doors that take an optimiser in the estimator slot take a [`Resume`](@ref) t
 # Validation
 
   - Everything [`assert_resume_scheme`](@ref) and the resumed arm of [`online_folds`](@ref) refuse.
+  - For `cross_val_predict`, everything [`assert_internal_optimiser`](@ref) and [`assert_external_optimiser`](@ref) refuse on `r.res.opt`.
 
 # Returns
 
@@ -384,6 +385,8 @@ The doors that take an optimiser in the estimator slot take a [`Resume`](@ref) t
 """
 function cross_val_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER; cols = :,
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+    assert_internal_optimiser(r.res.opt)
+    assert_external_optimiser(r.res.opt)
     if !isa(cols, Colon)
         rd = port_opt_view(rd, cols)
     end

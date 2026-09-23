@@ -597,6 +597,67 @@ function assert_search_entry(est, cv)
     return nothing
 end
 """
+    search_candidate(opt, lenses, vals)
+
+Build one candidate of a search: `opt` with each lens set to its value, in order.
+
+# Arguments
+
+  - `opt`: The estimator the search tunes.
+  - `lenses`: The lenses of one grid point.
+  - `vals`: The value of each lens at that grid point.
+
+# Returns
+
+  - The candidate estimator.
+
+# Related
+
+  - [`search_cross_validation`](@ref)
+  - [`assert_search_candidates`](@ref)
+"""
+function search_candidate(opt, lenses, vals)
+    for (lens, val) in zip(lenses, vals)
+        opt = Accessors.set(opt, lens, val)
+    end
+    return opt
+end
+"""
+    assert_search_candidates(opt, lens_grid, val_grid) -> Nothing
+
+Run the entry checks of [`cross_val_predict`](@ref) on every candidate of a search, before any candidate is scored.
+
+A search scores each candidate through the fold loop directly, so the checks the one-shot door runs must run here. They run on each candidate and not on `opt` alone, because a lens can write a value the checks refuse, such as a precomputed prior, and it can also replace one.
+
+# Arguments
+
+  - `opt`: The estimator the search tunes.
+  - `lens_grid`: The lenses of each grid point.
+  - `val_grid`: The values of each grid point.
+
+# Validation
+
+  - Every candidate passes [`assert_internal_optimiser`](@ref) and [`assert_external_optimiser`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`search_candidate`](@ref)
+  - [`assert_search_entry`](@ref)
+  - [`assert_estimated_prior`](@ref)
+"""
+function assert_search_candidates(opt, lens_grid, val_grid)::Nothing
+    for (lenses, vals) in zip(lens_grid, val_grid)
+        opti = search_candidate(opt, lenses, vals)
+        assert_internal_optimiser(opti)
+        assert_external_optimiser(opti)
+    end
+    return nothing
+end
+"""
     pin_draw(cv::MultipleRandomised)
     pin_draw(cv)
 

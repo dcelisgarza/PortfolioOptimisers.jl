@@ -439,17 +439,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that [`InverseVolatility`](@ref) is valid for external use.
 
-Requires that `opt.pe` is not an `AbstractPriorResult`.
+Requires that `opt.pe` holds no `AbstractPriorResult`, directly or through a [`TimeDependent`](@ref) schedule.
 
 # Related
 
   - [`InverseVolatility`](@ref)
   - [`assert_external_optimiser`](@ref)
+  - [`assert_estimated_prior`](@ref)
 """
 function assert_external_optimiser(opt::InverseVolatility)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.pe, AbstractPriorResult),
-              ArgumentError("opt.pe must not be an AbstractPriorResult for external use, got $(typeof(opt.pe))"))
+    assert_estimated_prior(opt.pe, "opt.pe")
     assert_internal_optimiser(opt)
     return nothing
 end

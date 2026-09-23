@@ -409,8 +409,7 @@ function time_dependent_field_defaults(::SubsetResampling)::NamedTuple
     return subset_resampling_td_defaults()
 end
 function assert_external_optimiser(opt::SubsetResampling)::Nothing
-    @argcheck(!isa(opt.pe, AbstractPriorResult),
-              ArgumentError("opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    assert_estimated_prior(opt.pe, "opt.pe")
     return assert_external_optimiser(opt.opt)
 end
 function assert_internal_optimiser(opt::SubsetResampling)::Nothing

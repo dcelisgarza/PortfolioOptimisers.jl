@@ -979,6 +979,59 @@
         pred = cross_val_predict(HierarchicalRiskParity(), rd, KFold())
         @test !all(p -> p.res.w == pred.pred[1].res.w, pred.pred[2:end])
     end
+    @testset "A search and a schedule refuse a precomputed prior (#1281)" begin
+        pr = prior(EmpiricalPrior(), rd)
+        function refusal_msg(f)
+            return try
+                f()
+                ""
+            catch e
+                isa(e, ArgumentError) ? e.msg : sprint(showerror, e)
+            end
+        end
+        refused(f, name) = startswith(refusal_msg(f), "$name cannot be a precomputed")
+        # A search scores each candidate through the fold loop, so it refuses what
+        # cross_val_predict refuses, for every scheme and for the randomised form.
+        pinned = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pr))
+        p = concrete_typed_array([["opt.wb" => [WeightBounds(; lb = 0.0, ub = 1.0),
+                                                WeightBounds(; lb = 0.0, ub = 0.5)]]])
+        for cv in (KFold(), CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2))
+            @test refused(() -> search_cross_validation(pinned,
+                                                        GridSearchCrossValidation(p;
+                                                                                  cv = cv),
+                                                        rd), "opt.opt.pe")
+        end
+        @test refused(() -> search_cross_validation(pinned,
+                                                    RandomisedSearchCrossValidation(p;
+                                                                                    n_iter = 2,
+                                                                                    rng = StableRNG(1)),
+                                                    rd), "opt.opt.pe")
+        # A lens that writes a precomputed prior is refused, and one that replaces it in every
+        # candidate is not.
+        writes = concrete_typed_array([["opt.pe" => [EmpiricalPrior(), pr]]])
+        @test refused(() -> search_cross_validation(HierarchicalRiskParity(),
+                                                    GridSearchCrossValidation(writes), rd),
+                      "opt.opt.pe")
+        replaces = concrete_typed_array([["opt.pe" => [EmpiricalPrior(),
+                                                       EmpiricalPrior(; horizon = 2)]]])
+        res = search_cross_validation(pinned, GridSearchCrossValidation(replaces), rd)
+        @test isa(res.opt.opt.pe, EmpiricalPrior)
+        # A schedule is refused when an entry or its default is a precomputed prior, and a
+        # schedule of estimators is not.
+        n = 5
+        for pe in (TimeDependent(fill(pr, n); default = EmpiricalPrior()),
+                   TimeDependent([EmpiricalPrior() for _ in 1:n]; default = pr))
+            @test refused(() -> cross_val_predict(InverseVolatility(; pe = pe), rd,
+                                                  KFold(; n = n)), "opt.pe")
+            @test refused(() -> cross_val_predict(HierarchicalRiskParity(;
+                                                                         opt = HierarchicalOptimiser(;
+                                                                                                     pe = pe)),
+                                                  rd, KFold(; n = n)), "opt.opt.pe")
+        end
+        estimated = TimeDependent([EmpiricalPrior() for _ in 1:n])
+        pred = cross_val_predict(InverseVolatility(; pe = estimated), rd, KFold(; n = n))
+        @test length(pred.pred) == n
+    end
     @testset "Cross val predict" begin
         w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))
         function test_pred(predictions, name; rtol = 1e-6)

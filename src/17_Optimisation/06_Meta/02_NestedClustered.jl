@@ -281,8 +281,7 @@ Checks that the outer optimiser does not use pre-computed prior results, regress
   - [`NestedClustered`](@ref)
 """
 function assert_external_optimiser(opt::ClusteringOptimisationEstimator)::Nothing
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
-              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    assert_estimated_prior(opt.opt.pe, "opt.opt.pe")
     assert_internal_optimiser(opt)
     return nothing
 end
@@ -333,10 +332,41 @@ function assert_external_lcse(opt)::Nothing
               ArgumentError("a constraint space in opt.opt.lcse cannot hold a precomputed AbstractLoadingsRegressionResult in re; use an estimator instead. The outer problem replaces the asset universe with cluster names, so stated loadings cannot be sliced to follow it, and a row re-based through them would name assets that no longer exist"))
     return nothing
 end
+"""
+    assert_estimated_prior(pe, name::AbstractString) -> Nothing
+
+Assert that a `pe` slot holds a prior estimator, and no precomputed prior, directly or through a [`TimeDependent`](@ref) schedule.
+
+A prior result was fitted once, over the rows it saw. A fold loop that reads one gives every fold the same moments, so the test rows of each fold enter its fit, and the outer solve of a nested optimiser cannot refit it over the cluster universe. A schedule is read through [`time_dependent_entries`](@ref): each vector entry and the `default` are checked. A callable schedule passes, because its values exist only when it runs.
+
+# Arguments
+
+  - `pe`: The value of the `pe` slot.
+  - `name`: The path of the slot, as the error message names it.
+
+# Validation
+
+  - Neither `pe`, nor a vector entry of a schedule in `pe`, nor the `default` of that schedule, is an `AbstractPriorResult`. An `ArgumentError` that names `name` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_external_optimiser`](@ref)
+  - [`time_dependent_entries`](@ref)
+  - [`AbstractPriorResult`](@ref)
+"""
+function assert_estimated_prior(pe, name::AbstractString)::Nothing
+    entries = isa(pe, TimeDependent) ? time_dependent_entries(pe) : (pe,)
+    @argcheck(!any(x -> isa(x, AbstractPriorResult), entries),
+              ArgumentError("$name cannot be a precomputed AbstractPriorResult, or a TimeDependent schedule whose entries or default hold one; use an estimator instead"))
+    return nothing
+end
 function assert_external_optimiser(opt::JuMPOptimisationEstimator)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
-              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    assert_estimated_prior(opt.opt.pe, "opt.opt.pe")
     assert_external_lcse(opt)
     assert_internal_optimiser(opt)
     return nothing
@@ -356,8 +386,7 @@ Matches either [`RiskBudgeting`](@ref) or [`RelaxedRiskBudgeting`](@ref). Used f
 const RiskBudgetingOptimiser = Union{<:RiskBudgeting, <:RelaxedRiskBudgeting}
 function assert_external_optimiser(opt::RiskBudgetingOptimiser)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
-              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    assert_estimated_prior(opt.opt.pe, "opt.opt.pe")
     if isa(opt.rba, FactorRiskBudgeting)
         @argcheck(!isa(opt.rba.re, AbstractLoadingsRegressionResult),
                   ArgumentError("opt.rba.re cannot be a precomputed AbstractLoadingsRegressionResult; use an estimator instead"))
@@ -368,8 +397,7 @@ function assert_external_optimiser(opt::RiskBudgetingOptimiser)::Nothing
 end
 function assert_external_optimiser(opt::FactorRiskContribution)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
-              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    assert_estimated_prior(opt.opt.pe, "opt.opt.pe")
     @argcheck(!isa(opt.re, AbstractLoadingsRegressionResult),
               ArgumentError("opt.re cannot be a precomputed AbstractLoadingsRegressionResult; use an estimator instead"))
     assert_external_lcse(opt)
@@ -628,8 +656,7 @@ function assert_internal_optimiser(opt::NestedClustered)::Nothing
 end
 function assert_external_optimiser(opt::NestedClustered)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.pe, AbstractPriorResult),
-              ArgumentError("opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    assert_estimated_prior(opt.pe, "opt.pe")
     @argcheck(!isa(opt.cle, AbstractClusteringResult),
               ArgumentError("opt.cle cannot be a precomputed AbstractClusteringResult; use an estimator instead"))
     assert_external_optimiser(opt.opto)

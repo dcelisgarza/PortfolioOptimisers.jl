@@ -70,6 +70,7 @@ Performs grid search cross-validation for portfolio optimisation estimators. Ite
 # Details
 
   - Refuses an estimator carrying a partial-fit state once, before any candidate is built, through [`assert_search_entry`](@ref): the search tunes the configuration alone, and under an Online Scheme the whole entry check of the online arm runs at the door.
+  - Runs the entry checks of [`cross_val_predict`](@ref) on every candidate before any is scored, through [`assert_search_candidates`](@ref), so a candidate whose prior is a precomputed result is refused.
   - Fixes the folds once through [`pin_draw`](@ref), so a scheme whose `split` draws at random scores every candidate over the same folds.
   - Iterates over all parameter combinations in the grid, in parallel over `gscv.ex`.
   - Scores each candidate through [`fit_and_predict`](@ref)`(opt_i, rd, gscv.cv; ex = SequentialEx())`, the one fold loop every cross-validation entry point runs, so the candidate runs the scheme it declared: a walk-forward threads the previous fold's weights through the scheme's `pws`, and resolves a [`TimeDependent`](@ref) schedule per fold, exactly as [`fit_and_predict`](@ref)`(opt, rd, cv)` does. The folds inside a candidate run in sequence.
@@ -81,6 +82,7 @@ Performs grid search cross-validation for portfolio optimisation estimators. Ite
 
   - [`finite_candidate_index`](@ref)
   - [`assert_search_entry`](@ref)
+  - [`assert_search_candidates`](@ref)
   - [`pin_draw`](@ref)
   - [`score_rows`](@ref)
   - [`write_candidate_scores!`](@ref)
@@ -94,6 +96,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                  gscv::GridSearchCrossValidation, rd::ReturnsResult)
     assert_search_entry(opt, gscv.cv)
     lens_grid, val_grid = lens_val_grid(gscv.p)
+    assert_search_candidates(opt, lens_grid, val_grid)
     scheme = pin_draw(gscv.cv)
     cv = split(scheme, rd)
     rows = score_rows(cv)
@@ -118,10 +121,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     let opt = opt, test_scores = test_scores, train_scores = train_scores, train_X = train_X
         FLoops.@floop gscv.ex for (i, (lenses, vals)) in
                                   enumerate(zip(lens_grid, val_grid))
-            local opti = opt
-            for (lens, val) in zip(lenses, vals)
-                opti = Accessors.set(opti, lens, val)
-            end
+            local opti = search_candidate(opt, lenses, vals)
             # Candidates run in parallel over `gscv.ex`; the folds inside one run in
             # sequence, through the same loop every other entry point runs.
             local predictions = fit_and_predict(opti, rd, scheme;
@@ -131,11 +131,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
         end
     end
     opt_idx = finite_candidate_index(gscv.scorer, test_scores)
-    opt_lens = lens_grid[opt_idx]
-    opt_vals = val_grid[opt_idx]
-    for (lens, val) in zip(opt_lens, opt_vals)
-        opt = Accessors.set(opt, lens, val)
-    end
+    opt = search_candidate(opt, lens_grid[opt_idx], val_grid[opt_idx])
     return SearchCrossValidationResult(; opt = opt, test_scores = test_scores,
                                        train_scores = train_scores, lens_grid = lens_grid,
                                        val_grid = val_grid, idx = opt_idx)
@@ -155,7 +151,9 @@ per-path instead: for each candidate the whole scheme is run through [`fit_and_p
 [`PopulationPredictionResult`](@ref)), and [`expected_risk`](@ref) yields one score per path.
 The score matrix is therefore `n_paths × n_candidates`; the scorer selects across candidates
 exactly as for the other schemes, through [`finite_candidate_index`](@ref), so a candidate that
-failed a path can never win. The randomised form delegates here through its grid.
+failed a path can never win. The randomised form delegates here through its grid. The
+entry checks are the contiguous schemes' own: [`assert_search_entry`](@ref) on the estimator
+and [`assert_search_candidates`](@ref) on every candidate, before any is scored.
 
 `train_scores` (only when `gscv.train_score`) keeps every per-fold in-sample score rather than
 collapsing to one number per path: it is a `Vector` of `n_paths` matrices, one per path, each
@@ -174,7 +172,9 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                  gscv::GridSearchCrossValidation{<:Any,
                                                                  <:CombinatorialCrossValidation},
                                  rd::ReturnsResult)
+    assert_search_entry(opt, gscv.cv)
     lens_grid, val_grid = lens_val_grid(gscv.p)
+    assert_search_candidates(opt, lens_grid, val_grid)
     cv = split(gscv.cv, rd)
     N = length(val_grid)
     M = maximum(cv.path_ids)          # one score per recombined backtest path
@@ -198,10 +198,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     path_X = [[fold_train_returns(cv, rd, I[2]) for I in findall(==(p), cv.path_ids)]
               for p in 1:M]
     for (i, (lenses, vals)) in enumerate(zip(lens_grid, val_grid))
-        opti = opt
-        for (lens, val) in zip(lenses, vals)
-            opti = Accessors.set(opti, lens, val)
-        end
+        opti = search_candidate(opt, lenses, vals)
         # Fold-level parallelism happens inside fit_and_predict; the candidate loop is
         # sequential to avoid nested threading.
         predictions = fit_and_predict(opti, rd, gscv.cv; ex = gscv.ex)
@@ -217,9 +214,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
         end
     end
     opt_idx = finite_candidate_index(gscv.scorer, test_scores)
-    for (lens, val) in zip(lens_grid[opt_idx], val_grid[opt_idx])
-        opt = Accessors.set(opt, lens, val)
-    end
+    opt = search_candidate(opt, lens_grid[opt_idx], val_grid[opt_idx])
     return SearchCrossValidationResult(; opt = opt, test_scores = test_scores,
                                        train_scores = train_scores, lens_grid = lens_grid,
                                        val_grid = val_grid, idx = opt_idx)

@@ -288,7 +288,7 @@
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { map = 12, units = 1, swept = false }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { map = 12, units = 10, swept = false }
 "src/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { map = 12, units = 2, swept = false }
-"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { map = 12, units = 21, swept = false }
+"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { map = 12, units = 23, swept = false }
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { map = 12, units = 3, swept = false }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { map = 12, units = 2, swept = false }
 "src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { map = 12, units = 6, swept = false }
@@ -344,7 +344,7 @@
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/17_VarianceSkewKurtosisConstraints.jl" = { map = 11, units = 1, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/18_GenericValueatRiskRangeConstraints.jl" = { map = 11, units = 1, swept = false }
 "src/17_Optimisation/06_Meta/01_Base_MetaOptimisation.jl" = { map = 10, units = 20, swept = false }
-"src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { map = 10, units = 18, swept = false }
+"src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { map = 10, units = 19, swept = false }
 "src/17_Optimisation/06_Meta/03_Stacking.jl" = { map = 10, units = 13, swept = false }
 "src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { map = 10, units = 14, swept = false }
 "src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { map = 10, units = 14, swept = false }
