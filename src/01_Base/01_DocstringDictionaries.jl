@@ -1320,6 +1320,7 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :nskew => "[nskew](@cite) D. Cajas. *On the Spectral Decomposition of Portfolio Skewness and its Application to Portfolio Optimization*. Available at SSRN 4540021 (2023).",#
                                  :robustaa => "[robustaa](@cite) R. H. Tütüncü and M. Koenig. *Robust asset allocation*. Annals of Operations Research 132, 157–187 (2004).",#
                                  :sdpmom => "[sdpmom](@cite) D. Cajas. *Semidefinite Relaxation of Higher Portfolio Moments*. Available at SSRN 5284483 (2025).",#
+                                 :sdprp => "[sdprp](@cite) D. Cajas. *A Semidefinite Programming Approach to Risk Parity Portfolio Optimization*. Available at SSRN 5097869 (2025).",#
                                  :emom => "[emom](@cite) D. Cajas. *Portfolio Optimization of Even Moments using Power Cone Programming*. Available at SSRN 6518258 (2026).",#
                                  :mad => "[mad](@cite) H. Konno and H. Yamazaki. *Mean-absolute deviation portfolio optimization model and its applications to Tokyo stock market*. Management Science 37, 519–531 (1991).",#
                                  :lpm => "[lpm](@cite) P. C. Fishburn. *Mean-risk analysis with risk associated with below-target returns*. The American Economic Review 67, 116–126 (1977).",#

@@ -116,6 +116,8 @@ Solves a mean-risk problem whose decision variable is the vector of factor expos
 
 The asset weights are recovered from the exposures through the factor loadings, so a constraint written on the decision variable is a constraint on a factor. This is the change of basis alone: `FactorRiskContribution` sets **no** risk budget of its own. A target contribution per factor is stated through the risk measure's own `rc` constraints, exactly as it is for assets.
 
+Under [`Variance`](@ref) those rows sit on the semidefinite relaxation of [sdprp](@cite), formulation 16, over the factor weights. A solve can report success while the factor shares of the returned portfolio miss the rows, so compare [`factor_risk_contribution`](@ref) of the result with them. The `## Risk contribution constraints` subsection of [`Variance`](@ref) states the relaxation and the condition under which the rows bind.
+
 # Mathematical definition
 
 The factor model of the loadings, fitted by `re` or carried by the prior:
@@ -229,6 +231,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 # References
 
   - $(ref_dict[:cajas2025]) Section 10.2.1.
+  - $(ref_dict[:sdprp]) Formulation 16.
   - $(ref_dict[:roncalliweisang2012])
   - $(ref_dict[:meucci2007])
 """

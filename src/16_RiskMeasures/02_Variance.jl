@@ -280,6 +280,35 @@ Where:
   - ``\\mathbf{G}``: Suitable factorisation of the `N × N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
   - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
+## Risk contribution constraints
+
+When `rc` holds rows, the model uses the semidefinite formulation of [sdprp](@cite) whatever `alg` says. It lifts the weights into a symmetric matrix and states each row on the diagonal of the lifted variance:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\, \\mathbf{W}}{\\mathrm{opt}} \\quad & \\mathrm{Tr}(\\mathbf{\\Sigma} \\mathbf{W})\\nonumber\\\\
+\\text{s.t.} \\quad & \\begin{bmatrix} \\mathbf{W} & \\boldsymbol{w} \\\\ \\boldsymbol{w}^\\intercal & k \\end{bmatrix} \\succeq 0\\,,\\nonumber\\\\
+& \\mathbf{A} \\, \\mathrm{diag}(\\mathbf{\\Sigma} \\mathbf{W}) \\leq \\boldsymbol{b} \\, \\mathrm{Tr}(\\mathbf{\\Sigma} \\mathbf{W})\\,,\\nonumber\\\\
+& \\mathbf{C} \\, \\mathrm{diag}(\\mathbf{\\Sigma} \\mathbf{W}) = \\boldsymbol{d} \\, \\mathrm{Tr}(\\mathbf{\\Sigma} \\mathbf{W})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\mathbf{W}``: `N × N` symmetric matrix variable, which takes the place of ``\\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``.
+  - $(math_dict[:k_budget])
+  - ``\\mathbf{A}``, ``\\boldsymbol{b}``: The inequality rows of `rc` and their bounds.
+  - ``\\mathbf{C}``, ``\\boldsymbol{d}``: The equality rows of `rc` and their targets.
+  - ``\\mathrm{diag}(\\cdot)``: The diagonal of a matrix, as a vector.
+  - ``\\mathrm{Tr}(\\cdot)``: The trace of a matrix.
+
+At ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal``, the diagonal of ``\\mathbf{\\Sigma} \\mathbf{W}`` is the vector of the assets' risk contributions ``w_{i} (\\mathbf{\\Sigma} \\boldsymbol{w})_{i}``, and its trace is the variance. So each row bounds a share of the variance. [`FactorRiskContribution`](@ref) states the same rows on the factor weights, with ``(\\mathbf{B}^\\intercal)^{+\\intercal} \\mathbf{\\Sigma} (\\mathbf{B}^\\intercal)^{+}`` in place of ``\\mathbf{\\Sigma}``.
+
+!!! warning
+
+    The formulation is a relaxation. The semidefinite constraint gives ``\\mathbf{W} \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k`` and not equality, so the rows bind the returned weights only when the solution has ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``. No term of the model forces a matrix of rank one. A solver can add a positive semidefinite part to ``\\mathbf{W}`` that moves the shares the rows constrain, and the solve still reports success. The rows then hold on ``\\mathbf{W}`` while the shares of the returned weights miss them, under a [`MinimumRisk`](@ref) objective as well as a [`MaximumUtility`](@ref) one. To check a result, compute [`risk_contribution`](@ref) of the returned weights, or [`factor_risk_contribution`](@ref) under [`FactorRiskContribution`](@ref), divide it by its sum, and compare the shares with the rows.
+
 # Functor
 
     (r::Variance)(w::VecNum)
@@ -340,10 +369,13 @@ julia> r(w)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
   - [`expected_risk`](@ref)
+  - [`risk_contribution`](@ref)
+  - [`rc_variance_constraints!`](@ref): registers the rows of `rc` on the lifted matrix.
 
 # References
 
   - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:sdprp]) Formulations 9 and 10.
 """
 @propagatable @concrete struct Variance <: RiskMeasure
     """

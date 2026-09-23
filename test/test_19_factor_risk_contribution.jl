@@ -1,5 +1,6 @@
 @testset "Factor risk contribution" begin
-    using Test, PortfolioOptimisers, DataFrames, CSV, TimeSeries, Clarabel
+    using Test, PortfolioOptimisers, DataFrames, CSV, TimeSeries, Clarabel, LinearAlgebra
+    import JuMP
     rd = prices_to_returns(price_ingestion(PriceIngestion(),
                                            TimeArray(CSV.File(joinpath(@__DIR__,
                                                                        "./assets/SP500.csv.gz"));
@@ -52,6 +53,36 @@
     @test rkc[2] >= -0.07
     @test rkc[5] <= 0.74
     @test isapprox(rkc[1], 0.09, rtol = 5e-5)
+
+    # The rows sit on the semidefinite relaxation of formulation 16 of Cajas (2025, SSRN
+    # 5097869). They bind the lifted matrix `frc_W`, and they bind the portfolio only where
+    # `frc_W == w1 * w1'`. On this panel the minimum-risk and maximum-utility solves leave a
+    # second eigenvalue in `frc_W`, so the realised shares miss the rows. The docstrings of
+    # `Variance` and `FactorRiskContribution` state this. The paper's formulation, solved on
+    # the same `sigma`, `mu` and loadings, returns the same weights and the same shares.
+    for (obj, shares) in ((MinimumRisk(), [0.053, 0.0954, -0.6071, 0.9024, 0.5563]),
+                          (MaximumUtility(), [0.1053, -0.1321, -0.4216, 0.6472, 0.8012]))
+        resr = optimise(FactorRiskContribution(; r = r, obj = obj, opt = opt, sets = sets),
+                        rd)
+        W = JuMP.value.(resr.model[:frc_W])
+        w1 = JuMP.value.(resr.model[:w1])
+        b1 = pinv(transpose(resr.rr.L))
+        Sb = transpose(b1) * pr.sigma * b1
+        # The rows hold on the lifted matrix.
+        lifted = diag(Sb * W) / tr(Sb * W)
+        @test isapprox(lifted[1], 0.09; atol = 1e-4)
+        @test lifted[2] >= -0.07 - 1e-4
+        @test lifted[5] <= 0.74 + 1e-4
+        # The lifted matrix is not of rank one.
+        @test eigvals(Symmetric(W))[end - 1] > 1e-3
+        # The realised factor shares are the shares of the rank-one matrix.
+        fshares = factor_risk_contribution(factory(r, pr, slv), resr.w, pr.X; rd = rd)
+        realised = fshares[1:(end - 1)] / sum(fshares)
+        @test isapprox(realised, diag(Sb * w1 * transpose(w1)) / dot(w1, Sb, w1);
+                       rtol = 1e-6)
+        @test isapprox(realised, shares; atol = 2e-3)
+        @test !isapprox(realised[1], 0.09; atol = 1e-2)
+    end
 
     res = optimise(FactorRiskContribution(; r = [ConditionalValueatRisk(), Variance()],
                                           wi = range(; start = inv(size(rd.F, 2)),

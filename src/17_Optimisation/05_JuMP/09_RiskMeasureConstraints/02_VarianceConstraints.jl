@@ -518,6 +518,32 @@ The fall-through method does nothing. The concrete method extracts the diagonal 
 `A_ineq * diag(sigma_W) <= B_ineq * variance_risk` and
 `A_eq * diag(sigma_W) == B_eq * variance_risk`.
 
+# JuMP formulation
+
+## Constraints
+
+  - `rc_variance_ineq_`: ``s_c \\left(\\mathbf{A} \\, \\mathrm{diag}(\\mathbf{S}) - \\boldsymbol{b} \\, \\mathrm{Tr}(\\mathbf{S})\\right) \\leq 0``, registered when `rc` holds inequality rows.
+  - `rc_variance_eq_`: ``s_c \\left(\\mathbf{C} \\, \\mathrm{diag}(\\mathbf{S}) - \\boldsymbol{d} \\, \\mathrm{Tr}(\\mathbf{S})\\right) = 0``, registered when `rc` holds equality rows.
+
+Where:
+
+  - ``\\mathbf{S}``: The `sigma_W_` expression, read from the model. It is ``\\mathbf{\\Sigma} \\mathbf{W}`` over the asset weights, and ``(\\mathbf{B}^\\intercal)^{+\\intercal} \\mathbf{\\Sigma} (\\mathbf{B}^\\intercal)^{+} \\mathbf{W}_{f}`` over the factor weights of [`FactorRiskContribution`](@ref).
+  - ``\\mathbf{W}``, ``\\mathbf{W}_{f}``: The symmetric matrix variables that [`set_sdp_constraints!`](@ref) and [`set_sdp_frc_constraints!`](@ref) bound by ``\\mathbf{W} \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``.
+  - ``\\mathbf{A}``, ``\\boldsymbol{b}``: The inequality rows of `rc` and their bounds.
+  - ``\\mathbf{C}``, ``\\boldsymbol{d}``: The equality rows of `rc` and their targets.
+  - ``\\mathrm{Tr}(\\mathbf{S})``: The `variance_risk` argument.
+  - $(math_dict[:w_port]) Over the factor weights it is the vector ``\\boldsymbol{w}_{1}`` of factor weights.
+  - $(math_dict[:k_budget])
+  - $(math_dict[:sc_scale])
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - The variance ``\\mathrm{Tr}(\\mathbf{S})`` in `variance_risk_` lies **above** its value at ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``, because ``\\mathbf{W} \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k`` and the covariance matrix is positive semidefinite.
+  - The rows bound the shares of ``\\mathrm{diag}(\\mathbf{S})`` in `sigma_W_`, not the risk contributions of the returned weights. Those can lie on either side of a bound.
+  - Both are tight when ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``, a matrix of rank one. No term of the model forces this, so a solve that reports success can return weights whose shares miss the rows. This is formulations 9, 10 and 16 of [sdprp](@cite), which name the rank-one relaxation as their approximation.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -533,6 +559,11 @@ The fall-through method does nothing. The concrete method extracts the diagonal 
 
   - [`set_risk_constraints!`](@ref)
   - [`set_sdp_variance_risk!`](@ref)
+  - [`Variance`](@ref): its `## Risk contribution constraints` subsection states how to check a result.
+
+# References
+
+  - $(ref_dict[:sdprp])
 """
 function rc_variance_constraints!(args...; kwargs...)
     return nothing
