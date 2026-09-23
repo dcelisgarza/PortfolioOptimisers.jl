@@ -5,13 +5,14 @@ Description = "Train/test splitting in PortfolioOptimisers.jl: hold out the most
 
 # Train/test splitting
 
-A holdout split trains on the first 80 % of the history and scores on the last 20 %.
+A holdout split trains on the first part of the history and scores on the rest. Most cells of
+this page hold out the last 20 %.
 Cross-validation scores many folds instead, at the cost of one fit per fold.
 
-Every step before the optimiser must also respect the split. A fill value computed from the
-whole price history includes the test window. So does a missing-data filter that chooses the
-assets from all four years of data. If you split a returns matrix built that way, the test rows
-have already entered the training data.
+Every step before the optimiser must also respect the split. As the pipelines example shows, a
+fill value or an asset filter fitted on the whole history already uses the prices of the test
+rows. If you split a returns matrix built that way, the test rows have already entered the
+training data.
 
 [`TrainTestSplit`](@ref), with the alias `TTS`, makes the split a step of a pipeline. It is
 the first step and runs before any other step sees the data. Every fitted step after it sees
@@ -226,7 +227,7 @@ pred_train = predict(res, split_res.train)
 #=
 We score both predictions on the return series of the portfolio. `expected_risk` on a
 prediction sees only that series. [`Variance`](@ref) and [`StandardDeviation`](@ref) need the
-weights, so they throw an error here, as the asset pre-selection example shows for `Variance`.
+weights, so they throw an error here, as the cross-validation example explains.
 `SCM()` is the second central moment of the return series, which is its variance.
 =#
 

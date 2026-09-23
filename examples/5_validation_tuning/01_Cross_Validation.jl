@@ -1,6 +1,6 @@
 #=
 ```@meta
-Description = "Cross-validation in PortfolioOptimisers.jl: walk-forward, K-fold and combinatorial splitters, the metrics they compute and their plots."
+Description = "Cross-validation in PortfolioOptimisers.jl: walk-forward, K-fold and combinatorial schemes, the measures you compute on their predictions, and their plots."
 ```
 
 # Cross validation
@@ -110,8 +110,7 @@ We run the cross-validation.
 kfold_pred = cross_val_predict(mr, rd, kfold)
 
 #=
-Four plots show the cumulative returns, the weight distribution, the turnover and the score
-of every fold.
+We load the plot packages and draw four plots of the K-fold prediction.
 =#
 
 using StatsPlots, GraphRecipes
@@ -132,8 +131,9 @@ the optimised portfolio on its test fold in `rd`.
 
 You can index `pred` to get one fold. The property `mrd` joins the returns of all the folds
 into one [`PredictionReturnsResult`](@ref), and the property `res` gives the vector of the
-optimisation results of the folds. This K-fold has no purge and no embargo, and the test folds
-cover all the rows once. We compare the timestamps of `mrd` with the timestamps of the returns.
+optimisation results of the folds. The test folds cover all the rows once, because a purge and
+an embargo remove only training rows. We compare the timestamps of `mrd` with the timestamps of
+the returns.
 =#
 
 println("isequal(kfold_pred.mrd.ts, rd.ts) = $(isequal(kfold_pred.mrd.ts, rd.ts))")
@@ -229,13 +229,13 @@ The field `id` of that path is its position in the population.
 median_pred = ratio_scorer(cfold_pred)
 
 #=
-We compare the path with the entry `id` of `cfold_pred.pred`.
+`true` means that the path is the entry `id` of `cfold_pred.pred`.
 =#
 median_pred === cfold_pred.pred[median_pred.id]
 
 #=
-As for K-fold, the scheme has no purge and no embargo, so a path covers all the rows. The
-cell compares the timestamps of the path with those of the returns.
+As for K-fold, a path covers all the rows. `true` means that the timestamps of the path are
+those of the returns.
 =#
 isequal(median_pred.mrd.ts, rd.ts)
 
@@ -280,7 +280,7 @@ The `id` of this path also indexes it in `cfold_pred.pred`.
 median_pred_min_variance === cfold_pred.pred[median_pred_min_variance.id]
 
 #=
-We compare its timestamps with those of the returns once more.
+`true` means that this path also covers all the rows.
 =#
 isequal(median_pred_min_variance.mrd.ts, rd.ts)
 
@@ -315,7 +315,7 @@ We run the walk-forward.
 idx_walkforward_pred = cross_val_predict(mr, rd, idx_walk_forward)
 
 #=
-We compare its timestamps with the timestamps of the returns from row 253 on.
+`true` means that the joined test windows start at row 253 and end at the last row.
 =#
 
 isequal(idx_walkforward_pred.mrd.ts, rd.ts[253:end])
@@ -438,20 +438,18 @@ pretty_table(hcat(DataFrame(:tickers => rd.nx),
                   DataFrame(reduce(hcat, getproperty.(date_tn_walkforward_pred.res, :w)),
                             Symbol.(1:15))); formatters = [resfmt])
 
-#=
-The two plots show the cumulative returns and the turnover over the month-end windows.
-=#
-
 # The cumulative returns over the month-end windows.
 plot_portfolio_cumulative_returns(date_tn_walkforward_pred)
 # The turnover at every month-end rebalance.
 plot_turnover(date_tn_walkforward_pred)
 
 #=
-The date walk-forward uses different windows from the index walk-forward, so its weights
-differ.
-The training windows of the two schemes cover almost the same dates, and the turnover
-constraint limits the change of an asset to 2 % in both.
+The date walk-forward sizes its windows in months and puts their bounds on month ends. The
+index walk-forward sizes them in rows. Because twelve months are about 252 trading days, the
+training windows of the two schemes cover almost the same dates. The same 2 % limit applies to
+both. To see how far the weights move, compare this table with the second table of section
+2.3.1. The date walk-forward has 15 folds and the index walk-forward has 16. Compare the weights
+of an asset over the folds, not column by column.
 
 [`MultipleRandomised`](@ref) is one more scheme. It runs a walk-forward on random subsets of the
 assets, and section 5.2 of the pipelines example uses it.

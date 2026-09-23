@@ -31,9 +31,8 @@ end;
 
 We use the same five years of daily data as the cross-validation example.
 
-A search fits every candidate again on the training rows of every fold. The fields of the
-estimator must therefore be estimators, such as a prior estimator, and not results computed
-beforehand.
+As in the cross-validation example, the fields of the estimator you tune must be estimators,
+not precomputed results. The search fits each candidate again on each fold.
 =#
 
 using CSV, TimeSeries, DataFrames, Clarabel, Statistics, StableRNGs, Distributions
@@ -78,7 +77,7 @@ that returns a copy of the estimator with that one field changed.
 A search needs a risk measure, `r`, to score every fold, and a cross-validation scheme, `cv`,
 which defaults to [`KFold`](@ref). It also accepts a [`WalkForwardEstimator`](@ref), a
 [`CombinatorialCrossValidation`](@ref) and a [`MultipleRandomised`](@ref). Under a
-combinatorial scheme, it scores every path instead of every fold.
+combinatorial scheme, it scores each path instead of each fold.
 =#
 
 opt = JuMPOptimiser(; slv = slv)
@@ -99,11 +98,10 @@ st = Stacking(; opti = [MeanRisk(; opt = optl2), RiskBudgeting(; opt = opt)],
 
 A grid is a vector of pairs. The first item of a pair is the key of a parameter, and the second
 is a vector of the values to try. A dictionary of the same pairs also works. The search takes
-the product of the values in a grid. A `Dict` has no fixed order. That does not matter to a
-grid search, but it changes the samples of a randomised search. There, use an `OrderedDict`
-from [`OrderedCollections`](https://github.com/JuliaCollections/OrderedCollections.jl) or a vector.
+the product of the values in a grid. A `Dict` has no fixed order, which matters to a
+randomised search, as section 2.2 explains.
 
-You can give a vector of grids. The search expands every grid on its own and joins the results
+You can give a vector of grids. The search expands each grid on its own and joins the results
 into one list of candidates.
 
 A literal vector of grids whose values have different types has an abstract element type, and
@@ -178,17 +176,19 @@ The search samples every parameter on its own, and `n_iter` sets the number of s
     unless the grid also holds a distribution. Then it draws with replacement, and it can draw
     a value twice.
 
-Then it takes the product of the samples in every grid, as the grid search does. A vector of
+Then it takes the product of the samples in each grid, as the grid search does. A vector of
 grids works as it does for [`GridSearchCrossValidation`](@ref).
 
 The search draws from one random number generator, `rng`, grid by grid and parameter by
 parameter. The order of the grids and of the parameters therefore changes the samples. To repeat a
-search, keep that order fixed, and use an ordered dictionary or a vector for every grid.
+search, keep that order fixed. Use an `OrderedDict` from
+[`OrderedCollections`](https://github.com/JuliaCollections/OrderedCollections.jl) or a vector
+for each grid.
 
 #### 2.2.1 Sampling from a predefined parameter space
 
 We sample from the same grids as before, with `n_iter = 2`. Every value is in a vector. The
-search draws two values for every parameter, without replacement.
+search draws two values for each parameter, without replacement.
 =#
 rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 2)
 

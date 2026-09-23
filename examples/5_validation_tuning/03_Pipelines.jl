@@ -89,9 +89,10 @@ pretty_table(miss; formatters = [resfmt])
 #=
 ## 2. Building a pipeline one step at a time
 
-A pipeline is an ordered list of steps, and a step is an ordinary estimator. Every step writes
-one slot of the pipeline's context, such as `:prices`, `:returns`, `:prior` or `:opt`. The
-kind of estimator decides the slot, so a step needs no wrapper. You can name a step with
+A pipeline is an ordered list of steps, and a step is an ordinary estimator. The pipeline
+keeps the data that its steps pass on in a context, a set of named slots such as `:prices`,
+`:returns`, `:prior` or `:opt`. You read the context of a fitted pipeline from `res.ctx`.
+Every step writes one slot. The kind of estimator decides the slot, so a step needs no wrapper. You can name a step with
 `"name" => estimator`. A step with no name takes the name of its slot, with a suffix `_1`,
 `_2` when two steps write the same slot.
 
@@ -209,7 +210,9 @@ with a [`MeanRisk`](@ref) optimisation.
 The pipeline connects the steps in two ways.
 
   - Every step writes the slot that its kind of estimator owns. A prior estimator writes
-    `:prior`. A phylogeny estimator and a weight-bounds estimator write `:constraints`.
+    `:prior`. A phylogeny constraint estimator, such as
+    [`SemiDefinitePhylogenyEstimator`](@ref), and a weight-bounds estimator write
+    `:constraints`. A phylogeny estimator writes `:phylogeny`.
   - Before the optimisation step runs, the pipeline puts the computed slots into the
     optimiser. The prior replaces the optimiser's `pe`. A constraint result goes to the field
     of the optimiser that its kind names, such as `wb`, `lcse`, `cte`, `ple`, `rkb` or a
