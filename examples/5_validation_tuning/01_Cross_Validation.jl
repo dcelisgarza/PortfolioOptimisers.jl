@@ -172,14 +172,13 @@ one fit per split, many more than K-fold, and it gives many paths instead of one
 
 [`optimal_number_folds`](@ref) chooses `n_folds` and `n_test_folds` from the number of rows, a
 target size of the training set and a target number of paths. The keywords `train_size_w` and
-`n_test_paths_w` set the weight of each target. The cell names the third argument
-`target_test_size`, but it is the target number of paths.
+`n_test_paths_w` set the weight of each target.
 =#
 
 T = size(rd.X, 1)
 target_train_size = 200
-target_test_size = 70
-n_folds, n_test_folds = optimal_number_folds(T, target_train_size, target_test_size)
+target_n_test_paths = 70
+n_folds, n_test_folds = optimal_number_folds(T, target_train_size, target_n_test_paths)
 cfold = CombinatorialCrossValidation(; n_folds = n_folds, n_test_folds = n_test_folds)
 
 #=
@@ -213,32 +212,32 @@ can pick a path with your own function or with a subtype of [`PredictionScorer`]
 values, by default the median, and returns the first path whose value is nearest to it. It
 leaves out paths whose optimisation failed or whose measure is not finite.
 
-We use the mean return over the variance as the measure. The cell names the scorer
-`sharpe_scorer`, but this ratio divides by the variance, not by the standard deviation.
+We use the mean return over the variance as the measure. This ratio divides by the variance,
+not by the standard deviation, so it is not a Sharpe ratio.
 =#
 
-sharpe_scorer = NearestQuantilePrediction(;
-                                          r = MeanReturnRiskRatio(;
-                                                                  rk = LowOrderMoment(;
-                                                                                      alg = SecondMoment())))
+ratio_scorer = NearestQuantilePrediction(;
+                                         r = MeanReturnRiskRatio(;
+                                                                 rk = LowOrderMoment(;
+                                                                                     alg = SecondMoment())))
 
 #=
 A scorer is a callable object. It takes the population of paths and returns the path it picks.
 The field `id` of that path is its position in the population.
 =#
 
-median_pred_max_sharpe = sharpe_scorer(cfold_pred)
+median_pred = ratio_scorer(cfold_pred)
 
 #=
 We compare the path with the entry `id` of `cfold_pred.pred`.
 =#
-median_pred_max_sharpe === cfold_pred.pred[median_pred_max_sharpe.id]
+median_pred === cfold_pred.pred[median_pred.id]
 
 #=
 As for K-fold, the scheme has no purge and no embargo, so a path covers all the rows. The
 cell compares the timestamps of the path with those of the returns.
 =#
-isequal(median_pred_max_sharpe.mrd.ts, rd.ts)
+isequal(median_pred.mrd.ts, rd.ts)
 
 #=
 We compute the ratio for all the paths and find the path nearest to the median by hand, to
@@ -246,11 +245,11 @@ compare it with the pick of the scorer. This comparison leaves out no path. It m
 scorer only when no path failed.
 =#
 
-sharpe_ratios = expected_risk(MeanReturnRiskRatio(;
-                                                  rk = LowOrderMoment(;
-                                                                      alg = SecondMoment())),
-                              cfold_pred)
-argmin(abs.(sharpe_ratios .- median(sharpe_ratios))) == median_pred_max_sharpe.id
+mean_var_ratios = expected_risk(MeanReturnRiskRatio(;
+                                                    rk = LowOrderMoment(;
+                                                                        alg = SecondMoment())),
+                                cfold_pred)
+argmin(abs.(mean_var_ratios .- median(mean_var_ratios))) == median_pred.id
 
 #=
 The next plot shows the distribution of the weight of each asset over the paths. A wide

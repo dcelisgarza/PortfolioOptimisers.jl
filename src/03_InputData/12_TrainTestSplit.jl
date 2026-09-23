@@ -115,7 +115,7 @@ end
 
 Cut price- or returns-level data into a training window (the head) and a held-out test window (the tail).
 
-The free-function form of [`TrainTestSplit`](@ref); the windows are [`port_opt_view`](@ref)s, so no data is copied. See [`safe_index`](@ref) for the sizing rules — complement when one side is given, embargo when both are.
+The free-function form of [`TrainTestSplit`](@ref). The windows come from [`port_opt_view`](@ref). At the returns level they are views, so no data is copied. At the price level, [`port_opt_view`](@ref) indexes a `TimeArray`, which copies the rows. See [`safe_index`](@ref) for the sizing rules — complement when one side is given, embargo when both are.
 
 # Algorithm
 

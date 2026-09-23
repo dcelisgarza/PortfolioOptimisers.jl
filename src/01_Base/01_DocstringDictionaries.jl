@@ -274,7 +274,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :add_bridges => "`add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
                                  # RNG
                                  :rng => "`rng`: Random number generator.",#
-                                 :seed => "`seed`: Seed for the random number generator.",
+                                 :seed => "`seed`: Optional seed. If set, the draws come from a copy of `rng` seeded with it, so `rng` does not advance and every call draws the same values. If `nothing`, the draws come from `rng` itself.",
                                  # JuMP Optimisation
                                  :model => "`model::JuMP.Model`: The JuMP optimisation model.",
                                  :opt_rjumpe => "`opt::RiskConstraintOwner`: The owner of the risk constraint, a risk-based JuMP optimisation estimator or a programme Allocation Set.",
@@ -607,7 +607,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :period => "`period`: Time period for date-based walk-forward cross-validation.",#
                                  :period_offset => "`period_offset`: Offset applied to the walk-forward period.",#
                                  :adjuster => "`adjuster`: Function for adjusting walk-forward dates.",#
-                                 :previous => "`previous`: Whether to include the previous period in the training window.",#
+                                 :previous => "`previous`: A date of the period grid that falls between two timestamps maps to the earlier timestamp if `true`, and to the later timestamp if `false`.",#
                                  :expand_train => "`expand_train`: Whether to expand the training window over time. An Online Scheme sets it `true`, because a fold cannot un-fold an observation.",#
                                  :reduce_test => "`reduce_test`: Whether to allow the last test window to be smaller.",#
                                  :subset_size => "`subset_size`: Size of each random subset.",#

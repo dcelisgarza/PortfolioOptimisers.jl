@@ -37,7 +37,7 @@ resfmt = (v, i, j) -> begin
     if j == 1
         return v
     else
-        return isa(v, Number) ? "$(round(v*100, digits=3)) %" : v
+        return isa(v, AbstractFloat) ? "$(round(v*100, digits=3)) %" : v
     end
 end;
 
@@ -252,7 +252,7 @@ of the input to predict on, here the prices after row 800.
 
 T = size(values(Xm), 1)
 res_train = fit(pipe, PricesResult(; X = Xm[1:800], span = span[1:800, :]))
-pred = PortfolioOptimisers.predict(res_train, pr, 801:T)
+pred = predict(res_train, pr, 801:T)
 expected_risk(ConditionalValueatRisk(), pred)
 
 #=
@@ -277,7 +277,7 @@ pipe = Pipeline(;
                          "gap_fill" => PriceGapFill(), PricesToReturns(), EmpiricalPrior(),
                          "opt" => MeanRisk(; opt = JuMPOptimiser(; slv = slv))))
 
-p = ["filter.col_thr" => [0.4, 0.9],
+p = ["filter.col_thr" => [0.0, 0.4],
      "gap_fill" =>
          [PriceGapFill(; fill = MeanValue()), PriceGapFill(; fill = MedianValue())]]
 
@@ -294,10 +294,15 @@ scores = DataFrame(; candidate = 1:length(tuned.val_grid),
 pretty_table(scores)
 
 #=
-The two thresholds give the same score. In every training window, JNJ either fails the filter
-or still has missing prices, and in both cases it gets no weight. The mean fill scores higher
-than the median fill. The search keeps the first candidate with the highest mean score, and
-`tuned.opt` is that pipeline, which we fit on the full sample.
+A threshold of zero drops every asset that has a gap in the training window. The first
+training window, rows 1 to 500, holds the gaps of AAPL and XOM. There the threshold of zero
+drops them, and the threshold of 0.4 keeps them and fills their gaps. JNJ fails both
+thresholds in both training windows.
+
+At the threshold of zero no gap is left to fill, so the two fills give the same score. That
+threshold scores highest. The search keeps the first candidate with the highest mean score,
+and `tuned.opt` is that pipeline. We fit it on the full sample, where it drops AAPL, JNJ and
+XOM.
 =#
 
 tuned.idx, tuned.opt.steps[1].col_thr, nameof(typeof(tuned.opt.steps[2].fill))
@@ -310,15 +315,14 @@ pretty_table(DataFrame(; asset = final.ctx.returns.nx, weight = final.w);
 ### 4.1 Replacing a whole estimator
 
 A grid value can be any object, so a grid can replace a whole step. Here the grid replaces the
-prior estimator. The last step, [`EqualWeighted`](@ref), does not use the prior, so the two
-candidates give the same weights and the same score, and the search keeps the first. To
-compare two priors, end the pipeline with an optimiser that uses them.
+prior estimator. The last step is a [`MeanRisk`](@ref) optimisation, which minimises the
+variance of the prior, so the two priors give different weights.
 =#
 
 pipe_struct = Pipeline(;
                        steps = (MissingDataFilter(; col_thr = 0.4), PriceGapFill(),
                                 PricesToReturns(), "prior" => EmpiricalPrior(),
-                                EqualWeighted()))
+                                MeanRisk(; opt = JuMPOptimiser(; slv = slv))))
 p_struct = ["prior" => [EmpiricalPrior(),
                         EmpiricalPrior(;
                                        ce = PortfolioOptimisersCovariance(; ce = GerberCovariance()))]]
@@ -331,6 +335,8 @@ tuned_struct = search_cross_validation(pipe_struct,
 tuned_struct.idx, vec(mean(tuned_struct.test_scores; dims = 1))
 
 #=
+The prior with the Gerber covariance scores higher, so the search keeps the second candidate.
+
 ### 4.2 Randomised search
 
 [`RandomisedSearchCrossValidation`](@ref) samples candidates from the grid and then runs the
@@ -391,8 +397,7 @@ mr = MultipleRandomised(IndexWalkForward(500, 250); subset_size = 6, n_subsets =
 pm = cross_val_predict(rpipe, rd, mr)
 pretty_table(DataFrame(; path = [p.id for p in pm.pred],
                        folds = [length(p.pred) for p in pm.pred],
-                       assets = [length(p.pred[1].res.w) for p in pm.pred]);
-             formatters = [resfmt])
+                       assets = [length(p.pred[1].res.w) for p in pm.pred]))
 
 #=
 ## 6. What a pipeline does not do
@@ -406,19 +411,22 @@ pretty_table(DataFrame(; path = [p.id for p in pm.pred],
   - A pipeline with no optimisation step is valid, for example one that fits only a prior.
     `predict` throws an error for it, because it has no weights.
 
-We run two calls. `split` accepts price data for a combinatorial scheme, so the first call
-returns a split and prints nothing. The second call prints the error that `optimise` gives for
-a pipeline.
+The first call prints the error that `optimise` gives for a pipeline.
 =#
 
 try
-    split(CombinatorialCrossValidation(), pr)
+    optimise(pipe, res.ctx.returns)
 catch e
     println(e.msg)
 end
 
+#=
+The second call fits a pipeline that ends with a prior step, and predicts with it. It prints
+the error that `predict` gives, because the pipeline has no weights.
+=#
+
 try
-    optimise(pipe, res.ctx.returns)
+    predict(fit(Pipeline(; steps = (PricesToReturns(), EmpiricalPrior())), pr), pr, 801:T)
 catch e
     println(e.msg)
 end

@@ -1150,7 +1150,7 @@ Represents a collection of [`MultiPeriodPredictionResult`](@ref) objects.
 """
 const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
 # Virtual properties `:res` and `:rd` broadcast over the inner `pred` vector, collecting
-# per-fold results and relative drawdowns (see [`@forward_properties`](@ref)).
+# per-fold results and per-fold prediction returns (see [`@forward_properties`](@ref)).
 @forward_properties MultiPeriodPredictionResult begin
     compute(res, pred.res; broadcast)
     compute(rd, pred.rd; broadcast)

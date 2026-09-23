@@ -261,7 +261,7 @@ Run one [`MultipleRandomised`](@ref) path of a price- or returns-level [`Pipelin
 
 # Related
 
-  - [`cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::MultipleRandomised)`](@ref)
+  - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::MultipleRandomised)`](@ref)
   - [`path_fit_and_predict`](@ref)
 """
 function pipeline_path_fit_and_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, folds,

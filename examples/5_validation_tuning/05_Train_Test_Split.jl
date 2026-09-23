@@ -227,13 +227,12 @@ pred_train = predict(res, split_res.train)
 We score both predictions on the return series of the portfolio. `expected_risk` on a
 prediction sees only that series. [`Variance`](@ref) and [`StandardDeviation`](@ref) need the
 weights, so they throw an error here, as the asset pre-selection example shows for `Variance`.
-`SCM()` is the second central moment of the return series, which is its variance. The column
-that the cell names `std` therefore holds a variance.
+`SCM()` is the second central moment of the return series, which is its variance.
 =#
 
 DataFrame(; window = ["train (in-sample)", "test (held out)"],
           observations = [length(pred_train.rd.X), length(pred_test.rd.X)],
-          std = [expected_risk(SCM(), pred_train), expected_risk(SCM(), pred_test)],
+          variance = [expected_risk(SCM(), pred_train), expected_risk(SCM(), pred_test)],
           cvar = [expected_risk(ConditionalValueatRisk(), pred_train),
                   expected_risk(ConditionalValueatRisk(), pred_test)])
 
@@ -267,7 +266,7 @@ pred_future = predict(res, future)
 
 DataFrame(; source = ["held-out window (fit_predict)", "fresh data (predict)"],
           observations = [length(pred_test.rd.X), length(pred_future.rd.X)],
-          std = [expected_risk(SCM(), pred_test), expected_risk(SCM(), pred_future)])
+          variance = [expected_risk(SCM(), pred_test), expected_risk(SCM(), pred_future)])
 
 #=
 ## 7. One evaluation protocol per call

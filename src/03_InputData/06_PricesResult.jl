@@ -182,7 +182,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of the `PricesResult` for the observation window `i` and the assets `j` of the asset price series `X`.
+Return the `PricesResult` for the observation window `i` and the assets `j` of the asset price series `X`. The result is a copy, not a view, because indexing a `TimeArray` copies the rows.
 
 The asset price series is the master clock: `i` selects rows of `X`, and the factor, benchmark, and implied volatility series are aligned to the selected timestamps (rows whose timestamps are absent from a series are dropped from that series). `j` selects asset columns and defaults to `:`, so a call giving only `i` is an observation window over the whole universe.
 
