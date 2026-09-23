@@ -325,23 +325,26 @@ end
     @test all(JuMP.value.(res.plr.A * res.model[:ib]) .<= res.plr.B)
     idx = [BitVector(res.plr.A[:, i]) for i in axes(res.plr.A, 2)]
     @test all([(count(abs.(getindex(res.w, i)) .> 1e-10) <= 1) for i in idx])
-    @test (isapprox(res.w,
-                    [-5.83349251195602e-14, -0.7549102373927532, -0.24489685036355585,
-                     2.5425310153855233e-16, 1.177641184405827e-13, -1.1761565067160182e-14,
-                     -3.8671847486726096e-14, 1.2944646679137976e-14,
-                     -1.9475087209248426e-14, 0.26951016407394074, 8.367112463199218e-14,
-                     0.7303004971078252, -6.194837681595708e-14, 2.309812136692163e-14,
-                     -2.5460214715889667e-14, -8.58412864279287e-15, 1.1757019029014802e-13,
-                     2.1546906367143115e-14, 5.7299916350654655e-15, 0.9999964265744166];
-                    rtol = 1e-6) || isapprox(res.w,
-                                             [-4.400162786139801e-14, -0.7068647775696704, -0.20178701626483694,
-                                              -1.0233912058364145e-15, 8.336251924927799e-14,
-                                              -1.0638713372805883e-14, -0.09129358185248605, 4.326412562038434e-15,
-                                              -1.626576456755123e-14, 0.2751905375771391, 5.428666085696465e-14,
-                                              0.7247587488302388, -4.6429454132911124e-14, 1.1792066087999556e-14,
-                                              -2.2237835848208057e-14, -1.100539171494297e-14, 8.51166817026479e-14,
-                                              1.0879558335436499e-14, 8.09956925306327e-16, 0.9999960892795525];
-                                             rtol = 1e-6))
+    #=
+    Pajarito's outer approximation does not reach the same integer vertex on every host, so
+    the weights are not a comparable number. Each of the eight solvers in `mip_slv`, run on
+    its own, succeeds, and they stop at four vertices:
+
+      mip1, mip5        assets 2, 3, 7, 12, 18, 20       Sharpe -1.09% vs the reference
+      mip2, mip3, mip4  assets 2, 3, 10, 12, 20          Sharpe -1.02%
+      mip6, mip7        assets 2, 3, 7, 10, 12, 20       Sharpe +0.002% (the reference)
+      mip8              19 assets, tol_feas = 1e-4       Sharpe +2.97%
+
+    The model accepts each of the first three supports: with the binaries fixed and the
+    rest solved by Clarabel, the objective is 2.7435e-4, 2.7301e-4 and 2.7227e-4. The
+    reference is the best of them, and the others are where the solver stopped.
+
+    So compare the ratio `MaximumRatio` maximises. `rtol = 0.02` is about twice the widest
+    spread of the solvers that satisfy the constraint, and it refuses the mip8 answer, whose
+    small weights break the phylogeny constraint the check above also reads. See #1276.
+    =#
+    sharpe = (dot(pr.mu, res.w) - rf) / sqrt(dot(res.w, pr.sigma, res.w))
+    @test isapprox(sharpe, 0.1822224153260592; rtol = 0.02)
 
     plc = IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = fill(2, size(pr.X, 2)))
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
