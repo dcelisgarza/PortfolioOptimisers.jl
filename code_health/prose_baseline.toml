@@ -11,8 +11,6 @@ commit = "ab7d9a42da"
 glossary_terms = 173
 
 [file]
-"examples/5_validation_tuning/04_Time_Dependent_Constraints.jl" = { emdash = 47, bold_label = 2, mechanism = 8, words = 2278 }
-"examples/5_validation_tuning/06_Time_Dependent_Optimisers.jl" = { emdash = 45, endash = 2, bold_label = 2, mechanism = 2, verdict = 1, words = 1930 }
 "user_guide/00_User_Guide.jl" = { emdash = 16, bold_label = 1, verdict = 2, words = 623 }
 "user_guide/01_Data_and_Priors.jl" = { emdash = 15, endash = 2, glossary = 1, words = 581 }
 "user_guide/02_Optimisers.jl" = { emdash = 21, aivocab = 1, glossary = 1, words = 1022 }

@@ -5,26 +5,27 @@ Description = "Time-dependent optimisers in PortfolioOptimisers.jl: a TimeDepend
 
 # Time-dependent optimisers
 
-The [previous example](04_Time_Dependent_Constraints.md) varied *inputs* of one optimiser over
-the folds of a cross-validation scheme. This one varies the **optimiser itself**: a
-[`TimeDependent`](@ref) whose per-fold values are whole optimisers is a *schedule of
-optimisers*, and it works in two positions:
+The page on [time-dependent constraints](04_Time_Dependent_Constraints.md) changed the inputs of
+one optimiser from fold to fold. This page changes the optimiser. A [`TimeDependent`](@ref) whose
+values are whole optimisers is a schedule of optimisers, and you can put it in two places.
 
- 1. **As the optimiser** — handed straight to [`cross_val_predict`](@ref); fold `i` runs
-    entry `i`.
- 2. **In an optimiser-valued field** — a fallback (`fb`), a meta-optimiser's inner/outer
-    optimisers, or a [`Pipeline`](@ref)'s optimisation step.
+ 1. In place of the optimiser, as the estimator you pass to [`cross_val_predict`](@ref). Fold `i`
+    runs entry `i`.
+ 2. In a field that takes an optimiser. That is a fallback `fb`, the inner or outer optimiser of a
+    meta-optimiser, or the optimisation step of a [`Pipeline`](@ref).
 
-The admissibility rule is the same one that governs every other field: an input may be
-time-dependent **iff it is problem definition** (what is being solved — and *which strategy
-solves it* is problem definition), never **execution control** (solvers, random number
-generators, a meta's own cross-validation scheme). The one wrinkle optimiser positions add is
-that they are *required*: there is no static default to fall back to outside fold loops, so a
-schedule there must state its fold-less value explicitly via `default`, or fold-less use
-throws.
+The constraint page states which inputs can change from fold to fold, and the same rule holds here.
+The choice of optimiser is part of the problem a fold solves, so it can change. The solvers, the
+random number generators and the cross-validation scheme of a meta-optimiser control how a fold is
+solved, and they stay static.
 
-Our running subject is a **regime-switching backtest**: a defensive strategy in turbulent
-markets, an aggressive one in calm markets, switched per rebalance.
+A field that takes an optimiser differs from a constraint field in one way. A constraint field has
+a static default, which a solve with no folds uses. A required optimiser field has none. A schedule
+there needs the `default` keyword to state which optimiser a solve with no folds runs. Without it,
+that solve throws.
+
+This page builds one backtest that switches strategy with market volatility. It runs a defensive
+strategy when the market is turbulent and an aggressive one when the market is calm.
 =#
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
@@ -38,10 +39,10 @@ end;
 #=
 ## 1. Setting up
 
-Three years of daily data, and two `MeanRisk` strategies that are easy to tell apart: the
-*defensive* one minimises variance under a 10 % position cap, the *aggressive* one maximises
-the return–risk ratio uncapped. A walk-forward with a one-year training window rebalancing
-every half-year gives us the fold loop.
+We load three years of daily prices and define two `MeanRisk` strategies that are easy to tell
+apart. The defensive one minimises the variance with a cap of 10 % on every weight. The aggressive
+one maximises the ratio of return to risk with no cap. A walk-forward that trains on one year and
+rebalances every half-year gives the folds.
 =#
 using CSV, TimeSeries, DataFrames, Clarabel, Statistics, StableRNGs
 
@@ -63,9 +64,9 @@ aggressive = MeanRisk(; obj = MaximumRatio(), opt = JuMPOptimiser(; slv = slv))
 wf = IndexWalkForward(252, 126)
 n = n_splits(wf, rd)
 #=
-To read off *which* strategy a fold ran, we backtest both static strategies once and match
-weights — a fold of the schedule that solves the same problem on the same window produces the
-same weights.
+To find which strategy a fold ran, we backtest both static strategies once and compare weights. A
+fold of the schedule that solves the same problem on the same window gets the same weights.
+`which_strategy` names a fold by the static backtest whose weights it matches.
 =#
 pred_def = cross_val_predict(defensive, rd, wf)
 pred_agg = cross_val_predict(aggressive, rd, wf)
@@ -81,12 +82,11 @@ function which_strategy(pred, i)
     end
 end;
 #=
-## 2. A schedule of optimisers as the optimiser
+## 2. A schedule in place of the optimiser
 
-The simplest spelling is a per-fold vector of optimisers handed to `cross_val_predict`
-*directly* — the schedule **is** the optimiser argument. Here the strategy alternates by
-calendar: entry `i` is the complete optimiser for fold `i`, exactly as a constraint schedule's
-entry `i` was the complete field value.
+The plainest form is a vector with one optimiser per fold, which you pass to `cross_val_predict` as
+the optimiser. Here the strategy alternates with the fold number. Entry `i` is the whole optimiser
+of fold `i`, as entry `i` of a constraint schedule is the whole value of its field.
 =#
 calendar = TimeDependent([isodd(i) ? defensive : aggressive for i in 1:n])
 pred_cal = cross_val_predict(calendar, rd, wf)
@@ -95,11 +95,12 @@ pretty_table(DataFrame(:fold => 1:n, :ran => [which_strategy(pred_cal, i) for i 
                        :max_weight => [maximum(p.res.w) for p in pred_cal.pred]);
              formatters = [resfmt])
 #=
-Odd folds are position-capped minimum-variance solutions, even folds concentrate freely —
-each fold ran its own strategy, and everything downstream of the fold loop (previous-weights
-threading, prediction stitching, plotting) is oblivious to the switch.
+The odd folds ran the capped minimum-variance strategy. The even folds ran the aggressive one, with
+more concentrated weights. Nothing after the fold loop depends on which optimiser a fold ran:
+`cross_val_predict` joins the predictions, and the plots draw them, as for one optimiser.
 
-Like any schedule, it is sized to the consuming loop's folds and validated at `split` time:
+A schedule of optimisers must have one entry per fold of the loop that uses it. The loop checks the
+length when it splits the data, before any fold runs, so a schedule of two entries fails here.
 =#
 try
     cross_val_predict(TimeDependent([defensive, aggressive]), rd, wf)
@@ -107,12 +108,12 @@ catch err
     err
 end
 #=
-## 3. Fold-less solves: `default` or throw
+## 3. A solve with no folds
 
-A constraint schedule is inert outside fold loops because the field it sits in has a *static
-default* to reset to. An optimiser position has none — "no optimiser" is not a thing
-`optimise` can run — so a fold-less solve of a defaultless schedule fails, with a structured
-error pointing at `cross_val_predict`:
+A constraint schedule has no effect outside a fold loop, because its field takes its static
+default. A field that takes an optimiser has no static default. So `optimise` on a schedule with no
+`default` has no optimiser to run, and it throws a [`TimeDependentDefaultError`](@ref). The message
+says that a schedule is defined only over the folds of a cross-validation scheme.
 =#
 try
     optimise(calendar, rd)
@@ -120,23 +121,25 @@ catch err
     err
 end
 #=
-The schedule states its fold-less value with the `default` keyword. This is deliberately
-explicit — entry 1 is a statement about fold 1, not about fold-less use, so the library never
-silently promotes it:
+The `default` keyword states the optimiser of a solve with no folds. The library never falls back to
+entry 1, which belongs to fold 1, so you state the `default` yourself. We solve the schedule with a
+default and compare its weights with those of the defensive strategy.
 =#
 calendar_d = TimeDependent([isodd(i) ? defensive : aggressive for i in 1:n];
                            default = defensive)
 res_foldless = optimise(calendar_d, rd)
 isapprox(res_foldless.w, optimise(defensive, rd).w)
 #=
-The `default` never runs inside a fold loop, so it is *not* counted by the fold-count
-assertion — only `val`'s entries are.
+The fold loop that uses the schedule never runs the `default`, and the length check counts only
+the per-fold entries.
 
-## 4. Regime switching with callables
+## 4. A callable that switches with market volatility
 
-A calendar fixed in advance is rarely the point. A **callable** schedule derives the fold's
-optimiser from the fold's own data: this one compares the training window's annualised
-equal-weight volatility against the full sample's and goes defensive in the turbulent half.
+A schedule fixed in advance cannot follow the data. A callable computes the fold's
+optimiser from the fold's own data. This one computes the annualised volatility of an equal-weight
+portfolio over the training window. It picks the defensive strategy when that volatility is above
+the volatility of the full sample, and the aggressive one otherwise. The full sample includes rows
+after the training window, so this rule uses data that a live backtest would not have yet.
 =#
 function ew_vol(Xm)
     return std(Xm * fill(1 / size(Xm, 2), size(Xm, 2))) * sqrt(252)
@@ -150,9 +153,9 @@ pred_regime = cross_val_predict(TimeDependent(regime; default = defensive), rd, 
 pretty_table(DataFrame(:fold => 1:n, :ran => [which_strategy(pred_regime, i) for i in 1:n]);
              formatters = [resfmt])
 #=
-Because a bare function's output type is unknowable upfront, it is checked when the fold loop
-swaps the value in — a callable that returns something that is not an optimiser fails there,
-with the fold that exposed it:
+A function can return a value of any type, so the library checks the value when the fold loop puts
+it in the optimiser's position. A callable that returns something other than an optimiser or an
+optimisation result fails at that point.
 =#
 try
     cross_val_predict(TimeDependent(ctx -> Fees(; l = 0.001); default = defensive), rd, wf)
@@ -160,11 +163,13 @@ catch err
     err
 end
 #=
-A struct subtyping [`TimeDependentOptimiserCallable`](@ref) declares its output kind *in the
-type*, so a schedule holding one is statically admissible wherever the optimiser-typed bounds
-require it (the meta-optimisers' fields below), its parameters are inspectable data, and —
-being a type — it can declare previous-weights needs via [`needs_previous_weights`](@ref).
-Here is the same policy as a reusable type:
+A callable can also be a struct that subtypes [`TimeDependentOptimiserCallable`](@ref). Its type
+states that it returns an optimiser. A struct with a call method is not a function, and
+`TimeDependent` takes it only through that subtype. You can inspect its parameters as fields. A
+[`Pipeline`](@ref) takes it as a step without a `PipelineStep` wrapper, as section 8 explains.
+A [`needs_previous_weights`](@ref) method on its type can declare that it uses the previous weights.
+
+We write the same rule as a type.
 =#
 struct RegimeSwitch{T <: PortfolioOptimisers.OptimisationEstimator,
                     U <: PortfolioOptimisers.OptimisationEstimator} <:
@@ -180,8 +185,8 @@ pred_struct = cross_val_predict(TimeDependent(RegimeSwitch(aggressive, defensive
                                               default = defensive), rd, wf)
 all(isapprox(a.res.w, b.res.w) for (a, b) in zip(pred_struct.pred, pred_regime.pred))
 #=
-How do the three backtests compare out of sample? The switcher sits where it should — its
-realised risk between the two static strategies:
+We compare the out-of-sample risk of the three backtests, measured by the second moment of their
+returns. The regime switch falls between the two static strategies.
 =#
 rk = LowOrderMoment(; alg = SecondMoment())
 pretty_table(DataFrame(:strategy => ["defensive", "aggressive", "regime switch"],
@@ -192,29 +197,30 @@ pretty_table(DataFrame(:strategy => ["defensive", "aggressive", "regime switch"]
 using StatsPlots, GraphRecipes
 plot_portfolio_cumulative_returns(pred_regime)
 #=
-The composition plot makes the switching visible — capped, spread-out folds alternate with
-concentrated ones:
+The composition plot shows the switch. The first fold has the capped weights of the defensive
+strategy, and the later folds have the concentrated weights of the aggressive one.
 =#
 plot_composition(pred_regime)
 #=
-## 5. Mixed schedules: estimators and precomputed results side by side
+## 5. A schedule that mixes estimators and results
 
-An entry need not be an estimator. A precomputed [`OptimisationResult`](@ref) is a legal
-entry: its fold is *predict-only* — the stored weights are replayed on the fold's test window,
-not re-optimised. This splices an externally solved period (a frozen model, a
-committee-approved allocation) into an otherwise live backtest:
+An entry can also be a precomputed [`OptimisationResult`](@ref). A fold with a result entry only
+predicts. It applies the stored weights to its test window and does not optimise again. With this
+you can put a period you solved elsewhere, such as a frozen model or an allocation a committee
+approved, into a backtest that optimises on its other folds.
 =#
 frozen = optimise(defensive, rd)
 mixed = TimeDependent([i == 1 ? frozen : aggressive for i in 1:n]; default = defensive)
 pred_mixed = cross_val_predict(mixed, rd, wf)
 isapprox(pred_mixed.pred[1].res.w, frozen.w)
 #=
-Fold 1 carries the frozen weights verbatim; the remaining folds re-optimise per window.
+Fold 1 has the frozen weights, and the other folds optimise on their own windows.
 
-The one scheme mixed schedules cannot serve is asset-subsampling cross-validation
-([`MultipleRandomised`](@ref)): each path views the problem down to a random asset subset, and
-a solved result has no sub-portfolio semantics — there is no meaningful "view" of a fixed
-weight vector onto fewer assets — so result entries are rejected up front:
+A mixed schedule does not work under a scheme that draws subsets of the assets, such as
+[`MultipleRandomised`](@ref). Every path restricts the problem to a random subset of the assets. The
+weights of a result were solved over all the assets. A part of them is not a portfolio of the
+subset. The fold loop rejects a result entry when it restricts the schedule to the path's assets,
+before any fold is solved.
 =#
 mrand = MultipleRandomised(IndexWalkForward(252, 126); subset_size = 15, n_subsets = 2,
                            rng = StableRNG(987654321), seed = 42)
@@ -224,16 +230,16 @@ catch err
     err
 end
 #=
-(A schedule of *estimators* works under `MultipleRandomised` exactly like any other
-optimiser — estimator entries are viewed down to each path's subset like a static optimiser
-would be.)
+A schedule of estimators works under `MultipleRandomised` as any other optimiser does. The fold
+loop restricts every estimator entry to the path's assets, as it restricts a static optimiser.
 
-## 6. Post-swap recursion: entries with schedules of their own
+## 6. An entry with schedules of its own
 
-The estimator a schedule swaps in may itself carry schedules in its fields. Those resolve
-**against the same fold context** immediately after the swap — one fold, one context, however
-deep the estimator goes. Here every fold runs the aggressive strategy, but the swapped-in
-copy carries a de-leveraging cap schedule of its own, sized to the *same* fold loop:
+The estimator that a schedule puts in a fold can have schedules in its own fields. Right after the
+fold loop puts the estimator in, it puts the same fold's values in those fields, including fields
+of fields. Here
+every fold runs the aggressive strategy. That strategy has its own schedule that lowers its cap,
+sized to the same fold loop.
 =#
 agg_capped = MeanRisk(; obj = MaximumRatio(),
                       opt = JuMPOptimiser(; slv = slv,
@@ -251,9 +257,11 @@ pretty_table(DataFrame(:fold => 1:n,
                        :cap => [0.35 - 0.15 * (i - 1) / max(n - 1, 1) for i in 1:n]);
              formatters = [resfmt])
 #=
-What is rejected is *nesting* — `TimeDependent(TimeDependent(...))`, or a schedule as a vector
-entry — because entry `i` is fold `i`'s **complete** value, so a schedule inside a schedule
-has no fold left to vary over:
+The largest weight of every fold stays at or under the cap of that fold.
+
+A schedule cannot contain another schedule, as `TimeDependent(TimeDependent(...))` or as a vector
+entry. Entry `i` is the whole value of fold `i`, so a schedule inside it has no folds left to change
+over. The constructor rejects it.
 =#
 try
     TimeDependent([defensive, TimeDependent([aggressive, defensive])])
@@ -261,14 +269,15 @@ catch err
     err
 end
 #=
-## 7. Schedules in optimiser-valued fields
+## 7. Schedules in fields that take an optimiser
 
-### 7.1 A per-fold fallback
+### 7.1 A fallback per fold
 
-Every concrete optimiser's fallback `fb` takes a schedule, and — because *optional* optimiser
-positions admit `nothing` entries — the fallback can switch off per fold. Here the primary's
-cap schedule turns infeasible in the second half of the backtest (a 4 % cap over 20 assets
-cannot sum to 1), and the fallback schedule provides an equal-weight rescue exactly there:
+The fallback `fb` of a weight optimiser such as `MeanRisk` takes a schedule. The finite-allocation
+optimisers take a static fallback only. A fallback field is optional, so a fallback schedule accepts
+`nothing` as an entry. The fallback can then be absent on some folds. Here the primary optimiser's
+cap schedule is infeasible in the second half of the backtest, because a cap of 4 % on 20 assets
+sums to at most 80 %. The fallback schedule gives an equal-weight portfolio on those folds.
 =#
 primary_caps = TimeDependent([WeightBounds(; lb = 0.0, ub = i <= n ÷ 2 ? 0.35 : 0.04)
                               for i in 1:n])
@@ -281,31 +290,38 @@ pretty_table(DataFrame(:fold => 1:n,
                            [all(w -> isapprox(w, 1 / length(p.res.w); rtol = 1e-6),
                                 p.res.w) for p in pred_fb.pred]); formatters = [resfmt])
 #=
-A `fb` schedule *without* a `default` does not throw on a fold-less solve — `nothing` is a
-legal fallback value, so outside fold loops it simply means *no fallback*. This is the one
-optimiser-valued position with that escape, precisely because absence is representable there.
+The table formatter prints `true` as 100 % and `false` as 0 %. The folds of the second half are
+equal-weighted.
 
-### 7.2 Meta-optimisers: field-level, element-level, and `bind`
+A `fb` schedule without a `default` does not throw on a solve with no folds. `nothing` is a valid
+fallback, so outside a fold loop the schedule means no fallback. `fb` is the one optimiser field
+that works this way, because a fallback can be absent.
 
-The meta-optimisers' optimiser fields take schedules too, with one extra rule inherited from
-[the previous example](04_Time_Dependent_Constraints.md)'s §7: **`bind = :nearest` is legal on
-an optimiser position iff an inner fold loop actually consumes the value there.**
+### 7.2 Schedules in a meta-optimiser
 
-[`NestedClustered`](@ref) hands its whole `opti` *field* across its inner cross-validation
-(it calls it once per cluster), so a field-level `:nearest` schedule is consumed by the inner
-folds — sized to them, not to any outer backtest. Because `opti` also has a fold-*less*
-consumer (the per-cluster full-window solve), a `:nearest` schedule there must carry a
-`default`, and the meta must actually have a `cv` — both checked at construction.
+The optimiser fields of a meta-optimiser take schedules too. Nested fold loops work as on the
+[time-dependent constraints](04_Time_Dependent_Constraints.md) page, with one more rule for
+optimiser fields. `bind = :nearest` is valid in an optimiser field only when an inner fold loop uses
+the value of that field.
 
-One practical note: the schedule's entries run *per cluster*, over that cluster's few assets —
-our defensive strategy's 10 % position cap is infeasible on a cluster of fewer than ten
-assets, so inside `NestedClustered` we use the [`UniformValues`](@ref) algorithm to cap the weights
-dynamically to the cluster's size. We can do the same for the outer estimator, but we must first
-know how many clusters there will be, this means we have to run [`clusterise`](@ref) before the run.
-Alternatively, we can provide a dummy asset set to the outer optimiser, and let it be populated with
-the correct names and size of the synthetic assets. They are named `_i` for `i = 1, …, k` where `k` is
-the number of clusters, and the outer optimiser's `WeightBoundsEstimator` will use the `UniformValues`
-algorithm to cap the weights dynamically to the number of clusters.
+[`NestedClustered`](@ref) passes its whole `opti` field to its inner cross-validation, once per
+cluster. So the inner folds use a `:nearest` schedule in that field, and you size it to them, not to
+an outer backtest. `opti` also runs with no folds, in the solve over the full window of each
+cluster. A `:nearest` schedule there must have a `default`, and the meta-optimiser must have a `cv`.
+The constructor checks both.
+
+The entries run once per cluster, over the few assets of that cluster. The defensive strategy's cap
+of 10 % is infeasible on a cluster of fewer than ten assets. The inner optimiser here takes its
+upper bound from [`UniformValues`](@ref) instead. That bound is one over the number of assets of the
+cluster. The outer optimiser takes the same bound over the clusters. `UniformValues` counts the
+names in the optimiser's [`UniverseSets`](@ref), so the outer optimiser needs one name per cluster,
+and the number of clusters is not known before the run. One way is to run [`clusterise`](@ref)
+first. The other, which we use here, is a placeholder set that the meta-optimiser fills with the
+names of the synthetic assets, `_1` to `_k` for `k` clusters.
+
+With a lower bound of zero and weights that sum to one, a bound of one over the number of assets
+leaves one feasible portfolio, the equal weights. So the objective of these two optimisers has no
+effect. Every cluster is equal-weighted, and so are the clusters.
 =#
 inner_sets = UniverseSets(; dict = Dict("nx" => rd.nx))
 inner_minvar = MeanRisk(; obj = MinimumRisk(),
@@ -325,16 +341,16 @@ nco = NestedClustered(;
 res_nco = optimise(nco, rd)
 maximum(res_nco.w)
 #=
-The inner `KFold(3)` consumed the three-entry schedule (fold `i` of the inner loop ran entry
-`i`) while each cluster's full-window solve ran the `default` — one schedule, both inner legs
-served.
+The inner `KFold(3)` used the three entries of the schedule, and fold `i` of the inner loop ran
+entry `i`. The solve over the full window of each cluster ran the `default`.
 
-[`Stacking`](@ref) enters its inner cross-validation once per *candidate*, so there the
-schedule goes on an **element** of `opti`, not the field (a field-level schedule would change
-the number of candidates per fold, and the outer optimiser's inputs would stop lining up). For
-this optimiser, we always know how many inner folds there will be so it is the user's responsibility
-to provide the correct number of entries in the [`UniverseSets`](@ref) instance, here we use two inner
-optimisers, so the synthetic asset names are `_1` and `_2`.
+[`Stacking`](@ref) runs its inner cross-validation once per candidate, which is an element of
+`opti`, and a `:nearest` schedule goes on an element of `opti`. The constructor rejects a
+`:nearest` schedule on the whole field. The inner cross-validation gets the elements of `opti`,
+never the field, and a candidate vector that changed from fold to fold would change the columns of
+returns that the outer optimiser combines. `Stacking` does not rename
+the assets of the outer optimiser. You give the outer [`UniverseSets`](@ref) one name per inner
+optimiser. With two inner optimisers the names are `_1` and `_2`.
 =#
 outer_sets = UniverseSets(; dict = Dict("nx" => ["_1", "_2"]))
 outer_minvar = MeanRisk(; obj = MinimumRisk(),
@@ -348,9 +364,12 @@ st = Stacking(;
 res_st = optimise(st, rd)
 maximum(res_st.w)
 #=
-Everywhere no inner *fold* loop owns the position — every `fb`, every `opto`,
-[`SubsetResampling`](@ref)'s `opt` (its internal loop draws asset subsets, not time folds) —
-a `:nearest` optimiser schedule is meaningless and rejected at construction:
+The outer bound of one half on two candidates again forces equal weights, so the stacked portfolio
+is half of each candidate.
+
+Where no inner fold loop uses an optimiser field, a `:nearest` schedule has no meaning, and the
+constructor rejects it. That is every `fb`, every `opto`, and the `opt` of
+[`SubsetResampling`](@ref), whose inner loop draws subsets of the assets, not folds of time.
 =#
 try
     MeanRisk(; opt = JuMPOptimiser(; slv = slv),
@@ -360,18 +379,20 @@ catch err
     err
 end
 #=
-(Field-level schedules on `Stacking.opti` and every other optimiser position remain available
-with the default `bind = :outermost`, consumed by whatever fold loop reaches the meta.)
+A schedule on the whole of `Stacking.opti`, or in any other optimiser field, works with the default
+`bind = :outermost`. The fold loop that reaches the meta-optimiser uses it.
 
-## 8. Pipelines: a schedule as the optimisation step
+## 8. A schedule as the optimisation step of a pipeline
 
-A whole workflow switches strategies the same way. The statically-typed schedule forms — a
-vector of optimisers/results, a declared [`TimeDependentOptimiserCallable`](@ref) — classify
-directly as a [`Pipeline`](@ref)'s optimisation step, and
-[`cross_val_predict`](@ref)`(pipe, data, cv)` resolves the step per fold *before* the
-pipeline is fitted, so preprocessing and prior steps never learn the strategy changed.
-Pipeline fold loops split the **raw input** — here a [`PricesResult`](@ref) of prices, not
-returns — so the schedule is sized against it:
+A pipeline switches strategy in the same way. A vector of optimisers or results, and a
+[`TimeDependentOptimiserCallable`](@ref) struct, state in their type that they return an optimiser.
+A [`Pipeline`](@ref) takes either as its optimisation step without a `PipelineStep` wrapper. The
+type of a function does not say that it returns an optimiser, so a function callable goes in through
+`PipelineStep(; est = td, writes = :opt)`.
+[`cross_val_predict`](@ref)`(pipe, data, cv)` puts the fold's optimiser in the step before it fits
+the pipeline, so the preprocessing and prior steps never see the change of strategy. The fold loop
+of a pipeline splits the raw input, here a [`PricesResult`](@ref) of prices and not returns, so we
+size the schedule with it.
 =#
 pr = PricesResult(; X = X)
 n_pipe = n_splits(wf, pr)
@@ -384,32 +405,30 @@ pretty_table(DataFrame(:fold => 1:n_pipe,
                        :max_weight => [maximum(p.res.w) for p in pred_pipe.pred]);
              formatters = [resfmt])
 #=
-A fold-less `fit(pipe, X)` resolves the step to its `default`, exactly like §3's fold-less
-`optimise`.
+A `fit(pipe, X)` with no folds puts the `default` in the step, as `optimise` did in section 3, and
+throws without one.
 
-## 9. Recovering which entry produced a fold
+## 9. Which entry ran on a fold
 
-Sections 2–8 read a fold's strategy back with `which_strategy`, matching its weights against the
-two static backtests. That works for *any* schedule, callables included, but it is indirect —
-and for a **vector** schedule it is unnecessary. A vector schedule is keyed by the fold index
-and nothing else: entry `i` runs at fold `i` of the scheme's `split` enumeration, so `val[i]`
-*is* fold `i`'s optimiser. No stored provenance, no weight matching — `calendar.val[i]` already
-answers "which strategy ran on fold `i`", and it agrees with the weight-matched column by
-construction:
+Sections 2 and 4 find the strategy of a fold with `which_strategy`, which compares the fold's
+weights with the two static backtests. That works for any schedule, callables included, but it is
+indirect. A vector schedule does not need it. Entry `i` runs on fold `i` in the order of `split`, so
+`calendar.val[i]` is the optimiser of fold `i`, with no stored record and no weight comparison. We
+put the two columns side by side.
 =#
 DataFrame(:fold => 1:n,
           :from_schedule =>
               [calendar.val[i] === defensive ? "defensive" : "aggressive" for i in 1:n],
           :from_weights => [which_strategy(pred_cal, i) for i in 1:n])
 #=
-Under the time-ordered schemes (walk-forward, unshuffled [`KFold`](@ref), pipelines) fold `i`
-is also `pred.pred[i]`, so the index lines up from schedule to prediction end to end.
+Under a walk-forward or a [`KFold`](@ref), with an optimiser or a pipeline, fold `i` is also
+`pred.pred[i]`, and the same `i` indexes the schedule and the predictions.
 
-The schemes that **regroup** for reporting break that last alignment but not the recovery.
-[`CombinatorialCrossValidation`](@ref) recombines each split's test groups into paths, so a
-path's predictions no longer sit in split order — yet the schedule is still keyed by the split
-index, and `split(cv, rd)` hands back the split→path map. So you can say which entry fed each
-path without inspecting a single prediction — the same indices you keyed the schedule by:
+Under a scheme that regroups its predictions for the report, `pred.pred[i]` is no longer fold `i`,
+but you can still find the entry. [`CombinatorialCrossValidation`](@ref) joins the test blocks of
+its splits into paths, so the predictions of a path are not in split order. The schedule is still
+keyed by the split, and `split(cv, rd)` returns the map from split to path in its `path_ids`. With
+it you can name the entry that fed each path without looking at a prediction.
 =#
 ccv = CombinatorialCrossValidation(; n_folds = 6, n_test_folds = 2)
 n_c = n_splits(ccv)
@@ -421,14 +440,14 @@ DataFrame(:split => 1:n_c,
               [sched_c.val[j] === defensive ? "defensive" : "aggressive" for j in 1:n_c],
           :feeds_paths => [sort(paths[:, j]) for j in 1:n_c])
 #=
-([`MultipleRandomised`](@ref) is the same idea one level in — it keys the schedule by each
-path's own fold position, so re-running `split` recovers the per-path fold order.)
+[`MultipleRandomised`](@ref) keys the schedule by the position of the fold in its path. With a fixed
+`seed`, a second call to `split` gives the same folds in the same order on every path.
 
-A **callable** has no entry to index, so none of this reaches it: what it returned on a fold is
-knowable only by re-running it, or by having it record its own choice. That last option is a
-logging concern you own, and a [`TimeDependentOptimiserCallable`](@ref) struct is the place for
-it — give the functor a field to write to, and it logs the regime as a side effect of picking
-it. Distinct folds write distinct slots, so it stays correct under the parallel fold loop:
+A callable has no entry to look up. You know what it returned on a fold only if you run it again, or
+if it records its own choice. You write that record yourself, and a
+[`TimeDependentOptimiserCallable`](@ref) struct is a good place for it. Give the struct a field to
+write to, and it logs the regime when it picks it. Different folds write different slots, so the log
+stays correct when the fold loop runs the folds in parallel.
 =#
 struct RegimeSwitchLogged{T <: PortfolioOptimisers.OptimisationEstimator,
                           U <: PortfolioOptimisers.OptimisationEstimator} <:
@@ -454,25 +473,25 @@ pretty_table(DataFrame(:fold => 1:n, :regime => logbook,
                        :ran => [which_strategy(pred_logged, i) for i in 1:n]);
              formatters = [resfmt])
 #=
-The `regime` column is the callable telling you what it saw, filled as the backtest ran rather
-than reconstructed after it; `ran` confirms `:turbulent` folds took the defensive strategy.
+The callable wrote the `regime` column during the backtest.
+The `ran` column shows that every `:turbulent` fold ran the defensive strategy.
 
 ## 10. Summary
 
-| Position | Spelling | `:nearest`? | Fold-less |
+| Position | How you write it | `:nearest` | With no folds |
 |---|---|---|---|
-| The optimiser itself | `cross_val_predict(TimeDependent([opt₁, …, optₙ]; default = d), rd, cv)` | — (it is handed to the loop directly) | runs `default`, or throws [`TimeDependentDefaultError`](@ref) without one |
-| Fallback `fb` | `MeanRisk(; fb = TimeDependent([…]))`, entries may be `nothing` | rejected | `default` if given, else *no fallback* |
-| `NestedClustered.opti` | field-level schedule | legal (inner CV consumes the field); needs `default` + `cv` | per-cluster leg runs `default` |
-| `Stacking.opti` | element-level schedule per candidate | legal per element; needs `default` + `cv` | full-sample leg runs `default` |
-| `opto`, `SubsetResampling.opt`, meta `fb` | field-level schedule | rejected (no inner fold loop owns them) | `default` or throw / no-fallback for `fb` |
-| Pipeline optimisation step | schedule as a step | — | `fit` runs `default` or throws |
+| The optimiser itself | `cross_val_predict(TimeDependent([opt₁, …, optₙ]; default = d), rd, cv)` | not applicable, the fold loop gets the schedule directly | runs `default`, or throws [`TimeDependentDefaultError`](@ref) without one |
+| Fallback `fb` | `MeanRisk(; fb = TimeDependent([…]))`, entries can be `nothing` | rejected | `default` if you give one, else no fallback |
+| `NestedClustered.opti` | a schedule on the field | valid, because the inner cross-validation uses the field; needs `default` and `cv` | the solve per cluster runs `default` |
+| `Stacking.opti` | a schedule on an element, per candidate | valid on an element; needs `default` and `cv` | the solve over the full sample runs `default` |
+| `opto`, `SubsetResampling.opt`, the `fb` of a meta-optimiser | a schedule on the field | rejected, because no inner fold loop uses them | `default`, else an error, or no fallback for `fb` |
+| Optimisation step of a pipeline | a schedule as a step | not applicable | `fit` runs `default`, or throws without one |
 
-Whatever the position: entry `i` is fold `i`'s complete optimiser (or precomputed result —
-mixed schedules predict on result folds, except under asset-subsampling schemes); callables
-derive the fold's optimiser from its [`TimeDependentContext`](@ref), with
-[`TimeDependentOptimiserCallable`](@ref) declaring the output kind statically; a swapped-in
-estimator's own schedules resolve against the same fold context (recursion), while schedules
-inside schedules are rejected (nesting); and the fold-less value is always something you said
-explicitly — a `default`, a static field default, or a structured error.
+In every position, entry `i` is the optimiser of fold `i`, or a precomputed result. A fold
+with a result entry only predicts. A scheme that draws subsets of the assets rejects a result entry.
+A callable computes the fold's optimiser from its [`TimeDependentContext`](@ref). A
+[`TimeDependentOptimiserCallable`](@ref) struct states in its type that it returns an optimiser.
+The schedules inside an entry take the same fold's values, but the constructor rejects a schedule
+inside a schedule. A solve with no folds runs a value you stated, a `default` or the static default
+of a field, or it throws an error.
 =#
