@@ -12,7 +12,7 @@ The loop then gives the callback a [`PortfolioOptimisers.Fold`](@ref) whose `tra
 PortfolioOptimisers.fit_fold_result
 PortfolioOptimisers.thread_online_folds!
 PortfolioOptimisers.online_folds
-PortfolioOptimisers.online_step_fold(::Any, ::Nothing, ::ReturnsResult)
+PortfolioOptimisers.online_step_fold(::Any, ::Nothing, ::PortfolioOptimisers.Prices_RR)
 PortfolioOptimisers.one_previous_portfolio
 PortfolioOptimisers.step_context
 ```
