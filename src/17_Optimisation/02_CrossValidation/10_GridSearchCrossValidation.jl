@@ -189,20 +189,14 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     else
         nothing
     end
-    # A combinatorial `path_ids` is a matrix, one row per test block of a fold, so a path's
-    # entries are Cartesian and the fold is the **column**. The folds of a path arrive in
-    # that order, measured against `res.pr.X` of each prediction. `train_X` is read only for
-    # a result that carries no carrier of its own; see [`candidate_train_score`](@ref).
-    path_folds = if gscv.train_score
-        [[I[2] for I in findall(==(p), cv.path_ids)] for p in 1:M]
-    else
-        nothing
-    end
-    train_X = if gscv.train_score
-        [fold_train_returns(cv, rd, k) for k in eachindex(cv.train_idx)]
-    else
-        nothing
-    end
+    # One training view per fold of each path. A combinatorial `path_ids` is a matrix, one
+    # row per test block of a fold, so a path's entries are Cartesian and the fold is the
+    # **column**. The folds of a path arrive in that order, measured against `res.pr.X` of
+    # each prediction. The views are lazy, so they are built whether or not a train score is
+    # asked for, and read only for a result that carries no carrier of its own; see
+    # [`candidate_train_score`](@ref).
+    path_X = [[fold_train_returns(cv, rd, I[2]) for I in findall(==(p), cv.path_ids)]
+              for p in 1:M]
     for (i, (lenses, vals)) in enumerate(zip(lens_grid, val_grid))
         opti = opt
         for (lens, val) in zip(lenses, vals)
@@ -214,10 +208,11 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
         test_scores[:, i] = sgn * expected_risk(r, predictions; gscv.kwargs...)
         if gscv.train_score
             for (p, path) in enumerate(predictions.pred)
-                train_scores[p][:, i] = [sgn * candidate_train_score(r, fp.res,
-                                                                     train_X[path_folds[p][t]],
-                                                                     gscv.kwargs)
-                                         for (t, fp) in enumerate(path.pred)]
+                # A two-argument `map`, not a comprehension that destructures a pair: over
+                # the method's declared signature JET cannot see through that destructuring.
+                train_scores[p][:, i] = map(path.pred, path_X[p]) do fp, X
+                    return sgn * candidate_train_score(r, fp.res, X, gscv.kwargs)
+                end
             end
         end
     end
