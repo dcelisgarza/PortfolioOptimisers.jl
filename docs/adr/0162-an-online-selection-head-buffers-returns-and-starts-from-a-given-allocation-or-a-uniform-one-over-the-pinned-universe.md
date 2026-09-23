@@ -95,6 +95,27 @@ and the rule's allocation from the second. That is what a live book migrating to
 the period-one trade is measured from `ŵ₁` as ADR 0160 rules, and no rule refuses `w0`. The
 docstring says the one-period case in one sentence.
 
+### An expert's start meets the set as `w0` does
+
+A rule that holds allocations of its own over the assets — the experts of an `ExpertMixture` and
+of a `FollowTheLeadingHistory` — starts each of them where its rule starts: at the Start
+Allocation for a rule that reads `w`, and at its own `w` for a `ConstantRebalancedPortfolio`. That
+start is projected once onto the head's Allocation Set, in the expert's own Projection Geometry,
+exactly as `w0` is, and under the same exception: a set that reads the head's rows holds it as
+given until the first Online Update. Without the projection, a one-hot expert of a switching
+portfolio under a cap earns `⟨e_k, x₁⟩` in period one, a return no feasible expert earns, and the
+expert weighting reads it for one row.
+[Issue #1268](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1268) found it.
+
+The set reaches the seed through the public verb: `rule_state_seed(alg, w, set)`, whose default
+method drops `set` and calls `rule_state_seed(alg, w)`, so a rule whose carrier reads only the
+Start Allocation writes the two-argument form it always wrote. The head calls the three-argument
+form once, inside the same projection step as the projection of `w0`, so a programme that holds
+an expert's start warns as the start's own Held Step. `nothing` for `set` projects nothing, which
+is what a direct two-argument call on a mixture answers. A newcomer of `FollowTheLeadingHistory`
+takes the same order — the rule's start first, then the projection — so a constant rebalanced
+base rule starts at the projection of its own `w`, not at the uniform portfolio's.
+
 ### The uniform start is over the pinned universe
 
 When `w0` is absent the recursion starts at `1/N` over every pinned name, unlisted ones included,
@@ -125,6 +146,12 @@ zeros elsewhere and accepts what their rule's geometry does with a zero.
 6. **Refuse a `w0` outside the Allocation Set.** Rejected: the prototype projects, the first
    Online Update projects anyway, and a book that violates a new constraint is the ordinary case
    a constrained start exists for.
+7. **Refuse an expert whose `w` the set excludes, and keep `rule_state_seed(alg, w)`.**
+   Rejected: it refuses the switching portfolio under a cap, the ordinary case a mixture of
+   one-hot experts exists for, and `w0`, which the head projects, would be treated otherwise.
+8. **Keep the one-row effect and state it.** Rejected: the expert weighting after row one reads
+   returns that no feasible expert earns, and the mixture is the one place a start is not
+   projected.
 
 ## Consequences
 
@@ -140,3 +167,7 @@ zeros elsewhere and accepts what their rule's geometry does with a zero.
   and the two docstring sentences.
 - The parity test of ADR 0158 reads its price-relative fixture as `1 .+ r` first; the ledger's
   moving-average example is unchanged in value.
+- `rule_state_seed` gains its three-argument form (#1268); `ExpertMixture` and
+  `FollowTheLeadingHistory` implement it, and the head's seed calls it inside the start's
+  projection step. One private helper, `project_start`, projects the head's start and every
+  expert's, so the exception for a set that reads rows is written once.

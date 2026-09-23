@@ -1158,9 +1158,9 @@ v_{t+1}^{(j)} = \\left( 1 - \\frac{1}{t + 1} \\right) \\hat{v}_{t+1}^{(j)}\\,,\\
 \\end{align}
 ```
 
-The multiplicative update is the paper's ``e^{-\\alpha f_t}`` on the log-wealth loss, the wealth weighting at `alpha = 1`, and the fixed share is what lets a newly started expert win an interval: the paper's adaptive regret on every interval `[r, s]` is `O(α⁻¹(log r + log |I|))` beyond the base rule's regret on that interval. A new expert is started at every period from the uniform portfolio in the base rule's own start, projected onto the Allocation Set in the base rule's geometry. Under `prune`, the working set is Woodruff's streaming set the paper adopts: an expert started at period ``i = r\\,2^k`` with ``r`` odd lives for ``2^{k+2} + 1`` periods, so the set holds `O(log t)` experts at period `t`, every interval still holds an expert started within its first half, and the weights are renormalised over the survivors; without it every expert lives, which is the paper's first algorithm at `O(t)` experts. The base rule of the paper is the [`NewtonStep`](@ref); any rule of the family serves.
+The multiplicative update is the paper's ``e^{-\\alpha f_t}`` on the log-wealth loss, the wealth weighting at `alpha = 1`, and the fixed share is what lets a newly started expert win an interval: the paper's adaptive regret on every interval `[r, s]` is `O(α⁻¹(log r + log |I|))` beyond the base rule's regret on that interval. A new expert is started at every period at the base rule's own start from the uniform portfolio, projected onto the Allocation Set in the base rule's geometry, so a constant rebalanced base starts at the projection of its own `w`. Under `prune`, the working set is Woodruff's streaming set the paper adopts: an expert started at period ``i = r\\,2^k`` with ``r`` odd lives for ``2^{k+2} + 1`` periods, so the set holds `O(log t)` experts at period `t`, every interval still holds an expert started within its first half, and the weights are renormalised over the survivors; without it every expert lives, which is the paper's first algorithm at `O(t)` experts. The base rule of the paper is the [`NewtonStep`](@ref); any rule of the family serves.
 
-The weight vector is projected onto the Expert Set on `eset` in the entropic geometry after the fixed share and the pruning, so a cap on `eset` caps the trust in any one copy; the working set changes size, so `eset` admits a scalar bound alone. The blend is projected onto the head's Allocation Set once more in the Euclidean geometry on `proj`, as an [`ExpertMixture`](@ref)'s is, skipped by type on a [`BoundedAllocationSet`](@ref). The rule reads nothing of a given Start Allocation beyond its first expert, which starts there.
+The weight vector is projected onto the Expert Set on `eset` in the entropic geometry after the fixed share and the pruning, so a cap on `eset` caps the trust in any one copy; the working set changes size, so `eset` admits a scalar bound alone. The blend is projected onto the head's Allocation Set once more in the Euclidean geometry on `proj`, as an [`ExpertMixture`](@ref)'s is, skipped by type on a [`BoundedAllocationSet`](@ref). The rule reads nothing of a given Start Allocation beyond its first expert, which starts there, projected onto the Allocation Set as the newcomers are ([`project_start`](@ref)).
 
 # Fields
 
@@ -1280,9 +1280,11 @@ end
 function projection_geometry(alg::FollowTheLeadingHistory)
     return alg.proj
 end
-function rule_state_seed(alg::FollowTheLeadingHistory, w::AbstractVector)
-    h = expert_start_allocation(alg.alg, w)
-    return FollowTheLeadingHistoryState(0, [rule_state_seed(alg.alg, h)], [h],
+function rule_state_seed(alg::FollowTheLeadingHistory, w::AbstractVector,
+                         set::Option{<:AbstractAllocationSet} = nothing)
+    h = project_start(projection_geometry(alg.alg), set,
+                      expert_start_allocation(alg.alg, w))
+    return FollowTheLeadingHistoryState(0, [rule_state_seed(alg.alg, h, set)], [h],
                                         [one(eltype(w))], [1])
 end
 """
@@ -1309,10 +1311,11 @@ function online_update!(alg::FollowTheLeadingHistory, st::FollowTheLeadingHistor
     for k in 1:K
         st.st[k], st.h[k] = online_update!(alg.alg, st.st[k], st.h[k], x, rows, set)
     end
-    # The newcomer starts where the base rule starts, on the set.
-    u = fill(one(eltype(w)) / length(w), length(w))
-    hn = expert_start_allocation(alg.alg, project(projection_geometry(alg.alg), set, u, u))
-    push!(st.st, rule_state_seed(alg.alg, hn))
+    # The newcomer starts where the base rule starts, on the set: a constant rebalanced
+    # base answers its own allocation, so the projection follows the start, not the reverse.
+    hn = expert_start_allocation(alg.alg, fill(one(eltype(w)) / length(w), length(w)))
+    hn = project(projection_geometry(alg.alg), set, hn, hn)
+    push!(st.st, rule_state_seed(alg.alg, hn, set))
     push!(st.h, hn)
     push!(st.born, t + 1)
     share = one(eltype(phat)) / (t + 1)

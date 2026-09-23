@@ -28,6 +28,7 @@ PortfolioOptimisers.assert_rule_admits_set
 PortfolioOptimisers.rows_needed_max
 PortfolioOptimisers.rule_state_view
 PortfolioOptimisers.price_adjusted_allocation
+PortfolioOptimisers.project_start
 PortfolioOptimisers.OnlinePortfolioSelectionState
 Base.copy(x::PortfolioOptimisers.OnlinePortfolioSelectionState)
 PortfolioOptimisers.renormalised_view

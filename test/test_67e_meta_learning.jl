@@ -1,7 +1,8 @@
 #=
 The meta-learning rows of the fourth set, as ADR 0165 rules them (issue #1183 on map #1148):
 the mixture's Gradient Point and Start Allocation over the experts, the `Ader` and `Sword`
-constructors, and the Switching Weighting with `SwitchingPortfolio`.
+constructors, and the Switching Weighting with `SwitchingPortfolio`; and the start of an expert,
+projected onto the Allocation Set as the head's `w0` is (ADR 0162, issue #1268).
 
 Every literal below states its provenance: the one-row blend-point step is a hand computation
 of the Euclidean step on the shared gradient `-x / ⟨w, x⟩` at `x = [1.2, 0.8]` from
@@ -314,5 +315,50 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
         v = po.port_opt_view(OPS(; alg = sp), [1, 3])
         @test v.alg.experts[2].w == [0.5, 0.5] && v.alg.experts[1].w == [1.0, 0.0]
         @test length(optimise(v, po.port_opt_view(rd, 1:5, [1, 3])).w) == 2
+    end
+
+    @testset "An expert's start meets the Allocation Set (#1268)" begin
+        # The one-hot experts of a switching portfolio under a cap of 0.5. The Euclidean
+        # projection of e_1 onto the capped simplex is [0.5, 0.25, 0.25], by hand.
+        onehot = [ConstantRebalancedPortfolio(; w = [1, 0, 0]),
+                  ConstantRebalancedPortfolio(; w = [0, 1, 0]),
+                  ConstantRebalancedPortfolio(; w = [0, 0, 1])]
+        cap = BoundedAllocationSet(; wb = WeightBounds(0, 0.5))
+        capr = resolve(cap, N)
+        u = fill(1 / N, N)
+        mix = ExpertMixture(; experts = onehot, alg = ExponentiatedGradient())
+        st = po.rule_state_seed(mix, u, capr)
+        @test st.h[1] ≈ [0.5, 0.25, 0.25] && st.h[3] ≈ [0.25, 0.25, 0.5]
+        @test all(h -> all(<=(0.5 + 1e-12), h) && isapprox(sum(h), 1; atol = 1e-12), st.h)
+        # Without a set nothing is projected, and the default method drops the set.
+        @test po.rule_state_seed(mix, u).h[1] == [1, 0, 0]
+        @test po.rule_state_seed(mix, u, nothing).h[1] == [1, 0, 0]
+        @test isnothing(po.rule_state_seed(BuyAndHold(), u, capr))
+        # The oracle: a mixture whose experts already hold the projected allocations. The
+        # head seeds on its set, so the expert weighting reads the same returns from the
+        # first row, and the two mixtures agree row for row.
+        feasible = [ConstantRebalancedPortfolio(; w = h) for h in st.h]
+        for alg in (ExponentiatedGradient(), BuyAndHold())
+            a = po.partial_fit!(OPS(; alg = ExpertMixture(; experts = onehot, alg = alg),
+                                    set = cap), rows(rd, 1:1))
+            b = po.partial_fit!(OPS(; alg = ExpertMixture(; experts = feasible, alg = alg),
+                                    set = cap), rows(rd, 1:1))
+            @test a.cache.st.p ≈ b.cache.st.p
+            @test a.cache.st.p ≉
+                  po.partial_fit!(OPS(; alg = ExpertMixture(; experts = onehot, alg = alg)),
+                                  rows(rd, 1:1)).cache.st.p
+            wa = optimise(OPS(; alg = ExpertMixture(; experts = onehot, alg = alg),
+                              set = cap), rows(rd, 1:8)).w
+            wb = optimise(OPS(; alg = ExpertMixture(; experts = feasible, alg = alg),
+                              set = cap), rows(rd, 1:8)).w
+            @test wa ≈ wb
+        end
+        # FollowTheLeadingHistory seeds its first expert on the set, and a newcomer of a
+        # constant rebalanced base starts at the projection of its own allocation.
+        ftl = FollowTheLeadingHistory(; alg = ConstantRebalancedPortfolio(; w = [1, 0, 0]))
+        @test po.rule_state_seed(ftl, u, capr).h[1] ≈ [0.5, 0.25, 0.25]
+        @test po.rule_state_seed(ftl, u).h[1] == [1, 0, 0]
+        of = po.partial_fit!(OPS(; alg = ftl, set = cap), rows(rd, 1:3))
+        @test all(h -> h ≈ [0.5, 0.25, 0.25], of.cache.st.h)
     end
 end

@@ -10,7 +10,7 @@ A rule is the one thing that varies across the online portfolio selection family
 In order to implement a new rule, subtype `AbstractOnlinePortfolioSelectionAlgorithm` with the paper's parameters and a `proj` slot as part of the struct, and implement the following methods:
 
   - `online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet) -> Tuple`: The Online Update: from the rule's carrier `st`, the allocation `w` held during the period, the finite price relative `x` of the period and the rows carrier the head holds through it, answer `(st', w')`, the carrier and the allocation for the next period. `st` is written in place where the rule can, and `w'` is always a new vector. A first-order rule also implements the seven-argument form, whose last argument is the Gradient Point an [`ExpertMixture`](@ref) hands it; the generic method drops the point.
-  - `rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector)`: The carrier before the first update, or `nothing` for a rule that carries nothing; `w` is the Start Allocation, whose length and element type the carrier takes.
+  - `rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector)`: The carrier before the first update, or `nothing` for a rule that carries nothing; `w` is the Start Allocation, whose length and element type the carrier takes. The head calls the three-argument form, `rule_state_seed(alg, w, set)`, with its Allocation Set, whose default method drops `set`; a rule that holds allocations of its own over the assets, as the experts of an [`ExpertMixture`](@ref) are, implements the three-argument form and projects them onto `set`.
   - `rows_needed(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> Union{Nothing, Integer}`: The number of rows the rule reads at a step: `0` for one that reads none, `nothing` for one that reads every row folded so far.
   - `projection_geometry(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> AbstractProjectionGeometry`: The geometry the head projects the Start Allocation in, the rule's `proj` slot by default.
 
@@ -688,16 +688,43 @@ function price_relative(r::Number)
 end
 """
     rule_state_seed(::AbstractOnlinePortfolioSelectionAlgorithm, ::AbstractVector)
+    rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector,
+                    set::Option{<:AbstractAllocationSet})
 
 The carrier a rule holds before its first update, `nothing` for a rule that carries nothing, which is the default.
+
+The head calls the three-argument form with its Allocation Set, and the default method drops `set`, so a rule whose carrier reads only the Start Allocation implements the two-argument form. A rule that holds allocations of its own over the assets — the experts of an [`ExpertMixture`](@ref) and of a [`FollowTheLeadingHistory`](@ref) — implements the three-argument form and projects each of them onto `set`, as the head projects its `w0`. `nothing` for `set` projects nothing.
 
 # Related
 
   - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
   - [`OnlinePortfolioSelectionState`](@ref)
+  - [`project_start`](@ref)
 """
 function rule_state_seed(::AbstractOnlinePortfolioSelectionAlgorithm, ::AbstractVector)
     return nothing
+end
+function rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet})
+    return rule_state_seed(alg, w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+A start projected once onto the Allocation Set `set` in the geometry `proj`, with itself as the reference: the head's Start Allocation, and the start of each expert an [`ExpertMixture`](@ref) or a [`FollowTheLeadingHistory`](@ref) holds, so the allocation held during the first period lies in the set. `nothing` for `set`, and a set that reads the head's rows, which has no constraints to form before the first row, hold `w` as given, and the first Online Update projects it.
+
+# Related
+
+  - [`rule_state_seed`](@ref)
+  - [`project`](@ref)
+  - [`online_selection_seed`](@ref)
+"""
+function project_start(proj::AbstractProjectionGeometry,
+                       set::Option{<:AbstractAllocationSet}, w::AbstractVector)
+    if isnothing(set) || isnothing(rows_needed(set))
+        return w
+    end
+    return project(proj, set, w, w)
 end
 """
     projection_geometry(alg::AbstractOnlinePortfolioSelectionAlgorithm)

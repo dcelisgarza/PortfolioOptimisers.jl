@@ -278,7 +278,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Seeds the head's state on its first row: pins the names and a static panel, forms the Start Allocation, projects it once onto the set in the rule's geometry, and seeds the rule's carrier and the rows buffer.
+Seeds the head's state on its first row: pins the names and a static panel, forms the Start Allocation, projects it once onto the set in the rule's geometry, and seeds the rule's carrier on the set through [`rule_state_seed`](@ref) and the rows buffer.
 
 The uniform start and a given `w0` meet the set alike, so the allocation held during the first period lies in the set wherever the set can be formed without rows. A set that reads the head's rows — a programme set with a fitted risk ceiling or a tracking error — has no constraints to form before the first row, so the start is held as given and the first Online Update projects it, as that update holds every step until the head has two rows. A programme that fails at the start holds the start as given and warns, as a row's Held Step does.
 
@@ -309,15 +309,13 @@ function online_selection_seed(opt::OnlinePortfolioSelection, rd::ReturnsResult,
     end
     # A set that reads the head's rows cannot form its constraints before the first row, so
     # the start is held as given and the first Online Update projects it; every other set
-    # meets the start once, uniform or given, and a hold at the start is warned as a row's is.
-    w0 = if isnothing(rows_needed(set))
-        start
-    else
-        w, held = with_projection_step(() -> project(projection_geometry(opt.alg), set,
-                                                     start, start), nothing, nothing)
-        report_held_steps(held, "the start")
-        w
+    # meets the start once, uniform or given. The rule's seed projects its experts' starts
+    # in the same step, and a hold at the start is warned as a row's is.
+    (w0, st), held = with_projection_step(nothing, nothing) do
+        w = project_start(projection_geometry(opt.alg), set, start)
+        return w, rule_state_seed(opt.alg, w, set)
     end
+    report_held_steps(held, "the start")
     need = rows_needed(opt)
     X = if isnothing(need)
         SampleBufferState()
@@ -327,9 +325,9 @@ function online_selection_seed(opt::OnlinePortfolioSelection, rd::ReturnsResult,
         SampleBufferState(; max_history = need)
     end
     static = isnothing(rd.pnl) || panel_is_static(rd.pnl)
-    return OnlinePortfolioSelectionState(; n = 0, w = w0, st = rule_state_seed(opt.alg, w0),
-                                         X = X, nx = rd.nx, pnl = static ? rd.pnl : nothing,
-                                         amsk = nothing, ts = nothing)
+    return OnlinePortfolioSelectionState(; n = 0, w = w0, st = st, X = X, nx = rd.nx,
+                                         pnl = static ? rd.pnl : nothing, amsk = nothing,
+                                         ts = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
