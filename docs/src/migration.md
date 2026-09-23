@@ -206,7 +206,7 @@ The API pages follow the new source layout, and each source file has a public pa
 
 ## From v0.31 to v0.32
 
-v0.32 adds the online portfolio selection family. It also removes `OnlineStep`, the `ff` keyword and three unexported functions, gives the naive optimisers a `fees` field, adds fields to three results, and moves two released numbers.
+v0.32 adds the online portfolio selection family. It also removes `OnlineStep`, the `ff` keyword, the `ddof` keyword of `LInfNorm` and three unexported functions. It gives the naive optimisers a `fees` field and adds fields to four results. Five calls that ran in v0.31 now raise an error, four calls that raised now answer, and the results in [Results that move](@ref migration-0-32-numbers) change.
 
 ### [Names that were removed](@id migration-0-32-removed)
 
@@ -215,6 +215,7 @@ v0.32 adds the online portfolio selection family. It also removes `OnlineStep`, 
 | `OnlineStep`, and the `ff` keyword of `IndexWalkForward` and `DateWalkForward` | The online step is a scheme wrapped in `Online`, and each scheme has its own constructor. `OnlineIndexWalkForward(train_size, test_size; …)` and `OnlineDateWalkForward(train_size, test_size; …)` take every keyword of the plain scheme except `expand_train`, which an online run sets. `IndexWalkForward(60, 1; ff = OnlineStep())` becomes `OnlineIndexWalkForward(60, 1)`. An `Online(cv)` that you write by hand on a scheme raises an error that names the three constructors. |
 | The derived `expand_train` (`nothing` on the two walk-forwards) | `expand_train` is a plain `Bool` keyword again, `false` by default, as in v0.30. |
 | `fold_fit`, `cv_online_info`, `cv_resume_info` (unexported) | Nothing replaces them. The fold loop reads the type of the scheme to decide whether it steps online. |
+| The `ddof` keyword and field of `LInfNorm` | `LInfNorm()`. The largest single-period difference carries no degrees of freedom, so the norm is not scaled. `LInfNorm(; ddof = 1)` raises a `MethodError`. |
 
 ### [Renamed keywords and changed defaults](@id migration-0-32-renames)
 
@@ -222,17 +223,57 @@ v0.32 adds the online portfolio selection family. It also removes `OnlineStep`, 
 - **`PerformanceSummaryResult`** has four more fields, `excess_ret`, `tracking_error`, `information_ratio` and `turnover`, so its positional constructor takes sixteen arguments. `performance_summary` takes a `benchmark` and fills the first three. Without a benchmark they are `NaN`, and `turnover` is `nothing` unless the result holds the path of the weights.
 - **`plot_performance_summary`** is one method over an array, an `OptimisationResult` or a prediction result, with `benchmark` as a keyword. v0.31 had six methods with different numbers of arguments. Every call written against v0.31 still works.
 - **The `opt` argument of the risk-measure builders** is a `RiskConstraintOwner`, which is a JuMP optimiser or a `ProgrammeAllocationSet`. Every method keeps its argument list, and a method that you added under the old type bound still dispatches.
+- **`LpNorm` defaults to `ddof = 1`**, where v0.31 used `0`. So `LpNorm(; p = 2)` equals `L2Norm()`. At `T = 252` the factor of `LpNorm()` is `251^(1/3)`, not `252^(1/3)`. State `ddof = 0` to keep the v0.31 error. `L1Norm` gains a `ddof` keyword whose default `0` keeps the v0.31 factor `T`.
+- **`GridEntropicValueatRiskView` and `GridRelativisticValueatRiskView`** take `M = 1`, where v0.31 used `10`. `M` now multiplies the smallest constant that releases each row, so it must be at least `1`.
+- **An upper bound over several assets on an EVaR or RLVaR view**, and an equality below the prior value, take the sequential formulation when `alg = nothing`. v0.31 sent them to the grid, which holds one asset, so the view raised an `ArgumentError`. A group lower bound stays conic.
+- **`plot_histogram(…; reference = true)`** draws the pdf of the Normal fitted to the returns, and `reference = false` draws no curve. v0.31 drew a kernel density under the label "Normal" for `true`, and the Normal for `false`.
+- **`plot_factor_risk_contribution`** names its last bar "Off-factor", where v0.31 named it "Constant". The factor names apply only when they count the columns of the loadings. Otherwise the bars are numbered.
+- **`plot_performance_summary`** draws four more bars: the excess return, the tracking error, the information ratio and the turnover.
+
+### [Calls that now raise](@id migration-0-32-raises)
+
+In v0.31 each of these calls returned a value that did not follow the configuration. In v0.32 each call raises an error that names the cause and the fix.
+
+| Call | v0.31 | v0.32 |
+| --- | --- | --- |
+| `cross_val_predict` on `HierarchicalRiskParity`, `HierarchicalEqualRiskContribution` or `SchurComplementHierarchicalRiskParity` whose `opt.pe` is a prior result | Every fold used the prior of the full sample, so each fold read its own test rows. Under `KFold` all five folds gave the same weights. | `ArgumentError`. Give an estimator, such as `EmpiricalPrior()`, so each fold fits its own prior. |
+| `search_cross_validation` on an optimiser whose prior is a prior result, or a grid that writes one | The search scored every candidate on the prior of the full sample | `ArgumentError`, before any candidate is scored |
+| A `TimeDependent` schedule whose entries or `default` hold a prior result, in the fold loop | Accepted, and every fold read the full-sample prior | `ArgumentError`. A callable schedule still runs. |
+| A walk-forward on a `Frontier` sweep with a term that reads the previous weights, such as `Turnover(; w)` | Ran, and charged every fold against the stated `w`, because no one portfolio of the sweep is the previous one | `ArgumentError`. A `fixed = true` turnover still runs. |
+| `GridEntropicValueatRiskView(; M)` or `GridRelativisticValueatRiskView(; M)` with `M < 1` | Accepted | `DomainError` |
+
+### [Calls that now answer](@id migration-0-32-answers)
+
+| Call | v0.31 | v0.32 |
+| --- | --- | --- |
+| A library estimator that holds a bare `StatsBase` covariance estimator, such as `Covariance(; ce = SimpleCovariance())`, inside a prior or an optimiser | `MethodError`: the bare estimator refused the library's keywords and the asset panel | Runs. A working path keeps its numbers. |
+| A mask-aware moment estimator (`ExpWeightedExpectedReturns`, `ExpWeightedVariance`, `ExpWeightedCovariance` and the two regime-adjusted forms) on a transposed sample with an asset panel, `dims = 2` | `DimensionMismatch` | The same answer as `dims = 1` |
+| An upper bound over several assets on an EVaR or RLVaR view, with `alg = nothing` | `ArgumentError` | The sequential formulation meets the view. |
+| An upper-bound grid EVaR view at half the prior value | On a 100-row example, a `DomainError` on the posterior weights | The posterior meets the bound to `1e-10`. |
 
 ### [Results that move](@id migration-0-32-numbers)
 
-This result was wrong in v0.31:
+These results were wrong in v0.31:
 
+- An `LInfNorm` tracking error divided the largest difference by `T - ddof`. With 252 rows, `err = 2e-2` let one day differ by `5.04`, so the bound did not bind. The error is now the largest difference, and `err` is the bound on one period.
+- `MonotonicSchurComplement` returned the weights of a `gamma` other than the one it reported. The difference reached `8e-6` in a weight. The bisection also returned the weights of a midpoint that it rejected.
+- `SchurComplementHierarchicalRiskParity` dropped its fee. The result had no `fees` field, so `calc_net_returns` gave the gross return, and a fold charged no forced exit. The result now carries the fee.
+- After `factory`, the skewness term of a `VarianceSkewKurtosis` had scale `1` and no floor, so `expected_risk` of the stored measure did not match the model. The weights did not move.
+- `IntegerConditionalValueatRiskView` did not reach the posterior of least divergence. On a 60-row example, the divergence falls from `0.0189` to `0.0175` for an upper bound, and from `0.0858` to `0.0415` for an equality. The view now warns when its window of `sbar` losses binds.
+- An `IterativeWeightFinaliser` that stalled or diverged reported success with weights that broke the bounds. It now returns the Euclidean projection of its input. A bound set that cannot hold the budget now fails, so the fallback chain runs.
 - A walk-forward that charged a turnover fee on a naive optimiser priced the fee against the reference weights `w` of its `Turnover` on every fold, never against the weights that the fold held. Buy-and-hold paid the most, and a constant rebalanced portfolio paid nothing. The fee is now charged against the previous weights that the fold loop passes on. The first fold's fee is the trade from those reference weights.
 
-This result was approximate in v0.31:
+These results were approximate in v0.31:
 
+- A tracking error on `LpNorm()`, whose default `ddof` moved from `0` to `1`.
 - The t-statistic of every information-coefficient summary treated the forward windows as independent rows. The windows overlap in three cases: `forecast_holding_period` from its second row on, `forecast_evaluation_summary` at any `step < horizon`, and `exposure_ic_summary` on a block at any `horizon > 1`. In these cases the statistic now uses a Newey-West variance at the known overlap order, so it is smaller. `ic_ir` does not move.
+
+This result keeps its numbers, but its meaning changed:
+
+- `PopulationPredictionResult` gives each member whose `id` is `nothing` its position, so a scorer that selects a path names it.
 
 ### [If you extend the library](@id migration-0-32-extending)
 
 - **A risk-measure builder** `set_risk_constraints!(model, i, r, opt, pr, …)` receives `opt::RiskConstraintOwner`. A method bound to `RiskJuMPOptimisationEstimator` alone is not called for a `ProgrammeAllocationSet`.
+- **`SchurComplementHierarchicalRiskParityResult`** has a `fees` field after `clr`, so its positional constructor takes one more argument. The keyword constructor needs `fees` too. Pass `fees = nothing` for a result with no fee.
+- **`L1Norm`** has a field, `ddof`, and **`LInfNorm`** has none. Code that constructs either by position must follow.
