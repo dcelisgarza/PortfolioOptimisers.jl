@@ -1,5 +1,5 @@
 ```@meta
-Description = "The online arm of the fold loop, private API of PortfolioOptimisers.jl: fit_fold_result, thread_online_folds!, online_folds."
+Description = "The online arm of the fold loop, private API of PortfolioOptimisers.jl: fit_fold_result, thread_online_folds!, online_folds, online_step_fold, step_context."
 ```
 
 # The online arm of the fold loop: private API
@@ -10,4 +10,6 @@ An Online Scheme — a walk-forward wrapped in `Online` by [`OnlineIndexWalkForw
 PortfolioOptimisers.fit_fold_result
 PortfolioOptimisers.thread_online_folds!
 PortfolioOptimisers.online_folds
+PortfolioOptimisers.online_step_fold(::Any, ::Nothing, ::ReturnsResult)
+PortfolioOptimisers.step_context
 ```

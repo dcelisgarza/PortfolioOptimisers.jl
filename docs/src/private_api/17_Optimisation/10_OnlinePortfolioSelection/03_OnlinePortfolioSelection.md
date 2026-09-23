@@ -19,4 +19,7 @@ PortfolioOptimisers.online_readout(::OnlinePortfolioSelection)
 PortfolioOptimisers.held_timestamps(opt::OnlinePortfolioSelection)
 PortfolioOptimisers.fees_carry_turnover
 PortfolioOptimisers.assert_online_fee_source(opt::OnlinePortfolioSelection, pws)
+PortfolioOptimisers.online_portfolio_selection_td_defaults
+PortfolioOptimisers.static_allocation_set
+PortfolioOptimisers.online_step_fold(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:PortfolioOptimisers.Option{<:PortfolioOptimisers.OnlinePortfolioSelectionState}}, ctx::PortfolioOptimisers.TimeDependentContext, rd::ReturnsResult)
 ```
