@@ -375,7 +375,7 @@ function mr_block1(idx)
             5e-5
         elseif i in
                (6, 16, 28, 36, 38, 40, 46, 52, 93, 108, 126, 139, 163, 165, 167, 177, 179,
-                192, 204, 214, 216, 254, 264, 278, 282, 286)
+                192, 204, 214, 216, 254, 264, 278, 286)
             5e-6
         elseif i in (18, 157, 158, 174, 228, 270)
             5e-4
@@ -387,19 +387,22 @@ function mr_block1(idx)
             1e-3
         elseif i in (198, 210)
             5e-2
-        elseif i in (208, 234, 246, 269)
+        elseif i in (208, 234, 269)
             1e-4
         elseif i == 240
             0.25
         else
             1e-6
         end
-        success = isapprox(res.w, df[!, i]; rtol = rtol)
-        # #1280: the floor on the ratio's `k` moves these two `LogarithmicReturn` answers
-        # where it does not bind. The reference keeps the better answer.
+        # #1280: Clarabel stops these two `LogarithmicReturn` ratios at ALMOST_OPTIMAL, and
+        # any change of 1e-8 or more to the floor on `k` moves where it stops. The weights move
+        # by up to 7.7e-2 and the ratio by up to 9.5e-3, so compare the ratio it maximises.
         if i in (246, 282)
-            @test_broken success
+            rkf = factory(r, pr, slv)
+            @test isapprox(expected_ratio(rkf, ret, res.w, pr; rf = rf),
+                           expected_ratio(rkf, ret, df[!, i], pr; rf = rf); rtol = 2e-2)
         else
+            success = isapprox(res.w, df[!, i]; rtol = rtol)
             if !success
                 println("Counter: $i")
                 find_tol(res.w, df[!, i])
