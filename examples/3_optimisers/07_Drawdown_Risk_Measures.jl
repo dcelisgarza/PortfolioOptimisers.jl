@@ -87,7 +87,7 @@ reduce that one loss. `AverageDrawdown` and `UlcerIndex` use the whole drawdown 
 uses the worst 5 % of it.
 =#
 
-using StatsPlots, GraphRecipes, StatsBase
+using StatsPlots, GraphRecipes
 plot_stacked_bar_composition(results, rd)
 
 #=
@@ -159,16 +159,14 @@ cr_cdar = cumulative_returns(ret_cdar)
 dd_var = drawdowns(ret_var)
 dd_cdar = drawdowns(ret_cdar)
 
-## Summary statistics.
+## Summary statistics, computed by the risk measures of section 2.
+rs_dd = [r_mdd, r_add, r_uci, r_cdar]
 pretty_table(DataFrame(;
                        :Metric =>
                            ["Max drawdown", "Avg drawdown", "Ulcer index", "CDaR 5%"],
-                       :MinVariance =>
-                           [-minimum(dd_var), -mean(dd_var), sqrt(mean(dd_var .^ 2)),
-                            -quantile(-dd_var, 0.95)],
-                       :MinCDaR =>
-                           [-minimum(dd_cdar), -mean(dd_cdar), sqrt(mean(dd_cdar .^ 2)),
-                            -quantile(-dd_cdar, 0.95)]); formatters = [resfmt])
+                       :MinVariance => [expected_risk(r, w_var, rd.X) for r in rs_dd],
+                       :MinCDaR => [expected_risk(r, w_cdar, rd.X) for r in rs_dd]);
+             formatters = [resfmt])
 
 #=
 Compare the two columns row by row. The minimum-variance portfolio has the lower variance, but

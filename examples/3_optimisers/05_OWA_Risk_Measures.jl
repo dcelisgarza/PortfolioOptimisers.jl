@@ -106,7 +106,7 @@ r_tgrg = OrderedWeightsArray(; w = owa_tgrg(T))
 r_wr = OrderedWeightsArray(; w = owa_wr(T))
 r_rg = OrderedWeightsArray(; w = owa_rg(T))
 r_cvarrg = OrderedWeightsArray(; w = owa_cvarrg(T))
-r_lcrm = OrderedWeightsArray(; w = owa_l_moment_crm(T))
+r_lcrm = OrderedWeightsArray(; w = owa_l_moment_crm(T; k = 5))
 
 #=
 ## 3. Minimising each OWA risk measure
@@ -135,9 +135,9 @@ so the portfolios differ.
     as well as to its level.
   - `WorstReal` depends on one day and `Range` on two days, so the solver chooses the weights that
     improve those days alone.
-  - `L-moment` holds the same portfolio as `GMD`. With the default `k = 2`, `owa_l_moment_crm`
-    keeps only the second L-moment, whose weights are half the GMD weights. Section 7 uses
-    higher orders.
+  - `L-moment` uses the L-moments of order 2 to 5, `k = 5`. The second L-moment alone has half
+    the GMD weights, and the higher orders add weight on the tails. So the portfolio holds the
+    same assets as `GMD`, with different weights. Section 7 changes the mix of the orders.
 =#
 
 using StatsPlots, GraphRecipes
@@ -179,8 +179,7 @@ r_range_default = OrderedWeightsArrayRange()
 
 ## Custom range: CVaR losses vs worst realisation gains.
 T_obs = T
-r_range_custom = OrderedWeightsArrayRange(; w1 = owa_cvar(T_obs),
-                                          w2 = reverse(owa_wr(T_obs)))
+r_range_custom = OrderedWeightsArrayRange(; w1 = owa_cvar(T_obs), w2 = owa_wr(T_obs))
 
 res_range_d = optimise(MeanRisk(; r = r_range_default, opt = opt))
 res_range_c = optimise(MeanRisk(; r = r_range_custom, opt = opt))
@@ -197,7 +196,7 @@ risk-free rate, per unit of Gini mean difference.
 
 rf = 4.2 / 100 / 252
 res_ratio = optimise(MeanRisk(; r = r_gmd, obj = MaximumRatio(; rf = rf), opt = opt))
-println("GMD Sharpe portfolio, max weight: $(round(maximum(res_ratio.w)*100; digits=2)) %")
+println("GMD ratio portfolio, max weight: $(round(maximum(res_ratio.w)*100; digits=2)) %")
 pretty_table(DataFrame(; :assets => rd.nx, :weight => res_ratio.w); formatters = [resfmt])
 
 #=
@@ -209,7 +208,8 @@ risk aversion `g`, with `0 < g < 1`. We use the L-moments of order 2 to 5, `k = 
 mass on the worst returns. A smaller `g` brings the measure closer to the second L-moment,
 which is half the Gini mean difference.
 
-We minimise the measure for `g` equal to 0.25, 0.5 and 0.75.
+We minimise the measure for `g` equal to 0.25, 0.5 and 0.75. The default is `g = 0.5`, which
+is the `L-moment` measure of section 3, so the `g=0.5` column repeats that column.
 =#
 
 gs = [0.25, 0.5, 0.75]
@@ -227,7 +227,7 @@ Each column holds the portfolio for one value of `g`, from the least weight on t
 the most.
 =#
 
-## The risk-aversion sweep, side by side: lower `g` (left) loads the defensive names harder.
+## The risk-aversion sweep, side by side, from the smallest `g` (left) to the largest (right).
 plot_stacked_bar_composition(lcrm_results, rd)
 
 #=

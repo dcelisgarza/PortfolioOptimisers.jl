@@ -251,7 +251,7 @@ plot_measures(res3.w, pr; x = r1, y = r2,
               c = ExpectedReturnRiskRatio(; rk = ConditionalDrawdownatRisk(),
                                           rt = ArithmeticReturn(), rf = rf),
               title = "Pareto Surface", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
-              zlabel = "CDaR/Return")
+              zlabel = "Return/CDaR")
 
 #=
 We plot the same surface in 2D, with the ratio as the colour.
@@ -261,7 +261,7 @@ plot_measures(res3.w, pr; x = r1, y = r2,
               c = ExpectedReturnRiskRatio(; rk = ConditionalDrawdownatRisk(),
                                           rt = ArithmeticReturn(), rf = rf),
               title = "Pareto Front", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
-              colorbar_title = "\n\nCDaR/Return", right_margin = 8Plots.mm)
+              colorbar_title = "\n\nReturn/CDaR", right_margin = 8Plots.mm)
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
 #src - Sweep clean (ADR 0014 retrofit): the high-order prior (denoised cov + cokurtosis +

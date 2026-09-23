@@ -141,7 +141,7 @@ plot_stacked_area_composition(ress[1].w, rd.nx;
 plot_measures(ress[1].w, pr; x = r, y = ExpectedReturn(; rt = ress[1].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "No regularisation", xlabel = "Variance",
-              ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
+              ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
 # L1 regularisation portfolio weights. As expected, the portfolio is sparsified, with fewer assets with non-zero weight.
@@ -152,7 +152,7 @@ plot_stacked_area_composition(ress[2].w, rd.nx;
 plot_measures(ress[2].w, pr; x = r, y = ExpectedReturn(; rt = ress[2].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "L1 regularisation", xlabel = "Variance",
-              ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
+              ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
 # L2 regularisation portfolio weights. Even values of p-norms smooth out the weights, leading to more diversified portfolios. The higher the value, the more highly penalised larger deviations from the mean weight become. This is similar to how moments of even order behave.
@@ -163,7 +163,7 @@ plot_stacked_area_composition(ress[3].w, rd.nx;
 plot_measures(ress[3].w, pr; x = r, y = ExpectedReturn(; rt = ress[3].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "L2 regularisation", xlabel = "Variance",
-              ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
+              ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
 # Lp regularisation portfolio weights. The higher the value of p, the closer the behaviour is to L-Inf regularisation, where the maximum absolute weight is penalised. This leads to portfolios where all weights are more similar in magnitude, but does not smear the negative weights into positive values like the L2 norm.
@@ -175,7 +175,7 @@ plot_stacked_area_composition(ress[4].w, rd.nx;
 plot_measures(ress[4].w, pr; x = r, y = ExpectedReturn(; rt = ress[4].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Lp (p = 5) regularisation", xlabel = "Variance",
-              ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
+              ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
 # L-Inf regularisation portfolio weights.
@@ -187,7 +187,7 @@ plot_stacked_area_composition(ress[5].w, rd.nx;
 plot_measures(ress[5].w, pr; x = r, y = ExpectedReturn(; rt = ress[5].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "L-Inf regularisation", xlabel = "Variance",
-              ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
+              ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
 #=

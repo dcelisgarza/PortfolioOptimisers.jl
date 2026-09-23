@@ -246,7 +246,7 @@ risk-return ratio.
 plot_measures(resA.w, resA.pr; x = r, y = ExpectedReturn(; rt = resA.ret),
               c = ExpectedReturnRiskRatio(; rt = resA.ret, rk = r, rf = rf),
               title = "Efficient Frontier", xlabel = "CVaR", ylabel = "Arithmetic Return",
-              colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
+              colorbar_title = "\nReturn/Risk Ratio", right_margin = 6Plots.mm)
 
 #=
 `plot_measures` takes *any* pair of measures, so you can view the same 30 portfolios on other
