@@ -10,10 +10,10 @@ its listing, which is a leading gap. A delisted asset has none after it, which i
 trading halt or a stale quote leaves a flat or missing stretch in the middle. Exchanges keep
 different holiday calendars, so the dates of two assets do not line up.
 
-Two functions prepare such a table for the rest of the library. [`price_ingestion`](@ref) reads
+Two functions prepare such a table for the rest of the library. [`price_ingestion`](@ref) treats
 `missing` and `NaN` as the same absent price, joins and collapses the series, and states each
-asset's listing span, the observations between its listing and its delisting. It reads the span
-off the whole table. A run of gaps at the start of an asset's column means the asset was not yet
+asset's listing span, the observations between its listing and its delisting. It takes the span
+from the whole table. A run of gaps at the start of an asset's column means the asset was not yet
 listed, a run at the end means it was delisted, and a run in the middle is a suspension of an asset
 that stayed listed. [`prices_to_returns`](@ref) then computes the returns and keeps every gap in
 them. The [`ReturnsResult`](@ref) it returns holds an [`AssetPanel`](@ref), which states the assets
@@ -92,8 +92,8 @@ pretty_table(first(worst_cols, 6); formatters = [resfmt],
 ## 3. Ingest the prices and read the listing span
 
 `price_ingestion` writes every `missing` as `NaN`, because a `Matrix{Float64}` of returns can hold
-`NaN` and cannot hold `missing`. It reads the listing span off the whole table once, outside any
-training window, so the span describes the asset and does not depend on the window a later step
+`NaN` and cannot hold `missing`. It finds the listing span once, from the whole table, outside
+any training window, so the span describes the asset and does not depend on the window a later step
 fits on.
 
 Asset 3 is missing for its first 160 observations, so its span starts after them. Asset 2's halt
@@ -113,9 +113,9 @@ pretty_table(DataFrame(; asset = nx[[3, 2, 4]],
 ## 4. Carry the gaps into the returns
 
 The conversion computes the returns and changes nothing else. Every asset keeps its column, every
-date keeps its row, and each return that reads a missing price is `NaN`. A run of `k` missing prices
-makes the `k + 1` returns that read one of them non-finite, and no more, because the return of one
-asset never reads the price of another.
+date keeps its row, and each return computed from a missing price is `NaN`. A run of `k` missing
+prices inside a column makes `k + 1` returns non-finite, and a run at either end of the column makes
+`k`. No other return changes, because the return of one asset uses only the prices of that asset.
 
 The [`AssetPanel`](@ref) in the result states the universe. `amsk` is the listing span on the dates
 of the returns, and `emsk` marks the cells of `amsk` whose return is also finite.
@@ -156,12 +156,13 @@ pretty_table(DataFrame(; table = ["carried", "filled with the Held Price"],
              title = "The fill closes the halts, and stops at asset 3's listing")
 
 #=
-The table counts the non-finite returns before and after the fill. The last column checks that
-the first return of asset 3 is still non-finite after the fill, before its listing.
+The table counts the non-finite returns before and after the fill. The last column shows, for
+each table, whether the first return of asset 3 is non-finite. Asset 3 was not yet listed on that
+date.
 
 ## 6. Drop what has too few prices
 
-Asset 3 is missing for about 64% of the window. Keeping it costs nothing, because an optimiser
+Asset 3 is missing for about 63% of the window. Keeping it costs nothing, because an optimiser
 leaves it out of every window where the library cannot estimate it. If you want it gone from the
 universe, use [`MissingDataFilter`](@ref), the only step that deletes an asset or an observation.
 It is a universe policy too. We fit it on the table, and the fit records the assets that pass the
@@ -176,7 +177,7 @@ println("Assets kept after the 50% column filter: $(length(mdf.nx)) of $N")
 ## 7. Optimise on the result
 
 A [`ReturnsResult`](@ref) that holds a panel goes into the rest of the package like any other,
-with no extra arguments. The optimiser reads the panel and gives no weight to an asset it cannot
+with no extra arguments. The optimiser uses the panel and gives no weight to an asset it cannot
 estimate on the window.
 
 We optimise on both tables to show what the fill changes. An optimiser keeps an asset only when its
@@ -216,8 +217,8 @@ heatmap(1:N, 1:T, Float64.(ismissing.(vals)); xlabel = "Asset", ylabel = "Day",
 #=
 ## Summary
 
-  - [`price_ingestion`](@ref) reads `missing` and `NaN` as one absent price, joins and collapses
-    the series, and reads each asset's listing span off the whole table.
+  - [`price_ingestion`](@ref) treats `missing` and `NaN` as one absent price, joins and
+    collapses the series, and computes each asset's listing span from the whole table.
   - [`prices_to_returns`](@ref) computes the returns and keeps every gap. The
     [`AssetPanel`](@ref) it returns states which assets the library can estimate on which dates.
   - [`PriceGapFill`](@ref) fills a held gap with a price convention and writes nothing outside the
@@ -235,11 +236,10 @@ over the prices.
     `nan_to_missing`, `impute_method`, `missing_col_percent` and `missing_row_percent` used to be
     keywords of `prices_to_returns`, and by default it deleted every row that held a gap. All four
     are gone. A keyword stays on the conversion only if it changes how a return is computed.
-    [`PriceGapFill`](@ref) now fills, and [`MissingDataFilter`](@ref) deletes. Its thresholds
-    accept `0.0`, which tolerates no gap.
+    [`PriceGapFill`](@ref) now fills, and [`MissingDataFilter`](@ref) deletes.
 
     Three keywords stayed, `ret_method`, `padding` and `gap_return_alg`. The other inputs the
-    conversion used to take are now fields of the [`PricesResult`](@ref) it reads. `join_method`
+    conversion used to take are now fields of the [`PricesResult`](@ref) it takes. `join_method`
     and `collapse_args` change the dates of the observations, so they belong to
     [`PriceIngestion`](@ref). `prices_to_returns(X)` on a bare price table returns the same result
     as `prices_to_returns(price_ingestion(PriceIngestion(), X))`. To use a different join, a

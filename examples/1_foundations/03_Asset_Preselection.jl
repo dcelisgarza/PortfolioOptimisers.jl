@@ -1,15 +1,15 @@
 #=
 ```@meta
-Description = "Asset pre-selection in PortfolioOptimisers.jl: drop constant, dominated and redundant assets before optimising, and why it helps."
+Description = "Asset pre-selection in PortfolioOptimisers.jl: drop constant, low-ranked and redundant assets before optimising, and why it helps."
 ```
 
 # Asset pre-selection
 
 Some assets in a universe add nothing to the optimisation. A constant column, such as a name that
-never traded, carries no information. Some assets are dominated, for example when you want the twenty
-names with the lowest risk and the universe holds two hundred. Some are redundant, because they move so closely
-with another asset that keeping both gives the optimiser the same information twice. The optimiser
-then treats one common factor as two separate sources of risk.
+never traded, carries no information. Some assets rank too low, for example when you want the twenty
+names with the lowest risk and the universe has two hundred. Some are redundant, because they move
+so closely with another asset that keeping both gives the optimiser the same information twice. The
+optimiser then treats one common factor as two separate sources of risk.
 
 An asset selector removes such assets from the universe, based on the returns. It is an ordinary
 preprocessing estimator and needs no pipeline. A [`Pipeline`](@ref) runs it through
@@ -132,8 +132,9 @@ assets by the trait would keep those assets instead.
 
 An ordinal rule compares the scores with each other. [`RankRule`](@ref) and
 [`QuantileRule`](@ref) sort the assets from best to worst by `bigger_is_better`, and take a count or
-a fraction of assets from each end. A rule takes counts, not positions, so you can drop the worst
-five without knowing how many assets there are, and take the two ends at once.
+a fraction of assets from each end. A rule takes counts, not positions, and it can take the two
+ends at once. `action = :drop` inverts the selection, so the rule drops the assets it names and
+keeps the rest. With it you can drop the worst five without knowing how many assets there are.
 =#
 
 rules = ["RankRule(best = 5)" => RankRule(; best = 5),
@@ -283,11 +284,10 @@ DataFrame(; algorithm = ["PairwiseCorrelation", "CorrelationComponents"],
 because two assets that move together carry the same information whatever the sign of their
 correlation.
 
-The largest correlation the greedy algorithm keeps is below the threshold, and the last column
-names the assets that the components algorithm drops in addition. Neither answer is wrong. The
-greedy algorithm keeps every pair below the threshold and keeps more assets. The components
-algorithm keeps one asset from each group of correlated assets, and drops more. Choose the one
-whose rule you want.
+The largest correlation the greedy algorithm keeps is below the threshold, and the last column names
+the assets that the components algorithm drops in addition. The greedy algorithm keeps every pair
+below the threshold and keeps more assets. The components algorithm keeps one asset from each group
+of correlated assets, and drops more. Choose the one whose rule you want.
 
 ### 5.1 Clustering as the grouping rule
 
@@ -310,10 +310,10 @@ end
 #=
 ## 6. The universe is the result of the fit
 
-Every cell above ran `fit_preprocessing` on one window. In a pipeline that window is the training
-window, and the fitted result holds the selected universe. A prediction on a later window keeps
-that universe. We fit a selector on the first 700 observations, apply it to the rest, and compare
-the result with the universe the selector would choose on the rest alone.
+Every selection above was fitted on one window, the whole sample. In a pipeline that window is the
+training window, and the fitted result holds the selected universe. A prediction on a later window
+keeps that universe. We fit a selector on the first 700 observations, apply it to the rest, and
+compare the result with the universe the selector would choose on the rest alone.
 =#
 
 selector = ScoreSelector(; score = ConditionalValueatRisk(), rule = RankRule(; best = 10))
@@ -368,7 +368,8 @@ pretty_table(DataFrame(; asset = res.ctx.returns.nx, weight = res.w); formatters
 
 #=
 The pipeline takes twenty assets and returns ten weights. `predict` on any window keeps the ten
-assets of the fit.
+assets of the fit. We predict on the whole sample and print the CVaR of the portfolio of ten
+assets.
 =#
 
 pred = StatsAPI.predict(res, rd)
@@ -382,8 +383,8 @@ scored on. [`search_cross_validation`](@ref) fits the whole pipeline, the select
 training window and scores it on the window held out, so no candidate sees the test window when it
 chooses its universe.
 
-A lens key names a field of a step. `"select.rule"` replaces the whole rule of the step named
-`"select"`.
+A key of the grid names a step and one of its fields. `"select.rule"` replaces the whole rule of
+the step named `"select"`.
 =#
 
 p = ["select.rule" => [RankRule(; best = 5), RankRule(; best = 10), RankRule(; best = 15)]]

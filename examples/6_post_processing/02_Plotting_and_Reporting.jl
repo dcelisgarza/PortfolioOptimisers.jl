@@ -58,7 +58,7 @@ the expected returns alone.
 plot_prior(pr, rd)
 
 #=
-The correlation matrix alone.
+We also plot the correlation matrix on its own.
 =#
 
 plot_correlation(pr)
@@ -89,14 +89,14 @@ plot_risk_contribution(factory(Variance(), pr), res_min, rd)
 #=
 ## 5. Performance over the sample
 
-[`plot_portfolio_cumulative_returns`](@ref) and [`plot_drawdowns`](@ref) plot the returns the
-maximum-ratio portfolio would have made over the sample.
+[`plot_portfolio_cumulative_returns`](@ref) plots the cumulative return of the maximum-ratio
+portfolio over the sample.
 =#
 
 plot_portfolio_cumulative_returns(res_ratio.w, rd)
 
 #=
-The drawdowns.
+[`plot_drawdowns`](@ref) plots the drawdowns of the same portfolio.
 =#
 
 plot_drawdowns(res_ratio.w, rd)
@@ -111,7 +111,7 @@ table, to compare two portfolios, or to test them. It needs no plotting package.
 performance_summary(res_ratio, rd)
 
 #=
-The same numbers as a plot.
+We draw the same summary as a figure.
 =#
 
 plot_performance_summary(res_ratio, rd)

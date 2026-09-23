@@ -73,12 +73,12 @@ port_ret = [name => rd.X * w for (name, w) in books]
 #=
 ## 2. Cumulative returns: the equity curve
 
-[`cumulative_returns`](@ref) turns a series of returns into a path of wealth. Its `compound` flag
-chooses how:
+[`cumulative_returns`](@ref) turns a series of returns into a path of wealth. Its second argument,
+`compound`, chooses how:
 
-  - `compound = false`, the default, sums the returns, `cumsum(X)`. This is the absolute
+  - `false`, the default, sums the returns, `cumsum(X)`. This is the absolute
     cumulative return. It adds up period by period and is easy to read over a short horizon.
-  - `compound = true` multiplies them, `cumprod(1 .+ X)`. This is the relative, or geometric,
+  - `true` multiplies them, `cumprod(1 .+ X)`. This is the relative, or geometric,
     multiple of wealth, which is what an investor who reinvests gets.
 
 [`absolute_cumulative_returns`](@ref) and [`relative_cumulative_returns`](@ref) compute each of the
@@ -97,7 +97,7 @@ pretty_table(DataFrame(; book = first.(final_wealth),
 [`drawdowns`](@ref) returns the drawdown at each point, the loss from the highest value reached
 before it. From that series we compute three statistics: the maximum drawdown, which is the worst
 loss; the average drawdown, which is the mean depth over time; and the Ulcer index, the root mean
-square of the depth, which weighs a long drawdown more than a short spike. We use compounded
+square of the depth, which weighs a deep drawdown more than a shallow one. We use compounded
 drawdowns, to match the compounded equity curve.
 =#
 
@@ -146,10 +146,10 @@ The fees have two time bases. `l`, `s` and `tn` are rates per period, so
 `calc_net_returns(w, X, fees)` deducts them on every row of `X`. `l` is proportional to the long
 positions and `s` to the short ones, and `tn` to the turnover. Over 252 daily observations, a rate
 `l` per period adds up to about `252 * l` over the year, before compounding. `fl` and `fs` are
-amounts of currency charged once for the whole holding period, and `fees.fa` decides where on the
-series that charge falls. We charge `l = 0.0005`, five basis points per period on the long
-positions, and compare the compounded wealth gross and net of it. The table also prints the fee of
-one period and the total over 252 periods.
+charged once for the whole holding period on each position that is not zero, and on a return series
+they are a fraction of capital. `fees.fa` decides where on the series that charge falls. We charge
+`l = 0.0005`, five basis points per period on the long positions, and compare the compounded wealth
+gross and net of it. The table also prints the fee of one period and the total over 252 periods.
 =#
 
 fees = Fees(; l = 0.0005)

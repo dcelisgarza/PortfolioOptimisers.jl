@@ -13,16 +13,17 @@ hold away from the target weights, and the smaller the account, the larger the m
 
   - [`GreedyAllocation`](@ref) rounds each weight to whole shares, or to lots, and then spends the
     cash left over on the assets furthest below their target. It needs no solver.
-  - [`DiscreteAllocation`](@ref) solves a mixed-integer programme for the best whole-share
-    portfolio. It needs a solver for mixed-integer programmes.
+  - [`DiscreteAllocation`](@ref) solves a mixed-integer programme. It chooses the share counts
+    that minimise the sum of the absolute differences, in money, between the target and the bought
+    positions, plus the cash left over. It needs a solver for mixed-integer programmes.
 
 !!! tip "When to reach for this"
     Reach for a finite allocation as the last step before you trade, because you buy shares, not
     fractions of capital. Use [`GreedyAllocation`](@ref) when you want an answer at once, and for a
     large portfolio where the mixed-integer programme is slow. Use [`DiscreteAllocation`](@ref)
-    when the account is small enough that the rounding matters and you want the best whole-share
-    portfolio. The difference between the weights you hold and the target weights is the error of
-    the rounding, and each table below prints it.
+    when the account is small enough that the rounding matters and you want the share counts that
+    the mixed-integer programme finds. The sum of the absolute differences between the weights you
+    hold and the target weights is the rounding error, and each table below prints it.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
@@ -77,12 +78,10 @@ pretty_table(DataFrame("Asset" => rd.nx, "Target" => res.w,
 #=
 ## 3. Exact allocation with a mixed-integer solver
 
-[`DiscreteAllocation`](@ref) solves for the best whole-share portfolio, where the greedy method
+[`DiscreteAllocation`](@ref) optimises all the share counts together, where the greedy method
 takes one asset at a time. It needs a mixed-integer solver, and we use
-[HiGHS](https://github.com/jump-dev/HiGHS.jl). The table compares the cash left over and the drift
-of the two methods. With this budget the greedy method is at or near the best allocation. The
-mixed-integer programme gains more on smaller budgets and with lots, where the greedy method can
-leave cash that a better choice of shares would spend.
+[HiGHS](https://github.com/jump-dev/HiGHS.jl). The table compares the cash left over and the
+rounding error of the two methods.
 =#
 
 mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,
@@ -99,9 +98,8 @@ pretty_table(DataFrame("Method" => ["Greedy", "Discrete (MIP)"],
 ## 4. Lot sizes
 
 Many instruments trade in lots, not single shares. `GreedyAllocation(; unit = u)` rounds to
-multiples of `u` shares. A larger lot gives a larger drift. A lot large enough can also spend more
-than the budget, and the cash left over is then negative, which tells you that the lot is too
-large for the account. The table compares single shares with lots of ten.
+multiples of `u` shares. A larger lot gives a larger rounding error and can leave
+more cash unspent. The table compares single shares with lots of ten.
 =#
 
 greedy_lots = optimise(GreedyAllocation(; unit = 10),
@@ -113,11 +111,11 @@ pretty_table(DataFrame("Allocation" => ["Single shares", "Lots of 10"],
              formatters = [resfmt], title = "Lot size coarsens the allocation")
 
 #=
-## 5. The budget sets the error of the rounding
+## 5. The budget sets the rounding error
 
 A rounding error too small to matter on a large account is large on a small one. We allocate the
-same target with budgets of \$100,000, \$25,000 and \$5,000, and the table prints the drift of
-each. On a small account, the choice of allocation method and of lot size changes the portfolio
+same target with budgets of \$100,000, \$25,000 and \$5,000, and the table prints the rounding error
+of each. On a small account, the choice of allocation method and of lot size changes the portfolio
 you hold the most.
 =#
 
@@ -133,8 +131,9 @@ pretty_table(DataFrame("Budget" => budgets,
              title = "Smaller budgets suffer larger discretisation error")
 
 #=
-Both allocators also accept a [`Fees`](@ref) argument, so they choose the number of shares net of
-transaction costs. [Fees and net returns](../4_constraints_costs/06_Fees_and_Net_Returns.md) covers
+[`FiniteAllocationInput`](@ref) also takes a `fees` keyword, a [`Fees`](@ref), which needs a
+`horizon` in periods too. With fees, both allocators choose share counts whose cost and fee fit in
+the cash. [Fees and net returns](../4_constraints_costs/06_Fees_and_Net_Returns.md) covers
 the fees.
 
 ## 6. Target and allocated weights
@@ -149,11 +148,13 @@ plot_stacked_bar_composition([res, greedy, discrete], rd;
 #src - New deep dive (6_post_processing). Verified on kaimon (f102cae9) with HiGHS as MIP solver:
 #src   - GreedyAllocation 100k: invested $99,986, leftover $14.22, drift 0.0033.
 #src   - DiscreteAllocation(HiGHS) 100k: identical here ($99,986, drift 0.0033) — greedy already
-#src     optimal on this book; framed honestly (MIP's edge is on tight budgets / lots).
+#src     optimal on this book; framed honestly (MIP's edge is on tight budgets).
 #src   - Budget sweep monotone: drift 100k=0.0033, 5k=0.0947 (~30x). Clean "small accounts suffer"
 #src     story.
-#src   - FINDING: GreedyAllocation(unit=10) → leftover cash NEGATIVE (-$268.44), drift 0.034. Large
-#src     lots overshoot the budget; documented in §4 as the signal the lot is too big. A guard /
-#src     warning when residual cash goes negative would help.
+#src   - GreedyAllocation(unit=10) 100k: leftover $34.64, drift 0.0407 (rerun 2026-09-23, #1226).
+#src     The old NEGATIVE leftover (-$268.44) is gone: both greedy passes now test the cost plus
+#src     the fee against the cash left, so a lot never overdraws the budget.
+#src   - Budget sweep, discrete vs greedy drift: 25k 0.0147 vs 0.0174, 5k 0.0849 vs 0.0947; at 5k
+#src     the discrete allocation leaves more cash ($15.81 vs $5.37). DiscreteAllocation has no lots.
 #src - optimise(GreedyAllocation()|DiscreteAllocation(; slv=mip), FiniteAllocationInput(; w, prices, cash)); prices =
 #src   vec(values(X)[end,:]). Result fields shares/cost/w/cash.

@@ -51,7 +51,7 @@ X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :D
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 #=
-The optimiser works on returns, so we compute them from the prices. The [`ReturnsResult`](@ref) that comes back stores the asset names in `nx`, the asset returns in `X` and the timestamps in `ts`. Its other fields hold data that this page does not use.
+The optimiser works on returns, so we compute them from the prices. The [`ReturnsResult`](@ref) that comes back stores the asset names in `nx`, the asset returns in `X` and the timestamps in `ts`. Its other fields store data that this page does not use.
 =#
 
 rd = prices_to_returns(X)
@@ -69,7 +69,7 @@ The [`MeanRisk`](@ref) estimator states a mean-risk optimisation problem. It is 
 using Clarabel
 
 #=
-A [`Solver`](@ref) holds the solver to use, an optional name that appears in the logs, optional solver settings, and optional keyword arguments for [`JuMP.assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#assert_is_solved_and_feasible).
+A [`Solver`](@ref) takes the solver to use, an optional name that appears in the logs, optional solver settings, and optional keyword arguments for [`JuMP.assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#assert_is_solved_and_feasible).
 
 A hard problem can fail with one solver or one group of settings and succeed with another. For that case you can pass a vector of `Solver` objects, and the optimisation tries each in turn until one succeeds or all fail. The Markowitz problem is easy to solve, so we use one solver.
 =#
@@ -82,7 +82,7 @@ slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 
 ### 2.2 Defining the optimisation estimator
 
-`PortfolioOptimisers` builds an optimisation out of smaller estimators, each with its own job. The first place this shows on this page is [`JuMPOptimiser`](@ref), which holds the settings that every `JuMPOptimisationEstimator` shares, the solver among them.
+`PortfolioOptimisers` builds an optimisation out of smaller estimators, each with its own job. The first place this shows on this page is [`JuMPOptimiser`](@ref), which has the settings that every `JuMPOptimisationEstimator` shares, the solver among them.
 
 We create a `MeanRisk` estimator. The printed output lists many more fields of `JuMPOptimiser` and `MeanRisk` than this page uses.
 =#
@@ -92,9 +92,9 @@ mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
 #=
 ### 2.3 Performing the optimisation
 
-The [`optimise`](@ref) function runs every optimisation in `PortfolioOptimisers`. It returns a result that holds a return code, the solution, and the statistics the optimisation used, whether you computed them first or the optimisation did.
+The [`optimise`](@ref) function runs every optimisation in `PortfolioOptimisers`. It returns a result with a return code, the solution, and the statistics the optimisation used, whether you computed them first or the optimisation did.
 
-The `retcode` field of the result holds an `OptimisationSuccess`, which means the solver found a solution.
+The `retcode` field of the result is an `OptimisationSuccess`, which means that the solver found a solution.
 =#
 
 res = optimise(mr, rd)
@@ -139,7 +139,7 @@ da = DiscreteAllocation(; slv = mip_slv)
 #=
 The allocation needs three inputs. The weights come from the optimisation, the latest prices are the last row of the price table `X`, and we invest `4206.9` USD.
 
-A [`FiniteAllocationInput`](@ref) holds the three. It can also hold a time horizon and fees, which this page does not use.
+A [`FiniteAllocationInput`](@ref) takes the three. It also takes a time horizon and fees, which this page does not use.
 =#
 
 mip_res = optimise(da,
@@ -147,7 +147,7 @@ mip_res = optimise(da,
                                          cash = 4206.9))
 
 #=
-This result has different fields from the optimisation result. The discrete allocation solves the long and the short positions apart and then combines them, and the fields that start with `l_` or `s_` hold the two halves.
+This result has different fields from the optimisation result. The discrete allocation solves the long and the short positions apart and then combines them, and the fields that start with `l_` or `s_` belong to the two halves.
 
 The table below puts the shares, their cost, the optimised weights and the weights of the allocation side by side.
 =#
@@ -157,7 +157,7 @@ pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip
              formatters = [mipresfmt])
 
 #=
-The weights of the allocation differ from the optimised weights, because a whole number of shares at a fixed cash amount can only come close to them. The `cash` property of the result is the cash left over, the starting cash less the sum of the costs. The cell below compares the two. The sum changes when the input holds fees.
+The weights of the allocation differ from the optimised weights, because a whole number of shares at a fixed cash amount can only come close to them. The `cash` property of the result is the cash left over. We print it beside the starting cash less the sum of the costs. When the input has fees, the allocation also subtracts the fees from the cash left over.
 =#
 
 println("used cash ≈ available cash: $(isapprox(mip_res.cash, 4206.9 - sum(mip_res.cost)))")
