@@ -4,4 +4,4 @@ Description = "Clique Hierarchy has no public API in PortfolioOptimisers.jl; its
 
 # Clique Hierarchy
 
-Clique Hierarchy has no public API in PortfolioOptimisers.jl; see [Clique Hierarchy: private API](../../../private_api/08_Phylogeny/06_DBHT/04_CliqueHierarchy.md) for its private API.
+Every name of this topic is private. The [private page](../../../private_api/08_Phylogeny/06_DBHT/04_CliqueHierarchy.md) documents them.

@@ -4,4 +4,4 @@ Description = "Meta optimisation has no public API in PortfolioOptimisers.jl; it
 
 # Meta optimisation
 
-Meta optimisation has no public API in PortfolioOptimisers.jl; see [Meta optimisation: private API](../../../private_api/17_Optimisation/06_Meta/01_Base_MetaOptimisation.md) for its private API.
+Every name of this topic is private. The [private page](../../../private_api/17_Optimisation/06_Meta/01_Base_MetaOptimisation.md) documents them.

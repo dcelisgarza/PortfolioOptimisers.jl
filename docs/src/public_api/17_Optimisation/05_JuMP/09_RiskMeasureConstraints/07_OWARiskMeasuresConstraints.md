@@ -4,4 +4,4 @@ Description = "OWA Risk Measure Constraints has no public API in PortfolioOptimi
 
 # OWA Risk Measure Constraints
 
-OWA risk measure constraints have no public API in PortfolioOptimisers.jl; see [OWA risk measure constraints: private API](../../../../private_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/07_OWARiskMeasuresConstraints.md) for their private API.
+Every name of this topic is private. The [private page](../../../../private_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/07_OWARiskMeasuresConstraints.md) documents them.

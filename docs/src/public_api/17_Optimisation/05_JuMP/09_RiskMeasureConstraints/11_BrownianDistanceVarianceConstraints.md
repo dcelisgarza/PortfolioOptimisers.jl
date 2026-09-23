@@ -4,4 +4,4 @@ Description = "Brownian Distance Variance Constraints has no public API in Portf
 
 # Brownian Distance Variance Constraints
 
-Brownian Distance Variance Constraints has no public API in PortfolioOptimisers.jl; see [Brownian Distance Variance Constraints: private API](../../../../private_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/11_BrownianDistanceVarianceConstraints.md) for its private API.
+Every name of this topic is private. The [private page](../../../../private_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/11_BrownianDistanceVarianceConstraints.md) documents them.
