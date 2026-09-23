@@ -1001,11 +1001,8 @@ const ret_dict = unique_key_dict(:ret_dict,
                                  :kte => "`kte::MatNum`: Cokurtosis matrix `assets x assets`.",#
                                  :ckurt => "`ckurt::MatNum`: Square cokurtosis matrix `assets² x assets²`.",#
                                  :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
-                                 :mev => "`mev`: New expected returns estimator of the same type as the argument, for the new view.",#
                                  :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
-                                 :cev => "`ce`: New covariance estimator of the same type as the argument, for the new view.",#
                                  :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",#
-                                 :vev => "`ve`: New variance estimator of the same type as the argument, for the new view.",#
                                  :skev => "`skev`: New coskewness estimator of the same type as the argument, for the new view.",#
                                  :ktev => "`kev`: New cokurtosis estimator of the same type as the argument, for the new view.",#
                                  :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
@@ -1014,7 +1011,6 @@ const ret_dict = unique_key_dict(:ret_dict,
                                  :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
                                  :stdnum => "`sd::Number`: Standard deviation of `X`.",
                                  :varnum => "`vr::Number`: Variance of `X`.",
-                                 :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
                                  :alg => "`alg`: The original algorithm instance.")
 """
     math_dict
