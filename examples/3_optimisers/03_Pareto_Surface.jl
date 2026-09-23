@@ -51,7 +51,7 @@ rd = prices_to_returns(X)
 #=
 ## 2. Solvers for the Pareto surface
 
-The optimisation on this page is harder and holds more constraints, so we pass a vector of seven
+The optimisation on this page is harder and has more constraints, so we pass a vector of seven
 solvers. The first uses the default settings, and the next six set
 `max_step_fraction` from 0.95 down to 0.70 in steps of 0.05.
 =#
@@ -82,8 +82,6 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 #=
 ## 3. High-order prior statistics
 
-We compute the prior once, because the page uses it several times.
-
 The risk measures on this page are of high order, so the prior needs the high-order moments.
 [`HighOrderPriorEstimator`](@ref) computes them, and it takes a second prior estimator for the
 low-order moments. One year of data is short, so we denoise the positive definite matrices, the
@@ -105,7 +103,7 @@ pe = HighOrderPriorEstimator(;
                              ske = Coskewness())
 
 #=
-We compute the prior.
+We compute the prior once, because the page uses it several times.
 =#
 
 pr = prior(pe, rd)
@@ -179,10 +177,9 @@ sk_rk2 = expected_risk(r1, res2.w, pr.X);
 kt_rk2 = expected_risk(r2, res2.w, pr.X);
 
 #=
-We build new risk measures with these bounds, and pass each one through `factory` immediately. The
-optimisation uses the parameters of a risk measure before those of the prior, so you can give the
-same risk measure twice with different parameters. Each range has 5 values, and the surface has
-one point per pair of values.
+We build new risk measures with these bounds, and pass each one through `factory` immediately,
+so that each takes its matrices from the prior. Each range has 5 values, and the surface has one
+point per pair of values.
 
 We do not know which of `sk_rk1` and `sk_rk2` is the larger, or which of `kt_rk1` and `kt_rk2`,
 so we use `min` and `max`.

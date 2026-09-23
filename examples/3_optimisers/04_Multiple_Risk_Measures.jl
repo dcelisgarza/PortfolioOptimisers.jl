@@ -20,9 +20,10 @@ of risk measures.
 
 !!! note "The return side takes several terms too"
     The `ret` field of `JuMPOptimiser` takes one return term or a vector of them, as the `r`
-    field of `MeanRisk` does, each with its own [`JuMPReturnsSettings`](@ref). Unlike the risk
-    measures, the optimiser always adds the return terms as a **weighted sum**, so no
-    scalariser applies to them. See [ℓ1 uncertainty sets](../2_moments_priors/11_L1_Uncertainty_Quintile_Portfolios.md).
+    field of `MeanRisk` does, each with its own [`JuMPReturnsSettings`](@ref). The optimiser
+    combines several risk measures with a scalariser, the rule that turns their values into one
+    number, and you choose it. It always adds the return terms as a weighted sum, with no
+    scalariser. See [ℓ1 uncertainty sets](../2_moments_priors/11_L1_Uncertainty_Quintile_Portfolios.md).
 =#
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
@@ -118,7 +119,7 @@ We minimise each of the six variances alone, and average the weights of the firs
 portfolios. Then we minimise all six variances in one optimisation, whose default scalariser adds
 them.
 
-That sum is twice the variance under the summed covariance, so the `multi_risk` column holds the
+That sum is twice the variance under the summed covariance, so the `multi_risk` column shows the
 same portfolio as the `sum_covs` column, up to the tolerance of the solver. The `mean_w` column
 averages the weights of the five single portfolios, and that is a different portfolio.
 =#
@@ -156,21 +157,22 @@ pretty_table(DataFrame(:assets => rd.nx, :dn => results[1].w, :gerber1 => result
 #=
 ### 3.2 Different weights and scalarisers
 
-Every optimiser takes a vector of risk measures, as `MeanRisk` does. You can give each measure
-its own weight, and choose one of four scalarisers to combine them. [`SumScalariser`](@ref),
-[`MaxScalariser`](@ref) and [`LogSumExpScalariser`](@ref) work with every optimiser, and
-[`MinScalariser`](@ref) works only with the hierarchical ones.
+`MeanRisk`, [`NearOptimalCentering`](@ref), [`RiskBudgeting`](@ref),
+[`FactorRiskContribution`](@ref), [`HierarchicalRiskParity`](@ref) and
+[`HierarchicalEqualRiskContribution`](@ref) each take a vector of risk measures. You can give
+each measure its own weight, and choose one of four scalarisers to combine them.
+[`SumScalariser`](@ref), [`MaxScalariser`](@ref) and [`LogSumExpScalariser`](@ref) work with all
+six, and [`MinScalariser`](@ref) works only with the two hierarchical optimisers.
 
 The restriction on `MinScalariser` comes from the optimisation *model*. Minimising a minimum has
 no convex form, so a `JuMP` optimiser does not accept `MinScalariser`. When you only combine risk
 values you already computed, no model is built, and all four scalarisers work. Section 5 reports
 one portfolio's risk under each of them.
 
-In a clustering optimisation the scalariser applies to each sub-optimisation separately. Under
+In a hierarchical optimiser the scalariser applies to each sub-optimisation separately. Under
 `MaxScalariser`, for example, the larger measure in one cluster need not be the larger measure in
-another cluster, or in the whole portfolio. This cannot be avoided, but a hierarchical
-optimisation aims at a trade-off between risk and diversification, not at the lowest possible risk, so it
-matters little in practice.
+another cluster, or in the whole portfolio. This cannot be avoided. A hierarchical optimiser aims
+at a trade-off between risk and diversification, not at the lowest possible risk.
 
 You can mix any risk measures that the optimiser accepts. We mix the variance with the negative
 skewness, and we scale the negative skewness down so that the larger of the two measures differs
@@ -178,7 +180,8 @@ from cluster to cluster.
 
 We use [`HierarchicalEqualRiskContribution`](@ref), which takes a risk measure and a scalariser
 inside each cluster, `ri` and `scai`, and a pair between the clusters, `ro` and `scao`. We compute
-the clusters once in advance, with the direct bubble hierarchy tree algorithm, [`DBHT`](@ref).
+the clusters once in advance, with the direct bubble hierarchical tree algorithm,
+[`DBHT`](@ref).
 =#
 clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
 
@@ -292,19 +295,20 @@ plot_stacked_bar_composition(results, rd)
 The `MaxScalariser` portfolio has the same weights as the negative skewness portfolio, and the
 `MinScalariser` portfolio the same weights as the variance portfolio. In every cluster the
 negative skewness is larger than the variance, so the maximum always picks the negative skewness
-and the minimum always picks the variance. Other clustering optimisers show the same effect.
-[`NearOptimalCentering`](@ref) can also give surprising results when it computes the risk bounds
-of an efficient frontier with `MaxScalariser`, because a different measure can be the largest at
-each point of the frontier.
+and the minimum always picks the variance. [`HierarchicalRiskParity`](@ref) applies its
+scalariser at each split of the tree, so the same effect can happen there.
+[`NearOptimalCentering`](@ref) computes the risk bounds of its frontier with the scalariser, and
+`MaxScalariser` takes the maximum at each end of the frontier separately. A different measure can
+then set each bound.
 
 ## 5. Reporting a vector of risk measures
 
 [`expected_risk`](@ref) also takes a vector of risk measures. It combines them into *one* number
 with the scalariser, and it does not return one number per measure.
 
-The result holds what the optimisation used. `res.r` is its vector of fitted risk measures, and
-`res.sca` is its scalariser. If you read both from the result,
-the reported risk is the risk that the optimisation measured.
+`res.r` is the vector of fitted risk measures of the optimisation, and `res.sca` is its
+scalariser. If you pass both from the result, the reported risk is the risk that the
+optimisation measured.
 
 Here `res` is the maximum-ratio optimisation over all six variance measures from section 3.1.
 =#
@@ -344,8 +348,8 @@ and it is not in their units. When the risks are small, `log(N)`, where `N` is t
 measures, makes up most of its value. Use it as a smooth form of the maximum, and do not compare
 its value with the other three.
 
-A hierarchical result also holds its measures, one pair for each level. The result of
-`HierarchicalEqualRiskContribution` holds the fitted `ri`, `scai`, `ro` and `scao`. We report the
+A hierarchical result also stores its measures, one pair for each level. The result of
+`HierarchicalEqualRiskContribution` contains the fitted `ri`, `scai`, `ro` and `scao`. We report the
 risk of the `SumScalariser` portfolio from the second run of section 4 under its outer measures
 and scalariser, `ro` and `scao`.
 =#

@@ -5,10 +5,10 @@ Description = "Trace the efficient frontier in PortfolioOptimisers.jl: the whole
 
 # Efficient frontier
 
-A single [`MeanRisk`](@ref) optimisation returns *one* portfolio. The efficient frontier is the whole
-curve of portfolios that earn the most return for each level of risk. They are also the
-portfolios that take the least risk for each level of return. You compute the whole trade-off
-first, and then choose a point on it.
+A single [`MeanRisk`](@ref) optimisation returns *one* portfolio. The efficient frontier is the
+whole curve of portfolios that earn the most return for each level of risk. They are also the
+portfolios that take the least risk for each level of return. You compute the whole trade-off first,
+and then choose a point on it.
 
 This page adds three things to the [`MeanRisk` objectives](01_MeanRisk_Objectives.md) page. It
 computes the frontier from both directions, once by minimising risk above a return floor and once
@@ -70,10 +70,10 @@ kinds of bound give four combinations, and this page uses `Frontier` in both dir
 directions give the *same* curve, so choose the one whose quantity is easier to set in your
 problem.
 
-We use [`ConditionalValueatRisk`](@ref) as the risk measure on the whole page, and compute the
-prior once and share it across every optimisation. One solver setting can fail to converge at some points of a
-frontier, so we pass a vector of two solvers. When the first fails, the optimiser tries the
-second.
+We use the conditional value at risk (CVaR), [`ConditionalValueatRisk`](@ref), as the risk measure
+on the whole page, and compute the prior once and share it across every optimisation. One solver
+setting can fail to converge at some points of a frontier, so we pass a vector of two solvers. When
+the first fails, the optimiser tries the second.
 =#
 
 using Clarabel
@@ -91,9 +91,9 @@ rf = 4.2 / 100 / 252
 #=
 ### Direction A: minimise risk above a return floor
 
-We minimise the CVaR, because `MinimumRisk` is the default objective, and a [`Frontier`](@ref)
-of 30 points sets the lower bound on the return. The bound is on the *return*, so it goes in the settings of
-[`ArithmeticReturn`](@ref), as `lb`.
+We set no objective, so the optimisation takes the default, `MinimumRisk`, and minimises the CVaR. A
+[`Frontier`](@ref) of 30 points sets the lower bound on the return. The bound is on the *return*, so
+it goes in the settings of [`ArithmeticReturn`](@ref), as `lb`.
 =#
 
 optA = JuMPOptimiser(; pe = pr, slv = slv,
@@ -104,7 +104,7 @@ optA = JuMPOptimiser(; pe = pr, slv = slv,
 resA = optimise(MeanRisk(; opt = optA, r = r))
 
 #=
-`retcode` and `sol` now hold one entry per point of the frontier. We check that every point
+`retcode` and `sol` now have one entry per point of the frontier. We check that every point
 solved.
 =#
 
@@ -229,7 +229,8 @@ The stacked areas show the weights at each point of the `MeanRisk` frontier.
 plot_stacked_area_composition(resM.w, rd.nx)
 
 #=
-The same plot for the NOC frontier holds more assets further up the frontier.
+The `MeanRisk` frontier holds five assets at its low-risk end and one at its high-return end. In
+the same plot for the NOC frontier, all 20 assets keep a weight above 0.01 % at every point.
 =#
 
 plot_stacked_area_composition(resN.w, rd.nx)
@@ -250,7 +251,9 @@ plot_measures(resA.w, resA.pr; x = r, y = ExpectedReturn(; rt = resA.ret),
 
 #=
 `plot_measures` takes *any* pair of measures, so you can view the same 30 portfolios on other
-axes. Here the y-axis is the CDaR, and the colour is the ratio of the CDaR to the CVaR. These
+axes. Here the y-axis is the conditional drawdown at risk (CDaR),
+[`ConditionalDrawdownatRisk`](@ref), which is the CVaR of the drawdowns. The colour is the ratio
+of the CDaR to the CVaR. These
 portfolios do not minimise the CDaR, so this plot is not a front of the CVaR against the CDaR.
 =#
 

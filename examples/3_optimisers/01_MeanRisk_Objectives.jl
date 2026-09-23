@@ -187,11 +187,12 @@ and [`expected_risk_ret_ratio`](@ref) returns all three at once, so we use it he
 A function that computes the expected return of a portfolio needs to know *which* return measure
 to use. We use the one that each optimisation used.
 
-The result of an optimisation holds what the call needs. `res.r` is the risk measure of the
-optimisation and `res.ret` its return measure. The result stores both as the optimisation used
-them. If you gave an estimator, the result holds the fitted measure, and if you left a field unset,
-the result holds the value the optimiser took from the prior. `res.sca` is the scalariser. So the
-call takes all its arguments from the result:
+The result of an optimisation stores what the call needs. `res.r` is the risk measure of the
+optimisation and `res.ret` its return measure, both as the optimisation used them. If you gave an
+estimator, the result contains the fitted measure. If you left a field unset, it contains the
+value that the optimiser took from the prior. `res.sca` is the scalariser, the rule that combines
+several risk values into one number. The [multiple risk measures](04_Multiple_Risk_Measures.md)
+page uses it. The call takes all its arguments from the result:
 
 ```julia
 expected_risk_ret_ratio(res.r, res.ret, res.w, res.pr; sca = res.sca, rf = rf)
@@ -238,14 +239,14 @@ plot_stacked_bar_composition([res0, res1, res2, res3, res4], rd)
 
 #=
 The histogram shows the daily returns of the minimum-risk portfolio, with lines at its mean, its
-VaR, its CVaR and several other risk levels.
+value at risk (VaR), its conditional value at risk (CVaR) and the other levels named in the
+legend.
 =#
 
 plot_histogram(res1, rd)
 
 #=
-The drawdown plot shows how far the minimum-risk portfolio stands below its last peak on each
-day.
+The drawdown plot shows the loss of the minimum-risk portfolio from its last peak on each day.
 =#
 
 plot_drawdowns(res1, rd)

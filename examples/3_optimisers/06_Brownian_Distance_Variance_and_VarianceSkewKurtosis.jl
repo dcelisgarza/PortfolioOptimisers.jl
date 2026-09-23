@@ -5,32 +5,32 @@ Description = "BrownianDistanceVariance and VarianceSkewKurtosis in PortfolioOpt
 
 # `BrownianDistanceVariance` and `VarianceSkewKurtosis`
 
-Some risk measures read parts of the return distribution that the variance and CVaR do not.
-This page shows two of them.
+Some risk measures respond to parts of the return distribution that the variance and the
+conditional value at risk do not measure. This page shows two of them.
 
   - [`BrownianDistanceVariance`](@ref) measures the dispersion of the portfolio returns with
     their distance variance, the Brownian distance covariance of the return series with
     itself. It is built from the distance between the returns of every pair of days, not
-    from their deviations about the mean, so it reads non-linear structure that the variance
-    does not see.
+    from their deviations about the mean, so it captures non-linear structure that the
+    variance misses.
   - [`VarianceSkewKurtosis`](@ref) combines the variance, the skewness and the kurtosis in one
     objective. Its model is a semidefinite relaxation with one large positive semidefinite
     matrix, so a first-order solver such as SCS suits it.
 
 !!! tip "When to reach for this"
-    Reach for `BrownianDistanceVariance` when you want a measure of dispersion that reads
+    Reach for `BrownianDistanceVariance` when you want a measure of dispersion that captures
     non-linear structure in the return series. Reach for `VarianceSkewKurtosis` when the
     third and fourth moments of the portfolio return matter, for example when the assets
-    have fat tails or skewed payoffs that mean-variance optimisation does not see.
+    have fat tails or skewed payoffs that mean-variance optimisation ignores.
 
 !!! warning "Solvers and the size of the sample"
     - `BrownianDistanceVariance` builds a `T × T` distance matrix inside the model, so the
     number of extra variables grows with the square of the number of observations. This
     example uses 50 observations to keep the model small.
     - `VarianceSkewKurtosis` builds a large semidefinite problem. This example solves it
-    with **SCS**, and you can use another solver that handles large semidefinite problems.
+    with SCS, and you can use another solver that handles large semidefinite problems.
     It also needs a [`HighOrderPriorEstimator`](@ref), which computes the coskewness and the
-    cokurtosis that the risk measure reads. This example uses the same 50 observations.
+    cokurtosis that the risk measure uses. This example uses the same 50 observations.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames
@@ -77,8 +77,8 @@ opt = JuMPOptimiser(; pe = pr, slv = slv)
 ### 2.1 `alg2`: the absolute distances
 
 By default [`BrownianDistanceVariance`](@ref) writes the absolute distances with a norm-one
-cone, `NormOneConeBrownianDistanceVariance`. The model holds each entry of the distance matrix
-as an extra variable and bounds it with that cone.
+cone, `NormOneConeBrownianDistanceVariance`. The model adds one variable for each entry of the
+distance matrix and bounds it with that cone.
 =#
 
 res_bdvar = optimise(MeanRisk(; r = BrownianDistanceVariance(), opt = opt))
@@ -111,11 +111,11 @@ pretty_table(DataFrame(; :assets => rd.nx, :BDVar_default => res_bdvar.w,
              formatters = [resfmt])
 
 #=
-The three columns hold the same portfolio. The formulations differ in how they build the model,
+The three columns show the same portfolio. The formulations differ in how they build the model,
 not in what the model optimises.
 
 We also minimise the variance, and plot the two portfolios. The Brownian distance variance
-reads the distances between the returns of pairs of days, and the variance reads the squared
+depends on the distances between the returns of pairs of days, and the variance on the squared
 deviations about the mean, so the two portfolios can differ.
 =#
 
@@ -174,8 +174,9 @@ r_vsk_heavy = VarianceSkewKurtosis(;
 res_vsk_heavy = optimise(MeanRisk(; r = r_vsk_heavy, opt = opt_ho), rd)
 
 #=
-We print the two portfolios side by side. With the larger scales, the objective penalises fat
-tails and returns skewed to the left more, relative to the variance.
+We print the two portfolios side by side. The larger scales double the skewness and kurtosis
+terms of the objective. On these 50 daily returns both terms are at least 500 times smaller
+than the variance term, so the two columns differ by less than 0.1 of a percentage point.
 =#
 
 pretty_table(DataFrame(; :assets => rd.nx, :VarianceSkewKurtosis => res_vsk.w,
@@ -195,9 +196,9 @@ plot_stacked_bar_composition([res_var_scs, res_vsk, res_vsk_heavy], rd)
 #=
 ## Summary
 
-  - The [`BrownianDistanceVariance`](@ref) portfolios solved with Clarabel on 50 returns. Keep
+  - We minimised [`BrownianDistanceVariance`](@ref) with Clarabel on 50 returns. Keep
     `T` small, because the size of the model grows with the square of `T`.
-  - The [`VarianceSkewKurtosis`](@ref) portfolios solved with **SCS**, because the model is a
+  - We minimised [`VarianceSkewKurtosis`](@ref) with SCS, because the model is a
     large semidefinite problem. Pair it with [`HighOrderPriorEstimator`](@ref), whose
     coskewness and cokurtosis grow with the number of assets.
 =#

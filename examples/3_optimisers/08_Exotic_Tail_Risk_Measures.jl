@@ -13,14 +13,14 @@ than CVaR does.
 
   - [`EntropicValueatRisk`](@ref), EVaR, is the tightest upper bound on VaR and CVaR that the
     Chernoff inequality gives, built from the moment-generating function of the losses. It is
-    at least as large as CVaR, and the solver works over the **exponential cone**.
+    at least as large as CVaR, and the solver works over the exponential cone.
   - [`RelativisticValueatRisk`](@ref), RLVaR, generalises EVaR with the Kaniadakis entropy,
     which has a deformation parameter ``\kappa \in (0, 1)``. It moves from EVaR as
     ``\kappa \to 0`` to the worst realisation as ``\kappa \to 1``, so ``\kappa`` sets how much
-    the largest losses count. The solver works over the **power cone**.
+    the largest losses count. The solver works over the power cone.
   - [`PowerNormValueatRisk`](@ref), PNVaR, generalises EVaR by replacing the
     moment-generating function with a power norm of power ``p \ge 1``. The solver also works
-    over the **power cone**, and the measure also moves toward the worst realisation as ``p``
+    over the power cone, and the measure also moves toward the worst realisation as ``p``
     grows. On a finite sample it reaches the worst realisation at a finite ``p``.
   - [`GenericValueatRiskRange`](@ref) combines *any* two of these measures into a range, one
     measure on the losses and another on the gains.
@@ -35,8 +35,8 @@ takes the tail fraction ``\alpha`` as CVaR does.
     RLVaR or ``p`` for PNVaR to move from a measure close to EVaR toward the worst case.
 
 !!! note "A conic solver is enough"
-    EVaR needs the exponential cone, and RLVaR and PNVaR need the power cone. **Clarabel
-    supports both**, so the Clarabel solver in `opt` handles both cones, and no other solver
+    EVaR needs the exponential cone, and RLVaR and PNVaR need the power cone. Clarabel
+    supports both, so the Clarabel solver in `opt` handles both cones, and no other solver
     is needed. The [previous page](06_Brownian_Distance_Variance_and_VarianceSkewKurtosis.md)
     solves `VarianceSkewKurtosis` with SCS, because it builds a large semidefinite problem.
     These measures also take an `slv` field. You need it only when you evaluate a measure alone with [`expected_risk`](@ref), as we do below, and not when the
@@ -78,9 +78,9 @@ opt = JuMPOptimiser(; pe = pr, slv = slv)
 #=
 ## 2. Minimising each tail measure
 
-[`MeanRisk`](@ref) takes each measure as it takes any other. We use the defaults `alpha = 0.05` for every measure and
-`kappa = 0.3` for RLVaR. For PNVaR we use `p = 1.5`, not the default `p = 2.0`. Section 5 shows
-that on 252 observations PNVaR at `p = 2.0` is the worst realisation.
+We minimise each measure with [`MeanRisk`](@ref). We use the defaults `alpha = 0.05` for every
+measure and `kappa = 0.3` for RLVaR. For PNVaR we use `p = 1.5`, not the default `p = 2.0`.
+Section 5 explains why, on 252 observations, PNVaR at `p = 2.0` is the worst realisation.
 =#
 
 measures = ["CVaR" => ConditionalValueatRisk(), "EVaR" => EntropicValueatRisk(),
@@ -94,8 +94,8 @@ pretty_table(DataFrame(hcat(rd.nx, [r.w for r in results]...),
                        [:assets; Symbol.(names_r)...]); formatters = [resfmt])
 
 #=
-The portfolios differ. CVaR reads the mean of the worst 5 % of days, and EVaR and RLVaR also
-weight the *worst* of those days more, so they choose different assets.
+The portfolios differ. CVaR is the mean loss over the worst 5 % of days. EVaR and RLVaR also
+put more weight on the *worst* of those days.
 =#
 
 using StatsPlots, GraphRecipes
@@ -121,9 +121,9 @@ pretty_table(cross; formatters = [resfmt])
 
 #=
 In each column, the smallest value is on the diagonal, where the portfolio minimised that
-measure. So a portfolio that is best under one measure is not best under another. Along each row
-CVaR ≤ EVaR ≤ RLVaR, because each puts more weight on the largest losses than the one before
-it. PNVaR sits where its `p` places it.
+measure. The portfolio that is best under one measure is not the best under the others. Along
+each row CVaR ≤ EVaR ≤ RLVaR, because each puts more weight on the largest losses than the one
+before it.
 
 ## 4. The parameter ``\kappa`` of RLVaR, from EVaR to the worst realisation
 
@@ -181,9 +181,9 @@ degenerates at that value, and the solver stops without a solution.
 ## 6. Both tails with `GenericValueatRiskRange`
 
 [`GenericValueatRiskRange`](@ref) combines any two of these tail measures into a range. One measure
-reads the returns for the losses, and the other reads the negated returns for the gains. So you
-can treat the two tails *differently*, for example with EVaR on the losses, which penalises large
-losses more, and CVaR on the gains. We compare it with the symmetric
+applies to the returns, for the losses, and the other to the negated returns, for the gains. This
+lets you treat the two tails *differently*, for example with EVaR on the losses, which penalises
+large losses more, and CVaR on the gains. We compare it with the symmetric
 [`ConditionalValueatRiskRange`](@ref).
 =#
 
@@ -196,9 +196,9 @@ pretty_table(DataFrame(; :assets => rd.nx, :EVaR_loss_CVaR_gain => res_asym.w,
                        :CVaR_range => res_sym.w); formatters = [resfmt])
 
 #=
-The asymmetric range weights the largest losses more than the symmetric CVaR range does, and it
-reads the gains with CVaR, as the symmetric range does. Compare the two columns to see what the
-change on the loss side does to the weights.
+The asymmetric range weights the largest losses more than the symmetric CVaR range does. Both
+ranges measure the gains with CVaR at the same `alpha`, so the two columns differ only by the
+measure on the loss side.
 
 We plot the four portfolios of section 2 again, with the name of each measure under its bar.
 =#
@@ -220,7 +220,7 @@ does.
   - [`GenericValueatRiskRange`](@ref) combines any two of them into one measure of both
     tails, with a different measure on each side.
 
-Every one of them is convex, and Clarabel solved all of them on this page.
+Every one of them is convex. We minimised all of them with Clarabel on this page.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
