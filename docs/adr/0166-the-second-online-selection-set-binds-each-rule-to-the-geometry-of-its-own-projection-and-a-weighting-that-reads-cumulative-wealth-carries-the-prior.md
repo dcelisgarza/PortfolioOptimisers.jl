@@ -26,22 +26,26 @@ Three things were measured before deciding.
 
 - **The confidence-weighted rule's own projection is Euclidean.** Its geometry is the Gaussian
   relative entropy over `(μ, Σ)`, but the paper's algorithm projects the mean alone, in squared
-  Euclidean distance onto the simplex, and rescales the covariance to a fixed trace, `Σ / (N² tr Σ)`.
-  The 2011 text writes the constraint on `log⟨μ, x⟩` with `ε = −0.5`; the 2013 text on `⟨μ, x⟩`
-  with `ε = 0.5`, the same step with the relative divided by `M_t` and the threshold compared
-  with `log M_t`. The library's rule follows the 2013 text and matches its recursion to `1e-13`
-  on the fixture under both formulations; the covariance stays diagonal throughout, so the
-  carrier is one vector.
+  Euclidean distance onto the simplex, and rescales the covariance to a fixed trace. The 2013
+  text writes the constraint on `⟨μ, x⟩` with `ε = 0.5` and rescales to `Σ / (N tr Σ)` in its
+  Algorithm 2, which keeps the trace `1 / N` of the seed `I / N²`. The 2011 text writes the
+  constraint on `log⟨μ, x⟩` with `ε = −0.5`, linearises the logarithm at the current mean, and
+  rescales to `Σ / (N² tr Σ)` in its Algorithm 1. The library's rule follows the 2013 text
+  throughout and matches its recursion to `1e-10` on the fixture under both formulations; the
+  covariance stays diagonal throughout, so the carrier is one vector.
 - **The anti-correlation transfer never leaves the simplex.** It moves at most what asset `i`
   holds out of it and conserves the budget, so the paper's step needs no projection; the
   correlation is recomputed from the last `2w` rows every period and nothing else is carried.
   The paper states the transfers twice: its prose starts them from the allocation the period
-  started from, `b_t`, and its algorithm box takes the wealth held at the end of the period,
-  `b̂_t = b_t ⊙ x_t / ⟨b_t, x_t⟩`, as its input, returns it before the first full window and
-  starts every transfer from it. The two differ by the period's price drift, `1.1e-2` at `w = 3`
-  on a five-asset fixture of 2 % returns, and before the first full window the prose rebalances
-  to the uniform allocation where the box holds. The rule follows the box: the transfers move the
-  wealth held, and the rule is buy-and-hold until `2w` rows are held.
+  started from, `b_t`, and its algorithm box (Figure 1) takes the wealth held at the end of the
+  period, `b̂_t = b_t ⊙ x_t / ⟨b_t, x_t⟩`, as its only allocation input, returns it while
+  `t < 2w` and initialises the new allocation to it. The box's step 6(a) then writes the transfer
+  from `b_t`, which is not among its inputs. The two bases differ by the period's price drift,
+  `1.1e-2` at `w = 3` on a five-asset fixture of 2 % returns. The rule computes every transfer
+  from `b̂_t`, so no asset gives more than it holds, and it is buy-and-hold until `2w` rows are
+  held. The box's step 5 also lets `i = j` claim a transfer to itself, which keeps part of the
+  asset's wealth in place; the prose's strict `μ₂(i) > μ₂(j)` excludes it, and the rule takes the
+  box's `≥` with `j ≠ i`.
 - **The weak aggregating algorithm's weight is not a function of the previous weight.** It is
   `p_{t+1} ∝ p_1 exp(G_t / √(t + 1))` with `G_t` the experts' cumulative log wealth, so a weighting
   that receives `(p_t, r_t)` cannot compute it without carrying `G_t` and `p_1`. The same carrier
@@ -58,7 +62,7 @@ Three things were measured before deciding.
 | `AntiCorrelation` | `EuclideanProjection` | the raw step lies in the simplex by construction, so on the default set the projection is the identity; on a stated set it is the Euclidean repair |
 | `ExpectationMaximisation` | `EuclideanProjection` | the raw step is positive and sums to one wherever `w_t` does, so the default projection is the identity; the 1997 derivation's chi-squared divergence is a weighted Euclidean distance, and the library carries no chi-squared geometry |
 | `AggregatingAlgorithm` | `EntropicProjection` | a multiplicative update of a non-negative vector, normalised |
-| `TopK` | `EuclideanProjection` | a selection, `1 / k` on the top `k` and zero elsewhere, in the simplex by construction; the Euclidean repair on a stated set |
+| `TopK` | `EuclideanProjection` | a selection, the top `k` weighted by their wealth and zero elsewhere, in the simplex by construction; the Euclidean repair on a stated set |
 | `WeakAggregatingAlgorithm` | `EntropicProjection` | a Bayesian mixture weight, normalised |
 
 Each bound is the geometry the rule's own step is already the projection in on the bare simplex,
@@ -67,10 +71,8 @@ which is ADR 0159's rule; none of the six admits a second geometry, so none is a
 ### The carriers
 
 - `ConfidenceWeightedMeanReversionState(n, sigma)`: the diagonal of the belief covariance, seeded at
-  `1 / N²` per asset and rescaled to trace `1 / N²` after every step, as the paper's algorithm
-  box states. The seed `I / N²` has trace `1 / N`, so the first step shrinks the trace by `N` and
-  every later step keeps it; the paper's prose rescales the largest entry to `1 / N²` instead,
-  which keeps the seed's scale, `6e-5` from the box on the fixture. The box is followed. The mean of the belief is the allocation held, so the rule reads `w` and carries no
+  `1 / N²` per asset and rescaled after every step to the trace `1 / N` of the seed, as the 2013
+  text's Algorithm 2 and its prose both state. The mean of the belief is the allocation held, so the rule reads `w` and carries no
   mean; the covariance is the rule's own and never a Prior's, because it is a belief over weights
   and not a moment of returns ([ADR 0158](0158-a-forecast-reading-rule-holds-an-expected-returns-estimator-and-a-covariance-enters-on-the-constraint-that-reads-it.md)).
 - `AntiCorrelation` carries `nothing` and reads the head's rows with `rows_needed = 2 · window`.
@@ -100,6 +102,8 @@ which is ADR 0159's rule; none of the six admits a second geometry, so none is a
   The prior of the weak aggregating step is the Start Allocation the seed receives, which on an
   `ExpertMixture` is its `p`, so the weighting carries no `p0` field of its own. `TopK` checks
   `k ≤ length(w)` at the seed, where the count is first known, and breaks equal wealth by index.
+  It weights the top `k` by their wealth, the CORN paper's Equation 8 under a uniform `q` on the
+  top `K` (its Algorithm 3), so it is buy-and-hold from the uniform allocation at `k = N`.
 - `AggregatingAlgorithm` carries nothing: `w′ ∝ w ⊙ x^η`, buy-and-hold at `η = 1` on the head and
   on the mixture.
 
@@ -115,16 +119,18 @@ numbers, so it is a sentence in the docstring and not a second name.
 1. **A `theta` field on the confidence-weighted rule resolved to `phi = Φ⁻¹(θ)`.** Rejected: the
    paper's algorithm takes `φ` as its input and reports it as not decisive; a quantile of a
    normal is one call away for a caller who thinks in `θ`.
-2. **The confidence-weighted rule under the trace normalisation `Σ / (N tr Σ)`, which keeps the
-   seed's trace.** Rejected: the paper's algorithm box states `N² tr Σ`, and the map's parity is
-   with the paper; the two differ by `4e-5` on the fixture.
-3. **The anti-correlation rule on price levels.** Rejected: the paper's windows are log price
+2. **The confidence-weighted rule under the trace normalisation `Σ / (N² tr Σ)` of the 2011
+   text.** Rejected: the rule follows the 2013 text for its constraint and its threshold, and
+   that text's Algorithm 2 states `N tr Σ`; mixing the two texts' steps is neither paper's rule.
+3. **`TopK` holding the top `k` in equal weight.** Rejected: the CORN paper combines its top `K`
+   experts by their wealth under a uniform `q`, not in equal weight; the two agree at `k = 1`.
+4. **The anti-correlation rule on price levels.** Rejected: the paper's windows are log price
    relatives.
-4. **A `p0` field on `WeakAggregatingAlgorithm`.** Rejected: the mixture's `p` is the prior
+5. **A `p0` field on `WeakAggregatingAlgorithm`.** Rejected: the mixture's `p` is the prior
    already, and a second field is a second place for one number.
-5. **`ContinuousAggregatingExponentialGradient` as a second constructor.** Rejected: the same
+6. **`ContinuousAggregatingExponentialGradient` as a second constructor.** Rejected: the same
    numbers under a second name.
-6. **A chi-squared Projection Geometry for the expectation-maximisation rule.** Deferred: the
+7. **A chi-squared Projection Geometry for the expectation-maximisation rule.** Deferred: the
    default set needs none, a stated set has the Euclidean repair, and a geometry with a theorem
    of its own is a fourth-set concern.
 

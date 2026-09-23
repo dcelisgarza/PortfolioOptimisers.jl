@@ -53,7 +53,8 @@ end
     w0 = fill(1 / N, N)
 
     @testset "Confidence weighted mean reversion" begin
-        # The paper's Algorithm 1 in its 2013 linear form, written out on full matrices.
+        # The 2013 paper's Algorithm 2, written out on full matrices. Its step 3 rescales the
+        # covariance to trace 1 / N, the trace of the seed I / N².
         function cwmr_paper(X, phi, eps, var::Bool)
             nr, na = size(X)
             mu = fill(1 / na, na)
@@ -84,7 +85,7 @@ end
                     u = (-lam * phi * V + sqrt(lam^2 * phi^2 * V^2 + 4V)) / 2
                     S = inv(inv(S) + lam * (phi / u) * diagm(x .^ 2))
                 end
-                S = S ./ (na^2 * tr(S))
+                S = S ./ (na * tr(S))
                 W[t + 1, :] .= mu
             end
             return W
@@ -96,8 +97,7 @@ end
         end
         # The two formulations differ from each other and both are passive when the
         # constraint already holds: a threshold above every return leaves the allocation
-        # where it was and only rescales the belief, whose seed trace 1 / N falls to the
-        # paper's 1 / N² at the first step and stays there.
+        # where it was, and the rescale keeps the belief at the trace 1 / N of its seed.
         @test !isapprox(libpath(ConfidenceWeightedMeanReversion()),
                         libpath(ConfidenceWeightedMeanReversion(;
                                                                 formulation = StandardDeviationUpdate()));
@@ -106,11 +106,11 @@ end
         @test st.sigma == fill(1 / N^2, N)
         stp, wp = step(ConfidenceWeightedMeanReversion(; eps = 2), w0, X[1, :])
         @test isapprox(wp, w0; atol = 1e-15)
-        @test stp.sigma == fill(1 / N^3, N) && stp.n == 1
-        # The belief's trace is rescaled to 1 / N² after every step, and the step moves
+        @test stp.sigma == fill(1 / N^2, N) && stp.n == 1
+        # The belief's trace is rescaled to 1 / N after every step, and the step moves
         # the mean against the price relative.
         sta, wa = step(ConfidenceWeightedMeanReversion(), w0, X[1, :])
-        @test isapprox(sum(sta.sigma), 1 / N^2; atol = 1e-15)
+        @test isapprox(sum(sta.sigma), 1 / N; atol = 1e-15)
         @test !isapprox(wa, w0; atol = 1e-6)
         @test wa[argmax(X[1, :])] < w0[argmax(X[1, :])]
         # The quadratic's root: no real root, a line, both roots negative.
@@ -378,6 +378,8 @@ end
     end
 
     @testset "Top-k selection" begin
+        # The paper's CORN-K combination, its Equation 8 under Algorithm 3: a uniform q on
+        # the top k, times each one's wealth, normalised.
         alg = TopK(; k = 2)
         W = libpath(alg)
         G = zeros(N)
@@ -385,9 +387,14 @@ end
             G .+= log.(X[t, :])
             top = sortperm(G; rev = true)[1:2]
             q = zeros(N)
-            q[top] .= 0.5
-            @test W[t + 1, :] == q
+            q[top] .= 0.5 .* exp.(G[top])
+            q ./= sum(q)
+            @test isapprox(W[t + 1, :], q; atol = 1e-14)
+            @test count(>(1e-12), W[t + 1, :]) == 2
         end
+        # At k = N the rule weights every asset by its wealth from a unit start, which is
+        # buy-and-hold from the uniform allocation.
+        @test isapprox(libpath(TopK(; k = N)), libpath(BuyAndHold()); atol = 1e-14)
         # Equal wealth breaks ties by index.
         st = po.rule_state_seed(alg, w0)
         _, w1 = po.online_update!(alg, st, w0, ones(N), nothing, simplex)
@@ -469,6 +476,89 @@ end
         @test_throws TypeError WeakAggregatingAlgorithm(; proj = EuclideanProjection())
         @test_throws Exception AggregatingExponentialGradient(; etas = Float64[])
         @test_throws Exception AggregatingExponentialGradient(; etas = [0.1, -0.1])
+    end
+
+    #=
+    The claims the docstrings state, pinned with numbers when the file was swept (#1194).
+    Each block names the docstring it checks.
+    =#
+    @testset "Swept claims" begin
+        # `VarianceUpdate` and `StandardDeviationUpdate`: the root makes the constraint hold
+        # with equality at the mean step and at the full rank-one update of the inverse
+        # covariance, not at its diagonal; `sqrt(U_t)` is the standard deviation of that
+        # update; and the multiplier is zero when the constraint holds at the current belief.
+        rngc = StableRNG(3)
+        for trial in 1:200
+            xc = 1 .+ 0.05 .* randn(rngc, N)
+            sc = 0.01 .+ 0.05 .* rand(rngc, N)
+            wc = rand(rngc, N)
+            wc ./= sum(wc)
+            M, V, Wt = dot(wc, xc), dot(sc, xc .^ 2), dot(sc, xc)
+            xbar = Wt / sum(sc)
+            for (f, var) in ((VarianceUpdate(), true), (StandardDeviationUpdate(), false))
+                spread(S) = var ? dot(xc, S * xc) : sqrt(dot(xc, S * xc))
+                lam = po.confidence_step(f, V, 2.0, xbar, Wt, M, 0.5)
+                @test lam > 0
+                gam = po.confidence_gain(f, lam, 2.0, V)
+                mun = wc .- lam .* sc .* (xc .- xbar)
+                Sf = inv(inv(Matrix(Diagonal(sc))) + gam * xc * xc')
+                @test isapprox(dot(mun, xc) + 2.0 * spread(Sf), 0.5; atol = 1e-10)
+                if !var
+                    u = (-lam * 2.0 * V + sqrt(lam^2 * 4.0 * V^2 + 4 * V)) / 2
+                    @test isapprox(u, sqrt(dot(xc, Sf * xc)); rtol = 1e-6)
+                end
+                # A threshold the current belief already meets moves nothing.
+                epsh = M + 2.0 * spread(Diagonal(sc)) + 0.01
+                @test po.confidence_step(f, V, 2.0, xbar, Wt, M, epsh) == 0
+            end
+        end
+        # `ExpectationMaximisation`: the step is a share `eta` of the way to the wealth held,
+        # a weight rises by at most `eta` and falls to no less than `1 - eta` of itself, and a
+        # small weight can grow by far more than the factor `1 + eta`.
+        eta = 0.3
+        for trial in 1:200
+            we = rand(rngc, N)
+            we ./= sum(we)
+            xe = exp.(2 .* randn(rngc, N))
+            st, wn = step(ExpectationMaximisation(; eta = eta), we, xe)
+            @test isapprox(wn,
+                           (1 - eta) .* we .+ eta .* po.price_adjusted_allocation(we, xe);
+                           atol = 1e-14)
+            @test all(wn .<= (1 - eta) .* we .+ eta .+ 1e-15)
+            @test all(wn .>= (1 - eta) .* we .- 1e-15)
+        end
+        _, wg = step(ExpectationMaximisation(; eta = eta), [0.1, 0.9, 0.0, 0.0],
+                     [10.0, 1.0, 1.0, 1.0])
+        @test wg[1] / 0.1 > 1 + 4 * eta
+        # `AggregatingAlgorithm`: the weight is the start weight times the wealth raised to
+        # `eta`; a large rate gathers the weight on the wealthiest asset, which is `TopK` at
+        # k = 1, and a small rate keeps the start.
+        Gc = vec(sum(log.(X); dims = 1))
+        for r in (0.5, 2.0)
+            q = w0 .* exp.(r .* Gc)
+            @test isapprox(libpath(AggregatingAlgorithm(; eta = r))[end, :], q ./ sum(q);
+                           atol = 1e-12)
+        end
+        @test isapprox(libpath(AggregatingAlgorithm(; eta = 1.0e4))[end, :],
+                       libpath(TopK(; k = 1))[end, :]; atol = 1e-12)
+        @test isapprox(libpath(AggregatingAlgorithm(; eta = 1.0e-9))[end, :], w0;
+                       atol = 1e-9)
+        # `AntiCorrelation`: the transfers out of an asset sum to what it holds or to zero.
+        wh = rand(rngc, N)
+        wh ./= sum(wh)
+        corr, mu2c = po.lagged_window_correlation(log1p.(R[1:5, :]), log1p.(R[6:10, :]))
+        claimc = po.anticorrelation_claims(corr, mu2c)
+        @test all(iszero, diag(claimc))
+        for i in 1:N
+            total = sum(claimc[i, :])
+            out = total > 0 ? wh[i] : 0.0
+            @test isapprox(sum(wh[i] .* claimc[i, :] ./ max(total, eps())), out;
+                           atol = 1e-15)
+        end
+        # The paper's headline, the uniform buy-and-hold mixture over the windows, is the
+        # default weighting and the default prior of `ExpertMixture`.
+        anti = ExpertMixture(; experts = [AntiCorrelation(; window = wn) for wn in 2:4])
+        @test isa(anti.alg, BuyAndHold) && isnothing(anti.p0)
     end
 
     @testset "The batch-online identity is exact at every block size" begin

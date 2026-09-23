@@ -1255,7 +1255,19 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :m_t_mom => "``\\boldsymbol{m}_t``: Squared-gradient average before period ``t``, the square taken per asset, zero at ``t = 1``.",#
                        :gamma1_mom => "``\\gamma_1``: Momentum decay, the weight the gradient average keeps on its past, in ``[0, 1)``.",#
                        :gamma2_mom => "``\\gamma_2``: Squared-gradient decay, the weight the squared-gradient average keeps on its past, in ``[0, 1)``.",#
-                       :eps_mom => "``\\epsilon``: Positive offset added to the root of the squared-gradient average before the division.")
+                       :eps_mom => "``\\epsilon``: Positive offset added to the root of the squared-gradient average before the division.",#
+                       :Sigma_t_cw => "``\\Sigma_t``: Diagonal belief covariance over the weights at period ``t``.",#
+                       :M_t_cw => "``M_t = \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle``: Gross return of the allocation over period ``t``.",#
+                       :V_t_cw => "``V_t = \\boldsymbol{x}_t^\\intercal \\Sigma_t \\boldsymbol{x}_t``: Variance of the belief along the price relative.",#
+                       :W_t_cw => "``W_t = \\boldsymbol{x}_t^\\intercal \\Sigma_t \\boldsymbol{1}``: Sum of the price relative weighted by the belief covariance.",#
+                       :xbar_t_cw => "``\\bar{x}_t = W_t / \\boldsymbol{1}^\\intercal \\Sigma_t \\boldsymbol{1}``: Mean of the price relative weighted by the belief covariance.",#
+                       :U_t_cw => "``U_t = \\boldsymbol{x}_t^\\intercal \\Sigma_{t+1} \\boldsymbol{x}_t``: Updated belief variance along the price relative, under the full rank-one update.",#
+                       :lambda_cw => "``\\lambda_{t+1}``: Lagrange multiplier of the confidence constraint, which sets the length of the mean step.",#
+                       :gamma_cw => "``\\gamma_{t+1}``: Gain, the scale of the squared price relative in the update of the inverse belief covariance.",#
+                       :phi_cw => "``\\phi = \\Phi^{-1}(\\theta)``: Confidence quantile, with ``\\Phi`` the standard normal distribution function and ``\\theta`` the confidence level.",#
+                       :eps_cw => "``\\epsilon``: Reversion threshold on the gross return of the period.",#
+                       :w_1_start => "``\\boldsymbol{w}_1``: Start Allocation, the allocation that the recursion starts from.",#
+                       :G_t_cumlog => "``\\boldsymbol{G}_t = \\sum_{s \\leq t} \\log \\boldsymbol{x}_s``: Cumulative log wealth after period ``t``, one entry for each asset, or for each expert on an expert mixture.")
 """
     ref_dict
 

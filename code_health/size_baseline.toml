@@ -10,7 +10,7 @@ commit = "0ecb3ce47c"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2993, doc = 0, comment = 241, blank = 48, total = 3282 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1215, doc = 113, comment = 128, blank = 43, total = 1499 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1227, doc = 113, comment = 128, blank = 43, total = 1511 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -311,7 +311,7 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { code = 266, doc = 323, comment = 5, blank = 137, total = 731 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { code = 387, doc = 441, comment = 2, blank = 99, total = 929 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { code = 460, doc = 678, comment = 1, blank = 215, total = 1354 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { code = 313, doc = 425, comment = 3, blank = 171, total = 912 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { code = 321, doc = 735, comment = 10, blank = 295, total = 1361 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { code = 422, doc = 726, comment = 8, blank = 276, total = 1432 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { code = 440, doc = 637, comment = 1, blank = 253, total = 1331 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { code = 278, doc = 365, comment = 16, blank = 142, total = 801 }
