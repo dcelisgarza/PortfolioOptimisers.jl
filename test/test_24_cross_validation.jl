@@ -955,6 +955,30 @@
         fold = quiet.pred[1]
         @test PopulationPredictionResult(; pred = [fold]).pred[1] === fold
     end
+    @testset "A clustering optimiser in the fold loop refuses a precomputed prior (#1277)" begin
+        # A precomputed prior is the full sample's, so every fold would read its test rows.
+        hopt = HierarchicalOptimiser(; pe = prior(EmpiricalPrior(), rd))
+        for opt in (HierarchicalRiskParity(; opt = hopt),
+                    HierarchicalEqualRiskContribution(; opt = hopt),
+                    SchurComplementHierarchicalRiskParity(; opt = hopt))
+            err = try
+                cross_val_predict(opt, rd, KFold())
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, ArgumentError) && occursin("opt.opt.pe", err.msg)
+        end
+        # The outer solve of a nested optimiser refuses it too, and the inner one views it.
+        pinned = HierarchicalRiskParity(; opt = hopt)
+        @test_throws ArgumentError NestedClustered(; opti = HierarchicalRiskParity(),
+                                                   opto = pinned)
+        @test isa(NestedClustered(; opti = pinned, opto = HierarchicalRiskParity()),
+                  NestedClustered)
+        # The estimator refits on each fold's training rows, so the folds differ.
+        pred = cross_val_predict(HierarchicalRiskParity(), rd, KFold())
+        @test !all(p -> p.res.w == pred.pred[1].res.w, pred.pred[2:end])
+    end
     @testset "Cross val predict" begin
         w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))
         function test_pred(predictions, name; rtol = 1e-6)

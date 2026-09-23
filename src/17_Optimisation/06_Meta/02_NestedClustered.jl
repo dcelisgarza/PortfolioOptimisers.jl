@@ -281,6 +281,8 @@ Checks that the outer optimiser does not use pre-computed prior results, regress
   - [`NestedClustered`](@ref)
 """
 function assert_external_optimiser(opt::ClusteringOptimisationEstimator)::Nothing
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
+              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
     assert_internal_optimiser(opt)
     return nothing
 end
