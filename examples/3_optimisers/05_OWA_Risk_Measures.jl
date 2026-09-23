@@ -159,7 +159,8 @@ are far from linear in rank, where the approximation is less close.
 
 r_approx = OrderedWeightsArray()
 res_approx = optimise(MeanRisk(; r = r_approx, opt = opt))
-println("Approx OWA, max weight: $(round(maximum(res_approx.w)*100; digits=2)) %")
+println("Largest weight difference from the GMD column: ",
+        maximum(abs, res_approx.w .- results[1].w))
 
 #=
 ## 5. OWA range measures for both tails

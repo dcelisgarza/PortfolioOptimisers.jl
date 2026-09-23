@@ -259,7 +259,7 @@ portfolios do not minimise the CDaR, so this plot is not a front of the CVaR aga
 
 plot_measures(resA.w, resA.pr; x = r, y = ConditionalDrawdownatRisk(),
               c = RiskRatio(; r1 = ConditionalDrawdownatRisk(), r2 = r),
-              title = "Pareto Front", xlabel = "CVaR", ylabel = "CDaR",
+              title = "CDaR of the CVaR frontier", xlabel = "CVaR", ylabel = "CDaR",
               colorbar_title = "\nCDaR/CVaR Ratio", right_margin = 6Plots.mm)
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
