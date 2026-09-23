@@ -1,37 +1,37 @@
 #=
 ```@meta
-Description = "Phylogeny and centrality constraints in PortfolioOptimisers.jl: limit exposure to tightly-knit clusters and tilt toward network hubs."
+Description = "Phylogeny and centrality constraints in PortfolioOptimisers.jl: limit joint holdings of linked assets, and tilt toward or away from the network's hubs."
 ```
 
 # Phylogeny and centrality constraints
 
-The constraints in [Linear and group constraints](02_Linear_Group_Constraints.md) act on names
-and hand-drawn groups. **Phylogeny** and **centrality** constraints act on the *structure* of
-the asset network instead — the graph of how assets co-move. Rather than telling the optimiser
-"tech ≤ 30%", you tell it "don't pile into a tightly-knit cluster" or "tilt toward (away from)
-the hubs of the correlation network". The groups are discovered from the data, not declared.
+The constraints in [Linear and group constraints](02_Linear_Group_Constraints.md) act on asset
+names and on groups that you write by hand. Phylogeny and centrality constraints act on the asset
+network instead. The asset network is a graph whose nodes are the assets, and whose edges join
+assets whose returns move together. In place of a cap such as "tech ≤ 30%", you tell the optimiser
+to hold few assets that are close in the network, or to tilt toward or away from the assets with
+many edges.
 
-`PortfolioOptimisers.jl` builds the network with a [`NetworkEstimator`](@ref) (or a clustering
-estimator) and then exposes two families:
+`PortfolioOptimisers.jl` builds the network with a [`NetworkEstimator`](@ref) or with a clustering
+estimator. We call that estimator the source of the network. Two families of constraints use it.
 
-  - **Phylogeny constraints** ([`SemiDefinitePhylogenyEstimator`](@ref),
-    [`IntegerPhylogenyEstimator`](@ref)) via the `ple` keyword — limit joint exposure to
-    network-linked assets.
-  - **Centrality constraints** ([`CentralityConstraint`](@ref) built from a
-    [`CentralityEstimator`](@ref)) via the `cte` keyword — bound the portfolio's average
-    network centrality.
+  - Phylogeny constraints, [`SemiDefinitePhylogenyEstimator`](@ref) and
+    [`IntegerPhylogenyEstimator`](@ref), go through the `ple` keyword. They limit how you hold
+    assets that are close in the network.
+  - Centrality constraints, a [`CentralityConstraint`](@ref) built from a
+    [`CentralityEstimator`](@ref), go through the `cte` keyword. They bound the weighted average
+    centrality of the portfolio.
 
 !!! tip "When to reach for this"
-    Reach for these when your diversification concern is *structural* rather than by label: you
-    do not want a book that looks diversified by sector but is actually one big correlated bet,
-    or you want to deliberately tilt toward stable hubs or peripheral diversifiers. They need no
-    hand-built groups — the structure comes from the covariance. The semidefinite phylogeny and
-    centrality forms are convex; the integer phylogeny form needs a MIP solver.
+    Reach for these constraints when you want to diversify by the structure of the returns rather
+    than by labels. A portfolio can spread over many sectors and still be one large bet on assets
+    whose returns move together. You can also tilt the portfolio toward the hubs of the network,
+    or toward its periphery. You write no groups by hand, because the network comes from the
+    covariance. The semidefinite phylogeny constraint and the centrality constraint are convex.
+    The integer phylogeny constraint needs a mixed-integer solver.
 
-Both families are driven by one dial you have to set deliberately: how far apart two assets may
-sit in the network and still count as related. That is the `sep` field of a
-[`NetworkEstimator`](@ref), covered in §2.1, and one of its settings quietly collapses the
-portfolio onto a single name — see the warning there.
+One parameter decides which assets count as related, and you must choose its value with care. It
+is the `sep` field of a [`NetworkEstimator`](@ref), and section 2 covers it.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -46,7 +46,10 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. Data
+
+We load a year of prices, fit an empirical prior, and solve the minimum-risk portfolio with no
+network constraint. It is the baseline for every comparison below.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -63,28 +66,34 @@ res_base = optimise(MeanRisk(; obj = MinimumRisk(),
 #=
 ## 2. The asset network
 
-A [`NetworkEstimator`](@ref) turns the covariance into a graph: assets are nodes, and edges link
-assets whose returns are connected after filtering out the noisy links (a minimum-spanning-tree
-or similar backbone). Both constraint families below read this graph. You do not have to build it
-by hand — the estimators take a `NetworkEstimator()` and construct it from the prior internally.
+A [`NetworkEstimator`](@ref) turns the covariance into a graph. Each asset is a node. The
+estimator keeps only the strongest connections between the assets, by default as a minimum
+spanning tree, and each connection it keeps is an edge. Both families of constraints below use
+this graph. You do not build it yourself. The constraint estimators take a `NetworkEstimator()` and
+build the graph from the prior.
 
-### 2.1 How far apart still counts as related
+### 2.1 How far apart two assets can be and still count as related
 
-The graph only says which assets are *directly* linked. Every constraint below needs a second
-answer: how far apart two assets may sit and still count as related. That is the `sep` field of
-the [`NetworkEstimator`](@ref), and it is the single dial controlling how much of the universe
-each constraint sees as one bet.
+The graph shows only which assets share an edge. Each constraint below also needs to know how far
+apart two assets can be and still count as related. The `sep` field of the
+[`NetworkEstimator`](@ref) sets that distance. It decides how much of the universe each
+constraint treats as one bet.
 
-Two separations ship, and they measure the same structure in different units:
+A separation measures how far apart two assets are in the graph. The library has two, and they
+measure the same graph in different units.
 
-  - [`HopCount`](@ref) counts **edges**, ignoring their lengths, with a budget of `n` of them.
-    `HopCount(; n = 1)` is the default and means "directly linked only".
-  - [`PathLength`](@ref) adds up the **distances** along the shortest path, with a budget `dmax`
-    in those same units.
+  - [`HopCount`](@ref) counts edges and ignores their lengths. Its budget `n` is a number of
+    edges. `HopCount(; n = 1)` is the default, and it relates only the assets that share an edge.
+  - [`PathLength`](@ref) adds up the distances along the shortest path between two assets. Its
+    budget `dmax` is in those distance units.
 
-The two are interchangeable — every consumer takes either — but their numbers are *not*
-comparable, because the budgets are in different units. Choose whichever unit you can reason
-about, then read the cardinality it produces rather than trusting the budget to feel tight.
+Every constraint accepts either separation. The budgets are in different units, so a value of `n`
+and a value of `dmax` do not compare. Pick the unit that you find easier to reason about. Then look
+at the number of pairs that the budget relates, because the value of the budget alone does not
+tell you how tight the constraint is.
+
+We count the related pairs for eight hop budgets and ten `dmax` budgets, and sort the rows by that
+count. The last column divides the count by the number of ordered pairs of assets.
 =#
 
 n_assets = size(pr.X, 2)
@@ -106,18 +115,18 @@ pretty_table(ladder; formatters = [(v, i, j) -> j == 4 ? "$(round(v*100, digits=
              title = "Pairs the network calls related, by separation and budget")
 
 #=
-### 2.2 Hop shells are coarse; a radius ball fills in between them
+### 2.2 A radius fills the gaps between the hop budgets
 
-Read the table by its ordering rather than row by row. The hop budgets give a ladder of eight
-rungs and nothing between them — on this universe `38`, `96`, `168` pairs and so on, because a
-whole shell of neighbours joins at once. The `PathLength` rows slot into the gaps: `50` pairs sits
-between the first and second hop shells, `132` and `178` straddle the third, and `4` pairs is
-tighter than the tightest hop budget can express.
+The hop budgets give eight values of the count and nothing between them, because one more hop
+relates every pair at that distance at once. We call the pairs that one more hop adds a hop shell.
+The `PathLength` rows fall in the gaps between the hop shells, and the smallest `dmax` relates
+fewer pairs than `HopCount(; n = 1)`.
 
-That is the whole of what the radius buys. It is the **same** notion of neighbourhood at a finer
-granularity, not a different one — the two ladders agree closely on which pairs are related, they
-just cannot stop at the same places. Reach for `PathLength` when a hop shell overshoots the
-concentration you are willing to allow.
+A radius measures the same neighbourhood in smaller steps. Use `PathLength` when one hop shell
+relates more pairs than you want the constraint to cover.
+
+We plot the count of related pairs against `dmax`, with a dashed line at the count of each hop
+budget.
 =#
 
 plot(dmax_budgets, dmax_pairs; label = "PathLength (radius ball)", marker = :circle,
@@ -127,9 +136,11 @@ hline!(hop_pairs; label = "HopCount shells (n = 1…8)", linestyle = :dash, colo
        linealpha = 0.7)
 
 #=
-The largest budget either family can usefully take is the **diameter** of the graph — the longest
-shortest path in it. [`separation_matrix`](@ref) and [`separation_budget`](@ref) expose both
-halves of that, and are what a consumer calls internally:
+The largest useful budget for either separation is the diameter of the graph, the longest of the
+shortest paths between two assets. [`separation_matrix`](@ref) returns the separation of every
+pair, and [`separation_budget`](@ref) returns the budget that a separation resolves to. The
+constraints call both functions to find their budget. We print the diameter in both units, the
+shortest edge, and the budgets that two `PathLength` settings resolve to.
 =#
 
 sep_matrix = separation_matrix(PathLength(), NetworkEstimator(), pr.X)
@@ -150,47 +161,50 @@ pretty_table(DataFrame("Quantity" => ["Observed diameter (distance units)",
              title = "The budgets this graph admits")
 
 #=
-A `dmax` above the diameter is clamped to it, so an over-large budget cannot select more than the
-whole component — which is exactly the hazard below.
+The library cuts a `dmax` above the diameter down to the diameter. A large budget therefore
+relates no more than the whole connected component.
 
 !!! warning "`PathLength()` with no `dmax` relates everything"
 
-    `dmax = nothing` is [`PathLength`](@ref)'s default and means *the whole connected component*,
-    implemented as the observed diameter above. Read by a constraint, "the whole component" means
-    **every reachable pair is related**, so `NetworkEstimator(; sep = PathLength())` yields a
-    phylogeny matrix of ones off the diagonal — the last row of the ladder table, at 100 % of
-    pairs. It is the opposite end of the dial from `HopCount()`'s default `n = 1`, reached by
-    swapping the separation and changing nothing else, and it is deliberately unguarded: it
-    optimises successfully and returns a single-asset portfolio (§3.1). State a numeric `dmax` to
-    select anything narrower.
+    `dmax = nothing` is the default of [`PathLength`](@ref), and it means the whole connected
+    component. The library uses the observed diameter above for it. A constraint then treats every
+    reachable pair as related. The phylogeny matrix marks each related pair with a nonzero entry.
+    For `NetworkEstimator(; sep = PathLength())` it is ones off the diagonal, and it relates 100 %
+    of pairs, as the last rows of the table in section 2.1 do. It is the opposite extreme
+    from the default `n = 1` of `HopCount()`, and you reach it when you change the type of the
+    separation and nothing else. The library does not guard against it. The optimisation succeeds
+    and returns a portfolio of one asset, as section 3.1 shows. Give a numeric `dmax` to relate
+    fewer pairs.
 
-The same `sep` is also read by [`PhylogenyPanel`](@ref), which builds an Asset Panel rather
-than a constraint. There the budget *shapes* a fall-off instead of selecting pairs — a second knob,
-[`Proximity`](@ref)'s `decay`, says how strongly — so the bare default is the natural choice on
-that path and the trap above on this one. The two knobs live on two different objects and neither
-follows the other: setting `sep` does not imply a `decay`, and setting `decay` does not imply a
-`sep`.
+A [`PhylogenyPanel`](@ref) also uses a `sep`, through the `NetworkEstimator` in its `pl` field. The
+panel does not build a constraint. It builds a proximity matrix, which scores how close each asset
+is to each other asset. The `decay` field of [`Proximity`](@ref) sets how that score falls with
+distance, and a [`LinearDecay`](@ref) reaches zero at the budget of `sep`. The default
+`PathLength()` suits a panel, and it relates every pair in a constraint. `sep` and `decay` are
+fields of different types, and neither sets the other.
 
 ### 2.3 When you cannot state the budget in advance
 
-Everything above assumes you can name the budget. Sometimes you cannot. A cross-validation fold
-refits the graph on a different slice, and a meta optimiser such as [`NestedClustered`](@ref) or
-[`SubsetResampling`](@ref) refits it on a different *universe* — so a `dmax` you tuned once is
-being applied to graphs it was never tuned for.
+A cross-validation fold fits the graph again on different rows. A meta optimiser such as [`NestedClustered`](@ref) or
+[`SubsetResampling`](@ref) fits it again on a different set of assets. A `dmax` that you tuned on
+one graph then applies to graphs that you did not tune it on.
 
-Both budget fields therefore also take a **rule**: a callable that is handed the estimator, the
-data, and the graph already built from them, and returns the budget. `n` takes a
-[`HopCountAlgorithm`](@ref), `dmax` takes a [`PathLengthAlgorithm`](@ref), and either takes a bare
-function of the same shape. [`resolve_separation`](@ref) calls it at the point of use — over the one
-structure its consumer built, so a rule costs a traversal and never a second graph — and one rule of
-each ships:
-[`HopCountQuantile`](@ref) and [`PathLengthQuantile`](@ref), which place the budget at a quantile
-of the observed separations.
+So each budget field also accepts a rule. A rule is a callable that gets the estimator, the data
+and the graph built from them, and returns the budget. `n` accepts a [`HopCountAlgorithm`](@ref),
+`dmax` accepts a [`PathLengthAlgorithm`](@ref), and either accepts a plain function with the same
+arguments. [`resolve_separation`](@ref) calls the rule when a constraint needs its budget. It passes
+the graph that the constraint already built, and a rule never needs a second graph. The library
+gives one rule for each field, [`HopCountQuantile`](@ref) and [`PathLengthQuantile`](@ref). Each
+puts the budget at a quantile of the observed separations.
 
-That changes *which* quantity stays put. A fixed `dmax` holds the **radius** still and lets the
-related-pair count move with the graph; a quantile rule holds the **count** still and lets the
-radius move. Since the count is what a constraint's strength is made of, the second is usually
-what you meant:
+A rule changes which quantity stays fixed. A fixed `dmax` keeps the radius fixed, and the number of
+related pairs changes with the graph. A quantile rule keeps the number of related pairs fixed, and
+the radius changes. The number of related pairs sets the strength of a constraint, and the
+quantile rule keeps that strength from fold to fold.
+
+We split the year into four folds and fit the graph on each. For each fold we count the related
+pairs under a fixed `dmax` and under the rule `PathLengthQuantile(; q = 0.25)`, and we print the
+`dmax` that the rule resolves to.
 =#
 
 folds = [1:63, 64:126, 127:189, 190:252]
@@ -212,16 +226,16 @@ pretty_table(DataFrame("Fold" => ["$(first(f))–$(last(f))" for f in folds],
              title = "A fixed radius against a quantile rule, over four folds of the same year")
 
 #=
-`dmax = 1.0107` is the quarter-quantile of the whole year, where it relates `94` of the `380`
-pairs. Applied fold by fold it relates `84`, `110`, `96` and `110` — the constraint is a different
-strength in each fold, and nothing says so. The rule relates `96` in **every** fold, and pays for
-it by moving the radius between `1.2055` and `0.8574`. Neither column is stable in both senses,
-because the graph is refitted either way; the rule just lets you choose which sense you care
-about.
+The fixed `dmax = 1.0107` is the 0.25 quantile of the separations over the whole year. The second
+column shows that one radius relates a different number of pairs in each fold. The constraint
+then has a different strength in each fold, and no message tells you. The fourth column shows that
+the rule relates the same number of pairs in every fold. The third column shows the radius that the
+rule moves to keep that number.
 
-The two quantile rules are not equally good at this, and the reason is the unit. `q` is
-continuous, but a hop count is an integer, so [`HopCountQuantile`](@ref) has to round — and the
-hop shells of §2.2 are coarse enough that the rounding dominates:
+The two quantile rules do not do this equally well, and the cause is the unit. `q` is continuous,
+but a hop count is an integer, so [`HopCountQuantile`](@ref) must round. The hop shells of section
+2.2 are large, and the rounding moves the share of related pairs far from `q`. We ask each rule for
+six values of `q` and print the share of pairs that it relates.
 =#
 
 q_grid = [0.1, 0.2, 0.25, 0.3, 0.5, 0.75]
@@ -239,18 +253,17 @@ pretty_table(DataFrame("q" => q_grid,
              title = "Asking for a share of the pairs, in two units")
 
 #=
-[`PathLengthQuantile`](@ref) delivers what you asked for to within a rounding of the pair count.
-[`HopCountQuantile`](@ref) cannot: three different values of `q` all land on `n = 2`, because
-there is no hop budget between `2` and `3`. Ask in hops when you think in hops, and ask in
-quantiles through `PathLength` when you think in cardinality.
+[`PathLengthQuantile`](@ref) relates a share of the pairs that differs from `q` by at most one
+pair. [`HopCountQuantile`](@ref) can miss `q` by a whole hop shell. Three values of `q` resolve to
+`n = 2`, because the second hop shell is large. Use `PathLengthQuantile` when you want a set share
+of the pairs.
 
-!!! tip "A rule is checked when it runs, not when it is stored"
-    A [`HopCountAlgorithm`](@ref) must return an `Integer` — three readers use `0:n` as a
-    matrix-power count — and a [`PathLengthAlgorithm`](@ref) must return a `Number`.
-    A functor's return type is not part of its signature, so the check happens in
-    [`resolve_separation`](@ref), the first time the rule is actually asked. Writing your own is
-    two definitions, and the third argument is the structure the consumer already built — read it
-    rather than deriving one:
+!!! tip "The library checks a rule when it runs, not when you store it"
+    A [`HopCountAlgorithm`](@ref) must return an `Integer`, because the library uses `0:n` as a
+    range of matrix powers. A [`PathLengthAlgorithm`](@ref) must return a `Number`. The return
+    type of a callable is not part of its signature, so [`resolve_separation`](@ref) checks the
+    value each time it calls the rule. Your own rule needs a type and one method. The third
+    argument is the graph that the constraint built. Use it, and do not build another:
 
     ```julia
     struct AssetScaledHops <: PortfolioOptimisers.HopCountAlgorithm
@@ -263,10 +276,9 @@ quantiles through `PathLength` when you think in cardinality.
 
 ## 3. Phylogeny constraints
 
-A [`SemiDefinitePhylogenyEstimator`](@ref) adds a semidefinite constraint that discourages
-holding assets which are neighbours in the network — concentrated, mutually-correlated bets.
-Passing it through `ple` reshapes the minimum-risk portfolio toward combinations that are
-diversified in *network* terms, not just in count.
+A [`SemiDefinitePhylogenyEstimator`](@ref) forbids the joint holding of two related assets. It
+writes the constraint as a semidefinite relaxation, and the problem stays convex. We pass it
+through `ple` and compare the minimum-risk weights with the baseline weights.
 =#
 
 res_phylo = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -279,17 +291,19 @@ pretty_table(DataFrame("Asset" => rd.nx, "Baseline" => res_base.w,
              title = "Minimum risk: baseline vs network-phylogeny constrained")
 
 #=
-The constraint moves a large fraction of the book — it is enforcing genuine structural
-diversification, not a cosmetic tweak. For a *hard* limit on the number of names drawn from each
-network cluster, [`IntegerPhylogenyEstimator`](@ref) imposes an integer (cardinality-style)
-version; being combinatorial it needs a MIP solver (see
-[Budget Constraints](01_Budget_Constraints.md) for the Pajarito/HiGHS setup).
+The constraint moves weight between many assets, and section 3.1 prints the size of that move as
+a turnover. [`IntegerPhylogenyEstimator`](@ref) sets a hard limit on how many assets you hold from
+each neighbourhood of the network. A neighbourhood is an asset and the assets related to it, or a
+cluster when the source is a clustering estimator. The constraint needs a mixed-integer solver,
+because it uses binary variables. [Cardinality and threshold](03_Cardinality_and_Threshold.md) shows
+how to set one up.
 
-### 3.1 The separation is the strength dial
+### 3.1 The separation sets the strength of the constraint
 
-`ple = SemiDefinitePhylogenyEstimator(; pl = NetworkEstimator())` above took the default
-`sep = HopCount(; n = 1)`. Widening the separation widens what the constraint treats as one bet,
-and the ladder of §2.1 becomes a ladder of portfolios:
+The estimator above uses the default `sep = HopCount(; n = 1)`. A wider separation makes the
+constraint treat more assets as one bet. We solve the minimum-risk portfolio under six
+separations. For each one we print the related pairs, the largest weight, the number of assets
+held, and the turnover from the baseline.
 =#
 
 sep_sweep = ["HopCount(; n = 1)" => HopCount(; n = 1),
@@ -323,25 +337,27 @@ pretty_table(DataFrame("Separation" => ["none (baseline)"; first.(sep_sweep)],
              title = "Minimum risk under a widening phylogeny separation")
 
 #=
-Two things are worth reading off that table before you tune `sep`.
+The table shows two facts to know before you tune `sep`.
 
-**Structural diversification is not weight diversification.** A wider separation forbids more
-joint holdings, so the optimiser is pushed out of clusters and into fewer, unrelated names — the
-largest weight *rises* as the constraint tightens. If you want both, pair `ple` with a weight
-upper bound or a [regularisation](07_Regularisation.md) term.
+First, a tighter phylogeny constraint concentrates the weights. A wider separation forbids more
+pairs of holdings, and the optimiser holds fewer assets. The largest weight rises as the
+constraint becomes tighter. To spread the weights as well, use `ple` together with an upper bound
+on the weights or a [regularisation](07_Regularisation.md) term.
 
-**The bare `PathLength()` row is the trap of §2.2, priced.** Every reachable pair is forbidden
-from being held jointly, so the only feasible book is a single asset, at 100 % weight. It reports
-`OptimisationSuccess` — nothing raises, and nothing warns. When a phylogeny-constrained portfolio
-collapses onto one name, check `sep` first.
+Second, the bare `PathLength()` row shows the cost of the setting in the warning of section 2.2.
+The constraint forbids every reachable pair, and the only feasible portfolio holds one asset at
+100 % weight. The result reports `OptimisationSuccess`. When a portfolio under a phylogeny
+constraint holds a single asset, check `sep` first.
 
 ## 4. Centrality constraints
 
-Centrality measures how *central* each asset is in the network — a hub that co-moves with many
-others, versus a periphery name that diversifies. A [`CentralityEstimator`](@ref) scores every
-asset, and a [`CentralityConstraint`](@ref) bounds the portfolio's weighted-average centrality
-through `cte`. You can push the book toward hubs (`comp = >=`, a higher floor) or toward the
-periphery (`comp = <=`, a lower ceiling).
+A centrality score measures how strongly an asset connects to the rest of the graph. A hub moves
+with many other assets. An asset on the periphery of the network moves with few, and it helps to
+diversify the portfolio. A [`CentralityEstimator`](@ref) gives every asset a score, and a
+[`CentralityConstraint`](@ref) in `cte` bounds the weighted average score of the portfolio. Use
+`comp = >=` and a floor to push the portfolio toward the hubs, or `comp = <=` and a ceiling to push
+it toward the periphery. We solve one portfolio of each kind and print its average centrality next
+to the baseline.
 =#
 
 res_hub = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -367,28 +383,29 @@ pretty_table(DataFrame("Portfolio" =>
              title = "Average network centrality of the portfolio")
 
 #=
-The constraint binds in both directions — the hub tilt lifts the average centrality to its floor,
-the periphery tilt drops it to its ceiling. Centrality is not one number: a
-[`CentralityEstimator`](@ref) accepts different algorithms (degree, eigenvector, closeness,
-betweenness, …), each emphasising a different notion of "central", so the right one depends on
-what kind of connectedness you care about.
+Compare the average of each tilted portfolio with its bound, the floor of the hub tilt and the
+ceiling of the periphery tilt. A [`CentralityEstimator`](@ref) accepts different algorithms, for
+example degree, eigenvector, closeness and betweenness centrality, and each one scores a different
+kind of connection.
 
-The algorithm also decides whether the network's *edge weights* are read. Each one declares the
-polarity its weights must have through [`centrality_polarity`](@ref) — distances for the
-shortest-path measures, similarities for [`EigenvectorCentrality`](@ref) — and the graph is built
-to match. Five cases run on the plain unweighted graph and none of them raises: a clustering
-source, [`DegreeCentrality`](@ref) (the default used above), [`Pagerank`](@ref),
-[`KatzCentrality`](@ref), and [`EigenvectorCentrality`](@ref) on a tree branch. The warning on
-[`CentralityEstimator`](@ref) has the details. §4.2 covers the one thing you can say back to it:
-[`TopologyOnly`](@ref), which withdraws a declaration and asks for the topology alone.
+The algorithm also decides whether the score uses the edge weights of the network. Through
+[`centrality_polarity`](@ref), each algorithm declares the polarity that its edge weights must
+have, which is a distance or a similarity. The shortest-path measures need distances, and
+[`EigenvectorCentrality`](@ref) needs similarities. The library builds the graph to match.
 
-### 4.1 Where `sep` bites, and where it is inert
+A clustering source always gives the unweighted graph. So do [`DegreeCentrality`](@ref), which is
+the default and the algorithm used above, [`Pagerank`](@ref), [`KatzCentrality`](@ref), and
+[`EigenvectorCentrality`](@ref) on a tree. None of these cases gives a warning, and the warning on
+[`CentralityEstimator`](@ref) lists them. Section 4.2 shows [`TopologyOnly`](@ref), which removes a
+declaration and asks for the unweighted graph.
 
-Reading the weights has a consequence that is easy to trip over. A weighted route reads the
-*structure* of the graph, not the separation closure the phylogeny constraints build, so on a
-weighted route the network estimator's `sep` is **inert** — you can widen it and the scores will
-not move at all. On an unweighted route `sep` is live. Which of the two you are on is decided by
-the algorithm, not by anything you write next to it:
+### 4.1 Where `sep` changes the scores, and where it does not
+
+An algorithm that uses the weights works on the graph itself, not on the related pairs that the
+phylogeny constraints build from `sep`. For such an algorithm the `sep` of the network estimator
+has no effect, and a wider `sep` leaves the scores where they were. An algorithm on the unweighted
+graph responds to `sep`. For each of the eight algorithms we print its polarity, and whether its
+scores change when `n` goes from 1 to 3.
 =#
 
 cts = ["BetweennessCentrality" => BetweennessCentrality(),
@@ -422,37 +439,38 @@ pretty_table(DataFrame("Algorithm" => first.(cts), "Polarity" => polarity_name.(
              title = "Which centralities read the weights, and which read sep")
 
 #=
-On this minimum-spanning-tree source the split is four and four: the four distance-polarity
-algorithms get a weighted graph and ignore `sep`, and the other four run unweighted and respond to
-it. So raising `n` moves a degree centrality and leaves a closeness one exactly where it was.
+On this minimum spanning tree the four algorithms with a distance polarity get a weighted graph
+and ignore `sep`. The other four get the unweighted graph and respond to it.
 
-The column to read is the last one, not the polarity. [`EigenvectorCentrality`](@ref) declares a
-similarity polarity and still lands on the unweighted side here, because a tree carries no
-similarity for it to read — so the declaration alone does not tell you which side you are on. The
-source decides that jointly with the algorithm.
+The last column, not the polarity, tells you which graph an algorithm gets.
+[`EigenvectorCentrality`](@ref) declares a similarity polarity, and it still gets the unweighted
+graph here, because a tree has no similarity weights for it to use. The source and the algorithm
+decide the graph together.
 
-[`BetweennessCentrality`](@ref) and [`StressCentrality`](@ref) are a second reason not to read the
-polarity column as the answer. They do read the weights, and are nonetheless unchanged by them *on
-a tree*: a tree has exactly one path between any two vertices, so no weighting can change the
-shortest-path set. That is a theorem about the graph, not a limitation of the algorithm, and it
-does not hold on a similarity branch.
+[`BetweennessCentrality`](@ref) and [`StressCentrality`](@ref) use the weights, but on a tree the
+weights do not change their scores. A tree has exactly one path between any two nodes, so no
+weighting can change the set of shortest paths. That is a property of a tree, not a limit of the
+two algorithms, and it does not hold on a graph with cycles. The table in section 4.2 shows it.
 
-### 4.2 Asking for the topology alone
+### 4.2 Asking for the unweighted graph
 
-Everything above is decided *for* you, by the algorithm's mathematics and by the branch the source
-builds. There is one thing you can say back. A [`TopologyOnly`](@ref) in an algorithm's `ov` field
-withdraws its declaration, so [`centrality_polarity`](@ref) answers `nothing` and the graph is
-built plain — the same computation the three unweighted algorithms already run:
+A [`TopologyOnly`](@ref) in the `ov` field of an algorithm removes its declaration.
+[`centrality_polarity`](@ref) then returns `nothing`, and the library builds the unweighted graph,
+the same graph that [`DegreeCentrality`](@ref), [`Pagerank`](@ref) and [`KatzCentrality`](@ref)
+use. We print the polarity of [`ClosenessCentrality`](@ref) without the override and with it.
 =#
 
 (centrality_polarity(ClosenessCentrality()),
  centrality_polarity(ClosenessCentrality(; ov = TopologyOnly())))
 
 #=
-Only the five algorithms that declare a polarity carry the field. [`DegreeCentrality`](@ref),
-[`Pagerank`](@ref) and [`KatzCentrality`](@ref) already read the topology alone, so they have
-nothing to withdraw and `DegreeCentrality(; ov = TopologyOnly())` is a `MethodError`. How much the
-request changes depends on the source it is made against:
+Only the five algorithms that declare a polarity have the `ov` field. The other three use the
+unweighted graph and have no declaration to remove, so `DegreeCentrality(; ov = TopologyOnly())`
+throws a `MethodError`. The effect of the override depends on the source. We compare the scores
+with and without the override on two sources. One is the default tree. The other is the
+triangulated maximally filtered graph that
+`NetworkEstimator(; alg = MaximumDistanceSimilarity())` builds, with the similarity that
+[`MaximumDistanceSimilarity`](@ref) gives.
 =#
 
 ovs = Dict("BetweennessCentrality" => BetweennessCentrality(; ov = TopologyOnly()),
@@ -477,31 +495,29 @@ pretty_table(DataFrame("Algorithm" => first.(cts),
              title = "Does asking for the topology alone move the score?")
 
 #=
-Two of the eight move on the tree, five of the eight on the triangulated maximally filtered graph.
-That gap is the whole difference between the weighted and the unweighted answer, and it is
-remarkably stable — measured across seven windows, nine universes, seven distance estimators and
-seven network algorithms, it is two on every tree and five on every graph. **Four** is a different
-quantity: it is the split in the first table, and it counts the algorithms that take a weighted
-*route*, not the ones whose answer *moves*. The two coincide only on a graph.
+A "yes" marks an algorithm whose score on that source depends on the edge weights. Compare the
+count of "yes" on the tree with the four algorithms of section 4.1 that get a weighted graph. On a
+tree, two of those four give the same score with and without the weights.
 
-The request runs one way only. It removes the weights and never supplies them, and there is no
-value that forces a polarity onto an algorithm. Forcing one would succeed rather than raise — the
-distance-weighted graph is available on both branches — and the algorithm would read a distance
-where it needs a similarity, reversing its own ordering in silence.
+The override removes the weights and never adds them. No value of `ov` forces a polarity onto an
+algorithm.
 
-The override also puts `sep` back in play. All five of these algorithms respond to `n = 1` versus
-`n = 3` once they carry `ov = TopologyOnly()`, including the four that were `sep`-inert in the
-first table, because the unweighted route is the one that reads the separation closure.
+With `ov = TopologyOnly()`, the scores of these five algorithms depend on `sep`. That includes the
+four that ignored `sep` in the table of section 4.1, because the library builds the unweighted
+graph from the related pairs of `sep`.
 
-That is worth knowing before you reach for it as a stabiliser. A topology-only centrality is
-sometimes argued to be the more fold-stable of the two, since it does not move when the estimated
-weights do. It trades them for a second knob rather than removing one, and under a bare
-[`PathLength`](@ref) that knob is the observed diameter — the data-dependent quantity the argument
-set out to avoid. Nothing here defaults to it: [`CentralityEstimator`](@ref)'s `ct` is a
-[`DegreeCentrality`](@ref), which reads the topology already, and the five that declare a polarity
-keep reading the weights their source carries unless you say otherwise.
+A score from the unweighted graph does not change when the estimated weights change, so the
+override can look like a way to make the scores more stable from fold to fold. But the override
+replaces the weights with a second parameter, `sep`, and the scores depend on that choice. Under a
+bare [`PathLength`](@ref) that parameter is the observed diameter, which also changes with the
+data. No default uses the override. The default `ct` of [`CentralityEstimator`](@ref) is a
+[`DegreeCentrality`](@ref), which uses the unweighted graph. The five algorithms that declare a
+polarity keep using the weights of their source unless you ask otherwise.
 
 ## 5. Comparing the structural constraints
+
+We plot the weights of six portfolios side by side. They are the baseline, the phylogeny
+constraint at three settings of `sep`, and the two centrality tilts.
 =#
 
 results = [res_base, res_phylo, res_sweep[2], res_sweep[6], res_hub, res_periph]
@@ -511,8 +527,9 @@ labels = ["Baseline", "Phylo n=1", "Phylo n=3", "Phylo bare\nPathLength", "Hub",
 plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 
 #=
-The two phylogeny bars and the bare-`PathLength` bar are the same constraint at three settings of
-one dial. The last one is a single block: that is what "relate everything" looks like as a book.
+The three phylogeny bars show one constraint at three settings of `sep`. The bar of the bare
+`PathLength()` is a single block, because a constraint that relates every pair leaves one asset in
+the portfolio.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
