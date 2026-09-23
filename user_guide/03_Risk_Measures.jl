@@ -103,10 +103,10 @@ supported_risk_measures(HierarchicalRiskParity)           # OptimisationRiskMeas
 
 Each table gives the meaning of each measure in one line, its alias and its class. The tables
 group the measures by the part of the returns that they measure. Every name is exported and has a
-docstring. The
-[public API page on risk measures](../public_api/16_RiskMeasures/01_Base_RiskMeasures.md) gives the
-signature, the fields and the references of each, and `?ConditionalValueatRisk` in the REPL shows
-the same docstring.
+docstring. The docstrings are on the
+[public API pages on risk measures](../public_api/16_RiskMeasures/01_Base_RiskMeasures.md). Each
+docstring gives the signature and the fields of its measure, and most also give references.
+`?ConditionalValueatRisk` in the REPL shows the same docstring.
 =#
 
 ## Reverse-map the exported alias layer onto the measure types it names, so the alias column
@@ -324,7 +324,7 @@ pretty_table(DataFrame("Alias" => [a[1] * "()" for a in alias_ctors],
 
 ## 5. Choosing a measure
 
-The choice depends on what you believe about the distribution of the returns:
+The choice depends on what you want to penalise:
 
   - If the returns are about symmetric and you care about their spread, use
     [`Variance`](@ref), the default, or [`StandardDeviation`](@ref).

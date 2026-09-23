@@ -1,6 +1,6 @@
 #=
 ```@meta
-Description = "Post-processing in PortfolioOptimisers.jl: turn continuous weights into whole shares under a cash budget, and plot the result."
+Description = "Turn the continuous weights of a PortfolioOptimisers.jl portfolio into whole shares under a cash budget, and plot the weights."
 ```
 
 # Post-processing
@@ -56,7 +56,7 @@ invested = sum(alloc.shares .* prices)
 pretty_table(DataFrame("Asset" => rd.nx, "Target weight" => res.w,
                        "Shares" => round.(Int, alloc.shares), "Realised weight" => alloc.w);
              formatters = [resfmt],
-             title = "Discrete allocation of \$$(round(Int, cash)) — invested \$$(round(Int, invested)), cash left \$$(round(alloc.cash, digits = 2))")
+             title = "Greedy allocation of \$$(round(Int, cash)), invested \$$(round(Int, invested)), cash left \$$(round(alloc.cash, digits = 2))")
 
 #=
 [`DiscreteAllocation`](@ref) solves a mixed-integer program to find an exact allocation, and it

@@ -131,9 +131,10 @@ hand once does not match the loadings of the later folds, and the factor exposur
 how far it moves. That page also covers groups of factors, factor rows mixed with asset rows, and
 the constraints that have no factor form. A constraint has a factor form only if it is a linear row
 in `w`. So cardinality, thresholds, turnover, tracking error and fees have none. Weight bounds have
-none either, because a bound on the factor exposures is a pair of linear rows that you write through
-`lcse`. To track a factor, you need no factor form. [`ReturnsTracking`](@ref) takes the return
-series of a benchmark, and the return series of a factor is a column of the factor matrix.
+none either, because `wb` takes a box on each asset and no linear rows. To bound a factor exposure
+from both sides, write the two rows through `lcse`. To track a factor, you need no factor form.
+[`ReturnsTracking`](@ref) takes the return series of a benchmark, and the return series of a
+factor is a column of the factor matrix.
 
 ## 4. Turnover
 
@@ -207,8 +208,10 @@ the sign that makes the objective worse, for a minimisation and for a maximisati
 positive contribution, and a reward is a negative contribution. One definition is correct under
 every objective, [`MaximumRatio`](@ref) included. The
 [custom objectives and constraints example](../examples/4_constraints_costs/09_Custom_Objectives_and_Constraints.md)
-builds a momentum tilt and a momentum floor. It also shows the two details of the model that keep a
-term written by hand correct, the scale of the constraints and the homogenisation variable `k`.
+builds a momentum tilt and a momentum floor. It also shows the two values of the model that a
+constraint written by hand needs. [`get_constraint_scale`](@ref) returns the scale of the
+constraints, and [`get_k`](@ref) returns the variable `k`, which rescales the weights under a ratio
+objective.
 =#
 
 #=

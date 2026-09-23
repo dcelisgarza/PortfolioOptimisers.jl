@@ -1,12 +1,12 @@
 #=
 ```@meta
-Description = "Turn prices into returns and returns into a prior with prices_to_returns and prior, which give the expected returns and covariance every optimiser uses."
+Description = "Turn prices into returns with prices_to_returns, and returns into a prior with prior, which gives the expected returns and covariance most optimisers use."
 ```
 
 # Data and priors
 
 The first stage turns prices into a prior, which holds the expected returns vector and the
-covariance matrix that every optimiser uses. Two calls cover the common path,
+covariance matrix that most optimisers use. Two calls cover the common path,
 [`prices_to_returns`](@ref) and [`prior`](@ref). For the other moment estimators and the priors that
 take views, see the
 [moments and priors examples](../examples/2_moments_priors/01_Expected_Returns_Estimation.md).
@@ -59,9 +59,9 @@ with gaps.
 ## 2. Returns to a prior
 
 [`prior`](@ref) applies a prior estimator to a [`ReturnsResult`](@ref) and returns the moments.
-The default is [`EmpiricalPrior`](@ref), which computes the sample mean and the sample
-covariance, and then repairs the covariance to the nearest positive definite matrix if it needs
-to. We compute it and print the mean and the volatility of each asset.
+The JuMP, clustering and meta-optimisers use [`EmpiricalPrior`](@ref) by default. It computes the
+sample mean and the sample covariance, and then repairs the covariance to the nearest positive
+definite matrix if it needs to. We compute it and print the mean and the volatility of each asset.
 =#
 
 pr = prior(EmpiricalPrior(), rd)
@@ -107,8 +107,8 @@ fits one, and
 [Cross-sectional factor model through a Pipeline](../examples/7_putting_it_together/06_Cross_Sectional_Factor_Pipeline.md)
 gets the same weights through a [`Pipeline`](@ref).
 
-A prior also holds a covariance estimator, and you can change it for another, such as a denoised
-covariance or the Gerber covariance. The page
+[`EmpiricalPrior`](@ref) holds a covariance estimator in its field `ce`, and you can change it for
+another, such as a denoised covariance or the Gerber covariance. The page
 [Covariance Estimation](../examples/2_moments_priors/02_Covariance_Estimation.md) compares them. A
 moment estimator can also use only the last part of the sample, or weight the recent returns more
 than the old ones. Use this when the recent returns describe the market better than the full

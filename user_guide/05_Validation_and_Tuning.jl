@@ -120,8 +120,8 @@ strategies = TimeDependent([isodd(i) ? mr : iv for i in 1:n]; default = mr)
 pred_switch = cross_val_predict(strategies, rd, wf)
 
 #=
-Outside a fold loop, `optimise` does not read the entries of a schedule. It uses the schedule's
-`default`, or else the value that the constructor gives the field. For schedules in the fields of
+A schedule in a field such as `wb` needs no `default`. Outside a fold loop, the field then takes
+the value that the constructor gives it when you do not pass it. For schedules in the fields of
 a meta-optimiser, functions that read the data of the fold, and schedules that hold computed
 results, see
 [Time Dependent Constraints](../examples/5_validation_tuning/04_Time_Dependent_Constraints.md)
