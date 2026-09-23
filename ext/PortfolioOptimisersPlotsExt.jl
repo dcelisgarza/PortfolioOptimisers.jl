@@ -1644,12 +1644,8 @@ function PortfolioOptimisers.plot_histogram(ret::VecNum;
     for (i, (risk, lbl)) in enumerate(zip(risks, risk_labels))
         vline!([risk]; label = lbl, color = colours[i + 1], linewidth = 2)
     end
-    D = StatsAPI.fit(Normal, ret)
     if reference
-        density!(ret;
-                 label = "Normal: μ=$(round(100*mean(D); digits=2))%, σ=$(round(100*std(D); digits=2))%",
-                 color = colours[end], linewidth = 2)
-    else
+        D = StatsAPI.fit(Normal, ret)
         plot!(x_range, pdf.(D, x_range);
               label = "Normal: μ=$(round(100*mean(D); digits=2))%, σ=$(round(100*std(D); digits=2))%",
               color = colours[end], linewidth = 2)

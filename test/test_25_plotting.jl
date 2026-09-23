@@ -133,6 +133,20 @@
         @test is_plot(plot_histogram(w, X))
         @test is_plot(plot_histogram(w, X; reference = false))
         @test is_plot(plot_histogram(w_rd, rd))
+
+        # #1284: `reference = true` overlays the pdf of the Normal fitted to the returns, not
+        # a kernel density, and `reference = false` overlays no curve.
+        ret = X * w
+        mu_n, sigma_n = mean(ret), std(ret; corrected = false)
+        p_ref = plot_histogram(w, X)
+        s_ref = p_ref.series_list[end]
+        @test startswith(s_ref[:label], "Normal")
+        @test s_ref[:x] ≈ range(extrema(ret)...; length = ceil(Int, 4 * sqrt(T)))
+        @test s_ref[:y] ≈
+              exp.(-(s_ref[:x] .- mu_n) .^ 2 ./ (2 * sigma_n^2)) ./ (sigma_n * sqrt(2 * pi))
+        p_noref = plot_histogram(w, X; reference = false)
+        @test length(p_noref.series_list) == length(p_ref.series_list) - 1
+        @test !any(s -> startswith(s[:label], "Normal"), p_noref.series_list)
     end
 
     @testset "plot_network" begin

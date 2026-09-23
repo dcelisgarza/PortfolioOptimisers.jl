@@ -132,23 +132,23 @@ end
 
 ## The curated catalogue: family => [measure => what it penalises].
 catalogue = ["Dispersion and moments" =>
-                 [:Variance => "Portfolio variance from a covariance matrix — the default `r`.",
+                 [:Variance => "Portfolio variance from a covariance matrix, the default `r`.",
                   :StandardDeviation => "Square root of the variance; same ordering, different scale.",
                   :UncertaintySetVariance => "Worst-case variance over a covariance uncertainty set (robust).",
                   :LowOrderMoment => "Generic first/second moment measure; see §4 for its aliases.",
                   :HighOrderMoment => "Generic third/fourth moment measure; see §4 for its aliases.",
-                  :MedianAbsoluteDeviation => "Median absolute deviation — the robust cousin of `MAD()`.",
+                  :MedianAbsoluteDeviation => "Median absolute deviation, a robust counterpart of `MAD()`.",
                   :Kurtosis => "Square-root kurtosis from the cokurtosis tensor (fat tails).",
                   :NegativeSkewness => "Downside asymmetry from the coskewness tensor.",
                   :VarianceSkewKurtosis => "Variance, skewness, and kurtosis combined in one expression.",
-                  :BrownianDistanceVariance => "Distance variance — penalises *any* dependence, not just linear."],
-             "Tail — X-at-Risk" => [:WorstRealisation => "The single worst observed loss.",
-                                    :ValueatRisk => "The `alpha` quantile of the loss distribution (MIP).",
-                                    :ConditionalValueatRisk => "Mean loss beyond the `alpha` quantile; expected shortfall.",
-                                    :DistributionallyRobustConditionalValueatRisk => "CVaR under a Wasserstein ball around the empirical distribution.",
-                                    :EntropicValueatRisk => "Exponential-cone upper bound on VaR; tighter tail control than CVaR.",
-                                    :RelativisticValueatRisk => "Power-cone family interpolating between CVaR and worst realisation.",
-                                    :PowerNormValueatRisk => "Power-norm tail measure parameterised by the norm order."],
+                  :BrownianDistanceVariance => "Distance variance: penalises *any* dependence, not only linear dependence."],
+             "Tail: X-at-Risk" => [:WorstRealisation => "The single worst observed loss.",
+                                   :ValueatRisk => "The `alpha` quantile of the loss distribution (MIP).",
+                                   :ConditionalValueatRisk => "Mean loss beyond the `alpha` quantile; expected shortfall.",
+                                   :DistributionallyRobustConditionalValueatRisk => "CVaR under a Wasserstein ball around the empirical distribution.",
+                                   :EntropicValueatRisk => "Exponential-cone upper bound on VaR; tighter tail control than CVaR.",
+                                   :RelativisticValueatRisk => "Power-cone family between EVaR (`kappa → 0`) and the worst realisation (`kappa → 1`).",
+                                   :PowerNormValueatRisk => "Power-norm tail measure parameterised by the norm order."],
              "Tail ranges (both sides)" =>
                  [:Range => "Best realisation minus worst realisation.",
                   :ValueatRiskRange => "Loss-side VaR plus gain-side VaR.",
@@ -158,7 +158,7 @@ catalogue = ["Dispersion and moments" =>
                   :RelativisticValueatRiskRange => "Two-sided relativistic VaR.",
                   :PowerNormValueatRiskRange => "Two-sided power-norm VaR.",
                   :GenericValueatRiskRange => "Any pair of tail measures, one per side of the distribution."],
-             "Drawdown — uncompounded" =>
+             "Drawdown: uncompounded" =>
                  [:AverageDrawdown => "Mean depth of the drawdown path.",
                   :UlcerIndex => "Root-mean-square drawdown depth; penalises long deep spells.",
                   :MaximumDrawdown => "Deepest peak-to-trough loss.",
@@ -166,9 +166,9 @@ catalogue = ["Dispersion and moments" =>
                   :ConditionalDrawdownatRisk => "Mean drawdown beyond the `alpha` quantile.",
                   :DistributionallyRobustConditionalDrawdownatRisk => "CDaR under a Wasserstein ball.",
                   :EntropicDrawdownatRisk => "Exponential-cone bound on the drawdown quantile.",
-                  :RelativisticDrawdownatRisk => "Power-cone drawdown family, CDaR → max drawdown.",
+                  :RelativisticDrawdownatRisk => "Power-cone drawdown family between EDaR (`kappa → 0`) and the maximum drawdown (`kappa → 1`).",
                   :PowerNormDrawdownatRisk => "Power-norm drawdown measure."],
-             "Drawdown — compounded (relative)" =>
+             "Drawdown: compounded (relative)" =>
                  [:RelativeAverageDrawdown => "Average drawdown of the compounded wealth path.",
                   :RelativeUlcerIndex => "Ulcer index of the compounded wealth path.",
                   :RelativeMaximumDrawdown => "Maximum drawdown of the compounded wealth path.",
@@ -187,17 +187,17 @@ catalogue = ["Dispersion and moments" =>
              "Composite and structural" =>
                  [:EqualRisk => "Drives every cluster to carry the same risk (hierarchical).",
                   :RiskRatio => "Ratio of two measures, used as a hierarchical objective.",
-                  :NoRisk => "Contributes nothing — a null `r` for return-only problems."],
+                  :NoRisk => "Contributes nothing: a null `r` for return-only problems."],
              "Non-optimisation (diagnostics and scoring)" =>
                  [:ExpectedReturn => "Prior expected return of the book.",
                   :MeanReturn => "Realised mean return of the book.",
                   :Skewness => "Standardised skewness of the return distribution.",
                   :ThirdCentralMoment => "Unstandardised third central moment.",
                   :NonOptimisationRiskRatio => "Ratio of any two non-optimisation measures.",
-                  :ExpectedReturnRiskRatio => "Prior expected return over risk — a Sharpe-style score.",
+                  :ExpectedReturnRiskRatio => "Prior expected return over risk, a Sharpe-style score.",
                   :MeanReturnRiskRatio => "Realised mean return over risk."]]
 
-## Every concrete measure must appear exactly once — this is what stops the page drifting.
+## Every concrete measure must appear exactly once. This stops the page from drifting.
 function leaf_measures(T, acc = Type[])
     subs = subtypes(T)
     isempty(subs) ? push!(acc, T) : foreach(S -> leaf_measures(S, acc), subs)
@@ -211,7 +211,7 @@ listed = [first(p) for (_, fam) in catalogue for p in fam]
 function family_table(name)
     entries = catalogue[findfirst(p -> first(p) == name, catalogue)][2]
     return DataFrame("Measure" => [String(first(e)) for e in entries],
-                     "Alias" => [get(rm_alias, first(e), "—") for e in entries],
+                     "Alias" => [get(rm_alias, first(e), "") for e in entries],
                      "Penalises" => [last(e) for e in entries],
                      "Optimisers" => [usage_class(getfield(PortfolioOptimisers, first(e)))
                                       for e in entries])
@@ -221,13 +221,13 @@ end;
 pretty_table(family_table("Dispersion and moments"))
 
 # ### Tail measures
-pretty_table(family_table("Tail — X-at-Risk"))
+pretty_table(family_table("Tail: X-at-Risk"))
 
 # ### Tail ranges (both sides)
 pretty_table(family_table("Tail ranges (both sides)"))
 
 # ### Drawdowns of uncompounded returns
-pretty_table(family_table("Drawdown — uncompounded"))
+pretty_table(family_table("Drawdown: uncompounded"))
 
 #=
 ### Drawdowns of compounded returns
@@ -235,7 +235,7 @@ pretty_table(family_table("Drawdown — uncompounded"))
 The `Relative*` measures compute the drawdown on the compounded wealth, not on the cumulative sum
 of the returns. They have no convex JuMP formulation, so they are all `clustering only`.
 =#
-pretty_table(family_table("Drawdown — compounded (relative)"))
+pretty_table(family_table("Drawdown: compounded (relative)"))
 
 # ### Ordered weights arrays
 pretty_table(family_table("Ordered weights arrays"))
@@ -271,16 +271,16 @@ alias builds in this version.
 alias_ctors = [("FLM", FLM, "First lower partial moment."),
                ("MAD", MAD, "Mean absolute deviation."),
                ("SCM", SCM,
-                "Second central moment — scenario variance / standard deviation."),
-               ("SLM", SLM, "Second lower moment — scenario semi-variance."),
+                "Second central moment: scenario variance or standard deviation."),
+               ("SLM", SLM, "Second lower moment: scenario semi-variance."),
                ("ECM", ECM, "Central even moment of order `2p`."),
                ("ELM", ELM, "Lower even moment of order `2p`."),
                ("TLM", TLM, "Third lower moment."),
-               ("SSK", SSK, "Standardised third lower moment — semi-skewness."),
+               ("SSK", SSK, "Standardised third lower moment: semi-skewness."),
                ("FTCM", FTCM, "Fourth central moment."),
                ("FTLM", FTLM, "Fourth lower moment."),
-               ("KT", KT, "Standardised fourth central moment — kurtosis."),
-               ("SKT", SKT, "Standardised fourth lower moment — semi-kurtosis."),
+               ("KT", KT, "Standardised fourth central moment: kurtosis."),
+               ("SKT", SKT, "Standardised fourth lower moment: semi-kurtosis."),
                ("OWA_GMD", OWA_GMD, "Gini mean difference."),
                ("OWA_CVaR", OWA_CVaR, "CVaR as an OWA."), ("OWA_TG", OWA_TG, "Tail Gini."),
                ("OWA_WR", OWA_WR, "Worst realisation as an OWA."),
@@ -355,7 +355,9 @@ a vertical line for each of several measures. One line marks the mean. Three lin
 less the standard deviation, less the mean absolute deviation and less the Gini mean difference.
 The other lines mark the value at risk, the conditional value at risk, the tail Gini and the worst
 return. The value at risk is a quantile of the returns. The conditional value at risk is the mean
-of the returns below that quantile, so its line is further to the left.
+of the returns below that quantile, so its line is further to the left. The curve is the density
+of the Normal distribution fitted to the returns. Where the histogram rises above the curve in the
+left tail, the returns have a fatter tail than the Normal. `reference = false` removes the curve.
 =#
 
 plot_histogram(w, rd)

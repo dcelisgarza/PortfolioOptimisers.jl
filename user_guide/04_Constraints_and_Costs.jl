@@ -13,7 +13,7 @@ with one minimal call each. For the others, see the
 [constraints and costs examples](../examples/4_constraints_costs/01_Budget_Constraints.md).
 
 We compute one empirical prior. Every call but the factor call uses it, and every call but the
-last one minimises the risk. So you can compare the portfolio under each constraint with the same
+last two minimises the risk. So you can compare the portfolio under each constraint with the same
 base portfolio.
 =#
 
@@ -139,36 +139,44 @@ series of a benchmark, and the return series of a factor is a column of the fact
 
 Trading limits and costs are keywords too. [`Turnover`](@ref) (`tn`) bounds how far the weight of
 each asset can move from a reference portfolio `w`, which is usually the portfolio that you hold.
-`val` is the largest change for each asset. We use the minimum-risk portfolio as the reference, and
-we solve the same problem again with a bound of 0.02.
+`val` is the largest change for each asset. We use the equal-weighted portfolio as the portfolio
+that you hold, and we bound the change of each asset at 0.02.
 =#
 
+w_held = fill(inv(length(rd.nx)), length(rd.nx))
 res_tn = optimise(MeanRisk(; obj = MinimumRisk(),
                            opt = JuMPOptimiser(; pe = pr, slv = slv,
-                                               tn = Turnover(; w = res_base.w, val = 0.02))))
+                                               tn = Turnover(; w = w_held, val = 0.02))))
 
 #=
-The reference is the solution of the same problem, so the bound changes no weight by more than
-0.1%. The `Turnover` column of the table at the end is almost equal to the `Base` column. The bound
-changes a portfolio when the reference is not the optimum, as for the weights that you hold from
-the last rebalance. Then a lower `val` keeps the result closer to the reference.
+The reference holds 5% in each of the 20 assets, so each weight of the result stays between 3% and
+7%. The base portfolio holds about 37% in one asset, and the bound keeps that asset at 7% or less.
+The `Turnover` column of the table at the end shows the result. A larger `val` lets the result move
+further from the reference, towards the base portfolio. If the reference is the optimum of the same
+problem, the bound changes almost nothing, because the optimum is already inside it.
 
 ## 5. Fees
 
 [`Fees`](@ref) (`fees`) charges a fee in each period on the positions that you hold, at one rate
 on the long weights and at another on the short weights, with optional fixed fees. It can also
 charge a fee on the traded weights. The optimiser subtracts the fees from the return that the
-objective uses. The minimal form sets `l`, the rate on the long weights. This call maximises
-the ratio of return to risk with [`MaximumRatio`](@ref), where the other calls minimise the risk.
-So the `Fees` column of the table at the end shows the effect of the objective and of the fee
-together.
+objective uses. So a fee changes the portfolio only when the objective reads the return, and a
+`MinimumRisk` portfolio does not change. The minimal form sets `l`, the rate on the long weights.
+We maximise the ratio of return to risk with [`MaximumRatio`](@ref) two times, first with no fee and
+then with a rate of 0.1% on the long weights. The two portfolios differ only by the fee.
 =#
 
+res_ratio = optimise(MeanRisk(; obj = MaximumRatio(; rf = 4.2 / 100 / 252),
+                              opt = JuMPOptimiser(; pe = pr, slv = slv)))
 res_fee = optimise(MeanRisk(; obj = MaximumRatio(; rf = 4.2 / 100 / 252),
                             opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                 fees = Fees(; l = 0.001))))
 
 #=
+The portfolio is long only and fully invested, so a fee on the long weights costs 0.1% in each
+period whatever the weights are. It has the effect of a higher risk-free rate. Both portfolios hold
+MRK and XOM, and the fee moves about 21% of the weight from MRK to XOM.
+
 The `l1` and `l2` keywords add an L1 or an L2 penalty on the weights, which you can use in place
 of a hard limit on the turnover or on the positions. The `l2c` keyword is a hard constraint, a
 ceiling on the 2-norm of the weights, which sets a lower limit on the number of effective assets.
@@ -206,13 +214,13 @@ term written by hand correct, the scale of the constraints and the homogenisatio
 #=
 ## 7. Comparing the effect
 
-The table and the plot compare the five portfolios. The first four minimise the risk with the
-same prior, so a difference between them comes from the constraint. The `Fees`
-portfolio also has a different objective.
+The table and the plot compare the six portfolios. The first four minimise the risk with the
+same prior, so a difference between them comes from the constraint. The last two maximise the
+ratio of return to risk, and they differ only by the fee.
 =#
 
-results = [res_base, res_cap, res_grp, res_tn, res_fee]
-labels = ["Base", "Cap 10%", "Tech ≥ 15%", "Turnover", "Fees"]
+results = [res_base, res_cap, res_grp, res_tn, res_ratio, res_fee]
+labels = ["Base", "Cap 10%", "Tech ≥ 15%", "Turnover", "Max ratio", "Max ratio, fees"]
 
 pretty_table(DataFrame(["Asset" => rd.nx,
                         [labels[i] => results[i].w for i in eachindex(results)]...]);
