@@ -1,19 +1,20 @@
 #=
 ```@meta
-Description = "Constraints and costs as keywords on JuMPOptimiser: weight bounds, budgets, groups, turnover, tracking, cardinality and fees, one minimal call each."
+Description = "Constraints and costs as keywords of JuMPOptimiser, with one minimal call each for weight bounds, groups, factor exposures, turnover and fees."
 ```
 
 # Constraints and costs
 
-Real mandates are not unconstrained. You cap concentration, hold a sector band, limit how much
-you trade at each rebalance, and pay transaction costs. In `PortfolioOptimisers.jl` these are
-**keywords on the [`JuMPOptimiser`](@ref)** — the optimiser carries the constraints and costs,
-the estimator carries the objective. This page shows the common ones with one minimal call
-each; for the full treatment see the
-[constraints & costs examples](../examples/4_constraints_costs/01_Budget_Constraints.md).
+A real mandate has constraints. You cap the weight of one asset, hold a sector inside a band, limit
+how much you trade at each rebalance, and pay fees. In `PortfolioOptimisers.jl` these are keywords
+of the [`JuMPOptimiser`](@ref). The `JuMPOptimiser` holds the constraints and the costs, and the
+optimiser that takes it, such as `MeanRisk`, holds the objective. This page shows the common ones
+with one minimal call each. For the others, see the
+[constraints and costs examples](../examples/4_constraints_costs/01_Budget_Constraints.md).
 
-We fix one empirical prior and a minimum-risk objective so each keyword's effect is visible
-against the same baseline.
+We compute one empirical prior. Every call but the factor call uses it, and every call but the
+last one minimises the risk. So you can compare the portfolio under each constraint with the same
+base portfolio.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -41,9 +42,9 @@ res_base = optimise(MeanRisk(; obj = MinimumRisk(),
 #=
 ## 1. Weight bounds
 
-[`WeightBounds`](@ref) sets the per-asset lower and upper bound through the `wb` keyword. The
-default is `lb = 0, ub = 1` (long-only, fully invested). Capping `ub` forces diversification —
-no single name can exceed the bound.
+[`WeightBounds`](@ref) sets a lower and an upper bound on the weight of each asset, through the
+`wb` keyword. The default is `lb = 0` and `ub = 1`, a long-only portfolio. A lower `ub` spreads
+the weight over more assets, because no asset can hold more than the bound.
 =#
 
 res_cap = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -51,16 +52,17 @@ res_cap = optimise(MeanRisk(; obj = MinimumRisk(),
                                                 wb = WeightBounds(; lb = 0.0, ub = 0.10))))
 
 #=
-The budget itself is the `bgt` keyword (default `1.0`); `BudgetRange` and a separate short
-budget `sbgt` let you build long/short and leveraged mandates — see
+The budget, the sum of the weights, is the `bgt` keyword, `1.0` by default. With
+[`BudgetRange`](@ref) and a separate short budget `sbgt`, you can build a long-short portfolio or a
+leveraged portfolio. See
 [Budget Constraints](../examples/4_constraints_costs/01_Budget_Constraints.md).
 
 ## 2. Linear and group constraints
 
-Group and linear constraints are written as plain strings over a [`UniverseSets`](@ref) and passed
-through `lcse` as a [`LinearConstraintEstimator`](@ref) — the same syntax used for views. Name a
-group, then bound it. Here we require the tech group to hold at least 15% (a floor the
-unconstrained minimum-risk portfolio would not give it).
+You write a group constraint or a linear constraint as a string over a [`UniverseSets`](@ref),
+and you pass it to `lcse` in a [`LinearConstraintEstimator`](@ref). Views use the same syntax.
+Name a group, then bound it. We require the tech group to hold at least 15% of the weight. The
+minimum-risk portfolio gives it almost none.
 =#
 
 sets = UniverseSets(; dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"]))
@@ -70,30 +72,33 @@ res_grp = optimise(MeanRisk(; obj = MinimumRisk(),
                                                                                  val = ["tech >= 0.15"]))))
 
 #=
-The same `lcse` handles absolute and relative bounds (`"AAPL <= 0.1"`, `"MSFT >= AMD"`). For
-constraints built from the asset *hierarchy* — phylogeny and centrality — see
-[Phylogeny & Centrality](../examples/4_constraints_costs/04_Phylogeny_Centrality.md).
+The same `lcse` takes a bound on one asset, such as `"AAPL <= 0.1"`, and a bound between two
+assets, such as `"MSFT >= AMD"`. For constraints built from the hierarchy of the assets, see
+[Phylogeny and Centrality](../examples/4_constraints_costs/04_Phylogeny_Centrality.md).
 
 ## 3. Factor exposure constraints
 
-Real mandates are often written in **factor** names rather than tickers — "at most 10% momentum",
-"market-neutral to value". Those bound the portfolio's factor weights `w_f = Mᵀw`, where `M` is
-the loadings matrix a factor model already computes.
+A mandate often names factors and not assets, as in "at most 10% momentum" or "no net exposure
+to value". Such a constraint bounds the factor exposures of the portfolio, `w_f = Mᵀw`, where `M`
+is the matrix of loadings that a factor model computes.
 
-Wrap a [`LinearConstraintEstimator`](@ref) in an [`ExposureConstraintEstimator`](@ref) and declare
-the space with [`FactorSpace`](@ref); the names resolve against the factor axis the loadings name,
-which for a time-series regression is the one a [`UniverseSets`](@ref) declares under `tfkey`
-(default `"nf"`), and the rows are projected through
-the loadings while the constraint is generated. What the optimiser receives is an ordinary
-asset-space constraint, so this composes with everything else on this page.
+Put a [`LinearConstraintEstimator`](@ref) in an [`ExposureConstraintEstimator`](@ref), and set its
+`space` keyword to [`FactorSpace`](@ref). The keyword has no default. The names in the
+constraint must be factor names of the loadings. For a time-series regression, these are the
+names that a [`UniverseSets`](@ref) holds under `tfkey`, `"nf"` by default. When the estimator
+builds the constraint, it multiplies each row by the loadings. So the optimiser receives an
+ordinary constraint on the asset weights, and you can use it with every other constraint on this
+page.
 
-It needs loadings from somewhere, and factor data, which [`prices_to_returns`](@ref) takes as an
-optional second argument. By default the loadings come from the prior, so this wants
-[`FactorPrior`](@ref) rather than [`EmpiricalPrior`](@ref) — and a prior with no regression is an
-error, never a silently dropped row. The space can also supply its own:
-`FactorSpace(; re = StepwiseRegression())` fits the loadings itself, which makes the mandate legal
-on any prior, and `FactorSpace(; re = <a fitted Regression>)` pins them. The deep dive covers the
-precedence and when a pinned basis goes stale.
+The constraint needs loadings, and the loadings need factor data. [`prices_to_returns`](@ref)
+takes no factor prices, so we give them to [`price_ingestion`](@ref) as `F`. By default the
+loadings come from the prior, so the prior must be a [`FactorPrior`](@ref) and not an
+[`EmpiricalPrior`](@ref). If the prior has no loadings, the constraint throws an error, and it
+does not drop the row. `FactorSpace(; re = <a fitted Regression>)` fixes the loadings.
+`FactorSpace(; re = StepwiseRegression())` fits them when the prior has none, so the constraint
+works on any prior. The
+[factor exposure example](../examples/4_constraints_costs/10_Factor_Exposure_Constraints.md) gives
+the order in which these sources apply.
 =#
 
 Fac = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/Factors.csv.gz"));
@@ -111,8 +116,8 @@ res_fac = optimise(MeanRisk(; obj = MinimumRisk(),
                    rd_f)
 
 #=
-Verify it by computing the realised exposures from the result — the loadings the optimiser
-actually used are on its prior:
+We compute the factor exposures of the result with the loadings on its prior, which are the
+loadings that the optimiser used. The `MTUM` row shows the floor of the constraint.
 =#
 
 pretty_table(DataFrame("Factor" => rd_f.nf,
@@ -120,22 +125,22 @@ pretty_table(DataFrame("Factor" => rd_f.nf,
              formatters = [resfmt], title = "Realised factor exposures")
 
 #=
-Pass the prior **estimator**, not a precomputed prior: the projection is then recomputed inside
-every cross-validation fold, against the loadings that fold actually fitted. This is the one
-constraint that cannot be precomputed by hand without going stale, and
-[Factor Exposure Constraints](../examples/4_constraints_costs/10_Factor_Exposure_Constraints.md)
-measures how far a hand-written row drifts. It also covers factor groups, mixing factor- and
-asset-space rows, and which constraints have no factor form — the rule is that a constraint is
-re-based only if it *is* a linear row in `w`, so cardinality, thresholds, weight bounds, turnover,
-tracking error and fees all stay out, each for its own reason. Tracking a *factor* is the case
-that looks like a gap and is not: [`ReturnsTracking`](@ref) takes a benchmark return series, and a
-factor's return series is a column of the factor matrix, so it needs no re-basis at all.
+Pass the prior estimator, not a computed prior. Then the optimiser builds the constraint again
+inside each cross-validation fold, with the loadings that the fold fitted. A row that you compute by
+hand once does not match the loadings of the later folds, and the factor exposure example measures
+how far it moves. That page also covers groups of factors, factor rows mixed with asset rows, and
+the constraints that have no factor form. A constraint has a factor form only if it is a linear row
+in `w`. So cardinality, thresholds, turnover, tracking error and fees have none. Weight bounds have
+none either, because a bound on the factor exposures is a pair of linear rows that you write through
+`lcse`. To track a factor, you need no factor form. [`ReturnsTracking`](@ref) takes the return
+series of a benchmark, and the return series of a factor is a column of the factor matrix.
 
 ## 4. Turnover
 
-Costs enter the same way. [`Turnover`](@ref) (`tn`) limits how far the new weights may drift
-from a reference portfolio `w` — your current holdings — so a rebalance stays cheap. Here we
-anchor at the current minimum-risk portfolio and re-solve under a turnover budget.
+Trading limits and costs are keywords too. [`Turnover`](@ref) (`tn`) bounds how far the weight of
+each asset can move from a reference portfolio `w`, which is usually the portfolio that you hold.
+`val` is the largest change for each asset. We use the minimum-risk portfolio as the reference, and
+we solve the same problem again with a bound of 0.02.
 =#
 
 res_tn = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -143,14 +148,20 @@ res_tn = optimise(MeanRisk(; obj = MinimumRisk(),
                                                tn = Turnover(; w = res_base.w, val = 0.02))))
 
 #=
-A tighter `val` keeps the result closer to the reference holdings; a looser one frees the
-optimiser to move toward the unconstrained solution.
+The reference is the solution of the same problem, so the bound changes no weight by more than
+0.1%. The `Turnover` column of the table at the end is almost equal to the `Base` column. The bound
+changes a portfolio when the reference is not the optimum, as for the weights that you hold from
+the last rebalance. Then a lower `val` keeps the result closer to the reference.
 
 ## 5. Fees
 
-[`Fees`](@ref) (`fees`) charges proportional (and optionally fixed) transaction costs on long
-and short positions, which the objective then trades off against return. The minimal form sets a
-per-unit long fee.
+[`Fees`](@ref) (`fees`) charges a fee in each period on the positions that you hold, at one rate
+on the long weights and at another on the short weights, with optional fixed fees. It can also
+charge a fee on the traded weights. The optimiser subtracts the fees from the return that the
+objective uses. The minimal form sets `l`, the rate on the long weights. This call maximises
+the ratio of return to risk with [`MaximumRatio`](@ref), where the other calls minimise the risk.
+So the `Fees` column of the table at the end shows the effect of the objective and of the fee
+together.
 =#
 
 res_fee = optimise(MeanRisk(; obj = MaximumRatio(; rf = 4.2 / 100 / 252),
@@ -158,43 +169,46 @@ res_fee = optimise(MeanRisk(; obj = MaximumRatio(; rf = 4.2 / 100 / 252),
                                                 fees = Fees(; l = 0.001))))
 
 #=
-Soft alternatives to hard turnover/position limits — L1/L2 weight regularisation and a
-weight-norm ceiling that doubles as a diversification floor (`l1`, `l2`, `l2c`) — are covered in
-[Regularisation](../examples/4_constraints_costs/07_Regularisation.md); benchmark
-[`TrackingError`](@ref) (the `tr` keyword) in
-[Turnover & Tracking](../examples/4_constraints_costs/05_Turnover_and_Tracking.md).
+The `l1` and `l2` keywords add an L1 or an L2 penalty on the weights, which you can use in place
+of a hard limit on the turnover or on the positions. The `l2c` keyword is a hard constraint, a
+ceiling on the 2-norm of the weights, which sets a lower limit on the number of effective assets.
+See [Regularisation](../examples/4_constraints_costs/07_Regularisation.md). The `tr` keyword takes
+a [`TrackingError`](@ref) to a benchmark. See
+[Turnover and Tracking](../examples/4_constraints_costs/05_Turnover_and_Tracking.md).
 
 ## 6. Custom objectives and constraints
 
-When a mandate needs something no built-in keyword covers — a continuous per-asset preference
-like a factor score, or a relationship between weights that isn't a plain linear bound — two
-[`JuMPOptimiser`](@ref) extension points let you write straight against the JuMP model:
+A mandate can need something that no keyword covers, such as a preference for each asset from a
+factor score, or a relation between weights that is not a linear bound. Two keywords of
+[`JuMPOptimiser`](@ref) let you write it directly into the JuMP model:
 
-  - `cobj` takes a [`CustomJuMPObjective`](@ref) — implement [`add_custom_objective_term!`](@ref)
-    to price a preference, contributing the term with [`add_to_objective_penalty!`](@ref).
-  - `ccnt` takes a [`CustomJuMPConstraint`](@ref) — implement [`add_custom_constraint!`](@ref) to
-    add a constraint to the model.
+  - `cobj` takes a [`CustomJuMPObjective`](@ref). You implement
+    [`add_custom_objective_term!`](@ref) to add a term for a preference, and you add the term with
+    [`add_to_objective_penalty!`](@ref).
+  - `ccnt` takes a [`CustomJuMPConstraint`](@ref). You implement [`add_custom_constraint!`](@ref)
+    to add a constraint to the model.
 
-Each keyword takes a single estimator or a vector of them, and each hook dispatches on the
-estimator's type. The two hooks take the same arguments — `(model, <what you dispatch on>,
-optimiser, attrs)`, with the objective one adding the [`ObjectiveFunction`](@ref) ahead of the
-dispatch argument. Subtyping one of these without implementing its method is an error, not a
-no-op, so a mis-shaped signature is caught rather than silently ignored.
+Each keyword takes one estimator or a vector of estimators, and each function dispatches on the
+type of the estimator. The constraint function takes `(model, ccnt, optimiser, attrs)`. The
+objective function also takes the [`ObjectiveFunction`](@ref), before the estimator,
+`(model, obj, cobj, optimiser, attrs)`. If you define a subtype and no method for it, the
+optimiser throws an error when it builds the model.
 
-Because a custom objective term goes through the objective penalty, the library applies the sign
-matching whichever optimisation sense is being built: a contribution always worsens the
-objective, and **a reward is a negative contribution**. One definition is therefore correct under
+The library adds a custom objective term to the objective penalty, which enters the objective with
+the sign that makes the objective worse, for a minimisation and for a maximisation. So a cost is a
+positive contribution, and a reward is a negative contribution. One definition is correct under
 every objective, [`MaximumRatio`](@ref) included. The
-[custom objectives & constraints example](../examples/4_constraints_costs/09_Custom_Objectives_and_Constraints.md)
-builds both from scratch — a momentum tilt and a momentum floor — and works through the two
-model idioms (the constraint scale, and the homogenisation variable `k`) that keep a
-hand-written term correct.
+[custom objectives and constraints example](../examples/4_constraints_costs/09_Custom_Objectives_and_Constraints.md)
+builds a momentum tilt and a momentum floor. It also shows the two details of the model that keep a
+term written by hand correct, the scale of the constraints and the homogenisation variable `k`.
 =#
 
 #=
 ## 7. Comparing the effect
 
-Same prior, same objective — only the constraint or cost changes the allocation.
+The table and the plot compare the five portfolios. The first four minimise the risk with the
+same prior, so a difference between them comes from the constraint. The `Fees`
+portfolio also has a different objective.
 =#
 
 results = [res_base, res_cap, res_grp, res_tn, res_fee]

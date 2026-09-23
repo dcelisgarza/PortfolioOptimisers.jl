@@ -1,23 +1,24 @@
 #=
 ```@meta
-Description = "Solver-free online portfolio selection rules on two synthetic markets, with static and dynamic regret and a forecast read off a prior."
+Description = "Online portfolio selection rules on two synthetic markets, with static and dynamic regret and a forecast read off a prior."
 ```
 
 # Online portfolio selection
 
-Every optimiser met so far fits a moment and solves a programme. The online portfolio selection
-family does neither. A rule of the family is one recursion, `w_{t+1} = f(w_t, x_t)`. It reads the
-price relative `x_t = 1 + r_t` the market just realised and moves the allocation from it, with no
-covariance, no expected return and no solver.
+Every optimiser met so far fits a moment and solves a programme. Most rules of the online
+portfolio selection family do neither. A rule of the family is one recursion,
+`w_{t+1} = f(w_t, x_t)`. It reads the price relative `x_t = 1 + r_t` the market just realised and
+moves the allocation from it. Most rules use no covariance, no expected return and no solver.
 
 [`OnlinePortfolioSelection`](@ref) is the head that runs a rule, a naive optimiser. In batch it
 makes one causal pass over the rows. It reads every row in order from the start allocation, and it
 answers the portfolio for the period after the last row. Its online updates are the same recursion
 one row at a time, so a walk-forward at `test_size = 1` and the batch pass hold the same path.
 
-A rule carries a guarantee that holds on every price sequence, with no statistical assumption. Its
-wealth cannot fall far behind the best constant portfolio chosen in hindsight. That guarantee is a
-bound, and it is not a return.
+Many rules carry a guarantee that holds on every price sequence, with no statistical assumption.
+The wealth of such a rule cannot fall far behind the best constant portfolio chosen in hindsight.
+That guarantee is a bound, and it is not a return. The follow-the-loser rules carry no such
+guarantee.
 
 This page runs the two halves of the family on two synthetic markets and shows what each half
 bets on. It then measures every rule against three hindsight comparators, shows the one place a

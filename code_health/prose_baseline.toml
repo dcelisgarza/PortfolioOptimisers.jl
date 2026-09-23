@@ -11,11 +11,3 @@ commit = "ab7d9a42da"
 glossary_terms = 173
 
 [file]
-"user_guide/00_User_Guide.jl" = { emdash = 16, bold_label = 1, verdict = 2, words = 623 }
-"user_guide/01_Data_and_Priors.jl" = { emdash = 15, endash = 2, glossary = 1, words = 581 }
-"user_guide/02_Optimisers.jl" = { emdash = 21, aivocab = 1, glossary = 1, words = 1022 }
-"user_guide/03_Risk_Measures.jl" = { emdash = 23, notjust = 1, aivocab = 1, fancy_is = 1, mechanism = 1, words = 982 }
-"user_guide/04_Constraints_and_Costs.jl" = { emdash = 22, glossary = 1, words = 910 }
-"user_guide/05_Validation_and_Tuning.jl" = { emdash = 8, words = 465 }
-"user_guide/06_Post_Processing.jl" = { emdash = 2, glossary = 1, words = 220 }
-"user_guide/07_Choosing_a_Strategy.jl" = { emdash = 7, notjust = 1, words = 373 }

@@ -5,12 +5,11 @@ Description = "Walk-forward and combinatorial cross-validation, and cross-valida
 
 # Validation and tuning
 
-Before trusting a strategy you want to know how it behaves on data it was not fitted to, and you
-want its hyperparameters chosen by that out-of-sample performance rather than by hand.
-`PortfolioOptimisers.jl` provides cross-validation splitters and cross-validated parameter
-search that work with *any* optimiser. This page shows the minimal path; for the full menu of
-splitters and search strategies see the
-[validation & tuning examples](../examples/5_validation_tuning/01_Cross_Validation.md).
+Cross-validation scores a strategy on data that it was not fitted to, and a search chooses the
+parameters of the strategy by that score. `PortfolioOptimisers.jl` has cross-validation splitters,
+and a cross-validated search over parameters, that work with any optimiser. This page shows the
+minimal path. For the other splitters and searches, see the
+[validation and tuning examples](../examples/5_validation_tuning/01_Cross_Validation.md).
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
@@ -27,37 +26,40 @@ mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
 #=
 ## 1. Cross-validation
 
-A cross-validation splitter partitions the timeline into training and testing folds.
-[`KFold`](@ref) is the simplest — `n` contiguous folds, each held out in turn.
-[`cross_val_predict`](@ref) fits the optimiser on each training fold and stitches the
-out-of-sample predictions back together, so you can score the strategy on data it never saw.
+A cross-validation splitter divides the dates into folds. [`KFold`](@ref) is the simplest. It makes
+`n` folds of consecutive dates, and each fold is the test fold once, while the other folds train the
+optimiser. [`cross_val_predict`](@ref) fits the optimiser on the training folds of each split,
+predicts the returns of the portfolio on the test fold, and joins the predictions. So you can score
+the strategy on data that it did not see.
 =#
 
 kfold = KFold(; n = 3)
 pred = cross_val_predict(mr, rd, kfold)
 
 #=
-The stitched predictions carry an out-of-sample realised risk, here the second moment of the
-predicted returns via [`expected_risk`](@ref).
+We compute the risk of the joined predictions with [`expected_risk`](@ref). The measure here is
+the variance of the predicted returns.
 =#
 
 cv_risk = expected_risk(LowOrderMoment(; alg = SecondMoment()), pred)
 
 #=
-For a more exhaustive evaluation, [`CombinatorialCrossValidation`](@ref) scores every
-train/test fold combination — heavier, but a fuller picture. See
-[Cross Validation](../examples/5_validation_tuning/01_Cross_Validation.md). A walk-forward
-can also *step* one estimator from fold to fold instead of refitting each fold, with
-`OnlineIndexWalkForward`; see [The online walk-forward](09_Online_Walk_Forward.md).
+[`CombinatorialCrossValidation`](@ref) takes every combination of a number of test folds out of
+the folds, and joins the test folds into several paths through the dates. You get several
+out-of-sample paths in place of one, for more fits. See
+[Cross Validation](../examples/5_validation_tuning/01_Cross_Validation.md). A walk-forward can also
+update one estimator from fold to fold instead of refitting it on each fold, with
+[`OnlineIndexWalkForward`](@ref). See [The online walk-forward](09_Online_Walk_Forward.md).
 
 ## 2. Hyperparameter tuning
 
-[`GridSearchCrossValidation`](@ref) searches a parameter grid and keeps the combination that
-scores best on the test folds. The grid is a list of `"path" => values` pairs, where the path is
-a string lens into the estimator (parsed by [Accessors.jl](https://github.com/JuliaObjects/Accessors.jl));
-a scoring rule like [`MeanReturnRiskRatio`](@ref) ranks the candidates.
-[`search_cross_validation`](@ref) runs the search and returns the tuned estimator in its `opt`
-field. Here we tune the L1 regularisation strength of our `MeanRisk`.
+[`GridSearchCrossValidation`](@ref) tries every combination of a grid of parameters, and keeps the
+one with the best score on the test folds. The grid is a list of `"path" => values` pairs. The
+path is a string that names a field inside the estimator, and the library turns it into a lens of
+[Accessors.jl](https://github.com/JuliaObjects/Accessors.jl). A scoring measure, such as
+[`MeanReturnRiskRatio`](@ref), ranks the candidates. [`search_cross_validation`](@ref) runs the
+search and returns the tuned estimator in its `opt` field. We tune the strength of the L1 penalty
+of our `MeanRisk`.
 =#
 
 score = MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment()))
@@ -66,24 +68,25 @@ grid = [["opt.l1" => [0.001, 0.01, 0.05]]]
 gs_res = search_cross_validation(mr, GridSearchCrossValidation(grid; r = score), rd)
 
 #=
-The tuned estimator optimises like any other.
+We optimise the tuned estimator on the full sample, with the same call as any other estimator.
 =#
 
 res_tuned = optimise(gs_res.opt, rd)
 
 #=
-[`RandomisedSearchCrossValidation`](@ref) samples the grid (or distributions) instead of
-enumerating it — cheaper for large spaces; see
+[`RandomisedSearchCrossValidation`](@ref) draws candidates from the grid, or from distributions,
+instead of trying every one. It costs less on a large grid. See
 [Hyperparameter Tuning](../examples/5_validation_tuning/02_Hyperparameter_Tuning.md).
 
 ## 3. Time-dependent inputs
 
-Under cross-validation each fold is a separate optimisation over its own slice of time, and any
-*problem-definition* input — constraints, priors, risk measures, objectives, even the fallback
-optimiser — can be told to change with it. Wrap a per-fold vector (or a function of the fold's
-context) in [`TimeDependent`](@ref) and store it in the field it varies; the fold loop swaps
-entry `i` in for fold `i`. Execution-control inputs (solvers, RNGs) stay static. Here the
-per-asset weight cap tightens as a walk-forward advances:
+Under cross-validation, each fold is a separate optimisation over its own dates. An input that
+defines the problem, such as a constraint, a prior, a risk measure, an objective or the fallback
+optimiser, can change from fold to fold. Put a vector with one entry for each fold, or a function
+of the fold's context, in a [`TimeDependent`](@ref), which this page calls a schedule. Then store
+the schedule in the field that it changes. The fold loop uses entry `i` for fold `i`. An input that
+controls how the problem runs, such as a solver or a random number generator, stays the same on
+every fold. We tighten the cap on the weight of each asset as a walk-forward moves forward.
 =#
 
 wf = IndexWalkForward(126, 42)
@@ -94,11 +97,11 @@ mr_caps = MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = caps))
 pred_caps = cross_val_predict(mr_caps, rd, wf)
 
 #=
-An [`OnlinePortfolioSelection`](@ref) head schedules its allocation set the same way, and the set
-is the one scheduled input its update reads at every row. The loop swaps entry `i` in before it
-folds fold `i`'s rows, so every row of fold `i` is held inside entry `i`, and so are the weights
-the fold reports. Each entry is a whole allocation set, so to vary one bound and hold the rest you
-write the whole set out, or build it inside a function of the fold's context:
+An [`OnlinePortfolioSelection`](@ref) takes a schedule of its allocation set, the set of weights
+that its rule can hold, in the same way. The loop puts entry `i` in place before it processes the
+rows of fold `i`. So the weights at each row of fold `i`, and the weights that the fold reports, lie
+inside the set of entry `i`. Each entry is a whole allocation set. To change one bound and keep the
+others, write the whole set in each entry, or build it in a function of the fold's context.
 =#
 
 caps_online = TimeDependent([BoundedAllocationSet(; wb = wb) for wb in bounds])
@@ -106,10 +109,10 @@ ops_caps = OnlinePortfolioSelection(; alg = ExponentiatedGradient(), set = caps_
 pred_ops = cross_val_predict(ops_caps, rd, OnlineIndexWalkForward(126, 42))
 
 #=
-A schedule's values may be whole optimisers — so the *strategy itself* switches per fold — and
-such a schedule can be handed to [`cross_val_predict`](@ref) directly as the optimiser. Because
-there is no static optimiser to fall back to, it must state what a fold-less
-[`optimise`](@ref) should run, via `default`:
+The entries of a schedule can be whole optimisers, so that the strategy changes from fold to fold.
+You can pass such a schedule to [`cross_val_predict`](@ref) as the optimiser. Outside a fold there
+is then no fixed optimiser, so the schedule names the optimiser that [`optimise`](@ref) runs there,
+in its `default` keyword.
 =#
 
 iv = InverseVolatility()
@@ -117,16 +120,17 @@ strategies = TimeDependent([isodd(i) ? mr : iv for i in 1:n]; default = mr)
 pred_switch = cross_val_predict(strategies, rd, wf)
 
 #=
-Outside a fold loop a schedule is inert: a plain `optimise` runs the affected field at its
-static default (or the schedule's own `default`). For schedules in meta-optimiser fields,
-callables that read the fold's data, and mixing precomputed results into a schedule, see
+Outside a fold loop, `optimise` does not read the entries of a schedule. It uses the schedule's
+`default`, or else the value that the constructor gives the field. For schedules in the fields of
+a meta-optimiser, functions that read the data of the fold, and schedules that hold computed
+results, see
 [Time Dependent Constraints](../examples/5_validation_tuning/04_Time_Dependent_Constraints.md)
 and [Time Dependent Optimisers](../examples/5_validation_tuning/06_Time_Dependent_Optimisers.md).
 
 ## 4. Cross-validation scores
 
-[`plot_cv_scores`](@ref) visualises the per-fold out-of-sample scores — a quick read on how
-stable the strategy is across the timeline.
+[`plot_cv_scores`](@ref) plots the out-of-sample score of each fold, so you can see how much the
+score of the strategy changes from fold to fold.
 =#
 
 plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), pred)

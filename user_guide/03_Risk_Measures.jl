@@ -5,22 +5,21 @@ Description = "The risk measures of PortfolioOptimisers.jl: variance, semi-momen
 
 # Risk measures
 
-The previous page showed *which optimiser* to call. This one is the catalogue of *what you ask it
-to minimise*: the `r` slot. `PortfolioOptimisers.jl` ships a large family of measures, and the
-names alone do not tell you which is which — several of the best-known ones (mean absolute
-deviation, semi-variance, Gini mean difference) are not types at all but *configurations* of a
-generic type, reachable through a short alias.
+The previous page showed which optimiser to call. This page lists what you can ask it to
+minimise, the risk measure in its `r` field. The library has many risk measures, and a name does
+not always tell you what the measure is. Several well-known measures, such as the mean absolute
+deviation, the semi-variance and the Gini mean difference, are not types. Each is a setting of a
+generic type, and a short alias builds it.
 
-This page is a reference, not a tutorial. It answers three questions in one place:
+This page is a reference. It answers three questions:
 
  1. What measures exist, and what does each penalise?
  2. Which optimisers accept it?
  3. What is its short alias, and what does that alias expand to?
 
-Every table below is **generated from the type system and the compatibility trait**
-([`supports_risk_measure`](@ref)), so it cannot drift from what the optimisers actually
-dispatch on. The one-line meanings are curated, and the page fails the docs build if a measure is
-added without one.
+We compute every table below from the types of the library and from
+[`supports_risk_measure`](@ref), so the tables list what the optimisers accept. The one-line
+meanings are written by hand, and the docs build fails if a measure has none.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, InteractiveUtils,
@@ -29,14 +28,16 @@ using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Interactiv
 #=
 ## 1. How a measure is used
 
-A risk measure plays two roles, and they use two different call shapes.
+A risk measure has two uses.
 
-**Inside an optimiser** it is a *configuration*: you hand it to the `r` field and the optimiser
+Inside an optimiser, a measure is a configuration. You pass it to the `r` field, and the optimiser
 turns it into constraints and an objective term.
 
-**Outside an optimiser** it is a *callable functor*: you evaluate it on a book to get a number.
-[`expected_risk`](@ref) is the uniform way in — it knows which of the three input shapes
-(net returns, weights + returns + fees, weights alone) each measure wants, so you do not have to.
+Outside an optimiser, a measure is an object that you call on a portfolio to get a number.
+[`expected_risk`](@ref) is one call for every measure. A measure takes one of three inputs: the
+net returns of the portfolio, the weights with the returns and the fees, or the weights alone.
+`expected_risk` gives each measure the input that it takes. We compute six measures on the
+equal-weighted portfolio.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -55,56 +56,57 @@ pretty_table(DataFrame("Measure" => ["StandardDeviation", "MAD (LowOrderMoment)"
 #=
 !!! note
 
-    [`factory`](@ref) binds a measure to a prior — it is what fills in `sigma` for
-    [`Variance`](@ref)/[`StandardDeviation`](@ref) and `mu` for the moment measures. Measures that
-    read only the return path ([`ConditionalValueatRisk`](@ref), the drawdown family) do not need
-    it, but calling `factory` unconditionally is always safe and is exactly what the optimisers do
-    internally. The measures that solve a sub-problem to evaluate —
-    [`EntropicValueatRisk`](@ref), [`RelativisticValueatRisk`](@ref), and their drawdown twins —
-    additionally need a [`Solver`](@ref) in their `slv` field before you can call them outside an
-    optimiser.
+    [`factory`](@ref) binds a measure to a prior. It fills `sigma` for [`Variance`](@ref) and
+    [`StandardDeviation`](@ref), and `mu` for the moment measures. It also gives the observation
+    weights of the prior to the measures that take them, such as
+    [`ConditionalValueatRisk`](@ref). Without `factory`, such a measure gives every observation the
+    same weight. The optimisers call `factory` on every measure, and you can call it on any
+    measure. [`EntropicValueatRisk`](@ref), [`RelativisticValueatRisk`](@ref) and their drawdown
+    forms solve a subproblem to compute the risk. Before you call one of them outside an
+    optimiser, put a [`Solver`](@ref) in its `slv` field.
 
 !!! note
 
-    Handing `expected_risk` the prior itself — `expected_risk(r, w, pr)` — runs `factory` for you,
-    so the explicit call above is only needed when you want the bound measure back. Handing it a
-    bare returns matrix cannot: a slot that holds a [`DeferredQuantity`](@ref) has no prior to
-    resolve against there, and the call refuses rather than guessing.
+    If you give `expected_risk` the prior, as in `expected_risk(r, w, pr)`, it calls `factory` for
+    you. So you call `factory` yourself only when you want the bound measure. If you give it a
+    returns matrix, and a field of the measure holds a [`DeferredQuantity`](@ref),
+    `expected_risk` throws an error, because it has no prior to compute the quantity from.
 
-    That second form is the other half of the slot. `sigma`, `mu`, `kt` and `sk` each take the
-    value **or the estimator that computes it**, and the estimator is resolved against whichever
-    prior the optimisation actually runs on — per cross-validation fold, per resampled subset.
-    Worked through in the
-    [subset resampling example](../examples/3_optimisers/14_Subset_Resampling_and_Cross_Validation.md).
+    The fields `sigma`, `mu`, `kt` and `sk` each take a value or an estimator that computes it. The
+    optimiser computes the estimator on the prior of each run, including each cross-validation
+    fold and each resampled subset. The
+    [subset resampling example](../examples/3_optimisers/14_Subset_Resampling_and_Cross_Validation.md)
+    shows it.
 
 ## 2. The three usage classes
 
-Every measure sits in one of three classes, and the class is what determines where it is legal.
-The `Optimisers` column in every table below is derived from it:
+Each measure belongs to one of three classes, and the class sets where you can use it. The
+`Optimisers` column of every table below comes from the class:
 
 | Class | `Optimisers` column | Meaning |
 | :-- | :-- | :-- |
-| [`RiskMeasure`](@ref) | `JuMP + clustering` | Has a convex JuMP formulation. Usable everywhere: [`MeanRisk`](@ref), [`RiskBudgeting`](@ref), [`NearOptimalCentering`](@ref), [`FactorRiskContribution`](@ref), *and* the clustering optimisers. |
-| [`HierarchicalRiskMeasure`](@ref) | `clustering only` | No JuMP formulation — it is only ever evaluated numerically, which clustering optimisers can do but a solver cannot. Passing one to `MeanRisk` is a type error, not a silent fallback. |
-| `NonOptimisationRiskMeasure` | `diagnostic only` | Not an optimisation target at all: a reporting quantity ([`ExpectedReturn`](@ref), [`Skewness`](@ref)) or a ratio used for scoring in cross-validation. |
+| [`RiskMeasure`](@ref) | `JuMP + clustering` | Has a JuMP formulation, which is convex for most measures and mixed-integer for a few. You can use it in [`MeanRisk`](@ref), [`RiskBudgeting`](@ref), [`NearOptimalCentering`](@ref), [`FactorRiskContribution`](@ref) and the clustering optimisers. |
+| [`HierarchicalRiskMeasure`](@ref) | `clustering only` | Has no JuMP formulation. Only a clustering optimiser can compute it, from the returns. `MeanRisk` throws a `TypeError` when you pass one. |
+| `NonOptimisationRiskMeasure` | `diagnostic only` | Is not a target of an optimisation. It is a quantity to report, such as [`ExpectedReturn`](@ref) or [`Skewness`](@ref), or a ratio that scores a portfolio in cross-validation. |
 
-Meta-optimisers ([`NestedClustered`](@ref), [`Stacking`](@ref), [`SubsetResampling`](@ref)) have no
-`r` of their own; they accept a measure only when *every* constituent optimiser does, so their
-acceptance is instance-specific and is not tabulated. Ask directly:
+The meta-optimisers, [`NestedClustered`](@ref), [`Stacking`](@ref) and [`SubsetResampling`](@ref),
+have no `r` of their own. Each accepts a measure only when every optimiser it holds accepts it, so
+the tables do not list them. Ask for the case you have:
 
 ```julia
 supports_risk_measure(MeanRisk, ConditionalValueatRisk)   # true
-supports_risk_measure(MeanRisk, EqualRisk)                # false — hierarchical only
+supports_risk_measure(MeanRisk, EqualRisk)                # false, hierarchical only
 supported_risk_measures(HierarchicalRiskParity)           # OptimisationRiskMeasure
 ```
 
 ## 3. The catalogue
 
-The curated one-liner for each measure, its alias, and its class — grouped by what the measure
-*looks at* rather than by source file. Every name below is exported and documented: the full
-signature, fields, and references live under
-[Public API → Risk Measures](../public_api/16_RiskMeasures/01_Base_RiskMeasures.md), and `?ConditionalValueatRisk`
-in the REPL gets you there without leaving the terminal.
+Each table gives the meaning of each measure in one line, its alias and its class. The tables
+group the measures by the part of the returns that they measure. Every name is exported and has a
+docstring. The
+[public API page on risk measures](../public_api/16_RiskMeasures/01_Base_RiskMeasures.md) gives the
+signature, the fields and the references of each, and `?ConditionalValueatRisk` in the REPL shows
+the same docstring.
 =#
 
 ## Reverse-map the exported alias layer onto the measure types it names, so the alias column
@@ -218,21 +220,20 @@ end;
 # ### Dispersion and moments
 pretty_table(family_table("Dispersion and moments"))
 
-# ### Tail — X-at-Risk
+# ### Tail measures
 pretty_table(family_table("Tail — X-at-Risk"))
 
 # ### Tail ranges (both sides)
 pretty_table(family_table("Tail ranges (both sides)"))
 
-# ### Drawdown — uncompounded
+# ### Drawdowns of uncompounded returns
 pretty_table(family_table("Drawdown — uncompounded"))
 
 #=
-### Drawdown — compounded (relative)
+### Drawdowns of compounded returns
 
-The `Relative*` twins measure drawdown on the **compounded** wealth path rather than the
-cumulative sum of returns. They have no convex JuMP formulation, which is why the whole family is
-`clustering only`.
+The `Relative*` measures compute the drawdown on the compounded wealth, not on the cumulative sum
+of the returns. They have no convex JuMP formulation, so they are all `clustering only`.
 =#
 pretty_table(family_table("Drawdown — compounded (relative)"))
 
@@ -248,21 +249,23 @@ pretty_table(family_table("Composite and structural"))
 #=
 ### Non-optimisation (diagnostics and scoring)
 
-These are *not* legal in an `r` slot. They exist to score a book after the fact and to serve as
-cross-validation scorers — see [validation and tuning](05_Validation_and_Tuning.md).
+You cannot put these measures in an `r` field. They score a portfolio after the optimisation,
+and they score the folds of a cross-validation. See
+[validation and tuning](05_Validation_and_Tuning.md).
 =#
 pretty_table(family_table("Non-optimisation (diagnostics and scoring)"))
 
 #=
-## 4. Measures that hide behind an `alg`
+## 4. Generic measures and their aliases
 
-Three of the types above are *generic*: [`LowOrderMoment`](@ref), [`HighOrderMoment`](@ref), and
-[`OrderedWeightsArray`](@ref) each host a whole family behind their `alg`/`w` field. Writing
-`LowOrderMoment(; alg = MeanAbsoluteDeviation())` by hand is exactly the friction the alias layer
-removes — every row below is a one-call constructor exported by the package.
+Three of the types above are generic. [`LowOrderMoment`](@ref), [`HighOrderMoment`](@ref) and
+[`OrderedWeightsArray`](@ref) each compute a family of measures, and the `alg` or `w` field
+selects the member. You can write `MAD()` for `LowOrderMoment(; alg = MeanAbsoluteDeviation())`.
+Each row below is an exported alias that builds a measure in one call. An alias that builds a
+`HighOrderMoment` gives a measure that only a clustering optimiser accepts.
 
-The `Expands to` column is read off the constructed object, so it states what the alias actually
-builds today.
+We read the `Expands to` column off the object that each alias builds, so the column shows what the
+alias builds in this version.
 =#
 
 alias_ctors = [("FLM", FLM, "First lower partial moment."),
@@ -314,43 +317,45 @@ pretty_table(DataFrame("Alias" => [a[1] * "()" for a in alias_ctors],
 #=
 !!! warning "`MAD()` is not `MedianAbsoluteDeviation()`"
 
-    [`MAD`](@ref) builds a [`LowOrderMoment`](@ref) with
-    [`MeanAbsoluteDeviation`](@ref) — deviation around the **mean**, and a full
-    [`RiskMeasure`](@ref) usable in any optimiser. [`MedianAbsoluteDeviation`](@ref) is a distinct
-    type measuring deviation around the **median**, and it is `clustering only`. The names
-    collide; the measures do not.
+    [`MAD`](@ref) builds a [`LowOrderMoment`](@ref) with [`MeanAbsoluteDeviation`](@ref), the
+    deviation around the mean. It is a [`RiskMeasure`](@ref), so every optimiser with an `r` field
+    accepts it. [`MedianAbsoluteDeviation`](@ref) is a different type. By default it measures the
+    deviation around the median, and only a clustering optimiser accepts it.
 
-## 5. Picking one
+## 5. Choosing a measure
 
-The catalogue is long, but the choice collapses to what you believe about the return distribution:
+The choice depends on what you believe about the distribution of the returns:
 
-  - **Roughly symmetric, care about spread** — [`Variance`](@ref) (the default) or
-    [`StandardDeviation`](@ref).
-  - **Left tail matters more than spread** — [`ConditionalValueatRisk`](@ref) first; reach for
-    [`EntropicValueatRisk`](@ref) / [`RelativisticValueatRisk`](@ref) when you want to control the
-    tail more tightly than CVaR does.
-  - **Path matters, not just the distribution** — the drawdown family, headed by
-    [`MaximumDrawdown`](@ref) and [`ConditionalDrawdownatRisk`](@ref).
-  - **You distrust the covariance estimate** — [`UncertaintySetVariance`](@ref).
-  - **You want to shape the whole ordered loss curve** — [`OrderedWeightsArray`](@ref).
-  - **Trading costs bite** — add [`TurnoverRiskMeasure`](@ref) or
-    [`TrackingRiskMeasure`](@ref) alongside your main measure.
+  - If the returns are about symmetric and you care about their spread, use
+    [`Variance`](@ref), the default, or [`StandardDeviation`](@ref).
+  - If a loss in the left tail matters more than the spread, start with
+    [`ConditionalValueatRisk`](@ref). [`EntropicValueatRisk`](@ref) is an upper bound on it, so it
+    penalises the tail more. [`RelativisticValueatRisk`](@ref) generalises the entropic value at
+    risk, and it tends to the entropic value at risk as its parameter `kappa` goes to zero.
+  - If the path of the wealth matters as well as the distribution of the returns, use a
+    drawdown measure, such as [`MaximumDrawdown`](@ref) or
+    [`ConditionalDrawdownatRisk`](@ref).
+  - If you do not trust the estimate of the covariance, use [`UncertaintySetVariance`](@ref).
+  - If you want to give a weight to each sorted return, use [`OrderedWeightsArray`](@ref).
+  - If trading costs matter, add [`TurnoverRiskMeasure`](@ref) to your main measure. It penalises
+    the distance from the previous weights. To penalise the distance of the portfolio's returns
+    from a benchmark, add [`TrackingRiskMeasure`](@ref).
 
-Several measures can be combined in one objective — see
-[Multiple Risk Measures](../examples/3_optimisers/04_Multiple_Risk_Measures.md) for how they are
-scalarised. The deep dives are
+[Multiple Risk Measures](../examples/3_optimisers/04_Multiple_Risk_Measures.md) shows how an
+optimiser combines several measures in one objective. These pages cover the measures in depth:
 [OWA Risk Measures](../examples/3_optimisers/05_OWA_Risk_Measures.md),
 [Brownian Distance, Skew and Kurtosis](../examples/3_optimisers/06_Brownian_Distance_Variance_and_VarianceSkewKurtosis.md),
 [Drawdown Risk Measures](../examples/3_optimisers/07_Drawdown_Risk_Measures.md), and
 [Exotic Tail Risk Measures](../examples/3_optimisers/08_Exotic_Tail_Risk_Measures.md).
 
-## 6. What the measures actually see
+## 6. The measures on the distribution of the returns
 
-The clearest way to read the catalogue is to put the measures back on the return distribution they
-summarise. [`plot_histogram`](@ref) draws the equal-weighted book's returns with each tail
-measure marked where it falls: VaR cuts at a quantile, CVaR sits further left as the *mean* of
-that tail, and the worst realisation anchors the end. Distance between the lines is exactly the
-difference in what you are asking the optimiser to control.
+[`plot_histogram`](@ref) draws the histogram of the returns of the equal-weighted portfolio, with
+a vertical line for each of several measures. One line marks the mean. Three lines mark the mean
+less the standard deviation, less the mean absolute deviation and less the Gini mean difference.
+The other lines mark the value at risk, the conditional value at risk, the tail Gini and the worst
+return. The value at risk is a quantile of the returns. The conditional value at risk is the mean
+of the returns below that quantile, so its line is further to the left.
 =#
 
 plot_histogram(w, rd)

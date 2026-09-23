@@ -5,59 +5,61 @@ Description = "A decision framework for choosing an optimiser, risk measure and 
 
 # Choosing a strategy
 
-The previous pages showed *how* to call each tool. This one is about *which* to reach for. There
-is no single best optimiser — the right choice falls out of four questions about your situation.
-The worked, end-to-end investor profiles live in
-[putting it together](../examples/7_putting_it_together/01_Profile_Retail_Daily.md); this page is
-the decision framework behind them.
+The previous pages showed how to call each tool. This page helps you choose one. Four questions
+about your situation lead to a choice. The
+[investor profiles](../examples/7_putting_it_together/01_Profile_Retail_Daily.md) work through four
+complete cases, and this page gives the questions behind them.
 
 ## The four questions
 
-1. **How much compute can you spend per rebalance?** Naive optimisers ([`InverseVolatility`](@ref),
-   [`EqualWeighted`](@ref)) are instant and solver-free. JuMP optimisers ([`MeanRisk`](@ref),
-   [`RiskBudgeting`](@ref)) solve a convex program — fast, but not free. Meta-optimisers
-   ([`NestedClustered`](@ref), [`Stacking`](@ref)) and cross-validated tuning stack many solves
-   and cost the most.
+### 1. How much compute can you spend on each rebalance?
 
-2. **How often do you rebalance?** High frequency rewards cheap, stable rules and tight
-   [`Turnover`](@ref)/[`Fees`](@ref) control so costs do not eat the edge. Infrequent rebalancing
-   can afford a heavier, more bespoke optimisation each time.
+Naive optimisers ([`InverseVolatility`](@ref), [`EqualWeighted`](@ref)) need no solver and return
+at once. JuMP optimisers ([`MeanRisk`](@ref), [`RiskBudgeting`](@ref)) solve a convex program,
+which takes longer than a naive rule. Meta-optimisers ([`NestedClustered`](@ref),
+[`Stacking`](@ref)) and cross-validated tuning solve many programs and cost the most.
 
-3. **How much do you trust your estimates?** If you have genuine forecasts, fold them in with a
-   view prior ([`BlackLittermanPrior`](@ref), [`EntropyPoolingPrior`](@ref)). If you mostly
-   distrust the noise in the moments, make the optimisation robust ([`UncertaintySetVariance`](@ref),
-   a worst-case mean) or lean on the correlation hierarchy ([`HierarchicalRiskParity`](@ref))
-   rather than point estimates.
+### 2. How often do you rebalance?
 
-4. **How large and constrained is the capital?** Small accounts need
-   [`GreedyAllocation`](@ref) to round into whole shares without wasting cash. Institutional
-   mandates pile on constraints — weight bounds, group limits, tracking — which is exactly what
-   the JuMP optimisers are built for.
+If you rebalance often, use cheap and stable rules, and bound the [`Turnover`](@ref) or charge the
+[`Fees`](@ref), so that the trading costs do not cancel the excess return. If you rebalance
+rarely, you can spend more compute on each optimisation.
 
-## A rough map
+### 3. How much do you trust your estimates?
 
-| Situation | Reach for |
+If you have forecasts, add them to the prior with a view prior ([`BlackLittermanPrior`](@ref),
+[`EntropyPoolingPrior`](@ref)). If you do not trust the moments, make the optimisation robust
+with an uncertainty set on the covariance ([`UncertaintySetVariance`](@ref)) or on the expected
+returns. Or use the hierarchy of the correlations ([`HierarchicalRiskParity`](@ref)) in place of
+point estimates.
+
+### 4. How large is your capital, and how many constraints does your mandate set?
+
+A small account needs a finite allocation, such as [`GreedyAllocation`](@ref), to buy whole
+shares and leave little cash. An institutional mandate has many constraints, such as weight
+bounds, group limits and tracking, and the JuMP optimisers take all of them.
+
+## A table of starting points
+
+| Situation | Use |
 | :-- | :-- |
-| Minimal compute, just want diversification | [`InverseVolatility`](@ref) / [`EqualWeighted`](@ref) |
-| Classic risk/return trade-off | [`MeanRisk`](@ref) with an objective + efficient frontier |
-| Want each holding to carry equal risk | [`RiskBudgeting`](@ref) |
-| Care about tail losses or drawdowns, not just variance | swap `MeanRisk`'s `r` to a tail ([`ConditionalValueatRisk`](@ref)) or drawdown ([`MaximumDrawdown`](@ref)) measure |
-| Many assets, unstable covariance | [`HierarchicalRiskParity`](@ref) and clustering optimisers |
-| Distrust a single fit, want robustness | [`NestedClustered`](@ref) / [`Stacking`](@ref), or uncertainty sets |
-| Have real views | [`BlackLittermanPrior`](@ref) / [`EntropyPoolingPrior`](@ref) |
-| Tight rebalancing budget | add [`Turnover`](@ref) / [`Fees`](@ref) to a [`JuMPOptimiser`](@ref) |
-| Trading real money | finish with [`GreedyAllocation`](@ref) |
+| Little compute, and you want diversification | [`InverseVolatility`](@ref) or [`EqualWeighted`](@ref) |
+| The trade-off between risk and return | [`MeanRisk`](@ref) with an objective, or its efficient frontier |
+| Each asset carries the same share of the risk | [`RiskBudgeting`](@ref) |
+| Tail losses or drawdowns matter more than the variance | set the `r` of `MeanRisk` to a tail measure ([`ConditionalValueatRisk`](@ref)) or a drawdown measure ([`MaximumDrawdown`](@ref)) |
+| Many assets, and a covariance that changes | [`HierarchicalRiskParity`](@ref) or another clustering optimiser |
+| You do not trust one fit | [`NestedClustered`](@ref) or [`Stacking`](@ref), or an uncertainty set |
+| You have views | [`BlackLittermanPrior`](@ref) or [`EntropyPoolingPrior`](@ref) |
+| Trading costs matter | add [`Turnover`](@ref) or [`Fees`](@ref) to a [`JuMPOptimiser`](@ref) |
+| You trade the portfolio | end with [`GreedyAllocation`](@ref) |
 
-These are starting points, not rules — most real strategies combine several (a view prior *and*
-constraints *and* finite allocation). The
-[putting-it-together profiles](../examples/7_putting_it_together/01_Profile_Retail_Daily.md) walk
-three complete examples end to end.
+Most strategies combine several rows, such as a view prior, constraints and a finite allocation.
 
-## The choice is real
+## Three strategies on the same data
 
-To make the point concrete: three archetypes from the map — pure diversification, the
-risk/return workhorse, and the hierarchy-based rule — produce visibly different portfolios on the
-same data. Picking a strategy is picking one of these shapes.
+We run three strategies from the table on the same data: equal weights, the minimum-risk
+`MeanRisk` and HRP. We plot their weights. In the plot, the minimum-risk bar has few colours, and
+the HRP bar has one colour for every asset.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
