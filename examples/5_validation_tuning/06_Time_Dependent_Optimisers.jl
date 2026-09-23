@@ -137,17 +137,15 @@ the per-fold entries.
 
 A schedule fixed in advance cannot follow the data. A callable computes the fold's
 optimiser from the fold's own data. This one computes the annualised volatility of an equal-weight
-portfolio over the training window. It picks the defensive strategy when that volatility is above
-the volatility of the full sample, and the aggressive one otherwise. The full sample includes rows
-after the training window, so this rule uses data that a live backtest would not have yet.
+portfolio over the training window. It picks the defensive strategy when that volatility is above a
+fixed level of 20 %, and the aggressive one otherwise. The rule reads only the rows of the training
+window, so it uses no data that a live backtest would not have yet.
 =#
 function ew_vol(Xm)
     return std(Xm * fill(1 / size(Xm, 2), size(Xm, 2))) * sqrt(252)
 end
-function regime(ctx)
-    vol_train = ew_vol(ctx.rd.X[ctx.train_idx[ctx.i], :])
-    return vol_train > ew_vol(ctx.rd.X) ? defensive : aggressive
-end
+is_turbulent(ctx) = ew_vol(ctx.rd.X[ctx.train_idx[ctx.i], :]) > 0.2
+regime(ctx) = is_turbulent(ctx) ? defensive : aggressive
 pred_regime = cross_val_predict(TimeDependent(regime; default = defensive), rd, wf)
 
 pretty_table(DataFrame(:fold => 1:n, :ran => [which_strategy(pred_regime, i) for i in 1:n]);
@@ -178,8 +176,7 @@ struct RegimeSwitch{T <: PortfolioOptimisers.OptimisationEstimator,
     turbulent::U
 end
 function (r::RegimeSwitch)(ctx::TimeDependentContext)
-    vol_train = ew_vol(ctx.rd.X[ctx.train_idx[ctx.i], :])
-    return vol_train > ew_vol(ctx.rd.X) ? r.turbulent : r.calm
+    return is_turbulent(ctx) ? r.turbulent : r.calm
 end
 pred_struct = cross_val_predict(TimeDependent(RegimeSwitch(aggressive, defensive);
                                               default = defensive), rd, wf)
@@ -288,10 +285,9 @@ pred_fb = cross_val_predict(mr_fb, rd, wf)
 pretty_table(DataFrame(:fold => 1:n,
                        :equal_weighted =>
                            [all(w -> isapprox(w, 1 / length(p.res.w); rtol = 1e-6),
-                                p.res.w) for p in pred_fb.pred]); formatters = [resfmt])
+                                p.res.w) for p in pred_fb.pred]))
 #=
-The table formatter prints `true` as 100 % and `false` as 0 %. The folds of the second half are
-equal-weighted.
+The folds of the second half are equal-weighted.
 
 A `fb` schedule without a `default` does not throw on a solve with no folds. `nothing` is a valid
 fallback, so outside a fold loop the schedule means no fallback. `fb` is the one optimiser field
@@ -311,33 +307,15 @@ cluster. A `:nearest` schedule there must have a `default`, and the meta-optimis
 The constructor checks both.
 
 The entries run once per cluster, over the few assets of that cluster. The defensive strategy's cap
-of 10 % is infeasible on a cluster of fewer than ten assets. The inner optimiser here takes its
-upper bound from [`UniformValues`](@ref) instead. That bound is one over the number of assets of the
-cluster. The outer optimiser takes the same bound over the clusters. `UniformValues` counts the
-names in the optimiser's [`UniverseSets`](@ref), so the outer optimiser needs one name per cluster,
-and the number of clusters is not known before the run. One way is to run [`clusterise`](@ref)
-first. The other, which we use here, is a placeholder set that the meta-optimiser fills with the
-names of the synthetic assets, `_1` to `_k` for `k` clusters.
-
-With a lower bound of zero and weights that sum to one, a bound of one over the number of assets
-leaves one feasible portfolio, the equal weights. So the objective of these two optimisers has no
-effect. Every cluster is equal-weighted, and so are the clusters.
+of 10 % is infeasible on a cluster of fewer than ten assets, so the minimum-variance optimiser here
+has no cap. The schedule runs it on inner folds 1 and 3 and in the `default`. It is also the outer
+optimiser, which combines the clusters.
 =#
-inner_sets = UniverseSets(; dict = Dict("nx" => rd.nx))
-inner_minvar = MeanRisk(; obj = MinimumRisk(),
-                        opt = JuMPOptimiser(; slv = slv, sets = inner_sets,
-                                            wb = WeightBoundsEstimator(; lb = 0,
-                                                                       ub = UniformValues())))
-outer_sets = UniverseSets(; dict = Dict("nx" => ["placeholder"]))
-outer_minvar = MeanRisk(; obj = MinimumRisk(),
-                        opt = JuMPOptimiser(; slv = slv, sets = outer_sets,
-                                            wb = WeightBoundsEstimator(; lb = 0,
-                                                                       ub = UniformValues())))
+minvar = MeanRisk(; obj = MinimumRisk(), opt = JuMPOptimiser(; slv = slv))
 inner_cv = OptimisationCrossValidation(; cv = KFold(; n = 3))
 nco = NestedClustered(;
-                      opti = TimeDependent([inner_minvar, aggressive, inner_minvar],
-                                           :nearest; default = inner_minvar),
-                      opto = outer_minvar, cv = inner_cv)
+                      opti = TimeDependent([minvar, aggressive, minvar], :nearest;
+                                           default = minvar), opto = minvar, cv = inner_cv)
 res_nco = optimise(nco, rd)
 maximum(res_nco.w)
 #=
@@ -348,24 +326,19 @@ entry `i`. The solve over the full window of each cluster ran the `default`.
 `opti`, and a `:nearest` schedule goes on an element of `opti`. The constructor rejects a
 `:nearest` schedule on the whole field. The inner cross-validation gets the elements of `opti`,
 never the field, and a candidate vector that changed from fold to fold would change the columns of
-returns that the outer optimiser combines. `Stacking` does not rename
-the assets of the outer optimiser. You give the outer [`UniverseSets`](@ref) one name per inner
-optimiser. With two inner optimisers the names are `_1` and `_2`.
+returns that the outer optimiser combines. We print the weights that the outer optimiser gives the
+two candidates.
 =#
-outer_sets = UniverseSets(; dict = Dict("nx" => ["_1", "_2"]))
-outer_minvar = MeanRisk(; obj = MinimumRisk(),
-                        opt = JuMPOptimiser(; slv = slv, sets = outer_sets,
-                                            wb = WeightBoundsEstimator(; lb = 0,
-                                                                       ub = UniformValues())))
 st = Stacking(;
-              opti = [TimeDependent([inner_minvar, aggressive, inner_minvar], :nearest;
-                                    default = inner_minvar), aggressive],
-              opto = outer_minvar, cv = inner_cv)
+              opti = [TimeDependent([minvar, aggressive, minvar], :nearest;
+                                    default = minvar), aggressive], opto = minvar,
+              cv = inner_cv)
 res_st = optimise(st, rd)
-maximum(res_st.w)
+res_st.reso.w
 #=
-The outer bound of one half on two candidates again forces equal weights, so the stacked portfolio
-is half of each candidate.
+The outer optimiser minimises the variance of the combined returns, and it puts almost all the
+weight on the first candidate. So that candidate's out-of-sample returns have a lower variance than
+those of the aggressive candidate.
 
 Where no inner fold loop uses an optimiser field, a `:nearest` schedule has no meaning, and the
 constructor rejects it. That is every `fb`, every `opto`, and the `opt` of
@@ -457,11 +430,7 @@ struct RegimeSwitchLogged{T <: PortfolioOptimisers.OptimisationEstimator,
     log::Vector{Symbol}
 end
 function (r::RegimeSwitchLogged)(ctx::TimeDependentContext)
-    picked = if ew_vol(ctx.rd.X[ctx.train_idx[ctx.i], :]) > ew_vol(ctx.rd.X)
-        :turbulent
-    else
-        :calm
-    end
+    picked = is_turbulent(ctx) ? :turbulent : :calm
     r.log[ctx.i] = picked
     return picked === :turbulent ? r.turbulent : r.calm
 end

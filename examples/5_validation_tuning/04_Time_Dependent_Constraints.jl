@@ -491,20 +491,29 @@ own schedules when it splits the data.
 ### 7.6 A schedule of constraint vectors
 
 A field that takes a vector of constraints changes from fold to fold through a vector of vectors.
-Entry `i` is the whole constraint vector of fold `i`. Here the linear constraints `lcse` have one
-cap in the first half of the folds and two caps in the second half.
+Entry `i` is the whole constraint vector of fold `i`. Here the linear constraints `lcse` cap the
+weight of WMT at 15 % on every fold, and they add a cap of 15 % on JNJ in the second half of the
+folds. The uncapped baseline puts its largest weight on WMT on the first fold and on JNJ on the last
+two folds.
 =#
 sets = UniverseSets(; dict = Dict("nx" => rd.nx))
-cap_a = LinearConstraintEstimator(; val = "$(rd.nx[1]) <= 0.5")
-cap_b = LinearConstraintEstimator(; val = "$(rd.nx[2]) <= 0.5")
+cap_a = LinearConstraintEstimator(; val = "WMT <= 0.15")
+cap_b = LinearConstraintEstimator(; val = "JNJ <= 0.15")
 lcse_sched = TimeDependent([i <= n_wf ÷ 2 ? [cap_a] : [cap_a, cap_b] for i in 1:n_wf])
 mr_lcse = MeanRisk(; opt = JuMPOptimiser(; slv = slv, sets = sets, lcse = lcse_sched))
 pred_lcse = cross_val_predict(mr_lcse, rd, wf)
-pretty_table(DataFrame(:fold => 1:n_wf, :vector_schedule => max_weights(pred_lcse));
+
+## The weight of one asset on each fold.
+asset_weights(pred, name) = [p.res.w[findfirst(==(name), rd.nx)] for p in pred.pred]
+pretty_table(DataFrame(:fold => 1:n_wf, :WMT_static => asset_weights(pred_wf_static, "WMT"),
+                       :WMT_schedule => asset_weights(pred_lcse, "WMT"),
+                       :JNJ_static => asset_weights(pred_wf_static, "JNJ"),
+                       :JNJ_schedule => asset_weights(pred_lcse, "JNJ"));
              formatters = [resfmt])
 #=
-Neither cap of 50 % binds on this data, so the largest weights are almost those of the uncapped
-baseline. The table shows the form of the schedule, not an effect of it.
+The weight of WMT stays at or under its cap on every fold. In the first half of the folds JNJ has no
+cap, and on the first two folds it takes a part of the weight that the cap removes from WMT. In the
+second half, the cap of JNJ binds on the folds where the baseline puts more than 15 % on it.
 
 A schedule can only be the whole value of a field, so an entry of a constraint vector cannot be a
 schedule. To change some entries of a constraint vector and keep the
