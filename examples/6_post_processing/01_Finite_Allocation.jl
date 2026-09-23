@@ -36,6 +36,13 @@ resfmt = (v, i, j) -> begin
         isa(v, AbstractFloat) ? "$(round(v*100, digits=3)) %" : v
     end
 end;
+cashfmt = (v, i, j) -> begin
+    return if j == 2
+        "\$$(round(v, digits = 2))"
+    else
+        resfmt(v, i, j)
+    end
+end;
 
 #=
 ## 1. A target portfolio and prices
@@ -92,7 +99,7 @@ pretty_table(DataFrame("Method" => ["Greedy", "Discrete (MIP)"],
                        "Leftover cash" => [greedy.cash, discrete.cash],
                        "Rounding error" =>
                            [rounding_error(greedy), rounding_error(discrete)]);
-             formatters = [resfmt],
+             formatters = [cashfmt],
              title = "Leftover cash and rounding error of the greedy and discrete allocations")
 
 #=
@@ -110,7 +117,7 @@ pretty_table(DataFrame("Allocation" => ["Single shares", "Lots of 10"],
                        "Leftover cash" => [greedy.cash, greedy_lots.cash],
                        "Rounding error" =>
                            [rounding_error(greedy), rounding_error(greedy_lots)]);
-             formatters = [resfmt],
+             formatters = [cashfmt],
              title = "Leftover cash and rounding error of the greedy allocation in single shares and in lots of 10")
 
 #=
@@ -129,7 +136,7 @@ budget_allocs = [optimise(GreedyAllocation(),
 pretty_table(DataFrame("Budget" => budgets,
                        "Leftover cash" => [a.cash for a in budget_allocs],
                        "Rounding error" => [rounding_error(a) for a in budget_allocs]);
-             formatters = [resfmt], title = "Rounding error by budget")
+             formatters = [cashfmt], title = "Rounding error by budget")
 
 #=
 [`FiniteAllocationInput`](@ref) also takes a `fees` keyword, a [`Fees`](@ref), which needs a
