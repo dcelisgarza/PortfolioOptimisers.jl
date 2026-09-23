@@ -302,7 +302,7 @@ pretty_table(DataFrame("max |Ms*f + eps - X|" => recon, "Pairs" => recon_pairs,
                                                         pr.sigma[inv_i, inv_i]),
                        "max |mu - M*f - b|" => maximum(abs,
                                                        view(pr.mu, inv_i) - view(rr.M * pr.fpr.mu + rr.b, inv_i)));
-             formatters = [numfmt], title = "Three identities the fit makes exact")
+             formatters = [numfmt], title = "Three residuals of the fit")
 
 #=
 The zero-sum constraint on the industry factor returns is a construction as well. At every
@@ -648,7 +648,7 @@ pretty_table(DataFrame("Decomposition" => ["Predicted", "Realised"],
                        "variance shares - 1" => [r[3] for r in residuals],
                        "factors - systematic" => [r[4] for r in residuals],
                        "families - systematic" => [r[5] for r in residuals]);
-             formatters = [numfmt], title = "The decomposition closes")
+             formatters = [numfmt], title = "Residuals of the two decompositions")
 
 pretty_table(DataFrame("Component" =>
                            ["Systematic", "Idiosyncratic", "Unattributed", "Total"],

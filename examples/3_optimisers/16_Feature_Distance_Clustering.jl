@@ -96,7 +96,7 @@ taxonomy = ["nx_sector", "nx_industry"]
 
 pretty_table(DataFrame("Asset" => rd0.nx, "Sector" => [sector[a] for a in rd0.nx],
                        "Industry" => [industry[a] for a in rd0.nx]);
-             title = "The classification the Asset Panel will carry")
+             title = "The classification the asset panel will hold")
 
 #=
 ## 2. From a classification to an asset panel
@@ -117,11 +117,11 @@ levels it has.
 inputs = panel_input(sets, taxonomy)
 pnl = asset_panel(inputs)
 
-pretty_table(DataFrame("Panel Field" => [f.name for f in pnl.pf],
+pretty_table(DataFrame("Field" => [f.name for f in pnl.pf],
                        "Kind" => [string(nameof(typeof(f))) for f in pnl.pf],
                        "Levels" => [length(PortfolioOptimisers.panel_field_labels(f))
                                     for f in pnl.pf]);
-             title = "One Panel Field per level of the classification")
+             title = "One panel field per level of the classification")
 
 #=
 [`feature_matrix`](@ref) stacks the panel into the matrix a distance measures, and
@@ -282,7 +282,7 @@ pretty_table(DataFrame(["Asset" => rd.nx;
                         [last(l) => Z_loadings[:, k]
                          for (k, l) in pairs(feature_labels(pnl_loadings))]...]);
              formatters = [(v, i, j) -> j == 1 ? v : round(v; digits = 4)],
-             title = "Factor loadings as a Panel Field")
+             title = "Factor loadings as a panel field")
 
 #=
 A producer that uses a prior needs one, so we hand [`clusterise`](@ref) the prior result and pass
@@ -317,7 +317,7 @@ Z_graph = feature_matrix(pnl_graph)
 pretty_table(DataFrame(["Asset" => rd.nx;
                         [rd.nx[k] => Z_graph[:, k] for k in 1:6]...]);
              formatters = [(v, i, j) -> j == 1 ? v : round(v; digits = 4)],
-             title = "The first six columns of the graph Panel Field")
+             title = "The first six columns of the graph panel field")
 
 #=
 In the table, `3` is the asset itself, `2` a direct neighbour, `1` a two-hop neighbour, and `0`
@@ -327,7 +327,8 @@ an asset the budget does not reach. Section 4 says where those numbers come from
 ### 3.3 The three routes side by side
 =#
 
-routes = DataFrame("Route" => ["The carrier's panel", "RegressionPanel", "PhylogenyPanel"],
+routes = DataFrame("Route" =>
+                       ["The panel of the returns", "RegressionPanel", "PhylogenyPanel"],
                    "`ape`" => ["nothing", "RegressionPanel()", "PhylogenyPanel(; …)"],
                    "Feature axis" => ["whatever you named", "factors", "the assets"],
                    "Shape here" =>
@@ -335,7 +336,7 @@ routes = DataFrame("Route" => ["The carrier's panel", "RegressionPanel", "Phylog
                    "Exogenous" => ["depends on the source", "no", "no"],
                    "Signed" => ["depends on the source", "yes", "no"],
                    "Under a fold" => ["sliced", "refitted", "refitted"])
-pretty_table(routes; title = "The three routes a Feature Matrix takes")
+pretty_table(routes; title = "The three routes to a feature matrix")
 
 #=
 ## 4. Two settings on the graph producer, and neither implies the other
@@ -482,7 +483,7 @@ distance must also give a similarity matrix. The `sim` field says how to compute
 =#
 
 S_fea, D_fea = cor_and_dist(FeatureDistance(), nothing, rd.X; rd = rd)
-println("S and D share provenance: ", size(S_fea) == size(D_fea))
+println("S is cos(πD): ", S_fea ≈ cos.(π .* D_fea))
 
 #=
 ## 6. Both shapes: static and time-varying
@@ -529,7 +530,7 @@ for (cname, alg) in collapses
                       "Mean at T = 1" => round(mean(D1); digits = 6)))
 end
 pretty_table(collapse_rows;
-             title = "Four collapse rules on one $(size(Ztv, 1))×$(size(Ztv, 2))×$(size(Ztv, 3)) Feature Matrix")
+             title = "Four collapse rules on one $(size(Ztv, 1))×$(size(Ztv, 2))×$(size(Ztv, 3)) feature matrix")
 
 #=
 The four rules give four different answers.
@@ -573,7 +574,7 @@ pnl_mixed = asset_panel([panel_input(sets, taxonomy);
 held(f) = isa(f, CategoricalPanelField) ? f.codes : f.vals
 stored(v) = isa(v, PortfolioOptimisers.RepeatedLeading) ? length(v.parent) : length(v)
 
-pretty_table(DataFrame("Panel Field" => [f.name for f in pnl_mixed.pf],
+pretty_table(DataFrame("Field" => [f.name for f in pnl_mixed.pf],
                        "Values type" =>
                            [string(nameof(typeof(held(f)))) for f in pnl_mixed.pf],
                        "Shape it presents" => [string(size(held(f))) for f in pnl_mixed.pf],
@@ -789,7 +790,7 @@ pretty_table(diameters;
 
 plot(1:length(windows), diameters[!, "Self score, bare"]; marker = :circle,
      label = "PathLength()", xlabel = "Rolling window", ylabel = "Top of the scale",
-     title = "A data-dependent budget moves the whole Panel Field")
+     title = "A data-dependent budget moves the whole panel field")
 plot!(1:length(windows), diameters[!, "Self score, dmax = 1.5"]; marker = :square,
       label = "PathLength(; dmax = 1.5)")
 
