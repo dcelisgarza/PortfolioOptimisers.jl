@@ -4,7 +4,7 @@ Description = "Pretty printing, private API of PortfolioOptimisers.jl: @define_p
 
 # Pretty printing: private API
 
-`PortfolioOptimisers.jl`'s types tend to contain quite a lot of information, these functions enable pretty printing so they are easier to interpret. A field that holds `nothing` is hidden by default and shown in this documentation; [`set_show_nothing_fields!`](@ref) is the switch, and [`show_fields`](@ref) is the hook a type overloads to hide a field of its own choice.
+The types of `PortfolioOptimisers.jl` hold many fields. The functions below print them one field per line, with the fields of a nested type indented under it. By default the printout hides a field that holds `nothing`, and this documentation shows it. [`set_show_nothing_fields!`](@ref) turns those fields on or off, and a type can overload [`show_fields`](@ref) to hide a field of its own choice.
 
 ```@docs
 @define_pretty_show

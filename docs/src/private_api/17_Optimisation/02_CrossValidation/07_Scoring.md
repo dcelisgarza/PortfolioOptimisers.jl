@@ -12,7 +12,7 @@ PredictionCrossValScorer
 PopulationCrossValScorer
 ```
 
-A [`PopulationPredictionResult`](@ref) numbers its members on construction, so the path a scorer selects names its place in the population.
+A [`PopulationPredictionResult`](@ref) gives each member without an `id` its position in the population as its `id`. So the `id` of the path that a scorer selects is its position in the population.
 
 ```@docs
 PortfolioOptimisers.successful_members

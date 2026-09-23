@@ -4,4 +4,4 @@ Description = "Price filters has no private API in PortfolioOptimisers.jl; its n
 
 # Price filters: private API
 
-Price filters has no private API in PortfolioOptimisers.jl; see [Price filters](../../public_api/03_InputData/09_PriceFilters.md) for its public API.
+Every name of this topic is public. The [public page](../../public_api/03_InputData/09_PriceFilters.md) documents them.

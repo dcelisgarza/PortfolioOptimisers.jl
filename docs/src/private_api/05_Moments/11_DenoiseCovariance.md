@@ -4,4 +4,4 @@ Description = "Denoise covariance has no private API in PortfolioOptimisers.jl; 
 
 # Denoise covariance: private API
 
-Denoise covariance has no private API in `PortfolioOptimisers.jl`; its names are in the public API.
+Every name of this topic is public. The [public page](../../public_api/05_Moments/11_DenoiseCovariance.md) documents them.

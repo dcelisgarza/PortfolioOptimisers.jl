@@ -4,7 +4,7 @@ Description = "Base Pipeline, private API of PortfolioOptimisers.jl: AbstractPip
 
 # Base Pipeline: private API
 
-The preprocessing estimator and result hierarchies, the price-level [`PricesResult`](@ref) container, and their fit/apply verbs are not pipeline concepts — they are documented under [Preprocessing](../03_InputData/04_Preprocessing.md).
+The abstract types of the preprocessing estimators and of their results, the price-level result [`PricesResult`](@ref), and the functions that fit and apply preprocessing are on the [preprocessing](../03_InputData/04_Preprocessing.md) page. They work without a pipeline, so this page does not document them.
 
 ```@docs
 AbstractPipelineEstimator

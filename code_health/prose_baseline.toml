@@ -11,25 +11,6 @@ commit = "ab7d9a42da"
 glossary_terms = 173
 
 [file]
-"docs/src/private_api/01_Base/01_DocstringDictionaries.md" = { filler = 1, mechanism = 1, words = 68 }
-"docs/src/private_api/01_Base/10_Assertions.md" = { filler = 1, words = 30 }
-"docs/src/private_api/02_Tools.md" = { filler = 2, words = 108 }
-"docs/src/private_api/05_Moments/01_Base_Moments.md" = { emdash = 2, words = 147 }
-"docs/src/private_api/05_Moments/02_SimpleExpectedReturns.md" = { glossary = 1, words = 83 }
-"docs/src/private_api/05_Moments/03_Covariance.md" = { glossary = 1, words = 133 }
-"docs/src/private_api/05_Moments/04_SimpleVariance.md" = { glossary = 1, words = 108 }
-"docs/src/private_api/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/03_CustomValueReturnForecast.md" = { glossary = 1, words = 16 }
-"docs/src/private_api/05_Moments/33_CoverageUniverse.md" = { glossary = 3, mechanism = 1, words = 144 }
-"docs/src/private_api/08_Phylogeny/06_DBHT/05_BubbleTree.md" = { mechanism = 1, words = 65 }
-"docs/src/private_api/08_Phylogeny/06_DBHT/06_DBHTDendrogram.md" = { mechanism = 1, words = 49 }
-"docs/src/private_api/10_Prior/10_Base_CrossSectionalFactorPrior.md" = { mechanism = 1, words = 37 }
-"docs/src/private_api/16_RiskMeasures/19_RatioRiskMeasure.md" = { glossary = 2, words = 17 }
-"docs/src/private_api/16_RiskMeasures/20_EqualRiskMeasure.md" = { glossary = 2, words = 17 }
-"docs/src/private_api/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.md" = { emdash = 4, glossary = 1, words = 70 }
-"docs/src/private_api/21_Pipeline/01_Base_Pipeline.md" = { emdash = 1, words = 22 }
-"docs/src/private_api/21_Pipeline/02_StepExecution.md" = { emdash = 2, words = 115 }
-"docs/src/private_api/21_Pipeline/03_Pipeline.md" = { emdash = 2, mechanism = 1, words = 91 }
-"docs/src/private_api/21_Pipeline/04_PredictionCV.md" = { glossary = 1, words = 201 }
 "docs/src/public_api/01_Base/07_Errors.md" = { filler = 1, words = 87 }
 "docs/src/public_api/01_Base/16_CoveragePolicy.md" = { glossary = 1, mechanism = 1, words = 56 }
 "docs/src/public_api/02_Tools.md" = { filler = 2, words = 102 }

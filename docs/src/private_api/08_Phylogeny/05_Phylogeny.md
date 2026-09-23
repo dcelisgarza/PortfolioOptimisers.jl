@@ -4,4 +4,4 @@ Description = "Phylogeny has no private API in PortfolioOptimisers.jl; its names
 
 # Phylogeny: private API
 
-Phylogeny has no private API in PortfolioOptimisers.jl; see [Phylogeny](../../public_api/08_Phylogeny/05_Phylogeny.md) for its public API.
+Every name of this topic is public. The [public page](../../public_api/08_Phylogeny/05_Phylogeny.md) documents them.

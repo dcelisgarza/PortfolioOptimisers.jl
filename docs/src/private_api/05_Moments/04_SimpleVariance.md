@@ -4,7 +4,7 @@ Description = "Simple variance and standard deviation, private API of PortfolioO
 
 # Simple variance and standard deviation: private API
 
-The variance is used throughout the library, it can be used as part of the expected return, covariance estimation, performance analysis, and constraint generation. It is trivial to compute the standard deviation from the variance, so we provide those too.
+The library uses the variance of each asset in several places, such as some estimators of the expected returns and of the covariance, performance analysis, and the constraints it generates. [`SimpleVariance`](@ref) computes the sample variance, and the standard deviation as its square root.
 
 ```@docs
 show_fields(::SimpleVariance)
@@ -13,7 +13,7 @@ simple_variance_kernel
 
 ## Incremental fit
 
-The sample variance folds one observation at a time, so a long history need not be held or re-read. [`partial_fit!`](@ref) returns a new estimator whose `cache` field carries the state, and `var` reads the fit off the estimator alone.
+The sample variance can take the observations one at a time as well. [`partial_fit!`](@ref) returns a new estimator whose `cache` field holds the running state, and `var(ve)` computes the estimate from that field, with no data.
 
 ```@docs
 SimpleVarianceState
@@ -23,7 +23,7 @@ Base.copy(x::SimpleVarianceState)
 
 ## Available-case fit
 
-With a [`CoveragePolicy`](@ref) in its `cvg` field the estimator fits each asset on that asset's own finite and active observations, and [`PortfolioOptimisers.coverage_variance`](@ref) routes between that arm and the Coverage Universe one.
+With a [`CoveragePolicy`](@ref) in its `cvg` field, the estimator computes the variance of each asset from the rows where that asset's return is finite and the asset is active. Without a policy, it computes the ordinary sample variance over the assets that have no gap in the window. [`PortfolioOptimisers.coverage_variance`](@ref) selects one of the two fits from the type of the `cvg` field.
 
 ```@docs
 PortfolioOptimisers.coverage_variance

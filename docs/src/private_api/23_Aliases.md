@@ -4,4 +4,4 @@ Description = "Aliases has no private API in PortfolioOptimisers.jl; its names a
 
 # Aliases: private API
 
-Aliases has no private API in PortfolioOptimisers.jl; see [Aliases](../public_api/23_Aliases.md) for its public API.
+Every name of this topic is public. The [public page](../public_api/23_Aliases.md) documents them.

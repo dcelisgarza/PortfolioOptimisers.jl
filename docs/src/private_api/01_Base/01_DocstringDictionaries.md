@@ -4,9 +4,9 @@ Description = "Docstring dictionaries, private API of PortfolioOptimisers.jl: ar
 
 # Docstring dictionaries: private API
 
-[`src/01_Base/`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/src/01_Base) implements the most basal symbols used in `PortfolioOptimisers.jl`. One file per concept: the docstring dictionaries, the type roots, the pretty-show macro, the `ScopedConfig` holders, the load-time preferences, the message builders, the error hierarchy, the type aliases, the observation weights, the `assert_*` family, `VecScalar`, the `NormError` family, the Kaniadakis logarithm, the partial-fit state seam and the sample buffer the online step folds into.
+The files under [`src/01_Base/`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/src/01_Base) hold the code that the rest of `PortfolioOptimisers.jl` depends on. Each file has its own page in this section, and this page documents the first.
 
-In order to standardise the documentation we use an `arg_dict` of terms.
+The docstrings of the library take the text of an argument, a field, a validation rule, a return value, a formula, an error name or a citation from the dictionaries below. A name that many functions share therefore reads the same on every page that documents it.
 
 ```@docs
 arg_dict

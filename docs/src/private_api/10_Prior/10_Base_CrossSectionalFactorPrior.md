@@ -4,7 +4,15 @@ Description = "Cross-Sectional Factor Prior internals, private API of PortfolioO
 
 # Cross-Sectional Factor Prior internals: private API
 
-The verbs a [`CrossSectionalFactorPrior`](@ref) composes: the carrier it hands its Exposure Estimators, the exposure history and its dependency order, the two masks the fit runs on, the idiosyncratic block, the scenario reconstruction, and the lift onto the assets.
+The functions below are the steps of a [`CrossSectionalFactorPrior`](@ref) fit. They compute these parts of it.
+
+- The benchmark weights that its exposure estimators read, which the prior computes from the market capitalisation.
+- The history of each factor exposure, in an order that puts each exposure after the exposures it is derived from.
+- The active mask and the estimation mask of the asset panel.
+- The idiosyncratic covariance of the latest observation.
+- The return scenarios of the assets.
+- The moments of the assets, from the moments of the factors and the loadings.
+- The forecast of the expected returns, when the prior has a return forecast estimator.
 
 ```@docs
 PortfolioOptimisers.cross_sectional_prior_pairs

@@ -4,7 +4,7 @@ Description = "Type aliases, private API of PortfolioOptimisers.jl: AbstractCust
 
 # Type aliases: private API
 
-`PortfolioOptimisers.jl` heavily relies on `Julia`'s dispatch and type system to ensure data validity. Many custom types and functions/methods can accept different data types. These can be represented as type unions, many of which are used throughout the library. The following type aliases centralise these union definitions, as well as improving correctness and maintainability.
+Many functions and fields of `PortfolioOptimisers.jl` accept more than one type, for example a vector or a matrix of numbers. The aliases below name those unions. A signature then reads `VecNum_MatNum`, and every method that accepts the same inputs uses the same union.
 
 ```@docs
 AbstractCustomValue
