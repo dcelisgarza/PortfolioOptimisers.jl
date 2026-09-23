@@ -83,14 +83,6 @@ glossary_terms = 173
 "docs/src/public_api/21_Pipeline/03_Pipeline.md" = { emdash = 4, words = 95 }
 "docs/src/public_api/21_Pipeline/04_PredictionCV.md" = { glossary = 1, words = 258 }
 "docs/src/public_api/21_Pipeline/06_OnlinePipeline.md" = { emdash = 2, mechanism = 3, words = 111 }
-"examples/2_moments_priors/01_Expected_Returns_Estimation.jl" = { emdash = 7, endash = 5, words = 368 }
-"examples/2_moments_priors/02_Covariance_Estimation.jl" = { emdash = 6, endash = 3, words = 377 }
-"examples/2_moments_priors/03_Higher_Moment_Estimation.jl" = { emdash = 5, endash = 1, words = 390 }
-"examples/2_moments_priors/04_Factor_Priors.jl" = { emdash = 2, fancy_is = 1, words = 1280 }
-"examples/2_moments_priors/05_Black_Litterman.jl" = { emdash = 12, endash = 8, notjust = 1, words = 679 }
-"examples/2_moments_priors/06_Advanced_Black_Litterman.jl" = { emdash = 14, endash = 6, aivocab = 1, bold_label = 1, words = 796 }
-"examples/2_moments_priors/07_Entropy_Pooling.jl" = { emdash = 9, endash = 7, notjust = 2, words = 1147 }
-"examples/2_moments_priors/08_Opinion_Pooling.jl" = { emdash = 9, endash = 3, notjust = 1, bold_label = 1, verdict = 2, words = 747 }
 "examples/2_moments_priors/09_Uncertainty_Sets.jl" = { emdash = 15, endash = 1, notjust = 1, verdict = 1, words = 984 }
 "examples/2_moments_priors/10_Windowed_Estimators.jl" = { emdash = 19, endash = 1, words = 923 }
 "examples/2_moments_priors/11_L1_Uncertainty_Quintile_Portfolios.jl" = { emdash = 50, bold_label = 1, verdict = 3, words = 2617 }

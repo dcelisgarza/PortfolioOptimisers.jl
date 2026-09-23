@@ -5,25 +5,27 @@ Description = "Coskewness and cokurtosis estimation in PortfolioOptimisers.jl, t
 
 # Higher moment estimation
 
-Mean–variance optimisation only looks at the first two moments. But asset returns are skewed
-and fat-tailed, and risk measures like [`NegativeSkewness`](@ref) and [`Kurtosis`](@ref) need
-estimates of the **coskewness** and **cokurtosis** tensors to capture that. These high-order
-moments are even harder to estimate than the covariance: the cokurtosis matrix is
-``N^2 \times N^2``, so with a short window it is wildly over-parametrised and numerically
-near-singular. As with the covariance, **denoising and sparsification** rescue it.
+Mean-variance optimisation reads only the first two moments of the returns. Asset returns are
+skewed and have fat tails, and risk measures such as [`NegativeSkewness`](@ref) and
+[`Kurtosis`](@ref) need estimates of the coskewness and cokurtosis tensors to account for
+that. These higher moments are harder to estimate than the covariance. The cokurtosis matrix is
+``N^2 \times N^2``, so on a short window it has far more entries than the window has
+observations, and it is close to singular. Denoising and sparsification help here, as they do
+for the covariance.
 
-In `PortfolioOptimisers` the high-order moments live in a [`HighOrderPriorEstimator`](@ref),
-which wraps a low-order prior and adds a [`Coskewness`](@ref) (`ske`) and [`Cokurtosis`](@ref)
-(`kte`) estimator. Each accepts the same [`MatrixProcessing`](@ref) pipeline — [`Denoise`](@ref)
-and [`LoGo`](@ref) — that we apply to covariances.
+[`HighOrderPriorEstimator`](@ref) computes the higher moments. It wraps a prior for the mean
+and the covariance, and adds a [`Coskewness`](@ref) estimator in `ske` and a
+[`Cokurtosis`](@ref) estimator in `kte`. Each takes the same [`MatrixProcessing`](@ref), with
+[`Denoise`](@ref) and [`LoGo`](@ref), that the [covariance page](02_Covariance_Estimation.md)
+uses.
 
 !!! tip "When to reach for this"
-    Reach for high-order moment estimation whenever you optimise against a skew- or
-    tail-sensitive risk measure ([`NegativeSkewness`](@ref), [`Kurtosis`](@ref), and the
-    square-root variants), or build a Pareto surface over them. And reach for *denoised*
-    high-order moments essentially always when you do: the raw cokurtosis on a short window is
-    numerically singular, so denoising is what makes these optimisations well-posed rather than
-    a nicety. If you only use variance/tail measures that need no tensors, skip it.
+    Reach for higher moment estimation when you optimise against a risk measure that reads the
+    skew or the tails, such as [`NegativeSkewness`](@ref), [`Kurtosis`](@ref) and their
+    square-root forms, or when you build a Pareto surface over them. When you do, denoise the
+    higher moments. The raw cokurtosis of a short window is numerically singular, and
+    denoising is what makes these optimisations well-posed. If your risk measures need no
+    tensors, you do not need this page.
 =#
 
 using PortfolioOptimisers, PrettyTables, LinearAlgebra
@@ -57,10 +59,11 @@ rd = prices_to_returns(X)
 #=
 ## 2. High-order priors
 
-We build three high-order priors that differ only in how the coskewness and cokurtosis are
-processed: raw (vanilla), [`FixedDenoise`](@ref)d, and [`LoGo`](@ref)-sparsified. We then
-compare the condition numbers of the coskewness negative-spectral-slice matrix `V` and the
-cokurtosis matrix `kt`.
+We build three high-order priors that differ only in how they process the coskewness and the
+cokurtosis. The first keeps the raw estimates. The second applies [`FixedDenoise`](@ref). The
+third applies the default [`Denoise`](@ref) and then [`LoGo`](@ref) sparsification. We then
+compare the condition numbers of `V`, the matrix of the negative spectral slices of the
+coskewness, and of `kt`, the cokurtosis matrix.
 =#
 
 hopes = ["Vanilla" => HighOrderPriorEstimator(),
@@ -86,9 +89,9 @@ hopes = ["Vanilla" => HighOrderPriorEstimator(),
 prs = [k => prior(pe, rd) for (k, pe) in hopes]
 
 #=
-The condition numbers tell the whole story. The raw cokurtosis is numerically singular (a
-condition number of order ``10^{15}``); denoising and sparsification bring it down by many
-orders of magnitude, turning an ill-posed optimisation into a stable one.
+A condition number near ``10^{15}`` means that the matrix is numerically singular, and an
+optimisation that reads it is ill-posed. In the table, compare the raw cokurtosis with the
+denoised and the sparsified ones.
 =#
 
 pretty_table(DataFrame(; :estimator => [k for (k, _) in prs],
@@ -99,26 +102,29 @@ pretty_table(DataFrame(; :estimator => [k for (k, _) in prs],
 #=
 ## 3. Visualising the high-order moments
 
-The coskewness and cokurtosis heatmaps show the denoising at work — the raw matrices are dense
-and noisy, the processed ones cleaner and better conditioned.
+[`plot_coskewness`](@ref) draws the coskewness matrix as a heatmap, and
+[`plot_cokurtosis`](@ref) draws the eigenvalues of the cokurtosis matrix. We draw each for the
+raw prior and for the denoised prior. The raw matrices are dense and noisy, and the denoised
+ones are cleaner.
 =#
 
-# Coskewness heatmap: vanilla vs denoised.
 using StatsPlots, GraphRecipes
-# Coskewness heatmap: denoised.
+# The coskewness of the raw prior.
 plot_coskewness(prs[1].second, rd)
-# Cokurtosis eigenspectrum: vanilla vs denoised.
+# The coskewness of the denoised prior.
 plot_coskewness(prs[2].second, rd)
-# Cokurtosis eigenspectrum: denoised.
+# The eigenvalues of the raw cokurtosis.
 plot_cokurtosis(prs[1].second, rd)
+# The eigenvalues of the denoised cokurtosis.
 plot_cokurtosis(prs[2].second, rd)
 
 #=
-## 4. Why it matters: skew- and tail-aware optimisation
+## 4. Minimum skewness and minimum kurtosis portfolios
 
-We minimise two high-order risk measures — [`NegativeSkewness`](@ref) and [`Kurtosis`](@ref) —
-using each high-order prior. With the raw (near-singular) tensors the solver is working against
-a degenerate problem; the denoised and sparsified priors give stable, sensible allocations.
+We minimise two higher moment risk measures, [`NegativeSkewness`](@ref) and
+[`Kurtosis`](@ref), with each high-order prior. The raw tensors are close to singular, so with
+them the solver works on a degenerate problem. The denoised and sparsified priors give it a
+well-posed one.
 =#
 
 using Clarabel
@@ -140,14 +146,14 @@ pretty_table(DataFrame(["Assets" => rd.nx;
              title = "Minimum skew / kurtosis weights by prior")
 
 #=
-The composition plot contrasts the negative skew-minimising portfolios across the three priors.
+We stack the weights that minimise the negative skewness into one bar per prior.
 =#
 
 plot_stacked_bar_composition([r for (_, r) in ress_sk], rd;
                              xticks = (1:length(ress_sk), [k for (k, _) in ress_sk]))
 
 #=
-The composition plot contrasts the kurtosis-minimising portfolios across the three priors.
+We do the same for the weights that minimise the kurtosis.
 =#
 
 plot_stacked_bar_composition([r for (_, r) in ress_kt], rd;

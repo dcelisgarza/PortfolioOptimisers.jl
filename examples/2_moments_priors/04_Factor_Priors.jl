@@ -5,16 +5,20 @@ Description = "Factor priors in PortfolioOptimisers.jl: asset moments implied by
 
 # Factor priors
 
-This example shows how to use factor models to perform optimisations. These reduce the estimation error by modelling asset returns as a function of common risk factors.
+A factor model writes the return of each asset as a function of a few common risk factors. It
+has fewer parameters to estimate than the moments of the assets have, so its estimates carry
+less error. This page builds priors from factor models and compares the optimisations they
+give.
 
 !!! tip "When to reach for this"
-    Reach for a factor prior when you have a set of common risk factors (style, macro, or
-    statistical) and want the asset moments *implied by* a regression onto them rather than
-    estimated freely. By expressing the ``N`` assets through a handful of factors, the factor
-    model slashes the number of parameters and the estimation error — especially valuable when
-    the asset count is large relative to the history. If you have no meaningful factors, or a
-    long history relative to the universe, a denoised empirical prior (see the covariance and
-    higher-moment examples) is simpler.
+    Reach for a factor prior when you have a set of common risk factors, of style, macro or
+    statistical kind, and want the asset moments that a regression onto them implies, rather
+    than moments estimated freely. The model writes the ``N`` assets through a few factors,
+    so it cuts the number of parameters and the estimation error. This helps most when the
+    number of assets is large next to the length of the history. If you have no meaningful
+    factors, or a long history next to the number of assets, a denoised empirical prior is
+    simpler, and the [covariance](02_Covariance_Estimation.md) and
+    [higher moment](03_Higher_Moment_Estimation.md) pages show it.
 =#
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
@@ -50,7 +54,8 @@ end;
 #=
 ## 1. ReturnsResult data
 
-We will use the same data as the previous example. But we will also load factor data.
+We use the same S&P 500 data as the other examples, and load the returns of the factors next
+to it.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -67,16 +72,16 @@ rd = prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))
 #=
 ## 2. Prior statistics
 
-`PortfolioOptimisers.jl` supports a wide range of prior models. Here we will use four of them:
+The library has many prior models, and this page uses four of them.
 
-1. [`EmpiricalPrior`](@ref): Computes the expected returns vector and covariance matrix from the empirical data.
-2. [`FactorPrior`](@ref): Computes the expected returns vector and covariance matrix using a factor model.
-3. [`HighOrderPriorEstimator`](@ref): Computes the expected returns vector and covariance matrix using the low order prior estimator provided, plus the coskewness and/or cokurtosis using the computed expected returns vector.
-4. [`HighOrderFactorPriorEstimator`](@ref): Computes the expected returns vector and covariance matrix, plus the coskewness and/or cokurtosis using a factor model.
+1. [`EmpiricalPrior`](@ref) computes the expected returns vector and the covariance matrix from the data.
+2. [`FactorPrior`](@ref) computes them with a factor model.
+3. [`HighOrderPriorEstimator`](@ref) computes them with the low-order prior estimator you give it. It adds the coskewness, the cokurtosis or both, which it computes with that expected returns vector.
+4. [`HighOrderFactorPriorEstimator`](@ref) computes the expected returns vector, the covariance matrix, and the coskewness, the cokurtosis or both, all with a factor model.
 
-Priors whos names don't start with the prefix `High` return [`LowOrderPrior`](@ref), while those that do return [`HighOrderPrior`](@ref) objects.
+An estimator whose name starts with `High` returns a [`HighOrderPrior`](@ref), and the others return a [`LowOrderPrior`](@ref).
 
-We have two different regression models with various targets. We won't explore them all in detail here, see [`StepwiseRegression`](@ref) and [`DimensionReductionRegression`](@ref) for details. First let's define the prior estimators.
+A factor model takes one of two regressions, [`StepwiseRegression`](@ref) or [`DimensionReductionRegression`](@ref). Each has several targets, and their docstrings describe them. We build eight prior estimators. The ones with a factor model use the stepwise regression by default, and the dimension reduction regression where the cell names it.
 =#
 
 pes = [EmpiricalPrior(),#
@@ -91,28 +96,31 @@ pes = [EmpiricalPrior(),#
                                                       re = DimensionReductionRegression()))]
 
 #=
-Now let's compute the prior statistics for each estimator.
+We compute the prior of each estimator.
 =#
 prs = prior.(pes, rd)
 
 #=
-We can visualise the prior statistics to understand what each estimator produces.
-The empirical prior serves as the baseline.
+The plots show what the empirical prior and the factor prior with stepwise regression compute.
+The empirical prior is the baseline.
 =#
 
-# 3-panel composite (μ, σ, correlation) for the empirical prior.
 using StatsPlots, GraphRecipes
-# Factor prior with stepwise regression — factor loadings reveal which factors drive each asset.
+# The expected returns, the volatilities and the correlations of the empirical prior.
 plot_prior(prs[1], rd)
+# The same three panels for the factor prior with stepwise regression.
 plot_prior(prs[2], rd)
+# The factor loadings of that prior, which show the factors that drive each asset.
 plot_factor_loadings(prs[2], rd)
+# The expected returns of the factors.
 plot_factor_mu(prs[2], rd)
+# The covariance matrix of the factors.
 plot_factor_sigma(prs[2], rd)
 
 #=
-First let's compare the first three prior results.
+We compare the first three priors.
 
-The expected returns, found in the `mu` field, do not change much between [`EmpiricalPrior`](@ref) and [`FactorPrior`](@ref). Which illustrates one of the reasons why it's unwise to put much stock on expected returns estimates, since they are highly uncertain and sensitive to noise. We will explore different expected returns estimators, which attempt to improve this drawback in future examples.
+Their expected returns, in the `mu` field, change little between [`EmpiricalPrior`](@ref) and [`FactorPrior`](@ref). Expected returns are uncertain and sensitive to noise, and this is one reason not to rely much on them. The [expected returns page](01_Expected_Returns_Estimation.md) shows estimators that reduce that noise.
 =#
 
 pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => prs[1].mu,
@@ -122,9 +130,9 @@ pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => prs[1].mu,
              source_notes = "prs[1].mu ≈ prs[1].mu ≈ prs[3].mu: $(prs[1].mu ≈ prs[1].mu ≈ prs[3].mu)")
 
 #=
-However, the covariance estimates, found in the `sigma` field, differ significantly more. Factor models tend to produce more stable and robust covariance estimates by capturing the underlying risk factors driving asset returns, while reducing the impact of idiosyncratic noise. We will check the condition number of the covariance matrices to illustrate this. The lower the condition number, the more less noisy and therefore more numerically stable the matrix is.
+The covariances, in the `sigma` field, differ much more. A factor model tends to give a more stable covariance estimate, because the factors carry the common part of the returns and the noise of each single asset has less effect. Each covariance table carries its condition number under it. A lower condition number means a less noisy matrix, which is more stable to invert.
 
-For the covariance estimation in particular, we can take advantage of a sparser Cholesky decomposition with better numerical properties than the naive version. If present, it is used instead of the cholesky decomposition of `sigma` in the `SecondOrderCone` constraint of the variance and/or standard deviation formulations in traditional optimisations. This special decomposition can be found in the `chol` field of the prior result.
+A factor prior also stores a sparser Cholesky factor, with better numerical properties than the plain one, in the `chol` field of the prior result. When it is present, the optimisers use it in place of the Cholesky factor of `sigma` in the `SecondOrderCone` constraint of the variance and standard deviation formulations.
 =#
 using LinearAlgebra
 
@@ -139,16 +147,19 @@ pretty_table(DataFrame([rd.nx prs[3].sigma], ["Assets"; rd.nx]); formatters = [m
              source_notes = "Condition number FactorPrior(DimRed): $(round(cond(prs[3].sigma); digits = 3))")
 
 #=
-The eigenspectrum of the covariance matrix shows how many eigenvalues exceed the Marchenko-Pastur
-upper bound (noise floor). Factor models tend to suppress noise eigenvalues.
+Each plot draws the eigenvalues of one covariance matrix with the Marchenko-Pastur upper bound,
+the level below which an eigenvalue is noise. The first plot is the empirical prior. A factor
+model tends to shrink the eigenvalues below the bound.
 =#
 
 plot_eigenspectrum(prs[1], rd)
+# The factor prior with stepwise regression.
 plot_eigenspectrum(prs[2], rd)
+# The factor prior with dimension reduction regression.
 plot_eigenspectrum(prs[3], rd)
 
 #=
-The next three prior results have the same low order moments and adjusted returns series as the `i-3`'th prior result because they use the same regression model.
+Priors 4 to 6 wrap priors 1 to 3, so each uses the same regression model as the prior three places before it. The loop prints whether the adjusted returns `X`, the `mu` and the `sigma` of prior `i` equal those of prior `i - 3`.
 =#
 for i in 4:6
     println("prs[$(i-3)].X     == prs[$(i)].X    : $(prs[i-3].X == prs[i].X)")
@@ -156,13 +167,13 @@ for i in 4:6
     println("prs[$(i-3)].sigma == prs[$(i)].sigma: $(prs[i-3].sigma == prs[i].sigma)\n")
 end
 
-# However, all high order moments for these estimators are identical to each other despite their low order moments being computed differently. This is because they are computed from the prior returns matrix, not the posterior one, as this would be inconsistent. The coskewness matrix is found in the `sk` field, the negative spectral decomposition of its slices is found in the `V` field, and the cokurtosis matrix is found in the `kt` field.
+# The `sk` field holds the coskewness matrix, `V` the negative spectral decomposition of its slices, and `kt` the cokurtosis matrix. We print whether they are equal for priors 4 to 6. They are, although the three priors compute their low-order moments in different ways. The estimator computes the high-order moments from the prior returns matrix and not from the posterior one, because the posterior one would be inconsistent.
 println("prs[4].sk == prs[5].sk == prs[6].sk: $(prs[4].sk == prs[5].sk == prs[6].sk)")
 println("prs[4].V  == prs[5].V  == prs[6].V : $(prs[4].V == prs[5].V == prs[6].V)")
 println("prs[4].kt == prs[5].kt == prs[6].kt: $(prs[4].kt == prs[5].kt == prs[6].kt)\n")
 
 #=
-Now let's compare the last four prior results. Remember the last two also use a factor model for the high order moments
+Next we compare priors 5 to 8. Priors 7 and 8 also use a factor model for the high-order moments.
 =#
 for i in 5:7
     for j in 6:8
@@ -178,15 +189,15 @@ for i in 5:7
 end
 
 #=
-As expected, the higher moments are the same only for `prs[5]` and `prs[6]`, since neither of them adjust the higher moments using a factor model. However, their low order moments differ because they use different regression models. The low order moments of `prs[5]` and `prs[7]` use the [`StepwiseRegression`](@ref) model, while `prs[6]` and `prs[8]` use the [`DimensionReductionRegression`](@ref) model, so those match too. Aside from `prs[5]` and `prs[6]`, the higher order moments are computed using regression models.
+The high-order moments match only for `prs[5]` and `prs[6]`, because neither adjusts them with a factor model. Their low-order moments differ, because they use different regression models. `prs[5]` and `prs[7]` compute their low-order moments with [`StepwiseRegression`](@ref), and `prs[6]` and `prs[8]` with [`DimensionReductionRegression`](@ref), so those two pairs match too. `prs[7]` and `prs[8]` also compute their high-order moments with the regression.
 
-Let's compare what these higher order moments look like. First let's create the names for the higher order moments.
+Now we look at the high-order moments themselves. First we make labels for the pairs of assets that index their columns.
 =#
 
 nx2 = collect(Iterators.flatten([(nx * "_") .* rd.nx for nx in rd.nx]))
 
 #=
-Now let's examine what the coskewness and its negative spectral slices look like.
+The tables print the coskewness and its negative spectral slices for priors 4, 7 and 8, with the condition number of each under it.
 =#
 pretty_table(DataFrame([rd.nx prs[4].sk], ["Assets^2 / Assets"; nx2]);
              formatters = [hmmtfmt], title = "HighOrderPriorEstimator Coskewness",
@@ -211,15 +222,17 @@ pretty_table(DataFrame([rd.nx prs[8].V], ["Assets"; rd.nx]); formatters = [hmmtf
              source_notes = "Condition number HighOrderFactorPriorEstimator(DimRed): $(round(cond(prs[8].V); digits = 3))")
 
 #=
-Coskewness heatmaps (N × N²) show the third-order dependence structure. Factor models can
-alter the off-diagonal structure.
+The heatmaps draw the ``N \times N^2`` coskewness matrix, which holds the dependence of third
+order between the assets. The first is the empirical high-order prior. A factor model can
+change the entries off the diagonal.
 =#
 
 plot_coskewness(prs[4], rd)
+# The high-order prior with a stepwise factor model.
 plot_coskewness(prs[7], rd)
 
 #=
-And the cokurtosis.
+We print the cokurtosis matrix of the same three priors.
 =#
 pretty_table(DataFrame([nx2 prs[4].kt], ["Assets^2"; nx2]); formatters = [hmmtfmt],
              title = "HighOrderPriorEstimator Cokurtosis",
@@ -232,20 +245,22 @@ pretty_table(DataFrame([nx2 prs[8].kt], ["Assets^2"; nx2]); formatters = [hmmtfm
              source_notes = "Condition number HighOrderFactorPriorEstimator(DimRed): $(round(cond(prs[8].kt); digits = 3))")
 
 #=
-Cokurtosis eigenspectrum (N² × N²) with optional Marchenko-Pastur reference.
+[`plot_cokurtosis`](@ref) draws the eigenvalues of the ``N^2 \times N^2`` cokurtosis matrix
+with the Marchenko-Pastur bound. The first plot is the empirical high-order prior.
 =#
 
 plot_cokurtosis(prs[4], rd)
+# The high-order prior with a stepwise factor model.
 plot_cokurtosis(prs[7], rd)
 
 #=
-Ideally, the condition numbers of the higher order moments should be lower when using factor models, indicating more stable and robust estimates. However, this is not always the case due to the higher exponentiation involved in their computation.
+A factor model would ideally give the high-order moments lower condition numbers, which would mean more stable estimates. It does not always do so, because the computation of these moments raises the returns to higher powers.
 =#
 
 #=
 ## 3. Comparing optimisations
 
-We'll now compare the effect of using these different prior estimators in the shape of the efficient frontier. We'll use Clarabel as the solver.
+This section compares how the priors change the efficient frontier. The solver is Clarabel. The cell gives it seven configurations, each with a shorter step than the one before, and the optimiser tries them in order until one solves the problem.
 =#
 using Clarabel
 slv = [Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
@@ -263,9 +278,9 @@ slv = [Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
        Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
               settings = Dict("verbose" => false, "max_step_fraction" => 0.7))]
 #=
-### 3.1 Mean-Standard deviation optimisation
+### 3.1 Mean-standard deviation optimisation
 
-First let's examine the mean-standard deviation efficient frontier using the empirical and factor priors. We will compute the efficient fronteir with 50 points for all relevant priors.
+We compute the mean-standard deviation efficient frontier under the empirical prior and under the two factor priors.
 =#
 ## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
 opts = [JuMPOptimiser(; pe = prs[1], slv = slv,
@@ -291,7 +306,7 @@ mrs = [MeanRisk(; r = StandardDeviation(), obj = MinimumRisk(), opt = opt) for o
 ress = optimise.(mrs)
 
 #=
-Let's plot the efficient frontiers.
+Each prior gets a composition plot and a frontier plot.
 =#
 using StatsPlots, GraphRecipes
 # Empirical prior composition.
@@ -315,12 +330,12 @@ plot_measures(ress[2].w, prs[2]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "FactorPrior(Step)", xlabel = "SD", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
-# Factor prior using dimensionality reduction.
+# Factor prior composition with dimension reduction regression.
 plot_stacked_area_composition(ress[3].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
                                         title = "FactorPrior(DimRed)",
                                         legend = :outerright))
-# Factor prior frontier with stepwise regression.
+# Factor prior frontier with dimension reduction regression.
 r = StandardDeviation()
 plot_measures(ress[3].w, prs[3]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
@@ -328,7 +343,7 @@ plot_measures(ress[3].w, prs[3]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
 
 #=
-Let's optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
+A frontier holds many portfolios. To compare one portfolio per prior, we compute the maximum risk-adjusted return ratio portfolio under each of the three.
 =#
 opts = [JuMPOptimiser(; pe = prs[1], slv = slv), JuMPOptimiser(; pe = prs[2], slv = slv),
         JuMPOptimiser(; pe = prs[3], slv = slv)]
@@ -343,15 +358,15 @@ pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
                        "FactorPrior(Step)" => ress[2].w,
                        "FactorPrior(DimRed)" => ress[3].w); formatters = [resfmt])
 
-# Side-by-side composition: empirical vs two factor priors (MaximumRatio, StandardDeviation).
+# The maximum-ratio portfolios under the empirical prior and the two factor priors.
 plot_stacked_bar_composition(ress, rd)
 
 #=
-We can see that the factor model portfolios are more diversified than the empirical one. This is because the factor model reduces estimation error in the covariance matrix, leading to more stable and diversified portfolios.
+The factor model portfolios are more diversified than the empirical one. The factor model reduces the estimation error of the covariance matrix, and a covariance with less error gives a more diversified portfolio.
 
-### 3.2 Mean-NegativeSkewness optimisation
+### 3.2 Mean-negative skewness optimisation
 
-Here we will perform the exact same procedure as before, but using the negative skewness as the risk measure.
+We repeat the steps of section 3.1 with the negative skewness as the risk measure. The priors are now 4, 7 and 8, the high-order priors that hold the coskewness this measure reads.
 =#
 ## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
 opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
@@ -377,7 +392,7 @@ mrs = [MeanRisk(; r = NegativeSkewness(), obj = MinimumRisk(), opt = opt) for op
 ress = optimise.(mrs)
 
 #=
-Let's plot the efficient frontiers.
+The plots follow the order of section 3.1.
 
 Empirical prior composition.
 =#
@@ -403,12 +418,12 @@ plot_measures(ress[2].w, prs[7]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
               title = "FactorPrior(Step)", xlabel = "NegativeSkewness",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
-# Factor prior using dimensionality reduction.
+# Factor prior composition with dimension reduction regression.
 plot_stacked_area_composition(ress[3].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
                                         title = "FactorPrior(DimRed)",
                                         legend = :outerright))
-# Factor prior frontier with stepwise regression.
+# Factor prior frontier with dimension reduction regression.
 r = NegativeSkewness()
 plot_measures(ress[3].w, prs[8]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
@@ -417,7 +432,7 @@ plot_measures(ress[3].w, prs[8]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
               right_margin = 6Plots.mm)
 
 #=
-Let's optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
+Then we solve one maximum-ratio portfolio per prior, as in section 3.1.
 =#
 opts = [JuMPOptimiser(; pe = prs[4], slv = slv), JuMPOptimiser(; pe = prs[7], slv = slv),
         JuMPOptimiser(; pe = prs[8], slv = slv)]
@@ -432,15 +447,15 @@ pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
                        "FactorPrior(Step)" => ress[2].w,
                        "FactorPrior(DimRed)" => ress[3].w); formatters = [resfmt])
 
-# Side-by-side composition: empirical vs two factor priors (MaximumRatio, NegativeSkewness).
+# The maximum-ratio portfolios with the negative skewness as the risk measure.
 plot_stacked_bar_composition(ress, rd)
 
 #=
-Here we have the opposite effect to before, this follows from the fact that for this particular scenario the condition number of the matrix of negative spectral slices of the coskewness is actually lower for the empirical prior than for the factor priors. This goes to show that higher order moments are more susceptible to noise, and factor models may not be able to fully mitigate this.
+Here the effect is the opposite of section 3.1. On this data the matrix of the negative spectral slices of the coskewness has a lower condition number under the empirical prior than under the factor priors. The higher moments are more sensitive to noise, and a factor model does not always reduce it.
 
-### 3.3 Mean-Kurtosis optimisation
+### 3.3 Mean-kurtosis optimisation
 
-Again we will do the same as before but with the kurtosis.
+We repeat the steps with the kurtosis as the risk measure.
 =#
 ## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
 opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
@@ -466,7 +481,7 @@ mrs = [MeanRisk(; r = Kurtosis(), obj = MinimumRisk(), opt = opt) for opt in opt
 ress = optimise.(mrs)
 
 #=
-Let's plot the efficient frontiers. However, this time when plotting the frontiers we will use the prior returns because the kurtosis risk measure is not computed from the cokurtosis matrix, but from the returns directly.
+This time every frontier plot reads the returns of the empirical high-order prior, `prs[4]`, because the kurtosis risk measure reads the returns directly and makes no use of the cokurtosis matrix.
 =#
 # Empirical prior composition.
 plot_stacked_area_composition(ress[1].w, rd.nx;
@@ -490,12 +505,12 @@ plot_measures(ress[2].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
               title = "FactorPrior(Step)", xlabel = "Kurtosis",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
-# Factor prior using dimensionality reduction.
+# Factor prior composition with dimension reduction regression.
 plot_stacked_area_composition(ress[3].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
                                         title = "FactorPrior(DimRed)",
                                         legend = :outerright))
-# Factor prior frontier with stepwise regression.
+# Factor prior frontier with dimension reduction regression.
 r = Kurtosis()
 plot_measures(ress[3].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
@@ -504,7 +519,7 @@ plot_measures(ress[3].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
               right_margin = 6Plots.mm)
 
 #=
-Let's optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
+The section ends with the maximum-ratio portfolios.
 =#
 opts = [JuMPOptimiser(; pe = prs[4], slv = slv), JuMPOptimiser(; pe = prs[7], slv = slv),
         JuMPOptimiser(; pe = prs[8], slv = slv)]
@@ -519,11 +534,11 @@ pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
                        "FactorPrior(Step)" => ress[2].w,
                        "FactorPrior(DimRed)" => ress[3].w); formatters = [resfmt])
 
-# Side-by-side composition: empirical vs two factor priors (MaximumRatio, Kurtosis).
+# The maximum-ratio portfolios of the last cell.
 plot_stacked_bar_composition(ress, rd)
 
 #=
-These findings are again consistent with the previous result, and reflective of the higher condition numbers of the factor-based higher order statistics. The next example will explore ways of reducing the estimation error.
+The kurtosis section shows the same pattern as the negative skewness section, which follows from the higher condition numbers of the high-order moments of the factor priors. The [covariance](02_Covariance_Estimation.md) and [higher moment](03_Higher_Moment_Estimation.md) pages show ways to reduce the estimation error of these moments.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
