@@ -38,7 +38,7 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. Data and a benchmark
+## 1. Data and two benchmarks
 
 The data is one year of S&P 500 prices, with two benchmarks. One is the equal-weight book, which
 is a weight vector. The other is the S&P 500 index, which is a return series.
@@ -86,8 +86,10 @@ pretty_table(DataFrame("Turnover budget" => turnover_vals,
 #=
 ## 3. Turnover as a risk measure
 
-[`TurnoverRiskMeasure`](@ref) makes the turnover the quantity to minimise. With no other term,
-the minimum is the reference book itself, so the result is the equal-weight book. The measure is
+[`TurnoverRiskMeasure`](@ref) makes the turnover the quantity to minimise. We minimise it with
+the equal-weight book as the reference, and print the drift of the result from that book, the
+sum of the absolute changes of section 2. With no other term the turnover is smallest at the
+reference, and a drift near zero means that the result is the reference book. The measure is
 useful as one term of a problem with more than one risk measure. You can also compute it for a
 candidate portfolio, to find how far that portfolio is from the current weights.
 =#

@@ -134,9 +134,11 @@ audit = DataFrame(:Metric => ["Max inner local weight", "Max outer cluster weigh
 pretty_table(audit; formatters = [resfmt])
 
 #=
-The first portfolio puts no bound on the outer optimisation, so its largest cluster weight can
-be above `0.62`, and only the first two portfolios can have a final asset weight above `0.20`.
-We plot the three portfolios.
+Compare each column with the `Limit` column. The first portfolio puts no bound on the outer
+optimisation, and its largest cluster weight is above `0.62`. In the first two portfolios, the
+final weight of an asset is its weight inside its cluster times the weight of the cluster. The
+inner and outer bounds of the second portfolio therefore let an asset reach
+`0.35 * 0.62 = 0.217`, which is above the final bound. We plot the three portfolios.
 =#
 
 using StatsPlots, GraphRecipes
@@ -147,10 +149,13 @@ plot_stacked_bar_composition([res_inner, res_inner_outer, res_nested_overall], r
 #=
 ## What to take away
 
-  - The `wb` of `NestedClustered` bounds the final asset weights. It takes a
-    [`WeightBounds`](@ref) of numbers or of vectors, or a [`WeightBoundsEstimator`](@ref).
-  - The `fees` of `NestedClustered` reduce the returns of the cluster portfolios that the outer
-    optimisation sees.
+  - With no final bound, an asset can reach the product of the inner and the outer bounds. On
+    this page that product, `0.217`, is above the final bound of `0.20`.
+  - To cap the final weights below that product, give the cap to the `wb` of `NestedClustered`,
+    as the third portfolio does. It takes a [`WeightBounds`](@ref) of numbers or of vectors, or
+    a [`WeightBoundsEstimator`](@ref).
+  - The page does not isolate the fee. The second portfolio adds the fee and the outer bound in
+    one step.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

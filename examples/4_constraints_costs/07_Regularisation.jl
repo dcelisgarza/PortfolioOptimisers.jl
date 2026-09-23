@@ -182,7 +182,7 @@ plot_measures(ress[3].w, pr; x = r, y = ExpectedReturn(; rt = ress[3].ret),
               ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
-# Weights with Lp regularisation, p = 5. As p grows, the penalty comes closer to the L-Inf penalty on the largest absolute weight, and the weights come closer to each other in size. In the plot the short weights stay negative, where the L2 penalty turns some of them positive.
+# Weights with Lp regularisation, p = 5. As p grows, the p-norm comes closer to the largest absolute weight, which is the norm of the L-Inf penalty.
 plot_stacked_area_composition(ress[4].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
                                         title = "Lp (p = 5) regularisation",
@@ -232,16 +232,18 @@ pretty_table(DataFrame(:Assets => rd.nx, :No_Reg => ress[1].w, :L1 => ress[2].w,
              summary_row_labels = ["# Eff. Assets"])
 
 #=
-How much a penalty changes the weights depends on its size against the rest of the objective.
-The penalty is the coefficient times the norm of the weights, and the objective here is the
-risk.
+Against `No_Reg`, the L1 penalty sets several weights to zero. The L2, Lp and L-Inf penalties
+make the weights more even, and the last row shows that each of them gives more effective assets
+than L1. How much a penalty changes the weights depends on its size against
+the rest of the objective, which here is the risk. The penalty is the coefficient times the
+norm of the weights.
 
 The number of effective assets, [`number_effective_assets`](@ref), is `1/(w ⋅ w)`. It measures
 how concentrated the weights are, and it is not a count of the weights that are not zero. A
 portfolio that holds fewer assets can still have more effective assets, if its weights are more
 even. A larger number of effective assets means a less concentrated portfolio.
 
-You can combine penalties: give more than one of the regularisation keywords to the
+To combine penalties, give more than one of the regularisation keywords to the
 `JuMPOptimiser`. For example, an L1 and an L2 penalty together ask for fewer assets and for more
 even weights. Each penalty you add is one more coefficient to choose.
 =#

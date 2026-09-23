@@ -15,8 +15,7 @@ This example applies cardinality and threshold constraints at four levels.
 !!! tip "When to reach for this"
     Reach for cardinality and threshold constraints when the number of positions matters as much
     as their sizes: a maximum number of holdings, a minimum size for each position you open, or
-    a limit on how many names, sets or groups hold a weight. They limit how many positions the
-    solution holds.
+    a limit on how many names, sets or groups hold a weight.
 
 !!! tip "A mixed-integer solver is required"
     These constraints add binary variables, so they need a mixed-integer solver.
@@ -36,10 +35,10 @@ end
 #=
 ## 1. Setup
 
-We load one year of S&P 500 prices and fit a `HighOrderPriorEstimator` prior. The mixed-integer
-solver is Pajarito, which uses HiGHS for the integer part and Clarabel for the conic part.
-Pajarito can print `Warning: integral solution repeated` on some solves. This is progress
-information, and the solve still succeeds.
+We load one year of S&P 500 prices and fit a [`HighOrderPriorEstimator`](@ref) prior. The
+mixed-integer solver is Pajarito, which uses HiGHS for the integer part and Clarabel for the
+conic part. Pajarito can print `Warning: integral solution repeated` on some solves. This is
+progress information, and the solve still succeeds.
 
 The [`UniverseSets`](@ref) name the groups, the clusters and the industries that the constraints
 below refer to. We chose them so that every problem on this page has a solution.

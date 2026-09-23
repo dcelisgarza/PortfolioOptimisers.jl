@@ -5,8 +5,8 @@ Description = "Budget constraints in PortfolioOptimisers.jl: the budget, the sho
 
 # Budget constraints
 
-This example shows how to use budget constraints. The budget is the sum of the portfolio
-weights. The short budget is the absolute value of the sum of the negative weights.
+The budget is the sum of the portfolio weights. The short budget is the absolute value of the
+sum of the negative weights.
 
 The two constraints act on different variables. The budget constraint acts on the weights. The
 short budget constraint acts on one relaxation variable per asset, and each relaxation variable
@@ -106,7 +106,7 @@ opt1 = JuMPOptimiser(; pe = pr, slv = slv)
 mr1 = MeanRisk(; r = r, opt = opt1)
 
 #=
-The printed estimator shows the defaults: `wb` is a [`WeightBounds`](@ref) with a lower bound
+The printed estimator shows the defaults. `wb` is a [`WeightBounds`](@ref) with a lower bound
 `lb = 0.0` and an upper bound `ub = 1.0` on each weight, and the budget is `bgt = 1.0`.
 
 We optimise, then print the budget and the long and short budgets. The last line is `true` when
@@ -190,8 +190,7 @@ println("used cash ≈ available cash: $(isapprox(sum(abs.(mip_res2.cost)) + mip
 #=
 #### 3.1.3 Short-only portfolio
 
-We now make a short-only portfolio, with a budget of `-1` and weights between `-1` and `0`. The
-same settings also build a hedging portfolio.
+We now make a short-only portfolio, with a budget of `-1` and weights between `-1` and `0`.
 =#
 
 opt3 = JuMPOptimiser(; pe = pr, slv = slv,
@@ -357,7 +356,7 @@ plot_stacked_bar_composition([res6, res7], rd)
 
 #=
 A short budget changes the weights only when it is smaller than the short exposure that the
-portfolio takes without it. The first portfolio does not use all of its short budget of 0.5.
-Compare the short budget that each cell prints with the one it was given to see whether the
-constraint binds.
+portfolio takes without it. The short positions of the first portfolio sum to more than 0.3 in
+size. Compare the short budget that the second cell prints with 0.3, and compare the two bars of
+the plot.
 =#

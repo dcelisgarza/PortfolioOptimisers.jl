@@ -71,8 +71,8 @@ res_base = optimise(MeanRisk(; obj = MinimumRisk(),
 
 #=
 The momentum exposure of a portfolio is `score' * w`. The minimum risk baseline takes no account
-of momentum, so its exposure is whatever the minimum risk weights give. We print it. Then we
-raise the exposure, first with a term in the objective and then with a constraint.
+of momentum. We print its exposure. Then we raise the exposure, first with a term in the
+objective and then with a constraint.
 =#
 
 base_exposure = score' * res_base.w
@@ -135,9 +135,10 @@ end
 
 #=
 `lambda` is the price of momentum against risk. We solve for four values of `lambda`, and print
-the momentum exposure and the largest weight of each result. A small `lambda` changes the
-weights little. A larger one raises the exposure, but each increase adds less than the one
-before, because the weights move toward the one asset with the highest score.
+the momentum exposure and the largest weight of each result. The smallest price above zero,
+`1e-4`, already moves the weights far from the baseline. Each larger price raises the exposure
+by less than the one before, because the weights move toward the one asset with the highest
+score.
 =#
 
 lambdas = [0.0, 1e-4, 5e-4, 2e-3]
