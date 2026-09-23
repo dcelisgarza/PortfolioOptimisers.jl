@@ -262,7 +262,7 @@ The three are different objects, and only this one is out of sample.
 
 # The threshold does not apply here
 
-Every other statistic of an evaluation is a statistic of a cross-section, so `fe.min_count` refuses one that carries too few assets. This one is not: the slope, the curve and the moments pool the pairs of every evaluation date and read them as one sample, so a thin cross-section contributes few pairs rather than an unreliable number. There is no cross-sectional count to threshold, and this verb takes no `min_count`.
+Every other statistic of an evaluation is a statistic of a cross-section. Each of them except [`forecast_coverage`](@ref), which explains why a date carries no statistic, refuses a cross-section that carries fewer than `fe.min_count` assets. This one is not a statistic of a cross-section: the slope, the curve and the moments pool the pairs of every evaluation date and read them as one sample, so a thin cross-section contributes few pairs rather than an unreliable number. There is no cross-sectional count to threshold, and this verb takes no `min_count`.
 
 # Algorithm
 
