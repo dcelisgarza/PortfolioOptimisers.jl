@@ -18,22 +18,22 @@ constraint swaps out without touching the optimiser.
 <!-- [![All Contributors](https://img.shields.io/github/all-contributors/dcelisgarza/PortfolioOptimisers.jl?labelColor=5e1ec7&color=c0ffee&style=flat-square)](#contributors) -->
 
 > [!CAUTION]
-> Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
+> Investing carries real risk, and portfolio optimisation tries to reduce that risk to a level you can accept. The examples use old data and a mix of stocks, some of which I consider meme stocks, to show how the library works. Nothing in this documentation is financial advice. The only advice here is about how to build a portfolio, and most of it is common knowledge in investing and statistics.
 
 ## What it does
 
-- **Optimisers** — mean-risk, risk budgeting and relaxed risk budgeting, near-optimal centering, hierarchical risk parity, hierarchical equal risk contribution, Schur complement, nested clustered optimisation, stacking, subset resampling and naive portfolios, with discrete and greedy finite allocation. See the [optimisers guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/02_Optimisers).
-- **Risk measures** — over 50 risk measures: variance, semi-moments, mean absolute deviation, VaR, CVaR, EVaR and RLVaR, ordered weights arrays, average, maximum and ulcer drawdowns, worst realisation, range, tracking and turnover measures, skewness and kurtosis. See the [risk measures guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/03_Risk_Measures).
-- **Priors and views** — empirical, factor and high-order priors; four Black-Litterman variants, entropy pooling in Meucci's form and the general form, and opinion pooling. See the [data and priors guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/01_Data_and_Priors).
-- **Moment estimation** — Gerber, Gerber-IQ and Smyth-Broby covariances, distance and mutual-information covariance, denoising, detoning, regime-adjusted exponentially-weighted covariance, coskewness and cokurtosis. See the [covariance estimation example](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/2_moments_priors/02_Covariance_Estimation).
-- **Constraints and costs** — budget, group, factor exposure, cardinality, turnover, tracking, phylogeny and centrality constraints; fees and market impact; your own JuMP expressions. See the [constraints and costs guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/04_Constraints_and_Costs).
-- **Validation and tuning** — walk-forward and combinatorial cross-validation, grid and randomised hyperparameter search, and pipelines. See the [validation and tuning guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/05_Validation_and_Tuning).
+- The optimisers include mean-risk, risk budgeting and relaxed risk budgeting, near-optimal centering, hierarchical risk parity, hierarchical equal risk contribution, Schur complement, nested clustered optimisation, stacking, subset resampling and the naive portfolios. A discrete or a greedy finite allocation turns the weights into whole shares. See the [optimisers guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/02_Optimisers).
+- The library has over 50 risk measures. Among them are variance, semi-moments, mean absolute deviation, VaR, CVaR, EVaR and RLVaR, ordered weights arrays, the average, maximum and ulcer drawdowns, worst realisation, range, tracking and turnover measures, skewness and kurtosis. See the [risk measures guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/03_Risk_Measures).
+- The priors include empirical, factor and high-order priors. You can add views with four Black-Litterman variants and with entropy pooling in Meucci's form or in the general form, and you can combine several priors with opinion pooling. See the [data and priors guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/01_Data_and_Priors).
+- The moment estimators include the Gerber, Gerber-IQ and Smyth-Broby covariances, distance and mutual-information covariance, a regime-adjusted exponentially weighted covariance, coskewness and cokurtosis. The library can also denoise and detone a covariance matrix. See the [covariance estimation example](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/2_moments_priors/02_Covariance_Estimation).
+- The constraints include budget, group, factor exposure, cardinality, turnover, tracking, phylogeny and centrality constraints. The costs are fees and market impact, and you can add your own JuMP expressions. See the [constraints and costs guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/04_Constraints_and_Costs).
+- You can validate a portfolio with walk-forward and combinatorial cross-validation, tune it with a grid or a randomised hyperparameter search, and join the steps of a fit in a pipeline. See the [validation and tuning guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/05_Validation_and_Tuning).
 
-The [capability catalogue](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/capability_catalogue) is the full inventory, generated from the live package.
+The [capability catalogue](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/capability_catalogue) lists everything the library can do. The docs build generates it from the package, so it cannot fall behind the code.
 
 ## Installation
 
-`PortfolioOptimisers.jl` is a registered package, so installation is as simple as:
+`PortfolioOptimisers.jl` is a registered package. Install it with the package manager:
 
 ```julia
 julia> using Pkg
@@ -43,22 +43,22 @@ julia> Pkg.add(PackageSpec(; name = "PortfolioOptimisers"))
 
 ## Roadmap
 
-- The [Issues](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/) page is used as a tracker for bugs, feature requests, plans, and works in progress.
+- The [Issues](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/) page tracks bugs, feature requests, plans and work in progress.
 
-- The [dev](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/dev) branch is used as a staging ground before merging into `main`.
+- Changes go to the [dev](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/dev) branch first, and they merge into `main` at a release.
 
 ## Quick-start
 
-The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/00_API/) docs contain toy examples of the many, many features.
+The example below loads a year of prices, finds the portfolio of minimum variance, turns its weights into whole shares, and plots the result. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples) explain each step at more length, and the docstrings on the [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/00_API/) pages include short examples.
 
-First we import the packages we will need for the example.
+The example needs these packages:
 
-- `StatsPlots` and `GraphRecipes` is needed to load the plotting extension.
-- `Clarabel` and `HiGHS` are the optimisers we will use.
-- `CSV`, `TimeSeries` and `DataFrames` for loading and preprocessing price data.
-- `PrettyTables` for displaying the results.
+- `StatsPlots` and `GraphRecipes` load the plotting extension.
+- `Clarabel` and `HiGHS` are the solvers.
+- `CSV`, `TimeSeries` and `DataFrames` load and hold the price data.
+- `PrettyTables` prints the tables.
 
-We use the S&P 500 sample dataset shipped in [`examples/SP500.csv.gz`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples): daily adjusted close prices for 20 large-cap stocks. To keep things quick, we only use the most recent year.
+The data is the S&P 500 sample in [`examples/SP500.csv.gz`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples), which has the daily adjusted close prices of 20 large-cap stocks. We keep the last 253 rows, about one year, so the example runs fast.
 
 ```julia
 # Import module and plotting extension.
