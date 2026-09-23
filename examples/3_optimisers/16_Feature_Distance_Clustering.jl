@@ -12,9 +12,10 @@ That route sees only the structure the price history contains.
 A [`FeatureDistance`](@ref) replaces the returns with a matrix of assets by features. Feature `k`
 is any per-asset quantity you can name, such as a sector membership, a factor loading, a position
 in the asset network or a trailing characteristic. Two assets are close when their feature rows
-point the same way. The output is an ordinary distance matrix, so every consumer that takes a
-distance estimator takes this one: [`ClustersEstimator`](@ref), [`NetworkEstimator`](@ref), the
-clustering optimisers, and the phylogeny and centrality constraint families.
+point the same way. The output is an ordinary distance matrix, so you can pass a
+`FeatureDistance` wherever the library takes a distance estimator: [`ClustersEstimator`](@ref),
+[`NetworkEstimator`](@ref), the clustering optimisers, and the phylogeny and centrality
+constraints.
 
 Nothing stores the matrix. An [`AssetPanel`](@ref) holds the values, one field per named quantity,
 and [`feature_matrix`](@ref) stacks the fields a selector names into the matrix a distance
@@ -22,8 +23,9 @@ measures. The stacking happens where the distance is measured, so one panel serv
 fundamentals table and a factor model at once.
 
 Use a feature matrix for structure the returns do not contain. A classification, a mandate, a
-supply chain or a factor model brings in relationships the price history has no record of. Feeding
-the returns graph back in as features is a different tool, and section 4 covers it.
+supply chain or a factor model brings in relationships the price history has no record of. A
+feature matrix built from the returns graph is a different tool. Section 3.2 introduces it, and
+section 4 covers its settings.
 
 !!! tip "When to reach for this"
     Reach for a [`FeatureDistance`](@ref) when you can name the structure you want the allocation
@@ -48,8 +50,8 @@ end;
 #=
 ## 1. The returns and a classification
 
-We use the same twenty-name S&P 500 slice as the other optimiser examples, and add a two-level
-classification. The levels nest. Every industry belongs to exactly one sector, so two assets in
+We take one year of daily returns of twenty S&P 500 stocks, and add a two-level classification
+of the twenty. The levels nest. Every industry belongs to exactly one sector, so two assets in
 the same industry are in the same sector.
 =#
 
@@ -81,9 +83,10 @@ industry = Dict("AAPL" => "ConsumerHardware", "AMD" => "Semiconductors",
                 "UNH" => "ManagedCare")
 
 #=
-The classification travels on a [`UniverseSets`](@ref). Every key an asset view has to follow
-carries the `xkey` prefix, so write `"nx_sector"` rather than `"sector"`. That prefix is what
-[`port_opt_view`](@ref) slices alongside the asset names.
+We store the classification in a [`UniverseSets`](@ref). A key whose values must follow the
+assets when the library keeps only some of them, as a fold or a subset does, carries the `xkey`
+prefix. Write `"nx_sector"` rather than `"sector"`, so that [`port_opt_view`](@ref), the function
+that cuts the data down to a subset of the assets, slices the labels with the asset names.
 =#
 
 sets = UniverseSets(; xkey = "nx",
@@ -99,11 +102,11 @@ pretty_table(DataFrame("Asset" => rd0.nx, "Sector" => [sector[a] for a in rd0.nx
 ## 2. From a classification to an asset panel
 
 An asset panel is a stack of named fields over the assets, and one field holds one named quantity.
-[`panel_input`](@ref) turns one `UniverseSets` key into one raw field. It dispatches on what the
-key holds: a vector of strings becomes a [`CategoricalPanelInput`](@ref), and a vector of numbers
-becomes a [`NumericPanelInput`](@ref). The vector form maps over several keys, which is how a
-nested taxonomy enters. The field takes its name from the key with the `xkey` prefix stripped, so
-`"nx_sector"` becomes the field `"sector"`.
+[`panel_input`](@ref) turns one `UniverseSets` key into one raw field. What it returns depends on
+the values of the key: a vector of strings becomes a [`CategoricalPanelInput`](@ref), and a vector
+of numbers becomes a [`NumericPanelInput`](@ref). The vector form maps over several keys, which is
+how a nested taxonomy enters. The field takes its name from the key with the `xkey` prefix stripped,
+so `"nx_sector"` becomes the field `"sector"`.
 
 [`asset_panel`](@ref) turns the raw inputs into the [`AssetPanel`](@ref) that the
 [`ReturnsResult`](@ref) holds. A categorical field stores one integer code per asset over its own
@@ -175,9 +178,9 @@ different industries at `1/3`, and two that share nothing at `0.5`.
 
 ### 2.2 The clustering it produces
 
-The panel travels on the [`ReturnsResult`](@ref), because it is data rather than configuration.
-The distance estimator goes into an ordinary [`ClustersEstimator`](@ref) through its `de` slot,
-and [`clusterise`](@ref) reads the panel off the [`ReturnsResult`](@ref) it is handed.
+The panel is data rather than configuration, so it goes on the [`ReturnsResult`](@ref) with the
+returns. The distance estimator goes into an ordinary [`ClustersEstimator`](@ref) through its `de`
+keyword, and [`clusterise`](@ref) takes the panel from the [`ReturnsResult`](@ref) you pass it.
 =#
 
 rd = ReturnsResult(; nx = rd0.nx, X = rd0.X, ts = rd0.ts, pnl = pnl)
@@ -196,10 +199,9 @@ pretty_table(DataFrame("Asset" => rd.nx, "Sector" => [sector[a] for a in rd.nx],
 
 #=
 We score the two hierarchies against each other with the adjusted Rand index, cut by cut. On
-this universe the two cuts are identical at four clusters, and they separate as the cut goes
-finer. A sector classification and a one-year correlation read the same coarse structure here.
-The feature route differs in the fine structure, in the merge order, and in what happens when
-the sample moves, which section 9 measures.
+this universe the two cuts are identical at four clusters, where the index is `1.0`, and they
+differ at every other cut from two to ten. The feature route also differs in the merge order,
+and in what happens when the sample moves, which section 9 measures.
 =#
 
 agreement = DataFrame("k" => 2:10,
@@ -208,16 +210,16 @@ agreement = DataFrame("k" => 2:10,
                                                 for k in 2:10])
 pretty_table(agreement; title = "How far the two hierarchies agree, cut by cut")
 
-# Plot the clusters for the feature distance clustering.
+# The feature distance gives these clusters.
 plot_clusters(clr_fea, rd.nx)
 
-# Plot the clusters for the correlation clustering.
+# The correlation distance gives these clusters.
 plot_clusters(clr_cor, rd.nx)
 
 #=
 We hand both hierarchies to [`HierarchicalRiskParity`](@ref) and compare the weights. Nothing on
-the optimiser names the feature source. The panel travels with the returns, and the distance
-estimator reads it there.
+the optimiser names the feature source. The panel comes with the returns, and the distance
+estimator takes it from there.
 =#
 
 hrp_cor = optimise(HierarchicalRiskParity(;
@@ -242,25 +244,25 @@ plot_stacked_bar_composition([hrp_cor, hrp_fea], rd;
 #=
 ## 3. Where the panel comes from
 
-[`FeatureDistance`](@ref)'s `ape` slot decides which panel gets measured, and it takes two
-settings.
+The `ape` field of [`FeatureDistance`](@ref) decides which panel the distance measures, and it
+takes two kinds of value.
 
-  - `ape = nothing`, the default, reads the panel the [`ReturnsResult`](@ref) holds. That is what
+  - `ape = nothing`, the default, measures the panel of the [`ReturnsResult`](@ref). That is what
     section 2 does. You built the panel, so you named its fields and you know what is in it.
   - `ape = <producer>` builds a panel at the point of use, from the prior and the returns the
     subproblem was handed. A producer is an [`AbstractAssetPanelEstimator`](@ref), and the library
     ships two.
 
-A producer never reads the panel that came with the returns, and a panel that came with the
-returns is never derived. One route gives one panel, and no precedence rule decides between them.
+A producer ignores any panel that came with the returns, and `ape = nothing` builds no panel of
+its own. Each value of `ape` therefore gives exactly one panel.
 
-The two routes differ under a fold. A panel that travels with the returns is data, so a fold
+The two routes differ under a fold. A panel that comes with the returns is data, so a fold
 slices it. A produced panel is recomputed on the subproblem's own returns, so a fold refits it.
 Section 8 measures the difference.
 
 ### 3.1 `RegressionPanel`, factor loadings
 
-[`RegressionPanel`](@ref) reads the loadings a factor prior has already fitted, so an asset's
+[`RegressionPanel`](@ref) takes the loadings a factor prior has already fitted, so an asset's
 feature row is its position in the factor coordinate system. The loadings come from the same
 returns, so this route brings in no outside structure. It is still a different reading of those
 returns, because two assets can load alike and co-move weakly.
@@ -283,7 +285,7 @@ pretty_table(DataFrame(["Asset" => rd.nx;
              title = "Factor loadings as a Panel Field")
 
 #=
-A producer that reads a prior needs one, so we hand [`clusterise`](@ref) the prior result and pass
+A producer that uses a prior needs one, so we hand [`clusterise`](@ref) the prior result and pass
 the returns beside it as a keyword.
 =#
 
@@ -302,9 +304,9 @@ correlation, so this route brings in no outside structure either. What it adds i
 of the network. [`phylogeny_matrix`](@ref) accumulates a walk count and then clamps it to `0` or
 `1`, which drops the step count. This one keeps the step count.
 
-Its source is always an estimator, never a precomputed result, so it rebuilds the graph on
-whatever universe the subproblem hands it. It reads no prior, so it can run before a
-prior is fitted, at a site such as preselection.
+It always takes an estimator, never a precomputed result, so it rebuilds the graph on the
+assets of each subproblem. It needs no prior, so it can also run where no prior is fitted yet,
+such as a step that preselects assets.
 =#
 
 ape_graph = PhylogenyPanel(; pl = NetworkEstimator(; sep = HopCount(; n = 2)),
@@ -318,9 +320,9 @@ pretty_table(DataFrame(["Asset" => rd.nx;
              title = "The first six columns of the graph Panel Field")
 
 #=
-Read the values off the table. `3` is the asset itself, `2` a direct neighbour, `1` a two-hop
-neighbour, and `0` an asset the budget does not reach. Section 4 says where those numbers come
-from, and why [`LinearDecay`](@ref) alone reads the budget as a scale.
+In the table, `3` is the asset itself, `2` a direct neighbour, `1` a two-hop neighbour, and `0`
+an asset the budget does not reach. Section 4 says where those numbers come from, and why only
+[`LinearDecay`](@ref) uses the budget as a scale.
 
 ### 3.3 The three routes side by side
 =#
@@ -338,10 +340,10 @@ pretty_table(routes; title = "The three routes a Feature Matrix takes")
 #=
 ## 4. Two settings on the graph producer, and neither implies the other
 
-[`PhylogenyPanel`](@ref) reads two settings, and they live on two different objects.
+[`PhylogenyPanel`](@ref) takes two settings, and they are fields of two different objects.
 
   - `sep` on the [`NetworkEstimator`](@ref) decides which pairs are related, which is how far
-    apart two assets may sit and still score above zero. [`HopCount`](@ref) counts edges with a
+    apart two assets can be and still score above zero. [`HopCount`](@ref) counts edges with a
     budget of `n` of them. [`PathLength`](@ref) sums distances along the shortest path with a
     budget `dmax` in those units.
   - `decay` on [`Proximity`](@ref) decides how strongly a related pair scores as the separation
@@ -383,7 +385,7 @@ pretty_table(sweep;
              title = "Four decays crossed against two separations")
 
 #=
-Read the table down the columns rather than across the rows.
+Compare the table column by column rather than row by row.
 
   - **`Related pairs` moves with the separation and never with the decay.** Which pairs are
     related is `sep`'s question alone.
@@ -396,9 +398,9 @@ Read the table down the columns rather than across the rows.
     changes the clusters that come out of it.
   - **[`NoDecay`](@ref) does not mean no truncation.** The budget still cuts, so the field is `1`
     inside the budget and `0` outside it, which is an indicator of the neighbourhood rather than a
-    matrix of ones. It is also the only decay under which the two separations reach the same
-    clustering, because an indicator keeps only the support, and these two supports differ by two
-    pairs in ninety-six.
+    matrix of ones. It is also the only decay under which the two separations score the same
+    against the correlation cut. An indicator keeps only the support, and the `Related pairs`
+    column shows that the two supports differ by two entries.
 =#
 
 plot(1:size(sweep, 1), sweep[!, "ARI vs correlation"]; marker = :circle, legend = false,
@@ -412,19 +414,21 @@ plot(1:size(sweep, 1), sweep[!, "ARI vs correlation"]; marker = :circle, legend 
 !!! warning "The same setting does something else on the constraint path"
 
     `PathLength()` with no `dmax` means the whole connected component. Here that is a reasonable
-    choice, because the budget only sets where the fall-off reaches zero, and the decay still
-    grades everything inside it. On the constraint path the same setting selects rather than
-    grades. It declares every reachable pair related, forbids all pairwise co-movement, and solves
-    to a one-asset portfolio without reporting a failure. Section 2.2 of
+    choice, because the budget only sets where the scores stop, and the decay still grades every
+    pair inside it. On the constraint path the same setting selects pairs rather than grading
+    them, and it relates every reachable pair. A [`SemiDefinitePhylogenyEstimator`](@ref) then
+    removes the diversification benefit of every pair from the variance the optimiser minimises.
+    It forbids no joint holding, but the minimum-risk portfolio puts all its weight in one asset,
+    and the solve reports no failure. Section 2.2 of
     [Phylogeny and centrality constraints](../4_constraints_costs/04_Phylogeny_Centrality.md)
-    covers that path. The bare default also ties the scale of the field to the sample, which
-    section 8.3 measures.
+    warns about that setting, and its section 3.1 shows the one-asset portfolio. The bare default
+    also ties the scale of the field to the sample, which section 8.3 measures.
 
-## 5. Metrics, and the similarity slot
+## 5. Metrics, and the similarity field
 
-[`FeatureDistance`](@ref)'s `metric` field takes any `Distances.SemiMetric`, including one you
-write yourself. The default is [`AngularDist`](@ref), the arc-cosine of the cosine similarity
-scaled to `[0, 1]`, which delegates to the BLAS `gemm` path of Distances.
+The `metric` field of [`FeatureDistance`](@ref) takes any `Distances.SemiMetric`, including one
+you write yourself. The default is [`AngularDist`](@ref), the arc-cosine of the cosine similarity
+scaled to `[0, 1]`.
 
 The choice changes the answer. Metrics differ in what they are defined on, and one of them returns
 a number on input outside its domain rather than raising, so the library checks the domain.
@@ -446,9 +450,10 @@ end
 pretty_table(metric_rows; title = "Three metrics on the same classification panel")
 
 #=
-On a matrix of indicator columns all three put the pairs in the same order, and only the scale
-differs. [`AngularDist`](@ref) stops at `0.5`, because a non-negative matrix admits no negative
-cosine. A signed matrix is a different case, and the next cell measures one.
+On a matrix of indicator columns each of the three metrics falls as the number of levels two
+assets share rises, so all three put the pairs in the same order and give three distinct
+distances. The values differ. [`AngularDist`](@ref) stops at `0.5`, because a non-negative matrix
+admits no negative cosine. A signed matrix is a different case, and the next cell measures one.
 =#
 
 signed_metric = try
@@ -465,15 +470,15 @@ println(signed_metric)
 input it returns values up to `2` and raises nothing, and a clustering routine then takes those
 values as distances. The domain check raises the error printed above instead, and it covers
 `Distances.BrayCurtis` and `Distances.ChiSqDist` as well. A signed field, and a block of factor
-loadings above all, wants [`AngularDist`](@ref) or `Distances.CosineDist`.
+loadings above all, needs [`AngularDist`](@ref) or `Distances.CosineDist`.
 
-### The `sim` slot
+### The `sim` field
 
-A clustering consumer calls [`cor_and_dist`](@ref) rather than [`distance`](@ref), so a feature
-distance owes a similarity matrix as well. `sim` holds it, and [`default_similarity`](@ref) fills
-it from the metric. [`AngularDist`](@ref) takes [`AngularSimilarity`](@ref), which recovers the
-cosine as `cos(πD)`, and every other metric takes [`ComplementSimilarity`](@ref), which is
-`1 - D`. Set `sim` yourself to override that.
+A clustering estimator calls [`cor_and_dist`](@ref) rather than [`distance`](@ref), so a feature
+distance must also give a similarity matrix. The `sim` field says how to compute it, and
+[`default_similarity`](@ref) sets it from the metric. [`AngularDist`](@ref) takes
+[`AngularSimilarity`](@ref), which recovers the cosine as `cos(πD)`, and every other metric takes
+[`ComplementSimilarity`](@ref), which is `1 - D`. Set `sim` yourself to override that.
 =#
 
 S_fea, D_fea = cor_and_dist(FeatureDistance(), nothing, rd.X; rd = rd)
@@ -488,8 +493,8 @@ with an observation axis, and carries an active mask and an estimation mask besi
 [`feature_matrix`](@ref) follows the shape. A static panel stacks to `assets × features`, and a
 time-varying one to `observations × assets × features`.
 
-One distance matrix has to come out of a time-varying matrix, and the `alg` field says how. The
-family is open, and the library ships four members.
+A time-varying matrix must give one distance matrix, and the `alg` field says how. The library
+ships four collapse rules, and you can write your own.
 
 The two features here move with the sample: annualised realised volatility over twenty-one days,
 and cumulative return over sixty-three. Both are ordinary numeric fields, so
@@ -527,9 +532,9 @@ pretty_table(collapse_rows;
              title = "Four collapse rules on one $(size(Ztv, 1))×$(size(Ztv, 2))×$(size(Ztv, 3)) Feature Matrix")
 
 #=
-The four rules give four different answers, and the difference is one of kind rather than degree.
+The four rules give four different answers.
 
-  - [`LastObservation`](@ref), the default, takes the most recent slice and reads no other.
+  - [`LastObservation`](@ref), the default, uses the most recent slice and ignores the rest.
   - [`AggregateFeatures`](@ref) averages the features first, then measures the distance once.
   - [`AggregateDistances`](@ref) measures each period, then averages the distance matrices. Its
     constructor refuses [`MedianCollapse`](@ref), because a convex combination of metrics is a
@@ -538,8 +543,8 @@ The four rules give four different answers, and the difference is one of kind ra
     exposed of the four to scale, because a period with large magnitudes dominates the rest.
 
 The last column of the table is the degenerate case. At one observation the four rules return the
-same distances, so the four rules are four readings of one idea. A static panel never reads
-`alg`, and setting one there raises nothing, because one estimator serves both shapes.
+same distances. A static panel ignores `alg`, and setting one there raises no error, because one
+estimator serves both shapes.
 
 Both averaging rules take observation weights on a `w` field, so an exponential decay or an
 entropy-pooling posterior reaches the collapse.
@@ -551,9 +556,10 @@ plot([distance(FeatureDistance(; alg = alg), Ztv; dims = 1)[1, :] for (_, alg) i
      title = "The collapse rule is a modelling choice, not a detail")
 
 #=
-### 6.1 A static field on a time-varying panel is lifted, not copied
+### 6.1 A static field on a time-varying panel is stored once
 
-A panel is one shape throughout, so a static input that meets a time-varying one is lifted.
+A panel is one shape throughout, so a static input that joins a time-varying one gains an
+observation axis.
 [`asset_panel`](@ref) wraps its values in a [`RepeatedLeading`](@ref), which stores them once and
 indexes a leading observation axis. A classification that never moves therefore costs its own
 memory beside characteristics that move every day, rather than its own memory times the
@@ -575,11 +581,10 @@ pretty_table(DataFrame("Panel Field" => [f.name for f in pnl_mixed.pf],
              title = "A lifted field presents an observation axis it does not store")
 
 #=
-## 7. The selector reads one namespace
+## 7. The selector names fields of the panel
 
-[`FeatureDistance`](@ref)'s `sel` field names what to stack, and it reads the panel's own field
-index. There is no second namespace, and no integer column to count. An entry takes one of four
-forms.
+The `sel` field of [`FeatureDistance`](@ref) names what to stack, by the names of the panel's own
+fields, levels and labels. You never count integer columns. An entry takes one of four forms.
 
 | Entry                          | Columns it contributes                        |
 |:------------------------------ |:--------------------------------------------- |
@@ -628,10 +633,10 @@ println("The estimator's own labels: ", feature_labels(de_coarse, pr, rd, rd.X))
 #=
 ### 7.1 `strict`, and an entry the panel does not hold
 
-`strict` is the library-wide setting, and here it governs a name, a level or a label the panel
-does not hold. Under the default, `strict = false`, the entry is dropped with a warning. Under
-`strict = true` the call raises. Dropping the entry is what lets one estimator serve a universe
-whose panel has lost a field, which happens inside a fold.
+`strict` is the setting the whole library uses for an input it cannot match. Here it decides what
+happens to a name, a level or a label that is not in the panel. Under the default, `strict = false`,
+the entry is dropped with a warning. Under `strict = true` the call raises. Dropping the entry is
+what lets one estimator serve a universe whose panel has lost a field, which happens inside a fold.
 =#
 
 dropped = feature_matrix(pnl, ["not_a_field", "sector"])
@@ -677,11 +682,12 @@ pretty_table(DataFrame("Selector entry" =>
 
 ### 8.1 The square case: slicing and measuring do not commute
 
-[`features_are_assets`](@ref) decides the question, and it compares names rather than axis
-lengths. When the labels of a tensor field are the asset names, the field's label axis is the
-asset axis, so an asset view slices it as well. A square field keyed by asset is therefore the
-only shape where measuring a subproblem differs from reading a subproblem out of the distance
-matrix of the whole universe. Nothing stores that fact. The view derives it from the names.
+[`features_are_assets`](@ref) decides whether the labels of a field are the assets, and it
+compares names rather than axis lengths. When the labels of a tensor field are the asset names,
+the field's label axis is the asset axis, so the library slices it too when it keeps a subset of
+the assets. A square field keyed by asset is therefore the only shape where measuring a
+subproblem differs from reading the subproblem out of the distance matrix of the whole universe.
+The library stores no flag for this, and it compares the names each time it slices.
 =#
 
 rd_square = ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts, pnl = pnl_graph)
@@ -714,22 +720,22 @@ well above the floating-point noise. It is the gap between asking how close two 
 this cluster and asking how close they are in the whole universe. Both questions are reasonable,
 and the shape of the field decides which one you asked.
 
-A produced panel never meets the choice. A producer refits on whatever universe it is handed, so
-[`PhylogenyPanel`](@ref) rebuilds the graph on the cluster rather than cutting the universe's
-graph down to it.
+A produced panel is refitted on the subproblem, so the question does not arise.
+[`PhylogenyPanel`](@ref) rebuilds the graph on the cluster rather than cutting the graph of the
+universe down to it.
 
 ### 8.2 A meta-optimiser's outer problem
 
 A meta-optimiser solves its outer problem over synthetic assets, such as sub-portfolios, clusters
 or predictions, and none of them has a row in any panel. The outer problem still takes features.
-The inner weights collapse the inner universe's panel onto the synthetic assets, one field at a
-time, so an outer [`FeatureDistance`](@ref) measures the features of the sub-portfolios rather
-than raising.
+The inner weights collapse the panel of the inner universe onto the synthetic assets, so an
+outer [`FeatureDistance`](@ref) measures the features of the sub-portfolios rather than raising
+an error.
 
-The collapse closes on the panel rather than on the matrix. A numeric field stays numeric, and a
-tensor field stays tensor. A categorical field becomes a tensor field of membership fractions over
-its own levels, so a cluster's row holds its weighted average membership of each group. A selector
-that named `"sector"` resolves unchanged on the outer panel.
+The collapse works field by field on the panel, not on the stacked matrix. A numeric field stays
+numeric, and a tensor field stays tensor. A categorical field becomes a tensor field of membership
+fractions over its own levels, so a cluster's row holds its weighted average membership of each
+group. A selector that named `"sector"` resolves unchanged on the outer panel.
 =#
 
 nco = NestedClustered(; pe = pr, cle = cle_fea,
@@ -882,14 +888,13 @@ pretty_table(DataFrame([backtest_row("Correlation", bt_cor),
 
 #=
 Return and volatility are close between the two rows, and the drawdown of the classification run
-is smaller. Read the last column. The classification hierarchy changes its weights between
+is smaller. The last column shows that the classification hierarchy changes its weights between
 rebalances by less than half of what the correlation hierarchy changes. The reason is the source
 of the structure. A sector does not move when a correlation moves, so the dendrogram, the merge
 order and the recursive bisection hold still, and the risk estimate inside each cluster is the
 only thing left moving.
 
-That stability has a price. A classification panel cannot react to a structural break the returns
-can see.
+A classification panel cannot react to a structural break that the returns show.
 =#
 
 plot_portfolio_cumulative_returns(bt_fea)
@@ -897,20 +902,20 @@ plot_portfolio_cumulative_returns(bt_fea)
 #=
 ## 10. Summary
 
-  - An [`AssetPanel`](@ref) is the data, one field per named quantity, and it travels on the
-    [`ReturnsResult`](@ref) beside the returns. [`feature_matrix`](@ref) stacks it where a distance
+  - An [`AssetPanel`](@ref) is the data, one field per named quantity, and it goes on the
+    [`ReturnsResult`](@ref) with the returns. [`feature_matrix`](@ref) stacks it where a distance
     measures it, and nothing stores the result.
-  - [`FeatureDistance`](@ref) turns that matrix into a distance, so every clustering, network and
-    constraint consumer takes it unchanged.
-  - `ape` picks the panel. `nothing` reads the panel that came with the returns, and a producer
+  - [`FeatureDistance`](@ref) turns that matrix into a distance, so every clustering estimator,
+    network estimator and constraint that takes a distance estimator takes it unchanged.
+  - `ape` picks the panel. `nothing` uses the panel that came with the returns, and a producer
     builds one at the point of use. [`RegressionPanel`](@ref) and [`PhylogenyPanel`](@ref) are the
-    two the library ships, and both read the returns. The panel that came with the returns is the
-    route that brings in structure from outside, and [`panel_input`](@ref) fills it from a
-    taxonomy.
-  - `sel` reads one namespace, the panel's own field index. An entry is a name, a name with the
-    levels or labels it keeps, or a name with its observed mask. `strict` decides whether an
-    absent entry is dropped or raises.
-  - [`PhylogenyPanel`](@ref) reads two settings on two different objects. `sep` chooses which pairs
+    two the library ships, and both derive their panel from the returns. The panel that came with
+    the returns is the route that brings in structure from outside, and [`panel_input`](@ref) fills
+    it from a taxonomy.
+  - `sel` names what to stack by the names of the panel's own fields. An entry is a name, a name
+    with the levels or labels it keeps, or a name with its observed mask. `strict` decides whether
+    an absent entry is dropped or raises.
+  - [`PhylogenyPanel`](@ref) takes two settings on two different objects. `sep` chooses which pairs
     are related, and `decay` how strongly. Neither sets the other, and the default pairing hides
     the difference.
   - Under a fold a panel that came with the returns is sliced, and a produced one is refitted. A
