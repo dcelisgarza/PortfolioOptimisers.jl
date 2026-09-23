@@ -227,9 +227,13 @@ mip_slv = [Solver(; name = :mip1,
                                                                                        1e-4)),
                   check_sol = (; allow_local = true, allow_almost = true))]
 
+# At its default tolerances SCS stops far from the optimum of `mr_block5`'s programmes: the
+# `MinimumRisk` risk was 34 % above it, and SCS 2.6.5 and 2.7.0 stop at points up to 0.25
+# apart. At `1e-9` both versions reach the same point, to `rtol = 5e-6`.
 scs_slv = Solver(; name = :scs1, solver = SCS.Optimizer,
                  check_sol = (; allow_local = true, allow_almost = true),
-                 settings = "verbose" => false)
+                 settings = Dict("verbose" => false, "eps_abs" => 1e-9, "eps_rel" => 1e-9,
+                                 "max_iters" => 1_000_000))
 sets = UniverseSets(;
                     dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
                                 "group2" => rd.nx[2:2:end],
@@ -698,7 +702,7 @@ function mr_block5()
         mr = MeanRisk(; r = r, obj = obj, opt = opt)
         res = optimise(mr, rd2)
         @test isa(res.retcode, OptimisationSuccess)
-        rtol = 1e-6
+        rtol = 1e-5
         success = isapprox(res.w, df[!, i]; rtol = rtol)
         if !success
             println("Counter: $i")

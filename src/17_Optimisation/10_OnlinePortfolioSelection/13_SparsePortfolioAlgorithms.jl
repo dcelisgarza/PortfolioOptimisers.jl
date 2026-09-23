@@ -317,3 +317,4 @@ function huber_remainder!(b::AbstractVector, phi::AbstractVector)
     return b
 end
 export L1Optimum, HuberOptimum, AlternatingDirectionMethod
+public AbstractSparsePortfolioAlgorithm, sparse_portfolio_iterate

@@ -928,3 +928,4 @@ end
 
 export IdentityTarget, ScaledIdentityTarget, CommonCovarianceTarget,
        ConstantCorrelationTarget, GeodesicShrinkageCovariance
+public AbstractCovarianceShrinkageTarget, shrinkage_target

@@ -26,6 +26,7 @@ KernelTrendTracking
 KernelTrendPatternTracking
 TransactionCostOptimisation
 ShortTermSparsePortfolio
+PortfolioOptimisers.AbstractSparsePortfolioAlgorithm
 PortfolioOptimisers.ForecasterState
 PortfolioOptimisers.forecast_relative
 ```
