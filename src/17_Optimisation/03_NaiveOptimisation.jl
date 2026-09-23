@@ -1191,32 +1191,31 @@ The kernel of [`BestConstantRebalancedPortfolio`](@ref), on a bare matrix so it 
 function cover_fixed_point(X::MatNum, iters::Integer, tol::Number)
     T, N = size(X)
     w = fill(one(eltype(X)) / N, N)
-    wc = w
-    local lw, gap
-    converged = false
+    # The certificate is read at `w`, the weights the kernel returns, before each step, so the
+    # uniform start is certified before the loop. Cover's multiplier of each asset is the mean
+    # over observations of its price relative against the portfolio's own. By concavity and
+    # Jensen's inequality the largest one bounds the shortfall,
+    # `lw* - lw <= T log(max_j g_j)`, and the bound reaches zero at the optimum, a corner
+    # included, where every multiplier is at most one.
+    p = X * w
+    lw = sum(log, p)
+    g = vec(Statistics.mean(X ./ p; dims = 1))
+    gap = max(zero(lw), T * log(maximum(g)))
+    converged = gap <= tol * max(one(lw), abs(lw))
     iterations = 0
-    for k in 0:iters
-        # The certificate is read at `wc`, the weights the kernel returns. Cover's multiplier
-        # of each asset is the mean over observations of its price relative against the
-        # portfolio's own. By concavity and Jensen's inequality the largest one bounds the
-        # shortfall, `lw* - lw <= T log(max_j g_j)`, and the bound reaches zero at the
-        # optimum, a corner included, where every multiplier is at most one.
-        wc = w
-        p = X * wc
+    while !converged && iterations < iters
+        # The multiplicative step, renormalised onto the simplex, then the certificate at the
+        # new weights.
+        w = w .* g
+        w ./= sum(w)
+        p = X * w
         lw = sum(log, p)
         g = vec(Statistics.mean(X ./ p; dims = 1))
         gap = max(zero(lw), T * log(maximum(g)))
-        iterations = k
         converged = gap <= tol * max(one(lw), abs(lw))
-        if converged
-            break
-        end
-        # The multiplicative step, renormalised onto the simplex. The step after the last
-        # certificate of the budget is not returned.
-        w = wc .* g
-        w ./= sum(w)
+        iterations += 1
     end
-    return (; w = wc, log_wealth = lw, gap = gap, converged = converged,
+    return (; w = w, log_wealth = lw, gap = gap, converged = converged,
             iterations = iterations)
 end
 """

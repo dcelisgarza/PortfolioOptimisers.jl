@@ -47,6 +47,12 @@ both pick the best single asset and the parity test says nothing about the fixed
         @test fp1.gap <= 1e-12
         fpx = po.cover_fixed_point(1 .+ X, 1, 1e-12)
         @test !fpx.converged && fpx.iterations == 1
+        # A budget of zero takes no step: the kernel certifies and returns the uniform start.
+        fp0 = po.cover_fixed_point(1 .+ X, 0, 1e-12)
+        @test !fp0.converged && fp0.iterations == 0
+        @test fp0.w == fill(1 / N, N)
+        @test fp0.log_wealth ≈ log_wealth(fill(1 / N, N))
+        @test fp0.gap > 0
         # The certificate bounds the shortfall from the optimum from above, at every budget.
         fps = po.cover_fixed_point(1 .+ X, 100_000, 1e-14)
         for k in (1, 10, 100)
