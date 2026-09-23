@@ -1241,7 +1241,22 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :cal_r_radius => "``r``: Ambiguity radius.",#
                        :cal_s_radius => "``s``: Scale of the radius, in the units of the series the slot owner prices.",#
                        :cal_s_i_series => "``\\hat{s}_{i}``: Sample dispersion of the series the slot owner prices, over column ``i``. It is ``\\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii}}`` under a [`ReturnsSeries`](@ref), and the dispersion of column ``i`` of the drawdown sample under a drawdown marker.",#
-                       :cal_T_e => "``T_{e}``: Effective sample size, which is Kish's when the observation weights are stated.")
+                       :cal_T_e => "``T_{e}``: Effective sample size, which is Kish's when the observation weights are stated.",#
+                       # The online portfolio selection family. Its rules read one price
+                       # relative per period and step an iterate, so these symbols are the
+                       # family's notation.
+                       :x_t_rel => "``\\boldsymbol{x}_t``: Price relative vector of period ``t``, each asset's price over its price one period earlier.",#
+                       :w_t_iter => "``\\boldsymbol{w}_t``: Iterate of the rule at period ``t``, the allocation its update reads.",#
+                       :eta_t_lr => "``\\eta_t``: Learning rate of the update at period ``t``.",#
+                       :t_period => "``t``: Period index, counted from one.",#
+                       :g_t_loss => "``\\boldsymbol{g}_t``: Gradient of the loss of period ``t``, taken at the iterate.",#
+                       :ghat_t => "``\\hat{\\boldsymbol{g}}_t``: Transformed gradient of period ``t``, the vector the mirror step reads.",#
+                       :alpha_mix => "``\\alpha``: Uniform-mix share, in ``[0, 1)``.",#
+                       :v_t_mom => "``\\boldsymbol{v}_t``: Gradient average before period ``t``, zero at ``t = 1``.",#
+                       :m_t_mom => "``\\boldsymbol{m}_t``: Squared-gradient average before period ``t``, the square taken per asset, zero at ``t = 1``.",#
+                       :gamma1_mom => "``\\gamma_1``: Momentum decay, the weight the gradient average keeps on its past, in ``[0, 1)``.",#
+                       :gamma2_mom => "``\\gamma_2``: Squared-gradient decay, the weight the squared-gradient average keeps on its past, in ``[0, 1)``.",#
+                       :eps_mom => "``\\epsilon``: Positive offset added to the root of the squared-gradient average before the division.")
 """
     ref_dict
 

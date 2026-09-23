@@ -708,4 +708,88 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test maxerr(full, o.cache.w) < 1e-14
         @test maxerr(full, optimise(o).w) < 1e-14
     end
+
+    @testset "The numbers the docstrings state, on the fixtures they name" begin
+        # `mixed_relatives`: the scaled floor against the raw mix, at the default rate and
+        # alpha = 0.2, over 60 periods of `1 .+ 0.02 .* randn(StableRNG(7), 60, 4)`.
+        X60 = 1 .+ 0.02 .* randn(StableRNG(7), 60, 4)
+        function mixpath(Xm, mixf)
+            n = size(Xm, 2)
+            u = fill(1 / n, n)
+            P = zeros(size(Xm, 1) + 1, n)
+            P[1, :] .= u
+            for t in axes(Xm, 1)
+                xm = mixf(Xm[t, :])
+                q = u .* exp.(0.05 .* xm ./ dot(u, xm))
+                u = q ./ sum(q)
+                P[t + 1, :] .= 0.8 .* u .+ 0.2 / n
+            end
+            return P
+        end
+        scaled(x) = po.mixed_relatives(x, 0.2)
+        raw(x) = (1 - 0.2 / length(x)) .* x .+ 0.2 / length(x)
+        @test round(maxerr(mixpath(X60, scaled), mixpath(X60, raw)); sigdigits = 2) ==
+              2.6e-6
+        @test round(maxerr(mixpath([1.5 1.0 1.0 1.0], scaled),
+                           mixpath([1.5 1.0 1.0 1.0], raw)); sigdigits = 2) == 7.0e-5
+        # The library plays the scaled mix.
+        rd60 = ReturnsResult(; nx = nx, X = X60 .- 1, ts = Date(2020, 1, 1) .+ Day.(0:59))
+        o60 = po.partial_fit!(OPS(; alg = ExponentiatedGradient(; alpha = 0.2)),
+                              rows(rd60, 1:59))
+        @test maxerr(o60.cache.w, mixpath(X60, scaled)[60, :]) < 1e-14
+
+        # `RiskLoss`: 1000 periods of `randn(StableRNG(7), 1000, 4) .* [0.01 0.02 0.03
+        # 0.04]`, a window of 20, the uniform allocation.
+        RV = randn(StableRNG(7), 1000, 4) .* [0.01 0.02 0.03 0.04]
+        u4 = fill(0.25, 4)
+        ratio = [norm((1 .+ RV[t + 1, :]) ./ dot(u4, 1 .+ RV[t + 1, :])) /
+                 norm(2 .* cov(RV[(t - 19):t, :]) * u4) for t in 20:999]
+        @test round.(extrema(ratio); sigdigits = 2) == (1100.0, 6400.0)
+        rdV = ReturnsResult(; nx = nx, X = RV, ts = Date(2020, 1, 1) .+ Day.(0:999))
+        iv = 1 ./ [0.01, 0.02, 0.03, 0.04] .^ 2
+        wmv = iv ./ sum(iv)
+        @test round(maxerr(wmv, u4); digits = 2) == 0.45
+        w05 = optimise(OPS(; alg = ExponentiatedGradient(; obj = RiskLoss())), rdV).w
+        @test round(maxerr(w05, u4); digits = 3) == 0.005
+        w100 = optimise(OPS(; alg = ExponentiatedGradient(; eta = 100, obj = RiskLoss())),
+                        rdV).w
+        @test maxerr(w100, wmv) < 0.06
+
+        # `loss_gradient` on a panel whose window does not cover D: the gradient is
+        # 2 Σ u on the three priced assets, u sliced and not renormalised, and zero at D.
+        Rn = copy(R[1:10, :])
+        am = trues(10, N)
+        am[:, 4] .= false
+        Rn[.!am] .= NaN
+        rdn = ReturnsResult(; nx = nx, X = Rn, ts = ts[1:10],
+                            pnl = AssetPanel(; amsk = am, emsk = copy(am)))
+        u = [0.3, 0.3, 0.2, 0.2]
+        g = po.loss_gradient(RiskLoss(; window = 10), u, X[11, :], rdn)
+        @test g[4] == 0
+        @test isapprox(g[1:3], 2 .* cov(R[1:10, 1:3]) * u[1:3]; atol = 1e-15)
+
+        # `reprojection`: a bounded set returns an allocation inside its bounds as the
+        # same object, and every other set projects it.
+        wh = fill(0.25, 4)
+        qin = [0.1, 0.4, 0.3, 0.2]
+        @test po.reprojection(EntropicProjection(), simplex, qin, wh) === qin
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false, "tol_gap_abs" => 1e-12,
+                                     "tol_gap_rel" => 1e-12, "tol_feas" => 1e-12),
+                     check_sol = (; allow_local = true, allow_almost = true))
+        cap = WeightBounds(; lb = 0, ub = [0.1, 1, 1, 1])
+        pset = resolve(ProgrammeAllocationSet(; slv = slv, wb = cap), 4)
+        q = [0.2, 0.3, 0.3, 0.2]
+        rp = po.reprojection(EuclideanProjection(), pset, q, wh)
+        @test rp == po.project(EuclideanProjection(), pset, q, wh)
+        @test isapprox(rp,
+                       po.project(EuclideanProjection(),
+                                  resolve(BoundedAllocationSet(; wb = cap), 4), q, wh);
+                       atol = 1e-8)
+        # A run with a positive alpha on that set plays inside the cap.
+        wp = optimise(OPS(; alg = GradientProjection(; alpha = 0.2),
+                          set = ProgrammeAllocationSet(; slv = slv, wb = cap)),
+                      rows(rd, 1:6)).w
+        @test wp[1] <= 0.1 + 1e-8 && isapprox(sum(wp), 1; atol = 1e-8)
+    end
 end

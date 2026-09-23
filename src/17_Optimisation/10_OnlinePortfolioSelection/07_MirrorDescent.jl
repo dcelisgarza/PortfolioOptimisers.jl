@@ -1,9 +1,25 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-The anytime rate ``\\eta_t = c / \\sqrt{t}``: the schedule of Zinkevich (2003, Theorem 1) for online gradient descent, and at ``c = \\sqrt{\\log N / (2 N)}`` the anytime Soft-Bayes rate of Orseau, Lattimore and Legg (2017, Theorem 10).
+Shrinks the learning rate with the square root of the period count, and needs no horizon.
 
-It reads the period count alone. Under the Euclidean map it carries Zinkevich's ``O(\\sqrt{T})`` regret with no horizon; under the entropic map the fixed-horizon constant of Helmbold, Schapire, Singer and Warmuth (1998, Theorem 4.1), ``\\eta = 2 r \\sqrt{2 \\log N / T}``, needs the horizon and the lower bound ``r`` on the price relatives as a fraction of the period's largest, which no online rule knows, so it is a documented formula and not a schedule.
+The schedule reads the period count and nothing else. It is the schedule of Zinkevich (2003, Theorem 1) for online gradient descent, which gives an ``O(\\sqrt{T})`` regret under the Euclidean map. At ``c = \\sqrt{\\log N / (2 N)}`` it is the anytime Soft-Bayes rate of Orseau, Lattimore and Legg (2017, Theorem 10).
+
+Under the entropic map, Helmbold, Schapire, Singer and Warmuth (1998, Theorem 4.1) tune a fixed rate, ``\\eta = 2 r \\sqrt{2 \\log N / T}``. That rate needs the horizon ``T`` and a lower bound ``r`` on each price relative as a fraction of the largest one of its period. An online rule knows neither, so the library states that rate here and does not implement it as a schedule.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\eta_t &= \\frac{c}{\\sqrt{t}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:eta_t_lr])
+  - ``c > 0``: Scale of the rate.
+  - $(math_dict[:t_period])
 
 # Fields
 
@@ -39,7 +55,7 @@ InverseSquareRootRate
 """
 struct InverseSquareRootRate{T1 <: Real} <: AbstractLearningRateSchedule
     """
-    The constant the inverse square root of the period count is scaled by.
+    The scale of the rate, the numerator of ``c / \\sqrt{t}``.
     """
     c::T1
     function InverseSquareRootRate(c::Real)
@@ -56,20 +72,41 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The doubling trick of Helmbold, Schapire, Singer and Warmuth (1998, Corollary 4.3): the exponentiated gradient with the uniform mix is run in stages, restarted at uniform at every stage boundary, with the share and the rate of each stage set from its length as Theorem 4.2 sets them from the horizon.
+Runs the rule in stages of growing length, and restarts it at the Start Allocation after the last period of each stage.
+
+This is the doubling trick of Helmbold, Schapire, Singer and Warmuth (1998, Corollary 4.3) for the exponentiated gradient with the uniform mix. Each stage sets its uniform-mix share and its rate from its own length, as their Theorem 4.2 sets them from the horizon. The schedule sets both, so a [`MirrorDescent`](@ref) that holds it does not read its own `alpha`.
+
+From the uniform Start Allocation, the staged rule is universal. For every sequence of non-negative price relatives, with no lower bound on them, its regret against every constant rebalanced portfolio over ``T`` periods is at most ``6 N^2 \\log N (1 + (T / (2 N^2 \\log N))^{3/4})``. The bound holds under the entropic map. Under another map the schedule restarts the rule and sets its rate, and no bound is known.
 
 # Mathematical definition
 
-Stage ``0`` lasts ``\\lceil 2 N^2 \\log N \\rceil`` periods and stage ``i > 0`` lasts ``\\lceil 2^i N^2 \\log N \\rceil``. Within a stage of length ``T_i``,
-
 ```math
 \\begin{align}
-\\alpha_i &= \\left( \\frac{N^2 \\log N}{8 T_i} \\right)^{1/4}\\,,\\quad
-\\eta_i = \\sqrt{\\frac{8 \\alpha_i^2 \\log N}{N^2 T_i}}\\,,
+T_0 &= \\lceil 2 N^2 \\log N \\rceil\\,, \\\\
+T_i &= \\lceil 2^i N^2 \\log N \\rceil\\,, \\quad i > 0\\,, \\\\
+\\alpha_i &= \\left( \\frac{N^2 \\log N}{8 T_i} \\right)^{1/4}\\,, \\\\
+\\eta_i &= \\sqrt{\\frac{8 \\alpha_i^2 \\log N}{N^2 T_i}}\\,.
 \\end{align}
 ```
 
-and the update of the last period of a stage answers the Start Allocation for the first period of the next, with the rule's carrier back at its seed. The staged rule is universal: its regret against every constant rebalanced portfolio is ``6 N^2 \\log N (1 + (T / (2 N^2 \\log N))^{3/4})`` for every sequence of non-negative price relatives, with no lower bound on them. The schedule answers both the rate and the share, so the `alpha` of a [`MirrorDescent`](@ref) that holds it is not read: the stage's share takes precedence. The theorem is the entropic map's; under any other map the schedule is a restart rule with a rate.
+Where:
+
+  - $(math_dict[:N])
+  - ``i``: Stage index, counted from zero.
+  - ``T_i``: Length of stage ``i``, in periods.
+  - ``\\alpha_i``: Uniform-mix share of every period of stage ``i``.
+  - ``\\eta_i``: Learning rate of every period of stage ``i``.
+
+Stages ``0`` and ``1`` have the same length. At ``T_i \\geq 2 N^2 \\log N`` the share is at most ``1/2``, the range the theorem needs.
+
+# Algorithm
+
+At period `t` the schedule runs these steps.
+
+ 1. Find the stage that holds `t` with [`doubling_stage`](@ref), giving its length `len` and its last period `fin`.
+ 2. Compute the stage's share ``\\alpha_i`` from `len`. The rule reads it in place of its own `alpha`.
+ 3. Compute the stage's rate ``\\eta_i`` from the share and `len`.
+ 4. When `t == fin`, name a restart. The rule's update of period `t` then returns the Start Allocation, and puts its carrier back at its seed. The period count stays, because the stages are cumulative.
 
 # Fields
 
@@ -79,11 +116,11 @@ $(DocStringExtensions.FIELDS)
 
     DoublingTrickRate(; N::Integer) -> DoublingTrickRate
 
-Keywords correspond to the struct's fields. `N` is the number of assets the rule moves over — the number of experts when the rule is a mixture's weighting — and has no default, because the stage lengths are its function.
+Keywords correspond to the struct's fields. `N` is the number of assets the rule moves over, or the number of experts when the rule weights a mixture. It has no default, because the stage lengths depend on it.
 
 ## Validation
 
-  - `N >= 2`. A `DomainError` is thrown otherwise: a single asset has no stage.
+  - `N >= 2`. A `DomainError` is thrown otherwise, because ``\\log 1 = 0`` gives a stage of no periods.
 
 # Examples
 
@@ -105,7 +142,7 @@ DoublingTrickRate
 """
 struct DoublingTrickRate{T1 <: Integer} <: AbstractLearningRateSchedule
     """
-    The number of assets, from which the stage lengths, the shares and the rates follow.
+    The number of assets. The stage lengths, the shares and the rates depend on it.
     """
     N::T1
     function DoublingTrickRate(N::Integer)
@@ -119,7 +156,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The stage of a [`DoublingTrickRate`](@ref) that period `t` falls in: its length and the period that closes it.
+Finds the stage of a [`DoublingTrickRate`](@ref) that holds period `t`.
+
+# Algorithm
+
+ 1. Compute `base = N^2 * log(N)`.
+ 2. Set the length `len` of stage 0 to `ceil(2 * base)`, and its last period `fin` to `len`.
+ 3. While `t > fin`, go to the next stage `i`. Set `len` to `ceil(2^i * base)`, and add `len` to `fin`.
+
+# Returns
+
+  - `(len, fin)::Tuple{Int, Int}`: The length of the stage that holds `t`, and its last period.
 
 # Related
 
@@ -155,9 +202,42 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The self-confident rate of Orseau, Lattimore and Legg (2017, Theorems 5 and 6): ``\\eta_t = \\sqrt{2 \\log N / C_{1, t-1}}``, read from the running first-order excess ``C_{1, t} = \\sum_{s \\leq t} \\max_i \\left( x_{s, i} / \\langle \\boldsymbol{w}_s, \\boldsymbol{x}_s \\rangle - 1 \\right)``, which the rule's carrier keeps for it beside ``\\log N``.
+Reads the learning rate from the running excess of each period's best asset over the played allocation.
 
-Theorem 6 bounds the regret of the Soft-Bayes step — [`ExpectationMaximisation`](@ref) — against every constant rebalanced portfolio by ``\\min(C_1, 2 \\sqrt{C_1 \\log N} + \\sqrt{2 T \\log N / C_1})`` at the fixed rate ``\\sqrt{2 \\log N / C_1}`` with ``C_1`` the whole run's excess, small when one asset is the best predictor for long stretches and never worse than ``O(\\sqrt{T \\log N})``. The statistic is non-decreasing, so the rate is non-increasing and can be read online from the running excess, as the paper notes; the paper states no bound for the online rate, and on a [`MirrorDescent`](@ref) the rate is the paper's online correction carried over, with no bound of its own. On the Soft-Bayes step the online form's pull towards the Start Allocation is capped at ``\\sqrt{t / (t + 1)}`` under this rate ([`correction_ratio_cap`](@ref)), because the rate holds still while the mixture predicts well and would otherwise let a weight decay exponentially. The rate is capped at `eta_max`, because the statistic is zero before the first row and the theorem's rate lies in ``(0, 1)``; the paper states no cap, and the default is the interval's end. The excess is measured at the allocation the rule played, so the mix of a [`MirrorDescent`](@ref) with a positive `alpha` is what it reads.
+This is the self-confident rate of Orseau, Lattimore and Legg (2017, Theorem 6). The rule's carrier keeps the excess for the schedule, beside ``\\log N``. The excess is measured at the allocation the rule played, so under a [`MirrorDescent`](@ref) with a positive `alpha` it reads the mix.
+
+Theorem 6 bounds the regret of the Soft-Bayes step, [`ExpectationMaximisation`](@ref), against every constant rebalanced portfolio. At the fixed rate ``\\sqrt{2 \\log N / C_1}``, with ``C_1`` the excess of the whole run, the bound is ``\\min\\{C_1, \\sqrt{2 C_1 \\log N} + 2 T \\log N / C_1\\}``. It is small when one asset is the best predictor for long stretches. The paper notes that the excess never falls, so the rate can be read online from the running excess, but it states no bound for that online rate. Under a [`MirrorDescent`](@ref) the rate is read online in the same way, and no bound is known either.
+
+Under the online form of the Soft-Bayes step, this rate caps the pull towards the Start Allocation at ``\\sqrt{t / (t + 1)}``, as the paper advises ([`correction_ratio_cap`](@ref)). Without the cap, the rate stays almost constant while the mixture predicts well, and a weight can then decay exponentially.
+
+The rate is capped at `eta_max`, because the excess is zero before the first row. The theorem needs a rate in ``(0, 1)``, and the paper states no cap, so the default cap is the end of that interval.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+C_{1, t} &= \\sum_{s = 1}^{t} \\left( \\max_i \\frac{x_{s, i}}{\\langle \\boldsymbol{w}_s, \\boldsymbol{x}_s \\rangle} - 1 \\right)\\,, \\\\
+\\eta_t &= \\min\\left( \\sqrt{\\frac{2 \\log N}{C_{1, t-1}}}, \\eta_{\\max} \\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``C_{1, t}``: First-order excess through period ``t``, zero at ``t = 0``.
+  - ``x_{s, i}``: Price relative of asset ``i`` in period ``s``.
+  - ``\\boldsymbol{x}_s``: Price relative vector of period ``s``.
+  - ``\\boldsymbol{w}_s``: Allocation the rule played in period ``s``.
+  - $(math_dict[:eta_t_lr])
+  - ``\\eta_{\\max} > 0``: Cap on the rate.
+  - $(math_dict[:N])
+
+Each term of ``C_{1, t}`` is non-negative, because the largest price relative is at least their mean under ``\\boldsymbol{w}_s``. So the excess never falls, and the rate never rises. While the excess is zero, the rate is ``\\eta_{\\max}``.
+
+# Algorithm
+
+ 1. Before the first row, seed the statistic `s = [0, log(N)]`.
+ 2. Read the rate of period `t` from `s`: `eta_max` while `s[1]` is not positive, and ``\\eta_t`` otherwise.
+ 3. After the rule's step of period `t`, add `maximum(x ./ dot(w, x)) - 1` to `s[1]`, with `w` the allocation the rule played in period `t` and `x` its price relative.
 
 # Fields
 
@@ -229,7 +309,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The carrier a [`WindowedBestRate`](@ref) keeps on the rule's carrier: the expert allocations, one exponentiated-gradient run per rate, and the ring of their period log returns the window is summed over.
+Holds the state of a [`WindowedBestRate`](@ref) on the rule's carrier.
+
+The state holds one expert allocation per rate, each an exponentiated-gradient run, and a ring of the experts' log period returns. The schedule sums the ring over the window.
 
 # Fields
 
@@ -246,11 +328,11 @@ $(DocStringExtensions.FIELDS)
     """
     n
     """
-    The experts' allocations, `assets × rates`, column `k` the exponentiated-gradient run at the `k`-th rate from the Start Allocation.
+    The experts' allocations, `assets × rates`. Column `k` is the exponentiated-gradient run at the `k`-th rate, from the Start Allocation.
     """
     B
     """
-    The experts' log period returns, `window × rates`, a ring the row of period `t` overwrites at `mod1(t, window)`; `1 × rates` and a running sum under the whole history.
+    The experts' log period returns, `window × rates`. The row of period `t` overwrites row `mod1(t, window)` of this ring. Under the whole history the matrix is `1 × rates` and holds a running sum.
     """
     L
 end
@@ -267,21 +349,43 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The moving-window adaptive rate of Zhang, Lin, Zheng and Yang (2022): every rate in `etas` names an expert, the exponentiated gradient run at that rate from the Start Allocation, and the rate of the period is the expert's whose cumulative wealth over the last `window` periods is the largest, the whole history when `window` is `nothing` (MAEG; AEG under the whole history).
+Chooses the learning rate of each period from a set of rates, by the recent wealth of one exponentiated-gradient run per rate.
+
+This is the moving-window adaptive rate of Zhang, Lin, Zheng and Yang (2022). Each rate in `etas` names an expert, the exponentiated gradient run at that rate from the Start Allocation. The rate of the period is the rate of the expert with the largest wealth over the last `window` periods. When `window` is `nothing`, the schedule compares the wealth over the whole history. The paper calls the first rule MAEG and the second AEG.
+
+The experts are a statistic of the run, and the rule never plays them. Each expert takes the paper's plain entropic step over the simplex, from the rule's Start Allocation, whatever the rule's own geometry, Allocation Set, uniform mix, Gradient Transform and objective. The rule applies the chosen rate to its own step. So on another geometry the schedule chooses the rate by a replay of the exponentiated gradient.
+
+The paper takes the rate set `0.001:0.001:0.2` from the practice of Helmbold, Schapire, Singer and Warmuth (1998). It chose the window `30` over `7` on its own data. Over windows from `2` to `50`, it reports that the final wealth stays within a small range, and that the window must stay within a reasonable range. A period costs one entropic step per rate and one sum over the ring, which is `O((N + w) K)` at `K` rates. The online form of [`ExpectationMaximisation`](@ref) refuses this schedule by name, because that form also reads the rate of the next period.
 
 # Mathematical definition
 
-With ``H`` the rate set and ``w`` the window, the carrier keeps the allocation ``\\boldsymbol{b}_t(\\eta)`` of every expert, the plain entropic step at its own rate from the Start Allocation. At period ``t``, after the price relative ``\\boldsymbol{x}_t`` is received, the expert's windowed wealth is
-
 ```math
 \\begin{align}
-S_t(\\eta) &= \\prod_{\\tau = t'}^{t} \\langle \\boldsymbol{b}_\\tau(\\eta), \\boldsymbol{x}_\\tau \\rangle\\,,\\quad t' = \\max(1, t - w + 1)\\,,
+t' &= \\max(1, t - w + 1)\\,, \\\\
+S_t(\\eta) &= \\prod_{\\tau = t'}^{t} \\langle \\boldsymbol{b}_\\tau(\\eta), \\boldsymbol{x}_\\tau \\rangle\\,, \\\\
+\\eta_t &= \\underset{\\eta \\in H}{\\arg\\max} \\; S_t(\\eta)\\,.
 \\end{align}
 ```
 
-and the rate of the rule's update at period ``t`` — the paper's ``\\eta_{t+1}``, which forms ``\\boldsymbol{b}_{t+1}`` from ``\\boldsymbol{b}_t`` and ``\\boldsymbol{x}_t`` — is ``\\arg\\max_{\\eta \\in H} S_t(\\eta)``, the first of `etas` at a tie. The rate is chosen from the period's own row, so the schedule answers `true` to [`reads_period_row`](@ref) and the rule writes the experts before it reads the rate. Under the whole history ``t' = 1`` and the carrier keeps one running sum per expert in place of the ring; the window is summed in logs, so the comparison never overflows.
+Where:
 
-The experts are a statistic of the run and are never played: they take the paper's plain entropic step over the simplex from the rule's Start Allocation, whatever the rule's own geometry, Allocation Set, uniform mix, Gradient Transform and objective, and the rate they choose is applied to the rule's own step. The schedule is the entropic rule's, and on another geometry it is a rate chosen by replaying the exponentiated gradient. The paper's rate set is the practice of Helmbold, Schapire, Singer and Warmuth (1998), `0.001:0.001:0.2`, and its window is `30`, chosen over `7` on its own data; it reports the wealth insensitive to the window over `2` to `50`. A period costs one entropic step per rate and a sum over the ring, `O((N + w) K)` at `K` rates. The online form of [`ExpectationMaximisation`](@ref) refuses the schedule by name, because it reads the rate of the next period as well.
+  - ``H``: Set of rates, the field `etas`.
+  - ``w``: Window, in periods. Under the whole history ``t' = 1``.
+  - ``\\boldsymbol{b}_\\tau(\\eta)``: Allocation of the expert at rate ``\\eta`` in period ``\\tau``.
+  - $(math_dict[:x_t_rel])
+  - ``S_t(\\eta)``: Wealth of the expert at rate ``\\eta`` over the window that ends at period ``t``.
+  - $(math_dict[:eta_t_lr])
+  - $(math_dict[:t_period])
+
+The rate of the update at period ``t`` reads ``\\boldsymbol{x}_t``. It is the paper's ``\\eta_{t+1}``, which forms ``\\boldsymbol{b}_{t+1}`` from ``\\boldsymbol{b}_t`` and ``\\boldsymbol{x}_t``. At a tie the first rate of `etas` wins.
+
+# Algorithm
+
+ 1. Before the first row, seed the state: every column of `B` is the Start Allocation, and `L` is zero, with `window` rows, or one row under the whole history.
+ 2. The schedule answers `true` to [`reads_period_row`](@ref), so the rule writes the state before it reads the rate. At period `n`, find the row `row` of `L` with [`ring_row`](@ref).
+ 3. For the expert `b` at each rate `eta`, compute its period return `r = dot(b, x)`. Write `log(r)` into `L[row, k]`: overwrite it under a window, and add it to the running sum under the whole history.
+ 4. Step `b` to `b .* exp.(eta .* x ./ r)`, and divide it by its sum.
+ 5. Sum each column of `L`, and take the rate of the column with the largest sum. The sum is in logs, so the comparison never overflows.
 
 # Fields
 
@@ -327,7 +431,7 @@ struct WindowedBestRate{T1 <: AbstractVector{<:Real}, T2 <: Option{<:Integer}} <
     """
     etas::T1
     """
-    The number of periods the experts' wealth is compared over; `nothing` is the whole history.
+    The number of periods over which the schedule compares the experts' wealth. `nothing` compares the whole history.
     """
     window::T2
     function WindowedBestRate(etas::AbstractVector{<:Real}, window::Option{<:Integer})
@@ -354,7 +458,9 @@ end
     ring_row(window::Nothing, n::Integer)
     ring_row(window::Integer, n::Integer)
 
-The row of a [`WindowedBestRateState`](@ref)'s ring that period `n` writes: `mod1(n, window)` under a window, and the one row of the running sum under the whole history.
+Finds the row of a [`WindowedBestRateState`](@ref)'s ring that period `n` writes.
+
+Under a window the row is `mod1(n, window)`. Under the whole history it is row `1`, the one row of the running sum.
 
 # Related
 
@@ -388,16 +494,18 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the Gradient Transforms a [`MirrorDescent`](@ref) rule may apply to its gradient before the mirror step: the momentum carriers of Li, Zheng, Chen, Wang and Xu (2022), which rescale the exponent of the multiplicative update and leave the update itself untouched.
+Abstract supertype for the Gradient Transforms, which change the gradient of a first-order rule before its mirror step.
+
+A [`MirrorDescent`](@ref) rule applies its transform to the gradient of every period. The momentum transforms of Li, Zheng, Chen, Wang and Xu (2022) change the exponent of the multiplicative update, and do not change the form of the update.
 
 # Interfaces
 
 In order to implement a new transform, subtype `AbstractGradientTransform` and implement:
 
-  - `gradient_state_seed(grad::AbstractGradientTransform, w::AbstractVector)`: The carrier the transform keeps on the Rule State before the first row, or `nothing`, the default; `w` is the Start Allocation, whose length and element type the carrier takes.
-  - `transform_gradient!(grad::AbstractGradientTransform, gs, g::AbstractVector) -> AbstractVector`: The transformed gradient of the period from the raw one, writing the carrier `gs` in place.
+  - `gradient_state_seed(grad::AbstractGradientTransform, w::AbstractVector)`: The carrier the transform keeps on the Rule State before the first row, or `nothing`, the default. `w` is the Start Allocation, and the carrier takes its length and its element type.
+  - `transform_gradient!(grad::AbstractGradientTransform, gs, g::AbstractVector) -> AbstractVector`: The transformed gradient of the period, computed from the raw gradient `g`. It writes the carrier `gs` in place.
 
-A carrier that is `nothing`, a vector or a pair of vectors is sliced and copied with the head's state already; a carrier of another shape needs a slice and a copy of its own, through the two private helpers [`MirrorDescentState`](@ref) names.
+The head's state already slices and copies a carrier that is `nothing`, a vector or a pair of vectors. A carrier of another shape needs its own methods of the two private helpers [`gradient_state_view`](@ref) and [`copy_gradient_state`](@ref).
 
 # Related
 
@@ -411,7 +519,9 @@ abstract type AbstractGradientTransform <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The identity Gradient Transform: the mirror step reads the period's gradient as it is. The default of [`MirrorDescent`](@ref).
+Leaves the gradient unchanged, so the mirror step reads the period's gradient as it is.
+
+It is the default Gradient Transform of [`MirrorDescent`](@ref).
 
 # Examples
 
@@ -429,9 +539,27 @@ struct PlainGradient <: AbstractGradientTransform end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The exponential moving average of the gradient (Li, Zheng, Chen, Wang and Xu 2022, Eq. 7): ``\\boldsymbol{v}_{t+1} = \\gamma_1 \\boldsymbol{v}_t + (1 - \\gamma_1) \\boldsymbol{g}_t`` from ``\\boldsymbol{v}_1 = \\boldsymbol{0}``, and the step reads ``\\boldsymbol{v}_{t+1}``.
+Replaces the gradient with its exponential moving average, which gives the step a momentum.
 
-With the entropic map it is the paper's EGE; the regret is the exponentiated gradient's ``O(\\sqrt{T \\log N})`` (their Theorem 1). The first step is scaled by ``1 - \\gamma_1``, because the average starts at zero; the paper applies no bias correction and neither does this.
+This is Eq. 7 of Li, Zheng, Chen, Wang and Xu (2022). Under the entropic map it is the paper's EGE, and its Theorem 1 gives the regret ``O(\\sqrt{T \\log N})`` of the exponentiated gradient.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{v}_{t+1} &= \\gamma_1 \\boldsymbol{v}_t + (1 - \\gamma_1) \\boldsymbol{g}_t\\,, \\\\
+\\hat{\\boldsymbol{g}}_t &= \\boldsymbol{v}_{t+1}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:v_t_mom])
+  - $(math_dict[:gamma1_mom])
+  - $(math_dict[:g_t_loss])
+  - $(math_dict[:ghat_t])
+
+The average starts at zero, so the first transformed gradient is ``(1 - \\gamma_1) \\boldsymbol{g}_1``. The paper applies no bias correction, and neither does this transform.
 
 # Fields
 
@@ -482,9 +610,30 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The root-mean-square rescaling of the gradient (Li, Zheng, Chen, Wang and Xu 2022, Eq. 8): ``\\boldsymbol{m}_{t+1} = \\gamma_2 \\boldsymbol{m}_t + (1 - \\gamma_2) \\boldsymbol{g}_t^2`` from ``\\boldsymbol{m}_1 = \\boldsymbol{0}``, and the step reads ``\\boldsymbol{g}_t / (\\sqrt{\\boldsymbol{m}_{t+1}} + \\epsilon)``.
+Divides the gradient by the root of a moving average of its square, per asset.
 
-With the entropic map it is the paper's EGR. **At the paper's recommended ``\\gamma_2 = 0``, the default, ``\\boldsymbol{m}_{t+1} = \\boldsymbol{g}_t^2`` and the transformed gradient is ``\\boldsymbol{g}_t / (\\lvert \\boldsymbol{g}_t \\rvert + \\epsilon)``, the sign of the gradient up to ``\\epsilon``: every asset's exponent is the same, so the multiplicative update moves nothing and the rule holds its iterate: the constant rebalanced portfolio at the Start Allocation, up to ``\\epsilon``** — the paper's own choice makes the rule the uniform constant rebalanced portfolio, not buy-and-hold, from which it is five per cent away over sixty rows of two per cent returns. A positive ``\\gamma_2`` is what gives the rescaling a memory.
+This is Eq. 8 of Li, Zheng, Chen, Wang and Xu (2022). Under the entropic map it is the paper's EGR.
+
+**At the default ``\\gamma_2 = 0``, which the paper recommends, the rule under [`LogWealth`](@ref) stays at its Start Allocation, up to the offset ``\\epsilon``.** At ``\\gamma_2 = 0`` the transformed gradient is the sign of the gradient, up to ``\\epsilon``. Every entry of the log-wealth gradient is negative, so the step moves every asset by the same amount, and the normalisation undoes it. The rule is then the constant rebalanced portfolio at its Start Allocation, not buy-and-hold. A positive ``\\gamma_2`` gives the average a memory, and the rule then moves.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{m}_{t+1} &= \\gamma_2 \\boldsymbol{m}_t + (1 - \\gamma_2) \\boldsymbol{g}_t^2\\,, \\\\
+\\hat{\\boldsymbol{g}}_t &= \\frac{\\boldsymbol{g}_t}{\\sqrt{\\boldsymbol{m}_{t+1}} + \\epsilon}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:m_t_mom])
+  - $(math_dict[:gamma2_mom])
+  - $(math_dict[:g_t_loss])
+  - $(math_dict[:ghat_t])
+  - $(math_dict[:eps_mom])
+
+The square, the root and the division are per asset. At ``\\gamma_2 = 0``, ``\\hat{\\boldsymbol{g}}_t = \\boldsymbol{g}_t / (\\lvert \\boldsymbol{g}_t \\rvert + \\epsilon)``.
 
 # Fields
 
@@ -542,9 +691,31 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The adaptive-moment rescaling of the gradient (Li, Zheng, Chen, Wang and Xu 2022, Eq. 9): both averages of [`GradientMomentum`](@ref) and [`RootMeanSquareGradient`](@ref), and the step reads ``\\boldsymbol{v}_{t+1} / (\\sqrt{\\boldsymbol{m}_{t+1}} + \\epsilon)`` with no bias correction.
+Divides the moving average of the gradient by the root of the moving average of its square, per asset.
 
-With the entropic map it is the paper's EGA. At the paper's ``\\gamma_2 = 0``, the default, the divisor is ``\\lvert \\boldsymbol{g}_t \\rvert + \\epsilon``, so the step reads the momentum in units of the current gradient's size.
+This is Eq. 9 of Li, Zheng, Chen, Wang and Xu (2022), with both averages of [`GradientMomentum`](@ref) and [`RootMeanSquareGradient`](@ref) and no bias correction. Under the entropic map it is the paper's EGA.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{v}_{t+1} &= \\gamma_1 \\boldsymbol{v}_t + (1 - \\gamma_1) \\boldsymbol{g}_t\\,, \\\\
+\\boldsymbol{m}_{t+1} &= \\gamma_2 \\boldsymbol{m}_t + (1 - \\gamma_2) \\boldsymbol{g}_t^2\\,, \\\\
+\\hat{\\boldsymbol{g}}_t &= \\frac{\\boldsymbol{v}_{t+1}}{\\sqrt{\\boldsymbol{m}_{t+1}} + \\epsilon}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:v_t_mom])
+  - $(math_dict[:m_t_mom])
+  - $(math_dict[:gamma1_mom])
+  - $(math_dict[:gamma2_mom])
+  - $(math_dict[:g_t_loss])
+  - $(math_dict[:ghat_t])
+  - $(math_dict[:eps_mom])
+
+At the default ``\\gamma_2 = 0``, which the paper recommends, the divisor is ``\\lvert \\boldsymbol{g}_t \\rvert + \\epsilon``. The step then reads the momentum in units of the size of the current gradient.
 
 # Fields
 
@@ -614,7 +785,9 @@ end
     gradient_state_seed(grad::RootMeanSquareGradient, w::AbstractVector)
     gradient_state_seed(grad::AdaptiveMomentGradient, w::AbstractVector)
 
-The carrier a Gradient Transform keeps on the Rule State before the first row: `nothing`, the zero average, the zero squared average, or the pair.
+Seeds the carrier that a Gradient Transform keeps on the Rule State before the first row.
+
+The seed is `nothing` for [`PlainGradient`](@ref), the zero average for [`GradientMomentum`](@ref), the zero squared average for [`RootMeanSquareGradient`](@ref), and the pair of both for [`AdaptiveMomentGradient`](@ref).
 
 # Related
 
@@ -639,7 +812,9 @@ end
     transform_gradient!(grad::RootMeanSquareGradient, m::AbstractVector, g::AbstractVector)
     transform_gradient!(grad::AdaptiveMomentGradient, gs::Tuple, g::AbstractVector)
 
-The transformed gradient of the period, the carrier written in place: `g` itself, the updated average `v`, `g` over the root of the updated squared average `m` plus `eps`, or the updated `v` over that root.
+Computes the transformed gradient of the period, and writes the updated carrier in place.
+
+[`PlainGradient`](@ref) returns `g` itself. [`GradientMomentum`](@ref) returns a copy of the updated average `v`. [`RootMeanSquareGradient`](@ref) returns `g` over the root of the updated squared average `m`, plus `eps`. [`AdaptiveMomentGradient`](@ref) returns the updated `v` over that root plus `eps`. The type docstrings state the formulas.
 
 # Related
 
@@ -670,7 +845,7 @@ end
     gradient_state_view(gs::AbstractVector, i)
     gradient_state_view(gs::Tuple, i)
 
-A Gradient Transform's carrier sliced to the assets `i`, as a copy.
+Slices a Gradient Transform's carrier to the assets `i`, as a copy.
 
 # Related
 
@@ -691,7 +866,7 @@ end
     copy_gradient_state(gs::AbstractVector)
     copy_gradient_state(gs::Tuple)
 
-A copy of a Gradient Transform's carrier sharing no array with it.
+Copies a Gradient Transform's carrier, so that the copy shares no array with it.
 
 # Related
 
@@ -710,14 +885,16 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the objectives a first-order Online Selection Rule steps on: the loss whose gradient at the iterate the mirror step reads.
+Abstract supertype for the objectives of a first-order Online Selection Rule.
+
+The objective is the loss of each period. The mirror step reads the gradient of that loss at the iterate.
 
 # Interfaces
 
 In order to implement a new objective, subtype `AbstractOnlineObjective` and implement:
 
-  - `loss_gradient(obj::AbstractOnlineObjective, u::AbstractVector, x::AbstractVector, rows) -> AbstractVector`: The gradient of the period's loss at the iterate `u`, from the period's price relative `x` and the rows the head holds, `nothing` when the objective reads none.
-  - `rows_needed(obj::AbstractOnlineObjective) -> Union{Nothing, Integer}`: The number of rows the objective reads at a step, `0` for one that reads none, which the rule that holds it answers as its own.
+  - `loss_gradient(obj::AbstractOnlineObjective, u::AbstractVector, x::AbstractVector, rows) -> AbstractVector`: The gradient of the period's loss at the iterate `u`. It reads the period's price relative `x` and the rows the head holds, which are `nothing` when the objective reads no rows.
+  - `rows_needed(obj::AbstractOnlineObjective) -> Union{Nothing, Integer}`: The number of rows the objective reads at a step, `0` when it reads none. The rule that holds the objective answers this number as its own.
 
 # Related
 
@@ -729,7 +906,26 @@ abstract type AbstractOnlineObjective <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The log-wealth objective of a first-order Online Selection Rule: the loss ``-\\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_t \\rangle`` of the period, whose gradient is ``-\\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle``, one row. The default of [`MirrorDescent`](@ref), and every rule of the literature.
+Takes the negative log of the period's wealth as the loss of a first-order Online Selection Rule.
+
+It reads the period's price relative and no rows. It is the default objective of [`MirrorDescent`](@ref), and the objective of every rule that the docstring of [`MirrorDescent`](@ref) cites.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\ell_t(\\boldsymbol{w}) &= -\\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_t \\rangle\\,, \\\\
+\\boldsymbol{g}_t &= \\nabla \\ell_t(\\boldsymbol{w}_t) = -\\frac{\\boldsymbol{x}_t}{\\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\ell_t``: Loss of period ``t``.
+  - ``\\boldsymbol{w}``: Allocation at which the loss is evaluated.
+  - $(math_dict[:x_t_rel])
+  - $(math_dict[:w_t_iter])
+  - $(math_dict[:g_t_loss])
 
 # Examples
 
@@ -748,19 +944,38 @@ struct LogWealth <: AbstractOnlineObjective end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The Risk Loss: a risk measure, or a scalarised vector of them, over the last `window` rows the head holds, as the objective of a first-order Online Selection Rule in place of log wealth.
+Takes a risk measure over the last `window` rows the head holds as the loss of a first-order Online Selection Rule.
+
+The Risk Loss replaces log wealth as the objective. `r` is one risk measure or a vector of them. The Risk Loss reads returns and not price relatives, because a risk measure reads returns. At every step the prior `pe` is fitted on the window, and the measure is resolved against that prior. So a [`Variance`](@ref) reads the covariance of the window, and a measure that holds its own matrix keeps it. The rule takes one step per period towards the minimiser of the measure, which it estimates again each period.
+
+`sca` scalarises a vector of measures at the `settings.scale` of each measure. So `[MeanReturn(), Variance()]`, with a negative scale on the mean, gives one step on the mean-variance utility.
+
+A prior fitted on one row has no covariance. So the loss starts when the head holds two rows, and the step before that leaves the iterate unchanged. The head's rows buffer holds at most `window` rows, so the first `window - 1` steps read a shorter window.
+
+**A risk gradient is small, so a rule on a Risk Loss needs a much larger rate than a log-wealth rule.** A variance gradient ``2 \\boldsymbol{\\Sigma} \\boldsymbol{w}`` has the size of one period's variance. Take 1000 periods of returns `randn(StableRNG(7), 1000, 4) .* [0.01 0.02 0.03 0.04]`, a window of 20 and the uniform allocation. Over every window, the log-wealth gradient is then between 1100 and 6400 times larger than the variance gradient. The entropic rule on [`Variance`](@ref) at the log-wealth default `eta = 0.05` ends 0.005 from its uniform start, and the minimum-variance allocation is 0.45 away. At `eta = 100` the rule ends within 0.06 of that allocation.
+
+The prior is fitted on the head's rows carrier as a batch prior is fitted on any carrier. The carrier holds `NaN` where there was no return, and the active mask beside it. So under a time-varying panel the prior reduces to the Coverage Universe of the window, and answers `NaN` at an asset that the window does not cover. The loss reads its gradient on the Investable Mask of that result, and writes zero at every other leg. The window holds no data about such a leg, so the loss does not move it, and the projection alone places it. A plain `pe` therefore never meets a constant column. A leg unlisted for a part of the window is outside the Coverage Universe of a plain prior until the window clears that part. A mask-aware prior takes the leg in after its own warm-up.
+
+The regret theorems of the first-order rules need a convex loss. So they hold here for the measures that are convex in the weights: [`Variance`](@ref), [`StandardDeviation`](@ref), [`ConditionalValueatRisk`](@ref), [`EntropicValueatRisk`](@ref), [`WorstRealisation`](@ref), [`Range`](@ref), [`MaximumDrawdown`](@ref), [`AverageDrawdown`](@ref), [`ConditionalDrawdownatRisk`](@ref), [`EntropicDrawdownatRisk`](@ref), the low-order moment measures, and [`MeanReturn`](@ref), which is linear. A quantile measure such as [`ValueatRisk`](@ref) or [`DrawdownatRisk`](@ref), a kurtosis, a skewness and a ratio are not convex, and on them the step is a heuristic with no bound. At a kink of a convex measure, a finite-difference gradient is the chord across the kink, near a subgradient, as [`risk_gradient`](@ref) states.
 
 # Mathematical definition
 
-At period ``t`` the loss is ``\\rho_r(\\boldsymbol{w}; \\boldsymbol{X}_t)``, the measure evaluated at the iterate over the window ``\\boldsymbol{X}_t`` of the head's returns — returns, not price relatives, because a risk measure reads returns — and the step reads its gradient ``\\nabla_{\\boldsymbol{w}} \\rho_r(\\boldsymbol{w}_t; \\boldsymbol{X}_t)`` through [`risk_gradient`](@ref): the closed form where the library states one, the finite difference otherwise. The measure is resolved against the prior `pe` fits on the window at every step, so a [`Variance`](@ref) reads the window's covariance and a measure that holds its own matrix keeps it; the rule takes one step per period toward the measure's minimiser, re-estimated each period. A vector of measures is scalarised by `sca` at each element's `settings.scale`, so `[MeanReturn(), Variance()]` with the mean's scale negative is one step on the mean–variance utility.
+```math
+\\begin{align}
+\\ell_t(\\boldsymbol{w}) &= \\rho(\\boldsymbol{w}; \\mathbf{X}_t)\\,, \\\\
+\\boldsymbol{g}_t &= \\nabla_{\\boldsymbol{w}} \\rho(\\boldsymbol{w}_t; \\mathbf{X}_t)\\,.
+\\end{align}
+```
 
-A prior fitted on one row has no covariance, so the loss is read once the head holds two rows and the step before that is the identity on the iterate. The rows reach the loss through the head's rows buffer, capped at `window`, so the first `window - 1` steps read a shorter window than stated.
+Where:
 
-The rate is stated against the loss, and a risk gradient is small: a variance's gradient ``2 \\boldsymbol{\\Sigma} \\boldsymbol{w}`` is of the order of the window's daily variance, some thousand times smaller than the log-wealth gradient ``\\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle``, so the default `eta` of a log-wealth rule leaves a variance rule within a fraction of a point of its start after a thousand rows. On daily returns a variance loss moves at a rate of tens to hundreds where the log-wealth default is `0.05`.
+  - ``\\ell_t``: Loss of period ``t``.
+  - ``\\rho``: Risk measure, resolved against the prior fitted on ``\\mathbf{X}_t``. A vector of measures is their scalarisation.
+  - ``\\mathbf{X}_t``: Returns of the last ``\\min(t, W)`` periods through period ``t``, with ``W`` the field `window`.
+  - $(math_dict[:w_t_iter])
+  - $(math_dict[:g_t_loss])
 
-The prior is fitted on the head's rows carrier as a batch prior is fitted on any carrier: `NaN` where there was no return, the active mask beside it, so under a time-varying panel it reduces to the Coverage Universe of the window and answers `NaN` at an asset the window does not cover. The loss reads its gradient on the Investable Mask of that result and writes zero at every other leg — the window carries no information about it, so the step leaves it to the projection — and a plain `pe` never meets a constant column. A leg unlisted for part of the window is outside a plain prior's Coverage Universe until the window clears the span, and inside a mask-aware one's from its own warm-up.
-
-The regret theorems of the first-order rules are stated for a convex loss, and hold here for the measures that are convex in the weights: [`Variance`](@ref), [`StandardDeviation`](@ref), [`ConditionalValueatRisk`](@ref), [`EntropicValueatRisk`](@ref), [`WorstRealisation`](@ref), [`Range`](@ref), [`MaximumDrawdown`](@ref), [`AverageDrawdown`](@ref), [`ConditionalDrawdownatRisk`](@ref), [`EntropicDrawdownatRisk`](@ref), the low-order moment measures, and [`MeanReturn`](@ref), which is linear. A quantile measure — [`ValueatRisk`](@ref), [`DrawdownatRisk`](@ref) — a kurtosis, a skewness, or a ratio is not, and on it the step is a heuristic with no bound. A finite-difference gradient at a kink of a convex measure is the chord across it, a subgradient's neighbour, as [`risk_gradient`](@ref) states.
+[`risk_gradient`](@ref) computes ``\\boldsymbol{g}_t``, in closed form where the library states one and by a finite difference otherwise. [`loss_gradient`](@ref) states the steps.
 
 # Fields
 
@@ -779,7 +994,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `window >= 2`. A `DomainError` is thrown otherwise: a prior fitted on one row has no covariance, so a window of one is never read.
+  - `window >= 2`. A `DomainError` is thrown otherwise, because a prior fitted on one row has no covariance, and the loss never reads a window of one row.
 
 # Examples
 
@@ -836,7 +1051,7 @@ struct RiskLoss{T1 <: BaseRM_VecBaseRM, T2 <: Integer, T3 <: Scalariser,
     """
     r::T1
     """
-    The number of rows of the head's returns buffer the loss is evaluated over.
+    The number of rows of the head's returns buffer that the loss reads.
     """
     window::T2
     """
@@ -864,7 +1079,9 @@ end
     rows_needed(obj::RiskLoss)
     rows_needed(alg::MirrorDescent)
 
-The rows a first-order rule's objective reads at a step, which the rule answers as its own: none for log wealth, the window of a Risk Loss.
+Answers the number of rows that a first-order rule's objective reads at a step.
+
+The rule answers the number of its objective as its own. Log wealth reads no rows, so its number is `0`. A Risk Loss reads its `window`.
 
 # Related
 
@@ -881,7 +1098,18 @@ end
     loss_gradient(obj::LogWealth, u::AbstractVector, x::AbstractVector, rows)
     loss_gradient(obj::RiskLoss, u::AbstractVector, x::AbstractVector, rows)
 
-The gradient of the period's loss at the iterate `u`: ``-\\boldsymbol{x} / \\langle \\boldsymbol{u}, \\boldsymbol{x} \\rangle`` for log wealth, from the price relative alone; and [`risk_gradient`](@ref) of the Risk Loss's measure at `u`, resolved against its prior fitted on the rows carrier `rows`, or the zero vector while the head holds fewer than two rows. The prior is fitted as a batch prior is, on the carrier's rows and Asset Panel, so it answers `NaN` at an asset outside its Coverage Universe; the gradient is read on the result's Investable Mask at the iterate sliced to it, and is zero at every other leg.
+Computes the gradient of the period's loss at the iterate `u`.
+
+For [`LogWealth`](@ref) the gradient reads the price relative `x` alone. For a [`RiskLoss`](@ref) it reads the rows carrier `rows`. The type docstrings state the two losses and their gradients.
+
+# Algorithm
+
+The [`LogWealth`](@ref) method returns `-x ./ dot(u, x)`. The [`RiskLoss`](@ref) method runs these steps.
+
+ 1. When `rows` is `nothing`, or holds fewer than two rows, return the zero vector.
+ 2. Fit the prior `pr` of the loss on `rows`, as a batch prior is fitted, on the rows of the carrier and its Asset Panel. The prior answers `NaN` at an asset outside its Coverage Universe.
+ 3. Read the Investable Mask of `pr`.
+ 4. Compute the gradient of the measure on that mask with [`investable_risk_gradient`](@ref). It is zero at every other leg.
 
 # Related
 
@@ -904,7 +1132,17 @@ end
     investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult, imsk::Nothing)
     investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult, imsk::BitVector)
 
-The Risk Loss's gradient on the Investable Mask of its prior result: [`risk_gradient`](@ref) at `u` when every asset is priced, and at `u` sliced to the mask against the prior viewed at it otherwise, written into a zero vector of the full length, so a leg the window does not cover takes no step from the loss.
+Computes the gradient of a Risk Loss on the Investable Mask of its prior result.
+
+A leg that the window does not cover gets a zero gradient, so the loss does not move it.
+
+# Algorithm
+
+When the mask is `nothing`, every asset is priced, and the method returns [`risk_gradient`](@ref) of the measure at `u`. Otherwise it runs these steps.
+
+ 1. Find the indices `idx` of the assets on the mask.
+ 2. Make the zero vector `g` of the length of `u`.
+ 3. Write [`risk_gradient`](@ref) of the measure at `u[idx]`, against the prior viewed at `idx`, into `g[idx]`. The slice of `u` is not renormalised.
 
 # Related
 
@@ -926,9 +1164,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The carrier of [`MirrorDescent`](@ref): the unmixed iterate, the Start Allocation the rule restarts at, the schedule's statistic and the Gradient Transform's averages.
+Holds the state of a [`MirrorDescent`](@ref) rule between its updates.
 
-The iterate is what the mirror step reads and writes; the allocation the head plays is its uniform mix when `alpha` is positive, and the iterate itself otherwise.
+The state holds the unmixed iterate, the Start Allocation that a restart returns to, the statistic of the schedule and the averages of the Gradient Transform. The mirror step reads and writes the iterate. The head plays the uniform mix of the iterate when `alpha` is positive, and the iterate itself otherwise.
 
 # Fields
 
@@ -945,7 +1183,7 @@ $(DocStringExtensions.FIELDS)
     """
     n
     """
-    The unmixed iterate ``\\boldsymbol{w}_t``, over the full pinned universe, summing to one.
+    The unmixed iterate ``\\boldsymbol{w}_t``, over the full pinned universe. It sums to one.
     """
     u
     """
@@ -975,25 +1213,74 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The family's first-order Online Selection Rule: one mirror-descent step on the period's gradient, in the divergence its Projection Geometry holds, and the projection back onto the Allocation Set in the same geometry.
+Takes one mirror-descent step on the period's gradient, then projects the result back onto the Allocation Set.
+
+This is the first-order Online Selection Rule of the family. The step and the projection both use the divergence of the rule's Projection Geometry.
+
+Each geometry gives a published rule.
+
+  - Under [`EntropicProjection`](@ref) the step is the multiplicative update of Helmbold, Schapire, Singer and Warmuth (1998), the exponentiated gradient. Its regret is ``O(\\sqrt{T \\log N})`` at ``\\eta = 2 r \\sqrt{2 \\log N / T}``, when every price relative is at least ``r`` times the largest one of its period.
+  - Under [`EuclideanProjection`](@ref) the step is additive, and the projection onto the simplex follows it. This is the online gradient descent of Zinkevich (2003), with regret ``O(\\sqrt{T N})``. It is also the gradient projection of Helmbold and co-authors (1997), except that the 1997 paper assumes the projection and does not enforce it.
+  - Under [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref) the step is the barrier step of Abernethy, Lee and Tewari (2015), Zimmert and Seldin (2021) and Orseau, Lattimore and Legg (2017, §7). On the default set each projection is a scalar root.
+
+The Euclidean map admits every Allocation Set the head admits. The other three maps are defined on the positive orthant, so they refuse a set with a negative lower bound. The tuned rates of the theorems need the horizon, which an online rule does not know, so the library states them as formulas only. The anytime rates are [`InverseSquareRootRate`](@ref), [`SelfConfidentRate`](@ref) and [`DoublingTrickRate`](@ref), on `eta`.
+
+`alpha` is the uniform mix of Helmbold and co-authors (1998, Theorem 4.2). The update reads the mixed price relatives at the unmixed iterate, and the head plays the mix of the new iterate. [`mixed_relatives`](@ref) states how the mix scales to the paper's relatives, which have a period maximum of one. The carrier holds the unmixed iterate, so the rule never inverts the mix. At `alpha = 0` the played allocation is the iterate, and the rule is the plain step. The mix is a convex shift and not a projection, so every geometry admits it. The theorem, ``O(T^{3/4})`` regret at ``\\alpha = (N^2 \\log N / (8 T))^{1/4}`` with no lower bound on the price relatives, holds under the entropic map. The doubling trick of Corollary 4.3 sets ``\\alpha`` and ``\\eta`` per stage, and its share takes precedence over `alpha`. The rule plays the Start Allocation unmixed in the first period, as every rule does.
+
+The mix lies in the Allocation Set when the uniform allocation does. Otherwise [`reprojection`](@ref) projects it onto the set again, in the rule's geometry. A bounded set that excludes the uniform allocation, a turnover ceiling and a MIP kind are such sets. On the default set the reprojection costs nothing.
+
+A schedule can name a restart. The update of that period then returns the Start Allocation, re-entered onto the set from the book the fund holds by [`reprojection`](@ref). The update puts the carrier back at its seed, and the averages of the Gradient Transform restart with it. The period count stays, because the stages are cumulative.
+
+The rule can also serve inside a mixture. As the weighting of an [`ExpertMixture`](@ref), it moves the weight over the experts on their period returns. As an expert of a mixture under [`BlendPoint`](@ref), the rule reads its gradient at the blend that the mixture played, and steps from its own iterate. The seven-argument [`online_update!`](@ref) hands it that Gradient Point. This is the shared gradient of Zhang, Lu and Zhou (2018) and of Zhao, Zhang, Zhang and Zhou (2020). On the head, and under [`OwnPoint`](@ref), the point is the iterate.
+
+`obj` is the loss. [`LogWealth`](@ref) is the loss of every rule above. A [`RiskLoss`](@ref) is a risk measure over the last `window` rows the head holds. The rule reads as many rows as its objective. Only the log-wealth gradient reads the mixed price relatives, because a risk measure reads returns and not price relatives. The mix of the played allocation applies under both.
 
 # Mathematical definition
 
-With ``\\boldsymbol{g}_t = -\\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` the gradient of the period's log-wealth loss at the iterate, ``\\hat{\\boldsymbol{g}}_t`` its Gradient Transform and ``\\Psi`` the geometry's potential,
-
 ```math
 \\begin{align}
-\\boldsymbol{w}_{t+1} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; \\eta_t \\langle \\hat{\\boldsymbol{g}}_t, \\boldsymbol{w} \\rangle + D_\\Psi(\\boldsymbol{w}, \\boldsymbol{w}_t) = \\mathrm{Proj}_\\Psi\\left( \\nabla \\Psi^* \\left( \\nabla \\Psi(\\boldsymbol{w}_t) - \\eta_t \\hat{\\boldsymbol{g}}_t \\right) \\right)\\,.
+\\tilde{\\boldsymbol{x}}_t &= \\left(1 - \\frac{\\alpha}{N}\\right) \\boldsymbol{x}_t + \\frac{\\alpha}{N} \\max_i x_{t, i} \\boldsymbol{1}\\,, \\\\
+\\boldsymbol{w}_{t+1} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; \\eta_t \\langle \\hat{\\boldsymbol{g}}_t, \\boldsymbol{w} \\rangle + D_\\Psi(\\boldsymbol{w}, \\boldsymbol{w}_t) = \\mathrm{Proj}_\\Psi\\left( \\nabla \\Psi^* \\left( \\nabla \\Psi(\\boldsymbol{w}_t) - \\eta_t \\hat{\\boldsymbol{g}}_t \\right) \\right)\\,, \\\\
+\\tilde{\\boldsymbol{w}}_{t+1} &= (1 - \\alpha) \\boldsymbol{w}_{t+1} + \\frac{\\alpha}{N} \\boldsymbol{1}\\,.
 \\end{align}
 ```
 
-Under [`EntropicProjection`](@ref) the step is the multiplicative update ``w_{t+1, i} \\propto w_{t, i} \\exp(\\eta x_{t, i} / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle)`` of Helmbold, Schapire, Singer and Warmuth (1998), the exponentiated gradient, with regret ``O(\\sqrt{T \\log N})`` at ``\\eta = 2 r \\sqrt{2 \\log N / T}`` when every price relative is at least ``r`` times the period's largest; under [`EuclideanProjection`](@ref) it is the additive step ``\\boldsymbol{w}_t + \\eta \\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` followed by the projection onto the simplex, Zinkevich's (2003) online gradient descent and, up to the projection the 1997 paper assumes rather than enforces, the gradient projection of Helmbold and co-authors (1997), with regret ``O(\\sqrt{T N})``; under [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref) it is the barrier step of Abernethy, Lee and Tewari (2015), Zimmert and Seldin (2021) and Orseau, Lattimore and Legg (2017, §7), each a scalar root on the default set. Every geometry admits every Allocation Set the head admits; the fixed-horizon constants of the theorems need the horizon, which no online rule knows, and are documented formulas, and the anytime rates are [`InverseSquareRootRate`](@ref), [`SelfConfidentRate`](@ref) and [`DoublingTrickRate`](@ref) on `eta`.
+Where:
 
-`alpha` is the uniform mix of Helmbold and co-authors (1998, Theorem 4.2): the update reads the mixed price relatives ``\\tilde{\\boldsymbol{x}}_t = (1 - \\alpha / N) \\boldsymbol{x}_t + (\\alpha / N) \\max_i x_{t, i} \\boldsymbol{1}`` at the unmixed iterate — the paper's mix over relatives normalised to a period maximum of one, which [`mixed_relatives`](@ref) states — and the head plays ``\\tilde{\\boldsymbol{w}}_{t+1} = (1 - \\alpha) \\boldsymbol{w}_{t+1} + (\\alpha / N) \\boldsymbol{1}``; the carrier holds the unmixed iterate, so the mix is never inverted, and at `alpha = 0` the carrier is the played allocation and the rule is the plain step. The mix is a convex shift, not a projection, so it is admitted under every geometry; the theorem — ``O(T^{3/4})`` with no lower bound on the price relatives, at ``\\alpha = (N^2 \\log N / (8 T))^{1/4}`` — is the entropic map's, and the doubling trick of Corollary 4.3 sets ``\\alpha`` and ``\\eta`` per stage and takes precedence over this slot. The Start Allocation is played unmixed for the first period, as every rule plays it. The mix lies on the Allocation Set wherever the uniform allocation does, and is projected onto the set once more in the rule's geometry where it does not — a bounded set that excludes the uniform allocation, a turnover ceiling, a MIP kind — through [`reprojection`](@ref), which the default set never pays for.
+  - $(math_dict[:x_t_rel])
+  - ``x_{t, i}``: Price relative of asset ``i`` in period ``t``.
+  - ``\\tilde{\\boldsymbol{x}}_t``: Mixed price relative vector of period ``t``. The log-wealth gradient reads it in place of ``\\boldsymbol{x}_t``.
+  - $(math_dict[:alpha_mix])
+  - $(math_dict[:N])
+  - ``\\boldsymbol{1}``: Vector of ones.
+  - $(math_dict[:w_t_iter])
+  - $(math_dict[:ghat_t]) It is the Gradient Transform of ``\\boldsymbol{g}_t``, the gradient of the loss.
+  - $(math_dict[:eta_t_lr])
+  - ``\\mathcal{W}``: Allocation Set.
+  - ``\\Psi``: Potential of the Projection Geometry.
+  - ``D_\\Psi``: Bregman divergence of ``\\Psi``.
+  - ``\\Psi^*``: Convex conjugate of ``\\Psi``.
+  - ``\\mathrm{Proj}_\\Psi``: Projection onto ``\\mathcal{W}`` in the divergence ``D_\\Psi``.
+  - ``\\tilde{\\boldsymbol{w}}_{t+1}``: Allocation the head plays in period ``t + 1``.
 
-A schedule that names a restart makes the update of that period answer the Start Allocation re-entered onto the set from the book the fund holds ([`reprojection`](@ref)), held on the carrier, and puts the carrier back at its seed with the period count kept, because the stages are cumulative; the Gradient Transform's averages restart with it. As the weighting of an [`ExpertMixture`](@ref) the rule moves the weight over the experts on their period returns. As an expert of a mixture under [`BlendPoint`](@ref) the rule reads its gradient at the mixture's played blend — the seven-argument [`online_update!`](@ref) hands it the Gradient Point — while stepping from its own iterate, the shared gradient of Zhang, Lu and Zhou (2018) and Zhao, Zhang, Zhang and Zhou (2020); on the head, and under [`OwnPoint`](@ref), the point is the iterate itself.
+Under the entropic map the step is ``w_{t+1, i} \\propto w_{t, i} \\exp(-\\eta_t \\hat{g}_{t, i})``. Under the Euclidean map it is ``\\mathrm{Proj}_{\\mathcal{W}}(\\boldsymbol{w}_t - \\eta_t \\hat{\\boldsymbol{g}}_t)``. At ``\\alpha = 0``, ``\\tilde{\\boldsymbol{x}}_t = \\boldsymbol{x}_t`` and ``\\tilde{\\boldsymbol{w}}_{t+1} = \\boldsymbol{w}_{t+1}``.
 
-`obj` is the loss the gradient is taken of: [`LogWealth`](@ref), the period's ``-\\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_t \\rangle`` of every rule above, or a [`RiskLoss`](@ref), a risk measure over the last `window` rows the head holds, whose gradient [`risk_gradient`](@ref) answers at the iterate; the rule's `rows_needed` is the objective's. The uniform mix is read by the log-wealth gradient alone, because a risk measure reads the returns and not the period's relative, and the mix of the played allocation applies under either.
+# Algorithm
+
+The seven-argument [`online_update!`](@ref) runs these steps at the period's row `x`. The six-argument form calls it with the iterate as the Gradient Point `point`.
+
+ 1. Set the period `t = st.n + 1`, and the Price-Adjusted Allocation `wh` of the book `w` after the row.
+ 2. When the schedule names a restart at `t`, re-enter the Start Allocation `st.w0` onto the set from `wh` with [`reprojection`](@ref). Put the statistic and the carrier of the Gradient Transform back at their seeds, keep `t`, and return that allocation. Stop.
+ 3. When the schedule reads the period's row, write its statistic from `w` and `x`.
+ 4. Read the rate `eta` and the share `alpha` of period `t`. A schedule's share takes precedence over the field `alpha`.
+ 5. Mix the price relatives into `xm` with [`mixed_relatives`](@ref).
+ 6. Take the gradient `g` of the loss at `point`, from `xm` and the head's `rows`.
+ 7. Transform `g` with the Gradient Transform, which updates its carrier.
+ 8. Take the mirror step `q` from the iterate `st.u`, on `eta` times the transformed gradient.
+ 9. Project `q` onto the set from `wh`, which gives the new iterate `u`.
+10. When the schedule reads the past alone, write its statistic from `w` and `x`.
+11. Form the played allocation from `u` with [`played_allocation`](@ref). When `alpha` is positive, project it with [`reprojection`](@ref).
+12. Return the new state and the played allocation.
 
 # Fields
 
@@ -1009,7 +1296,7 @@ $(DocStringExtensions.FIELDS)
         grad::AbstractGradientTransform = PlainGradient()
     ) -> MirrorDescent
 
-Keywords correspond to the struct's fields. The `proj` slot is bound to the geometries that are a scalar root on the default set; [`ExponentiatedGradient`](@ref) and [`GradientProjection`](@ref) fill it with the entropic and the Euclidean map.
+Keywords correspond to the struct's fields. The `proj` slot takes only the geometries whose projection onto the default set is a scalar root. [`ExponentiatedGradient`](@ref) fills it with the entropic map, and [`GradientProjection`](@ref) with the Euclidean map.
 
 ## Validation
 
@@ -1054,7 +1341,7 @@ struct MirrorDescent{T1 <: Union{<:Real, <:AbstractLearningRateSchedule},
                      T4 <: AbstractOnlineObjective, T5 <: AbstractGradientTransform} <:
        AbstractOnlinePortfolioSelectionAlgorithm
     """
-    Learning rate, a number or a Learning-Rate Schedule. Larger reacts faster and is less stable.
+    The learning rate, a number or a Learning-Rate Schedule. A larger rate reacts faster and is less stable.
     """
     eta::T1
     """
@@ -1062,11 +1349,11 @@ struct MirrorDescent{T1 <: Union{<:Real, <:AbstractLearningRateSchedule},
     """
     proj::T2
     """
-    The uniform-mix share, in `[0, 1)`; `0` is the plain step.
+    The uniform-mix share, in `[0, 1)`. At `0` the rule takes the plain step.
     """
     alpha::T3
     """
-    The objective the gradient is taken of: log wealth, or a Risk Loss over the head's rows.
+    The objective whose gradient the rule reads, log wealth or a Risk Loss over the head's rows.
     """
     obj::T4
     """
@@ -1103,7 +1390,25 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The played allocation of a [`MirrorDescent`](@ref) rule from its iterate: the iterate copied at `alpha = 0`, and its uniform mix ``(1 - \\alpha) \\boldsymbol{w} + (\\alpha / N) \\boldsymbol{1}`` otherwise.
+Forms the allocation that a [`MirrorDescent`](@ref) rule plays from its iterate.
+
+At `alpha = 0` the function returns a copy of the iterate `u`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{\\boldsymbol{w}} &= (1 - \\alpha) \\boldsymbol{w} + \\frac{\\alpha}{N} \\boldsymbol{1}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{\\boldsymbol{w}}``: Played allocation.
+  - ``\\boldsymbol{w}``: Iterate of the rule.
+  - $(math_dict[:alpha_mix])
+  - $(math_dict[:N])
+  - ``\\boldsymbol{1}``: Vector of ones.
 
 # Related
 
@@ -1118,9 +1423,32 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The price relatives a [`MirrorDescent`](@ref) rule's update reads under the uniform mix `alpha`: `x` itself at `alpha = 0`, and ``(1 - \\alpha / N) \\boldsymbol{x} + (\\alpha / N) \\max_i x_i \\boldsymbol{1}`` otherwise.
+Mixes the price relatives that a [`MirrorDescent`](@ref) rule's update reads under the uniform mix `alpha`.
 
-The mix of Helmbold, Schapire, Singer and Warmuth (1998, Theorem 4.2) is stated for relatives normalised to a period maximum of one, ``\\tilde{\\boldsymbol{x}} = (1 - \\alpha / N) \\boldsymbol{x} / \\max_i x_i + (\\alpha / N) \\boldsymbol{1}``, and every reader of the mixed vector — the gradient of the log-wealth loss, the hint residual — is invariant to its scale, so the floor is scaled to the period's maximum in place of the relatives to it. The mix of the raw relatives with an unscaled floor is a different step: it leaves the theorem's proof, and differs from this one by ``3 \\times 10^{-6}`` in the allocation at ``\\alpha = 0.2`` over sixty rows of two per cent returns, and by ``10^{-4}`` on a day one asset moves by half.
+At `alpha = 0` the function returns `x` itself.
+
+Helmbold, Schapire, Singer and Warmuth (1998, Theorem 4.2) state the mix for price relatives with a period maximum of one, ``(1 - \\alpha / N) \\boldsymbol{x} / \\max_i x_i + (\\alpha / N) \\boldsymbol{1}``. Every reader of the mixed vector, the gradient of the log-wealth loss and the hint residual, gives the same result at every scale of the vector. So the function scales the floor to the period's maximum, and does not scale the price relatives down to one.
+
+The mix of the raw price relatives with an unscaled floor is a different step, outside the proof of the theorem. Take the exponentiated gradient at the default rate and ``\\alpha = 0.2``, over the price relatives `1 .+ 0.02 .* randn(StableRNG(7), 60, 4)`. The two steps then give played allocations that differ by at most ``2.6 \\times 10^{-6}``. From the uniform allocation, over one period in which the first of four assets rises by half and the others stay flat, they differ by ``7.0 \\times 10^{-5}``.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{\\boldsymbol{x}} &= \\left(1 - \\frac{\\alpha}{N}\\right) \\boldsymbol{x} + \\frac{\\alpha}{N} \\max_i x_i \\boldsymbol{1}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{\\boldsymbol{x}}``: Mixed price relative vector.
+  - ``\\boldsymbol{x}``: Price relative vector of the period.
+  - ``x_i``: Price relative of asset ``i``.
+  - $(math_dict[:alpha_mix])
+  - $(math_dict[:N])
+  - ``\\boldsymbol{1}``: Vector of ones.
+
+The result is ``\\max_i x_i`` times the paper's mix.
 
 # Related
 
@@ -1174,7 +1502,11 @@ end
     reprojection(proj::AbstractProjectionGeometry, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
     reprojection(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector)
 
-The projection onto the head's Allocation Set of an allocation a [`MirrorDescent`](@ref) rule plays without having stepped to it: the uniform mix of its iterate under `alpha`, and the Start Allocation a restarting Learning-Rate Schedule returns to. Both are allocations, and both may lie outside the set — the mix wherever the set excludes the uniform allocation, the start wherever a turnover ceiling or a MIP kind excludes it from the book the fund now holds — so the head projects them once more in the rule's own geometry, as an [`ExpertMixture`](@ref) projects its blend ([`blend_projection`](@ref)). On a [`BoundedAllocationSet`](@ref) an allocation inside the bounds is answered as is, so the default set changes nothing and pays nothing; on every other set the projection is a programme, and a rule with a positive `alpha` pays two per period.
+Projects onto the head's Allocation Set an allocation that a [`MirrorDescent`](@ref) rule plays without a step to it.
+
+There are two such allocations. One is the uniform mix of the iterate under `alpha`. The other is the Start Allocation that a restart of a Learning-Rate Schedule returns to. Either can lie outside the set. The mix does when the set excludes the uniform allocation. The start does when a turnover ceiling or a MIP kind excludes it from the book the fund now holds. So the head projects them again, in the rule's own geometry, as an [`ExpertMixture`](@ref) projects its blend with [`blend_projection`](@ref).
+
+On a [`BoundedAllocationSet`](@ref), the function returns an allocation inside the bounds unchanged, so the default set costs nothing. On every other set the projection is a programme, and a rule with a positive `alpha` solves two programmes per period.
 
 # Arguments
 
@@ -1205,9 +1537,29 @@ end
 """
     ExponentiatedGradient(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::AbstractGradientTransform = PlainGradient())
 
-The exponentiated gradient of Helmbold, Schapire, Singer and Warmuth (1998): a [`MirrorDescent`](@ref) rule under [`EntropicProjection`](@ref) (EG).
+Builds the exponentiated gradient of Helmbold, Schapire, Singer and Warmuth (1998), a [`MirrorDescent`](@ref) rule under [`EntropicProjection`](@ref) (EG).
 
-The multiplicative update ``w_{t+1, i} \\propto w_{t, i} \\exp(\\eta x_{t, i} / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle)`` normalised to sum to one, which is the entropic projection onto the simplex; a momentum rule that increases the weight of whatever just did well, with regret ``O(\\sqrt{T \\log N})`` at a rate tuned to the horizon, and universal under the uniform mix `alpha` with the doubling trick. The default rate is the paper's ``0.05`` (§5.2: rates from ``0.01`` to ``0.15`` all do well, and a rate above one loses money on their two-stock case). As the weighting of an [`ExpertMixture`](@ref) it is the online gradient update over the expert-return vector.
+The rule moves weight towards the assets that just did well. Its regret is ``O(\\sqrt{T \\log N})`` at a rate tuned to the horizon, and under the uniform mix `alpha` with the doubling trick it is universal. The default rate is the paper's ``0.05``. In its §5.2, rates from ``0.01`` to ``0.15`` all do well, and a rate above one loses money on the two-stock example. As the weighting of an [`ExpertMixture`](@ref), the rule takes the online gradient step over the vector of expert returns.
+
+# Mathematical definition
+
+Under [`LogWealth`](@ref), at `alpha = 0` and with no Gradient Transform,
+
+```math
+\\begin{align}
+w_{t+1, i} &= \\frac{w_{t, i} \\exp(\\eta_t x_{t, i} / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle)}{\\sum_j w_{t, j} \\exp(\\eta_t x_{t, j} / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``w_{t, i}``: Weight of asset ``i`` in the iterate of period ``t``.
+  - ``x_{t, i}``: Price relative of asset ``i`` in period ``t``.
+  - $(math_dict[:w_t_iter])
+  - $(math_dict[:x_t_rel])
+  - $(math_dict[:eta_t_lr])
+
+The normalisation is the entropic projection onto the simplex.
 
 # Examples
 
@@ -1240,9 +1592,28 @@ end
 """
     GradientProjection(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::AbstractGradientTransform = PlainGradient())
 
-The gradient projection of Helmbold, Schapire, Singer and Warmuth (1997), which is Zinkevich's (2003) online gradient descent on the simplex: a [`MirrorDescent`](@ref) rule under [`EuclideanProjection`](@ref) (GP, OGD).
+Builds the gradient projection of Helmbold, Schapire, Singer and Warmuth (1997), a [`MirrorDescent`](@ref) rule under [`EuclideanProjection`](@ref) (GP, OGD).
 
-The additive step ``\\boldsymbol{w}_t + \\eta \\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` followed by the Euclidean projection onto the Allocation Set, which zeroes the entries the step pushes below its threshold. The 1997 paper subtracts the mean of the gradient to keep the budget and assumes non-negativity rather than enforcing it; the projection does both, and on the simplex is Zinkevich's fixed-rate step exactly, with regret ``O(\\sqrt{T})`` at ``\\eta \\propto 1 / \\sqrt{T}`` and the anytime rate [`InverseSquareRootRate`](@ref). Neither paper states a rate for the portfolio problem; the default is the entropic constructor's.
+On the simplex this is the online gradient descent of Zinkevich (2003). The 1997 paper subtracts the mean of the gradient to keep the budget, and assumes that the weights stay non-negative. The projection keeps the budget and enforces the sign, and on the simplex it is Zinkevich's fixed-rate step. The regret is ``O(\\sqrt{T})`` at ``\\eta \\propto 1 / \\sqrt{T}``, and [`InverseSquareRootRate`](@ref) is the anytime rate. Neither paper states a rate for the portfolio problem, so the default is the rate of [`ExponentiatedGradient`](@ref).
+
+# Mathematical definition
+
+Under [`LogWealth`](@ref), at `alpha = 0` and with no Gradient Transform,
+
+```math
+\\begin{align}
+\\boldsymbol{w}_{t+1} &= \\mathrm{Proj}_{\\mathcal{W}}\\left( \\boldsymbol{w}_t + \\eta_t \\frac{\\boldsymbol{x}_t}{\\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle} \\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_t_iter])
+  - $(math_dict[:x_t_rel])
+  - $(math_dict[:eta_t_lr])
+  - ``\\mathrm{Proj}_{\\mathcal{W}}``: Euclidean projection onto the Allocation Set ``\\mathcal{W}``.
+
+On the simplex, the projection sets to zero every entry that the step leaves below the projection's threshold.
 
 # Examples
 
@@ -1276,9 +1647,9 @@ end
 """
     EGE(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99, alpha::Real = 0)
 
-The exponentiated gradient with exponential-moving-average momentum of Li, Zheng, Chen, Wang and Xu (2022): [`ExponentiatedGradient`](@ref) under [`GradientMomentum`](@ref).
+Builds the exponentiated gradient with the momentum of an exponential moving average, [`ExponentiatedGradient`](@ref) under [`GradientMomentum`](@ref) (EGE).
 
-The paper's rate is Helmbold's ``2 r \\sqrt{2 \\log N / T}`` with the doubling trick when the horizon is unknown, which is [`DoublingTrickRate`](@ref) on `eta`; the default here is the entropic constructor's.
+This is the EGE of Li, Zheng, Chen, Wang and Xu (2022). The paper's rate is the rate ``2 r \\sqrt{2 \\log N / T}`` of Helmbold and co-authors, with the doubling trick when the horizon is unknown. [`DoublingTrickRate`](@ref) on `eta` gives that trick. The default rate is the rate of [`ExponentiatedGradient`](@ref).
 
 # Examples
 
@@ -1312,9 +1683,9 @@ end
 """
     EGR(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)
 
-The exponentiated gradient with root-mean-square rescaling of Li, Zheng, Chen, Wang and Xu (2022): [`ExponentiatedGradient`](@ref) under [`RootMeanSquareGradient`](@ref).
+Builds the exponentiated gradient with a root-mean-square scale on the gradient, [`ExponentiatedGradient`](@ref) under [`RootMeanSquareGradient`](@ref) (EGR).
 
-At the paper's recommended `gamma2 = 0`, the default, the transformed gradient is the sign of the gradient up to `eps`, the same at every asset, so the update moves nothing: the rule is the constant rebalanced portfolio at its Start Allocation. [`RootMeanSquareGradient`](@ref) states why.
+This is the EGR of Li, Zheng, Chen, Wang and Xu (2022). At the default `gamma2 = 0`, which the paper recommends, the rule stays at its Start Allocation, up to `eps`. The transformed gradient is then the sign of the gradient, the same at every asset, so the update moves nothing, and the rule is the constant rebalanced portfolio at its Start Allocation. [`RootMeanSquareGradient`](@ref) states why.
 
 # Examples
 
@@ -1350,7 +1721,9 @@ end
 """
     EGA(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99, gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)
 
-The exponentiated gradient with adaptive-moment rescaling of Li, Zheng, Chen, Wang and Xu (2022): [`ExponentiatedGradient`](@ref) under [`AdaptiveMomentGradient`](@ref).
+Builds the exponentiated gradient with an adaptive-moment scale on the gradient, [`ExponentiatedGradient`](@ref) under [`AdaptiveMomentGradient`](@ref) (EGA).
+
+This is the EGA of Li, Zheng, Chen, Wang and Xu (2022).
 
 # Examples
 
@@ -1388,9 +1761,9 @@ end
 """
     MAEG(; etas::AbstractVector{<:Real} = 0.001:0.001:0.2, window::Integer = 30, alpha::Real = 0)
 
-The moving-window-based adaptive exponential gradient of Zhang, Lin, Zheng and Yang (2022): [`ExponentiatedGradient`](@ref) under a [`WindowedBestRate`](@ref) over `window` periods (MAEG).
+Builds the moving-window adaptive exponential gradient, [`ExponentiatedGradient`](@ref) under a [`WindowedBestRate`](@ref) over `window` periods (MAEG).
 
-The defaults are the paper's: the rate set of Helmbold, Schapire, Singer and Warmuth (1998) and the window of `30` it chose over `7`.
+This is the MAEG of Zhang, Lin, Zheng and Yang (2022). The defaults are the paper's, the rate set of Helmbold, Schapire, Singer and Warmuth (1998) and the window `30`, which the paper chose over `7`.
 
 # Examples
 
@@ -1424,7 +1797,9 @@ end
 """
     AEG(; etas::AbstractVector{<:Real} = 0.001:0.001:0.2, alpha::Real = 0)
 
-The adaptive exponential gradient of Zhang, Lin, Zheng and Yang (2022): [`ExponentiatedGradient`](@ref) under a [`WindowedBestRate`](@ref) over the whole history, the paper's special case of [`MAEG`](@ref) whose window is the horizon (AEG).
+Builds the adaptive exponential gradient, [`ExponentiatedGradient`](@ref) under a [`WindowedBestRate`](@ref) over the whole history (AEG).
+
+This is the AEG of Zhang, Lin, Zheng and Yang (2022), the special case of [`MAEG`](@ref) whose window is the horizon.
 
 # Examples
 
