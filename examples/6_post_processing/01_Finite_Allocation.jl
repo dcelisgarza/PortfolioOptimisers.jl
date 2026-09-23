@@ -58,22 +58,21 @@ prices = vec(values(X)[end, :])
 #=
 ## 2. Greedy allocation
 
-[`GreedyAllocation`](@ref) needs no solver. Its result holds the whole number of `shares` per
-asset, the `cost` per asset, the weights `w` of the shares bought, and the `cash` left over. We
-allocate a budget of \$100,000. The function `drift` sums the absolute differences between the
-weights bought and the target weights, and the title of the table prints it with the cash left
-over.
+[`GreedyAllocation`](@ref) needs no solver. Its result holds the whole number of `shares` per asset,
+the `cost` per asset, the weights `w` of the shares bought, and the `cash` left over. We allocate a
+budget of \$100,000. The function `rounding_error` sums the absolute differences between the weights
+bought and the target weights, and the title of the table prints it with the cash left over.
 =#
 
 cash = 100_000.0
 greedy = optimise(GreedyAllocation(),
                   FiniteAllocationInput(; w = res.w, prices = prices, cash = cash))
 
-drift(alloc) = sum(abs, alloc.w .- res.w)
+rounding_error(alloc) = sum(abs, alloc.w .- res.w)
 pretty_table(DataFrame("Asset" => rd.nx, "Target" => res.w,
                        "Shares" => round.(Int, greedy.shares), "Realised" => greedy.w);
              formatters = [resfmt],
-             title = "Greedy allocation of \$$(round(Int, cash)) — leftover cash \$$(round(greedy.cash, digits = 2)), drift $(round(drift(greedy), digits = 4))")
+             title = "Greedy allocation of \$$(round(Int, cash)) — leftover cash \$$(round(greedy.cash, digits = 2)), rounding error $(round(rounding_error(greedy), digits = 4))")
 
 #=
 ## 3. Exact allocation with a mixed-integer solver
@@ -91,7 +90,8 @@ discrete = optimise(DiscreteAllocation(; slv = mip_slv),
 
 pretty_table(DataFrame("Method" => ["Greedy", "Discrete (MIP)"],
                        "Leftover cash" => [greedy.cash, discrete.cash],
-                       "Drift from target" => [drift(greedy), drift(discrete)]);
+                       "Rounding error" =>
+                           [rounding_error(greedy), rounding_error(discrete)]);
              formatters = [resfmt], title = "Greedy vs exact allocation")
 
 #=
@@ -107,7 +107,8 @@ greedy_lots = optimise(GreedyAllocation(; unit = 10),
 
 pretty_table(DataFrame("Allocation" => ["Single shares", "Lots of 10"],
                        "Leftover cash" => [greedy.cash, greedy_lots.cash],
-                       "Drift from target" => [drift(greedy), drift(greedy_lots)]);
+                       "Rounding error" =>
+                           [rounding_error(greedy), rounding_error(greedy_lots)]);
              formatters = [resfmt], title = "Lot size coarsens the allocation")
 
 #=
@@ -126,9 +127,8 @@ budget_allocs = [optimise(GreedyAllocation(),
 
 pretty_table(DataFrame("Budget" => budgets,
                        "Leftover cash" => [a.cash for a in budget_allocs],
-                       "Drift from target" => [drift(a) for a in budget_allocs]);
-             formatters = [resfmt],
-             title = "Smaller budgets suffer larger discretisation error")
+                       "Rounding error" => [rounding_error(a) for a in budget_allocs]);
+             formatters = [resfmt], title = "Rounding error by budget")
 
 #=
 [`FiniteAllocationInput`](@ref) also takes a `fees` keyword, a [`Fees`](@ref), which needs a

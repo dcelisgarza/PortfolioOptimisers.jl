@@ -152,7 +152,8 @@ rd_filled = prices_to_returns(PricesToReturns(), pr_filled)
 
 pretty_table(DataFrame(; table = ["carried", "filled with the Held Price"],
                        non_finite = [count(!isfinite, rd.X), count(!isfinite, rd_filled.X)],
-                       asset_3_still_unlisted = [true, !isfinite(rd_filled.X[1, 3])]);
+                       asset_3_still_unlisted = [!isfinite(rd.X[1, 3]),
+                                                 !isfinite(rd_filled.X[1, 3])]);
              title = "The fill closes the halts, and stops at asset 3's listing")
 
 #=

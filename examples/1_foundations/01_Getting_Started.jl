@@ -160,7 +160,7 @@ pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip
 The weights of the allocation differ from the optimised weights, because a whole number of shares at a fixed cash amount can only come close to them. The `cash` property of the result is the cash left over. We print it beside the starting cash less the sum of the costs. When the input has fees, the allocation also subtracts the fees from the cash left over.
 =#
 
-println("used cash ≈ available cash: $(isapprox(mip_res.cash, 4206.9 - sum(mip_res.cost)))")
+println("cash left over: $(round(mip_res.cash; digits = 2)), starting cash less the costs: $(round(4206.9 - sum(mip_res.cost); digits = 2))")
 
 #=
 The cost of each asset is its number of shares times its price, and the next cell compares the two.

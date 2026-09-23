@@ -171,7 +171,6 @@ pretty_table(DataFrame(;
 #=
 ## 6. Risk attribution
 
-An asset's share of the weight and its share of the risk can differ.
 [`risk_contribution`](@ref) splits the total risk into the share of each asset. As with the plots,
 a quadratic risk measure needs the covariance of the data, so pass `factory(Variance(), pr)`, not
 a bare `Variance()`. We scale the contributions to sum to one, and the table prints the eight
@@ -186,9 +185,24 @@ pretty_table(first(rc_df, 8); formatters = [resfmt],
              title = "Top risk contributors — minimum-variance book")
 
 #=
-A share of the weight and a share of the risk are different numbers. An asset with a small weight
-and a high volatility, or a high correlation with the others, can contribute more risk than its
-weight. Risk attribution shows where the two differ.
+On the minimum-variance portfolio the two columns match. At the minimum of the variance, a small
+move of weight between two assets in the portfolio does not change the variance, so each of its
+assets adds the same variance per unit of weight. The share of the risk of each asset is then its
+weight. We compute the same shares for the maximum-ratio portfolio, and the table prints the assets
+with a weight above 0.01 %.
+=#
+
+rc_ratio = risk_contribution(factory(Variance(), pr), w_ratio, rd.X)
+rc_ratio ./= sum(rc_ratio)
+rc_ratio_df = sort(DataFrame(; asset = rd.nx, weight = w_ratio, risk_share = rc_ratio),
+                   :risk_share; rev = true)
+pretty_table(filter(:weight => >(1e-4), rc_ratio_df); formatters = [resfmt],
+             title = "Risk contributors, maximum-ratio book")
+
+#=
+Here the two columns differ, and XOM takes a larger share of the risk than of the weight. An asset
+with a high volatility, or a high correlation with the other assets, can contribute more risk than
+its weight, and the weights alone do not show it.
 
 ## 7. The equity curves
 
@@ -207,19 +221,15 @@ current()
 #=
 ## Summary
 
-After the optimisation, these functions measure how a portfolio would have behaved, with no new
-optimisation:
+On this sample the three portfolios differ as follows:
 
-  - [`cumulative_returns`](@ref), simple or compounded, is the equity curve.
-    [`drawdowns`](@ref) is the loss from the running peak, from which the maximum drawdown and
-    the Ulcer index follow.
-  - [`calc_net_returns`](@ref) and [`calc_fees`](@ref) separate the gross performance from the
-    net performance.
-  - [`risk_contribution`](@ref) shows which assets the risk comes from, which the weights alone
-    do not show.
-
-Each of these takes plain weights, so they report on the output of an optimiser, on a benchmark,
-or on any portfolio from outside the library.
+  - The maximum-ratio portfolio ends with the largest compounded wealth of the three, and the
+    equal-weight portfolio has the largest value of all three drawdown statistics.
+  - A fee of five basis points per period on the long positions lowers the compounded wealth of
+    the maximum-ratio portfolio, and [`calc_total_fees`](@ref) gives the fee over the whole
+    sample.
+  - On the minimum-variance portfolio the share of the risk of each asset equals its weight. On
+    the maximum-ratio portfolio the two differ.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
