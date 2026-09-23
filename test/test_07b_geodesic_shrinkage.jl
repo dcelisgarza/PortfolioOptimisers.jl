@@ -1,4 +1,5 @@
 using PortfolioOptimisers, Test, LinearAlgebra, Statistics, StatsBase, StableRNGs
+using CovarianceEstimation: CovarianceEstimation
 
 const PO = PortfolioOptimisers
 
@@ -225,5 +226,89 @@ const REFX10 = Dict(:scaled =>
         @test isapprox(cor(partial_fit!(ce, X)), cor(ce, X); rtol = 1e-12)
         folded = foldl(partial_fit!, eachrow(X); init = ce)
         @test isapprox(cov(folded), cov(ce, X); rtol = 1e-10)
+    end
+    # Each property below is stated in a paper the docstrings cite, and each is checked against
+    # the implementation. `phi(T, S, a)` is the geodesic from `S` to `T` at `a`, computed from
+    # the target end, and `geodesic_first_form` is the geodesic from the start end.
+    phi(T, S, a) = PO.geodesic_point(T, S, a)
+    @testset "parity with Musolas, Smith and Marzouk (2021), section 2" begin
+        for a in (0.1, 0.35, 0.8)
+            got = phi(T3, S3, a)
+            # Equation 2.3: A1^(1/2) U Λ^t Uᵀ A1^(1/2), with U Λ Uᵀ the eigendecomposition of
+            # the whitened A1^(-1/2) A2 A1^(-1/2).
+            @test isapprox(got, geodesic_first_form(S3, T3, a); rtol = 1e-12)
+            # The two further forms after equation 2.3: A1 (A1⁻¹ A2)^t = A2 (A2⁻¹ A1)^(1 - t).
+            @test isapprox(got, S3 * real(exp(a * log(S3 \ T3))); rtol = 1e-10)
+            @test isapprox(got, T3 * real(exp((1 - a) * log(T3 \ S3))); rtol = 1e-10)
+            # Equations 2.4 and 2.5: d(A1, φ(t)) = |t| d(A1, A2), with d from the generalised
+            # eigenvalues of the pencil.
+            @test isapprox(airm(S3, got), a * airm(S3, T3); rtol = 1e-10)
+            # Equation 2.1: the distance is invariant under inversion.
+            @test isapprox(airm(inv(S3), inv(got)), airm(S3, got); rtol = 1e-10)
+            # Equation 2.2: the distance is invariant under congruence, and so is the geodesic.
+            Z = [1.0 0.3 -0.2; 0.0 2.0 0.5; 0.4 0.0 1.5]
+            @test isapprox(airm(Z * S3 * Z', Z * got * Z'), airm(S3, got); rtol = 1e-10)
+            @test isapprox(phi(Z * T3 * Z', Z * S3 * Z', a), Z * got * Z'; rtol = 1e-10)
+            # Section 2.2, property 1: φ⁻¹_{A1→A2}(t) = φ_{A1⁻¹→A2⁻¹}(t).
+            @test isapprox(inv(got), phi(inv(T3), inv(S3), a); rtol = 1e-10)
+            # Section 2.2, property 2: φ_{A1→A2}(t) = φ_{A2→A1}(1 - t).
+            @test isapprox(got, phi(S3, T3, 1 - a); rtol = 1e-10)
+            # Remark 2.2: φ_{A1→c A1}(t) = c^t A1.
+            @test isapprox(phi(2.5 * S3, S3, a), 2.5^a * S3; rtol = 1e-12)
+        end
+        # The two anchors are the two ends of the curve.
+        @test phi(T3, S3, 1) == T3
+        @test PO.geodesic_shrinkage!(GeodesicShrinkageCovariance(; pdm = nothing, tgt = T3,
+                                                                 alpha = 0), copy(S3)) == S3
+    end
+    @testset "parity with Bhatia (2007), the geometric mean of chapters 4 and 6" begin
+        for a in (0.2, 0.5, 0.7)
+            got = phi(T3, S3, a)
+            # The weighted geometric mean has det(A #_t B) = det(A)^(1 - t) det(B)^t.
+            @test isapprox(det(got), det(S3)^(1 - a) * det(T3)^a; rtol = 1e-12)
+            # A pair that commutes: A #_t B = A^(1 - t) B^t. Here B = A², so the answer is A^(1 + t).
+            vals, vecs = eigen(Symmetric(S3))
+            @test isapprox(phi(S3^2, S3, a), vecs * Diagonal(vals .^ (1 + a)) * vecs';
+                           rtol = 1e-10)
+        end
+        # The midpoint A # B is the unique positive definite solution of X A⁻¹ X = B.
+        mid = phi(T3, S3, 0.5)
+        @test isposdef(mid)
+        @test isapprox(mid * (S3 \ mid), T3; rtol = 1e-12)
+    end
+    @testset "parity with Schäfer and Strimmer (2005), table 2" begin
+        # CovarianceEstimation.jl builds the targets of the same table. A linear shrinkage at
+        # intensity one returns its target, so it gives the target built from the same
+        # corrected sample covariance.
+        CE = CovarianceEstimation
+        rng = StableRNG(97531)
+        X = randn(rng, 80, 5) * [1.0 0.4 0.2 0.0 0.1; 0 1 0.3 0.2 0; 0 0 1 0.5 0.1;
+                                 0 0 0 1 0.3; 0 0 0 0 1]
+        S = cov(X)
+        for (tgt, cet) in ((IdentityTarget(), CE.DiagonalUnitVariance()),
+                           (ScaledIdentityTarget(), CE.DiagonalCommonVariance()),
+                           (CommonCovarianceTarget(), CE.CommonCovariance()),
+                           (DiagonalTarget(), CE.DiagonalUnequalVariance()),
+                           (ConstantCorrelationTarget(), CE.ConstantCorrelation()))
+            ref = cov(CE.LinearShrinkage(cet, 1.0; corrected = true), X)
+            @test isapprox(PO.shrinkage_target(tgt, S), ref; rtol = 1e-12)
+        end
+        # The positive definite conditions the docstrings state. Target C has the eigenvalue
+        # v - c with multiplicity N - 1 and v + (N - 1) c once; target F has the correlation
+        # eigenvalues 1 - r with multiplicity N - 1 and 1 + (N - 1) r once.
+        n = 5
+        C = PO.shrinkage_target(CommonCovarianceTarget(), S)
+        v, c = C[1, 1], C[1, 2]
+        @test isapprox(eigvals(Symmetric(C)), sort([fill(v - c, n - 1); v + (n - 1) * c]);
+                       rtol = 1e-12)
+        F = PO.shrinkage_target(ConstantCorrelationTarget(), S)
+        d = sqrt.(diag(F))
+        r = F[1, 2] / (d[1] * d[2])
+        @test isapprox(eigvals(Symmetric(F ./ (d * d'))),
+                       sort([fill(1 - r, n - 1); 1 + (n - 1) * r]); rtol = 1e-12)
+        # Target E, perfect positive correlation, has rank one, so no geodesic reaches it.
+        E = sqrt.(diag(S)) * sqrt.(diag(S))'
+        @test rank(E) == 1
+        @test_throws DomainError GeodesicShrinkageCovariance(; tgt = E)
     end
 end
