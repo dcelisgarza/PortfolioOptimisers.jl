@@ -504,7 +504,7 @@ keep reading the weights their source carries unless you say otherwise.
 ## 5. Comparing the structural constraints
 =#
 
-results = [res_base, res_phylo, res_sweep[2], res_sweep[5], res_hub, res_periph]
+results = [res_base, res_phylo, res_sweep[2], res_sweep[6], res_hub, res_periph]
 labels = ["Baseline", "Phylo n=1", "Phylo n=3", "Phylo bare\nPathLength", "Hub",
           "Periphery"]
 
