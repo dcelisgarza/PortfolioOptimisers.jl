@@ -180,10 +180,20 @@ Every forecast-reading rule projects in the Euclidean geometry, and its `proj` s
 `EuclideanProjection` as ADR 0159 binds `ForecastReversion`'s: `ForecastTracking`,
 `KernelTrendTracking`, `TransactionCostOptimisation` and `ShortTermSparsePortfolio` each take a
 step that is a Euclidean move from the held allocation — a normalised direction, a kernel-scaled
-direction, a soft-thresholded proximal step, an ADMM iterate — and their papers close each step
-with the simplex projection of Duchi and co-authors, which is that geometry's scalar root on the
-default set. No forecast-reading rule admits another geometry: none of their steps is
+direction, a soft-thresholded proximal step, a scaled sparse iterate — and their papers close each
+step with the simplex projection of Duchi and co-authors, which is that geometry's scalar root on
+the default set. No forecast-reading rule admits another geometry: none of their steps is
 multiplicative, and none carries a Gram matrix.
+
+`ShortTermSparsePortfolio` finds its iterate by one of three algorithms in its `alg` slot, each
+holding only its own parameters (#1259). The paper states a linear objective with an `L1` penalty,
+whose optimum is the whole budget on the largest forecast (`L1Optimum`). The paper's alternating
+direction iteration does not converge to that optimum. It converges to the optimum of a programme
+that couples the iterate to its soft threshold by a quadratic term, and that optimum has a closed
+form (`HuberOptimum`). The iteration itself, stopped at the paper's tolerance on the budget
+residual, is kept as `AlternatingDirectionMethod`. `HuberOptimum` is the default, because it is the
+answer the paper's method reaches. The first two agree after the scaled projection up to
+`(1 − 1/ζ)/γ` assets, 99 at the paper's values, and the third can stop tenths away from the second.
 
 ### What a rule may read, and what is never a Prior's
 

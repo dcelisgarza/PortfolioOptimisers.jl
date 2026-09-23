@@ -4,7 +4,7 @@ Description = "Online selection rules: the forecast-reading arm, public API of P
 
 # Online selection rules: the forecast-reading arm
 
-The rules that consume a Price Relative Forecast: the passive-aggressive reversion step with its optional diagonal scale and the six paper constructors that fill its forecaster, the fixed-length tracking step with its three, the kernel-scaled tracking step with its one, the cost-aware soft-thresholded step and the sparse portfolio's alternating-direction solve. A forecaster with an exact fold is carried on the Rule State; one without is refit on the rows the head holds.
+The rules that consume a Price Relative Forecast: the passive-aggressive reversion step with its optional diagonal scale and the six paper constructors that fill its forecaster, the fixed-length tracking step with its three, the kernel-scaled tracking step with its one, the cost-aware soft-thresholded step and the sparse portfolio, whose iterate one of three algorithms finds. A forecaster with an exact fold is carried on the Rule State; one without is refit on the rows the head holds.
 
 ```@docs
 ForecastReversion

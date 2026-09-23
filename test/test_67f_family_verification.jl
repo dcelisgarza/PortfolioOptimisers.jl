@@ -88,6 +88,10 @@ and is held to the family's promises:
               "KernelTrendPatternTracking" => KernelTrendPatternTracking(),
               "TransactionCostOptimisation" => TransactionCostOptimisation(),
               "ShortTermSparsePortfolio" => ShortTermSparsePortfolio(),
+              "ShortTermSparsePortfolio(L1)" =>
+                  ShortTermSparsePortfolio(; alg = L1Optimum()),
+              "ShortTermSparsePortfolio(ADM)" =>
+                  ShortTermSparsePortfolio(; alg = AlternatingDirectionMethod()),
               "ForecastReversion(prior)" => ForecastReversion(; me = me_ew),
               "ForecastTracking(prior)" => ForecastTracking(; me = SimpleExpectedReturns()),
               "ConfidenceWeightedMeanReversion" => ConfidenceWeightedMeanReversion(),
@@ -288,7 +292,10 @@ and is held to the family's promises:
                 @test isa(res.retcode, OptimisationSuccess)
                 @test count(x -> x > 1e-6, res.w) <= 2
                 @test isapprox(sum(res.w), 1; atol = 1e-6)
-                @test all(res.w .>= -1e-6)
+                # The solver's error on a zero leg grows with the size of the projected point:
+                # the sparse portfolio projects `500 b`, and its zero legs come back near
+                # `-1e-6`. The sign is checked at the ceiling's tolerance.
+                @test all(res.w .>= -1e-5)
                 # A Held Step trades nothing and sits inside the ceiling; a mixture whose expert
                 # held still projects its blend, so the ceiling is the check in both cases.
                 @test maximum(abs.(res.w .- w_adj)) <= 0.1 + 1e-5

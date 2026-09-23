@@ -497,23 +497,36 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         tco2 = TransactionCostOptimisation(; me = PriceLevelExpectedReturns())
         @test po.rows_needed(tco2) == 4
         @test_throws DomainError TransactionCostOptimisation(; gamma = -1)
-        # The sparse portfolio: the paper's defaults, a feasible sparse answer, and the
-        # iteration's own convergence.
+        # The sparse portfolio: the paper's defaults on the rule and on each algorithm, and a
+        # feasible sparse answer from each algorithm.
         sspo = ShortTermSparsePortfolio()
-        @test isa(sspo.me.alg, WindowPeak) &&
-              sspo.lambda == 0.5 &&
-              sspo.gamma == 0.01 &&
-              sspo.eta == 0.005 &&
-              sspo.zeta == 500 &&
-              sspo.iters == 10_000 &&
-              sspo.tol == 1e-4
-        _, wsp = po.online_update!(sspo, nothing, w, x, rows(rd, 1:5), set)
-        @test sum(wsp) ≈ 1 && all(wsp .>= 0)
-        # The iterate solves the penalised programme's optimality up to the tolerance: the
-        # scaled iterate projects to the asset with the largest generalised return.
+        @test isa(sspo.me.alg, WindowPeak) && sspo.alg == HuberOptimum() && sspo.zeta == 500
+        hub = HuberOptimum()
+        @test hub.lambda == 0.5 && hub.gamma == 0.01
+        adm = AlternatingDirectionMethod()
+        @test adm.lambda == 0.5 &&
+              adm.gamma == 0.01 &&
+              adm.eta == 0.005 &&
+              adm.iters == 10_000 &&
+              adm.tol == 1e-4
+        # Below 1 / gamma assets every algorithm's scaled iterate projects to the asset with
+        # the largest generalised return.
         xw = xhat(WindowPeak(), R[1:5, :])
-        @test argmax(wsp) == argmax(xw)
+        for alg in (L1Optimum(), hub, adm)
+            _, wsp = po.online_update!(ShortTermSparsePortfolio(; alg = alg), nothing, w, x,
+                                       rows(rd, 1:5), set)
+            @test sum(wsp) ≈ 1 && all(wsp .>= 0)
+            @test argmax(wsp) == argmax(xw)
+        end
+        @test po.port_opt_view(ShortTermSparsePortfolio(; alg = adm), [1, 2]).alg == adm
         @test_throws DomainError ShortTermSparsePortfolio(; zeta = 0)
+        @test_throws DomainError HuberOptimum(; lambda = 0)
+        @test_throws DomainError HuberOptimum(; gamma = 0)
+        @test_throws DomainError AlternatingDirectionMethod(; lambda = 0)
+        @test_throws DomainError AlternatingDirectionMethod(; gamma = 0)
+        @test_throws DomainError AlternatingDirectionMethod(; eta = 0)
+        @test_throws DomainError AlternatingDirectionMethod(; iters = 0)
+        @test_throws DomainError AlternatingDirectionMethod(; tol = 0)
         @test_throws DomainError po.online_update!(ShortTermSparsePortfolio(;
                                                                             me = CustomValueExpectedReturns(;
                                                                                                             val = fill(-2.0,
@@ -527,6 +540,8 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
                     GaussianWeightingReversion(), LocalAdaptiveLearning(), PeakPriceTracking(),
                     AdaptiveInputCompositeTrend(), TrendPromotePriceTracking(),
                     TransactionCostOptimisation(), ShortTermSparsePortfolio(),
+                    ShortTermSparsePortfolio(; alg = L1Optimum()),
+                    ShortTermSparsePortfolio(; alg = AlternatingDirectionMethod()),
                     ForecastReversion(; me = ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 1)),
                     ForecastTracking(; me = SimpleExpectedReturns()))
             opt = OPS(; alg = alg)
@@ -640,10 +655,10 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
               po.project_simplex(w .+ max(0, (1.05 - dot(w, xl)) / sum(abs2, dev)) .* dev)
         @test !(wl ≈
                 po.project_simplex(w .+ max(0, (1.05 - dot(w, xl)) / norm(dev)) .* dev))
-        # The sparse portfolio stops at the paper's tolerance on the budget residual, which the
-        # iteration meets at a zero crossing of the residual long before its iterate settles:
-        # the library's answer is the projection of that early iterate, which is still tenths
-        # away from the iterate `iters` steps later. The iteration is written out here.
+        # The paper's iteration stops at the paper's tolerance on the budget residual, which
+        # it meets at a zero crossing of the residual long before its iterate settles: its
+        # answer is the projection of that early iterate, which is still tenths away from the
+        # iterate `iters` steps later. The iteration is written out here.
         w4 = [0.4, 0.3, 0.2, 0.1]
         xw = xhat(WindowPeak(), R[7:11, :])
         phi = -1.1 .* log.(xw) .- 1
@@ -664,8 +679,9 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
                 kstop = o
             end
         end
-        _, wsp = po.online_update!(ShortTermSparsePortfolio(), nothing, w4, X[11, :],
-                                   rows(rd, 7:11), set)
+        _, wsp = po.online_update!(ShortTermSparsePortfolio(;
+                                                            alg = AlternatingDirectionMethod()),
+                                   nothing, w4, X[11, :], rows(rd, 7:11), set)
         @test wsp == po.project_simplex(500 .* bstop)
         @test kstop < 1000 && maxerr(bstop, b) > 0.5
         # #1259: the fixed point is the optimum of the coupled programme the docstring states,
@@ -683,6 +699,72 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         @test maximum(phi) - minimum(phi) <= 2 * 0.5
         @test isapprox(b, b2; atol = 1e-8)
         @test maxerr(b, g) ≈ 0.01
+        # `HuberOptimum` is that fixed point in closed form, and the default rule projects it.
+        bh = po.sparse_portfolio_iterate(HuberOptimum(), phi, w4)
+        @test isapprox(bh, b; atol = 1e-8) && sum(bh) ≈ 1
+        _, wh = po.online_update!(ShortTermSparsePortfolio(), nothing, w4, X[11, :],
+                                  rows(rd, 7:11), set)
+        @test wh == po.project_simplex(500 .* bh)
+    end
+
+    @testset "The sparse portfolio's three algorithms" begin
+        # The stated programme's optimum is the vertex of the largest forecast, whatever the
+        # held allocation, and no feasible point does better.
+        phi = [-1.02, -1.10, -1.05, -1.01]
+        w4 = [0.4, 0.3, 0.2, 0.1]
+        e2 = [0.0, 1.0, 0.0, 0.0]
+        @test po.sparse_portfolio_iterate(L1Optimum(), phi, w4) == e2
+        p1(b) = dot(b, phi) + 0.5 * norm(b, 1)
+        rng1 = StableRNG(4)
+        for _ in 1:200
+            v = randn(rng1, 4)
+            v .+= (1 - sum(v)) / 4
+            @test p1(v) >= p1(e2)
+        end
+        # Ties split the budget evenly; a flat objective is the equal weights for both closed
+        # forms, and so is the fixed point.
+        @test po.sparse_portfolio_iterate(L1Optimum(), [-1.1, -1.0, -1.1], w4[1:3]) ==
+              [0.5, 0.0, 0.5]
+        @test po.sparse_portfolio_iterate(L1Optimum(), fill(-1.0, 4), w4) == fill(0.25, 4)
+        @test po.sparse_portfolio_iterate(HuberOptimum(), fill(-1.0, 4), w4) ≈ fill(0.25, 4)
+        # Past the bound both programmes fall without end, and the closed forms take the
+        # limit: the budget on the largest forecast.
+        wide = [-1.0, -2.2, -1.5]
+        @test maximum(wide) - minimum(wide) > 2 * 0.5
+        @test po.sparse_portfolio_iterate(HuberOptimum(), wide, w4[1:3]) == [0.0, 1.0, 0.0]
+        # With more than 1 / gamma assets the multiplier is a root inside its interval. The
+        # optimality conditions of the coupled programme hold: a coordinate inside the clamp
+        # reads the same multiplier off `a bᵢ = −(φᵢ + ν)`, and a clamped one sits on
+        # `|φᵢ + ν| = λ` with its sign.
+        function huber_kkt(alg, phi)
+            b = po.sparse_portfolio_iterate(alg, phi, fill(1 / length(phi), length(phi)))
+            a = alg.lambda / alg.gamma
+            inside = abs.(b) .< alg.gamma - 1e-12
+            nu = -(phi[inside] .+ a .* b[inside])
+            nu0 = first(nu)
+            atedge = .!inside
+            return b, maxerr(nu, fill(nu0, length(nu))),
+                   maximum(abs, -(phi[atedge] .+ nu0) .- alg.lambda .* sign.(b[atedge]);
+                           init = 0.0), count(atedge)
+        end
+        rng2 = StableRNG(5)
+        phin = -(1.1 .* log.(1 .+ max.(0, 0.05 .* randn(rng2, 150))) .+ 1)
+        bn, dnu, dedge, nedge = huber_kkt(HuberOptimum(), phin)
+        @test sum(bn) ≈ 1 && dnu < 1e-12 && dedge < 1e-12 && nedge == 0
+        @test count(>(0), po.project_simplex(500 .* bn)) > 1
+        @test po.project_simplex(500 .*
+                                 po.sparse_portfolio_iterate(L1Optimum(), phin, phin)) ==
+              Float64.(1:150 .== argmin(phin))
+        # At the upper end of the interval the asset with the smallest forecast takes the
+        # negative remainder, a short past `−gamma`.
+        phih = vcat(zeros(149), 0.9)
+        bh, dnu, dedge, nedge = huber_kkt(HuberOptimum(), phih)
+        @test sum(bh) ≈ 1 && bh[end] < -0.01 && dnu < 1e-12 && dedge < 1e-12 && nedge == 1
+        # The paper's iteration reads the held allocation: one iteration from two seeds
+        # differs.
+        one_step = AlternatingDirectionMethod(; iters = 1)
+        @test po.sparse_portfolio_iterate(one_step, phi, w4) !=
+              po.sparse_portfolio_iterate(one_step, phi, fill(0.25, 4))
     end
 
     @testset "Show and the search seam" begin

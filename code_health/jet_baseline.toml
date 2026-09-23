@@ -322,6 +322,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { raw = 0, reviewed = 0 }
 "src/18_ExpectedReturns.jl" = { raw = 1, reviewed = 1 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { raw = 0, reviewed = 0 }
@@ -649,6 +650,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { raw = 0, reviewed = 0 }
 "src/18_ExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { raw = 0, reviewed = 0 }

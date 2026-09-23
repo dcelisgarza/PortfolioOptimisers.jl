@@ -16,4 +16,5 @@ PortfolioOptimisers.refit_rows
 PortfolioOptimisers.last_active_mask
 PortfolioOptimisers.scale_relative
 PortfolioOptimisers.scale_rows
+PortfolioOptimisers.AbstractSparsePortfolioAlgorithm
 ```

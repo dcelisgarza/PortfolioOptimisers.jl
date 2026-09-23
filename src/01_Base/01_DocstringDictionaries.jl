@@ -244,7 +244,6 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :Xv => "`X`: Data vector `observations × 1`.",#
                                  :X_Xv => "`X`: Data matrix or vector.",#
                                  :Z => "`Z`: Feature matrix `assets × features` if `dims = 1`, `features × assets` when `dims = 2`. May also be a 3-D array of time-varying features, in which case the observation axis always leads: `observations × assets × features` if `dims = 1`, `observations × features × assets` when `dims = 2`.",#
-                                 :ze => "`ze`: Feature matrix estimator: the producer that computes `Z` from the wrapped prior result.",#
                                  :plfe => "`pl`: Structure source, always an estimator so that it refits per fold: a network estimator (a graph, whose `sep` measures the separations `alg` grades) or a clustering estimator (a partition, for which `alg` is inert). A precomputed result is not accepted -- an Estimator does not hold a Result.",#
                                  :plfalg => "`alg`: Phylogeny feature algorithm: the rule turning the source's separations into feature values. Inert for a partition source, which has no separation to grade.",#
                                  :dims => "`dims`: Dimension along which to perform the computation.",#
@@ -279,7 +278,6 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  # JuMP Optimisation
                                  :model => "`model::JuMP.Model`: The JuMP optimisation model.",
                                  :opt_rjumpe => "`opt::RiskConstraintOwner`: The owner of the risk constraint, a risk-based JuMP optimisation estimator or a programme Allocation Set.",
-                                 :opt_jumpe => "`opt::JuMPOptimisationEstimator`: JuMP optimisation estimator.",
                                  :ci => "`i`: Constraint index for unique variable and constraint naming.",
                                  :wb_arg => "`wb::WeightBounds`: Weight bound specification containing lower and upper bounds.",
                                  :ss_arg => "`ss::Option{<:Number}`: Big-M scaling constant (computed via [`get_mip_ss`](@ref) when `nothing`).",
@@ -696,6 +694,8 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :flag_schur => "`flag`: Whether to repair an augmented covariance block that is not positive definite. When `true`, `pdm` repairs it, and a failed repair raises. When `false`, no repair happens and the allocation is abandoned instead, which is what the [`MonotonicSchurComplement`](@ref) search needs; a caller that keeps the weights gets an error naming the `gamma` that failed.",#
                                  :r_res_schur => "`r`: The risk measure the optimisation ran under, stored **resolved**. It parallels `gamma`: one measure for the single-bundle path, a vector of them for the multi-bundle path. Schur carries **no** scalariser, because it carries no vector of measures to combine — `SchurComplementParams.r` is bounded to a standard deviation or a variance.",#
                                  :tol => "`tol`: Convergence tolerance.",#
+                                 :lambda_sspo => "`lambda`: The weight of the ``L_1`` penalty of the short-term sparse portfolio.",#
+                                 :gamma_sspo => "`gamma`: The soft-threshold width; the ratio `lambda / gamma` is the quadratic coupling of the paper's iteration.",#
                                  :iter => "`iter`: Maximum number of iterations.",#
                                  :w_opt_noc => "`w_opt`: Optimal portfolio weights.",#
                                  :w_min_noc => "`w_min`: Minimum risk portfolio weights.",#

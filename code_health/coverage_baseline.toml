@@ -305,6 +305,7 @@ commit = "8610300"
 "src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { lines = 29, misses = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { lines = 70, misses = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { lines = 220, misses = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { lines = 63, misses = 0 }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { lines = 54, misses = 0 }
 "src/18_ExpectedReturns.jl" = { lines = 148, misses = 0 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { lines = 134, misses = 0 }

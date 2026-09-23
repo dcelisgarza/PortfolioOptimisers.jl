@@ -1203,7 +1203,21 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The short-term sparse portfolio optimisation of Lai, Yang, Fang and Wu (2018): a linear objective on the generalised log return of the window peak with an ``L_1`` penalty, solved by an alternating direction method, then the projection of the scaled iterate (SSPO).
+The algorithm that finds the iterate of a [`ShortTermSparsePortfolio`](@ref) step: the vector ``\\boldsymbol{b}`` whose scaled projection is the next allocation. Its members differ in the programme they solve, and the rule's docstring compares them.
+
+# Related
+
+  - [`ShortTermSparsePortfolio`](@ref)
+  - [`L1Optimum`](@ref)
+  - [`HuberOptimum`](@ref)
+  - [`AlternatingDirectionMethod`](@ref)
+  - [`sparse_portfolio_iterate`](@ref)
+"""
+abstract type AbstractSparsePortfolioAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The short-term sparse portfolio optimisation of Lai, Yang, Fang and Wu (2018): a linear objective on the generalised log return of the window peak with an ``L_1`` penalty, solved for an iterate by `alg`, then the projection of the scaled iterate (SSPO).
 
 # Mathematical definition
 
@@ -1211,29 +1225,29 @@ With ``\\hat{\\boldsymbol{x}}_{t+1}`` the Price Relative Forecast — the window
 
 ```math
 \\begin{align}
-\\min_{\\boldsymbol{b}} \\; \\langle \\boldsymbol{b}, \\boldsymbol{\\phi}_t \\rangle + \\lambda \\lVert \\boldsymbol{b} \\rVert_1 \\quad \\text{s.t.} \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{b} = 1
+\\min_{\\boldsymbol{b}} \\; \\langle \\boldsymbol{b}, \\boldsymbol{\\phi}_t \\rangle + \\lambda \\lVert \\boldsymbol{b} \\rVert_1 \\quad \\text{s.t.} \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{b} = 1\\,,
 \\end{align}
 ```
 
-and runs the iteration, seeded at ``\\boldsymbol{b} = \\boldsymbol{g} = \\boldsymbol{w}_t`` and ``\\rho = 0``,
+and solves it by an alternating direction iteration. That iteration couples ``\\boldsymbol{b}`` to its soft threshold ``\\boldsymbol{g}`` by a quadratic term with no multiplier, so its fixed point solves another programme,
 
 ```math
 \\begin{align}
-\\boldsymbol{b} &\\leftarrow \\left( \\tfrac{\\lambda}{\\gamma} \\boldsymbol{I} + \\eta \\boldsymbol{1} \\boldsymbol{1}^\\intercal \\right)^{-1} \\left( \\tfrac{\\lambda}{\\gamma} \\boldsymbol{g} + (\\eta - \\rho) \\boldsymbol{1} - \\boldsymbol{\\phi}_t \\right)\\,,\\quad
-\\boldsymbol{g} \\leftarrow \\operatorname{sign}(\\boldsymbol{b}) \\odot \\max(\\lvert \\boldsymbol{b} \\rvert - \\gamma, 0)\\,,\\quad
-\\rho \\leftarrow \\rho + \\eta (\\boldsymbol{1}^\\intercal \\boldsymbol{b} - 1)\\,,
+\\min_{\\boldsymbol{b}, \\boldsymbol{g}} \\; \\langle \\boldsymbol{b}, \\boldsymbol{\\phi}_t \\rangle + \\lambda \\lVert \\boldsymbol{g} \\rVert_1 + \\tfrac{\\lambda}{2 \\gamma} \\lVert \\boldsymbol{b} - \\boldsymbol{g} \\rVert^2 \\quad \\text{s.t.} \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{b} = 1\\,.
 \\end{align}
 ```
 
-until ``\\lvert \\boldsymbol{1}^\\intercal \\boldsymbol{b} - 1 \\rvert < \\texttt{tol}`` or `iters` steps, and ``\\boldsymbol{w}_{t+1} = \\mathrm{Proj}(\\zeta \\boldsymbol{b})``. The fixed matrix is inverted once in closed form through the Sherman–Morrison identity, so every iteration is ``O(N)``. The iteration couples ``\\boldsymbol{b}`` and ``\\boldsymbol{g}`` by a quadratic term with no multiplier, so its fixed point does not solve the stated programme but
+The next allocation is ``\\boldsymbol{w}_{t+1} = \\mathrm{Proj}(\\zeta \\boldsymbol{b})``, and the scale ``\\zeta`` is what makes it sparse. `alg` chooses the iterate ``\\boldsymbol{b}``:
 
-```math
-\\begin{align}
-\\min_{\\boldsymbol{b}, \\boldsymbol{g}} \\; \\langle \\boldsymbol{b}, \\boldsymbol{\\phi}_t \\rangle + \\lambda \\lVert \\boldsymbol{g} \\rVert_1 + \\tfrac{\\lambda}{2 \\gamma} \\lVert \\boldsymbol{b} - \\boldsymbol{g} \\rVert^2 \\quad \\text{s.t.} \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{b} = 1\\,,
-\\end{align}
-```
+| `alg`                                | The iterate                                              | Parameters                               | Cost of a step                                 |
+|:------------------------------------ |:-------------------------------------------------------- |:---------------------------------------- |:---------------------------------------------- |
+| [`L1Optimum`](@ref)                  | the optimum of the stated programme                      | none                                     | ``O(N)``                                       |
+| [`HuberOptimum`](@ref)               | the fixed point of the paper's iteration, in closed form | `lambda`, `gamma`                        | ``O(N)``, or ``O(N^2)`` when ``N \\gamma > 1`` |
+| [`AlternatingDirectionMethod`](@ref) | the paper's iteration at the paper's stop                | `lambda`, `gamma`, `eta`, `iters`, `tol` | up to `iters` iterations of ``O(N)``           |
 
-where ``\\lVert \\boldsymbol{b} - \\boldsymbol{g} \\rVert_\\infty \\leq \\gamma`` at the optimum, because ``\\boldsymbol{g}`` is the soft threshold of ``\\boldsymbol{b}`` at ``\\gamma``. Both programmes are bounded only when ``\\max \\boldsymbol{\\phi}_t - \\min \\boldsymbol{\\phi}_t \\leq 2 \\lambda``, that is ``\\max \\hat{\\boldsymbol{x}} / \\min \\hat{\\boldsymbol{x}} \\leq e^{1 / 1.1}`` at the defaults. The dual step ``\\eta`` is small, so the iterate reaches that fixed point after thousands to hundreds of thousands of steps, more than `iters`. The augmented Lagrangian is proved to have a saddle point in the paper; the final step is the Euclidean projection of a **scaled** iterate, and the scale ``\\zeta`` is what makes the answer sparse. The budget residual changes sign as the dual variable adapts, so the paper's `tol = 1e-4` is met at a zero crossing after a few hundred to a few thousand iterations, while the iterate is still moving by tenths; the scaled projection of that point and of the point `iters` steps later can land on different assets. The answer at the paper's tolerance is the paper's; a tolerance the crossings never reach runs every one of the `iters` steps.
+The stated programme puts the whole budget on the largest forecast. The fixed point gives every other asset at most ``\\gamma``, so its scaled projection does the same while ``N \\gamma \\leq 1 - 1 / \\zeta``, which at the paper's `gamma = 0.01` and `zeta = 500` is up to 99 assets. With more assets than that, the fixed point's projection holds a few assets rather than one. The paper's iteration approaches the fixed point slowly and stops where the budget residual crosses zero, while the iterate can still be tenths away from it, so its projection is usually the fixed point's but not always. [`HuberOptimum`](@ref) is the default, because it is the answer the paper's method converges to. Take [`L1Optimum`](@ref) for the programme the paper states, and [`AlternatingDirectionMethod`](@ref) to reproduce the paper's loop, stop included.
+
+Both programmes have a minimum only when ``\\max \\boldsymbol{\\phi}_t - \\min \\boldsymbol{\\phi}_t \\leq 2 \\lambda``, which at ``\\lambda = 1/2`` is ``\\max \\hat{\\boldsymbol{x}} / \\min \\hat{\\boldsymbol{x}} \\leq e^{1 / 1.1}``. Past that bound the objective falls without end as the budget moves to the largest forecast. [`L1Optimum`](@ref) and [`HuberOptimum`](@ref) take that limit, and the paper's iteration returns its last iterate.
 
 # Fields
 
@@ -1243,21 +1257,16 @@ $(DocStringExtensions.FIELDS)
 
     ShortTermSparsePortfolio(;
         me::Union{<:AbstractExpectedReturnsEstimator, <:Online} = PriceLevelExpectedReturns(; alg = WindowPeak()),
-        lambda::Real = 0.5,
-        gamma::Real = 0.01,
-        eta::Real = 0.005,
+        alg::AbstractSparsePortfolioAlgorithm = HuberOptimum(),
         zeta::Real = 500,
-        iters::Integer = 10_000,
-        tol::Real = 1e-4,
         proj::EuclideanProjection = EuclideanProjection()
     ) -> ShortTermSparsePortfolio
 
-Keywords correspond to the struct's fields, and the defaults are the paper's. `rows_needed` forwards to `me`.
+Keywords correspond to the struct's fields. `zeta` and the parameters of `alg` default to the paper's values. `rows_needed` forwards to `me`.
 
 ## Validation
 
-  - `lambda > 0`, `gamma > 0`, `eta > 0`, `zeta > 0`, `tol > 0`. A `DomainError` is thrown otherwise.
-  - `iters >= 1`. A `DomainError` is thrown otherwise.
+  - `zeta > 0`. A `DomainError` is thrown otherwise.
   - `me` is not, and holds no, [`Online`](@ref) wrapper. An `ArgumentError` is thrown otherwise, by name.
   - At the update, `x̂ > 0` in every asset, so the log is defined. A `DomainError` is thrown otherwise.
 
@@ -1266,21 +1275,22 @@ Keywords correspond to the struct's fields, and the defaults are the paper's. `r
 ```jldoctest
 julia> ShortTermSparsePortfolio()
 ShortTermSparsePortfolio
-      me ┼ PriceLevelExpectedReturns
-         │   alg ┼ WindowPeak
-         │       │   window ┴ Int64: 5
-  lambda ┼ Float64: 0.5
-   gamma ┼ Float64: 0.01
-     eta ┼ Float64: 0.005
-    zeta ┼ Int64: 500
-   iters ┼ Int64: 10000
-     tol ┼ Float64: 0.0001
-    proj ┴ EuclideanProjection()
+    me ┼ PriceLevelExpectedReturns
+       │   alg ┼ WindowPeak
+       │       │   window ┴ Int64: 5
+   alg ┼ HuberOptimum
+       │   lambda ┼ Float64: 0.5
+       │    gamma ┴ Float64: 0.01
+  zeta ┼ Int64: 500
+  proj ┴ EuclideanProjection()
 ```
 
 # Related
 
   - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
+  - [`L1Optimum`](@ref)
+  - [`HuberOptimum`](@ref)
+  - [`AlternatingDirectionMethod`](@ref)
   - [`WindowPeak`](@ref)
   - [`ForecastTracking`](@ref)
 
@@ -1288,75 +1298,49 @@ ShortTermSparsePortfolio
 
   - $(ref_dict[:lai2018sspo])
 """
-struct ShortTermSparsePortfolio{T1 <: AbstractExpectedReturnsEstimator, T2 <: Real,
-                                T3 <: Real, T4 <: Real, T5 <: Real, T6 <: Integer,
-                                T7 <: Real, T8 <: EuclideanProjection} <:
+struct ShortTermSparsePortfolio{T1 <: AbstractExpectedReturnsEstimator,
+                                T2 <: AbstractSparsePortfolioAlgorithm, T3 <: Real,
+                                T4 <: EuclideanProjection} <:
        AbstractOnlinePortfolioSelectionAlgorithm
     """
     $(field_dict[:forecaster])
     """
     me::T1
     """
-    The weight of the ``L_1`` penalty.
+    The algorithm that finds the iterate.
     """
-    lambda::T2
-    """
-    The soft-threshold width, and the ratio `lambda / gamma` is the quadratic coupling of the iteration.
-    """
-    gamma::T3
-    """
-    The penalty on the budget equality and the dual step.
-    """
-    eta::T4
+    alg::T2
     """
     The scale of the iterate before its projection.
     """
-    zeta::T5
-    """
-    Maximum number of iterations.
-    """
-    iters::T6
-    """
-    Convergence tolerance on the budget residual.
-    """
-    tol::T7
+    zeta::T3
     """
     $(field_dict[:proj])
     """
-    proj::T8
-    function ShortTermSparsePortfolio(me::AbstractExpectedReturnsEstimator, lambda::Real,
-                                      gamma::Real, eta::Real, zeta::Real, iters::Integer,
-                                      tol::Real, proj::EuclideanProjection)
+    proj::T4
+    function ShortTermSparsePortfolio(me::AbstractExpectedReturnsEstimator,
+                                      alg::AbstractSparsePortfolioAlgorithm, zeta::Real,
+                                      proj::EuclideanProjection)
         assert_forecaster(me)
-        @argcheck(lambda > zero(lambda), DomainError(lambda, "lambda must be positive"))
-        @argcheck(gamma > zero(gamma), DomainError(gamma, "gamma must be positive"))
-        @argcheck(eta > zero(eta), DomainError(eta, "eta must be positive"))
         @argcheck(zeta > zero(zeta), DomainError(zeta, "zeta must be positive"))
-        @argcheck(iters >= 1, DomainError(iters, "iters must be at least 1"))
-        @argcheck(tol > zero(tol), DomainError(tol, "tol must be positive"))
-        return new{typeof(me), typeof(lambda), typeof(gamma), typeof(eta), typeof(zeta),
-                   typeof(iters), typeof(tol), typeof(proj)}(me, lambda, gamma, eta, zeta,
-                                                             iters, tol, proj)
+        return new{typeof(me), typeof(alg), typeof(zeta), typeof(proj)}(me, alg, zeta, proj)
     end
 end
-function ShortTermSparsePortfolio(me::Online, ::Real, ::Real, ::Real, ::Real, ::Integer,
-                                  ::Real, ::EuclideanProjection)
+function ShortTermSparsePortfolio(me::Online, ::AbstractSparsePortfolioAlgorithm, ::Real,
+                                  ::EuclideanProjection)
     return assert_forecaster(me)
 end
 function ShortTermSparsePortfolio(;
                                   me::Union{<:AbstractExpectedReturnsEstimator, <:Online} = PriceLevelExpectedReturns(;
                                                                                                                       alg = WindowPeak()),
-                                  lambda::Real = 0.5, gamma::Real = 0.01, eta::Real = 0.005,
-                                  zeta::Real = 500, iters::Integer = 10_000,
-                                  tol::Real = 1e-4,
+                                  alg::AbstractSparsePortfolioAlgorithm = HuberOptimum(),
+                                  zeta::Real = 500,
                                   proj::EuclideanProjection = EuclideanProjection())::ShortTermSparsePortfolio
-    return ShortTermSparsePortfolio(me, lambda, gamma, eta, zeta, iters, tol, proj)
+    return ShortTermSparsePortfolio(me, alg, zeta, proj)
 end
 function port_opt_view(alg::ShortTermSparsePortfolio, i, args...)
-    return ShortTermSparsePortfolio(; me = port_opt_view(alg.me, i, args...),
-                                    lambda = alg.lambda, gamma = alg.gamma, eta = alg.eta,
-                                    zeta = alg.zeta, iters = alg.iters, tol = alg.tol,
-                                    proj = alg.proj)
+    return ShortTermSparsePortfolio(; me = port_opt_view(alg.me, i, args...), alg = alg.alg,
+                                    zeta = alg.zeta, proj = alg.proj)
 end
 function rows_needed(alg::ShortTermSparsePortfolio)
     return rows_needed(alg.me)
@@ -1371,22 +1355,7 @@ function online_update!(alg::ShortTermSparsePortfolio, st, w::AbstractVector,
               DomainError(xhat,
                           "the short-term sparse portfolio takes the log of the Price Relative Forecast, which must be positive in every asset"))
     phi = -(1.1 .* log.(xhat) .+ one(eltype(xhat)))
-    b = collect(w)
-    g = copy(b)
-    rho = zero(eltype(b)) * alg.eta
-    a = alg.lambda / alg.gamma
-    N = length(w)
-    for _ in 1:(alg.iters)
-        rhs = a .* g .+ (alg.eta - rho) .- phi
-        # `(a I + η 1 1ᵀ)⁻¹ v = v / a − η (1ᵀ v) / (a (a + η N)) 1` by Sherman–Morrison.
-        b = rhs ./ a .- alg.eta * sum(rhs) / (a * (a + alg.eta * N))
-        g = sign.(b) .* max.(abs.(b) .- alg.gamma, zero(alg.gamma))
-        res = sum(b) - one(eltype(b))
-        rho += alg.eta * res
-        if abs(res) < alg.tol
-            break
-        end
-    end
+    b = sparse_portfolio_iterate(alg.alg, phi, w)
     return st, project(alg.proj, set, alg.zeta .* b, price_adjusted_allocation(w, x))
 end
 export ForecastReversion, MovingAverageReversion, ExponentialMovingAverageReversion,

@@ -317,6 +317,7 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { code = 59, doc = 131, comment = 1, blank = 64, total = 255 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { code = 116, doc = 91, comment = 0, blank = 36, total = 243 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { code = 403, doc = 248, comment = 4, blank = 98, total = 753 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { code = 100, doc = 156, comment = 1, blank = 62, total = 319 }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { code = 72, doc = 107, comment = 9, blank = 48, total = 236 }
 "src/18_ExpectedReturns.jl" = { code = 325, doc = 910, comment = 43, blank = 321, total = 1599 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { code = 313, doc = 631, comment = 5, blank = 270, total = 1219 }
