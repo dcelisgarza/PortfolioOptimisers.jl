@@ -5,26 +5,26 @@ Description = "Plotting and reporting in PortfolioOptimisers.jl: inputs, allocat
 
 # Plotting and reporting
 
-A portfolio is only as useful as your ability to explain it. `PortfolioOptimisers.jl` ships a
-plotting layer (loaded by bringing in `StatsPlots` and `GraphRecipes` alongside the package) that
-covers the whole pipeline: the inputs, the allocation, where the risk sits, realised performance,
-and the risk/return geometry — plus one-call dashboards that assemble several views at once. This
-page is a guided tour of the reporting toolkit on a single worked portfolio.
+`PortfolioOptimisers.jl` has plotting functions for each stage of an optimisation. They load when
+you load `StatsPlots` and `GraphRecipes` with the package. They plot the inputs, the allocation,
+the risk of each asset, the performance over the sample, and the portfolios on axes of risk and
+return. Two dashboards put several of these plots into one figure. This page draws them for one
+pair of portfolios.
 
 !!! tip "When to reach for this"
-    Reach for these at the end of every analysis — to sanity-check inputs before optimising, to
-    communicate an allocation, and to compare candidate strategies on the same axes. The
-    individual plots are building blocks; the dashboards ([`plot_portfolio_dashboard`](@ref),
-    [`plot_performance_summary`](@ref)) are the fastest way to a complete picture.
+    Reach for these plots to check the inputs before you optimise, to show an allocation to
+    someone else, and to compare candidate portfolios on the same axes. Each plot shows one view.
+    The dashboards, [`plot_portfolio_dashboard`](@ref) and [`plot_performance_summary`](@ref), put
+    several views in one call.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
 
 #=
-## 1. A worked portfolio
+## 1. The portfolios
 
-We build an empirical prior, a minimum-risk and a maximum-ratio book to compare, and an efficient
-frontier for the geometry plots.
+We compute an empirical prior, a minimum-risk portfolio and a maximum-ratio portfolio to compare,
+and an efficient frontier for the plots of risk and return.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -48,17 +48,17 @@ frontier = optimise(MeanRisk(; obj = MinimumRisk(),
                                                                                                                      N = 15))))))
 
 #=
-## 2. Inspecting the inputs
+## 2. The inputs
 
-Before trusting an optimisation, look at what fed it. [`plot_prior`](@ref) summarises the prior in
-one figure; [`plot_correlation`](@ref) and [`plot_mu`](@ref) zoom in on the covariance structure
-and the expected returns.
+Look at the inputs before you trust an optimisation. [`plot_prior`](@ref) plots the prior in one
+figure. [`plot_correlation`](@ref) plots the correlation matrix alone, and [`plot_mu`](@ref) plots
+the expected returns alone.
 =#
 
 plot_prior(pr, rd)
 
 #=
-The correlation matrix on its own.
+The correlation matrix alone.
 =#
 
 plot_correlation(pr)
@@ -66,61 +66,62 @@ plot_correlation(pr)
 #=
 ## 3. The allocation
 
-[`plot_stacked_bar_composition`](@ref) puts candidate books side by side — here minimum-risk
-versus maximum-ratio — making the difference in concentration immediate.
+[`plot_stacked_bar_composition`](@ref) puts the weights of several portfolios side by side. Here
+it compares the minimum-risk and the maximum-ratio portfolios, and you can see which of the two
+puts more weight on fewer assets.
 =#
 
 plot_stacked_bar_composition([res_min, res_ratio], rd;
                              xticks = (1:2, ["Min risk", "Max ratio"]))
 
 #=
-## 4. Where the risk sits
+## 4. The risk of each asset
 
-A book can look diversified by weight but be concentrated in *risk*.
-[`plot_risk_contribution`](@ref) decomposes the portfolio risk by asset. The risk measure comes
-first, and it must be **configured for the data**: pass `factory(Variance(), pr)` rather than a
-bare `Variance()` (a bare quadratic risk measure has no covariance attached yet — see the findings
-note). Return-based measures like [`ConditionalValueatRisk`](@ref) need no factory.
+A portfolio can spread its weights over many assets and still take most of its risk from a few.
+[`plot_risk_contribution`](@ref) splits the risk of the portfolio by asset. It takes the risk
+measure as its first argument. A quadratic risk measure needs the covariance of the data, so pass
+`factory(Variance(), pr)`, not a bare `Variance()`, which holds no covariance. A measure computed
+from returns, such as [`ConditionalValueatRisk`](@ref), needs no `factory`.
 =#
 
 plot_risk_contribution(factory(Variance(), pr), res_min, rd)
 
 #=
-## 5. Realised performance
+## 5. Performance over the sample
 
-[`plot_portfolio_cumulative_returns`](@ref) and [`plot_drawdowns`](@ref) show how the book would have
-behaved over the sample.
+[`plot_portfolio_cumulative_returns`](@ref) and [`plot_drawdowns`](@ref) plot the returns the
+maximum-ratio portfolio would have made over the sample.
 =#
 
 plot_portfolio_cumulative_returns(res_ratio.w, rd)
 
 #=
-The drawdown profile.
+The drawdowns.
 =#
 
 plot_drawdowns(res_ratio.w, rd)
 
 #=
-[`plot_performance_summary`](@ref) collects the headline performance views into one figure. It
-renders a [`PerformanceSummaryResult`](@ref), which [`performance_summary`](@ref) computes. Call
-that directly when you want the numbers rather than the bars — to tabulate them, to compare two
-books, or to assert on them in a test. It needs no plotting package.
+[`plot_performance_summary`](@ref) puts the main performance plots into one figure. It plots a
+[`PerformanceSummaryResult`](@ref), which [`performance_summary`](@ref) computes. Call
+`performance_summary` when you want the numbers and not the plot, for example to put them in a
+table, to compare two portfolios, or to test them. It needs no plotting package.
 =#
 
 performance_summary(res_ratio, rd)
 
 #=
-The same numbers, drawn.
+The same numbers as a plot.
 =#
 
 plot_performance_summary(res_ratio, rd)
 
 #=
-## 6. Risk/return geometry
+## 6. Risk and return
 
-[`plot_measures`](@ref) scatters portfolios on any pair of risk/return axes, and
-[`plot_efficient_frontier`](@ref) draws the frontier itself — the trade-off surface the optimiser
-traced out.
+[`plot_measures`](@ref) plots portfolios on any pair of risk and return axes.
+[`plot_efficient_frontier`](@ref) plots the efficient frontier, the portfolios with the least risk
+for each level of return.
 =#
 
 plot_efficient_frontier(frontier.w, pr; rt = frontier.ret)
@@ -128,19 +129,18 @@ plot_efficient_frontier(frontier.w, pr; rt = frontier.ret)
 #=
 ## 7. The dashboard
 
-[`plot_portfolio_dashboard`](@ref) assembles composition, risk, and performance into a single
-report — the fastest way to a complete picture of one book.
+[`plot_portfolio_dashboard`](@ref) puts the composition, the risk and the performance of one
+portfolio into one figure.
 =#
 
 plot_portfolio_dashboard(res_ratio, rd; r = factory(Variance(), pr))
 
 #=
-This is a selection, not the whole catalogue. The same layer also offers network and clustering
-views ([`plot_network`](@ref), [`plot_dendrogram`](@ref), [`plot_clusters`](@ref),
-[`plot_centrality`](@ref)), validation plots ([`plot_cv_scores`](@ref),
-[`plot_cv_dashboard`](@ref)), cost/turnover plots ([`plot_turnover`](@ref)), and higher-moment
-views ([`plot_coskewness`](@ref), [`plot_cokurtosis`](@ref)) — each following the same
-`plot_*(subject, …)` convention.
+This page shows some of the plots, not all. The library also plots networks and clusters
+([`plot_network`](@ref), [`plot_dendrogram`](@ref), [`plot_clusters`](@ref),
+[`plot_centrality`](@ref)), cross-validation ([`plot_cv_scores`](@ref),
+[`plot_cv_dashboard`](@ref)), turnover ([`plot_turnover`](@ref)), and the higher moments
+([`plot_coskewness`](@ref), [`plot_cokurtosis`](@ref)).
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
