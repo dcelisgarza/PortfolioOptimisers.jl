@@ -239,8 +239,8 @@ function systematic_pairs(pr, B, f)
     ftail = view(f, (size(f, 1) - Tf + 1):size(f, 1), :)
     fitted = Float64[]
     truth = Float64[]
-    for t in 2:Tf, i in axes(rr.csr.eps, 2)
-        u = dot(view(rr.Ms, t - 1, i, :), view(pr.fpr.X, t, :))
+    for t in (1 + rr.lag):Tf, i in axes(rr.csr.eps, 2)
+        u = dot(view(rr.Ms, t - rr.lag, i, :), view(pr.fpr.X, t, :))
         v = dot(view(B, i, :), view(ftail, t, :))
         if isfinite(u) && isfinite(v)
             push!(fitted, u)
@@ -276,8 +276,8 @@ function reconciliation(pr, X)
     Xtail = view(X, (size(X, 1) - Tf + 1):size(X, 1), :)
     worst = 0.0
     n = 0
-    for t in 2:Tf, i in axes(rr.csr.eps, 2)
-        v = dot(view(rr.Ms, t - 1, i, :), view(pr.fpr.X, t, :)) + rr.csr.eps[t, i]
+    for t in (1 + rr.lag):Tf, i in axes(rr.csr.eps, 2)
+        v = dot(view(rr.Ms, t - rr.lag, i, :), view(pr.fpr.X, t, :)) + rr.csr.eps[t, i]
         if isfinite(v) && isfinite(Xtail[t, i])
             worst = max(worst, abs(v - Xtail[t, i]))
             n += 1

@@ -108,7 +108,9 @@ gives almost the 1/N portfolio.
 We print the radius that gives each of four portfolios, which hold one asset, 20 % of the
 assets, half of them and all of them. `ladder(k)` is the radius at which the k-th best asset
 joins the portfolio, from Lemma 2 of the paper, so a radius between `ladder(k)` and
-`ladder(k + 1)` gives `k` assets.
+`ladder(k + 1)` gives `k` assets. The last asset has no `ladder(N + 1)`, so every radius past
+`ladder(N)` gives 1/N. At exactly `ladder(N)` the last asset can stay at zero, so the table
+prints `1.25 ladder(N)`, the radius that section 12 solves at.
 =#
 
 mu_sorted = sort(pr.mu; rev = true)
@@ -118,7 +120,7 @@ pretty_table(DataFrame(;
                        portfolio = ["single best asset", "quintile (20%)", "half (50%)",
                                     "1/N (everything)"],
                        radius = [ladder(2) / 2, (ladder(4) + ladder(5)) / 2,
-                                 (ladder(10) + ladder(11)) / 2, ladder(N)]);
+                                 (ladder(10) + ladder(11)) / 2, ladder(N) * 1.25]);
              formatters = [(v, i, j) -> isa(v, Number) ? string(round(v; sigdigits = 3)) : v])
 
 #=

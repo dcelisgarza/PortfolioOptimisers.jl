@@ -675,8 +675,8 @@ pretty_table(DataFrame("Selector entry" =>
                        "Shape" => [string(size(feature_matrix(pnl_gap, ["volatility"]))),
                                    string(size(Zobs)), string(size(Zboth))],
                        "Mean of the last column" =>
-                           [round(mean(Zgap[.!isnan.(Zgap)]); digits = 4),
-                            round(mean(Zobs); digits = 4),
+                           [round(mean(feature_matrix(pnl_gap, ["volatility"]));
+                                  digits = 4), round(mean(Zobs); digits = 4),
                             round(mean(selectdim(Zboth, 3, 2)); digits = 4)]);
              title = "The values and the observed mask of a filled field")
 

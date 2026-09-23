@@ -196,7 +196,9 @@ returned the same weight for every name.
 
 pretty_table(DataFrame("max |w_pipeline - w_direct|" => maximum(abs, piped.w - direct.w),
                        "sum(w)" => sum(piped.w), "Names held" => count(>(1e-6), piped.w),
-                       "Size exposure" => (transpose(direct.pa.pr.rr.M) * piped.w)[6]);
+                       "Size exposure" =>
+                           (transpose(direct.pa.pr.rr.M) * piped.w)[findfirst(isequal("size"),
+                                                                              direct.pa.pr.rr.nf)]);
              formatters = [numfmt], title = "Pipeline route against the hand-wired route")
 
 #=
