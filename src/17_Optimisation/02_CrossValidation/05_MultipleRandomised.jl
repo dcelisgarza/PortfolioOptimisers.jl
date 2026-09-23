@@ -516,8 +516,9 @@ asset subset and a set of walk-forward folds forms one path.
 
 Unlike combinatorial cross-validation, multiple-randomised resampling draws over **assets**
 (columns) while every observation window comes from an inner walk-forward, so the rows of
-each fold stay contiguous. That is why it is admissible at the price level for a
-price-starting pipeline — the rolling-window rule that blocks combinatorial does not apply.
+each fold stay contiguous. A price-starting pipeline therefore fits each fold on unbroken
+prices. Combinatorial cross-validation at the price level gets one spurious return per gap
+boundary in each training window.
 
 ## The draw is over the Coverage Universe of the path's own window
 
