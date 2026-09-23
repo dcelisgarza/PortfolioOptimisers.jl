@@ -1053,6 +1053,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :sigma_hat_i => "``\\hat{\\sigma}_i``: Estimated standard deviation of asset ``i``.",#
                        :sigma_rv_hat_i => "``\\hat{\\sigma}^{\\mathrm{rv}}_i``: Predicted realised volatility of asset ``i`` for the period that follows the sample.",#
                        :Sigma_hat => "``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.",#
+                       :T_shrink_target => "``\\mathbf{T}``: Covariance shrinkage target, a positive definite matrix.",#
                        :Sigma_hat_ii => "``\\hat{\\mathbf{\\Sigma}}_{ii}``: ``i``-th diagonal entry of ``\\hat{\\mathbf{\\Sigma}}``.",#
                        :Sigma_hat_ij => "``\\hat{\\mathbf{\\Sigma}}_{ij}``: Estimated covariance between assets ``i`` and ``j``.",#
                        # The covariance forecast evaluation. A forecast is formed at a step
@@ -1477,4 +1478,7 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :nemirovski2004 => "[nemirovski2004](@cite) A. Nemirovski. *Prox-method with rate of convergence O(1/t) for variational inequalities with Lipschitz continuous monotone operators and smooth convex-concave saddle point problems*. SIAM Journal on Optimization 15, 229–251 (2004).",#
                                  :zhang2018ader => "[zhang2018ader](@cite) L. Zhang, S. Lu and Z.-H. Zhou. *Adaptive online learning in dynamic environments*. In: Advances in Neural Information Processing Systems 31, 1323–1333 (2018).",#
                                  :zhao2020sword => "[zhao2020sword](@cite) P. Zhao, Y.-J. Zhang, L. Zhang and Z.-H. Zhou. *Dynamic regret of convex and smooth functions*. In: Advances in Neural Information Processing Systems 33, 12510–12520 (2020).",#
-                                 :singer1997 => "[singer1997](@cite) Y. Singer. *Switching portfolios*. International Journal of Neural Systems 8(4), 445–455 (1997).")
+                                 :singer1997 => "[singer1997](@cite) Y. Singer. *Switching portfolios*. International Journal of Neural Systems 8(4), 445–455 (1997).",#
+                                 :bhatia2007 => "[bhatia2007](@cite) R. Bhatia. *Positive Definite Matrices* (Princeton University Press, 2007).",#
+                                 :musolas2021 => "[musolas2021](@cite) A. Musolas, S. T. Smith and Y. Marzouk. *Geodesically parameterized covariance estimation*. SIAM Journal on Matrix Analysis and Applications 42, 528–556 (2021).",#
+                                 :schaferstrimmer2005 => "[schaferstrimmer2005](@cite) J. Schäfer and K. Strimmer. *A shrinkage approach to large-scale covariance matrix estimation and implications for functional genomics*. Statistical Applications in Genetics and Molecular Biology 4, Article 32 (2005).")

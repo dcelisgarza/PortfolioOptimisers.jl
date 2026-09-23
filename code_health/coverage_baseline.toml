@@ -119,6 +119,7 @@ commit = "8610300"
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { lines = 175, misses = 0 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { lines = 212, misses = 0 }
 "src/05_Moments/36_RankOneCovariance.jl" = { lines = 25, misses = 0 }
+"src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { lines = 116, misses = 0 }
 "src/06_Distance/01_Base_Distance.jl" = { lines = 12, misses = 0 }
 "src/06_Distance/02_Distance.jl" = { lines = 72, misses = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { lines = 14, misses = 0 }

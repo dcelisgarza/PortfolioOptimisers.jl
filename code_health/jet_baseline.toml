@@ -135,6 +135,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/36_RankOneCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -463,6 +464,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/36_RankOneCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }

@@ -242,6 +242,7 @@ Computes an asset covariance (and correlation) matrix. Core wrappers: `Covarianc
 - **RegimeAdjustedExpWeightedVariance/Covariance**: online exponentially-weighted estimators rescaled by a detected market regime state.
 - **ImpliedVolatility** (covariance): scales covariance using implied volatility.
 - **DenoiseCovariance / DetoneCovariance / ProcessedCovariance**: wrap another covariance estimator and apply matrix processing.
+- **GeodesicShrinkageCovariance**: wraps another covariance estimator and applies Geodesic Shrinkage (§3.5) to the matrix it computes.
 - **PortfolioOptimisersCovariance**: composite estimator bundling covariance estimation with post-processing.
 - **WindowedCovariance** / **WindowedVariance**: the Windowed Estimators for covariance and variance.
 
@@ -301,6 +302,10 @@ Removal of statistical noise from a covariance/correlation matrix by spectral th
 
 **Detoning**
 Removal of the largest principal components (market modes) from a correlation matrix, isolating asset-specific correlation.
+
+**Geodesic Shrinkage**
+Movement of a covariance matrix towards a target along the shortest path between two positive definite matrices under the affine-invariant metric. Targets: `IdentityTarget`, `ScaledIdentityTarget`, `CommonCovarianceTarget`, `ConstantCorrelationTarget`, `DiagonalTarget`, or a fixed positive definite matrix. It reads the matrix alone, so an incremental fit runs it.
+*Avoid*: linear shrinkage, which averages the matrix and the target entry by entry.
 
 **Posdef**
 Projection of a matrix to the nearest positive definite matrix.

@@ -129,6 +129,7 @@ commit = "0ecb3ce47c"
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { cyc = 9, cog = 14, arg = 5, cyc_sum = 94, cog_sum = 77, arg_sum = 94, macros = [] }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { cyc = 7, cog = 10, arg = 5, cyc_sum = 66, cog_sum = 57, arg_sum = 61, macros = [] }
 "src/05_Moments/36_RankOneCovariance.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 6, cog_sum = 4, arg_sum = 9, macros = [] }
+"src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { cyc = 5, cog = 5, arg = 5, cyc_sum = 36, cog_sum = 20, arg_sum = 58, macros = ["@propagatable"] }
 "src/06_Distance/01_Base_Distance.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 3, cog_sum = 2, arg_sum = 2, macros = [] }
 "src/06_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
 "src/06_Distance/03_DistanceDistance.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 5, arg_sum = 19, macros = [] }

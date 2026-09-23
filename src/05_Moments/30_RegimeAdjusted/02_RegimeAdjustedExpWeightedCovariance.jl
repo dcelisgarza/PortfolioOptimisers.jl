@@ -101,7 +101,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Regime-adjustment target that uses a diagonal baseline covariance structure.
+Targets the diagonal of a covariance matrix, in a regime adjustment and in a geodesic shrinkage.
+
+In a regime adjustment, the baseline covariance structure is diagonal, so the regime statistic reads the variances alone. In a [`GeodesicShrinkageCovariance`](@ref), the target matrix is the diagonal of the matrix being shrunk, which keeps the variances and removes every correlation.
 
 # Related
 
@@ -109,6 +111,8 @@ Regime-adjustment target that uses a diagonal baseline covariance structure.
   - [`MahalanobisTarget`](@ref)
   - [`PortfolioTarget`](@ref)
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`GeodesicShrinkageCovariance`](@ref)
+  - [`AbstractCovarianceShrinkageTarget`](@ref): the other target rules of a geodesic shrinkage.
 """
 struct DiagonalTarget <: RegimeAdjustedTarget end
 """
