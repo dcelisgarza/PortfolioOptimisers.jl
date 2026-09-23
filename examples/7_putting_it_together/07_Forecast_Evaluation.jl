@@ -7,35 +7,35 @@ Description = "Read a return forecast before an optimiser sees it: forecast eval
 
 A [`CrossSectionalFactorPrior`](@ref) takes a return forecast, which is an opinion about which
 assets are about to do better than the factor model says they should, and adds it to the expected
-returns an optimiser maximises. The optimiser acts on that opinion whatever it is worth. It cannot
-tell a forecast that orders the cross-section from one that orders it no better than a coin toss
-would.
+returns an optimiser maximises. The optimiser acts on that opinion whether it is good or bad. It
+cannot tell a forecast that orders the cross-section from one that orders it no better than a coin
+toss would.
 
-This page is the reading that happens before that. It scores a return forecast out of sample, on
-its own, against what happened next, and it puts two forecasts side by side so you can see the
-difference between one that works and one that does not.
+This page scores a return forecast before an optimiser sees it. It scores the forecast out of
+sample, on its own, against what happened next. It also puts two forecasts side by side, so you can
+see the difference between one that works and one that does not.
 
-Read the three questions in order, and stop at the first no.
+Ask three questions in order, and stop at the first no.
 
  1. Does it rank? Is the order the forecast puts the cross-section in related to the order that
     realised? That is the information coefficient.
- 2. Does the ranking pay? Turn the forecast into a book, and read what the book earned and what it
-    cost in turnover.
+ 2. Does the ranking pay? Turn the forecast into a book, and look at what the book earned and what
+    it cost in turnover.
  3. Is the magnitude right? A forecast can order the cross-section perfectly and still be ten
     times too large. That is the calibration slope.
 
-Two more questions are worth asking once all three answer yes. How long the forecast keeps its
-information, and whether it is a factor exposure under another name. The page reaches them last.
+Two more questions come after all three answer yes. They ask how long the forecast keeps its
+information and whether it is a factor exposure under another name. Section 6 asks them.
 
-Everything below runs on the synthetic panel of the
-[deep dive](05_Cross_Sectional_Factor_Model.md), at the same seed, so the alpha the panel was
-drawn from is known before the estimator runs, and you can check every claim against it.
+Everything below runs on the synthetic panel of the [deep dive](05_Cross_Sectional_Factor_Model.md).
+The alpha that the panel was drawn from is known before the estimator runs, and you can
+check every claim against it.
 
 !!! warning "These are synthetic numbers"
-    The panel plants a constant alpha per asset inside a field no factor exposure reads, and the
-    Sharpe ratios below are what a forecast of a planted constant earns on a long-short book with
-    no trading cost. They say something about the fixture, not about markets. What carries over is
-    the order of the reading, and the gap between the two forecasts.
+    The panel plants a constant alpha per asset inside a field that the factor exposures ignore. The
+    Sharpe ratios below are what a forecast of a planted constant earns on a long-short book with no
+    trading cost. They tell you about the synthetic panel, not about markets. What transfers to real
+    data is the order of the questions and the gap between the two forecasts.
 =#
 
 using PortfolioOptimisers, StableRNGs, Statistics, LinearAlgebra, Dates, PrettyTables,
@@ -48,10 +48,10 @@ end;
 #=
 ## 1. The panel, and two convictions
 
-The generator is the deep dive's, unchanged and at the same seed. Section 1 of
-[the deep dive](05_Cross_Sectional_Factor_Model.md) says what each panel field is. Here it is the
-input. Keep one field in mind, `signal`. It is the assets' true alpha plus a little noise, and no
-factor exposure reads it, so a forecast built on it carries a part the factor model does not span.
+We copy the panel generator from the deep dive without a change. Section 1 of
+[the deep dive](05_Cross_Sectional_Factor_Model.md) says what each field of the panel is. One field
+matters here, `signal`. It is the assets' true alpha plus a little noise, and no factor exposure is
+built from it. A forecast built on it has a part that the factor model does not span.
 =#
 
 function synthetic_panel(; T = 500, N = 80, seed = 661_001)
@@ -104,10 +104,10 @@ end
 rd = synthetic_panel()
 
 #=
-The evaluation scores a forecast against the idiosyncratic return, the part of an asset's return
-the factor model does not explain. That is the part a return forecast forecasts inside a
-[`CrossSectionalFactorPrior`](@ref). So the factor model is fitted first, and the block it leaves
-on the prior is what every function below reads.
+The evaluation scores a forecast against the idiosyncratic return, the part of an asset's return the
+factor model does not explain. That is the part a return forecast forecasts inside a
+[`CrossSectionalFactorPrior`](@ref). We fit the factor model first. Every function below
+takes the factor-model block that the fit leaves on the prior.
 =#
 
 style(d) = CompositeExposure(; descriptors = [d], family = "style")
@@ -133,19 +133,17 @@ pr = prior(pe, rd)
 csfm = pr.rr
 
 #=
-Now the two convictions. Both are return forecast estimators, and they are two of the four the
-library ships, so they differ in how they turn traits into a forecast as well as in which traits
-they read.
+Now the two convictions. Both are return forecast estimators. They differ in how they turn traits
+into a forecast and in which traits they take.
 
   - The signal composite is a [`FixedWeightedReturnForecast`](@ref) over the `signal` field. It
     says that this field is the alpha, at scale one, and it composes its descriptor scores one
     observation at a time, so it publishes a history of its own.
   - The trait regression is a [`TargetReturnForecast`](@ref) that regresses the forward
-    idiosyncratic return on four style traits the factor model already spans: size, value,
-    earnings yield and liquidity. It is the case against the exercise, a forecast built out of the
-    exposures the model already charges for.
+    idiosyncratic return on four style traits the factor model already spans: size, value, earnings
+    yield and liquidity. It is the control, a forecast built only from those traits.
 
-One of these forecasts something real and the other does not. The reading below tells them apart.
+One of these forecasts something real and the other does not. The sections below tell them apart.
 =#
 
 signal_forecast = FixedWeightedReturnForecast(; scores = signal_scores, scale = 1.0)
@@ -161,10 +159,11 @@ trait_forecast = TargetReturnForecast(;
 #=
 ## 2. The pairing
 
-[`forecast_evaluation`](@ref) is the one call that turns an estimator into something you can
-score. It fits the forecast, builds its history, builds the forward target the history is scored
-against, and returns a [`ForecastEvaluationResult`](@ref) carrying the two matrices, the
-observations it can be scored at, and the parameters that produced all three.
+[`forecast_evaluation`](@ref) is the one call that turns an estimator into something you can score.
+It fits the forecast, builds its history, builds the forward target the history is scored against,
+and returns a [`ForecastEvaluationResult`](@ref). The result has three matrices, the forecast, the
+forward target and the universe mask, together with the observations it can be scored at and the
+parameters that produced them.
 
 Five parameters shape the pairing, and the rest of the page uses them by name.
 
@@ -176,9 +175,8 @@ Five parameters shape the pairing, and the rest of the page uses them by name.
   - `ppy` is the number of periods in a year. The book statistics further down are annualised with
     it.
 
-The result holds the forecast, the target, the dates and the parameters, and nothing else. Every
-statistic is a function over it rather than a field on it, so you can change the parameters of one
-statistic without running the fit again.
+Every statistic is a function over the result rather than a field on it, so you can change the
+parameters of one statistic without running the fit again.
 =#
 
 horizon, lag, step, min_count, ppy = 5, 1, 5, 10, 252
@@ -209,13 +207,13 @@ path by refitting it along the evaluation grid, and a regression that calibrates
 warm-up before its first fit means anything. The two forecasts therefore start at different
 observations, and statistics taken over different samples are not a comparison.
 
-The fix is to cut both forecasts to the sample they share, and
-[`forecast_evaluation_align`](@ref) does it. Every evaluation's dates run `lo:step:hi` on the
-block's rows, so the grid two of them share starts where the later one becomes scorable and ends
-where the earlier one stops. The call rebuilds each result on that grid and leaves its forecast,
-target and universe alone, with no re-pairing, no refit and no blank. It refuses a pair that does
-not answer one question, which is a pair differing in target, horizon, lag, step, threshold, `ppy`
-or universe, for the same reason the summary does. A shared grid does not make two questions one.
+The fix is to cut both forecasts to the sample they share, and [`forecast_evaluation_align`](@ref)
+does it. Every evaluation's dates run `lo:step:hi` on the block's rows, so the grid two of them
+share starts where the later one becomes scorable and ends where the earlier one stops. The call
+rebuilds each result on that grid and leaves its forecast, target and universe alone, with no
+re-pairing, no refit and no blank. It refuses a pair that does not answer one question, which is a
+pair differing in target, horizon, lag, step, `min_count`, `ppy` or universe, for the same reason
+the summary does. A shared grid does not make two questions one.
 =#
 
 fe_signal, fe_trait = forecast_evaluation_align([raw_signal, raw_trait])
@@ -232,9 +230,9 @@ pretty_table(DataFrame("Common first row" => first(fe_signal.dates),
 [`forecast_ic`](@ref) gives the information coefficient at every evaluation date, which is the
 cross-sectional correlation between what the forecast said and what realised. It gives both
 coefficients at once in a `dates × 2` matrix, Spearman on the ranks and a weighted Pearson on the
-values, because the two say different things and a caller who reads one usually wants the other
-beside it. Passing the factor-model block resolves the cross-sectional weights the correlation is
-taken under.
+values, because the two say different things and you usually want both. Passing the factor-model
+block lets the `weighting` keyword take the Pearson weights from the block. The default, used here,
+gives every asset the same weight, and the Spearman column is unweighted.
 
 [`forecast_ic_summary`](@ref) reduces that matrix to five figures per coefficient. `ic_ir` is the
 mean over the standard deviation, the coefficient's own information ratio, and `t_stat` says
@@ -257,18 +255,19 @@ pretty_table(DataFrame("Forecast" => ["signal composite", "trait regression"],
              formatters = [numfmt], title = "Spearman information coefficient")
 
 #=
-The two rows of this table answer the first question. The signal composite's mean coefficient is
-an order of magnitude larger than the trait regression's, its t-statistic is far from zero where
-the trait regression's is not, and its hit rate sits well above one half where the trait
-regression's sits at it. If all you wanted to know was whether the trait regression is worth
-carrying, you can stop here. The sections below read the forecast that passed.
+The two rows of this table answer the first question. The signal composite's mean coefficient is an
+order of magnitude larger than the trait regression's, its t-statistic is far from zero where the
+trait regression's is not, and its hit rate sits well above one half where the trait regression's
+sits at it. If you only want to know whether to keep the trait regression, you can stop here. Most
+tables below keep both forecasts, so you can compare them on each question. The coverage, the
+holding-period tables and the single-forecast figures show the signal composite alone.
 
-A coefficient is only as believable as the cross-section it was taken over, so
-[`forecast_coverage`](@ref) gives the share of the estimation universe that carried both a finite
-forecast and a finite target at each date. The universe is the panel's estimation mask at that
-date, which the evaluation carries in `umsk`, so an asset that has not listed yet is outside the
-universe rather than missing from it. Coverage applies no `min_count`. It explains why a date
-carries no coefficient, so it has to answer where the coefficient does not.
+A coefficient is only as good as the cross-section it was taken over. [`forecast_coverage`](@ref)
+gives the share of the estimation universe that had both a finite forecast and a finite target at
+each date. The universe is the panel's estimation mask at that date, which the evaluation stores in
+`umsk`. An asset that has not listed yet is outside the universe, not missing from it.
+Coverage applies no `min_count`. It explains why a date has no coefficient, and it must give an
+answer on exactly those dates.
 =#
 
 cov_signal = forecast_coverage(fe_signal, csfm)
@@ -279,7 +278,7 @@ pretty_table(DataFrame("Mean coverage" => mean(cov_signal),
              formatters = [numfmt], title = "How much of the universe was scored")
 
 #=
-The running sum of the coefficient is worth drawing, because a mean hides whether the information
+We draw the running sum of the coefficient, because a mean hides whether the information
 arrived at every date or at three of them.
 =#
 
@@ -293,12 +292,12 @@ earns anything, because the coefficient weighs every asset alike and a book does
 
 [`forecast_portfolio`](@ref) builds the book from the forecast alone. Two constructions ship.
 `:rank` turns each cross-section into ranks, and `:zscore` turns it into standardised values. Both
-are then centred and rescaled to 200% gross, one unit long and one unit short, netting to zero, so
-a date is dollar neutral whatever the spread of the forecast happens to be that day. Two forecasts
+are then centred and rescaled to 200% gross, one unit long and one unit short, with a net of zero.
+Every date is dollar neutral whatever the spread of the forecast is that day. Two forecasts
 are comparable only after that rescaling. Without it a book's return would partly report how large
 the forecast's numbers are rather than how good its order is.
 
-The result carries the weights, the realised return path, the turnover path, and a
+The result holds the weights, the realised return path, the turnover path, and a
 [`performance_summary`](@ref) of the return path.
 =#
 
@@ -316,12 +315,12 @@ pretty_table(DataFrame("Forecast" => [b[1] for b in books],
              formatters = [numfmt], title = "The two books of each forecast")
 
 #=
-The second question answers the way the first did. The signal composite's two books earn a high
-Sharpe ratio. The trait regression's rank book earns a fraction of that, and its z-score book
-earns nothing you could tell from zero. Read the turnover column as well. Both forecasts turn over
-close to their whole gross at every date, because a rank book rebuilt from each cross-section
-trades whatever the ranks moved, and `mean_turnover` is there so you can see that cost before an
-optimiser with a turnover constraint does.
+The second question has the same answer as the first. The signal composite's two books earn a high
+Sharpe ratio. The trait regression's rank book earns a fraction of that, and its z-score book earns
+nothing you could tell from zero. Look at the turnover column as well. Both forecasts turn over
+close to their whole gross at every date, because a rank book rebuilt from each cross-section trades
+whatever the ranks moved, and `mean_turnover` is there so you can see that cost before an optimiser
+with a turnover constraint does.
 
 !!! note "Every hit rate counts against the dates that scored"
     The hit rate in this table counts against the dates the book scored, because a date the book
@@ -331,7 +330,7 @@ optimiser with a turnover constraint does.
     Every hit rate therefore sits over the same sample as the mean printed beside it.
 
 [`forecast_quantile_spread`](@ref) asks the same question more coarsely. Buy the top fraction of
-the cross-section, sell the bottom, and read what the difference earned. Reach for it when the
+the cross-section, sell the bottom, and measure what the difference earned. Reach for it when the
 worry is that a book's return comes from the middle of the distribution rather than from the tails
 the forecast is most confident about.
 =#
@@ -348,11 +347,11 @@ pretty_table(DataFrame("Forecast" =>
              formatters = [numfmt], title = "Top minus bottom")
 
 #=
-The spread is the noisiest reading on the page, and this table is where that shows. A tenth of
-eighty assets is eight names a side, so the trait regression reads a tail spread with a large
-annualised information ratio even though its coefficient is near zero and its books earn nothing.
-Read the spread as a check on where a book's return came from. The coefficient and the books are
-what say whether a forecast works.
+The spread is the noisiest statistic on the page, and this table shows it. A tenth of eighty assets
+is eight names a side. With so few names, the trait regression gets a tail spread with a large
+annualised information ratio, although its coefficient is near zero and its books earn little. Use
+the spread as a check on where a book's return came from. The coefficient and the books say whether
+a forecast works.
 =#
 
 plot_forecast_cumulative_returns(fe_signal;
@@ -372,10 +371,9 @@ A slope of a tenth says the forecast is ten times too large. A slope near zero s
 carries no information, whatever the order does.
 
 The intercept is fixed rather than fitted, because the cross-sectional mean of the target is what
-the factor model is for, and the forecast is only ever asked about the deviation from it. Unlike
-every other statistic on this page, the calibration reads no `min_count`. It pools the pairs of
-every date into one sample, so a thin cross-section contributes few pairs rather than an
-unreliable number.
+the factor model is for, and the forecast is only ever asked about the deviation from it. Like the
+coverage, the calibration applies no `min_count`. It pools the pairs of every date into one sample,
+so a thin cross-section contributes few pairs rather than an unreliable number.
 =#
 
 cal_signal = forecast_calibration(fe_signal, csfm)
@@ -390,41 +388,41 @@ pretty_table(DataFrame("Forecast" => ["signal composite", "trait regression"],
              formatters = [numfmt], title = "Calibration")
 
 #=
-The signal composite's slope sits just under one. That is the answer the fixture should give. The
-`signal` field is the alpha plus noise, stated in return units, so a scale multiplier near one is
-right, and the reading recovers it. The trait regression's slope is negative and small,
-which is what a magnitude with no information looks like.
+The signal composite's slope sits just under one, which is what the synthetic panel should give. The
+`signal` field is the alpha plus noise in return units, and a scale multiplier near one is right for
+it. The trait regression's slope is small and negative, as expected when the magnitude has no
+information.
 
-The curve is the same reading without the straight-line assumption. The pooled pairs are cut into
+The curve makes the same check without the straight-line assumption. The pooled pairs are cut into
 bins of the forecast, and each bin's mean forecast is plotted against its mean realised target. A
-forecast whose order is right but whose scale bends will show it here and nowhere else. The
-weights reach the slope alone, and the curve and the pooled moments read every pair alike, which
-is how one call gives a weighted scale and an unweighted shape.
+forecast whose order is right but whose scale bends will show it here and nowhere else. The weights
+enter the slope only. The curve and the pooled moments give every pair the same weight, and one call
+thus gives a weighted scale and an unweighted shape.
 =#
 
 plot_forecast_calibration(fe_signal, csfm; title = "Signal composite: calibration")
 
 #=
-## 6. Two questions you only reach on a yes
+## 6. Holding period and factor overlap
 
 ### How long does the forecast keep its information?
 
 [`forecast_holding_period`](@ref) scores the same forecast against cumulative forward windows,
-`horizon`, then twice it, then three times, and [`forecast_decay`](@ref) scores it against
-disjoint ones, each starting where the last ended. The first says how long a position is worth
-holding. The second says how quickly the information goes stale.
+`horizon`, then twice it, then three times, and [`forecast_decay`](@ref) scores it against disjoint
+ones, each starting where the last ended. The first says how long to hold a position. The second
+says how quickly the information goes stale.
 
 !!! warning "A table is internally comparable, and not comparable at another `n`"
-    A deeper window matures later, so every row of a table is read on the dates every window of
-    the grid can be scored at. Changing `n` therefore changes the sample as well as the depth, and
-    a row from a table at `n = 4` must never be set beside a row from a table at `n = 2`.
+    A deeper window matures later, so every row of a table is scored on the dates at which every
+    window of the grid can be scored. Changing `n` therefore changes the sample as well as the
+    depth, and a row from a table at `n = 4` must never be set beside a row from a table at `n = 2`.
 
 The stride between two dates stays at the base evaluation's, so from the second row of the
-holding-period table on, consecutive windows read the same returns and their coefficients are not
-independent. The `t_stat` column reads that overlap. Its standard error is the long-run one at the
-order the window and the stride imply, so a t-statistic that holds down the column is the forecast
-holding rather than the overlap accumulating. Without it, a forecast with no skill would look more
-significant at every row.
+holding-period table on, consecutive windows use the same returns, and their coefficients are not
+independent. The `t_stat` column corrects for that overlap. Its standard error is the long-run one,
+at the order that the window and the stride imply. A t-statistic that stays large down the column
+therefore reflects the forecast, not the overlap. Without it, a forecast with no skill would look
+more significant at every row.
 =#
 
 hp = forecast_holding_period(fe_signal, rd, csfm; n = 4)
@@ -442,26 +440,26 @@ pretty_table(DataFrame("Period" => dc.period, "Horizon" => dc.horizon, "Lag" => 
              title = "Decay: disjoint forward windows")
 
 #=
-The two tables answer differently, and the difference is a property of the fixture. The holding
-period's coefficient rises with depth, because a longer window averages more of the idiosyncratic
-noise away while the planted alpha accumulates. The decay's coefficient is flat, because the
-planted alpha is a constant per asset, and a signal that never changes never goes stale. A real
-alpha decays, so a flat decay table says the fixture's signal is not a real alpha.
+The two tables give different answers, and the difference comes from the synthetic panel. The
+holding period's coefficient rises with depth, because a longer window averages more of the
+idiosyncratic noise away while the planted alpha accumulates. The decay's coefficient is flat,
+because the planted alpha is a constant per asset, and a signal that never changes never goes stale.
+A real alpha decays. A flat decay table here shows that the planted signal is not a real alpha.
 
 ### Is the forecast a factor exposure under another name?
 
 The last question is whether the forecast tells the optimiser something the factor model already
 knows. [`forecast_factor_correlation`](@ref) gives the same-date correlation between the forecast
-and each factor exposure, one column per factor, so a forecast that is really a size bet reads a
-large number in the size column.
+and each factor exposure, one column per factor. A forecast that is really a size bet shows a large
+number in the size column.
 
-The statistic looks nowhere forward, so it is read on every observation of the forecast rather
-than on the evaluation grid. The grid keeps the forward windows of the coefficient from
-overlapping, and a same-date correlation has no window. The signal composite therefore scores on
-every row of the block, the rows before the common grid of section 2 included, because the
-alignment moved its dates and not its forecast. The trait regression carries a forecast on its
-grid only, so its column is `NaN` between two refits, and the mean below reads the rows it was
-fitted on. Pass `dates = fe.dates` for the correlations on the same dates as the coefficients.
+The statistic does not look forward. It is computed on every observation of the forecast, not on the
+evaluation grid. The grid keeps the forward windows of the coefficient from overlapping, and a
+same-date correlation has no window. The signal composite therefore scores on every row of the
+block, the rows before the common grid of section 2 included, because the alignment moved its dates
+and not its forecast. The trait regression has a forecast on its grid only. Its column is `NaN`
+between two refits, and the mean below is taken over the rows it was fitted on. Pass
+`dates = fe.dates` for the correlations on the same dates as the coefficients.
 =#
 
 fc_signal = forecast_factor_correlation(fe_signal, csfm)
@@ -477,35 +475,33 @@ pretty_table(DataFrame("Factor" => csfm.nf,
              formatters = [numfmt], title = "Mean correlation with each factor exposure")
 
 #=
-Both forecasts read small numbers, and that is worth saying plainly. A low factor correlation is
-necessary and not sufficient. The trait regression is built out of the exposures themselves and
-still reads near zero here, because it was fitted against the idiosyncratic return, which is
-exactly what the exposures do not explain. It passes this check and fails every other one. That is
-why the reading has an order, and why this question is last. A yes here means nothing on its own.
+Both forecasts give small numbers. The trait regression is built out of the exposures themselves and
+still gives numbers near zero here, because it was fitted against the idiosyncratic return, which is
+exactly what the exposures do not explain. It passes this check and fails the first three questions.
+That is why the questions have an order, and why this question is last. A low correlation alone does
+not make a forecast useful.
 
 !!! note "Neutralising a score does not decorrelate it"
-    A forecast whose descriptor scores are neutralised against a factor family does not read zero
-    in that family's columns. Both neutralisation sites build a cross-sectional regression whose
+    A forecast whose descriptor scores are neutralised against a factor family does not give zero in
+    that family's columns. Both neutralisation sites build a cross-sectional regression whose
     `intercept` is `false`, so the residual is orthogonal to its target in the uncentred sense and
     keeps a real correlation with it. Set `cre` to a regression with `intercept = true` when you
     want an uncorrelated residual.
 =#
 
 #=
-## 7. The comparison is the same result
+## 7. Comparing forecasts in one summary
 
-[`forecast_evaluation_summary`](@ref) reads every statistic above in one call. It gives a columnar
+[`forecast_evaluation_summary`](@ref) collects the statistics above in one call. It gives a columnar
 [`ForecastSummaryResult`](@ref) whose axis is the forecast, thirty columns with one entry per
-forecast. A single evaluation is the case of length one, and the case of length two is the
-comparison. There is no separate comparison type, because a comparison of two forecasts is a
-summary of two forecasts.
+forecast. A single evaluation gives a result of length one, and two evaluations give the comparison.
 
-It computes nothing of its own. Every column is one of the functions above, read on the same dates
-under the same parameters, which is why the alignment of section 2 had to happen first. The
-summary refuses a set of evaluations that disagree on `target`, `horizon`, `lag`, `step`,
-`min_count`, `ppy` or their dates, rather than reporting statistics taken over different samples.
-Pass `align = true` with the raw evaluations instead, and the summary runs the alignment of
-section 2 before it reads anything.
+It computes nothing of its own. Every column is one of the functions above, evaluated on the same
+dates under the same parameters. That is why the alignment of section 2 comes first. The summary
+refuses a set of evaluations that disagree on `target`, `horizon`, `lag`, `step`, `min_count`,
+`ppy`, their universe or their dates, rather than reporting statistics taken over different samples.
+Pass `align = true` with the raw evaluations instead, and the summary runs the alignment of section
+2 before it computes anything.
 =#
 
 fs = forecast_evaluation_summary([fe_signal, fe_trait], csfm;
@@ -532,8 +528,8 @@ pretty_table(DataFrame("Statistic" =>
              title = "Eleven of the thirty columns, side by side")
 
 #=
-The quantile spreads are the one second axis the result carries, and it fills them only on
-request. Pass no `quantiles` and the four spread fields read back as `nothing`. They are
+The quantile spreads are the only fields of the result with a second axis, and the result fills them
+only on request. If you pass no `quantiles`, the four spread fields are `nothing`. They are
 `forecasts × quantiles`, so you compare two forecasts at one tail or one forecast at two.
 =#
 
@@ -551,10 +547,10 @@ to read, so they stay in the table above.
 plot_forecast_evaluation_summary(fs; size = (900, 500))
 
 #=
-A bar is a mean, and as section 3 noted, a mean hides whether the information arrived at every
-date or at three of them. The comparison has two figures for that, the same running sums sections
-3 and 4 drew for one forecast, overlaid one series per forecast on the dates the evaluations
-share. The vector method refuses the pairs the summary refuses, so the two lines always cover one
+A bar is a mean, and as section 3 noted, a mean hides whether the information arrived at every date
+or at three of them. The comparison has two figures for that, the same running sums sections 3 and 4
+drew for one forecast, overlaid one series per forecast on the dates the evaluations share. The plot
+called with a vector refuses the pairs that the summary refuses. The two lines always cover one
 sample.
 =#
 
@@ -563,9 +559,8 @@ plot_forecast_cumulative_ic([fe_signal, fe_trait], csfm;
                             title = "Cumulative Spearman IC, both forecasts")
 
 #=
-The book overlay reads the same way. It draws one book per forecast, the rank book by default and
-the z-score book under `kind = :zscore`, so a figure of four forecasts carries four lines and not
-eight.
+The book overlay works the same way. It draws one book per forecast, the rank book by default and
+the z-score book under `kind = :zscore`, so a figure of four forecasts has four lines and not eight.
 =#
 
 plot_forecast_cumulative_returns([fe_signal, fe_trait];
@@ -573,19 +568,22 @@ plot_forecast_cumulative_returns([fe_signal, fe_trait];
                                  title = "Rank book cumulative returns, both forecasts")
 
 #=
-Three parts of an evaluation are not columns, each because its axis is not the forecast. The
-drawdown family is of a compressed return path, and it would set two forecasts beside each other
-over two different paths. The holding-period and decay tables have the forward window for an axis.
-The factor correlations have the factor. Read those three with the functions of section 6.
+Three parts of an evaluation are not columns. The drawdown and the other path statistics of a book
+are taken over its return path with the gap dates removed. Two forecasts whose gaps fall on
+different dates would then be compared over two different paths. The `summary` of
+[`forecast_portfolio`](@ref) in section 4 gives them for one forecast. The holding-period and decay
+tables have the forward window for an axis, and the factor correlations have the factor. Section 6
+gives both.
 =#
 
 #=
 ## 8. The other figures
 
-Six figures appear above. Seven more ship, each answering a question this page raised. All eleven
-take the [`ForecastEvaluationResult`](@ref), one of them or, for the two overlays of section 7, a
-vector of them, because you pair once and every figure reads that pairing. Building `alpha` can
-cost a rolling refit, and no figure should pay for it twice.
+Four plotting functions drew the six figures above, and seven more ship, each for a question this
+page raised. All eleven take a [`ForecastEvaluationResult`](@ref), because you pair once and every
+figure starts from that pairing. The two overlays and the summary plot also take a vector of them,
+and the summary plot also takes the [`ForecastSummaryResult`](@ref). Building `alpha` can cost a
+rolling refit, and no figure should pay for it twice.
 
 | Figure | What it answers |
 |:---|:---|
@@ -603,13 +601,13 @@ plot_forecast_rolling_ic(fe_signal, csfm; title = "Signal composite: rolling IC"
 #=
 ## Where to go next
 
-  - [Cross-sectional factor model, end to end](05_Cross_Sectional_Factor_Model.md) builds the
-    panel, the prior and the block this page reads, and hands the same forecast to an optimiser.
+  - [Cross-sectional factor model, end to end](05_Cross_Sectional_Factor_Model.md) builds the panel,
+    the prior and the block this page starts from, and hands the same forecast to an optimiser.
   - [Cross-sectional factor model through a Pipeline](06_Cross_Sectional_Factor_Pipeline.md)
     reaches the same weights, with the panel arriving on the returns result rather than in a slot
     of its own.
-  - [Walk-forward and cross-validation](../5_validation_tuning/01_Cross_Validation.md) is the
-    out-of-sample reading of a whole strategy, where this page reads a single forecast.
+  - [Walk-forward and cross-validation](../5_validation_tuning/01_Cross_Validation.md) tests a whole
+    strategy out of sample, where this page scores a single forecast.
   - [Performance attribution](../6_post_processing/03_Performance_Attribution.md) decomposes what
     a book earned, once one has been solved.
 =#

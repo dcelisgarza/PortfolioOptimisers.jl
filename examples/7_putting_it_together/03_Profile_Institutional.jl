@@ -11,15 +11,16 @@ The third profile runs a large benchmarked book under a written mandate. The
 rules: a cap on each name, a cap on each sector, and a limit on how far the book may drift from
 its benchmark. The prior is the plain empirical one, and the rules do most of the work.
 
-The [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md) asks which limits
-bind. Three bind on this mandate.
+Under the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md), this
+mandate has three binding limits.
 
   - The mandate's caps are hard limits, not preferences. Each one is a keyword on the
     [`JuMPOptimiser`](@ref).
-  - The book is measured against a benchmark, so we add a bound on the tracking error to the risk
-    we minimise.
-    [Turnover and Tracking](../4_constraints_costs/05_Turnover_and_Tracking.md) covers that bound.
-  - The book is large, so an exact [`DiscreteAllocation`](@ref) is worth its solve time.
+  - The book is measured against a benchmark, so we bound the tracking error while we minimise
+    risk. [Turnover and Tracking](../4_constraints_costs/05_Turnover_and_Tracking.md) covers that
+    bound.
+  - The book is large enough to pay for the solve time of an exact
+    [`DiscreteAllocation`](@ref).
 
 !!! tip "When to reach for this"
     Reach for this profile when a mandate, rather than a forecast, decides what the book may hold.
@@ -92,14 +93,15 @@ pretty_table(DataFrame("Sector" => ["tech", "energy", "healthcare"],
 
 #=
 The table gives the benchmark weight and the mandate weight for each of the three named sectors.
-Read the energy row against the 20% the mandate sets. The per-name cap and the tracking-error
-bound do not show in a sector table, and the full weight table in the next section shows them.
+Compare the energy row with the 20% the mandate sets. The per-name cap shows in the weight table
+of the next section. The tracking error does not show in either table.
 
 ## 3. Exact finite allocation
 
-The book holds \$10,000,000. [`DiscreteAllocation`](@ref) solves a mixed-integer problem with
-[HiGHS](https://github.com/jump-dev/HiGHS.jl) for the whole-share book closest to the target. The
-title of the table prints the cash left over, the cost of rounding to whole shares.
+The mandate invests \$10,000,000. We round the target to whole shares with
+[`DiscreteAllocation`](@ref), which solves a mixed-integer problem in
+[HiGHS](https://github.com/jump-dev/HiGHS.jl). The title of the table prints the cash left over,
+the cost of rounding to whole shares.
 =#
 
 mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,

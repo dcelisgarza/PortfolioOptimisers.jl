@@ -11,15 +11,13 @@ computation, and a month of return covers more trading cost than a day of it doe
 has instead is a house view, and the time to look at the whole risk-return trade-off before it
 picks a book.
 
-The [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md) asks which limits
-bind. Four of them answer differently here.
+Three of the limits in the
+[strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md) change for this desk.
 
-  - Compute is cheap next to a month of return, so we fit a richer prior and sweep a whole
-    frontier.
-  - The desk holds a view, so we state it as a constraint on the mean and fit an
+  - Compute is cheap next to a month of return, so we fit a richer prior, trace the whole
+    efficient frontier, and choose the risk-adjusted point on it.
+  - The desk has a view, so we state it as a constraint on the mean and fit an
     [`EntropyPoolingPrior`](@ref) rather than take the sample mean as given.
-  - One objective returns one book. We trace the efficient frontier first and choose the
-    risk-adjusted point from it.
   - The book is large enough to pay for an exact whole-share allocation, so we use
     [`DiscreteAllocation`](@ref).
 
@@ -44,10 +42,10 @@ end;
 ## 1. Data and the house view
 
 The desk expects healthcare to outperform energy. We state that as a view on the mean, and
-[`EntropyPoolingPrior`](@ref) turns it into a new set of weights over the historical scenarios. A
-scenario that supports the view carries more weight, and the rest carry less.
+[`EntropyPoolingPrior`](@ref) turns it into a new probability for each historical scenario. A
+scenario that supports the view gets more probability, and the rest get less.
 [Entropy Pooling](../2_moments_priors/07_Entropy_Pooling.md) covers the method that finds those
-weights.
+probabilities.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -102,10 +100,11 @@ pretty_table(DataFrame("Asset" => rd.nx, "Tangency weight" => desk.w);
 #=
 ## 4. Exact finite allocation
 
-The book holds \$500,000, so rounding to whole shares moves each weight by very little.
-[`DiscreteAllocation`](@ref) is still the right choice at this frequency. It solves a
-mixed-integer problem with [HiGHS](https://github.com/jump-dev/HiGHS.jl) for the whole-share book
-closest to the target, and its solve time is a few seconds once a month.
+The desk has \$500,000 to invest, so rounding to whole shares moves each weight by very little.
+[`DiscreteAllocation`](@ref) solves a mixed-integer problem with
+[HiGHS](https://github.com/jump-dev/HiGHS.jl). It minimises the money by which each position
+misses its target, plus the cash left over. The table title gives the amount invested and the cash
+left.
 =#
 
 mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,

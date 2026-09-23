@@ -5,33 +5,32 @@ Description = "An end-to-end profile in PortfolioOptimisers.jl: a desk with fact
 
 # Profile: factor-views desk
 
-The fourth profile holds its views on factors rather than on assets. The
+The fourth profile states its views on factors rather than on assets. The
 [desk monthly profile](02_Profile_Desk_Monthly.md) stated a thesis about two sectors, healthcare
 over energy, and entropy pooling turned it into a prior. This desk states what it expects momentum
-and value to earn, and a factor model carries those two numbers to every asset through the
+and value to earn, and a factor model takes those two numbers to every asset through the
 regression of assets on factors. The posterior then goes into an optimiser with caps on it,
-because on a factor view the optimiser puts its weight on whatever loads most on the favoured
-factors, and that is a small number of names.
+because without sector caps the risk-adjusted book puts most of its weight into two sectors.
 
 The [advanced Black-Litterman](../2_moments_priors/06_Advanced_Black_Litterman.md) page builds
 this prior one variant at a time. This page puts it to work in a whole book, with a
 [`FactorBlackLittermanPrior`](@ref), sector caps and an exact allocation.
 
-The [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md) asks which limits
-bind. Three bind on this desk.
+For this desk, three limits of the
+[strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md) bind.
 
   - The view is about what a factor earns, so we write it against the factor names and let the
-    regression carry it to the assets.
-  - Momentum and value load on few names over this slice, so we give the optimiser a cap on each
-    asset and a cap on each of the two sectors the view favours.
-  - The book is large, so we take the risk-adjusted book with [`MaximumRatio`](@ref) and turn it
+    regression take it to the assets.
+  - With only a cap on each asset, the book on this view puts most of its weight into two
+    sectors. We give the optimiser a cap on each asset and a cap on each of those two sectors.
+  - We take the risk-adjusted book with [`MaximumRatio`](@ref). The book is large, so we turn it
     into whole shares with a mixed-integer solve.
 
 !!! tip "When to reach for this"
     Reach for this profile when your view is about a factor, such as momentum, value, quality,
     size or low volatility, rather than about a name. Write the view against the factors with a
-    factor Black-Litterman prior, then cap the optimiser, so the view spreads over the universe
-    instead of landing on the few names that load hardest.
+    factor Black-Litterman prior, then cap the optimiser, so that the view cannot put most of the
+    book into one or two sectors.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
@@ -74,10 +73,10 @@ factor_views = LinearConstraintEstimator(; val = ["MTUM == 0.0005", "VLUE == 0.0
 #=
 ## 2. The factor Black-Litterman posterior
 
-[`FactorBlackLittermanPrior`](@ref) regresses the assets on the factors, applies the two views to
-the factor means, and returns a posterior `mu` and `sigma` over the assets. With `rsd = true` the
-posterior covariance keeps the residual variance of each regression, so it measures the whole risk
-of an asset rather than the part the factors explain.
+[`FactorBlackLittermanPrior`](@ref) regresses the assets on the factors, updates the factor means
+and the factor covariance with the two views, and returns a posterior `mu` and `sigma` over the
+assets. With `rsd = true` the posterior covariance adds the residual variance of each regression,
+so it measures the whole risk of an asset rather than the part the factors explain.
 =#
 
 prior_est = FactorBlackLittermanPrior(; pe = EmpiricalPrior(), rsd = true,
@@ -109,15 +108,13 @@ pretty_table(raw_sectors; formatters = [resfmt],
              title = "Sector weights with only a per-asset cap")
 
 #=
-The healthcare and energy rows hold nearly all of the book, and the tech row holds none of it.
-Those are the sectors whose names load on momentum and value over this slice. The two views reached the assets through
-the regression, and the book that came back holds few names.
+The healthcare and energy rows take most of the book, and the tech row takes none of it.
 
 ## 4. The constrained desk book
 
-So the desk caps the two sectors the view favours, healthcare at 35% and energy at 25%, on top of
-the 15% cap on each asset. The view still chooses which names to hold. The caps decide how much of
-the book any one sector may take.
+The desk caps those two sectors, healthcare at 35% and energy at 25%, on top of the 15% cap on
+each asset. The optimiser still chooses which names to buy. The caps decide how much of the book
+any one sector can take.
 =#
 
 desk = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
@@ -139,13 +136,13 @@ pretty_table(DataFrame("Asset" => rd.nx, "Weight" => desk.w); formatters = [resf
 
 #=
 Compare the two sector tables. Healthcare and energy sit at their caps in the second one, and the
-weight that left them went to the rest of the universe. The third table gives the whole book, name
-by name.
+weight that left them went to names outside the three sectors. The third table gives the whole
+book, name by name.
 
 ## 5. Exact finite allocation
 
-The book holds \$1,000,000. [`DiscreteAllocation`](@ref) solves a mixed-integer problem with
-[HiGHS](https://github.com/jump-dev/HiGHS.jl) for the whole-share book closest to the target.
+The desk invests \$1,000,000. As in the [institutional profile](03_Profile_Institutional.md),
+[`DiscreteAllocation`](@ref) rounds the target to whole shares with a mixed-integer solve.
 =#
 
 mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,

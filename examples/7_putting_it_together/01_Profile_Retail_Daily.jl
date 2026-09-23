@@ -10,21 +10,21 @@ for one investor, so you can see how the choices fit together. This first profil
 small retail account every day. Compute, trading cost and the size of the account set the limits
 here, and none of them rewards a more elaborate model.
 
-The [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md) asks which limits
-bind. Four do, for this investor.
+Of the limits in the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md),
+three shape this investor's choices.
 
   - The rebalance is daily, so you pay for the optimisation every trading day. One convex solve is
     enough.
-  - Trading cost compounds when you trade every day. We cap how far each weight may move and
-    charge a fee on what the book holds, so the optimiser sees both.
+  - Trading cost compounds when you trade every day. We cap how far each weight can move from the
+    current book, and we give the optimiser a fee on each long position.
   - The account is small, so one whole share is a large part of a position. The finite allocation
     at the end moves the weights you hold away from the weights you solved for.
-  - A cap of 15% per name spreads the book over more names and holds it there between rebalances.
 
 !!! tip "When to reach for this"
     Reach for this profile when trading cost and account size bind harder than the model does. Keep
-    the optimisation to one convex solve, hold turnover and fees inside the optimiser, and size the
-    last step to the cash you have.
+    the optimisation to one convex solve, bound the turnover inside the optimiser, and size the
+    last step to the cash you have. A fee changes the weights only under an objective or a
+    constraint that uses the portfolio return.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -60,10 +60,14 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
 #=
 ## 2. The optimisation
 
-One convex solve carries all four choices. The objective is minimum risk. The weight bounds cap
-each name at 15%. The turnover budget holds each target weight within 0.05 of the weight the
-investor holds today. The fee is proportional to each long position, and the optimiser carries it
-in the objective.
+One convex solve takes all the choices. The objective is minimum risk. The weight bounds cap each
+name at 15%. The turnover budget keeps each target weight within 0.05 of the weight the investor
+has today. The fee is proportional to each long position.
+
+Two of these choices do not change this book. With an equal-weight book of 20 names and a budget
+of 0.05, no weight can pass 10%, so the turnover budget, not the 15% cap, sets the largest
+position. The fee enters only the portfolio return. A minimum-risk objective with the default
+variance does not use that return, so the fee does not change the weights.
 =#
 
 retail = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -78,12 +82,12 @@ pretty_table(DataFrame("Asset" => rd.nx, "Current" => current_book, "Target" => 
              title = "Retail daily target — capped, low-turnover, net of fees")
 
 #=
-Compare the two weight columns. Every target sits at or below the 15% cap, and none of them is
-further than 0.05 from its current weight, so the trade list for the day is short.
+Compare the two weight columns. No target is further than 0.05 from its current weight, and the
+largest target is the 10% that the turnover budget permits.
 
 ## 3. Finite allocation
 
-The account holds \$10,000. [`GreedyAllocation`](@ref) turns the target weights into whole shares.
+The investor has \$10,000. [`GreedyAllocation`](@ref) turns the target weights into whole shares.
 It runs no mixed-integer solve, so it is cheap enough to run every day.
 =#
 
