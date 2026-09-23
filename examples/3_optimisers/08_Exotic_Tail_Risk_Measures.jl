@@ -21,7 +21,7 @@ than CVaR does.
   - [`PowerNormValueatRisk`](@ref), PNVaR, generalises EVaR by replacing the
     moment-generating function with a power norm of power ``p \ge 1``. The solver also works
     over the **power cone**, and the measure also moves toward the worst realisation as ``p``
-    grows.
+    grows. On a finite sample it reaches the worst realisation at a finite ``p``.
   - [`GenericValueatRiskRange`](@ref) combines *any* two of these measures into a range, one
     measure on the losses and another on the gains.
 
@@ -78,12 +78,14 @@ opt = JuMPOptimiser(; pe = pr, slv = slv)
 #=
 ## 2. Minimising each tail measure
 
-[`MeanRisk`](@ref) takes each measure as it takes any other. We use the defaults: `alpha = 0.05` for every measure,
-`kappa = 0.3` for RLVaR and `p = 2.0` for PNVaR.
+[`MeanRisk`](@ref) takes each measure as it takes any other. We use the defaults `alpha = 0.05` for every measure and
+`kappa = 0.3` for RLVaR. For PNVaR we use `p = 1.5`, not the default `p = 2.0`. Section 5 shows
+that on 252 observations PNVaR at `p = 2.0` is the worst realisation.
 =#
 
 measures = ["CVaR" => ConditionalValueatRisk(), "EVaR" => EntropicValueatRisk(),
-            "RLVaR" => RelativisticValueatRisk(), "PNVaR" => PowerNormValueatRisk()]
+            "RLVaR" => RelativisticValueatRisk(),
+            "PNVaR" => PowerNormValueatRisk(; p = 1.5)]
 
 results = [optimise(MeanRisk(; r = r, opt = opt)) for (_, r) in measures]
 names_r = first.(measures)
@@ -109,7 +111,7 @@ alone.
 
 evals = ["CVaR" => ConditionalValueatRisk(), "EVaR" => EntropicValueatRisk(; slv = slv),
          "RLVaR" => RelativisticValueatRisk(; slv = slv),
-         "PNVaR" => PowerNormValueatRisk(; slv = slv)]
+         "PNVaR" => PowerNormValueatRisk(; slv = slv, p = 1.5)]
 
 cross = DataFrame(; minimises = names_r)
 for (mname, m) in evals
@@ -155,18 +157,26 @@ hline!([wr_ref]; label = "Worst realisation", linestyle = :dot)
 ## 5. The power `p` of the power-norm VaR
 
 [`PowerNormValueatRisk`](@ref) has a power ``p \ge 1`` with a similar effect. A larger `p`
-moves the measure toward the worst realisation. We evaluate it on the same portfolio.
+moves the measure toward the worst realisation. We evaluate it on the same portfolio, beside the
+worst realisation `wr_ref` of section 4.
 =#
 
-ps = [2.0, 4.0, 10.0]
+ps = [1.25, 1.5, 1.75, 1.8]
 pnvar_curve = [expected_risk(PowerNormValueatRisk(; slv = slv, p = p), w_fixed, rd.X)
                for p in ps]
-pretty_table(DataFrame(; :p => ps, :PNVaR => pnvar_curve); formatters = [resfmt])
+pretty_table(DataFrame(; :p => ps, :PNVaR => pnvar_curve, :worst_realisation => wr_ref);
+             formatters = [resfmt])
 
 #=
-PNVaR rises with `p`. We start at `p = 2` on purpose. The
-constructor accepts `p = 1`, but the power cone degenerates at that value, and the solver stops
-without a solution.
+PNVaR rises with `p`. Unlike RLVaR, it reaches the worst realisation at a finite `p`. With
+``T`` equally weighted observations, PNVaR equals the worst realisation when
+``\alpha T^{1/p} \le 1``, that is when ``p \ge \log T / \log(1/\alpha)``. For our 252
+observations at ``\alpha = 0.05`` this is ``p \ge 1.85``, so the sweep stops at `p = 1.8`. At
+the default `p = 2` the measure is the worst realisation, and it warns you when you evaluate it.
+Raise `alpha` or use more observations to keep a larger `p` below that point.
+
+We start above `p = 1` on purpose. The constructor accepts `p = 1`, but the power cone
+degenerates at that value, and the solver stops without a solution.
 
 ## 6. Both tails with `GenericValueatRiskRange`
 
@@ -206,7 +216,7 @@ does.
   - [`RelativisticValueatRisk`](@ref) generalises EVaR, and ``\kappa`` moves it from EVaR
     (``\kappa \to 0``) to the worst realisation (``\kappa \to 1``), over the power cone.
   - [`PowerNormValueatRisk`](@ref) moves toward the worst realisation as its power
-    ``p \ge 1`` grows.
+    ``p \ge 1`` grows, and it equals the worst realisation once ``\alpha T^{1/p} \le 1``.
   - [`GenericValueatRiskRange`](@ref) combines any two of them into one measure of both
     tails, with a different measure on each side.
 
@@ -227,7 +237,11 @@ Every one of them is convex, and Clarabel solved all of them on this page.
 #src   accepted by the constructor (`@argcheck p >= 1`) but `expected_risk` returns `NaN` — all
 #src   Clarabel configs hit SLOW_PROGRESS / INSUFFICIENT_PROGRESS at the p=1 boundary (the power
 #src   cone degenerates). Either tighten the validation to `p > 1`, or document that p=1 is a
-#src   degenerate boundary. The example sweeps p in {2,4,10} to keep the rendered output clean.
+#src   degenerate boundary. The example sweeps p in {1.25,1.5,1.75,1.8} to keep the rendered
+#src   output clean.
+#src - PNVaR at T = 252, alpha = 0.05 equals WorstRealisation for every p >= log(T)/log(20) = 1.85
+#src   (#1282), and its value warns there. So sections 2 and 3 use p = 1.5, and the p-sweep stops
+#src   at 1.8. Measured: PNVaR(w_cvar) = 2.082/2.347/2.472/2.476 % against WR 2.479 %, no warning.
 #src - The `slv`-only-for-standalone-evaluation contract is a mild ergonomics trap: the same
 #src   measure needs `slv` for `expected_risk` but not when it is a `MeanRisk` objective. Noted
 #src   explicitly in the opening admonition so a reader who copies a measure between the two
