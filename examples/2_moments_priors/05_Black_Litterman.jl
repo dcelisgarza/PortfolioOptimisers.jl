@@ -8,9 +8,10 @@ Description = "The Black-Litterman model in PortfolioOptimisers.jl: tilt an equi
 The estimators on the earlier pages take the data as it is. But you often hold a view, such as
 "Apple will return 8 bps a day", "Microsoft will beat AMD" or "tech as a group will do well",
 and you want to add it to the prior without losing what the market already tells you. The
-Black-Litterman model does this. It starts from an equilibrium prior, the returns that holding
-the market implies, and moves it toward your views. The confidence of each view sets how far it
-moves the prior. The result is a posterior mean and covariance that any optimiser accepts.
+Black-Litterman model does this. It starts from an equilibrium prior, the returns that reverse
+optimisation implies for a given portfolio, and moves it toward your views. The confidence of
+each view sets how far it moves the prior. The result is a prior with a posterior mean and
+covariance, and you give it to an optimiser as you give any other prior.
 
 This page is the first of three on priors built from views.
 [Entropy pooling](07_Entropy_Pooling.md) and [opinion pooling](08_Opinion_Pooling.md) follow,
@@ -49,9 +50,10 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. The data
 
-We use the same S&P 500 slice as the other examples.
+We load the daily returns of 20 assets over one year. The views below name some of these
+assets.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -63,11 +65,13 @@ rd = prices_to_returns(X)
 ## 2. The equilibrium prior
 
 Black-Litterman does not start from the sample mean. It starts from the
-[`EquilibriumExpectedReturns`](@ref) vector, the returns that the market portfolio implies
-through reverse optimisation,
-``\boldsymbol{\pi} = \lambda \mathbf{\Sigma} \boldsymbol{w}_{mkt}``. The sample mean of a
-single year is noisy and often negative. The equilibrium prior is smoother and has an economic
-reason behind it, and the views move it from there.
+[`EquilibriumExpectedReturns`](@ref) vector, the returns that reverse optimisation implies for a
+portfolio ``\boldsymbol{w}_{mkt}``,
+``\boldsymbol{\pi} = \lambda \mathbf{\Sigma} \boldsymbol{w}_{mkt}``. The page passes no weights,
+so ``\boldsymbol{w}_{mkt}`` is the equal-weight portfolio. Pass market capitalisations in `w` to
+use the market portfolio. The sample mean of a single year is noisy and often negative. The
+equilibrium prior is smoother and has an economic reason behind it, and the views move it from
+there.
 
 We build both and compare them.
 =#
@@ -132,12 +136,12 @@ pretty_table(DataFrame(["Assets" => rd.nx, "Equilibrium" => pr_eq.mu,
              title = "Posterior expected returns by view type")
 
 #=
-## 5. Controlling conviction with `views_conf`
+## 5. The confidence of a view, `views_conf`
 
-`views_conf` sets how far the posterior moves toward each view, as a confidence in ``[0, 1]``.
-At a low confidence the posterior stays near the equilibrium prior, and at a high confidence it
-moves most of the way to the view. We sweep the confidence of one absolute view. The table
-prints Apple's posterior expected return at each confidence, and its title gives the
+`views_conf` sets how far the posterior moves toward each view, as a confidence strictly between
+0 and 1. At a low confidence the posterior stays near the equilibrium prior, and at a high
+confidence it moves most of the way to the view. We sweep the confidence of one absolute view.
+The table prints Apple's posterior expected return at each confidence, and its title gives the
 equilibrium value and the 8 bps of the view for comparison.
 =#
 
@@ -155,9 +159,10 @@ pretty_table(DataFrame(; confidence = confs,
 #=
 ## 6. The posterior covariance
 
-Black-Litterman updates the covariance as well as the mean, because the views add information.
-With a small `tau` the change is small. The table compares Apple's posterior variance with the
-empirical one.
+Black-Litterman updates the covariance as well as the mean. The posterior covariance adds `tau`
+times the covariance, for the uncertainty of the mean, and subtracts a smaller term for what the
+views tell. The posterior variance is therefore never below the prior one. With a small `tau`
+both terms are small. The table compares Apple's posterior variance with the empirical one.
 =#
 
 pretty_table(DataFrame(["quantity" => ["AAPL variance"],

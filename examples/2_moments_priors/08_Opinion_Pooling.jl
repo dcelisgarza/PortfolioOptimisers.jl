@@ -14,9 +14,9 @@ trust it. This page is the last of three on priors built from views. Each opinio
 
 [`OpinionPoolingPrior`](@ref) takes a vector of entropy pooling priors in `pes`, optional
 credibility weights in `w`, a pooling algorithm in `alg`, which is
-[`LinearOpinionPooling`](@ref) or [`LogarithmicOpinionPooling`](@ref), and an optional robust
-confidence in `p`. We build three opinions and pool them. Sections 5 to 7 then go through the
-parameters of the pool. Section 5 compares the two pooling algorithms. Section 6 shows the
+[`LinearOpinionPooling`](@ref) or [`LogarithmicOpinionPooling`](@ref), and an optional penalty
+`p` for robust pooling. We build three opinions and pool them. Sections 5 to 7 then go through
+the parameters of the pool. Section 5 compares the two pooling algorithms. Section 6 shows the
 credibility weights and the uniform prior that takes the weight they leave. Section 7 shows
 robust pooling, which lowers the weight of an opinion far from the others.
 
@@ -46,9 +46,9 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. The data
 
-We use the same S&P 500 slice as the other examples.
+We load one year of daily returns of 20 assets, and name two groups of them for the views.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -63,12 +63,11 @@ sets = UniverseSets(;
 #=
 ## 2. Three opinions
 
-Each opinion is an [`EntropyPoolingPrior`](@ref) with its own views. Think of them as three
-analysts who studied the same market and reached different conclusions.
+Each opinion is an [`EntropyPoolingPrior`](@ref) with its own views.
 
   - Opinion A is bullish on Apple, `AAPL == 0.0008`.
-  - Opinion B is a view on sectors. Tech returns at least as much as energy, and Microsoft
-    returns 6 bps a day.
+  - Opinion B is a view on sectors. The three tech means added together are at least the energy
+    mean, and Microsoft returns 6 bps a day.
   - Opinion C is defensive. It sets the expected returns of two low-volatility stocks,
     Johnson & Johnson at 4 bps a day and Coca-Cola at 3 bps a day.
 =#
@@ -99,8 +98,8 @@ op = OpinionPoolingPrior(; pes = [opinion_a, opinion_b, opinion_c], w = [0.5, 0.
 ## 4. The consensus and the individual opinions
 
 We compute the posterior of each opinion and the pooled consensus, and compare their expected
-returns with those of the plain empirical prior. The consensus holds each opinion in proportion
-to its weight, and no single opinion decides it.
+returns with those of the plain empirical prior. With weights that sum to one, each pooled mean
+is the average of the opinions' means, weighted by `w`.
 =#
 
 pr_emp = prior(EmpiricalPrior(), rd)
@@ -147,9 +146,9 @@ pretty_table(DataFrame(["Assets" => rd.nx, "Linear pool" => pr_lin.mu,
 #=
 ## 6. Credibility weights and the uniform-prior fallback
 
-The weights `w` state how credible each opinion is. If they sum to less than one, the pool
-gives the remaining weight to the uniform prior, which is the empirical distribution before any
-reweighting. So the total of `w` acts as one confidence for all the views together, and a
+The weights `w` state how credible each opinion is. If they sum to less than one, the pool gives
+the remaining weight to the uniform prior, which is the empirical distribution before any
+reweighting. The total of `w` therefore acts as one confidence for all the views together, and a
 smaller total pulls the consensus back toward the data and away from the views. We hold the
 relative trust at 5:3:2 and scale the total from 1.0 down to 0.4. The table shows the pooled
 expected returns of Apple and Microsoft as they move back toward the empirical prior.
@@ -172,29 +171,27 @@ pretty_table(DataFrame("weight total" => ["empirical (0.0)"; string.(scales)],
 #=
 ## 7. Robust pooling with `p`
 
-Linear pooling uses the weight of each opinion as given. Set `p` to a confidence in ``(0, 1]``
-to turn on robust opinion pooling. The pool then adjusts the weight of each opinion by the
-Kullback-Leibler divergence between its distribution and the consensus, to discount an opinion
-that is far from the rest.
+By default the pool uses the weight of each opinion as given. Set `p`, a penalty above zero, to
+turn on robust opinion pooling. The pool then multiplies the weight of opinion ``k`` by
+``\exp(-p D_k)``, where ``D_k`` is the Kullback-Leibler divergence between the distribution of
+that opinion and the linear consensus, and scales the weights to sum to one. A larger `p` moves
+more weight to the opinions nearest the consensus. The adjustment runs before either pooling
+algorithm.
 
 ```julia
 pr_robust = prior(OpinionPoolingPrior(; pes = [opinion_a, opinion_b, opinion_c],
                                       w = [0.5, 0.3, 0.2], p = 0.1), rd)
 ```
 
-The page shows this call without running it, because on this S&P 500 data it changes almost
-nothing. When we wrote the page, the robust adjustment moved the posterior mean and covariance
-by about ``10^{-14}``, which is numerical noise, even with a fourth opinion made extreme on
-purpose. The divergence discount changes the pooled probabilities of the scenarios. All the
-opinions share the same return scenarios, so that change barely reaches the first two moments
-here. Use `p` when the distributions of the opinions are far apart. To move the consensus mean
-on one short window, change the total of the credibility weights, as in section 6.
+The page shows this call without running it. On this data every opinion is close to the
+consensus in Kullback-Leibler divergence, so a small `p` barely moves the weights. To move the
+consensus mean on one short window, change the total of the credibility weights, as section 6
+does.
 
 ## 8. A consensus portfolio
 
 We maximise the risk-adjusted ratio under the empirical prior and under the pooled consensus,
-and compare the weights. The consensus portfolio is one allocation that takes all three
-opinions into account.
+and compare the weights.
 =#
 
 using Clarabel
@@ -231,9 +228,8 @@ plot_stacked_bar_composition([res_emp, res_op], rd; xticks = (1:2, ["Empirical",
 #src   sum(w)<1, so a second prior() call threw `length(w) == length(pes)`. Fixed in
 #src   src/10_Prior/07_OpinionPoolingPrior.jl by `ow = vcat(ow, rw)` (also fixes the uniform
 #src   `range` branch, which was immutable). Regression test added in test_12b_prior_core.jl.
-#src - FINDING (→ #126): robust pooling `p` had NEGLIGIBLE effect here — even an extreme outlier
-#src   (AMD == 0.006) at p∈{1.0,0.5,0.1,0.01} moved pooled mu by ~1e-14 (machine eps) and sigma
-#src   likewise. The KL discount reshapes scenario probabilities but barely propagates into the
-#src   first two moments on a single short window. Rewrote section 7 honestly (prose + caveat,
-#src   no fake contrast table) rather than overclaim. Worth a docstring note on when `p` bites.
-#src   Closes the BL→EP→OP view arc. → #126.
+#src - CORRECTED by #1227 (2026-09-23): the ~1e-14 effect of `p` that an earlier note recorded
+#src   was wrong. Measured on this slice: p = 0.1 moves the opinion weights by ~3e-5 and mu by
+#src   ~1e-7, p = 1 by ~3e-4 and ~1e-6, and p = 100 moves ow to [0.533, 0.304, 0.163]. Each
+#src   opinion sits within KL 0.006 of the consensus, so exp(-p D) stays near 1 until p nears
+#src   1/D. Robust pooling has no defect here.

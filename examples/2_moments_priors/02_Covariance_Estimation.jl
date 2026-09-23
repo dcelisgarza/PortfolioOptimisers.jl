@@ -12,9 +12,10 @@ amplifies the noise. Two families of fixes help.
 
   - Denoising separates the signal from the noise in the eigenvalues of the matrix.
     [`Denoise`](@ref) takes one of three algorithms for the eigenvalues below the noise
-    threshold. [`FixedDenoise`](@ref) replaces them with their mean, [`ShrunkDenoise`](@ref)
-    shrinks them, and [`SpectralDenoise`](@ref) sets them to zero. The last one does not
-    always lower the condition number, as section 2 shows.
+    threshold. [`FixedDenoise`](@ref) replaces them with their mean. [`ShrunkDenoise`](@ref)
+    keeps the diagonal of their part of the matrix and shrinks its other entries toward zero.
+    [`SpectralDenoise`](@ref) sets them to zero, which leaves a nearly singular matrix, as
+    section 2 shows.
   - Sparsification imposes a structure on the inverse. [`LoGo`](@ref) keeps only the entries
     that a network of the assets supports, and it builds the network from a similarity
     measure such as [`MaximumDistanceSimilarity`](@ref) or [`ExponentialSimilarity`](@ref).
@@ -27,8 +28,8 @@ You configure both through [`MatrixProcessing`](@ref), the `mp` field of
     assets and you run anything that reads the covariance, such as mean-variance
     optimisation, risk budgeting or clustering. A lower condition number gives a more stable
     inverse, and weights that move less when the data changes a little. Compare condition
-    numbers before you settle on a technique, because [`SpectralDenoise`](@ref) can make the
-    conditioning *worse* on some data.
+    numbers before you settle on a technique. [`SpectralDenoise`](@ref) sets the noise
+    eigenvalues to zero and leaves a nearly singular matrix.
 =#
 
 using PortfolioOptimisers, PrettyTables, LinearAlgebra
@@ -49,9 +50,10 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. The data
 
-We use the same S&P 500 slice as the other examples.
+We load the daily prices of 20 assets over the last 253 trading days, and convert them to
+returns.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -104,8 +106,9 @@ pretty_table(DataFrame(; :estimator => [k for (k, _) in prs],
 ## 3. Visualising the eigenspectrum
 
 [`plot_eigenspectrum`](@ref) draws the eigenvalues of a covariance matrix as bars, with the
-Marchenko-Pastur threshold ``\lambda_+``. A bar above the threshold carries signal, and a bar
-below it is noise. Denoising works on the bars below the threshold.
+Marchenko-Pastur upper bound ``\lambda_+`` of that covariance. A bar above the line is larger
+than noise alone would give. The denoiser does not use this line. It fits its own threshold to
+the eigenvalues of the correlation matrix.
 =#
 
 using StatsPlots, GraphRecipes
@@ -123,9 +126,8 @@ plot_eigenspectrum(prs[5].second, rd)
 #=
 ## 4. Minimum-variance portfolios
 
-The minimum-variance portfolio depends on the conditioning of the covariance more than any
-other. We solve it with each prior and compare the weights. A better-conditioned covariance
-tends to give a less concentrated allocation.
+The minimum-variance portfolio reads only the covariance, so it isolates the estimator. We solve
+it with each prior and compare the weights.
 =#
 
 using Clarabel

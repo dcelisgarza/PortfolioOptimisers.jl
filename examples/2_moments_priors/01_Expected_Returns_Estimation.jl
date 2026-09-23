@@ -43,9 +43,9 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. The data
 
-We use the same S&P 500 slice as the other examples.
+We load one year of daily prices of 20 assets and convert them to 252 daily returns.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -97,9 +97,8 @@ plot_mu(prs[3].second, rd.nx)
 ## 4. Expected returns in a maximum-ratio portfolio
 
 The expected returns change a portfolio only when the objective reads them. We maximise the
-risk-adjusted ratio with each prior in turn, and compare the weights. The covariance is the
-same in every prior, so only the mean differs. The sample mean concentrates the weights in a
-few assets, and shrinkage spreads them over more.
+risk-adjusted ratio with each prior in turn, and compare the weights. The covariance is the same
+in every prior, so only the mean differs. Compare how many assets get a weight in each column.
 =#
 
 using Clarabel
@@ -116,8 +115,7 @@ pretty_table(DataFrame(["Assets" => rd.nx; [k => r.w for (k, r) in ress]]);
              formatters = [resfmt], title = "Maximum-ratio weights by mu estimator")
 
 #=
-Each bar of the composition plot is the maximum-ratio portfolio of one estimator, and the
-expected returns estimator is the only input that changes between the bars.
+The composition plot draws the same weights as one bar per estimator.
 =#
 
 plot_stacked_bar_composition([r for (_, r) in ress], rd;

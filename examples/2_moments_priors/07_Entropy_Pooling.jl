@@ -6,26 +6,27 @@ Description = "Entropy pooling in PortfolioOptimisers.jl: views as constraints o
 # Entropy pooling
 
 [Black-Litterman](05_Black_Litterman.md) adds views to the mean through a Gaussian update.
-Entropy pooling is more general in two ways. First, a view can constrain any moment, such as
-the mean, the variance, the CVaR, the skewness or the kurtosis, and even a single covariance or
-correlation. Second, it assumes no normal distribution. It reweights the empirical scenarios so
-that the new distribution satisfies your views and stays as close as it can to the original
-one, in relative entropy, which is the Kullback-Leibler divergence. The result gives every
-scenario a new weight, so every moment of the prior can change.
+Entropy pooling is more general in two ways. First, a view can constrain one of several
+statistics, such as the mean, the variance, the CVaR, the skewness or the kurtosis, and even a
+single covariance or correlation. Second, it assumes no normal distribution. It reweights the
+empirical scenarios so that the new distribution satisfies your views and stays as close as it
+can to the original one, in relative entropy, which is the Kullback-Leibler divergence. The
+result gives every scenario a new weight, so every moment of the prior can change.
 
 This page is the second of three on priors built from views.
 [Black-Litterman](05_Black_Litterman.md) comes before it, and
 [opinion pooling](08_Opinion_Pooling.md) follows and combines several entropy pooling priors
 into one.
 
-[`EntropyPoolingPrior`](@ref) takes one [`LinearConstraintEstimator`](@ref) for each quantity,
-and the names of the fields need care. `mu_views` holds views on the mean, and `sigma_views`
+[`EntropyPoolingPrior`](@ref) takes the views on each quantity in its own field, and the names
+of the fields need care. `mu_views` holds views on the mean, and `sigma_views`
 views on the variance. The tail risk views are `var_views` for the value at risk, which is not
 the variance, `cvar_views` for the conditional value at risk, `evar_views` for the entropic
 value at risk and `rlvar_views` for the relativistic value at risk. `sk_views` and `kt_views`
 hold views on the skewness and the kurtosis, and `cov_views` and `rho_views` views on
-covariances and correlations. Each is a list of string constraints over the names of a
-[`UniverseSets`](@ref).
+covariances and correlations. Each field holds string constraints over the names of a
+[`UniverseSets`](@ref) in a [`LinearConstraintEstimator`](@ref), and section 5 shows the wrapper
+that the four tail risk fields put around it.
 
 !!! tip "When to reach for this"
     Reach for entropy pooling when your views say more than "the mean will be x". Examples are
@@ -54,9 +55,10 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. The data
 
-We use the same S&P 500 slice as the other examples.
+We load one year of daily prices of 20 assets and convert them to returns. Entropy pooling gives
+each of these 252 days a new probability.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -77,47 +79,14 @@ sets = UniverseSets(;
 #=
 ## 3. Views on several moments
 
-Entropy pooling views are strings too, but each field reads a different quantity. We state
-three views. In `mu_views`, Apple returns 8 bps a day, and tech returns at least as much as
-energy. In `sigma_views`, Apple's variance takes a fixed value. The comparison operators a view
-accepts depend on the moment. `mu_views`, `sigma_views`, `sk_views`, `kt_views`, `cov_views`,
-`rho_views`, `cvar_views`, `evar_views` and `rlvar_views` take `==`, `>=` and `<=`, and
-`var_views` takes only `==` and `>=`. An operator that a field does not accept raises a
-`ParseError`, which lists the operators that the field allows.
-
-A significance level belongs to the view and not to the estimator, because the CVaR at 1% and
-the CVaR at 10% are different statistics of the same series. So `var_views`, `cvar_views`,
-`evar_views` and `rlvar_views` take a [`ValueatRiskView`](@ref), a
-[`ConditionalValueatRiskView`](@ref), an [`EntropicValueatRiskView`](@ref) and a
-[`RelativisticValueatRiskView`](@ref) respectively. Each pairs a group of view equations with
-the `alpha` at which to read them, and a field also takes a vector of them for views at several
-levels. A [`RelativisticValueatRiskView`](@ref) holds a second parameter of the same kind,
-`kappa`. The RLVaR tends to the EVaR as `kappa` approaches zero, and rises toward the worst loss
-of the sample as `kappa` approaches one, so the group states both. A `prior(...)` term inside a
-group reads the prior's statistic at the `alpha` of that group, and at its `kappa` where the
-measure has one.
-
-A tail view is not a linear function of the posterior probabilities. It needs auxiliary
-variables, and therefore a [`JuMPEntropyPooling`](@ref) in `opt`. The `alg` field of a tail
-view group sets how the model writes each view. Left at `nothing`, each view takes the
-cheapest formulation that states it exactly. A lower bound, or an equality at or above the
-prior value, takes [`LinearConditionalValueatRiskView`](@ref),
-[`ConicEntropicValueatRiskView`](@ref) or [`ConicRelativisticValueatRiskView`](@ref). Any
-other view takes [`IntegerConditionalValueatRiskView`](@ref),
-[`GridEntropicValueatRiskView`](@ref) or [`GridRelativisticValueatRiskView`](@ref), which need
-a mixed-integer conic solver.
-
-A view over several assets whose coefficients all have one sign, such as a group, is a
-positive combination of the measures, and it takes the same dual formulations. A relative view
-has coefficients of both signs. For the CVaR it takes the integer formulation. For the other two
-measures it takes [`SequentialEntropicValueatRiskView`](@ref) or
-[`SequentialRelativisticValueatRiskView`](@ref), which solve a convex program a few times and
-need no integer variable. [`SequentialConditionalValueatRiskView`](@ref) gives the CVaR the same
-option. For an [`EntropicValueatRiskView`](@ref) or a [`RelativisticValueatRiskView`](@ref), the
-`alg` field also holds the grid of dual variables and the big-M constant, so one group can take
-its own [`GridEntropicValueatRiskView`](@ref) or [`GridRelativisticValueatRiskView`](@ref).
-[`ValueatRiskView`](@ref) has no `alg`, because a VaR view is linear in the posterior
-probabilities and there is no formulation to choose.
+Entropy pooling views are strings too, but each field reads a different quantity. We state three
+views. In `mu_views`, Apple returns 8 bps a day, and the three tech means added together are at
+least the energy mean. In entropy pooling a group stands for the sum of its members, not their
+average as in Black-Litterman. In `sigma_views`, Apple's variance takes a fixed value. The
+comparison operators a view accepts depend on the field. `mu_views`, `sigma_views`, `sk_views`,
+`kt_views`, `cov_views`, `rho_views`, `cvar_views`, `evar_views` and `rlvar_views` take `==`,
+`>=` and `<=`, and `var_views` takes only `==` and `>=`. An operator that a field does not
+accept raises a `ParseError`, which lists the operators that the field allows.
 =#
 
 mu_views = LinearConstraintEstimator(; val = ["AAPL == 0.0008", "tech >= energy"])
@@ -159,19 +128,56 @@ using StatsPlots, GraphRecipes
 plot_mu(pr_ep, rd.nx)
 
 #=
-## 5. A view on the relativistic value at risk
+## 5. Views on tail risk
 
-`rlvar_views` states a view on the relativistic value at risk, RLVaR, which generalises the
-entropic value at risk with a deformation parameter ``\kappa``. Two numbers define the
-statistic. `alpha` is the significance level, and `kappa` is the deformation. The RLVaR tends
-to the EVaR as `kappa` approaches zero, and rises toward the worst loss of the sample as `kappa`
-approaches one. Both belong to the [`RelativisticValueatRiskView`](@ref) group, not to the
-estimator.
+A significance level belongs to the view and not to the estimator, because the CVaR at 1% and
+the CVaR at 10% are different statistics of the same series. `var_views`, `cvar_views`,
+`evar_views` and `rlvar_views` therefore take a [`ValueatRiskView`](@ref), a
+[`ConditionalValueatRiskView`](@ref), an [`EntropicValueatRiskView`](@ref) and a
+[`RelativisticValueatRiskView`](@ref) respectively. Each pairs a group of view equations with
+the `alpha` at which to read them, and a field also takes a vector of them for views at several
+levels. A `prior(...)` term inside a group reads the prior's statistic at the `alpha` of that
+group, and at its `kappa` where the measure has one.
 
-The second number limits what a view can ask for. No reweighting of the sample can push a tail
-measure past the worst loss in the sample, so a lower-bound view has room only between the
-prior value and that loss. At `kappa = 0.3` the RLVaR is already close to the worst loss, and
-the CVaR of the same asset is not.
+The relativistic value at risk, RLVaR, generalises the entropic value at risk with a deformation
+parameter ``\kappa``, and a [`RelativisticValueatRiskView`](@ref) holds `kappa` next to `alpha`.
+The RLVaR tends to the EVaR as `kappa` approaches zero, and rises toward the worst loss of the
+sample as `kappa` approaches one.
+
+A VaR view is linear in the posterior probabilities, so [`ValueatRiskView`](@ref) has no `alg`
+and needs no solver. A CVaR, EVaR or RLVaR view is not linear in them. It needs auxiliary
+variables, and therefore a [`JuMPEntropyPooling`](@ref) in `opt`. One case is an exception. A
+lower bound on the EVaR or RLVaR of one asset, with [`GridEntropicValueatRiskView`](@ref) or
+[`GridRelativisticValueatRiskView`](@ref) set in `alg`, becomes a set of linear rows, and the
+default [`OptimEntropyPooling`](@ref) solves it.
+
+The `alg` field of a tail view group sets how the model writes each view. Left at `nothing`, a
+lower bound, or an equality at or above the prior value, takes
+[`LinearConditionalValueatRiskView`](@ref), [`ConicEntropicValueatRiskView`](@ref) or
+[`ConicRelativisticValueatRiskView`](@ref), each of which states the view exactly. An upper
+bound, or an equality below the prior value, on one asset takes
+[`IntegerConditionalValueatRiskView`](@ref), [`GridEntropicValueatRiskView`](@ref) or
+[`GridRelativisticValueatRiskView`](@ref). These need a mixed-integer conic solver, and the two
+grid forms state the view only at the points of their grid.
+
+A view over several assets whose coefficients all have one sign, such as a group, is a sum of
+the measures of its assets with positive weights, and a lower bound on it takes the same exact
+formulations. A relative view has coefficients of both signs. For the CVaR it takes the integer
+formulation. For the other two measures it takes [`SequentialEntropicValueatRiskView`](@ref) or
+[`SequentialRelativisticValueatRiskView`](@ref), which solve a convex program a few times and
+need no integer variable. [`SequentialConditionalValueatRiskView`](@ref) gives the CVaR the same
+option.
+
+For an [`EntropicValueatRiskView`](@ref) or a [`RelativisticValueatRiskView`](@ref), a grid
+formulation in `alg` sets how the library builds the grid: its width `pct`, its number of points
+`K`, and a multiplier `M` of its big-M constants. A big-M constant is a number large enough that
+adding it to a row of the grid makes the row hold at any posterior, so that a binary variable
+can switch the row off. The library builds the grid itself from the data when it computes the
+prior.
+
+No reweighting of the sample can push a tail measure past the worst loss of the sample, so a
+lower-bound view has room only between the prior value and that loss. At `kappa = 0.3` the RLVaR
+is already close to the worst loss, and the CVaR of the same asset is not.
 
 Every field that takes a `Solver` also takes a vector of them, and the library tries them in
 order until one solves the problem. Near the worst loss the second solver matters. With one
@@ -201,9 +207,9 @@ pretty_table(DataFrame(["Statistic" => ["CVaR", "EVaR", "RLVaR, kappa = 0.3", "w
              formatters = [mmtfmt], title = "How much room a lower-bound tail view has")
 
 #=
-So the view `"AAPL >= 1.25*prior(AAPL)"`, an ordinary request on `cvar_views`, throws a
-`DomainError` here, and the message gives the worst loss. On this statistic a view has room
-for a multiple near 1.05.
+The view `"AAPL >= 1.25*prior(AAPL)"` is an ordinary request on `cvar_views`. On `rlvar_views`
+it asks for more than the worst loss in the table. A lower bound on this statistic has room for
+a multiple of the prior RLVaR up to the ratio of the worst loss to the prior RLVaR, about 1.1.
 
 A target below the prior needs the other formulation.
 [`ConicRelativisticValueatRiskView`](@ref) bounds the RLVaR from below only, so a `<=` view
@@ -293,8 +299,8 @@ pretty_table(DataFrame(["Assets" => rd.nx, "Empirical" => res_emp.w,
              title = "Maximum-ratio weights: empirical vs entropy pooling")
 
 #=
-In the composition plot, compare the weights of Apple and of the tech stocks between the two
-bars.
+Each bar of the plot stacks the weights of one portfolio. Look at Apple and at the tech stocks
+in the two bars.
 =#
 
 plot_stacked_bar_composition([res_emp, res_ep], rd;

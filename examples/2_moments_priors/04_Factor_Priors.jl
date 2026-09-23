@@ -52,10 +52,10 @@ hmmtfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. The data
 
-We use the same S&P 500 data as the other examples, and load the returns of the factors next
-to it.
+We load the prices of 20 assets and of five factor funds over the same year. The two tables
+print their last rows, and `prices_to_returns` converts both to returns.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -76,7 +76,7 @@ The library has many prior models, and this page uses four of them.
 
 1. [`EmpiricalPrior`](@ref) computes the expected returns vector and the covariance matrix from the data.
 2. [`FactorPrior`](@ref) computes them with a factor model.
-3. [`HighOrderPriorEstimator`](@ref) computes them with the low-order prior estimator you give it. It adds the coskewness, the cokurtosis or both, which it computes with that expected returns vector.
+3. [`HighOrderPriorEstimator`](@ref) computes them with the low-order prior estimator you give it. It adds the coskewness, the cokurtosis or both, which it computes from the same returns, centred on their sample mean.
 4. [`HighOrderFactorPriorEstimator`](@ref) computes the expected returns vector, the covariance matrix, and the coskewness, the cokurtosis or both, all with a factor model.
 
 An estimator whose name starts with `High` returns a [`HighOrderPrior`](@ref), and the others return a [`LowOrderPrior`](@ref).
@@ -120,7 +120,7 @@ plot_factor_sigma(prs[2], rd)
 #=
 We compare the first three priors.
 
-Their expected returns, in the `mu` field, change little between [`EmpiricalPrior`](@ref) and [`FactorPrior`](@ref). Expected returns are uncertain and sensitive to noise, and this is one reason not to rely much on them. The [expected returns page](01_Expected_Returns_Estimation.md) shows estimators that reduce that noise.
+The note under the table prints whether their expected returns, in the `mu` field, are equal within the default tolerance of `≈`. Expected returns are uncertain and sensitive to noise, and this is one reason not to rely much on them. The [expected returns page](01_Expected_Returns_Estimation.md) shows estimators that reduce that noise.
 =#
 
 pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => prs[1].mu,
@@ -130,7 +130,7 @@ pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => prs[1].mu,
              source_notes = "prs[1].mu ≈ prs[2].mu ≈ prs[3].mu: $(prs[1].mu ≈ prs[2].mu ≈ prs[3].mu)")
 
 #=
-The covariances, in the `sigma` field, differ much more. A factor model tends to give a more stable covariance estimate, because the factors carry the common part of the returns and the noise of each single asset has less effect. Each covariance table carries its condition number under it. A lower condition number means a less noisy matrix, which is more stable to invert.
+The covariances, in the `sigma` field, differ much more. In a factor model the factors carry the common part of the returns, and the noise of each single asset has less effect on the covariance. Each covariance table carries its condition number under it. A lower condition number means that inverting the matrix amplifies its errors less.
 
 A factor prior also stores a sparser Cholesky factor, with better numerical properties than the plain one, in the `chol` field of the prior result. When it is present, the optimisers use it in place of the Cholesky factor of `sigma` in the `SecondOrderCone` constraint of the variance and standard deviation formulations.
 =#
@@ -148,8 +148,8 @@ pretty_table(DataFrame([rd.nx prs[3].sigma], ["Assets"; rd.nx]); formatters = [m
 
 #=
 Each plot draws the eigenvalues of one covariance matrix with the Marchenko-Pastur upper bound,
-the level below which an eigenvalue is noise. The first plot is the empirical prior. A factor
-model tends to shrink the eigenvalues below the bound.
+the largest eigenvalue that noise alone would give. The first plot is the empirical prior. Compare
+the eigenvalues below the bound in the three plots.
 =#
 
 plot_eigenspectrum(prs[1], rd)
@@ -159,7 +159,7 @@ plot_eigenspectrum(prs[2], rd)
 plot_eigenspectrum(prs[3], rd)
 
 #=
-Priors 4 to 6 wrap priors 1 to 3, so each uses the same regression model as the prior three places before it. The loop prints whether the adjusted returns `X`, the `mu` and the `sigma` of prior `i` equal those of prior `i - 3`.
+Priors 4 to 6 wrap the estimators of priors 1 to 3, so each computes its low-order moments as the prior three places before it does. The loop prints whether the adjusted returns `X`, the `mu` and the `sigma` of prior `i` equal those of prior `i - 3`.
 =#
 for i in 4:6
     println("prs[$(i-3)].X     == prs[$(i)].X    : $(prs[i-3].X == prs[i].X)")
@@ -167,7 +167,7 @@ for i in 4:6
     println("prs[$(i-3)].sigma == prs[$(i)].sigma: $(prs[i-3].sigma == prs[i].sigma)\n")
 end
 
-# The `sk` field holds the coskewness matrix, `V` the negative spectral decomposition of its slices, and `kt` the cokurtosis matrix. We print whether they are equal for priors 4 to 6. They are, although the three priors compute their low-order moments in different ways. The estimator computes the high-order moments from the prior returns matrix and not from the posterior one, because the posterior one would be inconsistent.
+# The `sk` field holds the coskewness matrix, `V` the negative spectral decomposition of its slices, and `kt` the cokurtosis matrix. We print whether they are equal for priors 4 to 6. The estimator computes them from the returns in `rd`, centred on their sample mean. It uses neither the returns that the factor model rebuilds nor the mean of the low-order prior.
 println("prs[4].sk == prs[5].sk == prs[6].sk: $(prs[4].sk == prs[5].sk == prs[6].sk)")
 println("prs[4].V  == prs[5].V  == prs[6].V : $(prs[4].V == prs[5].V == prs[6].V)")
 println("prs[4].kt == prs[5].kt == prs[6].kt: $(prs[4].kt == prs[5].kt == prs[6].kt)\n")
@@ -232,7 +232,7 @@ plot_coskewness(prs[4], rd)
 plot_coskewness(prs[7], rd)
 
 #=
-We print the cokurtosis matrix of the same three priors.
+We print the cokurtosis matrix of the same three priors. The [higher moment page](03_Higher_Moment_Estimation.md) shows why the raw cokurtosis is singular. The default processing makes it positive definite, and the condition number under each table measures that correction more than the data.
 =#
 pretty_table(DataFrame([nx2 prs[4].kt], ["Assets^2"; nx2]); formatters = [hmmtfmt],
              title = "HighOrderPriorEstimator Cokurtosis",
@@ -252,10 +252,6 @@ with the Marchenko-Pastur bound. The first plot is the empirical high-order prio
 plot_cokurtosis(prs[4], rd)
 # The high-order prior with a stepwise factor model.
 plot_cokurtosis(prs[7], rd)
-
-#=
-A factor model would ideally give the high-order moments lower condition numbers, which would mean more stable estimates. It does not always do so, because the computation of these moments raises the returns to higher powers.
-=#
 
 #=
 ## 3. Comparing optimisations
@@ -392,9 +388,7 @@ mrs = [MeanRisk(; r = NegativeSkewness(), obj = MinimumRisk(), opt = opt) for op
 ress = optimise.(mrs)
 
 #=
-The plots follow the order of section 3.1.
-
-Empirical prior composition.
+The plots follow the order of section 3.1. The first plot is the composition of the frontier under the empirical high-order prior.
 =#
 plot_stacked_area_composition(ress[1].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
@@ -481,7 +475,7 @@ mrs = [MeanRisk(; r = Kurtosis(), obj = MinimumRisk(), opt = opt) for opt in opt
 ress = optimise.(mrs)
 
 #=
-This time every frontier plot reads the returns of the empirical high-order prior, `prs[4]`, because the kurtosis risk measure reads the returns directly and makes no use of the cokurtosis matrix.
+This time every frontier plot measures the kurtosis on the returns of the empirical high-order prior, `prs[4]`. The optimisation reads the cokurtosis matrix of each prior, but a plot reads only the returns and the mean of the prior it is given. The returns of a factor prior are the ones its factor model rebuilds, so we pass `prs[4]` to measure the three frontiers on the same returns.
 =#
 # Empirical prior composition.
 plot_stacked_area_composition(ress[1].w, rd.nx;
@@ -538,7 +532,7 @@ pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
 plot_stacked_bar_composition(ress, rd)
 
 #=
-The kurtosis portfolios follow section 3.1 and not section 3.2: the factor priors give more diversified portfolios than the empirical prior. This is so although the cokurtosis matrices of the factor priors have higher condition numbers than the empirical one. So the condition number of a high-order moment alone does not tell how a factor model changes the portfolio. The [covariance](02_Covariance_Estimation.md) and [higher moment](03_Higher_Moment_Estimation.md) pages show ways to reduce the estimation error of these moments.
+The kurtosis portfolios follow section 3.1 and not section 3.2. The factor priors give more diversified portfolios than the empirical prior. The [covariance](02_Covariance_Estimation.md) and [higher moment](03_Higher_Moment_Estimation.md) pages show ways to reduce the estimation error of these moments.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

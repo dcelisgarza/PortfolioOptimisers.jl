@@ -9,9 +9,9 @@ Mean-variance optimisation reads only the first two moments of the returns. Asse
 skewed and have fat tails, and risk measures such as [`NegativeSkewness`](@ref) and
 [`Kurtosis`](@ref) need estimates of the coskewness and cokurtosis tensors to account for
 that. These higher moments are harder to estimate than the covariance. The cokurtosis matrix is
-``N^2 \times N^2``, so on a short window it has far more entries than the window has
-observations, and it is close to singular. Denoising and sparsification help here, as they do
-for the covariance.
+``N^2 \times N^2``. Its row for the pair (i, j) repeats its row for (j, i), so the raw estimate
+is singular at any window length. Denoising and sparsification help here, as they do for the
+covariance.
 
 [`HighOrderPriorEstimator`](@ref) computes the higher moments. It wraps a prior for the mean
 and the covariance, and adds a [`Coskewness`](@ref) estimator in `ske` and a
@@ -22,10 +22,10 @@ uses.
 !!! tip "When to reach for this"
     Reach for higher moment estimation when you optimise against a risk measure that reads the
     skew or the tails, such as [`NegativeSkewness`](@ref), [`Kurtosis`](@ref) and their
-    square-root forms, or when you build a Pareto surface over them. When you do, denoise the
-    higher moments. The raw cokurtosis of a short window is numerically singular, and
-    denoising is what makes these optimisations well-posed. If your risk measures need no
-    tensors, you do not need this page.
+square-root forms, or when you build a Pareto surface over them. When you do, denoise the
+    higher moments. The raw cokurtosis is numerically singular, and
+    denoising lowers its condition number by many orders of magnitude. If your risk measures
+    need no tensors, you do not need this page.
 =#
 
 using PortfolioOptimisers, PrettyTables, LinearAlgebra
@@ -46,9 +46,9 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. The data
 
-We use the same S&P 500 slice as the other examples.
+We load 252 daily returns of 20 assets. For 20 assets the cokurtosis is a 400 by 400 matrix.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -59,11 +59,12 @@ rd = prices_to_returns(X)
 #=
 ## 2. High-order priors
 
-We build three high-order priors that differ only in how they process the coskewness and the
-cokurtosis. The first keeps the raw estimates. The second applies [`FixedDenoise`](@ref). The
-third applies the default [`Denoise`](@ref) and then [`LoGo`](@ref) sparsification. We then
-compare the condition numbers of `V`, the matrix of the negative spectral slices of the
-coskewness, and of `kt`, the cokurtosis matrix.
+We build three high-order priors that differ only in how they process `V` and the cokurtosis.
+`V` is the positive semidefinite matrix that the library builds from the negative eigenvalues of
+the slices of the coskewness, and `kt` is the cokurtosis matrix. The first prior keeps the raw
+estimates. The second applies [`FixedDenoise`](@ref). The third applies the default
+[`Denoise`](@ref) and then [`LoGo`](@ref) sparsification. We then compare the condition numbers
+of `V` and of `kt`.
 =#
 
 hopes = ["Vanilla" => HighOrderPriorEstimator(),
@@ -104,8 +105,10 @@ pretty_table(DataFrame(; :estimator => [k for (k, _) in prs],
 
 [`plot_coskewness`](@ref) draws the coskewness matrix as a heatmap, and
 [`plot_cokurtosis`](@ref) draws the eigenvalues of the cokurtosis matrix. We draw each for the
-raw prior and for the denoised prior. The raw matrices are dense and noisy, and the denoised
-ones are cleaner.
+raw prior and for the denoised prior. The matrix processing acts on `V` and not on the
+coskewness, so the two heatmaps are the same. The raw cokurtosis has a block of eigenvalues near
+zero. [`FixedDenoise`](@ref) replaces the eigenvalues below its noise threshold with their mean,
+and the table of section 2 shows the condition number fall by many orders of magnitude.
 =#
 
 using StatsPlots, GraphRecipes
@@ -119,12 +122,13 @@ plot_cokurtosis(prs[1].second, rd)
 plot_cokurtosis(prs[2].second, rd)
 
 #=
-## 4. Minimum skewness and minimum kurtosis portfolios
+## 4. Minimum negative skewness and minimum kurtosis portfolios
 
 We minimise two higher moment risk measures, [`NegativeSkewness`](@ref) and
-[`Kurtosis`](@ref), with each high-order prior. The raw tensors are close to singular, so with
-them the solver works on a degenerate problem. The denoised and sparsified priors give it a
-well-posed one.
+[`Kurtosis`](@ref), with each high-order prior. The kurtosis constraint first adds the row of
+the pair (i, j) to the row of (j, i), and factors the smaller matrix that results. The repeated
+rows therefore never reach the solver. Denoising still changes the matrix that the solver reads,
+and with it the weights.
 =#
 
 using Clarabel
