@@ -17,7 +17,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type returned by [`SchurComplementHierarchicalRiskParity`](@ref) optimisation.
 
-Holds the prior result, the resolved weight bounds, the clustering result, the resolved risk measure, the Schur complement parameter the allocation ran at, the return code, the optimised weights, and the optional fallback estimator.
+Holds the prior result, the resolved weight bounds, the clustering result, the resolved fees, the resolved risk measure, the Schur complement parameter the allocation ran at, the return code, the optimised weights, and the optional fallback estimator.
 
 # Fields
 
@@ -25,7 +25,7 @@ $(DocStringExtensions.FIELDS)
 
 ## The measure is on the result, and the result is flat
 
-Schur joins [`HierarchicalOptimisationResult`](@ref) — it embeds a [`HierarchicalOptimiser`](@ref), which is the family's membership rule — but it keeps its own flat field block rather than embedding [`HierarchicalResult`](@ref). Its field set genuinely differs: it carries `gamma`, and it has **no** `fees` field.
+Schur joins [`HierarchicalOptimisationResult`](@ref) — it embeds a [`HierarchicalOptimiser`](@ref), which is the family's membership rule — but it keeps its own flat field block rather than embedding [`HierarchicalResult`](@ref). Its field set differs: it carries `gamma`.
 
 It carries **no scalariser**, because it carries no vector of measures to combine. `SchurComplementParams.r` is bounded [`Sd_Var`](@ref), so Schur takes one standard deviation or one variance.
 
@@ -39,6 +39,7 @@ It carries **no scalariser**, because it carries no vector of measures to combin
         pr::Option{<:AbstractPriorResult},
         wb::Option{<:WeightBounds},
         clr::Option{<:AbstractClusteringResult},
+        fees::Option{<:Fees},
         r::Union{<:Sd_Var, <:VecBaseRM},
         gamma::Union{<:Number, <:VecNum},
         retcode::OptimisationReturnCode,
@@ -74,6 +75,10 @@ The keyword constructor is the one door `_optimise` exits through, so it is wher
     """
     clr
     """
+    $(field_dict[:fees])
+    """
+    fees
+    """
     $(field_dict[:r_res_schur])
     """
     r
@@ -100,28 +105,37 @@ The keyword constructor is the one door `_optimise` exits through, so it is wher
     function SchurComplementHierarchicalRiskParityResult(pr::Option{<:AbstractPriorResult},
                                                          wb::Option{<:WeightBounds},
                                                          clr::Option{<:AbstractClusteringResult},
+                                                         fees::Option{<:Fees},
                                                          r::Union{<:Sd_Var, <:VecBaseRM},
                                                          gamma::Union{<:Number, <:VecNum},
                                                          retcode::OptimisationReturnCode,
                                                          w::Option{<:VecNum},
                                                          imsk::Option{<:BitVector},
                                                          fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(pr), typeof(wb), typeof(clr), typeof(r), typeof(gamma),
-                   typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb, clr, r,
-                                                                         gamma, retcode, w,
-                                                                         imsk, fb)
+        return new{typeof(pr), typeof(wb), typeof(clr), typeof(fees), typeof(r),
+                   typeof(gamma), typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr,
+                                                                                        wb,
+                                                                                        clr,
+                                                                                        fees,
+                                                                                        r,
+                                                                                        gamma,
+                                                                                        retcode,
+                                                                                        w,
+                                                                                        imsk,
+                                                                                        fb)
     end
 end
 function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPriorResult},
                                                      wb::Option{<:WeightBounds},
                                                      clr::Option{<:AbstractClusteringResult},
+                                                     fees::Option{<:Fees},
                                                      r::Union{<:Sd_Var, <:VecBaseRM},
                                                      gamma::Union{<:Number, <:VecNum},
                                                      retcode::OptimisationReturnCode,
                                                      w::Option{<:VecNum},
                                                      imsk::Option{<:BitVector} = nothing,
                                                      fb::Option{<:OptE_Opt_FbChain})::SchurComplementHierarchicalRiskParityResult
-    return SchurComplementHierarchicalRiskParityResult(pr, wb, clr, r, gamma, retcode,
+    return SchurComplementHierarchicalRiskParityResult(pr, wb, clr, fees, r, gamma, retcode,
                                                        expand_investable_weights(imsk, w),
                                                        imsk, fb)
 end
@@ -1048,12 +1062,20 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     sh = reset_time_dependent_estimator(sh)
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`,
+    # as `HierarchicalRiskParity` does. The allocation reads no fee: its measure is a
+    # variance or a standard deviation, which a fee does not move. The fee rides on the
+    # result, where the net returns and a fold's forced exit read it.
+    imsk = investable_mask(pr)
+    fees = investable_fees_view(fees_constraints(sh.opt.fees, sh.opt.sets;
+                                                 strict = sh.opt.strict,
+                                                 datatype = eltype(pr.X)), imsk, pr.X)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here: the
     # augmented matrix the Schur complement builds is finite, and the leaf permutation
     # indexes the investable universe. The weights are expanded back in
     # `SchurComplementHierarchicalRiskParityResult`.
-    imsk, pr, sh, rd = investable_reduction(pr, sh, rd)
+    _, pr, sh, rd = investable_reduction(imsk, pr, sh, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
@@ -1066,9 +1088,10 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     w, gamma, r = schur_complement_weights(pr, items, wb, sh.params)
     assert_schur_weights(w, gamma)
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w)
-    return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr, r = r,
-                                                       gamma = gamma, retcode = retcode,
-                                                       w = w, imsk = imsk, fb = nothing)
+    return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr,
+                                                       fees = fees, r = r, gamma = gamma,
+                                                       retcode = retcode, w = w,
+                                                       imsk = imsk, fb = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1088,12 +1111,20 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     sh = reset_time_dependent_estimator(sh)
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`,
+    # as `HierarchicalRiskParity` does. The allocation reads no fee: its measure is a
+    # variance or a standard deviation, which a fee does not move. The fee rides on the
+    # result, where the net returns and a fold's forced exit read it.
+    imsk = investable_mask(pr)
+    fees = investable_fees_view(fees_constraints(sh.opt.fees, sh.opt.sets;
+                                                 strict = sh.opt.strict,
+                                                 datatype = eltype(pr.X)), imsk, pr.X)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here: the
     # augmented matrix the Schur complement builds is finite, and the leaf permutation
     # indexes the investable universe. The weights are expanded back in
     # `SchurComplementHierarchicalRiskParityResult`.
-    imsk, pr, sh, rd = investable_reduction(pr, sh, rd)
+    _, pr, sh, rd = investable_reduction(imsk, pr, sh, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
@@ -1116,9 +1147,9 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     end
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w / sum(w))
     return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr,
-                                                       r = [rs...], gamma = gammas,
-                                                       retcode = retcode, w = w,
-                                                       imsk = imsk, fb = nothing)
+                                                       fees = fees, r = [rs...],
+                                                       gamma = gammas, retcode = retcode,
+                                                       w = w, imsk = imsk, fb = nothing)
 end
 """
     optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},

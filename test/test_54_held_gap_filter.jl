@@ -309,8 +309,8 @@ end
                                   fb = nothing)
     @test PO.result_investable_mask(ncres) == imsk
     scres = SchurComplementHierarchicalRiskParityResult(; pr = prk, wb = nothing,
-                                                        clr = nothing, r = Variance(),
-                                                        gamma = 0.5,
+                                                        clr = nothing, fees = nothing,
+                                                        r = Variance(), gamma = 0.5,
                                                         retcode = OptimisationSuccess(),
                                                         w = w_keep, imsk = imsk,
                                                         fb = nothing)

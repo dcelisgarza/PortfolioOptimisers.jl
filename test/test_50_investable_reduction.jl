@@ -533,6 +533,48 @@ end
                                       rdk))
 end
 
+@testset "Schur Complement HRP carries its fee, as Hierarchical Risk Parity does (#1296)" begin
+    fees = Fees(; l = fill(0.001, N), s = fill(0.002, N))
+    feesk = Fees(; l = fill(0.001, length(keep)), s = fill(0.002, length(keep)))
+    hopt = HierarchicalOptimiser(; pe = prn, fees = fees)
+    hrp = optimise(HierarchicalRiskParity(; opt = hopt), rd)
+    ps = [SchurComplementParams(; gamma = 0.5), SchurComplementParams(; gamma = 0.25)]
+    for sh in (SchurComplementHierarchicalRiskParity(; opt = hopt),
+               SchurComplementHierarchicalRiskParity(; params = ps, opt = hopt))
+        res = optimise(sh, rd)
+        # The fee sits on the reduced universe, marked with the mask, as the HRP fee does.
+        @test res.fees.imsk == res.imsk == hrp.fees.imsk
+        @test collect(res.fees.l) == collect(hrp.fees.l) == feesk.l
+        @test collect(res.fees.s) == feesk.s
+        # The net returns are net of the fee.
+        @test calc_net_returns(res, X) ≈ calc_net_returns(res.w[keep], X[:, keep], feesk)
+        # The allocation reads no fee: a variance is not moved by it.
+        ref = optimise(SchurComplementHierarchicalRiskParity(; params = sh.params,
+                                                             opt = HierarchicalOptimiser(;
+                                                                                         pe = prn)),
+                       rd)
+        @test res.w == ref.w
+        @test isnothing(ref.fees)
+    end
+    # A forced exit rides on the result, where the fold charges it, as it does for HRP.
+    lqf = Fees(; l = fill(0.001, N), lq = Turnover(; w = fill(0.2, N), val = 0.01))
+    lopt = HierarchicalOptimiser(; pe = prn, fees = lqf)
+    res = optimise(SchurComplementHierarchicalRiskParity(; opt = lopt), rd)
+    ref = optimise(HierarchicalRiskParity(; opt = lopt), rd)
+    @test !isnothing(res.fees.lq)
+    @test collect(res.fees.lq.w) == collect(ref.fees.lq.w)
+    # The all-investable path carries the fee too, and the net returns net it.
+    res = optimise(SchurComplementHierarchicalRiskParity(;
+                                                         opt = HierarchicalOptimiser(;
+                                                                                     pe = pr,
+                                                                                     fees = fees)),
+                   rd)
+    @test isnothing(res.imsk)
+    @test res.fees.l == fees.l
+    @test !(calc_net_returns(res, X) ≈ X * res.w)
+    @test calc_net_returns(res, X) ≈ calc_net_returns(res.w, X, fees)
+end
+
 @testset "Nested Clustered reduces once, and the cluster slice indexes the reduced axis" begin
     # The reduction happens before the clustering, so no cluster holds a non-investable
     # asset and every `port_opt_view(opti, cl, X)` below indexes the reduced universe.
