@@ -1,5 +1,5 @@
 ```@meta
-Description = "Simple covariance, private API of PortfolioOptimisers.jl: show_fields, covariance_centre_and_estimator, CovarianceState, Base.copy, covariance_state_seed, …"
+Description = "Simple covariance, private API of PortfolioOptimisers.jl: show_fields, library_covariance_estimator, covariance_centre_and_estimator, CovarianceState, …"
 ```
 
 # Simple covariance: private API

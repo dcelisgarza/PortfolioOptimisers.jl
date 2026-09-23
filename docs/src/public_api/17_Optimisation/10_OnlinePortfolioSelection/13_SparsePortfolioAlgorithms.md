@@ -1,5 +1,5 @@
 ```@meta
-Description = "The algorithms of the short-term sparse portfolio, public API of PortfolioOptimisers.jl: L1Optimum, HuberOptimum, AlternatingDirectionMethod"
+Description = "The algorithms of the short-term sparse portfolio, public API of PortfolioOptimisers.jl: L1Optimum, HuberOptimum, AlternatingDirectionMethod."
 ```
 
 # The algorithms of the short-term sparse portfolio

@@ -1205,6 +1205,12 @@ $(DocStringExtensions.TYPEDEF)
 
 The algorithm that finds the iterate of a [`ShortTermSparsePortfolio`](@ref) step: the vector ``\\boldsymbol{b}`` whose scaled projection is the next allocation. Its members differ in the programme they solve, and the rule's docstring compares them.
 
+# Interfaces
+
+In order to implement a new algorithm, subtype `AbstractSparsePortfolioAlgorithm` with its own parameters as the fields of the struct, and implement the following method:
+
+  - `sparse_portfolio_iterate(alg::AbstractSparsePortfolioAlgorithm, phi::AbstractVector, w::AbstractVector) -> AbstractVector`: The iterate for the objective `phi`, which sums to one; `w` is the held allocation, which an iteration reads as its seed.
+
 # Related
 
   - [`ShortTermSparsePortfolio`](@ref)
