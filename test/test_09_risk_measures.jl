@@ -498,6 +498,22 @@
         # per-period constant, and the model carries no fee term either.
         @test r(w, rd.X, Fees(; l = 0.001)) == r(w, rd.X)
     end
+    @testset "`factory` keeps a `Skewness`'s settings (#1293)" begin
+        # `factory(::Skewness, ...)` rebuilt the measure without its `settings`, so after
+        # `factory` the skewness term of a `VarianceSkewKurtosis` had scale 1 and no floor.
+        # The model used the stated scale, so the result stored a measure the model did not
+        # use, and its functor reported the skewness term at the wrong scale.
+        st = MaxRiskMeasureSettings(; scale = 2.0, lb = 0.5)
+        @test factory(Skewness(; settings = st), pr).settings === st
+        @test factory(Skewness(; settings = st, sk = pr.sk), pr.pr).settings === st
+
+        # `VarianceSkewKurtosis` turns off each child's `rke`, and keeps its `scale` and `lb`.
+        r = factory(VarianceSkewKurtosis(; sk = Skewness(; settings = st)), pr)
+        @test r.sk.settings === MaxRiskMeasureSettings(; rke = false, scale = 2.0, lb = 0.5)
+        w2 = kron(w, w)
+        @test isapprox(r(w, rd.X),
+                       dot(w, pr.sigma, w) - 2 * dot(w, pr.sk, w2) + dot(w2, pr.kt, w2))
+    end
     @testset "The weighted even moment weights observations linearly (#351)" begin
         # `moment_risk` computed `norm(val .* r.w, 2p)`, which raises each observation
         # weight to the power `2p`. The `JuMP` model attains `(sum w_t d_t^(2p) / T_d)^(1/p)`,

@@ -300,7 +300,8 @@ function factory(r::Skewness, pr::HighOrderPrior, args...; kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     sk = nothing_scalar_array_selector(r.sk, pr.sk)
-    return Skewness(; ve = factory(r.ve, w), sk = sk, w = w, mu = mu, pe = nothing)
+    return Skewness(; settings = r.settings, ve = factory(r.ve, w), sk = sk, w = w, mu = mu,
+                    pe = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -318,7 +319,8 @@ function factory(r::Skewness, pr::LowOrderPrior, args...; kwargs...)::Skewness
     r = resolve_deferred_quantities(r, pr)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    return Skewness(; ve = factory(r.ve, w), sk = r.sk, w = w, mu = mu, pe = nothing)
+    return Skewness(; settings = r.settings, ve = factory(r.ve, w), sk = r.sk, w = w,
+                    mu = mu, pe = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
