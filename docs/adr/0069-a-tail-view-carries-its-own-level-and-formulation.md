@@ -217,3 +217,39 @@ The carriers under `AbstractSequentialTailViewConstraint` hold the two sides and
 `ep_tail_dual_block!` writes one asset's dual block for the dual carrier and the sequential one of
 a measure alike, so each block is written once. `ep_jump_entropy_pooling` is the one solve, and
 `entropy_pooling` is the loop around it, so the three `ep_prior` stages refine within each stage.
+
+## Amendment (2026-09-23)
+
+Issue #1260 found that `IntegerConditionalValueatRiskView` solved a restriction of the view, not the
+view. The formulation of [EPTail](@cite) pins `q_j = w_[j] y_j` with the row
+`q_j >= w_[j] - (1 - y_j)` for every observation of the window, so every marked observation enters
+the tail in full, and the tail must be whole observations of mass exactly `alpha`. The CVaR of a
+discrete law lets its value at risk observation enter in part. The census of #1254 measured the
+integer posterior at 8.4% above the least divergence on an upper bound, and at 107% above it on a
+relative view.
+
+### An observation enters in full only when the one below it is marked
+
+The row now reads the indicator of the observation below:
+
+```julia
+[j = 2:sb], sc1 * (pw[ordi[j]] - (one(alpha) - y[j - 1]) - q[j]) <= 0
+```
+
+The lowest marked observation keeps `0 <= q_j <= w_[j]` alone, and `sum(q) == alpha` fixes it at
+`alpha` less the mass above it. That is the value at risk observation, so the model reads the
+posterior CVaR exactly. The change adds no variable and removes one row per asset. The feasible set
+only grows, so no posterior that was feasible becomes infeasible, and a released posterior can only
+move to a smaller divergence. This departs from the reference on purpose. The ascending order and
+the monotonicity of the section above are unchanged.
+
+### The window stays, and it warns where it binds
+
+`sbar` keeps the rule of thumb of the reference. The window is the one restriction left: the model
+admits the posteriors that put at least `alpha` on the `sbar` largest losses. An upper-bound view
+moves mass down the order and meets that bound first. After the last solve `entropy_pooling` calls
+`ep_check_tail_window`, which warns where the window holds no more than `alpha` plus `alpha` times
+the cube root of the machine epsilon. On the census fixture the binding window held `alpha` to
+`7e-12`, and the five windows that did not bind held `0.011` or more above it. `sbar = T` restricts
+nothing. On that fixture it reached the least divergence of the census to `3e-8` on all four views,
+in 2 to 4 seconds each.

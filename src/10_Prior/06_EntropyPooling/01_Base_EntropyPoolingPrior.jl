@@ -1261,7 +1261,7 @@ The conditional value at risk is the mean of the ``\\alpha`` heaviest tail mass 
 &y_{j} \\leq y_{j+1}\\,, &\\forall\\, j = 1,\\ldots,\\bar{s}-1\\\\
 &q_{j} \\leq y_{j}\\,, &\\forall\\, j = 1,\\ldots,\\bar{s}\\\\
 &q_{j} \\leq w_{[j]}\\,, &\\forall\\, j = 1,\\ldots,\\bar{s}\\\\
-&q_{j} \\geq w_{[j]} - (1 - y_{j})\\,, &\\forall\\, j = 1,\\ldots,\\bar{s}\\\\
+&q_{j} \\geq w_{[j]} - (1 - y_{j-1})\\,, &\\forall\\, j = 2,\\ldots,\\bar{s}\\\\
 &q_{j} \\geq 0\\,, &\\forall\\, j = 1,\\ldots,\\bar{s}\\\\
 &\\alpha = \\sum_{j=1}^{\\bar{s}} q_{j}\\\\
 &\\boldsymbol{y} \\in \\{0,1\\}^{\\bar{s}}\\\\
@@ -1278,9 +1278,11 @@ Where:
   - ``w_{[j]}``: Posterior probability of the observation in position ``j``.
   - ``\\bar{s}``: Number of largest losses the formulation reads.
   - ``\\boldsymbol{y}``: ``\\bar{s} \\times 1`` binary vector that marks the observations entering the tail.
-  - ``\\boldsymbol{q}``: ``\\bar{s} \\times 1`` auxiliary vector that carries the product ``q_{j} = w_{[j]} y_{j}``.
+  - ``\\boldsymbol{q}``: ``\\bar{s} \\times 1`` auxiliary vector that carries the tail mass of each observation of the window.
 
-The monotonicity constraint makes the marked set a suffix of the ascending order, which is what makes the expression the CVaR rather than the mean of an arbitrary subset of probability ``\\alpha``.
+The monotonicity constraint makes the marked set a suffix of the ascending order, which is what makes the expression the CVaR rather than the mean of an arbitrary subset of probability ``\\alpha``. An observation enters the tail in full when the observation below it is also marked, so every marked observation except the lowest one carries ``q_{j} = w_{[j]}``. The lowest one carries a part of its probability, and the sum condition fixes that part at ``\\alpha`` less the mass above it. That is the value at risk observation of the posterior, so the expression is the posterior CVaR exactly.
+
+The window is the one restriction. A posterior whose tail of mass ``\\alpha`` reaches below the ``\\bar{s}`` largest losses is outside the feasible set, so the posterior is the one of least divergence among those whose tail stays inside the window. An upper-bound view moves mass down the order and needs a wider window than a lower-bound view. [`entropy_pooling`](@ref) warns when the window binds, which it does where the window holds no more than the tail mass ``\\alpha``. Raise `sbar` there. An `sbar` equal to the number of observations restricts nothing, at the cost of one binary variable per observation.
 
 # Constructors
 
@@ -1339,7 +1341,7 @@ Sequential convex formulation of a conditional value-at-risk view.
 
 `SequentialConditionalValueatRiskView` writes every view [`LinearConditionalValueatRiskView`](@ref) cannot, with no integer variable: an upper bound, an equality below the prior CVaR, and a relative view whose coefficients carry both signs. It replaces the CVaR of every asset on the wrong side of the inequality by a linear upper bound, solves the convex problem that results, and re-solves with the bound re-read at the posterior until the bound is tight. The view holds on every posterior of that sequence, and the divergence of each is at most that of the one before it.
 
-The posterior is a local minimiser of the divergence. The feasible set of an upper-bound or relative CVaR view is not convex, so no convex program describes it exactly, and the sequence stops at a fixed point rather than at the posterior of least divergence. [`IntegerConditionalValueatRiskView`](@ref) reaches the latter, at the cost of binary variables and a solver that handles mixed-integer exponential cone programs. A view of one asset with a lower-bound operator is convex, and the formulation then reduces to the linear one with no re-solve.
+The posterior is a local minimiser of the divergence. The feasible set of an upper-bound or relative CVaR view is not convex, so no convex program describes it exactly, and the sequence stops at a fixed point rather than at the posterior of least divergence. [`IntegerConditionalValueatRiskView`](@ref) reaches the latter when its window holds the tail of the posterior, at the cost of binary variables and a solver that handles mixed-integer exponential cone programs. A view of one asset with a lower-bound operator is convex, and the formulation then reduces to the linear one with no re-solve.
 
 # Mathematical definition
 
@@ -4164,9 +4166,12 @@ Where:
  4. Read `iters`, the largest number of re-solves a carrier of `tvs` asks for, with [`ep_refine_iters`](@ref). It is zero where no carrier is sequential, and the steps below then do not run.
  5. Re-read every carrier at `w1` with [`ep_refine_tail_view`](@ref), which returns the carrier and whether its surrogate row is tight there. Stop where every carrier is tight.
  6. Solve again with the re-read carriers, giving a new `w1`, and return to step 5. Take at most `iters` re-solves, so the last posterior can hold a slack row when the sequence has not settled.
- 7. Return `w1` as `StatsBase.pweights`.
+ 7. Check every carrier at `w1` with [`ep_check_tail_window`](@ref), which warns where the window of an integer carrier can bind.
+ 8. Return `w1` as `StatsBase.pweights`.
 
 The re-solves are the sequential convex formulations' half of the work. Each re-read row is tight at the posterior it was read at and still holds there, so that posterior stays feasible and the divergence of the next one is at most its own.
+
+A stop on tight rows means that the sequence reached a fixed point, not that the posterior is the one of least divergence. The feasible set of a sequential view is not convex, so the fixed point can be a local minimiser. More re-solves or a smaller `tol` do not move it. On a sample of sixty observations, a view that bounds a CVaR at 0.7 times its prior value stopped with tight rows at a divergence 7.5% above the least one. No flag of the result marks this case.
 
 # Arguments
 
@@ -4194,6 +4199,7 @@ The re-solves are the sequential convex formulations' half of the work. Each re-
   - [`ep_jump_entropy_pooling`](@ref)
   - [`ep_refine_tail_view`](@ref)
   - [`ep_refine_iters`](@ref)
+  - [`ep_check_tail_window`](@ref)
   - [`add_ep_tail_view!`](@ref)
   - [`JuMPEntropyPooling`](@ref)
   - [`OptimEntropyPooling`](@ref)
@@ -4218,9 +4224,6 @@ function entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
     end
     w1 = ep_jump_entropy_pooling(w, epc, tvs, opt)
     iters = ep_refine_iters(tvs)
-    if iszero(iters)
-        return w1
-    end
     tvs = AbstractEntropyPoolingTailView[tv for tv in tvs]
     for _ in 1:iters
         tight = true
@@ -4233,6 +4236,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
         end
         w1 = ep_jump_entropy_pooling(w, epc, tvs, opt)
     end
+    foreach(tv -> ep_check_tail_window(tv, w1), tvs)
     return w1
 end
 """
@@ -4279,7 +4283,7 @@ A carrier whose rows are fixed at construction is returned unchanged, and is alw
 # Returns
 
   - `tv::AbstractEntropyPoolingTailView`: The carrier to solve with next.
-  - `tight::Bool`: Whether the rows `tv` held before the call were tight at `w`, within the tolerance the carrier holds.
+  - `tight::Bool`: Whether the rows `tv` held before the call were tight at `w`, within the tolerance the carrier holds. A tight row marks a fixed point of the sequence, which can be a local minimiser of the divergence and not the global one.
 
 # Related
 
@@ -4289,6 +4293,31 @@ A carrier whose rows are fixed at construction is returned unchanged, and is alw
 """
 function ep_refine_tail_view(tv::AbstractEntropyPoolingTailView, ::VecNum)
     return tv, true
+end
+"""
+    ep_check_tail_window(tv::AbstractEntropyPoolingTailView, w::VecNum)
+
+Warn where the window of a tail view carrier can restrict the posterior.
+
+Only [`IntegerConditionalValueatRiskViewConstraint`](@ref) reads a window: its model admits the posteriors that put at least `alpha` of their mass on the `sbar` largest losses of each asset. Where that restriction binds, the window holds exactly `alpha`, and the view can have a posterior of smaller divergence outside it, so the method warns. Every other carrier reads the whole sample and does nothing. The integer method lives beside its carrier in `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior.jl`.
+
+# Arguments
+
+  - `tv`: Tail view constraint.
+  - `w`: Posterior probabilities of the last solve.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`entropy_pooling`](@ref)
+  - [`IntegerConditionalValueatRiskView`](@ref)
+  - [`AbstractEntropyPoolingTailView`](@ref)
+"""
+function ep_check_tail_window(::AbstractEntropyPoolingTailView, ::VecNum)
+    return nothing
 end
 """
     ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
@@ -4308,7 +4337,7 @@ Build and solve the entropy pooling model of one set of tail view carriers, once
  6. Add every view with [`ep_jump_views!`](@ref), which mutates `obj_expr` when a fixed equality is relaxed.
  7. Set the objective to `obj_expr` under [`ExpEntropyPooling`](@ref), and to `obj_expr` less `so` times the inner product of `x` with the prior log-probabilities under [`LogEntropyPooling`](@ref).
  8. Solve with `slv`, and raise when no solver configuration succeeds.
- 9. Return the value of `x` as `StatsBase.pweights`.
+ 9. Clamp the value of `x` at zero, because the solver meets the non-negativity of step 4 to its feasibility tolerance only, and a mixed-integer solve can return an entry slightly below zero. Divide by its sum, and return it as `StatsBase.pweights`.
 
 # JuMP formulation
 
@@ -4401,7 +4430,9 @@ function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
     JuMP.@objective(model, Min, obj_expr)
     @argcheck(optimise_JuMP_model!(model, slv).success,
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
-    return StatsBase.pweights(JuMP.value.(x))
+    # The solver meets `x >= 0` to its feasibility tolerance, so an entry can come back a
+    # hair below zero, and every weighted estimator of the refit refuses it. Issue #1260.
+    return StatsBase.pweights(LinearAlgebra.normalize(max.(JuMP.value.(x), 0), 1))
 end
 function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
                                  opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,
@@ -4425,7 +4456,9 @@ function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
     JuMP.@objective(model, Min, obj_expr - so * LinearAlgebra.dot(x, log_p))
     @argcheck(optimise_JuMP_model!(model, slv).success,
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
-    return StatsBase.pweights(JuMP.value.(x))
+    # The solver meets `x >= 0` to its feasibility tolerance, so an entry can come back a
+    # hair below zero, and every weighted estimator of the refit refuses it. Issue #1260.
+    return StatsBase.pweights(LinearAlgebra.normalize(max.(JuMP.value.(x), 0), 1))
 end
 """
     ep_jump_views!(model::JuMP.Model, x, obj_expr, epc::AbstractDict, tvs::VecEPTV,

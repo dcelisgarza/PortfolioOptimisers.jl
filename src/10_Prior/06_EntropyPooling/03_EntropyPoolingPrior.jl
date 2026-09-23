@@ -393,7 +393,7 @@ q_{j}(\\theta) &= \\dfrac{w_{j} e^{-\\theta c_{j}}}{\\sum_{i=1}^{T} w_{i} e^{-\\
 \\end{align}
 ```
 
-The row's value under the tilt falls strictly as ``\\theta`` rises, from ``\\max_{j} c_{j}`` to ``\\min_{j} c_{j}``, so the tilt exists exactly when ``b`` sits strictly inside that range.
+The row's value under the tilt falls strictly as ``\\theta`` rises, from ``\\max_{j} c_{j}`` to ``\\min_{j} c_{j}`` over the observations with ``w_{j} > 0``, so the tilt exists exactly when ``b`` sits strictly inside that range. A tilt cannot put mass on an observation of zero prior probability, so the coefficient of such an observation bounds nothing.
 
 # Arguments
 
@@ -408,13 +408,14 @@ The row's value under the tilt falls strictly as ``\\theta`` rises, from ``\\max
 
 # Returns
 
-  - `q::Option{VecNum}`: The tilted probabilities, or `nothing` when `b` sits outside the range of `c` and no probability vector attains it.
+  - `q::Option{VecNum}`: The tilted probabilities, or `nothing` when `b` sits outside the range of `c` over the support of `w` and no tilt attains it, or when the tilted row is not finite.
 
 # Algorithm
 
- 1. Return `nothing` when `b` sits outside the open range of `c`.
+ 1. Return `nothing` when `b` sits outside the open range of `c` over the observations with `w > 0`.
  2. Bracket the root by doubling the tilt away from zero until the row's value crosses `b`.
  3. Bisect the bracket to the resolution of the floating-point type, or for `iters` steps, whichever comes first.
+ 4. Return `nothing` when the tilted weights sum to zero or to a value that is not a number, and the normalised weights otherwise.
 
 # Related
 
@@ -427,7 +428,10 @@ The row's value under the tilt falls strictly as ``\\theta`` rises, from ``\\max
 """
 function ep_row_tilt(w::VecNum, c::VecNum, b::Number; iters::Integer = 200)
     @argcheck(iters >= one(iters), DomainError(iters, "iters must be >= 1"))
-    lo, hi = extrema(c)
+    # The range is read over the support of `w`: a tilt leaves a zero prior probability at
+    # zero, so a target past the support's extreme sends the doubling below to underflow
+    # every `exp`, and the row to `0/0`. Issue #1260.
+    lo, hi = extrema(ci for (ci, wi) in zip(c, w) if wi > zero(wi))
     if !(lo < b < hi)
         return nothing
     end
@@ -454,7 +458,8 @@ function ep_row_tilt(w::VecNum, c::VecNum, b::Number; iters::Integer = 200)
         ((row(thm) - b) * sgn > zero(b)) ? (tha = thm) : (thb = thm)
     end
     row(thb)
-    return q ./ sum(q)
+    # A sum that is zero or not a number means the tilt underflowed.
+    return sum(q) > zero(eltype(q)) ? q ./ sum(q) : nothing
 end
 """
     ep_evar_anchor(x::VecNum, w::VecNum, alpha::Number, rhs::Number, z::Number;
@@ -1759,7 +1764,7 @@ The [`IntegerConditionalValueatRiskViewConstraint`](@ref) method registers five 
 
   - ``s_{c1} \\left(q_{j} - y_{j}\\right) \\leq 0``, ``\\forall\\, j = 1,\\ldots,\\bar{s}``.
   - ``s_{c1} \\left(q_{j} - p_{[j]}\\right) \\leq 0``, ``\\forall\\, j = 1,\\ldots,\\bar{s}``.
-  - ``s_{c1} \\left(p_{[j]} - (1 - y_{j}) - q_{j}\\right) \\leq 0``, ``\\forall\\, j = 1,\\ldots,\\bar{s}``.
+  - ``s_{c1} \\left(p_{[j]} - (1 - y_{j-1}) - q_{j}\\right) \\leq 0``, ``\\forall\\, j = 2,\\ldots,\\bar{s}``.
   - ``s_{c1} \\left(y_{j} - y_{j+1}\\right) \\leq 0``, ``\\forall\\, j = 1,\\ldots,\\bar{s}-1``.
   - ``s_{c1} \\left(\\sum_{j=1}^{\\bar{s}} q_{j} - \\alpha\\right) = 0``.
 
@@ -1795,7 +1800,7 @@ Where:
   - ``\\mathcal{P}``: Assets on the dual side of a sequential carrier.
   - ``b``, ``\\boldsymbol{c}``: Surrogate row a sequential carrier holds, from [`ep_tail_surrogate_row`](@ref).
   - ``\\boldsymbol{y}``: Binary vector. It marks the tail of one asset's window in the integer conditional value-at-risk method, and selects one grid point in the two grid methods.
-  - ``\\boldsymbol{q}``: ``\\bar{s} \\times 1`` vector that carries the product ``q_{j} = p_{[j]} y_{j}``.
+  - ``\\boldsymbol{q}``: ``\\bar{s} \\times 1`` vector that carries the tail mass of each observation of the window: ``p_{[j]}`` above the lowest marked observation, a part of ``p_{[j]}`` at it, and zero below it.
   - ``\\varepsilon``: Left hand side of an integer conditional value-at-risk view, the coefficient-weighted sum of the per-asset posterior CVaRs.
   - ``K``: Number of grid points the carrier holds.
   - ``c_{k,\\,j}``: Scaled coefficient of observation ``j`` at grid point ``k``, from [`ep_evar_grid_row`](@ref) or [`ep_rlvar_grid_row`](@ref).
@@ -1806,7 +1811,7 @@ Where:
 
 $(val_dict[:relax])
 
-The two grid methods and the sequential method bound the statistic. The dual method and the integer method are exact.
+The two grid methods and the sequential method bound the statistic. The dual method is exact. The integer method is exact over the posteriors whose tail of mass ``\\alpha`` lies inside the window of ``\\bar{s}`` largest losses, which is every posterior when ``\\bar{s} = T``.
 
 The sequential method is a **restriction** of the view, tightened by re-solves.
 
@@ -1896,8 +1901,8 @@ function add_ep_tail_view!(model::JuMP.Model, pw,
                           begin
                               [j = 1:sb], sc1 * (q[j] - y[j]) <= 0
                               [j = 1:sb], sc1 * (q[j] - pw[ordi[j]]) <= 0
-                              [j = 1:sb],
-                              sc1 * (pw[ordi[j]] - (one(alpha) - y[j]) - q[j]) <= 0
+                              [j = 2:sb],
+                              sc1 * (pw[ordi[j]] - (one(alpha) - y[j - 1]) - q[j]) <= 0
                               [j = 1:(sb - 1)], sc1 * (y[j] - y[j + 1]) <= 0
                               sc1 * (sum(q) - alpha) == 0
                           end)
@@ -1909,6 +1914,44 @@ function add_ep_tail_view!(model::JuMP.Model, pw,
         JuMP.@constraint(model, sc1 * (rhs - expr) <= 0)
     else
         JuMP.@constraint(model, sc1 * (expr - rhs) <= 0)
+    end
+    return nothing
+end
+"""
+    ep_check_tail_window(tv::IntegerConditionalValueatRiskViewConstraint, w::VecNum)
+
+Warn where the window of an integer conditional value-at-risk view can restrict the posterior.
+
+The model of [`IntegerConditionalValueatRiskView`](@ref) admits the posteriors that put at least `alpha` of their mass on the `sbar` largest losses of each asset. Where that restriction binds, the window holds exactly `alpha`, and the method warns. A window that holds more is not active at the posterior, so a small change of the posterior does not meet it.
+
+# Algorithm
+
+ 1. For each asset of the view, skip a window that holds every observation, since it restricts nothing.
+ 2. Sum `w` over the window, and warn where the sum exceeds `alpha` by no more than `alpha` times the cube root of the machine epsilon of `w`. That margin is far above the feasibility tolerance of a solver and far below the mass of one observation.
+
+# Arguments
+
+  - `tv`: Integer conditional value-at-risk view constraint.
+  - `w`: Posterior probabilities of the last solve.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ep_check_tail_window`](@ref)
+  - [`IntegerConditionalValueatRiskView`](@ref)
+  - [`entropy_pooling`](@ref)
+"""
+function ep_check_tail_window(tv::IntegerConditionalValueatRiskViewConstraint, w::VecNum)
+    (; ord, alpha) = tv
+    for o in ord
+        # The window binds when it holds no more than `alpha`, since the model asks it to hold
+        # at least that. A window of the whole sample restricts nothing.
+        if length(o) < length(w) && sum(view(w, o)) - alpha <= alpha * cbrt(eps(eltype(w)))
+            @warn("The integer CVaR view reads the $(length(o)) largest losses, and the posterior puts only the tail mass $(alpha) on them, so the window binds and a posterior of smaller divergence can lie outside it. Raise `sbar` in `IntegerConditionalValueatRiskView`.")
+        end
     end
     return nothing
 end
@@ -2206,15 +2249,16 @@ function ep_sbar(sbar::Number, T::Integer, args...)
 end
 """
     ep_assert_reachable_view(op::Symbol, rhs::Number, x::AbstractVector{<:VecNum},
-                             coef::VecNum, eqn::AbstractString, name::AbstractString)
+                             coef::VecNum, w::VecNum, eqn::AbstractString,
+                             name::AbstractString)
 
 Reject a tail view no reweighting of the sample can reach.
 
-A tail risk measure of a reweighted sample lies between the smallest and the largest loss the sample holds, so a coefficient-weighted sum of measures lies between the sums of those bounds, and a view outside that band is infeasible however the probabilities move. The band is exact for one asset, and an outer bound for several: a reweighting that puts every asset at its worst loss at once need not exist.
+A tail risk measure of a reweighted sample lies between the smallest and the largest loss the sample holds where the prior probability is positive, so a coefficient-weighted sum of measures lies between the sums of those bounds, and a view outside that band is infeasible however the probabilities move. The band is exact for one asset, and an outer bound for several: a reweighting that puts every asset at its worst loss at once need not exist. The posterior of entropy pooling puts no mass where the prior puts none, so an observation of zero prior probability widens nothing.
 
 # Algorithm
 
- 1. Read `hi`, the sum over the assets of the coefficient times the largest loss where the coefficient is positive, and times the smallest loss where it is negative. Read `lo` the other way round.
+ 1. Read `hi`, the sum over the assets of the coefficient times the largest loss where the coefficient is positive, and times the smallest loss where it is negative, over the observations with `w > 0`. Read `lo` the other way round.
  2. Where `op` asks the statistic to reach or exceed `rhs`, raise unless `rhs` sits below `hi`.
  3. Where `op` asks the statistic to reach or fall below `rhs`, raise unless `rhs` sits above `lo`.
 
@@ -2224,6 +2268,7 @@ A tail risk measure of a reweighted sample lies between the smallest and the lar
   - `rhs`: Target value of the view.
   - `x`: Per asset the view names, its loss series.
   - `coef`: Per asset, the coefficient the view gives its risk measure.
+  - `w`: Prior probability weights.
   - `eqn`: Equation of the view, used in the error message.
   - `name`: Name of the view family, used in the error message.
 
@@ -2242,10 +2287,14 @@ A tail risk measure of a reweighted sample lies between the smallest and the lar
   - [`ep_tail_views!`](@ref)
 """
 function ep_assert_reachable_view(op::Symbol, rhs::Number, x::AbstractVector{<:VecNum},
-                                  coef::VecNum, eqn::AbstractString, name::AbstractString)
-    hi = sum(ci * ifelse(ci > zero(ci), maximum(xi), minimum(xi))
+                                  coef::VecNum, w::VecNum, eqn::AbstractString,
+                                  name::AbstractString)
+    # Only the support of `w` bounds the band: a posterior puts no mass where the prior puts
+    # none. Issue #1260.
+    sup = w .> zero(eltype(w))
+    hi = sum(ci * ifelse(ci > zero(ci), maximum(view(xi, sup)), minimum(view(xi, sup)))
              for (xi, ci) in zip(x, coef))
-    lo = sum(ci * ifelse(ci > zero(ci), minimum(xi), maximum(xi))
+    lo = sum(ci * ifelse(ci > zero(ci), minimum(view(xi, sup)), maximum(view(xi, sup)))
              for (xi, ci) in zip(x, coef))
     if op == :geq || op == :eq
         @argcheck(rhs < hi,
@@ -2866,7 +2915,7 @@ function ep_tail_view_prior_args(tail_views::RelativisticValueatRiskView, w::Vec
             tail_views.args, tail_views.kwargs, tail_views.bracket)
 end
 """
-    ep_normalise_tail_view(terms::NamedTuple, X::MatNum, eqn::AbstractString,
+    ep_normalise_tail_view(terms::NamedTuple, X::MatNum, w::VecNum, eqn::AbstractString,
                            name::AbstractString)
 
 Normalise the coefficients of a tail view, read the loss series it is stated on, and say whether its coefficients carry both signs.
@@ -2879,12 +2928,13 @@ The steps below are shared by every tail view. A view of one asset is divided by
  2. Where the view names one asset, divide it by that asset's coefficient with [`ep_normalise_view_term`](@ref), which flips the operator where the coefficient is negative, and set the coefficient to one.
  3. Where it names several assets and `mixed` is false, multiply both sides by the sign of the first coefficient through the same function, so every coefficient is positive and the operator flips where the sign is negative.
  4. Read the loss series of each asset, `x`, as its negated returns column.
- 5. Reject a target no reweighting of the sample reaches with [`ep_assert_reachable_view`](@ref).
+ 5. Reject a target no reweighting of the sample under the support of `w` reaches with [`ep_assert_reachable_view`](@ref).
 
 # Arguments
 
   - `terms`: Resolved terms of the view, as [`ep_view_terms`](@ref) returns them.
   - `X`: Matrix of asset returns.
+  - `w`: Prior probability weights.
   - `eqn`: Equation of the view, used in the error messages.
   - `name`: Name of the risk measure, used in the error messages.
 
@@ -2904,8 +2954,8 @@ The steps below are shared by every tail view. A view of one asset is divided by
   - [`ep_add_tail_view!`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 """
-function ep_normalise_tail_view(terms::NamedTuple, X::MatNum, eqn::AbstractString,
-                                name::AbstractString)
+function ep_normalise_tail_view(terms::NamedTuple, X::MatNum, w::VecNum,
+                                eqn::AbstractString, name::AbstractString)
     (; idx, coef, op, rhs) = terms
     z = zero(eltype(coef))
     mixed = any(<(z), coef) && any(>(z), coef)
@@ -2918,7 +2968,7 @@ function ep_normalise_tail_view(terms::NamedTuple, X::MatNum, eqn::AbstractStrin
         coef = coef .* sgn
     end
     x = [-X[:, j] for j in idx]
-    ep_assert_reachable_view(op, rhs, x, coef, eqn, name)
+    ep_assert_reachable_view(op, rhs, x, coef, w, eqn, name)
     return x, coef, op, rhs, mixed
 end
 """
@@ -2976,7 +3026,7 @@ function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
                            tail_views::ConditionalValueatRiskView, alg, X::MatNum,
                            terms::NamedTuple, eqn::AbstractString, w::VecNum)
     alpha = tail_views.alpha
-    x, coef, op, rhs, mixed = ep_normalise_tail_view(terms, X, eqn, "CVaR")
+    x, coef, op, rhs, mixed = ep_normalise_tail_view(terms, X, w, eqn, "CVaR")
     rm = ConditionalValueatRisk(; alpha = alpha, w = StatsBase.pweights(w))
     pv = sum(ci * rm(-xi) for (xi, ci) in zip(x, coef))
     alg = ep_cvar_formulation(alg, mixed, op, rhs, pv)
@@ -2987,7 +3037,7 @@ function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
                            tail_views::EntropicValueatRiskView, alg, X::MatNum,
                            terms::NamedTuple, eqn::AbstractString, w::VecNum)
     (; alpha, args, kwargs, zlo_frac) = tail_views
-    x, coef, op, rhs, mixed = ep_normalise_tail_view(terms, X, eqn, "EVaR")
+    x, coef, op, rhs, mixed = ep_normalise_tail_view(terms, X, w, eqn, "EVaR")
     pv = zero(rhs)
     zstar = Vector{typeof(rhs)}(undef, length(x))
     for (k, (xi, ci)) in enumerate(zip(x, coef))
@@ -3004,7 +3054,7 @@ function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
                            tail_views::RelativisticValueatRiskView, alg, X::MatNum,
                            terms::NamedTuple, eqn::AbstractString, w::VecNum)
     (; alpha, kappa, args, kwargs, bracket) = tail_views
-    x, coef, op, rhs, mixed = ep_normalise_tail_view(terms, X, eqn, "RLVaR")
+    x, coef, op, rhs, mixed = ep_normalise_tail_view(terms, X, w, eqn, "RLVaR")
     pv = zero(rhs)
     zstar = Vector{typeof(rhs)}(undef, length(x))
     for (k, (xi, ci)) in enumerate(zip(x, coef))

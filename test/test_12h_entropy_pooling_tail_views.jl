@@ -901,6 +901,48 @@ end
     @test isapprox(ep_scvar(1, pr.w), tgt, rtol = 1e-3)
 end
 
+@testset "integer CVaR reaches the posterior of least divergence" begin
+    # Issue #1260. The integer formulation used to put every marked observation in the
+    # tail in full, so the tail had to be whole observations of mass exactly `alpha`. The
+    # value at risk observation now enters in part, and the model reads the posterior CVaR
+    # exactly. The pinned divergences are the global minima of the census of #1254: the
+    # least divergence over every candidate value at risk of a convex problem each. The old
+    # form landed at 0.0858 on the relative view, and the sequential formulation stops at a
+    # local minimum 7.5% above the global one on the upper bound.
+    rng = StableRNG(1254)
+    cT = 60
+    X = 0.01 .* randn(rng, cT, 3) .+ 0.0005
+    X[:, 1] .-= 0.02 .* (rand(rng, cT) .< 0.05)
+    crd = ReturnsResult(; nx = ["A", "B", "C"], X = X)
+    csets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+    cw0 = StatsBase.pweights(fill(inv(cT), cT))
+    ccvar(j, wi) = ConditionalValueatRisk(; alpha = ep_a, w = wi)(X[:, j])
+    fit = (alg, opt, eqn) -> prior(EntropyPoolingPrior(; sets = csets, opt = opt,
+                                                       cvar_views = ConditionalValueatRiskView(;
+                                                                                               alpha = ep_a,
+                                                                                               alg = alg,
+                                                                                               views = LinearConstraintEstimator(;
+                                                                                                                                 val = eqn))),
+                                   crd)
+    pc1 = ccvar(1, cw0)
+    pc3 = ccvar(3, cw0)
+    ialg = IntegerConditionalValueatRiskView(; sbar = cT)
+    pr = fit(ialg, ep_mopt, "A <= $(0.7 * pc1)")
+    @test all(>=(0), pr.w)
+    @test ccvar(1, pr.w) <= 0.7 * pc1 * (1 + 1e-6)
+    @test isapprox(pr.kld, 0.017502412119, rtol = 1e-6)
+    prs = fit(SequentialConditionalValueatRiskView(), JuMPEntropyPooling(; slv = slv),
+              "A <= $(0.7 * pc1)")
+    @test prs.kld > 1.05 * pr.kld
+    pr = fit(ialg, ep_mopt, "A - C == $(pc1 - pc3 + 0.01)")
+    @test isapprox(ccvar(1, pr.w) - ccvar(3, pr.w), pc1 - pc3 + 0.01, rtol = 1e-5)
+    @test isapprox(pr.kld, 0.041500929252, rtol = 1e-6)
+    # The default window holds six losses. An upper bound at half the prior CVaR needs a
+    # wider tail than that, so the window binds and the view warns.
+    @test_logs (:warn, r"window binds") match_mode = :any fit(IntegerConditionalValueatRiskView(),
+                                                              ep_mopt, "A <= $(0.5 * pc1)")
+end
+
 @testset "relative CVaR view over two assets" begin
     gap = ep_spcvar - ep_spcvarN
     tgt = gap + 0.01
@@ -1613,14 +1655,15 @@ end
     # realisation. Both ends are refused, and everything strictly inside passes.
     x = -rd.X[:, 1]
     lo, hi = extrema(x)
-    @test isnothing(PO.ep_assert_reachable_view(:eq, (lo + hi) / 2, [x], [1.0], "e",
+    @test isnothing(PO.ep_assert_reachable_view(:eq, (lo + hi) / 2, [x], [1.0], ep_w0, "e",
                                                 "EVaR"))
-    @test isnothing(PO.ep_assert_reachable_view(:geq, prevfloat(hi), [x], [1.0], "e",
+    @test isnothing(PO.ep_assert_reachable_view(:geq, prevfloat(hi), [x], [1.0], ep_w0, "e",
                                                 "EVaR"))
-    @test isnothing(PO.ep_assert_reachable_view(:leq, nextfloat(lo), [x], [1.0], "e",
+    @test isnothing(PO.ep_assert_reachable_view(:leq, nextfloat(lo), [x], [1.0], ep_w0, "e",
                                                 "EVaR"))
     for (op, v) in ((:geq, hi), (:leq, lo), (:eq, hi), (:eq, lo))
-        @test_throws DomainError PO.ep_assert_reachable_view(op, v, [x], [1.0], "e", "EVaR")
+        @test_throws DomainError PO.ep_assert_reachable_view(op, v, [x], [1.0], ep_w0, "e",
+                                                             "EVaR")
     end
     # Over several assets the band is the coefficient-weighted sum of the per-asset ends,
     # with the ends exchanged where the coefficient is negative.
@@ -1629,11 +1672,45 @@ end
     hib = hi - 2 * lo2
     lob = lo - 2 * hi2
     @test isnothing(PO.ep_assert_reachable_view(:eq, (lob + hib) / 2, [x, y], [1.0, -2.0],
-                                                "e", "CVaR"))
+                                                ep_w0, "e", "CVaR"))
     @test_throws DomainError PO.ep_assert_reachable_view(:geq, hib, [x, y], [1.0, -2.0],
-                                                         "e", "CVaR")
+                                                         ep_w0, "e", "CVaR")
     @test_throws DomainError PO.ep_assert_reachable_view(:leq, lob, [x, y], [1.0, -2.0],
-                                                         "e", "CVaR")
+                                                         ep_w0, "e", "CVaR")
+
+    # A posterior puts no mass where the prior puts none, so an observation of zero prior
+    # probability widens neither band. Issue #1260: with the worst loss at zero prior, a
+    # target between the worst loss on the support and the worst loss overall passed the
+    # guard, and the tilt doubled until every `exp` underflowed and returned all `NaN`.
+    wz = [0.25, 0.25, 0.5, 0.0]
+    cz = [1.0, 2.0, 3.0, 10.0]
+    @test isnothing(PO.ep_row_tilt(wz, cz, 5.0))
+    @test isnothing(PO.ep_row_tilt(wz, cz, 3.0))
+    qz = PO.ep_row_tilt(wz, cz, 2.9)
+    @test all(isfinite, qz)
+    @test iszero(qz[4])
+    @test LinearAlgebra.dot(qz, cz) ≈ 2.9
+    @test_throws DomainError PO.ep_assert_reachable_view(:geq, 5.0, [cz], [1.0], wz, "e",
+                                                         "EVaR")
+    @test isnothing(PO.ep_assert_reachable_view(:geq, 2.9, [cz], [1.0], wz, "e", "EVaR"))
+
+    # `ep_check_tail_window` warns where the window of an integer CVaR carrier binds, which
+    # is where it holds no more than `alpha`, and never for a window of the whole sample.
+    tvz = PO.IntegerConditionalValueatRiskViewConstraint([[3, 4, 5]], [[1.0, 2.0, 3.0]],
+                                                         [1.0], 0.1, :leq, 2.0)
+    @test_logs (:warn, r"window binds") PO.ep_check_tail_window(tvz,
+                                                                [0.45, 0.45, 0.0, 0.05,
+                                                                 0.05])
+    @test_logs PO.ep_check_tail_window(tvz, [0.3, 0.3, 0.2, 0.1, 0.1])
+    tvw = PO.IntegerConditionalValueatRiskViewConstraint([[1, 2]], [[1.0, 2.0]], [1.0], 0.1,
+                                                         :leq, 2.0)
+    @test_logs PO.ep_check_tail_window(tvw, [0.95, 0.05])
+    @test isnothing(PO.ep_check_tail_window(PO.LinearConditionalValueatRiskViewConstraint([[1.0,
+                                                                                            2.0]],
+                                                                                          [1.0],
+                                                                                          0.1,
+                                                                                          2.0),
+                                            [0.5, 0.5]))
 
     # `ep_normalise_view_term` flips the operator on a negative coefficient, and leaves an
     # equality alone. All four cells.
@@ -1730,7 +1807,9 @@ end
     @test d[EQ] == 1
     @test d[(Vector{JuMP.AffExpr}, JuMP.MOI.RelativeEntropyCone)] == 1
 
-    # Five rows per asset over its window, and one row carrying the operator.
+    # Five rows per asset over its window, and one row carrying the operator. The row that
+    # puts an observation in the tail in full reads the observation below it, so the lowest
+    # observation of the window has none. Issue #1260.
     o = sortperm(x)
     sb = PO.ep_sbar(nothing, Ts, ep_a, ep_sw0, o)
     ordw = o[(Ts - sb + 1):Ts]
@@ -1738,7 +1817,7 @@ end
                                                                   ep_a, :geq, 0.05), Ts)
     @test nv == 2 * sb
     @test d[BIN] == sb
-    @test d[LE] == 3 * sb + (sb - 1) + 1
+    @test d[LE] == 3 * sb - 1 + (sb - 1) + 1
     @test d[EQ] == 1
 
     # Two rows: the selector, and one row per grid point.

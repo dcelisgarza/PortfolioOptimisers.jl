@@ -50,6 +50,7 @@ ep_normalise_tail_view
 ep_add_tail_view!
 ep_tail_views!
 add_ep_tail_view!
+ep_check_tail_window(tv::IntegerConditionalValueatRiskViewConstraint, w::VecNum)
 PortfolioOptimisers.show_fields(::EntropyPoolingPrior)
 ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing; strict::Bool = false, kwargs...)
 ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing; strict::Bool = false, kwargs...)

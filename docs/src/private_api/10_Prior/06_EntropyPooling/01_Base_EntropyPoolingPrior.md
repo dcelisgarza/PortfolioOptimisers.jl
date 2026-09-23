@@ -38,6 +38,7 @@ entropy_pooling
 ep_jump_entropy_pooling
 ep_refine_iters
 ep_refine_tail_view(tv::AbstractEntropyPoolingTailView, ::VecNum)
+ep_check_tail_window(::AbstractEntropyPoolingTailView, ::VecNum)
 ep_sigma_views!
 fix_sigma!
 ep_cov_views!
