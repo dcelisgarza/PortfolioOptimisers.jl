@@ -332,7 +332,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :pes => "`pes`: Vector of prior estimators.",#
                                  :pe1 => "`pe1`: Pre-processing prior estimator.",#
                                  :pe2 => "`pe2`: Post-processing prior estimator.",#
-                                 :p_pool => "`p`: Opinion pooling blending parameter.",#
+                                 :p_pool => "`p`: Penalty of robust opinion pooling, above zero, or `nothing` to pool the opinion weights as given. A larger value moves more weight to the opinions nearest the consensus.",#
                                  # Entropy pooling.
                                  :mu_views => "`mu_views`: Expected returns views estimator or result.",#
                                  :var_views => "`var_views`: Value-at-risk views estimator or result.",#

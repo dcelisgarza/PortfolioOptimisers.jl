@@ -193,7 +193,7 @@ res_bl = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Equilibrium" => res_eq.w,
                         "Black-Litterman" => res_bl.w]); formatters = [resfmt],
-             title = "Maximum-ratio weights: equilibrium vs Black–Litterman")
+             title = "Maximum-ratio weights: equilibrium vs Black-Litterman")
 
 #=
 In the composition plot, compare the weight of Apple in the two bars.
@@ -227,7 +227,7 @@ plot_measures(fr_eq.w, pr_eq; x = Variance(), y = ExpectedReturn(; rt = fr_eq.re
 
 # The frontier under the Black-Litterman posterior.
 plot_measures(fr_bl.w, pr_abs; x = Variance(), y = ExpectedReturn(; rt = fr_bl.ret),
-              title = "Efficient frontier: Black–Litterman posterior", xlabel = "Variance",
+              title = "Efficient frontier: Black-Litterman posterior", xlabel = "Variance",
               ylabel = "Expected return")
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

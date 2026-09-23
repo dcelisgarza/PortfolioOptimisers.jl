@@ -147,7 +147,7 @@ ress_kt = [k => optimise(MeanRisk(; r = Kurtosis(), obj = MinimumRisk(),
 pretty_table(DataFrame(["Assets" => rd.nx;
                         ["NSkew $k" => r.w for (k, r) in ress_sk];
                         ["Kurt $k" => r.w for (k, r) in ress_kt]]); formatters = [resfmt],
-             title = "Minimum skew / kurtosis weights by prior")
+             title = "Minimum negative skewness / kurtosis weights by prior")
 
 #=
 We stack the weights that minimise the negative skewness into one bar per prior.

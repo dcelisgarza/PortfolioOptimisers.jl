@@ -178,15 +178,25 @@ that opinion and the linear consensus, and scales the weights to sum to one. A l
 more weight to the opinions nearest the consensus. The adjustment runs before either pooling
 algorithm.
 
-```julia
+We pool the three opinions again with `p = 0.1` and with `p = 100`. The `ow` field of a pooled
+prior holds the opinion weights after the adjustment, and the table prints them next to the
+weights we gave.
+=#
+
 pr_robust = prior(OpinionPoolingPrior(; pes = [opinion_a, opinion_b, opinion_c],
                                       w = [0.5, 0.3, 0.2], p = 0.1), rd)
-```
+pr_robust_100 = prior(OpinionPoolingPrior(; pes = [opinion_a, opinion_b, opinion_c],
+                                          w = [0.5, 0.3, 0.2], p = 100), rd)
 
-The page shows this call without running it. On this data every opinion is close to the
-consensus in Kullback-Leibler divergence, so a small `p` barely moves the weights. To move the
-consensus mean on one short window, change the total of the credibility weights, as section 6
-does.
+pretty_table(DataFrame(["Opinion" => ["A", "B", "C"], "Given" => pr_op.ow,
+                        "p = 0.1" => pr_robust.ow, "p = 100" => pr_robust_100.ow]);
+             formatters = [mmtfmt], title = "Opinion weights after the robust adjustment")
+
+#=
+On this data every opinion is close to the consensus in Kullback-Leibler divergence, so
+`p = 0.1` barely moves the weights. At `p = 100` weight moves from opinion C, the one farthest
+from the consensus, to the other two. To move the consensus mean on one short window, change the
+total of the credibility weights, as section 6 does.
 
 ## 8. A consensus portfolio
 

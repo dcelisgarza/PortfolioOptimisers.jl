@@ -210,6 +210,20 @@ pretty_table(DataFrame(["Statistic" => ["CVaR", "EVaR", "RLVaR, kappa = 0.3", "w
 The view `"AAPL >= 1.25*prior(AAPL)"` is an ordinary request on `cvar_views`. On `rlvar_views`
 it asks for more than the worst loss in the table. A lower bound on this statistic has room for
 a multiple of the prior RLVaR up to the ratio of the worst loss to the prior RLVaR, about 1.1.
+We state that view on `rlvar_views` and print the message of the error that `prior` throws.
+=#
+
+try
+    prior(EntropyPoolingPrior(; sets = sets, opt = JuMPEntropyPooling(; slv = slv),
+                              rlvar_views = RelativisticValueatRiskView(;
+                                                                        views = LinearConstraintEstimator(;
+                                                                                                          val = "AAPL >= 1.25*prior(AAPL)"))),
+          rd)
+catch e
+    println(e.msg)
+end
+
+#=
 
 A target below the prior needs the other formulation.
 [`ConicRelativisticValueatRiskView`](@ref) bounds the RLVaR from below only, so a `<=` view
