@@ -50,7 +50,7 @@ measures = [SD(), MAD(), CVaR(), CDaR(), MDD(), UCI()]
 pretty_table(DataFrame("Measure" => ["StandardDeviation", "MAD (LowOrderMoment)",
                                      "ConditionalValueatRisk", "ConditionalDrawdownatRisk",
                                      "MaximumDrawdown", "UlcerIndex"],
-                       "Risk of the equal-weighted book" =>
+                       "Risk of the equal-weighted portfolio" =>
                            [expected_risk(factory(r, pr), w, pr.X) for r in measures]))
 
 #=
@@ -94,10 +94,13 @@ have no `r` of their own. Each accepts a measure only when every optimiser it ho
 the tables do not list them. Ask for the case you have:
 
 ```julia
-supports_risk_measure(MeanRisk, ConditionalValueatRisk)   # true
-supports_risk_measure(MeanRisk, EqualRisk)                # false, hierarchical only
-supported_risk_measures(HierarchicalRiskParity)           # OptimisationRiskMeasure
+supports_risk_measure(MeanRisk, ConditionalValueatRisk)
+supports_risk_measure(MeanRisk, EqualRisk)
+supported_risk_measures(HierarchicalRiskParity)
 ```
+
+The three calls return `true`, `false` and `OptimisationRiskMeasure`. `EqualRisk` is a measure
+that only a clustering optimiser can use.
 
 ## 3. The catalogue
 
@@ -109,8 +112,6 @@ docstring gives the signature and the fields of its measure, and most also give 
 `?ConditionalValueatRisk` in the REPL shows the same docstring.
 =#
 
-## Reverse-map the exported alias layer onto the measure types it names, so the alias column
-## is read off the package rather than transcribed.
 rm_alias = Dict{Symbol, String}()
 for n in names(PortfolioOptimisers)
     v = getfield(PortfolioOptimisers, n)
@@ -119,7 +120,6 @@ for n in names(PortfolioOptimisers)
     end
 end
 
-## Class → the `Optimisers` column, derived from the compatibility trait.
 function usage_class(T)
     return if supports_risk_measure(MeanRisk, T)
         "JuMP + clustering"
@@ -130,23 +130,22 @@ function usage_class(T)
     end
 end
 
-## The curated catalogue: family => [measure => what it penalises].
 catalogue = ["Dispersion and moments" =>
                  [:Variance => "Portfolio variance from a covariance matrix, the default `r`.",
-                  :StandardDeviation => "Square root of the variance; same ordering, different scale.",
-                  :UncertaintySetVariance => "Worst-case variance over a covariance uncertainty set (robust).",
-                  :LowOrderMoment => "Generic first/second moment measure; see §4 for its aliases.",
-                  :HighOrderMoment => "Generic third/fourth moment measure; see §4 for its aliases.",
+                  :StandardDeviation => "Square root of the variance, in the units of the returns.",
+                  :UncertaintySetVariance => "Worst-case variance over an uncertainty set of covariance matrices.",
+                  :LowOrderMoment => "Generic low-order moment measure, which includes the mean absolute deviation. Section 4 lists its aliases.",
+                  :HighOrderMoment => "Generic third and fourth moment measure. Section 4 lists its aliases.",
                   :MedianAbsoluteDeviation => "Median absolute deviation, a robust counterpart of `MAD()`.",
-                  :Kurtosis => "Square-root kurtosis from the cokurtosis tensor (fat tails).",
+                  :Kurtosis => "Square root of the fourth central moment of the portfolio returns.",
                   :NegativeSkewness => "Downside asymmetry from the coskewness tensor.",
                   :VarianceSkewKurtosis => "Variance, skewness, and kurtosis combined in one expression.",
-                  :BrownianDistanceVariance => "Distance variance: penalises *any* dependence, not only linear dependence."],
+                  :BrownianDistanceVariance => "Upper bound on the distance variance of the portfolio returns, built from the distances between observations."],
              "Tail: X-at-Risk" => [:WorstRealisation => "The single worst observed loss.",
-                                   :ValueatRisk => "The `alpha` quantile of the loss distribution (MIP).",
-                                   :ConditionalValueatRisk => "Mean loss beyond the `alpha` quantile; expected shortfall.",
+                                   :ValueatRisk => "The `alpha` quantile of the loss distribution. The default formulation is mixed-integer.",
+                                   :ConditionalValueatRisk => "Mean loss beyond the `alpha` quantile, also called expected shortfall.",
                                    :DistributionallyRobustConditionalValueatRisk => "CVaR under a Wasserstein ball around the empirical distribution.",
-                                   :EntropicValueatRisk => "Exponential-cone upper bound on VaR; tighter tail control than CVaR.",
+                                   :EntropicValueatRisk => "Upper bound on VaR and on CVaR, computed with an exponential cone.",
                                    :RelativisticValueatRisk => "Power-cone family between EVaR (`kappa → 0`) and the worst realisation (`kappa → 1`).",
                                    :PowerNormValueatRisk => "Power-norm tail measure parameterised by the norm order."],
              "Tail ranges (both sides)" =>
@@ -160,9 +159,9 @@ catalogue = ["Dispersion and moments" =>
                   :GenericValueatRiskRange => "Any pair of tail measures, one per side of the distribution."],
              "Drawdown: uncompounded" =>
                  [:AverageDrawdown => "Mean depth of the drawdown path.",
-                  :UlcerIndex => "Root-mean-square drawdown depth; penalises long deep spells.",
+                  :UlcerIndex => "Root mean square of the drawdown depths.",
                   :MaximumDrawdown => "Deepest peak-to-trough loss.",
-                  :DrawdownatRisk => "The `alpha` quantile of the drawdown path (MIP).",
+                  :DrawdownatRisk => "The `alpha` quantile of the drawdown path, a mixed-integer formulation.",
                   :ConditionalDrawdownatRisk => "Mean drawdown beyond the `alpha` quantile.",
                   :DistributionallyRobustConditionalDrawdownatRisk => "CDaR under a Wasserstein ball.",
                   :EntropicDrawdownatRisk => "Exponential-cone bound on the drawdown quantile.",
@@ -178,26 +177,25 @@ catalogue = ["Dispersion and moments" =>
                   :RelativeRelativisticDrawdownatRisk => "Relativistic drawdown-at-risk, compounded.",
                   :RelativePowerNormDrawdownatRisk => "Power-norm drawdown-at-risk, compounded."],
              "Ordered weights arrays" =>
-                 [:OrderedWeightsArray => "Any weighting of the *sorted* losses; the most general family (§4).",
+                 [:OrderedWeightsArray => "A weight on each sorted return. Section 4 lists its aliases.",
                   :OrderedWeightsArrayRange => "An OWA applied to both sides of the distribution."],
              "Path and mandate" =>
-                 [:TrackingRiskMeasure => "Deviation of the book's returns from a benchmark.",
-                  :RiskTrackingRiskMeasure => "Deviation of the book's *risk* from a benchmark's risk.",
+                 [:TrackingRiskMeasure => "Deviation of the portfolio's returns from a benchmark.",
+                  :RiskTrackingRiskMeasure => "Risk of the weight difference from a benchmark, or the gap between the two risks.",
                   :TurnoverRiskMeasure => "Distance from the previous weights; penalises trading."],
              "Composite and structural" =>
-                 [:EqualRisk => "Drives every cluster to carry the same risk (hierarchical).",
+                 [:EqualRisk => "The same risk for every portfolio, so a hierarchical optimiser splits each cluster evenly.",
                   :RiskRatio => "Ratio of two measures, used as a hierarchical objective.",
-                  :NoRisk => "Contributes nothing: a null `r` for return-only problems."],
+                  :NoRisk => "Zero risk, for a problem with no risk term."],
              "Non-optimisation (diagnostics and scoring)" =>
-                 [:ExpectedReturn => "Prior expected return of the book.",
-                  :MeanReturn => "Realised mean return of the book.",
+                 [:ExpectedReturn => "Prior expected return of the portfolio.",
+                  :MeanReturn => "Realised mean return of the portfolio.",
                   :Skewness => "Standardised skewness of the return distribution.",
                   :ThirdCentralMoment => "Unstandardised third central moment.",
                   :NonOptimisationRiskRatio => "Ratio of any two non-optimisation measures.",
                   :ExpectedReturnRiskRatio => "Prior expected return over risk, a Sharpe-style score.",
                   :MeanReturnRiskRatio => "Realised mean return over risk."]]
 
-## Every concrete measure must appear exactly once. This stops the page from drifting.
 function leaf_measures(T, acc = Type[])
     subs = subtypes(T)
     isempty(subs) ? push!(acc, T) : foreach(S -> leaf_measures(S, acc), subs)
@@ -212,7 +210,7 @@ function family_table(name)
     entries = catalogue[findfirst(p -> first(p) == name, catalogue)][2]
     return DataFrame("Measure" => [String(first(e)) for e in entries],
                      "Alias" => [get(rm_alias, first(e), "") for e in entries],
-                     "Penalises" => [last(e) for e in entries],
+                     "Meaning" => [last(e) for e in entries],
                      "Optimisers" => [usage_class(getfield(PortfolioOptimisers, first(e)))
                                       for e in entries])
 end;
@@ -289,7 +287,6 @@ alias_ctors = [("FLM", FLM, "First lower partial moment."),
                ("OWA_TG_RG", OWA_TG_RG, "Two-sided tail Gini."),
                ("OWA_LMoment", OWA_LMoment, "L-moment weights of order `k`.")]
 
-## Walk the algorithm chain of a constructed measure so the expansion is observed, not asserted.
 function expands_to(m)
     if isa(m, OrderedWeightsArray)
         return "w = $(isa(m.w, Function) ? nameof(m.w) : nameof(typeof(m.w)))"

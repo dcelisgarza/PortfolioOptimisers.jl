@@ -231,7 +231,7 @@ labels = ["Base", "Cap 10%", "Tech ≥ 15%", "Turnover", "Max ratio", "Max ratio
 
 pretty_table(DataFrame(["Asset" => rd.nx,
                         [labels[i] => results[i].w for i in eachindex(results)]...]);
-             formatters = [resfmt], title = "Weights under each constraint / cost")
+             formatters = [resfmt], title = "Weights of the six portfolios")
 
 plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 

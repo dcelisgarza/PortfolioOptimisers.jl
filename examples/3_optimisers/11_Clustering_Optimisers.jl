@@ -37,7 +37,6 @@ error in those estimates moves the weights less, and variance-based risk needs n
 =#
 
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     if j == 1
         return Date(v)
@@ -64,7 +63,6 @@ using CSV, TimeSeries, DataFrames
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
-## Compute the returns
 rd = prices_to_returns(X)
 
 #=

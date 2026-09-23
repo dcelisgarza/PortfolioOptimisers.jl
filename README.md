@@ -58,19 +58,14 @@ The example needs these packages:
 - `CSV`, `TimeSeries` and `DataFrames` load and hold the price data.
 - `PrettyTables` prints the tables.
 
-The data is the S&P 500 sample in [`examples/SP500.csv.gz`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples), which has the daily adjusted close prices of 20 large-cap stocks. We keep the last 253 rows, about one year, so the example runs fast.
+The data is the S&P 500 sample in [`examples/SP500.csv.gz`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples), which has the daily adjusted close prices of 20 large-cap stocks. We keep the last 253 rows, about one year, so the example runs fast. The two functions `fmt1` and `fmt2` format the columns of the two tables that the example prints.
 
 ```julia
-# Import module and plotting extension.
 using PortfolioOptimisers, StatsPlots, GraphRecipes
-# Import optimisers.
 using Clarabel, HiGHS
-# Load and preprocess data.
 using CSV, TimeSeries, DataFrames
-# Pretty printing.
 using PrettyTables
 
-# Format for pretty tables.
 fmt1 = (v, i, j) -> begin
     if j == 1
         return Date(v)
@@ -86,89 +81,91 @@ fmt2 = (v, i, j) -> begin
     end
 end
 
-# Load the shipped S&P 500 price data as a TimeArray (run from the repo root).
+#! The path is relative, so run this from the root of the repository.
 prices = TimeArray(CSV.File(joinpath("examples", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
-
-#=
-Any price history with a `Date` column and one column per asset works. To pull live
-data instead, download it with YFinance and assemble a TimeArray:
-
-    using YFinance, TimeSeries
-    function stock_price_to_time_array(x)
-        coln = collect(keys(x))[3:end]
-        m = hcat([x[k] for k in coln]...)
-        return TimeArray(x["timestamp"], m, Symbol.(coln), x["ticker"])
-    end
-    assets = sort!(["AAPL", "AMD", "BAC", "BBY", "CVX", "GE", "HD", "JNJ", "JPM", "KO",
-                    "LLY", "MRK", "MSFT", "PEP", "PFE", "PG", "RRC", "UNH", "WMT", "XOM"])
-    prices = get_prices.(assets; startdt = "2024-01-01", enddt = "2025-01-01")
-    prices = stock_price_to_time_array.(prices)
-    prices = hcat(prices...)
-    cidx = colnames(prices)[occursin.(r"adj", string.(colnames(prices)))]
-    prices = prices[cidx]
-    TimeSeries.rename!(prices, Symbol.(assets))
-=#
-
 pretty_table(prices[(end - 5):end]; formatters = [fmt1])
+```
 
-# Compute the returns.
+The file is a gzipped CSV with a `Date` column and one column per asset, and any price history in that shape works. To use live data instead, run the block below in place of the `prices` line above. It downloads the prices with `YFinance.jl` and builds a `TimeArray`:
+
+```julia
+using YFinance, TimeSeries
+function stock_price_to_time_array(x)
+    coln = collect(keys(x))[3:end]
+    m = hcat([x[k] for k in coln]...)
+    return TimeArray(x["timestamp"], m, Symbol.(coln), x["ticker"])
+end
+assets = sort!(["AAPL", "AMD", "BAC", "BBY", "CVX", "GE", "HD", "JNJ", "JPM", "KO",
+                "LLY", "MRK", "MSFT", "PEP", "PFE", "PG", "RRC", "UNH", "WMT", "XOM"])
+prices = get_prices.(assets; startdt = "2024-01-01", enddt = "2025-01-01")
+prices = stock_price_to_time_array.(prices)
+prices = hcat(prices...)
+cidx = colnames(prices)[occursin.(r"adj", string.(colnames(prices)))]
+prices = prices[cidx]
+TimeSeries.rename!(prices, Symbol.(assets))
+```
+
+We compute the returns with `prices_to_returns`. `PortfolioOptimisers.jl` builds its optimisation problems with `JuMP`, so it works with any solver that `JuMP` supports, and it ships with none. A `Solver` holds the solver's `Optimizer`, its settings, and the solver statuses that the library accepts as a solution.
+
+```julia
 rd = prices_to_returns(prices)
 
-# Define the continuous solver.
 slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false, "max_step_fraction" => 0.9),
              check_sol = (; allow_local = true, allow_almost = true))
+```
 
-# `PortfolioOptimisers.jl` implements a number of optimisation types as estimators. `MeanRisk` and many other ones that use mathematical optimisation take a `JuMPOptimiser` structure, which defines general solver constraints. This structure in turn requires an instance (or vector) of `Solver`. `DiscreteAllocation`, used below, takes a `Solver` directly.
+`MeanRisk` and many other optimisers that solve a mathematical program take a `JuMPOptimiser`, which defines the solvers and the constraints that these optimisers share. A `JuMPOptimiser` takes one `Solver`, or a vector of them that it tries in order. The defaults of `MeanRisk` minimise the variance, which gives the Markowitz portfolio of minimum risk. `optimise` solves the problem, and `res.w` gives the weights.
+
+```julia
 opt = JuMPOptimiser(; slv = slv);
 
-# Vanilla (Markowitz) mean risk optimisation, i.e. minimum variance portfolio
 mr = MeanRisk(; opt = opt)
 
-# Perform the optimisation, res.w contains the optimal weights.
 res = optimise(mr, rd)
+```
 
-# Define the MIP solver for finite discrete allocation.
+The weights are fractions of the portfolio, but you buy whole shares with a fixed amount of cash. `DiscreteAllocation` turns the weights into numbers of shares with a mixed-integer program, so it needs a solver that handles one, here `HiGHS`. It takes the `Solver` directly, without a `JuMPOptimiser`. It needs the optimal weights `res.w`, the latest prices and the cash, which we set to `4206.90`. The table puts the shares, their cost, the optimal weights and the weights of the shares side by side, and the plot shows the compounded cumulative returns of the portfolio of whole shares.
+
+```julia
 mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
                  settings = Dict("log_to_console" => false),
                  check_sol = (; allow_local = true, allow_almost = true));
 
-# Discrete finite allocation.
 da = DiscreteAllocation(; slv = mip_slv)
 
-# Perform the finite discrete allocation, uses the final asset
-# prices, and an available cash amount. This is for us mortals
-# without infinite wealth.
 mip_res = optimise(da, FiniteAllocationInput(; w = res.w, prices = vec(values(prices[end])), cash = 4206.90))
 
 df = DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip_res.cost,
                :opt_weights => res.w, :mip_weights => mip_res.w)
 pretty_table(df; formatters = [fmt2])
 
-# Plot the portfolio cumulative returns of the finite allocation portfolio.
 plot_portfolio_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
 ```
 
 ![Fig. 1](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/src/assets/readme_1.svg)
 
-```julia
-# Furthermore, we can also plot the risk contribution per asset. For this, we must provide an instance of the risk measure we want to use with the appropriate statistics/parameters. We can do this by using the `factory` function (recommended when doing so programmatically), or manually set the quantities ourselves.
-plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx, erc = false)
+The plot of each asset's risk contribution needs a risk measure with its statistics set, here the covariance matrix of a `Variance`. `factory` builds a copy of the measure that takes its covariance from the prior result `res.pr`. You can also set it by hand, but `factory` is the better choice in code that builds many measures.
 
-# This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples).
+The risk measure needs this step because the library keeps the risk measures apart from the optimisers and their results. The same design lets you put several risk measures in one objective, or use a risk measure as a limit in an optimisation. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples) show both.
+
+```julia
+plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx, erc = false)
 ```
 
 ![Fig. 2](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/src/assets/readme_2.svg)
 
+The histogram shows the distribution of the portfolio returns.
+
 ```julia
-# We can also plot the returns' histogram and probability density.
 plot_histogram(mip_res.w, rd.X; slv = slv)
 ```
 
 ![Fig. 3](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/src/assets/readme_3.svg)
 
+The drawdown plot shows the compounded drawdowns. Pass `compound = false` for the uncompounded ones.
+
 ```julia
-# Plot compounded or uncompounded drawdowns.
 plot_drawdowns(mip_res.w, rd.X; slv = slv, ts = rd.ts, compound = true)
 ```
 

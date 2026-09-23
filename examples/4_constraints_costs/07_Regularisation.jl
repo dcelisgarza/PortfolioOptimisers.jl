@@ -14,7 +14,6 @@ three norm ceilings, `l2c`, `lpc` and `linfc`, which bound a norm of the weights
 penalty on it.
 =#
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     if j == 1
         return Date(v)
@@ -56,7 +55,6 @@ using CSV, TimeSeries, DataFrames, Clarabel
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
-## Compute the returns
 rd = prices_to_returns(X)
 pr = prior(EmpiricalPrior(), rd)
 
@@ -114,25 +112,25 @@ opts = [JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1)
                       ret = ArithmeticReturn(;
                                              settings = JuMPReturnsSettings(;
                                                                             lb = Frontier(;
-                                                                                          N = 50)))),#
+                                                                                          N = 50)))),
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       ret = ArithmeticReturn(;
                                              settings = JuMPReturnsSettings(;
                                                                             lb = Frontier(;
                                                                                           N = 50))),
-                      bgt = 1, l1 = 4e-4),#
+                      bgt = 1, l1 = 4e-4),
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       ret = ArithmeticReturn(;
                                              settings = JuMPReturnsSettings(;
                                                                             lb = Frontier(;
                                                                                           N = 50))),
-                      bgt = 1, l2 = L2Regularisation(; val = 4e-4)),#
+                      bgt = 1, l2 = L2Regularisation(; val = 4e-4)),
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       ret = ArithmeticReturn(;
                                              settings = JuMPReturnsSettings(;
                                                                             lb = Frontier(;
                                                                                           N = 50))),
-                      bgt = 1, lp = LpRegularisation(; p = 5, val = 4e-4)),#
+                      bgt = 1, lp = LpRegularisation(; p = 5, val = 4e-4)),
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       ret = ArithmeticReturn(;
                                              settings = JuMPReturnsSettings(;
@@ -214,22 +212,22 @@ weights, and its last row is the number of effective assets of each portfolio.
 =#
 
 opts = [JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                      bgt = 1),# no regularisation
+                      bgt = 1),
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                      bgt = 1, l1 = 4e-4),# L1 regularisation
+                      bgt = 1, l1 = 4e-4),
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                      bgt = 1, l2 = L2Regularisation(; val = 4e-4)),# L2 regularisation
+                      bgt = 1, l2 = L2Regularisation(; val = 4e-4)),
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                      bgt = 1, lp = LpRegularisation(; p = 5, val = 4e-4)),# Lp regularisation with p = 5
+                      bgt = 1, lp = LpRegularisation(; p = 5, val = 4e-4)),
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                      bgt = 1, linf = 4e-4)]# L-Inf regularisation
+                      bgt = 1, linf = 4e-4)]
 nocs = [MeanRisk(; opt = opt) for opt in opts]
 
 ress = optimise.(nocs)
 pretty_table(DataFrame(:Assets => rd.nx, :No_Reg => ress[1].w, :L1 => ress[2].w,
                        :L2 => ress[3].w, :L5 => ress[4].w, :LInf => ress[5].w);
              formatters = [resfmt], summary_rows = [summary_row],
-             summary_row_labels = ["# Eff. Assets"])
+             summary_row_labels = ["Effective assets"])
 
 #=
 Against `No_Reg`, the L1 penalty sets several weights to zero. The L2, Lp and L-Inf penalties
@@ -382,13 +380,13 @@ order 2, and of the order that its ceiling uses.
 
 ceil_rule = EffectiveAssetFloor(; fraction = 0.5)
 copts = [JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                       bgt = 1),# no ceiling
+                       bgt = 1),
          JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                       bgt = 1, l2c = ceil_rule),# 2-norm ceiling
+                       bgt = 1, l2c = ceil_rule),
          JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                       bgt = 1, lpc = LpRegularisation(; p = 5, val = ceil_rule)),# 5-norm ceiling
+                       bgt = 1, lpc = LpRegularisation(; p = 5, val = ceil_rule)),
          JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                       bgt = 1, linfc = ceil_rule)]# Inf-norm ceiling
+                       bgt = 1, linfc = ceil_rule)]
 cress = [optimise(MeanRisk(; opt = opt)) for opt in copts]
 
 n_eff_p(w, p) = isinf(p) ? inv(maximum(abs, w)) : sum(abs.(w) .^ p)^inv(1 - p)

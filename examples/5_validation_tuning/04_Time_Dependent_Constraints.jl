@@ -39,7 +39,6 @@ We run one portfolio problem under four cross-validation schemes, [`IndexWalkFor
 each scheme we compare the static optimiser with one schedule or more.
 =#
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 resfmt = (v, i, j) -> begin
     if j == 1
         return v
@@ -54,13 +53,12 @@ We load three years of daily prices and build a minimum-variance [`MeanRisk`](@r
 two Clarabel solvers. The library tries the second solver when the first fails. The field we vary in
 most sections is `wb`, the bounds of the weights. We change its upper bound, because the effect
 shows in the largest weight of a fold. Sections 2.4, 3.1 and 7.6 put a schedule in `card`, `tn` and
-`lcse`.
+`lcse`. The optimiser we build here has no cap, and it is the static baseline.
 =#
 using CSV, TimeSeries, DataFrames, Clarabel, Statistics, StableRNGs
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252 * 3):end]
 
-## Compute the returns.
 rd = prices_to_returns(X)
 
 slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
@@ -70,10 +68,8 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
               settings = Dict("verbose" => false, "max_step_fraction" => 0.9),
               check_sol = (; allow_local = true, allow_almost = true))];
 
-## Static baseline: an uncapped minimum-variance optimiser.
 mr_static = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
 
-## A helper that reads the largest weight of each fold's solution.
 max_weights(pred) = [maximum(p.res.w) for p in pred.pred];
 #=
 ## 2. The three forms
@@ -125,11 +121,11 @@ This callable changes with the data. It computes the annualised volatility of an
 portfolio over the fold's training window, and it lowers the cap as that volatility rises. It
 indexes `ctx.train_idx` with `ctx.i`. `i` is the fold's position in the scheme's own order, so
 `ctx.train_idx[ctx.i]` and `ctx.test_idx[ctx.i]` are this fold's windows under any scheme.
+The cap is 35 % minus the volatility, kept between 15 % and 35 %.
 =#
 function vol_cap(ctx)
     Xtr = ctx.rd.X[ctx.train_idx[ctx.i], :]
     vol = std(Xtr * fill(1 / size(Xtr, 2), size(Xtr, 2))) * sqrt(252)
-    ## 35 % cap in calm regimes, tightening towards 15 % as annualised volatility rises.
     return WeightBounds(; lb = 0.0, ub = clamp(0.35 - vol, 0.15, 0.35))
 end
 vol_cap_td = TimeDependent(vol_cap);
@@ -244,7 +240,8 @@ another part of the optimiser makes the loop run in sequence.
 
 Here no weight can move more than 2 percentage points from its previous value at a rebalance. Fold
 1 has no previous weights. The callable returns `nothing` there, and that fold has no turnover
-constraint.
+constraint. The table gives the sum of the absolute changes of the weights at every rebalance,
+with and without the budget.
 =#
 tn_budget = TimeDependent(PreviousWeightsFunction(ctx -> if isnothing(ctx.w_prev)
                                                       nothing
@@ -254,7 +251,6 @@ tn_budget = TimeDependent(PreviousWeightsFunction(ctx -> if isnothing(ctx.w_prev
 mr_wf_tn = MeanRisk(; opt = JuMPOptimiser(; slv = slv, tn = tn_budget))
 pred_wf_tn = cross_val_predict(mr_wf_tn, rd, wf)
 
-## One-norm distance between consecutive folds, with and without the budget.
 function l1turnover(pred)
     return [sum(abs, pred.pred[i].res.w - pred.pred[i - 1].res.w)
             for i in 2:length(pred.pred)]
@@ -318,8 +314,6 @@ mr_cc_sched = MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = deleverage(n_ccv)
 pred_cc_static = cross_val_predict(mr_static, rd, ccv)
 pred_cc_sched = cross_val_predict(mr_cc_sched, rd, ccv)
 
-## Largest weight across each path's folds; paths recombine the splits, so the cap shows
-## up path by path.
 pretty_table(DataFrame(:path => 1:length(pred_cc_sched.pred),
                        :static => [maximum(maximum(p.res.w) for p in path.pred)
                                    for path in pred_cc_static.pred],
@@ -508,7 +502,6 @@ lcse_sched = TimeDependent([i <= n_wf ÷ 2 ? [cap_a] : [cap_a, cap_b] for i in 1
 mr_lcse = MeanRisk(; opt = JuMPOptimiser(; slv = slv, sets = sets, lcse = lcse_sched))
 pred_lcse = cross_val_predict(mr_lcse, rd, wf)
 
-## The weight of one asset on each fold.
 asset_weights(pred, name) = [p.res.w[findfirst(==(name), rd.nx)] for p in pred.pred]
 pretty_table(DataFrame(:fold => 1:n_wf, :WMT_static => asset_weights(pred_wf_static, "WMT"),
                        :WMT_schedule => asset_weights(pred_lcse, "WMT"),

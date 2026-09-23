@@ -82,6 +82,23 @@ in the `Description` line, which `docs/page_metadata.jl` derives and `test_64` f
 drifts. With both exempt, the 638 pages fall from 417 counted hits over 186 pages to 181 over 67,
 across 9,814 words of body prose.
 
+### What the code of a page measured
+
+The rewrite tickets changed prose alone, and they found the same tells in the code cells, where no
+rule reached. Ticket [#1299](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1299)
+measured them with the widened census reader at `98db9442a0`.
+
+- **253 comments in the code of 47 texts.** 44 are Literate sources, and the other three are
+  `README.md`, `docs/src/index.md` and `docs/src/migration.md`. Most say what the next line does
+  ("Compute the returns", "Format for pretty tables"). A few are empty `#` marks that hold a line
+  break for the formatter. A few are gotchas, such as a radius that sits on a knife edge.
+- **30 counted hits in printed strings over 15 texts.** 12 em dashes in `pretty_table` titles,
+  capitalised glossary terms ("The Span Rule", "filled with the Held Price", "The synthetic Asset
+  Panel"), the verdict word "agree", and title-case titles.
+- **About 470 lines that print a string.** The census counts the tells, but the larger defect is a
+  title that states a claim: "Both knobs move the clustering", "Tighter tracking-error budget hugs
+  the benchmark". A title is read first, and a reader takes it as the finding of the cell.
+
 ## Decision
 
 **1. The rule governs every text a user reads as a page.** Four corpora: the 73 Literate sources
@@ -157,8 +174,9 @@ no row. Rewrite tickets run in parallel, and a per-text row keeps them off one s
 `vector`, `surface`, `primitive`, `harness` and `ratchet`, and rule 31 without `leverage` and
 `leveraged`, plus the strings of decisions 6 and 7 above. The exempt words stay under the skill and
 a reader applies them, as rules 10, 11, 27, 28, 32 and the self-audit are applied. The census skips
-a `#src` line, a `##` comment in a Literate source, a fenced block, an `@docs` block, an inline code
-span, an inline LaTeX expression and the target of a markdown link.
+a `#src` line, a fenced block that is not code, an `@docs` block, an inline code span, an inline
+LaTeX expression and the target of a markdown link. Decisions 16 and 17 state what it reads in the
+code.
 
 **14. The rule lives in one instruction file, and no artifact of the rule is named for Literate.**
 `.github/instructions/julia-prose.instructions.md` carries the glob
@@ -175,6 +193,35 @@ text this ADR governs. One build ticket widens the rule's three code artifacts a
 rows; four rewrite tickets follow, for the catalogue, for the four top-level pages with `README.md`,
 for the `public_api` mirror pages and for the `private_api` mirror pages. The verify ticket gains
 the new texts.
+
+**16. A string that a cell prints is prose.** Ruled by the maintainer on 2026-09-24. A
+`pretty_table` `title` or `source_notes`, a plot `title`, `label`, `xlabel`, `ylabel` or
+`colorbar_title`, a `println` sentence, and a column name or a cell that a table prints all render
+as text that a reader reads, and every rule of this ADR holds on them. A title says what its table
+or plot shows, and it makes no claim that the output of its cell does not show. A string that code
+reads as data stays as the code needs it. The census reads the body of every plain double-quoted
+string literal in the code of a page: every code line of a Literate source, and the body of every
+`julia`, `@example`, `@repl` and `@setup` fence of a Markdown page or of the prose of a Literate
+source. It reads an interpolation as a
+space, and it reads a string that a `title =` keyword opens as a heading too, so rule 17 reaches a
+title. The reader is a lexer of one line at a time, not a parser, so decision 11's design holds.
+
+**17. A comment in a code cell is removed, unless it is a gotcha, and a gotcha is a `#!` line.**
+Ruled by the maintainer on 2026-09-24. A gotcha is a thing that a reader who copies the cell gets
+wrong without the comment. It is short, one line is the target, and it sits on its own line above
+the code it is about. Its mark is `#!` and a space. Literate's `ismdline` makes a markdown line only
+of a bare `#`, or of a `#` and a space followed by text, so a `#!` line stays in the code cell and renders as
+written, where a `##` line renders with one `#` removed. Literate reads `#!md`, `#!nb` and `#!jl`
+at the start of a line as negated filter tokens and deletes the line from one output, so the space
+is part of the mark. The census reads the text of a gotcha as prose, and counts every other
+comment in a new column, `comment`, which holds at zero. Three markers are markup and not
+comments: Literate's `#-` and `#+`, and Documenter's `# hide`.
+
+**18. A cell that prints a verdict, and a section that checks the library, stay.** Ruled by the
+maintainer on 2026-09-24. A cell that prints `true`, `yes` or a `Binds?` column, and the sections of
+the online walk-forward page that print how far the online run is from the batch run, illustrate
+the point for the reader. Neither changes under decision 7. The words of their label strings follow
+decision 16.
 
 ## Considered options
 
@@ -228,6 +275,22 @@ kept in step.
 **A new map for the three new corpora.** Rejected: the rule, the gate and the rewrites are one
 effort, and #1218's destination sentence is the one that must come true.
 
+**A code comment keeps its `##` mark, and the rule reads its text.** Rejected by the maintainer: a
+comment that says what the next line does repeats the code, and the prose above the cell is where
+a page explains itself. Only a gotcha earns a place in the cell.
+
+**The gotcha as an admonition in the prose.** Rejected: a reader who copies the cell copies the
+code and leaves the prose, and a gotcha must travel with the line it is about.
+
+**The census leaves the printed strings to a reader.** Rejected: the counted rules read a string as
+exactly as a paragraph, and a lexer of one line costs about a hundred lines of text handling. Only
+the claim a string makes is left to a reader, as it is for a paragraph.
+
+**The census reads only the strings of known keywords, `title`, `label` and `println`.** Rejected:
+a column name and a cell of a printed table render as well, and a keyword list goes stale when a
+page calls a new plotting function. A string that code reads as data carries no tell, so reading
+every plain string costs no false hit.
+
 **`include`ing the catalogue and walking its nodes.** Rejected: the census would compile 1,520
 lines and define `Cap`, `Prose` and `CATALOGUE` beside `test/test_26_docs.jl`, which includes the
 same file. A text reader costs nothing and matches the census's stated design.
@@ -255,6 +318,18 @@ session measures a text before and after its rewrite without running the suite.
 
 **A new page owes a row.** A page added after the census widens fails until its row is written or
 its counts are zero, which is the same shape as the four baselines under `code_health/`.
+
+**A rewrite can now change a line of Julia, but only its strings and its comments.** The check
+that a rewrite changed no code strips every comment and empties every string literal, then compares
+the tokens of each code cell before and after. It compares tokens and not lines, because the
+formatter can reflow a call once an empty `#` that held its line break is gone.
+
+**A string a test reads changes with the test.** A title or a label that a test or a doctest reads
+is changed in the same commit as the test.
+
+**A code cell can hold a multi-line string only at a cost.** The lexer reads one line at a time.
+No code cell holds a triple-quoted or a multi-line string today. A page that adds one would need a
+lexer that carries its state from line to line.
 
 **Three artifacts change name once.** The build ticket renames `code_health/literate_prose.jl`,
 `code_health/literate_prose_baseline.toml` and `test/test_72_literate_prose_census.jl` in the same

@@ -66,18 +66,15 @@ function synthetic_panel(; T = 500, N = 80, seed = 661_001)
     industries = ["Energy", "Financials", "Health Care", "Technology"]
     Kind = length(industries)
     ind = rand(rng, 1:Kind, N)
-    ## The traits. `beta` is the market exposure, `Ltrue` the four style loadings.
     beta = 1.0 .+ 0.35 .* randn(rng, N)
     Ltrue = randn(rng, N, 4)
     alpha = 0.0004 .* randn(rng, N)
-    ## The factor returns, and the idiosyncratic shocks.
     onehot = Float64[ind[i] == k for i in 1:N, k in 1:Kind]
     Btrue = hcat(beta, onehot, Ltrue)
     ftrue = hcat(0.009 .* randn(rng, T), 0.005 .* randn(rng, T, Kind),
                  0.004 .* randn(rng, T, 4))
     ivol = 0.008 .+ 0.012 .* rand(rng, N)
     X = ftrue * transpose(Btrue) + randn(rng, T, N) .* transpose(ivol) .+ transpose(alpha)
-    ## The Panel Fields, each a noisy function of the traits above.
     logcap = 20.0 .+ 1.4 .* transpose(view(Ltrue, :, 1)) .+
              0.3 .* cumsum(randn(rng, T, N); dims = 1) ./ sqrt(T)
     mcap = exp.(logcap)
@@ -92,10 +89,7 @@ function synthetic_panel(; T = 500, N = 80, seed = 661_001)
               "adj_volume" =>
                   shares .* exp.(-4.5 .+ 0.6 .* transpose(view(Ltrue, :, 4)) .+
                                  0.15 .* randn(rng, T, N)),
-              ## A field no Factor Exposure reads, so a forecast built on it carries a part
-              ## the factors do not span.
               "signal" => transpose(alpha) .+ 0.0002 .* randn(rng, T, N)]
-    ## A fifth of the assets list late. A cell before an asset lists is blank.
     listed = [i <= N ÷ 5 ? rand(rng, 20:120) : 1 for i in 1:N]
     amsk = [t >= listed[i] for t in 1:T, i in 1:N]
     for (_, a) in fields
@@ -126,9 +120,9 @@ The panel comes with the returns. `rd.X` is the returns, `rd.pnl` is the panel, 
 =#
 
 pretty_table(DataFrame("Assets" => N, "Observations" => T,
-                       "Panel Fields" => length(rd.pnl.pf),
-                       "Active cells" => count(rd.pnl.amsk) / (T * N));
-             formatters = [numfmt], title = "The synthetic Asset Panel")
+                       "Panel fields" => length(rd.pnl.pf),
+                       "Share of active cells" => count(rd.pnl.amsk) / (T * N));
+             formatters = [numfmt], title = "The synthetic asset panel")
 
 #=
 ## 2. The prior
@@ -226,7 +220,8 @@ loading_corr = [cor(view(rr.M, active, k), view(syn.B, active, k))
 industry_k = findall(isequal("industry"), rr.fam)
 
 pretty_table(DataFrame("Factor" => rr.nf, "corr(fitted, true) loading" => loading_corr);
-             formatters = [numfmt], title = "The fit recovers the traits it was drawn from")
+             formatters = [numfmt],
+             title = "Correlation of each fitted loading with its true loading")
 
 pretty_table(DataFrame("One-hot industry loadings recovered exactly" =>
                            rr.M[active, industry_k] == syn.B[active, industry_k]))
@@ -238,7 +233,6 @@ and `Ms[t - lag] · f_t` does not depend on that basis, so you can compare it wi
 own.
 =#
 
-## The systematic return of every eligible pair, fitted against the generator's own.
 function systematic_pairs(pr, B, f)
     rr = pr.rr
     Tf = size(rr.csr.eps, 1)
@@ -264,7 +258,7 @@ pretty_table(DataFrame("corr(systematic return)" => cor(sys_fit, sys_true),
                        "corr(idio variance)" => cor(rr.esigma[idio_ok], syn.ivar[idio_ok]),
                        "median ratio" => median(rr.esigma[idio_ok] ./ syn.ivar[idio_ok]));
              formatters = [numfmt],
-             title = "The systematic return and the idiosyncratic level")
+             title = "Fitted systematic returns and idiosyncratic variances against the true ones")
 
 #=
 The next three quantities are constructions rather than estimates, so the residual the cell prints
@@ -276,7 +270,6 @@ for each one is at the level of machine precision.
  3. `mu` is the loadings through the factor mean, plus the orthogonal part of the alpha forecast.
 =#
 
-## The reconciliation identity, over every pair whose arithmetic is finite.
 function reconciliation(pr, X)
     rr = pr.rr
     Tf = size(rr.csr.eps, 1)
@@ -310,13 +303,11 @@ observation we compute the weighted sum of the industry factor returns, relative
 own terms, and the cell prints the largest of those relative sums.
 =#
 
-## The benchmark-weighted sum of a family's factor returns, relative to the size of its
-## own terms. The exposures are read `lag` observations back, because the fit's coefficients
-## are coordinates in the basis of that observation.
 function family_zero_sum(pr, family)
     rr = pr.rr
     worst = 0.0
     for u in axes(pr.fpr.X, 1)
+        #! The factor return of row u pairs with the exposures of row u - lag.
         t = u - rr.lag
         if t < 1
             continue
@@ -340,7 +331,8 @@ end
 zero_sum = family_zero_sum(pr, industry_k)
 
 pretty_table(DataFrame("max relative benchmark-weighted industry return" => zero_sum);
-             formatters = [numfmt], title = "The zero-sum re-basis")
+             formatters = [numfmt],
+             title = "Largest relative weighted sum of the industry factor returns")
 
 #=
 ## 4. Two orthogonal uncertainty sets
@@ -367,9 +359,9 @@ mu_set = mu_ucs(OrthogonalUncertaintySet(), pr)
 sigma_set = sigma_ucs(OrthogonalUncertaintySet(), pr)
 
 pretty_table(DataFrame("Rank of the factor span" => size(sigma_set.Q, 2),
-                       "Rank of the Orthogonal Subspace" => size(mu_set.L, 2),
+                       "Rank of the orthogonal subspace" => size(mu_set.L, 2),
                        "Mean-ball radius" => mu_set.kappa); formatters = [numfmt],
-             title = "The geometry the two sets share")
+             title = "Ranks of the two subspaces and the radius of the mean set")
 
 #=
 The number that shows the effect of the set on a book is how much of the book lies outside the
@@ -466,7 +458,8 @@ pretty_table(DataFrame("kappa" => first.(calibrated),
                                "$(round(v * 10_000, digits = 2)) bp"
                            else
                                v
-                           end], title = "A radius the sample chose")
+                           end],
+             title = "Stated and calibrated covariance radii, and the books they give")
 
 #=
 The two rules give very different radii. Here
@@ -503,7 +496,7 @@ pretty_table(DataFrame("Reference" => ["Equal weight (default)", "InverseVolatil
                            [orthogonal_share(calibrated_books[4].w, sigma_set),
                             orthogonal_share(vf_book.w, sigma_set)]);
              formatters = [(v, i, j) -> j == 2 ? "$(round(v * 100, digits = 2)) %" : v],
-             title = "The fraction is measured at a portfolio you choose")
+             title = "Share outside the span under VarianceFraction(; f = 0.1), at two reference portfolios")
 
 #=
 ### The radius is also searchable
@@ -601,8 +594,7 @@ pretty_table(DataFrame("Fold" => eachindex(folds.pred),
                            [orthogonal_share(folds.pred[i].res.w, fold_sets[i])
                             for i in eachindex(folds.pred)],
                        "Names" => [count(>(1e-6), p.res.w) for p in folds.pred]);
-             formatters = [numfmt],
-             title = "Every fold refits the prior, both sets and the mandate")
+             formatters = [numfmt], title = "The walk-forward book, fold by fold")
 
 #=
 The norm column is not zero, which shows that each fold refit its loadings. The size exposure is

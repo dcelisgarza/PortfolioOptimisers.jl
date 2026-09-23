@@ -227,7 +227,6 @@ rd_b = ReturnsResult(; nx = rd.nx, X = rd.X[127:end, :], nf = rd.nf, F = rd.F[12
 pr_a = prior(FactorPrior(), rd_a)
 pr_b = prior(FactorPrior(), rd_b)
 
-## The hand-written row: the first half's momentum loadings, spelled out as an equation.
 stale_eqn = join(string.(pr_a.rr.M[:, 1]) .* " * " .* rd.nx, " + ") * " <= 0.1"
 stale = LinearConstraintEstimator(; val = [stale_eqn])
 
@@ -281,7 +280,6 @@ res_fit = optimise(MeanRisk(; obj = MinimumRisk(),
                             opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
                                                 sets = sets, lcse = re_fit)), rd_b)
 
-## The prior carries no regression: the basis is the space's own refit.
 isnothing(res_fit.pa.pr.rr)
 
 #=
@@ -291,12 +289,12 @@ against its own loadings, next to the portfolio of the factor prior.
 
 rr_fit = regression(StepwiseRegression(), rd_b)
 
-pretty_table(DataFrame("Basis source" => ["`FactorPrior`'s own loadings",
-                                          "`FactorSpace(; re = StepwiseRegression())`"],
+pretty_table(DataFrame("Source of the loadings" => ["FactorPrior's own loadings",
+                                                    "FactorSpace(; re = StepwiseRegression())"],
                        "Realised MTUM exposure" => [dot(pr_b.rr.M[:, 1], res_live.w),
                                                     dot(rr_fit.M[:, 1], res_fit.w)],
                        "Cap" => [0.1, 0.1]); formatters = [resfmt],
-             title = "Reading the basis versus fitting it")
+             title = "Momentum cap with loadings from the prior and from the space")
 
 #=
 !!! warning
@@ -338,7 +336,7 @@ pretty_table(DataFrame("Constraint" =>
                            ["MTUM ≥ 20% (factor space)", "JNJ ≤ 10% (asset space)"],
                        "Realised" => [exposures(res_mixed)[1],
                                       res_mixed.w[findfirst(==("JNJ"), rd.nx)]]);
-             formatters = [resfmt], title = "Both hold at once")
+             formatters = [resfmt], title = "Factor and asset constraints together")
 
 #=
 ## 9. Projecting a precomputed constraint

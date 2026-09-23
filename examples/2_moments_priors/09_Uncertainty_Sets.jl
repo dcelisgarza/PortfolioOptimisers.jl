@@ -86,7 +86,7 @@ box_widths = [let u = sigma_ucs(NormalUncertaintySet(; rng = StableRNG(1), q = q
               for q in qs]
 
 pretty_table(DataFrame(; q = qs, Symbol("box total width") => box_widths);
-             title = "Smaller q → wider (more conservative) uncertainty set")
+             title = "Total width of the box set at each q")
 
 #=
 ## 4. Robust and nominal minimum variance
@@ -117,7 +117,7 @@ set gives the less concentrated weights.
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Nominal" => res_nom.w,
                         "Box-robust" => res_box.w, "Ellipsoid-robust" => res_ell.w]);
-             formatters = [resfmt], title = "Minimum-variance weights: nominal vs robust")
+             formatters = [resfmt], title = "Minimum-variance weights, nominal and robust")
 
 # The composition of the nominal, box-robust and ellipsoid-robust portfolios.
 using StatsPlots, GraphRecipes
@@ -174,7 +174,7 @@ most of the assets.
 pretty_table(DataFrame(["Assets" => rd.nx, "Nominal" => ret_nom.w,
                         "Box worst-case mean" => ret_box.w,
                         "Ellipsoid worst-case mean" => ret_ell.w]); formatters = [resfmt],
-             title = "Maximum-ratio weights: nominal vs worst-case mean")
+             title = "Maximum-ratio weights with the nominal mean and the two worst-case means")
 
 plot_stacked_bar_composition([ret_nom, ret_box, ret_ell], rd;
                              xticks = (1:3, ["Nominal", "Box μ", "Ellipsoid μ"]))
@@ -216,7 +216,7 @@ set_width(u) = sum(abs, u.ub .- u.lb)
 pretty_table(DataFrame(; estimator = ["Delta (fixed)", "Normal (q=0.05)"],
                        Symbol("box total width") =>
                            [set_width(ucs_delta), set_width(ucs_box)]);
-             title = "Delta is a tight, deterministic box")
+             title = "Total width of the Delta box and the Normal box")
 
 #=
 On this data the Delta box is narrower than the Normal box. [`UncertaintySetVariance`](@ref)
@@ -230,7 +230,7 @@ res_delta = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs_delta),
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Delta-robust" => res_delta.w,
                         "Normal-box-robust" => res_box.w]); formatters = [resfmt],
-             title = "Minimum-variance weights: Delta vs Normal box")
+             title = "Robust minimum-variance weights with the Delta box and the Normal box")
 
 plot_stacked_bar_composition([res_nom, res_delta, res_box], rd;
                              xticks = (1:3, ["Nominal", "Delta", "Normal box"]))

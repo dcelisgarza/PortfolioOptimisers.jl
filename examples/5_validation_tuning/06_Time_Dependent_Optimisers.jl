@@ -26,7 +26,6 @@ This page builds one backtest that switches strategy with market volatility. It 
 strategy when the market is turbulent and an aggressive one when the market is calm.
 =#
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 resfmt = (v, i, j) -> begin
     if j == 1
         return v
@@ -400,13 +399,15 @@ Under a scheme that regroups its predictions for the report, `pred.pred[i]` is n
 but you can still find the entry. [`CombinatorialCrossValidation`](@ref) joins the test blocks of
 its splits into paths, so the predictions of a path are not in split order. The schedule is still
 keyed by the split, and `split(cv, rd)` returns the map from split to path in its `path_ids`. With
-it you can name the entry that fed each path without looking at a prediction.
+it you can name the entry that fed each path without looking at a prediction. `path_ids` has
+one row per test block of a split and one column per split, and each entry is the number of the
+path that the block joins.
 =#
 ccv = CombinatorialCrossValidation(; n_folds = 6, n_test_folds = 2)
 n_c = n_splits(ccv)
 sched_c = TimeDependent([isodd(j) ? defensive : aggressive for j in 1:n_c];
                         default = defensive)
-paths = split(ccv, rd).path_ids   # paths[group, split] = the path each test group lands in
+paths = split(ccv, rd).path_ids
 DataFrame(:split => 1:n_c,
           :entry =>
               [sched_c.val[j] === defensive ? "defensive" : "aggressive" for j in 1:n_c],

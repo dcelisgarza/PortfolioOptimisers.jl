@@ -255,11 +255,13 @@ res_sg_2 = optimise(MeanRisk(;
 group_exposure_1 = res_sg_1.sgmtx * res_sg_1.w
 group_exposure_2 = res_sg_2.sgmtx[1] * res_sg_2.w
 println("Group-of-sets constraints")
-println("  grouped set count (single constraint run): ",
+println("  industries with a nonzero sum (first problem): ",
         count(abs.(group_exposure_1) .> 1e-10))
-println("  grouped set count (threshold run): ", count(abs.(group_exposure_2) .> 5e-10))
-println("  min grouped long exposure: ", minimum(group_exposure_2[group_exposure_2 .> 0]))
-println("  max grouped short exposure: ", maximum(group_exposure_2[group_exposure_2 .< 0]))
+println("  industries with a nonzero sum (second problem): ",
+        count(abs.(group_exposure_2) .> 5e-10))
+println("  smallest long industry sum: ", minimum(group_exposure_2[group_exposure_2 .> 0]))
+println("  short industry sum nearest zero: ",
+        maximum(group_exposure_2[group_exposure_2 .< 0]))
 pretty_table(DataFrame(:GroupSet => sets.dict["ux_industries"],
                        :group_exposure => group_exposure_2); formatters = [resfmt])
 

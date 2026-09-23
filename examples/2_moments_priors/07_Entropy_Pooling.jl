@@ -110,8 +110,7 @@ pretty_table(DataFrame(["moment" => ["mean (AAPL)", "variance (AAPL)"],
                         "Empirical" => [pr_emp.mu[i_aapl], pr_emp.sigma[i_aapl, i_aapl]],
                         "Entropy pooling" =>
                             [pr_ep.mu[i_aapl], pr_ep.sigma[i_aapl, i_aapl]]]);
-             formatters = [mmtfmt],
-             title = "Apple moments: empirical vs entropy-pooling view")
+             formatters = [mmtfmt], title = "AAPL mean and variance under each prior")
 
 #=
 The views on Apple and on the tech group move the other assets too, because the reweighting
@@ -121,7 +120,7 @@ every asset.
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Empirical" => pr_emp.mu,
                         "Entropy pooling" => pr_ep.mu]); formatters = [mmtfmt],
-             title = "Expected returns: empirical vs entropy-pooling posterior")
+             title = "Expected returns of every asset under the empirical prior and the entropy pooling posterior")
 
 # The expected returns of the entropy pooling posterior.
 using StatsPlots, GraphRecipes
@@ -205,7 +204,8 @@ worst_loss = maximum(-x_aapl)
 
 pretty_table(DataFrame(["Statistic" => ["CVaR", "EVaR", "RLVaR, kappa = 0.3", "worst loss"],
                         "AAPL, prior" => [prior_cvar, prior_evar, prior_rlvar, worst_loss]]);
-             formatters = [mmtfmt], title = "How much room a lower-bound tail view has")
+             formatters = [mmtfmt],
+             title = "AAPL tail measures under the prior at alpha = 0.05, and the worst loss")
 
 #=
 The view `"AAPL >= 1.25*prior(AAPL)"` is an ordinary request on `cvar_views`. On `rlvar_views`
@@ -282,7 +282,7 @@ pretty_table(DataFrame(["Prior" => ["empirical", "RLVaR >= 1.05 prior, conic",
                                     "RLVaR <= 0.95 prior, grid"],
                         "AAPL RLVaR" => [prior_rlvar, rlvar_of(pr_lo.w), rlvar_of(pr_hi.w)],
                         "Divergence" => ["", pr_lo.kld, pr_hi.kld]]); formatters = [kldfmt],
-             title = "Each RLVaR view lands on its target")
+             title = "AAPL RLVaR under the prior and under each RLVaR view")
 
 #=
 !!! warning "The conic formulation is hard to solve"
@@ -311,7 +311,7 @@ res_ep = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Empirical" => res_emp.w,
                         "Entropy pooling" => res_ep.w]); formatters = [resfmt],
-             title = "Maximum-ratio weights: empirical vs entropy pooling")
+             title = "Maximum-ratio weights with and without the views")
 
 #=
 Each bar of the plot stacks the weights of one portfolio. Look at Apple and at the tech stocks

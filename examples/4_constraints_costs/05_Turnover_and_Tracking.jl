@@ -81,7 +81,7 @@ pretty_table(DataFrame("Turnover budget" => turnover_vals,
                        "Drift from start" => drift.(getproperty.(turnover_res, :w)),
                        "Max weight" => maximum.(getproperty.(turnover_res, :w)));
              formatters = [resfmt],
-             title = "Tighter turnover budget keeps the book near the reference")
+             title = "Turnover budget and drift from the equal-weight book")
 
 #=
 ## 3. Turnover as a risk measure
@@ -124,7 +124,7 @@ res_replicate_idx = optimise(MeanRisk(;
 
 pretty_table(DataFrame("Asset" => rd.nx, "Replicate EW" => res_replicate_ew.w,
                        "Replicate index" => res_replicate_idx.w); formatters = [resfmt],
-             title = "Pure tracking: equal-weight book vs index replication")
+             title = "Minimum tracking-error weights for two benchmarks")
 
 #=
 ## 5. Tracking as a constraint
@@ -150,7 +150,7 @@ pretty_table(DataFrame("Tracking-error budget" => err_vals,
                        "Drift from benchmark" => drift.(getproperty.(track_res, :w)),
                        "Max weight" => maximum.(getproperty.(track_res, :w)));
              formatters = [resfmt],
-             title = "Tighter tracking-error budget hugs the benchmark")
+             title = "Drift from the equal-weight benchmark at four tracking-error budgets")
 
 #=
 The `alg` field of [`TrackingError`](@ref) sets the norm of the tracking error, which acts on

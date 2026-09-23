@@ -84,9 +84,10 @@ pretty_table(fundamentals;
              title = "The reported table, gaps included")
 
 #=
-The assets of the table are not in the order of the assets of the returns, and the panel
-reads a row by its position, not by its name. Put the table into the order of `rd0.nx` once,
-in the cell below, rather than assuming the two orders match.
+This table lists the assets in the order of the returns, but a table from another source can use
+another order. The panel reads a row by its position, and it never reads the name. So put the
+table into the order of `rd0.nx` once, in the cell below, and do not assume that the two orders
+match.
 =#
 
 row_of = Dict(a => i for (i, a) in pairs(fundamentals.Asset))
@@ -121,7 +122,7 @@ pretty_table(DataFrame("Field" => raw_fields,
                        "Standard deviation" =>
                            [std(filter(!isnan, tbl[!, f])) for f in raw_fields]);
              formatters = [(v, i, j) -> isa(v, AbstractFloat) ? round(v; digits = 4) : v],
-             title = "Five columns, five scales")
+             title = "Range and standard deviation of the five columns")
 
 #=
 The usual transform for a table of this shape is a z-score down each column, over the cells
@@ -237,7 +238,7 @@ for (hname, de) in hierarchies
                           round(randindex(cuts["Correlation (no panel)"], cuts[hname])[1];
                                 digits = 3)))
 end
-pretty_table(cut_rows; title = "One panel, six hierarchies")
+pretty_table(cut_rows; title = "Six hierarchies, scored against the correlation cut")
 
 #=
 The last column scores each cut against the cut the correlations give, where 1 means the two
@@ -250,7 +251,7 @@ The next table prints the four-way cuts themselves, one column per hierarchy.
 
 pretty_table(DataFrame(["Asset" => rd.nx; "Sector" => [sector[a] for a in rd.nx];
                         [hname => cuts[hname] for (hname, _) in hierarchies]...]);
-             title = "The same twenty assets, cut six ways")
+             title = "Four-cluster cuts, one column per hierarchy")
 
 #=
 ## 6. The observed mask is a feature
@@ -270,7 +271,7 @@ for f in raw_fields
             DataFrame("Field" => f, "Reported" => Int(sum(m)),
                       "Missing" => Int(length(m) - sum(m))))
 end
-pretty_table(obs_rows; title = "What the fill policy recorded")
+pretty_table(obs_rows; title = "Reported and missing cells by field")
 
 de_reported = FeatureDistance(;
                               sel = ["book_to_price", "gross_profitability",
@@ -335,7 +336,7 @@ bt = ["Correlation" => nothing, "Every field" => FeatureDistance(),
 results = [(name, backtest(de)) for (name, de) in bt]
 pretty_table(DataFrame([backtest_row(name, p) for (name, p) in results]);
              formatters = [(v, i, j) -> isa(v, AbstractFloat) ? round(v; digits = 4) : v],
-             title = "Out-of-sample, $(length(last(first(results)).pred)) quarterly rebalances")
+             title = "Out-of-sample results over $(length(last(first(results)).pred)) quarterly rebalances")
 
 #=
 Read the `Mean weight change` column. Each hierarchy built from the panel moves its weights
@@ -392,7 +393,7 @@ pretty_table(DataFrame("Panel" => ["Static (section 3)", "Time-varying (section 
                                                                                          [1,
                                                                                           2,
                                                                                           3]).pnl)))]);
-             title = "What a fold slices, and what it leaves alone")
+             title = "Shape of each panel before and after a view")
 
 #=
 Keeping the first 100 observations and the first three assets cut both panels to three assets,

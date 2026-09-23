@@ -111,7 +111,7 @@ pr_op = prior(op, rd)
 pretty_table(DataFrame(["Assets" => rd.nx, "Empirical" => pr_emp.mu, "Opinion A" => pr_a.mu,
                         "Opinion B" => pr_b.mu, "Opinion C" => pr_c.mu,
                         "Pooled" => pr_op.mu]); formatters = [mmtfmt],
-             title = "Expected returns: individual opinions vs pooled consensus")
+             title = "Expected returns of the empirical prior, each opinion and the pooled consensus")
 
 # The expected returns of the pooled consensus.
 using StatsPlots, GraphRecipes
@@ -141,7 +141,7 @@ pr_log = prior(OpinionPoolingPrior(; pes = [opinion_a, opinion_b, opinion_c],
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Linear pool" => pr_lin.mu,
                         "Logarithmic pool" => pr_log.mu]); formatters = [mmtfmt],
-             title = "Linear vs logarithmic pooling")
+             title = "Pooled expected returns, linear and logarithmic")
 
 #=
 ## 6. Credibility weights and the uniform-prior fallback
@@ -166,7 +166,7 @@ pretty_table(DataFrame("weight total" => ["empirical (0.0)"; string.(scales)],
                        "MSFT posterior" => [pr_emp.mu[i_msft];
                                             [p.mu[i_msft] for p in pr_scaled]]);
              formatters = [mmtfmt],
-             title = "Lower total weight shrinks the consensus toward the empirical prior")
+             title = "AAPL and MSFT pooled expected returns by total credibility weight")
 
 #=
 ## 7. Robust pooling with `p`
@@ -218,7 +218,7 @@ res_op = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Empirical" => res_emp.w,
                         "Pooled consensus" => res_op.w]); formatters = [resfmt],
-             title = "Maximum-ratio weights: empirical vs pooled consensus")
+             title = "Maximum-ratio weights under the empirical prior and the pooled consensus")
 
 #=
 The composition plot stacks the weights of each portfolio into one bar, the empirical

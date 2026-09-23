@@ -18,9 +18,11 @@ This file governs the **prose a user reads as a page**. Four corpora carry it.
   and every `Group` head that is a string. A `Cap` with no label takes its sentence from the type's
   docstring, which [`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) owns.
 
-A line of Julia, a fenced code block, a LaTeX expression, an `@ref` link and a `#src` line are
-outside this file. So is a docstring, which reaches a page through `@docs` and which the docstring
-standard owns. *What the rule does not read* below states the rest.
+The code of a page carries two more kinds of text that a reader reads, and this file governs them
+too: **a string that a cell prints**, and **a comment in a code cell**. *The code of a page* below
+states what each must do. The rest of a line of Julia, a LaTeX expression, an `@ref` link and a
+`#src` line are outside this file. So is a docstring, which reaches a page through `@docs` and
+which the docstring standard owns. *What the rule does not read* below states the rest.
 
 On a Literate page a reader runs the cells in order, and the prose between two cells says what the
 next cell does, or what the last output shows.
@@ -42,9 +44,9 @@ word `to`.
 
 **How to apply it.** Invoke `/unslop` on the file. When the skill cannot be invoked, read its rules
 and apply them by hand. Rewrite the prose, keep the meaning, and end with the skill's self-audit,
-"What makes this obviously AI generated?". A pass changes prose alone: a line of Julia, a `#src`
-line, an `@ref` link, an `@docs` block, an admonition's indentation and a fenced block stay as they
-are, and the outputs of a page do not move.
+"What makes this obviously AI generated?". A pass changes prose, printed strings and code comments
+alone: every other token of a line of Julia, a `#src` line, an `@ref` link, an `@docs` block and an
+admonition's indentation stay as they are, and the numbers a page prints do not move.
 
 ---
 
@@ -119,6 +121,42 @@ A short page carries none of them and is complete without.
 
 ---
 
+## The code of a page
+
+**A printed string is prose.** A `pretty_table` `title` or `source_notes`, a plot `title`,
+`label`, `xlabel`, `ylabel` or `colorbar_title`, a `println` sentence, and a column name or a cell
+of a table that a cell prints all render as text that a reader reads. Every rule of this file
+holds on them: no banned word, no capitalised glossary term, no mechanism word, no verdict word, no
+dash, and no title case in a title. A type name keeps its identifier, `EmpiricalPrior`, and an
+acronym keeps its capitals, `CVaR`.
+
+**A title says what the table or the plot shows.** It makes no claim that the output of its cell
+does not show. Write "Largest weight by estimation window", not "A longer window spreads the
+book". A string that code reads as data, such as a dictionary key, a column that the code selects
+by name, a file path or a solver setting, is code and stays as the code needs it.
+
+**A cell that prints a verdict stays.** A `println` that prints `true`, a `Binds?` column and a
+section that checks the online run against the batch run illustrate the point for the reader, and
+ADR 0171 keeps them. The words of their label strings still follow this file.
+
+**A comment in a code cell is removed, unless it is a gotcha.** A gotcha is a thing that a reader
+who copies the cell gets wrong without the comment. Everything else a comment could say belongs in
+the prose above the cell, or nowhere, because the code already says it. A gotcha is short, one line
+is the target, and it sits on a line of its own above the code it is about:
+
+```julia
+#! `ladder(N)` is the radius where the last asset joins, so step past it to reach 1/N.
+eps = 1.0001 * ladder(N)
+```
+
+**The mark of a gotcha is `#!` and a space.** Literate renders a `#!` line inside the code cell,
+where a `#` line would end the cell and a `##` line would lose one `#`. Always write the space:
+Literate reads `#!md`, `#!nb` and `#!jl` at the start of a line as filter tokens, and it deletes
+such a line from the output that the token names. A Markdown page writes its gotcha the same way,
+so one mark means one thing on every page.
+
+---
+
 ## What the rule does not read
 
 **Derived text.** The rule reads written prose. A text that a script derives, or that another
@@ -143,9 +181,15 @@ and are not in the tree. Their sources are the Literate files and `docs/capabili
 and a defect in one is fixed at its source.
 
 **Markup and code.** A `#src` line, which is an authoring note and not a rendered page, and which
-the process-citation census skips for the same reason. A line of Julia. A `##` comment in a
-Literate source, which renders inside a code cell. A fenced code block, an `@docs` block, an inline
-code span, an inline LaTeX expression, and the target of a markdown link.
+the process-citation census skips for the same reason. The rest of a line of Julia, once its
+strings and its comment are read. Three markers that look like comments and are markup: Literate's
+`#-` and `#+`, which split a cell, and Documenter's `# hide`. A fenced block that is not code, an
+`@docs` block, an inline code span, an inline LaTeX expression, and the target of a markdown link.
+
+**The hero of the landing page.** `docs/src/index.md` opens with a ```` ```@raw html ```` block of
+YAML. The values of its text, tagline, title and details keys render as the hero and the cards of
+the landing page. They are prose under this file, and the census does not read them, because it reads
+no fenced block that is not code. A person reads them.
 
 ---
 
@@ -161,12 +205,21 @@ census includes rather than copies. The rules the census cannot read hold by rev
 of [`STANDARDS.md`](../../STANDARDS.md).
 
 **Three shapes of text feed one set of counters.** A Literate source gives its `#= … =#` blocks and
-every comment line that opens with a `#` and a space at column zero. A Markdown page gives its own lines. The catalogue gives the
-body of every double-quoted string literal on a line that is neither a `#` comment nor part of a
-triple-quoted block, which is how
+every line that Literate renders as markdown: a bare `#`, or a `#` and a space followed by text,
+after any indentation. A Markdown page gives its own lines. The catalogue gives the body of every
+double-quoted string literal on a line that is neither a `#` comment nor part of a triple-quoted
+block, which is how
 [`test/test_71_process_citation_census.jl`](../../test/test_71_process_citation_census.jl) reads
 the same file. A triple-quoted block there documents `Cap`, `Section` and `Group` to a contributor
 and never renders.
+
+**The code of a page feeds the same counters.** The code of a Literate source is every other line,
+and the code of a Markdown page is the body of its `julia`, `@example`, `@repl` and `@setup`
+fences. Such a fence inside the prose of a Literate source is code too. A small lexer reads each line of it. The body of every plain double-quoted string literal
+is prose, with each interpolation read as a space, and a string that a `title =` keyword opens is
+also read as a heading, so rule 17 reads it. The text of a `#!` gotcha is prose. A prefixed
+literal such as `r"…"` is a pattern and not text. The lexer reads one line at a time, so a string
+literal in a code cell opens and closes on one line.
 
 **What it counts.** One column per rule, named in the row: `emdash` and `endash` for rule 13,
 `curly` for rule 19, `notjust` for rule 9, `aivocab` for rule 7, `fancy_is` for rule 8, `filler`
@@ -177,8 +230,14 @@ without "features". Rule 26 is read without "vector", "surface", "primitive", "h
 bold terms of [`CONTEXT.md`](../../CONTEXT.md) in their capitalised form, read off that file at
 every run so the list never goes stale, and `mechanism` counts the strings of *A page names a type
 by its identifier and a concept in plain words*. `verdict` counts the strings of *A check is a
-number the reader reads, never a verdict*. `words` records the prose word count of the text and
-carries no limit.
+number the reader reads, never a verdict*. `comment` counts the comments in the code of a text that
+are not a `#!` gotcha: a `#` or `##` comment on a line of its own, a comment after a line of code,
+an empty `#` that holds a line break, a `#= … =#` block inside a code fence, and a `#!` that no
+space follows. `words` records the prose word count of the text and carries no limit.
+
+**What a person reads.** The census reads the words of a printed string and of a gotcha, not their
+meaning. Whether a title claims what its cell does not show, whether a removed comment carried a
+fact that the prose now needs, and whether a gotcha is a gotcha, hold by review.
 
 **Why those words are exempt.** This library writes "the expected returns vector", "a Pareto
 surface", "a feature matrix" and "a leveraged portfolio", and each of those is the concrete word

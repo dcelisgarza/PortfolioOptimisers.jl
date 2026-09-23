@@ -73,7 +73,7 @@ pretty_table(DataFrame("Quantity" => ["Gross daily return", "Fee cost, every day
                                       "Fee cost, one time", "Net daily return"],
                        "Value" => [gross_daily, fee_cost, fee_one_off, net_daily]);
              formatters = [resfmt],
-             title = "A 0.2% long fee against this book's daily edge")
+             title = "Daily return of the baseline before and after a 0.2% long fee")
 
 #=
 ## 3. Optimising net of fees
@@ -113,7 +113,7 @@ pretty_table(DataFrame("Portfolio" => ["Baseline", "Healthcare fee 2%"],
                        "Healthcare weight" =>
                            [healthcare_weight(res_base.w), healthcare_weight(res_diff.w)]);
              formatters = [resfmt],
-             title = "A targeted fee steers exposure away from a sector")
+             title = "Healthcare weight with and without a 2% healthcare fee")
 
 #=
 ## 5. Fixed fees need a mixed-integer solver

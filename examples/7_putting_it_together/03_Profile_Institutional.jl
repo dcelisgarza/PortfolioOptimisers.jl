@@ -89,7 +89,7 @@ pretty_table(DataFrame("Sector" => ["tech", "energy", "healthcare"],
                        "Mandate book" => [sector_weight(institutional.w, g)
                                           for g in ["tech", "energy", "healthcare"]]);
              formatters = [resfmt],
-             title = "Institutional book — capped, energy-limited, benchmark-tracking")
+             title = "Sector weights of the benchmark and the mandate book")
 
 #=
 The table gives the benchmark weight and the mandate weight for each of the three named sectors.
@@ -114,7 +114,7 @@ invested = sum(alloc.shares .* prices)
 pretty_table(DataFrame("Asset" => rd.nx, "Target" => institutional.w,
                        "Shares" => round.(Int, alloc.shares), "Realised" => alloc.w);
              formatters = [resfmt],
-             title = "\$10,000,000 allocated — invested \$$(round(Int, invested)), cash left \$$(round(alloc.cash, digits = 2))")
+             title = "\$10,000,000 to invest, \$$(round(Int, invested)) invested, \$$(round(alloc.cash, digits = 2)) left in cash")
 
 #=
 ## 4. The book

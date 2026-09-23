@@ -46,7 +46,6 @@ We run one walk-forward under both conventions and compare the two.
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, Statistics,
       StatsPlots
 
-## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     return j == 1 ? Date(v) : v
 end;
@@ -102,12 +101,12 @@ wf_held = IndexWalkForward(252, 126; wd = SelfFinancingDrift(), store_weight_pat
 
 The two runs solve the same optimisation problems. Nothing in the fit changes. The switch says which
 return series a fold reports, not how its observations are split or how its weights are chosen.
+After the two runs, the cell compares their weights fold by fold.
 =#
 
 pred_target = cross_val_predict(mr, rd, wf_target)
 pred_held = cross_val_predict(mr, rd, wf_held)
 
-## The decisions are identical; only the reading of them differs.
 all(pred_target.res[i].w ≈ pred_held.res[i].w for i in eachindex(pred_target.res))
 
 #=
@@ -141,7 +140,7 @@ have two answers, and the switch says which one you are asking.
 We print the largest single-day gap between the two series, in per cent.
 =#
 
-println("largest daily gap between the two readings = $(round(maximum(abs, ret_held .- ret_target) * 100, digits = 4)) %")
+println("largest daily gap between the two series = $(round(maximum(abs, ret_held .- ret_target) * 100, digits = 4)) %")
 
 plot(pred_target.mrd.ts, cumulative_returns(ret_target, true); label = "target weights",
      xlabel = "Date", ylabel = "Compound cumulative return", legend = :topleft)
@@ -156,13 +155,13 @@ path can tell the two cases apart without looking at a number.
 
 The record has five fields: the asset returns the fold was scored over, the weight path when the
 scheme stored it, the weights the drift started from, the weights held after the last observation,
-and the drift scheme that produced them.
+and the drift scheme that produced them. The path has one row per observation of the fold and one
+column per asset.
 =#
 
 hw = pred_held.pred[1].hw
 U = hw.U
 
-## The path has one row per observation of the fold and one column per asset.
 size(U)
 
 #=
@@ -318,7 +317,7 @@ fixed amount charged one time.
 =#
 
 println("observations = $(size(rd.X, 1))")
-println("total, by clock  = $(round(calc_total_fees(w_eq, size(rd.X, 1), fee_first), sigdigits = 8)) and $(round(calc_total_fees(w_eq, size(rd.X, 1), fee_spread), sigdigits = 8))")
+println("total charged under the two clocks = $(round(calc_total_fees(w_eq, size(rd.X, 1), fee_first), sigdigits = 8)) and $(round(calc_total_fees(w_eq, size(rd.X, 1), fee_spread), sigdigits = 8))")
 
 #=
 !!! note "The fit uses the same clock, and its expected return always spreads"

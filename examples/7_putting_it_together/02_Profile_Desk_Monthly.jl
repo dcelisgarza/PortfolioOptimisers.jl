@@ -95,7 +95,7 @@ desk = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 
 pretty_table(DataFrame("Asset" => rd.nx, "Tangency weight" => desk.w);
              formatters = [resfmt],
-             title = "Desk monthly — risk-adjusted optimum on the view prior")
+             title = "Desk monthly tangency weights on the prior with the view")
 
 #=
 ## 4. Exact finite allocation
@@ -116,7 +116,7 @@ invested = sum(alloc.shares .* prices)
 pretty_table(DataFrame("Asset" => rd.nx, "Target" => desk.w,
                        "Shares" => round.(Int, alloc.shares), "Realised" => alloc.w);
              formatters = [resfmt],
-             title = "\$500,000 allocated — invested \$$(round(Int, invested)), cash left \$$(round(alloc.cash, digits = 2))")
+             title = "\$500,000 to invest, \$$(round(Int, invested)) invested, \$$(round(alloc.cash, digits = 2)) left in cash")
 
 #=
 ## 5. The book

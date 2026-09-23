@@ -106,11 +106,12 @@ value such as `ε = 0.05` looks like a small 5 %, but here it is near the top of
 gives almost the 1/N portfolio.
 
 We print the radius that gives each of four portfolios, which hold one asset, 20 % of the
-assets, half of them and all of them.
+assets, half of them and all of them. `ladder(k)` is the radius at which the k-th best asset
+joins the portfolio, from Lemma 2 of the paper, so a radius between `ladder(k)` and
+`ladder(k + 1)` gives `k` assets.
 =#
 
 mu_sorted = sort(pr.mu; rev = true)
-## The radius at which the k-th asset joins the portfolio (Lemma 2 of the paper).
 ladder(k) = sum(mu_sorted[i] - mu_sorted[k] for i in 1:k)
 
 pretty_table(DataFrame(;
@@ -189,11 +190,11 @@ changes, and the objective and the constraints stay the same.
 With the estimator, `scaled = true` on [`L1UncertaintySetAlgorithm`](@ref) gives this set.
 Here we build the set directly and pass the volatilities as `sd`. We solve both portfolios at
 the quintile radius, and print their weights next to the inverse-volatility weights that Lemma
-9 of the paper predicts.
+9 of the paper predicts. `gs(k)` is the ladder of the scaled set: it divides each difference
+`mu_sorted[i] - mu_sorted[k]` of `ladder(k)` by the volatility of asset `i`.
 =#
 
 sd_hat = sqrt.(diag(pr.sigma))
-## The volatility-adjusted ladder (Lemma 9): same construction, divided through by sigma.
 sd_by_mu = sd_hat[sortperm(pr.mu; rev = true)]
 gs(k) = sum((mu_sorted[i] - mu_sorted[k]) / sd_by_mu[i] for i in 1:k)
 
@@ -298,11 +299,13 @@ gross exposure.
 
 The paper notes that the active assets no longer follow the order of the ranking here, so no
 closed form gives the weights. The solver still solves the problem, which `xbgt = true` makes a
-mixed-integer linear program.
+mixed-integer linear program. The paper assumes a positive market beta for each asset, so we
+take the correlation of each asset with the average return of all the assets, and add 0.5 to
+its absolute value.
 =#
 
 beta = vec(cor(rd.X, mean(rd.X; dims = 2)))
-beta = abs.(beta) .+ 0.5   ## a positive market beta per asset, as the paper assumes
+beta = abs.(beta) .+ 0.5
 lc_mn = LinearConstraint(; eq = PartialLinearConstraint(reshape(beta, 1, N), [0.0]))
 
 w_mn = quintile(L1UncertaintySet(; eps = 0.002); bgt = nothing, gbgt = 1.0, xbgt = true,
@@ -488,8 +491,7 @@ paper, the comparison is in sample, on the same estimates that built every portf
 what each objective does, and it says nothing about performance out of sample.
 =#
 
-## `ladder(N)` is the exact radius at which the last asset joins, so it sits on the knife edge
-## and leaves the twentieth at zero. Step past it to land on 1/N proper.
+#! At exactly `ladder(N)` the last asset can stay at zero, so take a radius past it for 1/N.
 w_1n = long_only(L1UncertaintySet(; eps = ladder(N) * 1.25))
 
 rows = [(; portfolio = name, w = optimise(mre).w)

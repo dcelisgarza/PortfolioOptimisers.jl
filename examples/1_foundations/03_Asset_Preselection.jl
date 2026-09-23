@@ -188,7 +188,7 @@ prices never runs.
 =#
 
 Xz = copy(rd.X)
-Xz[:, 4] .= 0.0                                  # BBY stops trading
+Xz[:, 4] .= 0.0
 rd_z = ReturnsResult(; nx = rd.nx, X = Xz)
 setdiff(rd.nx, fit_preprocessing(ZeroVarianceFilter(), rd_z).nx)
 
@@ -209,9 +209,9 @@ for the best one, two and three assets.
 =#
 
 v = PortfolioOptimisers.asset_scores(SCM(), rd.X)
-ord = sortperm(v)                                # ascending variance; lower is better
+ord = sortperm(v)
 Xs = copy(rd.X)
-Xs[:, ord[3]] = Xs[:, ord[2]]                    # make ranks 2 and 3 tie exactly
+Xs[:, ord[3]] = Xs[:, ord[2]]
 rd_tie = ReturnsResult(; nx = rd.nx, X = Xs)
 
 tie_rows = map([1, 2, 3]) do k
@@ -267,7 +267,6 @@ comps = RedundancySelector(; alg = CorrelationComponents(; t = 0.65, absolute = 
 kept_g = fit_preprocessing(greedy, rd).nx
 kept_c = fit_preprocessing(comps, rd).nx
 
-## the greedy guarantee, verified: no surviving pair exceeds t
 gi = [findfirst(==(n), rd.nx) for n in kept_g]
 sub = abs.(cor(rd.X[:, gi]))
 max_surviving = maximum(sub[i, j] for j in axes(sub, 2) for i in (j + 1):size(sub, 1))
@@ -275,7 +274,7 @@ max_surviving = maximum(sub[i, j] for j in axes(sub, 2) for i in (j + 1):size(su
 DataFrame(; algorithm = ["PairwiseCorrelation", "CorrelationComponents"],
           kept = [length(kept_g), length(kept_c)],
           max_surviving_abs_cor = [round(max_surviving; digits = 3), missing],
-          extra_drops = ["—", join(setdiff(kept_g, kept_c), ", ")])
+          extra_drops = ["", join(setdiff(kept_g, kept_c), ", ")])
 
 #=
 `absolute = true` counts a correlation of `-0.9` as redundant too. That is usually what you want,
@@ -299,7 +298,7 @@ kept_cl = fit_preprocessing(clustered, rd).nx
 length(kept_cl), join(kept_cl, ", ")
 
 try
-    RedundancySelector(; alg = ClusterGroups())            # no score
+    RedundancySelector(; alg = ClusterGroups())
 catch e
     println(e.msg)
 end
@@ -320,10 +319,11 @@ test = ReturnsResult(; nx = rd.nx, X = rd.X[701:end, :])
 fitted = fit_preprocessing(selector, train)
 replayed = apply_preprocessing(fitted, test)
 
-## the *test* window's own ten lowest-CVaR names would have been different
 would_have_chosen = fit_preprocessing(selector, test).nx
 
-DataFrame(; universe = ["fitted on train", "replayed on test", "test window's own choice"],
+DataFrame(;
+          universe = ["fitted on the training window", "applied to the test window",
+                      "chosen on the test window"],
           assets = [join(fitted.nx, ", "), join(replayed.nx, ", "),
                     join(would_have_chosen, ", ")])
 
@@ -420,7 +420,7 @@ colours = [n in kept10 ? :steelblue : :lightgray for n in rd.nx[perm]]
 
 bar(1:length(perm), cvar[perm]; color = colours, legend = false,
     xticks = (1:length(perm), rd.nx[perm]), xrotation = 60, ylabel = "CVaR",
-    title = "Per-asset CVaR — RankRule(best = 10) keeps the blue names")
+    title = "CVaR per asset, with the ten that RankRule(best = 10) keeps in blue")
 
 #=
 The redundancy decision depends on the threshold. We count the assets each algorithm keeps over a
@@ -444,7 +444,7 @@ plot(thrs, n_greedy; label = "PairwiseCorrelation (greedy)", marker = :circle, l
 plot!(thrs, n_comps; label = "CorrelationComponents (transitive)", marker = :square, lw = 2)
 hline!([length(rd.nx)]; label = "full universe", ls = :dash, color = :gray)
 plot!(; xlabel = "|correlation| threshold", ylabel = "assets kept",
-      title = "Chaining costs assets", legend = :bottomright)
+      title = "Assets kept at each correlation threshold", legend = :bottomright)
 
 #=
 ## Summary

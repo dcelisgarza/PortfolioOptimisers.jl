@@ -72,7 +72,7 @@ rounding_error(alloc) = sum(abs, alloc.w .- res.w)
 pretty_table(DataFrame("Asset" => rd.nx, "Target" => res.w,
                        "Shares" => round.(Int, greedy.shares), "Realised" => greedy.w);
              formatters = [resfmt],
-             title = "Greedy allocation of \$$(round(Int, cash)) — leftover cash \$$(round(greedy.cash, digits = 2)), rounding error $(round(rounding_error(greedy), digits = 4))")
+             title = "Greedy allocation of \$$(round(Int, cash)): leftover cash \$$(round(greedy.cash, digits = 2)), rounding error $(round(rounding_error(greedy), digits = 4))")
 
 #=
 ## 3. Exact allocation with a mixed-integer solver
@@ -92,7 +92,8 @@ pretty_table(DataFrame("Method" => ["Greedy", "Discrete (MIP)"],
                        "Leftover cash" => [greedy.cash, discrete.cash],
                        "Rounding error" =>
                            [rounding_error(greedy), rounding_error(discrete)]);
-             formatters = [resfmt], title = "Greedy vs exact allocation")
+             formatters = [resfmt],
+             title = "Leftover cash and rounding error of the greedy and discrete allocations")
 
 #=
 ## 4. Lot sizes
@@ -109,7 +110,8 @@ pretty_table(DataFrame("Allocation" => ["Single shares", "Lots of 10"],
                        "Leftover cash" => [greedy.cash, greedy_lots.cash],
                        "Rounding error" =>
                            [rounding_error(greedy), rounding_error(greedy_lots)]);
-             formatters = [resfmt], title = "Lot size coarsens the allocation")
+             formatters = [resfmt],
+             title = "Leftover cash and rounding error of the greedy allocation in single shares and in lots of 10")
 
 #=
 ## 5. The budget sets the rounding error

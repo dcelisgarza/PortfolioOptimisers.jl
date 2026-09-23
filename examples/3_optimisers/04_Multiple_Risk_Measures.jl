@@ -26,7 +26,6 @@ of risk measures.
     scalariser. See [ℓ1 uncertainty sets](../2_moments_priors/11_L1_Uncertainty_Quintile_Portfolios.md).
 =#
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     if j == 1
         return Date(v)
@@ -53,7 +52,6 @@ using CSV, TimeSeries, DataFrames
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
-## Compute the returns
 rd = prices_to_returns(X)
 
 #=
@@ -205,16 +203,15 @@ under each of the four scalarisers. The negative skewness has a scale of 0.1.
 
 r = [Variance(), NegativeSkewness(; settings = RiskMeasureSettings(; scale = 0.1))]
 
-results = [optimise(HierarchicalEqualRiskContribution(; ri = r[1],# inner (intra-cluster) risk measure
-                                                      ro = r[1],  # outer (inter-cluster) risk measure
+results = [optimise(HierarchicalEqualRiskContribution(; ri = r[1], ro = r[1],
                                                       opt = HierarchicalOptimiser(; pe = pr,
                                                                                   cle = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r[2], ro = r[2],
                                                       opt = HierarchicalOptimiser(; pe = pr,
                                                                                   cle = clr))),
-           optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,#
-                                                      scai = SumScalariser(),# inner (intra-cluster)
-                                                      scao = SumScalariser(),# outer (inter-cluster)
+           optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
+                                                      scai = SumScalariser(),
+                                                      scao = SumScalariser(),
                                                       opt = HierarchicalOptimiser(; pe = pr,
                                                                                   cle = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
@@ -252,16 +249,15 @@ single measure.
 
 r = [Variance(), NegativeSkewness()]
 
-results = [optimise(HierarchicalEqualRiskContribution(; ri = r[1],# inner (intra-cluster) risk measure
-                                                      ro = r[1],  # outer (inter-cluster) risk measure
+results = [optimise(HierarchicalEqualRiskContribution(; ri = r[1], ro = r[1],
                                                       opt = HierarchicalOptimiser(; pe = pr,
                                                                                   cle = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r[2], ro = r[2],
                                                       opt = HierarchicalOptimiser(; pe = pr,
                                                                                   cle = clr))),
-           optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,#
-                                                      scai = SumScalariser(),# inner (intra-cluster)
-                                                      scao = SumScalariser(),# outer (inter-cluster)
+           optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
+                                                      scai = SumScalariser(),
+                                                      scao = SumScalariser(),
                                                       opt = HierarchicalOptimiser(; pe = pr,
                                                                                   cle = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
@@ -323,7 +319,8 @@ vector and the same scalariser, so the two numbers are equal. A different vector
 
 rk_hand = expected_risk(rs, res.w, res.pr; sca = SumScalariser())
 pretty_table(DataFrame(; :route => ["from the result", "named by hand"],
-                       :risk => [rk_opt, rk_hand]); title = "Both routes, one figure")
+                       :risk => [rk_opt, rk_hand]);
+             title = "Expected risk of the maximum-ratio portfolio")
 
 #=
 The scalariser is a keyword of `expected_risk`, so we report the same portfolio under each of the
@@ -334,7 +331,7 @@ scas = [SumScalariser(), MaxScalariser(), MinScalariser(), LogSumExpScalariser()
 pretty_table(DataFrame(; :scalariser => ["Sum", "Max", "Min", "LogSumExp"],
                        :risk =>
                            [expected_risk(res.r, res.w, res.pr; sca = s) for s in scas]);
-             title = "One portfolio, six variance measures, four scalarisers")
+             title = "Risk of the same portfolio under each scalariser")
 
 #=
 Sum, Max and Min stay in the units of the measure, and they always satisfy `Min ≤ Max ≤ Sum`.

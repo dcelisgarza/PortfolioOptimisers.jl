@@ -114,6 +114,8 @@ puts test information into the last training rows, and an embargo of 20 rows rem
 fields.
 
 `train_test_split` throws an error when the two windows overlap, and when a window is empty.
+The cell leaves an embargo between a training window of 60 % and a test window of 20 %. Then it
+asks for two windows that overlap and prints the error.
 =#
 
 tr_e, te_e = train_test_split(pr; train_size = 0.6, test_size = 0.2)
@@ -123,7 +125,6 @@ DataFrame(; window = ["train", "embargoed", "test"],
                   N - size(values(tr_e.X), 1) - size(values(te_e.X), 1),
                   size(values(te_e.X), 1)])
 
-## Two windows that overlap throw an error.
 try
     train_test_split(pr; train_size = 0.9, test_size = 0.2)
 catch e
@@ -136,7 +137,8 @@ end
 Nothing stops you from writing this:
 
 ```julia
-res  = fit(pipe, pr)          ## fitted on EVERYTHING
+#! This fits the pipeline on every row of pr, the test window included.
+res  = fit(pipe, pr)
 pred = predict(res, pr, test_window)
 ```
 
@@ -174,8 +176,8 @@ res = fit(pipe, pr)
 split_res = res["split"]
 
 DataFrame(;
-          quantity = ["prices in the sample", "prices the workflow was fitted on",
-                      "prices held out", "returns reaching the optimiser"],
+          quantity = ["prices in the sample", "prices in the training window",
+                      "prices held out", "returns the optimiser gets"],
           rows = [N, size(values(split_res.train.X), 1), size(values(split_res.test.X), 1),
                   size(res.ctx.returns.X, 1)])
 
@@ -201,7 +203,6 @@ catch e
     println(e.msg)
 end
 
-## A split inside a nested pipeline also throws an error.
 try
     inner = Pipeline(; steps = (TrainTestSplit(; test_size = 0.2), PricesToReturns()))
     Pipeline(; steps = (inner, EqualWeighted()))
@@ -216,12 +217,11 @@ For a pipeline with a split, [`fit_predict`](@ref) fits on the training rows and
 the rows that the split held out.
 
 For a pipeline without a split, `fit_predict` predicts on the same data that it fits, so the
-result is in sample.
+result is in sample. For comparison, we also predict on the training window, in sample.
 =#
 
 pred_test = fit_predict(pipe, pr)
 
-## For comparison, we predict on the training window, in sample.
 pred_train = predict(res, split_res.train)
 
 #=
@@ -243,10 +243,11 @@ the rows on which the optimiser minimised the variance. The held-out risk comes 
 the fit never saw. Here both held-out values are lower than the in-sample values, so on this
 window the in-sample risk did not understate the held-out risk. A holdout gives you one such
 comparison, and a different window can give the opposite result.
+
+The next table gives the weights. They cover the assets of the training window, and the test
+prediction uses the same assets.
 =#
 
-## The weights cover the assets of the training window, and the test prediction uses the same
-## assets.
 DataFrame(; asset = res.ctx.returns.nx, weight = res.w)
 
 #=
@@ -258,10 +259,10 @@ the data unchanged.
 
 You can therefore still fit on the history and predict on new rows. Every other fitted step still
 applies its state, such as the training assets, the training fill values and the conversion to
-returns. Only the split does nothing.
+returns. Only the split does nothing. We treat the last 41 prices as data that arrived after
+the fit.
 =#
 
-## We treat the last 41 prices as data that arrived after the fit.
 future = PricesResult(; X = X[(end - 40):end])
 pred_future = predict(res, future)
 

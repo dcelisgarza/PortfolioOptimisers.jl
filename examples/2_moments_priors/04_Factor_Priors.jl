@@ -21,7 +21,6 @@ give.
     [higher moment](03_Higher_Moment_Estimation.md) pages show it.
 =#
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     if j == 1
         return Date(v)
@@ -66,7 +65,6 @@ pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(F[(end - 5):end]; formatters = [tsfmt])
 
-## Compute the returns
 rd = prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))
 
 #=
@@ -84,13 +82,10 @@ An estimator whose name starts with `High` returns a [`HighOrderPrior`](@ref), a
 A factor model takes one of two regressions, [`StepwiseRegression`](@ref) or [`DimensionReductionRegression`](@ref). Each has several targets, and their docstrings describe them. We build eight prior estimators. The ones with a factor model use the stepwise regression by default, and the dimension reduction regression where the cell names it.
 =#
 
-pes = [EmpiricalPrior(),#
-       FactorPrior(),#
-       FactorPrior(; re = DimensionReductionRegression()),#
-       HighOrderPriorEstimator(),#
-       HighOrderPriorEstimator(; pe = FactorPrior()),#
-       HighOrderPriorEstimator(; pe = FactorPrior(; re = DimensionReductionRegression())),#
-       HighOrderFactorPriorEstimator(;),#
+pes = [EmpiricalPrior(), FactorPrior(), FactorPrior(; re = DimensionReductionRegression()),
+       HighOrderPriorEstimator(), HighOrderPriorEstimator(; pe = FactorPrior()),
+       HighOrderPriorEstimator(; pe = FactorPrior(; re = DimensionReductionRegression())),
+       HighOrderFactorPriorEstimator(;),
        HighOrderFactorPriorEstimator(;
                                      pe = FactorPrior(;
                                                       re = DimensionReductionRegression()))]
@@ -137,13 +132,13 @@ A factor prior also stores a sparser Cholesky factor, with better numerical prop
 using LinearAlgebra
 
 pretty_table(DataFrame([rd.nx prs[1].sigma], ["Assets"; rd.nx]); formatters = [mmtfmt],
-             title = "EmpiricalPrior Covariance",
+             title = "EmpiricalPrior covariance",
              source_notes = "Condition number EmpiricalPrior: $(round(cond(prs[1].sigma); digits = 3))")
 pretty_table(DataFrame([rd.nx prs[2].sigma], ["Assets"; rd.nx]); formatters = [mmtfmt],
-             title = "FactorPrior(Step) Covariance",
+             title = "FactorPrior(Step) covariance",
              source_notes = "Condition number FactorPrior(Step): $(round(cond(prs[2].sigma); digits = 3))")
 pretty_table(DataFrame([rd.nx prs[3].sigma], ["Assets"; rd.nx]); formatters = [mmtfmt],
-             title = "FactorPrior(DimRed) Covariance",
+             title = "FactorPrior(DimRed) covariance",
              source_notes = "Condition number FactorPrior(DimRed): $(round(cond(prs[3].sigma); digits = 3))")
 
 #=
@@ -200,25 +195,25 @@ nx2 = collect(Iterators.flatten([(nx * "_") .* rd.nx for nx in rd.nx]))
 The tables print the coskewness and its negative spectral slices for priors 4, 7 and 8, with the condition number of each under it.
 =#
 pretty_table(DataFrame([rd.nx prs[4].sk], ["Assets^2 / Assets"; nx2]);
-             formatters = [hmmtfmt], title = "HighOrderPriorEstimator Coskewness",
+             formatters = [hmmtfmt], title = "HighOrderPriorEstimator coskewness",
              source_notes = "Condition number HighOrderPriorEstimator: $(round(cond(prs[4].sk); digits = 3))")
 pretty_table(DataFrame([rd.nx prs[7].sk], ["Assets^2 / Assets"; nx2]);
              formatters = [hmmtfmt],
-             title = "HighOrderFactorPriorEstimator(Step) Coskewness",
+             title = "HighOrderFactorPriorEstimator(Step) coskewness",
              source_notes = "Condition number HighOrderFactorPriorEstimator(Step): $(round(cond(prs[7].sk); digits = 3))")
 pretty_table(DataFrame([rd.nx prs[8].sk], ["Assets^2 / Assets"; nx2]);
              formatters = [hmmtfmt],
-             title = "HighOrderFactorPriorEstimator(DimRed) Coskewness",
+             title = "HighOrderFactorPriorEstimator(DimRed) coskewness",
              source_notes = "Condition number HighOrderFactorPriorEstimator(DimRed): $(round(cond(prs[8].sk); digits = 3))")
 
 pretty_table(DataFrame([rd.nx prs[4].V], ["Assets"; rd.nx]); formatters = [hmmtfmt],
-             title = "HighOrderPriorEstimator Coskewness Negative Spectral Slices",
+             title = "HighOrderPriorEstimator negative spectral slices of the coskewness",
              source_notes = "Condition number HighOrderPriorEstimator: $(round(cond(prs[4].V); digits = 3))")
 pretty_table(DataFrame([rd.nx prs[7].V], ["Assets"; rd.nx]); formatters = [hmmtfmt],
-             title = "HighOrderFactorPriorEstimator(Step) Coskewness Negative Spectral Slices",
+             title = "HighOrderFactorPriorEstimator(Step) negative spectral slices of the coskewness",
              source_notes = "Condition number HighOrderFactorPriorEstimator(Step): $(round(cond(prs[7].V); digits = 3))")
 pretty_table(DataFrame([rd.nx prs[8].V], ["Assets"; rd.nx]); formatters = [hmmtfmt],
-             title = "HighOrderFactorPriorEstimator(DimRed) Coskewness Negative Spectral Slices",
+             title = "HighOrderFactorPriorEstimator(DimRed) negative spectral slices of the coskewness",
              source_notes = "Condition number HighOrderFactorPriorEstimator(DimRed): $(round(cond(prs[8].V); digits = 3))")
 
 #=
@@ -235,13 +230,13 @@ plot_coskewness(prs[7], rd)
 We print the cokurtosis matrix of the same three priors. The [higher moment page](03_Higher_Moment_Estimation.md) shows why the raw cokurtosis is singular. The default processing replaces a matrix that is not positive definite with the nearest correlation matrix, rescaled to the same diagonal, and the condition number under each table shows how close to singular the result is.
 =#
 pretty_table(DataFrame([nx2 prs[4].kt], ["Assets^2"; nx2]); formatters = [hmmtfmt],
-             title = "HighOrderPriorEstimator Cokurtosis",
+             title = "HighOrderPriorEstimator cokurtosis",
              source_notes = "Condition number HighOrderPriorEstimator: $(round(cond(prs[4].kt); digits = 3))")
 pretty_table(DataFrame([nx2 prs[7].kt], ["Assets^2"; nx2]); formatters = [hmmtfmt],
-             title = "HighOrderFactorPriorEstimator(Step) Cokurtosis",
+             title = "HighOrderFactorPriorEstimator(Step) cokurtosis",
              source_notes = "Condition number HighOrderFactorPriorEstimator(Step): $(round(cond(prs[7].kt); digits = 3))")
 pretty_table(DataFrame([nx2 prs[8].kt], ["Assets^2"; nx2]); formatters = [hmmtfmt],
-             title = "HighOrderFactorPriorEstimator(DimRed) Cokurtosis",
+             title = "HighOrderFactorPriorEstimator(DimRed) cokurtosis",
              source_notes = "Condition number HighOrderFactorPriorEstimator(DimRed): $(round(cond(prs[8].kt); digits = 3))")
 
 #=
@@ -276,9 +271,8 @@ slv = [Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
 #=
 ### 3.1 Mean-standard deviation optimisation
 
-We compute the mean-standard deviation efficient frontier under the empirical prior and under the two factor priors.
+We compute a mean-standard deviation efficient frontier of 50 portfolios under the empirical prior and under each of the two factor priors.
 =#
-## JuMP Optimisers, we will compute the efficient frontier with 50 points for all of them.
 opts = [JuMPOptimiser(; pe = prs[1], slv = slv,
                       ret = ArithmeticReturn(;
                                              settings = JuMPReturnsSettings(;
@@ -295,10 +289,8 @@ opts = [JuMPOptimiser(; pe = prs[1], slv = slv,
                                                                             lb = Frontier(;
                                                                                           N = 50))))]
 
-## Mean-Risk estimators using the standard deviation.
 mrs = [MeanRisk(; r = StandardDeviation(), obj = MinimumRisk(), opt = opt) for opt in opts]
 
-## Optimise
 ress = optimise.(mrs)
 
 #=
@@ -344,11 +336,9 @@ A frontier holds many portfolios. To compare one portfolio per prior, we compute
 opts = [JuMPOptimiser(; pe = prs[1], slv = slv), JuMPOptimiser(; pe = prs[2], slv = slv),
         JuMPOptimiser(; pe = prs[3], slv = slv)]
 
-## Mean-Risk estimators using the standard deviation.
 mrs = [MeanRisk(; r = StandardDeviation(), obj = MaximumRatio(; rf = 4.2 / 100 / 252),
                 opt = opt) for opt in opts]
 
-## Optimise
 ress = optimise.(mrs)
 pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
                        "FactorPrior(Step)" => ress[2].w,
@@ -364,7 +354,6 @@ The factor model portfolios are more diversified than the empirical one. The fac
 
 We repeat the steps of section 3.1 with the negative skewness as the risk measure. The priors are now 4, 7 and 8, the high-order priors that hold the coskewness this measure reads.
 =#
-## JuMP Optimisers, we will compute the efficient frontier with 50 points for all of them.
 opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                       ret = ArithmeticReturn(;
                                              settings = JuMPReturnsSettings(;
@@ -381,10 +370,8 @@ opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                                                                             lb = Frontier(;
                                                                                           N = 50))))]
 
-## Mean-Risk estimators using the negative skewness.
 mrs = [MeanRisk(; r = NegativeSkewness(), obj = MinimumRisk(), opt = opt) for opt in opts]
 
-## Optimise
 ress = optimise.(mrs)
 
 #=
@@ -392,36 +379,38 @@ The plots follow the order of section 3.1. The first plot is the composition of 
 =#
 plot_stacked_area_composition(ress[1].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
-                                        title = "EmpiricalPrior", legend = :outerright))
-# Empirical prior frontier.
+                                        title = "HighOrderPriorEstimator",
+                                        legend = :outerright))
+# Empirical high-order prior frontier.
 r = NegativeSkewness()
 plot_measures(ress[1].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[1].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
-              title = "EmpiricalPrior", xlabel = "NegativeSkewness",
+              title = "HighOrderPriorEstimator", xlabel = "NegativeSkewness",
               ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
-# Factor prior composition with stepwise regression.
+# High-order factor prior composition with stepwise regression.
 plot_stacked_area_composition(ress[2].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
-                                        title = "FactorPrior(Step)", legend = :outerright))
-# Factor prior frontier with stepwise regression.
+                                        title = "HighOrderFactorPriorEstimator(Step)",
+                                        legend = :outerright))
+# High-order factor prior frontier with stepwise regression.
 r = NegativeSkewness()
 plot_measures(ress[2].w, prs[7]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
-              title = "FactorPrior(Step)", xlabel = "NegativeSkewness",
+              title = "HighOrderFactorPriorEstimator(Step)", xlabel = "NegativeSkewness",
               ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
-# Factor prior composition with dimension reduction regression.
+# High-order factor prior composition with dimension reduction regression.
 plot_stacked_area_composition(ress[3].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
-                                        title = "FactorPrior(DimRed)",
+                                        title = "HighOrderFactorPriorEstimator(DimRed)",
                                         legend = :outerright))
-# Factor prior frontier with dimension reduction regression.
+# High-order factor prior frontier with dimension reduction regression.
 r = NegativeSkewness()
 plot_measures(ress[3].w, prs[8]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
-              title = "FactorPrior(DimRed)", xlabel = "NegativeSkewness",
+              title = "HighOrderFactorPriorEstimator(DimRed)", xlabel = "NegativeSkewness",
               ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
@@ -431,15 +420,14 @@ Then we solve one maximum-ratio portfolio per prior, as in section 3.1.
 opts = [JuMPOptimiser(; pe = prs[4], slv = slv), JuMPOptimiser(; pe = prs[7], slv = slv),
         JuMPOptimiser(; pe = prs[8], slv = slv)]
 
-## Mean-Risk estimators using the negative skewness.
 mrs = [MeanRisk(; r = NegativeSkewness(), obj = MaximumRatio(; rf = 4.2 / 100 / 252),
                 opt = opt) for opt in opts]
 
-## Optimise
 ress = optimise.(mrs)
-pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
-                       "FactorPrior(Step)" => ress[2].w,
-                       "FactorPrior(DimRed)" => ress[3].w); formatters = [resfmt])
+pretty_table(DataFrame("Assets" => rd.nx, "HighOrderPriorEstimator" => ress[1].w,
+                       "HighOrderFactorPriorEstimator(Step)" => ress[2].w,
+                       "HighOrderFactorPriorEstimator(DimRed)" => ress[3].w);
+             formatters = [resfmt])
 
 # The maximum-ratio portfolios with the negative skewness as the risk measure.
 plot_stacked_bar_composition(ress, rd)
@@ -451,7 +439,6 @@ Here the factor priors give less diversified portfolios than the empirical prior
 
 We repeat the steps with the kurtosis as the risk measure.
 =#
-## JuMP Optimisers, we will compute the efficient frontier with 50 points for all of them.
 opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                       ret = ArithmeticReturn(;
                                              settings = JuMPReturnsSettings(;
@@ -468,47 +455,48 @@ opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                                                                             lb = Frontier(;
                                                                                           N = 50))))]
 
-## Mean-Risk estimators using the kurtosis.
 mrs = [MeanRisk(; r = Kurtosis(), obj = MinimumRisk(), opt = opt) for opt in opts]
 
-## Optimise
 ress = optimise.(mrs)
 
 #=
 This time every frontier plot measures the kurtosis on the returns of the empirical high-order prior, `prs[4]`. The optimisation reads the cokurtosis matrix of each prior, but a plot reads only the returns and the mean of the prior it is given. The returns of a factor prior are the ones its factor model rebuilds, so we pass `prs[4]` to measure the three frontiers on the same returns.
 =#
-# Empirical prior composition.
+# Empirical high-order prior composition.
 plot_stacked_area_composition(ress[1].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
-                                        title = "EmpiricalPrior", legend = :outerright))
-# Empirical prior frontier.
+                                        title = "HighOrderPriorEstimator",
+                                        legend = :outerright))
+# Empirical high-order prior frontier.
 r = Kurtosis()
 plot_measures(ress[1].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[1].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
-              title = "EmpiricalPrior", xlabel = "Kurtosis", ylabel = "Arithmetic Return",
-              colorbar_title = "\nReturn/Risk Ratio", right_margin = 6Plots.mm)
+              title = "HighOrderPriorEstimator", xlabel = "Kurtosis",
+              ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
+              right_margin = 6Plots.mm)
 
-# Factor prior composition with stepwise regression.
+# High-order factor prior composition with stepwise regression.
 plot_stacked_area_composition(ress[2].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
-                                        title = "FactorPrior(Step)", legend = :outerright))
-# Factor prior frontier with stepwise regression.
+                                        title = "HighOrderFactorPriorEstimator(Step)",
+                                        legend = :outerright))
+# High-order factor prior frontier with stepwise regression.
 r = Kurtosis()
 plot_measures(ress[2].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
-              title = "FactorPrior(Step)", xlabel = "Kurtosis",
+              title = "HighOrderFactorPriorEstimator(Step)", xlabel = "Kurtosis",
               ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
-# Factor prior composition with dimension reduction regression.
+# High-order factor prior composition with dimension reduction regression.
 plot_stacked_area_composition(ress[3].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
-                                        title = "FactorPrior(DimRed)",
+                                        title = "HighOrderFactorPriorEstimator(DimRed)",
                                         legend = :outerright))
-# Factor prior frontier with dimension reduction regression.
+# High-order factor prior frontier with dimension reduction regression.
 r = Kurtosis()
 plot_measures(ress[3].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
               c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
-              title = "FactorPrior(DimRed)", xlabel = "Kurtosis",
+              title = "HighOrderFactorPriorEstimator(DimRed)", xlabel = "Kurtosis",
               ylabel = "Arithmetic Return", colorbar_title = "\nReturn/Risk Ratio",
               right_margin = 6Plots.mm)
 
@@ -518,15 +506,14 @@ The section ends with the maximum-ratio portfolios.
 opts = [JuMPOptimiser(; pe = prs[4], slv = slv), JuMPOptimiser(; pe = prs[7], slv = slv),
         JuMPOptimiser(; pe = prs[8], slv = slv)]
 
-## Mean-Risk estimators using the kurtosis.
 mrs = [MeanRisk(; r = Kurtosis(), obj = MaximumRatio(; rf = 4.2 / 100 / 252), opt = opt)
        for opt in opts]
 
-## Optimise
 ress = optimise.(mrs)
-pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
-                       "FactorPrior(Step)" => ress[2].w,
-                       "FactorPrior(DimRed)" => ress[3].w); formatters = [resfmt])
+pretty_table(DataFrame("Assets" => rd.nx, "HighOrderPriorEstimator" => ress[1].w,
+                       "HighOrderFactorPriorEstimator(Step)" => ress[2].w,
+                       "HighOrderFactorPriorEstimator(DimRed)" => ress[3].w);
+             formatters = [resfmt])
 
 # The maximum-ratio portfolios of the last cell.
 plot_stacked_bar_composition(ress, rd)

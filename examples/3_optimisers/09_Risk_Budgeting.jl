@@ -23,7 +23,6 @@ and to risk measured by any of the risk measures [`MeanRisk`](@ref) accepts.
 =#
 
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 resfmt = (v, i, j) -> begin
     if j == 1
         return v
@@ -75,16 +74,13 @@ We build two budgets. The equal budget gives the ERC portfolio. The linearly
 increasing budget asks each asset to carry more of the risk than the asset before it.
 =#
 
-## Equal risk contribution across assets.
 rb_eq = RiskBudgeting(; r = r, opt = opt,
                       rba = AssetRiskBudgeting(; rkb = RiskBudget(; val = fill(1.0, N)),
                                                alg = LogRiskBudgeting()))
-## Linearly increasing risk budget across assets.
 rb_inc = RiskBudgeting(; r = r, opt = opt,
                        rba = AssetRiskBudgeting(; rkb = RiskBudget(; val = 1:N),
                                                 alg = LogRiskBudgeting()))
 
-## Optimise both. The prior is precomputed, so no data is needed.
 res_eq, res_inc = optimise(rb_eq), optimise(rb_inc)
 
 #=
@@ -98,9 +94,11 @@ rc_eq ./= sum(rc_eq);
 rc_inc = risk_contribution(rf, res_inc.w, pr.X);
 rc_inc ./= sum(rc_inc);
 
-pretty_table(DataFrame(; :assets => rd.nx, Symbol("Eq weight") => res_eq.w,
-                       Symbol("Eq risk") => rc_eq, Symbol("Incr weight") => res_inc.w,
-                       Symbol("Incr risk") => rc_inc); formatters = [resfmt])
+pretty_table(DataFrame(; :assets => rd.nx, Symbol("Equal budget weight") => res_eq.w,
+                       Symbol("Equal budget risk share") => rc_eq,
+                       Symbol("Increasing budget weight") => res_inc.w,
+                       Symbol("Increasing budget risk share") => rc_inc);
+             formatters = [resfmt])
 
 #=
 Read the two risk columns of the table. The equal-budget portfolio carries the same $1/N$
@@ -196,7 +194,6 @@ prf = prior(EmpiricalPrior(), rdf)
 optf = JuMPOptimiser(; pe = prf, slv = slv)
 Nf = length(rdf.nf)
 
-## Equal risk contribution across factors.
 frb = RiskBudgeting(; r = Variance(), opt = optf,
                     rba = FactorRiskBudgeting(; rkb = RiskBudget(; val = fill(1.0, Nf))))
 

@@ -47,7 +47,6 @@ rd = prices_to_returns(X)
 pr = prior(EmpiricalPrior(), rd)
 clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
 
-## Shared solver and hierarchical optimiser.
 slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),
              check_sol = (; allow_local = true, allow_almost = true))

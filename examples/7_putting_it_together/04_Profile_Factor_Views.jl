@@ -61,8 +61,6 @@ asset_sets = UniverseSets(;
                           dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
                                       "energy" => ["CVX", "XOM", "RRC"],
                                       "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
-## `FactorBlackLittermanPrior` reads the *declared* factor axis, so the sets it takes names
-## both: assets under `xkey`, factors under `tfkey`, in the column order of `rd.F`.
 factor_sets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 tau = 1 / size(rd.X, 1)
 
@@ -100,8 +98,8 @@ raw = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 
 sector_weight(w, sec) = sum(w[[findfirst(==(t), rd.nx) for t in asset_sets.dict[sec]]])
 raw_sectors = DataFrame("sector" => ["tech", "energy", "healthcare"],
-                        "raw tilt" => [sector_weight(raw.w, s)
-                                       for s in ("tech", "energy", "healthcare")])
+                        "weight" => [sector_weight(raw.w, s)
+                                     for s in ("tech", "energy", "healthcare")])
 pretty_table(raw_sectors; formatters = [resfmt],
              title = "Sector weights with only a per-asset cap")
 
@@ -126,10 +124,10 @@ constrained_sectors = DataFrame("sector" => ["tech", "energy", "healthcare"],
                                 "constrained" => [sector_weight(desk.w, s)
                                                   for s in ("tech", "energy", "healthcare")])
 pretty_table(constrained_sectors; formatters = [resfmt],
-             title = "Sector weights after the 35% / 25% caps")
+             title = "Sector weights with healthcare capped at 35% and energy at 25%")
 
 pretty_table(DataFrame("Asset" => rd.nx, "Weight" => desk.w); formatters = [resfmt],
-             title = "Factor-views desk — constrained tangency book")
+             title = "Factor-views desk tangency weights with the sector caps")
 
 #=
 Compare the two sector tables. Healthcare and energy sit at their caps in the second one, and the
@@ -151,7 +149,7 @@ invested = sum(alloc.shares .* prices)
 pretty_table(DataFrame("Asset" => rd.nx, "Target" => desk.w,
                        "Shares" => round.(Int, alloc.shares), "Realised" => alloc.w);
              formatters = [resfmt],
-             title = "\$1,000,000 allocated — invested \$$(round(Int, invested)), cash left \$$(round(alloc.cash, digits = 2))")
+             title = "\$1,000,000 to invest, \$$(round(Int, invested)) invested, \$$(round(alloc.cash, digits = 2)) left in cash")
 
 #=
 ## 6. The book

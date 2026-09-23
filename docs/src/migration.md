@@ -43,18 +43,23 @@ v0.31 supports Julia 1.11, 1.12 and 1.13.
 
 `prices_to_returns` used to do five jobs with one keyword list: join the factor and benchmark tables onto the assets, collapse to a lower frequency, impute or delete gaps, apply a function, and compute returns. It now computes returns, and each of the other jobs is a named step you compose. The keywords that remain are `ret_method` and `padding`, plus a new `gap_return_alg`.
 
+In v0.30:
+
 ```julia
-# v0.30
 rd = prices_to_returns(X, F; B = B, iv = iv, ivpa = ivpa,
                        join_method = :outer, collapse_args = (week, last),
                        missing_col_percent = 0.9, missing_row_percent = 0.9,
                        impute_method = Impute.Interpolate(), map_func = f)
+```
 
-# v0.31
+In v0.31:
+
+```julia
 pr = price_ingestion(PriceIngestion(; join_method = :outer, collapse_args = (week, last)), X;
                      F = F, B = B, iv = iv, ivpa = ivpa)
-mdf = fit_preprocessing(MissingDataFilter(; col_thr = 0.9, row_thr = 0.9), pr)  # delete, or
-mdf = fit_preprocessing(PriceGapFill(; fill = CarriedPrice()), pr)               # fill
+#! Keep one of the next two lines: the first drops the assets and rows with too many gaps, the second fills the gaps.
+mdf = fit_preprocessing(MissingDataFilter(; col_thr = 0.9, row_thr = 0.9), pr)
+mdf = fit_preprocessing(PriceGapFill(; fill = CarriedPrice()), pr)
 rd = prices_to_returns(apply_preprocessing(mdf, pr))
 ```
 
@@ -76,15 +81,19 @@ If you build a `PricesResult` or a `ReturnsResult` by hand, the `pnl` keyword re
 
 In v0.30 a feature reached a clustering optimiser as a matrix `Z` and its labels `nz`, stored on the returns. The `z_src` keyword of the optimiser chose between the data and a `FeaturePrior` that made the features. One object replaces all of that. The asset panel is stored on the returns as `rd.pnl`, and it holds each feature as a named field. A field is numeric, categorical, or a tensor with its own labels.
 
+In v0.30:
+
 ```julia
-# v0.30: a classification from the asset sets, through a feature prior
 rd  = prices_to_returns(X; nz = ["nx_sector"], Z = Z)
 pe  = FeaturePrior(; pe = EmpiricalPrior(), ze = AssetSetsFeatures(; vals = ["nx_sector"]),
                    sets = sets)
 opt = HierarchicalOptimiser(; pe = pe, cle = ClustersEstimator(; de = FeatureDistance()),
                             z_src = :prior)
+```
 
-# v0.31: the classification is a Panel Field, and the distance selects it by name
+In v0.31:
+
+```julia
 rd  = ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts,
                     pnl = asset_panel([panel_input(sets, "nx_sector")]))
 opt = HierarchicalOptimiser(; pe = EmpiricalPrior(),

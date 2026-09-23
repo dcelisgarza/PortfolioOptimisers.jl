@@ -114,7 +114,7 @@ vol_w = DataFrame("asset" => rd.nx,
                   "win=252" => annvol(WindowedCovariance(; window = 252)))
 
 pretty_table(vol_w; formatters = [resfmt],
-             title = "Equal-weight vs exponentially-weighted vs trailing 252-day volatility")
+             title = "Annualised volatility with equal weights, exponential weights and a 252-day window")
 
 #=
 The weighted estimate keeps every observation. At the decay rate `2 / (T + 1)` the oldest
@@ -141,7 +141,7 @@ regime_vol = DataFrame("asset" => rd.nx,
                        "full" => annvol(PortfolioOptimisersCovariance()))
 
 pretty_table(regime_vol; formatters = [resfmt],
-             title = "Volatility conditioned on a crisis vs a calm window")
+             title = "Annualised volatility over the 2020 crash, a calm 2021 quarter and the full sample")
 
 #=
 The crash window gives several times the volatility of the calm window, and the full-sample
@@ -177,8 +177,8 @@ books = [windowed_minrisk(w) for w in windows]
 concentration = DataFrame("window" => ["full"; string.(windows)],
                           "max weight" => [maximum(full_book.w);
                                            [maximum(b.w) for b in books]],
-                          "names held" => [count(>(1e-4), full_book.w);
-                                           [count(>(1e-4), b.w) for b in books]])
+                          "assets held" => [count(>(1e-4), full_book.w);
+                                            [count(>(1e-4), b.w) for b in books]])
 
 concfmt = (v, i, j) -> j == 2 && isa(v, Number) ? "$(round(v * 100, digits = 2)) %" : v
 pretty_table(concentration; formatters = [concfmt],
@@ -207,7 +207,7 @@ rolling_dates = rd.ts[roll:T]
 
 plot(rolling_dates, rolling_vol; label = "AAPL trailing 252-day vol", xlabel = "date",
      ylabel = "annualised volatility", legend = :topright, lw = 2,
-     title = "A windowed moment driven through time")
+     title = "AAPL 252-day trailing volatility by date")
 
 #=
 The volatility rises in early 2020, when the days of the COVID crash enter the trailing window.

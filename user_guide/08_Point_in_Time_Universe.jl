@@ -40,10 +40,10 @@ is untouched. The gaps sit in the prices, which is how a data vendor sends them.
 nx = string.(colnames(X))
 P = Matrix{Float64}(values(X))
 T, N = size(P)
-late, dead, halt = 3, 7, 5                           # lists late, delists early, suspended
-P[1:60, late] .= NaN                                 # not yet listed for 60 observations
-P[(T - 39):T, dead] .= NaN                           # delists 40 observations before the end
-P[100:130, halt] .= NaN                              # suspended, then prices again
+late, dead, halt = 3, 7, 5
+P[1:60, late] .= NaN
+P[(T - 39):T, dead] .= NaN
+P[100:130, halt] .= NaN
 Xg = TimeArray(timestamp(X), P, colnames(X))
 
 rd = prices_to_returns(Xg)
@@ -153,11 +153,12 @@ You fit through a prior, which reduces and expands, or you use a mask-aware esti
 the active mask of an `AssetPanel`.
 
 The second error is the empty universe. A window that leaves no asset investable has nothing to
-weight, so the library throws instead of returning an empty portfolio.
+weight, so the library throws instead of returning an empty portfolio. The cell below sets the
+first return of every asset to `NaN`, so no asset has a return at every observation.
 =#
 
 Xdead = copy(rd.X)
-Xdead[1, :] .= NaN                                   # every asset misses the first observation
+Xdead[1, :] .= NaN
 
 try
     optimise(EqualWeighted(), ReturnsResult(; nx = nx, X = Xdead))
@@ -172,11 +173,12 @@ A price series can be finite while the asset is untradeable. A suspension can ca
 a corporate action can start a holding period, and your mandate can exclude a name. The prices
 alone say none of that. If you hold a listing calendar, pass it to [`PriceIngestion`](@ref) as
 `span`, sized `price observations × assets`. It replaces what the layer read off the gaps, and the
-layer never overrides a calendar you gave it.
+layer never overrides a calendar you gave it. We pass the prices without gaps, and a calendar that
+takes the suspended asset out of the universe over the rows of its halt.
 =#
 
 calendar = trues(T, N)
-calendar[100:130, halt] .= false                     # out of the universe, with a finite price
+calendar[100:130, halt] .= false
 
 pr_cal = price_ingestion(PriceIngestion(; span = calendar), X)
 rd_cal = prices_to_returns(pr_cal)

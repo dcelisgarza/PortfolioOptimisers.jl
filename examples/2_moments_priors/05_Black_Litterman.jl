@@ -81,7 +81,7 @@ pr_eq = prior(EmpiricalPrior(; me = EquilibriumExpectedReturns()), rd)
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Sample mean" => pr_sample.mu,
                         "Equilibrium" => pr_eq.mu]); formatters = [mmtfmt],
-             title = "Sample mean vs equilibrium prior")
+             title = "Sample mean and equilibrium expected returns")
 
 using StatsPlots, GraphRecipes
 # The sample mean of each asset.
@@ -154,7 +154,7 @@ i_aapl = findfirst(==("AAPL"), rd.nx)
 pretty_table(DataFrame(; confidence = confs,
                        Symbol("AAPL posterior") => [p.mu[i_aapl] for p in pr_confs]);
              formatters = [mmtfmt],
-             title = "AAPL posterior vs view confidence (equilibrium ≈ $(round(pr_eq.mu[i_aapl]*100; digits=4))%, view = 0.08%)")
+             title = "AAPL posterior by view confidence (equilibrium ≈ $(round(pr_eq.mu[i_aapl]*100; digits=4))%, view = 0.08%)")
 
 #=
 ## 6. The posterior covariance
@@ -193,7 +193,7 @@ res_bl = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Equilibrium" => res_eq.w,
                         "Black-Litterman" => res_bl.w]); formatters = [resfmt],
-             title = "Maximum-ratio weights: equilibrium vs Black-Litterman")
+             title = "Maximum-ratio weights under the equilibrium prior and the Black-Litterman posterior")
 
 #=
 In the composition plot, compare the weight of Apple in the two bars.

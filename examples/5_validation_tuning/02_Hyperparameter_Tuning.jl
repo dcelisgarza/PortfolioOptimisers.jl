@@ -10,7 +10,6 @@ folds of a cross-validation. This example shows the two searches of PortfolioOpt
 grid search and a randomised search.
 =#
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     if j == 1
         return Date(v)
@@ -40,7 +39,6 @@ using CSV, TimeSeries, DataFrames, Clarabel, Statistics, StableRNGs, Distributio
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252 * 5):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
-## Compute the returns
 rd = prices_to_returns(X)
 
 slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
@@ -81,10 +79,7 @@ combinatorial scheme, it scores each path instead of each fold.
 =#
 
 opt = JuMPOptimiser(; slv = slv)
-## The searches below tune an L2 regularisation coefficient. The coefficient is the `val`
-## field of an [`L2Regularisation`](@ref). The `l2` field of [`JuMPOptimiser`](@ref) takes
-## that estimator, not the number, so the first inner optimiser gets one, and the key of the
-## grid ends in `l2.val`.
+#! `l2` is `nothing` by default, and the key `l2.val` needs an `L2Regularisation` in it.
 optl2 = JuMPOptimiser(; slv = slv, l2 = L2Regularisation())
 r = MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment()))
 st = Stacking(; opti = [MeanRisk(; opt = optl2), RiskBudgeting(; opt = opt)],

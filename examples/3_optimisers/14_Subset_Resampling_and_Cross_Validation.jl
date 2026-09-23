@@ -132,8 +132,8 @@ pp_ssr = PopulationPredictionResult(; pred = [cv_ssr])
 median_bench = scorer(pp_bench)
 median_ssr = scorer(pp_ssr)
 
-println("MeanRisk cross-val variance = $(expected_risk(LowOrderMoment(; alg = SecondMoment()), cv_bench))")
-println("SubsetResampling cross-val variance = $(expected_risk(LowOrderMoment(; alg = SecondMoment()), cv_ssr))")
+println("MeanRisk cross-validated variance = $(expected_risk(LowOrderMoment(; alg = SecondMoment()), cv_bench))")
+println("SubsetResampling cross-validated variance = $(expected_risk(LowOrderMoment(; alg = SecondMoment()), cv_ssr))")
 
 # Each bar of the first plot is the variance of one test fold of the benchmark.
 plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), cv_bench)
@@ -154,7 +154,7 @@ selected.
 =#
 
 println("Median benchmark path id = $(median_bench.id)")
-println("Median SSR path id = $(median_ssr.id)")
+println("Median SubsetResampling path id = $(median_ssr.id)")
 
 #=
 ## 4. Efficient frontier of a meta-optimiser
@@ -190,7 +190,7 @@ pretty_table(DataFrame(; :point => 1:length(res_mf.w),
 
 plot(xs_m, ys_m; seriestype = :scatter, marker = (:circle, 5), label = "MeanRisk",
      xlabel = "Variance", ylabel = "Arithmetic return",
-     title = "Frontier: plain optimiser vs bagged meta-optimiser")
+     title = "Efficient frontiers of MeanRisk and SubsetResampling")
 plot!(xs_s, ys_s; seriestype = :scatter, marker = (:diamond, 6), label = "SubsetResampling")
 
 #=
@@ -223,8 +223,8 @@ idx = 1:14
 sigma_refit = cov(ce_dn, view(pr.X, :, idx))
 sigma_slice = view(sigma_full, idx, idx)
 
-println("Largest entry of the full-universe covariance   = $(maximum(abs, sigma_full))")
-println("Refit vs sliced, on a 14-asset subset           = $(maximum(abs, sigma_refit .- sigma_slice))")
+println("Largest entry of the full-universe covariance     = $(maximum(abs, sigma_full))")
+println("Largest gap, 14-asset refit against the cut block = $(maximum(abs, sigma_refit .- sigma_slice))")
 
 #=
 The second number is the largest gap between the covariance fitted on the 14 assets and the
@@ -269,8 +269,8 @@ cv_deferred = cross_val_predict(MeanRisk(; obj = MinimumRisk(),
                                          opt = JuMPOptimiser(; slv = slv)), rd, kfold)
 
 sm = LowOrderMoment(; alg = SecondMoment())
-println("Pasted-matrix cross-val variance      = $(expected_risk(sm, cv_pasted))")
-println("Deferred-estimator cross-val variance = $(expected_risk(sm, cv_deferred))")
+println("Pasted-matrix cross-validated variance      = $(expected_risk(sm, cv_pasted))")
+println("Deferred-estimator cross-validated variance = $(expected_risk(sm, cv_deferred))")
 
 #=
 The two runs differ in two ways. The pasted matrix was fitted on the observations each test
@@ -281,11 +281,13 @@ the one a portfolio could have earned.
 
 The fields a prior fills, `mu`, `sigma`, `kt` and `sk`, all work this way. A measure with two or
 more such fields takes a prior estimator in `pe` instead, and one fit fills every field you left
-unstated.
+unstated. The fit fills `mu` and `kt` of a `Kurtosis`, so its `pe` must compute a cokurtosis,
+as a `HighOrderPriorEstimator` does. It fills `mu`, `sigma` and `chol` of a
+`DistributionValueatRisk`.
 
 ```julia
-Kurtosis(; pe = EmpiricalPrior())                  # mu and kt from one fit
-DistributionValueatRisk(; pe = EmpiricalPrior())   # mu, sigma and chol from one fit
+Kurtosis(; pe = HighOrderPriorEstimator())
+DistributionValueatRisk(; pe = EmpiricalPrior())
 ```
 
 A field you state by hand keeps the value you gave it. The constructor checks the shape of each

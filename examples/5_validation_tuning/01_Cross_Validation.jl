@@ -15,7 +15,6 @@ field, wrapped in an [`OptimisationCrossValidation`](@ref). They then fit the ou
 on the out-of-sample returns of the inner estimators.
 =#
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     if j == 1
         return Date(v)
@@ -47,7 +46,6 @@ using CSV, TimeSeries, DataFrames, Clarabel, Statistics
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252 * 5):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
-## Compute the returns
 rd = prices_to_returns(X)
 
 slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,

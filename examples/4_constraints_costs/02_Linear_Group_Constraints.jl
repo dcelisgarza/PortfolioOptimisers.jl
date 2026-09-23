@@ -120,7 +120,7 @@ pretty_table(DataFrame("Interpretation" =>
                            ["per-member (each ≥ 15%)", "group-sum (total ≥ 15%)"],
                        "Staples total" => [sector_weight(res_member.w, "staples"),
                                            sector_weight(res_groupsum.w, "staples")]);
-             formatters = [resfmt], title = "Same number, two very different constraints")
+             formatters = [resfmt], title = "Staples total for each form of the 15% floor")
 
 #=
 Use the `WeightBoundsEstimator` form when the rule is about each name: "every position in this

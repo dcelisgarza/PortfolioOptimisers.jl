@@ -18,7 +18,6 @@ surface with [`NearOptimalCentering`](@ref), which the
 =#
 
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     if j == 1
         return Date(v)
@@ -45,7 +44,6 @@ using CSV, TimeSeries, DataFrames
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
-## Compute the returns
 rd = prices_to_returns(X)
 
 #=
@@ -93,14 +91,10 @@ denoised form puts a negative number under a square root, so we leave it as it i
 dn = Denoise(; alg = SpectralDenoise(;))
 mp = MatrixProcessing(; dn = dn)
 pe = HighOrderPriorEstimator(;
-                             ## Prior estimator for low order moments
                              pe = EmpiricalPrior(;
                                                  ce = PortfolioOptimisersCovariance(;
                                                                                     mp = mp)),
-                             ## Estimator for cokurtosis
-                             kte = Cokurtosis(; mp = mp),
-                             ## Estimator for coskewness
-                             ske = Coskewness())
+                             kte = Cokurtosis(; mp = mp), ske = Coskewness())
 
 #=
 We compute the prior once, because the page uses it several times.
@@ -139,7 +133,6 @@ the efficient frontier into bins. We keep the default number of bins, the number
 divided by the number of assets, and you can set it with the `bins` field.
 =#
 
-## Risk-free rate of 4.2/100/252
 rf = 4.2 / 100 / 252
 opt = JuMPOptimiser(; pe = pr, slv = slv)
 obj = MaximumRatio(; rf = rf)
@@ -188,7 +181,6 @@ so we use `min` and `max`.
 
 r1 = factory(NegativeSkewness(;
                               settings = RiskMeasureSettings(;
-                                                             ## Risk upper bounds go from the minimum to maximum risk given the optimisations.
                                                              ub = range(;
                                                                         start = min(sk_rk1,
                                                                                     sk_rk2),
@@ -248,8 +240,8 @@ plot_measures(res3.w, pr; x = r1, y = r2,
                                           rt = ArithmeticReturn(), rf = rf),
               c = ExpectedReturnRiskRatio(; rk = ConditionalDrawdownatRisk(),
                                           rt = ArithmeticReturn(), rf = rf),
-              title = "Pareto Surface", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
-              zlabel = "Return/CDaR")
+              title = "Pareto surface", xlabel = "Square root of negative skewness",
+              ylabel = "Square root of kurtosis", zlabel = "Return/CDaR")
 
 #=
 We plot the same surface in 2D, with the ratio as the colour.
@@ -258,8 +250,9 @@ We plot the same surface in 2D, with the ratio as the colour.
 plot_measures(res3.w, pr; x = r1, y = r2,
               c = ExpectedReturnRiskRatio(; rk = ConditionalDrawdownatRisk(),
                                           rt = ArithmeticReturn(), rf = rf),
-              title = "Pareto Front", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
-              colorbar_title = "\n\nReturn/CDaR", right_margin = 8Plots.mm)
+              title = "Pareto front", xlabel = "Square root of negative skewness",
+              ylabel = "Square root of kurtosis", colorbar_title = "\n\nReturn/CDaR",
+              right_margin = 8Plots.mm)
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
 #src - Sweep clean (ADR 0014 retrofit): the high-order prior (denoised cov + cokurtosis +

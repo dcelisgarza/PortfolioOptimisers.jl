@@ -25,7 +25,6 @@ We build a pipeline one step at a time and show what each step changes. Then we 
 preprocessing parameters under walk-forward cross-validation.
 =#
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     if j == 1
         return Date(v)
@@ -67,21 +66,22 @@ pipeline that starts at the price level takes one as its input.
 
 So that the cleaning steps change something, we delete some prices. JNJ loses the first half of its
 history, and AAPL and XOM lose one price each.
+
+[`listing_span`](@ref) reads the listing of each asset off its prices. A run of gaps at the
+start means that the asset is not listed yet, a run at the end means that it is delisted, and a
+gap in between is a gap inside the listing. [`price_ingestion`](@ref) makes this span for you,
+and we call `listing_span` only because we built the prices by hand. The cell ends with the
+fraction of missing prices of each asset.
 =#
 
 vals = Matrix{Float64}(values(X))
-vals[1:(end ÷ 2), 3] .= NaN    ## JNJ: missing for the first half of the sample
-vals[10, 1] = NaN              ## AAPL: an isolated gap
-vals[25, 5] = NaN              ## XOM: an isolated gap
+vals[1:(end ÷ 2), 3] .= NaN
+vals[10, 1] = NaN
+vals[25, 5] = NaN
 Xm = TimeArray(timestamp(X), vals, colnames(X))
-## `listing_span` finds the listing of each asset from its prices. A run of gaps at the start
-## means that the asset is not listed yet, a run at the end means that it is delisted, and a
-## gap in between is a gap inside the listing. [`price_ingestion`](@ref) makes the span for
-## you. We call `listing_span` here because we built the prices by hand.
 span = listing_span(vals)
 pr = PricesResult(; X = Xm, span = span)
 
-## How much is missing, per asset?
 miss = DataFrame(; asset = string.(colnames(Xm)),
                  missing_frac = vec(count(isnan, vals; dims = 1)) ./ size(vals, 1))
 pretty_table(miss; formatters = [resfmt])
@@ -273,6 +273,9 @@ A key of the grid names a step in one of three ways.
     the whole step.
   - A property path from the pipeline, `"steps[1].col_thr"`, works as it does for an
     optimiser outside a pipeline. The path starts at `steps`.
+
+The table after the search gives the mean test score of each candidate. The search negates a
+risk measure, so the highest score belongs to the lowest mean CVaR.
 =#
 
 pipe = Pipeline(;
@@ -288,8 +291,6 @@ gscv = GridSearchCrossValidation(p; cv = IndexWalkForward(500, 250),
                                  r = ConditionalValueatRisk())
 tuned = search_cross_validation(pipe, gscv, pr)
 
-## The mean test score of each candidate. The search negates a risk measure, so a bigger
-## score is better.
 scores = DataFrame(; candidate = 1:length(tuned.val_grid),
                    col_thr = [v[1] for v in tuned.val_grid],
                    gap_fill = [string(nameof(typeof(v[2].fill))) for v in tuned.val_grid],

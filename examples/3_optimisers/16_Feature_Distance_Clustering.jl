@@ -163,9 +163,9 @@ the bound holds for it.
 
 D = distance(FeatureDistance(), Z; dims = 1)
 levels = sort(unique(round.(D; digits = 6)))
-pretty_table(DataFrame("Quantity" => ["Feature columns", "Levels agreed on (L)",
-                                      "Row norm (every row, = sqrt(L))", "Distinct distances",
-                                      "The distances themselves"],
+pretty_table(DataFrame("Quantity" => ["Feature columns", "Classification levels (L)",
+                                      "Norm of the first row", "Number of distinct distances",
+                                      "Distinct distances"],
                        "Value" => [string(size(Z, 2)), string(length(taxonomy)),
                                    string(round(norm(Z[1, :]); digits = 4)),
                                    string(length(levels)), string(round.(levels; digits = 4))]);
@@ -208,7 +208,7 @@ agreement = DataFrame("k" => 2:10,
                       "Adjusted Rand index" => [round(randindex(cutree(clr_cor.res; k = k),
                                                                 cutree(clr_fea.res; k = k))[1]; digits = 3)
                                                 for k in 2:10])
-pretty_table(agreement; title = "How far the two hierarchies agree, cut by cut")
+pretty_table(agreement; title = "Adjusted Rand index of the two hierarchies at each cut")
 
 # The feature distance gives these clusters.
 plot_clusters(clr_fea, rd.nx)
@@ -236,7 +236,7 @@ hrp_fea = optimise(HierarchicalRiskParity(;
 pretty_table(DataFrame("Asset" => rd.nx, "HRP correlation" => hrp_cor.w,
                        "HRP features" => hrp_fea.w, "Difference" => hrp_fea.w - hrp_cor.w);
              formatters = [resfmt],
-             title = "Same risk measure, same prior, two hierarchies")
+             title = "HierarchicalRiskParity weights on the correlation and the feature hierarchy")
 
 plot_stacked_bar_composition([hrp_cor, hrp_fea], rd;
                              xticks = (1:2, ["Correlation", "Features"]))
@@ -292,7 +292,7 @@ the returns beside it as a keyword.
 de_loadings = FeatureDistance(; ape = RegressionPanel())
 clr_loadings = clusterise(ClustersEstimator(; de = de_loadings, onc = onc), pr_loadings;
                           rd = rdf)
-println("The producer and the panel agree exactly: ",
+println("The producer's distances equal the panel's: ",
         clr_loadings.D == distance(FeatureDistance(), Z_loadings; dims = 1))
 
 #=
@@ -409,7 +409,7 @@ plot(1:size(sweep, 1), sweep[!, "ARI vs correlation"]; marker = :circle, legend 
                [string(first(split(r.Separation, "(")), " / ", first(split(r.Decay, "(")))
                 for r in eachrow(sweep)]), xrotation = 45,
      ylabel = "Adjusted Rand index against the correlation cut",
-     title = "Both knobs move the clustering")
+     title = "Adjusted Rand index of each separation and decay pair")
 
 #=
 !!! warning "The same setting does something else on the constraint path"
@@ -556,7 +556,7 @@ entropy-pooling posterior reaches the collapse.
 plot([distance(FeatureDistance(; alg = alg), Ztv; dims = 1)[1, :] for (_, alg) in collapses];
      label = reshape([c for (c, _) in collapses], 1, :), marker = :circle,
      xticks = (1:N, rd.nx), xrotation = 90, ylabel = "Distance from AAPL",
-     title = "The collapse rule is a modelling choice, not a detail")
+     title = "Distance from AAPL under each collapse rule")
 
 #=
 ### 6.1 A static field on a time-varying panel is stored once
@@ -579,9 +579,9 @@ stored(v) = isa(v, PortfolioOptimisers.RepeatedLeading) ? length(v.parent) : len
 pretty_table(DataFrame("Field" => [f.name for f in pnl_mixed.pf],
                        "Values type" =>
                            [string(nameof(typeof(held(f)))) for f in pnl_mixed.pf],
-                       "Shape it presents" => [string(size(held(f))) for f in pnl_mixed.pf],
+                       "Shape" => [string(size(held(f))) for f in pnl_mixed.pf],
                        "Entries stored" => [stored(held(f)) for f in pnl_mixed.pf]);
-             title = "A lifted field presents an observation axis it does not store")
+             title = "Stored entries in the mixed panel, field by field")
 
 #=
 ## 7. The selector names fields of the panel
@@ -617,7 +617,7 @@ for (sname, sel) in selectors
                       "Distinct distances" => length(unique(round.(Ds; digits = 6))),
                       "Maximum distance" => round(maximum(Ds); digits = 4)))
 end
-pretty_table(selector_rows; title = "One namespace, five cuts of the same panel")
+pretty_table(selector_rows; title = "Five selectors on the same panel")
 
 #=
 Cutting to `"sector"` alone gives two distances rather than three, because the industry level is
@@ -678,7 +678,7 @@ pretty_table(DataFrame("Selector entry" =>
                            [round(mean(Zgap[.!isnan.(Zgap)]); digits = 4),
                             round(mean(Zobs); digits = 4),
                             round(mean(selectdim(Zboth, 3, 2)); digits = 4)]);
-             title = "The mask a fill policy left behind")
+             title = "The values and the observed mask of a filled field")
 
 #=
 ## 8. Under a fold, and under a meta-optimiser
@@ -703,18 +703,18 @@ commute = DataFrame("Feature axis" =>
                         ["The assets (square)", "Taxonomy levels (rectangular)"],
                     "Shape of the view" => [string(size(feature_matrix(view_square.pnl))),
                                             string(size(feature_matrix(view_rect.pnl)))],
-                    "Largest disagreement" => [maximum(abs,
-                                                       distance(FeatureDistance(), Z_graph; dims = 1)[subset,
-                                                                                                      subset] -
-                                                       distance(FeatureDistance(),
-                                                                feature_matrix(view_square.pnl); dims = 1)),
-                                               maximum(abs,
-                                                       distance(FeatureDistance(), Z; dims = 1)[subset, subset] -
-                                                       distance(FeatureDistance(), feature_matrix(view_rect.pnl);
-                                                                dims = 1))])
+                    "Largest difference" => [maximum(abs,
+                                                     distance(FeatureDistance(), Z_graph; dims = 1)[subset,
+                                                                                                    subset] -
+                                                     distance(FeatureDistance(),
+                                                              feature_matrix(view_square.pnl); dims = 1)),
+                                             maximum(abs,
+                                                     distance(FeatureDistance(), Z; dims = 1)[subset, subset] -
+                                                     distance(FeatureDistance(), feature_matrix(view_rect.pnl);
+                                                              dims = 1))])
 pretty_table(commute;
              formatters = [(v, i, j) -> isa(v, AbstractFloat) ? round(v; digits = 4) : v],
-             title = "Measuring the subproblem against measuring the universe")
+             title = "Distance measured on the subset and cut from the universe")
 
 #=
 The rectangular case shows a difference of zero. Its columns are the same twenty groups whichever
@@ -780,7 +780,7 @@ function window_row(lo, hi)
                                NetworkEstimator(; sep = PathLength()), Xw)
     Zfixed = phylogeny_features(Proximity(; decay = LinearDecay()),
                                 NetworkEstimator(; sep = PathLength(; dmax = 1.5)), Xw)
-    return (; Window = "$(lo)–$(hi)",
+    return (; Window = "$(lo) to $(hi)",
             var"Observed diameter" = maximum(filter(isfinite, seps)),
             var"Self score, bare" = Zbare[1, 1], var"Self score, dmax = 1.5" = Zfixed[1, 1])
 end
@@ -788,11 +788,11 @@ end
 diameters = DataFrame([window_row(lo, hi) for (lo, hi) in windows])
 pretty_table(diameters;
              formatters = [(v, i, j) -> isa(v, AbstractFloat) ? round(v; digits = 4) : v],
-             title = "The bare budget follows the sample; a stated one does not")
+             title = "Observed diameter and self score by rolling window")
 
 plot(1:length(windows), diameters[!, "Self score, bare"]; marker = :circle,
      label = "PathLength()", xlabel = "Rolling window", ylabel = "Top of the scale",
-     title = "A data-dependent budget moves the whole panel field")
+     title = "Self score under a bare and a stated budget")
 plot!(1:length(windows), diameters[!, "Self score, dmax = 1.5"]; marker = :square,
       label = "PathLength(; dmax = 1.5)")
 
@@ -816,9 +816,9 @@ Z_shifted[Z_bare .!= 0] .+= 1.0
 D_shifted = distance(FeatureDistance(), Z_shifted; dims = 1)
 
 pretty_table(DataFrame("Quantity" => ["Distinct differences on the shared support",
-                                      "The difference itself",
-                                      "Distance change from rescaling by 7.3",
-                                      "Distance change from adding 1.0 on the support"],
+                                      "First distinct difference",
+                                      "Largest distance change from rescaling by 7.3",
+                                      "Largest distance change from adding 1.0 on the support"],
                        "Value" =>
                            [string(length(unique(round.(Z_bare[shared] - Z_fixed[shared];
                                                         digits = 8)))),
@@ -827,7 +827,7 @@ pretty_table(DataFrame("Quantity" => ["Distinct differences on the shared suppor
                                          digits = 6)),
                             string(round(maximum(abs, D_scaled - D_bare); digits = 12)),
                             string(round(maximum(abs, D_shifted - D_bare); digits = 4))]);
-             title = "A shift is not a rescale, and only one of them is invisible")
+             title = "Bare budget against dmax = 3.0, then a rescale and a shift of the field")
 
 #=
 [`AngularDist`](@ref) does not change when an asset's whole row is rescaled, which is why the
@@ -887,7 +887,7 @@ end
 pretty_table(DataFrame([backtest_row("Correlation", bt_cor),
                         backtest_row("Classification", bt_fea)]);
              formatters = [(v, i, j) -> isa(v, AbstractFloat) ? round(v; digits = 4) : v],
-             title = "Out-of-sample, $(length(bt_cor.pred)) quarterly rebalances")
+             title = "Out-of-sample results over $(length(bt_cor.pred)) quarterly rebalances")
 
 #=
 Return and volatility are close between the two rows, and the drawdown of the classification run

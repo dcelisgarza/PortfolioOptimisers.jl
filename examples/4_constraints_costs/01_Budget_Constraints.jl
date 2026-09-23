@@ -18,7 +18,6 @@ turns the problem into a mixed-integer one.
 =#
 
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     if j == 1
         return Date(v)
@@ -52,7 +51,6 @@ using CSV, TimeSeries, DataFrames
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
-## Compute the returns
 rd = prices_to_returns(X)
 
 #=
@@ -153,10 +151,7 @@ constraint and have no risk. We maximise the ratio of return to risk instead.
 =#
 
 rf = 4.2 / 100 / 252
-opt2 = JuMPOptimiser(; pe = pr, slv = slv,
-                     ## Budget and short budget absolute values.
-                     bgt = 0, sbgt = 1,
-                     ## Weight bounds.
+opt2 = JuMPOptimiser(; pe = pr, slv = slv, bgt = 0, sbgt = 1,
                      wb = WeightBounds(; lb = -1.0, ub = 1.0))
 mr2 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt2)
 res2 = optimise(mr2)
@@ -193,10 +188,7 @@ println("used cash ≈ available cash: $(isapprox(sum(abs.(mip_res2.cost)) + mip
 We now make a short-only portfolio, with a budget of `-1` and weights between `-1` and `0`.
 =#
 
-opt3 = JuMPOptimiser(; pe = pr, slv = slv,
-                     ## Budget and short budget absolute values.
-                     bgt = -1, sbgt = 1,
-                     ## Weight bounds.
+opt3 = JuMPOptimiser(; pe = pr, slv = slv, bgt = -1, sbgt = 1,
                      wb = WeightBounds(; lb = -1.0, ub = 0.0))
 mr3 = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt3)
 res3 = optimise(mr3)
@@ -264,10 +256,7 @@ You can also give a range in place of an exact budget or short budget. A range a
 variables as the exact value, and section 4 shows it.
 =#
 
-opt5 = JuMPOptimiser(; pe = pr, slv = slv,
-                     ## Budget and short budget absolute values.
-                     bgt = 0.5, sbgt = 1,
-                     ## Weight bounds.
+opt5 = JuMPOptimiser(; pe = pr, slv = slv, bgt = 0.5, sbgt = 1,
                      wb = WeightBounds(; lb = -1.0, ub = 1.0))
 mr5 = MeanRisk(; r = r, opt = opt5)
 res5 = optimise(mr5)
@@ -312,13 +301,8 @@ budget, set `bgt` or `sbgt` to `nothing`.
 We set a budget between 0.3 and 0.8 and a short budget of 0.5.
 =#
 
-opt6 = JuMPOptimiser(; pe = pr, slv = slv,
-                     ## Budget range.
-                     bgt = BudgetRange(; lb = 0.3, ub = 0.8),
-                     ## Exact short budget
-                     sbgt = 0.5,
-                     ## Weight bounds.
-                     wb = WeightBounds(; lb = -1.0, ub = 1.0))
+opt6 = JuMPOptimiser(; pe = pr, slv = slv, bgt = BudgetRange(; lb = 0.3, ub = 0.8),
+                     sbgt = 0.5, wb = WeightBounds(; lb = -1.0, ub = 1.0))
 mr6 = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt6)
 res6 = optimise(mr6)
 println("budget: $(sum(res6.w))")
@@ -334,13 +318,8 @@ them can sit above the short weight it covers.
 Next we lower the short budget to 0.3.
 =#
 
-opt7 = JuMPOptimiser(; pe = pr, slv = slv,
-                     ## Budget range.
-                     bgt = BudgetRange(; lb = 0.3, ub = 0.8),
-                     ## Remove the slack from the short budget.
-                     sbgt = 0.3,
-                     ## Weight bounds.
-                     wb = WeightBounds(; lb = -1.0, ub = 1.0))
+opt7 = JuMPOptimiser(; pe = pr, slv = slv, bgt = BudgetRange(; lb = 0.3, ub = 0.8),
+                     sbgt = 0.3, wb = WeightBounds(; lb = -1.0, ub = 1.0))
 mr7 = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt7)
 res7 = optimise(mr7)
 println("budget: $(sum(res7.w))")

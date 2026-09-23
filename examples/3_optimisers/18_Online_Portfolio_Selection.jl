@@ -128,7 +128,7 @@ function summary_table(preds, free)
 end
 
 pretty_table(summary_table(preds, free); formatters = [pctfmt, resfmt],
-             title = "The roster fee-free and net of a 10 bp turnover fee, $(length(preds["Buy and hold"].pred)) periods")
+             title = "Each rule with no fee and net of a turnover fee of ten basis points, over $(length(preds["Buy and hold"].pred)) periods")
 
 #=
 The fee applies to the turnover column. That column is the mean, over the rebalances, of the

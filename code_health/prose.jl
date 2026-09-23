@@ -47,7 +47,8 @@ const COUNTED = ("emdash" => "rule 13", "endash" => "rule 13", "curly" => "rule 
                  "bold_label" => "rule 16", "title_case" => "rule 17", "emoji" => "rule 18",
                  "glossary" => "a concept in plain words",
                  "mechanism" => "a concept in plain words",
-                 "verdict" => "a check is a number")
+                 "verdict" => "a check is a number",
+                 "comment" => "a code comment is a gotcha or nothing")
 
 """
 The column that records the prose word count. It carries no limit: a text is long because it covers
@@ -85,12 +86,18 @@ const PATTERNS = Dict("emdash" => r"—", "endash" => r"–", "curly" => r"[“�
 #
 # Three corpora, three shapes, one set of counters.
 #
-# A Literate source renders two things as markdown: a `#= ... =#` block, and a line whose first two
-# characters are `# `. A `##` comment at column zero renders as a `#` INSIDE a code cell, so it is
-# code and not prose. A line that carries the `#src` trailer never reaches an output at all, and
+# A Literate source renders two things as markdown: a `#= ... =#` block, and a line that is a bare
+# `#` or a `# ` followed by text, after any indentation, which is Literate's own `ismdline`. Every
+# other line is code. A line that starts or ends with `#src` never reaches an output at all, and
 # `test/test_71_process_citation_census.jl` skips it for the same reason.
 #
-# A Markdown page needs no such step. Its lines are the page.
+# A Markdown page needs no such step. Its lines are the page, and its code is the body of its
+# `julia`, `@example`, `@repl` and `@setup` fences.
+#
+# The code of a page carries two more kinds of text a reader reads, and ADR 0171 decisions 16 and 17
+# bring them under the rule: the body of every double-quoted string literal, which a cell prints as a
+# title, a label or a sentence, and the text of a `#! ` gotcha. Every other comment in the code is
+# counted in `comment`, because the rule removes it.
 #
 # The catalogue holds its prose in double-quoted string literals, and ADR 0171 decision 11 states
 # that rule.
@@ -126,16 +133,25 @@ function is_mirror(path::AbstractString)
 end
 
 """
-    markdown_lines(text) -> Vector{String}
+    is_src(line) -> Bool
 
-The lines of a Literate source that Literate renders as markdown, in order, with the comment
-markers removed. A `#src` line is dropped.
+Whether Literate drops `line` from every output: it starts with `#src` at column zero, or it ends
+with `#src`.
 """
-function markdown_lines(text::AbstractString)
-    acc = String[]
+is_src(line::AbstractString) = startswith(line, "#src") || endswith(rstrip(line), "#src")
+
+"""
+    literate_parts(text) -> (markdown, code)
+
+The lines of a Literate source split the way Literate splits them. `markdown` holds the lines that
+render as markdown, in order, with the comment markers removed. `code` holds every other line, which
+renders inside a code cell. A `#src` line is in neither.
+"""
+function literate_parts(text::AbstractString)
+    acc, code = String[], String[]
     inblock = false
     for ln in split(text, '\n')
-        if endswith(rstrip(ln), "#src")
+        if is_src(ln)
             continue
         end
         if inblock
@@ -153,13 +169,210 @@ function markdown_lines(text::AbstractString)
                 s = s[1:(first(findfirst("=#", s)) - 1)]
             end
             push!(acc, String(s))
-        elseif startswith(ln, "# ")
-            push!(acc, String(ln[3:end]))
-        elseif ln == "#"
-            push!(acc, "")
+        elseif (m = match(r"^\h*#(?: (.*))?$", rstrip(ln))) !== nothing
+            push!(acc, m.captures[1] === nothing ? "" : String(m.captures[1]))
+        else
+            push!(code, String(ln))
+        end
+    end
+    return acc, code
+end
+
+"""
+    markdown_lines(text) -> Vector{String}
+
+The lines of a Literate source that Literate renders as markdown, in order, with the comment
+markers removed. A `#src` line is dropped.
+"""
+markdown_lines(text::AbstractString) = first(literate_parts(text))
+
+"""
+    fenced_code(lines) -> Vector{String}
+
+The code of a Markdown page: the body of every `julia`, `@example`, `@repl` and `@setup` fence, in
+order. A `julia> ` prompt is removed, and the rest of the line is code.
+"""
+function fenced_code(lines)
+    acc = String[]
+    fence, code = false, false
+    for ln in lines
+        s = lstrip(ln)
+        if startswith(s, "```")
+            if fence
+                fence, code = false, false
+            else
+                fence = true
+                code = occursin(r"^```\s*(?:julia|@example|@repl|@setup)\b", s)
+            end
+            continue
+        end
+        if code
+            push!(acc, replace(String(ln), r"^\s*julia>\s?" => ""))
         end
     end
     return acc
+end
+
+ident_char(c::AbstractChar) = isletter(c) || isdigit(c) || c == '_' || c == '!'
+
+"""
+    string_body(cs, i) -> (body, next)
+
+The body of the string literal whose first character after the opening quote is `cs[i]`, and the
+index after its closing quote. An interpolation becomes a space, because the value it prints is
+not written prose, and so does `\\n`. `\\\$` is dropped, so a written dollar sign never opens an
+inline LaTeX expression for [`readable`](@ref).
+"""
+function string_body(cs::Vector{Char}, i::Int)
+    buf = IOBuffer()
+    n = length(cs)
+    while i <= n
+        c = cs[i]
+        if c == '\\' && i < n
+            nxt = cs[i + 1]
+            if nxt == 'n'
+                print(buf, ' ')
+            elseif nxt != '$'
+                print(buf, nxt)
+            end
+            i += 2
+        elseif c == '"'
+            return String(take!(buf)), i + 1
+        elseif c == '$'
+            print(buf, ' ')
+            if i < n && cs[i + 1] == '('
+                i = interpolation_end(cs, i + 1)
+            else
+                i += 1
+                while i <= n && ident_char(cs[i])
+                    i += 1
+                end
+            end
+        else
+            print(buf, c)
+            i += 1
+        end
+    end
+    return String(take!(buf)), i
+end
+
+"""
+    interpolation_end(cs, i) -> Int
+
+The index after the `)` that closes the interpolation whose `(` is `cs[i]`. A string literal inside
+the interpolation is skipped whole, so its parentheses do not count.
+"""
+function interpolation_end(cs::Vector{Char}, i::Int)
+    depth = 0
+    n = length(cs)
+    while i <= n
+        c = cs[i]
+        if c == '"'
+            _, i = string_body(cs, i + 1)
+            continue
+        end
+        if c == '('
+            depth += 1
+        elseif c == ')'
+            depth -= 1
+            depth == 0 && return i + 1
+        end
+        i += 1
+    end
+    return i
+end
+
+"""
+    code_parts(line) -> (strings, comment)
+
+One line of code, read by a lexer small enough for the cells of a page. `strings` holds the body of
+every plain double-quoted string literal on the line, each with whether a `title =` keyword opens
+it. `comment` is the text after the `#` that opens the comment of the line, or `nothing`. A
+prefixed literal such as `r"…"` is a regular expression or a macro, not text, and is skipped. A
+character literal such as `'#'` is skipped, and a `'` after a name or a bracket is a transpose.
+"""
+function code_parts(line::AbstractString)
+    strs = Tuple{String, Bool}[]
+    cs = collect(line)
+    n = length(cs)
+    i = 1
+    while i <= n
+        c = cs[i]
+        if c == '#'
+            return strs, String(cs[(i + 1):end])
+        elseif c == '"'
+            start = i
+            body, i = string_body(cs, i + 1)
+            if !(start > 1 && ident_char(cs[start - 1]))
+                head = String(cs[1:(start - 1)])
+                push!(strs, (body, occursin(r"\btitle\s*=\s*$", head)))
+            end
+            continue
+        elseif c == '\''
+            prev = i > 1 ? cs[i - 1] : ' '
+            if !(ident_char(prev) || prev in (')', ']', '}', '\'', '.'))
+                j = i + 1
+                if j <= n && cs[j] == '\\'
+                    (j += 1)
+                end
+                j += 1
+                while j <= n && cs[j] != '\''
+                    j += 1
+                end
+                i = j + 1
+                continue
+            end
+        end
+        i += 1
+    end
+    return strs, nothing
+end
+
+"""
+    code_prose(code) -> (lines, comments)
+
+The text a reader reads in the code of a page, and the number of code comments in it. A string
+literal is read as prose, and one that a `title =` keyword opens is read as a heading, so rule 17
+reads it too. A `#! ` gotcha is read as prose. Every other comment counts once in `comments`,
+which is the `comment` column: a `#` or `##` comment on a line of its own, a comment after a line
+of code, a `#= … =#` block inside a code fence, and a `#!` that no space follows, which Literate
+reads as a filter token when `md`, `nb` or `jl` comes next. Three markers are markup, not comments:
+Literate's `#-` and `#+`, and Documenter's `# hide`.
+"""
+function code_prose(code)
+    acc = String[]
+    comments = 0
+    inblock = false
+    for ln in code
+        if inblock
+            if occursin("=#", ln)
+                inblock = false
+            end
+            continue
+        end
+        s = lstrip(ln)
+        if startswith(s, "#=")
+            comments += 1
+            inblock = !occursin("=#", s[3:end])
+            continue
+        end
+        if occursin(r"^#[-+]", s)
+            continue
+        end
+        strs, comment = code_parts(replace(ln, r"#\s*hide\s*$" => ""))
+        for (body, title) in strs
+            push!(acc, title ? "# " * body : body)
+        end
+        if comment === nothing
+            continue
+        end
+        if startswith(comment, "! ")
+            push!(acc, comment[3:end])
+        else
+            comments += 1
+        end
+    end
+    return acc, comments
 end
 
 """
@@ -261,26 +474,48 @@ function readable(line::AbstractString)
 end
 
 """
-    prose(path) -> Vector{String}
+    reading(path) -> (lines, comments)
 
-The prose of one text: every line a reader reads, cleaned of what the rule does not govern. This is
-the one reader. The census and a rewrite session's scan both call it.
+The prose of one text, and the number of code comments on it. `lines` is every line a reader reads,
+cleaned of what the rule does not govern: the prose of the page, then the string literals and the
+`#! ` gotchas of its code. This is the one reader. The census and a rewrite session's scan both
+call it.
 """
-function prose(path::AbstractString)
+function reading(path::AbstractString)
     text = read(path, String)
     kind = text_kind(path)
     if kind === :catalogue
-        # A string literal carries no fenced block and no page furniture.
-        return readable.(catalogue_lines(text))
+        # A string literal carries no fenced block and no page furniture, and the comments of the
+        # catalogue are written for a contributor and never render.
+        return readable.(catalogue_lines(text)), 0
     end
-    lines = kind === :literate ? markdown_lines(text) : String.(split(text, '\n'))
+    if kind === :literate
+        # The prose of a Literate page can show code in a fence of its own, and a reader reads
+        # that code as on a Markdown page.
+        lines, code = literate_parts(text)
+        code = vcat(code, fenced_code(lines))
+    else
+        lines = String.(split(text, '\n'))
+        code = fenced_code(lines)
+    end
     mirror = is_mirror(path)
     lines = unfenced(lines; meta = !mirror)
     if mirror
         (lines = drop_first_h1(lines))
     end
-    return readable.(lines)
+    strs, comments = code_prose(code)
+    # A string literal needs no LaTeX step: `string_body` already dropped every dollar sign.
+    return vcat(readable.(lines),
+                [replace(s, r"``[^`]*``" => " ", r"`[^`]*`" => " ") for s in strs]),
+           comments
 end
+
+"""
+    prose(path) -> Vector{String}
+
+The lines of one text that a reader reads. See [`reading`](@ref).
+"""
+prose(path::AbstractString) = first(reading(path))
 
 # --- the counts a line carries ---------------------------------------------
 
@@ -402,7 +637,8 @@ rewrite lands.
 """
 function counts(path::AbstractString; glossary = glossary_pattern(glossary_terms()))
     row = Dict{String, Int}(c => 0 for c in COLUMNS)
-    for line in prose(path)
+    lines, row["comment"] = reading(path)
+    for line in lines
         for (name, re) in PATTERNS
             row[name] += matches(re, line)
         end

@@ -113,7 +113,7 @@ ladder = DataFrame("Separation" => [["HopCount" for _ in hop_budgets];
                    "Share of pairs" => [hop_pairs; dmax_pairs] ./ n_pairs)
 sort!(ladder, "Related pairs")
 pretty_table(ladder; formatters = [(v, i, j) -> j == 4 ? "$(round(v*100, digits=1)) %" : v],
-             title = "Pairs the network calls related, by separation and budget")
+             title = "Related pairs for each separation and budget")
 
 #=
 ### 2.2 A radius fills the gaps between the hop budgets
@@ -132,10 +132,11 @@ We plot the count of related pairs against `dmax`, with a dashed line at the cou
 budget.
 =#
 
-plot(dmax_budgets, dmax_pairs; label = "PathLength (radius ball)", marker = :circle,
-     xlabel = "Budget: dmax, in distance units", ylabel = "Pairs called related",
-     title = "A continuous radius against eight discrete hop shells", legend = :bottomright)
-hline!(hop_pairs; label = "HopCount shells (n = 1…8)", linestyle = :dash, color = :grey,
+plot(dmax_budgets, dmax_pairs; label = "PathLength", marker = :circle,
+     xlabel = "Budget: dmax, in distance units", ylabel = "Related pairs",
+     title = "Related pairs by dmax, with the eight hop budgets dashed",
+     legend = :bottomright)
+hline!(hop_pairs; label = "HopCount, n = 1 to 8", linestyle = :dash, color = :grey,
        linealpha = 0.7)
 
 #=
@@ -161,7 +162,7 @@ pretty_table(DataFrame("Quantity" => ["Observed diameter (distance units)",
                                    string(round(separation_budget(PathLength(; dmax = 100),
                                                                   NetworkEstimator(), sep_matrix);
                                                 digits = 4))]);
-             title = "The budgets this graph admits")
+             title = "Diameter, shortest edge and two resolved budgets")
 
 #=
 The library cuts a `dmax` above the diameter down to the diameter. A large budget therefore
@@ -220,14 +221,14 @@ function resolved_dmax(f)
     return resolve_separation(PathLength(; dmax = q_rule), NetworkEstimator(), pr.X[f, :]).dmax
 end
 
-pretty_table(DataFrame("Fold" => ["$(first(f))–$(last(f))" for f in folds],
+pretty_table(DataFrame("Fold" => ["$(first(f)) to $(last(f))" for f in folds],
                        "Fixed dmax = 1.0107" =>
                            [fold_sep(PathLength(; dmax = 1.0107), f) for f in folds],
                        "Rule: resolved dmax" =>
                            [round(resolved_dmax(f); digits = 4) for f in folds],
                        "Rule: related pairs" =>
                            [fold_sep(PathLength(; dmax = q_rule), f) for f in folds]);
-             title = "A fixed radius against a quantile rule, over four folds of the same year")
+             title = "Fixed dmax and the 0.25 quantile rule in each fold")
 
 #=
 The fixed `dmax = 1.0107` is the 0.25 quantile of the separations over the whole year. The second
@@ -254,7 +255,7 @@ pretty_table(DataFrame("q" => q_grid,
                            [related_pairs(PathLength(; dmax = PathLengthQuantile(; q = q))) /
                             n_pairs for q in q_grid]);
              formatters = [(v, i, j) -> j in (3, 4) ? "$(round(v*100, digits=1)) %" : v],
-             title = "Asking for a share of the pairs, in two units")
+             title = "Resolved n and share of related pairs, by q")
 
 #=
 [`PathLengthQuantile`](@ref) relates a share of the pairs that differs from `q` by at most one
@@ -293,7 +294,7 @@ res_phylo = optimise(MeanRisk(; obj = MinimumRisk(),
 
 pretty_table(DataFrame("Asset" => rd.nx, "Baseline" => res_base.w,
                        "Phylogeny" => res_phylo.w); formatters = [resfmt],
-             title = "Minimum risk: baseline vs network-phylogeny constrained")
+             title = "Minimum-risk weights, baseline and phylogeny constraint")
 
 #=
 The constraint moves weight between many assets, and section 3.1 prints the size of that move as
@@ -325,12 +326,13 @@ res_sweep = [optimise(MeanRisk(; obj = MinimumRisk(),
              for (_, sep) in sep_sweep]
 
 pretty_table(DataFrame("Separation" => ["none (baseline)"; first.(sep_sweep)],
-                       "Related pairs" => ["—"; string.(related_pairs.(last.(sep_sweep)))],
+                       "Related pairs" =>
+                           ["none"; string.(related_pairs.(last.(sep_sweep)))],
                        "Largest weight" =>
                            [maximum(res_base.w); [maximum(r.w) for r in res_sweep]],
                        "Names held" => [count(>(1e-4), res_base.w);
                                         [count(>(1e-4), r.w) for r in res_sweep]],
-                       "Turnover vs baseline" =>
+                       "Turnover from baseline" =>
                            [0.0; [sum(abs, r.w .- res_base.w) for r in res_sweep]]);
              formatters = [(v, i, j) -> begin
                                return if j in (1, 2, 4)
@@ -339,7 +341,7 @@ pretty_table(DataFrame("Separation" => ["none (baseline)"; first.(sep_sweep)],
                                    "$(round(v*100, digits=2)) %"
                                end
                            end],
-             title = "Minimum risk under a widening phylogeny separation")
+             title = "Minimum-risk portfolio for six phylogeny separations")
 
 #=
 The table shows two facts to know before you tune `sep`.
@@ -382,7 +384,7 @@ centrality = centrality_vector(CentralityEstimator(), pr).X
 avg_centrality(w) = sum(w .* centrality)
 pretty_table(DataFrame("Portfolio" =>
                            ["Baseline", "Hub-tilted (≥ 0.20)", "Periphery (≤ 0.08)"],
-                       "Avg centrality" =>
+                       "Average centrality" =>
                            [avg_centrality(res_base.w), avg_centrality(res_hub.w),
                             avg_centrality(res_periph.w)]);
              title = "Average network centrality of the portfolio")
@@ -439,9 +441,9 @@ function sep_moves(ct)
 end
 
 pretty_table(DataFrame("Algorithm" => first.(cts), "Polarity" => polarity_name.(last.(cts)),
-                       "n = 1 → n = 3 moves the score" =>
+                       "Scores change from n = 1 to n = 3" =>
                            [sep_moves(ct) ? "yes" : "no" for (_, ct) in cts]);
-             title = "Which centralities read the weights, and which read sep")
+             title = "Polarity of each centrality algorithm, and whether sep changes its scores")
 
 #=
 On this minimum spanning tree the four algorithms with a distance polarity get a weighted graph
@@ -485,7 +487,7 @@ ovs = Dict("BetweennessCentrality" => BetweennessCentrality(; ov = TopologyOnly(
            "StressCentrality" => StressCentrality(; ov = TopologyOnly()))
 function ov_moves(nte, name, ct)
     if !(haskey(ovs, name))
-        return "no `ov` field"
+        return "no ov field"
     end
     declared = centrality_vector(CentralityEstimator(; pl = nte, ct = ct), pr).X
     topology = centrality_vector(CentralityEstimator(; pl = nte, ct = ovs[name]), pr).X
@@ -497,7 +499,7 @@ graph_src = NetworkEstimator(; alg = MaximumDistanceSimilarity())
 pretty_table(DataFrame("Algorithm" => first.(cts),
                        "Tree source" => [ov_moves(tree_src, n, ct) for (n, ct) in cts],
                        "Graph source" => [ov_moves(graph_src, n, ct) for (n, ct) in cts]);
-             title = "Does asking for the topology alone move the score?")
+             title = "Whether ov = TopologyOnly() changes the scores, on two sources")
 
 #=
 A "yes" marks an algorithm whose score on that source depends on the edge weights. Compare the

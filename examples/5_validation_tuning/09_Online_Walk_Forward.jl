@@ -85,6 +85,10 @@ write the listing calendar out as a fact about the instruments, and the returns 
 wherever an asset is not listed. The [`AssetPanel`](@ref) takes the calendar as its active mask.
 We set the estimation mask to the active one, because the online update takes the active mask
 alone. Section 2 shows the error that a narrower estimation mask throws.
+
+The function `cut` keeps the rows `i` of the returns, of the timestamps and of the panel masks.
+Sections 3 and 7 use it to cut windows by hand. The last line prints the first and the last
+listed row of each asset.
 =#
 
 function synthetic_panel(; T = 300, N = 8, K = 2, seed = 20260912)
@@ -108,7 +112,6 @@ end
 rd, rdf = synthetic_panel()
 T, N = size(rd.X)
 amsk = Matrix(rd.pnl.amsk)
-## The rows `i` of the carrier, panel included: the walk-forward cuts its windows this way.
 function cut(rd, i)
     return ReturnsResult(; nx = rd.nx, X = rd.X[i, :], ts = rd.ts[i],
                          pnl = AssetPanel(; amsk = amsk[i, :], emsk = amsk[i, :]))
@@ -214,11 +217,11 @@ adds the rows its window gained since the one before. We write the loop by hand 
 last line prints the largest difference between our weights and the weights of the loop.
 =#
 
-est = partial_fit!(mr, cut(rd, train_idx[1]))                 # warm-up: fold 1's window
+est = partial_fit!(mr, cut(rd, train_idx[1]))
 hand = [optimise(est).w]
 for i in 2:length(train_idx)
     delta = (last(train_idx[i - 1]) + 1):last(train_idx[i])
-    global est = partial_fit!(est, cut(rd, delta))            # only the new rows
+    global est = partial_fit!(est, cut(rd, delta))
     push!(hand, optimise(est).w)
 end
 
@@ -329,12 +332,12 @@ stacks the two.
 
 We compare the stack with the run over the full history at once. The loop finds the fold to
 resume from by the last timestamp the state holds, so a run that resumes needs timestamps, and
-the panel has dates.
+the panel has dates. The first run gets the first 260 rows, and the resumed run gets all 300.
 =#
 
-short = cut(rd, 1:260)                                   # the history at the first run
+short = cut(rd, 1:260)
 res_1 = cross_val_predict(hrp, short, online)
-res_2 = cross_val_predict(Resume(res_1), rd, online)     # the full history, one fold later
+res_2 = cross_val_predict(Resume(res_1), rd, online)
 stacked = vcat(res_1, res_2)
 
 (length(res_1.pred), length(res_2.pred), maximum(gap(stacked, o_hrp)),
@@ -366,7 +369,7 @@ and the cell prints the largest entrywise difference between it and each of the 
 =#
 
 rng = StableRNG(987654321)
-Z = randn(rng, 50, 4) .+ 1000.0                          # a level, not a return
+Z = randn(rng, 50, 4) .+ 1000.0
 fold(est, rows) = foldl(partial_fit!, eachrow(rows); init = est)
 
 function textbook(Z)
@@ -382,10 +385,11 @@ The update sits at the rounding floor of the exact answer, and the textbook form
 orders of magnitude above it on fifty rows. The gap widens with the level and with the sample.
 
 The update is faster as well. The cost of one update does not grow with the window, and the cost
-of a refit does. We print the cost of one refit over the cost of one updated row.
+of a refit does. We print the cost of one refit over the cost of one updated row, timed on a
+sample of the panel's size with no gaps.
 =#
 
-Xs = randn(rng, T, N) ./ 100                             # a clean sample of the fixture's size
+Xs = randn(rng, T, N) ./ 100
 step_cost = let est = fold(Covariance(), Xs[1:(end - 1), :]), row = Xs[end, :]
     minimum(@elapsed(partial_fit!(est, row)) for _ in 1:200)
 end

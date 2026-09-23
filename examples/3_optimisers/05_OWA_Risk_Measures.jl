@@ -176,13 +176,11 @@ Its portfolio still differs from the `TailGiniRange` column of section 3. The ap
 formulation of a range approximates each tail on its own and adds the two, and the
 `TailGiniRange` measure of section 3 approximates the combined weights in one block. You can
 pass your own `w1` and `w2` to choose what each side measures. We also build a range
-from `owa_cvar` and `owa_wr`.
+from `owa_cvar` and `owa_wr`, the CVaR of the losses plus the largest return.
 =#
 
-## Default range: tail Gini losses vs tail Gini gains.
 r_range_default = OrderedWeightsArrayRange()
 
-## Custom range: CVaR of the losses plus the largest return.
 T_obs = T
 r_range_custom = OrderedWeightsArrayRange(; w1 = owa_cvar(T_obs), w2 = owa_wr(T_obs))
 
@@ -229,10 +227,10 @@ pretty_table(DataFrame(hcat(rd.nx, [r.w for r in lcrm_results]...),
 
 #=
 As `g` rises, the portfolio moves weight from PEP to JNJ, and every other weight changes by
-less than one percentage point.
+less than one percentage point. The bars run from the smallest `g` on the left to the largest
+on the right.
 =#
 
-## The risk-aversion sweep, side by side, from the smallest `g` (left) to the largest (right).
 plot_stacked_bar_composition(lcrm_results, rd)
 
 #=

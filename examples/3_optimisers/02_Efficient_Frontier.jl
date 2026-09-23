@@ -26,7 +26,6 @@ up a little of the objective for a portfolio that holds more assets at each poin
 =#
 
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     if j == 1
         return Date(v)
@@ -53,7 +52,6 @@ using CSV, TimeSeries, DataFrames
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
-## Compute the returns
 rd = prices_to_returns(X)
 
 #=
@@ -150,10 +148,10 @@ ys_B = [expected_return(ArithmeticReturn(), w, pr) for w in resB.w]
 using StatsPlots, GraphRecipes
 
 plot(xs_A, ys_A; seriestype = :scatter, marker = (:circle, 5),
-     label = "Min risk | return floor", xlabel = "CVaR", ylabel = "Arithmetic return",
-     title = "Same frontier from both directions")
+     label = "Minimum risk above a return floor", xlabel = "CVaR",
+     ylabel = "Arithmetic return", title = "CVaR frontier in both directions")
 plot!(xs_B, ys_B; seriestype = :scatter, marker = (:cross, 7),
-      label = "Max return | risk ceiling")
+      label = "Maximum return below a risk ceiling")
 
 #=
 ## 3. The `MeanRisk` frontier vs the `NearOptimalCentering` frontier
@@ -218,8 +216,8 @@ ys_M = [expected_return(ArithmeticReturn(), w, pr) for w in resM.w]
 xs_N = [expected_risk(rcvar, w, pr.X) for w in resN.w]
 ys_N = [expected_return(ArithmeticReturn(), w, pr) for w in resN.w]
 
-plot(xs_M, ys_M; seriestype = :scatter, marker = (:circle, 5), label = "MeanRisk (extreme)",
-     xlabel = "CVaR", ylabel = "Arithmetic return", title = "Extreme vs centred frontier")
+plot(xs_M, ys_M; seriestype = :scatter, marker = (:circle, 5), label = "MeanRisk (edge)",
+     xlabel = "CVaR", ylabel = "Arithmetic return", title = "MeanRisk and NOC frontiers")
 plot!(xs_N, ys_N; seriestype = :scatter, marker = (:diamond, 6), label = "NOC (centred)")
 
 #=
@@ -246,7 +244,7 @@ risk-return ratio.
 
 plot_measures(resA.w, resA.pr; x = r, y = ExpectedReturn(; rt = resA.ret),
               c = ExpectedReturnRiskRatio(; rt = resA.ret, rk = r, rf = rf),
-              title = "Efficient Frontier", xlabel = "CVaR", ylabel = "Arithmetic Return",
+              title = "Efficient frontier", xlabel = "CVaR", ylabel = "Arithmetic Return",
               colorbar_title = "\nReturn/Risk Ratio", right_margin = 6Plots.mm)
 
 #=

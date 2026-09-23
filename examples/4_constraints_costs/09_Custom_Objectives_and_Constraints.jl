@@ -128,7 +128,6 @@ function PortfolioOptimisers.add_custom_objective_term!(model::JuMP.Model, obj,
                                                         cobj::MomentumTilt, optimiser,
                                                         attrs)
     w = PortfolioOptimisers.get_w(model)
-    ## Negative penalty == reward. No sign dispatch, no objective-type special cases.
     PortfolioOptimisers.add_to_objective_penalty!(model, -cobj.lambda * (cobj.score' * w))
     return nothing
 end
@@ -151,7 +150,7 @@ pretty_table(DataFrame("λ (momentum price)" => lambdas,
                        "Momentum exposure" => [score' * r.w for r in tilt_res],
                        "Max weight" => [maximum(r.w) for r in tilt_res]);
              formatters = [resfmt],
-             title = "A larger λ buys more momentum exposure, until it saturates")
+             title = "Momentum exposure and largest weight at each λ")
 
 #=
 The term is homogeneous of degree one in `w`. If you multiply the weights by a number, the term
@@ -236,7 +235,8 @@ pretty_table(DataFrame("Momentum floor" => floors,
                        "Momentum exposure" => [score' * r.w for r in floor_res],
                        "Binds?" => [score' * r.w > f + 1e-6 ? "no" : "yes"
                                     for (f, r) in zip(floors, floor_res)]);
-             formatters = [resfmt], title = "A hard floor clamps the exposure to its bound")
+             formatters = [resfmt],
+             title = "Momentum floors and the exposure of the minimum-risk portfolio")
 
 #=
 ## 5. Why a constant bound needs `k`
@@ -253,7 +253,8 @@ function PortfolioOptimisers.add_custom_constraint!(model::JuMP.Model,
                                                     ccnt::MomentumFloorNoK, opt, attrs)
     w = PortfolioOptimisers.get_w(model)
     sc = PortfolioOptimisers.get_constraint_scale(model)
-    JuMP.@constraint(model, sc * (ccnt.score' * w - ccnt.floor) >= 0)  # forgot `* k`
+    #! This bound leaves out `* k` on purpose, to show the mistake.
+    JuMP.@constraint(model, sc * (ccnt.score' * w - ccnt.floor) >= 0)
     return nothing
 end
 
@@ -279,7 +280,7 @@ pretty_table(DataFrame("Requested floor" => first.(k_compare),
                        "With * k (correct)" => getindex.(k_compare, 2),
                        "Without * k (wrong)" => getindex.(k_compare, 3));
              formatters = [resfmt],
-             title = "Under a ratio objective, only the k-scaled floor binds where asked")
+             title = "MaximumRatio momentum exposure, floor with and without * k")
 
 #=
 ## 6. Composing several custom pieces

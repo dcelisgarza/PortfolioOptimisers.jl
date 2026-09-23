@@ -62,11 +62,11 @@ nx = string.(colnames(X))
 T, N = size(values(X))
 
 vals = Matrix{Union{Float64, Missing}}(values(X))
-vals[1:160, 3] .= missing                 # asset 3: a late lister, missing for 160 days
-vals[100:120, 2] .= missing               # asset 2: a ~3-week trading halt
+vals[1:160, 3] .= missing
+vals[100:120, 2] .= missing
 using StableRNGs
 rng = StableRNG(42)
-for _ in 1:60                              # scattered single-day gaps elsewhere
+for _ in 1:60
     vals[rand(rng, 1:T), rand(rng, 4:N)] = missing
 end
 Xmiss = TimeArray(ts, vals, Symbol.(nx))
@@ -109,7 +109,7 @@ pretty_table(DataFrame(; asset = nx[[3, 2, 4]],
                        listed_from = [findfirst(view(span, :, j)) for j in (3, 2, 4)],
                        listed_to = [findlast(view(span, :, j)) for j in (3, 2, 4)],
                        observations = fill(T, 3));
-             title = "The Span Rule: a leading run is not-yet-listed, an interior one is a halt")
+             title = "First and last listed observation of assets 3, 2 and 4")
 
 #=
 ## 4. Carry the gaps into the returns
@@ -129,7 +129,7 @@ pretty_table(DataFrame(;
                                    "estimable cells"],
                        value = [length(rd.nx), size(rd.X, 1), count(!isfinite, rd.X),
                                 count(Matrix(rd.pnl.emsk))]);
-             title = "Nothing is deleted, and the panel states what is estimable")
+             title = "Counts on the returns after the conversion")
 
 #=
 ## 5. State a price convention across the halts
@@ -153,11 +153,11 @@ fill_res = fit_preprocessing(PriceGapFill(), pr)
 pr_filled = apply_preprocessing(fill_res, pr)
 rd_filled = prices_to_returns(PricesToReturns(), pr_filled)
 
-pretty_table(DataFrame(; table = ["carried", "filled with the Held Price"],
+pretty_table(DataFrame(; table = ["carried", "filled with the held price"],
                        non_finite = [count(!isfinite, rd.X), count(!isfinite, rd_filled.X)],
                        asset_3_still_unlisted = [!isfinite(rd.X[1, 3]),
                                                  !isfinite(rd_filled.X[1, 3])]);
-             title = "The fill closes the halts, and stops at asset 3's listing")
+             title = "Non-finite returns before and after the fill")
 
 #=
 The table counts the non-finite returns before and after the fill. The last column shows, for
@@ -201,10 +201,10 @@ function mv(rr)
 end
 res = mv(rd)
 res_filled = mv(rd_filled)
-pretty_table(DataFrame(; table = ["carried", "filled with the Held Price"],
+pretty_table(DataFrame(; table = ["carried", "filled with the held price"],
                        estimable = [count(res.imsk), count(res_filled.imsk)],
                        active_names = [count(>(1e-6), res.w), count(>(1e-6), res_filled.w)]);
-             title = "The panel keeps what the window cannot estimate out of the weights")
+             title = "Estimable assets and assets with a weight above 1e-6")
 
 #=
 ## 8. Plot the gaps
@@ -215,7 +215,7 @@ listing, the short block is asset 2's halt, and the scattered dots are the singl
 
 using StatsPlots, GraphRecipes
 heatmap(1:N, 1:T, Float64.(ismissing.(vals)); xlabel = "Asset", ylabel = "Day",
-        colorbar_title = "missing", title = "Missingness pattern (raw data)", yflip = true)
+        colorbar_title = "missing", title = "Missing prices by asset and day", yflip = true)
 
 #=
 ## Summary

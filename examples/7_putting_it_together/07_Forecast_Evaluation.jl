@@ -82,7 +82,6 @@ function synthetic_panel(; T = 500, N = 80, seed = 661_001)
               "adj_volume" =>
                   shares .* exp.(-4.5 .+ 0.6 .* transpose(view(Ltrue, :, 4)) .+
                                  0.15 .* randn(rng, T, N)),
-              ## The assets' own alpha, plus noise. No Factor Exposure reads it.
               "signal" => transpose(alpha) .+ 0.0002 .* randn(rng, T, N)]
     listed = [i <= N ÷ 5 ? rand(rng, 20:120) : 1 for i in 1:N]
     amsk = [t >= listed[i] for t in 1:T, i in 1:N]
@@ -194,7 +193,7 @@ pretty_table(DataFrame("Forecast" => ["signal composite", "trait regression"],
                            [first(raw_signal.dates), first(raw_trait.dates)],
                        "Evaluation dates" =>
                            [length(raw_signal.dates), length(raw_trait.dates)]);
-             title = "The same block, two different warm-ups")
+             title = "First scorable row and evaluation dates of each forecast")
 
 #=
 ### Two forecasts have to be aligned before they can be compared
@@ -221,9 +220,9 @@ fe_signal, fe_trait = forecast_evaluation_align([raw_signal, raw_trait])
 
 pretty_table(DataFrame("Common first row" => first(fe_signal.dates),
                        "Evaluation dates" => length(fe_signal.dates),
-                       "Dates agree" => fe_signal.dates == fe_trait.dates,
+                       "Same dates" => fe_signal.dates == fe_trait.dates,
                        "Forecast untouched" => fe_signal.alpha === raw_signal.alpha);
-             title = "Aligned")
+             title = "The two evaluations after alignment")
 
 #=
 ## 3. Does it rank?
@@ -536,7 +535,7 @@ only on request. If you pass no `quantiles`, the four spread fields are `nothing
 pretty_table(DataFrame("Tail" => ["10%", "20%"],
                        "signal composite Sharpe" => fs.spread_sharpe[1, :],
                        "trait regression Sharpe" => fs.spread_sharpe[2, :]);
-             formatters = [numfmt], title = "Quantile spread, the second axis")
+             formatters = [numfmt], title = "Quantile-spread Sharpe ratio at each tail")
 
 #=
 The figure draws ten headline columns of the thirty, and the spread Sharpe ratio at each of the

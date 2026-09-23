@@ -101,8 +101,8 @@ function cut(i)
 end
 (; train_idx) = split(online, rd)
 
-est = partial_fit!(hrp, cut(train_idx[1]))                     # warm-up: fold 1's window
-est = partial_fit!(est, cut((last(train_idx[1]) + 1):last(train_idx[2])))   # fold 2's new rows
+est = partial_fit!(hrp, cut(train_idx[1]))
+est = partial_fit!(est, cut((last(train_idx[1]) + 1):last(train_idx[2])))
 
 optimise(est).w == weights(o)[2]
 
@@ -209,12 +209,13 @@ end of the last training window. When more rows arrive, hand that result to [`Re
 the extended history and the same scheme. The loop skips the folds the result already holds,
 adds the new rows to a copy of the state, and continues from the next fold. The resumed result
 holds the new folds alone. `vcat` stacks the two results, and we compare the stack with the run
-over the whole history at once. The data needs timestamps, because the loop finds the fold to
-resume from by the last timestamp the state holds.
+over the whole history at once. The first run sees the first 260 rows, and the resume sees all 300
+rows. The data needs timestamps, because the loop finds the fold to resume from by the last
+timestamp the state holds.
 =#
 
-res_1 = cross_val_predict(hrp, cut(1:260), online)              # the history at the first run
-res_2 = cross_val_predict(Resume(res_1), rd, online)            # the full history
+res_1 = cross_val_predict(hrp, cut(1:260), online)
+res_2 = cross_val_predict(Resume(res_1), rd, online)
 
 (length(res_1.pred), length(res_2.pred), weights(vcat(res_1, res_2)) == weights(o))
 

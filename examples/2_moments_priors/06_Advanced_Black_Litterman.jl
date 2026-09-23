@@ -144,7 +144,8 @@ pretty_table(DataFrame(; quantity = ["AAPL posterior mean", "AAPL posterior vari
                        rsd_true = [pr_fbl_rsd.mu[i_aapl], pr_fbl_rsd.sigma[i_aapl, i_aapl]],
                        rsd_false = [pr_fbl_nors.mu[i_aapl],
                                     pr_fbl_nors.sigma[i_aapl, i_aapl]]);
-             formatters = [mmtfmt], title = "Factor BL: residual variance on vs off")
+             formatters = [mmtfmt],
+             title = "AAPL posterior mean and variance of FactorBlackLittermanPrior with and without the residual variance")
 
 #=
 With `rsd = false` the covariance keeps only the part the factors explain, so the posterior

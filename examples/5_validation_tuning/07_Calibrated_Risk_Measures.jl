@@ -43,7 +43,6 @@ stays on the slots that sit on a risk measure.
 
 using PortfolioOptimisers, PrettyTables, DataFrames, StatsBase, Statistics
 
-## Format for pretty tables.
 numfmt = (v, i, j) -> begin
     return isa(v, AbstractFloat) ? round(v; sigdigits = 4) : v
 end;

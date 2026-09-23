@@ -16,7 +16,6 @@ We use PrettyTables to format the tables the page prints.
 
 using PrettyTables
 
-## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     if j == 1
         return Date(v)

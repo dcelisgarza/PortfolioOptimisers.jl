@@ -124,11 +124,12 @@ clustering optimiser can use. You can ask with [`supports_risk_measure`](@ref) a
 [`supported_risk_measures`](@ref):
 
 ```julia
-supports_risk_measure(MeanRisk, ConditionalValueatRisk)   # true
-supported_risk_measures(HierarchicalRiskParity)           # OptimisationRiskMeasure
+supports_risk_measure(MeanRisk, ConditionalValueatRisk)
+supported_risk_measures(HierarchicalRiskParity)
 ```
 
-For a meta-optimiser, `NestedClustered`, `Stacking` or `SubsetResampling`, the answer depends on
+The first call returns `true`, and the second returns `OptimisationRiskMeasure`. For a
+meta-optimiser, `NestedClustered`, `Stacking` or `SubsetResampling`, the answer depends on
 the optimisers that it holds. The [risk measures](03_Risk_Measures.md) page shows every measure
 against these classes.
 

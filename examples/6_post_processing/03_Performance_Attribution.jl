@@ -47,7 +47,8 @@ end;
 
 We compare three portfolios: a minimum-variance and a maximum-ratio portfolio from
 [`MeanRisk`](@ref), and an equal-weight portfolio. The equal-weight portfolio is a plain vector,
-and every function below takes it as it takes the output of an optimiser.
+and every function below takes it as it takes the output of an optimiser. The sections below
+score each portfolio on the returns the optimiser fitted, so their numbers are in sample.
 =#
 
 using CSV, TimeSeries, Clarabel
@@ -67,7 +68,6 @@ w_ratio = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 w_ew = fill(inv(length(rd.nx)), length(rd.nx))
 
 books = ["Min variance" => w_min, "Max ratio" => w_ratio, "Equal weight" => w_ew]
-## Realised in-sample portfolio return series for each book.
 port_ret = [name => rd.X * w for (name, w) in books]
 
 #=
@@ -97,15 +97,16 @@ pretty_table(DataFrame(; book = first.(final_wealth),
 before it. From that series we compute three statistics: the maximum drawdown, which is the worst
 loss; the average drawdown, which is the mean depth over time; and the Ulcer index, the root mean
 square of the depth, which weighs a deep drawdown more than a shallow one. We use compounded
-drawdowns, to match the compounded equity curve.
+drawdowns, to match the compounded equity curve. A drawdown is zero or negative, so we negate the
+minimum and the mean.
 =#
 
 dd_stats = map(port_ret) do (name, r)
-    dd = drawdowns(r, true)          # compounded drawdown series, ≤ 0
+    dd = drawdowns(r, true)
     return (name = name, max_dd = -minimum(dd), avg_dd = -mean(dd),
             ulcer = sqrt(mean(dd .^ 2)))
 end
-pretty_table(DataFrame(dd_stats); formatters = [resfmt], title = "Drawdown analytics")
+pretty_table(DataFrame(dd_stats); formatters = [resfmt], title = "Drawdown statistics")
 
 #=
 ## 4. A scorecard of performance
@@ -160,12 +161,12 @@ pretty_table(DataFrame(;
                        quantity = ["Gross compounded wealth (×)",
                                    "Net compounded wealth (×)",
                                    "Single-period fee (fraction)",
-                                   "Approx annualised fee (252 periods)"],
+                                   "Total fee over 252 periods"],
                        value = [round(cumulative_returns(gross_ret, true)[end]; digits = 4),
                                 round(cumulative_returns(net_ret, true)[end]; digits = 4),
                                 round(single_period_fee; digits = 5),
                                 round(calc_total_fees(w_ratio, 252, fees); digits = 4)]);
-             title = "Fee drag on the maximum-ratio book (5 bps per period on the long positions)")
+             title = "Wealth and fees of the maximum-ratio portfolio, 5 basis points per period on the long positions")
 
 #=
 ## 6. Risk attribution
@@ -181,7 +182,7 @@ rc ./= sum(rc)
 rc_df = sort(DataFrame(; asset = rd.nx, weight = w_min, risk_share = rc), :risk_share;
              rev = true)
 pretty_table(first(rc_df, 8); formatters = [resfmt],
-             title = "Top risk contributors — minimum-variance book")
+             title = "The eight largest risk shares in the minimum-variance portfolio")
 
 #=
 On the minimum-variance portfolio the two columns match. At the minimum of the variance, a small
@@ -196,7 +197,7 @@ rc_ratio ./= sum(rc_ratio)
 rc_ratio_df = sort(DataFrame(; asset = rd.nx, weight = w_ratio, risk_share = rc_ratio),
                    :risk_share; rev = true)
 pretty_table(filter(:weight => >(1e-4), rc_ratio_df); formatters = [resfmt],
-             title = "Risk contributors, maximum-ratio book")
+             title = "Weight and risk share of each asset of the maximum-ratio portfolio with a weight above 0.01 %")
 
 #=
 Here the two columns differ, and XOM takes a larger share of the risk than of the weight. An asset

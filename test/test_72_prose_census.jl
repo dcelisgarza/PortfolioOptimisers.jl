@@ -19,9 +19,13 @@ total is one number that two sessions each lower to a different value, after whi
 one of the two writes. A per-text row is touched by one session alone.
 
 Three shapes of text feed one set of counters. A Literate source renders a `#= ... =#` block and a
-`# ` comment at column zero. A Markdown page is its own lines. The catalogue holds its prose in
+`# ` line, after any indentation. A Markdown page is its own lines. The catalogue holds its prose in
 double-quoted string literals, which is how `test_71_process_citation_census.jl` reads the same
 file.
+
+The code of a page feeds the same counters, as ADR 0171 decisions 16 and 17 rule. A string that a
+cell prints is prose, and a `title =` string is also a heading. The text of a `#! ` gotcha is prose.
+Every other comment in the code counts in the `comment` column, which holds at zero.
 
 Two lines of a mirror page under `docs/src/public_api/` or `docs/src/private_api/` are derived
 text, and this census does not read them: the H1, whose shape ADR 0128 fixes, and the `Description`
@@ -104,6 +108,9 @@ end
             @test !occursin("code cell", joined)
             # The em dash inside a code span is code, and the one in the paragraph is prose.
             @test P.counts(path; glossary = glossary)["emdash"] == 1
+            # Two comments: the `##` line in the code, and the comment in the fenced block of the
+            # prose, which a reader reads as code.
+            @test P.counts(path; glossary = glossary)["comment"] == 2
         end
     end
 
@@ -213,6 +220,98 @@ end
             # A `Symbol` name is not a string, so no `Cap` name reaches the counters.
             @test !occursin("EmpiricalPrior", joined)
             @test P.counts(path; glossary = glossary)["emdash"] == 1
+        end
+    end
+
+    #=
+    A string that a cell prints is prose, and a comment in a code cell is a gotcha or nothing, which
+    is ADR 0171 decisions 16 and 17. The fixture holds one of each shape the lexer must tell apart.
+    =#
+    @testset "the code of a Literate page: printed strings, gotchas and comments" begin
+        text = """
+        # A rendered line.
+        #src A note for the author — never rendered.
+        pretty_table(df; title = "Minimum Variance Weights By Estimator")
+        println("The two runs agree: ", a == b)
+        label = "cash left \\\$\$(round(x; digits = 2)) — after the fees"
+        x = [a' b'] .* '#'
+        s = "a hash # inside a string"
+        m = r"adj — a pattern"
+
+        ## Compute the returns.
+        rd = prices_to_returns(X)  # a trailing comment
+        w = [1,#
+             2]
+        #! Note: the radius sits on a knife edge.
+        #!md A filter token, which Literate deletes from the markdown output.
+            #! An indented gotcha — with a dash.
+        #-
+        nothing # hide
+        """
+        mktempdir() do dir
+            path = joinpath(dir, "page.jl")
+            write(path, text)
+            lines = P.prose(path)
+            joined = join(lines, "\n")
+            row = P.counts(path; glossary = glossary)
+            # The strings are read, with the interpolation read as a space and the dollar sign
+            # dropped, so the em dash after it is not hidden inside a LaTeX span.
+            @test "# Minimum Variance Weights By Estimator" in lines
+            @test occursin("The two runs agree", joined)
+            @test occursin("cash left", joined)
+            @test occursin("a hash # inside a string", joined)
+            # A prefixed literal is a pattern, and a `#src` line never renders.
+            @test !occursin("a pattern", joined)
+            @test !occursin("never rendered", joined)
+            # The gotchas are read. The comments are counted and their text is not read.
+            @test occursin("the radius sits on a knife edge", joined)
+            @test occursin("An indented gotcha", joined)
+            @test !occursin("Compute the returns", joined)
+            @test !occursin("trailing comment", joined)
+            @test !occursin("filter token", joined)
+            # `## Compute…`, the trailing comment, the empty `#` and `#!md`. The char literal
+            # `'#'`, the `#` inside a string, `#-` and `# hide` are not comments.
+            @test row["comment"] == 4
+            # The em dash of the label and of the indented gotcha.
+            @test row["emdash"] == 2
+            @test row["title_case"] == 1
+            @test row["verdict"] == 1
+        end
+    end
+
+    @testset "the code of a Markdown page is the body of its code fences" begin
+        text = """
+        A paragraph.
+
+        ```julia
+        # Compute the returns.
+        rd = prices_to_returns(X)
+        #=
+        A block comment — in a code fence.
+        =#
+        #! v0.30
+        ```
+
+        ```@example page
+        plot(x; title = "Efficient Frontier Across Every Portfolio")
+        nothing # hide
+        ```
+
+        ```text
+        # Not code, so not a comment.
+        ```
+        """
+        mktempdir() do dir
+            path = joinpath(dir, "page.md")
+            write(path, text)
+            joined = join(P.prose(path), "\n")
+            row = P.counts(path; glossary = glossary)
+            @test occursin("v0.30", joined)
+            @test occursin("Efficient Frontier Across Every Portfolio", joined)
+            @test !occursin("block comment", joined)
+            @test row["comment"] == 2
+            @test row["emdash"] == 0
+            @test row["title_case"] == 1
         end
     end
 

@@ -97,8 +97,9 @@ depth of the drawdown, and the colour bar gives the scale.
 =#
 
 drawdown_grid = hcat([(-drawdowns(rd.X * res.w)) for res in results]...)
-heatmap(eachindex(rd.ts), labels, drawdown_grid'; xlabel = "Day", ylabel = "Optimiser",
-        colorbar_title = "Drawdown", title = "Drawdown depth by optimiser")
+heatmap(eachindex(rd.ts), labels, drawdown_grid'; xlabel = "Day",
+        ylabel = "Minimised measure", colorbar_title = "Drawdown",
+        title = "Daily drawdown depth of each portfolio")
 
 #=
 ## 3. The tail level `alpha` of CDaR
@@ -138,33 +139,28 @@ println("CDaR-constrained max-ratio retcode: $(res_cdar_max_ratio.retcode)")
 ## 5. Drawdown statistics after the optimisation
 
 When you have a portfolio, `drawdowns()` and `cumulative_returns()` return its drawdown series
-and its cumulative return series over the sample. They are not objectives, so use them to study
-a portfolio after the optimiser has run. `expected_risk` with the measures of section 2 gives
-the statistics. We compare the minimum-variance portfolio with the
-minimum-CDaR portfolio of section 2.
+and its cumulative return series over the sample. By default both add the returns up without
+compounding. They are not objectives, so use them to study a portfolio after the optimiser has
+run. `expected_risk` with the measures of section 2 gives the statistics. We compare the
+minimum-variance portfolio with the minimum-CDaR portfolio of section 2.
 =#
 
-## Pick two portfolios to compare side by side.
 w_var = optimise(MeanRisk(; r = Variance(), opt = opt)).w
-w_cdar = results[4].w   ## CDaR minimising portfolio
+w_cdar = results[4].w
 
-## Portfolio return time series for each weight vector.
 ret_var = rd.X * w_var
 ret_cdar = rd.X * w_cdar
 
-## Cumulative returns (simple).
 cr_var = cumulative_returns(ret_var)
 cr_cdar = cumulative_returns(ret_cdar)
 
-## Drawdown series.
 dd_var = drawdowns(ret_var)
 dd_cdar = drawdowns(ret_cdar)
 
-## Summary statistics, computed by the risk measures of section 2.
 rs_dd = [r_mdd, r_add, r_uci, r_cdar]
 pretty_table(DataFrame(;
-                       :Metric =>
-                           ["Max drawdown", "Avg drawdown", "Ulcer index", "CDaR 5%"],
+                       :Metric => ["Maximum drawdown", "Average drawdown", "Ulcer index",
+                                   "CDaR 5%"],
                        :MinVariance => [expected_risk(r, w_var, rd.X) for r in rs_dd],
                        :MinCDaR => [expected_risk(r, w_cdar, rd.X) for r in rs_dd]);
              formatters = [resfmt])
@@ -175,15 +171,15 @@ the variance ignores the order of the returns, and the four rows compare the dep
 drawdowns of the two portfolios. We plot the cumulative returns of both portfolios.
 =#
 
-plot(cr_var; label = "Min Variance", xlabel = "Day", ylabel = "Cumulative return",
+plot(cr_var; label = "Minimum variance", xlabel = "Day", ylabel = "Cumulative return",
      title = "Cumulative return paths")
-plot!(cr_cdar; label = "Min CDaR")
+plot!(cr_cdar; label = "Minimum CDaR")
 
 # We plot the drawdowns of the same two portfolios.
 
-plot(dd_var; label = "Min Variance", xlabel = "Day", ylabel = "Drawdown",
+plot(dd_var; label = "Minimum variance", xlabel = "Day", ylabel = "Drawdown",
      title = "Drawdown paths")
-plot!(dd_cdar; label = "Min CDaR")
+plot!(dd_cdar; label = "Minimum CDaR")
 
 #=
 ## Summary

@@ -48,10 +48,10 @@ function synthetic_market(kind; T = 500, N = 5, seed = 7)
     lp = zeros(N)
     for t in 1:T
         if kind == :trending
-            lp .= 0.90 .* lp .+ 0.008 .* randn(rng, N)   # a persistent log return
+            lp .= 0.90 .* lp .+ 0.008 .* randn(rng, N)
             P[t + 1, :] .= P[t, :] .* exp.(lp)
         else
-            lp .= 0.90 .* lp .+ 0.04 .* randn(rng, N)    # a log price pulled to zero
+            lp .= 0.90 .* lp .+ 0.04 .* randn(rng, N)
             P[t + 1, :] .= exp.(lp)
         end
     end
@@ -123,7 +123,7 @@ portfolio is a causal member of the family, run through the same walk-forward.
 =#
 
 cut(rd, i) = ReturnsResult(; nx = rd.nx, X = rd.X[i, :], ts = rd.ts[i])
-test_rows(rd) = cut(rd, 21:size(rd.X, 1))       # the rows every fold was scored on
+test_rows(rd) = cut(rd, 21:size(rd.X, 1))
 
 best_stock = Pipeline(;
                       steps = (ScoreSelector(; score = MeanReturn(; flag = true),
@@ -193,8 +193,8 @@ every_row = preds_rev["Passive-aggressive mean reversion"]
 block = cross_val_predict(opt, rd_rev, cv5)
 drifted = cross_val_predict(opt, rd_rev, cv5d)
 
-k = 46                                           # one fold, read three ways
-t_end = last(split(cv5, rd_rev).train_idx[k])    # the last row the fold folded
+k = 46
+t_end = last(split(cv5, rd_rev).train_idx[k])
 (; target_identity = block.pred[k].res.w == optimise(opt, cut(rd_rev, 1:t_end)).w,
  held_book_gap = maximum(abs, drifted.pred[k].hw.w - drifted.pred[k].res.w),
  wealth = (; every_row = wealth(every_row), block = wealth(block),
@@ -255,7 +255,7 @@ pretty_table(DataFrame("Forecast" => first.(forecasts),
                            [wealth(online(a, rd_rev)) for a in last.(forecasts)],
                        "Trending market" =>
                            [wealth(online(a, rd_trend)) for a in last.(forecasts)]);
-             formatters = [resfmt], title = "One update, two forecasts")
+             formatters = [resfmt], title = "Terminal wealth by forecast")
 
 #=
 The two rows invert each other. The update is the same in both, and only the forecast differs. A
@@ -284,7 +284,7 @@ pretty_table(DataFrame("Geometry" => first.(geometries),
                            [wealth(online(a, rd_rev)) for a in last.(geometries)],
                        "Trending market" =>
                            [wealth(online(a, rd_trend)) for a in last.(geometries)]);
-             formatters = [resfmt], title = "One rate, four geometries")
+             formatters = [resfmt], title = "Terminal wealth by geometry")
 
 #=
 The three interior geometries land close together on both markets. Each of them is a slow step

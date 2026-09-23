@@ -21,7 +21,6 @@ not about how much risk it takes. It covers two jobs:
 
 using PortfolioOptimisers, PrettyTables
 
-## Format for pretty tables.
 resfmt = (v, i, j) -> begin
     if j == 1
         return v
@@ -108,7 +107,7 @@ using StatsPlots, GraphRecipes
 
 for (name, _) in obj_specs
     display(plot_risk_contribution(rf_asset, asset_res[name], rd;
-                                   title = "Asset RC - $(name)"))
+                                   title = "Asset risk contribution, $(name)"))
 end
 
 #=
@@ -153,7 +152,7 @@ miss the targets. On this data only the maximum-ratio column meets all three con
 
 for (name, _) in obj_specs
     display(plot_factor_risk_contribution(rf_fac, factor_res[name], rd;
-                                          title = "Factor RC - $(name)"))
+                                          title = "Factor risk contribution, $(name)"))
 end
 
 #=

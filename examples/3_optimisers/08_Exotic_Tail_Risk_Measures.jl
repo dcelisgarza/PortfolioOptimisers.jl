@@ -132,7 +132,7 @@ portfolio, the one that minimises CVaR, and evaluate RLVaR on it for five values
 We also evaluate EVaR and [`WorstRealisation`](@ref), the two limits.
 =#
 
-w_fixed = results[1].w   ## CVaR-minimising portfolio
+w_fixed = results[1].w
 kappas = [0.01, 0.1, 0.3, 0.6, 0.99]
 rlvar_curve = [expected_risk(RelativisticValueatRisk(; slv = slv, kappa = k), w_fixed,
                              rd.X) for k in kappas]
@@ -149,7 +149,7 @@ realisation at ``\kappa = 0.99``.
 
 plot(kappas, rlvar_curve; seriestype = :path, marker = (:circle, 5), label = "RLVaR(κ)",
      xlabel = "κ", ylabel = "Realised tail risk", legend = :topleft,
-     title = "RLVaR interpolates EVaR (κ→0) and worst realisation (κ→1)")
+     title = "RLVaR of the minimum-CVaR portfolio for five values of κ")
 hline!([evar_ref]; label = "EVaR", linestyle = :dash)
 hline!([wr_ref]; label = "Worst realisation", linestyle = :dot)
 

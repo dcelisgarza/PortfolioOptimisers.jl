@@ -30,7 +30,6 @@ changes the portfolio, and then prints the risk, return and ratio of each portfo
 =#
 
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     if j == 1
         return Date(v)
@@ -58,7 +57,6 @@ using CSV, TimeSeries, DataFrames
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
-## Compute the returns
 rd = prices_to_returns(X)
 
 #=
@@ -105,14 +103,10 @@ opt = JuMPOptimiser(; pe = pr, slv = slv)
 We build one `MeanRisk` per objective. Only the `obj` field differs between them.
 =#
 
-## Minimum risk
 mr1 = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)
-## Maximum utility (default risk aversion l = 2)
 mr2 = MeanRisk(; r = r, obj = MaximumUtility(), opt = opt)
-## Maximum risk-adjusted ratio, risk-free rate of 4.2/100/252
 rf = 4.2 / 100 / 252
 mr3 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
-## Maximum return
 mr4 = MeanRisk(; r = r, obj = MaximumReturn(), opt = opt)
 
 #=
@@ -162,7 +156,7 @@ end
 pretty_table(DataFrame(; Symbol("risk aversion l") => [s[1] for s in sweep],
                        :risk => [s[2] for s in sweep], :return => [s[3] for s in sweep],
                        :ratio => [s[4] for s in sweep]); formatters = [resfmt],
-             title = "MaximumUtility: higher l ⇒ lower risk and lower return")
+             title = "MaximumUtility portfolios by risk aversion l")
 
 #=
 Risk and return both fall as `l` rises, so the portfolio moves down the efficient frontier from
@@ -173,7 +167,7 @@ portfolio to show that path.
 using StatsPlots, GraphRecipes
 
 plot([s[2] for s in sweep], [s[3] for s in sweep]; seriestype = :path,
-     marker = (:circle, 5), xlabel = "SemiMoment-deviation risk",
+     marker = (:circle, 5), xlabel = "Semi-standard deviation",
      ylabel = "Arithmetic return", title = "MaximumUtility risk-aversion path",
      label = "l = " * join(string.(lambdas), ", "))
 
