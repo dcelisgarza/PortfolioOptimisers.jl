@@ -1,16 +1,17 @@
 #=
 ```@meta
-Description = "Assets that list, delist or go quiet mid-sample: the point-in-time universe, from a gapped price table to a walk-forward."
+Description = "How PortfolioOptimisers.jl handles assets that list, delist or stop quoting mid-sample, from a gapped price table to a walk-forward."
 ```
 
 # The point-in-time universe
 
 Real asset universes move. A company lists halfway through your sample, another is acquired and
 stops quoting, a third is suspended for a month. `PortfolioOptimisers.jl` answers all three cases
-with one rule. A layer either handles the missing asset, or it throws an error that names it.
+with one rule. Each estimator and function of the library either handles the missing asset, or
+throws an error that names it.
 
-A layer that can state a correct answer for a missing asset does so, and its docstring says how.
-A layer that cannot throws, instead of returning a number that is wrong. Nothing in the library
+One that can state a correct answer for a missing asset does so, and its docstring says how. One
+that cannot throws, instead of returning a number that is wrong. Nothing in the library
 drops an asset without telling you, back-fills a price, or reads a gap as a zero return.
 
 You ingest a gapped table with the call a clean table takes. [`prices_to_returns`](@ref) on a raw
@@ -52,8 +53,9 @@ rd = prices_to_returns(Xg)
 #=
 The conversion deleted nothing. Every asset keeps its column, every date but the first keeps its
 row, and a missing return is a `NaN` in the returns matrix. There is no sentinel value and no
-imputation. A return reads two consecutive prices, so a run of `k` gapped prices leaves the
-`k + 1` returns that read one of them non-finite. The gap never spreads to a neighbouring asset.
+imputation. A return divides one price by the price before it, so a run of `k` gapped prices
+inside the series leaves `k + 1` returns non-finite, and a run at either end leaves `k`. The gap
+never spreads to a neighbouring asset.
 
 ## 2. The panel states the universe
 
@@ -85,14 +87,13 @@ asset clock, collapses to a lower frequency if you ask for one, and reads the sp
 those options. The [data preprocessing example](../examples/1_foundations/02_Data_Preprocessing.md)
 walks each one.
 
-## 3. The prior answers, and the mask follows from its answer
+## 3. The prior marks the assets it could not estimate
 
 A prior estimator fits on the assets it can estimate, and it returns a result over the full asset
 universe. An asset it could not estimate carries `NaN` in `mu` and on the diagonal of `sigma`.
 
-The investable mask, the assets a result can weight, is not stored in a field. Every consumer
-reads it off the result with the one test below, so there is one definition and it cannot go
-stale.
+A prior result does not store its investable mask, the assets a result can weight. The library
+computes it from `mu` and `sigma` with the test below.
 =#
 
 pr = prior(EmpiricalPrior(), rd)
@@ -204,15 +205,16 @@ mpr = cross_val_predict(HierarchicalRiskParity(), rd, cv)
 
 #=
 The training windows of the first two folds straddle the late listing and the halt, so both assets
-are out of those folds. The third window sits inside the listed life of the young asset and after
-the halt, so only the suspension keeps an asset out there. `imsk` is `nothing` when every asset
+are out of those folds. The third window starts after the late listing but still contains the
+halt, so only the suspension keeps an asset out there. `imsk` is `nothing` when every asset
 was investable, because a fold that reduces nothing stores nothing, rather than a vector of
 `true`.
 
 The delisting never falls in a training window. It falls in the test window of the third fold,
-where the fold already holds the asset. The score zeroes that weight once, on the observation
-where the asset stops quoting, and the weight it held sits in cash from there on. The score leaves
-the other weights alone, because renormalising them would raise your exposure. Pass
+where the fold already holds the asset. When the fold computes its out-of-sample returns, it
+counts each missing return of that asset as zero, and it warns that it did so. From the
+observation where the asset stops quoting, its weight earns nothing, as if it sat in cash. The
+other weights do not change, because renormalising them would raise your exposure. Pass
 `strict = true` to throw there instead. The stitched folds give an out-of-sample series with a
 number at every observation, over a universe that moved.
 =#
@@ -223,7 +225,7 @@ number at every observation, over a universe that moved.
 #=
 A fill and a filter change the universe itself. [`PriceGapFill`](@ref) states a price across the
 halt, and [`MissingDataFilter`](@ref) drops an asset too sparse to trust. Each one is fitted on
-the training window of a fold and replayed by name on the test window, or the fold would be scored
+the training window of a fold and applied unchanged to the test window, or the fold would be scored
 against a universe the future chose. Each one therefore runs inside a [`Pipeline`](@ref) over the
 ingested price table, and the conversion to returns is the step after it. The folds are cut on the
 price clock, so we build the ingested price table once, outside the pipeline, and the pipeline
