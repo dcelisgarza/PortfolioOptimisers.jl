@@ -96,8 +96,8 @@ pretty_table(DataFrame(:fold => 1:n, :ran => [which_strategy(pred_cal, i) for i 
              formatters = [resfmt])
 #=
 The odd folds ran the capped minimum-variance strategy. The even folds ran the aggressive one, with
-more concentrated weights. Nothing after the fold loop depends on which optimiser a fold ran:
-`cross_val_predict` joins the predictions, and the plots draw them, as for one optimiser.
+more concentrated weights. Nothing after the fold loop depends on which optimiser a fold ran.
+`cross_val_predict` joins the predictions, and the plots draw them, as they do for one optimiser.
 
 A schedule of optimisers must have one entry per fold of the loop that uses it. The loop checks the
 length when it splits the data, before any fold runs, so a schedule of two entries fails here.
@@ -319,8 +319,9 @@ nco = NestedClustered(;
 res_nco = optimise(nco, rd)
 maximum(res_nco.w)
 #=
-The inner `KFold(3)` used the three entries of the schedule, and fold `i` of the inner loop ran
-entry `i`. The solve over the full window of each cluster ran the `default`.
+In each cluster, the inner `KFold(3)` runs entry `i` of the schedule on inner fold `i`. The solve
+over the full window of each cluster runs the `default`. The cell prints only the largest weight of
+the result, so it does not show which entry a fold ran.
 
 [`Stacking`](@ref) runs its inner cross-validation once per candidate, which is an element of
 `opti`, and a `:nearest` schedule goes on an element of `opti`. The constructor rejects a
@@ -419,7 +420,7 @@ DataFrame(:split => 1:n_c,
 A callable has no entry to look up. You know what it returned on a fold only if you run it again, or
 if it records its own choice. You write that record yourself, and a
 [`TimeDependentOptimiserCallable`](@ref) struct is a good place for it. Give the struct a field to
-write to, and it logs the regime when it picks it. Different folds write different slots, so the log
+write to, and it logs the regime when it picks it. Fold `i` writes entry `i` of the vector, so the log
 stays correct when the fold loop runs the folds in parallel.
 =#
 struct RegimeSwitchLogged{T <: PortfolioOptimisers.OptimisationEstimator,

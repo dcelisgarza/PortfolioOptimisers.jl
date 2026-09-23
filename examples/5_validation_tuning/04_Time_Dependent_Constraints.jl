@@ -35,8 +35,8 @@ Two rules decide which value a fold gets.
     takes its static default, or the value you give in the schedule's `default` keyword.
 
 We run one portfolio problem under four cross-validation schemes, [`IndexWalkForward`](@ref),
-[`KFold`](@ref), [`CombinatorialCrossValidation`](@ref) and [`MultipleRandomised`](@ref), and
-compare the three forms under each.
+[`KFold`](@ref), [`CombinatorialCrossValidation`](@ref) and [`MultipleRandomised`](@ref). Under
+each scheme we compare the static optimiser with one schedule or more.
 =#
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
@@ -51,9 +51,10 @@ end;
 ## 1. Setting up
 
 We load three years of daily prices and build a minimum-variance [`MeanRisk`](@ref) optimiser with
-two Clarabel solvers. The library tries the second solver when the first fails. The field we vary on
-this page is the upper bound of every weight, `wb`, because its effect shows in the largest weight
-of a fold.
+two Clarabel solvers. The library tries the second solver when the first fails. The field we vary in
+most sections is `wb`, the bounds of the weights. We change its upper bound, because the effect
+shows in the largest weight of a fold. Sections 2.4, 3.1 and 7.6 put a schedule in `card`, `tn` and
+`lcse`.
 =#
 using CSV, TimeSeries, DataFrames, Clarabel, Statistics, StableRNGs
 
@@ -212,7 +213,8 @@ pretty_table(DataFrame(:fold => 1:n_wf, :static => max_weights(pred_wf_static),
                        :vol_callable => max_weights(pred_wf_vol)); formatters = [resfmt])
 #=
 The static optimiser has no cap. Under the vector schedule the largest weight stays under a cap that
-falls from fold to fold. The callable of the falling cap gives the same weights. The volatility
+falls from fold to fold. The `callable` column states the same falling cap, so compare it with the
+`schedule` column fold by fold. The volatility
 callable moves its cap with the volatility of the training window, not with the fold number.
 
 We also backtest the struct and compare its weights with those of the function, fold by fold.
@@ -311,8 +313,8 @@ n_ccv = n_splits(ccv)
 #=
 Four blocks with two test blocks per split give six splits. The schedule needs six entries, one per
 split in the order of `split(ccv, rd)`. A split covers several blocks of time, so a cap per split is
-coarser than a cap per walk-forward fold. We keep the schedule to show that entry `i` caps split
-`i`.
+coarser than a cap per walk-forward fold. We run the schedule and the static optimiser under this
+scheme.
 =#
 mr_cc_sched = MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = deleverage(n_ccv)))
 pred_cc_static = cross_val_predict(mr_static, rd, ccv)
@@ -327,6 +329,10 @@ pretty_table(DataFrame(:path => 1:length(pred_cc_sched.pred),
                                      for path in pred_cc_sched.pred]);
              formatters = [resfmt])
 #=
+The table gives the largest weight on each path. A path joins the test blocks of several splits,
+and each block ran under the cap of its own split. The largest weight of a path mixes those caps,
+and the table does not show the cap of one split.
+
 ## 6. MultipleRandomised
 
 [`MultipleRandomised`](@ref) draws random subsets of the assets and runs a walk-forward on every
