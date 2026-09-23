@@ -12,7 +12,6 @@ glossary_terms = 173
 
 [file]
 "README.md" = { emdash = 6, words = 476 }
-"docs/capability_catalogue.jl" = { emdash = 4, endash = 1, filler = 1, glossary = 37, mechanism = 7, verdict = 1, words = 6455 }
 "docs/src/00_API.md" = { emdash = 2, words = 223 }
 "docs/src/index.md" = { filler = 1, words = 805 }
 "docs/src/migration.md" = { emdash = 7, endash = 1, bold_label = 5, glossary = 9, mechanism = 2, verdict = 1, words = 2598 }
