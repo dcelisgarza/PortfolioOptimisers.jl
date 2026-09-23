@@ -443,11 +443,11 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         # solver must resolve at its own 1e-12 tolerances, and on some CI hosts it returned
         # a Held Step; at 1e-4 every norm still binds, and at 1e-3 two of them no longer do.
         b3 = fill(1 / 3, 3)
-        tr_bound(::L1Norm, err, T) = err * T
+        tr_bound(alg::L1Norm, err, T) = err * (T - alg.ddof)
         tr_bound(alg::L2Norm, err, T) = err * sqrt(T - alg.ddof)
         tr_bound(alg::SquaredL2Norm, err, T) = sqrt(err * (T - alg.ddof))
         tr_bound(alg::LpNorm, err, T) = err * (T - alg.ddof)^(1 / alg.p)
-        tr_bound(alg::LInfNorm, err, T) = err * (T - alg.ddof)
+        tr_bound(::LInfNorm, err, T) = err
         tr_norm(::L1Norm, d) = sum(abs, d)
         tr_norm(::Union{<:L2Norm, <:SquaredL2Norm}, d) = norm(d)
         tr_norm(alg::LpNorm, d) = norm(d, alg.p)

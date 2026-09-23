@@ -27,7 +27,7 @@ Where:
   - ``k``: Rebalancing factor (0 or 1).
   - ``c_p``: Normalisation constant depending on the norm order ``p``.
 
-where ``\\boldsymbol{b}`` is the benchmark return series, ``k`` is the budget scaling variable, and ``c_p`` is the norm-order scaling factor (``T``, ``\\sqrt{T-d}``, etc.).
+where ``\\boldsymbol{b}`` is the benchmark return series, ``k`` is the budget scaling variable, and ``c_p`` is the norm-order scaling factor, [`norm_factor`](@ref) of `r.alg` (``T - d``, ``\\sqrt{T-d}``, ``1``, etc.).
 
 # Arguments
 
@@ -60,7 +60,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = length(net_X)
     t_tracking_risk = state_set!(model, prefix, :t_tracking_risk_, i, JuMP.@variable(model))
     tracking_risk = state_set!(model, prefix, :tracking_risk_, i,
-                               JuMP.@expression(model, t_tracking_risk / T))
+                               JuMP.@expression(model,
+                                                t_tracking_risk / norm_factor(r.alg, T)))
     tr = r.tr
     benchmark = tracking_benchmark(tr, X)
     tracking_r = state_set!(model, prefix, :tracking_r_, i,
@@ -128,7 +129,9 @@ Add JuMP risk constraints for `TrackingRiskMeasure` with `L2Norm` or
 `SquaredL2Norm` to `model`.
 
 Introduces a scalar variable and an SOC constraint to encode the L2 (root mean squared)
-tracking error between portfolio and benchmark returns.
+tracking error between portfolio and benchmark returns. The cone variable is the L2 norm for
+both norms, so it is divided by [`norm_factor`](@ref) of an [`L2Norm`](@ref) with the same
+`ddof`. [`set_tracking_risk!`](@ref) then squares it for a [`SquaredL2Norm`](@ref).
 
 # Arguments
 
@@ -162,7 +165,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     t_tracking_risk = state_set!(model, prefix, :t_tracking_risk_, i, JuMP.@variable(model))
     tracking_risk = state_set!(model, prefix, :tracking_risk_, i,
                                JuMP.@expression(model,
-                                                t_tracking_risk / sqrt(T - r.alg.ddof)))
+                                                t_tracking_risk /
+                                                norm_factor(L2Norm(; ddof = r.alg.ddof), T)))
     tr = r.tr
     benchmark = tracking_benchmark(tr, X)
     tracking_r = state_set!(model, prefix, :tracking_r_, i,
@@ -218,8 +222,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     state_set!(model, prefix, :t_tracking_risk_, i, t_tracking_risk)
     state_set!(model, prefix, :r_tracking_risk_, i, r_tr)
     p_inv = inv(r.alg.p)
-    scale = T - r.alg.ddof
-    scale = r.alg.p == 3 ? cbrt(scale) : scale^p_inv
+    scale = norm_factor(r.alg, T)
     tracking_risk = state_set!(model, prefix, :tracking_risk_, i,
                                JuMP.@expression(model, t_tracking_risk / scale))
     benchmark = tracking_benchmark(r.tr, X)
@@ -248,7 +251,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add JuMP risk constraints for `TrackingRiskMeasure` with `LInfNorm` to `model`.
 
 Introduces a scalar variable and an infinity-norm cone constraint to encode the L∞-norm
-(maximum) tracking error between portfolio and benchmark returns, scaled by `T - ddof`.
+(maximum) tracking error between portfolio and benchmark returns. Its [`norm_factor`](@ref) is `1`.
 
 # Arguments
 
@@ -278,7 +281,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     T = length(net_X)
     t_tracking_risk = state_set!(model, prefix, :t_tracking_risk_, i, JuMP.@variable(model))
-    scale = T - r.alg.ddof
+    scale = norm_factor(r.alg, T)
     tracking_risk = state_set!(model, prefix, :tracking_risk_, i,
                                JuMP.@expression(model, t_tracking_risk / scale))
     benchmark = tracking_benchmark(r.tr, X)

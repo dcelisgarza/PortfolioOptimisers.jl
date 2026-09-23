@@ -975,7 +975,7 @@ end
                                                                          alg = LInfNorm())]),
                               3))
             @test sqrt(sum(abs2, R * wv - bench) / (T - 1)) <= 0.002 * (1 + 1e-6)
-            @test maximum(abs, R * wv - bench) <= 0.003 * (T - 1) * (1 + 1e-6)
+            @test maximum(abs, R * (wv - [0.2, 0.3, 0.5])) <= 0.003 * (1 + 1e-6)
             rte = RiskTrackingError(; r = Variance(), tr = WeightsTracking(; w = w3),
                                     err = 1e-5)
             wrt = proj(resolve(ProgrammeAllocationSet(; slv = slv, tr = rte), 3))

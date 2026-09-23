@@ -11,7 +11,7 @@ In order to implement a new norm-based error algorithm which will work seamlessl
 
   - `norm_factor(f::NormError, T::Number) -> Number`: Returns the divisor that scales the norm. The `T === nothing` case is already covered by a generic method that returns `1`.
 
-The functor side is [`norm_error`](@ref), and the model side is `set_risk_constraints!` for [`TrackingRiskMeasure`](@ref) and `set_tracking_error_constraints!` for [`TrackingError`](@ref). All three must agree.
+The functor side is [`norm_error`](@ref), and the model side is `set_risk_constraints!` for [`TrackingRiskMeasure`](@ref) and `set_tracking_error_constraints!` for [`TrackingError`](@ref). All three read `norm_factor`, so a new norm declares its factor once.
 
 # Related
 
@@ -179,13 +179,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Norm-one (NOC) error formulation.
 
-`L1Norm` implements a norm-based error formulation using the L1 (norm-one) distance between portfolio and benchmark weights. This is commonly used for error constraints and objectives in portfolio optimisation where sparsity or absolute deviations are preferred.
+`L1Norm` implements a norm-based error formulation using the L1 (norm-one) distance between portfolio and benchmark weights, scaled by the number of observations minus the degrees of freedom (`ddof`). This is commonly used for error constraints and objectives in portfolio optimisation where sparsity or absolute deviations are preferred.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_1}{T}\\,.
+\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_1}{T - d}\\,.
 \\end{align}
 ```
 
@@ -194,17 +194,33 @@ Where:
   - $(math_dict[:tr_l1])
   - $(math_dict[:a_norm_err])
   - $(math_dict[:b_norm_err])
-  - $(math_dict[:T]) When ``T`` is not provided the denominator is 1.
+  - $(math_dict[:T])
+  - $(math_dict[:d_ddof])
+
+The default `ddof = 0` gives the denominator ``T`` of the source, so the error is the mean absolute difference. [`LpNorm`](@ref) defaults to `ddof = 1`, so `LpNorm(; p = 1)` and `L1Norm()` differ by a factor of ``T / (T - 1)``.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    L1Norm() -> L1Norm
+    L1Norm(;
+        ddof::Integer = 0
+    ) -> L1Norm
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `0 <= ddof`.
 
 # Examples
 
 ```jldoctest
 julia> L1Norm()
-L1Norm()
+L1Norm
+  ddof ┴ Int64: 0
 ```
 
 # Related
@@ -220,7 +236,19 @@ L1Norm()
 
   - $(ref_dict[:cajas2025]) Section 9.2, Equation 9.17.
 """
-struct L1Norm <: NormError end
+@concrete struct L1Norm <: NormError
+    """
+    $(field_dict[:ddof])
+    """
+    ddof
+    function L1Norm(ddof::Integer)::L1Norm
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
+        return new{typeof(ddof)}(ddof)
+    end
+end
+function L1Norm(; ddof::Integer = 0)::L1Norm
+    return L1Norm(ddof)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -245,13 +273,15 @@ Where:
   - $(math_dict[:d_ddof])
   - $(math_dict[:p_norm_order])
 
+The default `ddof = 1` matches [`L2Norm`](@ref), so `LpNorm(; p = 2)` and `L2Norm()` give the same error. [`L1Norm`](@ref) defaults to `ddof = 0`, so `LpNorm(; p = 1)` and `L1Norm()` differ by a factor of ``T / (T - 1)``. As ``p`` grows the factor goes to ``1``, which is the factor of [`LInfNorm`](@ref).
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    LpNorm(; p::Number = 3, ddof::Integer = 0) -> LpNorm
+    LpNorm(; p::Number = 3, ddof::Integer = 1) -> LpNorm
 
 Keywords correspond to the struct's fields.
 
@@ -265,7 +295,7 @@ Keywords correspond to the struct's fields.
 julia> LpNorm()
 LpNorm
      p ┼ Int64: 3
-  ddof ┴ Int64: 0
+  ddof ┴ Int64: 1
 ```
 
 # Related
@@ -292,7 +322,7 @@ LpNorm
         return new{typeof(p), typeof(ddof)}(p, ddof)
     end
 end
-function LpNorm(; p::Number = 3, ddof::Integer = 0)::LpNorm
+function LpNorm(; p::Number = 3, ddof::Integer = 1)::LpNorm
     return LpNorm(p, ddof)
 end
 """
@@ -300,13 +330,13 @@ $(DocStringExtensions.TYPEDEF)
 
 L-infinity norm (maximum absolute deviation) error estimator.
 
-`LInfNorm` takes the largest absolute deviation between the portfolio and the benchmark returns, and divides it by ``T - d``.
+`LInfNorm` takes the largest absolute deviation between the portfolio and the benchmark returns, and does not scale it. The factor of [`LpNorm`](@ref) is ``(T - d)^{1/p}``, which goes to ``1`` as ``p`` grows, so the error is the largest single-period difference and carries no degrees of freedom.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_\\infty}{T - d}\\,.
+\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_\\infty\\,.
 \\end{align}
 ```
 
@@ -315,29 +345,16 @@ Where:
   - $(math_dict[:tr_linf])
   - $(math_dict[:a_norm_err])
   - $(math_dict[:b_norm_err])
-  - $(math_dict[:T])
-  - $(math_dict[:d_ddof])
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    LInfNorm(; ddof::Integer = 0) -> LInfNorm
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - `0 <= ddof`.
+    LInfNorm() -> LInfNorm
 
 # Examples
 
 ```jldoctest
 julia> LInfNorm()
-LInfNorm
-  ddof ┴ Int64: 0
+LInfNorm()
 ```
 
 # Related
@@ -350,19 +367,7 @@ LInfNorm
   - [`norm_error`](@ref)
   - [`norm_factor`](@ref)
 """
-@concrete struct LInfNorm <: NormError
-    """
-    $(field_dict[:ddof])
-    """
-    ddof
-    function LInfNorm(ddof::Integer)::LInfNorm
-        assert_nonempty_nonneg_finite_val(ddof, :ddof)
-        return new{typeof(ddof)}(ddof)
-    end
-end
-function LInfNorm(; ddof::Integer = 0)::LInfNorm
-    return LInfNorm(ddof)
-end
+struct LInfNorm <: NormError end
 """
     norm_error(f::L2Norm, a, b, T::Option{<:Number} = nothing)
     norm_error(f::SquaredL2Norm, a, b, T::Option{<:Number} = nothing)
@@ -381,9 +386,9 @@ Compute the norm-based tracking error between portfolio and benchmark weights.
 \\begin{align}
 \\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_2}{\\sqrt{T - d}}\\,, \\\\
 \\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_2^2}{T - d}\\,, \\\\
-\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_1}{T}\\,, \\\\
+\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_1}{T - d}\\,, \\\\
 \\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_p}{(T-d)^{1/p}}\\,, \\\\
-\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_\\infty}{T - d}\\,.
+\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_\\infty\\,.
 \\end{align}
 ```
 
@@ -445,7 +450,7 @@ function norm_error end
 
 Compute the denominator that scales a norm in [`norm_error`](@ref).
 
-The factor is the single place where the optional observation count `T` is turned into a divisor. Each [`NormError`](@ref) declares its own factor, and the `T === nothing` case is a method, not a branch inside one. A branch is what let `ifelse` evaluate `T - f.ddof` on the `nothing` path.
+The factor is the single place where the optional observation count `T` is turned into a divisor. [`norm_error`](@ref) and both JuMP models read it. Each [`NormError`](@ref) declares its own factor, and the `T === nothing` case is a method, not a branch inside one. A branch is what let `ifelse` evaluate `T - f.ddof` on the `nothing` path.
 
 # Algorithm
 
@@ -454,9 +459,9 @@ The method Julia selects on the types of `f` and `T` is the algorithm. A `T` of 
  1. `f === nothing` gives `sqrt(T)`, the unweighted L2 factor.
  2. [`L2Norm`](@ref) gives `sqrt(T - f.ddof)`.
  3. [`SquaredL2Norm`](@ref) gives `T - f.ddof`.
- 4. [`L1Norm`](@ref) gives `T`, because that norm carries no degrees of freedom.
+ 4. [`L1Norm`](@ref) gives `T - f.ddof`.
  5. [`LpNorm`](@ref) gives `(T - f.ddof)^(1/f.p)`, taken with `cbrt` when `f.p` is `3`, the default.
- 6. [`LInfNorm`](@ref) gives `T - f.ddof`.
+ 6. [`LInfNorm`](@ref) gives `1`, the limit of the [`LpNorm`](@ref) factor as `f.p` grows.
 
 # Arguments
 
@@ -495,8 +500,8 @@ end
 function norm_factor(f::SquaredL2Norm, T::Number)
     return T - f.ddof
 end
-function norm_factor(::L1Norm, T::Number)
-    return T
+function norm_factor(f::L1Norm, T::Number)
+    return T - f.ddof
 end
 function norm_factor(f::LpNorm, T::Number)
     factor = T - f.ddof
@@ -506,8 +511,8 @@ function norm_factor(f::LpNorm, T::Number)
         factor^(inv(f.p))
     end
 end
-function norm_factor(f::LInfNorm, T::Number)
-    return T - f.ddof
+function norm_factor(::LInfNorm, T::Number)
+    return one(T)
 end
 function norm_error(f::L2Norm, a, b, T::Option{<:Number} = nothing)
     return LinearAlgebra.norm(a - b, 2) / norm_factor(f, T)

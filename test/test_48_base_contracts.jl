@@ -649,6 +649,21 @@ end
     @test pe.norm_error(SquaredL2Norm(), a, b, 5) == 0.0625
     @test pe.norm_error(SquaredL2Norm(), a - b, 5) == 0.0625
     @test pe.norm_error(SquaredL2Norm(), a, b, 5) == pe.norm_error(L2Norm(), a, b, 5)^2
+    # The norm of order `p` divides by `(T - d)^(1/p)` (#1271). `L1Norm` takes `ddof` and
+    # keeps the source's `T` at its default, `LpNorm` defaults to the `ddof` of `L2Norm`, so
+    # the two agree at `p = 2`, and `LInfNorm` divides by the limit `1` at every `T`.
+    @test pe.norm_factor(L1Norm(), 5) == 5
+    @test pe.norm_factor(L1Norm(; ddof = 1), 5) == 4
+    @test pe.norm_error(L1Norm(; ddof = 1), a, b, 5) ≈ 0.175
+    @test pe.norm_factor(LpNorm(; p = 2), 5) == pe.norm_factor(L2Norm(), 5)
+    @test pe.norm_error(LpNorm(; p = 2), a, b, 5) ≈ pe.norm_error(L2Norm(), a, b, 5)
+    @test pe.norm_factor(LpNorm(; p = 3), 9) ≈ 2
+    @test pe.norm_factor(LInfNorm(), 5) == 1
+    @test pe.norm_factor(LInfNorm(), 252) == 1
+    @test pe.norm_error(LInfNorm(), a, b, 252) == pe.norm_error(LInfNorm(), a, b)
+    @test pe.norm_error(LInfNorm(), a, b, 252) ≈ 0.4
+    @test_throws MethodError LInfNorm(; ddof = 0)
+    @test_throws DomainError L1Norm(; ddof = -1)
 end
 @testset "An unimplemented observation-weight shape names the shape" begin
     pe = PortfolioOptimisers

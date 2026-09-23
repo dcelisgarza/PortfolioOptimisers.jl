@@ -154,8 +154,9 @@ The `alg` field of [`TrackingError`](@ref) sets the norm of the tracking error, 
 the series of differences between the portfolio returns and the benchmark returns. The default
 is [`L2Norm`](@ref). [`L1Norm`](@ref) uses the sum of the absolute differences, [`LpNorm`](@ref)
 a p-norm of them, and [`LInfNorm`](@ref) the largest difference in one period. Each `alg`
-divides its norm by a factor of the number of observations, and `err` is in the units of that
-result. With `L1Norm` the result is the mean absolute difference.
+except `LInfNorm` divides its norm by a factor of the number of observations, and `err` is in
+the units of that result. With `L1Norm` the result is the mean absolute difference. `LInfNorm`
+does not divide, so its `err` bounds the largest difference in one period.
 
 ## 6. Comparing the approaches
 

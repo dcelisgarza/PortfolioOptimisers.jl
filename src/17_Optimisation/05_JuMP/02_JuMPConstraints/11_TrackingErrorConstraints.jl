@@ -5,11 +5,11 @@ Add tracking error constraints to the JuMP optimisation model.
 
 The fall-through method does nothing. Concrete methods dispatch on the tracking algorithm type:
 
-  - [`L1Norm`](@ref): Enforces `‖net_X - wb * k‖₁ ≤ err * T` via NormOneCone.
+  - [`L1Norm`](@ref): Enforces `‖net_X - wb * k‖₁ ≤ err * (T - ddof)` via NormOneCone.
   - [`L2Norm`](@ref): Enforces a scaled L2 norm via SecondOrderCone.
   - [`SquaredL2Norm`](@ref): The same cone, with the bound square-rooted, because `err` bounds the *squared* error that [`norm_error`](@ref) reports.
   - [`LpNorm`](@ref): Enforces a scaled Lp norm via power cone.
-  - [`LInfNorm`](@ref): Enforces `‖net_X - wb * k‖_∞ ≤ err * scale` via NormInfinityCone.
+  - [`LInfNorm`](@ref): Enforces `‖net_X - wb * k‖_∞ ≤ err` via NormInfinityCone.
   - [`IndependentVariableTracking`](@ref): Substitutes `w - wb` for `w` and applies the chosen risk constraint.
   - [`DependentVariableTracking`](@ref): Constrains the absolute difference between portfolio risk and benchmark risk.
 
@@ -32,7 +32,7 @@ Where:
   - ``\\boldsymbol{b}``: Benchmark return vector.
   - $(math_dict[:k_budget])
   - $(math_dict[:p_norm_order])
-  - ``c_p``: Norm-specific scaling factor (``T``, ``\\sqrt{T - d}``, etc.).
+  - ``c_p``: Norm-specific scaling factor, [`norm_factor`](@ref) of the norm (``T - d``, ``\\sqrt{T - d}``, ``1``, etc.).
   - ``\\mathrm{err}``: Tracking error tolerance.
 
 # Arguments
@@ -73,7 +73,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     wb = tracking_benchmark(tr.tr, X)
     err = tr.err
     T = size(X, 1)
-    f = err * T
+    f = err * norm_factor(tr.alg, T)
     t_tr = state_set!(model, prefix, :t_tr_, i, JuMP.@variable(model))
     tr = state_set!(model, prefix, :tr_, i, JuMP.@expression(model, net_X - wb * k))
     ctr_noc, ctr = JuMP.@constraints(model,
@@ -112,10 +112,10 @@ Both norms share one cone, which bounds ``\\lVert \\mathbf{X}\\boldsymbol{w} - \
   - [`SquaredL2Norm`](@ref)
 """
 function tracking_error_soc_factor(f::L2Norm, err::Number, T::Integer)
-    return err * sqrt(T - f.ddof)
+    return err * norm_factor(f, T)
 end
 function tracking_error_soc_factor(f::SquaredL2Norm, err::Number, T::Integer)
-    return sqrt(err * (T - f.ddof))
+    return sqrt(err * norm_factor(f, T))
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
@@ -157,8 +157,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     T = size(X, 1)
     err = tr.err
     p_inv = inv(tr.alg.p)
-    scale = T - tr.alg.ddof
-    f = err * (tr.alg.p == 3 ? cbrt(scale) : scale^p_inv)
+    f = err * norm_factor(tr.alg, T)
     t_tr, r_tr = JuMP.@variables(model, begin
                                      ()
                                      [1:T]
@@ -190,8 +189,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     wb = tracking_benchmark(tr.tr, X)
     T = size(X, 1)
     err = tr.err
-    scale = T - tr.alg.ddof
-    f = err * scale
+    f = err * norm_factor(tr.alg, T)
     t_tr = state_set!(model, prefix, :t_tr_, i, JuMP.@variable(model))
     tr = state_set!(model, prefix, :tr_, i, JuMP.@expression(model, net_X - wb * k))
     ctr_infnorm, ctr = JuMP.@constraints(model,

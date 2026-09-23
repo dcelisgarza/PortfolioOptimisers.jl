@@ -562,14 +562,15 @@ end
                                            alg = LpNorm()))
     mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
     res = optimise(mre)
-    @test LinearAlgebra.norm(rd.X * res.w - wr, 3) / cbrt(size(rd.X, 1)) <= 4.5e-3
+    @test LinearAlgebra.norm(rd.X * res.w - wr, 3) / cbrt(size(rd.X, 1) - 1) <= 4.5e-3
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
-                        tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 8e-5,
+                        tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 2e-2,
                                            alg = LInfNorm()))
     mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
     res = optimise(mre)
-    @test LinearAlgebra.norm(rd.X * res.w - wr, Inf) / size(rd.X, 1) <= 8e-5
+    @test isa(res.retcode, PortfolioOptimisers.OptimisationSuccess)
+    @test LinearAlgebra.norm(rd.X * res.w - wr, Inf) <= 2e-2 * (1 + 1e-6)
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         tr = [TrackingError(; tr = WeightsTracking(; w = w0), err = 2e-3,
