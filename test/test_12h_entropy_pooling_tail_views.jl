@@ -244,14 +244,14 @@ end
                                                                                                                   views = v))
 
     # `nothing` takes the exact conic formulation where it applies, and the grid elsewhere.
-    @test PO.ep_rlvar_formulation(nothing, false, :geq, 0.1, 0.05) ===
+    @test PO.ep_rlvar_formulation(nothing, false, true, :geq, 0.1, 0.05) ===
           ConicRelativisticValueatRiskView()
-    @test isa(PO.ep_rlvar_formulation(nothing, false, :leq, 0.1, 0.05),
+    @test isa(PO.ep_rlvar_formulation(nothing, false, true, :leq, 0.1, 0.05),
               GridRelativisticValueatRiskView)
-    @test isa(PO.ep_rlvar_formulation(nothing, false, :eq, 0.01, 0.05),
+    @test isa(PO.ep_rlvar_formulation(nothing, false, true, :eq, 0.01, 0.05),
               GridRelativisticValueatRiskView)
-    @test PO.ep_rlvar_formulation(ConicRelativisticValueatRiskView(), false, :leq, 0.0,
-                                  0.0) === ConicRelativisticValueatRiskView()
+    @test PO.ep_rlvar_formulation(ConicRelativisticValueatRiskView(), false, true, :leq,
+                                  0.0, 0.0) === ConicRelativisticValueatRiskView()
 
     # The conic formulation bounds the RLVaR from below only.
     @test_throws ArgumentError prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
@@ -662,18 +662,29 @@ end
               IntegerConditionalValueatRiskView)
     @test PO.ep_cvar_formulation(LinearConditionalValueatRiskView(), true, :leq, 0.0,
                                  0.0) === LinearConditionalValueatRiskView()
-    @test PO.ep_evar_formulation(nothing, false, :geq, 0.1, 0.05) ===
+    @test PO.ep_evar_formulation(nothing, false, true, :geq, 0.1, 0.05) ===
           ConicEntropicValueatRiskView()
-    @test isa(PO.ep_evar_formulation(nothing, false, :leq, 0.1, 0.05),
+    @test isa(PO.ep_evar_formulation(nothing, false, true, :leq, 0.1, 0.05),
               GridEntropicValueatRiskView)
-    @test isa(PO.ep_evar_formulation(nothing, false, :eq, 0.01, 0.05),
+    @test isa(PO.ep_evar_formulation(nothing, false, true, :eq, 0.01, 0.05),
               GridEntropicValueatRiskView)
     # A view whose coefficients carry both signs has no grid to select from, so the
     # sequential formulation is the one that expresses it.
-    @test PO.ep_evar_formulation(nothing, true, :geq, 0.1, 0.05) ===
+    @test PO.ep_evar_formulation(nothing, true, false, :geq, 0.1, 0.05) ===
           SequentialEntropicValueatRiskView()
-    @test PO.ep_rlvar_formulation(nothing, true, :leq, 0.1, 0.05) ===
+    @test PO.ep_rlvar_formulation(nothing, true, false, :leq, 0.1, 0.05) ===
           SequentialRelativisticValueatRiskView()
+    # An upper bound over several assets of one sign has no grid to select from either, and
+    # neither has an equality below the prior value. A lower bound stays conic. Issue #1287.
+    for (f, conic, seq) in ((PO.ep_evar_formulation, ConicEntropicValueatRiskView(),
+                             SequentialEntropicValueatRiskView()),
+                            (PO.ep_rlvar_formulation, ConicRelativisticValueatRiskView(),
+                             SequentialRelativisticValueatRiskView()))
+        @test f(nothing, false, false, :geq, 0.1, 0.05) === conic
+        @test f(nothing, false, false, :eq, 0.1, 0.05) === conic
+        @test f(nothing, false, false, :leq, 0.1, 0.05) === seq
+        @test f(nothing, false, false, :eq, 0.01, 0.05) === seq
+    end
 
     # A vector of formulations is spread one per view.
     @test length(PO.ep_view_formulations(nothing, 3, :alg)) == 3
@@ -2236,6 +2247,33 @@ end
                                                                                               views = LinearConstraintEstimator(;
                                                                                                                                 val = "AAPL - $nN >= $tgt"))),
                                      ep_srd)
+end
+
+@testset "a group upper bound with the default formulation is met" begin
+    # Issue #1287. `nothing` sent an upper bound over several assets of one sign to the grid,
+    # which is one asset's, and the grid refused the view. The EVaR and RLVaR views now take
+    # the sequential formulation. The CVaR views take the integer one, whose window is per
+    # asset.
+    pAe = ep_sevar(1, ep_sw0) + ep_sevar(2, ep_sw0)
+    pAr = ep_srlvar(1, ep_sw0) + ep_srlvar(2, ep_sw0)
+    pAc = ep_scvar(1, ep_sw0) + ep_scvar(2, ep_sw0)
+    for (op, f) in (("<=", 0.95), ("==", 0.97))
+        v = LinearConstraintEstimator(; val = "gA $op $(f)*prior(gA)")
+        pe = prior(EntropyPoolingPrior(; sets = ep_gsets, opt = ep_jopt,
+                                       evar_views = EntropicValueatRiskView(; views = v)),
+                   ep_srd)
+        @test isapprox(ep_sevar(1, pe.w) + ep_sevar(2, pe.w), f * pAe, rtol = 1e-5)
+        pr_ = prior(EntropyPoolingPrior(; sets = ep_gsets, opt = ep_jopt,
+                                        rlvar_views = RelativisticValueatRiskView(;
+                                                                                  kappa = ep_k,
+                                                                                  views = v)),
+                    ep_srd)
+        @test isapprox(ep_srlvar(1, pr_.w) + ep_srlvar(2, pr_.w), f * pAr, rtol = 1e-4)
+        pc = prior(EntropyPoolingPrior(; sets = ep_gsets, opt = ep_mopt,
+                                       cvar_views = ConditionalValueatRiskView(; views = v)),
+                   ep_srd)
+        @test isapprox(ep_scvar(1, pc.w) + ep_scvar(2, pc.w), f * pAc, rtol = 5e-3)
+    end
 end
 
 @testset "the sequential carriers register the rows their formulation names" begin

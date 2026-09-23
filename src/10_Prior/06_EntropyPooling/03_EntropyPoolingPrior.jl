@@ -2368,27 +2368,30 @@ function ep_cvar_formulation(::Nothing, mixed::Bool, op::Symbol, rhs::Number, pv
 end
 """
     ep_evar_formulation(alg::Option{<:AbstractEntropicValueatRiskViewFormulation}, mixed::Bool,
-                        op::Symbol, rhs::Number, pv::Number)
+                        single::Bool, op::Symbol, rhs::Number, pv::Number)
 
 Pick the formulation of one entropic value-at-risk view.
 
-A stated formulation is returned unchanged. `nothing` takes [`ConicEntropicValueatRiskView`](@ref) wherever it expresses the view exactly, which is every view whose lower level set is convex, and [`GridEntropicValueatRiskView`](@ref) for an upper bound and an equality below the prior value. A view whose coefficients carry both signs has no grid to select from, because the grid is one asset's, so it takes [`SequentialEntropicValueatRiskView`](@ref), the one formulation that expresses it.
+A stated formulation is returned unchanged. `nothing` takes [`ConicEntropicValueatRiskView`](@ref) wherever it expresses the view exactly, which is every view whose lower level set is convex. An upper bound and an equality below the prior value take [`GridEntropicValueatRiskView`](@ref) when the view names one asset. The grid is one asset's, so the same views over several assets take [`SequentialEntropicValueatRiskView`](@ref), the one formulation that expresses them. So does a view whose coefficients carry both signs.
 
 The branch each input takes:
 
-| `alg`     | `mixed` | `op`   | `rhs` against `pv` | Branch                                      |
-|:--------- |:------- |:------ |:------------------ |:------------------------------------------- |
-| stated    | any     | any    | any                | `alg`, unchanged                            |
-| `nothing` | `false` | `:geq` | any                | [`ConicEntropicValueatRiskView`](@ref)      |
-| `nothing` | `false` | `:eq`  | `rhs >= pv`        | [`ConicEntropicValueatRiskView`](@ref)      |
-| `nothing` | `false` | `:eq`  | `rhs < pv`         | [`GridEntropicValueatRiskView`](@ref)       |
-| `nothing` | `false` | `:leq` | any                | [`GridEntropicValueatRiskView`](@ref)       |
-| `nothing` | `true`  | any    | any                | [`SequentialEntropicValueatRiskView`](@ref) |
+| `alg`     | `mixed` | `single` | `op`   | `rhs` against `pv` | Branch                                      |
+|:--------- |:------- |:-------- |:------ |:------------------ |:------------------------------------------- |
+| stated    | any     | any      | any    | any                | `alg`, unchanged                            |
+| `nothing` | `false` | any      | `:geq` | any                | [`ConicEntropicValueatRiskView`](@ref)      |
+| `nothing` | `false` | any      | `:eq`  | `rhs >= pv`        | [`ConicEntropicValueatRiskView`](@ref)      |
+| `nothing` | `false` | `true`   | `:eq`  | `rhs < pv`         | [`GridEntropicValueatRiskView`](@ref)       |
+| `nothing` | `false` | `true`   | `:leq` | any                | [`GridEntropicValueatRiskView`](@ref)       |
+| `nothing` | `false` | `false`  | `:eq`  | `rhs < pv`         | [`SequentialEntropicValueatRiskView`](@ref) |
+| `nothing` | `false` | `false`  | `:leq` | any                | [`SequentialEntropicValueatRiskView`](@ref) |
+| `nothing` | `true`  | `false`  | any    | any                | [`SequentialEntropicValueatRiskView`](@ref) |
 
 # Arguments
 
   - `alg`: Stated formulation, or `nothing`.
   - `mixed`: Whether the coefficients of the view carry both signs.
+  - `single`: Whether the view names one asset.
   - `op`: Comparison operator of the view.
   - `rhs`: Target value of the view.
   - `pv`: Prior value of the view's left hand side.
@@ -2407,38 +2410,45 @@ The branch each input takes:
 function ep_evar_formulation(alg::AbstractEntropicValueatRiskViewFormulation, args...)
     return alg
 end
-function ep_evar_formulation(::Nothing, mixed::Bool, op::Symbol, rhs::Number, pv::Number)
+function ep_evar_formulation(::Nothing, mixed::Bool, single::Bool, op::Symbol, rhs::Number,
+                             pv::Number)
     return if mixed
         SequentialEntropicValueatRiskView()
     elseif op == :geq || op == :eq && rhs >= pv
         ConicEntropicValueatRiskView()
-    else
+    elseif single
         GridEntropicValueatRiskView()
+    else
+        # The grid is one asset's. Issue #1287.
+        SequentialEntropicValueatRiskView()
     end
 end
 """
     ep_rlvar_formulation(alg::Option{<:AbstractRelativisticValueatRiskViewFormulation},
-                         mixed::Bool, op::Symbol, rhs::Number, pv::Number)
+                         mixed::Bool, single::Bool, op::Symbol, rhs::Number, pv::Number)
 
 Pick the formulation of one relativistic value-at-risk view.
 
-A stated formulation is returned unchanged. `nothing` takes [`ConicRelativisticValueatRiskView`](@ref) wherever it expresses the view exactly, which is every view whose lower level set is convex, and [`GridRelativisticValueatRiskView`](@ref) for an upper bound and an equality below the prior value. A view whose coefficients carry both signs has no grid to select from, because the grid is one asset's, so it takes [`SequentialRelativisticValueatRiskView`](@ref), the one formulation that expresses it.
+A stated formulation is returned unchanged. `nothing` takes [`ConicRelativisticValueatRiskView`](@ref) wherever it expresses the view exactly, which is every view whose lower level set is convex. An upper bound and an equality below the prior value take [`GridRelativisticValueatRiskView`](@ref) when the view names one asset. The grid is one asset's, so the same views over several assets take [`SequentialRelativisticValueatRiskView`](@ref), the one formulation that expresses them. So does a view whose coefficients carry both signs.
 
 The branch each input takes:
 
-| `alg`     | `mixed` | `op`   | `rhs` against `pv` | Branch                                          |
-|:--------- |:------- |:------ |:------------------ |:----------------------------------------------- |
-| stated    | any     | any    | any                | `alg`, unchanged                                |
-| `nothing` | `false` | `:geq` | any                | [`ConicRelativisticValueatRiskView`](@ref)      |
-| `nothing` | `false` | `:eq`  | `rhs >= pv`        | [`ConicRelativisticValueatRiskView`](@ref)      |
-| `nothing` | `false` | `:eq`  | `rhs < pv`         | [`GridRelativisticValueatRiskView`](@ref)       |
-| `nothing` | `false` | `:leq` | any                | [`GridRelativisticValueatRiskView`](@ref)       |
-| `nothing` | `true`  | any    | any                | [`SequentialRelativisticValueatRiskView`](@ref) |
+| `alg`     | `mixed` | `single` | `op`   | `rhs` against `pv` | Branch                                          |
+|:--------- |:------- |:-------- |:------ |:------------------ |:----------------------------------------------- |
+| stated    | any     | any      | any    | any                | `alg`, unchanged                                |
+| `nothing` | `false` | any      | `:geq` | any                | [`ConicRelativisticValueatRiskView`](@ref)      |
+| `nothing` | `false` | any      | `:eq`  | `rhs >= pv`        | [`ConicRelativisticValueatRiskView`](@ref)      |
+| `nothing` | `false` | `true`   | `:eq`  | `rhs < pv`         | [`GridRelativisticValueatRiskView`](@ref)       |
+| `nothing` | `false` | `true`   | `:leq` | any                | [`GridRelativisticValueatRiskView`](@ref)       |
+| `nothing` | `false` | `false`  | `:eq`  | `rhs < pv`         | [`SequentialRelativisticValueatRiskView`](@ref) |
+| `nothing` | `false` | `false`  | `:leq` | any                | [`SequentialRelativisticValueatRiskView`](@ref) |
+| `nothing` | `true`  | `false`  | any    | any                | [`SequentialRelativisticValueatRiskView`](@ref) |
 
 # Arguments
 
   - `alg`: Stated formulation, or `nothing`.
   - `mixed`: Whether the coefficients of the view carry both signs.
+  - `single`: Whether the view names one asset.
   - `op`: Comparison operator of the view.
   - `rhs`: Target value of the view.
   - `pv`: Prior value of the view's left hand side.
@@ -2457,13 +2467,17 @@ The branch each input takes:
 function ep_rlvar_formulation(alg::AbstractRelativisticValueatRiskViewFormulation, args...)
     return alg
 end
-function ep_rlvar_formulation(::Nothing, mixed::Bool, op::Symbol, rhs::Number, pv::Number)
+function ep_rlvar_formulation(::Nothing, mixed::Bool, single::Bool, op::Symbol, rhs::Number,
+                              pv::Number)
     return if mixed
         SequentialRelativisticValueatRiskView()
     elseif op == :geq || op == :eq && rhs >= pv
         ConicRelativisticValueatRiskView()
-    else
+    elseif single
         GridRelativisticValueatRiskView()
+    else
+        # The grid is one asset's. Issue #1287.
+        SequentialRelativisticValueatRiskView()
     end
 end
 """
@@ -2662,9 +2676,9 @@ function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
     @argcheck(all(>(zero(eltype(coef))), coef),
               ArgumentError("View `$(eqn)` carries coefficients of both signs. `ConicEntropicValueatRiskView` writes a positive combination of EVaRs, whose lower level set is convex; a relative view needs `SequentialEntropicValueatRiskView`."))
     @argcheck(op != :leq,
-              ArgumentError("View `$(eqn)` is an upper bound. `ConicEntropicValueatRiskView` bounds the EVaR from below only; use `GridEntropicValueatRiskView` or `SequentialEntropicValueatRiskView`."))
+              ArgumentError("View `$(eqn)` is an upper bound. `ConicEntropicValueatRiskView` bounds the EVaR from below only; use `GridEntropicValueatRiskView` for a single asset, or `SequentialEntropicValueatRiskView`."))
     @argcheck(op != :eq || rhs >= pv,
-              ArgumentError("View `$(eqn)` targets $(rhs), below the prior EVaR $(pv). `ConicEntropicValueatRiskView` writes an equality as a lower bound, which is slack at the prior and would leave the view unmet; use `GridEntropicValueatRiskView` or `SequentialEntropicValueatRiskView`."))
+              ArgumentError("View `$(eqn)` targets $(rhs), below the prior EVaR $(pv). `ConicEntropicValueatRiskView` writes an equality as a lower bound, which is slack at the prior and would leave the view unmet; use `GridEntropicValueatRiskView` for a single asset, or `SequentialEntropicValueatRiskView`."))
     push!(tvs, ConicEntropicValueatRiskViewConstraint(x, coef, alpha, rhs))
     return nothing
 end
@@ -2674,7 +2688,7 @@ function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
                            zstar::VecNum, pv::Number, eqn::AbstractString; args::Tuple = (),
                            kwargs::NamedTuple = (;), zlo_frac::Option{<:Number} = nothing)
     @argcheck(isone(length(x)),
-              ArgumentError("View `$(eqn)` names $(length(x)) assets. `GridEntropicValueatRiskView` writes the EVaR of a single asset; use `ConicEntropicValueatRiskView` for a positive combination, and `SequentialEntropicValueatRiskView` for a relative view."))
+              ArgumentError("View `$(eqn)` names $(length(x)) assets. `GridEntropicValueatRiskView` writes the EVaR of a single asset; use `ConicEntropicValueatRiskView` for a lower bound on a positive combination, and `SequentialEntropicValueatRiskView` for an upper bound or a relative view."))
     (; pct, K, M, iters, tol, tilt_iters) = alg
     x = x[1]
     wi = w ./ sum(w)
@@ -2843,9 +2857,9 @@ function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
     @argcheck(all(>(zero(eltype(coef))), coef),
               ArgumentError("View `$(eqn)` carries coefficients of both signs. `ConicRelativisticValueatRiskView` writes a positive combination of RLVaRs, whose lower level set is convex; a relative view needs `SequentialRelativisticValueatRiskView`."))
     @argcheck(op != :leq,
-              ArgumentError("View `$(eqn)` is an upper bound. `ConicRelativisticValueatRiskView` bounds the RLVaR from below only; use `GridRelativisticValueatRiskView` or `SequentialRelativisticValueatRiskView`."))
+              ArgumentError("View `$(eqn)` is an upper bound. `ConicRelativisticValueatRiskView` bounds the RLVaR from below only; use `GridRelativisticValueatRiskView` for a single asset, or `SequentialRelativisticValueatRiskView`."))
     @argcheck(op != :eq || rhs >= pv,
-              ArgumentError("View `$(eqn)` targets $(rhs), below the prior RLVaR $(pv). `ConicRelativisticValueatRiskView` writes an equality as a lower bound, which is slack at the prior and would leave the view unmet; use `GridRelativisticValueatRiskView` or `SequentialRelativisticValueatRiskView`."))
+              ArgumentError("View `$(eqn)` targets $(rhs), below the prior RLVaR $(pv). `ConicRelativisticValueatRiskView` writes an equality as a lower bound, which is slack at the prior and would leave the view unmet; use `GridRelativisticValueatRiskView` for a single asset, or `SequentialRelativisticValueatRiskView`."))
     push!(tvs, ConicRelativisticValueatRiskViewConstraint(x, coef, alpha, kappa, rhs))
     return nothing
 end
@@ -2857,7 +2871,7 @@ function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
                             args::Tuple = (), kwargs::NamedTuple = (;),
                             bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
     @argcheck(isone(length(x)),
-              ArgumentError("View `$(eqn)` names $(length(x)) assets. `GridRelativisticValueatRiskView` writes the RLVaR of a single asset; use `ConicRelativisticValueatRiskView` for a positive combination, and `SequentialRelativisticValueatRiskView` for a relative view."))
+              ArgumentError("View `$(eqn)` names $(length(x)) assets. `GridRelativisticValueatRiskView` writes the RLVaR of a single asset; use `ConicRelativisticValueatRiskView` for a lower bound on a positive combination, and `SequentialRelativisticValueatRiskView` for an upper bound or a relative view."))
     (; pct, K, M, iters, tol, tilt_iters) = alg
     x = x[1]
     wi = w ./ sum(w)
@@ -3062,7 +3076,7 @@ function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
         pv += ci * e.evar
         zstar[k] = e.z
     end
-    alg = ep_evar_formulation(alg, mixed, op, rhs, pv)
+    alg = ep_evar_formulation(alg, mixed, isone(length(x)), op, rhs, pv)
     ep_add_evar_view!(epc, tvs, alg, x, coef, alpha, op, rhs, w, zstar, pv, eqn;
                       args = args, kwargs = kwargs, zlo_frac = zlo_frac)
     return nothing
@@ -3079,7 +3093,7 @@ function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
         pv += ci * r.rlvar
         zstar[k] = r.z
     end
-    alg = ep_rlvar_formulation(alg, mixed, op, rhs, pv)
+    alg = ep_rlvar_formulation(alg, mixed, isone(length(x)), op, rhs, pv)
     ep_add_rlvar_view!(epc, tvs, alg, x, coef, alpha, kappa, op, rhs, w, zstar, pv, eqn;
                        args = args, kwargs = kwargs, bracket = bracket)
     return nothing

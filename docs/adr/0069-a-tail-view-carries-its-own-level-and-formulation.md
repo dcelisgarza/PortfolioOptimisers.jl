@@ -332,3 +332,47 @@ more function evaluations in the others. Clarabel stopped at `SLOW_PROGRESS` whe
 
 A check after the solve, that the posterior statistic meets the target, was considered and refused.
 It would set a tolerance on a residual, which this library does not set (#573).
+
+## Amendment (2026-09-23) — from [#1287](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1287)
+
+Issue #1287 found that an upper bound on a group failed on the EVaR and the RLVaR when `alg` was
+left at `nothing`. A group is a view over several assets whose coefficients all have one sign. The
+selectors sent every upper bound whose coefficients had one sign to the grid, and so every equality
+below the prior value. The grid holds the measure of one asset, and it refused the view with an
+`ArgumentError`.
+
+### The selector reads the number of assets
+
+`ep_evar_formulation` and `ep_rlvar_formulation` take a new argument `single`, which says whether
+the view names one asset. A lower bound, and an equality at or above the prior value, keep the conic
+formulation at any number of assets. The grid keeps the upper bound and the low equality of one
+asset. The same views over several assets take the sequential formulation, which already took every
+relative view:
+
+```julia
+function ep_evar_formulation(::Nothing, mixed::Bool, single::Bool, op::Symbol, rhs::Number,
+                             pv::Number)
+    return if mixed
+        SequentialEntropicValueatRiskView()
+    elseif op == :geq || op == :eq && rhs >= pv
+        ConicEntropicValueatRiskView()
+    elseif single
+        GridEntropicValueatRiskView()
+    else
+        SequentialEntropicValueatRiskView()
+    end
+end
+```
+
+`ep_sequential_sides` negates an upper bound, so every asset of the group goes to the primal side,
+and the view is met with no integer variable. On the three technology assets of the S&P 500 slice
+of the examples, an upper bound at 95% of the prior value and an equality at 97% of it met their
+targets to a relative `8e-9` on both measures.
+
+`ep_cvar_formulation` does not change. It sends the same views to
+`IntegerConditionalValueatRiskView`, which keeps one window per asset and so accepts a group.
+
+The error of the grid named the conic formulation for any positive combination, but the conic
+formulation refuses an upper bound. It now names the conic formulation for a lower bound on a
+positive combination, and the sequential formulation for an upper bound or a relative view. The
+conic errors say that the grid holds a single asset.

@@ -163,10 +163,11 @@ grid forms state the view only at the points of their grid.
 A view over several assets whose coefficients all have one sign, such as a group, is a sum of
 the measures of its assets with positive weights, and a lower bound on it takes the same exact
 formulations. A relative view has coefficients of both signs. For the CVaR it takes the integer
-formulation. For the other two measures it takes [`SequentialEntropicValueatRiskView`](@ref) or
-[`SequentialRelativisticValueatRiskView`](@ref), which solve a convex program a few times and
-need no integer variable. [`SequentialConditionalValueatRiskView`](@ref) gives the CVaR the same
-option.
+formulation, and so does an upper bound on a group, or an equality below its prior value. A grid
+holds one asset, so for the other two measures these views take
+[`SequentialEntropicValueatRiskView`](@ref) or [`SequentialRelativisticValueatRiskView`](@ref),
+which solve a convex program a few times and need no integer variable.
+[`SequentialConditionalValueatRiskView`](@ref) gives the CVaR the same option.
 
 For an [`EntropicValueatRiskView`](@ref) or a [`RelativisticValueatRiskView`](@ref), a grid
 formulation in `alg` sets how the library builds the grid: its width `pct`, its number of points
