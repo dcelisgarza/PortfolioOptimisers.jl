@@ -2247,7 +2247,8 @@ does four steps.
     [`TimeDependentContext`](@ref), if `est` [`is_time_dependent`](@ref). The swap runs
     first, so a freshly swapped-in per-fold entry also gets the weights of step 3.
  3. It threads the previous fold's weights in through [`factory`](@ref), if `est`
-    [`needs_previous_weights`](@ref).
+    [`needs_previous_weights`](@ref). [`one_previous_portfolio`](@ref) refuses the
+    population a frontier sweep gives, because no one portfolio of it is the previous one.
  4. It calls `fit_fold(fold)`, with `fold` a [`Fold`](@ref).
 
 The callback takes the one [`Fold`](@ref) record, so a call site names what it reads
@@ -2331,7 +2332,7 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
                                                                 test_idx, w_prev, path_id))
         end
         if !isnothing(w_prev) && prev_w_flag
-            esti = factory(esti, w_prev)
+            esti = factory(esti, one_previous_portfolio(esti, w_prev))
         end
         return fit_fold(Fold(i, n, esti, rdi, train, test_idx[i], w_prev))
     end

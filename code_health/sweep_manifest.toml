@@ -292,7 +292,7 @@
 "src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { map = 12, units = 23, swept = false }
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { map = 12, units = 3, swept = false }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { map = 12, units = 2, swept = false }
-"src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { map = 12, units = 6, swept = false }
+"src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { map = 12, units = 7, swept = false }
 "src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { map = 12, units = 19, swept = false }
 "src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { map = 12, units = 6, swept = false }
 "src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { map = 12, units = 15, swept = false }

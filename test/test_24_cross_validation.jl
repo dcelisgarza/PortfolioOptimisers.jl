@@ -1151,6 +1151,27 @@
                         0.05670666006046363, 0.06106323762304805, 0.06731010011882382],
                        rtol = 1e-6)
 
+        # #1004: a frontier fold gives one portfolio per sweep point, and a term that reads
+        # the previous weights needs one portfolio. The loop charged such a term against its
+        # first stated `w` on every fold, so it now refuses the pair by name, on either
+        # Previous-Weights Source. A fixed turnover reads no previous weights, so it runs.
+        nx = size(rd.X, 2)
+        front_tn(tn) = MeanRisk(;
+                                opt = JuMPOptimiser(; slv = slv, tn = tn,
+                                                    ret = ArithmeticReturn(;
+                                                                           settings = JuMPReturnsSettings(;
+                                                                                                          lb = Frontier(;
+                                                                                                                        N = 5)))))
+        mr_tn = front_tn(Turnover(; val = 0.003, w = fill(inv(nx), nx)))
+        @test_throws "population of 5 portfolios" cross_val_predict(mr_tn, rd, cv)
+        @test_throws "population of 5 portfolios" cross_val_predict(mr_tn, rd,
+                                                                    IndexWalkForward(127,
+                                                                                     171;
+                                                                                     wd = SelfFinancingDrift(),
+                                                                                     pws = DriftedWeights()))
+        mr_fx = front_tn(Turnover(; val = 0.003, w = fill(inv(nx), nx), fixed = true))
+        @test length(cross_val_predict(mr_fx, rd, cv).pred) == n_splits(cv, rd)
+
         n_folds, n_test_folds = optimal_number_folds(1008, 247, 7; train_size_w = 19,
                                                      n_test_paths_w = 11)
         cv = CombinatorialCrossValidation(; n_folds = n_folds, n_test_folds = n_test_folds,

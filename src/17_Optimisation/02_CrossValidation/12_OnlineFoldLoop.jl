@@ -81,6 +81,40 @@ function online_step_fold(est, ::TimeDependentContext, rd::Prices_RR)
     return partial_fit!(est, rd)
 end
 """
+    one_previous_portfolio(est, w_prev::VecNum)
+    one_previous_portfolio(est, w_prev::VecVecNum)
+
+Give the one portfolio a fold reads as its previous weights, and refuse a population.
+
+[`fold_loop`](@ref) hands the previous fold's weights to [`factory`](@ref) when `est` [`needs_previous_weights`](@ref). A term that reads them, such as a turnover, a tracking error, a fee, or a custom constraint or objective, measures the trade from **one** portfolio. A frontier sweep gives a population, one portfolio per sweep point, and each fold resolves its own span from its own data. So point `k` at one fold and point `k` at the next sit at different return levels, and no one portfolio is the previous one. The two ideas contradict each other, so the loop refuses the combination by name instead of charging the term against a portfolio it would have to choose. ADR 0174 records the decision and the alternatives it leaves open.
+
+# Arguments
+
+  - `est`: The estimator of the fold, named in the error.
+  - `w_prev`: The weights the previous fold gives.
+
+# Returns
+
+  - `w_prev::VecNum`: The weights, unchanged, when they are one portfolio.
+
+# Throws
+
+  - `ArgumentError` when `w_prev` is a population.
+
+# Related
+
+  - [`fold_loop`](@ref)
+  - [`previous_weights`](@ref)
+  - [`needs_previous_weights`](@ref)
+  - [`Frontier`](@ref)
+"""
+function one_previous_portfolio(::Any, w_prev::VecNum)
+    return w_prev
+end
+function one_previous_portfolio(est, w_prev::VecVecNum)
+    return throw(ArgumentError("`$(typeof(est).name.name)` reads the previous fold's weights (`needs_previous_weights` is `true`), but the previous fold gave a population of $(length(w_prev)) portfolios, one per point of a frontier sweep. Each fold resolves its own frontier span from its own data, so a sweep point at one fold is not the same portfolio as the point with the same index at the next fold, and no one portfolio is the previous one. A frontier sweep and a term that reads the previous weights (a turnover, a tracking error, a fee, or a custom constraint or objective on the weights) contradict each other in a walk-forward. Optimise one portfolio per fold, or fix the previous weights of the term, for example `fixed = true` on a turnover, so that no fold reads them."))
+end
+"""
     fold_context(i::Integer, n::Integer, rd, train_idx, test_idx, w_prev, path_id)
 
 The [`TimeDependentContext`](@ref) of fold `i`, built once here and read by both places that resolve a schedule against a fold.
