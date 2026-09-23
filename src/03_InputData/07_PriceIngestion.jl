@@ -384,7 +384,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Estimator assembling raw price series into the span-carrying price carrier the ingestion layer converts.
 
-`PriceIngestion` runs **once on the whole panel**, and it is deliberately *not* a [`Pipeline`](@ref) step. The rule that puts it outside is the observation clock: unification, the factor and benchmark join, and the frequency collapse each move or renumber the observations, folds are cut once on the carrier's clock, and a hyperparameter that changes the test set cannot be scored against one that does not. A step that only touches values leaves the clock alone and stays inside.
+`PriceIngestion` runs **once on the whole panel**, and it is deliberately *not* a [`Pipeline`](@ref) step. The rule that puts it outside is the observation clock: the factor and benchmark join can add or drop observations and the frequency collapse renumbers them, folds are cut once on the carrier's clock, and a hyperparameter that changes the test set cannot be scored against one that does not. A step that only touches values leaves the clock alone and stays inside.
 
 Running outside the `Pipeline` is also what lets the **Span Rule** read the whole panel. A step only ever sees a window, and a window-local span reads a delisting straddling the window end as an asset that was never listed. What licenses the panel-wide read where a split otherwise forbids work before it is that a listing calendar is a fact about the *instruments*, not an estimate from returns.
 
