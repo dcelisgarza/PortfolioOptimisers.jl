@@ -1256,9 +1256,9 @@ Where:
   - $(math_dict[:w_t_iter])
   - $(math_dict[:ghat_t]) It is the Gradient Transform of ``\\boldsymbol{g}_t``, the gradient of the loss.
   - $(math_dict[:eta_t_lr])
-  - ``\\mathcal{W}``: Allocation Set.
-  - ``\\Psi``: Potential of the Projection Geometry.
-  - ``D_\\Psi``: Bregman divergence of ``\\Psi``.
+  - $(math_dict[:W_aset])
+  - $(math_dict[:Psi_pot])
+  - $(math_dict[:D_Psi_breg])
   - ``\\Psi^*``: Convex conjugate of ``\\Psi``.
   - ``\\mathrm{Proj}_\\Psi``: Projection onto ``\\mathcal{W}`` in the divergence ``D_\\Psi``.
   - ``\\tilde{\\boldsymbol{w}}_{t+1}``: Allocation the head plays in period ``t + 1``.

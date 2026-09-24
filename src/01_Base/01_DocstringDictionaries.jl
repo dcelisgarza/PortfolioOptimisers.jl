@@ -1268,6 +1268,12 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :eps_cw => "``\\epsilon``: Reversion threshold on the gross return of the period.",#
                        :w_1_start => "``\\boldsymbol{w}_1``: Start Allocation, the allocation that the recursion starts from.",#
                        :G_t_cumlog => "``\\boldsymbol{G}_t = \\sum_{s \\leq t} \\log \\boldsymbol{x}_s``: Cumulative log wealth after period ``t``, one entry for each asset, or for each expert on an expert mixture.",#
+                       # The Constrained Update: the raw step, the set it is projected onto,
+                       # and the divergence of the projection.
+                       :q_raw => "``\\boldsymbol{q}``: Raw step, the vector the rule's unconstrained step gives before the projection onto the Allocation Set.",#
+                       :W_aset => "``\\mathcal{W}``: Allocation Set.",#
+                       :Psi_pot => "``\\Psi``: Potential of the Projection Geometry.",#
+                       :D_Psi_breg => "``D_\\Psi``: Bregman divergence of ``\\Psi``.",#
                        # The short-term sparse portfolio and the algorithms that find its iterate.
                        :b_sspo => "``\\boldsymbol{b}``: Unscaled target of the short-term sparse portfolio step, the vector whose scaled projection is the next allocation.",#
                        :phi_sspo => "``\\boldsymbol{\\phi}``: Objective vector of the short-term sparse portfolio step, ``-(1.1 \\log \\hat{\\boldsymbol{x}} + \\boldsymbol{1})`` for the Price Relative Forecast ``\\hat{\\boldsymbol{x}}``. Its smallest entry is the largest forecast.",#

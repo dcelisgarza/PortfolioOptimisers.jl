@@ -2,7 +2,13 @@
     calibrated(x)
     calibrated(x::AbstractVector)
 
-Whether a penalty or a norm-ceiling slot holds a Calibration Rule, which resolves against the prior result and so reads the head's rows: the slot itself, or a slot of the term it holds ([`calibration_slots`](@ref)).
+Whether a penalty slot or a norm-ceiling slot holds a Calibration Rule.
+
+A Calibration Rule resolves against the prior result, so a calibrated slot reads the head's rows. The test reads the slot itself and every slot of the term it holds, which [`calibration_slots`](@ref) lists. A vector is calibrated when one of its entries is.
+
+# Returns
+
+  - `::Bool`: `true` when the slot, or a slot of its term, holds a Calibration Rule.
 
 # Related
 
@@ -19,15 +25,34 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The second stage of a [`ProgrammeAllocationSet`](@ref)'s resolution, at every step on the prior result `pr` fitted on the head's rows carrier `X`, or on `nothing` when the set reads no rows: an exposure row in `lcse` re-based through the prior's loadings, the centrality and phylogeny estimators fitted on the rows, the return floor materialised against the prior, and every Calibration Rule in a norm ceiling or a penalty resolved, as [`processed_jump_optimiser_attributes`](@ref) and [`assemble_jump_model!`](@ref) resolve them. The head's `strict` comes off the current [`ProjectionStep`](@ref); the rows carrier is the [`ReturnsResult`](@ref) the head hands the update, and every estimator here reads it as the batch verb reads one.
+Resolves the slots of a [`ProgrammeAllocationSet`](@ref) that read the head's rows, at every step.
+
+This is the second stage of the set's resolution. [`resolve_allocation_set`](@ref) resolves the slots keyed by name once per fold. This function resolves the rest on the prior result `pr` that is fitted on the rows carrier `rd`, as [`processed_jump_optimiser_attributes`](@ref) and [`assemble_jump_model!`](@ref) resolve them for a batch head. A set that reads no rows has no prior, and its slots come back as they are.
+
+# Algorithm
+
+The method on a prior result runs these steps.
+
+ 1. Read `strict` from the current [`ProjectionStep`](@ref).
+ 2. When `lcse` is keyed by exposure, build `lcsr` from it through [`linear_constraints`](@ref) with the prior's factor regression `pr.rr` and the rows. Otherwise `lcsr` is `lcse`.
+ 3. Fit the centrality rows `ctr` and the phylogeny result `plr` on the prior and the rows.
+ 4. Resolve the return floor `ret` against the prior.
+ 5. Resolve the Calibration Rules of the norm ceilings `l2c`, `linfc` and `lpc`, and of the penalties `l1`, `l2`, `lp` and `linf`, against the prior and the set's solver.
+ 6. Return the resolved slots and `rd`.
+
+# Arguments
+
+  - `set`: The programme set, resolved once per fold.
+  - `pr`: The prior result fitted on `rd`, or `nothing` when the set reads no rows.
+  - `rd`: The rows carrier the head holds, a [`ReturnsResult`](@ref).
 
 # Validation
 
-  - A prior result beside no carrier. An `IsNothingError` is thrown: the result is fitted on the carrier, so the pair never arises.
+  - A prior result with no carrier. An `IsNothingError` is thrown. The prior is fitted on the carrier, so this pair does not occur in the library.
 
 # Returns
 
-  - `attrs::NamedTuple`: `lcsr`, `ctr`, `plr`, `ret`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf` and the `ReturnsResult` `rd` over the rows, `nothing` when there are none.
+  - `attrs::NamedTuple`: `lcsr`, `ctr`, `plr`, `ret`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf`, and the rows carrier `rd`, which is `nothing` when the set reads no rows.
 
 # Related
 
@@ -76,22 +101,30 @@ end
     set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet, w::AbstractVector, X)
     set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet, w::AbstractVector, X, pr)
 
-Adds the constraints of a resolved Allocation Set to a model that already carries `w`, `k`, the scales and the observation count: the budget one and the weight bounds on both kinds, and on the programme set every kind through the shared builders, in the order [`assemble_jump_model!`](@ref) runs them — the linear and centrality rows, the MIP kinds, the sub-group MIP kinds, the turnover ceilings with their reference replaced by `w`, the tracking errors, the norm ceilings, the penalties into the Objective Penalty, the risk ceilings, the return floor, the integer and semidefinite phylogeny rows, and the custom constraints — the second-stage resolution ([`resolve_allocation_set_rows`](@ref)) run first on the prior fitted on `X`.
+Adds the constraints of a resolved Allocation Set to the bare projection model.
 
-The bare projection model of [`project`](@ref) is one caller, and hands the prior it fitted and reduced to the Investable Mask through the five-argument form; a JuMP head that takes the set as its programme's feasible region is another, through [`add_allocation_set_constraints!`](@ref), and the four-argument form fits the prior on the carrier it is given. In both the prior must price every asset the model trades ([`assert_set_prior_priced`](@ref)).
+The model must already hold `w`, `k`, the two scales and the observation count. On both kinds of set the function adds the weight bounds and the budget of one. On a [`ProgrammeAllocationSet`](@ref) it also adds every other kind of the set, through the builders a JuMP optimiser uses and in the order [`assemble_jump_model!`](@ref) runs them. [`assemble_allocation_set!`](@ref) lists that order.
+
+[`projection_programme`](@ref) calls the five-argument form with the prior it fitted and reduced to the Investable Mask. The four-argument form fits the prior on `X` itself. A JuMP head does not call this function. Its Allocation Set Constraint calls [`add_allocation_set_constraints!`](@ref), which runs the same builders under names that do not collide with the head's own. The prior must price every asset the model trades.
+
+# Algorithm
+
+ 1. In the four-argument form, fit the set's prior `pr` on `X` with [`allocation_set_prior`](@ref), and call the five-argument form.
+ 2. Add the weight bounds, the budget of one, and the short and gross budgets with [`set_allocation_set_bounds!`](@ref).
+ 3. On a programme set, add every other kind with [`assemble_allocation_set!`](@ref) under the empty prefix.
 
 # Arguments
 
   - $(arg_dict[:model])
   - `set`: The Allocation Set, resolved once per fold.
-  - `w`: The Price-Adjusted Allocation the step trades from, the reference of the turnover ceilings and of a tracking benchmark that is not fixed.
+  - `w`: The Price-Adjusted Allocation the step trades from. It is the reference of the turnover ceilings and of a tracking benchmark that is not fixed.
   - `X`: The rows carrier the head holds through the period, a [`ReturnsResult`](@ref), or `nothing`.
-  - `pr`: The prior result the row-reading slots are built on, [`allocation_set_prior`](@ref) of the set on `X`, or `nothing` when the set reads no rows.
+  - `pr`: The prior result that the slots which read the rows are built on, [`allocation_set_prior`](@ref) of the set on `X`, or `nothing` when the set reads no rows.
 
 # Validation
 
-  - A slot that reads the rows with `X === nothing`. An `ArgumentError` is thrown: the rows reach a projection inside an Online Update alone.
-  - A prior whose Investable Mask leaves out an asset the model trades. An `ArgumentError` is thrown.
+  - A slot that reads the rows, with `X === nothing`. The four-argument form throws an `ArgumentError`, because a projection gets the rows only inside an Online Update.
+  - A prior whose Investable Mask leaves out an asset the model trades. [`assert_set_prior_priced`](@ref) throws an `ArgumentError`.
 
 # Returns
 
@@ -126,11 +159,18 @@ end
     add_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet, w::AbstractVector, X)
     add_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet, w::AbstractVector, X)
 
-Adds the constraints of a resolved Allocation Set to a JuMP head's model mid-assembly, the arm of the Allocation Set Constraint a [`FollowTheLeader`](@ref) rule appends to its held optimiser.
+Adds the constraints of a resolved Allocation Set to a JuMP head's model during its assembly.
 
-The head's own builders have already registered the model's named entries — its weight bounds, its budgets, its turnover and tracking-error terms under their indices — so this arm adds the set's rows without a name where the bare projection model names them: the bounds, the budget of one and the short and gross budgets as anonymous constraints, and every other kind through the same builders as [`set_allocation_set_constraints!`](@ref), in the same order, under the `:aset_` prefix where a builder takes one, at the first index the model has not used where it takes an index, and with the head's `w` registered under the prefix so a ceiling's entries never meet the head's own measures'. The set's penalties and its semidefinite phylogeny's `p · tr(W)` fold into the Objective Penalty the head's objective builder folds in, so the adapter is one door. The tracking errors are written over the head's rows carrier `X` and its count, not the selection's. The set's prior is fitted on that carrier as the leader's own is, and the leader's model already trades its prior's Investable Mask alone, so a set prior that prices fewer assets than the leader's is refused by name ([`assert_set_prior_priced`](@ref)).
+This is the arm of the Allocation Set Constraint that a [`FollowTheLeader`](@ref) rule appends to its held optimiser. The head's builders have already registered their named entries: the weight bounds, the budgets, and the turnover and tracking-error terms under their indices. So this function adds the set's rows under other names than the bare projection model uses. It adds the bounds, the budget of one, and the short and gross budgets as anonymous rows. It adds every other kind through the same builders as [`set_allocation_set_constraints!`](@ref), in the same order. A builder that takes a prefix gets `:aset_`. A builder that takes an index gets the first index the model has not used. The function registers the head's `w` under the prefix, so the entries of a set's risk ceiling never collide with the head's own risk measures.
 
-A kind whose builder names its entries once per model — a MIP kind, the exact long-short pin, a norm ceiling, a penalty, an integer phylogeny — is stated in one home: on the set, or on the held optimiser. Stated in both, the second registration fails by name.
+The set's penalties and the `p · tr(W)` term of its semidefinite phylogeny go into the Objective Penalty, which the head's objective builder adds to the head's objective. The tracking errors read the head's rows carrier `X` and its row count. The set's prior is fitted on that carrier, as the leader's prior is. The leader's model trades only the Investable Mask of its own prior, so [`assert_set_prior_priced`](@ref) refuses a set prior that prices fewer assets than the leader's.
+
+Some builders register their entries under one fixed name per model: a MIP kind, the exact long-short pin, a norm ceiling, a penalty and an integer phylogeny. State such a kind on the set or on the held optimiser, not on both. When it is on both, the second registration fails with an error that names the entry.
+
+# Algorithm
+
+ 1. Add the bounds and the budgets as anonymous rows with [`add_allocation_set_bounds!`](@ref).
+ 2. On a programme set, fit the set's prior on `X` with [`allocation_set_prior`](@ref), and add every other kind with [`assemble_allocation_set!`](@ref) under the prefix `:aset_`.
 
 # Arguments
 
@@ -164,7 +204,38 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The builder sequence both arms share, after the bounds: every kind of a programme set in the order [`assemble_jump_model!`](@ref) runs them, under `prefix` — `Symbol("")` on the bare projection model, `:aset_` in a leader's model, where the indexed builders take the first free index and the head's `w` is registered under the prefix.
+Adds every kind of a programme set other than the bounds and the budgets, in the order [`assemble_jump_model!`](@ref) runs them.
+
+Both arms call it after they add the bounds. The bare projection model passes the empty prefix `Symbol("")`. A leader's model passes `:aset_`. Then the builders that take an index use the first free index, and the head's `w` is registered under the prefix.
+
+# Algorithm
+
+ 1. Check that the prior prices every asset in `X` with [`assert_set_prior_priced`](@ref).
+ 2. Resolve the slots that read the rows with [`resolve_allocation_set_rows`](@ref). This gives `lcsr`, `ctr`, `plr`, `ret`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf` and `rd`.
+ 3. When `prefix` is not empty, register the model's `w` under it.
+ 4. Add the linear rows `lcsr`, then the centrality rows `ctr`.
+ 5. Add the MIP kinds, then the sub-group MIP kinds.
+ 6. Add the turnover ceilings, each with its reference replaced by `w`, through [`set_allocation_turnover!`](@ref).
+ 7. When the set has tracking errors, resolve each against `w`, so that a benchmark that is not fixed takes `w`. Cut each benchmark series to the row count of the prior with [`prefix_tracking_benchmark`](@ref), and add the rows.
+ 8. Add the norm ceilings `l2c`, `lpc` and `linfc`.
+ 9. Add the penalties `l1`, `l2`, `lp` and `linf` to the Objective Penalty.
+10. Add the risk ceilings with [`set_allocation_risk_ceiling!`](@ref).
+11. Add the return floor `ret` with [`set_allocation_return_floor!`](@ref).
+12. Add the integer phylogeny rows and the semidefinite phylogeny rows of `plr`.
+13. Add the custom constraints.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `set`: The programme set, resolved once per fold.
+  - `w`: The Price-Adjusted Allocation the step trades from.
+  - `X`: The rows carrier the head holds through the period, a [`ReturnsResult`](@ref), or `nothing`.
+  - `pr`: The set's prior result on `X`, or `nothing` when the set reads no rows.
+  - `prefix`: `Symbol("")` on the bare projection model, `:aset_` in a leader's model.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -216,7 +287,18 @@ end
     prefix_tracking_benchmark(tr::TrackingError{<:ReturnsTracking}, T::Integer)
     prefix_tracking_benchmark(trs::AbstractVector, T::Integer)
 
-A [`ReturnsTracking`](@ref) benchmark on a programme set, cut to the first `T` rows when it is longer: the head's rows are the prefix of the fold's rows it has folded so far, so a benchmark series stated over the fold aligns with them by its prefix. A benchmark shorter than the rows reaches the builder as it is and is refused there by length. A weights benchmark reads the rows themselves and needs no cut.
+Cuts a [`ReturnsTracking`](@ref) benchmark of a programme set to its first `T` entries when it is longer.
+
+The head's rows are the first rows of the fold, up to the current period, so a benchmark series stated over the whole fold aligns with them by its first `T` entries. A benchmark shorter than the rows goes to the builder unchanged, and the builder throws a `DimensionMismatch`. A weights benchmark reads the rows themselves and is returned unchanged. A vector of tracking errors is cut entry by entry.
+
+# Arguments
+
+  - `tr`: A tracking error, a vector of them, or any other value.
+  - `T`: The row count of the head's rows.
+
+# Returns
+
+  - `tr'`: `tr` with each returns benchmark cut to `T` entries.
 
 # Related
 
@@ -242,7 +324,19 @@ end
     set_allocation_turnover!(model::JuMP.Model, tn::Turnover, bare::Bool)
     set_allocation_turnover!(model::JuMP.Model, tns::VecTn, bare::Bool)
 
-Writes a programme set's turnover ceilings, their reference already replaced by the step's Price-Adjusted Allocation: at the model's own indices on the bare projection model, and at the first indices the model has not used in a leader's model, so the set's terms sit beside the head's own.
+Adds a programme set's turnover ceilings, whose reference is already the step's Price-Adjusted Allocation.
+
+On the bare projection model the ceilings take the indices one to the number of ceilings. In a leader's model each ceiling takes the first index that the model has not used, so the set's terms do not replace the head's own.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `tn`: The turnover ceilings, one [`Turnover`](@ref), a vector of them, or `nothing`.
+  - `bare`: `true` on the bare projection model, `false` in a leader's model.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -271,7 +365,21 @@ end
     set_allocation_return_floor!(model::JuMP.Model, ret::JuMPReturnsEstimator, pr::AbstractPriorResult, bare::Bool; kwargs...)
     set_allocation_return_floor!(model::JuMP.Model, rets::VecJRE, pr::AbstractPriorResult, bare::Bool; kwargs...)
 
-Writes a programme set's return floor: each term's return expression on the prior's expected returns and its `settings.lb` row, through the per-index arm of [`set_return_constraints!`](@ref), at the model's own indices on the bare projection model and at the first indices the model has not used in a leader's model. The term's objective role — its scalarised expression, a ratio's normalisation — is not read: the set's objective is the geometry's divergence.
+Adds a programme set's return floor.
+
+For each term, the per-index arm of [`set_return_constraints!`](@ref) writes the return expression on the prior's expected returns and the row of its `settings.lb`. The term's scale is set to one first. On the bare projection model the terms take the indices one to the number of terms. In a leader's model each term takes the first index the model has not used. The function does not use a term in the objective, as a scalarised return or the normalisation of a ratio, because the objective of the projection is the geometry's divergence.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `ret`: The return floor, one return estimator, a vector of them, or `nothing`.
+  - `pr`: The set's prior result.
+  - `bare`: `true` on the bare projection model, `false` in a leader's model.
+  - `kwargs...`: Forwarded to [`set_return_constraints!`](@ref). The rows carrier arrives as `rd`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -300,7 +408,42 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Adds an Allocation Set's weight bounds, its budget of one and its short and gross budgets to a model that already names its own: the same inequalities [`set_allocation_set_bounds!`](@ref) writes, as anonymous constraints, the budgets over the model's own long and short parts when it holds them and over anonymous parts bound to `w` otherwise.
+Adds an Allocation Set's weight bounds, its budget of one, and its short and gross budgets to a model that already names its own.
+
+The rows are the inequalities that [`set_allocation_set_bounds!`](@ref) writes, registered under no name. The short and gross budgets read the model's long and short parts when the model holds them. Otherwise the function makes two anonymous vectors of parts and bounds them by `w`.
+
+# JuMP formulation
+
+## Variables
+
+  - `w`, `k`: read from the model.
+  - `lw`, `sw`: long and short parts. They are read from the model when it holds them. Otherwise, when the set has a short or a gross budget, they are two anonymous vectors of ``N`` variables, each bounded below by zero.
+
+## Constraints
+
+Every row is registered under no name.
+
+  - ``s_c (\\boldsymbol{w} - k \\boldsymbol{l}) \\geq 0``, when an entry of ``\\boldsymbol{l}`` is finite.
+  - ``s_c (\\boldsymbol{w} - k \\boldsymbol{u}) \\leq 0``, when an entry of ``\\boldsymbol{u}`` is finite.
+  - ``s_c \\left(\\sum_{i=1}^{N} w_i - k\\right) = 0``.
+  - ``s_c (\\boldsymbol{w} - \\boldsymbol{lw}) \\leq 0`` and ``s_c (\\boldsymbol{w} + \\boldsymbol{sw}) \\geq 0``, when the function makes the parts.
+  - The rows of [`anonymous_budget_rows!`](@ref) on ``\\sum_i sw_i`` for the short budget, and on ``\\sum_i (lw_i + sw_i)`` for the gross budget.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:k_budget])
+  - $(math_dict[:w_port])
+  - $(math_dict[:N])
+  - ``\\boldsymbol{l}``, ``\\boldsymbol{u}``: Lower and upper weight bounds of the set, resolved.
+  - ``\\boldsymbol{lw}``, ``\\boldsymbol{sw}``: Long and short parts of ``\\boldsymbol{w}``, each ``N \\times 1`` and non-negative.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `wb`: The set's resolved [`WeightBounds`](@ref).
+  - `sbgt`: The short budget, a number, a [`BudgetRange`](@ref), or `nothing`.
+  - `gbgt`: The gross budget, a number, a [`BudgetRange`](@ref), or `nothing`.
 
 # Validation
 
@@ -347,7 +490,40 @@ end
     anonymous_budget_rows!(model::JuMP.Model, expr, bgt::Number)
     anonymous_budget_rows!(model::JuMP.Model, expr, bgt::BudgetRange)
 
-One budget on an expression as anonymous rows: pinned to `k · bgt` by a number, bounded by a [`BudgetRange`](@ref), none for `nothing`.
+Adds one budget on an expression as rows under no name.
+
+A number fixes the expression at `k · bgt`. A [`BudgetRange`](@ref) bounds it on each side that is set. `nothing` adds no row.
+
+# JuMP formulation
+
+## Variables
+
+  - `k`: read from the model.
+
+## Constraints
+
+Every row is registered under no name.
+
+  - ``s_c (e - k b) = 0``, when the budget is a number.
+  - ``s_c (e - k b_l) \\geq 0`` and ``s_c (e - k b_u) \\leq 0``, when the budget is a range, each row only when its bound is set.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:k_budget])
+  - ``e``: The expression the budget bounds.
+  - ``b``: The budget, when it is a number.
+  - ``b_l``, ``b_u``: Lower and upper bounds of the range.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `expr`: The expression the budget bounds.
+  - `bgt`: A number, a [`BudgetRange`](@ref), or `nothing`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -377,7 +553,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The first index `i` at which the Model State entry `name` is not registered, so a builder keyed by an index can add its term beside a head's own.
+Returns the first index `i`, counted from one, at which the Model State holds no entry `name`.
+
+A builder keyed by an index uses it to add the set's term next to the head's own terms, which hold the indices from one up.
+
+# Returns
+
+  - `i::Int`: The first free index.
 
 # Related
 
@@ -394,7 +576,22 @@ end
 """
     set_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds, sbgt = nothing, gbgt = nothing)
 
-Adds an Allocation Set's weight bounds, its budget of one and its short and gross budgets to the model: the bounds through [`set_weight_constraints!`](@ref) with no net budget, so a negative lower bound builds the long-short decomposition without pinning its long side — under [`JuMPOptimiser`](@ref) a net budget with no short budget pins the long side to it, which forbids every short, and an Allocation Set admits a long-short book — the short budget on its short side and the gross budget on its leverage through the same builder, and then `Σw = k` through [`set_budget_constraints!`](@ref).
+Adds an Allocation Set's weight bounds, its budget of one, and its short and gross budgets to the bare projection model.
+
+[`set_weight_constraints!`](@ref) writes the bounds, the short budget and the gross budget, with no net budget. A negative lower bound then builds the long and short parts of `w` and leaves the long part free. Under [`JuMPOptimiser`](@ref), a net budget with no short budget fixes the long part at the net budget, which forbids every short position. An Allocation Set lets the book hold short positions, so the function passes no net budget there. It adds `Σw = k` after that, through [`set_budget_constraints!`](@ref).
+
+# Algorithm
+
+ 1. Check the bounds against the budget with [`assert_feasible_bounds`](@ref).
+ 2. Add the bounds, the short budget and the gross budget with [`set_weight_constraints!`](@ref), with no net budget.
+ 3. Add the budget `Σw = k` with [`set_budget_constraints!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `wb`: The set's resolved [`WeightBounds`](@ref).
+  - `sbgt`: The short budget, a number, a [`BudgetRange`](@ref), or `nothing`.
+  - `gbgt`: The gross budget, a number, a [`BudgetRange`](@ref), or `nothing`.
 
 # Validation
 
@@ -420,9 +617,71 @@ end
     set_projection_objective!(model::JuMP.Model, proj::TsallisProjection, q::AbstractVector)
     set_projection_objective!(model::JuMP.Model, proj::LogBarrierProjection, q::AbstractVector)
 
-Sets the projection programme's objective in the geometry's divergence from the raw step `q`: the Euclidean distance, or half its square when a penalty joins it ([`set_distance_cone!`](@ref)), the relative entropy ``\\sum_i w_i \\log (w_i / q_i)`` through a relative-entropy cone over the positive entries of `q` with the zero entries pinned at zero, the Gram norm ``\\lVert G (\\boldsymbol{w} - \\boldsymbol{q}) \\rVert`` with ``G^\\intercal G = A``, or half its square under a penalty, through the same cones, the Tsallis divergence ``-\\sum_i w_i^\\alpha / \\alpha + \\sum_i q_i^{\\alpha - 1} w_i`` through one power cone per positive entry, and the Itakura–Saito divergence ``-\\sum_i \\log w_i + \\sum_i w_i / q_i`` through one exponential cone per positive entry; under both barriers a zero entry of `q` is pinned at zero, as under the entropic arm.
+Sets the objective of the projection programme to the geometry's divergence from the raw step `q`, plus the Objective Penalty.
 
-The Euclidean and Gram arms minimise the norm when the objective is the divergence alone and half its square when a penalty joins it: the two have the same minimiser on their own and the norm's is the sharper for a solver, but a penalty added to the norm cannot move the minimiser off `q` until its gradient exceeds one, whereas added to the squared norm it is the proximal step the theory names. Both cones keep the programme conic on every solver. The two barrier arms drop the terms constant in `w`, so their objective value is the divergence up to a constant, with the same minimiser. Every arm hands its divergence to [`set_divergence_objective!`](@ref), which folds in the set's penalties.
+Each arm writes its divergence ``f`` as a conic model and hands it to [`set_divergence_objective!`](@ref), which adds the penalty and sets the objective.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+f_{\\mathrm{E}}(\\boldsymbol{w}) &= \\lVert \\boldsymbol{w} - \\boldsymbol{q} \\rVert_2\\,, \\\\
+f_{\\mathrm{E}}^{\\pi}(\\boldsymbol{w}) &= \\frac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{q} \\rVert_2^2\\,, \\\\
+f_{\\mathrm{G}}(\\boldsymbol{w}) &= \\lVert \\mathbf{G} (\\boldsymbol{w} - \\boldsymbol{q}) \\rVert_2\\,, \\\\
+f_{\\mathrm{G}}^{\\pi}(\\boldsymbol{w}) &= \\frac{1}{2} \\lVert \\mathbf{G} (\\boldsymbol{w} - \\boldsymbol{q}) \\rVert_2^2\\,, \\\\
+f_{\\mathrm{KL}}(\\boldsymbol{w}) &= \\sum_{i \\in P} w_i \\log \\frac{w_i}{q_i}\\,, \\\\
+f_{\\alpha}(\\boldsymbol{w}) &= \\frac{1}{1 - \\alpha} \\sum_{i \\in P} \\left( q_i^{\\alpha - 1} w_i - \\frac{w_i^{\\alpha}}{\\alpha} \\right)\\,, \\\\
+f_{\\mathrm{IS}}(\\boldsymbol{w}) &= \\sum_{i \\in P} \\left( \\frac{w_i}{q_i} - \\log w_i \\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:q_raw])
+  - ``\\pi``: Objective Penalty, the sum of the set's penalties and of the other terms added to the objective before it.
+  - ``f_{\\mathrm{E}}``, ``f_{\\mathrm{E}}^{\\pi}``: Divergence of [`EuclideanProjection`](@ref), without and with an Objective Penalty.
+  - ``f_{\\mathrm{G}}``, ``f_{\\mathrm{G}}^{\\pi}``: Divergence of [`GramProjection`](@ref), without and with an Objective Penalty.
+  - ``\\mathbf{G}``: Upper Cholesky factor of the geometry's Gram matrix ``\\mathbf{A}``, so ``\\mathbf{G}^\\intercal \\mathbf{G} = \\mathbf{A}``.
+  - ``f_{\\mathrm{KL}}``: Relative entropy, the divergence of [`EntropicProjection`](@ref).
+  - ``f_{\\alpha}``: Tsallis divergence, the divergence of [`TsallisProjection`](@ref).
+  - ``\\alpha``: Power of the Tsallis potential, in ``(0, 1)``.
+  - ``f_{\\mathrm{IS}}``: Itakura–Saito divergence, the divergence of [`LogBarrierProjection`](@ref).
+  - ``P = \\{i : q_i > 0\\}``: Positive entries of the raw step. Under the entropic, Tsallis and log-barrier geometries every ``w_i`` with ``i \\notin P`` is zero.
+  - $(math_dict[:Psi_pot])
+  - $(math_dict[:D_Psi_breg])
+
+Each ``f`` differs from the Bregman divergence ``D_\\Psi(\\boldsymbol{w}, \\boldsymbol{q})`` of its geometry's potential by a term that is constant in ``\\boldsymbol{w}`` on the budget ``\\sum_i w_i = 1``, so each has the minimiser of ``D_\\Psi`` and a penalty added to it weighs against ``D_\\Psi`` itself. ``f_{\\mathrm{E}}^{\\pi}`` and ``f_{\\mathrm{G}}^{\\pi}`` are these Bregman divergences, of ``\\tfrac{1}{2} \\lVert \\boldsymbol{w} \\rVert_2^2`` and ``\\tfrac{1}{2} \\boldsymbol{w}^\\intercal \\mathbf{A} \\boldsymbol{w}``. The norm ``f_{\\mathrm{E}}`` has the same minimiser as ``f_{\\mathrm{E}}^{\\pi}`` when no penalty is present, and ``f_{\\mathrm{G}}`` has the same minimiser as ``f_{\\mathrm{G}}^{\\pi}``. A penalty ``\\pi`` added to the norm does not move the minimiser off a feasible ``\\boldsymbol{q}`` while the dual norm of ``\\nabla \\pi(\\boldsymbol{q})`` is at most one, because the subdifferential of a norm at zero is its dual unit ball. Added to the squared norm, it gives the proximal step.
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: read from the model.
+  - `t_proj`: created. It is a scalar under the Euclidean, Gram and entropic arms, and a vector with one entry for each index in ``P`` under the Tsallis and log-barrier arms.
+
+## Constraints
+
+  - Euclidean and Gram arms: the row of [`set_distance_cone!`](@ref) on ``\\boldsymbol{x} = s_c (\\boldsymbol{w} - \\boldsymbol{q})`` or ``\\boldsymbol{x} = s_c \\mathbf{G} (\\boldsymbol{w} - \\boldsymbol{q})``.
+  - Entropic arm, `proj_zero`: ``s_c w_i = 0`` for each ``i \\notin P``, when such an ``i`` exists.
+  - Entropic arm, `proj_rec`: ``s_c t \\geq \\sum_{i \\in P} s_c w_i \\log (w_i / q_i)``, the relative entropy cone over ``(s_c t, s_c \\boldsymbol{q}_P, s_c \\boldsymbol{w}_P)``.
+  - Tsallis arm, under no name: ``t_j \\leq w_j^{\\alpha}`` for each ``j \\in P``, the power cone of power ``\\alpha`` over ``(s_c w_j, s_c, s_c t_j)``.
+  - Log-barrier arm, under no name: ``t_j \\leq \\log w_j`` for each ``j \\in P``, the exponential cone over ``(s_c t_j, s_c, s_c w_j)``.
+  - Tsallis and log-barrier arms: the rows of [`barrier_objective_entries`](@ref), which fix ``w_i = 0`` for each ``i \\notin P``.
+
+The divergence each arm hands to [`set_divergence_objective!`](@ref) is ``t`` under the Euclidean, Gram and entropic arms, ``\\frac{1}{1 - \\alpha} \\left( \\sum_{j \\in P} q_j^{\\alpha - 1} w_j - \\frac{1}{\\alpha} \\sum_{j \\in P} t_j \\right)`` under the Tsallis arm, and ``\\sum_{j \\in P} w_j / q_j - \\sum_{j \\in P} t_j`` under the log-barrier arm.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - ``t``, ``t_j``: The entries of `t_proj`.
+  - ``\\boldsymbol{q}_P``, ``\\boldsymbol{w}_P``: The entries of ``\\boldsymbol{q}`` and ``\\boldsymbol{w}`` at the indices in ``P``.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `proj`: The Projection Geometry.
+  - `q`: The raw step.
 
 # Validation
 
@@ -491,9 +750,11 @@ function set_projection_objective!(model::JuMP.Model, proj::TsallisProjection,
     for (i, j) in enumerate(pos)
         JuMP.@constraint(model, [sc * w[j], sc, sc * t_proj[i]] in JuMP.MOI.PowerCone(a))
     end
+    # The bracket is `(1 − α)` times the divergence up to a constant. The division restores
+    # the divergence, so a penalty weighs against it as under every other geometry.
     set_divergence_objective!(model,
-                              LinearAlgebra.dot(q[pos] .^ (a - 1), w[pos]) -
-                              sum(t_proj) / a, so)
+                              (LinearAlgebra.dot(q[pos] .^ (a - 1), w[pos]) -
+                               sum(t_proj) / a) / (1 - a), so)
     return nothing
 end
 function set_projection_objective!(model::JuMP.Model, ::LogBarrierProjection,
@@ -512,7 +773,38 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The cone that bounds a projection's distance variable `t` by the scaled deviation `x`: the second-order cone `t ≥ ‖x‖` when the model holds no Objective Penalty, whose minimum is sharp and which the solver answers exactly; and the rotated second-order cone `2 t · 1 ≥ ‖x‖²`, so `t ≥ ½ ‖w − q‖²` after the scale, when a penalty was accumulated before the objective — the penalties, a custom objective term, a semidefinite phylogeny's `p · tr(W)` — because a penalty added to the norm cannot move the minimiser off `q` until its gradient exceeds one, whereas added to half the square it is the proximal step.
+Bounds a projection's distance variable `t` below by the norm of the scaled deviation `x`, or by half its square when the model holds an Objective Penalty.
+
+Without a penalty the function writes the second-order cone. Its minimum is sharp, and the solver finds it to a tight tolerance. With a penalty it writes the rotated second-order cone, because a penalty added to the norm does not move the minimiser off a feasible raw step while its gradient is small, and added to half the square it gives the proximal step. The penalty is present when the set's penalties, a custom objective term or the `p · tr(W)` term of a semidefinite phylogeny were added before the objective. [`set_projection_objective!`](@ref) states the two divergences.
+
+# JuMP formulation
+
+## Variables
+
+  - `t`: read. It is the caller's distance variable.
+
+## Constraints
+
+  - `proj_soc`: ``(s_c t, \\boldsymbol{x}) \\in \\mathcal{K}_{\\mathrm{SOC}}``, that is ``t \\geq \\lVert \\boldsymbol{x} \\rVert_2 / s_c``, when the model holds no Objective Penalty.
+  - `proj_rsoc`: ``(s_c t, s_c, \\boldsymbol{x}) \\in \\mathcal{K}_{\\mathrm{RSOC}}``, that is ``t \\geq \\lVert \\boldsymbol{x} \\rVert_2^2 / (2 s_c^2)``, when it holds one.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - ``\\boldsymbol{x}``: The scaled deviation, ``s_c (\\boldsymbol{w} - \\boldsymbol{q})`` or ``s_c \\mathbf{G} (\\boldsymbol{w} - \\boldsymbol{q})``, so the two rows give ``t \\geq \\lVert \\boldsymbol{w} - \\boldsymbol{q} \\rVert_2`` and ``t \\geq \\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{q} \\rVert_2^2`` in the Euclidean geometry.
+  - ``\\mathcal{K}_{\\mathrm{SOC}} = \\{(u, \\boldsymbol{v}) : u \\geq \\lVert \\boldsymbol{v} \\rVert_2\\}``: Second-order cone.
+  - ``\\mathcal{K}_{\\mathrm{RSOC}} = \\{(u, v, \\boldsymbol{z}) : 2 u v \\geq \\lVert \\boldsymbol{z} \\rVert_2^2,\\, u \\geq 0,\\, v \\geq 0\\}``: Rotated second-order cone.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `t`: The distance variable.
+  - `x`: The scaled deviation, a vector of affine expressions.
+  - `sc`: The constraint scale.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -530,7 +822,35 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Sets the projection programme's objective to the geometry's divergence `div` plus the Objective Penalty the set's penalties and its semidefinite phylogeny accumulated — the door every JuMP head's objective takes through [`add_penalty_to_objective!`](@ref) — scaled by `so`, minimised. With no penalty the objective is the divergence alone, the paper's projection.
+Sets the projection programme's objective to the minimum of the geometry's divergence `div` plus the Objective Penalty, times the objective scale.
+
+The penalty holds the set's penalties, its custom objective terms and the `p · tr(W)` term of its semidefinite phylogeny. It enters through [`add_penalty_to_objective!`](@ref), which every JuMP head's objective also uses. With no penalty the objective is the divergence alone, which is the projection that the papers of the rules state.
+
+# JuMP formulation
+
+## Expressions
+
+  - `obj_expr`: ``d + \\pi``. The function registers ``d`` first and then adds the model's `op` when it holds one.
+
+## Objective
+
+  - `Min`: ``s_o`` times `obj_expr`.
+
+Where:
+
+  - ``d``: The divergence `div` of the geometry.
+  - ``\\pi``: The Objective Penalty `op`, zero when the model holds none.
+  - $(math_dict[:so_scale])
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `div`: The divergence, an affine expression or a variable.
+  - `so`: The objective scale.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -547,7 +867,38 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The entries a barrier objective is written over: refuses a raw step with a negative entry or none positive, pins every zero entry of `q` at zero, and answers the positive indices with the model's `w` and its two scales.
+Prepares the entries that a barrier objective is written over.
+
+It refuses a raw step with a negative entry or with no positive entry. It fixes the weight of every zero entry of `q` at zero. It returns the positive indices, the model's `w` and the two scales.
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: read from the model.
+
+## Constraints
+
+  - Under no name: ``s_c w_i = 0`` for each ``i`` with ``q_i = 0``.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:q_raw])
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `q`: The raw step.
+
+# Validation
+
+  - `all(>= 0, q)`. A `DomainError` is thrown otherwise.
+  - `sum(q) > 0`. A `DomainError` is thrown otherwise.
+
+# Returns
+
+  - `(pos, w, sc, so)::Tuple`: The indices of the positive entries of `q`, the model's `w`, the constraint scale and the objective scale.
 
 # Related
 
@@ -576,7 +927,13 @@ end
     projection_solver(proj::GramProjection, set::BoundedAllocationSet)
     projection_solver(proj::AbstractProjectionGeometry, set::BoundedAllocationSet)
 
-The solver a projection programme runs on: the geometry's own when it carries one, the set's otherwise. A scalar-root geometry on the bounded set has no programme to run and is refused by name; [`project`](@ref) never reaches it.
+Returns the solver a projection programme runs on.
+
+A [`GramProjection`](@ref) carries its own solver, and the programme uses it on every set. Every other geometry uses the programme set's solver. On a [`BoundedAllocationSet`](@ref) every geometry other than the Gram one is a scalar root with no programme, so the function throws an `ArgumentError` that names the geometry. [`project`](@ref) does not call it in that case.
+
+# Returns
+
+  - `slv`: The solver, or a vector of solvers.
 
 # Related
 
@@ -603,7 +960,13 @@ end
     allocation_set_ready(set::AbstractAllocationSet, X)
     allocation_set_ready(set::ProgrammeAllocationSet, X)
 
-Whether a set's constraints can be formed on the rows `X` the step holds: `nothing` when they can, and the reason for a Held Step when they cannot — a programme set that fits its prior on the rows, while the head holds fewer than two, because a covariance of one observation does not exist.
+Tells whether the set's constraints can be built on the rows `X` of the step.
+
+A programme set that fits its prior on the rows cannot be built while the head holds fewer than two rows, because a covariance of one observation does not exist. Every other set can always be built.
+
+# Returns
+
+  - `reason`: `nothing` when the constraints can be built, and otherwise the reason for the Held Step as a `String`.
 
 # Related
 
@@ -623,11 +986,57 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The projection programme: a bare model with `w`, `k = 1`, the set's scales and the observation count of the step's rows, the set's constraints from [`set_allocation_set_constraints!`](@ref) with `w` as the turnover reference, the set's custom objective terms through [`add_custom_objective_term!`](@ref) with the geometry as the objective and the set as the owner, and the geometry's objective from [`set_projection_objective!`](@ref), solved on [`projection_solver`](@ref).
+Projects the raw step `q` onto the Allocation Set in the geometry's divergence, as a JuMP programme.
 
-A solved programme answers its weights. A failed one, or one whose constraints cannot be formed on the step's rows ([`allocation_set_ready`](@ref)), is the Held Step: the record goes to the current [`ProjectionStep`](@ref) through [`record_held_step!`](@ref), and the answer is a copy of `w`, the book the fund already holds.
+A solved programme returns its weights. A programme that does not solve, or whose constraints cannot be built on the step's rows ([`allocation_set_ready`](@ref)), is a Held Step. Then [`record_held_step!`](@ref) writes the record to the current [`ProjectionStep`](@ref), and the function returns a copy of `w`, the book the fund already holds.
 
-A set that reads the rows fits its prior on the step's rows carrier as a batch head does, and the programme runs on that result's Investable Mask exactly as a batch head runs ([`programme_investable_reduction`](@ref)): the set, the raw step, the reference and the carrier are viewed at the mask, the reduced programme is solved, and the answer is expanded with a zero at every asset the prior could not price. Under a time-varying panel a leg unlisted for part of the window is outside a plain prior's universe until the window clears the span, and the programme writes a zero there — the one place the recursion's allocation takes a zero it did not step to, and the same zero a batch head answers; the leg is re-admitted the step its prior prices it, and whether the raw step then gives it mass is the rule's geometry, as it is for a zero in the Start Allocation. A set that reads no rows fits no prior and runs over the full pinned universe.
+A set that reads the rows fits its prior on the step's rows carrier, as a batch head does. The programme then runs on the prior's Investable Mask, also as a batch head does. It solves over the assets the prior prices, and gives a zero weight to every other asset. Under a time-varying panel, an asset without a listing for part of the window is outside the universe of a plain prior until the window no longer holds that part. So the programme gives it a zero, which is the one zero in the recursion's allocation that the rule's step did not make. A batch head gives the same zero. The asset comes back at the first step at which the prior prices it, and the rule's geometry decides whether the raw step then gives it weight, as for a zero in the Start Allocation. A set that reads no rows fits no prior and solves over the full universe.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{w}^{+} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; D_\\Psi(\\boldsymbol{w}, \\boldsymbol{q}) + \\pi(\\boldsymbol{w})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}^{+}``: The projected allocation.
+  - $(math_dict[:W_aset]) Under an Investable Mask it also holds ``w_i = 0`` for every asset ``i`` outside the mask.
+  - $(math_dict[:D_Psi_breg])
+  - $(math_dict[:Psi_pot])
+  - $(math_dict[:q_raw])
+  - ``\\pi``: Objective Penalty of the set, zero when the set has no penalty.
+
+[`set_projection_objective!`](@ref) states the objective each geometry writes for ``D_\\Psi``.
+
+# Algorithm
+
+ 1. Read the rows `X` of the current [`ProjectionStep`](@ref).
+ 2. When [`allocation_set_ready`](@ref) gives a reason, record the Held Step with it and return a copy of `w`. Stop.
+ 3. Fit the set's prior `pr` on `X` with [`allocation_set_prior`](@ref), and read its Investable Mask `imsk`.
+ 4. Reduce `set`, `X` and `pr` to the mask with [`programme_investable_reduction`](@ref). View `q` and `w` at the mask, which gives `q` and `wr`.
+ 5. Make a bare model with the set's two scales and the row count of `X`, zero when there are no rows. Register `k = 1`, and the vector `w` of weight variables.
+ 6. Add the set's constraints with [`set_allocation_set_constraints!`](@ref), with `wr` as the reference.
+ 7. Add the set's custom objective terms with [`add_custom_objective_term!`](@ref), with the geometry as the objective and the set as the owner.
+ 8. Set the objective with [`set_projection_objective!`](@ref).
+ 9. Solve on [`projection_solver`](@ref). When the solve succeeds, return the solution with a zero at every asset outside the mask. Otherwise record the Held Step with the solver trials, and return a copy of `w`.
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: created, with the base name `w`, one variable for each asset in the mask. It is registered in the Model State under the key `w`.
+
+## Expressions
+
+  - `k`: the constant one.
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
 
 # Arguments
 
@@ -681,13 +1090,15 @@ end
     programme_investable_reduction(imsk::BitVector, set::AbstractAllocationSet, X::ReturnsResult, pr::AbstractPriorResult)
     programme_investable_reduction(imsk::BitVector, set::AbstractAllocationSet, X, pr)
 
-Reduces the set, the rows carrier and the set's prior to the prior's Investable Mask, so the projection programme runs on the assets the prior can price exactly as a batch head does ([`investable_reduction`](@ref)); the raw step and the Price-Adjusted Allocation take [`investable_weights_view`](@ref) at the same mask.
+Reduces the set, the rows carrier and the set's prior to the prior's Investable Mask.
 
-Three methods, and the branch is dispatch. The `nothing` method is the all-investable path, which is every step on a static panel and every step of a set that reads no rows, and returns its arguments untouched; the `BitVector` method takes the views at `findall(imsk)`; a mask beside no carrier or no prior is refused by name, because a mask is derived from a prior fitted on a carrier and the pair never arises. The set is viewed against the carrier's unreduced returns matrix, as a tracking estimator's view asks. The Price-Adjusted Allocation is sliced and not renormalised, as the batch reduction slices a turnover reference: a leg the prior cannot price leaves the reference, and the budget of one over the investable legs is what the programme re-allocates. No departure is announced, because the read-out's Investable Mask already states it at every step.
+The projection programme then runs on the assets the prior can price, as a batch head does with [`investable_reduction`](@ref). The caller views the raw step and the Price-Adjusted Allocation at the same mask with [`investable_weights_view`](@ref).
+
+Dispatch selects one of three methods. A `nothing` mask means that every asset is investable, which is true at every step on a static panel and at every step of a set that reads no rows. That method returns its arguments unchanged. The `BitVector` method takes the views at `findall(imsk)`. The third method refuses a mask with no carrier or no prior, because a mask comes from a prior fitted on a carrier, so this pair does not occur in the library. The set is viewed against the carrier's full returns matrix, because a view of a tracking estimator needs it. The Price-Adjusted Allocation is cut to the mask and is not renormalised, as the batch reduction cuts a turnover reference. So an asset the prior cannot price leaves the reference, and the programme allocates the budget of one over the investable assets. The function writes no warning for such an asset, because the Investable Mask of the read-out already shows it at every step.
 
 # Validation
 
-  - A mask beside no carrier or no prior. An `IsNothingError` is thrown.
+  - A mask with no carrier or no prior. An `IsNothingError` is thrown.
 
 # Returns
 
@@ -717,7 +1128,9 @@ end
     projection_scale(set::ProgrammeAllocationSet, f::Symbol)
     projection_scale(set::BoundedAllocationSet, f::Symbol)
 
-The constraint scale `:sc` or the objective scale `:so` a projection programme registers on its model: the programme set's own, and one on the bounded set, which carries none.
+Returns the constraint scale `:sc` or the objective scale `:so` that a projection programme registers on its model.
+
+A programme set gives its own field. A bounded set carries no scale, so it gives one.
 
 # Related
 
@@ -734,7 +1147,9 @@ end
     allocation_set_cobj(set::ProgrammeAllocationSet)
     allocation_set_cobj(set::BoundedAllocationSet)
 
-The custom objective terms a projection programme folds into its objective: the programme set's `cobj`, and none on the bounded set, which carries no objective term.
+Returns the custom objective terms that a projection programme adds to its objective.
+
+A programme set gives its `cobj`. A bounded set carries no objective term, so it gives `nothing`.
 
 # Related
 
@@ -755,11 +1170,13 @@ end
     project(proj::TsallisProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
     project(proj::LogBarrierProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
 
-The programme arms of the Constrained Update: every pair but the scalar roots on the bounded set is the bare-model programme of [`projection_programme`](@ref).
+Projects a raw step onto the Allocation Set by the programme of [`projection_programme`](@ref).
+
+These are the programme arms of the Constrained Update. They cover every pair of a geometry and a set except the scalar roots on the bounded set. Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref), [`clip_at_zero`](@ref) sets every negative entry of the answer to zero. The solver can give an entry slightly below zero, within its tolerance, and the next step must not read it.
 
 # Validation
 
-  - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref): `all(>= 0, lb)` over the resolved bounds. A `DomainError` is thrown otherwise. Under the same three geometries the programme's answer passes through [`clip_at_zero`](@ref), so a leg the solver closed to within its tolerance below zero is zero to the next step.
+  - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref): `all(>= 0, lb)` over the resolved bounds. A `DomainError` is thrown otherwise.
 
 # Related
 
@@ -798,7 +1215,9 @@ end
     blend_projection(proj::EuclideanProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
     blend_projection(proj::EuclideanProjection, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector)
 
-The second projection of an [`ExpertMixture`](@ref)'s blend onto the head's set: skipped by dispatch on a [`BoundedAllocationSet`](@ref), where a blend of bounded allocations is bounded and the projection would be the identity, and [`project`](@ref) on every other set, where it is the repair a turnover ceiling or a MIP kind needs.
+Projects the blend of an [`ExpertMixture`](@ref) onto the head's set a second time, when the set needs it.
+
+On a [`BoundedAllocationSet`](@ref) dispatch returns the blend unchanged. The bounds and the budget define a convex set, so a convex blend of allocations in it is in it too, and the projection is the identity. On every other set the function calls [`project`](@ref), which gives the repair that a turnover ceiling or a MIP kind needs.
 
 # Related
 

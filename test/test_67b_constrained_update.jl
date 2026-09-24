@@ -276,6 +276,29 @@ end
         @test optimise(capped, rd).w[2] == 0
     end
 
+    @testset "A penalty weighs against the Bregman divergence in every geometry (#1215)" begin
+        # At an interior minimiser of D_Ψ(w, q) + λ‖w‖ on the simplex,
+        # ∇Ψ(w) − ∇Ψ(q) + λ w / ‖w‖ is the same in every entry. The Tsallis arm wrote
+        # (1 − α) D_Ψ, which gave the penalty 1 / (1 − α) times its weight: at α = 1/2 the
+        # spread below was 0.046.
+        qp = [0.35, 0.25, 0.4]
+        A = [2.0 0.3 0.1; 0.3 1.0 0.2; 0.1 0.2 1.5]
+        cases = ((EuclideanProjection(), w -> w, 0.2, 1e-6),
+                 (EntropicProjection(), w -> log.(w), 0.2, 1e-6),
+                 (TsallisProjection(; alpha = 0.5), w -> w .^ -0.5 ./ -0.5, 0.2, 1e-6),
+                 (TsallisProjection(; alpha = 0.3), w -> w .^ -0.7 ./ -0.7, 0.1, 1e-6),
+                 (LogBarrierProjection(), w -> -1 ./ w, 0.2, 1e-5),
+                 (GramProjection(; slv = slv, A = A), w -> A * w, 0.2, 1e-6))
+        for (proj, grad, lam, tol) in cases
+            set = resolve(ProgrammeAllocationSet(; slv = slv,
+                                                 l2 = L2Regularisation(; val = lam)), 3)
+            wp = po.project(proj, set, qp, wh)
+            r = grad(wp) .- grad(qp) .+ lam .* wp ./ norm(wp)
+            @test maximum(r) - minimum(r) < tol
+            @test sum(wp) ≈ 1 atol = 1e-8
+        end
+    end
+
     @testset "The turnover ceiling, the covariance cone, the tracking error and the MIP kinds" begin
         # The ceiling is per asset, measured from the Price-Adjusted Allocation.
         tset = resolve(ProgrammeAllocationSet(; slv = slv,
