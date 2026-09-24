@@ -1133,6 +1133,10 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :B_loadings => "``\\mathbf{B}``: Loading matrix, of size ``N \\times N_{f}``.",#
                        :w_1_factor => "``\\boldsymbol{w}_1``: Factor weights of [`FactorRiskContribution`](@ref), one entry for each of the ``N_f`` factors. The asset weights are ``\\mathbf{B}_1 \\boldsymbol{w}_1``, with ``\\mathbf{B}_1`` the pseudoinverse of ``\\mathbf{B}^\\intercal``, plus an off-factor block when `flag = true`.",#
                        :lu_factor => "``\\boldsymbol{\\ell}_{f}``, ``\\boldsymbol{u}_{f}``: Factor weight bounds, the lower and the upper, one entry for each factor. [`factor_weight_bounds`](@ref) derives them from the asset weight bounds.",#
+                       # The regularisation penalties.
+                       :lambda_2_reg => "``\\lambda_2``: L2 penalty coefficient, the `val` field of an [`L2Regularisation`](@ref).",#
+                       :q_l2_power => "``q``: Power of the L2 norm that the formulation penalises. It is ``1`` under [`SOCRiskExpr`](@ref), and ``2`` under [`SquaredSOCRiskExpr`](@ref), [`QuadRiskExpr`](@ref) and [`RSOCRiskExpr`](@ref).",#
+                       :lambda_p_reg => "``\\lambda_p``: Lp penalty coefficient, the `val` field of an [`LpRegularisation`](@ref) in the `lp` field of [`JuMPOptimiser`](@ref).",#
                        :so_scale => "``s_o``: Objective scale. It multiplies the objective, so a positive value leaves the argument of the optimum unchanged.",#
                        :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
                        :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.",#
