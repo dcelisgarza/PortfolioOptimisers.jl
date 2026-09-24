@@ -1052,6 +1052,9 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :T_shrink_target => "``\\mathbf{T}``: Covariance shrinkage target, a positive definite matrix.",#
                        :Sigma_hat_ii => "``\\hat{\\mathbf{\\Sigma}}_{ii}``: ``i``-th diagonal entry of ``\\hat{\\mathbf{\\Sigma}}``.",#
                        :Sigma_hat_ij => "``\\hat{\\mathbf{\\Sigma}}_{ij}``: Estimated covariance between assets ``i`` and ``j``.",#
+                       :T_ij_shrink_target => "``T_{ij}``: Entry of ``\\mathbf{T}`` in row ``i`` and column ``j``.",#
+                       :vbar_avg_var => "``\\bar{v}``: Average variance, the mean of the diagonal of ``\\hat{\\mathbf{\\Sigma}}``.",#
+                       :I_identity => "``\\mathbf{I}``: Identity matrix.",#
                        # The covariance forecast evaluation. A forecast is formed at a step
                        # and judged on the returns that follow it.
                        :Sigma_hat_t => "``\\hat{\\mathbf{\\Sigma}}_t``: Covariance forecast formed at step ``t``.",#

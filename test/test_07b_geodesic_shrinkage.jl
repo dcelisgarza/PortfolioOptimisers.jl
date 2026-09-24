@@ -130,6 +130,11 @@ const REFX10 = Dict(:scaled =>
             @test isapprox(cond(got), cond(S3)^(1 - a); rtol = 1e-10)
             @test isapprox(eigvals(Symmetric(got)),
                            eigvals(Symmetric(S3)) .^ (1 - a) .* v^a; rtol = 1e-12)
+            # The geometric mean is below the arithmetic mean of linear shrinkage, so the
+            # trace falls at an intermediate intensity.
+            @test all(eigvals(Symmetric(got)) .<=
+                      (1 - a) .* eigvals(Symmetric(S3)) .+ a * v .+ 1e-12)
+            @test tr(got) < tr(S3)
             for (key, tgt) in TARGETS3
                 T = PO.shrinkage_target(tgt, S3)
                 got = PO.geodesic_point(tgt, S3, a)
@@ -167,6 +172,15 @@ const REFX10 = Dict(:scaled =>
         @test_throws DomainError PO.geodesic_point(ScaledIdentityTarget(), bad, 0.5)
         @test_throws DomainError PO.geodesic_point(DiagonalTarget(), [1.0 0.0; 0.0 0.0],
                                                    0.5)
+        # A zero variance makes the constant correlation target `NaN` off the diagonal. Its
+        # Cholesky factorisation reports success, so the finite check is what refuses it.
+        Sz = [1.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 2.0]
+        @test any(isnan, PO.shrinkage_target(ConstantCorrelationTarget(), Sz))
+        @test_throws DomainError PO.geodesic_point(ConstantCorrelationTarget(), Sz, 0.5)
+        Xz = hcat(Xs[:, 1:2], ones(4))
+        @test_throws DomainError cov(GeodesicShrinkageCovariance(; pdm = nothing,
+                                                                 tgt = ConstantCorrelationTarget(),
+                                                                 alpha = 0.5), Xz)
         @test_throws DimensionMismatch PO.geodesic_point(T3, [1.0 0.0; 0.0 1.0], 0.5)
     end
     @testset "element types and the correlation" begin
@@ -306,6 +320,22 @@ const REFX10 = Dict(:scaled =>
         r = F[1, 2] / (d[1] * d[2])
         @test isapprox(eigvals(Symmetric(F ./ (d * d'))),
                        sort([fill(1 - r, n - 1); 1 + (n - 1) * r]); rtol = 1e-12)
+        # A positive definite start meets both bounds of target C. A singular start fails
+        # the lower bound when the equally weighted portfolio has zero variance, although no
+        # pair is perfectly correlated, and fails the upper bound when every variance is
+        # equal and every correlation is one. Perfect correlation with unequal variances
+        # fails neither.
+        @test isposdef(C) && isposdef(F)
+        x2 = randn(StableRNG(5), 50, 2)
+        S0 = cov(hcat(x2, -sum(x2; dims = 2)))
+        @test all(<(0.99), abs.(cor(hcat(x2, -sum(x2; dims = 2)))[[2, 3, 6]]))
+        C0 = PO.shrinkage_target(CommonCovarianceTarget(), S0)
+        @test isapprox(C0[1, 2], -C0[1, 1] / 2; rtol = 1e-12)
+        singular(M) = minimum(eigvals(Symmetric(M))) <
+                      1e-12 * maximum(eigvals(Symmetric(M)))
+        @test singular(C0)
+        @test singular(PO.shrinkage_target(CommonCovarianceTarget(), [1.0 1.0; 1.0 1.0]))
+        @test isposdef(PO.shrinkage_target(CommonCovarianceTarget(), [1.0 2.0; 2.0 4.0]))
         # Target E, perfect positive correlation, has rank one, so no geodesic reaches it.
         E = sqrt.(diag(S)) * sqrt.(diag(S))'
         @test rank(E) == 1

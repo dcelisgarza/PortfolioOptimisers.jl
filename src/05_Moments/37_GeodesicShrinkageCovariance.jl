@@ -3,11 +3,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the rules that build a covariance shrinkage target from the matrix being shrunk.
 
-Each rule is a target of the taxonomy of Schäfer and Strimmer that is positive definite, so a geodesic reaches it. Their target with perfect positive correlation has rank one and is not a member. [`DiagonalTarget`](@ref) is a rule of the same kind, and it is a member of [`GeodesicShrinkageTarget`](@ref) instead, because it is also a [`RegimeAdjustedTarget`](@ref).
+Each rule builds a target from the table of Schäfer and Strimmer. The target is positive definite when the matrix being shrunk is, so a geodesic reaches it. The target of the table with perfect positive correlation has rank one, so no rule builds it. [`DiagonalTarget`](@ref) builds the diagonal target of the same table. It is a [`RegimeAdjustedTarget`](@ref), so it joins the rules through [`GeodesicShrinkageTarget`](@ref) and not through this type.
 
 # Interfaces
 
-In order to implement a new target rule, subtype `AbstractCovarianceShrinkageTarget` and implement the following method.
+To implement a new target rule, subtype `AbstractCovarianceShrinkageTarget` and implement the following method.
 
 ## `shrinkage_target`
 
@@ -70,7 +70,7 @@ Targets the identity matrix, which ignores the scale of the matrix being shrunk.
 Where:
 
   - $(math_dict[:T_shrink_target])
-  - ``\\mathbf{I}``: Identity matrix.
+  - $(math_dict[:I_identity])
 
 # Examples
 
@@ -95,24 +95,24 @@ $(DocStringExtensions.TYPEDEF)
 
 Targets the identity matrix scaled by the average variance, the target with condition number one.
 
-The target has the trace of the matrix being shrunk. It commutes with every matrix, so a geodesic towards it keeps the eigenvectors of the start and moves only the eigenvalues.
-
 # Mathematical definition
 
 ```math
 \\begin{align}
 \\mathbf{T} &= \\bar{v} \\, \\mathbf{I}\\,, \\\\
-\\bar{v} &= \\frac{\\operatorname{tr}(\\hat{\\mathbf{\\Sigma}})}{N}\\,.
+\\bar{v} &= \\frac{1}{N} \\sum_{i = 1}^{N} \\hat{\\mathbf{\\Sigma}}_{ii}\\,.
 \\end{align}
 ```
 
 Where:
 
   - $(math_dict[:T_shrink_target])
-  - ``\\bar{v}``: Average variance.
-  - ``\\mathbf{I}``: Identity matrix.
-  - $(math_dict[:Sigma_hat])
+  - $(math_dict[:vbar_avg_var])
+  - $(math_dict[:I_identity])
+  - $(math_dict[:Sigma_hat_ii])
   - $(math_dict[:N])
+
+The target has the trace of ``\\hat{\\mathbf{\\Sigma}}``. It commutes with every matrix, so a geodesic towards it keeps the eigenvectors of ``\\hat{\\mathbf{\\Sigma}}`` and changes only the eigenvalues.
 
 # Examples
 
@@ -141,21 +141,22 @@ Targets a matrix with the average variance on the diagonal and the average covar
 
 ```math
 \\begin{align}
-T_{i,\\,j} &= \\begin{cases} \\bar{v} & i = j\\,, \\\\ \\bar{c} & i \\neq j\\,, \\end{cases} \\\\
-\\bar{v} &= \\frac{1}{N} \\sum_{i = 1}^{N} \\hat{\\Sigma}_{i,\\,i}\\,, \\\\
-\\bar{c} &= \\frac{1}{N (N - 1)} \\sum_{i \\neq j} \\hat{\\Sigma}_{i,\\,j}\\,.
+T_{ij} &= \\begin{cases} \\bar{v} & i = j\\,, \\\\ \\bar{c} & i \\neq j\\,, \\end{cases} \\\\
+\\bar{v} &= \\frac{1}{N} \\sum_{i = 1}^{N} \\hat{\\mathbf{\\Sigma}}_{ii}\\,, \\\\
+\\bar{c} &= \\frac{1}{N (N - 1)} \\sum_{i \\neq j} \\hat{\\mathbf{\\Sigma}}_{ij}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``T_{i,\\,j}``: Entry of the shrinkage target.
-  - ``\\bar{v}``: Average variance.
+  - $(math_dict[:T_ij_shrink_target])
+  - $(math_dict[:vbar_avg_var])
   - ``\\bar{c}``: Average covariance of the distinct pairs.
-  - ``\\hat{\\Sigma}_{i,\\,j}``: Entry of the matrix being shrunk.
+  - $(math_dict[:Sigma_hat_ii])
+  - $(math_dict[:Sigma_hat_ij])
   - $(math_dict[:N])
 
-The target is positive definite when ``-\\bar{v} / (N - 1) < \\bar{c} < \\bar{v}``, which holds for the covariance of assets that are not all perfectly correlated.
+The target has the eigenvalue ``\\bar{v} - \\bar{c}`` with multiplicity ``N - 1`` and the eigenvalue ``\\bar{v} + (N - 1) \\bar{c}`` once. So it is positive definite when ``-\\bar{v} / (N - 1) < \\bar{c} < \\bar{v}``. A positive definite ``\\hat{\\mathbf{\\Sigma}}`` meets both bounds. A singular ``\\hat{\\mathbf{\\Sigma}}`` fails the lower bound when the portfolio that holds every asset equally has zero variance. It fails the upper bound when every variance is equal and every pair has correlation one.
 
 # Examples
 
@@ -184,19 +185,20 @@ Targets a matrix that keeps the variances and gives every pair of assets the ave
 
 ```math
 \\begin{align}
-T_{i,\\,j} &= \\begin{cases} \\hat{\\Sigma}_{i,\\,i} & i = j\\,, \\\\ \\bar{r} \\sqrt{\\hat{\\Sigma}_{i,\\,i} \\, \\hat{\\Sigma}_{j,\\,j}} & i \\neq j\\,, \\end{cases} \\\\
-\\bar{r} &= \\frac{1}{N (N - 1)} \\sum_{i \\neq j} \\frac{\\hat{\\Sigma}_{i,\\,j}}{\\sqrt{\\hat{\\Sigma}_{i,\\,i} \\, \\hat{\\Sigma}_{j,\\,j}}}\\,.
+T_{ij} &= \\begin{cases} \\hat{\\mathbf{\\Sigma}}_{ii} & i = j\\,, \\\\ \\bar{r} \\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii} \\, \\hat{\\mathbf{\\Sigma}}_{jj}} & i \\neq j\\,, \\end{cases} \\\\
+\\bar{r} &= \\frac{1}{N (N - 1)} \\sum_{i \\neq j} \\frac{\\hat{\\mathbf{\\Sigma}}_{ij}}{\\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii} \\, \\hat{\\mathbf{\\Sigma}}_{jj}}}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``T_{i,\\,j}``: Entry of the shrinkage target.
+  - $(math_dict[:T_ij_shrink_target])
   - ``\\bar{r}``: Average correlation of the distinct pairs.
-  - ``\\hat{\\Sigma}_{i,\\,j}``: Entry of the matrix being shrunk.
+  - $(math_dict[:Sigma_hat_ii])
+  - $(math_dict[:Sigma_hat_ij])
   - $(math_dict[:N])
 
-The target is positive definite when every variance is positive and ``-1 / (N - 1) < \\bar{r} < 1``.
+The correlation matrix of the target has the eigenvalue ``1 - \\bar{r}`` with multiplicity ``N - 1`` and the eigenvalue ``1 + (N - 1) \\bar{r}`` once. So the target is positive definite when every variance is positive and ``-1 / (N - 1) < \\bar{r} < 1``. A positive definite ``\\hat{\\mathbf{\\Sigma}}`` meets both conditions.
 
 # Examples
 
@@ -222,7 +224,7 @@ struct ConstantCorrelationTarget <: AbstractCovarianceShrinkageTarget end
 
 Groups the targets a [`GeodesicShrinkageCovariance`](@ref) accepts: the rules that build the target from the matrix being shrunk, and a fixed positive definite matrix.
 
-The members share no supertype. [`DiagonalTarget`](@ref) is also a [`RegimeAdjustedTarget`](@ref), and a matrix is data, so the field is bounded by this union and [`shrinkage_target`](@ref) dispatches on its members.
+The members share no supertype. [`DiagonalTarget`](@ref) is also a [`RegimeAdjustedTarget`](@ref), and a matrix is data. So this union bounds the `tgt` field, and [`shrinkage_target`](@ref) dispatches on its members.
 
 # Related
 
@@ -237,7 +239,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Builds the target matrix of a covariance shrinkage from the matrix being shrunk.
 
-Each rule states its target under `# Mathematical definition`. A fixed matrix is returned as it is, after a check that its size is the size of `sigma`.
+Each rule states its target under `# Mathematical definition`. The function returns a fixed matrix as it is, after it checks that the matrix has the size of `sigma`.
 
 # Arguments
 
@@ -252,7 +254,7 @@ Each rule states its target under `# Mathematical definition`. A fixed matrix is
 
 # Validation
 
-  - A matrix `tgt` has the size of `sigma`. A `DimensionMismatch` is thrown otherwise.
+  - A matrix `tgt` has the size of `sigma`. The function throws a `DimensionMismatch` otherwise.
 
 # Returns
 
@@ -300,7 +302,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Checks a covariance shrinkage target at construction.
 
-A target rule needs no check, because it is built from the matrix it shrinks. A fixed matrix must be a valid target for every matrix it meets, so it is checked once here.
+A target rule needs no check, because [`shrinkage_target`](@ref) builds it from the matrix it shrinks. A fixed matrix must be a valid target for every matrix it meets, so this function checks it once, when the estimator is built.
 
 # Arguments
 
@@ -308,8 +310,8 @@ A target rule needs no check, because it is built from the matrix it shrinks. A 
 
 # Validation
 
-  - A matrix `tgt` is square. A `DimensionMismatch` is thrown otherwise.
-  - A matrix `tgt` is finite, symmetric within the default tolerance of `isapprox`, and positive definite. A `DomainError` is thrown otherwise.
+  - A matrix `tgt` is square. The function throws a `DimensionMismatch` otherwise.
+  - A matrix `tgt` is finite, symmetric within the default tolerance of `isapprox`, and positive definite. The function throws a `DomainError` otherwise.
 
 # Returns
 
@@ -340,9 +342,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Shrinks a covariance matrix towards a target along the geodesic of the positive definite matrices.
 
-Linear shrinkage averages the matrix and its target entry by entry. This estimator follows the shortest path between them under the affine-invariant metric instead, so the estimate is positive definite at every intensity when both ends are positive definite. Towards a target that commutes with the start the eigenvalues are interpolated geometrically: towards [`ScaledIdentityTarget`](@ref), each eigenvalue ``\\lambda_i`` moves to ``\\lambda_i^{1 - \\alpha} \\bar{v}^{\\alpha}``, where linear shrinkage gives ``(1 - \\alpha) \\lambda_i + \\alpha \\bar{v}``. The trace is not preserved at an intermediate intensity.
+Linear shrinkage averages the matrix and its target entry by entry. This estimator follows the shortest path between them under the affine-invariant metric instead. So the estimate is positive definite at every intensity when both ends are positive definite.
 
-A zero eigenvalue of the start stays zero at every intensity below one, so the shrinkage does not repair a singular matrix. That is what `pdm` is for: it repairs the matrix `ce` computes before the shrinkage runs. `cor` returns the correlation matrix of the shrunk covariance.
+A zero eigenvalue of the start stays zero at every intensity below one, so the shrinkage does not repair a singular matrix. The `pdm` field repairs the matrix that `ce` computes, before the shrinkage runs. `cor` returns the correlation matrix of the shrunk covariance.
 
 # Mathematical definition
 
@@ -368,13 +370,15 @@ Where:
   - $(math_dict[:Sigma_hat])
   - $(math_dict[:T_shrink_target])
   - ``\\alpha \\in [0, 1]``: Shrinkage intensity, the fraction of the geodesic distance from ``\\hat{\\mathbf{\\Sigma}}`` to ``\\mathbf{T}`` that the estimate travels.
-  - ``\\bar{v} = \\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}) / N``: Average variance.
+  - $(math_dict[:vbar_avg_var])
+  - $(math_dict[:I_identity])
   - ``\\mathbf{V}``, ``\\lambda_i``: Eigenvectors and eigenvalues of ``\\hat{\\mathbf{\\Sigma}}``.
   - ``\\mathbf{D} = \\operatorname{Diag}(\\hat{\\mathbf{\\Sigma}})``: Diagonal matrix of the variances.
   - ``\\mathbf{R} = \\mathbf{D}^{-1/2} \\hat{\\mathbf{\\Sigma}} \\mathbf{D}^{-1/2}``: Correlation matrix of ``\\hat{\\mathbf{\\Sigma}}``.
-  - $(math_dict[:N])
 
-The geodesic distance from ``\\hat{\\mathbf{\\Sigma}}`` to ``\\hat{\\mathbf{\\Sigma}}_{\\alpha}`` is ``\\alpha`` times the distance from ``\\hat{\\mathbf{\\Sigma}}`` to ``\\mathbf{T}``. Towards ``\\bar{v} \\mathbf{I}``, the condition number of ``\\hat{\\mathbf{\\Sigma}}_{\\alpha}`` is ``\\kappa(\\hat{\\mathbf{\\Sigma}})^{1 - \\alpha}``.
+The geodesic distance from ``\\hat{\\mathbf{\\Sigma}}`` to ``\\hat{\\mathbf{\\Sigma}}_{\\alpha}`` is ``\\alpha`` times the distance from ``\\hat{\\mathbf{\\Sigma}}`` to ``\\mathbf{T}``.
+
+Towards ``\\bar{v} \\mathbf{I}``, each eigenvalue moves to the weighted geometric mean ``\\lambda_i^{1 - \\alpha} \\bar{v}^{\\alpha}``. Linear shrinkage moves it to the weighted arithmetic mean ``(1 - \\alpha) \\lambda_i + \\alpha \\bar{v}``, which is never smaller. So at an intermediate intensity the trace of ``\\hat{\\mathbf{\\Sigma}}_{\\alpha}`` is below the trace of ``\\hat{\\mathbf{\\Sigma}}``, unless every eigenvalue equals ``\\bar{v}``. The condition number of ``\\hat{\\mathbf{\\Sigma}}_{\\alpha}`` is the condition number of ``\\hat{\\mathbf{\\Sigma}}`` to the power ``1 - \\alpha``.
 
 # Fields
 
@@ -407,7 +411,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 `GeodesicShrinkageCovariance` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
   - `ce` recurses through [`port_opt_view`](@ref) with every argument.
-  - A matrix `tgt` is sliced on both axes, because it is an asset-by-asset matrix. A target rule passes through unchanged, because it is built from the viewed matrix.
+  - The view slices a matrix `tgt` on both axes, because it is an asset-by-asset matrix. It keeps a target rule unchanged, because [`shrinkage_target`](@ref) builds the target of a rule from the viewed matrix.
 
 # Examples
 
@@ -484,7 +488,7 @@ end
 
 Restricts a [`GeodesicShrinkageCovariance`](@ref) to the assets `i`.
 
-A fixed target is an asset-by-asset matrix, so it is sliced on both axes, as a covariance matrix is. A target rule is built from the matrix it shrinks, so it needs no slice.
+A fixed target is an asset-by-asset matrix, so this method slices it on both axes, as it slices a covariance matrix. [`shrinkage_target`](@ref) builds the target of a rule from the matrix it shrinks, so a rule needs no slice.
 
 # Algorithm
 
@@ -517,9 +521,29 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Raises the eigenvalues of a positive semidefinite matrix to a power, reading an eigenvalue inside the round-off tolerance as zero.
+Raises the eigenvalues of a positive semidefinite matrix to a power, and reads an eigenvalue inside the round-off tolerance as zero.
 
-An eigendecomposition of a singular positive semidefinite matrix returns its zero eigenvalues as small numbers of either sign. The tolerance is the one a symmetric eigensolver resolves: the length of `vals` times the machine epsilon of its element type times its largest magnitude. A power below one magnifies such a number, `(1e-17)^0.5` is about `3e-9`, so an eigenvalue inside the tolerance is set to zero before the power, and a zero eigenvalue of the start stays zero. An eigenvalue below the negative of the tolerance belongs to an indefinite matrix, which no geodesic reaches.
+An eigendecomposition of a singular positive semidefinite matrix returns its zero eigenvalues as small numbers of either sign. A power below one makes such a number larger. For example, `(1e-17)^0.5` is about `3e-9`. The threshold keeps a zero eigenvalue of the start at zero.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\lambda_i^{(p)} &= \\begin{cases} \\lambda_i^{p} & \\lambda_i > \\tau\\,, \\\\ 0 & \\lambda_i \\leq \\tau\\,, \\end{cases} \\\\
+\\tau &= N \\, \\epsilon \\, \\max_{j} \\lvert \\lambda_j \\rvert\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\lambda_i^{(p)}``: ``i``-th eigenvalue after the power.
+  - $(math_dict[:lambda_i_eig])
+  - ``p``: The power, positive.
+  - ``\\tau``: Round-off tolerance of a symmetric eigensolver.
+  - ``\\epsilon``: Machine epsilon of the element type of the eigenvalues.
+  - $(math_dict[:N])
+
+An eigenvalue below ``-\\tau`` belongs to an indefinite matrix, which no geodesic reaches.
 
 # Arguments
 
@@ -528,7 +552,7 @@ An eigendecomposition of a singular positive semidefinite matrix returns its zer
 
 # Validation
 
-  - `minimum(vals)` is not below the negative of the tolerance. A `DomainError` is thrown otherwise.
+  - `minimum(vals)` is not below ``-\\tau``. The function throws a `DomainError` otherwise.
 
 # Returns
 
@@ -565,7 +589,7 @@ For every other target:
 
  1. Build the target matrix `tgt_mat` with [`shrinkage_target`](@ref).
  2. At `alpha = 1`, return a copy of `tgt_mat`.
- 3. Factor `tgt_mat` by Cholesky into `chol`, with lower factor `L`. Refuse a factorisation that fails. A `Diagonal` target factors into `Diagonal` factors, so its whitening only rescales the rows and columns of `sigma`.
+ 3. Factor `tgt_mat` by Cholesky into `chol`, with lower factor `L`. Refuse a `tgt_mat` that is not finite, or whose factorisation fails. A `Diagonal` target factors into `Diagonal` factors, so its whitening only rescales the rows and columns of `sigma`.
  4. Eigendecompose the whitened matrix `L \\ sigma / L'`, giving `vals` and `vecs`.
  5. Take the basis `basis = L * vecs`, raise `vals` to `1 - alpha` with [`geodesic_power`](@ref), rebuild the matrix from `basis` and the new eigenvalues, and return its symmetric part.
 
@@ -577,7 +601,8 @@ For every other target:
 
 # Validation
 
-  - The target matrix is positive definite. A `DomainError` is thrown otherwise.
+  - Every check of [`shrinkage_target`](@ref) applies.
+  - The target matrix is finite and positive definite. The function throws a `DomainError` otherwise. A zero variance in `sigma` makes the target of [`ConstantCorrelationTarget`](@ref) not finite, and the target of [`DiagonalTarget`](@ref) singular.
   - `sigma` is positive semidefinite, as [`geodesic_power`](@ref) states.
 
 # Returns
@@ -606,9 +631,9 @@ function geodesic_point(tgt::GeodesicShrinkageTarget, sigma::MatNum, alpha::Numb
         return copy(tgt_mat)
     end
     chol = LinearAlgebra.cholesky(LinearAlgebra.Symmetric(tgt_mat); check = false)
-    @argcheck(LinearAlgebra.issuccess(chol),
+    @argcheck(all(isfinite, tgt_mat) && LinearAlgebra.issuccess(chol),
               DomainError(LinearAlgebra.diag(tgt_mat),
-                          "the shrinkage target is not positive definite, so no geodesic reaches it. A target rule built from a matrix with a zero variance is the usual cause: an asset whose returns are constant has a zero variance. Remove the asset, or use `ScaledIdentityTarget`, whose scale is the average variance."))
+                          "the shrinkage target is not a finite positive definite matrix, so no geodesic reaches it. A target rule built from a matrix with a zero variance is the usual cause. An asset whose returns are constant has a zero variance, and `ConstantCorrelationTarget` divides by its standard deviation. Remove the asset, or use `ScaledIdentityTarget`, whose scale is the average variance."))
     vals, vecs = LinearAlgebra.eigen(LinearAlgebra.Symmetric(chol.L \ sigma / chol.U))
     basis = chol.L * vecs
     sigma_alpha = basis *
@@ -621,7 +646,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Repairs and shrinks the finite block of a covariance matrix in place, and leaves the frame of `NaN` around it alone.
 
-An inner estimator that reads the gaps of a sample answers `NaN` for an asset it could not estimate. The repair and the shrinkage have no answer for a `NaN`, so they run on the block of the assets whose variance is finite, and the frame keeps its `NaN` rows and columns.
+An inner estimator that reads the gaps of a sample returns `NaN` for an asset it could not estimate. The repair and the shrinkage cannot take a `NaN`. So they run on the block of the assets whose variance is finite, and the `NaN` rows and columns of the frame stay as they are.
 
 # Algorithm
 
@@ -639,12 +664,12 @@ An inner estimator that reads the gaps of a sample answers `NaN` for an asset it
 
 # Validation
 
-  - The block of `sigma` is finite. An `IsNonFiniteError` is thrown otherwise.
+  - The block of `sigma` is finite. The function throws an `IsNonFiniteError` otherwise.
   - Every check of [`geodesic_point`](@ref) applies to the block.
 
 # Returns
 
-  - `sigma::MatNum`: The input matrix, whose block was repaired and shrunk in place.
+  - `sigma::MatNum`: The input matrix, with its block repaired and shrunk in place.
 
 # Related
 
@@ -674,7 +699,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Rescales a covariance matrix to its correlation matrix in place, and keeps the `NaN` of an asset whose variance is not finite.
 
-`StatsBase.cov2cor!` writes one on the whole diagonal, which would turn the `NaN` variance of an asset outside the Coverage Universe into a unit correlation with itself. The entries off the diagonal of such an asset are already `NaN`, so only the diagonal needs it back.
+`StatsBase.cov2cor!` writes one on the whole diagonal, so it turns the `NaN` variance of an asset outside the Coverage Universe into a correlation of one. The entries off the diagonal of such an asset are already `NaN`, so this function writes the `NaN` back on the diagonal alone.
 
 # Algorithm
 
@@ -708,7 +733,7 @@ end
 
 Computes the covariance matrix with `ce.ce`, and shrinks it towards `ce.tgt` along the geodesic of the positive definite matrices.
 
-[`GeodesicShrinkageCovariance`](@ref) states the mathematics. The estimator forwards the sample and its keywords to `ce.ce` untouched, so an active mask reaches an inner estimator that reads one, and a gap is the inner estimator's to keep or to refuse.
+[`GeodesicShrinkageCovariance`](@ref) states the mathematics. The estimator forwards the sample and its keywords to `ce.ce` unchanged. So an active mask reaches an inner estimator that reads one, and the inner estimator keeps or refuses a gap.
 
 # Algorithm
 
@@ -716,7 +741,7 @@ Computes the covariance matrix with `ce.ce`, and shrinks it towards `ce.tgt` alo
  2. Compute `sigma` with `Statistics.cov(library_covariance_estimator(ce.ce), X; kwargs...)`.
  3. Copy `sigma` into a new `Matrix`, because step 4 writes in place and the inner estimator can return an immutable matrix.
  4. Repair and shrink the finite block of `sigma` with [`geodesic_shrinkage!`](@ref).
- 5. `cov` returns `sigma`. `cor` rescales it to a correlation matrix with [`frame_cov2cor!`](@ref) and returns it, so the correlation is the one of the shrunk covariance.
+ 5. `cov` returns `sigma`. `cor` rescales it to a correlation matrix with [`frame_cov2cor!`](@ref) and returns it, so the correlation is that of the shrunk covariance.
 
 # Arguments
 
@@ -758,7 +783,7 @@ end
 
 Forwards the Asset Panel to `ce.ce`, then repairs and shrinks the finite block of the frame it gets back.
 
-This is the estimator's override of the reduce-and-expand root. The inner estimator owns the reduction, because it alone knows whether it reads the gaps of the sample, and this method owns the shrinkage. An asset outside the Coverage Universe keeps its `NaN` row and column.
+This method overrides the reduce-and-expand root. The inner estimator does the reduction, because its own method decides whether to read the gaps of the sample. This method does the shrinkage. An asset outside the Coverage Universe keeps its `NaN` row and column.
 
 # Algorithm
 
@@ -806,9 +831,9 @@ end
 """
     gap_fill_value(ce::GeodesicShrinkageCovariance) -> Number
 
-Answer what `ce.ce` answers, because the estimator forwards the sample and its keywords untouched.
+Returns the gap fill value of `ce.ce`, because the estimator forwards the sample and its keywords unchanged.
 
-The shrinkage reads the matrix `ce.ce` returns and no cell of the sample, so a gap is the inner estimator's to keep or to lose.
+The shrinkage reads the matrix that `ce.ce` returns and no cell of the sample. So the inner estimator alone sets what a gap becomes.
 
 # Arguments
 
@@ -832,11 +857,11 @@ end
 
 Folds observations into a [`GeodesicShrinkageCovariance`](@ref) by forwarding them to `ce.ce`.
 
-The shrinkage reads the matrix `ce.ce` returns and no observation, so the estimator keeps no state of its own and folds exactly when `ce.ce` does. The read-out applies the shrinkage to the folded matrix.
+The shrinkage reads the matrix that `ce.ce` returns and no observation. So the estimator keeps no state of its own, and it folds when `ce.ce` folds. The read-out applies the shrinkage to the folded matrix.
 
 # Algorithm
 
- 1. Rebind `ce.ce` to the estimator [`partial_fit!`](@ref) gives, with `Accessors.@reset`.
+ 1. Build a copy of `ce` whose `ce.ce` is the estimator that [`partial_fit!`](@ref) returns, with `Accessors.@reset`.
 
 # Arguments
 
@@ -848,7 +873,7 @@ The shrinkage reads the matrix `ce.ce` returns and no observation, so the estima
 
 # Returns
 
-  - `ce`: The estimator, with `ce.ce` rebound to the estimator carrying the state after the last observation.
+  - `ce::GeodesicShrinkageCovariance`: A new estimator, equal to `ce` except that its `ce.ce` holds the state after the last observation.
 
 # Related
 
@@ -867,7 +892,7 @@ end
 
 Reads the shrunk covariance, or its correlation, of a folded [`GeodesicShrinkageCovariance`](@ref).
 
-`ce.ce` answers its own folded matrix, and the shrinkage runs on it as it runs on a batch fit, so this method answers what a batch fit over the same observations answers.
+`ce.ce` returns its folded matrix, and the shrinkage runs on it as it runs on a batch fit. So this method returns what a batch fit over the same observations returns.
 
 # Algorithm
 
@@ -883,7 +908,7 @@ Reads the shrunk covariance, or its correlation, of a folded [`GeodesicShrinkage
 
 # Validation
 
-  - `ce.ce` carries a partial-fit state. An `ArgumentError` is thrown otherwise.
+  - `ce.ce` carries a partial-fit state. The read-out of `ce.ce` throws an `ArgumentError` otherwise.
 
 # Returns
 
@@ -907,7 +932,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 [`GeodesicShrinkageCovariance`](@ref) method of [`supports_partial_fit`](@ref).
 
-The estimator folds by forwarding to `ce.ce`, so it folds exactly when `ce.ce` does.
+The estimator folds through `ce.ce`, so it folds when `ce.ce` folds.
 
 # Arguments
 

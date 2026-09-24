@@ -177,7 +177,7 @@
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { map = 3, units = 28, swept = false }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { map = 3, units = 14, swept = false }
 "src/05_Moments/36_RankOneCovariance.jl" = { map = 3, units = 3, swept = false }
-"src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { map = 3, units = 20, swept = false }
+"src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { map = 3, units = 20, algorithm = 8, swept = true, bindings = ["AbstractCovarianceShrinkageTarget", "CommonCovarianceTarget", "ConstantCorrelationTarget", "GeodesicShrinkageCovariance", "GeodesicShrinkageTarget", "IdentityTarget", "ScaledIdentityTarget", "assert_shrinkage_target", "cov", "cov", "cov", "frame_cov2cor!", "gap_fill_value", "geodesic_point", "geodesic_power", "geodesic_shrinkage!", "partial_fit!", "port_opt_view", "shrinkage_target", "supports_partial_fit"] }
 "src/06_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true, bindings = ["AbstractDistanceAlgorithm", "AbstractDistanceEstimator", "CanonicalDistance", "CorrelationDistance", "LogDistance", "SimpleAbsoluteDistance", "SimpleDistance", "VariationInfoDistance"] }
 "src/06_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true, bindings = ["AllInternalMutualInfoCov", "DistCov_AllInternalDistCov", "Distance", "LTDCov_AllInternalLTDCov", "RhoDistanceAlgorithm", "_absguard", "_as_correlation", "_dist_from_cor", "cor_and_dist", "distance", "distance", "distance", "distance"] }
 "src/06_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, algorithm = 3, swept = true, bindings = ["DistanceDistance", "cor_and_dist", "distance", "distance"] }

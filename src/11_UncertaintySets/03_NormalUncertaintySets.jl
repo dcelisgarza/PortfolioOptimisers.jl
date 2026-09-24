@@ -333,7 +333,7 @@ Where:
 
   - ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``: Asymptotic covariance of the vectorised covariance estimator.
   - ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``: Asymptotic covariance of the mean estimator.
-  - ``\\mathbf{I}``: Identity matrix.
+  - $(math_dict[:I_identity])
   - ``\\mathbf{K}``: Commutation matrix.
   - ``\\otimes``: Kronecker product.
   - $(math_dict[:Sigma_hat])
@@ -909,7 +909,7 @@ Where:
   - ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``: Asymptotic covariance of the covariance estimator, vectorised.
   - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
-  - ``\\mathbf{I}``: Identity matrix.
+  - $(math_dict[:I_identity])
   - ``\\mathbf{K}``: Commutation matrix.
   - ``\\otimes``: Kronecker product.
   - ``\\mathcal{E}_{\\boldsymbol{\\mu}}``: Ellipsoidal uncertainty set for expected returns.
@@ -1000,7 +1000,7 @@ Where:
   - ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``: Asymptotic covariance of the covariance estimator, vectorised.
   - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
-  - ``\\mathbf{I}``: Identity matrix.
+  - $(math_dict[:I_identity])
   - ``\\mathbf{K}``: Commutation matrix.
   - ``\\otimes``: Kronecker product.
 
@@ -1219,7 +1219,7 @@ Where:
   - ``\\mathcal{E}_{\\mathbf{\\Sigma}}``: Ellipsoidal uncertainty set for the covariance matrix.
   - ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``: Asymptotic covariance of the covariance estimator, vectorised.
   - ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``: Asymptotic covariance of the mean estimator.
-  - ``\\mathbf{I}``: Identity matrix.
+  - $(math_dict[:I_identity])
   - ``\\mathbf{K}``: Commutation matrix.
   - ``\\otimes``: Kronecker product.
   - ``k_{\\mathbf{\\Sigma}}``: Empirically fitted radius, the ``1 - q`` quantile of the sampled Mahalanobis distances.
@@ -1295,7 +1295,7 @@ Where:
   - ``\\mathcal{E}_{\\mathbf{\\Sigma}}``: Ellipsoidal uncertainty set for the covariance matrix.
   - ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``: Asymptotic covariance of the covariance estimator, vectorised.
   - ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``: Asymptotic covariance of the mean estimator, ``\\hat{\\mathbf{\\Sigma}} / T``.
-  - ``\\mathbf{I}``: Identity matrix.
+  - $(math_dict[:I_identity])
   - ``\\mathbf{K}``: Commutation matrix.
   - ``\\otimes``: Kronecker product.
   - ``k_{\\mathbf{\\Sigma}}``: Radius, the one [`k_ucs`](@ref) returns for `ue.alg.method`.
