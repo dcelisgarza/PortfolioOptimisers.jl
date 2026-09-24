@@ -316,6 +316,168 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
               0.05)
 end
 
+@testset "Cardinality rows: names, sub-group shapes, thresholds and the investable mask" begin
+    hslv = Solver(; name = :highs, solver = HiGHS.Optimizer,
+                  settings = "log_to_console" => false,
+                  check_sol = (; allow_local = true, allow_almost = true))
+    nxc = ["a", "b", "c", "d", "e", "f"]
+    Xc = 0.01 .* randn(StableRNG(42), 80, 6) .+ 0.001
+    rdc = ReturnsResult(; nx = nxc, X = Xc)
+    setsc = UniverseSets(;
+                         dict = Dict("nx" => nxc,
+                                     "nx_grp" => ["g1", "g1", "g2", "g2", "g3", "g3"],
+                                     "ux_grp" => ["g1", "g2", "g3"]))
+    S3 = [1.0 1 0 0 0 0; 0 0 1 1 0 0; 0 0 0 0 1 1]
+    S2 = [1.0 0 1 0 1 0; 0 1 0 1 0 1]
+    function solve_c(rdx = rdc; kwargs...)
+        opt = JuMPOptimiser(; slv = hslv, sets = setsc, kwargs...)
+        return optimise(MeanRisk(; r = ConditionalValueatRisk(), opt = opt), rdx)
+    end
+    function card_rows(res)
+        ks = collect(keys(JuMP.object_dictionary(res.model)))
+        return sort!(filter(k -> occursin("card", String(k)), ks))
+    end
+    held(v) = count(abs.(v) .> 1e-8)
+    lc_ineq(A, B) = LinearConstraint(; ineq = PartialLinearConstraint(; A = A, B = B))
+    lc_eq(A, B) = LinearConstraint(; eq = PartialLinearConstraint(; A = A, B = B))
+
+    # The asset space names its rows without a prefix, and the counts hold.
+    gce = LinearConstraintEstimator(; val = [:(a + b + c <= 1), :(d + e == 1)])
+    res = solve_c(; card = 3, gcarde = gce)
+    @test card_rows(res) == [:card, :gcard_eq, :gcard_ineq]
+    @test held(res.w) <= 3 && held(res.w[1:3]) <= 1 && held(res.w[4:5]) == 1
+
+    # A sub-grouped constraint is written over the sub-groups: one column for each row of
+    # `sgmtx`, and any number of rows. With no limit the portfolio holds all three.
+    one_of_three = lc_ineq([1.0 1.0 1.0], [1.0])
+    @test held(S3 * solve_c().w) == 3
+    res = solve_c(; sgcarde = one_of_three, sgmtx = S3)
+    @test card_rows(res) == [:sggcard_ineq_1_]
+    @test held(S3 * res.w) == 1
+    @test_throws DimensionMismatch JuMPOptimiser(; slv = hslv,
+                                                 sgcarde = lc_ineq(ones(2, 6), [1.0, 1.0]),
+                                                 sgmtx = S2)
+    @test_throws DimensionMismatch JuMPOptimiser(; slv = hslv,
+                                                 sgcarde = lc_eq([1.0 1.0], [1.0]),
+                                                 sgmtx = S3)
+    @test_throws DimensionMismatch JuMPOptimiser(; slv = hslv,
+                                                 sgcarde = [one_of_three, one_of_three],
+                                                 sgmtx = [S3, S2])
+
+    # One matrix and one threshold shared by both kinds of row take one builder, and its
+    # vector method gives each matrix its own entries.
+    mv = [S3, S2]
+    res = solve_c(; scard = [2, 1], smtx = mv, sgmtx = mv,
+                  sgcarde = [one_of_three, lc_eq([1.0 1.0], [1.0])])
+    @test card_rows(res) == [:scard_1_, :scard_2_, :sgcard_eq_2_, :sgcard_ineq_1_]
+    @test held(S3 * res.w) == 1 && held(S2 * res.w) == 1
+
+    # A sub-grouped threshold that is not the object of the sub-group threshold gets its own
+    # builder, so the model reads it on a shared matrix as it does on a copy.
+    two_of_three = lc_ineq([1.0 1.0 1.0], [2.0])
+    for sgm in (S3, copy(S3))
+        res = solve_c(; sgcarde = two_of_three, smtx = S3, sgmtx = sgm,
+                      slt = Threshold(0.05), sglt = Threshold(0.6))
+        @test card_rows(res) == [:sggcard_ineq_1_]
+        @test held(S3 * res.w) == 1
+    end
+
+    # A vector of thresholds with no cardinality reaches the vector methods.
+    over(x, t) = all(v -> abs(v) < 1e-8 || abs(v) >= t - 1e-8, x)
+    res = solve_c(; slt = [Threshold(0.3), Threshold(0.3)], smtx = mv)
+    @test over(S3 * res.w, 0.3) && over(S2 * res.w, 0.3)
+    res = solve_c(; sglt = [Threshold(0.3), Threshold(0.3)], sgmtx = mv)
+    @test over(S3 * res.w, 0.3) && over(S2 * res.w, 0.3)
+
+    # An asset that leaves the investable universe removes a column of `sgmtx` and no
+    # sub-group, so a sub-grouped constraint, estimated or precomputed, still solves.
+    Xn = copy(Xc)
+    Xn[5, 6] = NaN
+    rdn = ReturnsResult(; nx = nxc, X = Xn)
+    lce1 = LinearConstraintEstimator(; key = "ux_grp", val = [:(ux_grp <= 1)])
+    for (sgc, sgm) in
+        ((lce1, AssetSetsMatrixEstimator(; val = "nx_grp")), (one_of_three, S3))
+        res = solve_c(rdn; sgcarde = sgc, sgmtx = sgm)
+        @test iszero(res.w[6]) && held(S3 * res.w) == 1
+    end
+
+    # Each sub-group method with nothing to add returns before it reads the model.
+    m = JuMP.Model()
+    wbc = WeightBounds(; lb = 0.0, ub = 1.0)
+    for f in (PortfolioOptimisers.set_scardmip_constraints!,
+              PortfolioOptimisers.set_sgcardmip_constraints!)
+        @test isnothing(f(m, wbc, nothing, nothing, nothing, nothing, nothing))
+        @test isnothing(f(m, wbc, nothing, mv, nothing, nothing, nothing))
+    end
+    @test isnothing(PortfolioOptimisers.set_all_smip_constraints!(m, wbc, nothing, nothing,
+                                                                  nothing, nothing, nothing,
+                                                                  nothing))
+    @test isnothing(PortfolioOptimisers.set_all_smip_constraints!(m, wbc, nothing, nothing,
+                                                                  mv, nothing, nothing,
+                                                                  nothing))
+    @test isempty(JuMP.object_dictionary(m))
+
+    # The two validators, branch by branch.
+    af = PortfolioOptimisers.assert_subgroup_mip_fields
+    agf = PortfolioOptimisers.assert_subgrouped_mip_fields
+    thr = Threshold(0.1)
+    td = TimeDependent([1, 2])
+    @test isnothing(af(td, nothing, nothing, nothing))
+    @test isnothing(af(1, S3, thr, nothing))
+    @test_throws DomainError af(0, S3, nothing, nothing)
+    @test_throws ArgumentError af(1, [S3], nothing, nothing)
+    @test_throws ArgumentError af(1, S3, [thr], nothing)
+    @test_throws ArgumentError af(1, S3, nothing, [thr])
+    @test isnothing(af([1, 2], mv, [thr, nothing], [nothing, thr]))
+    @test_throws ArgumentError af([1], S3, nothing, nothing)
+    @test_throws DimensionMismatch af([1, 2], [S3], nothing, nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError af([1], [S3], Threshold[], nothing)
+    @test_throws DimensionMismatch af([1], [S3], [thr, thr], nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError af([1], [S3], nothing, Threshold[])
+    @test_throws DimensionMismatch af([1], [S3], nothing, [thr, thr])
+    @test isnothing(af(nothing, S3, thr, nothing))
+    @test_throws ArgumentError af(nothing, [S3], nothing, thr)
+    @test isnothing(af(nothing, mv, [thr, thr], [thr, nothing]))
+    @test_throws ArgumentError af(nothing, S3, [thr], nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError af(nothing, Matrix{Float64}[], [thr],
+                                                     nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError af(nothing, [S3], Threshold[], nothing)
+    @test_throws DimensionMismatch af(nothing, [S3], [thr, thr], nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError af(nothing, [S3], nothing, Threshold[])
+    @test_throws DimensionMismatch af(nothing, [S3], nothing, [thr, thr])
+
+    @test isnothing(agf(td, nothing, nothing, nothing))
+    @test isnothing(agf(one_of_three, S3, thr, nothing))
+    @test_throws DimensionMismatch agf(one_of_three, S2, nothing, nothing)
+    @test_throws ArgumentError agf(one_of_three, [S3], nothing, nothing)
+    @test_throws ArgumentError agf(one_of_three, S3, [thr], nothing)
+    @test_throws ArgumentError agf(one_of_three, S3, nothing, [thr])
+    @test isnothing(agf([one_of_three], [S3], [thr], [thr]))
+    @test_throws PortfolioOptimisers.IsEmptyError agf(LinearConstraint[], [S3], nothing,
+                                                      nothing)
+    @test_throws ArgumentError agf([one_of_three], S3, nothing, nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError agf([one_of_three], Matrix{Float64}[],
+                                                      nothing, nothing)
+    @test_throws DimensionMismatch agf([one_of_three], mv, nothing, nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError agf([one_of_three], [S3], Threshold[],
+                                                      nothing)
+    @test_throws DimensionMismatch agf([one_of_three], [S3], [thr, thr], nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError agf([one_of_three], [S3], nothing,
+                                                      Threshold[])
+    @test_throws DimensionMismatch agf([one_of_three], [S3], nothing, [thr, thr])
+    @test_throws DimensionMismatch agf([one_of_three], [S2], nothing, nothing)
+    @test isnothing(agf(nothing, S3, thr, nothing))
+    @test_throws ArgumentError agf(nothing, [S3], nothing, thr)
+    @test isnothing(agf(nothing, mv, [thr, thr], [thr, nothing]))
+    @test_throws ArgumentError agf(nothing, S3, [thr], nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError agf(nothing, Matrix{Float64}[], [thr],
+                                                      nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError agf(nothing, [S3], Threshold[], nothing)
+    @test_throws DimensionMismatch agf(nothing, [S3], [thr, thr], nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError agf(nothing, [S3], nothing, Threshold[])
+    @test_throws DimensionMismatch agf(nothing, [S3], nothing, [thr, thr])
+end
+
 @testset "Phylogeny" begin
     plc = IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = 1)
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,

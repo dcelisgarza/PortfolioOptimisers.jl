@@ -1119,6 +1119,8 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # JuMP optimisation variables.
                        :k_budget => "``k``: Budget scaling / homogenisation variable.",#
                        :sc_scale => "``s_c``: Constraint scale. It multiplies both sides of a row, so a positive value leaves the feasible set unchanged.",#
+                       :b_held => "``\\boldsymbol{b} \\in \\{0, 1\\}^{M}``: Held binary, one entry for each of the ``M`` assets or sub-groups that a MIP space gates. A position can be non-zero only when its entry is one. Under the long-short bundle it is the sum of the long and the short binary, which are never both one.",#
+                       :i_smtx => "``i``: Index of a sub-group selection matrix, its position in the vector of matrices, or `1` for a single matrix. [`mip_key`](@ref) writes it into the name of each sub-group row.",#
                        :so_scale => "``s_o``: Objective scale. It multiplies the objective, so a positive value leaves the argument of the optimum unchanged.",#
                        :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
                        :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.",#

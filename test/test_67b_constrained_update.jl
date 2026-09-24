@@ -961,12 +961,12 @@ end
             @test_throws po.IsNothingError ProgrammeAllocationSet(; slv = slv, scard = 1,
                                                                   smtx = AssetSetsMatrixEstimator(;
                                                                                                   val = "nf"))
-            # The sub-group shape checks are the optimiser's: the sub-grouped matrix is
-            # checked against `sgmtx`, the matrix its builder pairs it with (a defect the
-            # optimiser's constructor carried, which read `smtx` there).
-            two = linear_constraints(LinearConstraintEstimator(;
-                                                               val = [:(A <= 1), :(B <= 1)]),
-                                     sets3)
+            # The sub-group shape checks are the optimiser's: the sub-grouped constraint has
+            # one column for each row of `sgmtx`, the matrix its builder pairs it with, and
+            # not of `smtx`. `two` is written over two sub-groups.
+            two = LinearConstraint(;
+                                   ineq = PartialLinearConstraint(; A = [1.0 1.0; 1.0 0.0],
+                                                                  B = [1.0, 1.0]))
             @test isa(ProgrammeAllocationSet(; slv = slv, sgcarde = two,
                                              sgmtx = [1.0 0.0 0.0; 0.0 1.0 1.0]),
                       ProgrammeAllocationSet)

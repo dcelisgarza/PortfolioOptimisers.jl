@@ -97,7 +97,7 @@ struct AssetMIPSpace <: AbstractMIPSpace end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Sub-group MIP constraints: indicators gate the sub-group weights `smtx * w` and weight bounds map through the selection matrix. Model keys are namespaced as `Symbol(pfx, name, :_, i)` so multiple sub-groups (and the cardinality/group-cardinality variants) do not collide.
+Sub-group MIP constraints: indicators gate the sub-group weights `smtx * w` and weight bounds map through the selection matrix. Model keys are namespaced as `Symbol(pfx, name, :_, i, :_)` so multiple sub-groups (and the cardinality/group-cardinality variants) do not collide.
 
 # Fields
 
@@ -121,7 +121,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Map a logical MIP builder name to the model key for the given space.
 
-Asset space returns the name unchanged; sub-group space returns `Symbol(pfx, name, :_, i)`.
+Asset space returns the name unchanged; sub-group space returns `Symbol(pfx, name, :_, i, :_)`.
 
 # Related
 

@@ -1204,11 +1204,12 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     # A name-keyed estimator follows the door: a name that left resolves on the
     # Non-Investable Axis. A precomputed constraint cannot, because its `A` is bound to its
     # columns by position. Say so here rather than let the model meet two numbers.
+    # `sgcardr` is not checked: its columns are the rows of `sgmtx`, one for each sub-group,
+    # and a departed asset removes a column of `sgmtx`, never a sub-group.
     if !isnothing(imsk)
         N = size(X, 2)
         assert_investable_constraint_width(lcsr, N, "lcse")
         assert_investable_constraint_width(gcardr, N, "gcarde")
-        assert_investable_constraint_width(sgcardr, N, "sgcarde")
     end
     if opt.smtx === opt.sgmtx
         smtx = sgmtx = asset_sets_matrix(opt.smtx, opt.sets)

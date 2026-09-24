@@ -250,7 +250,7 @@ commit = "8610300"
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/04_WeightConstraints.jl" = { lines = 57, misses = 4 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/05_SDPConstraints.jl" = { lines = 57, misses = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/06_IntegerPhylogenyConstraints.jl" = { lines = 16, misses = 1 }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/07_CardinalityConstraints.jl" = { lines = 76, misses = 7 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/07_CardinalityConstraints.jl" = { lines = 76, misses = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/08_ThresholdConstraints.jl" = { lines = 12, misses = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/09_TurnoverConstraints.jl" = { lines = 19, misses = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/10_FeesConstraints.jl" = { lines = 47, misses = 0 }
