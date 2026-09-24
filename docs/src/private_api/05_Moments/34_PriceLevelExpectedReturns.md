@@ -11,6 +11,7 @@ PortfolioOptimisers.price_levels
 PortfolioOptimisers.fold_levels
 PortfolioOptimisers.fold_statistic_row
 PortfolioOptimisers.fold_active
+PortfolioOptimisers.weiszfeld_sums
 PortfolioOptimisers.spatial_median
 PortfolioOptimisers.assert_folding_statistic
 ```

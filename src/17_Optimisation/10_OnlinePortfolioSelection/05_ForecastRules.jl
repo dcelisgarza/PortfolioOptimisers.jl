@@ -661,7 +661,7 @@ Builds the reweighted price relative tracking of Lai, Yang, Fang and Wu (2020), 
 
 It is a [`ForecastReversion`](@ref) whose forecast is the [`ReweightedPriceRelative`](@ref) recursion. The [`MovingAverage`](@ref) forecast of the same `window` preconditions its step.
 
-The paper is not open access. Li, Luo and Xu (2023, eqs. 8 to 11) restate its forecast and its step, and the MATLAB code that the authors publish agrees with them. The defaults `theta = 0.8`, `eps = 50` and `window = 5` are the values of that code. In its first `window` periods the code preconditions with the last price relative, and the library uses the moving average of the levels that it has.
+The paper is not open access. Li, Luo and Xu (2023, eqs. 8 to 11) restate its forecast and its step, and the MATLAB code that the authors publish runs the same recursion. The code seeds the forecast at one, and the restatement seeds it at the first price relative, which [`ReweightedPriceRelative`](@ref) follows. The defaults `theta = 0.8`, `eps = 50` and `window = 5` are the values of that code. In its first `window` periods the code preconditions with the last price relative, and the library uses the moving average of the levels that it has.
 
 With `eps = 50` the forecast return is below the target at every step, so the step always moves. The projected answer is then almost one-hot, as the answers of the tracking rules at their defaults are.
 

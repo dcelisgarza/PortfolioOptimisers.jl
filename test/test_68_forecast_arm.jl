@@ -117,6 +117,19 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         @test_throws ArgumentError po.merge_states(st, c)
         @test_throws DomainError ExponentialMovingAverage(; alpha = 0)
         @test_throws DomainError ReweightedPriceRelative(; theta = 0)
+        # #1172: the default is the value of the authors' code, which seeds the forecast at
+        # one where the restating paper, and the library, seed it at the first relative. The
+        # two differ by 0.024 after the first row and by less than 1e-4 after ten rows.
+        @test ReweightedPriceRelative().theta == 0.8
+        phi_code = ones(N)
+        gaps = map(1:10) do t
+            g = 0.8 .* X[t, :] ./ (0.8 .* X[t, :] .+ phi_code)
+            phi_code = g .+ (1 .- g) .* phi_code ./ X[t, :]
+            return maxerr(phi_code, xhat(ReweightedPriceRelative(), R[1:t, :]))
+        end
+        @test 0.02 < gaps[1] < 0.03 && gaps[10] < 1e-4
+        # At `alpha = 1` the exponential moving average forecasts one in every asset.
+        @test xhat(ExponentialMovingAverage(; alpha = 1), R) == ones(N)
     end
 
     @testset "A folding statistic under an active mask: the reset, the count, the arms" begin
@@ -614,31 +627,55 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         xs = xhat(SpatialMedian(), Y)
         @test isapprox(xs, l1median(Pn); atol = 1e-8)
         @test maxerr(xs, l1median(Praw) ./ Praw[end, :]) > 1e-6
-        S = [100.0, 1, 1, 1]
-        @test maxerr(xs, l1median(Praw .* S') ./ (Praw[end, :] .* S)) > 1e-3
-        # The iteration runs to its minimiser: the optimality residual is at machine precision,
-        # where the paper's stop — a relative L1 change of 1e-3 — leaves it far from zero.
-        resid(mu) = norm(sum((Pn[i, :] .- mu) ./ norm(Pn[i, :] .- mu) for i in axes(Pn, 1)))
-        mlib = po.spatial_median(Pn, 100, 1e-8)
-        @test resid(mlib) < 1e-6
-        mu = vec(median(Pn; dims = 1))
-        mpaper = mu
-        for _ in 2:200
-            # One Weiszfeld step from `mu`, then the paper's stop.
-            num = zeros(N)
-            den = 0.0
-            for i in axes(Pn, 1)
-                d = norm(Pn[i, :] .- mu)
-                iszero(d) && continue
-                num .+= Pn[i, :] ./ d
-                den += 1 / d
+        # #1172: the numbers `SpatialMedian` states, over every five-level window of the
+        # fixture. The authors' code rebases each asset to one on the first day; the paper
+        # reads raw prices, here one asset quoted a hundred times higher.
+        tight(P) = po.spatial_median(P, 100_000, 1e-15)
+        wins = [levels(X[s:(s + 3), :]) for s in 1:(T - 4)]
+        rebased(s, S) = wins[s] .* (vec(prod(X[1:(s + 3), :]; dims = 1)) .* S)'
+        gap(S) = maximum(maxerr(tight(rebased(s, S)) ./ rebased(s, S)[end, :],
+                                tight(wins[s])) for s in eachindex(wins))
+        @test 1e-3 < gap(ones(N)) < 3e-3
+        @test 5e-2 < gap([100.0, 1, 1, 1]) < 8e-2
+        # The authors' code stops at a relative L1 change of 1e-9 against the old iterate, or
+        # after 200 iterations; the library's defaults are as close to the minimiser.
+        function code_median(P; tol = 1e-9, maxiter = 200)
+            y = vec(median(P; dims = 1))
+            for _ in 1:maxiter
+                num, den, Rn, eta = po.weiszfeld_sums(P, y)
+                Ty = if iszero(eta)
+                    num ./ den
+                else
+                    max(0, 1 - eta / Rn) .* (num ./ den) .+ min(1, eta / Rn) .* y
+                end
+                stop = norm(Ty .- y, 1) <= tol * norm(y, 1)
+                y = Ty
+                stop && break
             end
-            mun = num ./ den
-            mpaper = mun
-            norm(mu .- mun, 1) <= 1e-3 * norm(mun, 1) && break
-            mu = mun
+            return y
         end
-        @test resid(mpaper) > 1e-4 && maxerr(mpaper, mlib) > 1e-5
+        @test maximum(maxerr(po.spatial_median(P, 100, 1e-8), tight(P)) for P in wins) <
+              3e-8
+        @test maximum(maxerr(code_median(P), tight(P)) for P in wins) < 3e-8
+        # A median on a level is found exactly by the optimality test at the levels; the third
+        # window's median is its second level, which the iteration alone approaches from 4e-7.
+        m3 = po.spatial_median(wins[3], 100, 1e-8)
+        @test any(k -> m3 == wins[3][k, :], 1:5)
+        # A seed on a level that is not the median takes the modified step off the level.
+        Pv = [0.0 0.0; 1.0 0.0; 0.0 1.0; 5.0 5.0; 0.2 0.1]
+        @test vec(median(Pv; dims = 1)) == Pv[5, :]
+        mv = po.spatial_median(Pv, 1000, 1e-14)
+        @test po.weiszfeld_sums(Pv, mv)[3] < 1e-8 && mv != Pv[5, :]
+        # A median very near a level but not on it converges slowly: the cap of 100 stops the
+        # forecast about 1e-4 away while the sum of distances is within 1e-6 of its minimum.
+        Ps = levels((1 .+ 0.02 .* randn(StableRNG(15), 40, 4))[6:9, :])
+        cost(y) = sum(norm(Ps[i, :] .- y) for i in axes(Ps, 1))
+        ms = po.spatial_median(Ps, 100, 1e-8)
+        @test 1e-4 < maxerr(ms, tight(Ps)) < 2e-4
+        @test cost(ms) - cost(tight(Ps)) < 1e-6
+        # A step below `tol = 1e-8` stops it too, so a larger cap alone does not help.
+        @test maxerr(po.spatial_median(Ps, 100_000, 1e-8), tight(Ps)) > 1e-6
+        @test maxerr(po.spatial_median(Ps, 10_000, 1e-15), tight(Ps)) < 1e-8
         # The moving-average reversion admits the two-level window and a threshold at or
         # below one, which the paper's algorithm excludes and the step is defined for.
         @test MovingAverageReversion(; window = 2, eps = 1).me.alg.window == 2

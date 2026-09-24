@@ -144,8 +144,9 @@ ADR 0157 rejected for the rules. A forecaster carrying a state at the door is re
 head starts cold.
 
 **The cold start truncates the window.** Over the first rows a windowed statistic reads the
-levels available — with `window = 5` and two rows folded, three levels — as the reversion
-papers' reference implementations do and as the parity test with the prototype requires; a
+levels available — with `window = 5` and two rows folded, three levels — as the parity test
+with the prototype requires. The authors' code for the moving-average, median and peak price
+papers does not truncate: over its first `window` rows it forecasts the last price relative. A
 folding statistic starts from its seed; a composite truncates every window it holds; and the
 anti-correlation rule's two windows and a `LastRows` selector truncate the same way. A forecast
 is **flat** — one in every asset, which every rule's step holds on — where the forecaster has
