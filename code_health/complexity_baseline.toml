@@ -9,7 +9,19 @@ commit = "0ecb3ce47c"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { cyc = 10, cog = 15, arg = 16, cyc_sum = 520, cog_sum = 436, arg_sum = 1208, macros = [] }
-"src/01_Base/01_DocstringDictionaries.jl" = { cyc = 3, cog = 3, arg = 2, cyc_sum = 3, cog_sum = 3, arg_sum = 2, macros = [] }
+"src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { cyc = 4, cog = 4, arg = 3, cyc_sum = 4, cog_sum = 4, arg_sum = 3, macros = [] }
+"src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
+"src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
+"src/01_Base/01_DocstringDictionaries/04_ArgPhylogenyAndConstraints.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
+"src/01_Base/01_DocstringDictionaries/05_ArgRiskMeasuresAndCosts.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
+"src/01_Base/01_DocstringDictionaries/06_ArgOptimisation.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
+"src/01_Base/01_DocstringDictionaries/07_FieldDict.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
+"src/01_Base/01_DocstringDictionaries/08_ValidationsAndReturns.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
+"src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
+"src/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
+"src/01_Base/01_DocstringDictionaries/11_MathRiskAndOptimisation.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
+"src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
+"src/01_Base/01_DocstringDictionaries/13_References.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
 "src/01_Base/02_TypeRoots.jl" = { cyc = 2, cog = 2, arg = 2, cyc_sum = 4, cog_sum = 4, arg_sum = 4, macros = [] }
 "src/01_Base/03_PrettyShow.jl" = { cyc = 27, cog = 50, arg = 2, cyc_sum = 39, cog_sum = 62, arg_sum = 8, macros = ["@define_pretty_show"] }
 "src/01_Base/04_ScopedConfig.jl" = { cyc = 7, cog = 6, arg = 8, cyc_sum = 38, cog_sum = 12, arg_sum = 69, macros = [] }

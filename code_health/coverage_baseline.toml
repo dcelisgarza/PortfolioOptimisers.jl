@@ -8,7 +8,19 @@ commit = "8610300"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { lines = 979, misses = 376 }
-"src/01_Base/01_DocstringDictionaries.jl" = { lines = 8, misses = 0 }
+"src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { lines = 8, misses = 0 }
+"src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { lines = 0, misses = 0 }
+"src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { lines = 0, misses = 0 }
+"src/01_Base/01_DocstringDictionaries/04_ArgPhylogenyAndConstraints.jl" = { lines = 0, misses = 0 }
+"src/01_Base/01_DocstringDictionaries/05_ArgRiskMeasuresAndCosts.jl" = { lines = 0, misses = 0 }
+"src/01_Base/01_DocstringDictionaries/06_ArgOptimisation.jl" = { lines = 0, misses = 0 }
+"src/01_Base/01_DocstringDictionaries/07_FieldDict.jl" = { lines = 0, misses = 0 }
+"src/01_Base/01_DocstringDictionaries/08_ValidationsAndReturns.jl" = { lines = 0, misses = 0 }
+"src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { lines = 0, misses = 0 }
+"src/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.jl" = { lines = 0, misses = 0 }
+"src/01_Base/01_DocstringDictionaries/11_MathRiskAndOptimisation.jl" = { lines = 0, misses = 0 }
+"src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { lines = 0, misses = 0 }
+"src/01_Base/01_DocstringDictionaries/13_References.jl" = { lines = 0, misses = 0 }
 "src/01_Base/02_TypeRoots.jl" = { lines = 5, misses = 0 }
 "src/01_Base/03_PrettyShow.jl" = { lines = 79, misses = 0 }
 "src/01_Base/04_ScopedConfig.jl" = { lines = 47, misses = 0 }

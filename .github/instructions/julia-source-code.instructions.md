@@ -170,7 +170,7 @@ This avoids duplicating method definitions. A union alias is a **dispatch alias*
 
 ## Docstrings
 
-[`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) is the Authority for every docstring rule. It states which sections each kind of unit carries, what each section holds, the dictionaries in `src/01_Base/01_DocstringDictionaries.jl` that a description interpolates from, the mathematical notation, and the `jldoctest` blocks. Read it before you write a docstring, and change a docstring rule there and nowhere else.
+[`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) is the Authority for every docstring rule. It states which sections each kind of unit carries, what each section holds, the dictionaries in `src/01_Base/01_DocstringDictionaries/` that a description interpolates from, the mathematical notation, and the `jldoctest` blocks. Read it before you write a docstring, and change a docstring rule there and nowhere else.
 
 An **alias** is the case to check first. Its docstring carries a different set of sections from the unit it names, the set differs by kind of alias, and `test/test_26_docs.jl` reds the file over a section outside that set. See § *Section Structure for Aliases*.
 
@@ -283,7 +283,7 @@ the list can only shrink on its own.
 
 ## Code Organization
 
-- **File naming**: Source files are prefixed numerically to indicate load order (e.g., `src/01_Base/01_DocstringDictionaries.jl`). A prefix is unique within its directory, and the `include` list of `src/PortfolioOptimisers.jl` is the listing of `src/` sorted by prefix, so the number on a file is the order it loads in. A new file takes the next free number of its directory, or renumbers the files that load after it. `docs/src/public_api/` and `docs/src/private_api/` are each numbered the same way, to read beside `src/`. `test/test_47_alias_and_module_census.jl` gates both claims (ADR 0147).
+- **File naming**: Source files are prefixed numerically to indicate load order (e.g., `src/01_Base/02_TypeRoots.jl`). A prefix is unique within its directory, and the `include` list of `src/PortfolioOptimisers.jl` is the listing of `src/` sorted by prefix, so the number on a file is the order it loads in. A new file takes the next free number of its directory, or renumbers the files that load after it. `docs/src/public_api/` and `docs/src/private_api/` are each numbered the same way, to read beside `src/`. `test/test_47_alias_and_module_census.jl` gates both claims (ADR 0147).
 - **Directories**: A family of files under one subject is a directory, numbered as one entry of its parent, and its files are numbered inside it: `src/05_Moments/05_Gerber/` holds the three Gerber-family covariances, `src/17_Optimisation/05_JuMP/` everything that builds the JuMP model. A file whose subject already has a directory goes into it. A family of two or more files at the top of a directory that reads as one subject takes a directory of its own (ADR 0150). `docs/src/public_api/` and `docs/src/private_api/` each carry one page per source file at the same path, so a directory in `src/` is a directory of pages on each mirror (ADR 0128).
 - **Module structure**: Each submodule focuses on a specific domain (moments, risk, priors, etc.).
 - **Type hierarchy**: Subtype the appropriate abstract type (`AbstractEstimator`, `AbstractAlgorithm`, `AbstractResult`).

@@ -37,7 +37,8 @@ finished first, then adds its own change to the current text.
 Three files are shared by every sweep ticket, so this rule bites hardest there:
 
 - `code_health/sweep_manifest.toml` — one row per source file.
-- `src/01_Base/01_DocstringDictionaries.jl` — `arg_dict`, `math_dict` and their siblings.
+- `src/01_Base/01_DocstringDictionaries/` — `arg_dict`, `math_dict` and their siblings, one
+  subject to a file, so two sessions collide only when they add keys of one subject.
 - `test/test_26_docs.jl` — the library-wide ratchets, `DETAILS_TOTAL`, `NO_RELATED_TOTAL` and
   `MATH_COPY_TOTAL`.
 
@@ -98,7 +99,7 @@ before you merge so you lower the number that is current.
 - **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field
   list, write the constructor name once per type, and use the ordinary keyword constructor.
 - Docstring field text is centralised in `field_dict` / `arg_dict` in
-  `src/01_Base/01_DocstringDictionaries.jl`, and an entry
+  `src/01_Base/01_DocstringDictionaries/`, and an entry
   that loses its last user is deleted. When a description must interpolate a key and when prose is
   permitted is stated by
   [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md),

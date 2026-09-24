@@ -250,7 +250,7 @@ nothing raises `@error "File exists but no references were collected"` in
     source_files = vcat(files_under(SRC, ".jl"), files_under(EXT, ".jl"))
     # `ref_dict` itself names every key it defines, so it is not evidence that anything
     # cites the work. Exclude the file that holds the table when looking for users.
-    dict_file = joinpath(SRC, "01_Base", "01_DocstringDictionaries.jl")
+    dict_file = joinpath(SRC, "01_Base", "01_DocstringDictionaries", "13_References.jl")
 
     bib_keys = Set(m.captures[1]
                    for m in eachmatch(r"^@\w+\{([A-Za-z0-9_]+),"m, read(BIB, String)))
@@ -1168,16 +1168,26 @@ in the sense of `STANDARDS.md`.
 
     #=
     `math_dict` is read from source with the same instrument the rest of this file uses, so
-    the checks below load no package either. The table is built by a bare `Dict` call, so
-    each of its entries parses to `Expr(:call, :(=>), QuoteNode(key), value)`.
+    the checks below load no package either. The `*_Math*.jl` files of
+    `src/01_Base/01_DocstringDictionaries/` fill the table, each with one
+    `unique_key_dict!(math_dict, :math_dict, pairs...)` call, so each of its entries parses
+    to `Expr(:call, :(=>), QuoteNode(key), value)`.
     =#
-    function math_dict_pairs(path)
+    function math_dict_pairs(dir)
         acc = Tuple{Symbol, String}[]
+        for file in sort(readdir(dir; join = true))
+            endswith(file, ".jl") || continue
+            math_dict_pairs!(acc, file)
+        end
+        return acc
+    end
+    function math_dict_pairs!(acc, path)
         CH.walk_ast(CH.parse_file(path)) do node
-            if Meta.isexpr(node, :(=)) &&
-               node.args[1] === :math_dict &&
-               node.args[2] isa Expr
-                for p in node.args[2].args
+            if Meta.isexpr(node, :call) &&
+               node.args[1] === :unique_key_dict! &&
+               length(node.args) >= 3 &&
+               node.args[2] === :math_dict
+                for p in node.args[4:end]
                     if Meta.isexpr(p, :call) &&
                        length(p.args) == 3 &&
                        p.args[1] === :(=>) &&
@@ -1186,7 +1196,7 @@ in the sense of `STANDARDS.md`.
                         push!(acc, (p.args[2].value, strip(p.args[3])))
                     end
                 end
-                # The table is read, so nothing below it can add to `acc`.
+                # The call is read, so nothing below it can add to `acc`.
                 return CH.PRUNE
             end
             return nothing
@@ -1195,7 +1205,9 @@ in the sense of `STANDARDS.md`.
     end
 
     math_pairs = math_dict_pairs(joinpath(ROOT, "src", "01_Base",
-                                          "01_DocstringDictionaries.jl"))
+                                          "01_DocstringDictionaries"))
+    # A read that finds no call would make every check below vacuous.
+    @test !isempty(math_pairs)
 
     #=
     The notation contract (issue #481, under the standards-hardening map #478).
@@ -1203,7 +1215,7 @@ in the sense of `STANDARDS.md`.
     ADR 0085 records the decision and
     `.github/instructions/julia-docstrings.instructions.md` is the Authority, in its section
     "Notation is fixed by symbol and by family". A symbol that appears in the docstrings of
-    two or more units gets a `math_dict` key in `src/01_Base/01_DocstringDictionaries.jl`, and every site
+    two or more units gets a `math_dict` key in `src/01_Base/01_DocstringDictionaries/`, and every site
     interpolates it. A new description takes a NEW key, because editing a value already in
     the table moves every docstring that interpolates it.
 

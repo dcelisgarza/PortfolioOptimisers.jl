@@ -106,3 +106,12 @@ written.
 - **Keep `src/01_Base.jl` as a file of includes.** It would hold every link that names the old
   path, at the cost of an include level that no other file in `src/` has, and of a row in every
   baseline that measures nothing.
+
+## Amendment (2026-09-24)
+
+`01_DocstringDictionaries.jl` grew to 1341 code lines, over the size threshold of
+[ADR 0101](0101-the-size-gate-counts-code-lines-and-binds-over-a-threshold.md), and it became a
+directory of thirteen files, one subject to a file.
+[ADR 0177](0177-the-docstring-dictionaries-are-a-directory-one-subject-to-a-file.md) records the
+split, and `unique_key_dict!` replaces the `unique_key_dict` of the table above. The other rows
+of the table stand.

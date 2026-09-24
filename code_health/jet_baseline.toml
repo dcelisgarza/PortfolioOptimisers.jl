@@ -15,7 +15,19 @@ load_set = ["GraphRecipes", "StatsPlots"]
 
 [run.main.file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { raw = 0, reviewed = 0 }
-"src/01_Base/01_DocstringDictionaries.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/04_ArgPhylogenyAndConstraints.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/05_ArgRiskMeasuresAndCosts.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/06_ArgOptimisation.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/07_FieldDict.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/08_ValidationsAndReturns.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/11_MathRiskAndOptimisation.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/13_References.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/02_TypeRoots.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/03_PrettyShow.jl" = { raw = 2, reviewed = 2 }
 "src/01_Base/04_ScopedConfig.jl" = { raw = 0, reviewed = 0 }
@@ -344,7 +356,19 @@ load_set = ["GraphRecipes", "StatsPlots"]
 
 [run.plots_ext.file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { raw = 6, reviewed = 6 }
-"src/01_Base/01_DocstringDictionaries.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/04_ArgPhylogenyAndConstraints.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/05_ArgRiskMeasuresAndCosts.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/06_ArgOptimisation.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/07_FieldDict.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/08_ValidationsAndReturns.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/11_MathRiskAndOptimisation.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries/13_References.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/02_TypeRoots.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/03_PrettyShow.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/04_ScopedConfig.jl" = { raw = 0, reviewed = 0 }

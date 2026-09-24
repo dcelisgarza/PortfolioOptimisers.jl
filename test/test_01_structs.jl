@@ -2213,22 +2213,44 @@
     end
     @testset "Documentation dictionaries" begin
         # A `Dict` literal is last-wins, so a repeated key used to drop the earlier entry
-        # with no warning. `unique_key_dict` builds the four documentation dictionaries and
+        # with no warning. `unique_key_dict!` fills the documentation dictionaries and
         # refuses a repeat at load time, naming both descriptions.
-        @test_throws ArgumentError PortfolioOptimisers.unique_key_dict(:demo, :a => "one",
-                                                                       :b => "two",
-                                                                       :a => "three")
+        @test_throws ArgumentError PortfolioOptimisers.unique_key_dict!(Dict{Symbol,
+                                                                             String}(),
+                                                                        :demo, :a => "one",
+                                                                        :b => "two",
+                                                                        :a => "three")
         msg = try
-            PortfolioOptimisers.unique_key_dict(:demo, :a => "one", :a => "three")
+            PortfolioOptimisers.unique_key_dict!(Dict{Symbol, String}(), :demo, :a => "one",
+                                                 :a => "three")
         catch err
             sprint(showerror, err)
         end
         @test occursin("`demo` has a repeated key, `:a`", msg)
         @test occursin("first: one", msg)
         @test occursin("later: three", msg)
-        good = PortfolioOptimisers.unique_key_dict(:demo, :a => "one", :b => "two")
+        good = PortfolioOptimisers.unique_key_dict!(Dict{Symbol, String}(), :demo,
+                                                    :a => "one", :b => "two")
         @test good == Dict(:a => "one", :b => "two")
         @test isa(good, Dict{Symbol, String})
+        # A table is filled by several files, so the guard also holds across two calls. A
+        # key that returns with the description it holds is a second evaluation of the same
+        # file, as Revise makes, and changes nothing.
+        @test PortfolioOptimisers.unique_key_dict!(good, :demo, :a => "one",
+                                                   :c => "three") === good
+        @test good == Dict(:a => "one", :b => "two", :c => "three")
+        @test_throws ArgumentError PortfolioOptimisers.unique_key_dict!(good, :demo,
+                                                                        :b => "other")
+        @test good[:b] == "two"
+        # Every documentation table has an entry, and `field_dict` holds one entry for
+        # each key of `arg_dict`.
+        for d in (PortfolioOptimisers.arg_dict, PortfolioOptimisers.field_dict,
+                  PortfolioOptimisers.val_dict, PortfolioOptimisers.ret_dict,
+                  PortfolioOptimisers.math_dict, PortfolioOptimisers.err_name_dict,
+                  PortfolioOptimisers.ref_dict)
+            @test !isempty(d)
+        end
+        @test keys(PortfolioOptimisers.field_dict) == keys(PortfolioOptimisers.arg_dict)
         # The `:ple` collision this guard was written for: the surviving JuMP entry is now
         # named like its neighbours, and the shadowed phylogeny entry had no reader.
         @test !haskey(PortfolioOptimisers.arg_dict, :ple)
