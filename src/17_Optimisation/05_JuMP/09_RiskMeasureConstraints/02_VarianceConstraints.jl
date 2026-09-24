@@ -610,10 +610,11 @@ optimisers.
 Computes the portfolio variance risk expression and registers the upper-bound constraint
 and objective contribution according to the variance risk measure settings.
 
-The builder marks `variance_flag` on the namespace that owns the weights,
-[`weights_prefix`](@ref). A semidefinite phylogeny on the same weights then adds no
-`p · tr(W)` penalty, whether the variance is in the objective or is only a bound.
-[`sdp_variance_flag!`](@ref) selects the formulation, and the source of the covariance
+When the variance is a positive term of the objective's risk, the builder marks
+`variance_flag` on the namespace that owns the weights, [`mark_objective_variance!`](@ref).
+A semidefinite phylogeny on the same weights then adds no `p · tr(W)` penalty when the
+objective minimises the risk. A variance that is only a bound does not mark the flag, and
+the penalty stays. [`sdp_variance_flag!`](@ref) selects the formulation, and the source of the covariance
 matrix, the measure or the prior, does not change it. A measure that holds its matrix reads
 no prior, so a programme Allocation Set that reads no rows passes `pr = nothing`.
 
@@ -639,7 +640,7 @@ no prior, so a programme Allocation Set that reads no rows passes `pr = nothing`
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::RiskBoundOwner,
                                pr::Option{<:AbstractPriorResult}, pl::Option{<:PlC_VecPlC},
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    mark_state!(model, weights_prefix(model, prefix), :variance_flag)
+    mark_objective_variance!(model, prefix, r.settings)
     variance_risk, sdp_flag = set_risk!(model, i, r, opt, pr, pl, args...; prefix = prefix,
                                         kwargs...)
     var_bound_expr, var_bound_name = variance_risk_bounds_expr(model, i, sdp_flag;
@@ -681,7 +682,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::FactorRiskContribution, pr::AbstractPriorResult, ::Any,
                                ::Any, b1::MatNum, args...; prefix::Symbol = Symbol(""),
                                kwargs...)
-    mark_state!(model, prefix, :variance_flag)
+    mark_objective_variance!(model, prefix, r.settings)
     rc = linear_constraints(r.rc, opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
     set_sdp_frc_constraints!(model)
@@ -898,7 +899,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""),
                                rd::ReturnsResult = ReturnsResult(), kwargs...)
-    mark_state!(model, weights_prefix(model, prefix), :variance_flag)
+    mark_objective_variance!(model, prefix, r.settings)
     # The lift is the set's business: the box and the ellipsoid bound a matrix and raise
     # `W` themselves, and the compact set bounds a quadratic form in `w` and raises none.
     ucs = r.ucs

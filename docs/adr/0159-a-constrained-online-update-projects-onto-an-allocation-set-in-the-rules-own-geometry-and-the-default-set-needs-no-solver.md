@@ -208,8 +208,10 @@ A semidefinite kind costs nothing the set does not have. `set_sdp_constraints!` 
 `W` and its cone from `w`, `k` and the constraint scale alone, and the phylogeny rows `A ⊙ W = 0`
 are pinned by the `p · tr(W)` penalty the builder folds into the Objective Penalty, so they bite
 on a projection exactly as they bite on a head whose objective carries no `W`. The rule for the
-penalty is the head's: a `Variance` built on the same weights marks `variance_flag`, and then the
-penalty is not added, whether the variance is in the objective or is a ceiling. A kurtosis
+penalty is the head's: the penalty is omitted only when a `Variance` on the same weights is a
+positive term of an objective that minimises the risk (ADR 0005, amendment of 2026-09-24). A
+ceiling puts no price on the growth of `W`, so every ceiling of the set keeps the penalty, and in
+a leader's model the penalty is omitted only when the leader minimises a variance. A kurtosis
 ceiling on the set already built `W` this way. In a leader's model the set reuses the leader's
 `W`, because one `W` belongs to one `w`. The set registers the leader's `w` under `:aset_` and
 records their owner, `w_owner = Symbol("")`. `weights_prefix` reads the owner, so `W`,

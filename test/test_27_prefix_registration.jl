@@ -47,10 +47,10 @@
     weights_owned = (:W, :M, :M_PSD, :variance_flag, :rc_variance)
 
     # (measure, opt, weights, returns, Category-A singleton keys the inner build registers)
-    cases = [("Variance", Variance(), opt, w0, rd, [:variance_flag]),
+    cases = [("Variance", Variance(), opt, w0, rd, Symbol[]),
              ("StandardDeviation", StandardDeviation(), opt, w0, rd, Symbol[]),
              ("UncertaintySetVariance", UncertaintySetVariance(; ucs = ucs), opt, w0, rd,
-              [:W, :M, :M_PSD, :Au, :Al, :cbucs_variance, :variance_flag]),
+              [:W, :M, :M_PSD, :Au, :Al, :cbucs_variance]),
              ("ConditionalValueatRisk", ConditionalValueatRisk(), opt, w0, rd, [:net_X]),
              ("EntropicValueatRisk", EntropicValueatRisk(), opt, w0, rd, [:net_X]),
              ("PowerNormValueatRisk", PowerNormValueatRisk(), opt, w0, rd, [:net_X]),
@@ -96,6 +96,9 @@
             continue
         end
         p = trk_prefix(alg)
+        # The tracking constructor clears the inner `rke`, so an inner variance is no term
+        # of the objective and marks no `variance_flag` anywhere (#1305).
+        @test !haskey(m, Symbol(p, :variance_flag))
         # The tracking-difference weights are stored under the composed prefix (universal).
         @test haskey(m, Symbol(p, :w))
         # The bare weights from the outer build still exist.
@@ -183,9 +186,10 @@
 
     # #1305: a dependent build registers the weights of its enclosing build, so it records
     # their owner and reads the owner's lifted matrix. A semidefinite phylogeny on the head
-    # then constrains the inner variance, and the inner variance removes the phylogeny's
-    # `p·tr(W)` penalty, as a head's own variance does. An independent build shifts the
-    # weights, so it keeps its own `W`, and a dependent build inside it reads that one.
+    # then constrains the inner variance. An independent build shifts the weights, so it
+    # keeps its own `W`, and a dependent build inside it reads that one. The phylogeny's
+    # `p·tr(W)` penalty is omitted only for a variance that the objective minimises: a
+    # ceiling and a tracking variance put no price on the growth of `W`.
     @testset "DependentVariableTracking reads the lifted matrix of its weights (#1305)" begin
         A5 = zeros(Int, 5, 5)
         A5[1, 2] = A5[2, 1] = 1
@@ -195,7 +199,8 @@
                                         alg = DependentVariableTracking())
         iv(r) = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = w0), r = r,
                                         alg = IndependentVariableTracking())
-        build(rs) = optimise(MeanRisk(; r = rs, obj = MinimumRisk(), opt = optp), rd).model
+        build(rs; obj = MinimumRisk()) = optimise(MeanRisk(; r = rs, obj = obj, opt = optp),
+                                                  rd).model
         reads(m, expr, W) = issubset(keys(m[expr].terms), Set(vec(m[W])))
 
         m = build([Variance(), dv(Variance())])
@@ -204,16 +209,39 @@
         @test reads(m, :tr_dv_2_variance_risk_1, :W)
         @test haskey(m, :variance_flag) && !haskey(m, :tr_dv_2_variance_flag)
 
-        # The penalty follows the head's rule: a variance on the head's weights removes it,
-        # whether the head or a dependent build states it. A head without one keeps it.
+        # The penalty is omitted only for a variance that the objective minimises. A head
+        # without one keeps it, and so does a head whose variance is a tracking variance.
         @test haskey(build([ConditionalValueatRisk()]), :sdp_plg_p_1)
-        @test !haskey(build([Variance()]), :sdp_plg_p_1)
-        m = build([dv(Variance())])
-        @test haskey(m, :sdp_plg_1) && haskey(m, :variance_flag)
+        m = build([Variance()])
+        @test haskey(m, :variance_flag) && haskey(m, :risk_minimised)
         @test !haskey(m, :sdp_plg_p_1)
+        m = build([dv(Variance())])
+        @test haskey(m, :sdp_plg_1) && !haskey(m, :variance_flag)
+        @test haskey(m, :sdp_plg_p_1)
         m = build([dv(UncertaintySetVariance(; ucs = ucs))])
-        @test haskey(m, :variance_flag) && !haskey(m, :tr_dv_1_variance_flag)
-        @test !haskey(m, :tr_dv_1_W) && !haskey(m, :sdp_plg_p_1)
+        @test !haskey(m, :variance_flag) && !haskey(m, :tr_dv_1_variance_flag)
+        @test !haskey(m, :tr_dv_1_W) && haskey(m, :sdp_plg_p_1)
+
+        # The role is read per variance and per objective. A ceiling, a variance at zero
+        # scale, and a variance that the objective does not minimise keep the penalty.
+        ceiling = Variance(; settings = RiskMeasureSettings(; ub = 1.0, rke = false))
+        m = build([ConditionalValueatRisk(), ceiling])
+        @test haskey(m, :variance_risk_2_ub) && !haskey(m, :variance_flag)
+        @test haskey(m, :sdp_plg_p_1)
+        m = build([ConditionalValueatRisk(),
+                   Variance(; settings = RiskMeasureSettings(; scale = 0.0))])
+        @test !haskey(m, :variance_flag) && haskey(m, :sdp_plg_p_1)
+        m = build([Variance()]; obj = MaximumReturn())
+        @test haskey(m, :variance_flag) && !haskey(m, :risk_minimised)
+        @test haskey(m, :sdp_plg_p_1)
+        @test haskey(build([Variance()]; obj = MaximumUtility(; l = 0)), :sdp_plg_p_1)
+        @test !haskey(build([Variance()]; obj = MaximumUtility()), :sdp_plg_p_1)
+        # `MaximumRatio` minimises the risk in its return form; its risk form, `sr_risk`,
+        # bounds it.
+        m = build([Variance()]; obj = MaximumRatio(; rf = 0))
+        @test haskey(m, :sdp_plg_p_1) == haskey(m, :sr_risk)
+        m = build([Variance()]; obj = MaximumRatio(; rf = 1))
+        @test haskey(m, :sr_risk) && haskey(m, :sdp_plg_p_1)
 
         # A dependent build inside an independent one records the independent build as the
         # owner, so it reads the shifted `W` and leaves the head's penalty in place.
@@ -223,7 +251,7 @@
         @test haskey(m, :tr_iv_1_W) && !haskey(m, :tr_iv_1_tr_dv_1_W)
         @test m[:tr_iv_1_W] !== m[:W]
         @test reads(m, :tr_iv_1_tr_dv_1_variance_risk_1, :tr_iv_1_W)
-        @test haskey(m, :tr_iv_1_variance_flag) && !haskey(m, :variance_flag)
+        @test !haskey(m, :tr_iv_1_variance_flag) && !haskey(m, :variance_flag)
         @test haskey(m, :sdp_plg_p_1)
     end
 end

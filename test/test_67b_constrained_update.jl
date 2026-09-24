@@ -1207,13 +1207,13 @@ end
                                                                                                              p = 10.0)),
                                                        3), w3, nothing)
             # A matrix ceiling goes through the shared builder with no prior: the semidefinite
-            # rows on the one `W`, and the variance marks `variance_flag`, so the phylogeny
-            # adds no penalty, as in a head (#1303).
+            # rows on the one `W`. A ceiling puts no price on the growth of `W`, so it marks
+            # no `variance_flag` and the phylogeny keeps its penalty, as in a head (#1305).
             @test haskey(m2, :W) &&
                   haskey(m2, :variance_risk_1_ub) &&
                   haskey(m2, :sdp_plg_1) &&
-                  haskey(m2, :variance_flag)
-            @test !haskey(m2, :dev_1) && !haskey(m2, :sdp_plg_p_1)
+                  !haskey(m2, :variance_flag)
+            @test !haskey(m2, :dev_1) && haskey(m2, :sdp_plg_p_1)
             # The source of the matrix does not change the formulation: the ceiling that
             # holds its matrix and the ceiling fitted on the prior give one projection, with
             # the phylogeny and without it (#1303).
@@ -1259,19 +1259,25 @@ end
                                                                     3), w3, rdR))
             @test haskey(m4, :rc_variance) && haskey(m4, :variance_risk_2_ub)
             @test !haskey(m4, :dev_2)
-            # In a leader's model both routes build the ceiling on the leader's `W` and mark
-            # the leader's `variance_flag`; only the set's rows take the prefix.
-            for r in (ceil3(; sigma = S3), ceil3())
+            # In a leader's model both routes build the ceiling on the leader's `W`; only the
+            # set's rows take the prefix. The ceiling marks no flag, so the set's phylogeny
+            # keeps its penalty, unless the leader minimises a variance on the same `W`.
+            for r in (ceil3(; sigma = S3), ceil3()), leader_minimises in (false, true)
                 ml = JuMP.Model()
                 po.set_model_scales!(ml, 1, 1)
                 po.set_model_observations!(ml, T)
                 JuMP.@expression(ml, k, 1)
                 JuMP.@variable(ml, w[1:3])
+                if leader_minimises
+                    po.mark_risk_minimised!(ml, MinimumRisk())
+                    po.mark_objective_variance!(ml, Symbol(""), po.RiskMeasureSettings())
+                end
                 inside(() -> po.add_allocation_set_constraints!(ml, mk3(r, pair), w3, rdR))
                 @test haskey(ml, :W) && !haskey(ml, :aset_W)
-                @test haskey(ml, :variance_flag) && !haskey(ml, :aset_variance_flag)
+                @test haskey(ml, :variance_flag) == leader_minimises
+                @test !haskey(ml, :aset_variance_flag)
                 @test haskey(ml, :aset_variance_risk_1_ub) && haskey(ml, :aset_sdp_plg_1)
-                @test !haskey(ml, :aset_sdp_plg_p_1)
+                @test haskey(ml, :aset_sdp_plg_p_1) == !leader_minimises
                 @test po.weights_prefix(ml, :aset_) === Symbol("")
             end
             # A prefix without a recorded owner owns itself, even when it holds the model's

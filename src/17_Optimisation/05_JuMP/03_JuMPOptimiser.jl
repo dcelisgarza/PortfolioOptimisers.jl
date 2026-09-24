@@ -1574,6 +1574,9 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     set_non_fixed_fees!(model, fees)
     set_risk_and_scalarise!(model, r, optimiser, opt, pr, plr, fees, b1; rd = rd)
     set_return_constraints!(model, ret, obj, pr; rd = rd)
+    # After the return constraints, so a `MaximumRatio` has chosen its form, and before
+    # every semidefinite phylogeny, including a programme set's in `add_custom_constraint!`.
+    mark_risk_minimised!(model, obj)
     set_iplg_constraints!(model, plr)
     if sdp_asset_phylogeny
         set_sdp_phylogeny_constraints!(model, plr)

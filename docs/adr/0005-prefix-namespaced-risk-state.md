@@ -95,15 +95,14 @@ lifted matrix `tr_dv_iW` with its own PSD cone for the same `w` (#1305). Two def
 
 1. The head's semidefinite phylogeny rows `A ⊙ W = 0` were on the bare `W`, so they did not
    constrain the inner variance `tr(Σ tr_dv_iW)`.
-2. The inner variance marked `tr_dv_ivariance_flag`, so a head whose only variance was a
-   dependent tracking variance kept the phylogeny's `p · tr(W)` penalty. A head with a plain
-   variance dropped it.
+2. The phylogeny omitted its `p · tr(W)` penalty whenever a variance was present on its
+   weights. A presence flag cannot tell a variance that holds `W` down from one that does not.
 
-**Decision.** The lifted matrix `W` (with `M` and `M_PSD`) and the marks `variance_flag` and
-`rc_variance` belong to the weights, not to the build. A build that registers weights it did
-not make also registers `w_owner`, the namespace that owns them. `weights_prefix(model,
-prefix)` returns that owner, or `prefix` when there is none, and `set_sdp_constraints!`, the
-variance builders and the phylogeny builder read it.
+**Decision, the owner of the weights.** The lifted matrix `W` (with `M` and `M_PSD`) and the
+marks `variance_flag` and `rc_variance` belong to the weights, not to the build. A build that
+registers weights it did not make also registers `w_owner`, the namespace that owns them.
+`weights_prefix(model, prefix)` returns that owner, or `prefix` when there is none, and
+`set_sdp_constraints!`, the variance builders and the phylogeny builder read it.
 
 - `DependentVariableTracking` registers `w_owner = weights_prefix(model, prefix)` under its
   tracking prefix. Its inner measures read the enclosing build's `W` and marks, and keep
@@ -116,11 +115,33 @@ variance builders and the phylogeny builder read it.
 - A programme Allocation Set in a leader's model registers `w_owner = Symbol("")` under
   `:aset_` (#1303, ADR 0159). This replaces the boolean mark `w_shared` that #1303 added, which
   could not name an owner other than the bare namespace.
-- `UncertaintySetVariance` marks `variance_flag` on the owner, as `Variance` does, because it
-  builds on the owner's `W`.
 
-**Consequence.** A dependent tracking variance now removes the phylogeny's `p · tr(W)` penalty,
-as the head's own variance does. The `[A, Tracking(A)]` cases of
-`test/test_27_prefix_registration.jl` assert that a `DependentVariableTracking` build registers
-none of these keys under its prefix, and a new testset covers the phylogeny, the penalty and
-the nested chain.
+**Decision, the penalty.** The PSD cone forces only `W ⪰ w·wᵀ`. The step `W + t·eᵢeᵢᵀ` keeps
+the cone and the phylogeny rows, because `Aᵢᵢ = 0`, and it adds `t·Σᵢᵢ` to `tr(ΣW)`. The
+penalty prices that step at `p·t`. A term omits the penalty only if it prices the step with
+the same sign, so the rule reads each variance alone, by its role:
+
+- A variance that is a positive term of the objective's risk (`rke`, `scale > 0`) marks
+  `variance_flag`, `mark_objective_variance!`. A ceiling does not, and neither does the inner
+  variance of a tracking measure, whose `rke` the tracking constructor clears.
+- `assemble_jump_model!` marks `risk_minimised` after the return constraints,
+  `mark_risk_minimised!`: `MinimumRisk`, `MaximumUtility` with `l > 0`, and `MaximumRatio` in
+  its return form. In its risk form, `sr_risk`, the risk is a bound.
+- The phylogeny omits the penalty only when both marks are present. The factor-space
+  phylogeny of `FactorRiskContribution` follows the same rule.
+
+A dependent tracking variance adds `s·|tr(ΣW) − rb·k|`. When the portfolio's variance is below
+the benchmark's, the step lowers that term by `s·t·Σᵢᵢ`, so the term rewards a larger `W`. With
+no penalty the relaxation of the term is `max(0, v(w) − rb·k)`, where `v(w)` is the smallest
+`tr(ΣW)` that the constraints permit: it penalises only a portfolio riskier than the benchmark.
+A measurement on 5 assets with the riskiest asset as the benchmark showed a reported tracking
+error of `−9e-11` against a true `4.41e-4`. With the penalty, `W` stays tight exactly when
+`p ≥ s·maxᵢ Σᵢᵢ`; the measurement agreed at `s·Σᵢᵢ = 4.5e-4, 0.45` against `p = 0.05, 1`. So a
+tracking variance keeps the penalty. The penalty does not make the dependent tracking exact,
+and as a bound the tracking stays one-sided; that defect is outside this decision (#1307).
+
+**Consequence.** A ceiling, a tracking variance, a variance at zero scale, and a variance under
+`MaximumReturn` or the risk form of `MaximumRatio` now keep the penalty. Before, every variance
+present removed it. A head that minimises a variance builds the programme it built before.
+`test/test_27_prefix_registration.jl` covers the owner, the nested chain and each role, and
+`test/test_67b_constrained_update.jl` covers the set's ceilings in both models.

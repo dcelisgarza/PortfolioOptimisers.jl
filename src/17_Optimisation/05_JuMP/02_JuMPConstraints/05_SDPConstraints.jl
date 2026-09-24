@@ -27,6 +27,83 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Mark `variance_flag` on the weights under `prefix` when the variance is a positive term of the objective's risk.
+
+The PSD cone ``[\\mathbf{W}\\ \\boldsymbol{w};\\ \\boldsymbol{w}^\\intercal\\ k] \\succeq 0`` forces only ``\\mathbf{W} \\succeq \\boldsymbol{w}\\boldsymbol{w}^\\intercal``, and ``\\mathbf{W} + t\\,\\boldsymbol{e}_i\\boldsymbol{e}_i^\\intercal`` stays feasible for every ``t \\geq 0``, also under the phylogeny rows ``\\mathbf{A} \\odot \\mathbf{W} = \\mathbf{0}``, because ``A_{ii} = 0``. That step adds ``s\\,t\\,\\Sigma_{ii}`` to a variance term ``s\\,\\mathrm{tr}(\\boldsymbol{\\Sigma}\\mathbf{W})``. A variance that the objective minimises with ``s > 0`` therefore prices the growth of ``\\mathbf{W}``, as the phylogeny's ``p\\,\\mathrm{tr}(\\mathbf{W})`` penalty does, and [`set_sdp_phylogeny_constraints!`](@ref) can omit the penalty.
+
+A variance that is only a bound puts no price on the growth, and neither does the inner variance of a [`RiskTrackingRiskMeasure`](@ref). The constructor of the tracking measure clears the inner `rke`. The dependent term ``|\\mathrm{tr}(\\boldsymbol{\\Sigma}\\mathbf{W}) - r_b k|`` rewards a larger ``\\mathbf{W}`` when the portfolio's variance is below the benchmark's. So neither marks the flag. The rule reads each variance alone, and the objective's role is read by [`mark_risk_minimised!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `prefix`: The Model State namespace of the build. The mark goes to its owner, [`weights_prefix`](@ref).
+  - `settings`: The variance's settings. The mark needs `settings.rke` and `settings.scale > 0`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_sdp_phylogeny_constraints!`](@ref)
+  - [`mark_risk_minimised!`](@ref)
+  - [`Variance`](@ref)
+"""
+function mark_objective_variance!(model::JuMP.Model, prefix::Symbol,
+                                  settings::RiskMeasureSettings)
+    if settings.rke && settings.scale > zero(settings.scale)
+        mark_state!(model, weights_prefix(model, prefix), :variance_flag)
+    end
+    return nothing
+end
+"""
+    mark_risk_minimised!(model::JuMP.Model, obj::ObjectiveFunction)
+
+Mark `risk_minimised` when the objective `obj` minimises the risk term.
+
+[`assemble_jump_model!`](@ref) calls it after the return constraints, so a [`MaximumRatio`](@ref) has chosen its form. A marked variance holds the lifted matrix down only when the objective minimises it, [`mark_objective_variance!`](@ref).
+
+  - [`MinimumRisk`](@ref) minimises the risk.
+  - [`MaximumUtility`](@ref) minimises it when `l > 0`.
+  - [`MaximumRatio`](@ref) minimises it in the return form. In the risk form, which registers `sr_risk`, the risk is a bound.
+  - Every other objective, such as [`MaximumReturn`](@ref), leaves the risk out of the objective.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `obj`: The objective that the model builds.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`mark_objective_variance!`](@ref)
+  - [`set_sdp_phylogeny_constraints!`](@ref)
+"""
+function mark_risk_minimised!(::JuMP.Model, ::ObjectiveFunction)
+    return nothing
+end
+function mark_risk_minimised!(model::JuMP.Model, ::MinimumRisk)
+    shared_set!(model, :risk_minimised, true)
+    return nothing
+end
+function mark_risk_minimised!(model::JuMP.Model, obj::MaximumUtility)
+    if obj.l > zero(obj.l)
+        shared_set!(model, :risk_minimised, true)
+    end
+    return nothing
+end
+function mark_risk_minimised!(model::JuMP.Model, ::MaximumRatio)
+    if !shared_has(model, :sr_risk)
+        shared_set!(model, :risk_minimised, true)
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Add a positive semidefinite (PSD) constraint to the JuMP optimisation model for the portfolio weights.
 
 Creates a symmetric matrix variable `W` and enforces that the bordered matrix `[W w; wᵀ k]` lies in the PSD cone. Returns immediately if `W` already exists in `model`. The matrix is registered under the namespace that owns the weights under `prefix`, [`weights_prefix`](@ref), so weights registered twice have one `W`.
@@ -114,7 +191,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add semidefinite phylogeny constraints to the JuMP optimisation model.
 
-Iterates over `plgs` and, for each [`SemiDefinitePhylogeny`](@ref) entry, enforces `A ⊙ W = 0` and adds `p * tr(W)` to the objective penalty when no [`Variance`](@ref) was built on the same weights. A variance marks `variance_flag`, and the rule is the same whether the variance is in the objective or is a ceiling. Does nothing when `plgs` contains no [`SemiDefinitePhylogeny`](@ref) instances.
+Iterates over `plgs` and, for each [`SemiDefinitePhylogeny`](@ref) entry, enforces `A ⊙ W = 0` and adds `p * tr(W)` to the objective penalty. The penalty holds ``\\mathbf{W}`` down to ``\\boldsymbol{w}\\boldsymbol{w}^\\intercal``. It is omitted when a variance on the same weights marked `variance_flag`, [`mark_objective_variance!`](@ref), and the objective minimises the risk, [`mark_risk_minimised!`](@ref), because that variance then does the same work. A variance that is only a bound, or the inner variance of a tracking measure, keeps the penalty. Does nothing when `plgs` contains no [`SemiDefinitePhylogeny`](@ref) instances.
 
 # Arguments
 
@@ -147,7 +224,7 @@ function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PlC_Ve
         end
         A = pl.A
         state_set!(model, prefix, :sdp_plg_, i, JuMP.@constraint(model, sc * A ⊙ W == 0))
-        if !state_has(model, owner, :variance_flag)
+        if !(shared_has(model, :risk_minimised) && state_has(model, owner, :variance_flag))
             p = pl.p
             plp = state_set!(model, prefix, :sdp_plg_p_, i,
                              JuMP.@expression(model, p * LinearAlgebra.tr(W)))
@@ -161,7 +238,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add semidefinite phylogeny constraints for factor risk contribution to the JuMP optimisation model.
 
-Iterates over `plgs` and, for each [`SemiDefinitePhylogeny`](@ref) entry, enforces `A ⊙ frc_W = 0` and optionally adds `p * tr(frc_W)` to the objective penalty. Does nothing when `plgs` contains no [`SemiDefinitePhylogeny`](@ref) instances.
+Iterates over `plgs` and, for each [`SemiDefinitePhylogeny`](@ref) entry, enforces `A ⊙ frc_W = 0` and adds `p * tr(frc_W)` to the objective penalty, by the rule of [`set_sdp_phylogeny_constraints!`](@ref). Does nothing when `plgs` contains no [`SemiDefinitePhylogeny`](@ref) instances.
 
 # Arguments
 
@@ -193,7 +270,7 @@ function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
         A = pl.A
         state_set!(model, Symbol(""), :frc_sdp_plg_, i,
                    JuMP.@constraint(model, sc * A ⊙ W == 0))
-        if !shared_has(model, :variance_flag)
+        if !(shared_has(model, :risk_minimised) && shared_has(model, :variance_flag))
             p = pl.p
             plp = state_set!(model, Symbol(""), :frc_sdp_plg_p_, i,
                              JuMP.@expression(model, p * LinearAlgebra.tr(W)))

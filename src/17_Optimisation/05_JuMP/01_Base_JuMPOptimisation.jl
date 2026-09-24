@@ -1090,14 +1090,16 @@ const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical 
                                   # Per-optimiser scratch on the outer model.
                                   :noc_rk, :noc_rt, :psi,
                                   # The one deliberate write-prefixed / read-bare entry
-                                  # (ADR 0005). A variance marks the namespace that owns
-                                  # its weights, `weights_prefix`: a build on shifted
-                                  # weights marks its own prefix, so its presence does not
-                                  # leak outward, and a build on the head's own weights
-                                  # marks the bare entry. The readers are the phylogeny
-                                  # builders, which add a `p·tr(W)` penalty when no
-                                  # variance is on the weights of their `W`.
-                                  :variance_flag])
+                                  # (ADR 0005). A variance that is a positive term of the
+                                  # objective's risk marks the namespace that owns its
+                                  # weights, `weights_prefix`: a build on shifted weights
+                                  # marks its own prefix, so its presence does not leak
+                                  # outward, and a build on the head's own weights marks
+                                  # the bare entry. `risk_minimised` records that the
+                                  # objective minimises the risk. The readers are the
+                                  # phylogeny builders, which omit the `p·tr(W)` penalty
+                                  # only when both are present.
+                                  :variance_flag, :risk_minimised])
 """
     assert_shared_state(name::Symbol)
 
