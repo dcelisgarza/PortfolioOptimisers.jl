@@ -1611,7 +1611,7 @@ Where:
   - $(math_dict[:w_t_iter])
   - $(math_dict[:x_t_rel])
   - $(math_dict[:eta_t_lr])
-  - ``\\mathrm{Proj}_{\\mathcal{W}}``: Euclidean projection onto the Allocation Set ``\\mathcal{W}``.
+  - $(math_dict[:Proj_W_euclid])
 
 On the simplex, the projection sets to zero every entry that the step leaves below the projection's threshold.
 

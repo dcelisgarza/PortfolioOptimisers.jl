@@ -361,4 +361,88 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
         of = po.partial_fit!(OPS(; alg = ftl, set = cap), rows(rd, 1:3))
         @test all(h -> h ≈ [0.5, 0.25, 0.25], of.cache.st.h)
     end
+
+    @testset "The mathematics of the meta-learning docstrings (#1200)" begin
+        # Singer's equation 6, (1 - γK/(K - 1)) q + γ/(K - 1), is the step on the simplex.
+        for (g, K) in ((0.25, 3), (1 / 3, 5), (0.9, 4))
+            wk = rand(StableRNG(K), K)
+            wk ./= sum(wk)
+            xk = 1 .+ 0.05 .* randn(StableRNG(K + 1), K)
+            q = wk .* xk ./ dot(wk, xk)
+            eq6 = (1 - g * K / (K - 1)) .* q .+ g / (K - 1)
+            wn = po.online_update!(SwitchingWeighting(; gamma = g), nothing, wk, xk,
+                                   nothing, resolve(BoundedAllocationSet(), K))[2]
+            @test maxerr(wn, eq6) < 1e-15
+        end
+        # At γ = (K - 1) / K every entry is 1 / K.
+        @test po.online_update!(SwitchingWeighting(; gamma = 2 / 3), nothing,
+                                [0.7, 0.2, 0.1], X[1, :], nothing, simplex)[2] ≈
+              fill(1 / 3, 3)
+
+        # The switching portfolio is the Bayesian mixture over the paths of the hidden
+        # process: the prior of a path is (1/N) ∏ (1 - γ or γ/(N - 1)), and the wealth of
+        # the mixture is the prior-weighted sum of the wealths of all N^Tp paths.
+        g, Tp = 0.25, 6
+        Wsp = libpath(SwitchingPortfolio(; N = N, gamma = g))
+        wealth = prod(dot(Wsp[t, :], X[t, :]) for t in 1:Tp)
+        function path_sum(len)
+            mass = zeros(N)
+            total = 0.0
+            for path in Iterators.product(ntuple(_ -> 1:N, len)...)
+                prior = 1 / N
+                for t in 2:len
+                    prior *= path[t] == path[t - 1] ? 1 - g : g / (N - 1)
+                end
+                v = prior * prod(X[t, path[t]] for t in 1:min(len, Tp))
+                total += v
+                mass[path[end]] += v
+            end
+            return total, mass
+        end
+        total, _ = path_sum(Tp)
+        @test isapprox(total, wealth; rtol = 1e-13)
+        # The weight on a unit expert is the posterior probability that the process holds
+        # that asset in the next period.
+        total1, mass = path_sum(Tp + 1)
+        @test maxerr(mass ./ total1, Wsp[Tp + 1, :]) < 1e-13
+
+        # The smallest bound on the Euclidean norm of the log-wealth gradient over the
+        # simplex is ‖x‖₂ / min x, at the vertex of the smallest price relative. The bound
+        # 1 / min x does not hold: at the uniform allocation over [1, 1, 1, 0.6] the norm
+        # is 2.04, above 1 / 0.6.
+        grad_norm(w, x) = norm(x) / dot(w, x)
+        for s in 1:200
+            x = 1 .+ 0.1 .* randn(StableRNG(s), 4)
+            w = rand(StableRNG(s + 1000), 4)
+            w ./= sum(w)
+            @test grad_norm(w, x) <= norm(x) / minimum(x) * (1 + 1e-15)
+            vertex = [i == argmin(x) ? 1.0 : 0.0 for i in 1:4]
+            @test grad_norm(vertex, x) ≈ norm(x) / minimum(x)
+        end
+        xg = [1, 1, 1, 0.6]
+        @test round(grad_norm(fill(0.25, 4), xg); digits = 2) == 2.04 &&
+              grad_norm(fill(0.25, 4), xg) > 1 / 0.6
+
+        # Under any objective the weighting weighs the experts by their log wealth: on a
+        # Risk Loss the next weight is the exponentiated-gradient step over the experts'
+        # returns, p ∝ p ⊙ exp(ε r / ⟨p, r⟩), and not a step on the risk loss.
+        for obj in (LogWealth(), RiskLoss(; window = 5))
+            eps = 0.3
+            o = po.partial_fit!(OPS(;
+                                    alg = Ader(; eta_min = 0.05, K = 3, eps = eps,
+                                               obj = obj)), rows(rd, 1:12))
+            h = deepcopy(o.cache.st.h)
+            p = copy(o.cache.st.p)
+            r = [dot(hk, X[13, :]) for hk in h]
+            pn = p .* exp.(eps .* r ./ dot(p, r))
+            pn ./= sum(pn)
+            o = po.partial_fit!(o, rows(rd, 13:13))
+            @test maxerr(o.cache.st.p, pn) < 1e-14
+        end
+
+        # Every rate of the grid takes the numeric type of eta_min.
+        @test [e.eta for e in po.rate_grid_experts(1 // 20, 3, LogWealth())] ==
+              [1 // 20, 1 // 10, 1 // 5]
+        @test [e.eta for e in po.rate_grid_experts(1, 3, LogWealth())] == [1, 2, 4]
+    end
 end

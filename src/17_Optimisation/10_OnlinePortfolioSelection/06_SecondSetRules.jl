@@ -556,7 +556,7 @@ Where:
   - $(math_dict[:w_t_iter])
   - $(math_dict[:x_t_rel])
   - $(math_dict[:t_period])
-  - ``\\hat{\\boldsymbol{w}}_t = \\boldsymbol{w}_t \\odot \\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle``: Price-Adjusted Allocation, the wealth held in each asset at the end of period ``t``.
+  - $(math_dict[:w_hat_t_padj])
   - ``\\ell``: Window length.
   - ``L^{(1)}``, ``L^{(2)}``: Log price relatives of the first and the second window, ``\\ell`` rows each.
   - ``\\boldsymbol{\\mu}_1``, ``\\boldsymbol{\\mu}_2``: Column means of ``L^{(1)}`` and ``L^{(2)}``.

@@ -1275,7 +1275,22 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :gamma_st => "``\\gamma``: Soft-threshold width, positive.",#
                        :a_huber => "``a``: Quadratic coupling ``\\lambda / \\gamma`` of the target to the auxiliary vector.",#
                        :g_aux => "``\\boldsymbol{g}``: Auxiliary vector that carries the ``L_1`` penalty in place of the target.",#
-                       :nu_budget => "``\\nu``: Multiplier of the budget constraint ``\\boldsymbol{1}^\\intercal \\boldsymbol{b} = 1``.")
+                       :nu_budget => "``\\nu``: Multiplier of the budget constraint ``\\boldsymbol{1}^\\intercal \\boldsymbol{b} = 1``.",#
+                       # The expert mixtures, their dynamic-regret grids and the switching portfolio.
+                       :w_hat_t_padj => "``\\hat{\\boldsymbol{w}}_t = \\boldsymbol{w}_t \\odot \\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle``: Price-Adjusted Allocation, the wealth held in each asset at the end of period ``t``.",#
+                       :Proj_W_euclid => "``\\mathrm{Proj}_{\\mathcal{W}}``: Euclidean projection onto the Allocation Set ``\\mathcal{W}``.",#
+                       :K_expert => "``K``: Expert count of an expert mixture.",#
+                       :h_kt_expert => "``\\boldsymbol{h}_k(t)``: Allocation that expert ``k`` holds during period ``t``.",#
+                       :r_t_expert => "``\\boldsymbol{r}_t``: Expert-return vector of period ``t``, with entries ``r_{t,k} = \\langle \\boldsymbol{h}_k(t), \\boldsymbol{x}_t \\rangle``.",#
+                       :p_t_expert => "``\\boldsymbol{p}_t``: Weight vector over the experts at period ``t``, with entries ``p_{t,k}`` that sum to one.",#
+                       :eta_k_grid => "``\\eta_k``: Grid rate of expert ``k``, the learning rate of its gradient step.",#
+                       :eta_min_grid => "``\\eta_{\\min}``: Smallest grid rate, the rate of the first expert.",#
+                       :f_t_online => "``f_t``: Online loss of period ``t``, the objective that the experts step on.",#
+                       :ell_t_surr => "``\\ell_t(\\boldsymbol{w}) = \\langle \\nabla f_t(\\boldsymbol{w}_t), \\boldsymbol{w} - \\boldsymbol{w}_t \\rangle``: Surrogate loss of period ``t``, the online loss linearised at the played allocation.",#
+                       :T_regret => "``T``: Regret horizon, the number of periods that a regret bound covers.",#
+                       :D_diam => "``D``: Diameter of the feasible set in the Euclidean norm.",#
+                       :G_gradbound => "``G``: Bound on the Euclidean norm of the gradient of every online loss over the feasible set.",#
+                       :P_T_path => "``P_T = \\sum_{t=2}^{T} \\lVert \\boldsymbol{u}_t - \\boldsymbol{u}_{t-1} \\rVert_2``: Path length of a comparator sequence ``\\boldsymbol{u}_1, \\ldots, \\boldsymbol{u}_T`` in the feasible set.")
 """
     ref_dict
 
