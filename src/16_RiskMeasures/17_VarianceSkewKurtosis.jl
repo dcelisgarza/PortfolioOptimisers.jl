@@ -521,6 +521,12 @@ The skewness term takes a **lower** bound, because a larger skewness is preferab
 
     A relaxation block stands in for an exact Kronecker product, so the model's value carries the relaxation gap. The functor reads the moments from the matrices directly and carries no gap. The two agree to the width of that gap.
 
+!!! warning
+
+    The `JuMP` model is an approximate formulation of ``\\mathcal{R}``. Its optimum matches the optimum of ``\\mathcal{R}`` only where the relaxation is tight, and the relaxation is tight over a range of skewness values only. A skewness scale ``s_{\\mathrm{sk}}`` that is large against ``s_{\\sigma^2}`` and ``s_{\\kappa}`` loosens it: the optimum moves to relaxation blocks far from any product of the weights, and the model's value stops tracking the functor's. A first-order solver can then stop at a point that breaks the weight bounds and the budget. The solution check accepts that point as solved when `check_sol = (; allow_almost = true)`.
+
+    Raise ``s_{\\mathrm{sk}}`` in small steps and check the returned weights against the bounds and the budget. The default `check_sol` rejects an approximate solution, so a solver that stops short fails instead of returning such a point.
+
 # Functor
 
     (r::VarianceSkewKurtosis)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
