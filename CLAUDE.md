@@ -133,9 +133,10 @@ Wire your addition into the audit in the same change:
 
 1. Add or correct the file's row. The census prints the line to paste. Take `map` from the check
    below: it names the map when the directory uses one, and lists the candidates when the directory
-   uses several. Set `swept = false`. A swept row also records the
-   name of the binding each unit attaches to, so a unit replaced one for one in a swept file owes
-   the same four steps as an addition, and the row keeps `swept = true` (ADR 0148).
+   uses several. Set `swept = false`. A swept row also records the name of the binding each unit
+   attaches to. A unit added to a swept file, or replaced one for one in it, keeps
+   `swept = true`: the commit sweeps the new units itself, and steps 3 and 4 do not apply. If the
+   commit cannot sweep them, it sets `swept = false` and takes all four steps (ADR 0148).
 2. Cover every line of a new file, or give it a Coverage Exemption. ADR 0082 owns that rule.
 3. Reopen the child map that owns the file, and reopen its umbrella, issue #404.
 4. Open one sub-issue of that child map for the addition, so it is swept as systematically as the

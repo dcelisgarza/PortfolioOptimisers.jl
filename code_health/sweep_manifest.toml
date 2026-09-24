@@ -21,9 +21,10 @@
 #              It is the record of the text the sweep passed. `test/test_45_sweep_census.jl`
 #              compares it against the file: a unit REPLACED one for one leaves `units`
 #              where it was, and only the names see it (issue #1065). The session that flips
-#              `swept` writes the list in the same edit, and a session that changes the unit
-#              set of a swept file records the new list and joins the change to the child
-#              map, as an addition would.
+#              `swept` writes the list in the same edit. A session that changes the unit set
+#              of a swept file records the new list and sweeps the new units in the same
+#              commit, so it owes no sub-issue. If it cannot, it sets `swept = false`, and
+#              the change joins the child map as an addition would (ADR 0148).
 #
 # #404's standing rule is: any addition joins its child map, and a closed child map -- and the
 # umbrella -- is reopened. `CLAUDE.md`, section "Functionality you add", states the steps a person

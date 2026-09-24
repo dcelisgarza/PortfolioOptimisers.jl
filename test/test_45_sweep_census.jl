@@ -183,8 +183,9 @@ end
     @test isempty(drifted)
     if !isempty(drifted)
         println("Files whose documented-unit count no longer matches `code_health/sweep_manifest.toml`.",
-                " Join the addition to the file's child map of #404, reopen that map if it ",
-                "is closed, then record the new count:")
+                " On an unswept row, join the addition to the file's child map of #404 and ",
+                "reopen that map if it is closed. On a swept row, sweep the new units in this ",
+                "commit (ADR 0148). Then record the new count:")
         for (f, was, now) in drifted
             row = rows[f]
             println("  ", f, "  ", was, " -> ", now, "   [map ", row["map"], ": ",
@@ -221,11 +222,12 @@ end
     changed. The session that flips `swept` writes the list in the same edit, as it writes
     `algorithm`, and the printer below hands it the line.
 
-    What the failure asks for is the same as check 3's: join the change to the child map,
-    and record the new row. A swept file whose unit set changes owes the map a sub-issue for
-    the rewritten units, as it would owe one for an addition, and keeps its `swept` flag:
-    the flag arms the swept standard in `test/test_26_docs.jl`, and a rewrite must still meet
-    it. The blind spot that remains is a unit rewritten UNDER its own name -- a method whose
+    What the failure asks for is the same as check 3's on a swept row: record the new row,
+    and sweep the rewritten units in the same commit. The row keeps its `swept` flag: the flag
+    arms the swept standard in `test/test_26_docs.jl`, and a rewrite must still meet it. No
+    sub-issue is owed, because it would record nothing that the commit does not (ADR 0148
+    § Amendment, issue #1310). A commit that cannot meet the standard sets `swept = false`,
+    and the change then joins the child map as an addition to an unswept file does. The blind spot that remains is a unit rewritten UNDER its own name -- a method whose
     signature changed but whose function did not -- and that is accepted: the names gate the
     set, and the sweep gates the text.
     =#
@@ -277,9 +279,9 @@ end
     if !isempty(renamed)
         println("Swept files whose documented units are no longer the ones ",
                 "`code_health/sweep_manifest.toml` records. The sweep passed a text these files ",
-                "no longer hold. Join the change to the file's child map of #404 as an ",
-                "addition -- reopen the map if it is closed, and open a sub-issue for the ",
-                "rewritten units -- then record the new list:")
+                "no longer hold. Sweep the rewritten units in this commit, or set `swept = ",
+                "false` and join the change to the file's child map of #404 as an addition ",
+                "(ADR 0148). Then record the new list:")
         for (f, recorded, measured) in renamed
             row = rows[f]
             # A multiset difference: a method docstring added to a function that already has
