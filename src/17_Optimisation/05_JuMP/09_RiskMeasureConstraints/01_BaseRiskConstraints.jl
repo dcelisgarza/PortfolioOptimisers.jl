@@ -1,23 +1,24 @@
 """
     const NonFRCJuMPOpt = Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting}
 
-Alias for JuMP optimisers that do not use factor risk contribution.
+Groups the JuMP optimisers that do not use factor risk contribution.
 
-Matches [`MeanRisk`](@ref), [`NearOptimalCentering`](@ref), or [`RiskBudgeting`](@ref). Used for dispatch in risk constraint generation functions that apply to these optimiser types but not to factor risk contribution.
+[`FactorRiskContribution`](@ref) is the one JuMP optimiser outside the group. Two methods dispatch on this alias. The frontier method of [`set_risk_upper_bound!`](@ref) records a [`Frontier`](@ref) bound, and [`risk_contribution_constraints`](@ref) writes the risk contribution rows of a [`Variance`](@ref). A factor risk contribution optimiser reaches neither method.
 
 # Related
 
   - [`MeanRisk`](@ref)
   - [`NearOptimalCentering`](@ref)
   - [`RiskBudgeting`](@ref)
+  - [`RiskBoundOwner`](@ref)
 """
 const NonFRCJuMPOpt = Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting}
 """
     const RiskConstraintOwner = Union{<:RiskJuMPOptimisationEstimator, <:AbstractProgrammeAllocationSet}
 
-The owner of the risk constraint a builder writes: the JuMP optimiser whose programme the constraint joins, or the programme Allocation Set whose projection it joins.
+Groups the owners of the risk constraints that a builder writes. An owner is a JuMP optimiser, whose programme the constraint joins, or a programme Allocation Set, whose projection the constraint joins.
 
-Every `set_risk_constraints!` and `set_risk!` method takes the owner in its `opt` slot and reads it through three methods, which is the whole of what a builder asks of an optimiser: [`risk_constraint_solver`](@ref) for the solver a Deferred Quantity is resolved against, [`risk_contribution_constraints`](@ref) for a [`Variance`](@ref)'s risk-contribution rows, and [`set_risk_upper_bound!`](@ref) for the bound on the risk expression. A [`FactorRiskContribution`](@ref) is an owner whose bound is refused with a warning; a [`RiskBoundOwner`](@ref) is one whose bound is honoured.
+Every `set_risk_constraints!` and `set_risk!` method takes the owner in its `opt` slot. A builder reads the owner through three methods and no others. [`risk_constraint_solver`](@ref) gives the solver that resolves a Deferred Quantity. [`risk_contribution_constraints`](@ref) gives the risk contribution rows of a [`Variance`](@ref). [`set_risk_upper_bound!`](@ref) writes the bound on the risk expression. A [`RiskBoundOwner`](@ref) honours the bound, and a [`FactorRiskContribution`](@ref) ignores it with a warning.
 
 # Related
 
@@ -31,7 +32,9 @@ const RiskConstraintOwner = Union{<:RiskJuMPOptimisationEstimator,
 """
     const RiskBoundOwner = Union{<:NonFRCJuMPOpt, <:AbstractProgrammeAllocationSet}
 
-The [`RiskConstraintOwner`](@ref)s that honour a risk measure's `settings.ub`: the JuMP optimisers that do not use factor risk contribution, and the programme Allocation Set, whose `ub` is the ceiling of its projection.
+Groups the owners that honour the `settings.ub` of a risk measure.
+
+The group holds every JuMP optimiser except [`FactorRiskContribution`](@ref), and the programme Allocation Set. On a programme Allocation Set, `ub` is the ceiling of its projection.
 
 # Related
 
@@ -43,7 +46,17 @@ const RiskBoundOwner = Union{<:NonFRCJuMPOpt, <:AbstractProgrammeAllocationSet}
 """
     risk_constraint_solver(opt::JuMPOptimisationEstimator)
 
-The solver a risk-measure builder resolves a Deferred Quantity against: the JuMP optimiser's own `opt.slv`. A programme Allocation Set answers its own; see [`AbstractProgrammeAllocationSet`](@ref).
+Returns the solver against which a risk measure builder resolves a Deferred Quantity.
+
+The method for a JuMP optimiser returns the solver of the optimiser, `opt.opt.slv`. A programme Allocation Set has a method of its own, which [`AbstractProgrammeAllocationSet`](@ref) states.
+
+# Arguments
+
+  - `opt`: The JuMP optimiser that owns the constraint.
+
+# Returns
+
+  - `slv`: The solver, or the vector of solvers, of the optimiser.
 
 # Related
 
@@ -57,37 +70,71 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Collapse the `risk_vec` expression array stored in `model` into a single scalar
-`risk` JuMP expression.
+Reduces the entries of `model[:risk_vec]` to the one risk quantity `model[:risk]` that the objective reads.
 
-The `SumScalariser` method sums all entries into a linear or quadratic expression. The
-`LogSumExpScalariser` method introduces auxiliary variables and exponential cone constraints
-to encode a log-sum-exp scalarisation. The `MaxScalariser` method introduces a variable and
-linear constraints to encode the maximum over all entries.
+The scalariser `sca` selects the reduction. Under the sum, `risk` is an expression. Under the log-sum-exp and the maximum, `risk` is a free variable that rows bound from below.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathcal{R}_{\\mathrm{sum}} &= \\sum_k \\mathcal{R}_k\\,, \\\\
-\\mathcal{R}_{\\mathrm{lse}} &= \\frac{1}{\\gamma}\\ln\\sum_k e^{\\gamma \\mathcal{R}_k}\\,, \\\\
-\\mathcal{R}_{\\mathrm{max}} &= \\max_k \\mathcal{R}_k\\,.
+\\mathcal{R}_{\\mathrm{sum}} &= \\sum_{i=1}^{n} \\mathcal{R}_i\\,, \\\\
+\\mathcal{R}_{\\mathrm{lse}} &= \\frac{1}{\\gamma} \\ln \\sum_{i=1}^{n} e^{\\gamma \\mathcal{R}_i}\\,, \\\\
+\\mathcal{R}_{\\mathrm{max}} &= \\max_{1 \\leq i \\leq n} \\mathcal{R}_i\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathcal{R}_{\\mathrm{sum}}``: Sum scalarisation.
-  - ``\\mathcal{R}_{\\mathrm{lse}}``: Log-sum-exp scalarisation.
-  - ``\\mathcal{R}_{\\mathrm{max}}``: Maximum scalarisation.
-  - ``\\mathcal{R}_k``: ``k``-th risk expression.
-  - ``\\gamma``: Temperature parameter for log-sum-exp.
+  - ``\\mathcal{R}_{\\mathrm{sum}}``, ``\\mathcal{R}_{\\mathrm{lse}}``, ``\\mathcal{R}_{\\mathrm{max}}``: The risk under the sum, the log-sum-exp and the maximum scalariser.
+  - $(math_dict[:R_i_riskvec])
+  - ``n``: Number of entries of `risk_vec`.
+  - ``\\gamma > 0``: Smoothing parameter of the log-sum-exp, `sca.gamma`.
+
+# Algorithm
+
+ 1. When the model holds no `risk_vec`, return `nothing` and register nothing. This happens when every risk measure sets `rke = false`.
+ 2. Read `risk_vec`.
+ 3. Register `risk` through the method that `sca` selects, as the rows below state.
+
+# JuMP formulation
+
+## Variables
+
+  - `risk`: created by the log-sum-exp and the maximum methods, a free scalar.
+  - `u_risk`: created by the log-sum-exp method, ``n \\times 1``.
+
+## Expressions
+
+  - `risk`: registered by the sum method, ``\\sum_{i=1}^{n} \\mathcal{R}_i``. It is quadratic when an entry of `risk_vec` is quadratic, and affine otherwise.
+
+## Constraints
+
+  - `u_risk_lse`: ``s_c \\left(\\sum_{i=1}^{n} u_i - 1\\right) \\leq 0``, registered by the log-sum-exp method.
+  - `risk_lse`: ``\\left(s_c \\gamma (\\mathcal{R}_i - \\rho),\\, s_c,\\, s_c u_i\\right) \\in \\mathcal{K}_{\\mathrm{exp}}``, ``\\forall\\, i = 1,\\ldots,n``, registered by the log-sum-exp method.
+  - `risk_ms`: ``\\rho - \\mathcal{R}_i \\geq 0``, ``\\forall\\, i = 1,\\ldots,n``, registered by the maximum method.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:R_i_riskvec])
+  - ``\\rho``: The variable `risk`.
+  - ``u_i``: Entry ``i`` of `u_risk`.
+  - ``\\mathcal{K}_{\\mathrm{exp}} = \\mathrm{cl}\\,\\{(x, y, z) : y e^{x / y} \\leq z,\\, y > 0\\}``: Exponential cone.
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - The sum method is exact.
+  - The log-sum-exp rows give ``e^{\\gamma (\\mathcal{R}_i - \\rho)} \\leq u_i`` and ``\\sum_{i} u_i \\leq 1``, so ``\\rho \\geq \\mathcal{R}_{\\mathrm{lse}}``. The maximum rows give ``\\rho \\geq \\mathcal{R}_{\\mathrm{max}}``. In both cases `model[:risk]` lies above the scalarised risk.
+  - The bound is tight when the objective pulls `risk` down, as a minimum risk objective does.
+  - Under the maximum, the objective pulls on the largest entry alone. When a risk measure below the maximum is written through epigraph variables, its entry can lie above the risk that the measure gives. [`expected_risk`](@ref) gives the exact value.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `sca`: Scalariser instance (one of [`SumScalariser`](@ref), [`LogSumExpScalariser`](@ref),
-    or [`MaxScalariser`](@ref)).
+  - `sca`: The scalariser, a [`SumScalariser`](@ref), a [`LogSumExpScalariser`](@ref) or a [`MaxScalariser`](@ref).
 
 # Returns
 
@@ -98,6 +145,7 @@ Where:
   - [`SumScalariser`](@ref)
   - [`LogSumExpScalariser`](@ref)
   - [`MaxScalariser`](@ref)
+  - [`set_risk_expression!`](@ref)
 """
 function scalarise_risk_expression!(model::JuMP.Model, ::SumScalariser)
     if !shared_has(model, :risk_vec)
@@ -147,10 +195,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Number of entries the `:risk_frontier` Model State registry holds, or `0` when it holds none.
+Returns the number of entries in the `:risk_frontier` Model State registry, or `0` when the model holds no registry.
 
-Read before a risk measure builds its constraints, so that the entries it adds can be told
-from the entries its predecessors added.
+[`set_resolved_risk_constraints!`](@ref) reads the length before a risk measure builds its constraints. The entries after that position are the entries that the measure adds.
+
+# Arguments
+
+  - $(arg_dict[:model])
+
+# Returns
+
+  - `n::Int`: The number of registry entries.
 
 # Related
 
@@ -163,15 +218,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Stamp `i` as the owning risk measure of every `:risk_frontier` entry after position `first`.
+Records `i` as the owner of every `:risk_frontier` entry after position `first`.
 
-[`rebuild_risk_frontier`](@ref) resolves a [`Frontier`](@ref) bound into a span of numbers, and
-it needs the risk measure the span belongs to. The registry is **not** parallel to the measure
-vector: a measure registers an entry only when its `settings.ub` is a [`Front_NumVec`](@ref),
-and a memoised measure such as [`UlcerIndex`](@ref) registers one entry for every copy of
-itself in that vector. So the position of an entry does not name its measure, and the owner is
-recorded rather than derived. This mirrors the return side, whose `:ret_frontier` entry has
-carried its own term index from the start.
+[`rebuild_risk_frontier`](@ref) resolves a [`Frontier`](@ref) bound into a span of numbers, and it needs the risk measure that owns the span. The position of an entry does not give its measure, for two reasons. A measure registers an entry only when its `settings.ub` is a [`Front_NumVec`](@ref). A memoised measure such as [`UlcerIndex`](@ref) registers one entry for each copy of itself in the measure vector. So each entry records its owner. The entries of `:ret_frontier` record their term index in the same way.
+
+# Algorithm
+
+ 1. When the model holds no `:risk_frontier`, return `nothing`.
+ 2. For each entry `j` after position `first`, replace the fourth value of the entry, the owner, with `i`.
 
 # Arguments
 
@@ -204,33 +258,21 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Dispatch to index-aware `set_risk_constraints!` for a single risk measure or iterate over a
-vector of risk measures.
+Builds the constraints of one risk measure, or of each measure in a vector, and gives each measure its index.
 
-The single-measure overload calls `set_risk_constraints!(model, 1, r, ...)`. The vector
-overload calls `set_risk_constraints!(model, i, rs[i], ...)` for each element.
+This route calls no [`factory`](@ref), so a measure that states no solver of its own still holds `nothing`. Both methods resolve the measure against the solver of the owner, [`risk_constraint_solver`](@ref). A Calibration Rule that reads the solver then sees the same solver here and on the `factory` route.
 
-The single-measure overload also drops the measure's `scale` through
-[`unit_scale_risk_measure`](@ref). `scale` weights a measure inside an aggregate built from
-several measures, and one measure is not an aggregate, so the weight is inert. The vector
-overload keeps every element's `scale`.
+# Algorithm
 
-Both overloads stamp the owning measure onto the `:risk_frontier` entries that measure
-registered ([`set_risk_frontier_owner!`](@ref)). This is the only depth at which the measure
-and its entries are both in hand.
-
-Both overloads resolve the measure through [`resolve_deferred_quantities`](@ref), and both
-thread the estimator's own solver into that call. This route calls no [`factory`](@ref), so
-no selection has run and a measure that states no solver of its own still holds `nothing`. A
-**Calibration Rule** that reads the solver would see that `nothing`, while the same rule on
-the `factory` route sees the optimiser's. Threading [`risk_constraint_solver`](@ref) is what
-makes the two routes resolve one measure against one solver.
+ 1. The method for one measure drops the `scale` of `r` with [`unit_scale_risk_measure`](@ref), and builds the measure at index `1`. `scale` weighs a measure against the other measures of a vector, so it has no effect on one measure alone.
+ 2. The method for a vector builds each measure `rs[i]` at index `i`, and keeps its `scale`.
+ 3. Each build calls [`set_resolved_risk_constraints!`](@ref), which resolves the measure, builds it and records it as the owner of the `:risk_frontier` entries that it adds.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `r`: A [`RiskMeasure`](@ref) instance, or `rs` a vector of risk measures.
-  - `opt`: The owner of the constraint: a [`JuMPOptimisationEstimator`](@ref), or a programme Allocation Set ([`RiskConstraintOwner`](@ref)).
+  - `r`: A [`RiskMeasure`](@ref), or `rs`, a vector of risk measures.
+  - `opt`: The owner of the constraint, a [`JuMPOptimisationEstimator`](@ref) or a programme Allocation Set. [`RiskConstraintOwner`](@ref) states the owners.
   - $(arg_dict[:pr])
   - $(arg_dict[:pl_opt])
   - $(arg_dict[:fees_opt])
@@ -293,9 +335,32 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build one measure's constraints at index `i`: resolve its Deferred Quantities against the owner's solver ([`risk_constraint_solver`](@ref)), refuse a Calibration Rule that survived, build through the index-aware `set_risk_constraints!`, and stamp the measure onto the frontier entries it registered.
+Resolves one risk measure and builds its constraints at index `i`.
 
-The body both `set_risk_constraints!` entry points share, written once so the single-measure and the vector routes resolve one measure the same way.
+The two methods of [`set_risk_constraints!`](@ref) both call this function, so a measure resolves the same way alone and in a vector.
+
+# Algorithm
+
+ 1. Read `first`, the length of the `:risk_frontier` registry, with [`risk_frontier_length`](@ref).
+ 2. Resolve the Deferred Quantities of `r` against the solver of the owner, giving `resolved`. [`resolve_deferred_quantities`](@ref) does the work, and [`risk_constraint_solver`](@ref) gives the solver.
+ 3. Refuse a Calibration Rule that `resolved` still holds, with [`assert_declared_calibration_resolver`](@ref).
+ 4. Build the constraints of `resolved` at index `i` with the index method of `set_risk_constraints!`.
+ 5. Record `i` as the owner of the registry entries after `first`, with [`set_risk_frontier_owner!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `i::Integer`: The position of the measure in the risk measure vector.
+  - `r::RiskMeasure`: The risk measure.
+  - `opt`: The owner of the constraint, a [`RiskConstraintOwner`](@ref).
+  - $(arg_dict[:pr])
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
+  - $(arg_dict[:b1_opt])
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -319,9 +384,18 @@ end
 """
     prior_high_order_quantity(pr::AbstractPriorResult, key::Symbol)
 
-Read the high-order quantity named by `key` off prior result `pr`, or `nothing` when it carries none.
+Returns the high-order quantity that `key` names on the prior result `pr`, or `nothing` when `pr` carries none.
 
-A [`HighOrderPrior`](@ref) carries `kt`, `sk`, `V` and the three vectorisation matrices. A [`LowOrderPrior`](@ref) carries none of them, and a [`HighOrderPrior`](@ref) fitted with only one of the two tensors leaves the other `nothing`, so the answer is a value or `nothing` rather than an error either way.
+A [`HighOrderPrior`](@ref) has the fields `kt`, `sk`, `V` and the three vectorisation matrices. A [`LowOrderPrior`](@ref) has none of them. A [`HighOrderPrior`](@ref) fitted with one of the two tensors holds `nothing` in the field of the other. The function returns `nothing` in both cases, and never raises.
+
+# Arguments
+
+  - $(arg_dict[:pr])
+  - `key::Symbol`: The name of the quantity, for example `:kt`, `:sk`, `:V`, `:D2`, `:L2` or `:S2`.
+
+# Returns
+
+  - `q`: The quantity, or `nothing`.
 
 # Related
 
@@ -337,11 +411,25 @@ end
     assert_high_order_quantity(q, pr::AbstractPriorResult, rm::Symbol, key::Symbol,
                                est::Symbol)
 
-Refuse a high-order risk measure whose tensor resolves neither on the measure nor on the prior.
+Refuses a high-order risk measure when neither the measure nor the prior carries its tensor.
 
-`q` is what the measure holds in the slot named `key`, after [`resolve_deferred_quantities`](@ref) has run. The measure is buildable when either side supplies the quantity, so the gate is on the pair rather than on the type of `pr`: a caller who has told the measure how to build its own cokurtosis has already met the requirement, and a [`HighOrderPrior`](@ref) that computed neither tensor does not meet it.
+The builder can build the measure when either side gives the quantity, so the check reads the pair and not the type of `pr`. A measure that states how to build its own cokurtosis passes with a [`LowOrderPrior`](@ref). A [`HighOrderPrior`](@ref) that computed neither tensor fails.
 
-The message names the three ways out: state the quantity, name a `est` or an [`AbstractPriorEstimator`](@ref) in the slot, or give the optimiser a prior estimator that computes one.
+# Arguments
+
+  - `q`: The value in the slot `key` of the measure, after [`resolve_deferred_quantities`](@ref).
+  - $(arg_dict[:pr])
+  - `rm::Symbol`: The name of the risk measure type, for the message.
+  - `key::Symbol`: The name of the quantity, for example `:kt`.
+  - `est::Symbol`: The name of the estimator slot of the measure, for the message.
+
+# Validation
+
+  - Raises `ArgumentError` when `q` is `nothing` and [`prior_high_order_quantity`](@ref) finds no `key` on `pr`. The message gives three remedies. State the quantity on the measure, or name an `est` or an [`AbstractPriorEstimator`](@ref) in the measure, or give the optimiser a prior estimator that computes the quantity.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -360,11 +448,23 @@ end
 """
     dup_elim_sum_selector(pr::AbstractPriorResult, N::Integer)
 
-Select the duplication, elimination and summation matrices for `N` assets from prior result `pr`, rebuilding whichever of the three it does not carry.
+Returns the duplication, elimination and summation matrices for `N` assets, from the prior result `pr` when it carries them.
 
-[`dup_elim_sum_matrices`](@ref) is a pure function of the asset count, with no data in it, so the three matrices a [`HighOrderPrior`](@ref) carries are exactly the ones this rebuilds. That is what lets a measure holding its own tensor be built against a [`LowOrderPrior`](@ref): the vectorisation matrices were the only other thing the kernel took from the prior.
+[`dup_elim_sum_matrices`](@ref) depends on the asset count alone, so a rebuilt matrix equals the matrix that a [`HighOrderPrior`](@ref) carries. A measure that holds its own tensor can therefore build against a [`LowOrderPrior`](@ref), because the builder reads nothing else from the prior.
 
-One call builds all three, so the rebuild costs the same whether one of them is missing or all three are.
+# Algorithm
+
+ 1. Read `D2`, `L2` and `S2` from `pr` with [`prior_high_order_quantity`](@ref).
+ 2. When any of the three is `nothing`, build all three with [`dup_elim_sum_matrices`](@ref), and replace each `nothing` with its rebuilt matrix. One call builds all three, so the cost does not depend on how many are missing.
+
+# Arguments
+
+  - $(arg_dict[:pr])
+  - `N::Integer`: The number of assets.
+
+# Returns
+
+  - `(D2, L2, S2)`: The duplication, elimination and summation matrices.
 
 # Related
 
@@ -387,28 +487,46 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add an upper-bound constraint on a risk expression to `model`.
+Bounds the risk expression `r_expr` by `ub`, or records `ub` for a frontier solve.
 
-The `Nothing` overload does nothing (no bound was requested). The `Front_NumVec` overload
-records the expression and its frontier bound vector in the `:risk_frontier` Model State entry for later
-use in Pareto frontier solves. That entry is `(bound_var_key, bound_key) => (r_expr, ub, flag, owner)`,
-and `owner` is written here as `0`. The measure that registered the entry is not known at this
-depth, so [`set_risk_frontier_owner!`](@ref) stamps it from the loop that enumerates the
-measures. The `Number` overload adds the constraint
-`sc * (r_expr - ub * k) <= 0` directly to the model. The fall-through method emits a
-warning: a non-`nothing` bound with an optimiser outside [`RiskBoundOwner`](@ref) is
-ignored, which would otherwise happen silently. A programme Allocation Set's ceiling is one
-number, so a frontier or a per-asset vector on it is refused by name: the set's constructor
-refuses it first, and this is the seam's own refusal for a set that reaches the builder without
-that check.
+The type of `ub` and the owner `opt` select the method.
+
+  - A `nothing` bound adds nothing.
+  - A number adds one row. The row bounds `r_expr` from above when `flag` is `true`, and from below when it is `false`.
+  - A [`Front_NumVec`](@ref) adds an entry to the `:risk_frontier` registry, and the frontier solve reads the entry later. The owner of the entry is written as `0`, because the measure is not known here. [`set_risk_frontier_owner!`](@ref) writes the owner afterwards.
+
+Under a ratio objective the head divides the weights by ``k`` after the solve, so the row bounds the risk of the weights that the head returns. That is exact for a risk expression of degree one in the weights. A builder whose risk expression has a higher degree passes a separate expression of degree one, as [`set_variance_risk_bounds_and_expression!`](@ref) does.
+
+# JuMP formulation
+
+## Expressions
+
+  - `risk_frontier`: registered by the frontier method on its first call. It is a vector of entries `(<key>_ub_var, <key>_ub) => (R, ub, flag, 0)`, and each later call appends one entry.
+
+## Constraints
+
+  - `<key>_ub`: ``s_c \\left(R(\\boldsymbol{w}) - u k\\right) \\leq 0`` when `flag` is `true`, and ``s_c \\left(u k - R(\\boldsymbol{w})\\right) \\leq 0`` when it is `false`, registered by the number method.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:k_budget])
+  - $(math_dict[:R_w])
+  - ``u``: The bound, `ub`.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `r_expr::JuMP.AbstractJuMPScalar`: The risk JuMP expression to bound.
-  - `ub`: Upper bound; a scalar number or a frontier specification.
-  - `key::Symbol`: Symbol used to name the constraint in the model.
-  - `flag::Bool`: If true, sets upper bound; if false sets lower bound (default: `true`).
+  - `opt`: The owner of the constraint, a [`RiskConstraintOwner`](@ref).
+  - `r_expr::JuMP.AbstractJuMPScalar`: The risk expression to bound.
+  - `ub`: The bound. It is `nothing`, a number, or a [`Front_NumVec`](@ref), which is a vector of bounds or a [`Frontier`](@ref).
+  - `key::Symbol`: The Model State key of the risk expression. The row and the frontier entry take their keys from it.
+  - `flag::Bool`: `true` for an upper bound and `false` for a lower bound (default: `true`).
+
+# Validation
+
+  - An owner outside [`RiskBoundOwner`](@ref), a [`FactorRiskContribution`](@ref), ignores a bound that is not `nothing`, and the method warns. Without the warning the bound has no effect and nothing says so.
+  - A programme Allocation Set raises `ArgumentError` for a [`Front_NumVec`](@ref) bound. Its ceiling is one number. The constructor of the set refuses such a bound first, and this method refuses a set that reaches the builder without that check.
 
 # Returns
 
@@ -416,8 +534,11 @@ that check.
 
 # Related
 
+  - [`RiskBoundOwner`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
   - [`set_risk_expression!`](@ref)
+  - [`set_risk_frontier_owner!`](@ref)
+  - [`rebuild_risk_frontier`](@ref)
 """
 function set_risk_upper_bound!(::JuMP.Model, ::RiskConstraintOwner, r_expr, ::Nothing, key,
                                flag::Bool = true)
@@ -469,17 +590,28 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Push a scaled risk expression onto the `risk_vec` array in `model`.
+Appends the risk expression `r_expr`, times `scale`, to `model[:risk_vec]`.
 
-If `rke` is `false` the function does nothing. Otherwise it initialises `risk_vec` if needed
-and appends `scale * r_expr`.
+[`scalarise_risk_expression!`](@ref) reduces the entries of `risk_vec` to the risk that the objective reads. When `rke` is `false`, the function adds nothing, and the measure reaches the model through its bound alone.
+
+# JuMP formulation
+
+## Expressions
+
+  - `risk_vec`: registered on the first call as an empty vector of affine and quadratic expressions. Each call with `rke = true` appends ``\\mathcal{R}_i = \\omega R(\\boldsymbol{w})``.
+
+Where:
+
+  - $(math_dict[:R_i_riskvec])
+  - $(math_dict[:R_w])
+  - ``\\omega``: The weight of the measure, `scale`.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `r_expr::JuMP.AbstractJuMPScalar`: The risk JuMP expression to add.
-  - `scale::Number`: Scaling factor applied to the expression.
-  - `rke::Bool`: When `false` this method is a no-op.
+  - `r_expr::JuMP.AbstractJuMPScalar`: The risk expression to add.
+  - `scale::Number`: The weight of the measure.
+  - `rke::Bool`: `false` adds nothing.
 
 # Returns
 
@@ -505,24 +637,25 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply an upper-bound constraint and register the risk expression for the objective.
+Bounds a risk expression by `settings.ub`, and adds it to the risk that the objective reads.
 
-Calls [`set_risk_upper_bound!`](@ref) with `settings.ub` and [`set_risk_expression!`](@ref)
-with `settings.scale` and `settings.rke`.
+Every risk measure builder ends with this call, or with a sibling that takes a separate bound expression.
+
+# Algorithm
+
+ 1. Compose `key` from `prefix`, `name` and, in the index method, `i`, with [`state_key`](@ref). The builder registered its risk expression under the same key, so the bound keys cannot differ from it.
+ 2. Bound `r_expr` by `settings.ub` with [`set_risk_upper_bound!`](@ref), in the direction that `flag` gives.
+ 3. Append `r_expr` times `settings.scale` to `risk_vec` with [`set_risk_expression!`](@ref), when `settings.rke` is `true`.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - $(arg_dict[:opt_rjumpe])
-  - `r_expr::JuMP.AbstractJuMPScalar`: Risk JuMP expression.
-  - `settings::RiskMeasureSettings`: Settings carrying upper bound, scale, and `rke` flag.
-  - `name`: Bare Model State entry name seeding the derived bound keys (`<name>_ub`,
-    `<name>_ub_var`). The key is resolved here rather than at the call site, so emitters
-    never build a key by hand.
-  - `i`: Measure index, for per-measure entry names. The indexed method resolves the same
-    key the emitter registered the risk expression under, so the bound keys and the entry
-    key cannot drift apart.
-  - `flag::Bool`: If true, sets upper bound; if false sets lower bound (default: `true`).
+  - `opt`: The owner of the constraint, a [`RiskConstraintOwner`](@ref).
+  - `r_expr::JuMP.AbstractJuMPScalar`: The risk expression.
+  - `settings::RiskMeasureSettings`: The settings of the measure, which give the bound, the weight and `rke`.
+  - `name::Symbol`: The Model State name of the risk expression. The bound keys `<name>_ub` and `<name>_ub_var` derive from it.
+  - `i`: The index of the measure, in the index method.
+  - `flag::Bool`: `true` for an upper bound and `false` for a lower bound (default: `true`).
 
 # Keyword arguments
 
@@ -559,46 +692,83 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add portfolio drawdown tracking variables and constraints to `model`.
+Adds the drawdown variables of the portfolio to `model`, and returns them.
 
-Creates the `dd` variable array (length `T + 1`) together with three constraints:
-`cdd_start` (initial drawdown is zero), `cdd_geq_0` (drawdowns are non-negative), and `cdd`
-(drawdown recurrence relation). Returns the `dd` array; returns the existing one if already
-present in `model`.
+The function builds the variables once for each `prefix`. A second call returns the variables that the first call registered.
 
 # Mathematical definition
 
-Drawdown recurrence:
+The absolute drawdown of the net portfolio returns is
 
 ```math
 \\begin{align}
-dd_0 &= 0\\,, \\\\
-dd_t &\\geq 0\\,, \\\\
-dd_t &\\geq dd_{t-1} - \\hat{r}_t
-\\quad \\Leftrightarrow \\quad dd_t &= \\max_{s \\leq t} V_s - V_t\\,.
+c_t &= \\sum_{s=1}^{t} \\hat{r}_s\\,, \\quad c_0 = 0\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
 \\end{align}
 ```
 
+It satisfies the recurrence ``-d_0 = 0`` and ``-d_t = \\max(0,\\, -d_{t-1} - \\hat{r}_t)``.
+
 Where:
 
-  - ``dd_t``: Portfolio drawdown at time ``t``.
-  - ``\\hat{r}_t``: Portfolio return at time ``t``.
-  - ``V_t``: Cumulative portfolio wealth at time ``t``.
+  - $(math_dict[:rhat_t_net])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
 
-where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` and ``V_t = k + \\sum_{s=1}^t \\hat{r}_s``.
+# Algorithm
+
+ 1. Read `sc`, the constraint scale.
+ 2. Read `net_X`, the net portfolio returns, with [`set_net_portfolio_returns!`](@ref), and set `T` to its length.
+ 3. Create `dd`, ``T + 1`` free variables. Entry `dd[t + 1]` is ``dd_t``.
+ 4. Register the three rows below.
+ 5. Register `dd` under the Model State key `<prefix>dd`, and return it.
+
+# JuMP formulation
+
+## Variables
+
+  - `dd`: created, ``(T + 1) \\times 1``, and registered under the Model State key `<prefix>dd`.
+
+## Constraints
+
+  - `cdd_start`: ``s_c\\, dd_0 = 0``.
+  - `cdd_geq_0`: ``s_c\\, dd_t \\geq 0``, ``\\forall\\, t = 1,\\ldots,T``.
+  - `cdd`: ``s_c \\left(\\hat{r}_t + dd_t - dd_{t-1}\\right) \\geq 0``, ``\\forall\\, t = 1,\\ldots,T``.
+
+Each name is a Model State key, and a caller reads the row back under `prefix` followed by the name.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:dd_t_model])
+  - $(math_dict[:rhat_t_net])
+  - $(math_dict[:T])
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - The rows give ``dd_t \\geq \\max(0,\\, dd_{t-1} - \\hat{r}_t)``, so by induction ``dd_t \\geq -d_t`` for every ``t``. Each entry of `dd` lies at or above the drawdown.
+  - The bound on an entry is tight when the objective pulls that entry down. A sum over the entries, as in the average drawdown, pulls on every entry. A maximum over the entries, as in the maximum drawdown, pulls on the largest entry alone, and the other entries can lie above their drawdowns.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `X::MatNum`: Asset returns matrix (`T × N`).
+  - `X::MatNum`: The asset returns matrix, ``T \\times N``.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
 
-  - `dd`: JuMP variable array of length `T + 1` tracking portfolio drawdowns.
+  - `dd`: The drawdown variables, ``(T + 1) \\times 1``.
 
 # Related
 
-  - [`set_risk_constraints!`](@ref)
+  - [`risk_series`](@ref)
+  - [`DrawdownRiskSeries`](@ref)
+  - [`set_net_portfolio_returns!`](@ref)
 """
 function set_drawdown_constraints!(model::JuMP.Model, X::MatNum;
                                    prefix::Symbol = Symbol(""))
@@ -619,18 +789,42 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add a range risk measure's constraints to `model` by building its two tails and summing them.
+Adds the constraints of a range risk measure to `model`, as the sum of its loss tail and its gain tail.
 
-A range measure is its base measure applied twice, so this builds it that way. It reads the
-two point measures from [`range_tails`](@ref), calls [`set_risk_constraints!`](@ref) on the
-loss tail with `loss = true` and on the gain tail with `loss = false`, and registers the sum
-under `key`. The gain tail sees the *negated* net portfolio returns, which is the whole of
-what "the other tail" means and is what each base builder's `loss` keyword does.
+The two tails from [`range_tails`](@ref) carry `rke = false` and no bound, so the sum alone reaches the objective and the bound. Each tail builds under its own index, which [`nested_index`](@ref) composes from the side and `i`. The keys of the two tails therefore differ, also when a range holds a range.
 
-The two tails carry `rke = false` and no upper bound, so only the composite expression
-reaches the objective and the bound. Each tail builds under its own measure index, composed
-by [`nested_index`](@ref), so a two-tail model names its parts by the side they describe and
-a range nested in a range stays collision-free.
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{R}_{\\mathrm{range}}(\\boldsymbol{w}) &= \\mathcal{R}_{\\mathrm{loss}}(\\hat{\\boldsymbol{r}}) + \\mathcal{R}_{\\mathrm{gain}}(-\\hat{\\boldsymbol{r}})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{R}_{\\mathrm{range}}(\\boldsymbol{w})``: The range risk of the portfolio.
+  - ``\\mathcal{R}_{\\mathrm{loss}}``, ``\\mathcal{R}_{\\mathrm{gain}}``: The loss tail and the gain tail of the range measure, each a risk measure of a return series.
+  - ``\\hat{\\boldsymbol{r}}``: The net portfolio returns, ``T \\times 1``, with entries ``\\hat{r}_t``.
+  - $(math_dict[:rhat_t_net])
+
+# Algorithm
+
+ 1. Read the tails `loss` and `gain` of `r` with [`range_tails`](@ref).
+ 2. Build `loss` at index `nested_index(:loss_, i)` with `loss = true`, giving `loss_risk`.
+ 3. Build `gain` at index `nested_index(:gain_, i)` with `loss = false`, giving `gain_risk`. The builder then reads the negated net portfolio returns.
+ 4. Register `range_risk = loss_risk + gain_risk` under the Model State key of `name` and `i`.
+ 5. Bound `range_risk` and add it to `risk_vec` with [`set_risk_bounds_and_expression!`](@ref), from `r.settings`.
+
+# JuMP formulation
+
+## Expressions
+
+  - `<prefix><name><i>`: ``\\mathcal{R}_{\\mathrm{loss}} + \\mathcal{R}_{\\mathrm{gain}}``, registered as a Model State entry.
+
+Where:
+
+  - ``\\mathcal{R}_{\\mathrm{loss}}``, ``\\mathcal{R}_{\\mathrm{gain}}``: The risk expressions that the two tail builds return.
 
 # Arguments
 
@@ -674,13 +868,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the series a conic risk measure reduces.
+Abstract supertype for the series that a conic risk measure reduces.
 
-A conic tail measure is written once against a per-observation series of *returns*. The
-returns family reduces the net portfolio returns; the drawdown family reduces the negated
-drawdown path, which is the same series with one substitution. [`risk_series`](@ref) is the
-one place that substitution is made, so a builder is written once and each twin selects its
-series by passing the marker.
+A builder of a conic tail measure reads a series of returns, one entry for each observation. The returns family reads the net portfolio returns. The drawdown family reads the negated drawdown path, which is a series of returns too. [`risk_series`](@ref) makes the series from the marker, so one builder body serves both families.
 
 # Related
 
@@ -692,11 +882,9 @@ abstract type AbstractRiskSeriesAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Marker selecting the net portfolio returns as the series a risk measure reduces.
+Selects the net portfolio returns as the series that a risk measure reduces.
 
-This is the series of every returns-tail measure, and the only one that can be
-range-composed: the gain tail is the same series negated, which is what `loss = false` means
-in [`risk_series`](@ref).
+Every tail measure of returns reads this series. A range measure can read it alone, because its gain tail reads the same series negated, which `loss = false` gives in [`risk_series`](@ref).
 
 # Related
 
@@ -709,14 +897,11 @@ struct NetReturnsRiskSeries <: AbstractRiskSeriesAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Marker selecting the negated drawdown path as the series a risk measure reduces.
+Selects the negated drawdown path as the series that a risk measure reduces.
 
-`-dd[2:T+1]` is the return-signed drawdown series, so a builder written against net returns
-encodes the drawdown twin without a single sign written by hand.
+`-dd[2:T+1]` carries the sign of a return, so a builder of a measure of returns builds the drawdown measure with no change of sign.
 
-The drawdown series has no gain tail. A run-up is a different recurrence, not the negation
-of this one, so [`risk_series`](@ref) takes no `loss` keyword for this marker and no drawdown
-measure can be range-composed.
+The drawdown series has no gain tail. A run-up follows a different recurrence and is not the negation of the drawdown. So [`risk_series`](@ref) takes no `loss` keyword for this marker, and no range measure reads a drawdown series.
 
 # Related
 
@@ -729,31 +914,43 @@ struct DrawdownRiskSeries <: AbstractRiskSeriesAlgorithm end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build the per-observation series a conic risk measure reduces, and its length.
+Returns the series of net portfolio returns that a conic risk measure reduces, and its length.
 
-The returns twin and the drawdown twin of a conic tail measure are one programme under the
-substitution `net_X -> -dd[2:T+1]`. This function is the one place that substitution is
-written, so each builder takes `(series, T)` and encodes both twins.
+The measure of returns and the measure of drawdowns are one programme under the substitution of `-dd[2:T+1]` for `net_X`. The two methods of this function make that substitution, so each builder takes `(series, T)` and builds both measures. On both markers the series carries the sign of a return, and a loss is a negative entry.
 
-The series is signed as a *return*: a loss is a negative entry, on both markers. That is why
-the drawdown branch negates — `dd` is a non-negative loss path — and it is what lets one
-builder body serve both.
+# Mathematical definition
+
+```math
+\\begin{align}
+s_t &= \\begin{cases} \\hat{r}_t & \\text{for the loss tail}\\,, \\\\ -\\hat{r}_t & \\text{for the gain tail}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:s_t_series])
+  - $(math_dict[:rhat_t_net])
+
+# Algorithm
+
+ 1. Read `net_X`, the net portfolio returns, with [`set_net_portfolio_returns!`](@ref).
+ 2. Negate `net_X` when `loss` is `false`.
+ 3. Return `net_X` and its length.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `alg::NetReturnsRiskSeries`: Reduce the net portfolio returns.
+  - `alg::NetReturnsRiskSeries`: The marker that selects the net portfolio returns.
   - $(arg_dict[:pr_X])
 
 # Keyword arguments
 
-  - `loss::Bool`: `true` builds the loss tail on the net portfolio returns, `false` the gain
-    tail on their negation.
+  - `loss::Bool`: `true` gives the series of the loss tail, the net portfolio returns. `false` gives the series of the gain tail, their negation (default: `true`).
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
 
-  - `series`: The per-observation return series, length `T`.
+  - `series`: The series ``s_t``, ``T \\times 1``.
   - `T::Int`: The number of observations.
 
 # Related
@@ -774,20 +971,36 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build the negated drawdown path a drawdown risk measure reduces, and its length.
+Returns the negated drawdown path that a drawdown risk measure reduces, and its length.
 
-Registers the drawdown variables through [`set_drawdown_constraints!`](@ref), then returns
-`-dd[2:T+1]`. The negation is what makes the drawdown path a *return* series, so a builder
-written against net portfolio returns encodes the drawdown twin unchanged.
+The negation gives the drawdown path the sign of a return, so a builder of a measure of returns builds the drawdown measure with no change.
 
-There is no `loss` keyword. A drawdown has no gain tail, so a caller that tries to compose a
-range from this series fails at the call site rather than silently building the loss tail
-twice.
+The method takes no `loss` keyword, because a drawdown has no gain tail. A call that asks for the gain tail raises a `MethodError`, and does not build the loss tail a second time.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+s_t &= -dd_t\\,, \\quad t = 1,\\ldots,T\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:s_t_series])
+  - $(math_dict[:dd_t_model])
+  - $(math_dict[:T])
+
+# Algorithm
+
+ 1. Build `dd` with [`set_drawdown_constraints!`](@ref), or read it when the model holds it.
+ 2. Set `T = length(dd) - 1`.
+ 3. Return `-dd[2:T+1]` and `T`.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `alg::DrawdownRiskSeries`: Reduce the negated drawdown path.
+  - `alg::DrawdownRiskSeries`: The marker that selects the negated drawdown path.
   - $(arg_dict[:pr_X])
 
 # Keyword arguments
@@ -796,7 +1009,7 @@ twice.
 
 # Returns
 
-  - `series`: The negated drawdown path `-dd[2:T+1]`, length `T`.
+  - `series`: The negated drawdown path `-dd[2:T+1]`, ``T \\times 1``.
   - `T::Int`: The number of observations.
 
 # Related

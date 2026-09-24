@@ -1122,6 +1122,11 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :so_scale => "``s_o``: Objective scale. It multiplies the objective, so a positive value leaves the argument of the optimum unchanged.",#
                        :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
                        :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.",#
+                       # The risk measure layer of a JuMP model.
+                       :R_i_riskvec => "``\\mathcal{R}_i``: Entry ``i`` of `risk_vec`, the risk expression of the ``i``-th risk measure times the `scale` of the measure.",#
+                       :rhat_t_net => "``\\hat{r}_t``: Net portfolio return at observation ``t``, ``\\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` less the fees charged at ``t``.",#
+                       :dd_t_model => "``dd_t``: Drawdown variable of observation ``t``, with ``dd_0 = 0``. The rows hold it at or above the drawdown ``-d_t``.",#
+                       :s_t_series => "``s_t``: Entry ``t`` of the series that a conic risk measure reduces. It carries the sign of a return, so a loss is a negative entry.",#
                        # Second-moment formulations.
                        :d_secmom => "``\\boldsymbol{d}``: Deviation vector ``T \\times 1`` that the formulation squares. The risk measure supplies it.",#
                        :c_secmom => "``c``: Correction factor that the risk measure supplies. It is ``1`` when the co-moment matrix already carries it.",#

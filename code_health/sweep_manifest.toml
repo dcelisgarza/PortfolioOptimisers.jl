@@ -323,7 +323,7 @@
 "src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl" = { map = 10, units = 26, swept = false }
 "src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl" = { map = 10, units = 21, swept = false }
 "src/17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl" = { map = 10, units = 14, swept = false }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { map = 11, units = 22, swept = false }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { map = 11, units = 22, algorithm = 10, swept = true, bindings = ["AbstractRiskSeriesAlgorithm", "DrawdownRiskSeries", "NetReturnsRiskSeries", "NonFRCJuMPOpt", "RiskBoundOwner", "RiskConstraintOwner", "assert_high_order_quantity", "dup_elim_sum_selector", "prior_high_order_quantity", "risk_constraint_solver", "risk_frontier_length", "risk_series", "risk_series", "scalarise_risk_expression!", "set_drawdown_constraints!", "set_range_risk_constraints!", "set_resolved_risk_constraints!", "set_risk_bounds_and_expression!", "set_risk_constraints!", "set_risk_expression!", "set_risk_frontier_owner!", "set_risk_upper_bound!"] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl" = { map = 11, units = 18, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.jl" = { map = 11, units = 7, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/04_KurtosisConstraints.jl" = { map = 11, units = 5, swept = false }
