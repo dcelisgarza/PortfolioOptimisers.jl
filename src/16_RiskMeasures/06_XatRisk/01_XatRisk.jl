@@ -1,11 +1,11 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Value-at-Risk formulation algorithms.
+Selects whether a Value-at-Risk measure computes its quantile from the sample or from a parametric distribution.
 
-The formulation selects the **estimand**, not only the encoding. [`MIPValueatRisk`](@ref) reports the empirical quantile of the sample, and [`DistributionValueatRisk`](@ref) reports the quantile of a fitted parametric distribution. The two are different numbers on the same data, and a measure that holds one reports that one in its optimisation model and in its functor alike.
+The formulation selects the estimand, not only the encoding. [`MIPValueatRisk`](@ref) reports the empirical quantile of the sample, and [`DistributionValueatRisk`](@ref) reports the quantile of a parametric distribution fitted to the prior's moments. The two are different numbers on the same data. A measure that holds one formulation reports that number in its optimisation model and in its functor alike.
 
-All concrete and/or abstract types representing the formulation for computing Value-at-Risk (e.g., mixed-integer programming, distribution-based) should be subtypes of `ValueatRiskFormulation`.
+All concrete subtypes should subtype `ValueatRiskFormulation`.
 
 # Related
 
@@ -21,7 +21,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the Value-at-Risk formulation `alg` unchanged.
 
-Identity pass-through for formulation types that do not depend on prior results.
+A formulation that reads nothing from the prior has nothing to fill. [`DistributionValueatRisk`](@ref) reads the prior's moments, and it has its own method.
 
 # Related
 
@@ -32,20 +32,21 @@ function factory(alg::ValueatRiskFormulation, args...; kwargs...)::ValueatRiskFo
     return alg
 end
 """
-    port_opt_view(r, args...)
+    port_opt_view(r::ValueatRiskFormulation, i, args...) -> ValueatRiskFormulation
 
-Get a view or subset of a Value-at-Risk formulation for slicing.
+Return the Value-at-Risk formulation `r` unchanged for the asset selection `i`.
 
-Returns the formulation unchanged (for non-distribution types) or sliced (for distribution-based types). Used internally in hierarchical optimisation.
+A formulation that holds no per-asset data has nothing to slice. [`DistributionValueatRisk`](@ref) holds the moments of each asset, and it has its own method, which slices them.
 
 # Arguments
 
   - `r`: Value-at-Risk formulation.
-  - `args...`: Additional arguments (index, etc.).
+  - `i`: Asset selection, which this method does not read.
+  - `args...`: More arguments, which this method does not read.
 
 # Returns
 
-  - Sliced or unchanged formulation.
+  - `r`, unchanged.
 
 # Related
 
@@ -58,19 +59,52 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the lower-tail z-score for a parametric VaR at significance level `alpha`.
+Compute the loss-tail z-score of the parametric Value-at-Risk at significance level `alpha`.
 
-Returns the complementary quantile for Normal and scaled Student-t distributions, and the
-closed-form expression for the Laplace distribution.
+The z-score is the ``1 - \\alpha`` quantile of the distribution, the loss that the standardised return exceeds with probability ``\\alpha``.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+z_{\\alpha} &= F^{-1}(1 - \\alpha)\\,.
+\\end{align}
+```
+
+Each method reads ``F`` from its own distribution:
+
+  - `Normal`: ``F`` is the cumulative distribution function of `dist` as given, so the default `Normal()` is standardised.
+  - `TDist`: ``F`` is the Student-t distribution with ``\\nu`` degrees of freedom, scaled to unit variance, so ``z_{\\alpha} = t_{\\nu}^{-1}(1 - \\alpha) \\sqrt{(\\nu - 2)/\\nu}``.
+  - `Laplace`: ``F`` is the Laplace distribution with zero mean and unit variance, whatever the parameters of `dist`. Its closed form is below.
+
+```math
+\\begin{align}
+z_{\\alpha} &= \\begin{cases} -\\dfrac{\\ln(2 \\alpha)}{\\sqrt{2}}\\,, & \\alpha \\leq \\dfrac{1}{2}\\,,\\\\ \\dfrac{\\ln(2 (1 - \\alpha))}{\\sqrt{2}}\\,, & \\alpha > \\dfrac{1}{2}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``z_{\\alpha}``: Loss-tail z-score.
+  - ``F``: Cumulative distribution function of the standardised return.
+  - ``t_{\\nu}``: Cumulative distribution function of the Student-t distribution with ``\\nu`` degrees of freedom.
+  - ``\\nu``: Degrees of freedom of `dist`.
+  - $(math_dict[:alpha_rm])
+
+``z_{\\alpha}`` is positive for ``\\alpha < 1/2`` on each of the three distributions.
 
 # Arguments
 
-  - `dist`: Distribution instance (Normal, TDist, or Laplace).
+  - `dist`: Distribution of the standardised return, a `Normal`, a `TDist` or a `Laplace`.
   - `alpha::Number`: Significance level.
+
+# Validation
+
+  - `TDist`: the degrees of freedom are greater than 2, so that the variance is finite. Otherwise a `DomainError` is thrown.
 
 # Returns
 
-  - `z::Number`: Lower-tail z-score for the parametric VaR.
+  - `z::Number`: Loss-tail z-score.
 
 # Related
 
@@ -87,24 +121,48 @@ function compute_value_at_risk_z(dist::Distributions.TDist, alpha::Number)
     return Distributions.cquantile(dist, alpha) * sqrt((d - 2) / d)
 end
 function compute_value_at_risk_z(::Distributions.Laplace, alpha::Number)
-    return -log(2 * alpha) / sqrt(2)
+    return if 2 * alpha <= one(alpha)
+        -log(2 * alpha) / sqrt(2)
+    else
+        log(2 * (one(alpha) - alpha)) / sqrt(2)
+    end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the upper-tail z-score for a parametric VaR at significance level `alpha`.
+Compute the gain-tail z-score of the parametric Value-at-Risk at significance level `alpha`.
 
-Used for the high (upper) bound in VaR range constraints. Returns the lower quantile for
-Normal and scaled Student-t distributions, and the closed-form expression for Laplace.
+The z-score is the ``\\alpha`` quantile of the distribution. The gain tail of [`ValueatRiskRange`](@ref) reads it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+z^{c}_{\\alpha} &= F^{-1}(\\alpha)\\,.
+\\end{align}
+```
+
+Each method reads ``F`` from the same distribution as [`compute_value_at_risk_z`](@ref). The three distributions are symmetric about zero when standardised, so ``z^{c}_{\\alpha} = -z_{\\alpha}``, and the `Laplace` method returns that value.
+
+Where:
+
+  - ``z^{c}_{\\alpha}``: Gain-tail z-score.
+  - ``z_{\\alpha}``: Loss-tail z-score, from [`compute_value_at_risk_z`](@ref).
+  - ``F``: Cumulative distribution function of the standardised return.
+  - $(math_dict[:alpha_rm])
 
 # Arguments
 
-  - `dist`: Distribution instance (Normal, TDist, or Laplace).
+  - `dist`: Distribution of the standardised return, a `Normal`, a `TDist` or a `Laplace`.
   - `alpha::Number`: Significance level.
+
+# Validation
+
+  - `TDist`: the degrees of freedom are greater than 2, so that the variance is finite. Otherwise a `DomainError` is thrown.
 
 # Returns
 
-  - `z::Number`: Upper-tail z-score for the parametric VaR.
+  - `z::Number`: Gain-tail z-score.
 
 # Related
 
@@ -120,40 +178,46 @@ function compute_value_at_risk_cz(dist::Distributions.TDist, alpha::Number)
     @argcheck(d > 2, DomainError(d, "degrees of freedom must be greater than 2"))
     return Statistics.quantile(dist, alpha) * sqrt((d - 2) / d)
 end
-function compute_value_at_risk_cz(::Distributions.Laplace, alpha::Number)
-    return -log(2 * (one(alpha) - alpha)) / sqrt(2)
+function compute_value_at_risk_cz(dist::Distributions.Laplace, alpha::Number)
+    return -compute_value_at_risk_z(dist, alpha)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Mixed-integer programming (MIP) formulation for Value-at-Risk.
+Computes the Value-at-Risk as the empirical quantile of the sample, through a mixed-integer programme.
 
-`MIPValueatRisk` specifies bounds used in the binary variable formulation of Value-at-Risk within a `JuMP` optimisation model. It reports the **empirical** quantile, which is the value the functor of the risk measure computes directly.
+The programme has one binary indicator per observation. The functor of the measure that holds this formulation computes the same order statistic directly, so the model and the functor report one number. The default big-M constant, ``b = 1000``, exceeds any loss of a return series, so the programme is exact with it.
+
+A solver accepts an indicator that is within its integrality tolerance ``\\varepsilon`` of zero as zero. The exceedance row of that observation then holds for a risk as low as ``\\ell_{t} - b \\varepsilon``. So the risk that the model reports can be smaller than the order statistic of the weights that it returns, by up to ``b \\varepsilon``, and those weights need not be optimal. With the default ``b = 1000`` and a tolerance of ``10^{-6}`` the gap can reach ``10^{-3}``, which is large next to the scale of daily returns. A big-M constant that fits the scale of the losses, or a tighter integrality tolerance of the solver, makes the gap smaller.
 
 # Mathematical definition
 
-One binary indicator per observation flags an exceedance, the cardinality constraint caps how many observations may be flagged, and the big-M constant `b` relaxes the bound on a flagged one. The risk is minimised, so it settles on the smallest value that leaves no more than the permitted number of exceedances.
+Each indicator exempts one observation from the bound on the risk, and the cardinality row caps the weight of the exempt observations. The programme minimises ``r``, so ``r`` falls to the largest loss that no indicator exempts:
 
 ```math
 \\begin{align}
 \\underset{r,\\, \\boldsymbol{z}}{\\min} \\quad & r\\\\
-\\text{s.t.} \\quad & r \\geq -x_t - b z_t\\,, \\quad t = 1,\\ldots,T\\\\
-\\quad & \\sum_{t=1}^{T} z_t \\leq \\left(\\alpha - s\\right) T\\\\
-\\quad & z_t \\in \\left\\{0,\\, 1\\right\\}\\,.
+\\text{s.t.} \\quad & r \\geq \\ell_{t} - b z_{t}\\,, \\quad t = 1,\\ldots,T\\\\
+\\quad & \\sum_{t=1}^{T} w_{t} z_{t} \\leq \\left(\\alpha - s\\right) W_{T}\\\\
+\\quad & z_{t} \\in \\left\\{0,\\, 1\\right\\}\\,.
 \\end{align}
 ```
 
 Where:
 
   - ``r``: Value-at-Risk variable.
-  - ``x_t``: Net portfolio return at observation ``t``.
-  - ``z_t``: Binary exceedance indicator at observation ``t``.
+  - ``\\ell_{t}``: Loss of observation ``t``. It is ``-x_{t}`` for [`ValueatRisk`](@ref) and ``-d_{t}`` for [`DrawdownatRisk`](@ref).
+  - ``z_{t}``: Exceedance indicator of observation ``t``. It is one when the bound on ``r`` does not apply to the observation.
   - ``b``: Big-M constant, the `b` field.
-  - ``s``: Cardinality slack, the `s` field.
+  - $(math_dict[:s_mip_slack])
+  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when no observation weights are set.
+  - $(math_dict[:W_T_total])
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
 
-Observation weights replace both counts by their weighted sums, so the cardinality constraint reads ``\\boldsymbol{w}_{o}^\\intercal \\boldsymbol{z} \\leq (\\alpha - s) \\sum_{t=1}^{T} w_{o,t}``.
+The minimum is the ``k``-th largest loss, the order statistic that [`ValueatRisk`](@ref) defines. The programme exempts the largest losses first, and it can exempt them while their cumulative weight stays within ``(\\alpha - s) W_{T}``. The slack keeps the exempt weight strictly below ``\\alpha W_{T}``, and it absorbs the rounding error of ``\\alpha W_{T}``.
+
+The programme is exact when ``b`` is at least the largest loss minus the minimum. It needs ``s < \\alpha``, because the cardinality row has no solution for ``s > \\alpha``.
 
 # Fields
 
@@ -170,9 +234,9 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `b` is not `nothing`: `b > 0`.
-  - If `s` is not `nothing`: `s > 0`.
-  - If both are not `nothing`: `b > s`.
+  - If `b` is not `nothing`: `b > 0` and finite.
+  - If `s` is not `nothing`: `s > 0` and finite.
+  - If both `b` and `s` are not `nothing`: `b > s`.
 
 # Examples
 
@@ -188,11 +252,12 @@ MIPValueatRisk
   - [`ValueatRiskFormulation`](@ref)
   - [`DistributionValueatRisk`](@ref)
   - [`ValueatRisk`](@ref)
+  - [`DrawdownatRisk`](@ref): builds the same programme over the drawdowns.
   - [`Option`](@ref)
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 7.2.2.3.
+  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equation 7.51.
 """
 @concrete struct MIPValueatRisk <: ValueatRiskFormulation
     """
@@ -225,17 +290,45 @@ function MIPValueatRisk(; b::Option{<:Number} = nothing,
     return MIPValueatRisk(b, s)
 end
 """
+    mip_var_bounds(b, s) -> Tuple
+
+Resolve the big-M constant `b` and the cardinality slack `s` of the empirical quantile programme to numbers.
+
+A `nothing` takes the default, `b = 1e3` or `s = 1e-5`. The `JuMP` builder and the functor read the pair from this one function, so both select the same order statistic.
+
+# Arguments
+
+  - `b`: Big-M constant, or `nothing`.
+  - `s`: Cardinality slack, or `nothing`.
+
+# Returns
+
+  - `(b, s)`: The two numbers, each the stated value or its default.
+
+# Related
+
+  - [`MIPValueatRisk`](@ref)
+  - [`DrawdownatRisk`](@ref)
+  - [`empirical_value_at_risk`](@ref)
+"""
+function mip_var_bounds(b::Option{<:Number}, s::Option{<:Number})
+    return ifelse(isnothing(b), 1e3, b), ifelse(isnothing(s), 1e-5, s)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
-Distribution-based formulation for Value-at-Risk.
+Computes the Value-at-Risk as a quantile of a parametric distribution, from the mean and the covariance of the asset returns.
 
-`DistributionValueatRisk` specifies a parametric distribution for computing Value-at-Risk analytically. The distribution parameters can be overridden by prior results during optimisation. This is a different estimand from the empirical quantile that [`MIPValueatRisk`](@ref) reports, so the risk measure that holds it reports the parametric value in the optimisation model and in the functor alike.
+This is a different estimand from the empirical quantile that [`MIPValueatRisk`](@ref) reports. The risk measure that holds it reports the parametric value in the optimisation model and in the functor alike. `mu` and `sigma` fall back to the prior's own, so [`factory`](@ref) fills them before either the model or the functor reads them.
+
+The optimisation model bounds the standard deviation from above with a second-order cone, so the model is convex only while the coefficient of the standard deviation is not negative. For the three distributions that is ``\\alpha \\leq 1/2`` for [`ValueatRisk`](@ref), and ``\\alpha + \\beta \\leq 1`` for [`ValueatRiskRange`](@ref). Past that level a minimisation of the risk has no finite solution.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{VaR}_{\\alpha}(\\boldsymbol{w}) &= -\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + z_{\\alpha} \\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}\\,.
+\\mathrm{VaR}_{\\alpha}(\\boldsymbol{w}) &= -\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + z_{\\alpha} \\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}\\,,\\\\
+\\mathrm{VaRRange}_{\\alpha, \\beta}(\\boldsymbol{w}) &= \\left(z_{\\alpha} - z^{c}_{\\beta}\\right) \\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}\\,.
 \\end{align}
 ```
 
@@ -243,11 +336,13 @@ Where:
 
   - $(math_dict[:w_port])
   - $(math_dict[:mu_er])
-  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
-  - ``z_{\\alpha}``: Lower-tail z-score of the standardised `dist` at ``\\alpha``, from [`compute_value_at_risk_z`](@ref).
+  - ``\\mathbf{\\Sigma}``: Covariance matrix of the asset returns, ``N \\times N``.
+  - ``z_{\\alpha}``: Loss-tail z-score of `dist` at ``\\alpha``, from [`compute_value_at_risk_z`](@ref).
+  - ``z^{c}_{\\beta}``: Gain-tail z-score of `dist` at ``\\beta``, from [`compute_value_at_risk_cz`](@ref).
   - $(math_dict[:alpha_rm])
+  - ``\\beta``: Significance level of the gain tail, ``\\beta \\in (0, 1)``.
 
-The optimisation model states the standard deviation as a second-order cone over ``\\mathbf{G} \\boldsymbol{w}``, where ``\\mathbf{G}`` factorises ``\\mathbf{\\Sigma}``. `mu` and `sigma` fall back to the prior's own, so [`factory`](@ref) fills them before either the model or the functor reads them.
+The range is the Value-at-Risk of the returns plus the Value-at-Risk of the negated returns, and the two mean terms cancel.
 
 # Fields
 
@@ -269,20 +364,20 @@ Keywords correspond to the struct's fields.
 
   - If `mu` is not `nothing`: `!isempty(mu)`.
   - If `sigma` is not `nothing`: `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
-  - If `chol` is not `nothing`: `!isempty(chol)`, and `sigma` is a matrix rather than `nothing` or a **Deferred Quantity**.
+  - If `chol` is not `nothing`: `!isempty(chol)`, and `sigma` is a matrix rather than `nothing` or a Deferred Quantity.
 
 !!! warning
 
-    `mu`, `sigma` and `chol` are stated independently, so nothing makes them agree with each other. A caller who wants one consistent set names `pe` alone and lets it fill all three from a single fit. A caller who states them by hand must make sure that they agree.
+    The caller states `mu`, `sigma` and `chol` independently, and nothing makes them agree with each other. A caller who wants one consistent set gives `pe` alone, and one fit of `pe` fills all three. A caller who states them by hand must make sure that they agree.
 
 ## View parameters
 
 `DistributionValueatRisk` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
-  - `mu` is sliced to the selected assets. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
-  - `sigma` is sliced to the selected assets. A stated matrix is sliced on **both** axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
-  - `chol` is sliced on its **columns** alone. Its rows index the factorisation, which the asset selection does not address.
-  - `pe` and `dist` are carried through unchanged. `dist` describes the standardised loss, so it carries no asset axis.
+  - The method slices `mu` to the selected assets. A Deferred Quantity passes through unsliced, and resolves on the subset later.
+  - The method slices a stated `sigma` on both axes. A Deferred Quantity passes through unsliced, and resolves on the subset later.
+  - The method slices `chol` on its columns alone. Its rows index the factorisation, and the asset selection does not address them.
+  - `pe` and `dist` pass through unchanged. `dist` describes the standardised loss, so it has no asset axis.
 
 # Examples
 
@@ -309,7 +404,7 @@ DistributionValueatRisk
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 7.2.2.3.
+  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equations 7.52 and 7.53, and Section 11.2, Equation 11.5.
 """
 @propagatable @concrete struct DistributionValueatRisk <: ValueatRiskFormulation
     """
@@ -364,9 +459,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve every **Deferred Quantity** held by [`DistributionValueatRisk`](@ref) `alg` against prior result `pr`.
+Resolve every Deferred Quantity held by [`DistributionValueatRisk`](@ref) `alg` against prior result `pr`.
 
-The measure carries three prior-derived fields, and `mu` and `sigma` are independent of each other, so it takes a `pe`: one fit fills every slot the caller left unstated. `chol` is derived from `sigma` and travels with it — a `sigma` that names its own estimator supplies the factorisation from that same fit, and never from the `pe`'s.
+The formulation holds three fields that the prior can fill, and `mu` and `sigma` are independent of each other. So it takes a `pe`, and one fit of `pe` fills every slot that the caller left unstated. `chol` is a factor of `sigma` and goes with it. A `sigma` that names its own estimator gives the factor from that same fit, and never from the fit of `pe`.
+
+# Algorithm
+
+ 1. If `sigma` is a Deferred Quantity, fit it against `pr`, and take `sigma` and its factor `chol` from that one fit. Otherwise keep `sigma` and `chol` as stated.
+ 2. Resolve `mu` with [`resolve_slot`](@ref).
+ 3. If `pe` is `nothing`, rebuild the formulation with `mu`, `sigma` and `chol`, and return it.
+ 4. Fit `pe` against `pr`, giving `fitted`.
+ 5. If `sigma` is still `nothing`, take `chol` from `fitted`, so that the factor and the matrix come from one fit.
+ 6. Fill `mu` and `sigma` from `fitted` where they are still `nothing`, with [`fan_out_slot`](@ref).
+ 7. Rebuild the formulation with the four values and `pe = nothing`, and return it.
 
 # Related
 
@@ -406,9 +511,16 @@ functor_slots(alg::DistributionValueatRisk) = (; mu = alg.mu, sigma = alg.sigma)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`DistributionValueatRisk`](@ref) by resolving its **Deferred Quantities**, then falling back to the prior result for whatever is still unstated.
+Create an instance of [`DistributionValueatRisk`](@ref) by resolving its Deferred Quantities, then falling back to the prior result for whatever is still unstated.
 
-`sigma` and `chol` are selected **as a pair** ([`sigma_chol_selector`](@ref)), not field by field: a stated `sigma` with no factor must not be paired with the prior's, which factorises a different matrix.
+[`sigma_chol_selector`](@ref) selects `sigma` and `chol` as a pair, not field by field. A stated `sigma` with no factor must not take the factor of the prior, which is a factor of a different matrix.
+
+# Algorithm
+
+ 1. Resolve the Deferred Quantities with [`resolve_deferred_quantities`](@ref).
+ 2. Select `sigma` and `chol` as a pair with [`sigma_chol_selector`](@ref).
+ 3. Take `mu` from the formulation, or from `pr` when the formulation states none.
+ 4. Build the formulation with the three values, `pe = nothing` and the same `dist`.
 
 # Related
 
@@ -433,29 +545,41 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Value-at-Risk (VaR) risk measure.
+Measures the Value-at-Risk (VaR), the loss that the portfolio exceeds with probability `alpha`.
 
-`ValueatRisk` quantifies the maximum expected loss at a given confidence level `alpha` over a specified time horizon. It can be computed using empirical quantiles (weighted or unweighted) or via a parametric distribution.
+`alg` selects the estimand. [`MIPValueatRisk`](@ref), the default, gives the empirical quantile of the sample, which the definition below states. [`DistributionValueatRisk`](@ref) gives the quantile of a parametric distribution, which that type states. The measure is not convex, so its empirical model is a mixed-integer programme.
 
 # Mathematical definition
 
-Let ``\\boldsymbol{x} = (x_1, \\ldots, x_T)^\\intercal`` be the portfolio returns vector and ``x_{(k)}`` the ``k``-th order statistic (``k``-th smallest value). The empirical VaR at significance level ``\\alpha`` is:
-
 ```math
 \\begin{align}
-\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) &= -x_{(\\lceil \\alpha T \\rceil)}\\,.
+\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) &= -x_{(k)}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})``: Value-at-Risk at significance level ``\\alpha``.
-  - ``\\boldsymbol{x} = (x_1, \\ldots, x_T)^\\intercal``: Portfolio returns vector.
-  - ``x_{(k)}``: ``k``-th order statistic (``k``-th smallest value) of ``\\boldsymbol{x}``.
-  - ``\\alpha``: Significance level (e.g., ``\\alpha = 0.05`` for 95% VaR).
+  - ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})``: Value-at-Risk at level ``\\alpha``.
+  - $(math_dict[:xret])
+  - $(math_dict[:x_k_sorted])
+  - $(math_dict[:k_var_mip])
+  - $(math_dict[:W_k_cum])
+  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when no observation weights are set.
+  - $(math_dict[:s_mip_slack]) It is the `s` field of [`MIPValueatRisk`](@ref).
+  - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
 
-For observation-weighted samples with weight vector ``\\boldsymbol{w}`` summing to ``S_w``, VaR is the ``\\alpha S_w``-quantile of the weighted empirical distribution.
+``-x_{(k)}`` is the minimum of the programme of [`MIPValueatRisk`](@ref) over the losses ``-x_{t}``. Without observation weights ``k = \\lfloor (\\alpha - s) T \\rfloor + 1``. This is ``\\lceil \\alpha T \\rceil``, the index of the lower ``\\alpha``-quantile, while ``s T`` is smaller than ``1 - (\\lceil \\alpha T \\rceil - \\alpha T)``. The slack also absorbs the rounding error of ``\\alpha T``. For example, at ``\\alpha = 0.07`` and ``T = 100`` the product rounds to 7.000000000000001, and ``k`` is 7.
+
+The definition ``-\\inf\\{x : F(x) > \\alpha\\}`` of the reference, Equation 7.50, with ``F`` the distribution function of the returns, gives the upper ``\\alpha``-quantile on a sample, the position ``\\lfloor \\alpha T \\rfloor + 1``. It differs from ``k`` by one position when ``\\alpha T`` is an integer. The measure follows the programme of the same reference, Equation 7.51, in its model and in its functor.
+
+# Algorithm
+
+The functor of the empirical estimand:
+
+ 1. Read the slack `s` with [`mip_var_bounds`](@ref), which gives the default when `alg.s` is `nothing`.
+ 2. Read the observation weights `w` with [`get_observation_weights`](@ref).
+ 3. Return [`empirical_value_at_risk`](@ref) of `x` at `alpha` and `s`. Without weights the kernel reorders its input, so it receives a copy of `x`.
 
 # Fields
 
@@ -475,7 +599,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_nonneg])
 
 ## Propagated parameters
 
@@ -494,7 +618,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
     (r::ValueatRisk)(x::VecNum)
     (r::ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk})(w::VecNum, X, fees)
 
-`alg` selects the quantity, and each method reports the one that its own `JuMP` formulation builds. The first computes the empirical quantile of a portfolio returns vector, weighted by `w` when the measure states observation weights. The second computes the parametric quantile from the moments that [`DistributionValueatRisk`](@ref) holds, so it takes the asset weights instead. `X` and `fees` are unused, because the model's terms are the prior's moments and no return series enters them.
+`alg` selects the quantity, and each method reports the value that its own `JuMP` model builds. The first computes the empirical quantile of a portfolio returns vector, weighted by `w` when the measure states observation weights, and leaves `x` unchanged. The second computes the parametric quantile from the moments that [`DistributionValueatRisk`](@ref) holds, so it takes the asset weights instead. It does not read `X` and `fees`, because the terms of the model are the prior's moments and no return series enters them.
 
 ## Arguments
 
@@ -530,7 +654,7 @@ ValueatRisk
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 7.2.2.3.
+  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equations 7.50 and 7.51.
 """
 @propagatable @concrete struct ValueatRisk <: RiskMeasure
     """
@@ -567,11 +691,16 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the significance level `alpha` of a [`ValueatRisk`](@ref) against prior result `pr`, and resolve the formulation `alg` beside it.
 
-`alpha` takes a **Calibration Rule** in place of the number, so it resolves here. The rebuild goes through [`rebuild_with_slots`](@ref), and the inner constructor it calls re-runs `0 < alpha < 1` on the calibrated number: a rule that returns a value the slot does not admit is refused at fold time, by the guard a caller's own number meets.
+`alpha` can hold a Calibration Rule in place of a number, so it resolves here. The rebuild goes through [`rebuild_with_slots`](@ref), whose call to the inner constructor checks `0 < alpha < 1` again on the calibrated number. So the check that a number of the caller meets also refuses a rule that returns a value outside the slot.
 
-This method is more specific than the derived recursion, so it takes over the `alg` slot that [`deferred_slots`](@ref) declares. It resolves that slot through [`resolve_deferred_child`](@ref), which is the verb the derivation would have used.
+This method is more specific than the derived recursion, so it takes over the `alg` slot that [`deferred_slots`](@ref) declares. It resolves that slot through [`resolve_deferred_child`](@ref), the function that the derived recursion calls.
 
-The effective observation weights are computed locally as `sel(x.w, pr.w)` and threaded to the rule. The measure carries no solver of its own, so it hands the rule the one it was given.
+# Algorithm
+
+ 1. Set `ws` to the observation weights of the measure, or to those of `pr` when the measure states none.
+ 2. Resolve `alpha` with [`resolve_calibration_slot`](@ref), which gives the rule `pr`, `ws` and the solver `slv`. The measure holds no solver of its own.
+ 3. Resolve `alg` with [`resolve_deferred_child`](@ref).
+ 4. Rebuild the measure with the resolved `alpha` and `alg`.
 
 # Related
 
@@ -589,22 +718,13 @@ end
 # Calibration slots — see `calibration_slots`. The significance level is the one quantity of
 # this measure that a rule may compute.
 calibration_slots(x::ValueatRisk) = (; alpha = x.alpha)
-# The empirical order statistic is the `MIPValueatRisk` estimand, so the two functors
-# below name that formulation. Leaving `alg` free makes them overlap the parametric
-# method further down, which no rule of specificity can order.
-function (r::ValueatRisk{<:Any, <:Any, Nothing, <:MIPValueatRisk})(x::VecNum)
-    return -partialsort(x, ceil(Int, r.alpha * length(x)))
-end
-function (r::ValueatRisk{<:Any, <:Any, <:ObsWeights, <:MIPValueatRisk})(x::VecNum)
+# The empirical order statistic is the `MIPValueatRisk` estimand, so the functor below names
+# that formulation. Leaving `alg` free makes it overlap the parametric method further down,
+# which no rule of specificity can order.
+function (r::ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk})(x::VecNum)
+    _, s = mip_var_bounds(r.alg.b, r.alg.s)
     w = get_observation_weights(r.w, x)
-    sw = sum(w)
-    order = sortperm(x)
-    sorted_x = view(x, order)
-    sorted_w = view(w, order)
-    cum_w = cumsum(sorted_w)
-    idx = searchsortedfirst(cum_w, sw * r.alpha)
-    idx = ifelse(idx > length(x), idx - 1, idx)
-    return -sorted_x[idx]
+    return empirical_value_at_risk(isnothing(w) ? copy(x) : x, r.alpha, s, w)
 end
 # The parametric formulation is a different estimand from the empirical order statistic
 # above, and the `JuMP` model builds the parametric one. The functor must report the same
@@ -621,9 +741,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Value-at-Risk Range risk measure.
+Measures the Value-at-Risk Range, the spread between the loss quantile at `alpha` and the gain quantile at `beta`.
 
-`ValueatRiskRange` evaluates the Value-at-Risk at level `alpha` on the portfolio returns and the Value-at-Risk at level `beta` on the negated portfolio returns, then sums the two to give the total spread between the downside and the upside tail.
+The range sums the [`ValueatRisk`](@ref) of the portfolio returns and the Value-at-Risk of the negated returns. `alg` selects the estimand of both tails, as it does for [`ValueatRisk`](@ref).
 
 # Mathematical definition
 
@@ -636,13 +756,25 @@ Represents the Value-at-Risk Range risk measure.
 Where:
 
   - ``\\mathrm{VaRRange}_{\\alpha,\\beta}(\\boldsymbol{x})``: Value-at-Risk Range.
-  - ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})``: Lower-tail loss quantile.
-  - ``\\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})``: Upper-tail gain quantile.
+  - ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})``: Value-at-Risk of the returns at level ``\\alpha``, the loss quantile that [`ValueatRisk`](@ref) defines.
+  - ``\\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})``: Value-at-Risk of the negated returns at level ``\\beta``, which is minus the gain quantile.
   - $(math_dict[:xret])
-  - ``\\alpha``: Lower-tail significance level.
-  - ``\\beta``: Upper-tail significance level.
+  - ``\\alpha``: Significance level of the loss tail, ``\\alpha \\in (0, 1)``.
+  - ``\\beta``: Significance level of the gain tail, ``\\beta \\in (0, 1)``.
 
 $(math_dict[:negated_upper_tail])
+
+The two tails select their order statistics with the same slack ``s``. The gain tail is the ``k``-th largest return, with ``k`` the index of [`ValueatRisk`](@ref) at ``\\beta``.
+
+# Algorithm
+
+The functor of the empirical estimand:
+
+ 1. Read the slack `s` with [`mip_var_bounds`](@ref), which gives the default when `alg.s` is `nothing`.
+ 2. Read the observation weights `w` with [`get_observation_weights`](@ref).
+ 3. Compute `loss`, [`empirical_value_at_risk`](@ref) of `x` at `alpha` and `s`. Without weights the kernel reorders its input, so it receives a copy of `x`.
+ 4. Compute `gain`, [`empirical_value_at_risk`](@ref) of `-x` at `beta` and `s`.
+ 5. Return `loss + gain`.
 
 # Fields
 
@@ -664,7 +796,7 @@ Keywords correspond to the struct's fields.
 
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `beta` is a number: `0 < beta < 1`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_nonneg])
 
 ## Propagated parameters
 
@@ -683,7 +815,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
     (r::ValueatRiskRange)(x::VecNum)
     (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:DistributionValueatRisk})(w::VecNum, X, fees)
 
-`alg` selects the quantity, as it does for [`ValueatRisk`](@ref). The first method computes the sum of the two empirical tail quantiles of a portfolio returns vector. It holds the upper tail in the negated convention of [`ValueatRisk`](@ref), so it writes the sum as `loss - gain`. The second computes the parametric range, in which the two legs share one ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}`` term that cancels, leaving the spread of the two z-scores over one standard deviation.
+`alg` selects the quantity, as it does for [`ValueatRisk`](@ref). The first method computes the sum of the two empirical tail quantiles of a portfolio returns vector, and leaves `x` unchanged. The second computes the parametric range that [`DistributionValueatRisk`](@ref) states. It does not read `X` and `fees`.
 
 ## Arguments
 
@@ -765,9 +897,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the two significance levels of a [`ValueatRiskRange`](@ref) against prior result `pr`, and resolve the formulation `alg` beside them.
 
-Each tail carries its own slot and its own bound, so a stated tail rule and a stated head rule resolve independently. `beta` defaults to `alpha`, so a rule stated on the loss side alone reaches both ends: the rule states the method and the slot states the end. The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
+Each tail has its own slot and its own bound, so a rule for the loss tail and a rule for the gain tail resolve independently. `beta` defaults to `alpha`, so a rule stated for the loss tail alone reaches both tails. The rule states the method, and the slot states the tail. The rebuild goes through [`rebuild_with_slots`](@ref), whose call to the inner constructor checks both levels again on the calibrated numbers.
 
 This method is more specific than the derived recursion, so it takes over the `alg` slot that [`deferred_slots`](@ref) declares, through [`resolve_deferred_child`](@ref).
+
+# Algorithm
+
+ 1. Set `ws` to the observation weights of the measure, or to those of `pr` when the measure states none.
+ 2. Resolve `alpha` with [`resolve_calibration_slot`](@ref), which gives the rule `pr`, `ws` and the solver `slv`.
+ 3. Resolve `beta` in the same way.
+ 4. Resolve `alg` with [`resolve_deferred_child`](@ref).
+ 5. Rebuild the measure with the resolved `alpha`, `beta` and `alg`.
 
 # Related
 
@@ -802,39 +942,16 @@ function range_tails(r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:MIPValuea
                                alg = r.alg),
             gain = ValueatRisk(; settings = settings, alpha = r.beta, w = r.w, alg = r.alg))
 end
-# The empirical order statistic is the `MIPValueatRisk` estimand, so the two functors
-# below name that formulation. Leaving `alg` free makes them overlap the parametric
-# method further down, which no rule of specificity can order.
-function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing, <:MIPValueatRisk})(x::VecNum)
-    x = copy(x)
-    loss = -partialsort!(x, ceil(Int, r.alpha * length(x)))
-    gain = -partialsort!(x, ceil(Int, r.beta * length(x)); rev = true)
-    return loss - gain
-end
-function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:ObsWeights, <:MIPValueatRisk})(x::VecNum)
+# The empirical order statistic is the `MIPValueatRisk` estimand, so the functor below names
+# that formulation. Leaving `alg` free makes it overlap the parametric method further down,
+# which no rule of specificity can order. The gain tail is the same kernel over `-x`, as the
+# model builds it over the negated series.
+function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:MIPValueatRisk})(x::VecNum)
+    _, s = mip_var_bounds(r.alg.b, r.alg.s)
     w = get_observation_weights(r.w, x)
-    sw = sum(w)
-    order = sortperm(x)
-    sorted_x = view(x, order)
-    sorted_w = view(w, order)
-    cum_w = cumsum(sorted_w)
-    idx = searchsortedfirst(cum_w, sw * r.alpha)
-    idx = ifelse(idx > length(x), idx - 1, idx)
-    loss = -sorted_x[idx]
-
-    # Reverse the **permutation**, never the views. `sorted_x` and `sorted_w` are views, so
-    # `reverse!` on them writes through into the caller's `x` and into `r.w` —
-    # `get_observation_weights` hands back the stored weights object itself, so the measure
-    # would permute its own configuration. `order` was just allocated by `sortperm`, so it is
-    # ours to mutate, and the element sequence read below is identical.
-    reverse!(order)
-    sorted_x = view(x, order)
-    sorted_w = view(w, order)
-    cum_w = cumsum(sorted_w)
-    idx = searchsortedfirst(cum_w, sw * r.beta)
-    idx = ifelse(idx > length(x), idx - 1, idx)
-    gain = -sorted_x[idx]
-    return loss - gain
+    loss = empirical_value_at_risk(isnothing(w) ? copy(x) : x, r.alpha, s, w)
+    gain = empirical_value_at_risk(-x, r.beta, s, w)
+    return loss + gain
 end
 # The parametric twin of the two functors above. The model's two legs share one mean term,
 # which cancels in their difference, so the range is the spread of the two z-scores over one
@@ -850,42 +967,42 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Drawdown-at-Risk (DaR) risk measure.
+Measures the Drawdown-at-Risk (DaR), the uncompounded drawdown that the portfolio exceeds with probability `alpha`.
 
-`DrawdownatRisk` quantifies the maximum drawdown not exceeded at a given confidence level `alpha`. It operates on absolute drawdowns computed from the portfolio returns series. Its optimisation model is the mixed-integer programme of [`MIPValueatRisk`](@ref) applied to the drawdown series rather than to the return series, so `b` and `s` carry the same meaning here as they do there.
+It is the [`ValueatRisk`](@ref) of the drawdown series in place of the returns. Its optimisation model is the mixed-integer programme of [`MIPValueatRisk`](@ref) over the drawdowns, so `b` and `s` have the same meaning here as they have there. The measure is not convex.
 
 # Mathematical definition
 
-Define the cumulative wealth process and absolute drawdown at time ``t``:
-
 ```math
 \\begin{align}
-c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
-d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:xret])
-  - $(math_dict[:ct])
-  - $(math_dict[:dtdd])
-
-The Drawdown-at-Risk at level ``\\alpha`` is the ``\\lceil \\alpha T \\rceil``-th smallest (most extreme) drawdown:
-
-```math
-\\begin{align}
-\\mathrm{DaR}_{\\alpha}(\\boldsymbol{x}) &= -d_{(\\lceil \\alpha T \\rceil)}\\,.
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\quad c_0 = 0\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s\\,, \\\\
+\\mathrm{DaR}_{\\alpha}(\\boldsymbol{x}) &= -d_{(k)}\\,.
 \\end{align}
 ```
 
 Where:
 
   - ``\\mathrm{DaR}_{\\alpha}(\\boldsymbol{x})``: Drawdown-at-Risk at level ``\\alpha``.
+  - $(math_dict[:xret])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
+  - ``d_{(k)}``: ``k``-th smallest drawdown, the ``k``-th deepest, and ``w_{(k)}`` its observation weight.
+  - $(math_dict[:k_var_mip])
+  - $(math_dict[:W_k_cum])
+  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when no observation weights are set.
+  - $(math_dict[:s_mip_slack]) It is the `s` field.
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
-  - $(math_dict[:dtdd])
-  - ``d_{(k)}``: ``k``-th order statistic (sorted ascending) of the drawdown series.
+
+The running peak starts at ``c_0 = 0``, so a series that falls from its first period is in drawdown from the start. ``-d_{(k)}`` is the minimum of the programme of [`MIPValueatRisk`](@ref) over the losses ``-d_{t}``, and ``k`` follows the rules that [`ValueatRisk`](@ref) states.
+
+# Algorithm
+
+ 1. Read the slack `s` with [`mip_var_bounds`](@ref), which gives the default when the `s` field is `nothing`.
+ 2. Compute the drawdown series with [`absolute_drawdown_vec`](@ref).
+ 3. Read the observation weights with [`get_observation_weights`](@ref).
+ 4. Return [`empirical_value_at_risk`](@ref) of the drawdown series at `alpha` and `s`.
 
 # Fields
 
@@ -906,16 +1023,16 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - If `w` is not `nothing`: `!isempty(w)`.
-  - If `b` is not `nothing`: `b > 0`.
-  - If `s` is not `nothing`: `s > 0`.
+  - $(val_dict[:oow_nonneg])
+  - If `b` is not `nothing`: `b > 0` and finite.
+  - If `s` is not `nothing`: `s > 0` and finite.
   - If both `b` and `s` are not `nothing`: `b > s`.
 
 # Functor
 
     (r::DrawdownatRisk)(x::VecNum)
 
-Computes the Drawdown-at-Risk of a portfolio returns vector `x`.
+Computes the Drawdown-at-Risk of a portfolio returns vector `x`, and leaves `x` unchanged.
 
 ## Arguments
 
@@ -942,12 +1059,13 @@ DrawdownatRisk
   - [`RiskMeasureSettings`](@ref)
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`RelativeDrawdownatRisk`](@ref)
-  - [`drawdown_at_risk`](@ref)
+  - [`MIPValueatRisk`](@ref)
+  - [`empirical_value_at_risk`](@ref)
 
 # References
 
   - $(ref_dict[:cdar])
-  - $(ref_dict[:cajas2025]) Section 7.2.4.3.
+  - $(ref_dict[:cajas2025]) Section 7.2.4.3, Equations 7.90 and 7.91.
 """
 @propagatable @concrete struct DrawdownatRisk <: RiskMeasure
     """
@@ -1005,21 +1123,41 @@ calibration_slots(x::DrawdownatRisk) = (; alpha = x.alpha)
 """
     absolute_drawdown_vec(x::VecNum) -> Vector
 
-Compute the absolute drawdown series for a single-asset return vector.
+Compute the uncompounded drawdown series of one return series.
 
-Each element of the result is the difference between the current cumulative return and its running maximum (always ≤ 0).
+The function reads `x` and does not write it, so any `AbstractVector` works, for example a column view, a range or an immutable array.
 
-The running maximum starts at zero, so the drawdown is measured against the initial portfolio value rather than against the first observation.
+# Mathematical definition
 
-`x` is read, never written: the accumulator and the running peak are carried in scalars, so any `AbstractVector` works — a column view, a range, an immutable array.
+```math
+\\begin{align}
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\quad c_0 = 0\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
+
+The running peak starts at ``c_0 = 0``, so each drawdown is relative to the initial portfolio value, not to the first observation.
+
+# Algorithm
+
+ 1. Allocate `dd`, of the same length and element type as `x`.
+ 2. Set the cumulative return `cs` and the running peak `peak` to zero.
+ 3. For each observation, add it to `cs`, raise `peak` to `cs` when `cs` is larger, and store `cs - peak` in `dd`.
+ 4. Return `dd`.
 
 # Arguments
 
-  - `x::VecNum`: Return series vector.
+  - `x::VecNum`: Return series.
 
 # Returns
 
-  - `Vector`: Drawdown vector of the same length as `x`.
+  - `dd`: Drawdown series of the same length as `x`, with every entry ``\\leq 0``.
 
 # Related
 
@@ -1038,94 +1176,120 @@ function absolute_drawdown_vec(x::VecNum)
     return dd
 end
 """
-    drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing) -> Number
-    drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum) -> Number
+    empirical_value_at_risk(x::VecNum, alpha::Real, s::Real, ::Nothing) -> Number
+    empirical_value_at_risk(x::VecNum, alpha::Real, s::Real, w::VecNum) -> Number
 
-Aggregate a drawdown series into its Drawdown-at-Risk at level `alpha`.
+Compute the empirical Value-at-Risk of a series, the negated order statistic that the mixed-integer quantile programme selects.
 
-This is the shared aggregation kernel behind [`DrawdownatRisk`](@ref) and [`RelativeDrawdownatRisk`](@ref): the two measures differ only in the drawdown series they feed it ([`absolute_drawdown_vec`](@ref) and [`relative_drawdown_vec`](@ref) respectively), so the tail selection lives here once.
-
-`dd` is **consumed in place** — the unweighted method reorders it via `partialsort!`. Callers pass a freshly computed drawdown vector.
-
-Dispatch on the third argument selects the weighting scheme, so callers resolve observation weights with [`get_observation_weights`](@ref) and let dispatch do the rest.
-
-  - `::Nothing`: unweighted, the `alpha`-quantile of the drawdown series by rank.
-  - `w::VecNum`: weighted, the drawdown at which the cumulative observation weight first reaches `alpha`.
-
-# Arguments
-
-  - `dd::VecNum`: Drawdown series, all entries ≤ 0. Consumed in place.
-  - `alpha::Real`: Significance level, `0 < alpha < 1`.
-  - `w`: Resolved observation weights, or `nothing` for the unweighted aggregation.
-
-# Returns
-
-  - `Number`: Drawdown-at-Risk, returned as a positive loss.
-
-# Related
-
-  - [`DrawdownatRisk`](@ref)
-  - [`RelativeDrawdownatRisk`](@ref)
-  - [`absolute_drawdown_vec`](@ref)
-  - [`relative_drawdown_vec`](@ref)
-  - [`conditional_drawdown_at_risk`](@ref)
-"""
-function drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing)
-    return -partialsort!(dd, ceil(Int, alpha * length(dd)))
-end
-function drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum)
-    sw = sum(w)
-    order = sortperm(dd)
-    sorted_dd = view(dd, order)
-    sorted_w = view(w, order)
-    cum_w = cumsum(sorted_w)
-    idx = searchsortedfirst(cum_w, sw * alpha)
-    idx = ifelse(idx > length(dd), idx - 1, idx)
-    return -sorted_dd[idx]
-end
-function (r::DrawdownatRisk)(x::VecNum)
-    return drawdown_at_risk(absolute_drawdown_vec(x), r.alpha,
-                            get_observation_weights(r.w, x))
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Represents the Relative Drawdown-at-Risk risk measure for hierarchical optimisation.
-
-`RelativeDrawdownatRisk` quantifies the maximum relative (compounded) drawdown not exceeded at a given confidence level `alpha`. It operates on relative drawdowns computed from the portfolio returns series.
+The four empirical measures of the family call this one kernel: [`ValueatRisk`](@ref) and [`ValueatRiskRange`](@ref) on the returns, [`DrawdownatRisk`](@ref) and [`RelativeDrawdownatRisk`](@ref) on a drawdown series. The method without weights reorders `x` in place, so a caller passes a copy or a vector that it has just computed.
 
 # Mathematical definition
 
-Define the compounded wealth process and relative drawdown at time ``t``:
-
 ```math
 \\begin{align}
-C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
-rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) &= -x_{(k)}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - $(math_dict[:xret])
-  - $(math_dict[:Ct])
-  - $(math_dict[:rdt])
+  - $(math_dict[:x_k_sorted])
+  - $(math_dict[:k_var_mip])
+  - $(math_dict[:W_k_cum])
+  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when `w` is `nothing`.
+  - $(math_dict[:s_mip_slack])
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
 
-The Relative Drawdown-at-Risk at level ``\\alpha`` is:
+# Algorithm
+
+Without observation weights:
+
+ 1. Set `k` to ``\\lfloor (\\alpha - s) T \\rfloor + 1``, clamped to the range from 1 to ``T``.
+ 2. Partially sort `x`, so that its `k` smallest entries come first, in ascending order.
+ 3. Return minus the entry at `k`.
+
+With observation weights:
+
+ 1. Sort `x` with `sortperm`, giving `order`, and accumulate the sorted weights, giving `cum_w`.
+ 2. Set `k` to one plus the last position at which `cum_w` does not exceed `(alpha - s)` times the total weight, and cap it at ``T``.
+ 3. Return minus the `k`-th smallest entry of `x`.
+
+# Arguments
+
+  - `x::VecNum`: Series, for example the portfolio returns or a drawdown series. The method without weights reorders it.
+  - `alpha::Real`: Significance level, `0 < alpha < 1`.
+  - `s::Real`: Cardinality slack, from [`mip_var_bounds`](@ref).
+  - `w`: Observation weights from [`get_observation_weights`](@ref), or `nothing`.
+
+# Returns
+
+  - `Number`: The Value-at-Risk, positive when the order statistic is a loss.
+
+# Related
+
+  - [`ValueatRisk`](@ref)
+  - [`ValueatRiskRange`](@ref)
+  - [`DrawdownatRisk`](@ref)
+  - [`RelativeDrawdownatRisk`](@ref)
+  - [`MIPValueatRisk`](@ref): the programme whose minimum this kernel computes.
+  - [`conditional_drawdown_at_risk`](@ref)
+"""
+function empirical_value_at_risk(x::VecNum, alpha::Real, s::Real, ::Nothing)
+    T = length(x)
+    k = clamp(floor(Int, (alpha - s) * T) + 1, 1, T)
+    return -partialsort!(x, k)
+end
+function empirical_value_at_risk(x::VecNum, alpha::Real, s::Real, w::VecNum)
+    order = sortperm(x)
+    cum_w = cumsum(view(w, order))
+    k = min(searchsortedlast(cum_w, (alpha - s) * cum_w[end]) + 1, length(x))
+    return -x[order[k]]
+end
+function (r::DrawdownatRisk)(x::VecNum)
+    _, s = mip_var_bounds(r.b, r.s)
+    return empirical_value_at_risk(absolute_drawdown_vec(x), r.alpha, s,
+                                   get_observation_weights(r.w, x))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Measures the Relative Drawdown-at-Risk, the compounded drawdown that the portfolio exceeds with probability `alpha`.
+
+It is the [`ValueatRisk`](@ref) of the relative drawdown series. The compounded wealth is a product of linear functions of the weights, so the library states no JuMP formulation of the measure, and it is a [`HierarchicalRiskMeasure`](@ref).
+
+# Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{RDaR}_{\\alpha}(\\boldsymbol{x}) &= -rd_{(\\lceil \\alpha T \\rceil)}\\,.
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\quad C_0 = 1\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1\\,, \\\\
+\\mathrm{RDaR}_{\\alpha}(\\boldsymbol{x}) &= -rd_{(k)}\\,.
 \\end{align}
 ```
 
 Where:
 
   - ``\\mathrm{RDaR}_{\\alpha}(\\boldsymbol{x})``: Relative Drawdown-at-Risk at level ``\\alpha``.
+  - $(math_dict[:xret])
+  - $(math_dict[:Ct])
+  - $(math_dict[:rdt])
+  - ``rd_{(k)}``: ``k``-th smallest relative drawdown, the ``k``-th deepest, and ``w_{(k)}`` its observation weight.
+  - $(math_dict[:k_var_mip])
+  - $(math_dict[:W_k_cum])
+  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when no observation weights are set.
+  - $(math_dict[:s_mip_slack]) The measure has no `s` field, so it takes the default of [`mip_var_bounds`](@ref).
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
-  - $(math_dict[:rdt])
-  - ``rd_{(k)}``: ``k``-th order statistic (sorted ascending) of the relative drawdown series.
+
+The running peak starts at ``C_0 = 1``, so each drawdown is relative to the initial portfolio value. The index ``k`` is the one of [`DrawdownatRisk`](@ref), so the two measures select the same position in their series.
+
+# Algorithm
+
+ 1. Read the default slack `s` with [`mip_var_bounds`](@ref).
+ 2. Compute the relative drawdown series with [`relative_drawdown_vec`](@ref).
+ 3. Read the observation weights with [`get_observation_weights`](@ref).
+ 4. Return [`empirical_value_at_risk`](@ref) of the relative drawdown series at `alpha` and `s`.
 
 # Fields
 
@@ -1144,13 +1308,13 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_nonneg])
 
 # Functor
 
     (r::RelativeDrawdownatRisk)(x::VecNum)
 
-Computes the Relative Drawdown-at-Risk of a portfolio returns vector `x`.
+Computes the Relative Drawdown-at-Risk of a portfolio returns vector `x`, and leaves `x` unchanged.
 
 ## Arguments
 
@@ -1173,7 +1337,7 @@ RelativeDrawdownatRisk
   - [`HierarchicalRiskMeasureSettings`](@ref)
   - [`DrawdownatRisk`](@ref)
   - [`RelativeConditionalDrawdownatRisk`](@ref)
-  - [`drawdown_at_risk`](@ref)
+  - [`empirical_value_at_risk`](@ref)
 
 # References
 
@@ -1208,23 +1372,43 @@ end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::RelativeDrawdownatRisk) = (; alpha = x.alpha)
 """
-    relative_drawdown_vec(x)
+    relative_drawdown_vec(x::VecNum) -> Vector
 
-Compute the relative drawdown vector for a vector of portfolio returns.
+Compute the compounded drawdown series of one return series.
 
-Returns the relative drawdown at each time step, computed as the current portfolio value relative to its running maximum.
+The function reads `x` and does not write it, so any `AbstractVector` works, for example a column view, a range or an immutable array.
 
-The running maximum starts at one, so the drawdown is measured against the initial portfolio value rather than against the first observation.
+# Mathematical definition
 
-`x` is read, never written: the compounding factor and the running peak are carried in scalars, so any `AbstractVector` works — a column view, a range, an immutable array.
+```math
+\\begin{align}
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\quad C_0 = 1\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:Ct])
+  - $(math_dict[:rdt])
+
+The running peak starts at ``C_0 = 1``, so each drawdown is relative to the initial portfolio value, not to the first observation.
+
+# Algorithm
+
+ 1. Allocate `dd`, of the same length and element type as `x`.
+ 2. Set the compounded wealth `cp` and the running peak `peak` to one.
+ 3. For each observation, multiply `cp` by one plus the return, raise `peak` to `cp` when `cp` is larger, and store `cp / peak - 1` in `dd`.
+ 4. Return `dd`.
 
 # Arguments
 
-  - `x`: Vector of portfolio returns.
+  - `x::VecNum`: Return series.
 
 # Returns
 
-  - Relative drawdown vector.
+  - `dd`: Relative drawdown series of the same length as `x`, with every entry ``\\leq 0``.
 
 # Related
 
@@ -1243,20 +1427,24 @@ function relative_drawdown_vec(x::VecNum)
     return dd
 end
 function (r::RelativeDrawdownatRisk)(x::VecNum)
-    return drawdown_at_risk(relative_drawdown_vec(x), r.alpha,
-                            get_observation_weights(r.w, x))
+    _, s = mip_var_bounds(nothing, nothing)
+    return empirical_value_at_risk(relative_drawdown_vec(x), r.alpha, s,
+                                   get_observation_weights(r.w, x))
 end
 
 """
     const CholRM = Union{<:Variance, <:StandardDeviation, <:DistributionValueatRisk}
 
-Union of risk measures that support Cholesky-factor-based computation.
+Groups the types that hold an optional covariance matrix `sigma` and its optional factor `chol`.
+
+The group exists so that one method of [`chol_sigma_selector`](@ref) serves all three. The `JuMP` model of each type reads a factor of the covariance, and that method selects it. It takes `chol` when the caller states it, a factor of `sigma` when the caller states only `sigma`, and the factor of the prior otherwise. [`DistributionValueatRisk`](@ref) is a formulation, not a risk measure, but it holds the same two fields.
 
 # Related
 
   - [`Variance`](@ref)
   - [`StandardDeviation`](@ref)
   - [`DistributionValueatRisk`](@ref)
+  - [`chol_sigma_selector`](@ref)
 """
 const CholRM = Union{<:Variance, <:StandardDeviation, <:DistributionValueatRisk}
 

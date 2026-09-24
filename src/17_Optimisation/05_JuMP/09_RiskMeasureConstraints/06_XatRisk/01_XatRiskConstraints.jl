@@ -68,8 +68,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
-    b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
-    s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
+    b, s = mip_var_bounds(r.alg.b, r.alg.s)
     series, T = risk_series(model, NetReturnsRiskSeries(), pr; loss = loss, prefix = prefix)
     return set_mip_quantile_risk_constraints!(model, i, r, opt, pr, series, T, b, s,
                                               (; risk = :var_risk_, z = :z_var_,
@@ -340,8 +339,7 @@ the empirical drawdown quantile at confidence level `r.alpha`.
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::DrawdownatRisk,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
-    b = ifelse(!isnothing(r.b), r.b, 1e3)
-    s = ifelse(!isnothing(r.s), r.s, 1e-5)
+    b, s = mip_var_bounds(r.b, r.s)
     series, T = risk_series(model, DrawdownRiskSeries(), pr; prefix = prefix)
     return set_mip_quantile_risk_constraints!(model, i, r, opt, pr, series, T, b, s,
                                               (; risk = :dar_risk_, z = :z_dar_,

@@ -51,6 +51,11 @@ unique_key_dict!(math_dict, :math_dict,
                  :x_k_sorted => "``x_{(k)}``: ``k``-th smallest entry of the series, and ``w_{(k)}`` its observation weight.",#
                  :W_k_cum => "``W_{k} = \\sum_{j=1}^{k} w_{(j)}``: Cumulative weight of the ``k`` smallest entries, with ``W_{0} = 0``.",#
                  :k_star_tail => "``k^{\\star} = \\min\\{k : W_{k} \\geq \\alpha W_{T}\\}``: Boundary index, the position of the one entry that the tail holds in part.",#
+                 :W_T_total => "``W_{T} = \\sum_{t=1}^{T} w_{t}``: Total observation weight.",#
+                 # The empirical quantile family of `01_XatRisk.jl`: the mixed-integer
+                 # programme and the functors select one order statistic by one rule.
+                 :s_mip_slack => "``s``: Cardinality slack of the mixed-integer quantile programme, ``0 < s < \\alpha``.",#
+                 :k_var_mip => "``k = \\min\\{k : W_{k} > (\\alpha - s) W_{T}\\}``: Quantile index, the position of the order statistic that the mixed-integer quantile programme selects.",#
                  :l_ek => "``l``: Tail-term weight of the Esfahani-Kuhn loss, ``l > 0``. It does not scale the mean term.",#
                  :tau_ek => "``\\tau``: Esfahani-Kuhn level, the variable the worst-case expected loss is minimised over.",#
                  :pos_part => "``(\\cdot)_{+} = \\max(\\cdot, 0)``: Positive part.",#

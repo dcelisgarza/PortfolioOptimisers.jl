@@ -182,7 +182,7 @@ Where:
   - $(math_dict[:pos_part])
   - $(math_dict[:T])
   - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when no observation weights are set.
-  - ``W_{T} = \\sum_{t=1}^{T} w_{t}``: Total observation weight.
+  - $(math_dict[:W_T_total])
   - ``\\lambda``: Bound on the Lipschitz modulus of the loss in the dual norm.
   - ``s_{t}``: Epigraph variable of the worst-case loss at scenario ``t``.
   - ``\\boldsymbol{u}_{t}^{(i)}``: Dual variables of the support constraint, for scenario ``t`` and piece ``i``, ``N \\times 1``.
@@ -871,7 +871,7 @@ Where:
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
   - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when no observation weights are set.
-  - ``W_{T} = \\sum_{t=1}^{T} w_{t}``: Total observation weight.
+  - $(math_dict[:W_T_total])
   - $(math_dict[:nu_ru])
 
 The running peak starts at ``c_0 = 0``, so a series that falls from its first period is in drawdown from the start. The minimum has the sorted closed form that [`conditional_drawdown_at_risk`](@ref) states.
@@ -1244,7 +1244,7 @@ A weights vector `w`:
   - [`RelativeConditionalDrawdownatRisk`](@ref)
   - [`absolute_drawdown_vec`](@ref)
   - [`relative_drawdown_vec`](@ref)
-  - [`drawdown_at_risk`](@ref)
+  - [`empirical_value_at_risk`](@ref)
 """
 function conditional_drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing)
     aT = alpha * length(dd)
@@ -1305,7 +1305,7 @@ Where:
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
   - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when no observation weights are set.
-  - ``W_{T} = \\sum_{t=1}^{T} w_{t}``: Total observation weight.
+  - $(math_dict[:W_T_total])
   - $(math_dict[:nu_ru])
 
 The running peak starts at ``C_0 = 1``, the initial wealth. The minimum has the sorted closed form that [`conditional_drawdown_at_risk`](@ref) states.

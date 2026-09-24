@@ -61,7 +61,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :r_b => "`r_b`: Radius of the type-1 Wasserstein ambiguity ball of the upper tail. It multiplies a decision variable, so it is not a constant offset. The bound is [`Num_AmbRadCal`](@ref), so the slot takes the radius itself, an [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref) that computes it from the prior result, or a plain function of the same five arguments.",#
                  :gamma => "`gamma`: Log-sum-exp scalariser smoothing parameter.",#
                  :b_mip => "`b`: Big-M constant of the MIP formulation. It relaxes the bound on an observation that the model flags as an exceedance. If `nothing`, the model uses `1000`.",#
-                 :s_mip => "`s`: Cardinality slack of the MIP formulation. It caps the number of flagged observations at `(alpha - s) * T`. If `nothing`, the model uses `1e-5`.",#
+                 :s_mip => "`s`: Cardinality slack of the MIP formulation. It caps the weight of the flagged observations at `(alpha - s)` times the total weight, which is `(alpha - s) * T` without observation weights. The functor selects its order statistic with the same slack. If `nothing`, the model and the functor use `1e-5`.",#
                  :slv => "`slv`: Solver or vector of solvers.",#
                  :p_rm => "`p`: Power or order parameter.",#
                  :p_owa => "`p`: Vector of p-norm orders used to approximate the ordered weights array risk.",#

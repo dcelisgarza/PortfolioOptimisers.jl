@@ -209,7 +209,7 @@ commit = "8610300"
 "src/16_RiskMeasures/03_MomentRiskMeasures.jl" = { lines = 139, misses = 2 }
 "src/16_RiskMeasures/04_Kurtosis.jl" = { lines = 89, misses = 10 }
 "src/16_RiskMeasures/05_NegativeSkewness.jl" = { lines = 42, misses = 0 }
-"src/16_RiskMeasures/06_XatRisk/01_XatRisk.jl" = { lines = 215, misses = 10 }
+"src/16_RiskMeasures/06_XatRisk/01_XatRisk.jl" = { lines = 215, misses = 0 }
 "src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl" = { lines = 224, misses = 0 }
 "src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { lines = 103, misses = 1 }
 "src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { lines = 148, misses = 0 }

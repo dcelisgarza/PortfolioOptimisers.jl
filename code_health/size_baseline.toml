@@ -221,7 +221,7 @@ commit = "0ecb3ce47c"
 "src/16_RiskMeasures/03_MomentRiskMeasures.jl" = { code = 295, doc = 916, comment = 5, blank = 353, total = 1569 }
 "src/16_RiskMeasures/04_Kurtosis.jl" = { code = 160, doc = 219, comment = 3, blank = 78, total = 460 }
 "src/16_RiskMeasures/05_NegativeSkewness.jl" = { code = 89, doc = 135, comment = 5, blank = 48, total = 277 }
-"src/16_RiskMeasures/06_XatRisk/01_XatRisk.jl" = { code = 367, doc = 624, comment = 41, blank = 257, total = 1289 }
+"src/16_RiskMeasures/06_XatRisk/01_XatRisk.jl" = { code = 347, doc = 781, comment = 37, blank = 310, total = 1475 }
 "src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl" = { code = 390, doc = 737, comment = 25, blank = 265, total = 1417 }
 "src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { code = 158, doc = 322, comment = 7, blank = 124, total = 611 }
 "src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { code = 284, doc = 525, comment = 13, blank = 182, total = 1004 }
@@ -292,7 +292,7 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.jl" = { code = 230, doc = 185, comment = 0, blank = 74, total = 489 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/04_KurtosisConstraints.jl" = { code = 147, doc = 113, comment = 10, blank = 47, total = 317 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/05_NegativeSkewnessConstraints.jl" = { code = 69, doc = 68, comment = 2, blank = 30, total = 169 }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/01_XatRiskConstraints.jl" = { code = 122, doc = 164, comment = 0, blank = 64, total = 350 }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/01_XatRiskConstraints.jl" = { code = 120, doc = 164, comment = 0, blank = 64, total = 348 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/02_ConditionalXatRiskConstraints.jl" = { code = 159, doc = 222, comment = 3, blank = 83, total = 467 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/03_EntropicXatRiskConstraints.jl" = { code = 57, doc = 102, comment = 0, blank = 42, total = 201 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/04_RelativisticXatRiskConstraints.jl" = { code = 94, doc = 103, comment = 0, blank = 41, total = 238 }
