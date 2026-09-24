@@ -705,6 +705,56 @@ end
                                                            w4), rdR, 1)
         @test isapprox(wf, po.project(EuclideanProjection(), vmat, q4, w4); atol = 1e-5)
         @test dot(wf, S, wf) <= vub * (1 + 1e-4)
+        # The set's own cone takes the factor the shared builder takes. A cash leg makes
+        # the matrix singular at its first pivot, where a Cholesky factor without a check
+        # is wrong and the ceiling did not bind: the answer was the free projection at four
+        # times the ceiling.
+        S0 = zero(S)
+        S0[2:4, 2:4] = S[2:4, 2:4]
+        vub0 = 0.25 * dot(free, S0, free)
+        w0v = po.project(EuclideanProjection(),
+                         resolve(ProgrammeAllocationSet(; slv = slv,
+                                                        r = Variance(; sigma = S0,
+                                                                     settings = RiskMeasureSettings(;
+                                                                                                    ub = vub0))),
+                                 4), q4, w4)
+        w0s = po.project(EuclideanProjection(),
+                         resolve(ProgrammeAllocationSet(; slv = slv,
+                                                        r = StandardDeviation(; sigma = S0,
+                                                                              settings = RiskMeasureSettings(;
+                                                                                                             ub = sqrt(vub0)))),
+                                 4), q4, w4)
+        @test isapprox(dot(w0v, S0, w0v), vub0; rtol = 1e-6)
+        @test isapprox(w0v, w0s; atol = 1e-8)
+        # A stated factor is the one the cone reads, and an indefinite matrix is refused by
+        # the factor, as the shared builder refuses it.
+        G = Matrix(qr(randn(StableRNG(3), 4, 4)).Q) * po.covariance_factor(S)
+        wch = po.project(EuclideanProjection(),
+                         resolve(ProgrammeAllocationSet(; slv = slv,
+                                                        r = Variance(; sigma = S, chol = G,
+                                                                     settings = RiskMeasureSettings(;
+                                                                                                    ub = vub))),
+                                 4), q4, w4)
+        @test isapprox(wch, wf; atol = 1e-5)
+        Sind = [1.0 0.9 0.0 0.0; 0.9 1.0 0.9 0.0; 0.0 0.9 1.0 0.0; 0.0 0.0 0.0 1.0] .* 1e-4
+        @test_throws PosDefException po.project(EuclideanProjection(),
+                                                resolve(ProgrammeAllocationSet(; slv = slv,
+                                                                               r = Variance(;
+                                                                                            sigma = Sind,
+                                                                                            settings = RiskMeasureSettings(;
+                                                                                                                           ub = 1e-5))),
+                                                        4), q4, w4)
+        # The norm bound of the cone, and the refusals of a ceiling that is not one number.
+        quarter = RiskMeasureSettings(; ub = 1 // 4)
+        @test po.allocation_risk_ceiling(Variance(; settings = quarter)) == 1 / 2
+        @test po.allocation_risk_ceiling(StandardDeviation(; settings = quarter)) === 1 // 4
+        @test isnothing(po.assert_risk_ceiling(nothing))
+        @test_throws ArgumentError po.assert_risk_ceiling(ConditionalValueatRisk())
+        @test_throws IsEmptyError po.assert_risk_ceiling(po.RiskMeasure[])
+        # The clip raises a negative entry to zero in the element type it is given.
+        @test po.clip_at_zero([-1e-12, 0.5, 0.5]) == [0.0, 0.5, 0.5]
+        @test po.clip_at_zero([-1 // 10, 11 // 10]) == [0 // 1, 11 // 10]
+        @test eltype(po.clip_at_zero(Float32[-1.0f-7, 1])) === Float32
         # The measure's `rke` is cleared and its expression joins no objective: the model
         # holds the bound and no risk vector, whichever the measure states.
         rke = ConditionalValueatRisk(;
@@ -1125,6 +1175,22 @@ end
             @test haskey(m2, :W) &&
                   haskey(m2, :set_risk_sdp_1) &&
                   !haskey(m2, :set_risk_soc_1)
+            # The semidefinite row bounds tr(ΣW), which lies above the variance. The pair
+            # phylogeny forbids W = w wᵀ, so the variance of the answer stays below the
+            # ceiling, while the cone without the phylogeny binds at it.
+            S3 = cov(R)
+            vub3 = 0.3 * dot(free, S3, free)
+            vc3 = Variance(; sigma = S3, settings = ub_of(vub3))
+            wsd = proj(resolve(ProgrammeAllocationSet(; slv = slv, r = vc3,
+                                                      ple = po.SemiDefinitePhylogeny(;
+                                                                                     A = [0 1 0;
+                                                                                          1 0 0;
+                                                                                          0 0 0],
+                                                                                     p = 10.0)),
+                               3))
+            @test dot(wsd, S3, wsd) < 0.7 * vub3
+            wsoc = proj(resolve(ProgrammeAllocationSet(; slv = slv, r = vc3), 3))
+            @test isapprox(dot(wsoc, S3, wsoc), vub3; rtol = 1e-6)
             # A Variance with risk-contribution rows reads the rows and builds through the
             # shared semidefinite builder.
             rcv = Variance(; rc = LinearConstraintEstimator(; val = :(A <= 0.5)),

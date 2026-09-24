@@ -1290,7 +1290,11 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :T_regret => "``T``: Regret horizon, the number of periods that a regret bound covers.",#
                        :D_diam => "``D``: Diameter of the feasible set in the Euclidean norm.",#
                        :G_gradbound => "``G``: Bound on the Euclidean norm of the gradient of every online loss over the feasible set.",#
-                       :P_T_path => "``P_T = \\sum_{t=2}^{T} \\lVert \\boldsymbol{u}_t - \\boldsymbol{u}_{t-1} \\rVert_2``: Path length of a comparator sequence ``\\boldsymbol{u}_1, \\ldots, \\boldsymbol{u}_T`` in the feasible set.")
+                       :P_T_path => "``P_T = \\sum_{t=2}^{T} \\lVert \\boldsymbol{u}_t - \\boldsymbol{u}_{t-1} \\rVert_2``: Path length of a comparator sequence ``\\boldsymbol{u}_1, \\ldots, \\boldsymbol{u}_T`` in the feasible set.",#
+                       # The risk ceiling of a programme Allocation Set.
+                       :Sigma_rm => "``\\mathbf{\\Sigma}``: Covariance matrix that the risk measure holds, ``N \\times N``.",#
+                       :rbar_ceil => "``\\bar{r}``: Ceiling of an Allocation Set's risk measure, its `settings.ub`.",#
+                       :u_cone => "``u``: Norm bound of the ceiling's second-order cone, ``\\sqrt{\\bar{r}}`` for a variance and ``\\bar{r}`` for a standard deviation.")
 """
     ref_dict
 
