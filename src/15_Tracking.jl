@@ -156,6 +156,13 @@ Applies the risk measure to each portfolio, then takes the absolute difference o
 
 The risk is the dependent variable of a risk measure, so this formulation compares the two portfolios after the measure is evaluated: it reports ``\\left\\lvert R(\\boldsymbol{w}) - R(\\boldsymbol{w}_{b}) \\right\\rvert``.
 
+In an optimisation the difference is exact only when the model states ``R(\\boldsymbol{w})`` exactly. A [`Variance`](@ref) in the semidefinite form does not: it states ``\\mathrm{tr}(\\boldsymbol{\\Sigma}\\mathbf{W})``, and the solver can raise ``\\mathbf{W}`` above ``\\boldsymbol{w}\\boldsymbol{w}^\\intercal``. The variance takes that form under a [`SemiDefinitePhylogeny`](@ref) or risk-contribution rows, and without it the absolute difference of a variance is not convex. The model then penalises a portfolio riskier than the benchmark, and it can report zero for one that is less risky:
+
+  - In the objective, the difference is exact when the terms that price the growth of ``\\mathbf{W}`` outweigh the tracking term: ``p + s_v \\Sigma_{ii} \\geq s \\Sigma_{ii}`` for every ``i``. Here ``p`` is the phylogeny's penalty, ``s`` the tracking scale, and ``s_v`` the scale of a variance that the objective minimises on the same weights, `0` when there is none.
+  - As a bound, a `RiskTrackingRiskMeasure` with `settings.ub` or a [`RiskTrackingError`](@ref), it holds from above only.
+
+The dependent method of `set_risk_constraints!` for a [`RiskTrackingRiskMeasure`](@ref) states the bound in its `## Relaxation`.
+
 # Constructors
 
     DependentVariableTracking() -> DependentVariableTracking

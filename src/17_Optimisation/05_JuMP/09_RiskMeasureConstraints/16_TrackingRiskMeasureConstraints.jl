@@ -449,8 +449,48 @@ The prefix namespacing replaces the former save/restore swap and is re-entrant.
 The weights under `tprefix` are the weights under `prefix`, so the method also registers
 `w_owner`, the namespace that owns them, [`weights_prefix`](@ref). The inner build then
 reads the enclosing build's lifted matrix ``\\mathbf{W}`` and its marks `variance_flag` and
-`rc_variance`. A semidefinite phylogeny on the head constrains the inner variance, and an
-inner variance removes the phylogeny's `p · tr(W)` penalty, as a head's own variance does.
+`rc_variance`. A semidefinite phylogeny on the head constrains the inner variance. The inner
+variance is no term of the objective, because the tracking constructor clears its `rke`, so
+it does not remove the phylogeny's `p · tr(W)` penalty, [`mark_objective_variance!`](@ref).
+
+# JuMP formulation
+
+## Variables
+
+  - `w`, `k`: read from the model.
+  - `tracking_risk_i`: created, the tracking risk.
+
+## Expressions
+
+  - `r_dv_i`: ``d = \\rho(\\boldsymbol{w}) - r_b k``.
+
+## Constraints
+
+  - `crtr_noc_i`: ``[s_c t;\\ s_c d] \\in \\mathcal{K}_{1}``, that is ``t \\geq \\lvert d \\rvert``.
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - **Direction.** `tracking_risk_i` can lie below ``\\lvert R(\\boldsymbol{w}) - r_b k \\rvert`` when the inner model expression ``\\rho(\\boldsymbol{w})`` lies above the exact risk ``R(\\boldsymbol{w})``. A [`Variance`](@ref) in the semidefinite form has ``\\rho = \\mathrm{tr}(\\boldsymbol{\\Sigma}\\mathbf{W}) \\geq \\boldsymbol{w}^\\intercal\\boldsymbol{\\Sigma}\\boldsymbol{w}``, and the step ``\\mathbf{W} + t\\,\\boldsymbol{e}_i\\boldsymbol{e}_i^\\intercal`` keeps every row, so ``\\rho`` can rise to ``r_b k``. With no price on that step, the model value is ``\\max(0,\\ R(\\boldsymbol{w}) - r_b k)``: it penalises a portfolio riskier than the benchmark, and it can report zero for one that is less risky.
+  - **Quantity.** `tracking_risk_i` and `r_dv_i`.
+  - **Condition.** The model value equals the exact value when ``\\mathbf{W} = \\boldsymbol{w}\\boldsymbol{w}^\\intercal`` at the solution. When ``R(\\boldsymbol{w}) \\geq r_b k`` it is not below the exact value. In the objective, ``\\mathbf{W}`` stays tight when the phylogeny's penalty and the variances that the objective minimises on the same weights price the step at least as much as the tracking term gains, ``p + s_v \\Sigma_{ii} \\geq s \\Sigma_{ii}`` for every ``i``. With no minimised variance that is ``p \\geq s \\max_i \\Sigma_{ii}``. As a bound, `settings.ub`, no condition makes it tight, so the bound holds from above only.
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - $(math_dict[:sc_scale])
+  - ``t``: The tracking risk, `tracking_risk_i`.
+  - ``\\rho(\\boldsymbol{w})``: The inner measure's model expression, built under `tprefix`.
+  - ``R(\\boldsymbol{w})``: The inner measure's exact risk.
+  - ``r_b``: The benchmark's expected risk, the inner measure at `r.tr.w`.
+  - ``\\mathcal{K}_{1}``: The norm-one cone of dimension 2.
+  - ``\\boldsymbol{\\Sigma}``: The covariance matrix of the inner variance.
+  - ``\\mathbf{W}``: The lifted matrix of the weights, [`set_sdp_constraints!`](@ref).
+  - ``p``: The penalty of the [`SemiDefinitePhylogeny`](@ref), [`set_sdp_phylogeny_constraints!`](@ref).
+  - ``s``: The scale of the tracking measure, `r.settings.scale`.
+  - ``s_v``: The scale of a variance that the objective minimises on the same weights.
 
 # Arguments
 

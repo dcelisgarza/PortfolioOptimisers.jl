@@ -11,7 +11,7 @@ The fall-through method does nothing. Concrete methods dispatch on the tracking 
   - [`LpNorm`](@ref): Enforces a scaled Lp norm via power cone.
   - [`LInfNorm`](@ref): Enforces `‖net_X - wb * k‖_∞ ≤ err` via NormInfinityCone.
   - [`IndependentVariableTracking`](@ref): Substitutes `w - wb` for `w` and applies the chosen risk constraint.
-  - [`DependentVariableTracking`](@ref): Constrains the absolute difference between portfolio risk and benchmark risk.
+  - [`DependentVariableTracking`](@ref): Constrains the absolute difference between portfolio risk and benchmark risk. The inner build reads the lifted matrix of the head's weights, [`weights_prefix`](@ref). When the inner measure builds on that matrix, the bound holds from above only, as [`DependentVariableTracking`](@ref) states.
 
 The collection method iterates over all tracking errors in `tres`.
 
@@ -241,6 +241,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     tr_dr = state_set!(model, prefix, :tr_dr_, i, JuMP.@variable(model))
     tprefix = nested_prefix(prefix, :tr_dr_, i)
     state_set!(model, tprefix, :w, get_w(model, prefix))
+    state_set!(model, tprefix, :w_owner, weights_prefix(model, prefix))
     risk_expr = set_risk_tracking_risk_constraints!(model, ri, opt, pr, pl, fees, tprefix,
                                                     args...; kwargs...)
     # The risk difference is its own entry name. It was `Symbol(key, i)` — the *composed*

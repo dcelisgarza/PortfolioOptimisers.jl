@@ -33,7 +33,7 @@ Where:
   - ``\\rho``: The risk measure in `r`.
   - ``\\varepsilon``: The tolerance in `err`.
 
-Both bind at `err`, and the realised value can be read back through the matching [`RiskTrackingRiskMeasure`](@ref).
+Both bind at `err`, and the realised value can be read back through the matching [`RiskTrackingRiskMeasure`](@ref). When `r` is a [`Variance`](@ref) in the semidefinite form, the dependent bound holds from above only: a portfolio less risky than the benchmark by more than `err` can satisfy it, as [`DependentVariableTracking`](@ref) states. Read the realised value back to check it.
 
 !!! warning
 
@@ -413,6 +413,8 @@ Where:
   - $(math_dict[:w_port])
   - ``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``.
   - ``\\rho``: Chosen base risk measure.
+
+In an optimisation the dependent mode is exact only when the model states ``\\rho(\\boldsymbol{w})`` exactly. A [`Variance`](@ref) in the semidefinite form does not, and the mode then holds from one side only, as [`DependentVariableTracking`](@ref) states.
 
 Neither this measure nor its constraint twin reads `tr.fees`: the computation reads `tr.w` alone. There is no [`Fees`](@ref) object on this path, so fee amortisation cannot reach it, and the distance is re-evaluated fresh every fold.
 
