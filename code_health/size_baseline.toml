@@ -18,11 +18,11 @@ commit = "0ecb3ce47c"
 "src/01_Base/01_DocstringDictionaries/06_ArgOptimisation.jl" = { code = 238, doc = 0, comment = 24, blank = 0, total = 262 }
 "src/01_Base/01_DocstringDictionaries/07_FieldDict.jl" = { code = 3, doc = 0, comment = 2, blank = 0, total = 5 }
 "src/01_Base/01_DocstringDictionaries/08_ValidationsAndReturns.jl" = { code = 85, doc = 0, comment = 4, blank = 0, total = 89 }
-"src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { code = 100, doc = 0, comment = 28, blank = 0, total = 128 }
+"src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { code = 112, doc = 0, comment = 30, blank = 0, total = 142 }
 "src/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.jl" = { code = 31, doc = 0, comment = 21, blank = 0, total = 52 }
 "src/01_Base/01_DocstringDictionaries/11_MathRiskAndOptimisation.jl" = { code = 77, doc = 0, comment = 36, blank = 0, total = 113 }
 "src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { code = 86, doc = 0, comment = 16, blank = 0, total = 102 }
-"src/01_Base/01_DocstringDictionaries/13_References.jl" = { code = 221, doc = 0, comment = 3, blank = 0, total = 224 }
+"src/01_Base/01_DocstringDictionaries/13_References.jl" = { code = 222, doc = 0, comment = 3, blank = 0, total = 225 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -139,7 +139,7 @@ commit = "0ecb3ce47c"
 "src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { code = 463, doc = 752, comment = 1, blank = 352, total = 1568 }
 "src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { code = 425, doc = 547, comment = 0, blank = 267, total = 1239 }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { code = 225, doc = 318, comment = 2, blank = 150, total = 695 }
-"src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 230, doc = 368, comment = 0, blank = 184, total = 782 }
+"src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 236, doc = 477, comment = 0, blank = 215, total = 928 }
 "src/05_Moments/33_CoverageUniverse.jl" = { code = 403, doc = 639, comment = 0, blank = 298, total = 1340 }
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { code = 373, doc = 787, comment = 6, blank = 339, total = 1505 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { code = 356, doc = 604, comment = 9, blank = 228, total = 1197 }

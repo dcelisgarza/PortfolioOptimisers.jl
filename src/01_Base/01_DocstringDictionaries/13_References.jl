@@ -221,4 +221,5 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :singer1997 => "[singer1997](@cite) Y. Singer. *Switching portfolios*. International Journal of Neural Systems 8(4), 445–455 (1997).",#
                  :bhatia2007 => "[bhatia2007](@cite) R. Bhatia. *Positive Definite Matrices* (Princeton University Press, 2007).",#
                  :musolas2021 => "[musolas2021](@cite) A. Musolas, S. T. Smith and Y. Marzouk. *Geodesically parameterized covariance estimation*. SIAM Journal on Matrix Analysis and Applications 42, 528–556 (2021).",#
-                 :schaferstrimmer2005 => "[schaferstrimmer2005](@cite) J. Schäfer and K. Strimmer. *A shrinkage approach to large-scale covariance matrix estimation and implications for functional genomics*. Statistical Applications in Genetics and Molecular Biology 4, Article 32 (2005).")
+                 :schaferstrimmer2005 => "[schaferstrimmer2005](@cite) J. Schäfer and K. Strimmer. *A shrinkage approach to large-scale covariance matrix estimation and implications for functional genomics*. Statistical Applications in Genetics and Molecular Biology 4, Article 32 (2005).",#
+                 :joanesgill1998 => "[joanesgill1998](@cite) D. N. Joanes and C. A. Gill. *Comparing measures of sample skewness and kurtosis*. Journal of the Royal Statistical Society: Series D (The Statistician) 47, 183–189 (1998).")

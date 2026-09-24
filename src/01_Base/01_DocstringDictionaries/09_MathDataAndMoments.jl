@@ -127,4 +127,16 @@ unique_key_dict!(math_dict, :math_dict,
                  :cal_r_radius => "``r``: Ambiguity radius.",#
                  :cal_s_radius => "``s``: Scale of the radius, in the units of the series the slot owner prices.",#
                  :cal_s_i_series => "``\\hat{s}_{i}``: Sample dispersion of the series the slot owner prices, over column ``i``. It is ``\\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii}}`` under a [`ReturnsSeries`](@ref), and the dispersion of column ``i`` of the drawdown sample under a drawdown marker.",#
-                 :cal_T_e => "``T_{e}``: Effective sample size, which is Kish's when the observation weights are stated.")
+                 :cal_T_e => "``T_{e}``: Effective sample size, which is Kish's when the observation weights are stated.",#
+                 # The idiosyncratic diagnostics of a cross-sectional fit. Each symbol is
+                 # stated by two or more Units of that file.
+                 :eps_ti_idio => "``\\varepsilon_{ti}``: Idiosyncratic return of asset ``i`` at observation ``t``.",#
+                 :v_ti_idio => "``v_{ti}``: Idiosyncratic variance the fit predicted for asset ``i`` at observation ``t``.",#
+                 :sigma_ti_idio => "``\\hat{\\sigma}_{ti} = \\sqrt{\\max(v_{ti}, 0)}``: Predicted idiosyncratic volatility of asset ``i`` at observation ``t``. A negative variance counts as zero.",#
+                 :z_ti_idio => "``z_{ti}``: Standardised idiosyncratic return of asset ``i`` at observation ``t``.",#
+                 :F_t_idio => "``\\mathcal{F}_{t}``: Finite cross-section of observation ``t``, the assets whose standardised return ``z_{ti}`` is finite.",#
+                 :n_t_idio => "``n_{t}``: Count of the assets in ``\\mathcal{F}_{t}``.",#
+                 :m_pt_idio => "``m_{pt}``: Central moment of order ``p`` of the finite standardised returns of observation ``t``.",#
+                 :a_t_series => "``a_{t}``: Diagnostic series value at observation ``t``.",#
+                 :A_series_fin => "``\\mathcal{A}``: Finite observations of a diagnostic series, those at which ``a_{t}`` is finite.",#
+                 :rho_S_cs => "``\\rho_{S}``: Cross-sectional rank correlation, over the assets at which both cross-sections are finite. It correlates the ordinal ranks, so two equal values take two ranks, in the order of the asset axis.")

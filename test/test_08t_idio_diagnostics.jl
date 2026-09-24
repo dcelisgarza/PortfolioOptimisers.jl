@@ -198,6 +198,41 @@ using Statistics
         @test all(isnan, (m.m2, m.m3, m.m4))
     end
 
+    @testset "a constant cross-section, an infinite entry and an integer input" begin
+        # A cross-section of equal non-zero values has no skewness and no kurtosis. Its mean
+        # carries round-off, so a centred moment computed from it is often a tiny positive
+        # number and not zero: before the exact test, 4195 of 20000 such rows of 3 to 7
+        # assets gave a finite skewness, up to 2.45. The counts avoid 4, whose mean is exact.
+        for nc in (3, 5, 6, 7), x in (0.1, -0.7, 1.3, 2.9)
+            zc = fill(x, 2, nc)
+            @test all(isnan, idio_skewness(zc))
+            @test nc < 4 || all(isnan, idio_kurtosis(zc))
+            @test idio_calibration(zc) == zeros(2)
+            mc = PortfolioOptimisers.idio_row_moments(zc, 1)
+            @test (mc.n, mc.m2, mc.m3, mc.m4) == (nc, 0.0, 0.0, 0.0)
+        end
+        # An infinite entry enters neither the count nor the sum of the tail rate, so the
+        # rate over the finite entries 0.5, 4 and -5 is two in three, never one.
+        @test idio_tail_rate([Inf 0.5 4.0 NaN -5.0]) == [2 / 3]
+        # An integer history answers in floating point rather than raising `InexactError`.
+        e_int = [1 -2 3 0; 3 4 -1 2; 0 1 2 -3]
+        v_int = [1 4 1 0; 1 0 4 1; 1 1 1 1]
+        z_int = standardised_idio_returns(e_int, v_int)
+        @test eltype(z_int) == Float64
+        @test isequal(z_int, [1.0 -1.0 3.0 NaN; 3.0 NaN -0.5 2.0; 0.0 1.0 2.0 -3.0])
+        @test idio_calibration([1 2 3; 4 5 7]) ≈ [1.0, std([4, 5, 7])]
+        # A Float32 history keeps its element type through every series.
+        rng32 = StableRNG(7)
+        e32 = randn(rng32, Float32, 6, 9)
+        v32 = rand(rng32, Float32, 6, 9) .+ 0.5f0
+        for f in
+            (idio_calibration, idio_tail_rate, idio_kurtosis, idio_skewness, idio_vol_ic,
+             idio_vol_residual_dependence)
+            @test eltype(f(e32, v32)) == Float32
+        end
+        @test idio_calibration_summary(e32, v32).mean_cs_std isa Float32
+    end
+
     @testset "the refusals" begin
         @test_throws PortfolioOptimisers.IsEmptyError standardised_idio_returns(zeros(0, 0),
                                                                                 zeros(0, 0))
