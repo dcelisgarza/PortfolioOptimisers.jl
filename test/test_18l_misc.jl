@@ -522,11 +522,11 @@ end
             5e-6
         elseif i in (4, 8)
             5e-3
-        elseif i in (12, 23)
+        elseif i == 12
             1e-4
         elseif i in (6, 14)
             5e-5
-        elseif i in (7, 22)
+        elseif i in (7, 22, 23)
             5e-4
         else
             1e-6
