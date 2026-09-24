@@ -344,6 +344,41 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         @test vec(mean(wme, R)) ≈ vec(mean(pa, R[(end - 9):end, :]))
     end
 
+    @testset "The Prior adapter against its definition" begin
+        # The adapter's mean is the mean of the prior fitted on the same rows, at both
+        # orientations, for every family of prior it admits. The ensemble prior draws its
+        # subsystems at each fit, so a fixed seed makes two fits comparable.
+        h = 21
+        for pe in (EmpiricalPrior(), EmpiricalPrior(; horizon = h),
+                   EmpiricalPrior(; me = ShrunkExpectedReturns()), HighOrderPriorEstimator(),
+                   EntropyPoolingPrior(), LowDimensionEnsemblePrior(; seed = 7))
+            me = PriorExpectedReturns(; pe = pe)
+            mu = vec(prior(pe, R).mu)
+            @test vec(mean(me, R)) == mu
+            @test maxerr(vec(mean(me, permutedims(R); dims = 2)), mu) < 1e-16
+            @test vec(mean(me, R, nothing)) == mu
+        end
+        # Under the horizon arm, the mean is the arithmetic mean of the lognormal law at the
+        # horizon, exp(h m + h s² / 2) - 1, with m and s² the moments of the log-returns.
+        Rl = log1p.(R)
+        lognormal = exp.(h .* vec(mean(Rl; dims = 1)) .+ h .* diag(cov(Rl)) ./ 2) .- 1
+        @test maxerr(vec(mean(PriorExpectedReturns(; pe = EmpiricalPrior(; horizon = h)),
+                              R)), lognormal) < 1e-15
+        # A direct fold of the default prior, one row and then a block, reads the batch mean
+        # of every row folded, although a host does not fold it.
+        f = partial_fit!(partial_fit!(PriorExpectedReturns(), R[1, :]), R[2:end, :])
+        @test isa(f, PriorExpectedReturns)
+        @test size(mean(f)) == (1, N)
+        @test maxerr(vec(mean(f)), vec(mean(R; dims = 1))) < 1e-16
+        @test !po.supports_partial_fit(f)
+        # The no-data form refuses a prior that folded nothing, and a factor leaf under an
+        # optional-argument host is refused at construction.
+        @test_throws ArgumentError mean(PriorExpectedReturns())
+        @test_throws ArgumentError PriorExpectedReturns(;
+                                                        pe = EntropyPoolingPrior(;
+                                                                                 pe = FactorPrior()))
+    end
+
     @testset "The fold-or-refit of a forecaster on the Rule State" begin
         # A folding forecaster is carried; the head holds the current row alone for it,
         # the row verbatim that the fold reads (ADR 0170).
