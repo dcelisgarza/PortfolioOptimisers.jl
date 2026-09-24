@@ -394,6 +394,17 @@ end
     @test PortfolioOptimisers.held_bin(PortfolioOptimisers.mip_indicators(m)) === m[:ib]
     @test abs(w1_of(m)[2]) < 1e-9
     @test min(abs(res.w[4]), abs(res.w[5])) < 1e-9
+    # A phylogeny over the assets in the factor slot is refused before the solve.
+    @test_throws DimensionMismatch solve(MinimumRisk(), mip;
+                                         frc = IntegerPhylogeny(; A = Aa, B = 1))
+    # With the off-factor block, the factor weights are still the loadings' image of the
+    # asset weights, so the bounds of the gate still hold.
+    res = optimise(FactorRiskContribution(; flag = true,
+                                          opt = JuMPOptimiser(; pe = pr, slv = mip),
+                                          frc_ple = IntegerPhylogeny(; A = A, B = 1)), rd)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test abs(w1_of(res.model)[2]) < 1e-9
+    @test maximum(abs, transpose(res.rr.L) * res.w - w1_of(res.model)) < 1e-10
 
     # The bounds are the image of the asset box under the loadings, widened to hold zero.
     Bt = [1.0 -2.0; 0.5 0.5]

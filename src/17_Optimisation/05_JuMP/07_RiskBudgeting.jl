@@ -525,7 +525,7 @@ Where:
   - ``\\boldsymbol{b}``: Risk budget vector, `rba.rkb`.
   - ``\\boldsymbol{b}_{f}``: Risk budget vector over the factors.
   - ``\\boldsymbol{y}_{f}``: Factor exposure vector.
-  - ``\\mathbf{B}``: Loading matrix.
+  - $(math_dict[:B_loadings])
   - ``\\boldsymbol{z}``: Binary vector. ``z_{i} = 1`` lets asset ``i`` be long, ``z_{i} = 0`` lets it be short.
   - ``M``: Large constant of the big-M constraints.
   - ``N``: Number of assets.

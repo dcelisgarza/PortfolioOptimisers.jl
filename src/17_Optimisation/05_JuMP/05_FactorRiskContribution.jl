@@ -159,7 +159,7 @@ Where:
 
   - ``\\mathbf{R}``: Asset returns matrix.
   - ``\\mathbf{F}``: Factor returns matrix.
-  - ``\\mathbf{B}``: Loading matrix, of size ``N \\times N_{f}``.
+  - $(math_dict[:B_loadings])
   - ``\\mathbf{E}``: Residual matrix.
   - ``\\boldsymbol{w}``: Portfolio weight vector.
   - ``\\boldsymbol{y}_{f}``: Factor exposure vector, the decision variable.

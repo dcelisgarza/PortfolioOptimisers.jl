@@ -1119,8 +1119,15 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # JuMP optimisation variables.
                        :k_budget => "``k``: Budget scaling / homogenisation variable.",#
                        :sc_scale => "``s_c``: Constraint scale. It multiplies both sides of a row, so a positive value leaves the feasible set unchanged.",#
-                       :b_held => "``\\boldsymbol{b} \\in \\{0, 1\\}^{M}``: Held binary, one entry for each of the ``M`` assets or sub-groups that a MIP space gates. A position can be non-zero only when its entry is one. Under the long-short bundle it is the sum of the long and the short binary, which are never both one.",#
+                       :b_held => "``\\boldsymbol{b} \\in \\{0, 1\\}^{M}``: Held binary, one entry for each of the ``M`` assets, sub-groups or factors that a MIP space gates. A position can be non-zero only when its entry is one. Under the long-short bundle it is the sum of the long and the short binary, which are never both one.",#
                        :i_smtx => "``i``: Index of a sub-group selection matrix, its position in the vector of matrices, or `1` for a single matrix. [`mip_key`](@ref) writes it into the name of each sub-group row.",#
+                       # The rows of a phylogeny, and the factor weights they can act on.
+                       :A_iplg => "``\\mathbf{A}``: Row set of an [`IntegerPhylogeny`](@ref), one row for each distinct neighbourhood or cluster, with one column for each position that the MIP space gates.",#
+                       :B_iplg => "``\\boldsymbol{B}``: Largest number of held positions in each row of ``\\mathbf{A}``. A scalar applies to every row.",#
+                       :i_plg => "``i``: Position of the entry in `plgs`, or `1` for a single entry.",#
+                       :B_loadings => "``\\mathbf{B}``: Loading matrix, of size ``N \\times N_{f}``.",#
+                       :w_1_factor => "``\\boldsymbol{w}_1``: Factor weights of [`FactorRiskContribution`](@ref), one entry for each of the ``N_f`` factors. The asset weights are ``\\mathbf{B}_1 \\boldsymbol{w}_1``, with ``\\mathbf{B}_1`` the pseudoinverse of ``\\mathbf{B}^\\intercal``, plus an off-factor block when `flag = true`.",#
+                       :lu_factor => "``\\boldsymbol{\\ell}_{f}``, ``\\boldsymbol{u}_{f}``: Factor weight bounds, the lower and the upper, one entry for each factor. [`factor_weight_bounds`](@ref) derives them from the asset weight bounds.",#
                        :so_scale => "``s_o``: Objective scale. It multiplies the objective, so a positive value leaves the argument of the optimum unchanged.",#
                        :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
                        :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.",#

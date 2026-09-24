@@ -230,7 +230,7 @@ Where:
 
   - ``\\mathbf{M}_f``: The bordered ``(N_f + 1) \\times (N_f + 1)`` matrix.
   - ``\\mathbf{W}_f``: The symmetric ``N_f \\times N_f`` lifted matrix of the factor weights.
-  - ``\\boldsymbol{w}_1``: The ``N_f \\times 1`` vector of factor weights. The portfolio weights are ``\\boldsymbol{w} = \\mathbf{B}_1 \\boldsymbol{w}_1``, with ``\\mathbf{B}_1`` the pseudoinverse of the transposed loadings.
+  - $(math_dict[:w_1_factor])
   - $(math_dict[:k_budget])
 
 # JuMP formulation
@@ -315,7 +315,7 @@ Where:
   - ``\\mathbf{W}``: The symmetric ``N \\times N`` lifted matrix of the weights, ``\\mathbf{W} \\succeq \\boldsymbol{w}\\boldsymbol{w}^\\intercal / k``.
   - ``\\mathbf{A}``: The relatedness matrix of the entry, symmetric with a zero diagonal.
   - ``p``: The penalty of the entry.
-  - ``i``: The position of the entry in `plgs`. Each name carries `prefix`.
+  - $(math_dict[:i_plg]) Each name carries `prefix`.
   - $(math_dict[:sc_scale])
   - $(math_dict[:w_port])
   - $(math_dict[:k_budget])
@@ -399,10 +399,10 @@ It is [`set_sdp_phylogeny_constraints!`](@ref) on the factor weights, with the s
 Where:
 
   - ``\\mathbf{W}_f``: The symmetric ``N_f \\times N_f`` lifted matrix of the factor weights, ``\\mathbf{W}_f \\succeq \\boldsymbol{w}_1\\boldsymbol{w}_1^\\intercal / k``.
-  - ``\\boldsymbol{w}_1``: The ``N_f \\times 1`` vector of factor weights.
+  - $(math_dict[:w_1_factor])
   - ``\\mathbf{A}``: The relatedness matrix of the entry over the factors, symmetric with a zero diagonal.
   - ``p``: The penalty of the entry.
-  - ``i``: The position of the entry in `plgs`.
+  - $(math_dict[:i_plg])
   - $(math_dict[:sc_scale])
   - $(math_dict[:k_budget])
 

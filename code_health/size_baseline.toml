@@ -10,7 +10,7 @@ commit = "0ecb3ce47c"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2993, doc = 0, comment = 241, blank = 48, total = 3282 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1295, doc = 113, comment = 141, blank = 43, total = 1592 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1301, doc = 113, comment = 142, blank = 43, total = 1599 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -261,7 +261,7 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl" = { code = 429, doc = 422, comment = 0, blank = 144, total = 995 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/04_WeightConstraints.jl" = { code = 93, doc = 102, comment = 2, blank = 51, total = 248 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/05_SDPConstraints.jl" = { code = 73, doc = 67, comment = 0, blank = 36, total = 176 }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/06_IntegerPhylogenyConstraints.jl" = { code = 21, doc = 18, comment = 0, blank = 10, total = 49 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/06_IntegerPhylogenyConstraints.jl" = { code = 74, doc = 127, comment = 0, blank = 62, total = 263 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/07_CardinalityConstraints.jl" = { code = 235, doc = 164, comment = 0, blank = 60, total = 459 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/08_ThresholdConstraints.jl" = { code = 30, doc = 45, comment = 0, blank = 16, total = 91 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/09_TurnoverConstraints.jl" = { code = 29, doc = 41, comment = 0, blank = 20, total = 90 }

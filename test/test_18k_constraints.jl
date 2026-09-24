@@ -628,6 +628,57 @@ end
                     1.7964324466334559e-9, 9.69410371286415e-8], rtol = 1e-6)
 end
 
+@testset "Integer phylogeny rows: positions, vector bounds and widths" begin
+    hslv = Solver(; name = :highs, solver = HiGHS.Optimizer,
+                  settings = "log_to_console" => false,
+                  check_sol = (; allow_local = true, allow_almost = true))
+    Xp = 0.01 .* randn(StableRNG(42), 80, 6) .+ 0.001
+    rdp = ReturnsResult(; nx = string.('a':'f'), X = Xp)
+    function solve_p(slv = hslv; kwargs...)
+        opt = JuMPOptimiser(; slv = slv, wb = WeightBounds(; lb = 0, ub = 0.4), kwargs...)
+        res = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumReturn(),
+                                opt = opt), rdp)
+        @test isa(res.retcode, OptimisationSuccess)
+        return res
+    end
+    held_bits(res) = round.(Int, JuMP.value.(res.model[:ib]))
+
+    # Without the rows, assets 1 and 6 are both held.
+    w = solve_p().w
+    @test w[1] > 1e-3 && w[6] > 1e-3
+    # The first entry links assets 1 and 6, and 2 and 4, under a vector bound. The second
+    # links 1 and 3. Each entry writes its rows under its own position.
+    A1 = zeros(Int, 6, 6)
+    A1[1, 6] = A1[6, 1] = 1
+    A1[2, 4] = A1[4, 2] = 1
+    A2 = zeros(Int, 6, 6)
+    A2[1, 3] = A2[3, 1] = 1
+    pl1 = IntegerPhylogeny(; A = A1, B = [1, 1, 1, 1])
+    pl2 = IntegerPhylogeny(; A = A2, B = 1)
+    res = solve_p(; ple = [pl1, pl2])
+    ib = held_bits(res)
+    @test all(pl1.A * ib .<= pl1.B) && all(pl2.A * ib .<= pl2.B)
+    @test min(abs(res.w[1]), abs(res.w[6])) < 1e-8
+    @test all(abs.(res.w[ib .== 0]) .< 1e-8)
+    @test haskey(res.model, :card_plg_1) && haskey(res.model, :card_plg_2)
+
+    # An entry of another kind adds no row here, and the integer entry keeps its position.
+    # The semidefinite entry needs a conic MIP solver.
+    res = optimise(MeanRisk(;
+                            opt = JuMPOptimiser(; slv = mip_slv,
+                                                wb = WeightBounds(; lb = 0, ub = 0.4),
+                                                ple = [SemiDefinitePhylogeny(; A = A1,
+                                                                             p = 0.05),
+                                                       pl1])), rdp)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test haskey(res.model, :sdp_plg_1) && haskey(res.model, :card_plg_2)
+    @test !haskey(res.model, :card_plg_1)
+    @test all(pl1.A * held_bits(res) .<= pl1.B)
+
+    # An entry with one column too few is refused before the solve.
+    @test_throws DimensionMismatch solve_p(; ple = IntegerPhylogeny(; A = zeros(Int, 5, 5)))
+end
+
 @testset "Tracking" begin
     rdb = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
                                                         "./assets/SP500_idx.csv.gz"));
