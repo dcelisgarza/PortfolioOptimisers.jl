@@ -633,7 +633,7 @@ Where:
  1. A `nothing` fee returns `expected_risk(r, wd, X)`, because the two series are equal without a fee.
  2. A measure that reads a return series, [`NetReturnsInput`](@ref), reads ``\\boldsymbol{x}``.
  3. A measure that reads the weights alone, [`WeightsInput`](@ref), reads `wd` and no fee.
- 4. A moment measure resolves its observation weights against `X` with [`resolve_observation_weights`](@ref). It reads ``\\boldsymbol{x}`` and takes its target from `wd`. So a per-asset target is ``(\\boldsymbol{w} - \\boldsymbol{w}_b)^\\intercal \\boldsymbol{\\mu}``, as in the model.
+ 4. A moment measure resolves its observation weights against `X` with [`resolve_observation_weights`](@ref). It reads ``\\boldsymbol{x}`` and takes its target from `wd`. So a per-asset target is ``(\\boldsymbol{w} - \\boldsymbol{w}_b)^\\intercal \\boldsymbol{\\mu}`` minus the mean fee of the portfolio `w`, from [`moment_target_fees`](@ref), as in the model.
  5. A [`TrackingRiskMeasure`](@ref) takes the norm of ``\\boldsymbol{x}`` minus its own benchmark series.
  6. A nested [`RiskTrackingRiskMeasure`](@ref) recurses. The independent mode subtracts its own benchmark weights from `wd`. The dependent mode subtracts the risk of its own benchmark weights, which pay their own fee, as in the model.
  7. A [`RiskRatio`](@ref) divides the results of its two measures. A [`VarianceSkewKurtosis`](@ref) reads `wd` and no fee.
@@ -683,7 +683,9 @@ function difference_risk(r::Union{<:LoHiOrderMoment, <:Kurtosis, <:TCM_Sk,
                          X::MatNum, fees::Fees)
     resolved = resolve_observation_weights(r, X)
     x = charge_fees(X * wd, w, fees)
-    return moment_risk(resolved, x .- calc_moment_target(resolved, wd, x))
+    tgt = calc_moment_target(resolved, wd, x) -
+          moment_target_fees(resolved.mu, w, fees, length(x))
+    return moment_risk(resolved, x .- tgt)
 end
 function difference_risk(r::TrackingRiskMeasure, wd::VecNum, w::VecNum, X::MatNum,
                          fees::Fees)

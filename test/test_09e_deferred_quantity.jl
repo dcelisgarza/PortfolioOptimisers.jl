@@ -407,12 +407,12 @@ end
     centred = MedianAbsoluteDeviation(; mu = MedianCentering())(w, X)
     @test deferred != centred
 
-    # `MeanCentering()` centres net of fees, a resolved vector is gross. With fees the two
-    # differ; with no fees they agree by linearity.
+    # `MeanCentering()` centres on the mean of the net series. A resolved vector is gross,
+    # and the target subtracts the mean fee, so it is the net mean. The two agree by
+    # linearity, with or without fees (#1320).
     fees = Fees(; l = 0.02)
     resolved = factory(MedianAbsoluteDeviation(; mu = SimpleExpectedReturns()), pr)
-    @test resolved(w, X, fees) !=
-          MedianAbsoluteDeviation(; mu = MeanCentering())(w, X, fees)
+    @test resolved(w, X, fees) ≈ MedianAbsoluteDeviation(; mu = MeanCentering())(w, X, fees)
     @test resolved(w, X) ≈ MedianAbsoluteDeviation(; mu = MeanCentering())(w, X)
 
     # Neither interface the widening touches needs a new method. `weight_independent_target`
@@ -1237,14 +1237,14 @@ consumer resolves and the kernel refuses.
                     expected_risk(Variance(; sigma = ce), w, pr))
 
     # `factory` also fills an unstated slot, so the seam and the optimiser now report one
-    # number where they used to report two. With fees the two centres genuinely differ:
-    # `mu === nothing` centres on the mean of the net portfolio series, and `pr.mu` is
-    # gross. The prior arm follows the optimiser; the matrix arm keeps the old centring,
-    # because there is no prior there to fill from.
+    # number where they used to report two. `mu === nothing` centres on the mean of the net
+    # portfolio series. `pr.mu` is gross, and the target subtracts the mean fee, so with the
+    # sample mean as `pr.mu` the two centres agree with fees too (#1320). The prior arm
+    # follows the optimiser; the matrix arm keeps the centring of the series.
     fees = Fees(; l = 0.01)
     @test expected_risk(LowOrderMoment(), w, pr, fees) ==
           expected_risk(factory(LowOrderMoment(), pr), w, X, fees)
-    @test expected_risk(LowOrderMoment(), w, pr, fees) !=
+    @test expected_risk(LowOrderMoment(), w, pr, fees) ≈
           expected_risk(LowOrderMoment(), w, X, fees)
 
     # A `ReturnsResult` carries no moments, so it only unwraps its `X` and the measure is

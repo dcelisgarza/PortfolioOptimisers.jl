@@ -547,7 +547,7 @@ Keywords correspond to the struct's fields. A `w` that is not `nothing` is passe
 
 # `JuMP` Formulations
 
-Depending on the `alg` field, the risk measure is formulated in `JuMP` as follows. Every formulation measures the deviations against the target returned by [`calc_risk_constraint_target`](@ref), which is `mu` when the slot holds a value and the prior's expected returns otherwise.
+Depending on the `alg` field, the risk measure is formulated in `JuMP` as follows. Every formulation measures the deviations against the target returned by [`calc_risk_constraint_target`](@ref), which is `mu` when the slot holds a value and the prior's expected returns otherwise. A per-asset target is net of the mean fee per period, so a per period fee cancels from every deviation, and the model agrees with the functor.
 
 ## `FirstLowerMoment`
 
@@ -1273,7 +1273,7 @@ Compute the vector of deviations from the target value for moment-based risk mea
 # Details
 
   - Computes net portfolio returns using the provided weights, return matrix, and optional fees.
-  - Computes the target value for the moment calculation using [`calc_moment_target`](@ref).
+  - Computes the target value for the moment calculation using [`calc_moment_target`](@ref), and subtracts [`moment_target_fees`](@ref) from it, so that a per-asset target is the net mean of the net series.
   - Returns the element-wise difference between net returns and the target value.
 
 # Related
@@ -1286,7 +1286,7 @@ Compute the vector of deviations from the target value for moment-based risk mea
 function calc_deviations_vec(r::LoHiOrderMoment, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
-    tgt = calc_moment_target(r, w, x)
+    tgt = calc_moment_target(r, w, x) - moment_target_fees(r.mu, w, fees, length(x))
     return x .- tgt
 end
 """

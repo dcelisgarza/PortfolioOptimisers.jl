@@ -392,6 +392,34 @@ Return `false`: the target type requires portfolio weights (e.g. a per-asset `mu
 """
 weight_independent_target(::Any) = false
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the fee that a moment target `mu` subtracts, so that a per-asset target centres a net series on its net mean.
+
+A per-asset target states a gross expected return, ``\\boldsymbol{w}^\\intercal \\boldsymbol{\\mu}``. The series a moment measure centres is net of the fee, so the target is the net mean ``\\boldsymbol{w}^\\intercal \\boldsymbol{\\mu} - \\bar{F}(\\boldsymbol{w})``, where ``\\bar{F}`` is the mean fee per period that [`term_fees`](@ref) charges. A per period fee then cancels from every deviation, and the value of the measure agrees with its `JuMP` model. A target that [`weight_independent_target`](@ref) calls weight-independent (the mean or the median of the net series, or a scalar threshold) is already stated on the net series, so it subtracts nothing.
+
+# Arguments
+
+  - `mu`: The target slot of the measure.
+  - `w`: The weights of the target, ``\\boldsymbol{w}`` in ``\\boldsymbol{w}^\\intercal \\boldsymbol{\\mu}``.
+  - `fees`: Fee of the portfolio whose series is centred, or `nothing`.
+  - `T`: Observation count of the series, over which the one-off terms are spread.
+
+# Returns
+
+  - `f::Number`: ``\\bar{F}(\\boldsymbol{w})`` for a per-asset target, and a zero of the element type of `w` otherwise.
+
+# Related
+
+  - [`weight_independent_target`](@ref)
+  - [`term_fees`](@ref)
+  - [`calc_moment_target`](@ref)
+  - [`calc_deviations_vec`](@ref)
+"""
+function moment_target_fees(mu, w::VecNum, fees::Option{<:Fees}, T::Integer)
+    return weight_independent_target(mu) ? zero(eltype(w)) : term_fees(w, fees, T, true)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for risk measures that are not intended for use in portfolio optimisation routines.

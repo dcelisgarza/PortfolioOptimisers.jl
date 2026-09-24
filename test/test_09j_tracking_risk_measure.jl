@@ -114,10 +114,11 @@ end
                                                                                                               w = b),
                                                                                          r = ri,
                                                                                          alg = alg)
-        # A moment measure takes its target from the weight difference, as the model does.
+        # A moment measure takes its target from the weight difference, net of the fee of the
+        # portfolio, as the model does (#1320).
         lom = factory(LowOrderMoment(), pr)
-        @test isapprox(track(lom)(w, X, fees), mean(max.(dot(wd, pr.mu) .- x, 0));
-                       rtol = 1e-12)
+        tgt = dot(wd, pr.mu) - 0.002 * sum(w)
+        @test isapprox(track(lom)(w, X, fees), mean(max.(tgt .- x, 0)); rtol = 1e-12)
         @test isapprox(track(LowOrderMoment())(w, X, fees), mean(max.(mean(x) .- x, 0));
                        rtol = 1e-12)
         @test isapprox(track(MedianAbsoluteDeviation())(w, X, fees),
@@ -125,7 +126,7 @@ end
         # Observation weights that resolve against the data resolve first.
         ow = aweights(collect(range(1.0, 2.0; length = T)))
         lomd = LowOrderMoment(; w = TrackedDecayWeights(), mu = pr.mu)
-        @test isapprox(track(lomd)(w, X, fees), mean(max.(dot(wd, pr.mu) .- x, 0), ow);
+        @test isapprox(track(lomd)(w, X, fees), mean(max.(tgt .- x, 0), ow);
                        rtol = 1e-12)
         # Every moment family resolves its weights against `X`, down to the variance
         # estimator it holds, and agrees with the same measure built with the resolved
@@ -167,8 +168,9 @@ end
             sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
                                     opt = JuMPOptimiser(; pe = pr, slv = slv, fees = fees)))
             @test isa(sol.retcode, OptimisationSuccess)
+            # The net target lets the tracked moment reach zero at the benchmark (#1320).
             @test isapprox(expected_risk(factory(r, pr, slv), sol.w, X, fees),
-                           JuMP.value(sol.model[:risk]); rtol = 1e-6)
+                           JuMP.value(sol.model[:risk]); rtol = 1e-6, atol = 1e-9)
         end
     end
 
