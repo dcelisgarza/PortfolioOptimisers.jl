@@ -919,6 +919,7 @@ Validation rules for certain arg_dict terms used in the documentation of `Portfo
 """
 const val_dict = unique_key_dict(:val_dict,
                                  :oow => "If `w` is not `nothing`, `!isempty(w)`.",
+                                 :oow_nonneg => "If `w` is a `StatsBase.AbstractWeights`, it is not empty, and each entry is finite and `>= 0`. A [`DynamicAbstractWeights`](@ref) is not checked here, because it holds no weights until it reads the data.",#
                                  :gerbt => "`0 <= t`.",#
                                  :t => "`0 < t < 1`.",#
                                  :c1 => "`0 <= c1`.",#
@@ -1122,6 +1123,16 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # Relative drawdown series.
                        :Ct => "``C_t``: Compound wealth process at period ``t``.",#
                        :rdt => "``rd_t \\leq 0``: Relative drawdown at period ``t``.",#
+                       # The conditional tail family of `02_ConditionalXatRisk.jl`. The
+                       # value-at-risk and drawdown measures share the tail average and its
+                       # sorted form, and the two robust measures share the Esfahani-Kuhn loss.
+                       :nu_ru => "``\\nu``: Rockafellar-Uryasev threshold, the variable the tail average is minimised over. At a minimiser it is the lower ``\\alpha``-quantile of the series.",#
+                       :x_k_sorted => "``x_{(k)}``: ``k``-th smallest entry of the series, and ``w_{(k)}`` its observation weight.",#
+                       :W_k_cum => "``W_{k} = \\sum_{j=1}^{k} w_{(j)}``: Cumulative weight of the ``k`` smallest entries, with ``W_{0} = 0``.",#
+                       :k_star_tail => "``k^{\\star} = \\min\\{k : W_{k} \\geq \\alpha W_{T}\\}``: Boundary index, the position of the one entry that the tail holds in part.",#
+                       :l_ek => "``l``: Tail-term weight of the Esfahani-Kuhn loss, ``l > 0``. It does not scale the mean term.",#
+                       :tau_ek => "``\\tau``: Esfahani-Kuhn level, the variable the worst-case expected loss is minimised over.",#
+                       :pos_part => "``(\\cdot)_{+} = \\max(\\cdot, 0)``: Positive part.",#
                        # JuMP optimisation variables.
                        :k_budget => "``k``: Budget scaling / homogenisation variable.",#
                        :sc_scale => "``s_c``: Constraint scale. It multiplies both sides of a row, so a positive value leaves the feasible set unchanged.",#

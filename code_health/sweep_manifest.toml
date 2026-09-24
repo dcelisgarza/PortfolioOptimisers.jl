@@ -258,7 +258,7 @@
 "src/16_RiskMeasures/04_Kurtosis.jl" = { map = 9, units = 9, swept = false }
 "src/16_RiskMeasures/05_NegativeSkewness.jl" = { map = 9, units = 5, swept = false }
 "src/16_RiskMeasures/06_XatRisk/01_XatRisk.jl" = { map = 9, units = 19, swept = false }
-"src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl" = { map = 9, units = 14, swept = false }
+"src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl" = { map = 9, units = 14, algorithm = 8, swept = true, bindings = ["ConditionalDrawdownatRisk", "ConditionalValueatRisk", "ConditionalValueatRiskRange", "DistributionallyRobustConditionalDrawdownatRisk", "DistributionallyRobustConditionalValueatRisk", "DistributionallyRobustConditionalValueatRiskRange", "RMCDaR", "RMCVaR", "RMCVaRRg", "RelativeConditionalDrawdownatRisk", "conditional_drawdown_at_risk", "resolve_deferred_quantities", "resolve_deferred_quantities", "resolve_deferred_quantities"] }
 "src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { map = 9, units = 5, swept = false }
 "src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { map = 9, units = 9, algorithm = 5, swept = true, bindings = ["RRM", "RelativeRelativisticDrawdownatRisk", "RelativisticDrawdownatRisk", "RelativisticValueatRisk", "RelativisticValueatRiskRange", "resolve_deferred_quantities", "resolve_deferred_quantities", "resolve_deferred_quantities", "resolve_deferred_quantities"] }
 "src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl" = { map = 9, units = 5, swept = false }
