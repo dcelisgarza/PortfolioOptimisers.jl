@@ -154,6 +154,14 @@ end
         predb = cross_val_predict(OPS(; alg = PassiveAggressiveMeanReversion()), rd, cvb)
         @test isapprox(predb.pred[1].res.w, p.weights[6, :]; atol = 1e-14)
         @test isapprox(predb.mrd.X, pred5.mrd.X; atol = 1e-14)
+        # The uncapped refit that `Online(head)` stands for is the online arm bit for bit,
+        # and the capped one restarts the recursion from `w0` inside each window.
+        @test all(a.res.w == b.res.w for (a, b) in zip(predb.pred, pred5.pred))
+        prr = cross_val_predict(OPS(; alg = ExponentiatedGradient()), rd,
+                                IndexWalkForward(8, 3))
+        @test all(prr.pred[i].res.w == optimise(OPS(; alg = ExponentiatedGradient()),
+                       rows(rd, (1 + 3 * (i - 1)):(8 + 3 * (i - 1)))).w
+                  for i in eachindex(prr.pred))
     end
 
     @testset "The Start Allocation" begin
@@ -171,6 +179,21 @@ end
         r1 = optimise(out, rows(rd, 1:1)).w
         pw0 = po.project_simplex([2.0, 0.5, -0.2, 0.1])
         @test isapprox(r1, pw0 .* x1 ./ dot(pw0, x1); atol = 1e-14)
+        # A rule whose next allocation is not a step from `w` replaces the start at the
+        # first update. A constant rebalanced portfolio and a mixture of them never read it
+        # again, but the Newton step's gradient reads `w`, and an expert that steps from
+        # `w` starts at `w0`, so both carry it forward.
+        exps = [ConstantRebalancedPortfolio(; w = [0.4, 0.2, 0.2, 0.2]),
+                ConstantRebalancedPortfolio()]
+        for (alg, carries) in ((ConstantRebalancedPortfolio(), false),
+                               (ExpertMixture(; experts = exps), false), (NewtonStep(), true),
+                               (ExpertMixture(; experts = [ExponentiatedGradient(), BuyAndHold()]), true))
+            for t in 1:3
+                a = optimise(OPS(; alg = alg, w0 = w0), rows(rd, 1:t)).w
+                b = optimise(OPS(; alg = alg), rows(rd, 1:t)).w
+                @test (a != b) == carries
+            end
+        end
         # A zero under the entropic geometry stays zero.
         egz = OPS(; alg = ExponentiatedGradient(), w0 = [0.5, 0.5, 0.0, 0.0])
         @test optimise(egz, rows(rd, 1:3)).w[3:4] == [0.0, 0.0]
@@ -208,11 +231,18 @@ end
         # At row 11 D relists at the recursion's own weight, never at zero.
         res11 = optimise(opt, rows(rdg, 1:11))
         @test res11.w[4] > 0.2
-        # The parked weight over the unlisted span is what the docstring states: the
-        # listed legs' tilts are those of the full recursion scaled by 3/4.
+        # The parked weight over the unlisted span enters the gross return that a rule
+        # reads. Buy-and-hold scales each leg by its own relative, so its fund is the
+        # recursion over the listed names alone; the exponentiated-gradient step divides by
+        # the gross return, so its fund is not.
         full = optimise(OPS(; alg = ExponentiatedGradient()),
                         ReturnsResult(; nx = nx[1:3], X = R[1:5, 1:3])).w
         @test !isapprox(res.w[1:3], full; atol = 1e-6)
+        @test isapprox(res.w[1:3] .- 1 / 3, full .- 1 / 3; rtol = 1e-2)
+        bah = optimise(OPS(; alg = BuyAndHold()), rows(rdg, 1:5)).w
+        bah3 = optimise(OPS(; alg = BuyAndHold()),
+                        ReturnsResult(; nx = nx[1:3], X = R[1:5, 1:3])).w
+        @test isapprox(bah[1:3], bah3; atol = 1e-14) && bah[4] == 0
         # An active cell with a non-finite return is a Held Gap: a warning, and a refusal
         # under `strict`.
         Rh = copy(R)
@@ -221,6 +251,15 @@ end
         @test_logs (:warn, r"non-finite return") optimise(opt, rows(rdh, 1:5))
         @test_throws ArgumentError optimise(OPS(; alg = ExponentiatedGradient(),
                                                 strict = true), rows(rdh, 1:5))
+        # The message names the row's index in the whole fold, across blocks.
+        o12 = po.partial_fit!(opt, rows(rdh, 1:2))
+        @test_logs (:warn, r"the first at observation 3\.") po.partial_fit!(o12,
+                                                                            rows(rdh, 3:5))
+        # A gap at an asset to which the recursion gives no weight is silent. The
+        # entropic step keeps the zero exact.
+        @test_nowarn optimise(OPS(; alg = ExponentiatedGradient(),
+                                  w0 = [0.5, 0.0, 0.25, 0.25], strict = true),
+                              rows(rdh, 1:5))
         # The step reads x = 1 at the gap: the same answer as a zero return.
         Rz = copy(R)
         Rz[3, 2] = 0.0
@@ -232,13 +271,14 @@ end
         # The diagnostic writes nothing: the row keeps its gap.
         rgap = [0.1, NaN, 0.2]
         @test_logs (:warn, r"non-finite return") po.report_row_gaps(rgap, [0.5, 0.5, 0.0],
-                                                                    nothing, nx[1:3], false)
+                                                                    nothing, nx[1:3], false,
+                                                                    7)
         @test isnan(rgap[2])
-        @test_nowarn po.report_row_gaps(rgap, [0.5, 0.0, 0.5], nothing, nx[1:3], false)
+        @test_nowarn po.report_row_gaps(rgap, [0.5, 0.0, 0.5], nothing, nx[1:3], false, 7)
         @test_nowarn po.report_row_gaps(rgap, [0.5, 0.5, 0.0], [true, false, true], nx[1:3],
-                                        true)
+                                        true, 7)
         @test_throws ArgumentError po.report_row_gaps(rgap, [0.5, 0.5, 0.0], nothing,
-                                                      nx[1:3], true)
+                                                      nx[1:3], true, 7)
         # The buffer keeps the gap and the row's active mask, and the carrier the rule reads
         # is the buffer under the pinned names with the masks as a time-varying panel.
         ob = po.partial_fit!(OPS(; alg = MovingAverageReversion(; window = 4)),
@@ -459,6 +499,18 @@ end
                      set = BoundedAllocationSet(; wb = WeightBounds(0, 0.4)))
         wc = optimise(capped, rd).w
         @test all(<=(0.4 + 1e-12), wc) && isapprox(sum(wc), 1; atol = 1e-12)
+        # Outside a fold loop, a schedule on `set` steps inside its `default`, or inside
+        # the default Allocation Set when it has none.
+        cap4 = BoundedAllocationSet(; wb = WeightBounds(0, 0.4))
+        free4 = BoundedAllocationSet()
+        withd = po.partial_fit!(OPS(; alg = ExponentiatedGradient(),
+                                    set = TimeDependent(; val = [free4, free4],
+                                                        default = cap4)), rd)
+        @test withd.cache.w == po.partial_fit!(capped, rd).cache.w
+        nod = po.partial_fit!(OPS(; alg = ExponentiatedGradient(),
+                                  set = TimeDependent(; val = [cap4, cap4])), rd)
+        @test nod.cache.w ==
+              po.partial_fit!(OPS(; alg = ExponentiatedGradient()), rd).cache.w
         lower = OPS(; alg = PassiveAggressiveMeanReversion(),
                     set = BoundedAllocationSet(; wb = WeightBounds(0.1, 1)))
         @test all(>=(0.1 - 1e-12), optimise(lower, rd).w)

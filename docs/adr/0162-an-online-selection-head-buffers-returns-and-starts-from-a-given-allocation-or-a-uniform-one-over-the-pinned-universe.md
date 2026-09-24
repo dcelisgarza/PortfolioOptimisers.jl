@@ -88,10 +88,12 @@ at the start holds the start as given and warns, as a row's Held Step does.
 
 `w0` reaches the first Online Update as its `w`, and that is the whole of its meaning. A rule that
 reads `w` — `BuyAndHold`, `ExponentiatedGradient`, `PassiveAggressive`, `ForecastReversion`
-through the Price-Adjusted Allocation — continues from it; a rule that does not —
-`ConstantRebalancedPortfolio` answers its own `w`, `ExpertMixture` answers its experts' mix, the
-Newton step reads its Gram — replaces it at that update, so the fund holds `w0` for one period
-and the rule's allocation from the second. That is what a live book migrating to such a rule does,
+through the Price-Adjusted Allocation — continues from it; a rule whose next allocation is not a
+step from `w` — `ConstantRebalancedPortfolio` answers its own `w`, `ExpertMixture` answers its
+experts' mix, the Newton step solves its Gram — replaces it at that update, so the fund holds `w0`
+for one period and the rule's allocation from the second. Such a rule can still carry `w0`
+forward: the Newton step's gradient `x/⟨w, x⟩` reads the held `w`, so `w0` stays in the Gram, and
+an expert that steps from `w` starts at `w0`. That is what a live book migrating to such a rule does,
 the period-one trade is measured from `ŵ₁` as ADR 0160 rules, and no rule refuses `w0`. The
 docstring says the one-period case in one sentence.
 
@@ -122,10 +124,14 @@ When `w0` is absent the recursion starts at `1/N` over every pinned name, unlist
 as ADR 0157's cash reading of a gap already implies. An unlisted leg earns a zero return until it lists, the read-out
 slices it away and renormalises, and when it relists it holds the recursion's own weight. The cost
 is stated, not hidden: on a universe where `k` of `N` assets are unlisted at the first row, the
-recursion parks `k/N` of its weight in cash-like legs until the rule moves it, and the fund's
-tilts are scaled by `(N − k)/N` for as long as that lasts. The head's docstring states it, and a
-caller who wants the recursion to be the fund from row one gives `w0` over the listed assets with
-zeros elsewhere and accepts what their rule's geometry does with a zero.
+recursion parks `k/N` of its weight in cash-like legs until the rule moves it. The read-out
+renormalises over the listed legs, so the fund holds them alone, but the parked legs enter the
+gross return `⟨w, x⟩` that a rule reads. Buy-and-hold scales each leg by its own relative, so its
+fund is the recursion over the listed names alone; the exponentiated-gradient step divides by the
+gross return, so its fund is not (within 1 % of the listed-only tilts on the test fixture). The
+head's docstring states it, and a caller who wants the recursion to be the fund from row one gives
+`w0` over the listed assets with zeros elsewhere and accepts what their rule's geometry does with a
+zero.
 
 ## Considered options
 
