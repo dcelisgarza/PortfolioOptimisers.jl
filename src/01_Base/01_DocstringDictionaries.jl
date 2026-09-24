@@ -1096,6 +1096,12 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :rlvar_sigma => "``\\sigma``: Positive root of the stationarity condition of ``\\varphi_{\\kappa}``.",#
                        :rlvar_phi => "``\\varphi_{\\kappa}(u, z)``: Smallest sum the pair of power cones of one observation allows.",#
                        :rlvar_target => "``\\bar{\\vartheta}``: Target relativistic value at risk of the view.",#
+                       # The primal power-cone programme of `RelativisticValueatRisk`, which
+                       # `RRM` builds and solves. The measure states it and `RRM` registers it.
+                       :K_pow => "``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^{p} b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.",#
+                       :rlvar_z_ge => "``z \\geq 0``: Scale variable of the primal power-cone programme.",#
+                       :rlvar_aux => "``\\psi_i``, ``\\theta_i``, ``\\epsilon_i``, ``\\omega_i``: Auxiliary variables of observation ``i`` in the primal power-cone programme.",#
+                       :p_i_obs => "``p_i``: Probability of observation ``i``. It is ``1/T`` without observation weights, and the ``i``-th observation weight divided by the sum of the weights with them.",#
                        # Entropy pooling tail views.
                        :cvar_stat => "``\\mathrm{CVaR}_{\\alpha}(X)``: Conditional value at risk of the loss series ``\\boldsymbol{x}`` at level ``\\alpha``.",#
                        :cvar_target => "``\\bar{c}``: Target conditional value at risk of the view.",#

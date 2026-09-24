@@ -1770,7 +1770,7 @@ Where:
   - $(math_dict[:rlvar_target])
   - ``\\boldsymbol{\\nu}``: ``T \\times 1`` vector of weights that attains the RLVaR.
   - ``\\boldsymbol{\\tau}``, ``\\boldsymbol{\\varsigma}``: ``T \\times 1`` vectors that carry the Kaniadakis entropy budget of ``\\boldsymbol{\\nu}``.
-  - ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^{p} b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.
+  - $(math_dict[:K_pow])
 
 The budget is the dual description of RLVaR, so the constraint set is feasible if and only if ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) \\geq \\bar{\\vartheta}``.
 

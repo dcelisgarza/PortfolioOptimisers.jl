@@ -10,7 +10,7 @@ commit = "0ecb3ce47c"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2993, doc = 0, comment = 241, blank = 48, total = 3282 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1327, doc = 113, comment = 148, blank = 43, total = 1631 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1331, doc = 113, comment = 150, blank = 43, total = 1637 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -212,7 +212,7 @@ commit = "0ecb3ce47c"
 "src/16_RiskMeasures/06_XatRisk/01_XatRisk.jl" = { code = 367, doc = 624, comment = 41, blank = 257, total = 1289 }
 "src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl" = { code = 384, doc = 653, comment = 25, blank = 242, total = 1304 }
 "src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { code = 158, doc = 322, comment = 7, blank = 124, total = 611 }
-"src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { code = 284, doc = 428, comment = 13, blank = 154, total = 879 }
+"src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { code = 284, doc = 525, comment = 13, blank = 182, total = 1004 }
 "src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl" = { code = 181, doc = 354, comment = 10, blank = 121, total = 666 }
 "src/16_RiskMeasures/07_OWARiskMeasures.jl" = { code = 559, doc = 1231, comment = 43, blank = 522, total = 2355 }
 "src/16_RiskMeasures/08_AverageDrawdown.jl" = { code = 41, doc = 153, comment = 1, blank = 72, total = 267 }

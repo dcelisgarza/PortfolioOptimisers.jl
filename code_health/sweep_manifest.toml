@@ -260,7 +260,7 @@
 "src/16_RiskMeasures/06_XatRisk/01_XatRisk.jl" = { map = 9, units = 19, swept = false }
 "src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl" = { map = 9, units = 14, swept = false }
 "src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { map = 9, units = 5, swept = false }
-"src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { map = 9, units = 9, swept = false }
+"src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { map = 9, units = 9, algorithm = 5, swept = true, bindings = ["RRM", "RelativeRelativisticDrawdownatRisk", "RelativisticDrawdownatRisk", "RelativisticValueatRisk", "RelativisticValueatRiskRange", "resolve_deferred_quantities", "resolve_deferred_quantities", "resolve_deferred_quantities", "resolve_deferred_quantities"] }
 "src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl" = { map = 9, units = 5, swept = false }
 "src/16_RiskMeasures/07_OWARiskMeasures.jl" = { map = 9, units = 48, swept = false }
 "src/16_RiskMeasures/08_AverageDrawdown.jl" = { map = 9, units = 3, swept = false }

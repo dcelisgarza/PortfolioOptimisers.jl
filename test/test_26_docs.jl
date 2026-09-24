@@ -1367,6 +1367,10 @@ in the sense of `STANDARDS.md`.
                     "objective scale" => [:ep_so, :so_scale],
                     # The weights an optimisation produced, against the weights themselves.
                     "portfolio weights vector ``n \\times 1``" => [:w_0_finaliser, :w_port],
+                    # One cone under two glyphs, ``\mathcal{K}_{\mathrm{pow}}(p)`` and
+                    # ``\mathcal{P}_{\alpha}``. The relativistic measures cannot read the
+                    # second, because their ``\alpha`` is the significance level.
+                    "power cone" => [:K_pow, :P_alpha_power],
                     # One quantity under two glyphs, ``r_{tj}`` and ``x_{t,\,i}``. A merge
                     # candidate, and the wider of the two.
                     "return" => [:r_tj, :x_ti_ret],
