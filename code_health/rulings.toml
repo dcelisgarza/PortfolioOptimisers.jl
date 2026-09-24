@@ -12,9 +12,11 @@
 #   [[unmeasured_path]] a path the gate never measures. It has no row and nothing to ratchet.
 #   [[exemption]]       a real number that may stand. It binds issue candidacy alone.
 #   [[dismissal]]       a JET report class that is not a defect. It binds the reviewed count.
+#   [[perf_dismissal]]  a performance Finding that is not a trap. It binds the rule's count.
 #   [[coverage_exemption]]  a line that no test can reach. It binds the terminal condition.
 #
-# An Exemption, a Dismissal and a Coverage Exemption all cite a Rationale by name. Citing an
+# An Exemption, a Dismissal, a performance Dismissal and a Coverage Exemption all cite a Rationale
+# by name. Citing an
 # approved Rationale is bookkeeping and any contributor may do it. Adding a `[rationale.…]` block
 # is a claim that some code is correct, and it needs the maintainer.
 
@@ -34,6 +36,9 @@ cyclomatic = 10
 cognitive = 15
 argcount = 10
 jet_reviewed = 1
+# ADR 0175. An added file enters `code_health/perf_baseline.toml` with no performance Finding that
+# a Dismissal does not cover, which is the entry rule `jet_reviewed` sets for JET.
+perf_reviewed = 1
 
 # --- the size ratchet ------------------------------------------------------
 #

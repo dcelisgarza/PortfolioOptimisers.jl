@@ -10,8 +10,8 @@
 # it reads no issue body.** The tracker is read and written by `gh` in the workflow around it, so
 # every decision this job makes lives here, in one place a person can run and read.
 #
-# The two measuring scripts are reused rather than copied. Each is included into a module of its
-# own, because all three scripts name their entry point `measure`.
+# The three measuring scripts are reused rather than copied. Each is included into a module of its
+# own, because all four scripts name their entry point `measure`.
 #
 # The input is what `gh issue list --label code-health --state all` produced, one issue per line as
 # `number<TAB>state<TAB>closedAt<TAB>title`. The output is a directory of title and body files.
@@ -26,6 +26,12 @@ using TOML
 # type is only one type when one module defines it.
 module Complexity
 include(joinpath(@__DIR__, "complexity.jl"))
+end
+
+# The performance gate reads source text alone, like the complexity measurement, so it is always
+# loaded. ADR 0175.
+module Perf
+include(joinpath(@__DIR__, "perf.jl"))
 end
 
 # JET is loaded only when it will be used. Its module loads PortfolioOptimisers and the whole plot
@@ -73,6 +79,7 @@ const REPORTS_SHOWN = 25
 struct Config
     limits::Dict{String, Int}
     jet_reviewed::Int
+    perf_reviewed::Int
     open_queue::Int
 end
 
@@ -87,7 +94,7 @@ function read_config(rulings)
     th = CodeHealth.thresholds(rulings)
     job = rulings["scheduled_job"]
     limits = Dict(key => th[ruling] for (key, (_, ruling)) in METRICS)
-    return Config(limits, th["jet_reviewed"], job["open_queue"])
+    return Config(limits, th["jet_reviewed"], th["perf_reviewed"], job["open_queue"])
 end
 
 # --- the tracker's side, as data -------------------------------------------
@@ -154,7 +161,8 @@ end
     recorded_numbers(commit, path) -> Dict{String, Int}
 
 The baseline row one file carried at one commit, as a flat map of metric to number. The three
-complexity numbers keep their own keys and each JET run contributes `jet:<run>`.
+complexity numbers keep their own keys, each JET run contributes `jet:<run>`, and each performance
+rule contributes `perf:<rule>`.
 
 The **committed baseline** is read rather than a fresh measurement, because the number a file
 carried at a past commit exists nowhere else. ADR 0078 chose git over a label, a fifth committed
@@ -179,6 +187,15 @@ function recorded_numbers(commit::AbstractString, path::AbstractString)
                 continue
             end
             haskey(row, "reviewed") && (out["jet:" * run] = row["reviewed"])
+        end
+    end
+    text = file_at(commit, "code_health/perf_baseline.toml")
+    if text !== nothing
+        row = get(get(TOML.parse(text), "file", Dict{String, Any}()), path, nothing)
+        if row !== nothing
+            for r in Perf.RULE_NAMES
+                haskey(row, r) && (out["perf:" * r] = row[r])
+            end
         end
     end
     return out
@@ -215,10 +232,12 @@ struct Candidate
     breaches::Vector{Breach}
     worst::Vector{Pair{String, Vector{CodeHealth.Definition}}}
     reports::Vector{CodeHealth.Reviewed}
+    findings::Vector{CodeHealth.Finding}
     max_excess::Float64
 end
 
 has_jet(c::Candidate) = !(isempty(c.reports))
+has_perf(c::Candidate) = !(isempty(c.findings))
 
 """
     surviving(numbers, path, rulings, key) -> Vector{Definition}
@@ -234,7 +253,7 @@ function surviving(numbers, path::AbstractString, rulings, key::AbstractString)
 end
 
 """
-    candidates(cm, jm, rulings, cfg, baseline, jet_baseline) -> Vector{Candidate}
+    candidates(cm, jm, pm, rulings, cfg, baseline, jet_baseline, perf_baseline) -> Vector{Candidate}
 
 Every file that stands above a threshold, worst first.
 
@@ -243,8 +262,14 @@ file, because a suspected defect outranks a refactor, and inside each group the 
 orders them. The ratio is used rather than the raw value because a cyclomatic 12 and an argument
 count 12 are not the same distance past their own thresholds. The path breaks a tie, so two runs
 over one tree rank the same files in the same order.
+
+A performance Finding makes a file a candidate, as a reviewed JET report does, and ADR 0175 gives
+it no ratio of its own. A Finding is a count of sites with a known replacement, not a distance past
+a threshold, and no ratio of it compares with a complexity ratio. So a file with Findings alone
+ranks by its complexity ratio, which is at most 1, and sits after every file that breaches a
+complexity threshold.
 """
-function candidates(cm, jm, rulings, cfg::Config, baseline, jet_baseline)
+function candidates(cm, jm, pm, rulings, cfg::Config, baseline, jet_baseline, perf_baseline)
     out = Candidate[]
     for path in cm.files
         numbers = cm.numbers[path]
@@ -272,10 +297,20 @@ function candidates(cm, jm, rulings, cfg::Config, baseline, jet_baseline)
                   Breach("JET reports, reviewed", length(reports), recorded,
                          cfg.jet_reviewed))
         end
+        findings = pm === nothing ? CodeHealth.Finding[] : pm.findings[path]
+        if length(findings) >= cfg.perf_reviewed
+            prow = get(perf_baseline, path, Dict{String, Any}())
+            recorded = sum(r -> get(prow, r, 0), Perf.RULE_NAMES; init = 0)
+            push!(breaches,
+                  Breach("performance Findings, reviewed", length(findings), recorded,
+                         cfg.perf_reviewed))
+        else
+            findings = CodeHealth.Finding[]
+        end
         if isempty(breaches)
             continue
         end
-        push!(out, Candidate(path, breaches, worst, reports, excess))
+        push!(out, Candidate(path, breaches, worst, reports, findings, excess))
     end
     return sort!(out; by = c -> (has_jet(c) ? 0 : 1, -c.max_excess, c.path))
 end
@@ -367,6 +402,22 @@ function report_table(c::Candidate)
     return String(take!(io))
 end
 
+function finding_table(c::Candidate)
+    io = IOBuffer()
+    cell(s) = replace(strip(s), '\n' => " ", '|' => "\\|")
+    println(io, "| line | rule | definition | code | replacement |")
+    println(io, "| ---: | --- | --- | --- | --- |")
+    for f in first(sort(c.findings; by = f -> (f.line, f.rule)), REPORTS_SHOWN)
+        println(io, "| ", f.line, " | `", f.rule, "` | `", cell(f.definition), "` | `",
+                cell(f.code), "` | ", cell(f.hint), " |")
+    end
+    if length(c.findings) > REPORTS_SHOWN
+        println(io, "\n", length(c.findings) - REPORTS_SHOWN,
+                " more Findings are not listed. Run the scan to see them all.")
+    end
+    return String(take!(io))
+end
+
 """
     body_of(candidate, action, reason, commit) -> String
 
@@ -418,11 +469,22 @@ function body_of(c::Candidate, action::Symbol, reason::AbstractString,
                 "either real, and is fixed, or a false positive, and is dismissed.\n")
         println(io, report_table(c))
     end
+    if has_perf(c)
+        println(io, "## Performance Findings\n")
+        println(io,
+                "Each Finding has a replacement with the same meaning. Make it, or dismiss a ",
+                "Finding that is not a trap with a `[[perf_dismissal]]`. A replacement can move a ",
+                "result by an ulp. See ADR 0175.\n")
+        println(io, finding_table(c))
+    end
     println(io, "## Reproduce\n")
     println(io, "```bash")
     println(io, "julia --project=code_health code_health/complexity.jl check")
     if has_jet(c)
         println(io, "julia --project=code_health code_health/jet.jl check")
+    end
+    if has_perf(c)
+        println(io, "julia --project=code_health code_health/perf.jl scan ", c.path)
     end
     println(io, "```\n")
     println(io, "The procedure is on the [Code health](",
@@ -547,6 +609,7 @@ function main(args)
                 "development aid.")
     end
     cm = Complexity.measure()
+    pm = Perf.measure()
     jm = WITH_JET ? Main.Jet.measure() : nothing
     baseline = get(CodeHealth.read_toml(joinpath(CodeHealth.DIR,
                                                  "complexity_baseline.toml")), "file",
@@ -557,7 +620,10 @@ function main(args)
                                                               "jet_baseline.toml")), "run",
                                 Dict{String, Any}()))
 
-    all = candidates(cm, jm, rulings, cfg, baseline, jet_baseline)
+    perf_baseline = get(CodeHealth.read_toml(joinpath(CodeHealth.DIR, "perf_baseline.toml")),
+                        "file", Dict{String, Any}())
+
+    all = candidates(cm, jm, pm, rulings, cfg, baseline, jet_baseline, perf_baseline)
     verdicts = [(c, verdict(c, existing)...) for c in all]
     chosen = first([v for v in verdicts if v[2] !== :skip], room)
     commit = CodeHealth.git_short_commit()

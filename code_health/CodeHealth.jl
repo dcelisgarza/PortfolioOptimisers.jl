@@ -1,18 +1,19 @@
 """
     CodeHealth
 
-Shared machinery for the four code-health entry scripts, `complexity.jl`, `expansion.jl`, `jet.jl`
-and `coverage.jl`. It reads and writes the generated TOML files, compares provenance, applies the
-ratchet, pairs renames, and renders a failure for a terminal and for GitHub Actions.
+Shared machinery for the code-health entry scripts, `complexity.jl`, `expansion.jl`, `jet.jl`,
+`coverage.jl`, `size.jl` and `perf.jl`. It reads and writes the generated TOML files, compares
+provenance, applies the ratchet, pairs renames, and renders a failure for a terminal and for GitHub
+Actions.
 
-The decisions this module implements are recorded in ADRs 0071 to 0077 and ADR 0082 under
-`docs/adr/`. The maintenance procedure that calls it is `docs/src/contribute/3-code-health.md`.
+The decisions this module implements are recorded in ADRs 0071 to 0077, ADR 0082 and ADR 0175
+under `docs/adr/`. The maintenance procedure that calls it is `docs/src/contribute/3-code-health.md`.
 """
 module CodeHealth
 
 using TOML
 
-export Definition, Reviewed, Rise, RefreshRefused, run_script
+export Definition, Reviewed, Finding, Rise, RefreshRefused, run_script
 
 # --- what one measurement says about one definition -------------------------
 #
@@ -50,6 +51,25 @@ struct Reviewed
     kind::String
     message::String
     line::Int
+end
+
+"""
+    Finding
+
+One performance trap, as `code_health/perf.jl` measures it and the scheduled job reports it: the
+file and line, the rule, the definition that holds it, the code of the flagged expression as
+`string` prints it, and the replacement `perf.jl scan` offers.
+
+The Performance Fingerprint is `(file, rule, definition, code)`. It carries no line, so a Dismissal
+survives an edit above it, and `code` is the printed `Expr`, so it survives a reformat. ADR 0175.
+"""
+struct Finding
+    file::String
+    line::Int
+    rule::String
+    definition::String
+    code::String
+    hint::String
 end
 
 # --- paths and scope -------------------------------------------------------
@@ -854,6 +874,7 @@ function check_rationale_citations(rulings)
     known = Set(keys(get(rulings, "rationale", Dict{String, Any}())))
     bad = String[]
     for (kind, entries) in (("dismissal", get(rulings, "dismissal", [])),
+                            ("perf_dismissal", get(rulings, "perf_dismissal", [])),
                             ("exemption", get(rulings, "exemption", [])),
                             ("coverage_exemption", get(rulings, "coverage_exemption", [])))
         for e in entries

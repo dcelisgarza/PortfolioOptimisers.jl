@@ -14,9 +14,10 @@ Description = "The code-health loop of PortfolioOptimisers.jl: what each gate me
     If you haven't, please read the [Developer documentation](2-developer.md) first. This page
     assumes you can already build, test and format the package.
 
-Three tools measure this repository continuously. **JET** looks for inference and correctness
+Four tools measure this repository continuously. **JET** looks for inference and correctness
 problems, **CodeComplexity** measures cyclomatic complexity, cognitive complexity and argument
-count, and **JuliaSyntax** counts the code lines in a file. Their numbers are recorded per file in
+count, **JuliaSyntax** counts the code lines in a file, and `code_health/perf.jl` counts the
+performance traps in it. Their numbers are recorded per file in
 `code_health/`, and a CI gate turns red when a number rises.
 
 This page is the procedure for making a number **fall**. It is what you follow when you pick up an
@@ -252,6 +253,36 @@ not a defect. One Rationale serves the dozens of Dismissals a systematic class n
 A Dismissal cannot quietly relax the gate. The reviewed count is `raw − matched dismissals`, so a
 report that matches no Dismissal always turns CI red. The arithmetic forces the safe direction, and
 no rule has to be enforced by hand.
+
+## [Reviewing and dismissing a performance Finding](@id code_health_performance)
+
+`code_health/perf.jl` reads the source text for seven performance traps, and each one has a
+replacement that means the same thing: a slice that copies where a view reads, a reduction over a
+temporary array, a broadcast that does not fuse, a search that builds every hit, a linear-algebra
+chain that builds a matrix to read a scalar or a diagonal, one expensive call made twice, and an
+array a loop allocates on every iteration and does not keep. See
+`docs/adr/0175-the-performance-gate-reads-traps-from-the-source-text-and-ratchets-the-count-per-file-and-per-rule.md`.
+
+Unlike `jet.jl`, it prints its Findings. `scan` writes nothing, and it costs a few seconds.
+
+```bash
+julia --project=code_health code_health/perf.jl scan src/13_Fees.jl
+julia --project=code_health code_health/perf.jl scan --rule linalg_temporary
+```
+
+Each Finding prints its file, line, definition, code and replacement. Make the replacement, run the
+file's tests, and refresh the baseline so the count falls. A replacement can move a result by an
+ulp, because `dot` and `sum` add in different orders.
+
+A Finding that is not a trap takes a `[[perf_dismissal]]`. Copy `file`, `rule`, `definition` and
+`code` from the line `scan` prints, and cite a Rationale, under the same rules as a JET Dismissal:
+anyone may cite an approved Rationale, and a new one needs the maintainer. Leave `code` out to
+cover every Finding of that rule in that definition, which is the key of a complexity Exemption: a
+loop that must allocate on every iteration takes one entry.
+
+The scheduled job files a file with a Finding as it files a file over a complexity threshold, and a
+swept file carries no Finding that a Dismissal does not cover. That is the fifth condition of the
+sweep of issue #404.
 
 ## [Exempting a complexity number](@id code_health_exemption)
 
