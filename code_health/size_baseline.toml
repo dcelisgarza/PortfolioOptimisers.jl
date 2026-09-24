@@ -249,7 +249,7 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { code = 309, doc = 448, comment = 4, blank = 163, total = 924 }
 "src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { code = 168, doc = 263, comment = 0, blank = 69, total = 500 }
 "src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { code = 152, doc = 209, comment = 2, blank = 96, total = 459 }
-"src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl" = { code = 161, doc = 281, comment = 4, blank = 118, total = 564 }
+"src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl" = { code = 280, doc = 617, comment = 5, blank = 258, total = 1160 }
 "src/17_Optimisation/03_NaiveOptimisation.jl" = { code = 463, doc = 734, comment = 35, blank = 225, total = 1457 }
 "src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl" = { code = 197, doc = 395, comment = 4, blank = 113, total = 709 }
 "src/17_Optimisation/04_Hierarchical/02_HierarchicalRiskParity.jl" = { code = 181, doc = 264, comment = 34, blank = 76, total = 555 }

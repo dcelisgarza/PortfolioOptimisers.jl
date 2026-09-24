@@ -77,6 +77,29 @@ and the best stock as a top-1 `ScoreSelector` composed with `EqualWeighted`.
                                                    bare_prediction(a, ts); lags = 3)
         @test_throws DomainError log_wealth_regret(bare_prediction(a, ts),
                                                    bare_prediction(a, ts); lags = -1)
+        # A return below -1 leaves a negative wealth, so it is refused with the return as
+        # the value, in either series; a `NaN` return passes and reaches the regret.
+        err = try
+            log_wealth_regret(bare_prediction([0.01, -1.5, 0.0], ts),
+                              bare_prediction(a, ts))
+        catch e
+            e
+        end
+        @test isa(err, DomainError) && err.val == -1.5
+        @test_throws DomainError log_wealth_regret(bare_prediction(a, ts),
+                                                   bare_prediction([NaN, -2.0, 0.0], ts))
+        @test isnan(log_wealth_regret(bare_prediction([NaN, 0.0, 0.0], ts),
+                                      bare_prediction(a, ts)).regret)
+        # A return of -1 is a total loss: the regret is infinite and the test undefined.
+        ruin = log_wealth_regret(bare_prediction([0.0, -1.0, 0.0], ts),
+                                 bare_prediction(a, ts))
+        @test ruin.regret == Inf && isnan(ruin.z) && isnan(ruin.p)
+        # A difference that is a non-zero constant has no variance in exact arithmetic, so
+        # the statistic is infinite; in floating point it is very large and `p` is zero.
+        c = log_wealth_regret(bare_prediction(a, ts),
+                              bare_prediction((1 .+ a) .* exp(0.001) .- 1, ts))
+        @test isapprox(c.regret, 0.003; atol = 1e-12)
+        @test c.variance < 1e-25 && abs(c.z) > 1e10 && c.p == 0
         # A population of paths reads its first path, as the summary does.
         b = [0.025, 0.0, 0.03]
         pop = bare_prediction([b, a], ts)

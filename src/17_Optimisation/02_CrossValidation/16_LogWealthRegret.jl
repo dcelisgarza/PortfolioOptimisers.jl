@@ -1,11 +1,11 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-The log-wealth regret of a strategy against a comparator over one sequence of rows, with the test of its per-row difference.
+Holds the log-wealth regret of a strategy against a comparator, and the test of its per-row difference.
 
-`LogWealthRegretResult` is what [`log_wealth_regret`](@ref) returns. The regret is the gap in log terminal wealth between the comparator and the strategy, positive when the comparator wins; the per-row difference series carries a Newey–West test of equal expected log growth, in the shape of [`CovarianceForecastComparisonResult`](@ref). Negative regret is expected on many sequences and is not a defect: a causal strategy that reads the market's structure can beat a constant portfolio, and a Hindsight Comparator is a ceiling only over the class it was chosen from.
+[`log_wealth_regret`](@ref) returns it, over one sequence of rows. The regret is the comparator's log terminal wealth less the strategy's, so it is positive when the comparator wins. The per-row difference carries a Newey–West test of equal expected log growth, in the shape of [`CovarianceForecastComparisonResult`](@ref). A negative regret is common and is not a defect: a causal strategy that reads the market's structure can beat a constant portfolio, and a Hindsight Comparator is best only over the class it was chosen from.
 
-The Result also states the comparator's side of a dynamic-regret bound: `path_length` is the summed Euclidean distance between the comparator's consecutive targets, ``P_T``, which is zero for a constant comparator and grows with every switch a [`HindsightSplit`](@ref) comparator makes, and `cumulative` is the running regret, the cumulative sum of `difference`.
+Two fields state the comparator's side of a dynamic-regret bound. `path_length` is ``P_T``, the summed Euclidean distance between the comparator's consecutive targets: zero for a constant comparator, and larger with every switch that a [`HindsightSplit`](@ref) comparator makes. `cumulative` is the running regret.
 
 # Fields
 
@@ -18,7 +18,7 @@ $(DocStringExtensions.FIELDS)
         n_periods, wealth_a, wealth_b, path_length
     ) -> LogWealthRegretResult
 
-Arguments correspond to the struct's fields, in the order they are declared. The type is a Result, so [`log_wealth_regret`](@ref) builds it and a caller reads it; there is no keyword constructor, and the type validates nothing of its own.
+Arguments correspond to the struct's fields, in the order they are declared. The type is a Result: [`log_wealth_regret`](@ref) builds it and a caller reads it. It has no keyword constructor and validates nothing of its own.
 
 # Related
 
@@ -54,7 +54,7 @@ Arguments correspond to the struct's fields, in the order they are declared. The
     """
     z
     """
-    Two-sided p-value of the statistic against the standard normal. It is `NaN` when the two series coincide, because their difference has no variance.
+    Two-sided p-value of the statistic against the standard normal. It is `NaN` when the two series coincide, because their difference has no variance, and zero when the difference is a non-zero constant.
     """
     p
     """
@@ -84,7 +84,7 @@ end
 
 The realised return series and the timestamps a prediction result was scored on, as [`log_wealth_regret`](@ref) reads them.
 
-The series is the one [`performance_summary`](@ref) reads: the portfolio returns [`predict`](@ref) stored, net of the fee the fold settled, drifted where a Weight Drift ran; a population of paths reads its first path. A multi-period result reads its stacked returns and timestamps.
+The series is the one [`performance_summary`](@ref) reads: the portfolio returns that [`predict`](@ref) stored, net of the fee the fold settled, and drifted where a Weight Drift ran. A population of paths gives its first path. A multi-period result gives its stacked returns and timestamps.
 
 # Arguments
 
@@ -114,7 +114,7 @@ end
 
 The one weight vector of a fold, or the first member's under a population.
 
-A population result carries one vector per member, and the evaluation readers of this file read its first path, as [`regret_series`](@ref) and [`performance_summary`](@ref) do; a single vector is its own first member.
+A population result carries one vector per member, and the path readers of the regret take the first, as [`regret_series`](@ref) and [`performance_summary`](@ref) take the first path. A single vector is its own first member.
 
 # Arguments
 
@@ -140,7 +140,9 @@ end
 
 The weights a fold started from, and, through [`fold_held`](@ref), the weights it held after its last observation, on the fold's own asset names.
 
-`fold_target` is the fold's target on a fold that carries no Held Weights record, and the record's `w0` — its own target on a solved fold, the previous weights it was handed on a failed one, as [`held_start_weights`](@ref) names them — on a fold that carries one. `fold_held` is the same target with no record, because a fold without a drift holds its target to the end, and the record's `w` with one, the drifted holding the next fold trades from. Both read the first member of a population, and both are viewed at the fold's Investable Mask, so they sit on `pred.rd.nx`, the names of the fold's own universe, which is what [`stacked_fold_weights`](@ref) embeds by.
+On a fold with no Held Weights record, `fold_target` is the fold's target. On a fold with one, it is the record's `w0`, the start that [`held_start_weights`](@ref) names: the fold's own target when it solved, and the weights it was handed when it failed. `fold_held` is the target on a fold with no record, because a fold without a drift holds its target to the end. On a fold with a record it is the record's `w`, the drifted holding that the next fold trades from.
+
+Both read the first member of a population. Both are viewed at the fold's Investable Mask, so they sit on `pred.rd.nx`, the names of the fold's own universe, which [`stacked_fold_weights`](@ref) embeds by.
 
 # Arguments
 
@@ -183,7 +185,14 @@ end
 
 One weight vector per fold, read by `read` and embedded by asset name on the union of the folds' universes.
 
-The folds of a multi-period result need not share a universe: a [`Pipeline`](@ref) with an Asset Selector fits each fold on the assets it selected, so a top-1 selector's fold carries one name and one weight. A path over the folds is stated on one axis, so this reader takes the union of every fold's `rd.nx` in order of first appearance, and writes each fold's weights into the columns of its own names, zero elsewhere. A fold whose weights and names disagree in length is refused, because the embedding would misplace them.
+The folds of a multi-period result need not share a universe. A [`Pipeline`](@ref) with an Asset Selector fits each fold on the assets it selected, so the fold of a top-1 selector carries one name and one weight. A path over the folds is stated on one axis, so each fold's weights go into the columns of its own names on the union axis, and every other entry of its row is zero.
+
+# Algorithm
+
+ 1. Read each fold's weights through `read`, giving `ws`.
+ 2. Take the union of the folds' `rd.nx` in order of first appearance, giving `names`, and map each name to its column, giving `pos`.
+ 3. Promote the element types of `ws`, giving `Tf`, and allocate `W`, a `folds × assets` matrix of zeros of type `Tf`.
+ 4. For each fold `i`, check the length of `ws[i]` against its `rd.nx`, and write each weight into row `i` of `W`, at the column that `pos` gives its name.
 
 # Arguments
 
@@ -192,7 +201,7 @@ The folds of a multi-period result need not share a universe: a [`Pipeline`](@re
 
 # Validation
 
-  - Every fold's weights have one entry per name of its `rd.nx`.
+  - Every fold's weights have one entry per name of its `rd.nx`. A `DimensionMismatch` is thrown otherwise, because the embedding would misplace them.
 
 # Returns
 
@@ -216,7 +225,9 @@ function stacked_fold_weights(pred::MultiPeriodPredictionResult, read)
         nx = f.rd.nx
         @argcheck(length(ws[i]) == length(nx),
                   DimensionMismatch("fold $i carries $(length(ws[i])) weights over $(length(nx)) asset names, so its weights cannot be embedded by name"))
-        W[i, [pos[n] for n in nx]] = ws[i]
+        for (n, wn) in zip(nx, ws[i])
+            W[i, pos[n]] = wn
+        end
     end
     return W
 end
@@ -224,9 +235,29 @@ end
     comparator_path_length(b::PredictionResult, ::Type{Tf})
     comparator_path_length(b::MultiPeriodPredictionResult, ::Type{Tf})
 
-The path length ``P_T = \\sum_{t \\geq 2} \\lVert u_t - u_{t-1} \\rVert_2`` of a comparator's targets, as [`log_wealth_regret`](@ref) reports it.
+The path length of a comparator's targets, as [`log_wealth_regret`](@ref) reports it.
 
-A multi-period result's targets are one per fold, read through [`fold_target`](@ref) and stacked by [`stacked_fold_weights`](@ref), and the path length sums the Euclidean distance between consecutive folds' targets; at `test_size = 1` a fold is a row and ``u_t`` the comparator's target on row ``t``. A single prediction result holds one target and no path, and so does a multi-period result of one fold: both answer `NaN`, in the number type `Tf` the regret is stated in.
+A multi-period result has one target per fold, so the path is over the folds. At `test_size = 1` a fold is a row, and ``\\boldsymbol{u}_t`` is the comparator's target on row ``t``. A single prediction result holds one target and no path, and so does a multi-period result of one fold. Both answer `NaN`, in the number type `Tf` of the regret.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+P_T &= \\sum_{t=2}^{T} \\lVert \\boldsymbol{u}_t - \\boldsymbol{u}_{t-1} \\rVert_2\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:P_T_path])
+  - ``\\boldsymbol{u}_t``: Comparator's target on fold ``t``, embedded by asset name on the union of the folds' universes, with a zero at every asset outside the fold's own universe.
+  - ``T``: Number of folds.
+
+# Algorithm
+
+ 1. Read one target per fold through [`fold_target`](@ref), and embed the targets on one axis through [`stacked_fold_weights`](@ref), giving `W`, one row per fold.
+ 2. When `W` has fewer than two rows, return `NaN` of type `Tf`.
+ 3. Sum the Euclidean norms of the differences of consecutive rows of `W`.
 
 # Arguments
 
@@ -260,7 +291,14 @@ end
 
 The log-wealth regret of strategy `a` against comparator `b` over one and the same sequence of rows.
 
-Regret is defined over one sequence, so the verb refuses unless the two prediction results carry the same timestamps. Each series is read exactly as it was scored — net of the fee the fold settled, drifted where a Weight Drift ran — so the comparator's fee policy is the caller's, and a fee-free comparator against a fee-paying strategy measures the fee as regret. The comparator is any prediction result over the rows: the same estimator run causally through `cross_val_predict` with the strategy's `cv`, or a Hindsight Comparator, an estimator fit on the rows it is scored on and predicted in sample, `predict(optimise(est, rd_test), rd_test)`. The best constant rebalanced portfolio in hindsight is [`BestConstantRebalancedPortfolio`](@ref) with no solver, or, exactly and under any bound, [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref) with a solver; the best stock in hindsight is a [`ScoreSelector`](@ref) under [`RankRule`](@ref)`(; best = 1)` and [`MeanReturn`](@ref)`(; flag = true)` composed with [`EqualWeighted`](@ref) in a [`Pipeline`](@ref).
+Regret is defined over one sequence, so the verb refuses two prediction results that do not carry the same timestamps. Each series is read as it was scored: net of the fee the fold settled, and drifted where a Weight Drift ran. The comparator's fee policy is therefore the caller's, and a fee-free comparator against a fee-paying strategy measures the fee as regret.
+
+The comparator is any prediction result over the rows. It can be the same estimator run causally through `cross_val_predict` with the strategy's `cv`. It can also be a Hindsight Comparator, an estimator fit on the rows it is scored on and predicted over them, `predict(optimise(est, rd_test), rd_test)`. Two Hindsight Comparators are common:
+
+  - The best constant rebalanced portfolio in hindsight: [`BestConstantRebalancedPortfolio`](@ref) with no solver, or [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref) with a solver, which is exact under any bound.
+  - The best stock in hindsight: a [`ScoreSelector`](@ref) under [`RankRule`](@ref)`(; best = 1)` and [`MeanReturn`](@ref)`(; flag = true)`, composed with [`EqualWeighted`](@ref) in a [`Pipeline`](@ref).
+
+No scorer and no summary column ship for regret. A hyperparameter search ranks on [`MeanReturn`](@ref)`(; flag = true)`, the log wealth per period, which orders candidates as the regret against any fixed comparator orders them. The performance summary reads one series and holds no comparator.
 
 # Mathematical definition
 
@@ -269,7 +307,8 @@ Regret is defined over one sequence, so the verb refuses unless the two predicti
 \\delta_t &= \\log\\left(1 + r_{b,t}\\right) - \\log\\left(1 + r_{a,t}\\right)\\,, \\\\
 R &= \\sum_{t=1}^{T} \\delta_t\\,, \\quad \\bar{\\delta} = \\frac{R}{T}\\,, \\\\
 \\hat{\\omega}^2 &= \\hat{\\gamma}_0 + 2 \\sum_{k=1}^{\\ell} \\left(1 - \\frac{k}{\\ell + 1}\\right) \\hat{\\gamma}_k\\,, \\\\
-z &= \\frac{\\sqrt{T}\\, \\bar{\\delta}}{\\sqrt{\\hat{\\omega}^2}}\\,.
+z &= \\frac{\\sqrt{T}\\, \\bar{\\delta}}{\\sqrt{\\hat{\\omega}^2}}\\,, \\\\
+P_T &= \\sum_{t=2}^{T} \\lVert \\boldsymbol{u}_t - \\boldsymbol{u}_{t-1} \\rVert_2\\,.
 \\end{align}
 ```
 
@@ -281,21 +320,38 @@ Where:
   - ``\\bar{\\delta}``: Regret per period.
   - ``T``: Number of periods.
   - ``\\hat{\\omega}^2``: Long-run variance of ``\\delta_t``, the Bartlett-kernel estimate with ``\\ell`` lags.
-  - ``\\hat{\\gamma}_k``: Sample autocovariance of ``\\delta_t`` at lag ``k``.
+  - ``\\hat{\\gamma}_k``: Sample autocovariance of ``\\delta_t`` at lag ``k``, about ``\\bar{\\delta}`` and divided by ``T``.
   - ``\\ell``: Number of lags, ``0`` by default because the rows of a walk-forward at `test_size = 1` do not overlap.
   - ``z``: Diebold–Mariano–West statistic.
+  - $(math_dict[:P_T_path])
+  - ``\\boldsymbol{u}_t``: Comparator's target on fold ``t``, embedded by asset name on the union of the folds' universes.
 
-Under equal expected log growth, ``z`` is asymptotically standard normal, and the two-sided `p` reads it against that law. The test is exact only for a comparator that did not read the rows it is scored on; against a Hindsight Comparator it is optimistic by construction, because the comparator was chosen on the very sequence the difference is tested over, and the `p` then overstates the evidence that the comparator is better. Two identical series have ``\\bar{\\delta} = 0`` and ``\\hat{\\omega}^2 = 0``, so their statistic and `p` are `NaN`. Negative regret is expected on many sequences and is not a defect.
+Under equal expected log growth, ``z`` is asymptotically standard normal, and the two-sided `p` reads it against that law. The test is exact only for a comparator that did not read the rows it is scored on. Against a Hindsight Comparator it is optimistic by construction: the comparator was chosen on the sequence that the difference is tested over, so `p` overstates the evidence that the comparator is better.
 
-The Result also carries the comparator's **path length** ``P_T = \\sum_{t \\geq 2} \\lVert u_t - u_{t-1} \\rVert_2`` over its consecutive targets, and the **running regret**, the cumulative sum of ``\\delta_t``. Dynamic regret is regret against a comparator that moves, and its bounds are stated in ``P_T``, so the two numbers are read together: a static comparator has ``P_T = 0`` and its regret is the static regret; a moving one buys its lower regret with a path the bound charges for. The three comparators the literature states dynamic regret against are the same estimator through three schemes, on the three-row example ``x_1 = (1.2, 0.98)``, ``x_2 = (0.9, 1.1)``, ``x_3 = (1.3, 0.7)`` of price relatives:
+Three degenerate series have a stated answer:
 
-  - **Static**: the best constant rebalanced portfolio over all three rows, `predict(optimise(est, rd), rd)`, is all-in on the first asset, wealth ``1.2 \\cdot 0.9 \\cdot 1.3 = 1.404``, ``P_T = 0``. `est` is [`BestConstantRebalancedPortfolio`](@ref) or [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref).
-  - **Be-the-leader**: `cross_val_predict(est, rd, HindsightSplit())`, the best constant rebalanced portfolio over the rows through ``t`` played on row ``t``: ``u_1 = (1, 0)``, ``u_2 \\approx (0.523, 0.477)``, ``u_3 = (1, 0)``, wealth ``1.2 \\cdot 0.995 \\cdot 1.3 \\approx 1.553``, ``P_T \\approx 1.35``. The first fold trains on one row, so [`MeanRisk`](@ref) needs a prior that fits one row, which [`HindsightSplit`](@ref) states.
-  - **Per-period minimiser**: the top-1 [`ScoreSelector`](@ref) under [`MeanReturn`](@ref)`(; flag = true)` composed with [`EqualWeighted`](@ref) through `HindsightSplit(; prefix = false)`, one-hot on each row's best asset, wealth ``1.2 \\cdot 1.1 \\cdot 1.3 = 1.716``, ``P_T = 2 \\sqrt{2}``.
+  - Two identical series have ``\\bar{\\delta} = 0`` and ``\\hat{\\omega}^2 = 0``, so ``z`` and `p` are `NaN`.
+  - A difference that is a non-zero constant has ``\\hat{\\omega}^2 = 0``, so ``z`` is infinite and `p` is zero. In floating point ``\\hat{\\omega}^2`` is round-off of about ``10^{-33}``, so ``z`` is a very large finite number.
+  - A return of ``-1`` is a total loss. Its log growth is ``-\\infty``, so ``R`` is infinite, and ``z`` and `p` are `NaN`.
 
-The path length reads the comparator's per-fold targets, embedded by asset name on the union of the folds' universes through [`stacked_fold_weights`](@ref), and it is `NaN` when the comparator is one prediction result, which holds one target and no path. The bound reads the other way too: the regret at a **given** budget ``L`` is the gap to the best sequence whose path length is at most ``L``, which neither be-the-leader nor the per-period minimiser is, and [`BudgetedHindsightPath`](@ref) fits that sequence, whose prediction result is one fold per row for this verb to read.
+Dynamic regret is regret against a comparator that moves. Its bounds are stated in ``P_T``, so ``R`` and ``P_T`` are read together: a static comparator has ``P_T = 0`` and its regret is the static regret, and a moving comparator buys its lower regret with a path that the bound charges for. ``P_T`` is `NaN` when the comparator is one prediction result, which holds one target and no path. The literature states dynamic regret against three comparators, and each is the same estimator through its own scheme. On the three-row example ``\\boldsymbol{x}_1 = (1.2, 0.98)``, ``\\boldsymbol{x}_2 = (0.9, 1.1)``, ``\\boldsymbol{x}_3 = (1.3, 0.7)`` of price relatives:
 
-No scorer and no summary column ship for regret. A hyperparameter search ranks on [`MeanReturn`](@ref)`(; flag = true)`, which is log wealth per period and orders candidates as regret against any fixed comparator would; the performance summary reads one series and holds no comparator.
+  - **Static**: the best constant rebalanced portfolio over all three rows, `predict(optimise(est, rd), rd)`, is all-in on the first asset. Its wealth is ``1.2 \\cdot 0.9 \\cdot 1.3 = 1.404``, and ``P_T = 0``. `est` is [`BestConstantRebalancedPortfolio`](@ref), or [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref).
+  - **Be-the-leader**: `cross_val_predict(est, rd, HindsightSplit())` plays on row ``t`` the best constant rebalanced portfolio over the rows through ``t``. The targets are ``\\boldsymbol{u}_1 = (1, 0)``, ``\\boldsymbol{u}_2 = (23/44, 21/44) \\approx (0.523, 0.477)`` and ``\\boldsymbol{u}_3 = (1, 0)``. The wealth is ``1.2 \\cdot 0.995 \\cdot 1.3 \\approx 1.553``, and ``P_T = 2 \\sqrt{2} \\cdot 21/44 \\approx 1.350``. The first fold trains on one row, so [`MeanRisk`](@ref) needs a prior that fits one row, which [`HindsightSplit`](@ref) states.
+  - **Per-period minimiser**: the top-1 [`ScoreSelector`](@ref) under [`MeanReturn`](@ref)`(; flag = true)`, composed with [`EqualWeighted`](@ref) through `HindsightSplit(; prefix = false)`, is one-hot on each row's best asset. Its wealth is ``1.2 \\cdot 1.1 \\cdot 1.3 = 1.716``, and ``P_T = 2 \\sqrt{2}``.
+
+The bound also reads the other way. The regret at a given budget ``L`` is the gap to the best sequence whose path length is at most ``L``. Neither be-the-leader nor the per-period minimiser is that sequence. [`BudgetedHindsightPath`](@ref) fits it, and its prediction result has one fold per row for this verb to read.
+
+# Algorithm
+
+ 1. Read the strategy's series and timestamps through [`regret_series`](@ref), giving `ra` and `tsa`, and the comparator's, giving `rb` and `tsb`.
+ 2. Check that the two series share their timestamps and their length, giving `T`.
+ 3. Check `lags`, and check that no return is below ``-1``.
+ 4. Take the log growth of each series, giving `la` and `lb`, and their difference `d`.
+ 5. Sum `d` cumulatively, giving `cumulative`. Its last entry is `regret`, and `regret / T` is `md`.
+ 6. Estimate the long-run variance of `d` through [`newey_west_variance`](@ref), giving `v`.
+ 7. Form the statistic `z` from `md` and `v`, and its two-sided p-value `p`.
+ 8. Read the comparator's path length through [`comparator_path_length`](@ref).
 
 # Arguments
 
@@ -307,6 +363,7 @@ No scorer and no summary column ship for regret. A hyperparameter search ranks o
 
   - `a` and `b` carry the same timestamps and the same number of rows. An `ArgumentError` is thrown otherwise: two runs over different rows compare nothing.
   - `0 <= lags < n_periods`. A `DomainError` is thrown otherwise.
+  - No return of either series is below ``-1``. A `DomainError` is thrown otherwise, because a negative wealth has no log. A `NaN` return passes, and its `NaN` reaches the regret.
 
 # Returns
 
@@ -335,6 +392,9 @@ function log_wealth_regret(a::PredRes_MultiPredRes, b::PredRes_MultiPredRes;
               ArgumentError("the two prediction results do not share their rows: regret is defined over one sequence, so both must be scored over the same rows, with the same timestamps. Run both through `cross_val_predict` with the same `rd` and `cv`, or fit the comparator on the rows the strategy was scored on and predict it over them."))
     T = length(ra)
     @argcheck(0 <= lags < T, DomainError(lags, "`lags` must lie in [0, n_periods)"))
+    @argcheck(!any(<(-1), ra) && !any(<(-1), rb),
+              DomainError(minimum(filter(<(-1), vcat(ra, rb))),
+                          "a return below -1 leaves a negative wealth, whose log is not defined, so the log-wealth regret cannot read it"))
     la = log1p.(ra)
     lb = log1p.(rb)
     d = lb .- la
@@ -353,13 +413,38 @@ end
 """
     path_norm_epigraph!(model::JuMP.Model, t, x, p::Number)
 
-Write the epigraph ``t \\geq \\lVert x \\rVert_p`` of one step of a comparator path into a bare model.
+Writes the epigraph ``t \\geq \\lVert \\boldsymbol{x} \\rVert_p`` of one step of a comparator path into a bare model.
 
-The cone is the norm's own: the second-order cone at `p = 2`, the norm-one cone at `p = 1`, the norm-infinity cone at `p = Inf`, and otherwise the power-cone form ``r_j^{1/p} t^{1 - 1/p} \\geq \\lvert x_j \\rvert``, ``\\sum_j r_j = t``, one scalar row per entry. It is the epigraph [`norm_ball_dual_norm_epigraph!`](@ref) writes, without the model registry a bare programme has no use for.
+The cone is the norm's own at `p = 2`, `p = 1` and `p = Inf`. Every other order takes the power-cone form, one row per entry. It is the epigraph that [`norm_ball_dual_norm_epigraph!`](@ref) writes, without the model registry, which a bare programme does not use.
+
+# JuMP formulation
+
+## Variables
+
+  - `t`: read. It is the caller's epigraph variable.
+  - `r`: created at an order other than `1`, `2` and `Inf`, an anonymous vector of one variable per entry of ``\\boldsymbol{x}``.
+
+## Constraints
+
+Every row is registered under no name.
+
+  - At ``p = 2``, the second-order cone row ``t \\geq \\lVert \\boldsymbol{x} \\rVert_2``.
+  - At ``p = 1``, the norm-one cone row ``t \\geq \\lVert \\boldsymbol{x} \\rVert_1``.
+  - At ``p = \\infty``, the norm-infinity cone row ``t \\geq \\lVert \\boldsymbol{x} \\rVert_\\infty``.
+  - At any other ``p``, one power cone row per entry, ``r_j^{1/p}\\, t^{1 - 1/p} \\geq \\lvert x_j \\rvert`` with ``r_j \\geq 0`` and ``t \\geq 0``, and the row ``\\sum_j r_j - t = 0``.
+
+Where:
+
+  - ``t``: Epigraph variable of the step.
+  - ``\\boldsymbol{x}``: Affine expression whose norm is bounded, with entries ``x_j``.
+  - $(math_dict[:p_norm_order])
+  - ``r_j``: Auxiliary variable of entry ``j``.
+
+The power-cone rows are exact. Each row gives ``r_j \\geq \\lvert x_j \\rvert^p / t^{p-1}``, and the sum of the rows gives ``t^p \\geq \\sum_j \\lvert x_j \\rvert^p``, which is ``t \\geq \\lVert \\boldsymbol{x} \\rVert_p``.
 
 # Arguments
 
-  - `model`: The bare model.
+  - $(arg_dict[:model])
   - `t`: The epigraph variable.
   - `x`: The affine expression whose norm is bounded, one entry per asset.
   - `p`: The norm order, `1 <= p`.
@@ -394,7 +479,18 @@ end
     row_bound_view(b::Number, m::AbstractVector{Bool})
     row_bound_view(b::VecNum, m::AbstractVector{Bool})
 
-One side of a resolved weight bound on the investable assets of a row: a scalar bound is every asset's and passes through, and a vector bound is viewed at the row's mask.
+One side of a resolved weight bound on the investable assets of a row.
+
+A scalar bound applies to every asset, so it passes through. A vector bound is viewed at the row's mask.
+
+# Arguments
+
+  - `b`: One side of the resolved bound, a number or one entry per asset.
+  - `m`: The row's Investable Mask.
+
+# Returns
+
+  - `b`: The scalar bound, or the view of the vector bound at `m`.
 
 # Related
 
@@ -409,11 +505,38 @@ end
 """
     path_row_constraints!(model::JuMP.Model, u, z, x, m::AbstractVector{Bool}, wb::WeightBounds)
 
-Write one row of the budgeted path programme on the row's investable assets: the budget `Σ u = 1`, the resolved bounds `lb ≤ u ≤ ub` where they are finite, and the exponential cone `z ≤ log⟨u, x⟩`, all over the assets `m` keeps; the allocation of every other asset is fixed at zero, because a row with no price relative for an asset cannot hold it.
+Writes one row of the budgeted path programme on the row's investable assets.
+
+The budget, the finite bounds and the log wealth of the row read the assets that `m` keeps. The allocation of every other asset is fixed at zero, because a row with no price relative for an asset cannot hold it.
+
+# JuMP formulation
+
+## Variables
+
+  - `u`: read. It is the row's allocations, one per asset. Every entry outside `m` is fixed at zero with `JuMP.fix`, which sets the variable's bounds and adds no row.
+  - `z`: read. It is the row's log-wealth variable.
+
+## Constraints
+
+Every row is registered under no name, and each reads the assets in ``m`` alone.
+
+  - ``\\sum_{i \\in m} u_i = 1``.
+  - ``u_i - l_i \\geq 0`` for each ``i \\in m``, when an entry of ``\\boldsymbol{l}`` is finite.
+  - ``u_i - h_i \\leq 0`` for each ``i \\in m``, when an entry of ``\\boldsymbol{h}`` is finite.
+  - The exponential cone row ``\\left(z, 1, \\sum_{i \\in m} x_i u_i\\right) \\in \\mathcal{K}_{\\exp}``, which holds when ``z \\leq \\log \\sum_{i \\in m} x_i u_i``.
+
+Where:
+
+  - ``u_i``: Allocation of asset ``i`` on the row.
+  - ``z``: Log-wealth variable of the row.
+  - ``x_i``: Price relative of asset ``i`` on the row, one plus its return.
+  - ``m``: Set of the assets in the row's Investable Mask.
+  - ``l_i``, ``h_i``: Resolved lower and upper weight bounds of asset ``i``, the entries of ``\\boldsymbol{l}`` and ``\\boldsymbol{h}``.
+  - ``\\mathcal{K}_{\\exp} = \\mathrm{cl}\\,\\{(a, b, c) : b\\, e^{a / b} \\leq c,\\, b > 0\\}``: Exponential cone.
 
 # Arguments
 
-  - `model`: The bare model.
+  - $(arg_dict[:model])
   - `u`: The row's allocation variables, one per asset.
   - `z`: The row's log-wealth variable.
   - `x`: The row's price relatives, finite where `m` holds.
@@ -451,11 +574,39 @@ end
 """
     path_budget_constraint!(model::JuMP.Model, u, L::Number, p::Number)
 
-Write the path-length budget of the budgeted path programme: one epigraph variable per step through [`path_norm_epigraph!`](@ref), and their sum at most `L`. A path of one row has no step and writes nothing.
+Writes the path-length budget of the budgeted path programme.
+
+Each step of the path takes one epigraph variable through [`path_norm_epigraph!`](@ref), and the sum of these variables is at most `L`. A path of one row has no step, so the function writes nothing.
+
+# JuMP formulation
+
+## Variables
+
+  - `u`: read. It is the `T × N` allocation variables, one row per period.
+  - `s`: created, an anonymous vector of ``T - 1`` step lengths.
+  - `d`: created, an anonymous ``(T - 1) \\times N`` matrix of steps.
+
+## Constraints
+
+Every row is registered under no name.
+
+  - ``\\boldsymbol{d}_{t-1} = \\boldsymbol{u}_t - \\boldsymbol{u}_{t-1}``, for ``t = 2, \\ldots, T``, one row per entry.
+  - The rows of [`path_norm_epigraph!`](@ref) on ``s_{t-1} \\geq \\lVert \\boldsymbol{d}_{t-1} \\rVert_p``, for ``t = 2, \\ldots, T``.
+  - ``\\sum_{t=1}^{T-1} s_t \\leq L``.
+
+Where:
+
+  - ``\\boldsymbol{u}_t``: Allocation of period ``t``, one entry per asset.
+  - ``\\boldsymbol{d}_t``: Step from period ``t`` to period ``t + 1``.
+  - ``s_t``: Length of step ``t`` in the norm of order ``p``.
+  - ``L``: Path-length budget.
+  - $(math_dict[:p_norm_order])
+  - $(math_dict[:T])
+  - $(math_dict[:N])
 
 # Arguments
 
-  - `model`: The bare model.
+  - $(arg_dict[:model])
   - `u`: The `T × N` allocation variables, one row per period.
   - `L`: The path-length budget.
   - `p`: The norm order.
@@ -486,33 +637,44 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The best comparator sequence under a path-length budget: the estimator whose fit on a panel is the path of per-row allocations with the largest log wealth among those whose summed step length is at most `L`.
+Fits the path of per-row allocations with the largest log wealth whose summed step length is at most `L`.
 
-Dynamic regret at a budget is the gap to this path, the comparator of Zinkevich's (2003) Definition 7, and neither per-row comparator a [`HindsightSplit`](@ref) builds is it: be-the-leader is one point at its own path length, and the per-period minimiser is the unbudgeted limit. The estimator is the Hindsight Comparator rule of [`log_wealth_regret`](@ref) as every other comparator is: `predict(optimise(est, rd_test), rd_test)` is its prediction result over the rows it was fit on, one fold per row, which the regret verb reads unchanged and whose Euclidean path length it reports beside the regret. [`optimise`](@ref) answers a [`BudgetedHindsightPathResult`](@ref), which holds the path itself, and [`predict`](@ref) answers the folds, refusing any rows but the fit's.
+Dynamic regret at a budget is the gap to this path, the comparator of Zinkevich's (2003) Definition 7. Neither per-row comparator that a [`HindsightSplit`](@ref) builds is this path: be-the-leader is one point at its own path length, and the per-period minimiser is the limit with no budget. The fit is one concave programme over the whole panel. The Lagrangian form, which puts a penalty on the path length in place of the budget, is the same programme with one term moved, and the library does not build it.
+
+The estimator follows the Hindsight Comparator rule of [`log_wealth_regret`](@ref), as every other comparator does. [`optimise`](@ref) returns a [`BudgetedHindsightPathResult`](@ref), which holds the path. [`predict`](@ref) over the same rows returns one fold per row, and it refuses any other rows. So `predict(optimise(est, rd_test), rd_test)` is a prediction result that the regret verb reads unchanged, and the verb reports its Euclidean path length beside the regret.
+
+Each row's universe is the Coverage Universe of its one-row window, as [`coverage_mask`](@ref) derives it: an asset is in the row when its return is finite and the Asset Panel's active mask is `true` there. A static panel, or no panel, reads finiteness alone. A [`HindsightSplit`](@ref)`(; prefix = false)` fold fits on the same universe, so the two per-row comparators agree on what a row can hold. The result carries the masks, so `predict` views each row at its own mask and names no Held Gap. A row with no asset in its universe is refused, because its budget of one cannot be met.
+
+The budget is stated in the norm of order `p`, but [`LogWealthRegretResult`](@ref) reports the path length in the Euclidean norm. The two numbers agree at `p = 2` alone. A tight budget on a long panel puts most step cones at their apex, where an interior-point solver can stall short of its tolerance and report insufficient progress. A first-order solver solves such a programme, so on a panel of many rows the robust `slv` is a solver vector with a first-order solver as the fallback. The fit reads the rows it is scored on, so the test of [`log_wealth_regret`](@ref) against it is optimistic by construction.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{u}_1, \\ldots, \\boldsymbol{u}_T}{\\max} &\\quad \\sum_{t=1}^{T} \\log \\left\\langle \\boldsymbol{u}_t, \\boldsymbol{x}_t \\right\\rangle \\\\
-\\textrm{s.t.} &\\quad \\boldsymbol{1}^\\intercal \\boldsymbol{u}_t = 1\\,, \\quad \\boldsymbol{l} \\leq \\boldsymbol{u}_t \\leq \\boldsymbol{h}\\,, \\\\
+\\underset{\\boldsymbol{u}_1, \\ldots, \\boldsymbol{u}_T}{\\max} &\\quad \\sum_{t=1}^{T} \\log \\sum_{i \\in \\mathcal{M}_t} u_{t,i}\\, x_{t,i} \\\\
+\\textrm{s.t.} &\\quad \\sum_{i \\in \\mathcal{M}_t} u_{t,i} = 1\\,, \\quad l_i \\leq u_{t,i} \\leq h_i \\;\\; \\forall i \\in \\mathcal{M}_t\\,, \\quad u_{t,i} = 0 \\;\\; \\forall i \\notin \\mathcal{M}_t\\,, \\\\
 &\\quad \\sum_{t=2}^{T} \\lVert \\boldsymbol{u}_t - \\boldsymbol{u}_{t-1} \\rVert_p \\leq L\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{u}_t``: The comparator's allocation on row ``t``.
-  - ``\\boldsymbol{x}_t``: The price relatives of row ``t``, one plus the returns.
-  - ``\\boldsymbol{l}``, ``\\boldsymbol{h}``: The resolved weight bounds, the simplex by default.
-  - ``L``: The path-length budget.
-  - ``p``: The norm order of the budget.
+  - ``\\boldsymbol{u}_t``: Comparator's allocation on row ``t``, with entries ``u_{t,i}``.
+  - $(math_dict[:x_t_rel])
+  - ``x_{t,i}``: Entry ``i`` of ``\\boldsymbol{x}_t``, one plus the return of asset ``i`` on row ``t``.
+  - ``\\mathcal{M}_t``: Coverage Universe of row ``t``, the assets that the row can hold.
+  - ``l_i``, ``h_i``: Resolved lower and upper weight bounds of asset ``i``, zero and one by default.
+  - ``L``: Path-length budget.
+  - $(math_dict[:p_norm_order])
+  - $(math_dict[:T])
 
-The fit is one concave programme over the whole panel, `T × N` variables: each row is one exponential cone on the resolved bounds through [`path_row_constraints!`](@ref), and each step of the path is one norm cone of order `p` through [`path_budget_constraint!`](@ref). At `L = 0` the path is constant and the answer is the best constant rebalanced portfolio in hindsight, [`BestConstantRebalancedPortfolio`](@ref) under the same bounds; at any `L` that the per-period minimiser's own path length does not exceed, the budget is slack and the answer is that minimiser, one-hot on each row's best asset under the simplex bounds. Between the two, the path spends the budget where a switch buys the most log wealth, and the regret against it is the regret at that budget. The Lagrangian form, a penalty on the path length in place of the budget, is the same programme with one term moved and is not built.
+Three consequences follow from the programme:
 
-Every row of the path is a one-row fit, and its Investable Mask is the Coverage Universe of that window, as [`coverage_mask`](@ref) derives it: an asset is in the row when its return is finite and the Asset Panel's active mask is `true` there, and a static panel or none reads finiteness alone. This is the universe a [`HindsightSplit`](@ref)`(; prefix = false)` fold fits on, so the two per-row comparators agree on what a row can hold. An asset outside a row's universe has its allocation fixed at zero there, the row's budget, bounds and log read the assets in it alone, and the result carries the masks, so `predict` views each row at its own and no Held Gap is named. An asset that delists inside the panel is therefore sold on its last row whatever the budget, and that forced step is charged to the path length as any other step is. A row with no asset in its universe is refused, because its budget of one cannot be met.
+  - At ``L = 0`` the path is constant. It holds only the assets that every row covers, and it is the best constant rebalanced portfolio in hindsight over them, as [`BestConstantRebalancedPortfolio`](@ref) fits it under the same bounds. When no asset is in every row's universe, the programme is infeasible.
+  - When ``L`` is at least the path length of the per-period minimiser, the budget is slack. Under the default bounds the answer is then that minimiser, one-hot on each row's best asset, when each row has one best asset.
+  - An asset that delists inside the panel is outside every later row's universe. The path therefore sells it on its last row at any budget, and the forced step counts towards the path length like any other step.
 
-The budget is stated in the norm of order `p`, and [`LogWealthRegretResult`](@ref) reports the path length in the Euclidean norm whatever `p` is, so the two numbers agree at `p = 2` alone. A tight budget on a long panel puts most step cones at their apex, where an interior-point solver can stall short of its tolerance and report insufficient progress; a first-order solver reaches such a programme, so a solver vector with one as the fallback is the robust `slv` on a panel of many rows. A comparator fit on the rows it is scored on is a Hindsight Comparator, and the test of [`log_wealth_regret`](@ref) against it is optimistic by construction.
+Between the two ends the path spends the budget where a switch buys the most log wealth, and the regret against it is the regret at that budget.
 
 # Fields
 
@@ -634,9 +796,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The fit of a [`BudgetedHindsightPath`](@ref): the path itself, one allocation per row of the panel it was solved over, with the rows' Investable Masks, the resolved bounds, the rows' names and clock, and the return code.
+Holds a budgeted hindsight path, one allocation per row of the panel it was solved over.
 
-The path is bound to its rows, so [`predict`](@ref) answers one fold per row over those rows alone, and refuses a returns result whose names, clock or row count differ. A fit no solver solved carries `NaN` on every investable entry and an [`OptimisationFailure`](@ref) naming the trials.
+[`BudgetedHindsightPath`](@ref) fits it. It also carries the rows' Investable Masks, the resolved bounds, the rows' names and clock, and the return code. The path is bound to its rows, so [`predict`](@ref) answers one fold per row over those rows alone, and refuses a returns result whose names, clock or row count differ. A fit that no solver solved carries `NaN` on every investable entry, and an [`OptimisationFailure`](@ref) that names the trials.
 
 # Fields
 
@@ -654,7 +816,7 @@ $(DocStringExtensions.FIELDS)
         fb::Option{<:FbChain} = nothing
     ) -> BudgetedHindsightPathResult
 
-Keywords correspond to the struct's fields. The type is a Result, so [`optimise`](@ref) builds it and a caller reads it; it validates nothing of its own.
+Keywords correspond to the struct's fields. The type is a Result: [`optimise`](@ref) builds it and a caller reads it. It validates nothing of its own.
 
 # Related
 
@@ -713,7 +875,16 @@ end
 """
     factory(res::BudgetedHindsightPathResult, fb::Option{<:FbChain})
 
-Rebuild a budgeted path result with the fallback chain `fb` that [`optimise`](@ref) walked, every other field unchanged.
+Rebuilds a budgeted path result with the fallback chain `fb` that [`optimise`](@ref) walked, and keeps every other field.
+
+# Arguments
+
+  - `res`: The budgeted path result.
+  - `fb`: The fallback chain, or `nothing`.
+
+# Returns
+
+  - `res::BudgetedHindsightPathResult`: A new result with `fb` in place of the old chain.
 
 # Related
 
@@ -727,7 +898,20 @@ end
 """
     row_coverage_mask(rd::ReturnsResult, t::Integer) -> Option{BitVector}
 
-The Coverage Universe of row `t` of `rd` alone, through [`coverage_mask`](@ref) on the one-row view, with the empty-universe refusal restated to name the row.
+The Coverage Universe of row `t` of `rd` alone, through [`coverage_mask`](@ref) on the one-row view.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - `t`: The row.
+
+# Validation
+
+  - The row has at least one asset in its Coverage Universe. An `IsEmptyError` that names the row is thrown otherwise, through [`row_universe_error`](@ref). Any other error of [`coverage_mask`](@ref) passes through as it is.
+
+# Returns
+
+  - `msk::Option{BitVector}`: The row's mask, one entry per asset, or `nothing` when the row covers every asset.
 
 # Related
 
@@ -746,7 +930,9 @@ end
     row_universe_error(err::IsEmptyError, t::Integer) -> IsEmptyError
     row_universe_error(err::Exception, t::Integer) -> Exception
 
-The error [`row_coverage_mask`](@ref) throws for row `t`: the empty Coverage Universe of [`coverage_mask`](@ref) restated to name the row, and any other error as it is.
+The error that [`row_coverage_mask`](@ref) throws for row `t`.
+
+The `IsEmptyError` of an empty Coverage Universe is restated to name the row. Any other error is returned as it is.
 
 # Related
 
@@ -759,7 +945,15 @@ row_universe_error(err::Exception, ::Integer) = err
 """
     path_row_masks(rd::ReturnsResult) -> Option{BitMatrix}
 
-The Investable Mask of every row of a budgeted path: row `t` is the Coverage Universe of the one-row window `t` through [`coverage_mask`](@ref), `true` at every asset whose return is finite and whose Asset Panel active mask is `true` on that row, so a delisted or unlisted asset is out of the row as it is out of a `HindsightSplit(; prefix = false)` fold's fit. `nothing` when every row covers every asset.
+The Investable Mask of every row of a budgeted path.
+
+Row `t` is the Coverage Universe of the one-row window `t`: `true` at every asset whose return is finite and whose Asset Panel active mask is `true` on that row. A delisted or unlisted asset is therefore out of the row, as it is out of the fit of a `HindsightSplit(; prefix = false)` fold.
+
+# Algorithm
+
+ 1. Start from `msk`, a `rows × assets` matrix of `true`.
+ 2. For each row `t`, derive the row's Coverage Universe through [`row_coverage_mask`](@ref), giving `cm`, and write it into row `t` of `msk` when it is not `nothing`.
+ 3. Return `nothing` when every entry of `msk` is `true`, and `msk` otherwise.
 
 # Arguments
 
@@ -794,7 +988,44 @@ end
 """
     _optimise(est::BudgetedHindsightPath, rd::ReturnsResult; dims::Int = 1, kwargs...) -> BudgetedHindsightPathResult
 
-Solve the budgeted path programme of [`BudgetedHindsightPath`](@ref) over the rows of `rd`. [`optimise`](@ref) is the door, and it walks `est.fb` on a failure.
+Solves the budgeted path programme of [`BudgetedHindsightPath`](@ref) over the rows of `rd`.
+
+[`optimise`](@ref) is the door, and it walks `est.fb` on a failure. The value of a variable fixed at zero is the solver's zero, so the fit writes an exact zero at every entry outside a row's mask.
+
+# Algorithm
+
+ 1. Check that `rd.X` is not `nothing` and that `dims` is `1`.
+ 2. Add one to the returns, giving the price relatives `X`, of size `T × N`.
+ 3. Derive the rows' Investable Masks through [`path_row_masks`](@ref), giving `imsk`, and `msk`, which is all `true` when `imsk` is `nothing`.
+ 4. Resolve the weight bounds through [`weight_bounds_constraints`](@ref), giving `wb`.
+ 5. Make a bare model with the allocation variables `u` and the log-wealth variables `z`.
+ 6. Write each row through [`path_row_constraints!`](@ref), and the budget through [`path_budget_constraint!`](@ref).
+ 7. Set the objective, and solve the model through [`optimise_JuMP_model!`](@ref), giving `res`.
+ 8. Read the path `W` from `u` and `OptimisationSuccess` on a success. On a failure, fill `W` with `NaN` and make an `OptimisationFailure` that names the trials.
+ 9. Set every entry of `W` outside `msk` to zero.
+
+# JuMP formulation
+
+## Variables
+
+  - `u`: created, an anonymous `T × N` matrix of allocations, one row per period.
+  - `z`: created, an anonymous vector of ``T`` log-wealth variables, one per period.
+
+## Constraints
+
+The rows of [`path_row_constraints!`](@ref), one call per period, which give ``z_t \\leq \\log \\sum_{i \\in \\mathcal{M}_t} u_{t,i}\\, x_{t,i}``, and the rows of [`path_budget_constraint!`](@ref). The function registers no row itself.
+
+## Objective
+
+  - `Max`: ``\\sum_{t=1}^{T} z_t``, the log wealth of the path.
+
+Where:
+
+  - ``z_t``: Log-wealth variable of period ``t``.
+  - ``u_{t,i}``: Allocation of asset ``i`` in period ``t``.
+  - ``x_{t,i}``: Price relative of asset ``i`` in period ``t``, one plus its return.
+  - ``\\mathcal{M}_t``: Coverage Universe of period ``t``.
+  - $(math_dict[:T])
 
 # Arguments
 
@@ -908,7 +1139,9 @@ end
 """
     path_row_fold(res::BudgetedHindsightPathResult, rd::ReturnsResult, t::Integer) -> PredictionResult
 
-One fold of a budgeted path's prediction result: row `t`'s allocation as a [`NaiveOptimisationResult`](@ref) on the resolved bounds, predicted over row `t` of `rd` alone. A row with a gap carries its Investable Mask, so `predict` views the row and the weights at it and never reads the gap; a row with none carries `nothing`, as a full-universe fit does.
+One fold of a budgeted path's prediction result: row `t`'s allocation as a [`NaiveOptimisationResult`](@ref) on the resolved bounds, predicted over row `t` of `rd` alone.
+
+A row with a gap carries its Investable Mask, so `predict` views the row and the weights at the mask and never reads the gap. A row with no gap carries `nothing`, as a fit on the full universe does.
 
 # Related
 

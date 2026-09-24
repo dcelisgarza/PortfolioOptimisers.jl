@@ -261,6 +261,18 @@ be-the-leader's own path length, which is the gap the issue measured.
                   for p in stuck.pred)
         @test stuck.pred[1].res.w[2] == 0.0
         @test all(isnan, stuck.mrd.X)
+        # When the rows share assets, a zero budget holds the shared assets alone, and it is
+        # the best constant rebalanced portfolio over them: B has no return on row 1, so both
+        # fits drop it and go all-in on A.
+        Xg = [1.2 NaN 1.01; 0.9 1.1 1.0; 1.3 0.7 1.02] .- 1
+        rdg = ReturnsResult(; nx = ["A", "B", "C"], X = Xg, ts = ts3)
+        zero_res = optimise(BudgetedHindsightPath(; L = 0.0, slv = slv), rdg)
+        @test isa(zero_res.retcode, OptimisationSuccess)
+        # B's gap on row 1 is an exact zero; the constant path holds B at the solver's zero.
+        @test zero_res.w[1, 2] == 0.0
+        @test all(isapprox.(zero_res.w[:, 2], 0; atol = 1e-6))
+        bcrp_g = optimise(BestConstantRebalancedPortfolio(), rdg)
+        @test all(isapprox(zero_res.w[t, :], bcrp_g.w; atol = 1e-5) for t in 1:3)
         # A vector lower bound is read on the investable assets alone, so a floor on the
         # missing asset does not make the row infeasible.
         floored = path_of(rdn, 10.0; wb = WeightBounds(; lb = [0.1, 0.1], ub = 1.0),
