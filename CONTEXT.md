@@ -719,6 +719,7 @@ The fixed sequence in which an Optimisation Estimator's constraint and risk buil
 **Objective Penalty**
 The accumulator through which every *soft* contribution reaches the objective: regularisation, soft Turnover and Tracking, and Custom Objective Terms. A contribution always worsens the objective, so a reward is a negative contribution.
 A programme Allocation Set's penalties and its semidefinite phylogeny's `p · tr(W)` reach a leader's objective through the same accumulator, from inside the Allocation Set Constraint. ADR 0164.
+Under MaximumRatio every regularisation penalty has degree one in the homogenisation variable `k`: a squared norm is divided by `k`, so a penalty keeps its weight against a degree-one risk when the normalisation `ohf` changes. Issue #1318.
 
 **Custom Term**
 The user-facing extension point for a preference the library does not name: a Custom Objective Term prices one, a Custom Constraint mandates one.

@@ -37,9 +37,12 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
         @test haskey(m, key)
     end
     @test length(m[:clp_1]) == length(w)
-    # QuadRiskExpr penalises the weights directly and creates no epigraph variable.
+    # QuadRiskExpr penalises the weights directly and creates no epigraph variable. With
+    # k = 1 no squared formulation divides by k through a cone.
     @test !haskey(m, :t_l2_3)
     @test !haskey(m, :t_lp_3)
+    @test !haskey(m, :t_l2_sq_2)
+    @test !haskey(m, :t_l2_sq_3)
     # Each expression is the penalty of its term, and `op` is their sum.
     pens = (l1 = 5e-4 * n1, linf = 2e-3 * ninf, l2_1 = 1e-3 * n2, l2_2 = 2e-3 * n2^2,
             l2_3 = 3e-3 * n2^2, l2_4 = 4e-3 * n2^2, lp_1 = 1e-3 * norm(w, 1.5),
@@ -87,6 +90,45 @@ end
                                   opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                       l2 = L2Regularisation(; val = 1e-4)))).w
     @test isapprox(w_of(ohf), w_of(10 * ohf); atol = 1e-4)
+end
+
+@testset "Under MaximumRatio a squared penalty is divided by k" begin
+    # Issue #1318. The model penalises norm(k * w)^2 / k = k * norm(w)^2, which has degree one
+    # in k as the standard deviation has, so the normalisation of the ratio does not move the
+    # weights. Before the division the weights moved by 0.25 between ohf and 10 * ohf.
+    ohf = mean(abs.(pr.mu))
+    for (sr_risk, kw) in ((false, (;)), (true, (; ret = LogarithmicReturn())))
+        w_of(alg, ohf) = optimise(MeanRisk(; r = StandardDeviation(),
+                                           obj = MaximumRatio(; ohf = ohf),
+                                           opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                               l2 = L2Regularisation(;
+                                                                                     val = 1e-2,
+                                                                                     alg = alg),
+                                                               kw...)); save = true)
+        w0 = optimise(MeanRisk(; r = StandardDeviation(), obj = MaximumRatio(; ohf = ohf),
+                               opt = JuMPOptimiser(; pe = pr, slv = slv, kw...))).w
+        ws = map((SquaredSOCRiskExpr(), QuadRiskExpr(), RSOCRiskExpr())) do alg
+            res = w_of(alg, ohf)
+            @test isa(res.retcode, OptimisationSuccess)
+            m = res.model
+            @test haskey(m, :sr_risk) == sr_risk
+            k = value(m[:k])
+            n2 = norm(res.w, 2)
+            @test isapprox(value(m[:l2_1]), 1e-2 * k * n2^2; rtol = 1e-5)
+            if isa(alg, RSOCRiskExpr)
+                @test isapprox(value(m[:t_l2_1]), k * n2^2; rtol = 1e-5)
+            else
+                @test isapprox(value(m[:t_l2_sq_1]), k * n2^2; rtol = 1e-5)
+                @test haskey(m, :cl2_sq_rsoc_1)
+            end
+            @test isapprox(res.w, w_of(alg, 10 * ohf).w; atol = 1e-4)
+            res.w
+        end
+        # The penalty moves the weights, and the three squared formulations agree.
+        @test norm(ws[1] - w0, Inf) > 0.1
+        @test isapprox(ws[1], ws[2]; atol = 1e-4)
+        @test isapprox(ws[1], ws[3]; atol = 1e-4)
+    end
 end
 
 @testset "The builders refuse a coefficient that is not positive and finite" begin

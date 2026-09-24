@@ -11,6 +11,7 @@ L2Reg_VecL2Reg
 VecLpReg
 LpReg_VecLpReg
 set_l1_regularisation!
+squared_norm_over_k!
 _set_l2_regularisation!
 set_l2_regularisation!
 set_lp_regularisation!

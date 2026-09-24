@@ -492,6 +492,8 @@ end
         set_silent(model)
         @variable(model, w[1:length(wv)])
         @constraint(model, w .== wv)
+        # The builder divides the square by the homogenisation variable, #1318.
+        @expression(model, k, 1)
         PortfolioOptimisers.set_model_scales!(model, sc, 1.0)
         PortfolioOptimisers.set_l2_regularisation!(model,
                                                    L2Regularisation(; val = 1.0,

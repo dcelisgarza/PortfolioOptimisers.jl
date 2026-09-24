@@ -358,7 +358,7 @@ $(DocStringExtensions.TYPEDEF)
 
 L2-norm penalty term that a [`JuMPOptimiser`](@ref) adds to the objective.
 
-The penalty shrinks the weights towards zero, and under a budget it spreads them over the assets. The `alg` field selects the formulation, which sets the cones the solver sees and the power of the norm, so one `val` gives a different penalty under each formulation. Under [`MaximumRatio`](@ref) the model's weights are the homogenised vector ``k \\boldsymbol{w}``. The penalty of power one then scales with ``k`` as the ratio does, so the weights do not depend on the normalisation `ohf` of the ratio. A squared penalty is ``k^2 \\lambda_2 \\lVert \\boldsymbol{w} \\rVert_2^2``, and ``k`` scales with `ohf`, so under a squared formulation the strength of the penalty changes with `ohf`.
+The penalty shrinks the weights towards zero, and under a budget it spreads them over the assets. The `alg` field selects the formulation, which sets the cones the solver sees and the power of the norm, so one `val` gives a different penalty under each formulation. Under [`MaximumRatio`](@ref) the model's weights are the homogenised vector ``k \\boldsymbol{w}``, and ``k`` scales with the normalisation `ohf` of the ratio. Each formulation gives a penalty of degree one in ``k``: the squared formulations divide ``\\lVert k \\boldsymbol{w} \\rVert_2^2`` by ``k``, through [`squared_norm_over_k!`](@ref). When the ratio bounds the risk and maximises the return, the weights do not depend on `ohf`. When the ratio fixes the return and minimises the risk, they do not depend on `ohf` if the risk term also has degree one, as a standard deviation or a conditional value at risk has. A [`Variance`](@ref) in the SOC or quadratic formulation has degree two, so beside it the strength of every penalty changes with `ohf`.
 
 # Mathematical definition
 
@@ -507,18 +507,84 @@ Matches either a single [`L2Regularisation`](@ref) or a vector of them ([`VecL2R
 """
 const L2Reg_VecL2Reg = Union{<:L2Regularisation, <:VecL2Reg}
 """
+    squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k::Number, sc::Number)
+    squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k, sc::Number)
+
+Return a term equal to the squared 2-norm of `x` divided by the homogenisation variable `k`, for the squared L2 penalty at position `i`.
+
+Under [`MaximumRatio`](@ref) the model's weights are the homogenised vector ``\\boldsymbol{y} = k \\boldsymbol{w}``, so for ``\\boldsymbol{x} = \\boldsymbol{y}`` the term is ``k \\lVert \\boldsymbol{w} \\rVert_2^2``. It has degree one in ``k``, as the other penalties have, so it does not change the balance of the ratio when the normalisation `ohf` changes. When `k` is a number, the term is the quadratic ``\\boldsymbol{x}^\\intercal \\boldsymbol{x} / k``, and every objective except [`MaximumRatio`](@ref) sets ``k = 1``. When `k` is a variable, the quotient is not quadratic, and the function states it as a rotated second-order cone.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\text{term} &= \\frac{\\lVert \\boldsymbol{x} \\rVert_2^2}{k}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: The vector argument `x`. A scalar `x` is the vector of one entry.
+  - $(math_dict[:k_budget])
+
+# JuMP formulation
+
+The number method registers no entry. The variable method registers these entries, and each name ends in `i`.
+
+## Variables
+
+  - `t_l2_sq_i`: the epigraph variable ``s`` of the term.
+
+## Constraints
+
+  - `cl2_sq_rsoc_i`: ``\\left(s_c s,\\, s_c k / 2,\\, s_c \\boldsymbol{x}\\right)`` lies in the rotated second-order cone, which is ``s k \\geq \\lVert \\boldsymbol{x} \\rVert_2^2``. The penalty makes the objective worse as ``s`` rises, so at the optimum ``s`` equals its bound ``\\lVert \\boldsymbol{x} \\rVert_2^2 / k``.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `i::Integer`: Position of the term, which ends the name of each entry it registers.
+  - `x`: The vector, or the scalar, whose squared norm the term measures.
+  - `k`: The homogenisation variable from [`effective_k`](@ref), or the number that stands for it.
+  - `sc::Number`: Constraint scale. The number method registers no row and ignores it.
+
+# Returns
+
+  - The quadratic expression ``\\boldsymbol{x}^\\intercal \\boldsymbol{x} / k`` when `k` is a number, else the epigraph variable `t_l2_sq_i`.
+
+# Related
+
+  - [`_set_l2_regularisation!`](@ref)
+  - [`effective_k`](@ref)
+  - [`MaximumRatio`](@ref)
+"""
+function squared_norm_over_k!(::JuMP.Model, ::Integer, x, k::Number, ::Number)
+    return LinearAlgebra.dot(x, x) / k
+end
+function squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k, sc::Number)
+    t_sq = state_set!(model, Symbol(""), :t_l2_sq_, i, JuMP.@variable(model))
+    state_set!(model, Symbol(""), :cl2_sq_rsoc_, i,
+               JuMP.@constraint(model,
+                                [sc * t_sq; sc * k / 2; sc * x] in
+                                JuMP.RotatedSecondOrderCone()))
+    return t_sq
+end
+"""
     _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
                             l2::L2Regularisation{<:Any, <:SOCRiskExpr}, sc::Number)
     _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
                             l2::L2Regularisation{<:Any, <:SquaredSOCRiskExpr}, sc::Number)
     _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                            l2::L2Regularisation{<:Any, <:QuadRiskExpr}, args...)
+                            l2::L2Regularisation{<:Any, <:QuadRiskExpr}, sc::Number)
     _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
                             l2::L2Regularisation{<:Any, <:RSOCRiskExpr}, sc::Number)
 
 Add the penalty of the L2 term at position `i` to the objective penalty, in the formulation that `l2.alg` selects.
 
-[`SOCRiskExpr`](@ref) penalises ``\\lVert \\boldsymbol{w} \\rVert_2``, and [`SquaredSOCRiskExpr`](@ref), [`QuadRiskExpr`](@ref) and [`RSOCRiskExpr`](@ref) penalise ``\\lVert \\boldsymbol{w} \\rVert_2^2``, so one `val` gives a different penalty under each. [`QuadRiskExpr`](@ref) and [`SquaredSOCRiskExpr`](@ref) give a quadratic penalty, and [`add_to_objective_penalty!`](@ref) promotes an affine objective penalty to a `JuMP.QuadExpr` to hold it. Under [`MaximumRatio`](@ref) the model's `w` is the homogenised vector ``k \\boldsymbol{w}``, so the penalty acts on ``k \\boldsymbol{w}``.
+[`SOCRiskExpr`](@ref) penalises ``\\lVert \\boldsymbol{w} \\rVert_2``, and [`SquaredSOCRiskExpr`](@ref), [`QuadRiskExpr`](@ref) and [`RSOCRiskExpr`](@ref) penalise ``\\lVert \\boldsymbol{w} \\rVert_2^2``, so one `val` gives a different penalty under each. Under [`MaximumRatio`](@ref) the model's `w` is the homogenised vector ``k \\boldsymbol{w}``, so the penalty acts on ``k \\boldsymbol{w}``. The three squared formulations divide the square by ``k``, so every penalty has degree one in ``k``. Under every other objective ``k = 1``: [`QuadRiskExpr`](@ref) and [`SquaredSOCRiskExpr`](@ref) then give a quadratic penalty, and [`add_to_objective_penalty!`](@ref) promotes an affine objective penalty to a `JuMP.QuadExpr` to hold it. Under [`MaximumRatio`](@ref) the quotient is not quadratic, so [`squared_norm_over_k!`](@ref) states it as a rotated second-order cone.
 
 # Mathematical definition
 
@@ -542,25 +608,28 @@ Each name ends in `i`, so the entries of two terms do not collide.
 
   - `w`: read from the model, passed in as the argument `w`.
   - `t_l2_i`: created by every formulation except [`QuadRiskExpr`](@ref), the epigraph variable of the norm or of its square.
+  - `t_l2_sq_i`: created by [`squared_norm_over_k!`](@ref) under [`SquaredSOCRiskExpr`](@ref) and [`QuadRiskExpr`](@ref) when ``k`` is a variable.
 
 ## Expressions
 
   - `l2_i`: the penalty. [`add_to_objective_penalty!`](@ref) adds it to the objective penalty `op`.
       + [`SOCRiskExpr`](@ref): ``\\lambda_2 t_2``.
-      + [`SquaredSOCRiskExpr`](@ref): ``\\lambda_2 t_2^2``.
-      + [`QuadRiskExpr`](@ref): ``\\lambda_2 \\boldsymbol{w}^\\intercal \\boldsymbol{w}``.
+      + [`SquaredSOCRiskExpr`](@ref): ``\\lambda_2 t_2^2 / k``.
+      + [`QuadRiskExpr`](@ref): ``\\lambda_2 \\boldsymbol{w}^\\intercal \\boldsymbol{w} / k``.
       + [`RSOCRiskExpr`](@ref): ``\\lambda_2 t_2``.
 
 ## Constraints
 
   - `cl2_soc_i`, under [`SOCRiskExpr`](@ref) and [`SquaredSOCRiskExpr`](@ref): ``\\left(s_c t_2,\\, s_c \\boldsymbol{w}\\right)`` lies in the second-order cone, which is ``t_2 \\geq \\lVert \\boldsymbol{w} \\rVert_2``.
-  - `cl2_rsoc_i`, under [`RSOCRiskExpr`](@ref): ``\\left(s_c t_2,\\, s_c / 2,\\, s_c \\boldsymbol{w}\\right)`` lies in the rotated second-order cone, which is ``t_2 \\geq \\lVert \\boldsymbol{w} \\rVert_2^2``.
+  - `cl2_rsoc_i`, under [`RSOCRiskExpr`](@ref): ``\\left(s_c t_2,\\, s_c k / 2,\\, s_c \\boldsymbol{w}\\right)`` lies in the rotated second-order cone, which is ``t_2 \\geq \\lVert \\boldsymbol{w} \\rVert_2^2 / k``.
+  - `cl2_sq_rsoc_i`, under [`SquaredSOCRiskExpr`](@ref) and [`QuadRiskExpr`](@ref) when ``k`` is a variable: the row of [`squared_norm_over_k!`](@ref).
 
-[`QuadRiskExpr`](@ref) registers no row. The objective penalty always makes the objective worse, ``\\lambda_2 > 0``, and ``t_2^2`` rises with ``t_2 \\geq 0``, so at the optimum ``t_2`` equals its bound.
+[`QuadRiskExpr`](@ref) registers no row when ``k`` is a number. The objective penalty always makes the objective worse, ``\\lambda_2 > 0``, and ``t_2^2`` rises with ``t_2 \\geq 0``, so at the optimum ``t_2`` equals its bound.
 
 Where:
 
   - ``t_2``: The epigraph variable `t_l2_i`.
+  - $(math_dict[:k_budget])
   - $(math_dict[:lambda_2_reg])
   - $(math_dict[:sc_scale])
   - $(math_dict[:w_port])
@@ -571,7 +640,7 @@ Where:
   - `i::Integer`: Position of the term, which ends the name of each entry it registers.
   - `w::VecNum`: The weights variable of the model.
   - `l2::L2Regularisation`: The L2 term.
-  - `sc::Number`: Constraint scale. The [`QuadRiskExpr`](@ref) method registers no row and ignores it.
+  - `sc::Number`: Constraint scale. The [`QuadRiskExpr`](@ref) method uses it only when ``k`` is a variable.
 
 # Returns
 
@@ -601,25 +670,27 @@ function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
     t_l2 = state_set!(model, Symbol(""), :t_l2_, i, JuMP.@variable(model))
     state_set!(model, Symbol(""), :cl2_soc_, i,
                JuMP.@constraint(model, [sc * t_l2; sc * w] in JuMP.SecondOrderCone()))
-    l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * t_l2^2))
+    t_l2_sq = squared_norm_over_k!(model, i, t_l2, effective_k(model), sc)
+    l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * t_l2_sq))
     add_to_objective_penalty!(model, l2)
     return nothing
 end
 function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                                 l2::L2Regularisation{<:Any, <:QuadRiskExpr}, args...)
+                                 l2::L2Regularisation{<:Any, <:QuadRiskExpr}, sc::Number)
     val = l2.val
-    l2 = state_set!(model, Symbol(""), :l2_, i,
-                    JuMP.@expression(model, val * LinearAlgebra.dot(w, w)))
+    w_sq = squared_norm_over_k!(model, i, w, effective_k(model), sc)
+    l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * w_sq))
     add_to_objective_penalty!(model, l2)
     return nothing
 end
 function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
                                  l2::L2Regularisation{<:Any, <:RSOCRiskExpr}, sc::Number)
     val = l2.val
+    k = effective_k(model)
     t_l2 = state_set!(model, Symbol(""), :t_l2_, i, JuMP.@variable(model))
     state_set!(model, Symbol(""), :cl2_rsoc_, i,
                JuMP.@constraint(model,
-                                [sc * t_l2; sc * 0.5; sc * w] in
+                                [sc * t_l2; sc * k / 2; sc * w] in
                                 JuMP.RotatedSecondOrderCone()))
     l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * t_l2))
     add_to_objective_penalty!(model, l2)
