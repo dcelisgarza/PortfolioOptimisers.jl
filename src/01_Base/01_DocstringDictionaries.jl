@@ -1315,6 +1315,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :theta_aset => "``\\theta``: Budget multiplier, the root of ``\\sum_i w_i(\\theta) = 1``.",#
                        :w_plus_proj => "``\\boldsymbol{w}^{+}``: Projected allocation, the answer of the projection onto the Allocation Set.",#
                        :pi_obj_pen => "``\\pi``: Objective Penalty of the set, zero when the set has no penalty.",#
+                       :h_diag_norm => "``\\boldsymbol{h}``: Positive diagonal of the norm, one entry for each asset.",#
                        # The constant rebalanced portfolio, the passive-aggressive step and the
                        # set that an expert mixture's weighting projects onto.
                        :b_crp => "``\\boldsymbol{b}``: Target of a constant rebalanced portfolio, the allocation that it rebalances to every period.",#

@@ -18,7 +18,7 @@ Where:
 
   - $(math_dict[:q_raw])
   - $(math_dict[:W_aset])
-  - ``\\boldsymbol{h}``: Positive diagonal of the norm, one entry for each asset.
+  - $(math_dict[:h_diag_norm])
   - $(math_dict[:lu_i_aset])
   - $(math_dict[:theta_aset])
 

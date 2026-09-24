@@ -1470,6 +1470,132 @@ end
         @test_throws po.IsEmptyError ProgrammeAllocationSet(; slv = slv,
                                                             ret = po.JuMPReturnsEstimator[])
     end
+    @testset "The base file's closed forms, roots and helpers (#1173)" begin
+        # The bisection midpoint overflowed to `Inf` once `lo + hi` passed `floatmax`, on a
+        # bracket that `bisection_cap` states it covers. The halves do not overflow.
+        M = floatmax(Float64)
+        r = po.bounded_root(x -> x <= 0.75M ? 2.0 : 0.0, 0.0, M)
+        @test isfinite(r) && abs(r - 0.75M) <= eps(0.75M)
+        r = po.bounded_root(x -> x <= -0.75M ? 2.0 : 0.0, -M, M)
+        @test isfinite(r) && abs(r + 0.75M) <= eps(0.75M)
+        @test po.bounded_root(x -> x <= nextfloat(0.0) ? 2.0 : 0.0, -M, M) == nextfloat(0.0)
+        # In the normal range the new midpoint is the old one, bit for bit.
+        rng = StableRNG(11)
+        for _ in 1:200
+            a = randn(rng) * 10.0^rand(rng, -100:100)
+            b = a + abs(randn(rng)) * 10.0^rand(rng, -100:100)
+            c = a + rand(rng) * (b - a)
+            @test (a / 2 + b / 2) === (a + b) / 2
+            @test abs(po.bounded_root(x -> x <= c ? 2.0 : 0.0, a, b) - c) <= 2 * eps(c)
+        end
+        # The cap is an upper bound on the halvings of the widest bracket.
+        for (T, n) in ((Float64, 2099), (Float32, 278), (Float16, 41))
+            lo, hi, k = -floatmax(T), floatmax(T), 0
+            while true
+                mid = lo / 2 + hi / 2
+                (mid == lo || mid == hi) && break
+                k += 1
+                mid <= nextfloat(zero(T)) ? (lo = mid) : (hi = mid)
+            end
+            @test k == n && k <= po.bisection_cap(T)
+        end
+        # The two closed-form arms meet the KKT conditions of their projections on random
+        # bounds: one budget multiplier over the free entries, and each clipped entry on the
+        # side of its bound that the multiplier puts it.
+        nE = nK = 0
+        for _ in 1:300
+            N = rand(rng, 2:7)
+            lb = rand(rng, N) .* (0.8 / N) .- (rand(rng) < 0.3 ? 0.1 : 0.0)
+            ub = lb .+ rand(rng, N) .* 0.9 .+ 0.02
+            sum(lb) <= 1 <= sum(ub) || continue
+            set = resolve(BoundedAllocationSet(; wb = WeightBounds(; lb = lb, ub = ub)), N)
+            q = randn(rng, N) .* 10.0^rand(rng, -2:1)
+            w = po.project(EuclideanProjection(), set, q, fill(1 / N, N))
+            @test sum(w) ≈ 1 && all(lb .- 1e-14 .<= w .<= ub .+ 1e-14)
+            free = (w .> lb .+ 1e-12) .& (w .< ub .- 1e-12)
+            if any(free)
+                th = (q .- w)[findfirst(free)]
+                @test all(abs.((q .- w)[free] .- th) .< 1e-10)
+                @test all(q[.!free .& (w .<= lb .+ 1e-12)] .- th .<=
+                          lb[.!free .& (w .<= lb .+ 1e-12)] .+ 1e-10)
+                @test all(q[.!free .& (w .>= ub .- 1e-12)] .- th .>=
+                          ub[.!free .& (w .>= ub .- 1e-12)] .- 1e-10)
+            end
+            nE += 1
+            all(lb .>= 0) || continue
+            qp = abs.(q)
+            we = po.project(EntropicProjection(), set, qp, fill(1 / N, N))
+            @test sum(we) ≈ 1 && all(lb .- 1e-14 .<= we .<= ub .+ 1e-14)
+            freeK = (we .> lb .+ 1e-12) .& (we .< ub .- 1e-12)
+            if any(freeK)
+                t = (we ./ qp)[findfirst(freeK)]
+                @test all(abs.((we ./ qp)[freeK] .- t) .< 1e-10 * t)
+                @test all(t .* qp[.!freeK .& (we .<= lb .+ 1e-12)] .<=
+                          lb[.!freeK .& (we .<= lb .+ 1e-12)] .+ 1e-10)
+                @test all(t .* qp[.!freeK .& (we .>= ub .- 1e-12)] .>=
+                          ub[.!freeK .& (we .>= ub .- 1e-12)] .- 1e-10)
+            end
+            nK += 1
+        end
+        @test nE > 200 && nK > 100
+        # Off the simplex bounds, a floor lifts a zero entry under the entropic projection,
+        # and a zero cap sets a positive entry to zero.
+        lifted = resolve(BoundedAllocationSet(;
+                                              wb = WeightBounds(; lb = [0.0, 0.2, 0.0],
+                                                                ub = [1.0, 1.0, 0.0])), 3)
+        @test po.project(EntropicProjection(), lifted, [1.0, 0.0, 1.0], wh) ≈
+              [0.8, 0.2, 0.0]
+        # The sort of Duchi and co-authors: the stated rho and theta, and the KKT form.
+        v = [0.9, 0.5, -0.2, 0.4]
+        u = sort(v; rev = true)
+        rho = maximum(j for j in 1:4 if u[j] - (sum(u[1:j]) - 1) / j > 0)
+        theta = (sum(u[1:rho]) - 1) / rho
+        @test rho == 3 && po.project_simplex(v) ≈ max.(v .- theta, 0)
+        @test sum(po.project_simplex(v)) ≈ 1 && po.project_simplex(v)[3] == 0
+        # The price relative, the Price-Adjusted Allocation and the renormalised view.
+        @test po.price_relative(0.05) == 1.05
+        @test all(isone, po.price_relative.([NaN, Inf, -Inf]))
+        @test po.price_relative(0.05f0) isa Float32
+        wp = [0.2, 0.3, 0.5]
+        xp = [1.1, 0.9, 1.0]
+        @test po.price_adjusted_allocation(wp, xp) ≈ wp .* xp ./ dot(wp, xp)
+        @test sum(po.price_adjusted_allocation(wp, xp)) ≈ 1
+        @test po.renormalised_view(wp, [2, 3]) ≈ [0.375, 0.625]
+        @test po.renormalised_view([1.0, 0.0, 0.0], [2, 3]) == [0.5, 0.5]
+        @test isnothing(po.renormalised_view(nothing, [1]))
+        # The Held Step tolerance is `isapprox`'s default, a relative `sqrt(eps)`.
+        b3 = resolve(BoundedAllocationSet(), 3)
+        @test po.budget_or_held_step([0.5, 0.5, 1e-8], wp, EuclideanProjection(), b3) ==
+              [0.5, 0.5, 1e-8]
+        (held, rec) = po.with_projection_step(() -> po.budget_or_held_step([0.5, 0.5, 2e-8],
+                                                                           wp,
+                                                                           EuclideanProjection(),
+                                                                           b3), nothing,
+                                              Date(2020, 1, 1))
+        @test held == wp && !(held === wp) && length(rec) == 1
+        # The two write points of a schedule's statistic: a schedule that reads the period's
+        # row writes before the rate, and a number writes after the step.
+        wbr = po.WindowedBestRate(; etas = [0.1, 0.2], window = 3)
+        s0 = po.schedule_state_seed(wbr, fill(1 / 3, 3))
+        @test po.statistic_after_step(wbr, s0, wp, xp) === s0
+        @test po.statistic_before_rate(wbr, s0, wp, xp).n == 1
+        @test po.statistic_before_rate(0.1, :s, wp, xp) === :s
+        @test po.statistic_after_step(0.1, :s, wp, xp) === :s
+        # The copy of a state shares no array with the original, at the top and inside.
+        rdc = ReturnsResult(; nx = ["A", "B", "C"], X = 0.02 .* randn(rng, 12, 3),
+                            ts = Date(2020, 1, 1) .+ Day.(0:11))
+        for alg in (MirrorDescent(), NewtonStep(), MovingAverageReversion(; window = 4))
+            s = po.partial_fit!(OPS(; alg = alg), rdc).cache
+            c = copy(s)
+            for (a, b) in ((s, c), (s.st, c.st), (s.X, c.X))
+                isnothing(a) && continue
+                for f in fieldnames(typeof(a))
+                    y = getfield(a, f)
+                    y isa AbstractArray && @test !(y === getfield(b, f))
+                end
+            end
+        end
+    end
     @testset "Docs and the search seam" begin
         @test occursin("Held Step", string(@doc(po.HeldStep)))
         @test occursin("per-asset", string(@doc(ProgrammeAllocationSet)))

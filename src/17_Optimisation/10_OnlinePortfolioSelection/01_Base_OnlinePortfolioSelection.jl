@@ -1,33 +1,64 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the Online Selection Rules an [`OnlinePortfolioSelection`](@ref) head holds on `alg`.
+Abstract supertype for the Online Selection Rules that an [`OnlinePortfolioSelection`](@ref) head holds in its `alg` field.
 
-A rule is the one thing that varies across the online portfolio selection family: a struct of the paper's parameters, a private carrier for what the update accumulates, and one update method. Everything shared — the Allocation Set, the Causal Pass, the Block Step, the Recursion Read-out, the refusals — is written once on the head. A rule projects its raw step onto the head's Allocation Set in its own Projection Geometry, held on its `proj` slot, whose type bound names the geometries the rule's theorem covers.
+The rule is the only part of the online portfolio selection family that changes from one paper to the next. It is a struct of the paper's parameters, a private carrier for what the update accumulates, and one update method. The head owns the parts that every rule shares: the Allocation Set, the Causal Pass, the Block Step, the Recursion Read-out and the checks that refuse a bad input. A rule projects its raw step onto the head's Allocation Set in its own Projection Geometry, which it holds in its `proj` field. The type bound of that field names the geometries that the rule's theorem covers.
 
 # Interfaces
 
-In order to implement a new rule, subtype `AbstractOnlinePortfolioSelectionAlgorithm` with the paper's parameters and a `proj` slot as part of the struct, and implement the following methods:
+To implement a new rule, subtype `AbstractOnlinePortfolioSelectionAlgorithm` with the paper's parameters and a `proj` field, and implement the following methods:
 
-  - `online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet) -> Tuple`: The Online Update: from the rule's carrier `st`, the allocation `w` held during the period, the finite price relative `x` of the period and the rows carrier the head holds through it, answer `(st', w')`, the carrier and the allocation for the next period. `st` is written in place where the rule can, and `w'` is always a new vector. A first-order rule also implements the seven-argument form, whose last argument is the Gradient Point an [`ExpertMixture`](@ref) hands it; the generic method drops the point.
-  - `rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector)`: The carrier before the first update, or `nothing` for a rule that carries nothing; `w` is the Start Allocation, whose length and element type the carrier takes. The head calls the three-argument form, `rule_state_seed(alg, w, set)`, with its Allocation Set, whose default method drops `set`; a rule that holds allocations of its own over the assets, as the experts of an [`ExpertMixture`](@ref) are, implements the three-argument form and projects them onto `set`.
-  - `rows_needed(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> Union{Nothing, Integer}`: The number of rows the rule reads at a step: `0` for one that reads none, `nothing` for one that reads every row folded so far.
-  - `projection_geometry(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> AbstractProjectionGeometry`: The geometry the head projects the Start Allocation in, the rule's `proj` slot by default.
+  - `online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet) -> Tuple`: The Online Update. It reads the rule's carrier `st`, the allocation `w` held during the period, the finite price relative `x` of the period and the rows carrier that the head holds through the period. It returns `(st', w')`, the carrier and the allocation for the next period. It may write `st` in place, and it always returns a new vector for `w'`. A first-order rule also implements the seven-argument form, whose last argument is the Gradient Point that an [`ExpertMixture`](@ref) gives it. The generic method of that form drops the point.
+  - `rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector)`: The carrier before the first update, or `nothing` for a rule that carries nothing. `w` is the Start Allocation, and the carrier takes its length and its element type. The head calls the three-argument form, `rule_state_seed(alg, w, set)`, with its Allocation Set, and the default method of that form drops `set`. A rule that holds allocations of its own over the assets, as the experts of an [`ExpertMixture`](@ref) are, implements the three-argument form and projects them onto `set`.
+  - `rows_needed(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> Union{Nothing, Integer}`: The number of rows that the rule reads at a step. It is `0` for a rule that reads none, and `nothing` for a rule that reads every row folded so far.
+  - `projection_geometry(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> AbstractProjectionGeometry`: The geometry in which the head projects the Start Allocation. It is the rule's `proj` field by default.
 
-A rule whose carrier holds a per-asset axis also implements `port_opt_view(st, i, args...)` on the carrier's type, so a view of the head slices it, and `Base.copy(st)`, so the value form of the fold aliases nothing.
+A rule whose carrier has a per-asset axis also implements `port_opt_view(st, i, args...)` on the type of the carrier, so that a view of the head slices the carrier. It also implements `Base.copy(st)`, so that the copy of the state that [`partial_fit`](@ref) makes shares no array with the original.
 
 ## Arguments
 
   - `alg`: The concrete rule.
   - `st`: The rule's private carrier, or `nothing`.
-  - `w`: The allocation held during the period, over the full pinned universe, summing to one.
-  - `x`: The price relative of the period, [`price_relative`](@ref) of the row: `1 .+ r`, and one at a gap, so it is finite at every asset.
-  - `rows`: The rows carrier the head holds through the period, a [`ReturnsResult`](@ref) whose `X` is the rows of returns verbatim, `NaN` where there was no return, under the pinned names and the buffer's Asset Panel; or `nothing` when the rule reads none. A statistic over it — a forecaster's mean, a prior, a re-solve — reads it as the batch verb reads a carrier, and reduces to its own Coverage Universe; a kernel over the price relatives reads a gap as one through [`price_relative`](@ref).
-  - `set`: The head's Allocation Set, which the rule projects onto through [`project`](@ref).
+  - `w`: The allocation held during the period. It covers the full pinned universe and sums to one.
+  - `x`: The price relative of the period, [`price_relative`](@ref) of the row. It is `1 .+ r`, and one at a gap, so it is finite at every asset.
+  - `rows`: The rows carrier that the head holds through the period, or `nothing` when the rule reads no rows. It is a [`ReturnsResult`](@ref) whose `X` holds the rows of returns as they arrived, with `NaN` where there was no return, under the pinned names and the Asset Panel of the buffer. A statistic over it, such as the mean of a forecaster, a prior or a re-solve, reads it as the batch verb reads a carrier, and reduces to its own Coverage Universe. A kernel over the price relatives reads a gap as one through [`price_relative`](@ref).
+  - `set`: The head's Allocation Set. The rule projects onto it through [`project`](@ref).
 
 ## Returns
 
   - `(st', w')::Tuple`: The carrier and the allocation for the next period.
+
+# Examples
+
+A rule that projects one fixed raw step at every period. Under a cap of `0.5`, the Euclidean projection moves the excess of the first asset to the other two assets in equal parts.
+
+```jldoctest
+julia> struct FixedTarget{T1, T2} <: PortfolioOptimisers.AbstractOnlinePortfolioSelectionAlgorithm
+           q::T1
+           proj::T2
+       end
+
+julia> function PortfolioOptimisers.online_update!(alg::FixedTarget, st, w::AbstractVector,
+                                                   x::AbstractVector, rows,
+                                                   set::PortfolioOptimisers.AbstractAllocationSet)
+           wh = PortfolioOptimisers.price_adjusted_allocation(w, x)
+           return st, PortfolioOptimisers.project(alg.proj, set, alg.q, wh)
+       end
+
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\", \"C\"], X = [0.1 -0.1 0.0; 0.0 0.2 -0.05]);
+
+julia> opt = OnlinePortfolioSelection(; alg = FixedTarget([0.8, 0.1, 0.1], EuclideanProjection()),
+                                      set = BoundedAllocationSet(;
+                                                                 wb = WeightBounds(; lb = 0,
+                                                                                   ub = 0.5)));
+
+julia> optimise(opt, rd).w
+3-element Vector{Float64}:
+ 0.5
+ 0.25
+ 0.25
+```
 
 # Related
 
@@ -41,28 +72,69 @@ abstract type AbstractOnlinePortfolioSelectionAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the Projection Geometries an Online Selection Rule projects its raw step back onto the Allocation Set in.
+Abstract supertype for the Projection Geometries in which an Online Selection Rule projects its raw step back onto the Allocation Set.
 
-The geometry is the theorem's, not decoration: exponentiated gradient's regret bound is a relative-entropy argument and its multiplicative update followed by normalisation is the exact Kullback–Leibler projection onto the simplex; the reversion rules are Euclidean, and their sparsity is the Euclidean projection zeroing entries. The `proj` slot of every rule is bound to the geometries its theorem covers.
+The geometry belongs to the theorem of the rule. The regret bound of exponentiated gradient is a relative-entropy argument, and its multiplicative update followed by normalisation is the exact Kullback–Leibler projection onto the simplex. The reversion rules are Euclidean, and their sparsity comes from the entries that the Euclidean projection sets to zero. The type bound of the `proj` field of every rule names the geometries that its theorem covers.
+
+# Mathematical definition
+
+A geometry is a potential ``\\Psi``. It projects the raw step onto the Allocation Set in the Bregman divergence of that potential.
+
+```math
+\\begin{align}
+\\boldsymbol{w}^{+} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; D_\\Psi(\\boldsymbol{w}, \\boldsymbol{q})\\,, \\\\
+D_\\Psi(\\boldsymbol{w}, \\boldsymbol{q}) &= \\Psi(\\boldsymbol{w}) - \\Psi(\\boldsymbol{q}) - \\nabla \\Psi(\\boldsymbol{q})^\\intercal (\\boldsymbol{w} - \\boldsymbol{q})\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_plus_proj])
+  - $(math_dict[:W_aset])
+  - $(math_dict[:D_Psi_breg])
+  - $(math_dict[:Psi_pot])
+  - $(math_dict[:q_raw])
 
 # Interfaces
 
-In order to implement a new geometry, subtype `AbstractProjectionGeometry` and implement, for every Allocation Set it projects onto:
+To implement a new geometry, subtype `AbstractProjectionGeometry` and implement the following method for every Allocation Set that it projects onto:
 
-  - `project(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector) -> AbstractVector`: The projection of the raw step `q` onto `set` in this geometry, a new vector.
+  - `project(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector) -> AbstractVector`: The projection of the raw step `q` onto `set` in this geometry, as a new vector.
 
 ## Arguments
 
   - `proj`: The geometry.
-  - `set`: The Allocation Set, its bounds resolved to vectors.
+  - `set`: The Allocation Set, with its bounds resolved to vectors.
   - `q`: The raw step of the rule, before the projection.
-  - `w`: The Price-Adjusted Allocation the step trades from, the reference a turnover ceiling on a [`ProgrammeAllocationSet`](@ref) reads and the allocation a Held Step answers; the bounded set reads it only on a Held Step.
+  - `w`: The Price-Adjusted Allocation from which the step trades. A turnover ceiling on a [`ProgrammeAllocationSet`](@ref) reads it as its reference, and a Held Step returns it. The bounded set reads it only on a Held Step.
 
 ## Returns
 
   - `w'::AbstractVector`: The projected allocation.
 
-A geometry with no closed form on any set carries its own solver, as [`GramProjection`](@ref) does, and [`projection_solver`](@ref) reads it ahead of the set's.
+A geometry with no closed form on any set carries its own solver, as [`GramProjection`](@ref) does, and [`projection_solver`](@ref) reads that solver before the solver of the set.
+
+# Examples
+
+A geometry that projects in the norm of a fixed positive diagonal. The asset with the larger weight in the norm moves less.
+
+```jldoctest
+julia> struct FixedDiagonal{T} <: PortfolioOptimisers.AbstractProjectionGeometry
+           h::T
+       end
+
+julia> function PortfolioOptimisers.project(proj::FixedDiagonal, set::BoundedAllocationSet,
+                                            q::AbstractVector, w::AbstractVector)
+           return PortfolioOptimisers.bounded_quadratic_projection(q, set.wb, proj.h)
+       end
+
+julia> set = PortfolioOptimisers.resolve_allocation_set(BoundedAllocationSet(), 2, false, Float64);
+
+julia> PortfolioOptimisers.project(FixedDiagonal([1.0, 3.0]), set, [0.8, 0.8], [0.5, 0.5])
+2-element Vector{Float64}:
+ 0.35
+ 0.65
+```
 
 # Related
 
@@ -76,9 +148,30 @@ abstract type AbstractProjectionGeometry <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The Euclidean Projection Geometry: the raw step is projected onto the Allocation Set in squared Euclidean distance, ``\\min \\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{q} \\rVert^2``.
+Projects the raw step onto the Allocation Set in squared Euclidean distance.
 
-On the simplex this is the sort of Duchi, Shalev-Shwartz, Singer and Chandra (2008), and it zeroes every entry below its threshold, which is what makes the reversion rules sparse. It is the geometry of the reversion rules, of the constant rebalanced portfolio and of buy-and-hold, and the prototype's answer for the Newton step.
+On the simplex this projection is the sort of Duchi, Shalev-Shwartz, Singer and Chandra (2008). It sets every entry below its threshold to zero, and that is the source of the sparsity of the reversion rules. It is the default geometry of most rules, among them the reversion and tracking rules, the constant rebalanced portfolio, buy-and-hold and the Newton step.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\Psi(\\boldsymbol{w}) &= \\tfrac{1}{2} \\lVert \\boldsymbol{w} \\rVert_2^2\\,, \\\\
+\\mathrm{Proj}_{\\mathcal{W}}(\\boldsymbol{q}) &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; \\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{q} \\rVert_2^2\\,, \\\\
+w_i(\\theta) &= \\min\\left(\\max\\left(q_i - \\theta,\\, l_i\\right),\\, u_i\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:Psi_pot])
+  - $(math_dict[:Proj_W_euclid])
+  - $(math_dict[:q_raw])
+  - $(math_dict[:W_aset])
+  - $(math_dict[:lu_i_aset])
+  - $(math_dict[:theta_aset])
+
+On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at the root. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``, and it is linear between the kinks at ``q_i - u_i`` and ``q_i - l_i``. The geometry admits a negative lower bound.
 
 # Examples
 
@@ -92,14 +185,40 @@ EuclideanProjection()
   - [`AbstractProjectionGeometry`](@ref)
   - [`EntropicProjection`](@ref)
   - [`project`](@ref)
+  - [`project_simplex`](@ref)
+
+# References
+
+  - $(ref_dict[:duchi2008])
 """
 struct EuclideanProjection <: AbstractProjectionGeometry end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The entropic Projection Geometry: the raw step is projected onto the Allocation Set in relative entropy, ``\\min \\sum_i w_i \\log (w_i / q_i)``.
+Projects the raw step onto the Allocation Set in relative entropy.
 
-On the simplex this is plain normalisation, `q / Σq`, so exponentiated gradient's multiplicative update followed by normalisation is exactly this projection. It cannot zero a positive entry, and a zero entry stays zero, so a Start Allocation with a zero under it holds that zero for the run. It refuses a raw step with a negative entry, whose logarithm is undefined.
+On the simplex this projection is normalisation, `q / sum(q)`. So the multiplicative update of exponentiated gradient, followed by normalisation, is this projection. Under the simplex bounds the projection keeps every positive entry positive and every zero entry at zero, so a zero in the Start Allocation stays zero for the whole run. The projection refuses a raw step with a negative entry, because the logarithm of a negative number is not defined.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\Psi(\\boldsymbol{w}) &= \\sum_i w_i \\log w_i\\,, \\\\
+\\mathrm{Proj}^{\\mathrm{KL}}_{\\mathcal{W}}(\\boldsymbol{q}) &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; \\sum_i w_i \\log \\frac{w_i}{q_i}\\,, \\\\
+w_i(\\theta) &= \\min\\left(\\max\\left(q_i e^{-\\theta},\\, l_i\\right),\\, u_i\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:Psi_pot])
+  - ``\\mathrm{Proj}^{\\mathrm{KL}}_{\\mathcal{W}}``: Projection onto ``\\mathcal{W}`` in relative entropy.
+  - $(math_dict[:q_raw])
+  - $(math_dict[:W_aset])
+  - $(math_dict[:lu_i_aset])
+  - $(math_dict[:theta_aset])
+
+The Bregman divergence of ``\\Psi`` is ``\\sum_i w_i \\log (w_i / q_i) - \\sum_i w_i + \\sum_i q_i``, and on the budget its last two terms are constant. On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at the root. Under the simplex bounds the root is ``e^{-\\theta} = 1 / \\sum_i q_i``. Under other bounds a floor ``l_i > 0`` lifts a zero entry to ``l_i``, and a cap ``u_i = 0`` sets a positive entry to zero. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``, and it is linear in ``e^{-\\theta}`` between the kinks at ``l_i / q_i`` and ``u_i / q_i``. The geometry refuses a negative lower bound.
 
 # Examples
 
@@ -113,14 +232,37 @@ EntropicProjection()
   - [`AbstractProjectionGeometry`](@ref)
   - [`EuclideanProjection`](@ref)
   - [`project`](@ref)
+
+# References
+
+  - $(ref_dict[:helmbold1998])
 """
 struct EntropicProjection <: AbstractProjectionGeometry end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The Gram Projection Geometry: the raw step is projected onto the Allocation Set in the norm of the rule's Gram matrix, ``\\min (\\boldsymbol{w} - \\boldsymbol{q})^\\intercal A (\\boldsymbol{w} - \\boldsymbol{q})``.
+Projects the raw step onto the Allocation Set in the norm of the rule's Gram matrix.
 
-It is the geometry the online Newton step's logarithmic regret is proved in (Agarwal, Hazan, Kale and Schapire 2006), and it has no closed form on any set, the bare simplex included, so it carries its own solver and every projection in it is a programme. The matrix is the rule's: [`NewtonStep`](@ref) binds its carrier's ``A_t`` onto the geometry's `A` slot at every step through [`gram_geometry`](@ref), and a geometry with no matrix bound refuses to project. The Start Allocation is projected before any gradient is seen, where ``A_0 = I`` and the geometry is the Euclidean one, so [`projection_geometry`](@ref) answers [`EuclideanProjection`](@ref) for it.
+The online Newton step of Agarwal, Hazan, Kale and Schapire (2006) proves its logarithmic regret in this geometry. The projection has no closed form on any set, the bare simplex included, so the geometry carries its own solver and every projection in it is a programme. The rule owns the matrix. [`NewtonStep`](@ref) binds the Gram matrix of its carrier to the `A` field of the geometry at every step, through [`gram_geometry`](@ref). A geometry with no matrix refuses to project. The head projects the Start Allocation before the rule sees a gradient. The Gram matrix is the identity there, and the geometry is the Euclidean one, so [`projection_geometry`](@ref) returns [`EuclideanProjection`](@ref) for the Newton step.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\Psi(\\boldsymbol{w}) &= \\tfrac{1}{2} \\boldsymbol{w}^\\intercal \\mathbf{A} \\boldsymbol{w}\\,, \\\\
+\\mathrm{Proj}^{\\mathbf{A}}_{\\mathcal{W}}(\\boldsymbol{q}) &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; (\\boldsymbol{w} - \\boldsymbol{q})^\\intercal \\mathbf{A} (\\boldsymbol{w} - \\boldsymbol{q})\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:Psi_pot])
+  - ``\\mathbf{A}``: Gram matrix that the rule binds at the step, symmetric and positive definite.
+  - ``\\mathrm{Proj}^{\\mathbf{A}}_{\\mathcal{W}}``: Projection onto ``\\mathcal{W}`` in the norm of ``\\mathbf{A}``.
+  - $(math_dict[:q_raw])
+  - $(math_dict[:W_aset])
+
+At ``\\mathbf{A} = I`` the projection is the Euclidean one.
 
 # Fields
 
@@ -133,7 +275,7 @@ $(DocStringExtensions.FIELDS)
         A::Option{<:AbstractMatrix} = nothing
     ) -> GramProjection
 
-Keywords correspond to the struct's fields. `A` is bound by the rule, never by the caller.
+Keywords correspond to the struct's fields. The rule binds `A` at each step, and a caller leaves it at `nothing`.
 
 ## Validation
 
@@ -172,7 +314,7 @@ struct GramProjection{T1 <: Slv_VecSlv, T2 <: Option{<:AbstractMatrix}} <:
     """
     slv::T1
     """
-    The Gram matrix the projection is taken in the norm of, bound by the rule at each step, or `nothing` before the rule binds one.
+    The Gram matrix in whose norm the geometry projects. The rule binds it at each step, and it is `nothing` before the rule binds one.
     """
     A::T2
     function GramProjection(slv::Slv_VecSlv, A::Option{<:AbstractMatrix})
@@ -188,10 +330,12 @@ function GramProjection(; slv::Slv_VecSlv,
     return GramProjection(slv, A)
 end
 """
-    gram_geometry(proj::EuclideanProjection, A::AbstractMatrix)
+    gram_geometry(proj::AbstractProjectionGeometry, A::AbstractMatrix)
     gram_geometry(proj::GramProjection, A::AbstractMatrix)
 
-The geometry a rule with a Gram matrix projects in at this step: a [`GramProjection`](@ref) with the rule's current matrix bound onto its `A` slot, and any other geometry unchanged.
+Returns the geometry in which a rule with a Gram matrix projects at this step.
+
+For a [`GramProjection`](@ref) it is a new geometry with the same solver and with the rule's current matrix `A` in its `A` field. Every other geometry comes back unchanged.
 
 # Related
 
@@ -207,9 +351,25 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The Allocation Set of weight bounds alone: `Σw = 1` and `lb ≤ w ≤ ub`, with no solver field, because every projection onto it is closed form.
+Limits the allocation to the budget and to per-asset weight bounds, with closed-form projections and no solver.
 
-The default, `BoundedAllocationSet()`, is the simplex. Every projection onto the set is closed form: under the simplex bounds the sort of Duchi and co-authors in the Euclidean geometry and plain normalisation in the entropic one, and under any other bound a scalar root — `w = clip(q − θ, lb, ub)` for the `θ` that restores the budget, or `w = clip(t q, lb, ub)` for the `t` that does — found exactly from the kinks of the budget. A negative lower bound is admitted under the Euclidean geometry and refused under the entropic one, whose `log w` is undefined below zero.
+The default, `BoundedAllocationSet()`, is the simplex. Under the simplex bounds the Euclidean projection is the sort of Duchi and co-authors, and the entropic projection is normalisation. Under any other bound each projection clips the raw step at one scalar, the root of the budget, which [`breakpoint_root`](@ref) finds exactly from the kinks of the budget. The barrier geometries find their root by bisection. The Euclidean geometry admits a negative lower bound. The entropic and barrier geometries refuse it, because their potentials are not defined below zero.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{W} &= \\left\\lbrace \\boldsymbol{w} \\in \\mathbb{R}^N : \\boldsymbol{1}^\\intercal \\boldsymbol{w} = 1,\\; l_i \\leq w_i \\leq u_i \\right\\rbrace\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:W_aset])
+  - $(math_dict[:N])
+  - $(math_dict[:lu_i_aset])
+
+The set is not empty when ``\\sum_i l_i \\leq 1 \\leq \\sum_i u_i``. At ``l_i = 0`` and ``u_i = 1`` it is the probability simplex.
 
 # Fields
 
@@ -226,7 +386,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
 
 ## View parameters
 
@@ -279,6 +439,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolves the weight bounds of a [`BoundedAllocationSet`](@ref) to vectors over `N` assets.
 
+[`weight_bounds_constraints`](@ref) does the work, with the set's `sets` for a bound that names assets. The set that comes back keeps its `sets`.
+
 # Related
 
   - [`BoundedAllocationSet`](@ref)
@@ -296,7 +458,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Whether a resolved bound is the simplex's `(0, 1)` at every asset, where the projection is a sort rather than a root.
+Checks whether a resolved bound is `(0, 1)` at every asset. The bound is then the simplex, and the projection is a sort or a normalisation, not a root.
 
 # Related
 
@@ -309,7 +471,11 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuses a resolved bound no allocation summing to one satisfies: `Σ lb ≤ 1 ≤ Σ ub`.
+Refuses a resolved bound that no allocation on the budget satisfies.
+
+# Validation
+
+  - `sum(wb.lb) <= 1 <= sum(wb.ub)`. An `ArgumentError` is thrown otherwise.
 
 # Related
 
@@ -322,35 +488,74 @@ function assert_feasible_bounds(wb::WeightBounds)::Nothing
     return nothing
 end
 """
-    project(::EuclideanProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
-    project(::EntropicProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
+    project(proj::EuclideanProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
+    project(proj::EntropicProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
 
-Projects a rule's raw step onto the Allocation Set in the rule's Projection Geometry.
+Projects a rule's raw step onto a [`BoundedAllocationSet`](@ref) in the Euclidean or the entropic geometry.
 
-The one dispatch of the Constrained Update. On the bounded set under the simplex bounds, the Euclidean arm is the sort of Duchi and co-authors ([`project_simplex`](@ref)) and the entropic arm is normalisation; under any other bound each arm is a scalar root, `clip(q − θ, lb, ub)` ([`bounded_quadratic_projection`](@ref) at unit weights) and `clip(t q, lb, ub)`, found exactly from the kinks of the budget through [`breakpoint_root`](@ref). A root whose allocation still misses the budget in floating point is the Held Step ([`budget_or_held_step`](@ref)). The entropic arm refuses a raw step with a negative entry, a step with no positive entry at all, which no normalisation puts on the simplex, a step whose zeros hold their floors while the caps of its positive entries do not reach the budget, and a negative lower bound.
+These are the closed-form arms of the Constrained Update. Under the simplex bounds the Euclidean arm is the sort of [`project_simplex`](@ref), and the entropic arm is normalisation. Under any other bound each arm finds the root of its budget exactly, from the kinks of the budget, through [`breakpoint_root`](@ref). A root whose allocation misses the budget in floating point gives the Held Step, through [`budget_or_held_step`](@ref).
+
+# Mathematical definition
+
+```math
+\\begin{align}
+w^{+}_i &= \\min\\left(\\max\\left(q_i - \\theta,\\, l_i\\right),\\, u_i\\right) \\quad \\text{(Euclidean)}\\,, \\\\
+w^{+}_i &= \\min\\left(\\max\\left(q_i e^{-\\theta},\\, l_i\\right),\\, u_i\\right) \\quad \\text{(entropic)}\\,, \\\\
+\\sum_i w^{+}_i &= 1\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_plus_proj])
+  - $(math_dict[:q_raw])
+  - $(math_dict[:lu_i_aset])
+  - $(math_dict[:theta_aset])
+
+Each form is the KKT solution of the projection in its geometry, and ``\\theta`` is the multiplier of the budget. In the entropic form a zero entry stays at ``l_i`` for every ``\\theta``. So the entropic arm needs ``q_i \\geq 0``, ``\\sum_i q_i > 0``, ``l_i \\geq 0``, and ``\\sum_{q_i > 0} u_i + \\sum_{q_i = 0} l_i \\geq 1``.
+
+# Algorithm
+
+Under [`EuclideanProjection`](@ref):
+
+ 1. When the bounds are the simplex bounds, refuse a non-finite `q` with [`assert_finite_raw_step`](@ref), and return [`project_simplex`](@ref) of `q`.
+ 2. Otherwise, find the allocation at the root with [`bounded_quadratic_projection`](@ref) at unit weights.
+ 3. Return that allocation, or the Held Step `w`, with [`budget_or_held_step`](@ref).
+
+Under [`EntropicProjection`](@ref):
+
+ 1. Refuse a non-finite `q`, a `q` with a negative entry, and a `q` that sums to zero.
+ 2. When the bounds are the simplex bounds, return `q ./ sum(q)`.
+ 3. Refuse a negative lower bound, and bounds that no allocation on the budget satisfies, with [`assert_feasible_bounds`](@ref).
+ 4. Refuse a `q` that cannot reach the budget, because its zeros stay at their floors and its positive entries stop at their caps.
+ 5. Find the scale `t` at which `sum(clamp.(t .* q, lb, ub))` is one, with [`breakpoint_root`](@ref) over the kinks `lb ./ q` and `ub ./ q`. The search runs in `-t`, in which the budget does not increase.
+ 6. Return `clamp.(t .* q, lb, ub)`, or the Held Step `w`, with [`budget_or_held_step`](@ref).
 
 # Arguments
 
   - `proj`: The geometry.
-  - `set`: The set, its bounds resolved.
+  - `set`: The set, with its bounds resolved.
   - `q`: The raw step.
-  - `w`: The Price-Adjusted Allocation the step trades from, the answer of a Held Step.
+  - `w`: The Price-Adjusted Allocation from which the step trades. A Held Step returns it.
 
 # Validation
 
   - `all(isfinite, q)`. A `DomainError` is thrown otherwise.
-  - `Σ lb ≤ 1 ≤ Σ ub` over the resolved bounds. An `ArgumentError` is thrown otherwise.
-  - Under [`EntropicProjection`](@ref), `all(>= 0, q)`, `sum(q) > 0`, `all(>= 0, lb)` and `Σ_{q_i > 0} ub_i + Σ_{q_i = 0} lb_i ≥ 1`. A `DomainError` is thrown otherwise.
+  - `sum(lb) <= 1 <= sum(ub)` over the resolved bounds, off the simplex bounds. An `ArgumentError` is thrown otherwise.
+  - Under [`EntropicProjection`](@ref): `all(>=(0), q)`, `sum(q) > 0`, `all(>=(0), lb)` and `sum(ifelse.(q .> 0, ub, lb)) >= 1`. A `DomainError` is thrown otherwise.
 
 # Returns
 
-  - `w'::Vector`: The projected allocation, a new vector, or `w` copied on a Held Step.
+  - `w'::Vector`: The projected allocation as a new vector, or a copy of `w` on a Held Step.
 
 # Related
 
   - [`AbstractProjectionGeometry`](@ref)
   - [`BoundedAllocationSet`](@ref)
   - [`project_simplex`](@ref)
+  - [`bounded_quadratic_projection`](@ref)
+  - [`breakpoint_root`](@ref)
+  - [`budget_or_held_step`](@ref)
 """
 function project(proj::EuclideanProjection, set::BoundedAllocationSet, q::AbstractVector,
                  w::AbstractVector)
@@ -393,7 +598,11 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuses a raw step with a non-finite entry: no projection of an infinite or undefined step lies on the budget.
+Refuses a raw step with a non-finite entry, because no projection of an infinite or undefined step lies on the budget.
+
+# Validation
+
+  - `all(isfinite, q)`. A `DomainError` is thrown otherwise.
 
 # Related
 
@@ -409,9 +618,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The projected allocation `wn` when it meets the budget, or the Held Step otherwise: the record goes to the current [`ProjectionStep`](@ref) through [`record_held_step!`](@ref), and the answer is a copy of `w`, as a failed [`projection_programme`](@ref) answers.
+Returns the projected allocation `wn` when it meets the budget, and the Held Step otherwise.
 
-A scalar root is exact on every input its bracket can resolve in floating point, and a barrier geometry's root can lose its budget to cancellation where a base is far larger than the step it restores. That loss is caught here, and not returned as an allocation off the budget.
+A root found from the kinks is exact on every input whose kinks floating point can hold. The root of a barrier geometry can lose its budget to cancellation, when a base is far larger than the step it restores. This function catches that loss, so no allocation off the budget reaches the rule.
+
+# Algorithm
+
+ 1. When `isapprox(sum(wn), 1)` holds, return `wn`. The default tolerance of `isapprox` is a relative error of `sqrt(eps)` of the element type, `1.49e-8` for `Float64`.
+ 2. Otherwise, record a Held Step on the current [`ProjectionStep`](@ref) with [`record_held_step!`](@ref). Its reason names the set, the geometry and the sum, and it has no solver trials.
+ 3. Return a copy of `w`, as a failed [`projection_programme`](@ref) does.
 
 # Arguments
 
@@ -441,7 +656,35 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The projection of a raw step onto a bounded set in the norm of a positive diagonal `h`, ``\\min \\tfrac{1}{2} \\sum_i h_i (w_i - q_i)^2`` subject to the budget and the bounds: the scalar root ``w_i = \\mathrm{clip}(q_i - \\theta / h_i, lb_i, ub_i)`` at the ``\\theta`` that restores the budget, found exactly from the kinks of the budget through [`breakpoint_root`](@ref). At `h = 1`, the default, it is the Euclidean arm of [`project`](@ref) off the simplex bounds; with the gradient mass of [`AdaptiveSubgradient`](@ref) it is the [`DiagonalProjection`](@ref) on every bound.
+Projects a raw step onto a bounded set in the norm of a positive diagonal `h`, at the exact root of the budget.
+
+At `h = 1`, the default, it is the Euclidean arm of [`project`](@ref) off the simplex bounds. With the gradient mass of [`AdaptiveSubgradient`](@ref) in `h`, it is the [`DiagonalProjection`](@ref) on every bound.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{w}^{+} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; \\tfrac{1}{2} \\sum_i h_i (w_i - q_i)^2\\,, \\\\
+w_i(\\theta) &= \\min\\left(\\max\\left(q_i - \\theta / h_i,\\, l_i\\right),\\, u_i\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_plus_proj])
+  - $(math_dict[:W_aset])
+  - $(math_dict[:h_diag_norm])
+  - $(math_dict[:q_raw])
+  - $(math_dict[:lu_i_aset])
+  - $(math_dict[:theta_aset])
+
+The projection is ``\\boldsymbol{w}(\\theta)`` at the root. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``, and it is linear between the kinks at ``h_i (q_i - u_i)`` and ``h_i (q_i - l_i)``, so the line through the two kinks that bracket the root gives the root exactly.
+
+# Algorithm
+
+ 1. Refuse a non-finite `q` with [`assert_finite_raw_step`](@ref), and bounds that no allocation on the budget satisfies with [`assert_feasible_bounds`](@ref).
+ 2. Find `theta`, the root of `sum(clamp.(q .- theta ./ h, lb, ub))` at one, with [`breakpoint_root`](@ref) over the kinks `h .* (q .- ub)` and `h .* (q .- lb)`.
+ 3. Return `clamp.(q .- theta ./ h, lb, ub)`.
 
 # Arguments
 
@@ -478,9 +721,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The root of a non-increasing, piecewise linear budget function `f` where it crosses one, found exactly from its kinks `x`.
+Finds, from its kinks `x`, the point at which a non-increasing, piecewise linear budget function `f` crosses one.
 
-The Euclidean, diagonal and entropic projections onto a bounded set are each a clip of the raw step at one scalar, linear in that scalar between the kinks where an asset reaches a bound. A binary search over the sorted kinks finds the two that bracket the root, and the line through them is the root. The search reads the kinks and not a bracket's width, so a raw step whose entries span hundreds of binades is as exact as one near the simplex. A kink at an infinite bound is no kink, and the budget is linear past the last finite one, so a root there is the line through that kink and a second point on the same side.
+The Euclidean, diagonal and entropic projections onto a bounded set each clip the raw step at one scalar. The budget is linear in that scalar between the kinks at which an asset reaches a bound, so the line through the two kinks that bracket the root gives the root exactly. The search reads the kinks and not the width of a bracket, so a raw step whose entries span hundreds of binades is as exact as a step near the simplex. A kink at an infinite bound is not a kink, and the budget is linear past the last finite kink.
+
+# Algorithm
+
+ 1. Drop the non-finite kinks and sort the rest, giving `x`. When no kink is left, use the one kink `0`.
+ 2. Search the indices of `x` by bisection for `lo`, the last kink at which `f` is at least one, and `hi = lo + 1`. The index `0` stands for the linear tail below the first kink, and the index `length(x) + 1` for the tail above the last kink.
+ 3. Take the segment `(a, b)` that holds the root with [`breakpoint_segment`](@ref).
+ 4. When `f(a) == f(b)`, return `a`. Otherwise, return the point at which the line through `(a, f(a))` and `(b, f(b))` crosses one.
 
 # Arguments
 
@@ -515,7 +765,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The segment of [`breakpoint_root`](@ref)'s budget that holds the root, from the kinks `x[lo]` and `x[hi]`. An index past either end is a linear tail, and a second point on it is taken one kink's magnitude, at least one, beyond the last kink.
+Returns the segment of the budget of [`breakpoint_root`](@ref) that holds the root, from the kinks `x[lo]` and `x[hi]`.
+
+An index past either end of `x` stands for a linear tail. The second point on a tail lies beyond the outer kink by the magnitude of that kink, and by at least one.
+
+# Algorithm
+
+ 1. When `lo == 0`, return `(x[1] - max(1, abs(x[1])), x[1])`.
+ 2. When `hi > length(x)`, return `(x[end], x[end] + max(1, abs(x[end])))`.
+ 3. Otherwise, return `(x[lo], x[hi])`.
 
 # Related
 
@@ -532,9 +790,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The root of a non-increasing budget function `f` on `[lo, hi]` where it crosses one, by bisection until the bracket collapses to adjacent floating-point values.
+Finds the point on `[lo, hi]` at which a non-increasing budget function `f` crosses one, by bisection until the bracket collapses to adjacent floating-point values.
 
-A barrier geometry's projection onto a bounded set is a clip of the raw step at one scalar, and the budget is monotone in that scalar but not linear, so it is bisected. The cap on the halvings is [`bisection_cap`](@ref) of the bracket's type, the count in which a bracket spanning the type's whole range collapses, so no bracket stops short of its resolution.
+The projection of a barrier geometry onto a bounded set clips the raw step at one scalar. The budget is monotone in that scalar but not linear, so the function bisects it. [`bisection_cap`](@ref) of the type of the bracket caps the number of halvings. The cap is not less than the number of halvings in which a bracket over the whole range of the type collapses, so no bracket stops before it reaches its resolution. The midpoint is `lo / 2 + hi / 2`, which does not overflow on a bracket near `floatmax`.
+
+# Algorithm
+
+ 1. Take the midpoint `mid = lo / 2 + hi / 2`. Stop when `mid` equals `lo` or `hi`, because the bracket then holds two adjacent values.
+ 2. Set `lo = mid` when `f(mid) >= 1`, and `hi = mid` otherwise.
+ 3. Repeat steps 1 and 2, at most [`bisection_cap`](@ref) times.
+ 4. Return `lo / 2 + hi / 2`.
 
 # Arguments
 
@@ -553,8 +818,10 @@ A barrier geometry's projection onto a bounded set is a clip of the raw step at 
   - [`bisection_cap`](@ref)
 """
 function bounded_root(f, lo, hi)
-    for _ in 1:bisection_cap(typeof((lo + hi) / 2))
-        mid = (lo + hi) / 2
+    # `(lo + hi) / 2` overflows to `Inf` when `lo + hi` passes `floatmax`; the halves do not,
+    # and in the normal range the two midpoints are the same number.
+    for _ in 1:bisection_cap(typeof(lo / 2 + hi / 2))
+        mid = lo / 2 + hi / 2
         if mid == lo || mid == hi
             break
         end
@@ -564,15 +831,31 @@ function bounded_root(f, lo, hi)
             hi = mid
         end
     end
-    return (lo + hi) / 2
+    return lo / 2 + hi / 2
 end
 """
     bisection_cap(::Type{T}) where {T <: AbstractFloat}
     bisection_cap(::Type)
 
-The number of halvings in which a bisection bracket of type `T` collapses to adjacent values of `T`, from the widest bracket the type holds: its normal binades, `exponent(floatmax(T)) - exponent(floatmin(T))`, and twice its precision, which covers the significand and the subnormal binades below `floatmin(T)`. It is 2151 for `Float64`, 301 for `Float32` and 51 for `Float16`.
+Returns a number of halvings that is enough for any bisection bracket of type `T` to collapse to adjacent values of `T`.
 
-The cap only guards [`bounded_root`](@ref): on a floating-point type the collapse check ends the loop first. Any other type takes the cap of `Float64`. The loop does not need a tight cap there: an AD dual and a quantity with units compare by their values, so the collapse check still ends the loop, and a `Rational` bracket never collapses, so no cap can be derived from it.
+# Mathematical definition
+
+```math
+\\begin{align}
+c(T) &= e_{\\max}(T) - e_{\\min}(T) + 2 p(T)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``c(T)``: Cap on the halvings for the type ``T``.
+  - ``e_{\\max}(T)``, ``e_{\\min}(T)``: Exponents of `floatmax(T)` and `floatmin(T)`. Their difference counts the normal binades of ``T``.
+  - ``p(T)``: Precision of ``T`` in bits. Twice the precision covers the significand and the subnormal binades below `floatmin(T)`.
+
+The cap is 2151 for `Float64`, 301 for `Float32` and 51 for `Float16`. The widest bracket, `[-floatmax(T), floatmax(T)]`, collapses at the smallest subnormal after 2099, 278 and 41 halvings, so the cap is an upper bound and not the exact count.
+
+The cap only guards [`bounded_root`](@ref). On a floating-point type the collapse check stops the loop first. Any other type takes the cap of `Float64`, and the loop does not need a tight cap there. An AD dual and a quantity with units compare by their values, so the collapse check still stops the loop. A `Rational` bracket never collapses, so no cap comes from it, and a `Rational{Int}` bracket overflows its integers after about sixty halvings.
 
 # Related
 
@@ -587,20 +870,35 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The Euclidean projection of a vector onto the probability simplex, by the sort of Duchi, Shalev-Shwartz, Singer and Chandra (2008).
+Projects a vector onto the probability simplex in Euclidean distance, by the sort of Duchi, Shalev-Shwartz, Singer and Chandra (2008).
 
 # Mathematical definition
 
-The projection solves ``\\min \\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{v} \\rVert^2`` subject to ``\\boldsymbol{1}^\\intercal \\boldsymbol{w} = 1`` and ``\\boldsymbol{w} \\geq 0``. Its Lagrangian gives ``w_i = \\max(v_i - \\theta, 0)`` for the scalar ``\\theta`` that restores the budget: with ``\\boldsymbol{u}`` the entries of ``\\boldsymbol{v}`` in decreasing order,
-
 ```math
 \\begin{align}
-\\rho &= \\max \\left\\lbrace j : u_j - \\frac{1}{j} \\left( \\sum_{k \\leq j} u_k - 1 \\right) > 0 \\right\\rbrace\\,,\\quad
-\\theta = \\frac{1}{\\rho} \\left( \\sum_{k \\leq \\rho} u_k - 1 \\right)\\,.
+\\boldsymbol{w}^{+} &= \\underset{\\boldsymbol{w} \\in \\Delta_N}{\\arg\\min} \\; \\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{v} \\rVert_2^2\\,, \\\\
+w^{+}_i &= \\max(v_i - \\theta, 0)\\,, \\\\
+\\rho &= \\max \\left\\lbrace j : u_j - \\frac{1}{j} \\left( \\sum_{k \\leq j} u_k - 1 \\right) > 0 \\right\\rbrace\\,, \\\\
+\\theta &= \\frac{1}{\\rho} \\left( \\sum_{k \\leq \\rho} u_k - 1 \\right)\\,.
 \\end{align}
 ```
 
-Entries pushed below ``\\theta`` become exactly zero, which is the sparsity of every rule under this geometry.
+Where:
+
+  - $(math_dict[:w_plus_proj])
+  - $(math_dict[:Delta_N_simplex])
+  - ``\\boldsymbol{v}``: Vector to project.
+  - $(math_dict[:theta_aset])
+  - ``\\rho``: Number of positive entries of the projection.
+  - ``\\boldsymbol{u}``: Entries of ``\\boldsymbol{v}`` in decreasing order.
+
+The entries of ``\\boldsymbol{v}`` below ``\\theta`` become exactly zero. That is the sparsity of every rule under the Euclidean geometry.
+
+# Algorithm
+
+ 1. Sort `v` in decreasing order, giving `u`.
+ 2. For each `j`, add `u[j]` to the running sum `css` and take `t = (css - 1) / j`. When `u[j] - t > 0`, set `rho = j` and `theta = t`.
+ 3. Return `max.(v .- theta, 0)`.
 
 # Arguments
 
@@ -638,13 +936,32 @@ end
     online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet)
     online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet, point::Option{<:AbstractVector})
 
-The Online Update: one row of the online portfolio selection recursion, written once per rule.
+Runs the Online Update, one row of the online portfolio selection recursion, which each rule writes once.
 
-Takes the rule, its private carrier `st`, the allocation `w` held during the period, the finite price relative `x` of that period, the rows carrier the head holds through it, and the head's Allocation Set; answers `(st', w')`, the carrier and the allocation for the next period. The carrier is written in place where the rule can, `nothing` is a legal carrier, and `w'` is always a new vector, because the projection allocates one — so a `w` that is a view after [`port_opt_view`](@ref) is never written.
+The function reads the rule, its private carrier `st`, the allocation `w` held during the period, the finite price relative `x` of that period, the rows carrier that the head holds through the period, and the head's Allocation Set. It returns `(st', w')`, the carrier and the allocation for the next period. A rule may write its carrier in place, and `nothing` is a legal carrier. `w'` is always a new vector, because the projection makes one, so the update never writes a `w` that is a view after [`port_opt_view`](@ref).
 
-Every rule takes the same two halves — the unconstrained step to a raw vector, then [`project`](@ref) onto the set in the rule's geometry — and a rule that reads `w` continues from whatever it is handed, the Start Allocation on the first row.
+Every rule makes the same two steps. It takes an unconstrained step to a raw vector, and it then calls [`project`](@ref) onto the set in its geometry. A rule that reads `w` continues from the allocation it gets, which is the Start Allocation on the first row.
 
-The seven-argument form names the **Gradient Point**: an [`ExpertMixture`](@ref) under [`BlendPoint`](@ref) hands every expert its played blend as `point`, and a first-order rule evaluates its gradient there while stepping from its own iterate, the shared gradient the dynamic-regret mixtures are stated on. The generic method drops the point and takes the six-argument update, so a rule that has no gradient ignores it, and a `nothing` point — the mixture under [`OwnPoint`](@ref) — is the six-argument update for every rule; [`MirrorDescent`](@ref), [`OptimisticStep`](@ref) and [`AdaptiveSubgradient`](@ref) read a given point.
+The seven-argument form names the **Gradient Point**. An [`ExpertMixture`](@ref) under [`BlendPoint`](@ref) gives every expert its played blend as `point`. A first-order rule then evaluates its gradient at that point and steps from its own iterate, so every expert reads the one gradient on which the dynamic-regret mixtures state their bounds. The generic method drops the point and runs the six-argument update. So a rule with no gradient ignores the point, and a `nothing` point, which the mixture gives under [`OwnPoint`](@ref), runs the six-argument update for every rule. [`MirrorDescent`](@ref), [`OptimisticStep`](@ref) and [`AdaptiveSubgradient`](@ref) read a given point.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+(s_{t+1}, \\boldsymbol{q}) &= U(s_t, \\boldsymbol{w}_t, \\boldsymbol{x}_t)\\,, \\\\
+\\boldsymbol{w}_{t+1} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; D_\\Psi(\\boldsymbol{w}, \\boldsymbol{q})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``U``: Unconstrained step of the rule.
+  - ``s_t``: Carrier of the rule before the update of period ``t``.
+  - $(math_dict[:w_t_iter])
+  - $(math_dict[:x_t_rel])
+  - $(math_dict[:q_raw])
+  - $(math_dict[:W_aset])
+  - $(math_dict[:D_Psi_breg])
 
 # Arguments
 
@@ -652,7 +969,7 @@ The seven-argument form names the **Gradient Point**: an [`ExpertMixture`](@ref)
   - `st`: The rule's carrier, or `nothing`.
   - `w`: The allocation held during the period.
   - `x`: The price relative of the period, `1 .+ r`, one at a gap.
-  - `rows`: The rows carrier the head holds through the period, a [`ReturnsResult`](@ref) of the rows verbatim, or `nothing`.
+  - `rows`: The rows carrier that the head holds through the period, a [`ReturnsResult`](@ref) of the rows as they arrived, or `nothing`.
   - `set`: The Allocation Set, resolved.
   - `point`: The Gradient Point, the allocation a first-order rule evaluates its gradient at, or `nothing` for its own iterate.
 
@@ -676,7 +993,22 @@ end
 """
     price_relative(r::Number)
 
-The price relative of one return, `1 + r`, and one at a gap: a non-finite return is a period in which the leg sat in cash, the Held Gap's own reading, so the Online Update sees a finite `x` at every asset and a kernel over the rows reads the same number there.
+Returns the price relative of one return, `1 + r`, and one at a gap.
+
+A non-finite return is a period in which the leg held cash, which is how the Held Gap reads it. So the Online Update sees a finite `x` at every asset, and a kernel over the rows reads the same number at the gap.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+x_{tj} &= \\begin{cases} 1 + r_{tj} & \\text{if } r_{tj} \\text{ is finite}\\,, \\\\ 1 & \\text{otherwise}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``x_{tj}``: Price relative of asset ``j`` in period ``t``.
+  - $(math_dict[:r_tj])
 
 # Related
 
@@ -691,9 +1023,9 @@ end
     rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector,
                     set::Option{<:AbstractAllocationSet})
 
-The carrier a rule holds before its first update, `nothing` for a rule that carries nothing, which is the default.
+Returns the carrier that a rule holds before its first update. The default is `nothing`, for a rule that carries nothing.
 
-The head calls the three-argument form with its Allocation Set, and the default method drops `set`, so a rule whose carrier reads only the Start Allocation implements the two-argument form. A rule that holds allocations of its own over the assets — the experts of an [`ExpertMixture`](@ref) and of a [`FollowTheLeadingHistory`](@ref) — implements the three-argument form and projects each of them onto `set`, as the head projects its `w0`. `nothing` for `set` projects nothing.
+The head calls the three-argument form with its Allocation Set, and the default method of that form drops `set`. So a rule whose carrier reads only the Start Allocation implements the two-argument form. A rule that holds allocations of its own over the assets, as an [`ExpertMixture`](@ref) and a [`FollowTheLeadingHistory`](@ref) hold their experts, implements the three-argument form. It projects each allocation onto `set`, as the head projects its `w0`. When `set` is `nothing`, the method projects nothing.
 
 # Related
 
@@ -711,7 +1043,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-A start projected once onto the Allocation Set `set` in the geometry `proj`, with itself as the reference: the head's Start Allocation, and the start of each expert an [`ExpertMixture`](@ref) or a [`FollowTheLeadingHistory`](@ref) holds, so the allocation held during the first period lies in the set. `nothing` for `set`, and a set that reads the head's rows, which has no constraints to form before the first row, hold `w` as given, and the first Online Update projects it.
+Projects a start allocation `w` once onto the Allocation Set `set` in the geometry `proj`, with `w` as its own reference.
+
+The head projects its Start Allocation with this function, and so does each expert of an [`ExpertMixture`](@ref) or a [`FollowTheLeadingHistory`](@ref). So the allocation held during the first period lies in the set. When `set` is `nothing`, or when it reads the head's rows and so has no constraints before the first row, the function returns `w` as it is, and the first Online Update projects it.
 
 # Related
 
@@ -729,7 +1063,9 @@ end
 """
     projection_geometry(alg::AbstractOnlinePortfolioSelectionAlgorithm)
 
-The Projection Geometry the head projects the Start Allocation in: the rule's `proj` slot.
+Returns the Projection Geometry in which the head projects the Start Allocation. The default is the rule's `proj` field.
+
+A rule overrides it when its start needs another geometry. [`NewtonStep`](@ref) returns [`EuclideanProjection`](@ref), because its Gram matrix is the identity before the first gradient.
 
 # Related
 
@@ -742,7 +1078,7 @@ end
 """
     rows_needed(alg::AbstractOnlinePortfolioSelectionAlgorithm)
 
-The number of rows a rule reads at a step. A rule with no method reads none.
+Returns the number of rows that a rule reads at a step. The default is `0`, so a rule with no method of its own reads no rows.
 
 # Related
 
@@ -755,7 +1091,7 @@ end
 """
     rows_needed_max(a, b)
 
-The larger of two row needs, `nothing` being unbounded.
+Returns the larger of two row needs. `nothing` stands for every row, so it is larger than any number.
 
 # Related
 
@@ -775,7 +1111,13 @@ end
     rule_state_view(st::AbstractPartialFitState, i, args...)
     rule_state_view(st, i, args...)
 
-Slices a rule's carrier to the selected assets, forwarding a typed carrier to its own [`port_opt_view`](@ref) and refusing one that has none.
+Slices a rule's carrier to the selected assets.
+
+A `nothing` carrier stays `nothing`. A carrier that subtypes [`AbstractPartialFitState`](@ref) goes to its own [`port_opt_view`](@ref). The function refuses any other carrier.
+
+# Validation
+
+  - `st` is `nothing` or an [`AbstractPartialFitState`](@ref). An `ArgumentError` is thrown otherwise.
 
 # Related
 
@@ -794,9 +1136,24 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The Price-Adjusted Allocation: the book the fund holds at the end of a period before it trades, `w .* x / ⟨w, x⟩`, one row of the self-financing Weight Drift at budget one.
+Returns the Price-Adjusted Allocation, the book that the fund holds at the end of a period before it trades.
 
-It is the reference of the family's trade — the update of [`BuyAndHold`](@ref) *is* this vector, and a turnover ceiling on a later set kind bounds the distance from it — and it is handed to every projection as its `w` argument.
+It is one row of the self-financing Weight Drift at budget one. Every trade of the family starts from it. The update of [`BuyAndHold`](@ref) returns this vector, a turnover ceiling on a [`ProgrammeAllocationSet`](@ref) bounds the distance from it, and every projection gets it as its `w` argument.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{w}}_t &= \\frac{\\boldsymbol{w}_t \\odot \\boldsymbol{x}_t}{\\boldsymbol{w}_t^\\intercal \\boldsymbol{x}_t}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_hat_t_padj])
+  - $(math_dict[:w_t_iter])
+  - $(math_dict[:x_t_rel])
+  - ``\\odot``: Elementwise product.
 
 # Arguments
 
@@ -819,9 +1176,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The record of a Held Step: a projection programme of one row that did not solve, so the step traded nothing.
+Records a Held Step, a projection of one row that did not give an allocation on the budget, so the step traded nothing.
 
-A projection onto a [`ProgrammeAllocationSet`](@ref), or in a [`GramProjection`](@ref), is a programme, and a programme can fail — infeasible on the day a turnover ceiling and a cap cannot both hold, timed out, a MIP at its limit, a covariance cone with no finite data on its first rows. The step then answers the Price-Adjusted Allocation it was handed, the book the fund already holds, so the fund trades nothing; the rule's carrier still absorbs the row. The head warns once with the row's timestamp, and its Recursion Read-out carries the record of the last folded row inside an [`OptimisationSuccess`](@ref), so a fallback chain never runs on a hold. A step never throws on a failed solve, and never falls back to a weaker set: a constraint dropped on the day it binds is not a constraint.
+A projection onto a [`ProgrammeAllocationSet`](@ref), or in a [`GramProjection`](@ref), is a programme, and a programme can fail. It is infeasible on a day when a turnover ceiling and a cap cannot both hold. It can also time out, stop a MIP at its limit, or meet a covariance cone with no finite data on its first rows. A closed-form root can also miss the budget in floating point, as [`budget_or_held_step`](@ref) states. The step then returns the Price-Adjusted Allocation that it got, the book that the fund already holds, so the fund trades nothing. The rule's carrier still takes in the row. The head warns once with the timestamp of the row. Its Recursion Read-out carries the record of the last folded row inside an [`OptimisationSuccess`](@ref), so a fallback chain never runs on a hold. A step never throws on a failed solve, and never falls back to a weaker set, because a constraint that the step drops on the day it binds does not constrain.
 
 # Fields
 
@@ -836,24 +1193,24 @@ $(DocStringExtensions.FIELDS)
 """
 struct HeldStep{T1, T2 <: AbstractString, T3}
     """
-    The timestamp of the row whose projection was held, or its index in the fold when the carrier has no timestamps, or `nothing` outside a fold.
+    The timestamp of the row whose projection the step held. It is the index of the row in the fold when the carrier has no timestamps, and `nothing` outside a fold.
     """
     ts::T1
     """
-    What was held: which projection of the row, and why.
+    The projection of the row that the step held, and the reason.
     """
     reason::T2
     """
-    The solver trials of the failed programme, a [`JuMPResult`](@ref)'s `trials`, or `nothing` when no programme was built.
+    The solver trials of the failed programme, the `trials` of a [`JuMPResult`](@ref), or `nothing` when the projection built no programme.
     """
     trials::T3
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The step a projection runs inside: the rows carrier the head holds through the period, the row's timestamp, and the Held Steps recorded so far.
+Holds the context of one row for every projection of that row: the rows carrier, the timestamp of the row, and the Held Steps recorded so far.
 
-The Online Update's projection is `project(proj, set, q, w)`, four arguments and no more, so a programme set's covariance cone and tracking error — which read the head's rows — and the Held Step's record — which the head must see — travel outside the signature, on the task-scoped [`PROJECTION_STEP`](@ref). The head opens one step per row through [`with_projection_step`](@ref), around the whole Online Update, so every projection of that row — a mixture's experts' and its own blend's — reads one carrier and writes one log. The carrier is the one the update itself is handed, a [`ReturnsResult`](@ref) of the rows verbatim under the pinned names and the buffer's Asset Panel, so a programme set fits its prior at the same door a batch head does ([`rows_carrier`](@ref)). Outside a step, a projection reads no rows and reports a hold as a warning.
+The projection of the Online Update is `project(proj, set, q, w)`, with four arguments and no more. Two things must reach it outside that signature. The covariance cone and the tracking error of a programme set read the head's rows, and the head must see the record of a Held Step. Both go on the task-scoped [`PROJECTION_STEP`](@ref). The head opens one step for each row through [`with_projection_step`](@ref), around the whole Online Update. So every projection of that row, those of a mixture's experts and that of its blend, reads one carrier and writes one log. The carrier is the one that the update gets, a [`ReturnsResult`](@ref) of the rows as they arrived, under the pinned names and the Asset Panel of the buffer. So a programme set fits its prior through [`rows_carrier`](@ref), as a batch head does. Outside a step, a projection reads no rows and reports a hold as a warning.
 
 # Fields
 
@@ -869,26 +1226,26 @@ $(DocStringExtensions.FIELDS)
 """
 struct ProjectionStep{T1, T2}
     """
-    The rows carrier the head holds through the period, a [`ReturnsResult`](@ref) of the rows verbatim, or `nothing`.
+    The rows carrier that the head holds through the period, a [`ReturnsResult`](@ref) of the rows as they arrived, or `nothing`.
     """
     rows::T1
     """
-    The row's timestamp, or its index in the fold.
+    The timestamp of the row, or the index of the row in the fold.
     """
     ts::T2
     """
-    The head's `strict` flag, read by a programme set's row-stage resolution, so a name an exposure row states and the universe does not carry is refused as the head refuses one.
+    The head's `strict` flag. A programme set reads it when it resolves its rows, so it refuses a name that an exposure row states and the universe does not carry, as the head refuses one.
     """
     strict::Bool
     """
-    The Held Steps recorded during this row, in the order their programmes failed.
+    The Held Steps recorded during this row, in the order in which their projections failed.
     """
     held::Vector{HeldStep}
 end
 """
     const PROJECTION_STEP
 
-The task-scoped [`ProjectionStep`](@ref) a projection reads, `nothing` outside a step.
+Holds the task-scoped [`ProjectionStep`](@ref) that a projection reads. It is `nothing` outside a step.
 
 # Related
 
@@ -899,7 +1256,9 @@ const PROJECTION_STEP = ScopedValue{Union{Nothing, ProjectionStep}}(nothing)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Runs `f()` inside a [`ProjectionStep`](@ref) over the rows carrier `rows` at `ts`, the head's `strict` carried, and answers `(f(), held)`: the update's result and the Held Steps its projections recorded, an empty vector when every programme solved.
+Runs `f()` inside a [`ProjectionStep`](@ref) over the rows carrier `rows` at `ts`, with the head's `strict` flag.
+
+It returns `(f(), held)`, the result of the update and the Held Steps that its projections recorded. `held` is empty when every projection met the budget.
 
 # Related
 
@@ -915,7 +1274,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Records a Held Step on the current [`ProjectionStep`](@ref), or warns at once when the projection runs outside one.
+Records a Held Step on the current [`ProjectionStep`](@ref). Outside a step, it warns at once and records nothing.
 
 # Related
 
@@ -934,7 +1293,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The rows the current [`ProjectionStep`](@ref) holds, or `nothing` outside a step.
+Returns the rows that the current [`ProjectionStep`](@ref) holds, or `nothing` outside a step.
 
 # Related
 
@@ -948,7 +1307,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The head's `strict` flag the current [`ProjectionStep`](@ref) carries, or `false` outside a step.
+Returns the head's `strict` flag that the current [`ProjectionStep`](@ref) carries, or `false` outside a step.
 
 # Related
 
@@ -962,7 +1321,9 @@ end
 """
     assert_rule_admits_set(alg::AbstractOnlinePortfolioSelectionAlgorithm, set::AbstractAllocationSet)
 
-Refuses, at the head's construction, a rule and an Allocation Set that cannot meet: the default admits every pair, and a rule that holds an optimisation estimator with no model for a programme set refuses that set by name ([`FollowTheLeader`](@ref)). A rule over other rules forwards the check to each of them.
+Refuses, when the head is built, a rule and an Allocation Set that cannot work together.
+
+The default admits every pair. A rule that holds an optimisation estimator with no model for a programme set, such as [`FollowTheLeader`](@ref), refuses that set by name. A rule over other rules sends the check to each of them.
 
 # Related
 
@@ -977,9 +1338,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The Partial Fit State of an [`OnlinePortfolioSelection`](@ref) head: a Rule State beside the rows held once, the Fold Context pinned by the first step, and every timestamp folded.
+Holds the Partial Fit State of an online portfolio selection head: the Rule State, the rows, the Fold Context and every folded timestamp.
 
-The pair `(st, w)` is the Rule State, the unit the family recurses over. The rows any rule of the tree reads are held once, on this state, as a [`SampleBufferState`](@ref) of **returns** — the Returns Result's rows verbatim, `NaN` where there was no return, and the row's active mask beside them under a time-varying panel — capped by the rule tree's [`rows_needed`](@ref), and `nothing` for a tree that reads none. The head reads the buffer out as a [`ReturnsResult`](@ref) at every row ([`rows_carrier`](@ref)), so a statistic over the rows reduces to its Coverage Universe as a batch fit over the same window does. The timestamps are never capped, so [`Resume`](@ref) works for a carrier-free rule. The last folded row's active mask is the Investable Mask the read-out reduces on, `nothing` under a static panel; the recursion itself keeps the full `w` and never carries a forced zero.
+The pair `(st, w)` is the Rule State, the unit over which the family recurses. The state holds once the rows that any rule of the tree reads, as a [`SampleBufferState`](@ref) of returns. The buffer keeps the rows of the Returns Result as they arrived, with `NaN` where there was no return, and under a time-varying panel it keeps the active mask of each row beside it. [`rows_needed`](@ref) of the rule tree caps the buffer, and the buffer is `nothing` for a tree that reads no rows. At every row the head reads the buffer out as a [`ReturnsResult`](@ref) through [`rows_carrier`](@ref), so a statistic over the rows reduces to its Coverage Universe as a batch fit over the same window does. No cap applies to the timestamps, so [`Resume`](@ref) works for a rule with no carrier. The active mask of the last folded row is the Investable Mask on which the read-out reduces, and it is `nothing` under a static panel. The recursion keeps the full `w` and never carries a forced zero.
 
 # Fields
 
@@ -1005,11 +1366,17 @@ Keywords correspond to the struct's fields.
 
   - `n >= 0`. A `DomainError` is thrown otherwise.
   - `length(nx) == length(w)` when `nx` is given, and `length(amsk) == length(w)` when `amsk` is given. A `DimensionMismatch` is thrown otherwise.
-  - `pnl` is static when it is not `nothing`. An `ArgumentError` is thrown otherwise: a time-varying panel's masks ride with the rows.
+  - `pnl` is static when it is not `nothing`. An `ArgumentError` is thrown otherwise, because the buffer holds the masks of a time-varying panel with the rows.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets: `w` is sliced and renormalised, `st` is forwarded to the carrier's own view through [`rule_state_view`](@ref), `X`, `nx`, `pnl` and `amsk` are sliced, and `n`, `ts` and `hold` are copied.
+`OnlinePortfolioSelectionState` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method passes `args...` to the view of the carrier and to the view of the rows buffer.
+  - `w` is sliced and renormalised through [`renormalised_view`](@ref), as a copy. The recursion keeps the full `w`.
+  - `st` goes to the view of the carrier through [`rule_state_view`](@ref).
+  - `X`, `nx`, `pnl` and `amsk` are sliced along the asset axis.
+  - `n`, `ts` and `hold` pass through, and `ts` is copied.
 
 # Related
 
@@ -1025,7 +1392,7 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
     """
     n
     """
-    The allocation held during the current period, over the full pinned universe, summing to one.
+    The allocation held during the current period. It covers the full pinned universe and sums to one.
     """
     w
     """
@@ -1033,7 +1400,7 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
     """
     st
     """
-    The rows of returns any rule of the tree reads, a [`SampleBufferState`](@ref) of the rows verbatim and their active masks, capped by [`rows_needed`](@ref), or `nothing` when the tree reads none.
+    The rows of returns that any rule of the tree reads, a [`SampleBufferState`](@ref) of the rows as they arrived and of their active masks. [`rows_needed`](@ref) caps it. It is `nothing` when the tree reads no rows.
     """
     X
     """
@@ -1041,19 +1408,19 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
     """
     nx
     """
-    The static [`AssetPanel`](@ref) of the universe, pinned by the first step, or `nothing`. A time-varying panel is never held here.
+    The static [`AssetPanel`](@ref) of the universe, pinned by the first step, or `nothing`. The state never holds a time-varying panel here.
     """
     pnl
     """
-    The active mask of the last folded row under a time-varying panel, the Investable Mask of the read-out, or `nothing` under a static one.
+    The active mask of the last folded row under a time-varying panel, which is the Investable Mask of the read-out, or `nothing` under a static panel.
     """
     amsk
     """
-    Timestamps of the observations folded, in order and uncapped, or `nothing` when the carrier holds none.
+    Timestamps of the folded observations, in order and with no cap, or `nothing` when the carrier holds none.
     """
     ts
     """
-    The [`HeldStep`](@ref) record of the last folded row when a projection of that row was held, or `nothing` when every projection of it solved; the Recursion Read-out's retcode carries it.
+    The [`HeldStep`](@ref) record of the last folded row when the step held a projection of that row, or `nothing` when every projection of it met the budget. The return code of the Recursion Read-out carries it.
     """
     hold
 end
@@ -1082,9 +1449,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuses to merge two online selection states, by name.
+Refuses to merge two online selection states.
 
-An Online Update is not a sufficient statistic for its block: even a carrier that is — a Gram sum, a prefix of rows — sits beside an allocation that is not, so two states folded on disjoint blocks describe no single run. The family's parallel route is the Causal Pass, which is `O(N)` a row.
+An Online Update is not a sufficient statistic for its block. A carrier can be one, such as a Gram sum or a prefix of rows, but the allocation beside it is not. So two states folded on disjoint blocks describe no single run. To fold the rows in one pass, run the Causal Pass, which costs `O(N)` a row.
+
+# Validation
+
+  - The function always throws an `ArgumentError`.
 
 # Related
 
@@ -1097,7 +1468,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Copies an [`OnlinePortfolioSelectionState`](@ref) so the copy shares no array with the original: `w`, `st`, `X` and `ts` are deep-copied.
+Copies an [`OnlinePortfolioSelectionState`](@ref) so that the copy shares no array with the original.
+
+The method calls `copy` on `w`, `st`, `X`, `nx`, `amsk` and `ts`. A carrier and the rows buffer copy their own arrays through their `Base.copy` methods. `n`, `pnl` and `hold` pass through unchanged.
 
 # Related
 
@@ -1113,9 +1486,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Slices an [`OnlinePortfolioSelectionState`](@ref) to the selected assets: the state of the same observations over them.
+Slices an [`OnlinePortfolioSelectionState`](@ref) to the selected assets, giving the state of the same observations over those assets.
 
-`w` is sliced and renormalised, the carrier is forwarded to its own view through [`rule_state_view`](@ref), the rows buffer takes [`SampleBufferState`](@ref)'s view, the names, the panel and the mask are sliced, and the count, the timestamps and the hold record are copied. The view is a copy for the read-out; the recursion keeps the full `w`.
+The method slices `w` and renormalises it. It sends the carrier to its own view through [`rule_state_view`](@ref), and the rows buffer to the view of [`SampleBufferState`](@ref). It slices the names, the panel and the mask, and it keeps the count, the timestamps and the hold record. The view is a copy for the read-out, and the recursion keeps the full `w`.
 
 # Arguments
 
@@ -1152,9 +1525,23 @@ end
     renormalised_view(w::Nothing, i)
     renormalised_view(w::AbstractVector, i)
 
-Slices an allocation to the selected assets and renormalises it to sum to one, as a copy; passes an absent one through.
+Slices an allocation to the selected assets and renormalises it to sum to one, as a copy. A `nothing` allocation stays `nothing`.
 
-The mass the selection leaves out is spread over the kept assets in proportion, which is the reading every per-asset view of an allocation takes in the family: the read-out under a time-varying panel, and the view of a rule's own allocation. A selection that keeps none of the mass, as a view of a one-hot allocation over the other assets does, has no proportion to spread it in and answers the uniform allocation over the kept assets, the family's Start Allocation.
+The function spreads the mass that the selection leaves out over the kept assets in proportion. Every per-asset view of an allocation in the family reads it this way, the read-out under a time-varying panel and the view of a rule's own allocation among them. A selection that keeps none of the mass, such as a view of a one-hot allocation to the other assets, has no proportion. It returns the uniform allocation over the kept assets, the Start Allocation of the family.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+v_i &= \\begin{cases} w_i \\big/ \\sum_{j \\in I} w_j & \\text{if } \\sum_{j \\in I} w_j \\neq 0\\,, \\\\ 1 / \\lvert I \\rvert & \\text{otherwise}\\,, \\end{cases} \\quad i \\in I\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``v_i``: Entry of the view for the kept asset ``i``.
+  - ``w_i``: Entry of the allocation for asset ``i``.
+  - ``I``: Set of the kept assets.
 
 # Related
 
@@ -1172,24 +1559,50 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the Learning-Rate Schedules a first-order Online Selection Rule may hold on `eta` in place of a number.
+Abstract supertype for the Learning-Rate Schedules that a first-order Online Selection Rule can hold in `eta` in place of a number.
 
-A schedule is read at every update as a function of the period count and of the rule's carrier, so it may follow the count alone, read a running statistic of the run that the carrier keeps for it, or name a stage boundary at which the rule restarts. It owns no state: whatever it accumulates lives on the rule's carrier, seeded by the schedule and written by it once per row — after the step by default, so the rate of a period reads the past alone, or before the rate is read when the schedule declares that it chooses the rate from the period's own row.
+The rule reads its schedule at every update, as a function of the period count and of the rule's carrier. So a schedule can follow the count alone, read a running statistic of the run that the carrier keeps for it, or name a stage boundary at which the rule restarts. A schedule owns no state. What it accumulates lives on the rule's carrier. The schedule seeds that statistic and writes it once for each row. By default it writes after the step, so the rate of a period reads only the past. A schedule that chooses the rate from the row of the period itself writes before the rule reads the rate.
 
 # Interfaces
 
-In order to implement a new schedule, subtype `AbstractLearningRateSchedule` and implement:
+To implement a new schedule, subtype `AbstractLearningRateSchedule` and implement the following methods:
 
-  - `learning_rate(sched::AbstractLearningRateSchedule, t::Integer, st) -> Real`: The rate of the update at period `t`, the `t`-th row the rule has seen; `st` is the rule's carrier, whose `s` field is the schedule's own statistic.
-  - `restart(sched::AbstractLearningRateSchedule, t::Integer) -> Bool`: Whether the update at period `t` closes a stage, at which the rule answers the Start Allocation for period `t + 1` and puts its carrier back at its seed; `false` by default.
-  - `schedule_state_seed(sched::AbstractLearningRateSchedule, w::AbstractVector)`: The statistic the carrier holds for the schedule before the first row, or `nothing`, the default.
-  - `schedule_update!(sched::AbstractLearningRateSchedule, s, w::AbstractVector, x::AbstractVector)`: Writes the row into the statistic `s`, from the allocation `w` played during the period and its price relative `x`; the identity by default.
-  - `reads_period_row(sched::AbstractLearningRateSchedule) -> Bool`: Whether the rate of period `t` is chosen from the row of period `t`, so the statistic is written before the rate is read rather than after the step; `false` by default. A rule whose update needs the rate of the *next* period as well, as the online form of [`ExpectationMaximisation`](@ref) does, refuses a schedule that answers `true`, because the next period's row is not there to read.
-  - `mixing_share(sched::AbstractLearningRateSchedule, t::Integer, alpha::Real) -> Real`: The uniform-mix share of the update at period `t`, the rule's own `alpha` by default; a schedule that sets the share from a stage length answers its own.
+  - `learning_rate(sched::AbstractLearningRateSchedule, t::Integer, st) -> Real`: The rate of the update at period `t`, the `t`-th row that the rule has seen. `st` is the rule's carrier, and its `s` field is the schedule's own statistic.
+  - `restart(sched::AbstractLearningRateSchedule, t::Integer) -> Bool`: Whether the update at period `t` closes a stage. At a stage boundary the rule returns the Start Allocation for period `t + 1` and puts its carrier back at its seed. The default is `false`.
+  - `schedule_state_seed(sched::AbstractLearningRateSchedule, w::AbstractVector)`: The statistic that the carrier holds for the schedule before the first row. The default is `nothing`.
+  - `schedule_update!(sched::AbstractLearningRateSchedule, s, w::AbstractVector, x::AbstractVector)`: Writes the row into the statistic `s`, from the allocation `w` played during the period and its price relative `x`. The default returns `s` unchanged.
+  - `reads_period_row(sched::AbstractLearningRateSchedule) -> Bool`: Whether the schedule chooses the rate of period `t` from the row of period `t`. When it does, the rule writes the statistic before it reads the rate, and not after the step. The default is `false`. A rule whose update also needs the rate of the *next* period, as the online form of [`ExpectationMaximisation`](@ref) does, refuses a schedule that returns `true`, because the row of the next period is not there to read.
+  - `mixing_share(sched::AbstractLearningRateSchedule, t::Integer, alpha::Real) -> Real`: The share of the uniform mix in the update at period `t`. The default is the rule's own `alpha`, and a schedule that sets the share from a stage length returns its own.
 
-A statistic whose entries lie over the assets, as the expert allocations of a replaying schedule do, also implements [`schedule_state_view`](@ref), which slices it to the selected assets with the rule's carrier; a statistic over the run alone is copied as it stands.
+A statistic with entries over the assets, such as the expert allocations of a schedule that replays the run, also implements [`schedule_state_view`](@ref). That method slices the statistic to the selected assets with the rule's carrier. The default copies a statistic over the run as it is.
 
-A number on `eta` is the constant schedule: every verb answers the number, `false`, `nothing`, the identity, `false` and `alpha`.
+A number in `eta` is the constant schedule. The six verbs return the number, `false`, `nothing`, the statistic unchanged, `false` and `alpha`.
+
+# Examples
+
+A schedule that halves the rate at every period, from `0.4`. Two steps of exponentiated gradient at the rates `0.4` and `0.2` give the allocation below.
+
+```jldoctest
+julia> struct HalvingRate{T} <: PortfolioOptimisers.AbstractLearningRateSchedule
+           eta::T
+       end
+
+julia> function PortfolioOptimisers.learning_rate(sched::HalvingRate, t::Integer, st)
+           return sched.eta / 2^(t - 1)
+       end
+
+julia> PortfolioOptimisers.learning_rate(HalvingRate(0.4), 3, nothing)
+0.1
+
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\", \"C\"], X = [0.1 -0.1 0.0; 0.0 0.2 -0.05]);
+
+julia> round.(optimise(OnlinePortfolioSelection(; alg = MirrorDescent(; eta = HalvingRate(0.4))),
+                       rd).w; digits = 4)
+3-element Vector{Float64}:
+ 0.3436
+ 0.3295
+ 0.327
+```
 
 # Related
 
@@ -1205,7 +1618,9 @@ abstract type AbstractLearningRateSchedule <: AbstractAlgorithm end
     learning_rate(eta::Real, t::Integer, st)
     learning_rate(sched::AbstractLearningRateSchedule, t::Integer, st)
 
-The step size a first-order rule takes at period `t`: the number itself when `eta` is one, and the schedule's answer otherwise, read from the period count and the rule's carrier.
+Returns the step size that a first-order rule takes at period `t`.
+
+When `eta` is a number, the step size is that number. Otherwise the schedule returns it, from the period count and the rule's carrier.
 
 # Related
 
@@ -1219,7 +1634,9 @@ end
     restart(eta::Real, t::Integer)
     restart(sched::AbstractLearningRateSchedule, t::Integer)
 
-Whether the update at period `t` closes a stage of the schedule, so the rule answers the Start Allocation for period `t + 1` and puts its carrier back at its seed. A number and every schedule without stages answer `false`.
+Checks whether the update at period `t` closes a stage of the schedule.
+
+At a stage boundary the rule returns the Start Allocation for period `t + 1` and puts its carrier back at its seed. A number and every schedule with no stages return `false`.
 
 # Related
 
@@ -1233,7 +1650,7 @@ end
     schedule_state_seed(eta::Real, w::AbstractVector)
     schedule_state_seed(sched::AbstractLearningRateSchedule, w::AbstractVector)
 
-The statistic a rule's carrier holds for its schedule before the first row: `nothing` for a number and for a schedule that reads none.
+Returns the statistic that a rule's carrier holds for its schedule before the first row. It is `nothing` for a number and for a schedule that reads no statistic.
 
 # Related
 
@@ -1248,7 +1665,9 @@ end
     schedule_update!(eta::Real, s, w::AbstractVector, x::AbstractVector)
     schedule_update!(sched::AbstractLearningRateSchedule, s, w::AbstractVector, x::AbstractVector)
 
-Writes one row into the schedule's statistic `s`, from the allocation `w` played during the period and its price relative `x`, and answers the statistic; the identity for a number and for a schedule that reads none.
+Writes one row into the schedule's statistic `s`, from the allocation `w` played during the period and its price relative `x`, and returns the statistic.
+
+For a number, and for a schedule that reads no statistic, it returns `s` unchanged.
 
 # Related
 
@@ -1263,7 +1682,9 @@ end
     mixing_share(eta::Real, t::Integer, alpha::Real)
     mixing_share(sched::AbstractLearningRateSchedule, t::Integer, alpha::Real)
 
-The uniform-mix share of the update at period `t`: the rule's own `alpha` under a number and under every schedule that does not set it, and the stage's share under [`DoublingTrickRate`](@ref), whose share is a function of the stage length and takes precedence.
+Returns the share of the uniform mix in the update at period `t`.
+
+It is the rule's own `alpha` under a number and under every schedule that does not set the share. Under [`DoublingTrickRate`](@ref) the share is a function of the stage length, and it replaces `alpha`.
 
 # Related
 
@@ -1278,7 +1699,9 @@ end
     reads_period_row(eta::Real)
     reads_period_row(sched::AbstractLearningRateSchedule)
 
-Whether the schedule chooses the rate of period `t` from the row of period `t`: `true` for a schedule that replays the period before it answers, as [`WindowedBestRate`](@ref) does, and `false` for a number and for every schedule that reads the past alone. A rule writes the statistic before it reads the rate when the answer is `true`, and after its step otherwise; [`statistic_before_rate`](@ref) and [`statistic_after_step`](@ref) are the two calls.
+Checks whether the schedule chooses the rate of period `t` from the row of period `t`.
+
+It is `true` for a schedule that replays the period before it returns a rate, as [`WindowedBestRate`](@ref) does. It is `false` for a number and for every schedule that reads only the past. When it is `true`, a rule writes the statistic before it reads the rate. Otherwise the rule writes it after its step. [`statistic_before_rate`](@ref) and [`statistic_after_step`](@ref) are the two calls.
 
 # Related
 
@@ -1291,7 +1714,9 @@ end
 """
     statistic_before_rate(eta, s, w::AbstractVector, x::AbstractVector)
 
-The first of the two points at which a rule writes its schedule's row: the statistic the rate of the period is read from. The row enters here when [`reads_period_row`](@ref) answers `true`, and the call answers `s` unchanged otherwise; [`statistic_after_step`](@ref) is the other point, so a rule makes both calls and the schedule decides which one writes.
+Returns the statistic from which the rule reads the rate of the period. This is the first of the two points at which a rule writes the row of its schedule.
+
+The row goes in here when [`reads_period_row`](@ref) returns `true`. Otherwise the call returns `s` unchanged. [`statistic_after_step`](@ref) is the other point. A rule makes both calls, and the schedule decides which one writes.
 
 # Related
 
@@ -1305,7 +1730,9 @@ end
 """
     statistic_after_step(eta, s, w::AbstractVector, x::AbstractVector)
 
-The second of the two points at which a rule writes its schedule's row: the statistic the carrier keeps after the step. The row enters here when [`reads_period_row`](@ref) answers `false`, the default, and the call answers `s` unchanged otherwise; [`statistic_before_rate`](@ref) is the other point.
+Returns the statistic that the carrier keeps after the step. This is the second of the two points at which a rule writes the row of its schedule.
+
+The row goes in here when [`reads_period_row`](@ref) returns `false`, the default. Otherwise the call returns `s` unchanged. [`statistic_before_rate`](@ref) is the other point.
 
 # Related
 
@@ -1319,7 +1746,9 @@ end
 """
     schedule_state_view(s, i)
 
-Slices a schedule's statistic to the selected assets when a rule's carrier is viewed: a copy of the statistic as it stands by default, because the statistics of the count-reading and run-reading schedules lie over the run and not over the assets; a statistic that holds allocations, as [`WindowedBestRate`](@ref)'s does, slices and renormalises each of them through [`renormalised_view`](@ref).
+Slices a schedule's statistic to the selected assets when a view slices the rule's carrier.
+
+By default it returns a copy of the statistic as it is, because a schedule that reads the count or the run keeps a statistic over the run and not over the assets. A statistic that holds allocations, as the statistic of [`WindowedBestRate`](@ref) does, slices and renormalises each allocation through [`renormalised_view`](@ref).
 
 # Related
 
