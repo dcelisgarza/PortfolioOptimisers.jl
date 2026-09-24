@@ -245,7 +245,8 @@ function set_frc_iplg_constraints!(model::JuMP.Model, plgs::Option{<:PlC_VecPlC}
     end
     fwb = factor_weight_bounds(wb, Bt)
     if !isa(get_k(model), Number)
-        set_mip_ss_expr!(model, ss, wb)
+        # `factor_weight_bounds` refused a `nothing` bound above.
+        set_mip_ss_expr!(model, ss, wb::WeightBounds)
     end
     sp = FactorMIPSpace()
     ib = held_bin(declare_held_indicators!(model, sp, fwb, mip_wx!(model, sp), ss))

@@ -424,4 +424,9 @@ end
     PortfolioOptimisers.set_frc_iplg_constraints!(m, SemiDefinitePhylogeny(; A = A),
                                                   nothing, Bt, nothing)
     @test !haskey(m, :frc_ib)
+    # A factor bit gates the weight directly only under a constant budget, as a sub-group
+    # bit does. The unit-budget shortcut belongs to the asset space alone (#1315).
+    sp = PortfolioOptimisers.FactorMIPSpace()
+    @test PortfolioOptimisers.use_direct_mip_indicators(m, sp, 1)
+    @test !PortfolioOptimisers.use_direct_mip_indicators(m, sp, JuMP.@variable(m))
 end

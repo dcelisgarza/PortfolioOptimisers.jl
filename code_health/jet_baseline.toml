@@ -261,7 +261,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/04_Hierarchical/04_HierarchicalEqualRiskContribution.jl" = { raw = 1, reviewed = 1 }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation.jl" = { raw = 0, reviewed = 0 }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/01_MIPIndicators.jl" = { raw = 3, reviewed = 3 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/01_MIPIndicators.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { raw = 5, reviewed = 5 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl" = { raw = 4, reviewed = 4 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/04_WeightConstraints.jl" = { raw = 0, reviewed = 0 }
