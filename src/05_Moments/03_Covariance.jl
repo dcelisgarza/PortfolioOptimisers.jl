@@ -244,11 +244,14 @@ end
     library_covariance_estimator(ce::AbstractCovarianceEstimator) -> AbstractCovarianceEstimator
     library_covariance_estimator(ce::StatsBase.CovarianceEstimator) -> GeneralCovariance
 
-Returns an estimator that answers every call this library makes of a nested covariance estimator.
+Returns a nested covariance estimator in a form that takes every call this library makes of one.
 
-A field bound to `StatsBase.CovarianceEstimator` admits an estimator that this library does not own, such as `StatsBase.SimpleCovariance()`. The library calls a nested estimator with its own keywords, such as `iv`, `ivpa` and `active_mask`, and with an Asset Panel argument. A `StatsBase` method refuses both. [`GeneralCovariance`](@ref) answers both for any `StatsBase.CovarianceEstimator`, because [`robust_cov`](@ref) and [`robust_cor`](@ref) drop a keyword the estimator does not take. So a verb that forwards to a nested estimator calls it through this function.
+A field bound to `StatsBase.CovarianceEstimator` admits an estimator that this library does not own, such as `StatsBase.SimpleCovariance()`. The library calls a nested estimator with its own keywords, such as `iv`, `ivpa` and `active_mask`, with an Asset Panel argument, and through `Statistics.var` and `Statistics.std`. `StatsBase` defines no method for any of the three. A verb that forwards to a nested estimator therefore calls it through this function.
 
-An estimator of the library is returned unchanged, so it still receives every keyword. An estimator that the library does not own is wrapped in a [`GeneralCovariance`](@ref) without weights, which calls it with the same `dims` and `mean` as before.
+The two methods select one branch each:
+
+  - An [`AbstractCovarianceEstimator`](@ref) is returned unchanged, so it still receives every keyword.
+  - Any other `StatsBase.CovarianceEstimator` is wrapped in a [`GeneralCovariance`](@ref) without weights. The wrapper is an [`AbstractCovarianceEstimator`](@ref), so the Asset Panel methods and the diagonal methods of `var` and `std` take it. Its `cov` and `cor` go through [`robust_cov`](@ref) and [`robust_cor`](@ref), which call the wrapped estimator with `dims` and `mean` alone when its method does not take the other keywords. The wrapper therefore returns what the bare estimator returns for the same `dims` and `mean`.
 
 # Arguments
 
@@ -264,6 +267,8 @@ An estimator of the library is returned unchanged, so it still receives every ke
   - [`AbstractCovarianceEstimator`](@ref)
   - [`robust_cov`](@ref)
   - [`robust_cor`](@ref)
+  - [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+  - [`std(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function library_covariance_estimator(ce::AbstractCovarianceEstimator)
     return ce

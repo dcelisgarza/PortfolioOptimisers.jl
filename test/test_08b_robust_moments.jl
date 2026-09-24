@@ -119,9 +119,19 @@ end
     end
     @test prior(EmpiricalPrior(; ce = sc), X; kw...).sigma ==
           prior(EmpiricalPrior(; ce = gc), X; kw...).sigma
-    for me in (ShrunkExpectedReturns, EquilibriumExpectedReturns)
+    for me in (ShrunkExpectedReturns, EquilibriumExpectedReturns,
+               StandardDeviationExpectedReturns, VarianceExpectedReturns)
         @test mean(me(; ce = sc), X; kw...) == mean(me(; ce = gc), X; kw...)
+        @test mean(me(; ce = sc), X, nothing; kw...) ==
+              mean(me(; ce = gc), X, nothing; kw...)
     end
+    # #1263: the two diagonal estimators called `std` and `var` on the bare estimator, which
+    # `StatsBase` does not define for a `CovarianceEstimator`.
+    d = LinearAlgebra.diag(Statistics.cov(sc, X))
+    @test vec(mean(VarianceExpectedReturns(; ce = sc), X)) ≈ d
+    @test vec(mean(StandardDeviationExpectedReturns(; ce = sc), X)) ≈ sqrt.(d)
+    @test prior(EmpiricalPrior(; me = StandardDeviationExpectedReturns(; ce = sc)), X).mu ≈
+          sqrt.(d)
     rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X)
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                  settings = Dict("verbose" => false))
