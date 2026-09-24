@@ -2,7 +2,16 @@
 # against the closed forms their docstrings state: the five norms of `TrackingRiskMeasure`,
 # the two modes of `RiskTrackingRiskMeasure`, the two modes of `RiskTrackingError` in an
 # optimisation, and every propagation method of the three types.
-using Clarabel, JuMP
+using Clarabel, JuMP, Statistics
+
+# Observation weights that resolve against the returns matrix. It lives at top level because
+# `@testset` expands to a function body, which cannot hold a `struct`.
+struct TrackedDecayWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::TrackedDecayWeights,
+                                                     X::PortfolioOptimisers.MatNum;
+                                                     dims::Int = 1, kwargs...)
+    return aweights(collect(range(1.0, 2.0; length = size(X, dims))))
+end
 
 @testset "Tracking risk measures" begin
     rng = StableRNG(1049)
@@ -66,24 +75,91 @@ using Clarabel, JuMP
         @test iszero(rd(wb, X))
     end
 
-    @testset "the independent functor charges the fee of the weight difference" begin
-        # The docstring states it, and the model charges the fee of `w` instead. The gap
-        # is recorded on #1316; this pins the present value so a change shows here.
+    @testset "the independent functor charges the fee of the portfolio" begin
+        # The model tracks the series `X(w - wb) - F(w)`, and the functor reads the same
+        # series (#1316). Before the fix the functor charged `F(w - wb)`, zero at `wb`.
         cvar = ConditionalValueatRisk()
+        x = X * (w - wb) .- 0.002 * sum(w)
         r = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = cvar)
-        @test isapprox(r(w, X, fees), expected_risk(cvar, w - wb, X, fees); rtol = 1e-14)
-        @test abs(r(wb, X, fees)) < 1e-12
+        @test isapprox(r(w, X, fees), cvar(x); rtol = 1e-14)
+        @test isapprox(r(wb, X, fees), 0.002; rtol = 1e-12)
+        # Without a fee the two series are equal.
+        @test r(w, X) == expected_risk(cvar, w - wb, X)
         sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
                                 opt = JuMPOptimiser(; pe = pr, slv = slv, fees = fees)))
         @test isa(sol.retcode, OptimisationSuccess)
         @test isapprox(sol.w, wb; atol = 1e-6)
         @test isapprox(JuMP.value(sol.model[:risk]), 0.002; rtol = 1e-6)
+        @test isapprox(expected_risk(r, sol.w, X, fees), JuMP.value(sol.model[:risk]);
+                       rtol = 1e-6)
+        # A measure that reads the weights alone reads no fee.
+        rs = factory(RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb),
+                                             r = StandardDeviation()), pr)
+        @test rs(w, X, fees) == rs(w, X)
         # The dependent functor charges each weight vector its own fee, as the model does.
         rd = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = cvar,
                                      alg = DependentVariableTracking())
         @test isapprox(rd(w, X, fees),
                        abs(expected_risk(cvar, w, X, fees) -
                            expected_risk(cvar, wb, X, fees)); rtol = 1e-12)
+    end
+
+    @testset "every tracked measure reads the series of the weight difference" begin
+        cvar = ConditionalValueatRisk()
+        wd = w - wb
+        x = X * wd .- 0.002 * sum(w)
+        wb2 = [0.1, 0.2, 0.3, 0.4]
+        track(ri; b = wb, alg = IndependentVariableTracking()) = RiskTrackingRiskMeasure(;
+                                                                                         tr = WeightsTracking(;
+                                                                                                              w = b),
+                                                                                         r = ri,
+                                                                                         alg = alg)
+        # A moment measure takes its target from the weight difference, as the model does.
+        lom = factory(LowOrderMoment(), pr)
+        @test isapprox(track(lom)(w, X, fees), mean(max.(dot(wd, pr.mu) .- x, 0));
+                       rtol = 1e-12)
+        @test isapprox(track(LowOrderMoment())(w, X, fees), mean(max.(mean(x) .- x, 0));
+                       rtol = 1e-12)
+        @test isapprox(track(MedianAbsoluteDeviation())(w, X, fees),
+                       MedianAbsoluteDeviation()(x); rtol = 1e-12)
+        # Observation weights that resolve against the data resolve first.
+        ow = aweights(collect(range(1.0, 2.0; length = T)))
+        lomd = LowOrderMoment(; w = TrackedDecayWeights(), mu = pr.mu)
+        @test isapprox(track(lomd)(w, X, fees), mean(max.(dot(wd, pr.mu) .- x, 0), ow);
+                       rtol = 1e-12)
+        # A tracking error takes the norm of the series minus its own benchmark series.
+        te = TrackingRiskMeasure(; tr = WeightsTracking(; w = wb2))
+        @test isapprox(track(te)(w, X, fees), norm(x - X * wb2, 2) / sqrt(T - 1);
+                       rtol = 1e-12)
+        # A nested independent mode subtracts its benchmark weights. A nested dependent mode
+        # subtracts the risk of its benchmark weights, which pay their own fee.
+        @test isapprox(track(track(cvar; b = wb2))(w, X, fees),
+                       cvar(X * (wd - wb2) .- 0.002 * sum(w)); rtol = 1e-12)
+        @test isapprox(track(track(cvar; b = wb2, alg = DependentVariableTracking()))(w, X,
+                                                                                      fees),
+                       abs(cvar(x) - cvar(X * wb2 .- 0.002 * sum(wb2))); rtol = 1e-12)
+        # A ratio divides the two results, and a composite of the weights reads no fee.
+        cvar10 = ConditionalValueatRisk(; alpha = 0.1)
+        @test isapprox(track(RiskRatio(; r1 = cvar, r2 = cvar10))(w, X, fees),
+                       cvar(x) / cvar10(x); rtol = 1e-12)
+        vsk = factory(VarianceSkewKurtosis(), prior(HighOrderPriorEstimator(), X))
+        @test track(vsk)(w, X, fees) == vsk(wd, X)
+        # Any other measure that reads weights and returns reads the series, or refuses.
+        @test isapprox(PortfolioOptimisers.difference_risk(PortfolioOptimisers.WeightsReturnsFeesInput(),
+                                                           LowOrderMoment(), wd, w, X,
+                                                           fees), LowOrderMoment()(x);
+                       rtol = 1e-12)
+        @test_throws ArgumentError PortfolioOptimisers.difference_risk(PortfolioOptimisers.WeightsReturnsFeesInput(),
+                                                                       te, wd, w, X, fees)
+        # In an optimisation the functor reads back the value of the model.
+        for ri in (lom, te, track(cvar; b = wb2))
+            r = track(ri)
+            sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
+                                    opt = JuMPOptimiser(; pe = pr, slv = slv, fees = fees)))
+            @test isa(sol.retcode, OptimisationSuccess)
+            @test isapprox(expected_risk(factory(r, pr, slv), sol.w, X, fees),
+                           JuMP.value(sol.model[:risk]); rtol = 1e-6)
+        end
     end
 
     @testset "in an optimisation the independent mode is exact and the dependent mode one-sided" begin

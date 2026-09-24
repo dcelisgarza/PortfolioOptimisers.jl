@@ -8,7 +8,7 @@ Bounds how far the risk of a portfolio can move from the risk of a benchmark por
 
 In an optimisation the independent bound is exact, and the dependent bound holds from above only. The model states the portfolio risk through an upper bound that the solver can raise. So a portfolio whose risk is below the benchmark risk by more than `err` also satisfies the dependent bound. This is true of every measure whose model is an upper bound, among them [`ConditionalValueatRisk`](@ref), [`StandardDeviation`](@ref) and a [`Variance`](@ref) in the semidefinite form. A [`Variance`](@ref) outside the semidefinite form does not solve in the dependent mode.
 
-The model charges the fee of the portfolio on the returns that the tracked measure reads, in both modes, and it never reads `tr.fees`. In the independent mode, the functor of [`RiskTrackingRiskMeasure`](@ref) charges the fee of the weight difference instead. So with a fee, a returns-based measure reads back a value that is different from the value that the model bounds.
+The model charges the fee of the portfolio on the returns that the tracked measure reads, in both modes, and it never reads `tr.fees`. The functor of [`RiskTrackingRiskMeasure`](@ref) charges the same fee, so it reads back the value that the model bounds. In the independent mode the tracked series is ``\\mathbf{X}(\\boldsymbol{w} - \\boldsymbol{w}_b) - F(\\boldsymbol{w})``, the net return of the portfolio minus the gross return of the benchmark.
 
 !!! warning
 
@@ -232,9 +232,9 @@ The `alg` field selects the norm and the divisor that scales it.
 Where:
 
   - ``\\boldsymbol{x}``: Net portfolio return series ``T \\times 1``.
-  - ``\\mathbf{X}``: Returns matrix ``T \\times N``.
+  - $(math_dict[:X_returns])
   - $(math_dict[:w_port])
-  - ``F(\\boldsymbol{w})``: Fee series ``T \\times 1`` of the portfolio, zero when `fees` is `nothing`. See [`calc_net_returns`](@ref).
+  - $(math_dict[:F_fee_series])
   - ``\\boldsymbol{b}``: Benchmark return series ``T \\times 1``, from [`tracking_benchmark`](@ref) on `tr`. A [`WeightsTracking`](@ref) gives ``\\boldsymbol{b} = \\mathbf{X}\\boldsymbol{w}_b - F_b(\\boldsymbol{w}_b)``, with the fee ``F_b`` of its own `fees` field.
   - $(math_dict[:w_b_track])
   - ``\\mathrm{TE}_{L_2}``, ``\\mathrm{TE}_{L_2^2}``, ``\\mathrm{TE}_{L_1}``, ``\\mathrm{TE}_{L_p}``, ``\\mathrm{TE}_{L_\\infty}``: Tracking error under [`L2Norm`](@ref), [`SquaredL2Norm`](@ref), [`L1Norm`](@ref), [`LpNorm`](@ref) and [`LInfNorm`](@ref).
@@ -409,7 +409,7 @@ The `alg` field selects the mode. The independent mode, [`IndependentVariableTra
 
 In an optimisation the independent mode is exact, and the dependent mode holds from one side only. The model states the portfolio risk through an upper bound that the solver can raise. So the model penalises a portfolio that is riskier than the benchmark, and it can report zero for a portfolio that is less risky. This is true of every measure whose model is an upper bound, among them [`ConditionalValueatRisk`](@ref), [`StandardDeviation`](@ref) and a [`Variance`](@ref) in the semidefinite form. The constructor warns for a measure whose model is a quadratic expression, and a [`Variance`](@ref) outside the semidefinite form does not solve in the dependent mode.
 
-The functor never reads `tr.fees`. It passes the `fees` of the portfolio to the tracked measure. In the independent mode the tracked measure charges the fee of ``\\boldsymbol{w} - \\boldsymbol{w}_b``, but an optimisation charges the fee of ``\\boldsymbol{w}``. So with a fee, a returns-based measure reports a value that is different from the value that the model minimises. In the dependent mode the functor and the model both charge the fee of each weight vector on its own risk.
+The functor never reads `tr.fees`, and it charges the fee of the portfolio as the model does. In the independent mode the tracked measure reads the series ``\\mathbf{X}(\\boldsymbol{w} - \\boldsymbol{w}_b) - F(\\boldsymbol{w})``, the net return of the portfolio minus the gross return of the benchmark. [`difference_risk`](@ref) computes it. The benchmark pays no fee there, because the difference ``\\boldsymbol{w} - \\boldsymbol{w}_b`` is not a portfolio that anyone holds. In the dependent mode each weight vector pays its own fee on its own risk, in the functor and in the model.
 
 # Mathematical definition
 
@@ -466,7 +466,7 @@ Computes the risk tracking of the portfolio weights `w` on the returns matrix `X
 
   - `w::VecNum`: Portfolio weights vector.
   - `X::MatNum`: Asset returns matrix (``T \\times N``).
-  - `fees`: Optional fee of the portfolio. The tracked measure receives it with each weight vector that it reads.
+  - `fees`: Optional fee of the portfolio `w`. In the dependent mode the benchmark weights also pay it, on their own risk.
 
 # Examples
 
@@ -549,9 +549,9 @@ deferred_slots(r::RiskTrackingRiskMeasure) = (; r = r.r)
 function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,
                                      <:IndependentVariableTracking})(w::VecNum, X::MatNum,
                                                                      fees::Option{<:Fees} = nothing)
-    wb = r.tr.w
-    wd = w - wb
-    return expected_risk(r.r, wd, X, fees)
+    assert_resolved_slots(r.r)
+    assert_calibrated_slots(r.r)
+    return difference_risk(r.r, w - r.tr.w, w, X, fees)
 end
 function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,
                                      <:DependentVariableTracking})(w::VecNum, X::MatNum,

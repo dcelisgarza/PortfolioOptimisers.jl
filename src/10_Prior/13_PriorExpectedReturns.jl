@@ -21,7 +21,7 @@ Where:
 
   - $(math_dict[:mu_er])
   - ``\\mathcal{P}(\\mathbf{X})``: The Prior fitted on ``\\mathbf{X}``, a distribution of the asset returns.
-  - ``\\mathbf{X}``: Returns matrix ``T \\times N``.
+  - $(math_dict[:X_returns])
   - ``\\boldsymbol{x}``: Asset returns vector ``N \\times 1``, distributed as ``\\mathcal{P}(\\mathbf{X})``.
   - $(math_dict[:x_t_obs])
   - $(math_dict[:T])

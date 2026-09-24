@@ -9,6 +9,7 @@ MatNum_Pr
 RkRatioRM
 missing_returns_carrier_message
 resolve_risk_inputs
+difference_risk
 original_returns
 resolve_factor_risk_inputs
 resolve_factor_regression

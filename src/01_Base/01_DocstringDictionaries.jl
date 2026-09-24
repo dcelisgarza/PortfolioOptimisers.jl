@@ -1220,6 +1220,8 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # The risk tracking family.
                        :w_b_track => "``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``, the `w` of the tracking specification `tr`.",#
                        :rho_track => "``\\rho``: Tracked risk measure, the `r` field. Its value at a weight vector is the risk of that vector as [`expected_risk`](@ref) reports it.",#
+                       :X_returns => "``\\mathbf{X}``: Returns matrix ``T \\times N``.",#
+                       :F_fee_series => "``F(\\boldsymbol{w})``: Fee series ``T \\times 1`` of the portfolio, zero when `fees` is `nothing`. See [`calc_net_returns`](@ref).",#
                        # The Range convention (ADR 0057).
                        :negated_upper_tail => "The upper tail is the base measure applied to the negated returns ``-\\boldsymbol{x}``, so both tails are reported on the same sign convention and the range is their sum, not their difference.",#
                        # The Gerber family. `01_GerberCovariance.jl` states the statistic,

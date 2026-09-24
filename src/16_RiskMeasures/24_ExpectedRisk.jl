@@ -605,6 +605,118 @@ function expected_risk(r::BaseRM_VecBaseRM, w::VecVecNum, pr::Pr_RR,
     return [expected_risk(r, wi, X, fees; kwargs...) for wi in w]
 end
 """
+    difference_risk(r::AbstractBaseRiskMeasure, wd::VecNum, w::VecNum, X::MatNum,
+                    fees::Option{<:Fees}) -> Number
+
+Compute the risk of the weight difference `wd` on a return series that pays the fee of the portfolio `w`.
+
+The independent mode of [`RiskTrackingRiskMeasure`](@ref) calls it with `wd = w - wb`. The model of that mode charges the fee once, on the portfolio, so the series that it tracks is the net return of the portfolio minus the gross return of the benchmark. This function reads the same series. [`expected_risk`](@ref) on `wd` charges the fee of `wd` instead, and `wd` is not a portfolio that pays a fee.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{x} &= \\mathbf{X}(\\boldsymbol{w} - \\boldsymbol{w}_b) - F(\\boldsymbol{w})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: Return series ``T \\times 1`` that the tracked measure reads.
+  - $(math_dict[:X_returns])
+  - $(math_dict[:w_port])
+  - $(math_dict[:w_b_track])
+  - $(math_dict[:F_fee_series])
+
+# Algorithm
+
+ 1. A `nothing` fee returns `expected_risk(r, wd, X)`, because the two series are equal without a fee.
+ 2. A measure that reads a return series, [`NetReturnsInput`](@ref), reads ``\\boldsymbol{x}``.
+ 3. A measure that reads the weights alone, [`WeightsInput`](@ref), reads `wd` and no fee.
+ 4. A moment measure reads ``\\boldsymbol{x}`` and takes its target from `wd`. So a per-asset target is ``(\\boldsymbol{w} - \\boldsymbol{w}_b)^\\intercal \\boldsymbol{\\mu}``, as in the model.
+ 5. A [`TrackingRiskMeasure`](@ref) takes the norm of ``\\boldsymbol{x}`` minus its own benchmark series.
+ 6. A nested [`RiskTrackingRiskMeasure`](@ref) recurses. The independent mode subtracts its own benchmark weights from `wd`. The dependent mode subtracts the risk of its own benchmark weights, which pay their own fee, as in the model.
+ 7. A [`RiskRatio`](@ref) divides the results of its two measures. A [`VarianceSkewKurtosis`](@ref) reads `wd` and no fee.
+ 8. Any other [`WeightsReturnsFeesInput`](@ref) measure reads ``\\boldsymbol{x}`` through [`expected_risk_from_returns`](@ref), which refuses a measure that cannot read a series.
+
+# Arguments
+
+  - `r`: Tracked risk measure.
+  - `wd`: Weight difference `assets × 1`.
+  - $(arg_dict[:pw])
+  - `X`: Asset returns matrix `observations × assets`.
+  - `fees`: Fee of the portfolio `w`, or `nothing`.
+
+# Returns
+
+  - `rk::Number`: The risk of `wd` on the series ``\\boldsymbol{x}``.
+
+# Related
+
+  - [`RiskTrackingRiskMeasure`](@ref)
+  - [`charge_fees`](@ref)
+  - [`expected_risk`](@ref)
+  - [`risk_input_kind`](@ref)
+"""
+function difference_risk(r::AbstractBaseRiskMeasure, wd::VecNum, ::VecNum, X::MatNum,
+                         ::Nothing)
+    return expected_risk(r, wd, X)
+end
+function difference_risk(r::AbstractBaseRiskMeasure, wd::VecNum, w::VecNum, X::MatNum,
+                         fees::Fees)
+    return difference_risk(risk_input_kind(r), r, wd, w, X, fees)
+end
+function difference_risk(::NetReturnsInput, r::AbstractBaseRiskMeasure, wd::VecNum,
+                         w::VecNum, X::MatNum, fees::Fees)
+    return r(charge_fees(X * wd, w, fees))
+end
+function difference_risk(::WeightsInput, r::AbstractBaseRiskMeasure, wd::VecNum, ::VecNum,
+                         ::MatNum, ::Fees)
+    return r(wd)
+end
+function difference_risk(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure, wd::VecNum,
+                         w::VecNum, X::MatNum, fees::Fees)
+    return expected_risk_from_returns(r, charge_fees(X * wd, w, fees))
+end
+function difference_risk(r::Union{<:LoHiOrderMoment, <:Kurtosis, <:TCM_Sk,
+                                  <:MedianAbsoluteDeviation}, wd::VecNum, w::VecNum,
+                         X::MatNum, fees::Fees)
+    x = charge_fees(X * wd, w, fees)
+    return moment_risk(r, x .- calc_moment_target(r, wd, x))
+end
+# `moment_risk` reads resolved observation weights off `r`, so weights stated against the data
+# resolve against `X` first, as the functor `r(w, X, fees)` resolves them.
+# `MedianAbsoluteDeviation` resolves its own inside `calc_moment_target`, and #1319 moves the
+# other families to that design, which deletes this method.
+function difference_risk(r::Union{<:LoHiOrderMoment{<:Any, <:DynamicAbstractWeights},
+                                  <:Kurtosis{<:Any, <:DynamicAbstractWeights},
+                                  <:TCM_Sk{<:DynamicAbstractWeights}}, wd::VecNum,
+                         w::VecNum, X::MatNum, fees::Fees)
+    return difference_risk((Accessors.@set r.w = get_observation_weights(r.w, X)), wd, w, X,
+                           fees)
+end
+function difference_risk(r::TrackingRiskMeasure, wd::VecNum, w::VecNum, X::MatNum,
+                         fees::Fees)
+    return norm_error(r.alg, charge_fees(X * wd, w, fees), tracking_benchmark(r.tr, X),
+                      size(X, 1))
+end
+function difference_risk(r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
+                                                    <:IndependentVariableTracking},
+                         wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
+    return difference_risk(r.r, wd - r.tr.w, w, X, fees)
+end
+function difference_risk(r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
+                                                    <:DependentVariableTracking},
+                         wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
+    return abs(difference_risk(r.r, wd, w, X, fees) - expected_risk(r.r, r.tr.w, X, fees))
+end
+function difference_risk(r::RiskRatio, wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
+    return difference_risk(r.r1, wd, w, X, fees) / difference_risk(r.r2, wd, w, X, fees)
+end
+function difference_risk(r::VarianceSkewKurtosis, wd::VecNum, ::VecNum, X::MatNum, ::Fees)
+    return r(wd, X)
+end
+"""
     expected_risk_from_returns(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...) -> Number
 
 Evaluate a risk measure on a net return series that the caller already formed.
