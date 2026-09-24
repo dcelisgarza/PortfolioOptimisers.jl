@@ -695,7 +695,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :r_res_schur => "`r`: The risk measure the optimisation ran under, stored **resolved**. It parallels `gamma`: one measure for the single-bundle path, a vector of them for the multi-bundle path. Schur carries **no** scalariser, because it carries no vector of measures to combine — `SchurComplementParams.r` is bounded to a standard deviation or a variance.",#
                                  :tol => "`tol`: Convergence tolerance.",#
                                  :lambda_sspo => "`lambda`: The weight of the ``L_1`` penalty of the short-term sparse portfolio.",#
-                                 :gamma_sspo => "`gamma`: The soft-threshold width; the ratio `lambda / gamma` is the quadratic coupling of the paper's iteration.",#
+                                 :gamma_sspo => "`gamma`: The soft-threshold width. The ratio `lambda / gamma` is the quadratic coupling of the paper's iteration.",#
                                  :iter => "`iter`: Maximum number of iterations.",#
                                  :w_opt_noc => "`w_opt`: Optimal portfolio weights.",#
                                  :w_min_noc => "`w_min`: Minimum risk portfolio weights.",#
@@ -1267,7 +1267,15 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :phi_cw => "``\\phi = \\Phi^{-1}(\\theta)``: Confidence quantile, with ``\\Phi`` the standard normal distribution function and ``\\theta`` the confidence level.",#
                        :eps_cw => "``\\epsilon``: Reversion threshold on the gross return of the period.",#
                        :w_1_start => "``\\boldsymbol{w}_1``: Start Allocation, the allocation that the recursion starts from.",#
-                       :G_t_cumlog => "``\\boldsymbol{G}_t = \\sum_{s \\leq t} \\log \\boldsymbol{x}_s``: Cumulative log wealth after period ``t``, one entry for each asset, or for each expert on an expert mixture.")
+                       :G_t_cumlog => "``\\boldsymbol{G}_t = \\sum_{s \\leq t} \\log \\boldsymbol{x}_s``: Cumulative log wealth after period ``t``, one entry for each asset, or for each expert on an expert mixture.",#
+                       # The short-term sparse portfolio and the algorithms that find its iterate.
+                       :b_sspo => "``\\boldsymbol{b}``: Unscaled target of the short-term sparse portfolio step, the vector whose scaled projection is the next allocation.",#
+                       :phi_sspo => "``\\boldsymbol{\\phi}``: Objective vector of the short-term sparse portfolio step, ``-(1.1 \\log \\hat{\\boldsymbol{x}} + \\boldsymbol{1})`` for the Price Relative Forecast ``\\hat{\\boldsymbol{x}}``. Its smallest entry is the largest forecast.",#
+                       :lambda_l1 => "``\\lambda``: Penalty weight of the ``L_1`` norm, positive.",#
+                       :gamma_st => "``\\gamma``: Soft-threshold width, positive.",#
+                       :a_huber => "``a``: Quadratic coupling ``\\lambda / \\gamma`` of the target to the auxiliary vector.",#
+                       :g_aux => "``\\boldsymbol{g}``: Auxiliary vector that carries the ``L_1`` penalty in place of the target.",#
+                       :nu_budget => "``\\nu``: Multiplier of the budget constraint ``\\boldsymbol{1}^\\intercal \\boldsymbol{b} = 1``.")
 """
     ref_dict
 

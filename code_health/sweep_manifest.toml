@@ -366,7 +366,7 @@
 "src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { map = 10, units = 5, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { map = 10, units = 12, swept = false }
 "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { map = 10, units = 24, swept = false }
-"src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { map = 10, units = 8, swept = false }
+"src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { map = 10, units = 8, algorithm = 4, swept = true, bindings = ["AlternatingDirectionMethod", "HuberOptimum", "L1Optimum", "huber_coordinates", "huber_multiplier", "huber_remainder!", "largest_forecast_split", "sparse_portfolio_iterate"] }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { map = 10, units = 6, swept = false }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { map = 8, units = 28, swept = false }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { map = 8, units = 38, swept = false }

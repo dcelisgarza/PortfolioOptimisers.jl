@@ -767,6 +767,85 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
               po.sparse_portfolio_iterate(one_step, phi, fill(0.25, 4))
     end
 
+    @testset "The sparse portfolio's docstrings, with numbers (#1266)" begin
+        # `HuberOptimum`: the minimum over `g` is the soft threshold, and it leaves the Huber
+        # penalty `h`, whose derivative is `clamp(a b, −λ, λ)`.
+        lam, gam = 0.5, 0.01
+        a = lam / gam
+        h(b) = abs(b) <= gam ? a / 2 * b^2 : lam * abs(b) - lam * gam / 2
+        for b in range(-0.05, 0.05; length = 41)
+            g = sign(b) * max(abs(b) - gam, 0)
+            @test lam * abs(g) + a / 2 * (b - g)^2 ≈ h(b) atol = 1e-15
+            @test all(lam * abs(u) + a / 2 * (b - u)^2 >= h(b) - 1e-15
+                      for u in range(-0.1, 0.1; length = 201))
+            # A central difference across the kink at `|b| = γ` is off by `a db / 4`.
+            db = 1e-7
+            @test (h(b + db) - h(b - db)) / (2 * db) ≈ clamp(a * b, -lam, lam) atol = 1e-5
+        end
+        # `AlternatingDirectionMethod`: the Sherman-Morrison line is the inverse.
+        v = randn(StableRNG(3), 6)
+        @test (a * I + 0.005 * ones(6, 6)) \ v ≈
+              v ./ a .- 0.005 * sum(v) / (a * (a + 0.005 * 6))
+        # The numbers of the docstring, on the fixture of this file from the uniform seed: the
+        # stop, the sign changes before it, the distance there, and the iterations to within
+        # 1e-6 of the fixed point, over the 36 windows of five rows.
+        function adm_trace(phi, w)
+            bh = po.sparse_portfolio_iterate(HuberOptimum(), phi, w)
+            b = copy(w)
+            g = copy(w)
+            rho = 0.0
+            prev = NaN
+            nsign = 0
+            kstop = 0
+            dist = NaN
+            kconv = 0
+            o = 0
+            while kstop == 0 || kconv == 0
+                o += 1
+                rhs = a .* g .+ (0.005 - rho) .- phi
+                b = rhs ./ a .- 0.005 * sum(rhs) / (a * (a + 0.005 * length(w)))
+                g = sign.(b) .* max.(abs.(b) .- gam, 0)
+                res = sum(b) - 1
+                rho += 0.005 * res
+                if kstop == 0
+                    nsign += !isnan(prev) && sign(res) != sign(prev)
+                    prev = res
+                    if abs(res) < 1e-4
+                        kstop = o
+                        dist = maxerr(b, bh)
+                        # The library stops where the trace stops.
+                        @test b ==
+                              po.sparse_portfolio_iterate(AlternatingDirectionMethod(), phi,
+                                                          w)
+                    end
+                end
+                if kconv == 0 && maxerr(b, bh) < 1e-6
+                    kconv = o
+                end
+            end
+            return kstop, nsign, dist, kconv
+        end
+        traces = [adm_trace(-1.1 .* log.(xhat(WindowPeak(), R[(t - 4):t, :])) .- 1,
+                            fill(0.25, N)) for t in 5:T]
+        @test length(traces) == 36
+        @test extrema(first.(traces)) == (359, 4619)
+        @test extrema(getindex.(traces, 2)) == (2, 27)
+        @test isapprox(maximum(getindex.(traces, 3)), 0.67; atol = 0.005)
+        @test extrema(getindex.(traces, 4)) == (29461, 104386)
+        # Two assets with almost equal forecasts: the stopped iterate and the fixed point
+        # project to different assets.
+        R1 = 0.02 .* randn(StableRNG(1), 60, 4)
+        phi1 = -1.1 .* log.(xhat(WindowPeak(), R1[2:6, :])) .- 1
+        pa = po.project_simplex(500 .*
+                                po.sparse_portfolio_iterate(AlternatingDirectionMethod(),
+                                                            phi1, fill(0.25, 4)))
+        ph = po.project_simplex(500 .* po.sparse_portfolio_iterate(HuberOptimum(), phi1,
+                                                                   fill(0.25, 4)))
+        @test isapprox(pa, [0.46, 0, 0, 0.54]; atol = 0.005)
+        @test ph == [0.0, 0.0, 0.0, 1.0]
+        @test abs(phi1[1] - phi1[4]) < 1e-4
+    end
+
     @testset "Show and the search seam" begin
         @test occursin("ForecastReversion",
                        sprint(show, MIME("text/plain"), MovingAverageReversion()))

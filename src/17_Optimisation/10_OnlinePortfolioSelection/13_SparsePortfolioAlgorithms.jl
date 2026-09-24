@@ -1,11 +1,29 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-The optimum of the programme the short-term sparse portfolio's paper states: the whole budget on the asset with the largest Price Relative Forecast, split in equal parts between tied assets.
+Puts the whole budget on the asset with the largest Price Relative Forecast, and splits it in equal parts between tied assets.
+
+This is the optimum of the programme that the paper of the short-term sparse portfolio states, its equation (12). The optimum does not depend on ``\\lambda``, so the algorithm takes no parameter. Where the programme has no minimum, the algorithm returns the same split.
 
 # Mathematical definition
 
-The programme is ``\\min_{\\boldsymbol{b}} \\langle \\boldsymbol{b}, \\boldsymbol{\\phi} \\rangle + \\lambda \\lVert \\boldsymbol{b} \\rVert_1`` subject to ``\\boldsymbol{1}^\\intercal \\boldsymbol{b} = 1``. Over ``\\boldsymbol{b} \\geq \\boldsymbol{0}`` the penalty is the constant ``\\lambda``, so the optimum there is the vertex ``\\boldsymbol{e}_k`` with ``k = \\arg\\min_i \\phi_i``. A short of ``t`` on asset ``j`` that funds more of asset ``k`` changes the objective by ``t (\\phi_k - \\phi_j + 2 \\lambda)``, which is not negative while ``\\max \\boldsymbol{\\phi} - \\min \\boldsymbol{\\phi} \\leq 2 \\lambda``, so no short improves on the vertex. Past that bound the programme has no minimum, and the objective falls without end along the same direction, so the vertex is also its limit. The optimum does not depend on ``\\lambda``, and the algorithm takes no parameter. Tied assets share an optimal face, and the equal split is its centre.
+```math
+\\begin{align}
+\\boldsymbol{b}^\\star &= \\underset{\\boldsymbol{b}}{\\arg\\min} \\; \\langle \\boldsymbol{b}, \\boldsymbol{\\phi} \\rangle + \\lambda \\lVert \\boldsymbol{b} \\rVert_1 \\quad \\text{s.t.} \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{b} = 1\\,, \\\\
+\\boldsymbol{b}^\\star &= \\frac{1}{\\lvert \\mathcal{K} \\rvert} \\sum_{k \\in \\mathcal{K}} \\boldsymbol{e}_k\\,, \\quad \\mathcal{K} = \\underset{i}{\\arg\\min} \\; \\phi_i\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{b}^\\star``: Optimum of the programme.
+  - $(math_dict[:b_sspo])
+  - $(math_dict[:phi_sspo])
+  - $(math_dict[:lambda_l1])
+  - ``\\mathcal{K}``: Set of the assets with the smallest entry of ``\\boldsymbol{\\phi}``.
+  - ``\\boldsymbol{e}_k``: Unit vector of asset ``k``.
+
+Over ``\\boldsymbol{b} \\geq \\boldsymbol{0}`` the penalty is the constant ``\\lambda``, so the optimum there is a vertex ``\\boldsymbol{e}_k`` with ``k \\in \\mathcal{K}``. A short of ``s`` on asset ``j`` that funds more of asset ``k`` changes the objective by ``s (\\phi_k - \\phi_j + 2 \\lambda)``. That change is not negative while ``\\max \\boldsymbol{\\phi} - \\min \\boldsymbol{\\phi} \\leq 2 \\lambda``, so no short improves on the vertex. Past that bound the programme has no minimum, and the objective falls without end along that short from the vertex. Tied assets share an optimal face, and the equal split is its centre.
 
 # Examples
 
@@ -19,6 +37,7 @@ L1Optimum()
   - [`ShortTermSparsePortfolio`](@ref)
   - [`HuberOptimum`](@ref)
   - [`AlternatingDirectionMethod`](@ref)
+  - [`largest_forecast_split`](@ref)
 
 # References
 
@@ -28,27 +47,46 @@ struct L1Optimum <: AbstractSparsePortfolioAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The fixed point of the short-term sparse portfolio's alternating direction iteration, solved in closed form.
+Finds the fixed point of the alternating direction iteration of the short-term sparse portfolio in closed form.
+
+The paper's iteration converges to this point, so it is the default algorithm of [`ShortTermSparsePortfolio`](@ref). Where the programme has no minimum, the algorithm returns the split of [`L1Optimum`](@ref).
 
 # Mathematical definition
 
-The fixed point solves ``\\min_{\\boldsymbol{b}, \\boldsymbol{g}} \\langle \\boldsymbol{b}, \\boldsymbol{\\phi} \\rangle + \\lambda \\lVert \\boldsymbol{g} \\rVert_1 + \\tfrac{a}{2} \\lVert \\boldsymbol{b} - \\boldsymbol{g} \\rVert^2`` subject to ``\\boldsymbol{1}^\\intercal \\boldsymbol{b} = 1``, with ``a = \\lambda / \\gamma``. The minimum over ``\\boldsymbol{g}`` is the soft threshold of ``\\boldsymbol{b}`` at ``\\gamma``, and it leaves a Huber penalty on each coordinate,
-
 ```math
 \\begin{align}
-h(b) &= \\begin{cases} \\tfrac{a}{2} b^2 & \\lvert b \\rvert \\leq \\gamma\\,, \\\\ \\lambda \\lvert b \\rvert - \\tfrac{\\lambda \\gamma}{2} & \\text{otherwise}\\,, \\end{cases}
+\\underset{\\boldsymbol{b}, \\boldsymbol{g}}{\\min} &\\; \\langle \\boldsymbol{b}, \\boldsymbol{\\phi} \\rangle + \\lambda \\lVert \\boldsymbol{g} \\rVert_1 + \\frac{a}{2} \\lVert \\boldsymbol{b} - \\boldsymbol{g} \\rVert_2^2 \\quad \\text{s.t.} \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{b} = 1\\,, \\\\
+h(b) &= \\underset{g}{\\min} \\; \\lambda \\lvert g \\rvert + \\frac{a}{2} (b - g)^2 = \\begin{cases} \\tfrac{a}{2} b^2 & \\lvert b \\rvert \\leq \\gamma\\,, \\\\ \\lambda \\lvert b \\rvert - \\tfrac{\\lambda \\gamma}{2} & \\text{otherwise}\\,, \\end{cases} \\\\
+b_i(\\nu) &= \\mathrm{clamp}\\left( -\\frac{\\phi_i + \\nu}{a}, -\\gamma, \\gamma \\right)\\,, \\quad \\nu \\in \\left[ -\\lambda - \\min \\boldsymbol{\\phi}, \\lambda - \\max \\boldsymbol{\\phi} \\right]\\,.
 \\end{align}
 ```
 
-so the programme is ``\\min_{\\boldsymbol{b}} \\langle \\boldsymbol{b}, \\boldsymbol{\\phi} \\rangle + \\sum_i h(b_i)`` subject to the budget. Its derivative ``h'(b) = \\mathrm{clamp}(a b, -\\lambda, \\lambda)`` is bounded, so a multiplier ``\\nu`` exists only in ``[-\\lambda - \\min \\boldsymbol{\\phi}, \\lambda - \\max \\boldsymbol{\\phi}]``, and every asset inside the clamp holds
+Where:
 
-```math
-\\begin{align}
-b_i(\\nu) &= \\mathrm{clamp}\\left( -\\frac{\\phi_i + \\nu}{a}, -\\gamma, \\gamma \\right)\\,.
-\\end{align}
-```
+  - $(math_dict[:b_sspo])
+  - $(math_dict[:g_aux])
+  - $(math_dict[:phi_sspo])
+  - $(math_dict[:lambda_l1])
+  - $(math_dict[:gamma_st])
+  - $(math_dict[:a_huber])
+  - ``h``: Huber penalty of one coordinate, the minimum of the programme over the auxiliary coordinate ``g``.
+  - $(math_dict[:nu_budget])
+  - ``b_i(\\nu)``: Coordinate of asset ``i`` at the multiplier ``\\nu``, where ``\\lvert \\phi_i + \\nu \\rvert < \\lambda``.
+  - $(math_dict[:N])
 
-The sum of the ``b_i(\\nu)`` falls piecewise linearly in ``\\nu`` with knots at ``-\\phi_i \\pm \\lambda``, so ``\\nu`` is its root at one, read off the knots, or the end of the interval where the sum cannot reach one. At the lower end the assets with the smallest ``\\phi_i`` take the remainder of the budget in equal parts, and at the upper end the assets with the largest take it. When ``N \\gamma \\leq 1`` the sum is at most one everywhere, so the largest forecast takes ``1 - \\sum_{i \\neq k} b_i`` and every other asset holds at most ``\\gamma``. Past the bound ``\\max \\boldsymbol{\\phi} - \\min \\boldsymbol{\\phi} \\leq 2 \\lambda`` the interval is empty and the programme has no minimum; the algorithm then takes the limit the objective falls towards, the whole budget on the largest forecast, as [`L1Optimum`](@ref) does.
+The programme is equation (20) of the paper without its penalty on the budget residual, which is zero on the budget. The minimum over ``\\boldsymbol{g}`` is the soft threshold of ``\\boldsymbol{b}`` at ``\\gamma``, and it leaves the penalty ``h`` on each coordinate. The paper's equation (19) is ``h / \\lambda``.
+
+The derivative ``h'(b) = \\mathrm{clamp}(a b, -\\lambda, \\lambda)`` is bounded, so a multiplier ``\\nu`` exists only in the interval above. An asset with ``\\lvert \\phi_i + \\nu \\rvert < \\lambda`` holds ``b_i(\\nu)``. An asset with ``\\lvert \\phi_i + \\nu \\rvert = \\lambda`` can hold any amount past ``\\pm \\gamma``, with the sign of ``-(\\phi_i + \\nu)``, because ``h`` is linear there. The sum of the ``b_i(\\nu)`` falls piecewise linearly in ``\\nu``, with knots at ``-\\phi_i \\pm \\lambda``. The multiplier is the root of that sum at one, or the end of the interval where the sum cannot reach one. At the lower end the assets with the smallest ``\\phi_i`` take the remainder of the budget, and at the upper end the assets with the largest ``\\phi_i`` take it.
+
+When ``N \\gamma \\leq 1`` the sum is at most one everywhere. An asset ``k`` with the smallest ``\\phi_k`` then takes ``1 - \\sum_{i \\neq k} b_i``, and every other asset holds at most ``\\gamma``. When ``\\max \\boldsymbol{\\phi} - \\min \\boldsymbol{\\phi} > 2 \\lambda`` the interval is empty, and the programme has no minimum.
+
+# Algorithm
+
+ 1. Compute the ends of the interval of the multiplier, `lo = -lambda - minimum(phi)` and `hi = lambda - maximum(phi)`.
+ 2. When `lo > hi`, the programme has no minimum. Return the split of [`largest_forecast_split`](@ref).
+ 3. Find the multiplier `nu` in `[lo, hi]` with [`huber_multiplier`](@ref).
+ 4. Compute the coordinates `b` at `nu` with [`huber_coordinates`](@ref).
+ 5. Add the remainder of the budget to `b` with [`huber_remainder!`](@ref), in equal parts between tied assets, and return `b`.
 
 # Fields
 
@@ -78,6 +116,7 @@ HuberOptimum
   - [`ShortTermSparsePortfolio`](@ref)
   - [`L1Optimum`](@ref)
   - [`AlternatingDirectionMethod`](@ref)
+  - [`huber_multiplier`](@ref)
 
 # References
 
@@ -104,21 +143,50 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The alternating direction iteration the short-term sparse portfolio's paper runs, stopped where the paper stops it.
+Runs the alternating direction iteration of the short-term sparse portfolio, and stops where the paper stops it.
+
+Take this algorithm to reproduce the paper's loop and its stop. Its fixed point is the point that [`HuberOptimum`](@ref) finds in closed form, but the stop comes long before the iterate reaches that point. The stop reads the budget residual, which changes sign as the dual variable adapts, and the iteration meets `tol = 1e-4` at one of those sign changes. The scaled projection of the stopped iterate is usually the fixed point's projection, but it can hold other assets. A tolerance that the sign changes never meet runs all `iters` iterations.
+
+The tests measure these numbers from the uniform seed. On `0.02 .* randn(StableRNG(11), 40, 4)`, over the 36 windows of five rows, the stop comes after 359 to 4619 iterations and 2 to 27 sign changes. At the stop the iterate is up to about 0.67 from the fixed point in one coordinate, and it comes within ``10^{-6}`` of the fixed point after 29461 to 104386 iterations. On `0.02 .* randn(StableRNG(1), 60, 4)`, rows 2 to 6 give two assets almost equal forecasts. At `zeta = 500` the stopped iterate projects to about `[0.46, 0, 0, 0.54]`, and the fixed point projects to `[0, 0, 0, 1]`.
 
 # Mathematical definition
 
-With ``a = \\lambda / \\gamma``, the iteration is seeded at ``\\boldsymbol{b} = \\boldsymbol{g} = \\boldsymbol{w}_t`` and ``\\rho = 0``, and repeats
-
 ```math
 \\begin{align}
-\\boldsymbol{b} &\\leftarrow \\left( a \\boldsymbol{I} + \\eta \\boldsymbol{1} \\boldsymbol{1}^\\intercal \\right)^{-1} \\left( a \\boldsymbol{g} + (\\eta - \\rho) \\boldsymbol{1} - \\boldsymbol{\\phi} \\right)\\,,\\quad
-\\boldsymbol{g} \\leftarrow \\operatorname{sign}(\\boldsymbol{b}) \\odot \\max(\\lvert \\boldsymbol{b} \\rvert - \\gamma, 0)\\,,\\quad
-\\rho \\leftarrow \\rho + \\eta (\\boldsymbol{1}^\\intercal \\boldsymbol{b} - 1)\\,,
+L(\\boldsymbol{b}, \\boldsymbol{g}, \\rho) &= \\langle \\boldsymbol{b}, \\boldsymbol{\\phi} \\rangle + \\frac{a}{2} \\lVert \\boldsymbol{b} - \\boldsymbol{g} \\rVert_2^2 + \\lambda \\lVert \\boldsymbol{g} \\rVert_1 + \\frac{\\eta}{2} (\\boldsymbol{1}^\\intercal \\boldsymbol{b} - 1)^2 + \\rho (\\boldsymbol{1}^\\intercal \\boldsymbol{b} - 1)\\,, \\\\
+\\boldsymbol{b}^{(o+1)} &= \\underset{\\boldsymbol{b}}{\\arg\\min} \\; L(\\boldsymbol{b}, \\boldsymbol{g}^{(o)}, \\rho^{(o)}) = \\left( a \\mathbf{I} + \\eta \\boldsymbol{1} \\boldsymbol{1}^\\intercal \\right)^{-1} \\left( a \\boldsymbol{g}^{(o)} + (\\eta - \\rho^{(o)}) \\boldsymbol{1} - \\boldsymbol{\\phi} \\right)\\,, \\\\
+\\boldsymbol{g}^{(o+1)} &= \\underset{\\boldsymbol{g}}{\\arg\\min} \\; L(\\boldsymbol{b}^{(o+1)}, \\boldsymbol{g}, \\rho^{(o)}) = \\operatorname{sign}(\\boldsymbol{b}^{(o+1)}) \\odot \\max(\\lvert \\boldsymbol{b}^{(o+1)} \\rvert - \\gamma, 0)\\,, \\\\
+\\rho^{(o+1)} &= \\rho^{(o)} + \\eta (\\boldsymbol{1}^\\intercal \\boldsymbol{b}^{(o+1)} - 1)\\,, \\\\
+\\left( a \\mathbf{I} + \\eta \\boldsymbol{1} \\boldsymbol{1}^\\intercal \\right)^{-1} \\boldsymbol{v} &= \\frac{\\boldsymbol{v}}{a} - \\frac{\\eta \\, \\boldsymbol{1}^\\intercal \\boldsymbol{v}}{a (a + \\eta N)} \\boldsymbol{1}\\,.
 \\end{align}
 ```
 
-until ``\\lvert \\boldsymbol{1}^\\intercal \\boldsymbol{b} - 1 \\rvert < \\texttt{tol}`` or `iters` iterations. The fixed matrix is inverted once in closed form through the Sherman–Morrison identity, so every iteration is ``O(N)``. The fixed point is [`HuberOptimum`](@ref)'s. The dual step ``\\eta`` is small, so the iterate needs thousands to hundreds of thousands of iterations to reach it, and the budget residual changes sign as the dual variable adapts. The paper's `tol = 1e-4` is therefore met at a zero crossing after a few hundred to a few thousand iterations, while the iterate is still moving by tenths, and the scaled projection of that point and of the fixed point can land on different assets. Take this algorithm to reproduce the paper's loop; a tolerance the crossings never reach runs every one of the `iters` iterations.
+Where:
+
+  - ``L``: Augmented Lagrangian of the iteration.
+  - $(math_dict[:b_sspo])
+  - $(math_dict[:g_aux])
+  - ``\\rho``: Dual variable of the budget constraint.
+  - ``o``: Iteration index, counted from one.
+  - $(math_dict[:phi_sspo])
+  - $(math_dict[:lambda_l1])
+  - $(math_dict[:gamma_st])
+  - $(math_dict[:a_huber])
+  - ``\\eta``: Weight of the penalty on the budget residual, and the step of the dual variable.
+  - ``\\mathbf{I}``: ``N \\times N`` identity matrix.
+  - ``\\boldsymbol{v}``: Any ``N \\times 1`` vector.
+  - $(math_dict[:N])
+
+``L`` is the paper's equation (13), and the three updates are its equations (29), (32) and (27). The last line is the Sherman-Morrison identity. A fixed point of the updates has a zero budget residual, and it solves the programme of [`HuberOptimum`](@ref).
+
+# Algorithm
+
+ 1. Seed `b` and `g` at the held allocation `w`, and `rho` at zero, as step 3 of the paper's Algorithm 1 does. Compute `a = lambda / gamma`.
+ 2. Compute the right-hand side `rhs` of the update of ``\\boldsymbol{b}`` from `g` and `rho`.
+ 3. Compute `b` from `rhs` with the inverse in closed form, in ``O(N)`` operations.
+ 4. Compute `g`, the soft threshold of `b` at `gamma`.
+ 5. Compute the budget residual `res = sum(b) - 1`, and add `eta * res` to `rho`.
+ 6. When `abs(res) < tol`, or after `iters` iterations, return `b`. Otherwise go back to step 2.
 
 # Fields
 
@@ -174,15 +242,15 @@ struct AlternatingDirectionMethod{T1 <: Real, T2 <: Real, T3 <: Real, T4 <: Inte
     """
     gamma::T2
     """
-    The penalty on the budget equality and the dual step.
+    The weight of the penalty on the budget residual, which is also the step of the dual variable.
     """
     eta::T3
     """
-    Maximum number of iterations.
+    $(field_dict[:iter])
     """
     iters::T4
     """
-    Convergence tolerance on the budget residual.
+    The convergence tolerance on the budget residual.
     """
     tol::T5
     function AlternatingDirectionMethod(lambda::Real, gamma::Real, eta::Real,
@@ -209,10 +277,17 @@ end
     sparse_portfolio_iterate(alg::HuberOptimum, phi::AbstractVector, w::AbstractVector)
     sparse_portfolio_iterate(alg::AlternatingDirectionMethod, phi::AbstractVector, w::AbstractVector)
 
-The iterate ``\\boldsymbol{b}`` of a [`ShortTermSparsePortfolio`](@ref) step for the objective `phi`, which sums to one: the optimum of the stated programme, the closed form of the iteration's fixed point, or the paper's iteration seeded at the held allocation `w`. Only the iteration reads `w`.
+Finds the unscaled target of a [`ShortTermSparsePortfolio`](@ref) step for the objective vector `phi`.
+
+[`L1Optimum`](@ref) returns the optimum of the programme that the paper states. [`HuberOptimum`](@ref) returns the fixed point of the paper's iteration in closed form. [`AlternatingDirectionMethod`](@ref) runs the paper's iteration from the held allocation `w`, and it is the only method that reads `w`. The type docstrings state the formulas.
+
+# Returns
+
+  - `b::AbstractVector`: The unscaled target. The two closed forms sum to one. The iteration sums to one within `tol` when it stops at `tol`, and it can be further from one when it runs all `iters` iterations.
 
 # Related
 
+  - [`AbstractSparsePortfolioAlgorithm`](@ref)
   - [`ShortTermSparsePortfolio`](@ref)
   - [`largest_forecast_split`](@ref)
   - [`huber_multiplier`](@ref)
@@ -252,7 +327,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The whole budget on the smallest entries of `phi`, the largest forecasts, in equal parts between ties.
+Splits the whole budget in equal parts between the smallest entries of `phi`, which are the assets with the largest forecast.
+
+The split is the optimum of [`L1Optimum`](@ref). [`HuberOptimum`](@ref) returns it where its programme has no minimum.
 
 # Related
 
@@ -266,10 +343,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The coordinates ``\\mathrm{clamp}(-(\\phi_i + \\nu) / a, -\\gamma, \\gamma)`` of [`HuberOptimum`](@ref) at the multiplier `nu`, with ``a = \\lambda / \\gamma``.
+Computes the coordinates of [`HuberOptimum`](@ref) at the multiplier `nu`, each clamped to `[-gamma, gamma]`.
+
+The docstring of [`HuberOptimum`](@ref) states the formula of the coordinates.
 
 # Related
 
+  - [`HuberOptimum`](@ref)
   - [`huber_multiplier`](@ref)
 """
 function huber_coordinates(alg::HuberOptimum, phi::AbstractVector, nu::Real)
@@ -279,10 +359,23 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The multiplier of [`HuberOptimum`](@ref) in `[lo, hi]`: `lo` when the coordinates sum to at most one there, `hi` when they sum to at least one there, and otherwise the root of their sum at one. The sum is linear between the knots ``-\\phi_i \\pm \\lambda``, so the root is read off the two knots that bracket it.
+Finds the multiplier of [`HuberOptimum`](@ref) in `[lo, hi]`.
+
+The sum of the coordinates is linear between two knots, so the linear interpolation between the two knots that bracket the root gives the root.
+
+# Algorithm
+
+ 1. Compute `budget(nu)`, the sum of the coordinates of [`huber_coordinates`](@ref) at a multiplier `nu`.
+ 2. When `budget(lo) <= 1`, return `lo`. When `budget(hi) >= 1`, return `hi`.
+ 3. Collect the knots `-phi .- lambda` and `-phi .+ lambda` that lie strictly between `lo` and `hi`, giving `inner`.
+ 4. Sort `inner`, and put `lo` before it and `hi` after it, giving `knots`.
+ 5. Compute `sums`, the budget at each knot.
+ 6. Find the first knot `i` whose sum is at most one.
+ 7. Interpolate linearly between the knots `i - 1` and `i`, and return the multiplier where the budget is one.
 
 # Related
 
+  - [`HuberOptimum`](@ref)
   - [`huber_coordinates`](@ref)
   - [`huber_remainder!`](@ref)
 """
@@ -304,10 +397,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Adds the remainder of the budget to `b` in place, in equal parts: to the smallest entries of `phi` when the remainder is not negative, and to the largest when it is. At an end of the multiplier's interval those assets are the ones the clamp does not bind, and inside it the remainder is rounding.
+Adds the remainder of the budget to `b` in place, in equal parts between tied assets.
+
+At an end of the interval of the multiplier, the assets that take the remainder are the assets where the Huber penalty is linear, so they can hold any amount past `gamma`. Inside the interval the remainder is rounding.
+
+# Algorithm
+
+ 1. Compute the remainder `r = 1 - sum(b)`.
+ 2. Find the assets `K`, which have the smallest entry of `phi` when `r` is not negative, and the largest entry when `r` is negative.
+ 3. Add `r / count(K)` to each asset of `K`, and return `b`.
 
 # Related
 
+  - [`HuberOptimum`](@ref)
   - [`huber_multiplier`](@ref)
 """
 function huber_remainder!(b::AbstractVector, phi::AbstractVector)
