@@ -10,7 +10,7 @@ commit = "0ecb3ce47c"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2993, doc = 0, comment = 241, blank = 48, total = 3282 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1316, doc = 113, comment = 145, blank = 43, total = 1617 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1319, doc = 113, comment = 146, blank = 43, total = 1621 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -223,7 +223,7 @@ commit = "0ecb3ce47c"
 "src/16_RiskMeasures/13_NoRisk.jl" = { code = 49, doc = 125, comment = 1, blank = 60, total = 235 }
 "src/16_RiskMeasures/14_Range.jl" = { code = 15, doc = 44, comment = 1, blank = 22, total = 82 }
 "src/16_RiskMeasures/15_TurnoverRiskMeasure.jl" = { code = 32, doc = 85, comment = 1, blank = 41, total = 159 }
-"src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { code = 128, doc = 376, comment = 5, blank = 140, total = 649 }
+"src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { code = 128, doc = 401, comment = 5, blank = 153, total = 687 }
 "src/16_RiskMeasures/17_VarianceSkewKurtosis.jl" = { code = 182, doc = 408, comment = 19, blank = 136, total = 745 }
 "src/16_RiskMeasures/18_GenericValueatRiskRange.jl" = { code = 30, doc = 98, comment = 9, blank = 30, total = 167 }
 "src/16_RiskMeasures/19_RatioRiskMeasure.jl" = { code = 44, doc = 140, comment = 4, blank = 42, total = 230 }

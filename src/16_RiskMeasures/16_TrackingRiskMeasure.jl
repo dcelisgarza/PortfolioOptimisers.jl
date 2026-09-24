@@ -2,26 +2,25 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Constrains how far a portfolio's **risk** may stand from a benchmark portfolio's risk.
+Bounds how far the risk of a portfolio can move from the risk of a benchmark portfolio.
 
-This is the constraint twin of [`RiskTrackingRiskMeasure`](@ref): the same quantity in the same two modes, bounded here rather than minimised. Give it to a `JuMPOptimiser`'s `tr` slot, and the solution satisfies the bound; give the matching measure to `expected_risk` afterwards, and you read the value it bound. The distance is a **risk** distance rather than a norm of the return difference, which is what separates it from [`TrackingError`](@ref).
+[`RiskTrackingRiskMeasure`](@ref) measures the same quantity in the same two modes, and this type bounds it. Put it in the `tr` slot of a `JuMPOptimiser`. The distance is a difference of risks, not a norm of the difference of the return series, and that is how it differs from [`TrackingError`](@ref).
+
+In an optimisation the independent bound is exact, and the dependent bound holds from above only. The model states the portfolio risk through an upper bound that the solver can raise. So a portfolio whose risk is below the benchmark risk by more than `err` also satisfies the dependent bound. This is true of every measure whose model is an upper bound, among them [`ConditionalValueatRisk`](@ref), [`StandardDeviation`](@ref) and a [`Variance`](@ref) in the semidefinite form. A [`Variance`](@ref) outside the semidefinite form does not solve in the dependent mode.
+
+The model charges the fee of the portfolio on the returns that the tracked measure reads, in both modes, and it never reads `tr.fees`. In the independent mode, the functor of [`RiskTrackingRiskMeasure`](@ref) charges the fee of the weight difference instead. So with a fee, a returns-based measure reads back a value that is different from the value that the model bounds.
+
+!!! warning
+
+    The default `err = 0.0` bounds the tracked quantity at zero. In the independent mode with a positive-definite measure, the bound pins the portfolio weights to the benchmark weights. Give an `err` unless you want that result.
 
 # Mathematical definition
 
-`alg` chooses which of two quantities `err` bounds.
-
-**Independent** ([`IndependentVariableTracking`](@ref)) bounds the risk of the weight difference:
+The `alg` field selects which of two quantities `err` bounds. The independent mode, [`IndependentVariableTracking`](@ref), bounds the risk of the weight difference. The dependent mode, [`DependentVariableTracking`](@ref), bounds the absolute difference of the two risks.
 
 ```math
 \\begin{align}
-\\rho(\\boldsymbol{w} - \\boldsymbol{w}_b) &\\leq \\varepsilon\\,.
-\\end{align}
-```
-
-**Dependent** ([`DependentVariableTracking`](@ref)) bounds the difference of the two risks:
-
-```math
-\\begin{align}
+\\rho(\\boldsymbol{w} - \\boldsymbol{w}_b) &\\leq \\varepsilon\\,, \\\\
 \\lvert \\rho(\\boldsymbol{w}) - \\rho(\\boldsymbol{w}_b) \\rvert &\\leq \\varepsilon\\,.
 \\end{align}
 ```
@@ -29,17 +28,9 @@ This is the constraint twin of [`RiskTrackingRiskMeasure`](@ref): the same quant
 Where:
 
   - $(math_dict[:w_port])
-  - ``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``, the `w` of `tr`.
-  - ``\\rho``: The risk measure in `r`.
-  - ``\\varepsilon``: The tolerance in `err`.
-
-Both bind at `err`, and the realised value can be read back through the matching [`RiskTrackingRiskMeasure`](@ref). When `r` is a [`Variance`](@ref) in the semidefinite form, the dependent bound holds from above only: a portfolio less risky than the benchmark by more than `err` can satisfy it, as [`DependentVariableTracking`](@ref) states. Read the realised value back to check it.
-
-!!! warning
-
-    The default `err = 0.0` admits only portfolios whose tracked risk is exactly the benchmark's. For a positive-definite measure in independent mode that pins ``\\boldsymbol{w}`` to ``\\boldsymbol{w}_b``. State an `err` unless that is what you want.
-
-The bound reads `tr.w` and never `tr.fees`, so it holds no [`Fees`](@ref) object to amortise and fee amortisation cannot reach it.
+  - $(math_dict[:w_b_track])
+  - $(math_dict[:rho_track])
+  - ``\\varepsilon``: Tolerance, the `err` field.
 
 # Fields
 
@@ -56,11 +47,19 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-The constructor rewrites `r` through [`no_bounds_no_risk_expr_risk_measure`](@ref), so the inner measure's own `settings.ub` and `settings.rke` are dropped. The measure is being used to *measure* the distance, not to bound the portfolio or to contribute to the objective, and both of those belong to the enclosing optimisation. `err` is this constraint's only bound.
+The constructor passes `r` through [`no_bounds_no_risk_expr_risk_measure`](@ref), which drops the `settings.ub` and the `settings.rke` of the tracked measure. The tracked measure only measures the distance. It does not bound the portfolio and it adds no term to the objective, so `err` is the only bound of the constraint.
 
 ## Validation
 
-  - `err` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - `err`, through [`assert_nonempty_nonneg_finite_val`](@ref): `err` is finite and not negative.
+
+## View parameters
+
+`RiskTrackingError` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - `tr` recurses through [`port_opt_view`](@ref) with the asset indices alone, which slices the benchmark weights.
+  - `r` recurses through [`port_opt_view`](@ref) with the asset indices and the returns matrix, because a measure can slice a moment that it holds.
+  - `err` and `alg` pass through unchanged.
 
 # Examples
 
@@ -131,14 +130,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of [`RiskTrackingError`](@ref) `tr` sliced to asset indices `i`.
+Return a [`RiskTrackingError`](@ref) restricted to the assets at the indices `i`.
 
-Slices both the inner tracking benchmark and the risk measure for cluster-based optimisation.
+A hierarchical or clustering optimiser calls it to build the constraint of one cluster. The benchmark weights of the result are the entries `i` of `tr.tr.w`, so they no longer sum to the budget of the whole benchmark.
+
+# Algorithm
+
+ 1. Slice the benchmark with `port_opt_view(tr.tr, i)`.
+ 2. Slice the tracked measure with `port_opt_view(tr.r, i, X)`.
+ 3. Build a new [`RiskTrackingError`](@ref) from the two slices, `tr.err` and `tr.alg`.
 
 # Related
 
   - [`RiskTrackingError`](@ref)
-  - [`port_opt_view`](@ref)
   - [`port_opt_view`](@ref)
 """
 function port_opt_view(tr::RiskTrackingError, i, X::MatNum, args...)
@@ -148,7 +152,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`RiskTrackingError`](@ref) updating the inner benchmark and risk measure from the prior result and solver context.
+Return a [`RiskTrackingError`](@ref) whose tracked measure is resolved against a prior result, and whose benchmark takes the weights `w`.
+
+# Algorithm
+
+ 1. Advance the benchmark with `factory(tr.tr, w)`. The benchmark stays as it is when `w` is `nothing`, or when its `fixed` flag is `true`.
+ 2. Resolve the tracked measure with `factory(tr.r, pr, slv, ucs, w, args...; kwargs...)`, which fills the moments that it reads from `pr`.
+ 3. Build a new [`RiskTrackingError`](@ref) from the two results, `tr.err` and `tr.alg`.
 
 # Related
 
@@ -165,9 +175,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether [`RiskTrackingError`](@ref) `tr` requires previous portfolio weights.
+Return `true` when the benchmark or the tracked measure of [`RiskTrackingError`](@ref) `tr` reads the previous portfolio weights.
 
-Returns `true` if either the inner tracking benchmark or the inner risk measure requires previous weights.
+A [`WeightsTracking`](@ref) benchmark reads them unless its `fixed` flag is `true`.
 
 # Related
 
@@ -180,7 +190,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`RiskTrackingError`](@ref) updating the inner benchmark and risk measure from new portfolio weights `w`.
+Return a [`RiskTrackingError`](@ref) whose benchmark and tracked measure take the portfolio weights `w`.
+
+# Algorithm
+
+ 1. Advance the benchmark with `factory(tr.tr, w)`. A [`WeightsTracking`](@ref) whose `fixed` flag is `true` stays as it is.
+ 2. Advance the tracked measure with `factory(tr.r, w)`.
+ 3. Build a new [`RiskTrackingError`](@ref) from the two results, `tr.err` and `tr.alg`.
 
 # Related
 
@@ -194,30 +210,39 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Tracking Error risk measure.
+Measures the tracking error, a scaled norm of the gap between the net portfolio returns and a benchmark return series.
 
-`TrackingRiskMeasure` penalises portfolio deviation from a benchmark by computing a norm of the difference between portfolio returns and a benchmark return series or benchmark weights. The tracking error is defined using returns-based or weights-based benchmarks, and the norm is configurable.
+The benchmark is a return series in a [`ReturnsTracking`](@ref), and a weight vector in a [`WeightsTracking`](@ref), which builds the series from the returns matrix. [`TrackingError`](@ref) bounds the same quantity in an optimisation, and [`RiskTrackingRiskMeasure`](@ref) measures a difference of risks in its place.
 
 # Mathematical definition
 
-Let ``\\boldsymbol{x}`` be the portfolio returns series, ``\\boldsymbol{b}`` the benchmark returns, and ``N_T`` the number of observations. With the default [`L2Norm`](@ref), the tracking error is:
+The `alg` field selects the norm and the divisor that scales it.
 
 ```math
 \\begin{align}
-\\mathrm{TE}(\\boldsymbol{w}) &= \\frac{\\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_2}{\\sqrt{N_T - \\nu}}\\,.
+\\boldsymbol{x} &= \\mathbf{X}\\boldsymbol{w} - F(\\boldsymbol{w})\\,, \\\\
+\\mathrm{TE}_{L_2}(\\boldsymbol{w}) &= \\frac{\\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_2}{\\sqrt{T - d}}\\,, \\\\
+\\mathrm{TE}_{L_2^2}(\\boldsymbol{w}) &= \\frac{\\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_2^2}{T - d}\\,, \\\\
+\\mathrm{TE}_{L_1}(\\boldsymbol{w}) &= \\frac{\\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_1}{T - d}\\,, \\\\
+\\mathrm{TE}_{L_p}(\\boldsymbol{w}) &= \\frac{\\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_p}{(T - d)^{1/p}}\\,, \\\\
+\\mathrm{TE}_{L_\\infty}(\\boldsymbol{w}) &= \\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_\\infty\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{TE}(\\boldsymbol{w})``: ``L^2`` tracking error of the portfolio.
+  - ``\\boldsymbol{x}``: Net portfolio return series ``T \\times 1``.
+  - ``\\mathbf{X}``: Returns matrix ``T \\times N``.
   - $(math_dict[:w_port])
-  - ``\\boldsymbol{x}``: Portfolio returns series ``N_T \\times 1``.
-  - ``\\boldsymbol{b}``: Benchmark returns series ``N_T \\times 1``.
-  - ``N_T``: Number of observations.
-  - ``\\nu``: Delta degrees of freedom, the `ddof` field of the norm. It is `1` by default, so the denominator is the sample one.
+  - ``F(\\boldsymbol{w})``: Fee series ``T \\times 1`` of the portfolio, zero when `fees` is `nothing`. See [`calc_net_returns`](@ref).
+  - ``\\boldsymbol{b}``: Benchmark return series ``T \\times 1``, from [`tracking_benchmark`](@ref) on `tr`. A [`WeightsTracking`](@ref) gives ``\\boldsymbol{b} = \\mathbf{X}\\boldsymbol{w}_b - F_b(\\boldsymbol{w}_b)``, with the fee ``F_b`` of its own `fees` field.
+  - $(math_dict[:w_b_track])
+  - ``\\mathrm{TE}_{L_2}``, ``\\mathrm{TE}_{L_2^2}``, ``\\mathrm{TE}_{L_1}``, ``\\mathrm{TE}_{L_p}``, ``\\mathrm{TE}_{L_\\infty}``: Tracking error under [`L2Norm`](@ref), [`SquaredL2Norm`](@ref), [`L1Norm`](@ref), [`LpNorm`](@ref) and [`LInfNorm`](@ref).
+  - $(math_dict[:T])
+  - $(math_dict[:d_ddof])
+  - $(math_dict[:p_norm_order])
 
-The `alg` field selects the norm. It sets both the norm of the deviation vector and the divisor that scales it — see [`norm_error`](@ref) and [`norm_factor`](@ref).
+With ``d = 0``, the ``L_2`` and ``L_1`` forms are Equations 9.16 and 9.17 of Cajas's book. With ``d = 0``, the squared ``L_2`` form is the empirical tracking error of Benidis, Feng and Palomar.
 
 # Fields
 
@@ -243,24 +268,24 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
     (r::TrackingRiskMeasure)(w::VecNum, X::MatNum, fees = nothing)
 
-Computes the Tracking Error of a portfolio weight vector `w`.
+Computes the tracking error of the portfolio weights `w` on the returns matrix `X`.
 
 ## Arguments
 
   - `w::VecNum`: Portfolio weights vector.
   - `X::MatNum`: Asset returns matrix (``T \\times N``).
-  - `fees`: Optional fee structure.
+  - `fees`: Optional fee of the portfolio.
 
-The benchmark's fee and the portfolio's fee are charged at the same site, over the same `X`, and neither is divided by a fold. `fees` reaches [`calc_net_returns`](@ref) and `r.tr.fees` reaches [`tracking_benchmark`](@ref). A bare [`AmortisedFees`](@ref) on either one charges in full, so both halves of the norm read one clock. State a `horizon` on both to divide both.
+[`calc_net_returns`](@ref) charges `fees` on the portfolio series, and [`tracking_benchmark`](@ref) charges `r.tr.fees` on the benchmark series. Both charge over the same `X`, and neither divides by a fold. A bare [`AmortisedFees`](@ref) on either fee charges its fixed amounts in full. Give a `horizon` to both fees to spread both of them.
 
 ## Precomputed portfolio returns
 
     (r::TrackingRiskMeasure{<:Any, <:ReturnsTracking})(x::VecNum)
 
-Computes the Tracking Error of an already-reduced portfolio returns series `x` (``T \\times 1``).
-Only a [`ReturnsTracking`](@ref) measure supports this, because its benchmark is itself a returns
-series. A [`WeightsTracking`](@ref) measure rebuilds its benchmark from the asset returns, so it
-needs the portfolio weights and throws an `ArgumentError` instead. See
+Computes the tracking error of a portfolio return series `x` (``T \\times 1``) that the caller already holds.
+Only a [`ReturnsTracking`](@ref) measure supports this, because its benchmark is a return
+series. A [`WeightsTracking`](@ref) measure builds its benchmark from the asset returns, so it
+needs the portfolio weights. On a series it throws an `ArgumentError`. See
 [`supports_precomputed_returns`](@ref).
 
 # Examples
@@ -293,7 +318,8 @@ TrackingRiskMeasure
 # References
 
   - $(ref_dict[:palomar2025])
-  - $(ref_dict[:cajas2025]) Section 9.2.
+  - $(ref_dict[:cajas2025]) Section 9.2, Equations 9.16 and 9.17.
+  - $(ref_dict[:benidis2018])
 """
 @propagatable @concrete struct TrackingRiskMeasure <: RiskMeasure
     """
@@ -332,9 +358,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether [`TrackingRiskMeasure`](@ref) `r` requires previous portfolio weights.
+Return `true` when the benchmark of [`TrackingRiskMeasure`](@ref) `r` reads the previous portfolio weights.
 
-Delegates to the inner tracking specification.
+A [`WeightsTracking`](@ref) benchmark reads them unless its `fixed` flag is `true`. A [`ReturnsTracking`](@ref) benchmark never reads them.
 
 # Related
 
@@ -347,7 +373,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`TrackingRiskMeasure`](@ref) updating the inner tracking specification with new weights `w`.
+Return a [`TrackingRiskMeasure`](@ref) whose benchmark takes the portfolio weights `w`.
+
+`factory(r.tr, w)` advances the benchmark. A [`WeightsTracking`](@ref) whose `fixed` flag is `false` takes `w` as its new benchmark weights, and any other benchmark stays as it is. `r.settings` and `r.alg` pass through unchanged.
 
 # Related
 
@@ -360,9 +388,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`TrackingRiskMeasure`](@ref) from a full optimisation context, forwarding `w` to `factory(r, w)`.
+Return `factory(r, w)`, the [`TrackingRiskMeasure`](@ref) whose benchmark takes the portfolio weights `w`.
 
-Ignores prior result, solver, and uncertainty set arguments.
+The measure reads no moment, so the prior result, the solver and the uncertainty set in the second to fourth positions are not read.
 
 # Related
 
@@ -375,48 +403,33 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Risk Tracking risk measure.
+Measures how far the risk of a portfolio is from the risk of a benchmark portfolio, under any risk measure.
 
-`RiskTrackingRiskMeasure` computes the deviation of portfolio risk from a benchmark portfolio risk, using any base risk measure. Two modes are supported:
+The `alg` field selects the mode. The independent mode, [`IndependentVariableTracking`](@ref), takes the risk of the weight difference. The dependent mode, [`DependentVariableTracking`](@ref), takes the absolute difference of the two risks. [`RiskTrackingError`](@ref) bounds the same quantity in an optimisation, and [`TrackingRiskMeasure`](@ref) measures a norm of the gap between two return series in its place.
 
-  - **Independent** (`IndependentVariableTracking`): computes the risk of the weight difference ``\\boldsymbol{w} - \\boldsymbol{w}_b``.
-  - **Dependent** (`DependentVariableTracking`): computes the absolute difference between the portfolio risk and the benchmark risk.
+In an optimisation the independent mode is exact, and the dependent mode holds from one side only. The model states the portfolio risk through an upper bound that the solver can raise. So the model penalises a portfolio that is riskier than the benchmark, and it can report zero for a portfolio that is less risky. This is true of every measure whose model is an upper bound, among them [`ConditionalValueatRisk`](@ref), [`StandardDeviation`](@ref) and a [`Variance`](@ref) in the semidefinite form. The constructor warns for a measure whose model is a quadratic expression, and a [`Variance`](@ref) outside the semidefinite form does not solve in the dependent mode.
+
+The functor never reads `tr.fees`. It passes the `fees` of the portfolio to the tracked measure. In the independent mode the tracked measure charges the fee of ``\\boldsymbol{w} - \\boldsymbol{w}_b``, but an optimisation charges the fee of ``\\boldsymbol{w}``. So with a fee, a returns-based measure reports a value that is different from the value that the model minimises. In the dependent mode the functor and the model both charge the fee of each weight vector on its own risk.
 
 # Mathematical definition
 
-**Independent mode:**
-
 ```math
 \\begin{align}
-\\mathrm{RkTrack}_{\\mathrm{indep}}(\\boldsymbol{w}) &= \\rho(\\boldsymbol{w} - \\boldsymbol{w}_b)\\,.
+\\mathrm{RT}_{\\mathrm{ind}}(\\boldsymbol{w}) &= \\rho(\\boldsymbol{w} - \\boldsymbol{w}_b)\\,, \\\\
+\\mathrm{RT}_{\\mathrm{dep}}(\\boldsymbol{w}) &= \\lvert \\rho(\\boldsymbol{w}) - \\rho(\\boldsymbol{w}_b) \\rvert\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{RkTrack}_{\\mathrm{indep}}(\\boldsymbol{w})``: Risk of the weight difference between portfolio and benchmark.
+  - ``\\mathrm{RT}_{\\mathrm{ind}}(\\boldsymbol{w})``: Risk tracking in the independent mode, the risk of the weight difference.
+  - ``\\mathrm{RT}_{\\mathrm{dep}}(\\boldsymbol{w})``: Risk tracking in the dependent mode, the absolute difference of the two risks.
   - $(math_dict[:w_port])
-  - ``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``.
-  - ``\\rho``: Chosen base risk measure.
+  - $(math_dict[:w_b_track])
+  - $(math_dict[:rho_track])
+  - ``\\mathbf{\\Sigma}``: Covariance matrix of a [`StandardDeviation`](@ref) tracked measure.
 
-**Dependent mode:**
-
-```math
-\\begin{align}
-\\mathrm{RkTrack}_{\\mathrm{dep}}(\\boldsymbol{w}) &= |\\rho(\\boldsymbol{w}) - \\rho(\\boldsymbol{w}_b)|\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{RkTrack}_{\\mathrm{dep}}(\\boldsymbol{w})``: Absolute difference between portfolio risk and benchmark risk.
-  - $(math_dict[:w_port])
-  - ``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``.
-  - ``\\rho``: Chosen base risk measure.
-
-In an optimisation the dependent mode is exact only when the model states ``\\rho(\\boldsymbol{w})`` exactly. A [`Variance`](@ref) in the semidefinite form does not, and the mode then holds from one side only, as [`DependentVariableTracking`](@ref) states.
-
-Neither this measure nor its constraint twin reads `tr.fees`: the computation reads `tr.w` alone. There is no [`Fees`](@ref) object on this path, so fee amortisation cannot reach it, and the distance is re-evaluated fresh every fold.
+With a [`StandardDeviation`](@ref), the independent mode is ``\\sqrt{(\\boldsymbol{w} - \\boldsymbol{w}_b)^\\intercal \\mathbf{\\Sigma} (\\boldsymbol{w} - \\boldsymbol{w}_b)}``, Equation 9.18 of Cajas's book.
 
 # Fields
 
@@ -433,17 +446,27 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+The constructor passes `r` through [`no_bounds_no_risk_expr_risk_measure`](@ref), which drops the `settings.ub` and the `settings.rke` of the tracked measure. The tracked measure only measures the distance, and `settings` of this measure holds its bound and its objective flag. In the dependent mode, the constructor logs a warning when `r` is a measure whose model is a quadratic expression, such as a [`Variance`](@ref).
+
+## View parameters
+
+`RiskTrackingRiskMeasure` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - `tr` recurses through [`port_opt_view`](@ref) with the asset indices alone, which slices the benchmark weights.
+  - `r` recurses through [`port_opt_view`](@ref) with the asset indices and the returns matrix, because a measure can slice a moment that it holds.
+  - `settings` and `alg` pass through unchanged.
+
 # Functor
 
     (r::RiskTrackingRiskMeasure)(w::VecNum, X::MatNum, fees = nothing)
 
-Computes the Risk Tracking deviation of a portfolio weight vector `w`.
+Computes the risk tracking of the portfolio weights `w` on the returns matrix `X`, in the mode that `r.alg` selects.
 
 ## Arguments
 
   - `w::VecNum`: Portfolio weights vector.
   - `X::MatNum`: Asset returns matrix (``T \\times N``).
-  - `fees`: Optional fee structure.
+  - `fees`: Optional fee of the portfolio. The tracked measure receives it with each weight vector that it reads.
 
 # Examples
 
@@ -484,7 +507,7 @@ RiskTrackingRiskMeasure
 # References
 
   - $(ref_dict[:palomar2025])
-  - $(ref_dict[:cajas2025]) Section 9.2.
+  - $(ref_dict[:cajas2025]) Section 9.2, Equation 9.18.
 """
 @concrete struct RiskTrackingRiskMeasure <: RiskMeasure
     """
@@ -541,14 +564,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of [`RiskTrackingRiskMeasure`](@ref) `r` sliced to asset indices `i`.
+Return a [`RiskTrackingRiskMeasure`](@ref) restricted to the assets at the indices `i`.
 
-Slices both the inner tracking benchmark and the risk measure for cluster-based optimisation.
+A hierarchical or clustering optimiser calls it to build the measure of one cluster. The benchmark weights of the result are the entries `i` of `r.tr.w`, so they no longer sum to the budget of the whole benchmark.
+
+# Algorithm
+
+ 1. Slice the benchmark with `port_opt_view(r.tr, i)`.
+ 2. Slice the tracked measure with `port_opt_view(r.r, i, X)`.
+ 3. Build a new [`RiskTrackingRiskMeasure`](@ref) from the two slices, `r.settings` and `r.alg`.
 
 # Related
 
   - [`RiskTrackingRiskMeasure`](@ref)
-  - [`port_opt_view`](@ref)
   - [`port_opt_view`](@ref)
 """
 function port_opt_view(r::RiskTrackingRiskMeasure, i, X::MatNum, args...)
@@ -559,9 +587,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`RiskTrackingRiskMeasure`](@ref) updating the inner risk measure from the prior result.
+Return a [`RiskTrackingRiskMeasure`](@ref) whose tracked measure is resolved against the prior result `pr`.
 
-The inner tracking benchmark is preserved; the risk measure is updated via `factory`.
+`factory(r.r, pr, args...; kwargs...)` fills the moments that the tracked measure reads from `pr`. The benchmark stays as it is, even when `args` carries portfolio weights. The method `factory(r, w)` advances it.
 
 # Related
 
@@ -576,9 +604,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether [`RiskTrackingRiskMeasure`](@ref) `r` requires previous portfolio weights.
+Return `true` when the benchmark or the tracked measure of [`RiskTrackingRiskMeasure`](@ref) `r` reads the previous portfolio weights.
 
-Returns `true` if either the inner tracking benchmark or the inner risk measure requires previous weights.
+A [`WeightsTracking`](@ref) benchmark reads them unless its `fixed` flag is `true`.
 
 # Related
 
@@ -591,7 +619,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`RiskTrackingRiskMeasure`](@ref) updating the inner benchmark and risk measure from new portfolio weights `w`.
+Return a [`RiskTrackingRiskMeasure`](@ref) whose benchmark and tracked measure take the portfolio weights `w`.
+
+# Algorithm
+
+ 1. Advance the benchmark with `factory(r.tr, w)`. A [`WeightsTracking`](@ref) whose `fixed` flag is `true` stays as it is.
+ 2. Advance the tracked measure with `factory(r.r, w)`.
+ 3. Build a new [`RiskTrackingRiskMeasure`](@ref) from the two results, `r.settings` and `r.alg`.
 
 # Related
 
@@ -609,8 +643,9 @@ risk_input_kind(::RiskTrackingRiskMeasure) = WeightsReturnsFeesInput()
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `false`: a [`WeightsTracking`](@ref) measure compares against a benchmark weight
-vector and always requires explicit portfolio weights.
+Return `false` for a [`TrackingRiskMeasure`](@ref) with a [`WeightsTracking`](@ref) benchmark.
+
+The measure builds the benchmark series from the returns matrix, so it needs the portfolio weights and the returns matrix, not a return series.
 
 # Related
 
@@ -622,8 +657,9 @@ supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:WeightsTracking})::B
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true`: a [`ReturnsTracking`](@ref) measure compares against a benchmark return
-series and its risk is a function of the net-return series alone.
+Return `true` for a [`TrackingRiskMeasure`](@ref) with a [`ReturnsTracking`](@ref) benchmark.
+
+The benchmark is a return series, so the tracking error is a function of the net portfolio return series alone.
 
 # Related
 
@@ -635,9 +671,9 @@ supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:ReturnsTracking})::B
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `false`: a [`RiskTrackingRiskMeasure`](@ref) tracks a benchmark held as a weight vector and always needs explicit portfolio weights.
+Return `false` for every [`RiskTrackingRiskMeasure`](@ref), because the measure needs the portfolio weights.
 
-Its `tr` slot is a [`WeightsTracking`](@ref), and both functors read the benchmark weights from it: the independent mode measures the inner risk of `w - r.tr.w`, and the dependent mode takes the difference of the inner risk at `w` and at `r.tr.w`. A bare net-return series carries no weights, so neither difference exists for it.
+Its `tr` field is a [`WeightsTracking`](@ref), and both functors read the benchmark weights from it. The independent mode takes the tracked risk of `w - r.tr.w`, and the dependent mode takes the difference of the tracked risk at `w` and at `r.tr.w`. A net return series carries no weights, so neither difference exists for it.
 
 # Related
 

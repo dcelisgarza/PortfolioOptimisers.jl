@@ -271,7 +271,7 @@
 "src/16_RiskMeasures/13_NoRisk.jl" = { map = 9, units = 6, swept = false }
 "src/16_RiskMeasures/14_Range.jl" = { map = 9, units = 1, swept = false }
 "src/16_RiskMeasures/15_TurnoverRiskMeasure.jl" = { map = 9, units = 4, swept = false }
-"src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { map = 9, units = 17, swept = false }
+"src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { map = 9, units = 17, algorithm = 5, swept = true, bindings = ["RiskTrackingError", "RiskTrackingRiskMeasure", "TrackingRiskMeasure", "factory", "factory", "factory", "factory", "factory", "factory", "needs_previous_weights", "needs_previous_weights", "needs_previous_weights", "port_opt_view", "port_opt_view", "supports_precomputed_returns", "supports_precomputed_returns", "supports_precomputed_returns"] }
 "src/16_RiskMeasures/17_VarianceSkewKurtosis.jl" = { map = 9, units = 16, swept = false }
 "src/16_RiskMeasures/18_GenericValueatRiskRange.jl" = { map = 9, units = 2, swept = false }
 "src/16_RiskMeasures/19_RatioRiskMeasure.jl" = { map = 9, units = 2, swept = false }

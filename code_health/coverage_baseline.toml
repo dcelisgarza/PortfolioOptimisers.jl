@@ -211,7 +211,7 @@ commit = "8610300"
 "src/16_RiskMeasures/13_NoRisk.jl" = { lines = 27, misses = 3 }
 "src/16_RiskMeasures/14_Range.jl" = { lines = 6, misses = 0 }
 "src/16_RiskMeasures/15_TurnoverRiskMeasure.jl" = { lines = 13, misses = 2 }
-"src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { lines = 56, misses = 15 }
+"src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { lines = 56, misses = 0 }
 "src/16_RiskMeasures/17_VarianceSkewKurtosis.jl" = { lines = 92, misses = 11 }
 "src/16_RiskMeasures/18_GenericValueatRiskRange.jl" = { lines = 13, misses = 0 }
 "src/16_RiskMeasures/19_RatioRiskMeasure.jl" = { lines = 13, misses = 0 }
