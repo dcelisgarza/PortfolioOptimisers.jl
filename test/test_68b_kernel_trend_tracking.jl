@@ -84,6 +84,32 @@ the worked step the paper prints for five assets at its defaults.
         @test isnothing(po.elastic_net_polish(P, y, zcap, lam, path.theta))
         @test po.elastic_net_polish(P, y, z, lam, path.theta) ≈ z
         @test maxerr(zcap, z) > 0.5
+        # #1188: on this fixture the sweeps find the pattern between 2000 and 5000 sweeps,
+        # which the docstring of `ElasticNetPath` states.
+        polished(it) = !isnothing(po.elastic_net_polish(P, y,
+                                                        po.elastic_net_path(ElasticNetPath(;
+                                                                                           iters = it),
+                                                                            P, y), lam,
+                                                        path.theta))
+        @test !polished(2000) && polished(5000)
+        # #1188: at theta = 1 the lasso's equations over a pattern with more columns than
+        # observations are singular. The polish refused to solve them and threw; it now
+        # refuses the pattern, and the sweeps reach a point that meets the conditions.
+        rng3 = StableRNG(124)
+        P = 1 .+ 0.02 .* randn(rng3, 4, 5)
+        y = P[:, end] .* (1 .+ 0.03 .* randn(rng3, 4))
+        lasso = ElasticNetPath(; theta = 1.0)
+        @test isnothing(po.elastic_net_polish(P, y, ones(5), 1e-3, 1.0))
+        z = po.elastic_net_path(lasso, P, y)
+        lam = maximum(abs, P' * y) * sqrt(lasso.ratio)
+        corr = P' * (y .- P * z)
+        for k in 1:5
+            @test if iszero(z[k])
+                abs(corr[k]) <= lam + 1e-8
+            else
+                isapprox(corr[k], lam * sign(z[k]); atol = 1e-8)
+            end
+        end
         @test_throws DomainError ElasticNetPath(; theta = 0)
         @test_throws DomainError ElasticNetPath(; theta = 1.1)
         @test_throws DomainError ElasticNetPath(; ratio = 1)
@@ -99,6 +125,15 @@ the worked step the paper prints for five assets at its defaults.
         @test po.trend_reverting_fraction(ones(2, 3)) == 0
         # Two assets, one alternating and one monotone: half the cells.
         @test po.trend_reverting_fraction([1.0 1; 2 2; 1 3; 2 4]) == 0.5
+        # #1188: the fraction takes the element type of the levels, so a Float32 panel
+        # gives a Float32 forecast.
+        @test po.trend_reverting_fraction(Float32[1 1; 2 2; 1 3; 2 4]) === 0.5f0
+        @test po.trend_reverting_fraction(ones(Float32, 2, 3)) === 0.0f0
+        X32 = Float32.(0.02 .* randn(StableRNG(5), 20, 4))
+        k32 = KernelTrendPattern(; nu = 0.5f0,
+                                 path = ElasticNetPath(; theta = 0.99f0, ratio = 1.0f-3,
+                                                       tol = 1.0f-6))
+        @test eltype(vec(mean(PriceLevelExpectedReturns(; alg = k32), X32))) == Float32
     end
 
     @testset "The statistic: the hand recursion, the fold, the batch and the memory" begin

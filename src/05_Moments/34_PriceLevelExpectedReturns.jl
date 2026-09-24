@@ -145,7 +145,7 @@ Where:
   - ``\\mathrm{MA}_{t}``: The exponential moving average of the levels up to period ``t``.
   - $(math_dict[:p_t_level]) The first level is ``\\boldsymbol{p}_{0}``.
   - $(math_dict[:x_t_rel])
-  - ``\\alpha``: The smoothing weight on the current level.
+  - $(math_dict[:alpha_ema])
   - $(math_dict[:xhat_fc])
 
 The paper writes the first price as ``\\boldsymbol{p}_{1}`` and seeds the average there. The seed above is the same seed with the first level indexed zero, so the forecast after one level is one.
@@ -677,10 +677,15 @@ end
     window_rows(alg::ExponentialMovingAverage)
     window_rows(alg::LaggedPrice)
     window_rows(alg::ReweightedPriceRelative)
+    window_rows(alg::GaussianWeightedDoubleEstimate)
+    window_rows(test::AbstractTrendTest)
+    window_rows(alg::TrendSwitch)
+    window_rows(alg::CompositeTrend)
+    window_rows(alg::KernelTrendPattern)
 
 Returns the number of return rows the batch form of a statistic reads, or `nothing` for one that reads every row it gets.
 
-A statistic over `window` levels reads `window - 1` rows, which is the default. The lagged price reads `lag` rows. A folding statistic reads every row, because its batch form is the recursion from the first level.
+A statistic over `window` levels reads `window - 1` rows, which is the default, and so does a trend test. The lagged price reads `lag` rows. A folding statistic reads every row, because its batch form is the recursion from the first level. The Gaussian double estimate reads the number of levels in its Gaussian window. A trend switch reads the largest number of its test and its branches, and a composite trend reads `window - 1` rows more than its widest trend. Either of them reads every row when one of its members does.
 
 # Related
 
@@ -703,8 +708,11 @@ end
     folds(alg::AbstractPriceLevelStatistic)
     folds(alg::ExponentialMovingAverage)
     folds(alg::ReweightedPriceRelative)
+    folds(alg::KernelTrendPattern)
 
 Returns `true` when a statistic is an exact recursion over price relatives, and `false` by default.
+
+A composite statistic does not fold, even when a member does, because it reads each member over a window of levels.
 
 # Related
 
@@ -722,10 +730,11 @@ function folds(::ReweightedPriceRelative)
 end
 """
     memory_rows(alg::AbstractPriceLevelStatistic)
+    memory_rows(alg::KernelTrendPattern)
 
 Returns the number of relatives a folding statistic carries as its memory on the state.
 
-The default is `0`, for a statistic whose recursion reads the carried vector alone.
+The default is `0`, for a statistic whose recursion reads the carried vector alone. The kernel trend pattern carries `2 window` relatives.
 
 # Related
 
@@ -856,8 +865,15 @@ end
     price_level_statistic(alg::WindowPeak, P::AbstractMatrix)
     price_level_statistic(alg::LaggedPrice, P::AbstractMatrix)
     price_level_statistic(alg::ReweightedPriceRelative, P::AbstractMatrix)
+    price_level_statistic(alg::TruncatedExponentialMovingAverage, P::AbstractMatrix)
+    price_level_statistic(alg::GaussianWeightedDoubleEstimate, P::AbstractMatrix)
+    price_level_statistic(alg::TrendSwitch, P::AbstractMatrix)
+    price_level_statistic(alg::CompositeTrend, P::AbstractMatrix)
+    price_level_statistic(alg::KernelTrendPattern, P::AbstractMatrix)
 
 Returns the statistic of a window of price levels, one value per asset.
+
+Each composite statistic states its own statistic in its `# Mathematical definition`, and its method returns that statistic times the last level. A trend switch and a composite trend read each member over the member's own window with [`member_statistic`](@ref). The kernel trend pattern runs its recursion through [`fold_levels`](@ref).
 
 Every statistic is homogeneous of degree one when all the levels are scaled by one number. The moving average is the column mean of the levels. The exponential moving average runs its recursion over every row from the first. The spatial median is the point that minimises the sum of Euclidean distances to the rows, which [`spatial_median`](@ref) finds. The window peak is the column maximum. The lagged price is the row `lag` above the last, or the first row when the window truncates. The reweighted relative runs its recursion over the relatives of successive rows through [`fold_levels`](@ref), and multiplies the result by the last level.
 
@@ -956,7 +972,7 @@ Where:
   - ``\\hat{\\boldsymbol{x}}``, ``\\hat{\\boldsymbol{x}}'``: The forecast of [`ExponentialMovingAverage`](@ref) before and after the row.
   - ``\\hat{\\boldsymbol{\\varphi}}``, ``\\hat{\\boldsymbol{\\varphi}}'``: The forecast of [`ReweightedPriceRelative`](@ref) before and after the row.
   - ``\\boldsymbol{x}``: The price relative of the row.
-  - ``\\alpha``: The smoothing weight of the exponential moving average.
+  - $(math_dict[:alpha_ema]) It is the weight of the exponential moving average.
   - ``\\theta``, ``\\boldsymbol{\\gamma}``: The reweighting strength and the per-asset weight of the reweighted relative.
   - ``\\hat{\\boldsymbol{x}}_{\\mathrm{cold}}``, ``\\hat{\\boldsymbol{\\varphi}}_{\\mathrm{cold}}``: The carried value before the first row, which [`cold_statistic`](@ref) returns.
 

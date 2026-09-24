@@ -1302,6 +1302,15 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :xtilde_fc => "``\\tilde{\\boldsymbol{x}}_{t+1} = \\hat{\\boldsymbol{x}}_{t+1} - \\bar{x}_{t+1} \\boldsymbol{1}``: Centred Price Relative Forecast, with ``\\bar{x}_{t+1}`` the mean of the entries of ``\\hat{\\boldsymbol{x}}_{t+1}``. Its entries sum to zero.",#
                        :p_t_level => "``\\boldsymbol{p}_t``: Price level vector of period ``t``, one entry per asset.",#
                        :w_levels => "``w``: Price-level window, the number of price levels a statistic reads, the current one included.",#
+                       :p_ti_level => "``p_{t,i}``: Price level of asset ``i`` at period ``t``, the entry ``i`` of ``\\boldsymbol{p}_t``.",#
+                       :alpha_ema => "``\\alpha``: Smoothing weight on the current level, in ``(0, 1]``. A smaller weight gives a longer memory.",#
+                       :s_i_trend => "``s_i``: Trend sign of asset ``i``, ``+1`` for a rising asset, ``0`` for a flat one and ``-1`` for a falling one.",#
+                       # The elastic net that the kernel trend pattern fits.
+                       :y_enet => "``\\boldsymbol{y}``: Response of the elastic net, one entry per observation.",#
+                       :P_enet => "``\\mathbf{P}``: Regressors of the elastic net, one row per observation and one column per regressor. Column ``k`` is ``\\mathbf{P}_k``.",#
+                       :z_enet => "``\\boldsymbol{z}``: Coefficients of the elastic net, one per column of ``\\mathbf{P}``. Coefficient ``k`` is ``z_k``.",#
+                       :gamma_enet => "``\\gamma``: Regularisation strength of the elastic net.",#
+                       :theta_enet => "``\\vartheta``: Share of the ``L_1`` penalty in the elastic net, the `theta` field of [`ElasticNetPath`](@ref).",#
                        :Sigma_hat_pred => "``\\hat{\\mathbf{\\Sigma}}_{t+1}``: Predictive covariance of the price relatives of period ``t + 1``, made after the row of period ``t``.",#
                        :Sigma_hat_RO => "``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{RO}}``: Rank-one covariance estimate of a window, the matrix that [`RankOneCovariance`](@ref) computes.",#
                        # The Constrained Update: the raw step, the set it is projected onto,

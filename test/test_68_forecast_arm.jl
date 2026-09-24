@@ -289,6 +289,94 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         @test_throws DomainError CompositeTrend(; sigma2 = 0)
     end
 
+    @testset "The composite statistics' docstrings, with numbers (#1188)" begin
+        rng3 = StableRNG(1188)
+        P = levels(1 .+ 0.02 .* randn(rng3, 30, 6))
+        D = exp.(randn(rng3, 6))
+        pls(alg, Q) = po.price_level_statistic(alg, Q)
+        # Every statistic of the file reads each asset alone, so it scales with each asset.
+        for alg in (TruncatedExponentialMovingAverage(), GaussianWeightedDoubleEstimate(),
+                    TrendSwitch(),
+                    TrendSwitch(; test = RegressionSlope(), rising = WindowPeak(),
+                                flat = ExponentialMovingAverage(),
+                                falling = ExponentialMovingAverage()), CompositeTrend())
+            @test pls(alg, P .* D') ≈ pls(alg, P) .* D
+        end
+        # The truncated average: the weights sum to 0.96875 at the defaults, so a flat path
+        # forecasts below one; at alpha = 1 the forecast is one; Float32 stays Float32.
+        tema = TruncatedExponentialMovingAverage()
+        @test pls(tema, ones(7, 2)) ≈ fill(0.96875, 2)
+        @test pls(TruncatedExponentialMovingAverage(; alpha = 1.0), P) == P[end, :]
+        @test eltype(pls(TruncatedExponentialMovingAverage(; alpha = 0.5f0), Float32.(P))) ==
+              Float32
+        # The Gaussian double estimate on a full window: eq. (3) gives l = 9, and the
+        # statistic reads l + 1 levels.
+        gw = GaussianWeightedDoubleEstimate()
+        @test floor(Int, sqrt(-2 * 2.8^2 * log(0.005))) == 9
+        g = [exp(-k^2 / (2 * 2.8^2)) for k in 1:9]
+        K = size(P, 1)
+        est(u) = sum(g[k] .* P[u - k + 1, :] for k in 1:9) ./ sum(g)
+        p2 = (g[1] .* est(K - 1) .+ sum(g[k] .* P[K - k + 1, :] for k in 2:9)) ./ sum(g)
+        @test pls(gw, P) ≈ (est(K) .+ p2) ./ 2
+        @test pls(gw, P) == pls(gw, P[(end - 9):end, :])
+        @test eltype(pls(GaussianWeightedDoubleEstimate(; tau = 2.8f0, cutoff = 0.005f0),
+                         Float32.(P))) == Float32
+        # The pairwise test sums ten slopes; the four slopes from the current level that
+        # eq. (6) of the paper writes can have the other sign.
+        ten(Q, i) = sign(sum((Q[b, i] - Q[a, i]) / (b - a) for a in 1:4 for b in (a + 1):5))
+        four(Q, i) = sign(sum((Q[5, i] - Q[a, i]) / (5 - a) for a in 1:4))
+        Qs = [levels(1 .+ 0.02 .* randn(rng3, 4, 1)) for _ in 1:200]
+        @test all(Q -> po.trend_sign(PairwiseSlopeSum(), Q)[1] == ten(Q, 1), Qs)
+        @test any(Q -> four(Q, 1) != ten(Q, 1), Qs)
+        # The regression test is the least-squares slope with a free intercept at
+        # lambda = 0; a slope equal to the threshold is flat, and one below it falls.
+        Q = P[(end - 4):end, :]
+        ols = [([ones(5) 1:5] \ Q[:, i])[2] for i in 1:6]
+        @test po.trend_sign(RegressionSlope(; threshold = 0), Q) == sign.(ols)
+        lin = reshape(collect(1.0:5.0), :, 1)
+        @test po.trend_sign(RegressionSlope(; threshold = 1), lin) == [0]
+        @test po.trend_sign(RegressionSlope(; threshold = 1.5), lin) == [-1]
+        # Over one level no trend exists, and both tests return zero whatever the ridge
+        # weight; a Float32 window gives a Float32 sign.
+        for test in (PairwiseSlopeSum(), RegressionSlope(), RegressionSlope(; lambda = 1))
+            @test po.trend_sign(test, P[end:end, :]) == zeros(6)
+        end
+        @test eltype(po.trend_sign(RegressionSlope(; threshold = 0.1f0, lambda = 0.0f0),
+                                   Float32.(Q))) == Float32
+        # The switch takes each branch per asset on the sign of its test.
+        s = po.trend_sign(PairwiseSlopeSum(), Q)
+        up = pls(TruncatedExponentialMovingAverage(), Q)
+        pk = vec(maximum(Q; dims = 1))
+        @test pls(TrendSwitch(), P) ≈
+              [s[i] > 0 ? up[i] : s[i] < 0 ? pk[i] : Q[end, i] for i in 1:6]
+        lal = TrendSwitch(; test = RegressionSlope(), rising = WindowPeak(),
+                          flat = ExponentialMovingAverage(),
+                          falling = ExponentialMovingAverage())
+        sl = po.trend_sign(RegressionSlope(), Q)
+        ema = pls(ExponentialMovingAverage(), P)
+        @test pls(lal, P) ≈ [sl[i] > 0 ? pk[i] : ema[i] for i in 1:6]
+        # The composite against its definition: the trend portfolio for period t - k is the
+        # projected forecast made after the row of t - k - 1, scored on the relative of
+        # t - k; the centre has the best worst return, and the weights are normalised.
+        ct = CompositeTrend()
+        function by_definition(Q)
+            n = size(Q, 1)
+            fc(l, u) = po.member_statistic(ct.trends[l], Q, u) ./ Q[u, :]
+            xh = [fc(l, n) for l in 1:3]
+            xt = po.project_simplex.(xh)
+            # `scores`, not `R`: an assignment in a closure writes the testset's `R`.
+            scores = [[dot(po.project_simplex(fc(l, n - k - 1)),
+                           Q[n - k, :] ./ Q[n - k - 1, :]) for k in 0:4 if n - k - 1 >= 1]
+                      for l in 1:3]
+            star = isempty(scores[1]) ? 1 : argmax(minimum.(scores))
+            phi = [exp(-sum(abs2, xt[star] .- xt[l]) / (2 * ct.sigma2)) for l in 1:3]
+            return sum(phi[l] .* xh[l] for l in 1:3) ./ sum(phi) .* Q[n, :]
+        end
+        for n in (2, 3, 6, 15, 31)
+            @test pls(ct, P[(end - n + 1):end, :]) ≈ by_definition(P[(end - n + 1):end, :])
+        end
+    end
+
     @testset "The Prior adapter" begin
         pa = PriorExpectedReturns()
         @test vec(mean(pa, R)) ≈ vec(mean(R; dims = 1))

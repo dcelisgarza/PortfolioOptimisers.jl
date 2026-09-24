@@ -10,7 +10,7 @@ commit = "0ecb3ce47c"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2993, doc = 0, comment = 241, blank = 48, total = 3282 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1302, doc = 113, comment = 142, blank = 43, total = 1600 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1310, doc = 113, comment = 143, blank = 43, total = 1609 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -127,8 +127,8 @@ commit = "0ecb3ce47c"
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { code = 225, doc = 318, comment = 2, blank = 150, total = 695 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 230, doc = 368, comment = 0, blank = 184, total = 782 }
 "src/05_Moments/33_CoverageUniverse.jl" = { code = 403, doc = 639, comment = 0, blank = 298, total = 1340 }
-"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { code = 373, doc = 773, comment = 6, blank = 337, total = 1489 }
-"src/05_Moments/35_CompositePriceLevelStatistics.jl" = { code = 347, doc = 444, comment = 5, blank = 179, total = 975 }
+"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { code = 373, doc = 787, comment = 6, blank = 339, total = 1505 }
+"src/05_Moments/35_CompositePriceLevelStatistics.jl" = { code = 356, doc = 604, comment = 9, blank = 228, total = 1197 }
 "src/05_Moments/36_RankOneCovariance.jl" = { code = 37, doc = 103, comment = 6, blank = 49, total = 195 }
 "src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { code = 185, doc = 525, comment = 0, blank = 246, total = 956 }
 "src/06_Distance/01_Base_Distance.jl" = { code = 24, doc = 222, comment = 0, blank = 89, total = 335 }
