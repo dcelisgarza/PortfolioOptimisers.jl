@@ -730,7 +730,7 @@ function needs_previous_weights(tn::TnE_Tn)::Bool
     return !tn.fixed
 end
 function needs_previous_weights(tn::VecTnE_Tn)::Bool
-    return any(needs_previous_weights.(tn))
+    return any(needs_previous_weights, tn)
 end
 
 export TurnoverEstimator, Turnover, turnover_constraints

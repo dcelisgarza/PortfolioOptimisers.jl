@@ -881,7 +881,7 @@ Each entry is derived from [`arg_dict`](@ref) by stripping the leading parameter
   - [`ret_dict`](@ref)
   - [`math_dict`](@ref)
 """
-const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
+const field_dict = Dict(key => strip(@view(val[(findfirst(":", val)[1] + 1):end]))
                         for (key, val) in arg_dict)
 """
     err_name_dict

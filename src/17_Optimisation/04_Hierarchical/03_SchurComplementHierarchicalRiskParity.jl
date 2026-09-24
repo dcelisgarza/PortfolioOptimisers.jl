@@ -699,8 +699,9 @@ function symmetric_step_up_matrix(n1::Integer, n2::Integer)
     row = fill(inv(n2), n2)
     e = LinearAlgebra.I(n2)
     for i in axes(m, 1)
-        mj = vcat(e[1:(i - 1), :], row', e[i:end, :])
-        m .+= mj / n1
+        view(m, 1:(i - 1), :) .+= view(e, 1:(i - 1), :) ./ n1
+        view(m, i, :) .+= row ./ n1
+        view(m, (i + 1):n1, :) .+= view(e, i:n2, :) ./ n1
     end
     return m
 end

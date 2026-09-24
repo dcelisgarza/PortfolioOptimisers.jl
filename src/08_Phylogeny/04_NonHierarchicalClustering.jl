@@ -199,7 +199,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
         W_list[i] = vec_to_real_measure(measure_alg, costs)
     end
     k = if c1 > 2
-        gaps = W_list[1:(end - 2)] + W_list[3:end] - 2 * W_list[2:(end - 1)]
+        gaps = @views W_list[1:(end - 2)] .+ W_list[3:end] .- 2 .* W_list[2:(end - 1)]
         all(!isfinite, gaps) ? length(gaps) : argmax(gaps)
     else
         c1

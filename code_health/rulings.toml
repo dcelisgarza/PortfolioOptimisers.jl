@@ -192,6 +192,34 @@ drives its own file's maximum. Neither body changed. Lowering either number is s
 the definition itself: the macro carries the whole pretty-show rendering, and `apply_preferences!` \
 carries one branch per key of `PREFERENCE_KEYS`."""
 
+[rationale.an-allocation-the-loop-keeps]
+text = """
+ADR 0175 reads an allocation inside a `for` or `while` body as a temporary unless a keeper call \
+such as `push!` or `setindex!` takes it on the same line. The parser cannot see an allocation \
+bound with a plain `=` that the loop keeps: one stored into a Result or a dictionary on a later \
+line, one returned by the iteration's own branch, or one rebound as the state the next iteration \
+reads. Each such array is a distinct output of its iteration, and it has its own length, so one \
+buffer before the loop would alias every stored copy to the last one. The ADR names this case and \
+says that it takes a Dismissal. Found by issue #1312 at twelve sites: the bisection frontier of \
+the hierarchical optimisers, the test-index lists of the combinatorial split, the family lists of \
+the cross-sectional factor axis, the NaN weight matrices of `rebuild_weight_path`, the copies that \
+`replace_prior_views` returns, and the index lists `replace_coprior_views` records per row."""
+
+[rationale.a-slice-the-result-keeps]
+text = """
+A slice passed to a callee that returns it, or stores it in the Result it builds, becomes a field \
+of that Result. A view would make the field a `SubArray` that aliases a local matrix, which \
+changes the field's type and keeps the whole matrix alive. Found by issue #1312 at \
+`cross_sectional_idiosyncratic_covariance`, which returns the variance row it is given when its \
+threshold is zero."""
+
+[rationale.a-failure-message-is-a-cold-path]
+text = """
+ADR 0175 leaves a cold path unread: an interpolation, a `throw`, an `error`, or a logging macro. \
+A function that only builds the text of a failure message is the same path in a definition of its \
+own, and runs once, on the solve that failed. Its loop sorts the keys of each trial's dictionary, \
+whose key type differs between trials, so a shared buffer would need an `Any` element type."""
+
 # --- exemptions ------------------------------------------------------------
 #
 # Keyed (path, definition, metric), dropped before the file's maximum is taken. An Exemption binds
@@ -451,3 +479,63 @@ path = "src/05_Moments/20_Base_Regression.jl"
 definition = "MaxValStepwiseRegressionCriterion"
 misses = 1
 rationale = "a-closure-inside-a-top-level-const"
+
+# --- performance dismissals ------------------------------------------------
+#
+# ADR 0175. A row with `code` covers the one Finding whose printed code matches; a row without it
+# covers every Finding of the rule in the definition. Issue #1312 wrote the first rows.
+
+[[perf_dismissal]]
+file = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior.jl"
+rule = "loop_allocation"
+definition = "replace_prior_views"
+rationale = "an-allocation-the-loop-keeps"
+
+[[perf_dismissal]]
+file = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior.jl"
+rule = "loop_allocation"
+definition = "replace_coprior_views"
+rationale = "an-allocation-the-loop-keeps"
+
+[[perf_dismissal]]
+file = "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl"
+rule = "loop_allocation"
+definition = "cross_sectional_factor_sets"
+rationale = "an-allocation-the-loop-keeps"
+
+[[perf_dismissal]]
+file = "src/14_NetReturnsDrawdowns.jl"
+rule = "loop_allocation"
+definition = "rebuild_weight_path"
+rationale = "an-allocation-the-loop-keeps"
+
+[[perf_dismissal]]
+file = "src/17_Optimisation/02_CrossValidation/03_Combinatorial.jl"
+rule = "loop_allocation"
+definition = "split"
+rationale = "an-allocation-the-loop-keeps"
+
+[[perf_dismissal]]
+file = "src/17_Optimisation/04_Hierarchical/02_HierarchicalRiskParity.jl"
+rule = "loop_allocation"
+definition = "_optimise"
+rationale = "an-allocation-the-loop-keeps"
+
+[[perf_dismissal]]
+file = "src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl"
+rule = "loop_allocation"
+definition = "schur_complement_weights"
+rationale = "an-allocation-the-loop-keeps"
+
+[[perf_dismissal]]
+file = "src/10_Prior/11_CrossSectionalFactorPrior.jl"
+rule = "slice_copy"
+definition = "prior"
+code = "vs[end, :]"
+rationale = "a-slice-the-result-keeps"
+
+[[perf_dismissal]]
+file = "src/01_Base/06_Messages.jl"
+rule = "loop_allocation"
+definition = "failed_solve_msg"
+rationale = "a-failure-message-is-a-cold-path"

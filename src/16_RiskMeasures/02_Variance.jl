@@ -1005,14 +1005,15 @@ optimiser sees.
 function ucs_variance(ucs::BoxUncertaintySet, ::Any, w::VecNum)
     W = w * transpose(w)
     z = zero(eltype(W))
-    return sum(ucs.ub .* max.(W, z)) - sum(ucs.lb .* max.(-W, z))
+    return sum(ucs.ub[i] * max(W[i], z) for i in eachindex(ucs.ub, W)) -
+           sum(ucs.lb[i] * max(-W[i], z) for i in eachindex(ucs.lb, W))
 end
 function ucs_variance(ucs::EllipsoidalUncertaintySet, sigma::MatNum, w::VecNum)
     W = w * transpose(w)
     # The set names its own centre; `sigma` is the fallback (ADR 0050).
     sigma = something(ucs.val, sigma)
     G = LinearAlgebra.cholesky(ucs.sigma).U
-    return LinearAlgebra.tr(sigma * W) + ucs.k * LinearAlgebra.norm(G * vec(W))
+    return LinearAlgebra.dot(w, sigma, w) + ucs.k * LinearAlgebra.norm(G * vec(W))
 end
 function ucs_variance(ucs::CompactCovarianceUncertaintySet, sigma::MatNum, w::VecNum)
     # The set names its own centre; `sigma` is the fallback (ADR 0050).
@@ -1033,7 +1034,7 @@ function ucs_variance(ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
     # `norm` of an empty vector is zero under every order, so a map with no column pays
     # nothing without a branch.
     penalty = LinearAlgebra.norm(transpose(ucs.L) * vec(W), dual_norm_order(ucs.p))
-    return LinearAlgebra.tr(sigma * W) + ucs.kappa * penalty
+    return LinearAlgebra.dot(w, sigma, w) + ucs.kappa * penalty
 end
 """
     _no_bounds_risk_measure(r, flag)

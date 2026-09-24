@@ -274,8 +274,9 @@ function shrinkage_target(::ScaledIdentityTarget, sigma::MatNum)
 end
 function shrinkage_target(::CommonCovarianceTarget, sigma::MatNum)
     n = size(sigma, 1)
-    v = LinearAlgebra.tr(sigma) / n
-    c = n > 1 ? (sum(sigma) - LinearAlgebra.tr(sigma)) / (n * (n - 1)) : zero(v)
+    trs = LinearAlgebra.tr(sigma)
+    v = trs / n
+    c = n > 1 ? (sum(sigma) - trs) / (n * (n - 1)) : zero(v)
     tgt_mat = fill(c, n, n)
     tgt_mat[LinearAlgebra.diagind(tgt_mat)] .= v
     return tgt_mat

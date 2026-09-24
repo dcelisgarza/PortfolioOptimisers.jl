@@ -293,7 +293,7 @@ function schedule_state_seed(::SelfConfidentRate, w::AbstractVector)
 end
 function schedule_update!(::SelfConfidentRate, s::AbstractVector, w::AbstractVector,
                           x::AbstractVector)
-    s[1] += maximum(x ./ LinearAlgebra.dot(w, x)) - one(eltype(s))
+    s[1] += maximum(Base.Fix2(/, LinearAlgebra.dot(w, x)), x) - one(eltype(s))
     return s
 end
 function learning_rate(sched::SelfConfidentRate, ::Integer, st)

@@ -99,7 +99,10 @@ Where:
   - [`weights_meet_bounds`](@ref)
 """
 function weights_break_bounds(wb::WeightBounds, w::VecNum)::Bool
-    return !isnothing(wb.lb) && any(w .< wb.lb) || !isnothing(wb.ub) && any(w .> wb.ub)
+    return !isnothing(wb.lb) &&
+           any(Broadcast.instantiate(Broadcast.broadcasted(<, w, wb.lb))) ||
+           !isnothing(wb.ub) &&
+           any(Broadcast.instantiate(Broadcast.broadcasted(>, w, wb.ub)))
 end
 """
     euclidean_weight_projection(w::VecNum, wb::WeightBounds) -> VecNum
@@ -141,8 +144,9 @@ function euclidean_weight_projection(w::VecNum, wb::WeightBounds)
     # `Σ clip(w − θ, lb, ub)` is piecewise linear and non-increasing in `θ`, with its kinks
     # at `w − ub` and `w − lb`. `breakpoint_root` finds where a function crosses one, so the
     # budget `s` is moved to one.
-    theta = breakpoint_root(t -> sum(clamp.(w .- t, lb, ub)) - s + one(s),
-                            [w .- ub; w .- lb])
+    clip = t -> Broadcast.instantiate(Broadcast.broadcasted((x, l, u) -> clamp(x - t, l, u),
+                                                            w, lb, ub))
+    theta = breakpoint_root(t -> sum(clip(t)) - s + one(s), [w .- ub; w .- lb])
     return clamp.(w .- theta, lb, ub)
 end
 """
@@ -253,13 +257,13 @@ function entropic_weight_projection(w::VecNum, wb::WeightBounds)
     if !(s > zero(s) &&
          all(x -> x >= zero(x), w) &&
          all(x -> x >= zero(x), lb) &&
-         sum(lb) < s <= sum(ifelse.(iszero.(w), lb, ub)))
+         sum(lb) < s <= sum(i -> ifelse(iszero(w[i]), lb[i], ub[i]), eachindex(w, lb, ub)))
         return euclidean_weight_projection(w, wb)
     end
     # `Σ clip(t w, lb, ub)` is piecewise linear and non-decreasing in the scale `t`, with its
     # kinks at `lb / w` and `ub / w`; the root is taken in `-t`, where it is non-increasing.
-    t = -breakpoint_root(u -> sum(clamp.(-u .* w, lb, ub)) - s + one(s),
-                         [-lb ./ w; -ub ./ w])
+    t = -breakpoint_root(u -> sum(i -> clamp(-u * w[i], lb[i], ub[i]),
+                                  eachindex(w, lb, ub)) - s + one(s), [-lb ./ w; -ub ./ w])
     return clamp.(t .* w, lb, ub)
 end
 """
@@ -310,8 +314,12 @@ function weights_meet_bounds(wb::WeightBounds, w::VecNum, s::Number)::Bool
     end
     # The type of a division, so an integer vector that no finaliser moved has an `eps`.
     tol = sqrt(eps(typeof(one(eltype(w)) / one(eltype(w)))))
-    lb_ok = isnothing(wb.lb) || all(w .>= wb.lb .- tol)
-    ub_ok = isnothing(wb.ub) || all(w .<= wb.ub .+ tol)
+    lb_ok = isnothing(wb.lb) ||
+            all(Broadcast.instantiate(Broadcast.broadcasted((x, l) -> x >= l - tol, w,
+                                                            wb.lb)))
+    ub_ok = isnothing(wb.ub) ||
+            all(Broadcast.instantiate(Broadcast.broadcasted((x, u) -> x <= u + tol, w,
+                                                            wb.ub)))
     return lb_ok && ub_ok && abs(sum(w) - s) <= tol * max(one(s), abs(s))
 end
 function opt_weight_bounds(::EuclideanWeightFinaliser, wb::WeightBounds, w::VecNum)
@@ -330,11 +338,11 @@ function opt_weight_bounds(wf::IterativeWeightFinaliser, wb::WeightBounds, w::Ve
     w0 = w
     s1 = sum(w)
     for _ in 1:(wf.iter)
-        old_w = copy(w)
+        old_w = w
         w = max.(min.(w, ub), lb)
         idx = w .< ub .&& w .> lb
-        w_add = sum(max.(old_w ⊖ ub, zero(eltype(w))))
-        w_sub = sum(min.(old_w ⊖ lb, zero(eltype(w))))
+        w_add = sum(x -> max(x, zero(eltype(w))), old_w ⊖ ub)
+        w_sub = sum(x -> min(x, zero(eltype(w))), old_w ⊖ lb)
         delta = w_add + w_sub
         if !iszero(delta)
             # A new vector, which the division widens when the clip kept integers.

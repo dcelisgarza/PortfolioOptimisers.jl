@@ -1214,7 +1214,7 @@ function online_update!(alg::KernelTrendTracking, st, w::AbstractVector, x::Abst
     q = if all(iszero, dev)
         w
     else
-        K = exp.(-abs.((w .- Statistics.mean(w)) .- dev) .^ inv(alg.q))
+        K = exp.(.-(abs.((w .- Statistics.mean(w)) .- dev) .^ inv(alg.q)))
         w .+ alg.eta .* K .* dev
     end
     return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
@@ -1604,7 +1604,7 @@ function online_update!(alg::ShortTermSparsePortfolio, st, w::AbstractVector,
     @argcheck(all(v -> v > zero(v), xhat),
               DomainError(xhat,
                           "the short-term sparse portfolio takes the log of the Price Relative Forecast, which must be positive in every asset"))
-    phi = -(1.1 .* log.(xhat) .+ one(eltype(xhat)))
+    phi = .-(1.1 .* log.(xhat) .+ one(eltype(xhat)))
     b = sparse_portfolio_iterate(alg.alg, phi, w)
     return st, project(alg.proj, set, alg.zeta .* b, price_adjusted_allocation(w, x))
 end

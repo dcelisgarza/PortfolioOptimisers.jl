@@ -83,23 +83,27 @@ The union is scored, not the cut between the two clusters, so a distance between
 """
 function LinkageFunction(d::MatNum, labelvec::VecNum)
     lvec = sort!(unique(labelvec))
-    Links = Matrix{Int}(undef, 0, 3)
-    for r in 1:(length(lvec) - 1)
+    nl = length(lvec)
+    Links = Matrix{promote_type(eltype(lvec), eltype(d))}(undef, nl * (nl - 1) ÷ 2, 3)
+    k = 0
+    for r in 1:(nl - 1)
         vecr = labelvec .== lvec[r]
-        for c in (r + 1):length(lvec)
+        for c in (r + 1):nl
             vecc = labelvec .== lvec[c]
             x1 = vecr .|| vecc
             dd = d[x1, x1]
             de = dd[dd .!= 0]
-            Link1 = if !isempty(de)
-                hcat(lvec[r], lvec[c], vec(maximum(de; dims = 1)))
+            k += 1
+            Links[k, 1] = lvec[r]
+            Links[k, 2] = lvec[c]
+            Links[k, 3] = if !isempty(de)
+                maximum(de)
             else
-                hcat(lvec[r], lvec[c], 0)
+                0
             end
-            Links = vcat(Links, Link1)
         end
     end
-    dvu, imn = findmin(Links[:, 3])
+    dvu, imn = findmin(view(Links, :, 3))
     PairLink = Links[imn, 1:2]
     return PairLink, dvu
 end
@@ -154,6 +158,7 @@ This function iterates over the vertices in a bubble or cluster, merging the pai
 function build_link_and_dendro(rg::AbstractRange, dpm::MatNum, LabelVec::VecNum,
                                LabelVec1::VecNum, LabelVec2::VecNum, V::VecNum, nc::Number,
                                Z::MatNum)
+    LabelVecPrev = similar(LabelVec2)
     for _ in rg
         PairLink, dvu = LinkageFunction(dpm, LabelVec)  # Look for the pair of clusters which produces the best linkage
         LabelVec[LabelVec .== PairLink[1].||LabelVec .== PairLink[2]] .= maximum(LabelVec1) +
@@ -161,7 +166,7 @@ function build_link_and_dendro(rg::AbstractRange, dpm::MatNum, LabelVec::VecNum,
         LabelVec2[V] = LabelVec
         Z = DendroConstruct(Z, LabelVec1, LabelVec2, 1 / nc)
         nc -= 1
-        LabelVec1 = copy(LabelVec2)
+        LabelVec1 = copyto!(LabelVecPrev, LabelVec2)
     end
     return Z, nc, LabelVec1
 end
@@ -209,6 +214,7 @@ function HierarchyConstruct4s(Rpm::MatNum, Dpm::MatNum, Tc::VecNum, Mv::MatNum)
     N = size(Dpm, 1)
     kvec = sort!(unique(Tc))
     LabelVec1 = collect(1:N)
+    LabelVec2 = similar(LabelVec1)
     E = SparseArrays.sparse(LabelVec1, Tc, ones(Int, N), N, maximum(Tc))
     Z = Matrix{Float64}(undef, 0, 3)
 
@@ -217,7 +223,7 @@ function HierarchyConstruct4s(Rpm::MatNum, Dpm::MatNum, Tc::VecNum, Mv::MatNum)
         Mc = vec(E[:, kvec[n]]) ⊙ Mv   # Get the list of bubbles which coincide with nth cluster
         Mvv = BubbleMember(Rpm, Mv, Mc) # Assign each vertex in the nth cluster to a specific bubble
         Bub = findall(vec(sum(Mvv; dims = 1) .> 0)) # Get the list of bubbles which contain the vertices of nth cluster
-        nc = sum(Tc .== kvec[n]) - 1
+        nc = count(==(kvec[n]), Tc) - 1
 
         # Apply the linkage within the bubbles.
         for m in eachindex(Bub)
@@ -225,7 +231,7 @@ function HierarchyConstruct4s(Rpm::MatNum, Dpm::MatNum, Tc::VecNum, Mv::MatNum)
             if length(V) > 1
                 dpm = Dpm[V, V] # Retrieve the distance matrix for the vertices in V
                 LabelVec = LabelVec1[V] # Initiate the label vector which labels for the clusters
-                LabelVec2 = copy(LabelVec1)
+                copyto!(LabelVec2, LabelVec1)
                 Z, nc, LabelVec1 = build_link_and_dendro(1:(length(V) - 1), dpm, LabelVec,
                                                          LabelVec1, LabelVec2, V, nc, Z)
             end
@@ -236,13 +242,13 @@ function HierarchyConstruct4s(Rpm::MatNum, Dpm::MatNum, Tc::VecNum, Mv::MatNum)
 
         # Perform linkage merging between the bubbles
         LabelVec = LabelVec1[V] # Initiate the label vector which labels for the clusters.
-        LabelVec2 = copy(LabelVec1)
+        copyto!(LabelVec2, LabelVec1)
         Z, nc, LabelVec1 = build_link_and_dendro(1:(length(Bub) - 1), dpm, LabelVec,
                                                  LabelVec1, LabelVec2, V, nc, Z)
     end
 
     # Inter-cluster hierarchy construction
-    LabelVec2 = copy(LabelVec1)
+    copyto!(LabelVec2, LabelVec1)
     dcl = ones(Int, length(LabelVec1))
     for _ in 1:(length(kvec) - 1)
         PairLink, dvu = LinkageFunction(Dpm, LabelVec1)
@@ -252,7 +258,7 @@ function HierarchyConstruct4s(Rpm::MatNum, Dpm::MatNum, Tc::VecNum, Mv::MatNum)
               unique(dcl[LabelVec1 .== PairLink[2]])
         dcl[LabelVec1 .== PairLink[1].||LabelVec1 .== PairLink[2]] .= dvu
         Z = DendroConstruct(Z, LabelVec1, LabelVec2, dvu)
-        LabelVec1 = copy(LabelVec2)
+        copyto!(LabelVec1, LabelVec2)
     end
 
     return Z

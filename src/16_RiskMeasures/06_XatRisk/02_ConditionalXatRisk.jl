@@ -354,8 +354,10 @@ function (r::RMCVaR{<:ObsWeights})(x::VecNum)
         -sorted_x[1]
     else
         idx = ifelse(idx > length(x), idx - 1, idx)
-        -(LinearAlgebra.dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
-          sorted_x[idx] * (alpha - cum_w[idx - 1])) / alpha
+        k = idx - 1
+        ord = view(order, 1:k)
+        -(LinearAlgebra.dot(view(x, ord), view(w, ord)) +
+          sorted_x[idx] * (alpha - cum_w[k])) / alpha
     end
 end
 """
@@ -758,8 +760,10 @@ function (r::RMCVaRRg{<:ObsWeights})(x::VecNum)
         -sorted_x[1]
     else
         idx = ifelse(idx > length(x), idx - 1, idx)
-        -(LinearAlgebra.dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
-          sorted_x[idx] * (alpha - cum_w[idx - 1])) / (alpha)
+        k = idx - 1
+        ord = view(order, 1:k)
+        -(LinearAlgebra.dot(view(x, ord), view(w, ord)) +
+          sorted_x[idx] * (alpha - cum_w[k])) / (alpha)
     end
 
     # Reverse the **permutation**, never the views. `sorted_x` and `sorted_w` are views, so
@@ -777,8 +781,10 @@ function (r::RMCVaRRg{<:ObsWeights})(x::VecNum)
         -sorted_x[1]
     else
         idx = ifelse(idx > length(x), idx - 1, idx)
-        -(LinearAlgebra.dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
-          sorted_x[idx] * (beta - cum_w[idx - 1])) / (beta)
+        k = idx - 1
+        ord = view(order, 1:k)
+        -(LinearAlgebra.dot(view(x, ord), view(w, ord)) + sorted_x[idx] * (beta - cum_w[k])) /
+        (beta)
     end
     return loss - gain
 end
@@ -1155,8 +1161,10 @@ function conditional_drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum)
         -sorted_dd[1]
     else
         idx = ifelse(idx > length(dd), idx - 1, idx)
-        -(LinearAlgebra.dot(sorted_dd[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
-          sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
+        k = idx - 1
+        ord = view(order, 1:k)
+        -(LinearAlgebra.dot(view(dd, ord), view(w, ord)) +
+          sorted_dd[idx] * (alpha - cum_w[k])) / alpha
     end
 end
 function (r::RMCDaR)(x::VecNum)

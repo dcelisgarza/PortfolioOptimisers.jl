@@ -2015,8 +2015,9 @@ macro windowed_estimator(head, body)
     specs = [windowed_parse_forward(f) for f in forward]
     refs = [windowed_method_ref(gen, field, name, input) for (gen, input, _, _) in specs]
     defs = Any[]
+    siblings = String[]
     for (i, (gen, input, has_mean, ret_keys)) in pairs(specs)
-        siblings = [r for (j, r) in pairs(refs) if j != i]
+        append!(empty!(siblings), (r for (j, r) in pairs(refs) if j != i))
         push!(defs,
               Expr(:macrocall, GlobalRef(Core, Symbol("@doc")), LineNumberNode(@__LINE__),
                    windowed_method_doc(gen, field, name, input, has_mean, ret_keys, noun,

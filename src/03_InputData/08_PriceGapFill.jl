@@ -354,8 +354,9 @@ function fit_preprocessing(est::PriceGapFill, pr::PricesResult)::PriceGapFillRes
     vals = values(pr.X)
     keep = Vector{Int}(undef, 0)
     v = Vector{Any}(undef, 0)
+    obs = Vector{nonmissingtype(eltype(vals))}(undef, 0)
     for i in axes(vals, 2)
-        obs = identity.([x for x in view(vals, :, i) if !is_missing_value(x)])
+        append!(empty!(obs), Iterators.filter(!is_missing_value, view(vals, :, i)))
         if isempty(obs)
             continue
         end

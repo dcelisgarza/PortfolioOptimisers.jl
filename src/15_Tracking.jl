@@ -699,7 +699,7 @@ function needs_previous_weights(tr::TrackingError)
     return needs_previous_weights(tr.tr)
 end
 function needs_previous_weights(tr::VecTr)
-    return any(needs_previous_weights.(tr))
+    return any(needs_previous_weights, tr)
 end
 
 export IndependentVariableTracking, DependentVariableTracking, WeightsTracking,

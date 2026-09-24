@@ -144,8 +144,7 @@ function PMFG_T2s(W::MatNum, nargout::Integer = 3)
         end
 
         # Update vertex lists
-        ou_v = ou_v[deleteat!(collect(1:length(ou_v)), v)]
-        # vcat(ou_v[1:(v - 1)], ou_v[(v + 1):end])
+        deleteat!(ou_v, v)
         in_v[k] = ve
 
         # Update adjacency matrix
@@ -175,7 +174,7 @@ function PMFG_T2s(W::MatNum, nargout::Integer = 3)
     cliqueTree = nothing
 
     if nargout > 3
-        cliques = vcat(transpose(in_v[1:4]), hcat(clique3, in_v[5:end]))
+        cliques = @views vcat(transpose(in_v[1:4]), hcat(clique3, in_v[5:end]))
     end
 
     if nargout > 4

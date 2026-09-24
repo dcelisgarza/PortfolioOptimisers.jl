@@ -437,8 +437,9 @@ function fold_online_selection(opt::OnlinePortfolioSelection,
                ts = row_timestamp(rd.ts, t, n), i = n + 1)
         st, w, X, hold = online_selection_row!(opt, st, w, X, row, rd.nx, set)
         n += 1
-        last_amsk = isnothing(row.amsk) ? nothing : BitVector(row.amsk)
+        last_amsk = row.amsk
     end
+    last_amsk = isnothing(last_amsk) ? nothing : BitVector(last_amsk)
     return OnlinePortfolioSelectionState(; n = n, w = w, st = st, X = X, nx = state.nx,
                                          pnl = state.pnl, amsk = last_amsk,
                                          ts = fold_column(state.ts, rd.ts, nothing),

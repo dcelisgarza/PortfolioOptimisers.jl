@@ -244,12 +244,13 @@ function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastE
     ex = Matrix{Tf}(undef, n, length(levels))
     ns = Vector{Int}(undef, n)
     np = Vector{Int}(undef, n)
+    dbar = Vector{Tf}(undef, 0)
     for (i, cfer) in enumerate(cfers)
         m = cfer.mahalanobis_ratio
         dof = target_dof.(Ref(cfer.target), cfer.n_valid, cfer.horizon)
         sdof = target_step_dof.(Ref(cfer.target), cfer.horizon)
-        dbar = [Statistics.mean(filter(isfinite, view(cfer.diagonal_ratio, t, :)))
-                for t in axes(cfer.diagonal_ratio, 1)]
+        map!(t -> Statistics.mean(filter(isfinite, view(cfer.diagonal_ratio, t, :))),
+             resize!(dbar, size(cfer.diagonal_ratio, 1)), axes(cfer.diagonal_ratio, 1))
         mm[i] = LinearAlgebra.dot(dof, m) / sum(dof)
         mmed[i] = Statistics.median(m)
         m5[i] = Statistics.quantile(m, 0.05)
@@ -276,7 +277,7 @@ function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastE
         stat = dof .* m
         for (j, q) in enumerate(levels)
             thr = Distributions.quantile.(Distributions.Chisq.(dof), q)
-            ex[i, j] = Statistics.mean(stat .> thr)
+            ex[i, j] = Statistics.mean(k -> stat[k] > thr[k], eachindex(stat, thr))
         end
         ns[i] = length(m)
         np[i] = size(cfer.standardised_return, 2)

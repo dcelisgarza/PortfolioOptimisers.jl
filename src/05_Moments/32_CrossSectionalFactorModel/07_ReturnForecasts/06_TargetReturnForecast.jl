@@ -815,7 +815,7 @@ function target_forecast_coefficient(rfe::TargetReturnForecast, model, Sf::MatNu
     end
     p = target_forecast_uncalibrated(rfe.cv, rfe, model, Sf, yf, ok)
     P = forecast_return_units(rfe.unit, target_forecast_scatter(p, nt, size(w, 2)),
-                              vs[1:nt, :])
+                              view(vs, 1:nt, :))
     return target_forecast_calibration(P, fwd, vs, w, rfe.decay, rfe.min_obs)
 end
 

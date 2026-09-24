@@ -95,7 +95,7 @@ function expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorRes
     rw = ret.w
     X = pr.X
     kret = if isnothing(rw)
-        Statistics.mean(log1p.(X * w))
+        Statistics.mean(log1p, X * w)
     else
         Statistics.mean(log1p.(X * w), rw)
     end
@@ -1592,7 +1592,7 @@ function summarise_returns(ret::VecNum, turnover::Option{<:Number};
         oftype(one(ann_ret) / one(ann_vol), NaN)
     end
     neg_ret = min.(ret, zero(eltype(ret)))
-    ddev = sqrt(mean(neg_ret .^ 2) * ann)
+    ddev = sqrt(mean(abs2, neg_ret) * ann)
     sortino = ddev > zero(ddev) ? ann_ret / ddev : oftype(one(ann_ret) / one(ddev), NaN)
     cret = cumulative_returns(ret, compound)
     dd_series = drawdowns(cret, compound; cX = true)

@@ -66,7 +66,7 @@ Alias for an abstract vector of [`AbstractBaseRiskMeasure`](@ref) elements.
 """
 const VecBaseRM = AbstractVector{<:AbstractBaseRiskMeasure}
 function needs_previous_weights(r::VecBaseRM)::Bool
-    return any(needs_previous_weights.(r))
+    return any(needs_previous_weights, r)
 end
 """
     const BaseRM_VecBaseRM = Union{<:AbstractBaseRiskMeasure, <:VecBaseRM}

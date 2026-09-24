@@ -586,13 +586,14 @@ function project(proj::EntropicProjection, set::BoundedAllocationSet, q::Abstrac
     assert_feasible_bounds(wb)
     # A zero entry sits at its floor at every scale, so the positive entries must reach the
     # budget at their caps.
-    @argcheck(sum(ifelse.(q .> zero(s), wb.ub, wb.lb)) >= one(s),
+    @argcheck(sum(i -> ifelse(q[i] > zero(s), wb.ub[i], wb.lb[i]),
+                  eachindex(q, wb.lb, wb.ub)) >= one(s),
               DomainError(q,
                           "the zeros of the raw step stay at their floors under the entropic projection, and the caps of the remaining assets do not reach the budget"))
     # `Σ clip(t q, lb, ub)` is piecewise linear and non-decreasing in the scale `t`, with its
     # kinks at `lb / q` and `ub / q`; the root is taken in `-t`, where it is non-increasing.
-    t = -breakpoint_root(u -> sum(clamp.(-u .* q, wb.lb, wb.ub)),
-                         [-wb.lb ./ q; -wb.ub ./ q])
+    t = -breakpoint_root(u -> sum(i -> clamp(-u * q[i], wb.lb[i], wb.ub[i]),
+                                  eachindex(q, wb.lb, wb.ub)), [-wb.lb ./ q; -wb.ub ./ q])
     return budget_or_held_step(clamp.(t .* q, wb.lb, wb.ub), w, proj, set)
 end
 """
@@ -714,7 +715,8 @@ function bounded_quadratic_projection(q::AbstractVector, wb::WeightBounds,
     assert_feasible_bounds(wb)
     # `Σ clip(q − θ / h, lb, ub)` is piecewise linear and non-increasing in `θ`, with its
     # kinks at `h (q − ub)` and `h (q − lb)`.
-    theta = breakpoint_root(t -> sum(clamp.(q .- t ./ h, wb.lb, wb.ub)),
+    theta = breakpoint_root(t -> sum(i -> clamp(q[i] - t / h[i], wb.lb[i], wb.ub[i]),
+                                     eachindex(q, h, wb.lb, wb.ub)),
                             [h .* (q .- wb.ub); h .* (q .- wb.lb)])
     return clamp.(q .- theta ./ h, wb.lb, wb.ub)
 end

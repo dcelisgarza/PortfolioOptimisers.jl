@@ -246,8 +246,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                            JuMP.SecondOrderCone()
                                                            [i = 1:Nf],
                                                            sc * (x_kurt[i] -
-                                                                 LinearAlgebra.tr(Bi[i] * W)) ==
-                                                           0
+                                                                 LinearAlgebra.dot(transpose(Bi[i]),
+                                                                                   W)) == 0
                                                        end)
     state_set!(model, prefix, :capprox_kurt_soc_, i, capprox_kurt_soc)
     state_set!(model, prefix, :capprox_kurt_, i, capprox_kurt)

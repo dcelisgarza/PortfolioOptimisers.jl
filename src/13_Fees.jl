@@ -1359,7 +1359,7 @@ function calc_fees(w::VecNum, ::Nothing)
     return zero(eltype(w))
 end
 function calc_fees(w::VecNum, tn::Turnover{<:Any, <:Number})
-    return tn.val * sum(abs.(w - tn.w))
+    return tn.val * sum(abs, w - tn.w)
 end
 function calc_fees(w::VecNum, tn::Turnover{<:Any, <:VecNum})
     return LinearAlgebra.dot(tn.val, abs.(w - tn.w))

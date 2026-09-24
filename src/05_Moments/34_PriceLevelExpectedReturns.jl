@@ -898,7 +898,7 @@ function price_level_statistic(::MovingAverage, P::AbstractMatrix)
     return vec(Statistics.mean(P; dims = 1))
 end
 function price_level_statistic(alg::ExponentialMovingAverage, P::AbstractMatrix)
-    ma = P[1, :] .* one(alg.alpha)
+    ma = view(P, 1, :) .* one(alg.alpha)
     for t in 2:size(P, 1)
         @views ma .= alg.alpha .* P[t, :] .+ (one(alg.alpha) - alg.alpha) .* ma
     end
@@ -1125,7 +1125,7 @@ function fold_levels(alg::AbstractPriceLevelStatistic, P::AbstractMatrix)
         hist = push_memory(alg, hist, x)
         stat = fold_statistic_row(alg, stat, hist, x)
     end
-    return isnothing(stat) ? P[end, :] : stat .* P[end, :]
+    return isnothing(stat) ? P[end, :] : stat .* view(P, lastindex(P, 1), :)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

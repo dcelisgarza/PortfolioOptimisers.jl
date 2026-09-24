@@ -766,8 +766,8 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
     lb = ucs.lb
     ucs_variance_risk = state_set!(model, prefix, :bucs_variance_risk_, i,
                                    JuMP.@expression(model,
-                                                    LinearAlgebra.tr(Au * ub) -
-                                                    LinearAlgebra.tr(Al * lb)))
+                                                    LinearAlgebra.dot(transpose(ub), Au) -
+                                                    LinearAlgebra.dot(transpose(lb), Al)))
     return ucs_variance_risk, :bucs_variance_risk_
 end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncertaintySet,
@@ -792,8 +792,8 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncer
     x_eucs, ucs_variance_risk = JuMP.@expressions(model,
                                                   begin
                                                       G * vec(WpE)
-                                                      LinearAlgebra.tr(sigma * WpE) +
-                                                      k * t_eucs
+                                                      LinearAlgebra.dot(transpose(sigma),
+                                                                        WpE) + k * t_eucs
                                                   end)
     state_set!(model, prefix, :x_eucs, i, x_eucs)
     state_set!(model, prefix, :eucs_variance_risk_, i, ucs_variance_risk)
@@ -822,7 +822,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any,
     x_cucs = if size(Q, 2) > zero(Int)
         z_cucs = state_set!(model, prefix, :z_cucs, i,
                             JuMP.@variable(model, [1:size(Q, 2)]))
-        JuMP.@expression(model, C .* w - Q * z_cucs)
+        JuMP.@expression(model, C .* w .- Q * z_cucs)
     else
         JuMP.@expression(model, C .* w)
     end
@@ -861,9 +861,10 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any,
         x_nbucs = state_set!(model, prefix, :x_nbucs_, i,
                              JuMP.@expression(model, transpose(L) * vec(WpE)))
         t_nbucs = norm_ball_dual_norm_epigraph!(model, prefix, i, x_nbucs, ucs.p)
-        JuMP.@expression(model, LinearAlgebra.tr(sigma * WpE) + ucs.kappa * t_nbucs)
+        JuMP.@expression(model,
+                         LinearAlgebra.dot(transpose(sigma), WpE) + ucs.kappa * t_nbucs)
     else
-        JuMP.@expression(model, LinearAlgebra.tr(sigma * WpE))
+        JuMP.@expression(model, LinearAlgebra.dot(transpose(sigma), WpE))
     end
     state_set!(model, prefix, :nbucs_variance_risk_, i, ucs_variance_risk)
     return ucs_variance_risk, :nbucs_variance_risk_

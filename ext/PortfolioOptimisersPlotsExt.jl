@@ -503,7 +503,7 @@ function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, X::MatNum,
     node_size = if isnothing(w)
         fill(1, size(X, 2))
     else
-        abs.(w) ./ maximum(abs.(w))
+        abs.(w) ./ maximum(abs, w)
     end
     return graphplot(A; names = nx, node_weights = node_size, title = "Asset Network",
                      kwargs...)
@@ -537,21 +537,19 @@ function PortfolioOptimisers.plot_dendrogram(clr::AbstractClusteringResult,
     dend = plot(clr.res; normalize = false, ylim = extrema(clr.res.heights),
                 xticks = (1:N, nx_ord), xrotation = 90)
     for (i, cl) in pairs(cls)
-        a = filter(!isnothing, [findfirst(x -> x == c, clr.res.order) for c in cl])
+        a = Iterators.filter(!isnothing, (findfirst(==(c), clr.res.order) for c in cl))
         if isempty(a)
             continue
         end
         xmin = minimum(a)
         xmax = xmin + length(cl)
-        i1 = filter(!isnothing,
-                    [findfirst(x -> x == c, -view(clr.res.merges, :, 1)) for c in cl])
-        i2 = filter(!isnothing,
-                    [findfirst(x -> x == c, -view(clr.res.merges, :, 2)) for c in cl])
-        i3 = unique([i1; i2])
+        i3 = Iterators.filter(!isnothing,
+                              (findfirst(==(-c), view(clr.res.merges, :, k)) for k in 1:2
+                               for c in cl))
         if isempty(i3)
             continue
         end
-        h = min(maximum(clr.res.heights[i3]) * 1.1, 1)
+        h = min(maximum(j -> clr.res.heights[j], i3) * 1.1, 1)
         plot!(dend,
               [xmin - 0.25, xmax - 0.75, xmax - 0.75, xmax - 0.75, xmax - 0.75, xmin - 0.25,
                xmin - 0.25, xmin - 0.25], [0, 0, 0, h, h, h, h, 0]; color = nothing,
@@ -578,7 +576,7 @@ function PortfolioOptimisers.plot_clusters(clr::AbstractClusteringResult,
                                            nx::AbstractVector = 1:size(clr.S, 1);
                                            dend_theme::Symbol = :Spectral,
                                            hmap_theme::Symbol = :Spectral,
-                                           color_func = x -> if any(x .< zero(eltype(x)))
+                                           color_func = x -> if any(<(zero(eltype(x))), x)
                                                (-1, 1)
                                            else
                                                (0, 1)
@@ -605,25 +603,24 @@ function PortfolioOptimisers.plot_clusters(clr::AbstractClusteringResult,
     hmap = plot(S_ord; st = :heatmap, yticks = (1:N, nx_ord), xticks = (1:N, nx_ord),
                 xrotation = 90, colorbar = false, clim = clim, xlim = (0.5, N + 0.5),
                 ylim = (0.5, N + 0.5), color = colgrad, yflip = true)
-    dend1 = plot(clr.res; xticks = false, ylim = extrema(clr.res.heights))
+    hlim = extrema(clr.res.heights)
+    dend1 = plot(clr.res; xticks = false, ylim = hlim)
     dend2 = plot(clr.res; yticks = false, orientation = :horizontal, xrotation = 90,
-                 yflip = true, xlim = extrema(clr.res.heights))
+                 yflip = true, xlim = hlim)
     for (i, cl) in pairs(cls)
-        a = filter(!isnothing, [findfirst(x -> x == c, clr.res.order) for c in cl])
+        a = Iterators.filter(!isnothing, (findfirst(==(c), clr.res.order) for c in cl))
         if isempty(a)
             continue
         end
         xmin = minimum(a)
         xmax = xmin + length(cl)
-        i1 = filter(!isnothing,
-                    [findfirst(x -> x == c, -view(clr.res.merges, :, 1)) for c in cl])
-        i2 = filter(!isnothing,
-                    [findfirst(x -> x == c, -view(clr.res.merges, :, 2)) for c in cl])
-        i3 = unique([i1; i2])
+        i3 = Iterators.filter(!isnothing,
+                              (findfirst(==(-c), view(clr.res.merges, :, k)) for k in 1:2
+                               for c in cl))
         if isempty(i3)
             continue
         end
-        h = maximum(clr.res.heights[i3])
+        h = maximum(j -> clr.res.heights[j], i3)
         col_i = colours[mod1(i, clr.k)]
         box_x = [xmin - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5, xmin - 0.5,
                  xmin - 0.5, xmin - 0.5]
@@ -1446,7 +1443,7 @@ function attribution_plot_rows(v::VecNum, N::Option{<:Number})
         throw(DomainError(N, "N must be > 0"))
     end
     n = clamp(ceil(Int, N), 1, M)
-    return sort!(sortperm(abs.(v); rev = true)[1:n])
+    return sort!(partialsortperm(abs.(v), 1:n; rev = true))
 end
 # The labels of the rows an attribution plot draws.
 function attribution_plot_labels(labels, idx)
@@ -1774,7 +1771,7 @@ function PortfolioOptimisers.plot_weight_stability(mpred::MultiPeriodPredictionR
         isnothing(rd1.nx) ? string.(1:size(w_mat, 1)) : string.(rd1.nx)
     end
     M, K = size(w_mat)
-    mean_abs = vec(mean(abs.(w_mat); dims = 2))
+    mean_abs = vec(mean(abs, w_mat; dims = 2))
     N, idx = relevant_assets(mean_abs, M, N)
     top_idx = sort(view(idx, 1:N))
     labels = nx[top_idx]
@@ -1797,7 +1794,7 @@ function PortfolioOptimisers.plot_weight_stability(ppred::PopulationPredictionRe
         isnothing(rd1.nx) ? string.(1:size(w_mat, 1)) : string.(rd1.nx)
     end
     M, K = size(w_mat)
-    mean_abs = vec(mean(abs.(w_mat); dims = 2))
+    mean_abs = vec(mean(abs, w_mat; dims = 2))
     N, idx = relevant_assets(mean_abs, M, N)
     top_idx = sort(view(idx, 1:N))
     labels = nx[top_idx]
@@ -1825,7 +1822,7 @@ function PortfolioOptimisers.plot_turnover(w_series::AbstractVector{<:VecNum};
                                            ts::AbstractVector = 1:length(w_series),
                                            kwargs...)
     turnover = view(PortfolioOptimisers.calc_turnover(w_series), 2:length(w_series))
-    return plot(ts[2:end], turnover; title = "Portfolio Turnover",
+    return plot(@view(ts[2:end]), turnover; title = "Portfolio Turnover",
                 ylabel = "Turnover (∑|Δw|)", xlabel = "Date", legend = false, linewidth = 2,
                 kwargs...)
 end
@@ -1947,7 +1944,7 @@ function PortfolioOptimisers.plot_benchmark(net_ret::VecNum, B::VecNum_VecVecNum
     ret = cumulative_returns(net_ret, compound)
     Bmat = isa(B, VecVecNum) ? hcat(B...) : reshape(B, :, 1)
     Nb = size(Bmat, 2)
-    bench_labels = isnothing(nb) ? ["Benchmark $i" for i in 1:Nb] : string.(nb[1:Nb])
+    bench_labels = isnothing(nb) ? ["Benchmark $i" for i in 1:Nb] : string.(view(nb, 1:Nb))
     f = plot(ts, ret; label = "Portfolio", linewidth = 2, title = "Portfolio vs Benchmark",
              xlabel = "Date",
              ylabel = "$(compound ? "Compound" : "Simple") Cumulative Returns",
@@ -2360,10 +2357,10 @@ function cs_diagnostic_labels(csfm, nf::Option{<:AbstractVector}, K::Integer)
 end
 function cs_diagnostic_series(vals::MatNum, labels::AbstractVector, title::AbstractString,
                               ylabel::AbstractString; kwargs...)
-    plt = plot(vals[:, 1]; title = title, xlabel = "Observation", ylabel = ylabel,
+    plt = plot(view(vals, :, 1); title = title, xlabel = "Observation", ylabel = ylabel,
                label = labels[1], legend = true, linewidth = 2, kwargs...)
     for k in 2:size(vals, 2)
-        plot!(plt, vals[:, k]; label = labels[k], linewidth = 2, kwargs...)
+        plot!(plt, view(vals, :, k); label = labels[k], linewidth = 2, kwargs...)
     end
     return plt
 end
@@ -2829,10 +2826,10 @@ const FORECAST_WINDOW_BOOK_LABELS = ["Rank Ann. Return", "Rank Sharpe",
 function forecast_plot_series(x::AbstractVector, vals::MatNum, labels::AbstractVector,
                               title::AbstractString, xlabel::AbstractString,
                               ylabel::AbstractString; kwargs...)
-    plt = plot(x, vals[:, 1]; title = title, xlabel = xlabel, ylabel = ylabel,
+    plt = plot(x, view(vals, :, 1); title = title, xlabel = xlabel, ylabel = ylabel,
                label = labels[1], legend = true, linewidth = 2, kwargs...)
     for k in 2:size(vals, 2)
-        plot!(plt, x, vals[:, k]; label = labels[k], linewidth = 2, kwargs...)
+        plot!(plt, x, view(vals, :, k); label = labels[k], linewidth = 2, kwargs...)
     end
     return plt
 end
@@ -2960,7 +2957,7 @@ function PortfolioOptimisers.plot_forecast_rolling_ic(fe::PortfolioOptimisers.Fo
     Tf = typeof(one(real(eltype(ic))) / one(Int))::Type{<:Number}
     roll = Matrix{Tf}(undef, T, 2)
     for k in 1:2
-        roll[:, k] = forecast_rolling_mean(ic[:, k], window)
+        roll[:, k] = forecast_rolling_mean(view(ic, :, k), window)
     end
     return forecast_plot_series(dates, roll, FORECAST_IC_LABELS,
                                 "Rolling Forecast IC (window=$window)", "Observation",
@@ -3016,7 +3013,7 @@ function PortfolioOptimisers.plot_forecast_quantile_returns(fe::PortfolioOptimis
     Tf = eltype(spread)
     cum = Matrix{Tf}(undef, size(spread, 1), size(spread, 2))
     for k in axes(spread, 2)
-        cum[:, k] = forecast_cumulative_book(spread[:, k], compound)
+        cum[:, k] = forecast_cumulative_book(view(spread, :, k), compound)
     end
     labels = ["q = $q" for q in quantiles]
     kind = compound ? "Compounded" : "Uncompounded"

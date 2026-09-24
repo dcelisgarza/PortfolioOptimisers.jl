@@ -2724,14 +2724,14 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
                 any(x -> x < zero(eltype(x)), lcs.A_ineq .* lcs.B_ineq)),
               DomainError(var_views,
                           "A `var_view` states a loss magnitude, so its target is non-negative, and one of these is negative:\n$var_views"))
+    Ai = zeros(eltype(X), 1, size(X, 1))
     for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
         end
-        A = getproperty(lcs, p).A
-        B = getproperty(lcs, p).B
+        (; A, B) = getproperty(lcs, p)
         for i in eachindex(B)
-            j = .!iszero.(A[i, :])
+            j = .!iszero.(view(A, i, :))
             idx = findall(x -> x <= -abs(B[i]), view(X, :, j))
             @argcheck(!isempty(idx),
                       DomainError(abs(B[i]),
@@ -2742,7 +2742,7 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
             #! `<=` view and flipped the row.
             sign = ifelse(p == :eq || B[i] > zero(eltype(B)), one(eltype(B)),
                           -one(eltype(B)))
-            Ai = zeros(eltype(X), 1, size(X, 1))
+            fill!(Ai, zero(eltype(Ai)))
             Ai[1, idx] .= sign
             add_ep_constraint!(epc, Ai, [sign * alpha], p)
         end
@@ -2905,9 +2905,8 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     end
     T = length(w)
     factor = inv(sqrt(T))
-    A = fill(factor, 1, T)
-    B = [factor]
-    wb = [typemin(eltype(w)) typemax(eltype(w))]
+    blocks = Any[(fill(factor, 1, T), [factor])]
+    wbs = AbstractMatrix[[typemin(eltype(w)) typemax(eltype(w))]]
     for (key, val) in epc
         s = length(val[2])
         #! A `:feq` dual variable is boxed by `sc2`, so `sc2 == 0` pins it to zero and the
@@ -2917,18 +2916,19 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         if key == :feq && iszero(opt.sc2)
             continue
         end
-        A = vcat(A, val[1])
-        B = vcat(B, val[2])
-        wb = if key == :eq || key == :cvar_eq
-            vcat(wb, [fill(typemin(eltype(w)), s) fill(typemax(eltype(w)), s)])
+        push!(blocks, val)
+        lo, hi = if key == :eq || key == :cvar_eq
+            typemin(eltype(w)), typemax(eltype(w))
         elseif key == :ineq
-            vcat(wb, [zeros(eltype(w), s) fill(typemax(eltype(w)), s)])
+            zero(eltype(w)), typemax(eltype(w))
         elseif key == :feq
-            vcat(wb, [fill(-opt.sc2, s) fill(opt.sc2, s)])
+            -opt.sc2, opt.sc2
         else
             throw(KeyError("Unknown key $(key) in epc."))
         end
+        push!(wbs, repeat([lo hi], s))
     end
+    A, B, wb = reduce(vcat, first.(blocks)), reduce(vcat, last.(blocks)), reduce(vcat, wbs)
     #! `wb` bounds a `:feq` dual variable by `sc2`, and the constructor admits any
     #! `sc2 >= 0`. An unclamped start of `factor` therefore sits outside the box whenever
     #! `sc2 < 1/sqrt(T)`, and `Optim` raises an opaque `ArgumentError` instead of solving.
@@ -2991,9 +2991,8 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     end
     T = length(w)
     factor = inv(sqrt(T))
-    A = fill(factor, 1, T)
-    B = [factor]
-    wb = [typemin(eltype(w)) typemax(eltype(w))]
+    blocks = Any[(fill(factor, 1, T), [factor])]
+    wbs = AbstractMatrix[[typemin(eltype(w)) typemax(eltype(w))]]
     for (key, val) in epc
         s = length(val[2])
         #! A `:feq` dual variable is boxed by `sc2`, so `sc2 == 0` pins it to zero and the
@@ -3003,18 +3002,19 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         if key == :feq && iszero(opt.sc2)
             continue
         end
-        A = vcat(A, val[1])
-        B = vcat(B, val[2])
-        wb = if key == :eq || key == :cvar_eq
-            vcat(wb, [fill(typemin(eltype(w)), s) fill(typemax(eltype(w)), s)])
+        push!(blocks, val)
+        lo, hi = if key == :eq || key == :cvar_eq
+            typemin(eltype(w)), typemax(eltype(w))
         elseif key == :ineq
-            vcat(wb, [zeros(eltype(w), s) fill(typemax(eltype(w)), s)])
+            zero(eltype(w)), typemax(eltype(w))
         elseif key == :feq
-            vcat(wb, [fill(-opt.sc2, s) fill(opt.sc2, s)])
+            -opt.sc2, opt.sc2
         else
             throw(KeyError("Unknown key $(key) in epc."))
         end
+        push!(wbs, repeat([lo hi], s))
     end
+    A, B, wb = reduce(vcat, first.(blocks)), reduce(vcat, last.(blocks)), reduce(vcat, wbs)
     log_p = log.(w)
     #! `wb` bounds a `:feq` dual variable by `sc2`, and the constructor admits any
     #! `sc2 >= 0`. An unclamped start of `factor` therefore sits outside the box whenever
@@ -3030,7 +3030,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     function common_op(x)
         if x != last_x
             copy!(last_x, x)
-            log_x .= log_p - (one(eltype(log_p)) .+ transpose(A) * x)
+            log_x .= log_p .- (one(eltype(log_p)) .+ transpose(A) * x)
             y .= exp.(log_x)
             grad .= B - A * y
         end
@@ -3066,7 +3066,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
-    return StatsBase.pweights(exp.(log_p - (one(eltype(log_p)) .+ transpose(A) * x)))
+    return StatsBase.pweights(exp.(log_p .- (one(eltype(log_p)) .+ transpose(A) * x)))
 end
 """
     entropy_pooling(w::VecNum, epc::AbstractDict, opt::JuMPEntropyPooling)
@@ -3262,7 +3262,7 @@ function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDi
         end
         A = getproperty(lcs, p).A
         add_ep_constraint!(epc, A * tmp, getproperty(lcs, p).B, p)
-        to_fix .= to_fix .| dropdims(any(.!iszero.(A); dims = 1); dims = 1)
+        to_fix .= to_fix .| dropdims(any(!iszero, A; dims = 1); dims = 1)
     end
     return to_fix
 end
@@ -3419,8 +3419,8 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult,
             asset1 = n.captures[1]
             asset2 = n.captures[2]
             if startswith(asset1, "[") && endswith(asset1, "]")
-                asset1 = split(n.captures[1][2:(end - 1)], ", ")
-                asset2 = split(n.captures[2][2:(end - 1)], ", ")
+                asset1 = split(@view(n.captures[1][2:(end - 1)]), ", ")
+                asset2 = split(@view(n.captures[2][2:(end - 1)]), ", ")
                 j = [findfirst(x -> x == a1, nx) for a1 in asset1]
                 k = [findfirst(x -> x == a2, nx) for a2 in asset2]
             else
@@ -3448,8 +3448,8 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult,
         asset1 = n.captures[1]
         asset2 = n.captures[2]
         if startswith(asset1, "[") && endswith(asset1, "]")
-            asset1 = split(n.captures[1][2:(end - 1)], ", ")
-            asset2 = split(n.captures[2][2:(end - 1)], ", ")
+            asset1 = split(@view(n.captures[1][2:(end - 1)]), ", ")
+            asset2 = split(@view(n.captures[2][2:(end - 1)]), ", ")
             # A pair group sheds its departed pairs before it is written out, so a departed
             # name reaching here means the group lost *every* pair and `replace_group_by_assets`
             # kept one to say so. The row goes whole, in silence. See ADR 0125.
@@ -3962,7 +3962,7 @@ function ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
         end
         A = getproperty(lcs, p).A
         add_ep_constraint!(epc, A * tmp, getproperty(lcs, p).B, p)
-        to_fix .= to_fix .| dropdims(any(.!iszero.(A); dims = 1); dims = 1)
+        to_fix .= to_fix .| dropdims(any(!iszero, A; dims = 1); dims = 1)
     end
     return to_fix
 end
@@ -4097,7 +4097,7 @@ function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDi
         end
         A = getproperty(lcs, p).A
         add_ep_constraint!(epc, A * tmp, getproperty(lcs, p).B, p)
-        to_fix .= to_fix .| dropdims(any(.!iszero.(A); dims = 1); dims = 1)
+        to_fix .= to_fix .| dropdims(any(!iszero, A; dims = 1); dims = 1)
     end
     return to_fix
 end

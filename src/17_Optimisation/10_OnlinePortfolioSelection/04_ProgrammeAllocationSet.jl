@@ -1003,7 +1003,7 @@ function barrier_projection(b::AbstractVector, phi, wb::WeightBounds)
               DomainError(b,
                           "a barrier projection needs a positive raw entry: a raw step of zeros has no projection, because a zero stays zero under the potential"))
     clipped = (m, l, u) -> m > zero(m) ? clamp(phi(m), l, u) : u
-    f = mu -> sum(clipped.(b .+ mu, lb, ub))
+    f = mu -> sum(i -> clipped(b[i] + mu, lb[i], ub[i]), eachindex(b, lb, ub))
     lo = -maximum(finite)
     @argcheck(f(lo) >= one(lo),
               DomainError(b,

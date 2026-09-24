@@ -261,7 +261,7 @@ function cross_sectional_exposure_history(factors::AbstractVector{<:Pair},
     (; nf, fam) = cross_sectional_factor_axis(factors, rd)
     wid = cross_sectional_exposure_widths(factors, rd)
     ord, src = cross_sectional_exposure_order(factors)
-    col = cumsum(vcat(1, wid[1:(end - 1)]))
+    col = cumsum(vcat(1, @view(wid[1:(end - 1)])))
     X = rd.X
     Tf = real(eltype(X))
     Ms = Array{Tf, 3}(undef, size(X, 1), size(X, 2), length(nf))
@@ -1202,7 +1202,7 @@ function cross_sectional_return_forecast(rfe::AbstractReturnForecastEstimator,
                                          c::Real)
     rf = return_forecast(rfe, rd, csfm)
     rw = csfm.rw
-    (; g, ap) = cross_sectional_alpha_split(cre, rf.mu, csfm.L, rw[size(rw, 1), :])
+    (; g, ap) = cross_sectional_alpha_split(cre, rf.mu, csfm.L, @view(rw[size(rw, 1), :]))
     return (;
             rr = CrossSectionalFactorModel(; M = csfm.M, L = getfield(csfm, :L), b = c * ap,
                                            csr = csfm.csr, Ms = csfm.Ms, vs = csfm.vs,

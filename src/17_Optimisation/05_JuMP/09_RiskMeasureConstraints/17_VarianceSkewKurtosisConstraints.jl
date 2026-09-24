@@ -68,12 +68,14 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosi
     W3 = state_get(model, prefix, :W3_vr_sk_kt)
     vr_risk, sk_risk, kt_risk = JuMP.@expressions(model,
                                                   begin
-                                                      LinearAlgebra.tr(sigma * W1)
-                                                      LinearAlgebra.tr(sk * D2 * W2)
-                                                      LinearAlgebra.tr(S2 *
-                                                                       kt *
-                                                                       transpose(S2) *
-                                                                       W3)
+                                                      LinearAlgebra.dot(transpose(sigma),
+                                                                        W1)
+                                                      LinearAlgebra.dot(transpose(sk * D2),
+                                                                        W2)
+                                                      LinearAlgebra.dot(transpose(S2 *
+                                                                                  kt *
+                                                                                  transpose(S2)),
+                                                                        W3)
                                                   end)
     state_set!(model, prefix, :vr_risk_, i, vr_risk)
     state_set!(model, prefix, :sk_risk_, i, sk_risk)

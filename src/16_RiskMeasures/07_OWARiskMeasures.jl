@@ -1055,7 +1055,7 @@ function owa_cvar(T::Integer, alpha::Number = 0.05)
     k = floor(Int, T * alpha)
     w = zeros(typeof(alpha), T)
     w[1:k] .= -one(alpha) / (T * alpha)
-    w[k + 1] = -one(alpha) - sum(w[1:k])
+    w[k + 1] = -one(alpha) - sum(@view(w[1:k]))
     return w
 end
 """

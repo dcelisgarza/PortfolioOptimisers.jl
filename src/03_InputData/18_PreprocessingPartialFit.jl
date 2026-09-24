@@ -274,9 +274,13 @@ The batch conversion hands [`gap_return`](@ref) a whole column; a block hands it
 function block_gap_return!(alg::AbstractGapReturnAlgorithm, R::AbstractMatrix,
                            P::AbstractMatrix, anchor::AbstractVector, last::AbstractMatrix,
                            ret_method::Symbol)
+    p = similar(P, promote_type(eltype(anchor), eltype(last), eltype(P)), size(P, 1) + 2)
+    r = similar(R, size(R, 1) + 1)
     for j in axes(P, 2)
-        p = vcat(anchor[j], last[1, j], view(P, :, j))
-        r = vcat(oftype(R[1, j], NaN), view(R, :, j))
+        p[1], p[2] = anchor[j], last[1, j]
+        copyto!(view(p, 3:length(p)), view(P, :, j))
+        r[1] = oftype(R[1, j], NaN)
+        copyto!(view(r, 2:length(r)), view(R, :, j))
         w = gap_return_writable(p, r)
         if !any(w)
             continue

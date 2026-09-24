@@ -76,6 +76,7 @@ macro define_pretty_show(T, flag::Bool = true)
                 name = Base.typename(tobj).wrapper
                 print(io, name, '\n')
                 padding = maximum(map(length, map(string, fields))) + 2
+                ellines = String[]
                 for (i, field) in enumerate(fields)
                     val = getproperty(obj, field)
                     flag = has_pretty_show_method(val)
@@ -115,7 +116,8 @@ macro define_pretty_show(T, flag::Bool = true)
                            !isempty(val) &&
                            all(has_pretty_show_method, val)
                         print(io, "┼ ", pretty_show_vector_summary(val), '\n')
-                        ellines = [pretty_show_vector_element(v) for v in val]
+                        map!(pretty_show_vector_element, resize!(ellines, length(val)),
+                             val)
                         for l in pretty_show_vector_body(io, ellines)
                             print(io, lpad("│ ", padding + 3), l, '\n')
                         end
@@ -242,7 +244,7 @@ function pretty_show_vector_body(io::IO, lines::AbstractVector{<:AbstractString}
     end
     nhead = cld(budget, 2)
     ntail = budget - nhead
-    return vcat(lines[1:nhead], "⋮", lines[(n - ntail + 1):n])
+    return vcat(view(lines, 1:nhead), "⋮", view(lines, (n - ntail + 1):n))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

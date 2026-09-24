@@ -387,7 +387,7 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     f_mu = cross_sectional_forecast_mu(pe.lambda, f_pr.mu, g)
     ex = cross_sectional_expand(fb.fcb, r, pe.lag, csr.f, f_mu, f_pr.sigma)
     ev = vs[end, :]
-    idx = cross_sectional_investable(amr[end, :], L, ev)
+    idx = cross_sectional_investable(@view(amr[end, :]), L, ev)
     @argcheck(!isempty(idx),
               IsEmptyError("no asset is investable at the latest observation: every asset is either inactive, or carries a non-finite idiosyncratic variance or Factor Exposure. Give more observations, or widen the active mask of the Asset Panel."))
     Xs = cross_sectional_scenarios(f_pr.X, L, S, ev)

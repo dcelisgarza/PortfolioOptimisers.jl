@@ -1298,7 +1298,8 @@ The first three methods each run one procedure. The fourth, `k_ucs(type::Number,
   - $(ref_dict[:fabozzi2007])
 """
 function k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum)
-    k_mus = LinearAlgebra.diag(X * (sigma_X \ transpose(X)))
+    A = sigma_X \ transpose(X)
+    k_mus = [transpose(view(X, i, :)) * view(A, :, i) for i in axes(X, 1)]
     return sqrt(Statistics.quantile(k_mus, one(q) - q; km.kwargs...))
 end
 function k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)

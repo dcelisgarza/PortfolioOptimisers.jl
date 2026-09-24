@@ -51,7 +51,7 @@ function find_complete_indices(X::AbstractMatrix; dims::Int = 1)
     N = size(X, 2)
     to_remove = Vector{Int}(undef, 0)
     for i in axes(X, 2)
-        if any(ismissing, X[:, i]) || any(isnan, X[:, i])
+        if any(ismissing, view(X, :, i)) || any(isnan, view(X, :, i))
             push!(to_remove, i)
         end
     end

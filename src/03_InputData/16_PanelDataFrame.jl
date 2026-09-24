@@ -340,12 +340,14 @@ function panel_frame_wide(pnl::AssetPanel, fs, j::VecInt, nxj::VecStr, ts, decod
     if !static
         df[!, "observation"] = collect(ts)
     end
+    cols = Vector{String}(undef, length(nxj))
     for f in fs
         for (name, vals, omsk) in panel_frame_columns(f, decode)
-            panel_frame_block!(df, panel_array_view(vals, :, j), ["$name@$a" for a in nxj])
+            panel_frame_block!(df, panel_array_view(vals, :, j),
+                               map!(a -> "$name@$a", cols, nxj))
             if !isnothing(omsk)
                 panel_frame_block!(df, panel_array_view(omsk, :, j),
-                                   ["$name::observed@$a" for a in nxj])
+                                   map!(a -> "$name::observed@$a", cols, nxj))
             end
         end
     end

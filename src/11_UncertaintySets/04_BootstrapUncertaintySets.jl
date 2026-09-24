@@ -909,8 +909,8 @@ function ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
     X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
     X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
     for i in axes(X_mu, 2)
-        X_mu[:, i] = vec(mus[:, i] - prr.mu)
-        X_sigma[:, i] = vec(sigmas[:, :, i] - prr.sigma)
+        X_mu[:, i] = vec(@view(mus[:, i]) - prr.mu)
+        X_sigma[:, i] = vec(@view(sigmas[:, :, i]) - prr.sigma)
     end
     X_mu = transpose(X_mu)
     X_sigma = transpose(X_sigma)
@@ -988,7 +988,7 @@ function mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
     mus = mu_bootstrap_generator(ue, X; kwargs...)
     X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
     for i in axes(X_mu, 2)
-        X_mu[:, i] = vec(mus[:, i] - prr.mu)
+        X_mu[:, i] = vec(@view(mus[:, i]) - prr.mu)
     end
     X_mu = transpose(X_mu)
     sigma_mu = Statistics.cov(ue.ce, X_mu)
@@ -1061,7 +1061,7 @@ function sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
     sigmas = sigma_bootstrap_generator(ue, X; kwargs...)
     X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
     for i in axes(X_sigma, 2)
-        X_sigma[:, i] = vec(sigmas[:, :, i] - prr.sigma)
+        X_sigma[:, i] = vec(@view(sigmas[:, :, i]) - prr.sigma)
     end
     X_sigma = transpose(X_sigma)
     sigma_sigma = Statistics.cov(ue.ce, X_sigma)
@@ -1142,8 +1142,8 @@ function ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
     X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
     X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
     for i in axes(X_mu, 2)
-        X_mu[:, i] = vec(mus[:, i] - prr.mu)
-        X_sigma[:, i] = vec(sigmas[:, :, i] - prr.sigma)
+        X_mu[:, i] = vec(@view(mus[:, i]) - prr.mu)
+        X_sigma[:, i] = vec(@view(sigmas[:, :, i]) - prr.sigma)
     end
     mu_set, sigma_set = norm_ball_deviation_set(ue.alg, ue.q, transpose(X_mu),
                                                 MuUncertaintySetClass(), prr.mu),
@@ -1206,7 +1206,7 @@ function mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
     mus = mu_bootstrap_generator(ue, X; kwargs...)
     X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
     for i in axes(X_mu, 2)
-        X_mu[:, i] = vec(mus[:, i] - prr.mu)
+        X_mu[:, i] = vec(@view(mus[:, i]) - prr.mu)
     end
     set = norm_ball_deviation_set(ue.alg, ue.q, transpose(X_mu), MuUncertaintySetClass(),
                                   prr.mu)
@@ -1266,7 +1266,7 @@ function sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
     sigmas = sigma_bootstrap_generator(ue, X; kwargs...)
     X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
     for i in axes(X_sigma, 2)
-        X_sigma[:, i] = vec(sigmas[:, :, i] - prr.sigma)
+        X_sigma[:, i] = vec(@view(sigmas[:, :, i]) - prr.sigma)
     end
     set = norm_ball_deviation_set(ue.alg, ue.q, transpose(X_sigma),
                                   SigmaUncertaintySetClass(), prr.sigma)

@@ -628,7 +628,7 @@ squared innovations.
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
 function get_regime_state(method::FirstMomentRegimeAdjusted, z2_valid::VecNum, ::Any)
-    return Statistics.mean(sqrt.(max.(z2_valid, zero(eltype(z2_valid))))) / method.x
+    return Statistics.mean(z -> sqrt(max(z, zero(eltype(z2_valid)))), z2_valid) / method.x
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1054,7 +1054,7 @@ function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::
                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = regime_adjusted_variance_pass!(ce, X, dims, estimation_mask, active_mask)
-    if !ce.centred && any(.!cache.active)
+    if !ce.centred && any(!, cache.active)
         cache.location[.!cache.active] .= NaN
     end
 

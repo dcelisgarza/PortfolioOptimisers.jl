@@ -1023,7 +1023,7 @@ function update_var_cor!(cache::RegimeAdjustedCovarianceState,
     idx = findall(active)
     cor_raw = cache.cor_state[idx, idx]
     d = LinearAlgebra.diag(cor_raw)
-    if !all(d .> ce.min_val)
+    if !all(>(ce.min_val), d)
         return nothing
     end
     inv_d = inv.(sqrt.(d))

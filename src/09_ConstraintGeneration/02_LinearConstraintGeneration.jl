@@ -2109,7 +2109,7 @@ function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
     @argcheck(expr.head == :call,
               Meta.ParseError("Expression must be a function call (comparison operator expected):\n$expr"))
     # Count how many valid operators are present
-    op_count = count(op -> expr.args[1] == op, ops2[2:end])
+    op_count = count(op -> expr.args[1] == op, Iterators.drop(ops2, 1))
     @argcheck(op_count == 1,
               Meta.ParseError("Expression must contain a valid comparison operator $(join(ops2[2:end], ", ")) .\n$expr"))
     opstr = string(expr.args[1])
@@ -2235,8 +2235,7 @@ function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
     # its row with it, one door later. See ADR 0125.
     other = counterpart_axis_names(sets, sets.xkey)
     variables, coeffs = res.vars, res.coef
-    variables_new = copy(variables)
-    coeffs_new = copy(coeffs)
+    variables_new, coeffs_new = copy(variables), copy(coeffs)
     variables_tmp = Vector{eltype(variables)}(undef, 0)
     coeffs_tmp = Vector{eltype(coeffs)}(undef, 0)
     idx_rm = Vector{Int}(undef, 0)
@@ -2283,11 +2282,12 @@ function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
                       ArgumentError("The pattern 'prior(a)' can only be used in entropy pooling (ep_flag is true). Got\nep_flag => $(ep_flag)."))
             n = match(corr_pattern, v)
             if isnothing(n) && !rho_flag
-                asset = get(sets.dict, v[7:(end - 1)], nothing)
+                grp = @view v[7:(end - 1)]
+                asset = get(sets.dict, grp, nothing)
                 if isnothing(asset)
                     continue
                 end
-                asset = shed_departed_members(asset, other, ledger, v[7:(end - 1)], res.eqn)
+                asset = shed_departed_members(asset, other, ledger, grp, res.eqn)
                 push!(idx_rm, i)
                 c = !bl_flag ? coeffs[i] : coeffs[i] / length(asset)
                 append!(variables_tmp, ["prior($a)" for a in asset])

@@ -2704,7 +2704,7 @@ function forward_walk_expr(path, struct_name, broadcast::Bool)
     pathstr = join(string.(path), ".")
     stmts = Any[:(__v = getfield(x, $(QuoteNode(path[1]))))]
     for k in 2:length(path)
-        nodestr = join(string.(path[1:(k - 1)]), ".")
+        nodestr = join(string.(view(path, 1:(k - 1))), ".")
         push!(stmts, :(__v = $(forward_nonnothing)(__v, $struct_name, $pathstr, $nodestr)))
         leaf = QuoteNode(path[k])
         if k == length(path) && broadcast

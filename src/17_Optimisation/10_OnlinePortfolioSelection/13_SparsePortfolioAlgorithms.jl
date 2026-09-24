@@ -354,7 +354,7 @@ The docstring of [`HuberOptimum`](@ref) states the formula of the coordinates.
 """
 function huber_coordinates(alg::HuberOptimum, phi::AbstractVector, nu::Real)
     a = alg.lambda / alg.gamma
-    return clamp.(-(phi .+ nu) ./ a, -alg.gamma, alg.gamma)
+    return clamp.((phi .+ nu) ./ -a, -alg.gamma, alg.gamma)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

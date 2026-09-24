@@ -309,7 +309,7 @@ function _regression(re::StepwiseRegression{<:PValue, <:ForwardSelection}, x::Ve
             if best_pval > test_pval && maximum(new_pvals) <= re.crit.t
                 best_pval = test_pval
                 new_factor = i
-                pvals = copy(new_pvals)
+                pvals = new_pvals
             end
         end
         iszero(new_factor) ? break : push!(included, new_factor)
@@ -415,12 +415,13 @@ function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriteri
     criterion_func = regression_criterion_func(re.crit, re.tgt)
     t = regression_threshold(re.crit)
     included = Vector{eltype(indices)}(undef, 0)
+    factors = similar(included)
     excluded = collect(indices)
     value = fill(regression_polarity(re.crit).worst(promote_type(eltype(F), eltype(x))), N)
     for _ in eachindex(x)
         ni = length(excluded)
         for i in excluded
-            factors = copy(included)
+            append!(empty!(factors), included)
             push!(factors, i)
             f1 = [ovec view(F, :, factors)]
             fri = StatsAPI.fit(re.tgt, f1, x)
@@ -578,6 +579,7 @@ function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriteri
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     included = collect(1:N)
+    factors = similar(included)
     fri = StatsAPI.fit(re.tgt, [ovec F], x)
     criterion_func = regression_criterion_func(re.crit, re.tgt)
     t = criterion_func(fri)
@@ -585,7 +587,7 @@ function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriteri
     for _ in eachindex(x)
         ni = length(included)
         for (i, factor) in pairs(included)
-            factors = copy(included)
+            append!(empty!(factors), included)
             popat!(factors, i)
             if !isempty(factors)
                 f1 = [ovec view(F, :, factors)]
@@ -643,7 +645,6 @@ Each asset takes its own search, so the searches see one another only through th
   - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.2-4.3.
 """
 function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
-    factors = 1:size(F, 2)
     cols = size(F, 2) + 1
     N, rows = size(X)
     ovec = range(one(eltype(F)), one(eltype(F)); length = N)
@@ -657,8 +658,7 @@ function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
         fri = StatsAPI.fit(re.tgt, x1, view(X, :, i))
         params = StatsAPI.coef(fri)
         rr[i, 1] = params[1]
-        idx = [searchsortedfirst(factors, i) + 1 for i in included]
-        rr[i, idx] = params[2:end]
+        view(rr, i, 2:cols)[included] = view(params, 2:lastindex(params))
     end
     return Regression(; b = view(rr, :, 1), M = view(rr, :, 2:cols))
 end

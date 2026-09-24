@@ -352,7 +352,7 @@ julia> size(cov(ce, X))
 function Statistics.cov(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = exp_weighted_pass!(ce, X, dims, active_mask)
-    if !ce.centred && any(.!cache.active)
+    if !ce.centred && any(!, cache.active)
         cache.location[.!cache.active] .= NaN
     end
 

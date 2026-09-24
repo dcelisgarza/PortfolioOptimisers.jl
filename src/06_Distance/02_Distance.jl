@@ -269,10 +269,10 @@ function _dist_from_cor(::SimpleAbsoluteDistance, power::Integer, rho::MatNum)
                         one(eltype(rho))))
 end
 function _dist_from_cor(::LogDistance, ::Nothing, rho::MatNum)
-    return max.(-log.(_absguard(rho)), zero(eltype(rho)))
+    return max.(.-log.(_absguard(rho)), zero(eltype(rho)))
 end
 function _dist_from_cor(::LogDistance, power::Integer, rho::MatNum)
-    return max.(-log.(_absguard(rho) .^ power), zero(eltype(rho)))
+    return max.(.-log.(_absguard(rho) .^ power), zero(eltype(rho)))
 end
 function _dist_from_cor(::CorrelationDistance, ::Nothing, rho::MatNum)
     return sqrt.(clamp!(one(eltype(rho)) .- rho, zero(eltype(rho)), one(eltype(rho))))

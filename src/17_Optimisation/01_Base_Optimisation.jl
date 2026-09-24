@@ -1955,7 +1955,7 @@ Return `true` if any element of the vector of optimisation estimators or results
   - [`VecOptE_Opt`](@ref)
 """
 function needs_previous_weights(opt::VecOptE_Opt_TD)
-    return any(needs_previous_weights.(opt))
+    return any(needs_previous_weights, opt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1968,7 +1968,7 @@ Return `true` if any element of the vector of optimisation estimators or results
   - [`VecOptE_Opt`](@ref)
 """
 function is_time_dependent(opt::VecOptE_Opt_TD)
-    return any(is_time_dependent.(opt))
+    return any(is_time_dependent, opt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
