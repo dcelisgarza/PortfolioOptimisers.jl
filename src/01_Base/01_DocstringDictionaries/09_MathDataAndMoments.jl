@@ -81,7 +81,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :tr_lp => "``\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b})``: Lp-norm error.",#
                  :tr_linf => "``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm error, the largest absolute deviation.",#
                  # The Gerber family. `01_GerberCovariance.jl` states the statistic,
-                 # and `02_SmythBrobyCovariance.jl` and `03_GerberIQCovariance.jl`
+                 # and `02_SmythBrobyCovariance.jl` and `03_GerberIQCovariance_a.jl`
                  # build on the same symbols.
                  :x_ti_ret => "``x_{t,\\,i}``: Return of asset ``i`` at observation ``t``.",#
                  :t_threshold => "``t``: Threshold parameter, read as a standalone symbol; a subscript ``t`` is the observation index. An asset crosses at an observation when its return is at least ``t`` of its own standard deviations away from zero, and a return of exactly zero never crosses.",#

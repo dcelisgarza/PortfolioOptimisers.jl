@@ -337,7 +337,7 @@ It is the queue telling you, and everyone else, that a file is genuinely hard.
 ## A worked example
 
 The two halves come from two files. The JET half is `src/05_Moments/01_Base_Moments.jl`, and it has
-already been through the loop. The complexity half is `src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl`,
+already been through the loop. The complexity half is `src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl`,
 which is still a candidate.
 
 ### The JET half
@@ -375,7 +375,7 @@ Two details of this case are worth carrying to the next one.
 ### The complexity half
 
 The clearest complexity case is in another file. `JuMPOptimiser`, in
-`src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl`, breaches all three metrics at once.
+`src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl`, breaches all three metrics at once.
 
 | metric | value | threshold | ratio |
 | --- | --- | --- | --- |

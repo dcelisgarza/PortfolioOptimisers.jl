@@ -48,7 +48,7 @@
 
     # Files that build a DIFFERENT `JuMP.Model` — not the portfolio model, so the Model
     # State vocabulary does not apply to them at all.
-    other_models = ["16_RiskMeasures/07_OWARiskMeasures.jl",          # OWA weight fitting
+    other_models = ["16_RiskMeasures/07_OWARiskMeasures_a.jl",        # OWA weight fitting
                     "17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl"]  # allocation MIP
 
     # Strip `#` line comments, `\"\"\"` docstrings and `#=` block comments so prose mentions

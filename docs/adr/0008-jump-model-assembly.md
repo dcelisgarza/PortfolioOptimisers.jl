@@ -19,7 +19,7 @@ is repeated, in the same order, across five files:
 - [`RiskBudgeting`](../../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl) (`_optimise` ~688–713)
 - [`RelaxedRiskBudgeting`](../../src/17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl) (`_optimise` ~382)
 - [`FactorRiskContribution`](../../src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl) (`_optimise` ~299–341)
-- [`NearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl) (constrained `_optimise` ~1053–1105)
+- [`NearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl) (constrained `_optimise` ~1053–1105)
 
 The middle is the seam between builders, but it is not a module: it has no interface, so a
 change to constraint ordering or a new constraint type must be applied in five places, and
@@ -44,7 +44,7 @@ There are also two parallel representations of the processed inputs: MeanRisk/RB
 result-suffixed names (`lcsr`, `ctr`, `gcardr`, `plr`); constrained-NOC uses
 `processed_jump_optimiser` → a processed `JuMPOptimiser` in place, read with
 estimator-suffixed names (`lcse`, `cte`, `gcarde`, `ple`) and carrying the scalar settings on
-the same object, wrapped in a [`NearOptimalSetup`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl).
+the same object, wrapped in a [`NearOptimalSetup`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl).
 
 This builds on the Model State interface of [ADR 0004](0004-typed-jump-model-state.md): that
 ADR gave the data the builders share a named interface; this ADR gives the *ordering* of the
@@ -309,7 +309,7 @@ rather than refused.
 ### The census
 
 Every `JuMPOptimiser` setting was set one at a time on a default
-[`NearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl) with the three
+[`NearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl) with the three
 anchor portfolios supplied, and the assembled centring model was compared byte for byte
 against the same model without the setting. `lcse`, `card`, `l1`, `linf`, `lp`, `l2c`,
 `linfc`, `tn`, `tr` and `ss` all leave the model identical. They are carried and validated,
@@ -347,7 +347,7 @@ another, with nothing comparing the two.
 The review asks for a membership declaration that the head checks, so that a setting the
 formulation cannot honour raises instead of being ignored. That half is **not** done, and the
 exclusion is stated in the docstrings instead —
-[`UnconstrainedNearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl)
+[`UnconstrainedNearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl)
 now lists every setting the centring model reads and every setting it does not, and the `alg`
 field text names the choice as the thing that selects between them.
 

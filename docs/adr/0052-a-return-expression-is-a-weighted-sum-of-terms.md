@@ -6,7 +6,7 @@ status: accepted
 
 ## Context
 
-[`JuMPOptimiser`](../../src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl)'s `ret` field held **one**
+[`JuMPOptimiser`](../../src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl)'s `ret` field held **one**
 returns estimator. The risk side of the same struct had held a vector for far longer:
 `MeanRisk.r` takes one risk measure or several, each carrying a
 [`RiskMeasureSettings`](../../src/16_RiskMeasures/01_Base_RiskMeasures.jl) bundle, and the
@@ -87,7 +87,7 @@ Sense-normalisation would rescue all three at a stroke — store `-ret`, minimis
 transform becomes available and conic. It is **barred**. `:ret` is a model-global name that
 [`get_ret`](../../src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation.jl) serves to the objective, to
 the return bounds, to the `MaximumRatio` numerator and to
-[`NearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl). A stored
+[`NearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl). A stored
 `-ret` leads every one of them astray, and the cost of that is spread across the whole model
 rather than paid at one site.
 

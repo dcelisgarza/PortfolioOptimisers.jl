@@ -8,7 +8,7 @@ status: accepted
 
 Constraint equations, Black-Litterman view strings and entropy-pooling view strings are untrusted
 input: a config file, spreadsheet, or UI feeds them into a caller, and they all funnel through the
-exported [`parse_equation`](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration.jl). That
+exported [`parse_equation`](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl). That
 function calls `Meta.parse` on the caller string and then walks the resulting expression tree with
 several recursive functions (`eval_numeric_functions`, `collect_terms!`, `has_invalid_plus`).
 
@@ -174,7 +174,7 @@ recursion, and `_expr_depth_exceeds` cannot measure a tree that does not exist y
 therefore: cap the length, parse, cap the depth, walk.
 
 - `parse_equation(eqn::AbstractString)` measures `lexpr` and `rexpr`, one for each side of the
-  comparison operator, after [`rethrow_parse_error`](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration.jl)
+  comparison operator, after [`rethrow_parse_error`](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl)
   and before `_parse_equation`.
 - `parse_lens(key::AbstractString)` measures the parsed tree before `expr_to_lens_chain`.
 - Both raise the `Meta.ParseError` message the `Expr` arm already raises, so one number and one

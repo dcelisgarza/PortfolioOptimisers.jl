@@ -47,7 +47,7 @@ typo is obvious while a legitimately-absent asset stays quiet.**
   builders never interpolate the full universe (only `length(nx)` and the key) nor the input
   value dictionary / parsed struct, so the info-leak-safe shape and the suggestion behaviour cannot
   drift between call sites. The known boundaries are `get_linear_constraints`
-  ([02_LinearConstraintGeneration.jl](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration.jl)),
+  ([02_LinearConstraintGeneration.jl](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl)),
   `group_to_val!` / `estimator_to_val` (same file — the value-mapping path behind
   `WeightBoundsEstimator`, `Fees`, `Turnover`, threshold and risk-budget estimators), the
   Black-Litterman view generator

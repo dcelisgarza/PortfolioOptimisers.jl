@@ -4279,7 +4279,7 @@ end
 
 Re-read a tail view carrier at a posterior, and say whether its rows were already tight there.
 
-A carrier whose rows are fixed at construction is returned unchanged, and is always tight. A sequential carrier re-reads the multipliers of its primal side at `w`, which is what tightens its surrogate row between two solves of [`entropy_pooling`](@ref); its method lives beside it in `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior.jl`.
+A carrier whose rows are fixed at construction is returned unchanged, and is always tight. A sequential carrier re-reads the multipliers of its primal side at `w`, which is what tightens its surrogate row between two solves of [`entropy_pooling`](@ref); its method lives beside it in `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl`.
 
 # Arguments
 
@@ -4305,7 +4305,7 @@ end
 
 Warn where the window of a tail view carrier can restrict the posterior.
 
-Only [`IntegerConditionalValueatRiskViewConstraint`](@ref) reads a window: its model admits the posteriors that put at least `alpha` of their mass on the `sbar` largest losses of each asset. Where that restriction binds, the window holds exactly `alpha`, and the view can have a posterior of smaller divergence outside it, so the method warns. Every other carrier reads the whole sample and does nothing. The integer method lives beside its carrier in `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior.jl`.
+Only [`IntegerConditionalValueatRiskViewConstraint`](@ref) reads a window: its model admits the posteriors that put at least `alpha` of their mass on the `sbar` largest losses of each asset. Where that restriction binds, the window holds exactly `alpha`, and the view can have a posterior of smaller divergence outside it, so the method warns. Every other carrier reads the whole sample and does nothing. The integer method lives in `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_b.jl`.
 
 # Arguments
 
@@ -4498,7 +4498,7 @@ Add every view constraint of an entropy pooling problem to a JuMP model.
   - `cfeq`: ``s_{c1} \\left(\\mathbf{A}_{\\mathrm{feq}} \\boldsymbol{p} - \\boldsymbol{B}_{\\mathrm{feq}} - \\boldsymbol{c}\\right) = 0``
   - Registered under no name, alongside `cfeq`: ``\\left(s_{c1} \\eta_{c},\\; s_{c1} \\boldsymbol{c}\\right) \\in \\mathcal{K}_{1}``, which states ``\\eta_{c} \\geq \\lVert \\boldsymbol{c} \\rVert_{1}``.
 
-Each of the four named rows is registered only when `epc` holds the block it carries. [`add_ep_tail_view!`](@ref) registers every row a tail view needs, in `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior.jl`.
+Each of the four named rows is registered only when `epc` holds the block it carries. [`add_ep_tail_view!`](@ref) registers every row a tail view needs, in `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl` and `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_b.jl`.
 
 ## Relaxation
 

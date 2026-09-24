@@ -8,7 +8,7 @@ status: accepted
 
 `strict = false` is the documented "warn and continue" path of every view family. A view row that
 names no asset in the universe is reported by `strict_diagnostic` and dropped, and
-[`get_linear_constraints`](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration.jl)
+[`get_linear_constraints`](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl)
 answers `nothing` when **every** row of a group is dropped that way.
 
 Five view verbs read a block off that answer without checking it: `ep_mu_views!`,

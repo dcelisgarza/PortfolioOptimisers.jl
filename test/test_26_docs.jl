@@ -1231,7 +1231,7 @@ in the sense of `STANDARDS.md`.
     A glyph is not owned by a key. `\boldsymbol{w}` is `math_dict[:w_port]`, the portfolio
     weights vector, inside a risk measure; it is the observation weights in
     `src/02_Tools.jl` and the OWA weight vector in
-    `src/16_RiskMeasures/07_OWARiskMeasures.jl`. Matching on the symbol alone reported 149
+    `src/16_RiskMeasures/07_OWARiskMeasures_a.jl`. Matching on the symbol alone reported 149
     sites, and the great majority of them define a different quantity that the key would
     state wrongly -- `src/02_Tools.jl` among them, the one such site inside a swept file.
     Matching the whole bullet against the whole value reports only a COPY of the dictionary

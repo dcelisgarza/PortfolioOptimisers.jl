@@ -884,4 +884,4 @@ Read a real docstring, not a copy of one. Each row names a Unit whose file is ma
 | Private function | `_denoise!` | [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) |
 | Dispatch alias | `RhoDistanceAlgorithm` | [`src/06_Distance/02_Distance.jl`](../../src/06_Distance/02_Distance.jl) |
 | `# JuMP formulation` | `set_distance_cone!` | [`src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl`](../../src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl) |
-| `# JuMP formulation` with a `## Relaxation` | `ep_tail_dual_block!` | [`src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior.jl`](../../src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior.jl) |
+| `# JuMP formulation` with a `## Relaxation` | `ep_tail_dual_block!` | [`src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl`](../../src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl) |

@@ -6,7 +6,7 @@ status: accepted
 
 ## Context
 
-Three prior estimators reweight observations: [`EntropyPoolingPrior`](../../src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior.jl),
+Three prior estimators reweight observations: [`EntropyPoolingPrior`](../../src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_c.jl),
 [`MeucciEntropyPoolingPrior`](../../src/10_Prior/06_EntropyPooling/02_MeucciEntropyPoolingPrior.jl) and
 [`OpinionPoolingPrior`](../../src/10_Prior/07_OpinionPoolingPrior.jl). Each one fits a nested prior
 and pools a probability vector over the scenarios that fit produced.

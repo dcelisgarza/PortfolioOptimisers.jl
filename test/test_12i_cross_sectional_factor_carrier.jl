@@ -292,7 +292,7 @@ end
         @test occursin("the universe (3 factors under key `ncf`)", msg)
 
         # 2. `constraint_row_term`, at
-        #    `09_ConstraintGeneration/02_LinearConstraintGeneration.jl`.
+        #    `09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl`.
         Ai = [true, false, true]
         @test PO.constraint_row_term(csfm_reb, Ai, 2.0) ==
               PO.constraint_row_term(reg_reb, Ai, 2.0) ==

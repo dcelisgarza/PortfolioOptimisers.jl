@@ -100,7 +100,7 @@ Mirrors [`BaseJuMPOptimisationEstimator`](@ref): the factored-out struct holding
   - [`RiskJuMPOptimisationResult`](@ref)
 """
 abstract type BaseJuMPOptimisationResult <: AbstractResult end
-# The concrete core `JuMPOptimisationResult` is defined in 03_JuMPOptimiser.jl, after
+# The concrete core `JuMPOptimisationResult` is defined in 03_JuMPOptimiser_a.jl, after
 # `ProcessedJuMPOptimiserAttributes` and `JuMPOptimiser` — it is the result-side analogue
 # of `JuMPOptimiser` and its typed constructor binds `pa::ProcessedJuMPOptimiserAttributes`,
 # which must be in scope.
@@ -2093,7 +2093,7 @@ export JuMPOptimisationSolution, JuMPOptimisationResult
 # `get_w`/`get_k` are too generic to put in a user's namespace, and the two builder methods
 # must be qualified anyway to be extended. Reach them as `PortfolioOptimisers.name`, or
 # import the ones you need. (`ProcessedJuMPOptimiserAttributes`, the `attrs` bundle a hook
-# receives, is already exported by `03_JuMPOptimiser.jl`.)
+# receives, is already exported by `03_JuMPOptimiser_b.jl`.)
 public CustomJuMPObjective, CustomJuMPConstraint, VecJuMPObj, VecJuMPConstr,
        add_custom_objective_term!, add_custom_constraint!, add_to_objective_penalty!, get_w,
        get_k, get_constraint_scale
