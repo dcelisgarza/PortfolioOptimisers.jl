@@ -114,7 +114,7 @@ $(DocStringExtensions.FIELDS)
         pe::Option{<:AbstractPriorEstimator} = nothing
     ) -> Skewness
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. A `w` that is not `nothing` is passed to `ve` with [`factory`](@ref), so the variance estimator reads the same weights as the measure.
 
 ## Validation
 
@@ -223,7 +223,7 @@ function Skewness(; settings::MaxRiskMeasureSettings = MaxRiskMeasureSettings(),
                   sk::Option{<:SkSlot} = nothing, w::Option{<:ObsWeights} = nothing,
                   mu::Option{<:MuSlot} = nothing,
                   pe::Option{<:AbstractPriorEstimator} = nothing)::Skewness
-    return Skewness(settings, ve, sk, w, mu, pe)
+    return Skewness(settings, factory(ve, w), sk, w, mu, pe)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

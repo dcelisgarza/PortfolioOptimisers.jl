@@ -633,7 +633,7 @@ Where:
  1. A `nothing` fee returns `expected_risk(r, wd, X)`, because the two series are equal without a fee.
  2. A measure that reads a return series, [`NetReturnsInput`](@ref), reads ``\\boldsymbol{x}``.
  3. A measure that reads the weights alone, [`WeightsInput`](@ref), reads `wd` and no fee.
- 4. A moment measure reads ``\\boldsymbol{x}`` and takes its target from `wd`. So a per-asset target is ``(\\boldsymbol{w} - \\boldsymbol{w}_b)^\\intercal \\boldsymbol{\\mu}``, as in the model.
+ 4. A moment measure resolves its observation weights against `X` with [`resolve_observation_weights`](@ref). It reads ``\\boldsymbol{x}`` and takes its target from `wd`. So a per-asset target is ``(\\boldsymbol{w} - \\boldsymbol{w}_b)^\\intercal \\boldsymbol{\\mu}``, as in the model.
  5. A [`TrackingRiskMeasure`](@ref) takes the norm of ``\\boldsymbol{x}`` minus its own benchmark series.
  6. A nested [`RiskTrackingRiskMeasure`](@ref) recurses. The independent mode subtracts its own benchmark weights from `wd`. The dependent mode subtracts the risk of its own benchmark weights, which pay their own fee, as in the model.
  7. A [`RiskRatio`](@ref) divides the results of its two measures. A [`VarianceSkewKurtosis`](@ref) reads `wd` and no fee.
@@ -681,19 +681,9 @@ end
 function difference_risk(r::Union{<:LoHiOrderMoment, <:Kurtosis, <:TCM_Sk,
                                   <:MedianAbsoluteDeviation}, wd::VecNum, w::VecNum,
                          X::MatNum, fees::Fees)
+    resolved = resolve_observation_weights(r, X)
     x = charge_fees(X * wd, w, fees)
-    return moment_risk(r, x .- calc_moment_target(r, wd, x))
-end
-# `moment_risk` reads resolved observation weights off `r`, so weights stated against the data
-# resolve against `X` first, as the functor `r(w, X, fees)` resolves them.
-# `MedianAbsoluteDeviation` resolves its own inside `calc_moment_target`, and #1319 moves the
-# other families to that design, which deletes this method.
-function difference_risk(r::Union{<:LoHiOrderMoment{<:Any, <:DynamicAbstractWeights},
-                                  <:Kurtosis{<:Any, <:DynamicAbstractWeights},
-                                  <:TCM_Sk{<:DynamicAbstractWeights}}, wd::VecNum,
-                         w::VecNum, X::MatNum, fees::Fees)
-    return difference_risk((Accessors.@set r.w = get_observation_weights(r.w, X)), wd, w, X,
-                           fees)
+    return moment_risk(resolved, x .- calc_moment_target(resolved, wd, x))
 end
 function difference_risk(r::TrackingRiskMeasure, wd::VecNum, w::VecNum, X::MatNum,
                          fees::Fees)

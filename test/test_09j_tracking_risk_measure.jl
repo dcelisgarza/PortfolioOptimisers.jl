@@ -127,6 +127,16 @@ end
         lomd = LowOrderMoment(; w = TrackedDecayWeights(), mu = pr.mu)
         @test isapprox(track(lomd)(w, X, fees), mean(max.(dot(wd, pr.mu) .- x, 0), ow);
                        rtol = 1e-12)
+        # Every moment family resolves its weights against `X`, down to the variance
+        # estimator it holds, and agrees with the same measure built with the resolved
+        # weights (#1319).
+        sha = PortfolioOptimisers.StandardisedHighOrderMoment
+        for f in (ow -> LowOrderMoment(; w = ow, mu = pr.mu, alg = SecondMoment()),
+                  ow -> HighOrderMoment(; w = ow, mu = pr.mu, alg = sha()),
+                  ow -> Kurtosis(; w = ow, mu = pr.mu), ow -> Skewness(; w = ow, mu = pr.mu))
+            @test isapprox(track(f(TrackedDecayWeights()))(w, X, fees),
+                           track(f(ow))(w, X, fees); rtol = 1e-12)
+        end
         # A tracking error takes the norm of the series minus its own benchmark series.
         te = TrackingRiskMeasure(; tr = WeightsTracking(; w = wb2))
         @test isapprox(track(te)(w, X, fees), norm(x - X * wb2, 2) / sqrt(T - 1);

@@ -530,7 +530,7 @@ $(DocStringExtensions.FIELDS)
         alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment(),
     ) -> LowOrderMoment
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. A `w` that is not `nothing` is passed to `alg` with [`factory`](@ref), so a variance estimator inside `alg` reads the same weights as the measure.
 
 ## Validation
 
@@ -845,6 +845,7 @@ Computes the low-order moment risk measure as defined in `r` using portfolio wei
 
   - `r.alg` defines what low-order moment to compute.
   - The values of `r.mu` and `r.w` are optionally used to compute the moment target via [`calc_moment_target`](@ref), which is used in [`calc_deviations_vec`](@ref) to compute the deviation vector.
+  - A [`DynamicAbstractWeights`](@ref) in `r.w` resolves against `X` first, with [`resolve_observation_weights`](@ref).
 
 # Examples
 
@@ -915,7 +916,7 @@ end
 function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         w::Option{<:ObsWeights} = nothing, mu::Option{<:MuSlot} = nothing,
                         alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())::LowOrderMoment
-    return LowOrderMoment(settings, w, mu, alg)
+    return LowOrderMoment(settings, w, mu, factory(alg, w))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1018,7 +1019,7 @@ $(DocStringExtensions.FIELDS)
         alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
     ) -> HighOrderMoment
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. A `w` that is not `nothing` is passed to `alg` with [`factory`](@ref), so a variance estimator inside `alg` reads the same weights as the measure.
 
 ## Validation
 
@@ -1044,6 +1045,7 @@ Computes the high-order moment risk measure as defined in `r` using portfolio we
 
   - `r.alg` defines what high-order moment to compute.
   - The values of `r.mu` and `r.w` are optionally used to compute the moment target via [`calc_moment_target`](@ref), which is used in [`calc_deviations_vec`](@ref) to compute the deviation vector.
+  - A [`DynamicAbstractWeights`](@ref) in `r.w` resolves against `X` first, with [`resolve_observation_weights`](@ref).
 
 # Examples
 
@@ -1104,7 +1106,7 @@ end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                          w::Option{<:ObsWeights} = nothing, mu::Option{<:MuSlot} = nothing,
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())::HighOrderMoment
-    return HighOrderMoment(settings, w, mu, alg)
+    return HighOrderMoment(settings, w, mu, factory(alg, w))
 end
 """
     const LoHiOrderMoment{T1, T2, T3, T4} = Union{...}
