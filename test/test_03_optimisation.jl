@@ -491,6 +491,41 @@ end
             @test PortfolioOptimisers.weights_meet_bounds(wbc, ent(wc, wbc), sum(wc))
         end
         @test ent([0.6, 0.4, 0.0], WeightBounds(; lb = 0.0, ub = 0.4)) ≈ [0.4, 0.4, 0.2]
+        # Under zero lower bounds the loop converges to the entropic point. Under two-sided
+        # bounds it can stop elsewhere, farther from the input in relative entropy.
+        kl(w, w0) = sum(w .* log.(w ./ w0))
+        w3 = [0.5, 0.4, 0.1]
+        wb3 = WeightBounds(; lb = 0.0, ub = 0.45)
+        @test opt(IterativeWeightFinaliser(), wb3, copy(w3)) ≈ [0.45, 0.44, 0.11]
+        @test opt(EntropicWeightFinaliser(), wb3, copy(w3)) ≈ [0.45, 0.44, 0.11]
+        wb3 = WeightBounds(; lb = 0.3, ub = 0.45)
+        wi = opt(IterativeWeightFinaliser(; iter = 10_000), wb3, copy(w3))
+        we = opt(EntropicWeightFinaliser(), wb3, copy(w3))
+        @test wi ≈ [0.4, 0.3, 0.3]
+        @test we ≈ [3.5, 2.8, 2.7] ./ 9
+        @test kl(we, w3) < kl(wi, w3)
+    end
+    @testset "An integer weight vector projects as its float copy does" begin
+        # An absent bound was `typemin(Int)`, which is finite, so `w .- typemin` overflowed
+        # and `[0, -5]` under `ub = 0` projected to `-9.2e18`. The iterative loop wrote a
+        # float into an integer vector, and `weights_meet_bounds` had no `eps(Int)`.
+        opt = PortfolioOptimisers.opt_weight_bounds
+        euc = PortfolioOptimisers.euclidean_weight_projection
+        ent = PortfolioOptimisers.entropic_weight_projection
+        @test euc([0, -5], WeightBounds(; lb = nothing, ub = 0)) == [0.0, -5.0]
+        @test ent([4, 1], WeightBounds(; lb = -3, ub = nothing)) == [4.0, 1.0]
+        for (wbi, wbf) in
+            ((WeightBounds(; lb = nothing, ub = 1), WeightBounds(; lb = nothing, ub = 1.0)),
+             (WeightBounds(; lb = -1, ub = 1), WeightBounds(; lb = -1.0, ub = 1.0)),
+             (WeightBounds(; lb = 0, ub = nothing), WeightBounds(; lb = 0.0, ub = nothing))),
+            wf in (IterativeWeightFinaliser(), EuclideanWeightFinaliser(),
+                   EntropicWeightFinaliser()), wi in ([3, -2, 0], [2, 1, 0], [-1, 1, 1])
+
+            rf, wf_ = PortfolioOptimisers.finalise_weight_bounds(wf, wbf, Float64.(wi))
+            ri, wi_ = PortfolioOptimisers.finalise_weight_bounds(wf, wbi, copy(wi))
+            @test typeof(ri) == typeof(rf)
+            @test isequal(wi_, wf_)
+        end
     end
     @testset "The relative formulations write eps into a zero weight" begin
         wz = [0.6, 0.4, 0.0, 0.0]
