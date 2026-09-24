@@ -54,9 +54,10 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
   - Build docs locally:
 
          1. `julia --project=docs`
-         2. `] dev .` (first time only)
-         3. `using LiveServer`
-         4. `servedocs()`
+         2. `using LiveServer`
+         3. `servedocs()`
+
+     `docs/Project.toml` points `PortfolioOptimisers` at this checkout through `[sources]`, so do not run `] dev .`: `Pkg.develop` rewrites that entry.
 
 ## Project-Specific Conventions
 
@@ -82,7 +83,9 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
 - **Commit/PR Practices:**
 
   - Use imperative, informative commit messages.
-  - Keep commits atomic and rebase on `main` before PR.
+  - Keep commits atomic.
+  - A session in this checkout rebases onto `dev` and pushes `dev`, as [`CLAUDE.md`](../CLAUDE.md) § *Parallel sessions* states.
+  - An outside contributor who works from a fork rebases onto `upstream/main` before a PR, as [`docs/src/contribute/2-developer.md`](../docs/src/contribute/2-developer.md) states.
 - **Releases:**
 
   - Use a `release-x.y.z` branch, update `Project.toml`, and follow the release checklist in `2-developer.md`.

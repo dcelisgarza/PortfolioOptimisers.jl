@@ -48,10 +48,7 @@ Both kinds are documented as [`.github/instructions/julia-docstrings.instruction
 
 Write the method that the estimator calls internally when it holds this algorithm, and document it as [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Section Structure for Functions* states. Read `denoise!` and `_denoise!` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) for a public and a private function docstring.
 
-Common interface methods to implement include:
-
-- `factory(alg::MyAlgorithm, w::ObsWeights)::MyAlgorithm` — returns a copy with observation weights propagated.
-- `port_opt_view(alg::MyAlgorithm, i)::MyAlgorithm` — returns a sliced view.
+An algorithm that propagates observation weights, a prior or a view also needs `factory` and `port_opt_view`. Do not write them by hand. Declare it `@propagatable @concrete struct` and tag its fields: the macro (`src/02_Tools.jl`) always makes `factory`, and makes `port_opt_view` when a field is tagged `@vprop`. The docstring then follows [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *`@propagatable` concrete struct types*. Write a method by hand only for a rule the tags cannot express, as `factory(re::LinearModel, w::ObsWeights)::LinearModel` in [`src/05_Moments/20_Base_Regression.jl`](../../src/05_Moments/20_Base_Regression.jl) does.
 
 ## Step 4 — Add return type annotations
 

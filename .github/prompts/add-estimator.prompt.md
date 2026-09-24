@@ -42,8 +42,7 @@ In the appropriate source file (or a new numbered file if this is a distinct com
 
 Implement all methods required by the abstract supertype's `# Interfaces` section. Common ones include:
 
-- `factory(est::MyEstimator, w::ObsWeights)::MyEstimator` — returns a copy with observation weights propagated.
-- `port_opt_view(est::MyEstimator, i)::MyEstimator` — returns a sliced view.
+- `factory` and `port_opt_view`. Do not write them by hand for a type that propagates observation weights, a prior or a view. Declare it `@propagatable @concrete struct` and tag its fields: the macro (`src/02_Tools.jl`) always makes `factory`, and makes `port_opt_view` when a field is tagged `@vprop`. Read `GeneralCovariance` in [`src/05_Moments/03_Covariance.jl`](../../src/05_Moments/03_Covariance.jl). Write a method by hand only for a rule the tags cannot express, as `factory(re::LinearModel, w::ObsWeights)::LinearModel` in [`src/05_Moments/20_Base_Regression.jl`](../../src/05_Moments/20_Base_Regression.jl) does.
 - The domain-specific computation function (for example `Statistics.cov`, `prior`, `denoise!`).
 
 Write a docstring for every method, as [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Section Structure for Functions* states.
@@ -52,7 +51,7 @@ Write a docstring for every method, as [`.github/instructions/julia-docstrings.i
 
 Follow [`.github/instructions/julia-return-types.instructions.md`](../instructions/julia-return-types.instructions.md):
 
-- Annotate `factory` with `::MyEstimator`.
+- Annotate a hand-written `factory` with `::MyEstimator`.
 - Annotate validation helpers with `::Nothing`.
 - Annotate passthrough methods with the abstract return type.
 

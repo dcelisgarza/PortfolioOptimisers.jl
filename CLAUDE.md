@@ -152,7 +152,9 @@ child map's *Not yet specified* section, and take steps 3 and 4 when the design 
 ## Repo etiquette
 
 - Never link to or post in repositories outside `dcelisgarza`'s — name external sources in prose.
-- Branch before committing if you are on the default branch, and only commit when asked.
+- Branch before committing if you are on the default branch.
+- **A session that works an issue commits without being asked.** It commits, rebases and pushes
+  `dev` as § *Parallel sessions* states. Any other session commits only when asked.
 - **Close an issue yourself after you commit the work that resolves it.** This holds for every kind
   of issue: a defect, a feature, a sweep sub-issue, a map. Name the issue in the commit message, for
   example `Fix #493: …`. A closing keyword does not close the issue: GitHub acts on the keyword only

@@ -31,11 +31,11 @@ Julia's type inference is excellent, so return type annotations (`::ReturnType`)
   end
   ```
 
-- **Factory methods** when the return type is the exact same concrete type as the first argument:
+- **Hand-written factory methods** when the return type is the exact same concrete type as the first argument. A `@propagatable` type gets its `factory` from the macro, so this applies only to a method written by hand:
 
   ```julia
-  function factory(ce::GeneralCovariance, w::ObsWeights)::GeneralCovariance
-      return GeneralCovariance(; ce = factory(ce.ce, w), w = w)
+  function factory(re::LinearModel, w::ObsWeights)::LinearModel
+      return LinearModel(; kwargs = (; re.kwargs..., weights = w))
   end
   ```
 

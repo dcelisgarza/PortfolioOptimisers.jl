@@ -226,7 +226,7 @@ Here is how you do it:
  2. If this is the first time building the docs
 
      1. Press `]` to enter `pkg` mode
-     2. Run `pkg> dev .` to use the development version of your package
+     2. Run `pkg> instantiate`. The `[sources]` entry of `docs/Project.toml` already points the docs at the development version of the package, so do not run `pkg> dev .`, which rewrites that entry.
      3. Press backspace to leave `pkg` mode
  3. Run `julia> using LiveServer`
  4. Run `julia> servedocs()`
