@@ -1303,6 +1303,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :p_t_level => "``\\boldsymbol{p}_t``: Price level vector of period ``t``, one entry per asset.",#
                        :w_levels => "``w``: Price-level window, the number of price levels a statistic reads, the current one included.",#
                        :Sigma_hat_pred => "``\\hat{\\mathbf{\\Sigma}}_{t+1}``: Predictive covariance of the price relatives of period ``t + 1``, made after the row of period ``t``.",#
+                       :Sigma_hat_RO => "``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{RO}}``: Rank-one covariance estimate of a window, the matrix that [`RankOneCovariance`](@ref) computes.",#
                        # The Constrained Update: the raw step, the set it is projected onto,
                        # and the divergence of the projection.
                        :q_raw => "``\\boldsymbol{q}``: Raw step, the vector the rule's unconstrained step gives before the projection onto the Allocation Set.",#

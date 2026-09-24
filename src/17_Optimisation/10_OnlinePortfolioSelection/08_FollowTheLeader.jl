@@ -1230,7 +1230,7 @@ Where:
   - $(math_dict[:C_t_sample])
   - $(math_dict[:x_t_rel])
   - ``\\gamma``: Weight of the variance against the worst increasing factor, the paper's ``\\gamma``.
-  - ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{RO}}``: Rank-one covariance estimate of the paper on the sample.
+  - $(math_dict[:Sigma_hat_RO])
   - ``w``: Window of the rule, the paper's ``w``.
   - $(math_dict[:N])
   - $(math_dict[:t_period])

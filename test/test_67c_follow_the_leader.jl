@@ -541,6 +541,41 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test all(abs.(C) .<= 1)
         @test C[1, 2] == sign(S[1, 2])
         @test cov(RankOneCovariance(), permutedims(R[1:5, :]); dims = 2) ≈ S
+        # ζ₁* minimises the paper's equation 48, ρ²(θ₁u₁u₁ᵀ)/ρ(Σ̂) + ρ(Σ̂)ρ(Σ̂_MP), with
+        # ρ(A) = tr(A)/(N rank(A)) and rank(Σ̂_MP) = w − 1.
+        f48(z) = (theta / 4)^2 / (z / 4) + (z / 4) * (trD / (4 * 4))
+        zs = range(zeta / 2, 3zeta / 2; length = 100_001)
+        @test isapprox(zs[argmin(f48.(zs))], zeta; rtol = 1e-4)
+        # The quotient is the mean of the sample variances of the window.
+        @test trD / (4 * 4) ≈ mean(var(W5; dims = 1))
+        # A window longer than N + 1 keeps Algorithm 1's w − 1, not the rank N of Σ̂_MP.
+        Wl = X[1:12, 1:3]
+        Xcl = Wl .- mean(Wl; dims = 1)
+        @test rank(Xcl' * Xcl) == 3
+        Fl = svd(Wl)
+        @test isapprox(cov(RankOneCovariance(), R[1:12, 1:3]),
+                       Fl.S[1]^2 * sqrt(3 * 11 / sum(abs2, Xcl)) .* Fl.V[:, 1] *
+                       Fl.V[:, 1]'; rtol = 1e-10)
+        # A window whose rows are all the same has no centred energy: the estimate is zero,
+        # and every correlation off the diagonal is zero, where the paper divides by zero.
+        # The column means of equal rows carry round-off, so a test of the centred energy
+        # alone missed 114 of these 240 constant windows.
+        @test all(iszero(cov(RankOneCovariance(), repeat(R[t:t, :], w, 1)))
+                  for t in axes(R, 1), w in 2:7)
+        Rc = repeat(R[1:1, :], 3, 1)
+        @test cor(RankOneCovariance(), Rc) == I(4)
+        # An asset that the principal vector does not load has zero variance and zero
+        # correlation.
+        Rz = copy(R[1:5, :])
+        Rz[:, 3] .= -1
+        @test all(iszero, cov(RankOneCovariance(), Rz)[3, :])
+        @test cor(RankOneCovariance(), Rz)[3, :] == [0, 0, 1, 0]
+        # Where the correlation is defined it is the correlation of the covariance.
+        d = sqrt.(diag(S))
+        @test isapprox(C, S ./ (d * d'); atol = 1e-12)
+        # The element type is derived from the data.
+        S32 = cov(RankOneCovariance(), Float32.(R[1:5, :]))
+        @test eltype(S32) == Float32 && isapprox(S32, S; rtol = 1e-4)
         # The factor: bitwise the Cholesky where it exists, a PSD factor where it does not.
         A = cov(R)
         @test po.covariance_factor(A) == cholesky(A).U

@@ -1,24 +1,36 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-The rank-one covariance estimate of Lai, Tan, Wu and Fang (2020): the principal spectral component of a short window of price relatives, scaled so that its energy trades off against the centred window's.
+Estimates the covariance of a short window as a rank-one matrix along the principal direction of its price relatives.
+
+Lai, Tan, Wu and Fang (2020) built the estimate for short-term portfolio optimisation, where the window holds a few observations of many assets. The matrix is positive semidefinite and singular, so it has no Cholesky factor. A consumer reads it as a quadratic form, as [`Variance`](@ref) does under [`QuadRiskExpr`](@ref).
 
 # Mathematical definition
 
-With ``X \\in \\mathbb{R}^{w \\times N}`` the window of price relatives, uncentred, and its singular value decomposition ``X = V \\Xi U^\\intercal``,
-
 ```math
 \\begin{align}
-\\theta_1 &= \\Xi_{11}^2\\,,\\quad
-D = \\Xi^2 - \\frac{1}{w} \\Xi V^\\intercal \\boldsymbol{1} \\boldsymbol{1}^\\intercal V \\Xi\\,,\\\\
-\\zeta_1^\\star &= \\theta_1 \\left( \\frac{\\operatorname{tr}(D)}{N (w - 1)} \\right)^{-1/2}\\,,\\quad
-\\hat{\\Sigma}_{\\mathrm{RO}} = \\zeta_1^\\star \\boldsymbol{u}_1 \\boldsymbol{u}_1^\\intercal\\,,
+\\mathbf{X}^\\intercal \\mathbf{X} \\boldsymbol{u}_1 &= \\theta_1 \\boldsymbol{u}_1\\,, \\\\
+\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}} &= \\mathbf{X}^\\intercal \\left( \\mathbf{I} - \\frac{1}{w} \\boldsymbol{1} \\boldsymbol{1}^\\intercal \\right) \\mathbf{X}\\,, \\\\
+\\zeta_1^\\star &= \\theta_1 \\left( \\frac{\\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}})}{N (w - 1)} \\right)^{-1/2}\\,, \\\\
+\\hat{\\mathbf{\\Sigma}}_{\\mathrm{RO}} &= \\zeta_1^\\star \\boldsymbol{u}_1 \\boldsymbol{u}_1^\\intercal\\,.
 \\end{align}
 ```
 
-where ``\\boldsymbol{u}_1`` is the principal right singular vector of ``X``, the eigenvector of ``X^\\intercal X`` at its largest eigenvalue ``\\theta_1``. ``\\operatorname{tr}(D)`` is the total energy of the column-centred window, ``\\lVert X - \\tfrac{1}{w} \\boldsymbol{1} \\boldsymbol{1}^\\intercal X \\rVert_F^2``, which is what the sample covariance's nuclear norm carries, so ``\\zeta_1^\\star`` is the paper's trade-off between the principal tangent direction of the uncentred Gram and the sample covariance's magnitude (its equations 42, 46 and 49). The matrix has rank one: it is positive semidefinite and singular, so a consumer that factorises it takes a quadratic form rather than a Cholesky factor — [`Variance`](@ref) under [`QuadRiskExpr`](@ref).
+Where:
 
-The paper decomposes price relatives, and the library hands a covariance estimator returns, so `shift` is added to every entry before the decomposition: one, the default, turns returns into the price relatives the paper reads, and zero decomposes the rows as given. The estimator reads `w` observations of `N` assets and needs at least two rows, since the centred energy of one row is zero.
+  - ``\\mathbf{X}``: ``w \\times N`` window of price relatives, one row per observation, not centred.
+  - ``w``: Number of observations in the window.
+  - $(math_dict[:N])
+  - ``\\theta_1``: Largest eigenvalue of ``\\mathbf{X}^\\intercal \\mathbf{X}``, the square of the largest singular value of ``\\mathbf{X}``.
+  - ``\\boldsymbol{u}_1``: Unit eigenvector of ``\\mathbf{X}^\\intercal \\mathbf{X}`` at ``\\theta_1``, the principal right singular vector of ``\\mathbf{X}``.
+  - ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}``: Scatter matrix of the window, the sum of the outer products of its centred rows.
+  - $(math_dict[:I_identity])
+  - ``\\zeta_1^\\star``: Energy of the estimate along ``\\boldsymbol{u}_1``.
+  - $(math_dict[:Sigma_hat_RO])
+
+This is Algorithm 1 of the paper. Its equations 42 and 49 write the trace of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}`` in the basis of the singular vectors of ``\\mathbf{X}``, as ``\\operatorname{tr}(D)``, which is the same number. The quotient ``\\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}) / (N (w - 1))`` is the mean of the ``N`` sample variances of the window. So ``\\zeta_1^\\star`` is ``\\theta_1`` over the root of the mean variance. That value minimises the trade-off of equation 48 between the magnitude of ``\\theta_1 \\boldsymbol{u}_1 \\boldsymbol{u}_1^\\intercal`` and the magnitude of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}``.
+
+Equation 47 divides the trace of a matrix by its rank, and equation 49 puts the rank of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}`` at ``w - 1``. That is the rank of a short window, ``w \\leq N + 1``, which is the case the paper studies. On a longer window the rank is at most ``N``, but the definition keeps ``w - 1``, as Algorithm 1 and the authors' code do. When every row of the window is the same, ``\\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}) = 0`` and ``\\zeta_1^\\star`` is not defined.
 
 # Fields
 
@@ -29,6 +41,10 @@ $(DocStringExtensions.FIELDS)
     RankOneCovariance(; shift::Real = 1) -> RankOneCovariance
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `isfinite(shift)`. A `DomainError` is thrown otherwise.
 
 # Examples
 
@@ -41,17 +57,17 @@ RankOneCovariance
 # Related
 
   - [`AbstractCovarianceEstimator`](@ref)
-  - [`ShortTermLossControlPortfolio`](@ref)
+  - [`ShortTermLossControlPortfolio`](@ref): the programme that reads the estimate.
   - [`Variance`](@ref)
   - [`QuadRiskExpr`](@ref)
 
 # References
 
-  - $(ref_dict[:lai2020spolc])
+  - $(ref_dict[:lai2020spolc]) Algorithm 1 and equations 42 to 49.
 """
 struct RankOneCovariance{T1 <: Real} <: AbstractCovarianceEstimator
     """
-    The number added to every entry of the rows before the decomposition: `1` reads returns as the price relatives the paper decomposes, `0` decomposes the rows as given.
+    Number added to every entry of the returns to form the price relatives ``\\mathbf{X}``. The default `1` turns returns into the price relatives that the paper reads, and `0` decomposes the rows as given.
     """
     shift::T1
     function RankOneCovariance(shift::Real)
@@ -65,11 +81,34 @@ end
 """
     Statistics.cov(ce::RankOneCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
-The rank-one covariance of a window: ``\\zeta_1^\\star \\boldsymbol{u}_1 \\boldsymbol{u}_1^\\intercal`` over the shifted rows, `assets × assets`.
+Computes the rank-one covariance of a window of returns, `assets × assets`.
+
+[`RankOneCovariance`](@ref) states the mathematics.
+
+# Algorithm
+
+ 1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref).
+ 2. Add `ce.shift` to every entry of `X` to form the price relatives `Xs`.
+ 3. Subtract the column means from `Xs`, and sum the squares of the result. The sum `trD` is the trace of the scatter matrix.
+ 4. Compute the singular value decomposition of `Xs`. Take `theta`, the square of the largest singular value, and `u`, its right singular vector.
+ 5. Compute `zeta = theta * sqrt(N * (w - 1) / trD)`. When every row of `Xs` is the same, or when `trD` is zero, `zeta` is zero. The method compares the rows, because the column means of equal rows carry round-off, and `trD` of a constant window is often a tiny positive number.
+ 6. Return `zeta .* (u .* transpose(u))`. The method forms the outer product entry by entry, so the matrix is symmetric to the bit.
+
+# Arguments
+
+  - `ce`: The rank-one covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments. The method ignores them, because the estimate reads no mean and no observation weights.
 
 # Validation
 
-  - `size(X, 1) >= 2` after orientation. An `ArgumentError` is thrown otherwise.
+  - $(val_dict[:dims])
+  - `size(X, 1) >= 2` after orientation. An `ArgumentError` is thrown otherwise, because one row has no centred energy.
+
+# Returns
+
+  - `sigma::Matrix`: The rank-one covariance matrix, positive semidefinite and symmetric. It is the zero matrix when every row of the window is the same.
 
 # Related
 
@@ -88,7 +127,9 @@ function Statistics.cov(ce::RankOneCovariance, X::MatNum; dims::Int = 1, kwargs.
     F = LinearAlgebra.svd(Xs)
     theta = abs2(F.S[1])
     u = F.V[:, 1]
-    zeta = if iszero(trD)
+    # The column means of equal rows carry round-off, so `trD` of a constant window is often
+    # a tiny positive number and not zero. The row test is exact.
+    zeta = if iszero(trD) || allequal(eachrow(Xs))
         zero(theta)
     else
         theta * sqrt(N * (w - 1) / trD)
@@ -100,7 +141,44 @@ end
 """
     Statistics.cor(ce::RankOneCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
-The correlation of the rank-one covariance: ``\\pm 1`` between two assets the principal vector loads, the sign of the product of their loadings, one on the diagonal, and zero at an asset the vector does not load, whose variance under the estimate is zero.
+Computes the correlation matrix of the rank-one covariance of a window of returns, `assets × assets`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\rho_{ij} &= \\frac{\\hat{\\Sigma}_{ij}}{\\sqrt{\\hat{\\Sigma}_{ii} \\hat{\\Sigma}_{jj}}} = \\operatorname{sign}(u_{1i} u_{1j})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\rho_{ij}``: Correlation between assets ``i`` and ``j``.
+  - ``\\hat{\\Sigma}_{ij}``: Entry of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{RO}}`` in row ``i`` and column ``j``.
+  - ``u_{1i}``: Entry ``i`` of the principal vector ``\\boldsymbol{u}_1`` of [`RankOneCovariance`](@ref).
+
+The second equality holds when ``\\zeta_1^\\star > 0`` and both assets have a non-zero entry in ``\\boldsymbol{u}_1``. Otherwise the variance of one of the two assets is zero, and ``\\rho_{ij}`` is not defined.
+
+# Algorithm
+
+ 1. Compute `sigma` with the `cov` method of [`RankOneCovariance`](@ref).
+ 2. Take the sign of every entry of `sigma`.
+ 3. Set the diagonal to one.
+
+# Arguments
+
+  - `ce`: The rank-one covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments. The method passes them to `cov`, which ignores them.
+
+# Validation
+
+  - Every check of the `cov` method applies.
+
+# Returns
+
+  - `rho::Matrix`: The correlation matrix, with ones on the diagonal and ``\\pm 1`` off it. An entry whose correlation is not defined is zero.
 
 # Related
 
