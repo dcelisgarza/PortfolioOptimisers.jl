@@ -195,3 +195,103 @@ end
                                    sets = UniverseSets(; dict = Dict("nx" => rd.nf)))
     @test_throws IsNothingError optimise(frc_e, ReturnsResult())
 end
+
+@testset "A semidefinite factor phylogeny reads the marks of the assembled model" begin
+    using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Clarabel
+    import JuMP
+
+    rng = StableRNG(123)
+    T, N, Nf = 300, 6, 3
+    F = randn(rng, T, Nf) .* 0.02
+    B = randn(rng, N, Nf)
+    X = F * transpose(B) .+ randn(rng, T, N) .* 0.01 .+ 0.001
+    rd = ReturnsResult(; X = X, nx = string.(1:N), F = F, nf = string.(1:Nf))
+    slv = Solver(; solver = Clarabel.Optimizer, settings = Dict("verbose" => false),
+                 check_sol = (; allow_local = true, allow_almost = true))
+    opt = JuMPOptimiser(; pe = prior(EmpiricalPrior(), rd), slv = slv)
+    A = [0 1 0; 1 0 0; 0 0 0]
+    function build(r, obj; p = 0.05, ple = SemiDefinitePhylogeny(; A = A, p = p))
+        res = optimise(FactorRiskContribution(; r = r, obj = obj, opt = opt, frc_ple = ple),
+                       rd)
+        @test isa(res.retcode, OptimisationSuccess)
+        return res.model
+    end
+    k_of(m) = isa(m[:k], Number) ? m[:k] : JuMP.value(m[:k])
+
+    # The head builds the factor phylogeny after the risk measures and the objective's mark,
+    # so a variance that the objective minimises omits the `p·tr(frc_W)` penalty, as it
+    # does for the asset phylogeny. It was built first, and the penalty was always added.
+    m = build(Variance(), MinimumRisk())
+    @test haskey(m, :variance_flag) && haskey(m, :risk_minimised)
+    @test haskey(m, :frc_sdp_plg_1) && !haskey(m, :frc_sdp_plg_p_1)
+    @test haskey(build(Variance(), MaximumReturn()), :frc_sdp_plg_p_1)
+    @test haskey(build(ConditionalValueatRisk(), MinimumRisk()), :frc_sdp_plg_p_1)
+
+    # The rows hold on the lifted matrix, and the PSD cone holds it above `w1·w1ᵀ / k`.
+    for m in
+        (build(Variance(), MinimumRisk()), build(ConditionalValueatRisk(), MinimumRisk()))
+        W = JuMP.value.(m[:frc_W])
+        w1 = JuMP.value.(m[:w1])
+        @test maximum(abs, A .* W) < 1e-12
+        @test eigmin(Symmetric(W - w1 * transpose(w1) / k_of(m))) > -1e-8
+    end
+
+    # The rows bind `frc_W`, not `w1·w1ᵀ`. With `p = 0` and no minimised variance, nothing
+    # holds `frc_W` down, and the first two factors both carry weight. The penalty makes
+    # `frc_W` of rank one here, and then the rows bind the factor weights.
+    m = build(ConditionalValueatRisk(), MinimumRisk(); p = 0.0)
+    W = JuMP.value.(m[:frc_W])
+    w1 = JuMP.value.(m[:w1])
+    @test maximum(abs, A .* W) < 1e-12
+    @test maximum(abs, A .* (w1 * transpose(w1))) > 0.2
+    @test eigvals(Symmetric(W))[end - 1] > 0.4
+    m = build(ConditionalValueatRisk(), MinimumRisk(); p = 0.05)
+    w1 = JuMP.value.(m[:w1])
+    @test maximum(abs, A .* (w1 * transpose(w1))) < 1e-8
+
+    # A vector skips an entry that is not semidefinite, and indexes the rows by position.
+    m = build(ConditionalValueatRisk(), MinimumRisk();
+              ple = [IntegerPhylogeny(; A = A, B = 1),
+                     SemiDefinitePhylogeny(; A = A, p = 0.05)])
+    @test !haskey(m, :frc_sdp_plg_1) && haskey(m, :frc_sdp_plg_2)
+    @test haskey(m, :frc_sdp_plg_p_2)
+    # The asset phylogeny skips the same way. An integer entry needs a MIP solver, so the
+    # model is built directly and not solved.
+    m = JuMP.Model()
+    PortfolioOptimisers.set_model_scales!(m, 1, 1)
+    JuMP.@variable(m, w[1:3])
+    m[:k] = 1
+    PortfolioOptimisers.set_sdp_phylogeny_constraints!(m,
+                                                       [IntegerPhylogeny(; A = A, B = 1),
+                                                        SemiDefinitePhylogeny(; A = A,
+                                                                              p = 0.05)])
+    @test !haskey(m, :sdp_plg_1) && haskey(m, :sdp_plg_2) && haskey(m, :sdp_plg_p_2)
+
+    # An estimator resolves on the factor returns, and a keyword that the head does not read
+    # does not reach it.
+    res = optimise(FactorRiskContribution(; opt = opt,
+                                          frc_ple = SemiDefinitePhylogenyEstimator()), rd;
+                   unread = 1)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test isa(res.frc_plr, SemiDefinitePhylogeny)
+    @test size(res.frc_plr.A) == (Nf, Nf)
+
+    # The penalty is at least `p‖w‖² / k`, so it also spreads the weights. On the asset
+    # phylogeny of this panel a large `p` holds both assets of a linked pair.
+    Aa = zeros(Int, N, N)
+    Aa[1, 2] = Aa[2, 1] = 1
+    Aa[3, 4] = Aa[4, 3] = 1
+    function asset_w(p)
+        res = optimise(MeanRisk(; r = ConditionalValueatRisk(),
+                                opt = JuMPOptimiser(; pe = prior(EmpiricalPrior(), rd),
+                                                    slv = slv,
+                                                    ple = SemiDefinitePhylogeny(; A = Aa,
+                                                                                p = p))),
+                       rd)
+        return res.w
+    end
+    w = asset_w(0.05)
+    @test maximum(abs, Aa .* (w * transpose(w))) < 1e-8
+    w = asset_w(1.0)
+    @test maximum(abs, Aa .* (w * transpose(w))) > 0.01
+end

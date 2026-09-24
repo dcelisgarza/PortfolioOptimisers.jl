@@ -13,7 +13,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unkn
 
     FactorRiskContributionResult(;
         jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM, rr::AbstractLoadingsRegressionResult,
-        frc_plr::Option{<:AbstractPhylogenyConstraintResult}, fb::Option{<:OptE_Opt_FbChain}
+        frc_plr::Option{<:PlC_VecPlC}, fb::Option{<:OptE_Opt_FbChain}
     ) -> FactorRiskContributionResult
 
 Keywords correspond to the struct's fields.
@@ -38,7 +38,7 @@ Keywords correspond to the struct's fields.
     """
     rr
     """
-    Factor risk contribution placeholder result.
+    Phylogeny constraints on the factor weights, resolved on the factor returns. `nothing` when the estimator holds none.
     """
     frc_plr
     """
@@ -47,7 +47,7 @@ Keywords correspond to the struct's fields.
     fb
     function FactorRiskContributionResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                           rr::AbstractLoadingsRegressionResult,
-                                          frc_plr::Option{<:AbstractPhylogenyConstraintResult},
+                                          frc_plr::Option{<:PlC_VecPlC},
                                           fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(jr), typeof(r), typeof(rr), typeof(frc_plr), typeof(fb)}(jr, r,
                                                                                    rr,
@@ -57,7 +57,7 @@ Keywords correspond to the struct's fields.
 end
 function FactorRiskContributionResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                       rr::AbstractLoadingsRegressionResult,
-                                      frc_plr::Option{<:AbstractPhylogenyConstraintResult},
+                                      frc_plr::Option{<:PlC_VecPlC},
                                       fb::Option{<:OptE_Opt_FbChain})::FactorRiskContributionResult
     return FactorRiskContributionResult(jr, r, rr, frc_plr, fb)
 end
@@ -188,7 +188,7 @@ $(DocStringExtensions.FIELDS)
         fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> FactorRiskContribution
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the factor model, risk measure, objective, placeholder constraints, asset sets, warm start and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `flag` is execution control and stays static.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the factor model, risk measure, objective, factor phylogeny constraints, asset sets, warm start and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `flag` is execution control and stays static.
 
 ## Validation
 
@@ -253,7 +253,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     obj
     """
-    Factor risk contribution placeholder constraints.
+    Phylogeny constraints on the factor weights, an estimator or a result, or a vector of them. Only a semidefinite entry adds rows, [`set_sdp_frc_phylogeny_constraints!`](@ref).
     """
     frc_ple
     """
@@ -408,9 +408,11 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     b1, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, attrs.pr,
                                                        frc.flag, frc.wi)
     set_weight_constraints!(model, attrs.wb, frc.opt)
-    frc_plr = phylogeny_constraints(frc.frc_ple, rd.F, kwargs...)
-    set_sdp_frc_phylogeny_constraints!(model, frc_plr)
     assemble_jump_model!(model, frc, frc.opt, attrs, rd, frc.r, frc.obj, b1, false)
+    # After the model is assembled, so the factor phylogeny reads the marks that the
+    # variance builders and `mark_risk_minimised!` write, as the asset phylogeny does.
+    frc_plr = phylogeny_constraints(frc.frc_ple, rd.F)
+    set_sdp_frc_phylogeny_constraints!(model, frc_plr)
     set_portfolio_objective_function!(model, frc.obj, frc, attrs)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(attrs.pr.X))
     return FactorRiskContributionResult(;

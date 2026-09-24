@@ -282,7 +282,7 @@ SemiDefinitePhylogeny
 
   - [`set_sdp_constraints!`](@ref)
   - [`set_sdp_frc_constraints!`](@ref)
-  - [`set_sdp_phylogeny_constraints!`](@ref): writes `A ⊙ W == 0` for every result of this type, and adds `p * tr(W)` to the objective penalty only when the model carries no variance.
+  - [`set_sdp_phylogeny_constraints!`](@ref): writes `A ⊙ W == 0` for every result of this type, and adds `p * tr(W)` to the objective penalty unless the objective minimises a variance on the same weights.
   - [`SemiDefinitePhylogenyEstimator`](@ref)
   - [`AbstractPhylogenyConstraintResult`](@ref)
   - [`phylogeny_constraints`](@ref)

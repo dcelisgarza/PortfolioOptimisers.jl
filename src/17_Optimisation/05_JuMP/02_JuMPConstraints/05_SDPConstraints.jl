@@ -3,12 +3,12 @@
 
 Returns the Model State namespace that owns the weights registered under `prefix`.
 
-One lifted matrix ``\\mathbf{W}`` belongs to one weight vector, and so do the marks that describe the measures built on it, `variance_flag` and `rc_variance`. A build that registers weights it did not make also registers `w_owner`, the namespace that owns them. A programme Allocation Set in a leader's model registers the model's own `w` under `:aset_` with the owner `Symbol("")`. A [`DependentVariableTracking`](@ref) build registers the weights of its enclosing build under its tracking prefix, with the owner of those weights. The set's ceiling, the tracking build's inner measures and the head's measures then read one ``\\mathbf{W}`` and one set of marks, as the measures of one head do. A prefix without `w_owner` owns itself, as an [`IndependentVariableTracking`](@ref) prefix does, because the benchmark shifts its weights.
+One lifted matrix ``\\mathbf{W}`` belongs to one weight vector, and so do the marks that describe the measures built on it, `variance_flag` and `rc_variance`. A build that registers weights it did not make also registers `w_owner`, the namespace that owns them. A programme Allocation Set in a leader's model registers the model's own `w` under `:aset_` with the owner `Symbol("")`. A build under [`DependentVariableTracking`](@ref) registers the weights of its enclosing build under its tracking prefix, with the owner of those weights. So the set's ceiling, the inner measures of the tracking build and the head's measures read one ``\\mathbf{W}`` and one set of marks. A prefix without `w_owner` owns itself. An [`IndependentVariableTracking`](@ref) prefix is one of these, because the benchmark shifts its weights.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `prefix`: The Model State namespace the weights are registered under.
+  - `prefix`: The Model State namespace that the weights are registered under.
 
 # Returns
 
@@ -20,6 +20,7 @@ One lifted matrix ``\\mathbf{W}`` belongs to one weight vector, and so do the ma
   - [`get_w`](@ref)
   - [`add_allocation_set_constraints!`](@ref)
   - [`RiskTrackingRiskMeasure`](@ref)
+  - [`RiskTrackingError`](@ref)
 """
 function weights_prefix(model::JuMP.Model, prefix::Symbol)
     return state_has(model, prefix, :w_owner) ? state_get(model, prefix, :w_owner) : prefix
@@ -29,9 +30,40 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Mark `variance_flag` on the weights under `prefix` when the variance is a positive term of the objective's risk.
 
-The PSD cone ``[\\mathbf{W}\\ \\boldsymbol{w};\\ \\boldsymbol{w}^\\intercal\\ k] \\succeq 0`` forces only ``\\mathbf{W} \\succeq \\boldsymbol{w}\\boldsymbol{w}^\\intercal``, and ``\\mathbf{W} + t\\,\\boldsymbol{e}_i\\boldsymbol{e}_i^\\intercal`` stays feasible for every ``t \\geq 0``, also under the phylogeny rows ``\\mathbf{A} \\odot \\mathbf{W} = \\mathbf{0}``, because ``A_{ii} = 0``. That step adds ``s\\,t\\,\\Sigma_{ii}`` to a variance term ``s\\,\\mathrm{tr}(\\boldsymbol{\\Sigma}\\mathbf{W})``. A variance that the objective minimises with ``s > 0`` therefore prices the growth of ``\\mathbf{W}``, as the phylogeny's ``p\\,\\mathrm{tr}(\\mathbf{W})`` penalty does, and [`set_sdp_phylogeny_constraints!`](@ref) can omit the penalty.
+The mark goes to the namespace that owns the weights, [`weights_prefix`](@ref). A variance that is only a bound marks nothing. The inner variance of a [`RiskTrackingRiskMeasure`](@ref) or a [`RiskTrackingError`](@ref) marks nothing either, because the constructors of both clear the inner `rke`. The function reads one variance at a time. [`mark_risk_minimised!`](@ref) reads the role of the objective, and [`set_sdp_phylogeny_constraints!`](@ref) omits its penalty only when both marks are present.
 
-A variance that is only a bound puts no price on the growth, and neither does the inner variance of a [`RiskTrackingRiskMeasure`](@ref). The constructor of the tracking measure clears the inner `rke`. The dependent term ``|\\mathrm{tr}(\\boldsymbol{\\Sigma}\\mathbf{W}) - r_b k|`` rewards a larger ``\\mathbf{W}`` when the portfolio's variance is below the benchmark's. So neither marks the flag. The rule reads each variance alone, and the objective's role is read by [`mark_risk_minimised!`](@ref).
+# Mathematical definition
+
+The PSD cone of [`set_sdp_constraints!`](@ref) bounds ``\\mathbf{W}`` from below only, and the phylogeny rows leave its diagonal free:
+
+```math
+\\begin{align}
+\\mathbf{W} \\succeq \\frac{\\boldsymbol{w}\\boldsymbol{w}^\\intercal}{k}\\,, \\qquad \\mathbf{A} \\odot \\mathbf{W} = \\mathbf{0}\\,, \\qquad A_{ii} = 0\\,.
+\\end{align}
+```
+
+So the step ``\\mathbf{W} + t\\,\\boldsymbol{e}_i\\boldsymbol{e}_i^\\intercal`` with ``t \\geq 0`` satisfies both, and it changes a variance term by
+
+```math
+\\begin{align}
+s\\,\\mathrm{tr}\\left(\\boldsymbol{\\Sigma}\\left(\\mathbf{W} + t\\,\\boldsymbol{e}_i\\boldsymbol{e}_i^\\intercal\\right)\\right) - s\\,\\mathrm{tr}(\\boldsymbol{\\Sigma}\\mathbf{W}) = s\\,t\\,\\Sigma_{ii}\\,.
+\\end{align}
+```
+
+A variance that the objective minimises with ``s > 0`` therefore puts a price on the growth of ``\\mathbf{W}``, as the phylogeny's penalty ``p\\,\\mathrm{tr}(\\mathbf{W})`` does. A bound puts no price on it. The inner variance of a tracking measure enters the model as ``|\\mathrm{tr}(\\boldsymbol{\\Sigma}\\mathbf{W}) - r_b k|``, which falls as ``\\mathbf{W}`` grows while the portfolio's variance is below the benchmark's.
+
+Where:
+
+  - ``\\mathbf{W}``: The symmetric ``N \\times N`` lifted matrix of the weights.
+  - ``\\mathbf{A}``: The relatedness matrix of a semidefinite phylogeny, symmetric with a zero diagonal.
+  - ``\\boldsymbol{e}_i``: The ``i``-th unit vector.
+  - ``t``: The size of the step.
+  - ``s``: The scale of the variance in the objective, `settings.scale`.
+  - ``\\boldsymbol{\\Sigma}``: The covariance matrix of the variance.
+  - ``p``: The penalty of the semidefinite phylogeny.
+  - ``r_b``: The variance of the benchmark.
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
 
 # Arguments
 
@@ -61,11 +93,11 @@ end
 
 Mark `risk_minimised` when the objective `obj` minimises the risk term.
 
-[`assemble_jump_model!`](@ref) calls it after the return constraints, so a [`MaximumRatio`](@ref) has chosen its form. A marked variance holds the lifted matrix down only when the objective minimises it, [`mark_objective_variance!`](@ref).
+[`assemble_jump_model!`](@ref) calls it after the return constraints, when a [`MaximumRatio`](@ref) has chosen its form. A variance with the mark of [`mark_objective_variance!`](@ref) holds the lifted matrix down only when the objective minimises it.
 
   - [`MinimumRisk`](@ref) minimises the risk.
   - [`MaximumUtility`](@ref) minimises it when `l > 0`.
-  - [`MaximumRatio`](@ref) minimises it in the return form. In the risk form, which registers `sr_risk`, the risk is a bound.
+  - [`MaximumRatio`](@ref) minimises it in the return form. The risk form registers `sr_risk`, and the risk is then a bound.
   - Every other objective, such as [`MaximumReturn`](@ref), leaves the risk out of the objective.
 
 # Arguments
@@ -81,6 +113,7 @@ Mark `risk_minimised` when the objective `obj` minimises the risk term.
 
   - [`mark_objective_variance!`](@ref)
   - [`set_sdp_phylogeny_constraints!`](@ref)
+  - [`set_sdp_frc_phylogeny_constraints!`](@ref)
 """
 function mark_risk_minimised!(::JuMP.Model, ::ObjectiveFunction)
     return nothing
@@ -104,33 +137,58 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add a positive semidefinite (PSD) constraint to the JuMP optimisation model for the portfolio weights.
+Add the positive semidefinite (PSD) cone that lifts the portfolio weights to a matrix variable.
 
-Creates a symmetric matrix variable `W` and enforces that the bordered matrix `[W w; wᵀ k]` lies in the PSD cone. Returns immediately if `W` already exists in `model`. The matrix is registered under the namespace that owns the weights under `prefix`, [`weights_prefix`](@ref), so weights registered twice have one `W`.
+The matrix belongs to the namespace that owns the weights under `prefix`, [`weights_prefix`](@ref), so weights registered twice have one ``\\mathbf{W}``. A second call for the same owner returns the first call's matrix and adds nothing.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
 \\mathbf{M} &= \\begin{bmatrix} \\mathbf{W} & \\boldsymbol{w} \\\\ \\boldsymbol{w}^\\intercal & k \\end{bmatrix} \\succeq 0 \\\\
-&\\quad\\Leftrightarrow\\quad \\mathbf{W} \\succeq \\frac{\\boldsymbol{w}\\boldsymbol{w}^\\intercal}{k}\\,.
+&\\quad\\Leftrightarrow\\quad \\mathbf{W} \\succeq \\frac{\\boldsymbol{w}\\boldsymbol{w}^\\intercal}{k} \\quad \\text{for } k > 0\\,.
 \\end{align}
 ```
 
+The equivalence is the Schur complement of ``k``. At ``k = 0`` the cone forces ``\\boldsymbol{w} = \\mathbf{0}``.
+
 Where:
 
-  - ``\\mathbf{M}``: Bordered positive semidefinite matrix.
-  - ``\\mathbf{W}``: Symmetric ``N \\times N`` matrix variable.
+  - ``\\mathbf{M}``: The bordered ``(N + 1) \\times (N + 1)`` matrix.
+  - ``\\mathbf{W}``: The symmetric ``N \\times N`` lifted matrix of the weights.
   - $(math_dict[:w_port])
-  - $(math_dict[:k_budget])
+  - $(math_dict[:k_budget]) It is ``1`` under a unit budget, [`effective_k`](@ref).
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: read, the weights under the owner's namespace.
+  - `k`: read through [`effective_k`](@ref).
+  - `W`: created, a symmetric ``N \\times N`` matrix, registered as `W` under the owner's namespace.
+
+## Expressions
+
+  - `M`: ``\\mathbf{M}``, the bordered matrix above.
+
+## Constraints
+
+  - `M_PSD`: ``s_c \\mathbf{M} \\in \\mathcal{S}_{+}^{N + 1}``.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - ``\\mathcal{S}_{+}^{N + 1}``: The cone of positive semidefinite ``(N + 1) \\times (N + 1)`` matrices.
+  - Each name carries the owner's namespace as a prefix. It is empty in a head.
 
 # Arguments
 
   - $(arg_dict[:model])
+  - `prefix`: The Model State namespace of the build. The entries go to its owner, [`weights_prefix`](@ref).
 
 # Returns
 
-  - `W`: Symmetric JuMP variable matrix of size `N × N`.
+  - `W`: The lifted matrix, a symmetric ``N \\times N`` matrix of JuMP variables.
 
 # Related
 
@@ -155,9 +213,46 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add a positive semidefinite (PSD) constraint for factor risk contribution to the JuMP optimisation model.
+Add the positive semidefinite (PSD) cone that lifts the factor weights of a [`FactorRiskContribution`](@ref) to a matrix variable.
 
-Creates a symmetric matrix variable `frc_W` and enforces that the bordered matrix `[frc_W w1; w1ᵀ k]` lies in the PSD cone. Returns immediately if `frc_W` already exists in `model`.
+It is [`set_sdp_constraints!`](@ref) on the factor weights ``\\boldsymbol{w}_1``. A second call returns the first call's matrix and adds nothing.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{M}_f &= \\begin{bmatrix} \\mathbf{W}_f & \\boldsymbol{w}_1 \\\\ \\boldsymbol{w}_1^\\intercal & k \\end{bmatrix} \\succeq 0 \\\\
+&\\quad\\Leftrightarrow\\quad \\mathbf{W}_f \\succeq \\frac{\\boldsymbol{w}_1\\boldsymbol{w}_1^\\intercal}{k} \\quad \\text{for } k > 0\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{M}_f``: The bordered ``(N_f + 1) \\times (N_f + 1)`` matrix.
+  - ``\\mathbf{W}_f``: The symmetric ``N_f \\times N_f`` lifted matrix of the factor weights.
+  - ``\\boldsymbol{w}_1``: The ``N_f \\times 1`` vector of factor weights. The portfolio weights are ``\\boldsymbol{w} = \\mathbf{B}_1 \\boldsymbol{w}_1``, with ``\\mathbf{B}_1`` the pseudoinverse of the transposed loadings.
+  - $(math_dict[:k_budget])
+
+# JuMP formulation
+
+## Variables
+
+  - `w1`: read, the factor weights.
+  - `k`: read through [`get_k`](@ref).
+  - `frc_W`: created, a symmetric ``N_f \\times N_f`` matrix.
+
+## Expressions
+
+  - `frc_M`: ``\\mathbf{M}_f``, the bordered matrix above.
+
+## Constraints
+
+  - `frc_M_PSD`: ``s_c \\mathbf{M}_f \\in \\mathcal{S}_{+}^{N_f + 1}``.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - ``\\mathcal{S}_{+}^{N_f + 1}``: The cone of positive semidefinite ``(N_f + 1) \\times (N_f + 1)`` matrices.
 
 # Arguments
 
@@ -165,7 +260,7 @@ Creates a symmetric matrix variable `frc_W` and enforces that the bordered matri
 
 # Returns
 
-  - `frc_W`: Symmetric JuMP variable matrix of size `Nf × Nf`.
+  - `frc_W`: The lifted matrix, a symmetric ``N_f \\times N_f`` matrix of JuMP variables.
 
 # Related
 
@@ -189,15 +284,55 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add semidefinite phylogeny constraints to the JuMP optimisation model.
+Add the rows of each [`SemiDefinitePhylogeny`](@ref) in `plgs` on the lifted matrix of the weights.
 
-Iterates over `plgs` and, for each [`SemiDefinitePhylogeny`](@ref) entry, enforces `A ⊙ W = 0` and adds `p * tr(W)` to the objective penalty. The penalty holds ``\\mathbf{W}`` down to ``\\boldsymbol{w}\\boldsymbol{w}^\\intercal``. It is omitted when a variance on the same weights marked `variance_flag`, [`mark_objective_variance!`](@ref), and the objective minimises the risk, [`mark_risk_minimised!`](@ref), because that variance then does the same work. A variance that is only a bound, or the inner variance of a tracking measure, keeps the penalty. Does nothing when `plgs` contains no [`SemiDefinitePhylogeny`](@ref) instances.
+A semidefinite phylogeny asks that no two linked assets both carry weight. The rows state this on ``\\mathbf{W}``, and the penalty ``p\\,\\mathrm{tr}(\\mathbf{W})`` holds ``\\mathbf{W}`` down to ``\\boldsymbol{w}\\boldsymbol{w}^\\intercal / k``. The function omits the penalty when a variance on the same weights carries the mark of [`mark_objective_variance!`](@ref) and the objective carries the mark of [`mark_risk_minimised!`](@ref), because that variance then puts the same price on the growth of ``\\mathbf{W}``. A variance that is only a bound, or the inner variance of a tracking measure, keeps the penalty. The function does nothing when `plgs` holds no [`SemiDefinitePhylogeny`](@ref).
+
+# Algorithm
+
+ 1. Return when `plgs` holds no [`SemiDefinitePhylogeny`](@ref).
+ 2. Get the lifted matrix `W` from [`set_sdp_constraints!`](@ref), which builds it once for the owner of the weights.
+ 3. Find `owner`, the namespace that owns the weights, with [`weights_prefix`](@ref).
+ 4. For each semidefinite entry at position `i` of `plgs`, register the row `sdp_plg_<i>`. Skip an entry of another kind. A single entry has position 1.
+ 5. When the model does not carry both `risk_minimised` and the `variance_flag` of `owner`, register the penalty `sdp_plg_p_<i>` and add it to the objective penalty with [`add_to_objective_penalty!`](@ref).
+
+# JuMP formulation
+
+## Variables
+
+  - `W`: read, the lifted matrix of [`set_sdp_constraints!`](@ref) under the owner of the weights.
+
+## Expressions
+
+  - `sdp_plg_p_<i>`: ``p\\,\\mathrm{tr}(\\mathbf{W})``, added to the objective penalty. It is absent when both marks are present.
+
+## Constraints
+
+  - `sdp_plg_<i>`: ``s_c\\,\\mathbf{A} \\odot \\mathbf{W} = \\mathbf{0}``.
+
+Where:
+
+  - ``\\mathbf{W}``: The symmetric ``N \\times N`` lifted matrix of the weights, ``\\mathbf{W} \\succeq \\boldsymbol{w}\\boldsymbol{w}^\\intercal / k``.
+  - ``\\mathbf{A}``: The relatedness matrix of the entry, symmetric with a zero diagonal.
+  - ``p``: The penalty of the entry.
+  - ``i``: The position of the entry in `plgs`. Each name carries `prefix`.
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - The exact rows are ``A_{ij}\\,w_i w_j = 0``, so at most one asset of a linked pair carries weight. The rows `sdp_plg_<i>` bind ``\\mathbf{W}`` in place of ``\\boldsymbol{w}\\boldsymbol{w}^\\intercal / k``. So the weights that they admit include every weight vector that the exact rows admit, and can hold both assets of a linked pair.
+  - The rows are tight when ``\\mathbf{W} = \\boldsymbol{w}\\boldsymbol{w}^\\intercal / k``, a matrix of rank one. The rows do not force this. The penalty `sdp_plg_p_<i>`, or a variance that the objective minimises, puts a price on the growth of ``\\mathbf{W}``. With ``p = 0`` and no such variance, nothing holds ``\\mathbf{W}`` down.
+  - The penalty is at least ``p \\lVert \\boldsymbol{w} \\rVert_2^2 / k``, so it also spreads the weights. A large ``p`` can therefore leave ``\\mathbf{W}`` above rank one and put weight on both assets of a linked pair.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `plgs`: Phylogeny constraint(s). Accepts `nothing`, a single phylogeny, or a vector.
-  - `prefix::Symbol`: The Model State namespace the rows and the penalty are registered under, `Symbol("")` for a head's own. The lifted `W` and the `variance_flag` it reads belong to the weights, [`weights_prefix`](@ref), so a programme Allocation Set's phylogeny in a leader's model reuses the leader's `W` and prefixes only its rows.
+  - `plgs`: The phylogeny constraints, `nothing`, one result, or a vector of results.
+  - `prefix::Symbol`: The Model State namespace of the rows and the penalty, `Symbol("")` for a head's own. The lifted matrix and the `variance_flag` that the function reads belong to the weights, [`weights_prefix`](@ref). So a programme Allocation Set's phylogeny in a leader's model reads the leader's ``\\mathbf{W}``, and only its rows carry the prefix.
 
 # Returns
 
@@ -236,14 +371,52 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add semidefinite phylogeny constraints for factor risk contribution to the JuMP optimisation model.
+Add the rows of each [`SemiDefinitePhylogeny`](@ref) in `plgs` on the lifted matrix of the factor weights of a [`FactorRiskContribution`](@ref).
 
-Iterates over `plgs` and, for each [`SemiDefinitePhylogeny`](@ref) entry, enforces `A ⊙ frc_W = 0` and adds `p * tr(frc_W)` to the objective penalty, by the rule of [`set_sdp_phylogeny_constraints!`](@ref). Does nothing when `plgs` contains no [`SemiDefinitePhylogeny`](@ref) instances.
+It is [`set_sdp_phylogeny_constraints!`](@ref) on the factor weights, with the same rule for the penalty. The head calls it after [`assemble_jump_model!`](@ref), so the marks of the variance and of the objective are present when the function reads them. It reads them in the head's own namespace. The function does nothing when `plgs` holds no [`SemiDefinitePhylogeny`](@ref).
+
+# Algorithm
+
+ 1. Return when `plgs` holds no [`SemiDefinitePhylogeny`](@ref).
+ 2. Get the lifted matrix `frc_W` from [`set_sdp_frc_constraints!`](@ref).
+ 3. For each semidefinite entry at position `i` of `plgs`, register the row `frc_sdp_plg_<i>`. Skip an entry of another kind.
+ 4. When the model does not carry both `risk_minimised` and `variance_flag`, register the penalty `frc_sdp_plg_p_<i>` and add it to the objective penalty with [`add_to_objective_penalty!`](@ref).
+
+# JuMP formulation
+
+## Variables
+
+  - `frc_W`: read, the lifted matrix of [`set_sdp_frc_constraints!`](@ref).
+
+## Expressions
+
+  - `frc_sdp_plg_p_<i>`: ``p\\,\\mathrm{tr}(\\mathbf{W}_f)``, added to the objective penalty. It is absent when both marks are present.
+
+## Constraints
+
+  - `frc_sdp_plg_<i>`: ``s_c\\,\\mathbf{A} \\odot \\mathbf{W}_f = \\mathbf{0}``.
+
+Where:
+
+  - ``\\mathbf{W}_f``: The symmetric ``N_f \\times N_f`` lifted matrix of the factor weights, ``\\mathbf{W}_f \\succeq \\boldsymbol{w}_1\\boldsymbol{w}_1^\\intercal / k``.
+  - ``\\boldsymbol{w}_1``: The ``N_f \\times 1`` vector of factor weights.
+  - ``\\mathbf{A}``: The relatedness matrix of the entry over the factors, symmetric with a zero diagonal.
+  - ``p``: The penalty of the entry.
+  - ``i``: The position of the entry in `plgs`.
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:k_budget])
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - The rows `frc_sdp_plg_<i>` bind ``\\mathbf{W}_f`` in place of ``\\boldsymbol{w}_1\\boldsymbol{w}_1^\\intercal / k``, as the rows of [`set_sdp_phylogeny_constraints!`](@ref) bind ``\\mathbf{W}``. So the factor weights that they admit can hold both factors of a linked pair.
+  - The rows are tight when ``\\mathbf{W}_f = \\boldsymbol{w}_1\\boldsymbol{w}_1^\\intercal / k``. The penalty `frc_sdp_plg_p_<i>`, or a variance that the objective minimises, holds ``\\mathbf{W}_f`` down, and it spreads the factor weights as the asset penalty spreads the weights.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `plgs`: Phylogeny constraint(s). Accepts `nothing`, a single phylogeny, or a vector.
+  - `plgs`: The phylogeny constraints on the factors, `nothing`, one result, or a vector of results.
 
 # Returns
 
@@ -254,6 +427,7 @@ Iterates over `plgs` and, for each [`SemiDefinitePhylogeny`](@ref) entry, enforc
   - [`set_sdp_frc_constraints!`](@ref)
   - [`set_sdp_phylogeny_constraints!`](@ref)
   - [`SemiDefinitePhylogeny`](@ref)
+  - [`FactorRiskContribution`](@ref)
 """
 function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
                                             plgs::Option{<:PlCE_PlC_VecPlCE_PlC})

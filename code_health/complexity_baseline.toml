@@ -259,7 +259,7 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { cyc = 8, cog = 8, arg = 6, cyc_sum = 126, cog_sum = 89, arg_sum = 206, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl" = { cyc = 13, cog = 12, arg = 7, cyc_sum = 73, cog_sum = 56, arg_sum = 104, macros = ["@propagatable"] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/04_WeightConstraints.jl" = { cyc = 9, cog = 10, arg = 6, cyc_sum = 24, cog_sum = 15, arg_sum = 21, macros = [] }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/05_SDPConstraints.jl" = { cyc = 7, cog = 8, arg = 3, cyc_sum = 17, cog_sum = 17, arg_sum = 8, macros = [] }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/05_SDPConstraints.jl" = { cyc = 8, cog = 9, arg = 3, cyc_sum = 30, cog_sum = 25, arg_sum = 21, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/06_IntegerPhylogenyConstraints.jl" = { cyc = 4, cog = 4, arg = 2, cyc_sum = 5, cog_sum = 4, arg_sum = 4, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/07_CardinalityConstraints.jl" = { cyc = 23, cog = 44, arg = 11, cyc_sum = 70, cog_sum = 95, arg_sum = 74, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/08_ThresholdConstraints.jl" = { cyc = 3, cog = 2, arg = 9, cyc_sum = 5, cog_sum = 3, arg_sum = 15, macros = [] }

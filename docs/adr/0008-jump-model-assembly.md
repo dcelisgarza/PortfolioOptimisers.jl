@@ -375,3 +375,21 @@ of fees": builds the head and the middle with the three anchors supplied, so no 
 asserts that the model's return expression and the `rt_opt` target both move with the fees, and
 that a fixed fee moves neither. Proved to discriminate — before the fix the two return
 expressions are byte-identical.
+
+## Amendment 4 (2026-09-24)
+
+Decision 5 put FRC's `set_sdp_frc_phylogeny_constraints!` in FRC's tail. The code called it in
+the head, before `assemble_jump_model!`. It reads two marks that the middle writes:
+`variance_flag`, which a variance marks when the objective's risk carries it, and
+`risk_minimised`, which `mark_risk_minimised!` writes after the return constraints. Neither mark
+was present when the head ran, so the factor phylogeny always added its `p · tr(frc_W)` penalty,
+while the asset phylogeny omits it for a variance that the objective minimises (#1305).
+
+The call now runs after `assemble_jump_model!` and before the objective, where decision 5 put
+it, and the two phylogenies follow one rule. The same change stopped passing `_optimise`'s
+keyword arguments to `phylogeny_constraints` as positional arguments, which threw a
+`MethodError` for a phylogeny estimator and any keyword that the head does not read, and widened
+`FactorRiskContributionResult`'s `frc_plr` to a vector of results, which `frc_ple` already
+accepts. Found by the sweep of `05_SDPConstraints.jl` (#1304). Verified in
+`test_19_factor_risk_contribution.jl`, "A semidefinite factor phylogeny reads the marks of the
+assembled model".
