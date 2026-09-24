@@ -214,9 +214,9 @@ the worked step the paper prints for five assets at its defaults.
         flat_rd = ReturnsResult(; nx = nx, X = zeros(12, N))
         @test optimise(OPS(; alg = KernelTrendPatternTracking()), flat_rd).w ≈ u
         # At the default the answer through the statistic is one-hot on real data, unless two
-        # kernel-scaled forecasts are within `1 / eta`. The default cap reaches the polished
+        # kernel-scaled forecasts are within `2 / eta`. The default cap reaches the polished
         # path, so a larger cap gives the same answer (#1259). On rows 1:18 two assets are
-        # within `1 / eta`; a cap of 1000 sweeps gave a one-hot answer there, from a path the
+        # within `2 / eta`; a cap of 1000 sweeps gave a one-hot answer there, from a path the
         # sweeps had not solved.
         opt = OPS(; alg = KernelTrendPatternTracking())
         wo = optimise(opt, rows(rd, 1:18)).w

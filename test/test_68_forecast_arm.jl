@@ -421,7 +421,7 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
               ema.eps == 10
         rprt = ReweightedPriceRelativeTracking()
         @test isa(rprt.me.alg, ReweightedPriceRelative) &&
-              rprt.me.alg.theta == 0.7 &&
+              rprt.me.alg.theta == 0.8 &&
               rprt.eps == 50 &&
               rprt.scale == MovingAverage(; window = 5)
         gwr = GaussianWeightingReversion()
@@ -643,8 +643,8 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         # below one, which the paper's algorithm excludes and the step is defined for.
         @test MovingAverageReversion(; window = 2, eps = 1).me.alg.window == 2
         @test_throws DomainError MovingAverageReversion(; window = 1)
-        # The local adaptive learning takes the solution of the paper's programme, the
-        # squared norm in the step length, not the printed one.
+        # The local adaptive learning takes the step of the paper's eq. (12), whose step
+        # length has the squared norm of the centred forecast, and not the plain norm.
         w = fill(1 / N, N)
         set = po.resolve_allocation_set(BoundedAllocationSet(), N, false, Float64)
         load = LocalAdaptiveLearning(; eps = 1.05)
@@ -844,6 +844,128 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         @test isapprox(pa, [0.46, 0, 0, 0.54]; atol = 0.005)
         @test ph == [0.0, 0.0, 0.0, 1.0]
         @test abs(phi1[1] - phi1[4]) < 1e-4
+    end
+
+    @testset "The forecast rules' docstrings, with numbers (#1190)" begin
+        set = po.resolve_allocation_set(BoundedAllocationSet(), N, false, Float64)
+        u = fill(1 / N, N)
+        # `ForecastReversion`: without a preconditioner the raw step stays on the budget
+        # hyperplane and reaches the target. With one it leaves both, and the projection
+        # restores the budget.
+        xh = 1 .+ vec(mean(SimpleExpectedReturns(), R[1:5, :]))
+        D = 1 .+ vec(mean(PriceLevelExpectedReturns(), R[1:5, :]))
+        dev = xh .- mean(xh)
+        lam = max(0, (10 - dot(u, xh)) / sum(abs2, dev))
+        q0 = u .+ lam .* dev
+        q1 = u .+ lam .* D .* dev
+        @test lam > 0
+        @test sum(q0) ≈ 1 && dot(q0, xh) ≈ 10
+        @test abs(sum(q1) - 1) > 1 && abs(dot(q1, xh) - 10) > 1
+        # The reweighted price relative tracking takes the defaults of the authors' code. On
+        # the fixture the step moves at every row, and from the second row on one asset holds
+        # more than 0.01.
+        rprt = ReweightedPriceRelativeTracking()
+        @test rprt.me.alg.theta == 0.8 && rprt.eps == 50 && rprt.scale.window == 5
+        w = copy(u)
+        st = po.rule_state_seed(rprt, w)
+        for t in 1:T
+            rw = rows(rd, max(1, t - 3):t)
+            _, xr = po.forecast_relative(rprt.me, deepcopy(st), X[t, :], rw)
+            @test dot(w, xr) < rprt.eps
+            st, w = po.online_update!(rprt, st, w, X[t, :], rw, set)
+            t > 1 && @test count(>(0.01), w) == 1
+        end
+        # With fewer rows than its window, the preconditioner is the moving average of the
+        # levels that the head holds.
+        @test po.scale_relative(MovingAverage(), X[2, :], rows(rd, 1:2)) ≈
+              xhat(MovingAverage(; window = 3), R[1:2, :])
+        # `ForecastTracking`: the projection is one-hot whenever `eps` times the gap of the
+        # unit direction is at least two, from any book on the simplex. From a book on the
+        # second asset, a gap of 1.5 leaves two assets.
+        rng = StableRNG(3)
+        for _ in 1:500
+            w0 = po.project_simplex(randn(rng, N))
+            d = randn(rng, N)
+            d .-= mean(d)
+            d ./= norm(d)
+            s = sort(d; rev = true)
+            ep = 2 * (1 + rand(rng)) / (s[1] - s[2])
+            ft = ForecastTracking(; me = CustomValueExpectedReturns(; val = d), eps = ep)
+            _, w1 = po.online_update!(ft, nothing, w0, ones(N), nothing, set)
+            @test w1 == (1:N .== argmax(d))
+        end
+        d = [0.6, 0.0, -0.3, -0.3]
+        d ./= norm(d)
+        ft = ForecastTracking(; me = CustomValueExpectedReturns(; val = d),
+                              eps = 1.5 / (d[1] - d[2]))
+        _, w1 = po.online_update!(ft, nothing, [0.0, 1.0, 0.0, 0.0], ones(N), nothing, set)
+        @test w1 ≈ [0.75, 0.25, 0, 0]
+        # `KernelTrendTracking`: the same bound on the kernel-scaled forecast is `2 / eta`.
+        # From a book on the second asset, a gap of `1.5 / eta` leaves 0.75 and 0.25.
+        wk = [0.0, 1.0, 0.0, 0.0]
+        a = 0.00332336168084042
+        dk = [a, 0.0, -a / 2, -a / 2]
+        Kk = exp.(-abs.((wk .- mean(wk)) .- dk) .^ (1 / 6))
+        @test isapprox(Kk[1] * dk[1] - Kk[2] * dk[2], 1.5e-3; atol = 1e-6)
+        ktt = KernelTrendTracking(; me = CustomValueExpectedReturns(; val = dk))
+        _, w2 = po.online_update!(ktt, nothing, wk, ones(N), nothing, set)
+        @test isapprox(w2, [0.75, 0.25, 0, 0]; atol = 1e-4)
+        rng = StableRNG(4)
+        for _ in 1:500
+            w0 = po.project_simplex(randn(rng, N))
+            dk = 0.05 .* randn(rng, N)
+            dk .-= mean(dk)
+            sk = exp.(-abs.((w0 .- mean(w0)) .- dk) .^ (1 / 6)) .* dk
+            s = sort(sk; rev = true)
+            et = 2 * (1 + rand(rng)) / (s[1] - s[2])
+            ktt = KernelTrendTracking(; me = CustomValueExpectedReturns(; val = dk),
+                                      eta = et)
+            _, w1 = po.online_update!(ktt, nothing, w0, ones(N), nothing, set)
+            @test w1 == (1:N .== argmax(sk))
+        end
+        # `TransactionCostOptimisation`: the soft threshold at `10 eta gamma` minimises the
+        # proximal programme with the budget multiplier at the mean gradient.
+        wt = [0.4, 0.3, 0.2, 0.1]
+        x = X[5, :]
+        what = po.price_adjusted_allocation(wt, x)
+        g = (1 ./ x) ./ dot(what, 1 ./ x)
+        c = g .- mean(g)
+        dt = sign.(10 .* c) .* max.(abs.(10 .* c) .- 10 * 0.01, 0)
+        f(v) = -dot(c, v) + sum(abs2, v) / (2 * 10) + 0.01 * sum(abs, v)
+        rng = StableRNG(5)
+        @test all(f(dt .+ 1e-3 .* randn(rng, N)) >= f(dt) for _ in 1:500)
+        _, wt2 = po.online_update!(TransactionCostOptimisation(), nothing, wt, x,
+                                   rows(rd, 5:5), set)
+        @test wt2 ≈ po.project_simplex(what .+ dt)
+        # `ShortTermSparsePortfolio`: the fixed point gives every asset but the largest
+        # forecast at most `gamma`.
+        rng = StableRNG(6)
+        for _ in 1:200
+            n = rand(rng, 2:60)
+            phi = -(1.1 .* log.(1 .+ 0.1 .* rand(rng, n)) .+ 1)
+            b = po.sparse_portfolio_iterate(HuberOptimum(), phi, fill(1 / n, n))
+            @test maximum(b[setdiff(1:n, argmin(phi))]) <= 0.01 + 1e-12
+        end
+        # The rows each constructor needs, as its docstring states.
+        @test po.rows_needed(ExponentialMovingAverageReversion()) == 1
+        @test po.rows_needed(KernelTrendPatternTracking()) == 1
+        @test isnothing(po.rows_needed(AdaptiveInputCompositeTrend()))
+        @test isnothing(po.rows_needed(LocalAdaptiveLearning()))
+        # The defaults each docstring attributes to its paper.
+        rmr = RobustMedianReversion()
+        @test rmr.eps == 5 && rmr.me.alg.window == 5
+        gwr = GaussianWeightingReversion()
+        @test gwr.me.alg.tau == 2.8 && gwr.me.alg.cutoff == 0.005
+        load = LocalAdaptiveLearning()
+        @test load.me.alg.test.window == 5 &&
+              load.me.alg.test.threshold == 0.1 &&
+              load.me.alg.flat.alpha == 0.5
+        aictr = AdaptiveInputCompositeTrend()
+        @test aictr.me.alg.window == 5
+        tppt = TrendPromotePriceTracking()
+        @test tppt.me.alg.test.window == 5 && tppt.me.alg.rising.alpha == 0.5
+        @test MovingAverageReversion().eps == 10 &&
+              MovingAverageReversion().me.alg.window == 5
     end
 
     @testset "Show and the search seam" begin

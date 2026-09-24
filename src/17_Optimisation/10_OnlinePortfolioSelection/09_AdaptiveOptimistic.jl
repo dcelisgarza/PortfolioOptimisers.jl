@@ -457,7 +457,7 @@ M_{t+1} &= -\\hat{\\boldsymbol{x}}_{t+1} / \\langle \\boldsymbol{v}_{t+1}, \\hat
 Where:
 
   - $(math_dict[:M_t_hint])
-  - ``\\hat{\\boldsymbol{x}}_{t+1}``: Price Relative Forecast for period ``t + 1``, made after the row of period ``t``.
+  - $(math_dict[:xhat_fc])
   - $(math_dict[:v_t_sec])
   - $(math_dict[:t_period])
 

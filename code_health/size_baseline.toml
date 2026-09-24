@@ -10,7 +10,7 @@ commit = "0ecb3ce47c"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2993, doc = 0, comment = 241, blank = 48, total = 3282 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1261, doc = 113, comment = 134, blank = 43, total = 1551 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1263, doc = 113, comment = 134, blank = 43, total = 1553 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }

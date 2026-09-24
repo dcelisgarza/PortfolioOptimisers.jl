@@ -361,7 +361,7 @@ Where:
   - ``\\theta``: The reweighting strength; larger puts more weight on the current relative.
   - ``\\hat{\\boldsymbol{\\varphi}}_{t+1}``: The Price Relative Forecast, per asset.
 
-[`ExponentialMovingAverage`](@ref) is the case of a constant weight ``\\boldsymbol{\\gamma} = \\alpha \\boldsymbol{1}``. The paper's own defaults for ``\\theta`` are not read; the restating paper's `theta = 0.7` is the library's default on [`ReweightedPriceRelativeTracking`](@ref).
+[`ExponentialMovingAverage`](@ref) is the case of a constant weight ``\\boldsymbol{\\gamma} = \\alpha \\boldsymbol{1}``. The default `theta = 0.7` is the value that the restating paper sets for its own rule. [`ReweightedPriceRelativeTracking`](@ref) takes `theta = 0.8`, the value of the MATLAB code that the authors of the reweighted price relative tracking publish.
 
 # Fields
 
