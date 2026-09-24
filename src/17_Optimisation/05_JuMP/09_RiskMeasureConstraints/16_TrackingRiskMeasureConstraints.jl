@@ -472,9 +472,9 @@ it does not remove the phylogeny's `p · tr(W)` penalty, [`mark_objective_varian
 
 $(val_dict[:relax])
 
-  - **Direction.** `tracking_risk_i` can lie below ``\\lvert R(\\boldsymbol{w}) - r_b k \\rvert`` when the inner model expression ``\\rho(\\boldsymbol{w})`` lies above the exact risk ``R(\\boldsymbol{w})``. A [`Variance`](@ref) in the semidefinite form has ``\\rho = \\mathrm{tr}(\\boldsymbol{\\Sigma}\\mathbf{W}) \\geq \\boldsymbol{w}^\\intercal\\boldsymbol{\\Sigma}\\boldsymbol{w}``, and the step ``\\mathbf{W} + t\\,\\boldsymbol{e}_i\\boldsymbol{e}_i^\\intercal`` keeps every row, so ``\\rho`` can rise to ``r_b k``. With no price on that step, the model value is ``\\max(0,\\ R(\\boldsymbol{w}) - r_b k)``: it penalises a portfolio riskier than the benchmark, and it can report zero for one that is less risky.
+  - **Direction.** `tracking_risk_i` can lie below ``\\lvert R(\\boldsymbol{w}) - r_b k \\rvert`` when the inner model expression ``\\rho(\\boldsymbol{w})`` lies above the exact risk ``R(\\boldsymbol{w})``. Every inner measure that the model states through an epigraph has ``\\rho(\\boldsymbol{w}) \\geq R(\\boldsymbol{w})``, and the solver can raise ``\\rho`` to ``r_b k`` at no cost. For [`ConditionalValueatRisk`](@ref) it raises the auxiliary variables, for [`StandardDeviation`](@ref) and [`LowOrderMoment`](@ref) the cone variable. A [`Variance`](@ref) in the semidefinite form has ``\\rho = \\mathrm{tr}(\\boldsymbol{\\Sigma}\\mathbf{W})``, and the step ``\\mathbf{W} + t\\,\\boldsymbol{e}_i\\boldsymbol{e}_i^\\intercal`` keeps every row. With no price on that rise, the model value is ``\\max(0,\\ R(\\boldsymbol{w}) - r_b k)``: it penalises a portfolio riskier than the benchmark, and it can report zero for one that is less risky.
   - **Quantity.** `tracking_risk_i` and `r_dv_i`.
-  - **Condition.** The model value equals the exact value when ``\\mathbf{W} = \\boldsymbol{w}\\boldsymbol{w}^\\intercal`` at the solution. When ``R(\\boldsymbol{w}) \\geq r_b k`` it is not below the exact value. In the objective, ``\\mathbf{W}`` stays tight when the phylogeny's penalty and the variances that the objective minimises on the same weights price the step at least as much as the tracking term gains, ``p + s_v \\Sigma_{ii} \\geq s \\Sigma_{ii}`` for every ``i``. With no minimised variance that is ``p \\geq s \\max_i \\Sigma_{ii}``. As a bound, `settings.ub`, no condition makes it tight, so the bound holds from above only.
+  - **Condition.** The model value equals the exact value when ``\\rho(\\boldsymbol{w}) = R(\\boldsymbol{w})`` at the solution. When ``R(\\boldsymbol{w}) \\geq r_b k`` it is not below the exact value. The inner build owns its auxiliary variables under `tprefix`, so no other term prices them, and an epigraph measure stays one-sided. The semidefinite [`Variance`](@ref) is the one exception, because its ``\\mathbf{W}`` is the head's. In the objective, ``\\mathbf{W}`` stays tight when the phylogeny's penalty and the variances that the objective minimises on the same weights price the step at least as much as the tracking term gains, ``p + s_v \\Sigma_{ii} \\geq s \\Sigma_{ii}`` for every ``i``. With no minimised variance that is ``p \\geq s \\max_i \\Sigma_{ii}``. As a bound, `settings.ub`, no condition makes it tight, so the bound is the ceiling ``R(\\boldsymbol{w}) \\leq (r_b + u)\\,k`` for every inner measure.
 
 Where:
 
@@ -490,6 +490,7 @@ Where:
   - ``\\mathbf{W}``: The lifted matrix of the weights, [`set_sdp_constraints!`](@ref).
   - ``p``: The penalty of the [`SemiDefinitePhylogeny`](@ref), [`set_sdp_phylogeny_constraints!`](@ref).
   - ``s``: The scale of the tracking measure, `r.settings.scale`.
+  - ``u``: The upper bound of the tracking measure, `r.settings.ub`.
   - ``s_v``: The scale of a variance that the objective minimises on the same weights.
 
 # Arguments

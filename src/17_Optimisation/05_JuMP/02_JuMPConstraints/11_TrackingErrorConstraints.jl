@@ -11,7 +11,7 @@ The fall-through method does nothing. Concrete methods dispatch on the tracking 
   - [`LpNorm`](@ref): Enforces a scaled Lp norm via power cone.
   - [`LInfNorm`](@ref): Enforces `‖net_X - wb * k‖_∞ ≤ err` via NormInfinityCone.
   - [`IndependentVariableTracking`](@ref): Substitutes `w - wb` for `w` and applies the chosen risk constraint.
-  - [`DependentVariableTracking`](@ref): Constrains the absolute difference between portfolio risk and benchmark risk. The inner build reads the lifted matrix of the head's weights, [`weights_prefix`](@ref). When the inner measure builds on that matrix, the bound holds from above only, as [`DependentVariableTracking`](@ref) states.
+  - [`DependentVariableTracking`](@ref): Constrains the difference between portfolio risk and benchmark risk. The inner build reads the lifted matrix of the head's weights, [`weights_prefix`](@ref). The bound holds from above only, ``R(\\boldsymbol{w}) \\leq R(\\boldsymbol{w}_b) + \\mathrm{err}``, for every inner measure whose model is an upper bound on the risk, as [`DependentVariableTracking`](@ref) states. A portfolio whose risk is below the benchmark risk by more than `err` also satisfies it.
 
 The collection method iterates over all tracking errors in `tres`.
 

@@ -126,8 +126,7 @@ end
         # Observation weights that resolve against the data resolve first.
         ow = aweights(collect(range(1.0, 2.0; length = T)))
         lomd = LowOrderMoment(; w = TrackedDecayWeights(), mu = pr.mu)
-        @test isapprox(track(lomd)(w, X, fees), mean(max.(tgt .- x, 0), ow);
-                       rtol = 1e-12)
+        @test isapprox(track(lomd)(w, X, fees), mean(max.(tgt .- x, 0), ow); rtol = 1e-12)
         # Every moment family resolves its weights against `X`, down to the variance
         # estimator it holds, and agrees with the same measure built with the resolved
         # weights (#1319).
@@ -194,15 +193,19 @@ end
         rw = expected_risk(cvar, sol.w, X)
         @test rw - rb <= err
         @test rb - rw > 10 * err
-        # In the objective, the model reports zero for a portfolio that is less risky.
-        r = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = cvar,
-                                    alg = DependentVariableTracking())
-        sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
-                                opt = JuMPOptimiser(; pe = pr, slv = slv)))
-        @test isa(sol.retcode, OptimisationSuccess)
-        @test abs(JuMP.value(sol.model[:risk])) < 1e-8
-        @test rb - expected_risk(cvar, sol.w, X) > 1e-5
-        @test isapprox(r(sol.w, X), rb - expected_risk(cvar, sol.w, X); rtol = 1e-12)
+        # In the objective, the model reports zero for a portfolio that is less risky. This
+        # holds for every measure whose model is an upper bound on the risk (#1317).
+        for ri in (cvar, factory(StandardDeviation(), pr), factory(LowOrderMoment(), pr))
+            rbi = expected_risk(ri, wb, X)
+            r = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = ri,
+                                        alg = DependentVariableTracking())
+            sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
+                                    opt = JuMPOptimiser(; pe = pr, slv = slv)))
+            @test isa(sol.retcode, OptimisationSuccess)
+            @test abs(JuMP.value(sol.model[:risk])) < 1e-8
+            @test rbi - expected_risk(ri, sol.w, X) > 1e-5
+            @test isapprox(r(sol.w, X), rbi - expected_risk(ri, sol.w, X); rtol = 1e-12)
+        end
     end
 
     @testset "the constructors" begin
