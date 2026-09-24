@@ -1,5 +1,5 @@
 ```@meta
-Description = "Cardinality Constraints, private API of PortfolioOptimisers.jl: set_card_constraints!, set_gcard_constraints!, set_all_smip_constraints!, …"
+Description = "Cardinality Constraints, private API of PortfolioOptimisers.jl: set_card_constraints!, set_gcard_constraints!, subgroup_entry, set_all_smip_constraints!, …"
 ```
 
 # Cardinality Constraints: private API
