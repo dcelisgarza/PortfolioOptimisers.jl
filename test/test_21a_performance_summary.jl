@@ -92,6 +92,37 @@ end
     @test isfinite(flat.sharpe)
 end
 
+@testset "performance_summary: a guarded statistic keeps the number type of the series" begin
+    # #1193. A guard's `NaN` must take the number type its finite branch lands in. A bare
+    # `NaN` literal is `Float64`, so a `Float32` series came back with a `Float64` Sortino,
+    # Calmar and standard error when their guards fired and a `Float32` one when they did
+    # not; and the excess statistics wrote a `Float32` `NaN` where the finite tracking error
+    # and information ratio are `Float64`, because `sqrt(252)` is. `0.25f0` is exact in
+    # binary, so the standard deviation of the constant series is an exact zero and every
+    # guard fires.
+    flat = performance_summary(fill(0.25f0, 10))
+    @test iszero(flat.ann_volatility)
+    @test isnan(flat.sharpe) &&
+          isnan(flat.sharpe_stderr) &&
+          isnan(flat.sortino) &&
+          isnan(flat.calmar)
+    live = performance_summary(Float32[0.02, -0.01, 0.03, -0.02];
+                               benchmark = Float32[0.01, 0, 0.01, 0])
+    @test all(isfinite,
+              (live.sharpe, live.sharpe_stderr, live.sortino, live.calmar, live.excess_ret,
+               live.tracking_error, live.information_ratio))
+    @test live.sortino isa Float32
+    for f in (:sharpe, :sharpe_stderr, :sortino, :calmar, :excess_ret, :tracking_error,
+              :information_ratio)
+        @test typeof(getproperty(flat, f)) == typeof(getproperty(live, f))
+    end
+    # A zero tracking error is the guard of the information ratio.
+    tied = performance_summary(Float32[0.02, -0.01, 0.03, -0.02];
+                               benchmark = Float32[0.02, -0.01, 0.03, -0.02])
+    @test isnan(tied.information_ratio)
+    @test typeof(tied.information_ratio) == typeof(live.information_ratio)
+end
+
 #=
 Issue #549, conditions 2 and 3. `src/18_ExpectedReturns.jl` held 49 of child map 8's 66
 misses, and `brinson_attribution` had no test in the whole suite. Every check below was run
