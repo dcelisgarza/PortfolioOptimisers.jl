@@ -898,7 +898,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""),
                                rd::ReturnsResult = ReturnsResult(), kwargs...)
-    mark_state!(model, prefix, :variance_flag)
+    mark_state!(model, weights_prefix(model, prefix), :variance_flag)
     # The lift is the set's business: the box and the ellipsoid bound a matrix and raise
     # `W` themselves, and the compact set bounds a quadratic form in `w` and raises none.
     ucs = r.ucs

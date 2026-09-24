@@ -212,8 +212,10 @@ penalty is the head's: a `Variance` built on the same weights marks `variance_fl
 penalty is not added, whether the variance is in the objective or is a ceiling. A kurtosis
 ceiling on the set already built `W` this way. In a leader's model the set reuses the leader's
 `W`, because one `W` belongs to one `w`. The set registers the leader's `w` under `:aset_` and
-marks the prefix `w_shared`. `weights_prefix` reads the mark, so `W`, `variance_flag` and
-`rc_variance` stay in the bare namespace, and only the set's rows take the prefix.
+records their owner, `w_owner = Symbol("")`. `weights_prefix` reads the owner, so `W`,
+`variance_flag` and `rc_variance` stay in the bare namespace, and only the set's rows take the
+prefix. A `DependentVariableTracking` build records its owner the same way (ADR 0005,
+amendment of 2026-09-24).
 
 It refuses, by having no field for them: a budget, below; fees, which are a deduction from an
 expected return the projection does not have, and which ADR 0160 placed on the head; the

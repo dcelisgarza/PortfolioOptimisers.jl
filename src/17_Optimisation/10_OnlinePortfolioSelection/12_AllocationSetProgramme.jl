@@ -212,7 +212,7 @@ Both arms call it after they add the bounds. The bare projection model passes th
 
  1. Check that the prior prices every asset in `X` with [`assert_set_prior_priced`](@ref).
  2. Resolve the slots that read the rows with [`resolve_allocation_set_rows`](@ref). This gives `lcsr`, `ctr`, `plr`, `ret`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf` and `rd`.
- 3. When `prefix` is not empty, register the model's `w` under it, and mark the prefix `w_shared`. Then [`weights_prefix`](@ref) keeps the lifted `W`, `variance_flag` and `rc_variance` in the bare namespace, because the weights are the leader's.
+ 3. When `prefix` is not empty, register the model's `w` under it, with the owner `w_owner = Symbol("")`. Then [`weights_prefix`](@ref) keeps the lifted `W`, `variance_flag` and `rc_variance` in the bare namespace, because the weights are the leader's.
  4. Add the linear rows `lcsr`, then the centrality rows `ctr`.
  5. Add the MIP kinds, then the sub-group MIP kinds.
  6. Add the turnover ceilings, each with its reference replaced by `w`, through [`set_allocation_turnover!`](@ref).
@@ -254,7 +254,7 @@ function assemble_allocation_set!(model::JuMP.Model, set::ProgrammeAllocationSet
                                                                                                  X)
     if !bare
         state_build!(() -> get_w(model), model, prefix, :w)
-        mark_state!(model, prefix, :w_shared)
+        state_build!(() -> Symbol(""), model, prefix, :w_owner)
     end
     set_linear_weight_constraints!(model, lcsr, state_key(prefix, :lcs_ineq_),
                                    state_key(prefix, :lcs_eq_))

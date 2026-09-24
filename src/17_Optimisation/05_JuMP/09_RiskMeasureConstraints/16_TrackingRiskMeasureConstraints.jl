@@ -345,9 +345,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Build the inner risk expression for risk tracking under a namespaced `tprefix`.
 
 The caller stores the tracking-difference weights under `tprefix`, so the inner
-[`set_risk_tr_constraints!`](@ref) build reads and writes ALL of its model-state keys
-(`:w`, `:net_X`, `:W`, `:variance_flag`, the per-measure scratch, …) under `tprefix` and
-cannot collide with the outer model's keys. This replaces the former
+[`set_risk_tr_constraints!`](@ref) build reads and writes its model-state keys
+(`:w`, `:net_X`, the per-measure scratch, …) under `tprefix` and cannot collide with the
+outer model's keys. The lifted matrix `:W` and the marks `:variance_flag` and
+`:rc_variance` belong to the namespace that owns the weights, [`weights_prefix`](@ref).
+That is `tprefix` for shifted weights, and the enclosing build's owner for the unshifted
+weights of a [`DependentVariableTracking`](@ref) build. This replaces the former
 save/unregister/restore swap: the prefix isolates the nested build structurally.
 Because tracking prefixes COMPOSE (`tprefix = nested_prefix(prefix, :tr_iv_, i)`),
 tracking-nested-in-tracking is collision-free.
@@ -443,6 +446,12 @@ Computes the benchmark's expected risk value, stores the (unshifted) portfolio w
 risk expression and the benchmark's expected risk scaled by the allocation variable `k`.
 The prefix namespacing replaces the former save/restore swap and is re-entrant.
 
+The weights under `tprefix` are the weights under `prefix`, so the method also registers
+`w_owner`, the namespace that owns them, [`weights_prefix`](@ref). The inner build then
+reads the enclosing build's lifted matrix ``\\mathbf{W}`` and its marks `variance_flag` and
+`rc_variance`. A semidefinite phylogeny on the head constrains the inner variance, and an
+inner variance removes the phylogeny's `p · tr(W)` penalty, as a head's own variance does.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -483,6 +492,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     tracking_risk = state_set!(model, prefix, :tracking_risk_, i, JuMP.@variable(model))
     tprefix = nested_prefix(prefix, :tr_dv_, i)
     state_set!(model, tprefix, :w, get_w(model, prefix))
+    state_set!(model, tprefix, :w_owner, weights_prefix(model, prefix))
     risk_expr = set_risk_tracking_risk_constraints!(model, ri, opt, pr, pl, fees, tprefix,
                                                     args...; kwargs...)
     dr = state_set!(model, prefix, :r_dv_, i, JuMP.@expression(model, risk_expr - rb * k))

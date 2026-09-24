@@ -84,3 +84,43 @@ risk-build spine; the inner build reads and writes only prefixed keys.
   hazard. Phase 2 gives the cross-file Category-A infra keys (`:X`, `:net_X`, `:Xap1`,
   `:ddap1`, `:dd`, SDP) named prefixed `get_*`/`has_*` accessors; per-measure
   singletons stay on the prefix-computed form.
+
+## Amendment (2026-09-24)
+
+The invariant said that a weight-dependent key and a presence flag are per-build risk state.
+That holds for a build on shifted weights. It does not hold for a build that registers the
+weights of its enclosing build without a change. `DependentVariableTracking` is such a build:
+its prefix holds the head's own `w`. Under the old rule its inner measures built a second
+lifted matrix `tr_dv_iW` with its own PSD cone for the same `w` (#1305). Two defects followed:
+
+1. The head's semidefinite phylogeny rows `A ⊙ W = 0` were on the bare `W`, so they did not
+   constrain the inner variance `tr(Σ tr_dv_iW)`.
+2. The inner variance marked `tr_dv_ivariance_flag`, so a head whose only variance was a
+   dependent tracking variance kept the phylogeny's `p · tr(W)` penalty. A head with a plain
+   variance dropped it.
+
+**Decision.** The lifted matrix `W` (with `M` and `M_PSD`) and the marks `variance_flag` and
+`rc_variance` belong to the weights, not to the build. A build that registers weights it did
+not make also registers `w_owner`, the namespace that owns them. `weights_prefix(model,
+prefix)` returns that owner, or `prefix` when there is none, and `set_sdp_constraints!`, the
+variance builders and the phylogeny builder read it.
+
+- `DependentVariableTracking` registers `w_owner = weights_prefix(model, prefix)` under its
+  tracking prefix. Its inner measures read the enclosing build's `W` and marks, and keep
+  their own rows and scratch under the prefix.
+- The owner is resolved when the weights are registered, so a chain collapses: a dependent
+  build inside an `IndependentVariableTracking` build owns the independent build's shifted
+  weights, not the bare ones.
+- `IndependentVariableTracking` registers no owner. Its weights are `w - wb·k`, so its `W`
+  and its marks stay under its own prefix, as this ADR decided.
+- A programme Allocation Set in a leader's model registers `w_owner = Symbol("")` under
+  `:aset_` (#1303, ADR 0159). This replaces the boolean mark `w_shared` that #1303 added, which
+  could not name an owner other than the bare namespace.
+- `UncertaintySetVariance` marks `variance_flag` on the owner, as `Variance` does, because it
+  builds on the owner's `W`.
+
+**Consequence.** A dependent tracking variance now removes the phylogeny's `p · tr(W)` penalty,
+as the head's own variance does. The `[A, Tracking(A)]` cases of
+`test/test_27_prefix_registration.jl` assert that a `DependentVariableTracking` build registers
+none of these keys under its prefix, and a new testset covers the phylogeny, the penalty and
+the nested chain.

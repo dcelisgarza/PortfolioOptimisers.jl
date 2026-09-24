@@ -3,7 +3,7 @@
 
 Returns the Model State namespace that owns the weights registered under `prefix`.
 
-One lifted matrix ``\\mathbf{W}`` belongs to one weight vector, and so do the marks that describe the measures built on it, `variance_flag` and `rc_variance`. A programme Allocation Set in a leader's model registers the model's own `w` under `:aset_` and marks the prefix `w_shared`, so the bare namespace owns it. The set's variance ceiling, its semidefinite phylogeny and the leader's measures then read one ``\\mathbf{W}`` and one set of marks, as the measures of one head do. A prefix without the mark owns itself, as a tracking build's prefix does.
+One lifted matrix ``\\mathbf{W}`` belongs to one weight vector, and so do the marks that describe the measures built on it, `variance_flag` and `rc_variance`. A build that registers weights it did not make also registers `w_owner`, the namespace that owns them. A programme Allocation Set in a leader's model registers the model's own `w` under `:aset_` with the owner `Symbol("")`. A [`DependentVariableTracking`](@ref) build registers the weights of its enclosing build under its tracking prefix, with the owner of those weights. The set's ceiling, the tracking build's inner measures and the head's measures then read one ``\\mathbf{W}`` and one set of marks, as the measures of one head do. A prefix without `w_owner` owns itself, as an [`IndependentVariableTracking`](@ref) prefix does, because the benchmark shifts its weights.
 
 # Arguments
 
@@ -12,16 +12,17 @@ One lifted matrix ``\\mathbf{W}`` belongs to one weight vector, and so do the ma
 
 # Returns
 
-  - `owner::Symbol`: `Symbol("")` when `prefix` carries the `w_shared` mark, and `prefix` otherwise.
+  - `owner::Symbol`: The `w_owner` entry under `prefix` when there is one, and `prefix` otherwise.
 
 # Related
 
   - [`set_sdp_constraints!`](@ref)
   - [`get_w`](@ref)
   - [`add_allocation_set_constraints!`](@ref)
+  - [`RiskTrackingRiskMeasure`](@ref)
 """
 function weights_prefix(model::JuMP.Model, prefix::Symbol)
-    return state_has(model, prefix, :w_shared) ? Symbol("") : prefix
+    return state_has(model, prefix, :w_owner) ? state_get(model, prefix, :w_owner) : prefix
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

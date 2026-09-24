@@ -1274,14 +1274,14 @@ end
                 @test !haskey(ml, :aset_sdp_plg_p_1)
                 @test po.weights_prefix(ml, :aset_) === Symbol("")
             end
-            # A prefix without the set's mark owns itself, as a tracking build's does, even
-            # when it holds the model's own `w`.
+            # A prefix without a recorded owner owns itself, even when it holds the model's
+            # own `w`. The owner a build records is the owner `weights_prefix` returns.
             mt = JuMP.Model()
             JuMP.@variable(mt, w[1:3])
             mt[:tr_w] = w
             @test po.weights_prefix(mt, :tr_) === :tr_
             @test po.weights_prefix(mt, Symbol("")) === Symbol("")
-            po.mark_state!(mt, :tr_, :w_shared)
+            po.state_set!(mt, :tr_, :w_owner, Symbol(""))
             @test po.weights_prefix(mt, :tr_) === Symbol("")
             # A Variance with risk-contribution rows reads the rows and builds through the
             # shared semidefinite builder.

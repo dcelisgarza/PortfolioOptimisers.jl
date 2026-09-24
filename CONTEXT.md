@@ -710,6 +710,7 @@ The in-flight state of the JuMP model as it is built: the shared variables, expr
 
 **Per-Build Risk State**
 The part of Model State belonging to one risk build rather than to the model as a whole, and so not shared with a build nested inside it.
+The lifted matrix `W` and the variance marks belong to the weights, not to the build: a nested build on the same weights, such as a `DependentVariableTracking` build or a programme Allocation Set in a leader's model, shares them.
 
 **Model Assembly**
 The fixed sequence in which an Optimisation Estimator's constraint and risk builders run to turn an empty model into a fully-constrained one. Distinct from Model State, which is the data those builders read and write.

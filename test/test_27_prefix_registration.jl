@@ -43,6 +43,8 @@
     end
     trk_prefix(::IndependentVariableTracking) = :tr_iv_2_
     trk_prefix(::DependentVariableTracking) = :tr_dv_2_
+    # The entries that belong to the weights rather than to the build, `weights_prefix`.
+    weights_owned = (:W, :M, :M_PSD, :variance_flag, :rc_variance)
 
     # (measure, opt, weights, returns, Category-A singleton keys the inner build registers)
     cases = [("Variance", Variance(), opt, w0, rd, [:variance_flag]),
@@ -99,6 +101,14 @@
         # The bare weights from the outer build still exist.
         @test haskey(m, :w)
         for k in ckeys
+            # A dependent build tracks the head's own weights, so the lifted matrix and the
+            # variance marks belong to the head (ADR 0005 amendment of 2026-09-24, #1305):
+            # the inner build reuses the bare entries and registers none under its prefix.
+            if isa(alg, DependentVariableTracking) && k in weights_owned
+                @test !haskey(m, Symbol(p, k))
+                @test haskey(m, k)
+                continue
+            end
             # the inner build registered the key UNDER the tracking prefix ...
             @test haskey(m, Symbol(p, k))
             # ... and where the outer build also makes a bare JuMP object, the two are
@@ -169,5 +179,51 @@
         # sits at index 1 under the innermost prefix, on the other axis entirely.
         @test haskey(m, Symbol(p_inner, :cvar_risk_1))
         @test !haskey(m, Symbol(:cvar_risk_, p_inner, 1))
+    end
+
+    # #1305: a dependent build registers the weights of its enclosing build, so it records
+    # their owner and reads the owner's lifted matrix. A semidefinite phylogeny on the head
+    # then constrains the inner variance, and the inner variance removes the phylogeny's
+    # `p·tr(W)` penalty, as a head's own variance does. An independent build shifts the
+    # weights, so it keeps its own `W`, and a dependent build inside it reads that one.
+    @testset "DependentVariableTracking reads the lifted matrix of its weights (#1305)" begin
+        A5 = zeros(Int, 5, 5)
+        A5[1, 2] = A5[2, 1] = 1
+        optp = JuMPOptimiser(; pe = pr, slv = slv,
+                             ple = SemiDefinitePhylogeny(; A = A5, p = 0.05))
+        dv(r) = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = w0), r = r,
+                                        alg = DependentVariableTracking())
+        iv(r) = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = w0), r = r,
+                                        alg = IndependentVariableTracking())
+        build(rs) = optimise(MeanRisk(; r = rs, obj = MinimumRisk(), opt = optp), rd).model
+        reads(m, expr, W) = issubset(keys(m[expr].terms), Set(vec(m[W])))
+
+        m = build([Variance(), dv(Variance())])
+        @test m[:tr_dv_2_w_owner] === Symbol("")
+        @test haskey(m, :W) && !haskey(m, :tr_dv_2_W)
+        @test reads(m, :tr_dv_2_variance_risk_1, :W)
+        @test haskey(m, :variance_flag) && !haskey(m, :tr_dv_2_variance_flag)
+
+        # The penalty follows the head's rule: a variance on the head's weights removes it,
+        # whether the head or a dependent build states it. A head without one keeps it.
+        @test haskey(build([ConditionalValueatRisk()]), :sdp_plg_p_1)
+        @test !haskey(build([Variance()]), :sdp_plg_p_1)
+        m = build([dv(Variance())])
+        @test haskey(m, :sdp_plg_1) && haskey(m, :variance_flag)
+        @test !haskey(m, :sdp_plg_p_1)
+        m = build([dv(UncertaintySetVariance(; ucs = ucs))])
+        @test haskey(m, :variance_flag) && !haskey(m, :tr_dv_1_variance_flag)
+        @test !haskey(m, :tr_dv_1_W) && !haskey(m, :sdp_plg_p_1)
+
+        # A dependent build inside an independent one records the independent build as the
+        # owner, so it reads the shifted `W` and leaves the head's penalty in place.
+        m = build([iv(dv(Variance()))])
+        @test !haskey(m, :tr_iv_1_w_owner)
+        @test m[:tr_iv_1_tr_dv_1_w_owner] === :tr_iv_1_
+        @test haskey(m, :tr_iv_1_W) && !haskey(m, :tr_iv_1_tr_dv_1_W)
+        @test m[:tr_iv_1_W] !== m[:W]
+        @test reads(m, :tr_iv_1_tr_dv_1_variance_risk_1, :tr_iv_1_W)
+        @test haskey(m, :tr_iv_1_variance_flag) && !haskey(m, :variance_flag)
+        @test haskey(m, :sdp_plg_p_1)
     end
 end
