@@ -1314,7 +1314,16 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :lu_i_aset => "``l_i``, ``u_i``: Lower and upper bounds of asset ``i`` on a [`BoundedAllocationSet`](@ref).",#
                        :theta_aset => "``\\theta``: Budget multiplier, the root of ``\\sum_i w_i(\\theta) = 1``.",#
                        :w_plus_proj => "``\\boldsymbol{w}^{+}``: Projected allocation, the answer of the projection onto the Allocation Set.",#
-                       :pi_obj_pen => "``\\pi``: Objective Penalty of the set, zero when the set has no penalty.")
+                       :pi_obj_pen => "``\\pi``: Objective Penalty of the set, zero when the set has no penalty.",#
+                       # The constant rebalanced portfolio, the passive-aggressive step and the
+                       # set that an expert mixture's weighting projects onto.
+                       :b_crp => "``\\boldsymbol{b}``: Target of a constant rebalanced portfolio, the allocation that it rebalances to every period.",#
+                       :S_t_crp => "``S_t(\\boldsymbol{b}) = \\prod_{s \\leq t} \\langle \\boldsymbol{b}, \\boldsymbol{x}_s \\rangle``: Wealth of the constant rebalanced portfolio ``\\boldsymbol{b}`` after period ``t``, from a wealth of one.",#
+                       :tau_t_pa => "``\\tau_t``: Step length of the passive-aggressive update of period ``t``, non-negative.",#
+                       :ell_t_pa => "``\\ell_t = \\max(0, \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle - \\epsilon)``: Hinge loss of period ``t``, the part of the gross return above the reversion threshold.",#
+                       :xbar_t_pa => "``\\bar{x}_t``: Cross-sectional mean of the price relative of period ``t``, the average of its ``N`` entries.",#
+                       :C_pa => "``C``: Aggressiveness of a passive-aggressive slack rule, positive.",#
+                       :E_eset => "``\\mathcal{E}``: Expert Set, the Allocation Set over the experts that the weighting of an expert mixture projects onto.")
 """
     ref_dict
 

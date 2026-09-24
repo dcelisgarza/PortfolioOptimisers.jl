@@ -701,4 +701,138 @@ end
         @test res.opt.alg.me.alg.window in (3, 5)
         @test size(res.test_scores, 2) == 2
     end
+
+    @testset "The mathematics of the selection-rule docstrings (#1174)" begin
+        # Each literal is a hand recursion of the paper's update on this file's fixture: the
+        # Li-Hoi survey for buy-and-hold and the constant rebalanced portfolio, Figure 1 of
+        # Agarwal et al. (2006) for the Newton step, Algorithm 1 of Li et al. (2012) for the
+        # passive-aggressive step, eq. 34 and Theorem 1 of Cover and Ordentlich (1996) for the
+        # mixtures.
+        function simplex_projection(q)
+            u = sort(q; rev = true)
+            cs = cumsum(u)
+            rho = findlast(j -> u[j] + (1 - cs[j]) / j > 0, eachindex(u))
+            theta = (1 - cs[rho]) / rho
+            return max.(q .+ theta, 0)
+        end
+        padj(w, x) = w .* x ./ dot(w, x)
+        simplex = po.resolve_allocation_set(BoundedAllocationSet(), N, false, Float64)
+
+        # Buy-and-hold is the Price-Adjusted Allocation, and the weight of asset i is the
+        # share w_1i ∏ x_si of the wealth.
+        W = libpath(BuyAndHold())
+        H = zeros(T, N)
+        H[1, :] .= 1 / N
+        for t in 1:(T - 1)
+            H[t + 1, :] .= padj(H[t, :], X[t, :])
+        end
+        @test maxerr(W, H) < 1e-15
+        g = vec(prod(X[1:(T - 1), :]; dims = 1))
+        @test maxerr(W[T, :], g ./ sum(g)) < 1e-15
+
+        # The constant rebalanced portfolio holds b from the second period, after a given
+        # Start Allocation, and its wealth over periods 2 to t is S_t(b) / S_1(b).
+        b = [0.1, 0.2, 0.3, 0.4]
+        Wc = libpath(ConstantRebalancedPortfolio(; w = b))
+        @test maxerr(Wc[2:end, :], repeat(b', T - 1)) < 1e-15
+        @test po.partial_fit!(OPS(; alg = ConstantRebalancedPortfolio(; w = b),
+                                  w0 = [0.7, 0.1, 0.1, 0.1]), rows(rd, 1:1)).cache.w ≈ b
+        S(v, t) = prod(dot(v, X[s, :]) for s in 1:t)
+        @test prod(dot(Wc[s, :], X[s, :]) for s in 2:T) ≈ S(b, T) / S(b, 1)
+        @test_throws IsEmptyError ConstantRebalancedPortfolio(; w = Float64[])
+        @test_throws DomainError ConstantRebalancedPortfolio(; w = [NaN, 1.0])
+        # A view whose slice sums to zero is uniform over the selected assets.
+        @test po.port_opt_view(ConstantRebalancedPortfolio(; w = [0.0, 0.0, 1.0]), 1:2).w ==
+              [0.5, 0.5]
+
+        # The Newton step is Figure 1 of the paper under the Euclidean norm, with the
+        # uniform mix before the projection.
+        for (beta, delta, eta) in ((1, 0.125, 0), (0.5, 0.3, 0), (1, 0.125, 0.2))
+            Wn = libpath(NewtonStep(; beta = beta, delta = delta, eta = eta))
+            Hn = zeros(T, N)
+            Hn[1, :] .= 1 / N
+            A = Matrix(1.0I, N, N)
+            bt = zeros(N)
+            for t in 1:(T - 1)
+                gt = X[t, :] ./ dot(Hn[t, :], X[t, :])
+                A .+= gt * gt'
+                bt .+= (1 + 1 / beta) .* gt
+                q = (1 - eta) .* delta .* (A \ bt) .+ eta / N
+                Hn[t + 1, :] .= simplex_projection(q)
+            end
+            @test maxerr(Wn, Hn) < 1e-13
+        end
+
+        # The passive-aggressive step, Algorithm 1 of the paper, under the three step-length
+        # rules, at thresholds below, at and above one.
+        steps = ((NoSlack(), (l, d) -> l / d),
+                 (LinearSlack(; C = 5), (l, d) -> min(5, l / d)),
+                 (QuadraticSlack(; C = 5), (l, d) -> l / (d + 1 / 10)))
+        for (slack, f) in steps, eps in (0.5, 1.0, 1.01)
+            Wp = libpath(PassiveAggressiveMeanReversion(; eps = eps, slack = slack))
+            Hp = zeros(T, N)
+            Hp[1, :] .= 1 / N
+            for t in 1:(T - 1)
+                d = X[t, :] .- mean(X[t, :])
+                l = max(0, dot(Hp[t, :], X[t, :]) - eps)
+                Hp[t + 1, :] .= simplex_projection(Hp[t, :] .- f(l, sum(abs2, d)) .* d)
+            end
+            @test maxerr(Wp, Hp) < 1e-13
+        end
+        # Under NoSlack the raw step keeps the budget and earns exactly eps on the period.
+        w4, x4 = [0.1, 0.2, 0.3, 0.4], [0.9, 1.0, 1.1, 1.2]
+        d4 = x4 .- mean(x4)
+        q4 = w4 .-
+             po.passive_aggressive_step(NoSlack(), dot(w4, x4) - 0.5, sum(abs2, d4)) .* d4
+        @test sum(q4) ≈ 1 && dot(q4, x4) ≈ 0.5
+        # NoSlack is the limit of the other two rules as C grows.
+        for s in (LinearSlack(; C = 1e12), QuadraticSlack(; C = 1e12))
+            @test po.passive_aggressive_step(s, 0.3, 0.02) ≈
+                  po.passive_aggressive_step(NoSlack(), 0.3, 0.02)
+        end
+        # Every asset moved alike: the step is zero.
+        @test po.online_update!(PassiveAggressiveMeanReversion(; eps = 0.0), nothing, w4,
+                                fill(1.3, N), nothing, simplex)[2] ≈ w4
+
+        # Under buy-and-hold the mixture's wealth is the p1-weighted average of the experts'
+        # wealths, so the best expert beats it by at most -log p1 of that expert.
+        targets = [[0.7, 0.1, 0.1, 0.1], [0.1, 0.7, 0.1, 0.1], fill(0.25, 4),
+                   [0.0, 0.0, 0.5, 0.5]]
+        crps = [ConstantRebalancedPortfolio(; w = v) for v in targets]
+        Sk = [S(v, T - 1) for v in targets]
+        for p1 in (fill(0.25, 4), [0.4, 0.3, 0.2, 0.1])
+            Wm = libpath(ExpertMixture(; experts = crps, p0 = p1))
+            Wm[1, :] .= sum(p1 .* targets)
+            Smix = prod(dot(Wm[t, :], X[t, :]) for t in 1:(T - 1))
+            @test Smix ≈ dot(p1, Sk)
+            @test log(maximum(Sk)) - log(Smix) <= -log(p1[argmax(Sk)])
+        end
+        @test_throws IsEmptyError ExpertMixture(; experts = [BuyAndHold()], p0 = Float64[])
+        @test_throws DomainError ExpertMixture(; experts = [BuyAndHold()], p0 = [NaN])
+
+        # The universal portfolio is the wealth-weighted average of its sampled targets, and
+        # the best sampled expert beats it by at most log K.
+        up = UniversalPortfolio(; N = N, n_experts = 50, seed = 3)
+        B = reduce(hcat, [e.w for e in up.experts])
+        St = [S(B[:, k], 25) for k in 1:50]
+        @test maxerr(optimise(OPS(; alg = up), rows(rd, 1:25)).w, B * St ./ sum(St)) < 1e-15
+        Wu = libpath(up)
+        Wu[1, :] .= vec(mean(B; dims = 2))
+        Su = prod(dot(Wu[t, :], X[t, :]) for t in 1:(T - 1))
+        SK = [S(B[:, k], T - 1) for k in 1:50]
+        @test Su ≈ mean(SK)
+        @test log(maximum(SK)) - log(Su) <= log(50)
+        @test_throws IsEmptyError UniversalPortfolio(; N = 2, alpha = Float64[])
+        @test_throws DomainError UniversalPortfolio(; N = 2, alpha = -1)
+        # Theorem 1 of Cover and Ordentlich on the exact integral over two assets: the best
+        # constant rebalanced portfolio beats the uniform-prior universal portfolio by at
+        # most (N - 1) log(T + 1), here 0.99 against log 31 on an alternating market.
+        Xa = [isodd(t) ? [2.0, 0.5] : [0.5, 2.0] for t in 1:30]
+        S2(p) = prod(p * x[1] + (1 - p) * x[2] for x in Xa)
+        grid = range(0, 1; length = 20_001)
+        vals = S2.(grid)
+        Sup = sum((vals[1:(end - 1)] .+ vals[2:end]) ./ 2) * step(grid)
+        gap = log(maximum(vals)) - log(Sup)
+        @test round(gap; digits = 2) == 0.99 && gap <= log(31)
+    end
 end
