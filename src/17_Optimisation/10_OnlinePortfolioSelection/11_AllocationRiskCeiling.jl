@@ -206,11 +206,11 @@ end
 
 Adds a programme set's risk ceilings to the model, one row block for each measure, at the measure's index.
 
-With a prior result, each ceiling goes through the measure's own JuMP builder, [`set_risk_constraints!`](@ref). The set is the [`RiskConstraintOwner`](@ref), and the builder also reads the resolved phylogeny `pl`, so a [`Variance`](@ref) under a semidefinite phylogeny takes the semidefinite formulation, as it does in a head. The builder bounds each measure at its `settings.ub` through [`set_risk_upper_bound!`](@ref), and its own `# JuMP formulation` names the rows.
+Each ceiling goes through the measure's own JuMP builder, [`set_risk_constraints!`](@ref), with the set as the [`RiskConstraintOwner`](@ref). The builder bounds each measure at its `settings.ub` through [`set_risk_upper_bound!`](@ref), and its own `# JuMP formulation` names the rows. So the set writes the rows that a JuMP optimiser writes for the same bound. A [`Variance`](@ref) takes the semidefinite formulation under the conditions that select it in a head, [`sdp_variance_flag!`](@ref): risk-contribution rows, an earlier variance with such rows on the same weights, or a semidefinite phylogeny in `pl`. Otherwise it takes the second-order cone. The variance marks `variance_flag`, so a semidefinite phylogeny on the same weights adds no `p · tr(W)` penalty, as in a head.
 
-Without a prior result, every ceiling is a [`Variance`](@ref) or a [`StandardDeviation`](@ref) that holds its matrix, on a set that reads no rows. There is no prior to build on, so each ceiling is the set's own cone, [`set_matrix_risk_ceiling!`](@ref).
+The source of the covariance matrix does not change the formulation. With a prior result, each measure is resolved against it first. Without one, every ceiling is a [`Variance`](@ref) or a [`StandardDeviation`](@ref) that holds its matrix, on a set that reads no rows, and the builder reads that matrix with `pr = nothing`.
 
-Under a `prefix`, the builders put their entries in that namespace. [`assemble_allocation_set!`](@ref) registers the head's `w` under the prefix before any builder runs. This keeps the ceiling's entries apart from the entries of the head's own measures.
+Under a `prefix`, the builders put their entries in that namespace. [`assemble_allocation_set!`](@ref) registers the head's `w` under the prefix before any builder runs. This keeps the ceiling's entries apart from the entries of the head's own measures. The lifted matrix ``\\mathbf{W}`` and the marks belong to the weights, [`weights_prefix`](@ref), so in a leader's model the ceiling, the set's phylogeny and the leader's measures read one ``\\mathbf{W}``.
 
 # Algorithm
 
@@ -221,13 +221,13 @@ For one measure:
 For a vector and a prior result:
 
  1. Resolve each measure against `pr` with [`factory`](@ref) and `set.slv`. A moment that the measure holds, such as its own covariance, stays. A cache that the head filled from another prior is not read.
- 2. Clear the measure's `rke` with [`no_risk_expr_risk_measure`](@ref), so its expression joins no objective.
- 3. Set the measure's `scale` to one with [`unit_scale_risk_measure`](@ref), because a ceiling is not a combination of measures.
- 4. Call [`set_risk_constraints!`](@ref) on the vector of ceilings, with the set as owner, `pr`, `pl` and `prefix`.
+ 2. Clear the measure's `rke` with [`no_risk_expr_risk_measure`](@ref), so its expression joins no objective. The measure's `scale` weights its expression only in the objective, so a ceiling ignores it.
+ 3. Call [`set_risk_constraints!`](@ref) on the vector of ceilings, with the set as owner, `pr`, `pl` and `prefix`.
 
 For a vector and no prior result:
 
- 1. For each measure at index `i`, call [`set_matrix_risk_ceiling!`](@ref).
+ 1. For each measure at index `i`, clear its `rke`, as above.
+ 2. Call the index-aware [`set_risk_constraints!`](@ref) at `i`, with the set as owner, `pr = nothing`, `pl` and `prefix`.
 
 # Arguments
 
@@ -247,7 +247,7 @@ For a vector and no prior result:
   - [`ProgrammeAllocationSet`](@ref)
   - [`set_allocation_set_constraints!`](@ref)
   - [`set_risk_constraints!`](@ref)
-  - [`set_matrix_risk_ceiling!`](@ref)
+  - [`sdp_variance_flag!`](@ref)
   - [`HeldStep`](@ref)
 """
 function set_allocation_risk_ceiling!(::JuMP.Model, ::Nothing, ::ProgrammeAllocationSet,
@@ -261,210 +261,19 @@ function set_allocation_risk_ceiling!(model::JuMP.Model, r::RiskMeasure,
     return nothing
 end
 function set_allocation_risk_ceiling!(model::JuMP.Model, rs::VecRM,
-                                      ::ProgrammeAllocationSet, ::Nothing, pl;
+                                      set::ProgrammeAllocationSet, ::Nothing, pl;
                                       prefix::Symbol = Symbol(""))::Nothing
     for (i, r) in enumerate(rs)
-        set_matrix_risk_ceiling!(model, i, r, pl; prefix = prefix)
+        set_risk_constraints!(model, i, no_risk_expr_risk_measure(r), set, nothing, pl,
+                              nothing, nothing; prefix = prefix)
     end
     return nothing
 end
 function set_allocation_risk_ceiling!(model::JuMP.Model, rs::VecRM,
                                       set::ProgrammeAllocationSet, pr::AbstractPriorResult,
                                       pl; prefix::Symbol = Symbol(""))::Nothing
-    ceilings = [unit_scale_risk_measure(no_risk_expr_risk_measure(factory(r, pr, set.slv)))
-                for r in rs]
+    ceilings = [no_risk_expr_risk_measure(factory(r, pr, set.slv)) for r in rs]
     set_risk_constraints!(model, ceilings, set, pr, pl, nothing; prefix = prefix)
-    return nothing
-end
-"""
-    set_matrix_risk_ceiling!(model::JuMP.Model, i::Integer, r::Variance, pl; prefix::Symbol = Symbol(""))
-    set_matrix_risk_ceiling!(model::JuMP.Model, i::Integer, r::StandardDeviation, pl; prefix::Symbol = Symbol(""))
-
-Adds the set's own row for a ceiling that holds its matrix and reads no prior, at index `i`.
-
-A [`StandardDeviation`](@ref) always takes the second-order cone of [`set_matrix_risk_soc!`](@ref). So does a [`Variance`](@ref), unless [`sdp_variance_flag!`](@ref) selects the semidefinite formulation because `pl` holds a semidefinite phylogeny. The variance then takes one linear row on the model's lifted matrix ``\\mathbf{W}``. The phylogeny's rows use the same ``\\mathbf{W}``, because one lifted matrix belongs to one weight vector.
-
-# Mathematical definition
-
-The semidefinite ceiling on the lifted matrix:
-
-```math
-\\begin{align}
-\\mathrm{tr}(\\mathbf{\\Sigma} \\mathbf{W}) &\\leq \\bar{r} k\\,, \\\\
-\\begin{bmatrix} \\mathbf{W} & \\boldsymbol{w} \\\\ \\boldsymbol{w}^\\intercal & k \\end{bmatrix} &\\succeq 0\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathbf{W}``: Lifted symmetric matrix of the semidefinite formulation, ``N \\times N``.
-  - $(math_dict[:Sigma_rm])
-  - $(math_dict[:rbar_ceil])
-  - $(math_dict[:w_port])
-  - $(math_dict[:k_budget])
-
-For ``k > 0`` the second line gives ``\\mathbf{W} \\succeq \\boldsymbol{w}\\boldsymbol{w}^\\intercal / k``, so every allocation that the first line admits satisfies ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} \\leq \\bar{r} k^2``.
-
-# Algorithm
-
- 1. Ask [`sdp_variance_flag!`](@ref) for the formulation of a variance. A standard deviation skips this step.
- 2. Under the semidefinite formulation, get the lifted matrix `W` from [`set_sdp_constraints!`](@ref), which builds it and its cone when the model has none.
- 3. Register the row `set_risk_sdp_` at index `i`, and return.
- 4. Otherwise, call [`set_matrix_risk_soc!`](@ref).
-
-# JuMP formulation
-
-## Variables
-
-  - `W`: ``\\mathbf{W}``, the lifted matrix, read from the model or created with its cone.
-  - `k`: ``k``, read from the model.
-
-## Constraints
-
-  - `set_risk_sdp_i`, under `prefix`: ``s_c \\left(\\mathrm{tr}(\\mathbf{\\Sigma} \\mathbf{W}) - \\bar{r} k\\right) \\leq 0``.
-
-Where:
-
-  - ``\\mathbf{W}``: Lifted symmetric matrix of the semidefinite formulation, ``N \\times N``.
-  - ``\\mathbf{A}``: Adjacency matrix of the semidefinite phylogeny.
-  - $(math_dict[:Sigma_rm])
-  - $(math_dict[:rbar_ceil])
-  - $(math_dict[:w_port])
-  - $(math_dict[:k_budget])
-  - $(math_dict[:sc_scale])
-
-## Relaxation
-
-$(val_dict[:relax])
-
-The row bounds ``\\mathrm{tr}(\\mathbf{\\Sigma} \\mathbf{W}) / k``, which lies above the variance ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} / k^2``. So the row is conservative. The variance of the answer never exceeds the ceiling, and it can stay below it. The bound is tight when ``\\mathbf{W} = \\boldsymbol{w}\\boldsymbol{w}^\\intercal / k``. The phylogeny's rows ``\\mathbf{A} \\odot \\mathbf{W} = \\mathbf{0}`` can forbid that matrix, and then the ceiling binds below ``\\bar{r}``.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:ci])
-  - `r`: The ceiling, a measure that holds its covariance matrix.
-  - $(arg_dict[:pl_opt])
-  - `prefix`: The Model State namespace of the row.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`set_allocation_risk_ceiling!`](@ref)
-  - [`set_matrix_risk_soc!`](@ref)
-  - [`set_sdp_constraints!`](@ref)
-  - [`sdp_variance_flag!`](@ref)
-"""
-function set_matrix_risk_ceiling!(model::JuMP.Model, i::Integer, r::Variance, pl;
-                                  prefix::Symbol = Symbol(""))::Nothing
-    if isa(sdp_variance_flag!(model, false, pl; prefix = prefix), LinearBound)
-        W = set_sdp_constraints!(model)
-        k = get_k(model)
-        sc = get_constraint_scale(model)
-        ub = r.settings.ub
-        state_set!(model, prefix, :set_risk_sdp_, i,
-                   JuMP.@constraint(model,
-                                    sc * (LinearAlgebra.tr(r.sigma * W) - ub * k) <= 0))
-        return nothing
-    end
-    set_matrix_risk_soc!(model, i, r; prefix = prefix)
-    return nothing
-end
-function set_matrix_risk_ceiling!(model::JuMP.Model, i::Integer, r::StandardDeviation,
-                                  ::Any; prefix::Symbol = Symbol(""))::Nothing
-    set_matrix_risk_soc!(model, i, r; prefix = prefix)
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Adds the second-order cone of [`set_matrix_risk_ceiling!`](@ref) at index `i`.
-
-The factor is the measure's `chol` when it states one, and otherwise [`covariance_factor`](@ref) of its matrix, as in the shared builder. So a singular matrix, such as the covariance of a book with a cash leg, gives an exact factor, and an indefinite matrix throws its `PosDefException`. The shared builder writes the same bound as two rows through an auxiliary variable. This function writes it as one row.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\left\\lVert \\mathbf{G} \\boldsymbol{w} \\right\\rVert_2 &\\leq u k\\,, \\quad \\mathbf{G}^\\intercal \\mathbf{G} = \\mathbf{\\Sigma}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathbf{G}``: Upper factor of ``\\mathbf{\\Sigma}``.
-  - $(math_dict[:Sigma_rm])
-  - $(math_dict[:u_cone])
-  - $(math_dict[:rbar_ceil])
-  - $(math_dict[:w_port])
-  - $(math_dict[:k_budget])
-
-For ``k \\geq 0`` the row is ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} \\leq u^2 k^2``. So the row bounds a variance by ``\\bar{r} k^2``, and a standard deviation by ``\\bar{r} k``.
-
-# Algorithm
-
- 1. Take the factor `G`: `r.chol` when it is set, and `covariance_factor(r.sigma)` otherwise.
- 2. Read the norm bound `u` from [`allocation_risk_ceiling`](@ref).
- 3. Read `w`, `k` and the constraint scale from the model.
- 4. Register the row `set_risk_soc_` at index `i`.
-
-# JuMP formulation
-
-## Variables
-
-  - `w`: ``\\boldsymbol{w}``, read from the model.
-  - `k`: ``k``, read from the model.
-
-## Constraints
-
-  - `set_risk_soc_i`, under `prefix`: ``\\left(s_c u k,\\; s_c \\mathbf{G} \\boldsymbol{w}\\right) \\in \\mathcal{K}_{\\mathrm{SOC}}``.
-
-Where:
-
-  - ``\\mathbf{G}``: Upper factor of ``\\mathbf{\\Sigma}``.
-  - ``\\mathcal{K}_{\\mathrm{SOC}}``: Second-order cone.
-  - $(math_dict[:Sigma_rm])
-  - $(math_dict[:u_cone])
-  - $(math_dict[:rbar_ceil])
-  - $(math_dict[:w_port])
-  - $(math_dict[:k_budget])
-  - $(math_dict[:sc_scale])
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:ci])
-  - `r`: The ceiling, a measure that holds its covariance matrix.
-  - `prefix`: The Model State namespace of the row.
-
-# Validation
-
-  - `r.sigma` is not positive semidefinite and `r.chol` is `nothing`. A `PosDefException` is thrown.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`set_matrix_risk_ceiling!`](@ref)
-  - [`covariance_factor`](@ref)
-  - [`chol_sigma_selector`](@ref)
-"""
-function set_matrix_risk_soc!(model::JuMP.Model, i::Integer,
-                              r::Union{<:Variance, <:StandardDeviation};
-                              prefix::Symbol = Symbol(""))::Nothing
-    G = isnothing(r.chol) ? covariance_factor(r.sigma) : r.chol
-    u = allocation_risk_ceiling(r)
-    w = get_w(model)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    state_set!(model, prefix, :set_risk_soc_, i,
-               JuMP.@constraint(model,
-                                [sc * u * k; sc * (G * w)] in JuMP.SecondOrderCone()))
     return nothing
 end
 """
@@ -490,16 +299,19 @@ function risk_constraint_solver(set::ProgrammeAllocationSet)
 end
 """
     risk_contribution_constraints(r::Variance, set::ProgrammeAllocationSet, pr::AbstractPriorResult)
+    risk_contribution_constraints(r::Variance, set::ProgrammeAllocationSet, pr::Nothing)
 
 Resolves the risk-contribution rows of a [`Variance`](@ref) ceiling on a programme set.
 
 The set resolves `r.rc` over its own `sets`, under the `strict` of the head that runs the step, the same way an optimiser resolves its own rows. When there are rows, the shared builder takes the semidefinite formulation.
 
+Without a prior result the set reads no rows. [`risk_reads_rows`](@ref) sends a variance with rows to the prior, so `r.rc` is `nothing` here, and the method returns it.
+
 # Arguments
 
   - `r`: The variance ceiling.
   - `set`: The programme Allocation Set.
-  - $(arg_dict[:pr])
+  - `pr`: The set's prior result, or `nothing` when the set reads no rows.
 
 # Returns
 
@@ -509,50 +321,15 @@ The set resolves `r.rc` over its own `sets`, under the `strict` of the head that
 
   - [`RiskConstraintOwner`](@ref)
   - [`linear_constraints`](@ref)
+  - [`risk_reads_rows`](@ref)
 """
 function risk_contribution_constraints(r::Variance, set::ProgrammeAllocationSet,
                                        pr::AbstractPriorResult)
     return linear_constraints(r.rc, set.sets; datatype = eltype(pr.X),
                               strict = projection_step_strict())
 end
-"""
-    allocation_risk_ceiling(r::Variance)
-    allocation_risk_ceiling(r::StandardDeviation)
-
-Returns the norm bound of the set's own second-order cone for a ceiling that holds its matrix.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-u &= \\sqrt{\\bar{r}} \\quad \\text{for a variance,} \\\\
-u &= \\bar{r} \\quad \\text{for a standard deviation.}
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:u_cone])
-  - $(math_dict[:rbar_ceil])
-
-# Arguments
-
-  - `r`: The ceiling.
-
-# Returns
-
-  - `u::Number`: The norm bound, in the type that `sqrt` gives for a variance and in the type of `settings.ub` for a standard deviation.
-
-# Related
-
-  - [`set_matrix_risk_soc!`](@ref)
-  - [`ProgrammeAllocationSet`](@ref)
-"""
-function allocation_risk_ceiling(r::Variance)
-    return sqrt(r.settings.ub)
-end
-function allocation_risk_ceiling(r::StandardDeviation)
-    return r.settings.ub
+function risk_contribution_constraints(r::Variance, ::ProgrammeAllocationSet, ::Nothing)
+    return r.rc
 end
 """
     clip_at_zero(w::AbstractVector)

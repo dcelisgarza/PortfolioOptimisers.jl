@@ -5,6 +5,7 @@ Description = "SDP Constraints, private API of PortfolioOptimisers.jl: set_sdp_c
 # SDP Constraints: private API
 
 ```@docs
+PortfolioOptimisers.weights_prefix
 set_sdp_constraints!
 set_sdp_frc_constraints!
 set_sdp_phylogeny_constraints!

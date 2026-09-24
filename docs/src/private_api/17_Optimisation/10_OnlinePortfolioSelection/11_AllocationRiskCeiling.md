@@ -11,9 +11,6 @@ PortfolioOptimisers.allocation_set_prior
 PortfolioOptimisers.prior_investable_mask
 PortfolioOptimisers.assert_set_prior_priced
 PortfolioOptimisers.set_allocation_risk_ceiling!
-PortfolioOptimisers.set_matrix_risk_ceiling!
-PortfolioOptimisers.set_matrix_risk_soc!
 PortfolioOptimisers.risk_contribution_constraints(r::Variance, set::ProgrammeAllocationSet, pr::AbstractPriorResult)
-PortfolioOptimisers.allocation_risk_ceiling
 PortfolioOptimisers.clip_at_zero
 ```

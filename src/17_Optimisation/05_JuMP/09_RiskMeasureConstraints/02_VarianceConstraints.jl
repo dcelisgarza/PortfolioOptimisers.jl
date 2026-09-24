@@ -81,7 +81,8 @@ both `nothing`, the Cholesky of `r.sigma` when `r.chol` is `nothing`, or `r.chol
 
   - [`get_chol_or_sigma_pm`](@ref)
 """
-function chol_sigma_selector(model::JuMP.Model, pr::AbstractPriorResult, r::CholRM)
+function chol_sigma_selector(model::JuMP.Model, pr::Option{<:AbstractPriorResult},
+                             r::CholRM)
     return if isnothing(r.sigma) && isnothing(r.chol)
         get_chol_or_sigma_pm(model, pr)
     elseif isnothing(r.chol)
@@ -202,7 +203,7 @@ where ``\\mathbf{G}`` is the upper Cholesky factor of ``\\boldsymbol{\\Sigma}`` 
   - [`set_variance_risk!`](@ref)
 """
 function set_risk!(model::JuMP.Model, i::Any, r::StandardDeviation,
-                   opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                   opt::RiskConstraintOwner, pr::Option{<:AbstractPriorResult}, args...;
                    prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
@@ -244,8 +245,8 @@ formulations based on risk-contribution and phylogeny settings.
   - [`set_ucs_variance_risk!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::StandardDeviation,
-                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::Option{<:AbstractPriorResult},
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     sd_risk, name = set_risk!(model, i, r, opt, pr, args...; prefix = prefix, kwargs...)
     set_risk_bounds_and_expression!(model, opt, sd_risk, r.settings, name, i;
                                     prefix = prefix)
@@ -323,7 +324,7 @@ Returns [`LinearBound`](@ref) (SDP formulation) when any of the following hold: 
 function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool, pl::Option{<:PlC_VecPlC};
                             prefix::Symbol = Symbol(""))
     return if rc_flag ||
-              state_has(model, prefix, :rc_variance) ||
+              state_has(model, weights_prefix(model, prefix), :rc_variance) ||
               isa(pl, SemiDefinitePhylogeny) ||
               isa(pl, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), pl)
         LinearBound()
@@ -361,12 +362,14 @@ directly as ``\\boldsymbol{w}^\\intercal \\Sigma \\boldsymbol{w}``.
   - [`set_sdp_variance_risk!`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
-function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance, pr::AbstractPriorResult,
-                            ::LinearBound; prefix::Symbol = Symbol(""))
+function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
+                            pr::Option{<:AbstractPriorResult}, ::LinearBound;
+                            prefix::Symbol = Symbol(""))
     return set_sdp_variance_risk!(model, i, r, pr; prefix = prefix)
 end
-function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance, pr::AbstractPriorResult,
-                            ::SquareRootBound; prefix::Symbol = Symbol(""))
+function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
+                            pr::Option{<:AbstractPriorResult}, ::SquareRootBound;
+                            prefix::Symbol = Symbol(""))
     return set_variance_risk!(model, i, r, pr; prefix = prefix)
 end
 """
@@ -393,16 +396,17 @@ at index `i`.
   - [`set_variance_risk!`](@ref)
 """
 function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
-                                pr::AbstractPriorResult; prefix::Symbol = Symbol(""))
+                                pr::Option{<:AbstractPriorResult};
+                                prefix::Symbol = Symbol(""))
     W = set_sdp_constraints!(model; prefix = prefix)
-    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
+    sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     sigma_W = state_set!(model, prefix, :sigma_W_, i, JuMP.@expression(model, sigma * W))
     return state_set!(model, prefix, :variance_risk_, i,
                       JuMP.@expression(model, LinearAlgebra.tr(sigma_W)))
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:Any, <:SquaredSOCRiskExpr},
-                            pr::AbstractPriorResult; prefix::Symbol = Symbol(""))
+                            pr::Option{<:AbstractPriorResult}; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     G = chol_sigma_selector(model, pr, r)
@@ -413,10 +417,10 @@ function set_variance_risk!(model::JuMP.Model, i::Any,
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:Any, <:QuadRiskExpr},
-                            pr::AbstractPriorResult; prefix::Symbol = Symbol(""))
+                            pr::Option{<:AbstractPriorResult}; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
-    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
+    sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     G = chol_sigma_selector(model, pr, r)
     dev = state_set!(model, prefix, :dev_, i, JuMP.@variable(model))
     state_set!(model, prefix, :cdev_soc_, i,
@@ -573,7 +577,7 @@ function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstrain
                                   prefix::Symbol = Symbol(""))
     sigma_W = state_get(model, prefix, :sigma_W_, i)
     sc = get_constraint_scale(model)
-    mark_state!(model, prefix, :rc_variance)
+    mark_state!(model, weights_prefix(model, prefix), :rc_variance)
     vsw = vec(LinearAlgebra.diag(sigma_W))
     if !isnothing(rc.A_ineq)
         state_set!(model, prefix, :rc_variance_ineq_, i,
@@ -588,7 +592,7 @@ function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstrain
     return nothing
 end
 function set_risk!(model::JuMP.Model, i::Any, r::Variance, opt::RiskBoundOwner,
-                   pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC}, args...;
+                   pr::Option{<:AbstractPriorResult}, pl::Option{<:PlC_VecPlC}, args...;
                    prefix::Symbol = Symbol(""), kwargs...)
     rc = risk_contribution_constraints(r, opt, pr)
     rc_flag = sdp_rc_variance_flag!(model, opt, rc)
@@ -606,13 +610,20 @@ optimisers.
 Computes the portfolio variance risk expression and registers the upper-bound constraint
 and objective contribution according to the variance risk measure settings.
 
+The builder marks `variance_flag` on the namespace that owns the weights,
+[`weights_prefix`](@ref). A semidefinite phylogeny on the same weights then adds no
+`p · tr(W)` penalty, whether the variance is in the objective or is only a bound.
+[`sdp_variance_flag!`](@ref) selects the formulation, and the source of the covariance
+matrix, the measure or the prior, does not change it. A measure that holds its matrix reads
+no prior, so a programme Allocation Set that reads no rows passes `pr = nothing`.
+
 # Arguments
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
   - `r::Variance`: The variance risk measure.
   - `opt::RiskBoundOwner`: The optimisation estimator.
-  - $(arg_dict[:pr])
+  - `pr`: The prior result, or `nothing` when `r` holds its covariance matrix and has no risk-contribution rows.
   - $(arg_dict[:pl_opt])
 
 # Returns
@@ -626,9 +637,9 @@ and objective contribution according to the variance risk measure settings.
   - [`set_risk!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::RiskBoundOwner,
-                               pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC}, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
-    mark_state!(model, prefix, :variance_flag)
+                               pr::Option{<:AbstractPriorResult}, pl::Option{<:PlC_VecPlC},
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
+    mark_state!(model, weights_prefix(model, prefix), :variance_flag)
     variance_risk, sdp_flag = set_risk!(model, i, r, opt, pr, pl, args...; prefix = prefix,
                                         kwargs...)
     var_bound_expr, var_bound_name = variance_risk_bounds_expr(model, i, sdp_flag;
@@ -738,10 +749,9 @@ squares. It is the one overload that leaves the programme a second-order cone pr
 """
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySet, args...;
                                 prefix::Symbol = Symbol(""))
-    set_sdp_constraints!(model; prefix = prefix)
+    W = set_sdp_constraints!(model; prefix = prefix)
     Au = state_build!(model, prefix, :Au) do
         sc = get_constraint_scale(model)
-        W = state_get(model, prefix, :W)
         N = size(W, 1)
         Au = JuMP.@variable(model, [1:N, 1:N], Symmetric, lower_bound = 0)
         Al = state_set!(model, prefix, :Al,
@@ -762,9 +772,8 @@ end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncertaintySet,
                                 sigma::MatNum; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    set_sdp_constraints!(model; prefix = prefix)
+    W = set_sdp_constraints!(model; prefix = prefix)
     state_build!(model, prefix, :E) do
-        W = state_get(model, prefix, :W)
         N = size(W, 1)
         E = JuMP.@variable(model, [1:N, 1:N], Symmetric)
         state_set!(model, prefix, :WpE, JuMP.@expression(model, W + E))
@@ -831,9 +840,8 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any,
                                                             <:SigmaUncertaintySetClass},
                                 sigma::MatNum; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    set_sdp_constraints!(model; prefix = prefix)
+    W = set_sdp_constraints!(model; prefix = prefix)
     state_build!(model, prefix, :E) do
-        W = state_get(model, prefix, :W)
         N = size(W, 1)
         E = JuMP.@variable(model, [1:N, 1:N], Symmetric)
         state_set!(model, prefix, :WpE, JuMP.@expression(model, W + E))

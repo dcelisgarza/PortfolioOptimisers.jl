@@ -705,7 +705,7 @@ end
         @test expected_risk(cvar, wc, R) >= 0.02 * (1 - 1e-2)
         @test !isapprox(wc, free; atol = 1e-3)
         # A drawdown ceiling, and a variance built on the fitted prior through the same
-        # route as the tail measures, which agrees with the cone the matrix route writes.
+        # route as the tail measures, which agrees with the variance that holds its matrix.
         mset = resolve(ProgrammeAllocationSet(; slv = slv, r = mdd), 4)
         (wm, hm) = po.with_projection_step(() -> po.project(EuclideanProjection(), mset, q4,
                                                             w4), rdR, 1)
@@ -728,10 +728,10 @@ end
                                                            w4), rdR, 1)
         @test isapprox(wf, po.project(EuclideanProjection(), vmat, q4, w4); atol = 1e-5)
         @test dot(wf, S, wf) <= vub * (1 + 1e-4)
-        # The set's own cone takes the factor the shared builder takes. A cash leg makes
-        # the matrix singular at its first pivot, where a Cholesky factor without a check
-        # is wrong and the ceiling did not bind: the answer was the free projection at four
-        # times the ceiling.
+        # A matrix ceiling takes the shared builder's factor. A cash leg makes the matrix
+        # singular at its first pivot, where a Cholesky factor without a check is wrong and
+        # the ceiling did not bind: the answer was the free projection at four times the
+        # ceiling.
         S0 = zero(S)
         S0[2:4, 2:4] = S[2:4, 2:4]
         vub0 = 0.25 * dot(free, S0, free)
@@ -767,10 +767,7 @@ end
                                                                                             settings = RiskMeasureSettings(;
                                                                                                                            ub = 1e-5))),
                                                         4), q4, w4)
-        # The norm bound of the cone, and the refusals of a ceiling that is not one number.
-        quarter = RiskMeasureSettings(; ub = 1 // 4)
-        @test po.allocation_risk_ceiling(Variance(; settings = quarter)) == 1 / 2
-        @test po.allocation_risk_ceiling(StandardDeviation(; settings = quarter)) === 1 // 4
+        # The refusals of a ceiling that is not one number.
         @test isnothing(po.assert_risk_ceiling(nothing))
         @test_throws ArgumentError po.assert_risk_ceiling(ConditionalValueatRisk())
         @test_throws IsEmptyError po.assert_risk_ceiling(po.RiskMeasure[])
@@ -793,6 +790,16 @@ end
                                                                           r = rke), 4), w4,
                                            rdR)
         @test haskey(m, :cvar_risk_1_ub) && !haskey(m, :risk_vec)
+        # `scale` weights a measure only in the objective, so it does not move a ceiling.
+        cvar5 = ConditionalValueatRisk(;
+                                       settings = RiskMeasureSettings(; ub = 0.02,
+                                                                      scale = 5))
+        (wc5, _) = po.with_projection_step(() -> po.project(EuclideanProjection(),
+                                                            resolve(ProgrammeAllocationSet(;
+                                                                                           slv = slv,
+                                                                                           r = cvar5),
+                                                                    4), q4, w4), rdR, 1)
+        @test isapprox(wc5, wc; atol = 1e-8)
         # A measure that needs a quantity the prior does not carry is refused by name.
         kset = resolve(ProgrammeAllocationSet(; slv = slv,
                                               r = Kurtosis(;
@@ -1195,25 +1202,83 @@ end
                                                                                                                   0 0 0],
                                                                                                              p = 10.0)),
                                                        3), w3, nothing)
+            # A matrix ceiling goes through the shared builder with no prior: the semidefinite
+            # rows on the one `W`, and the variance marks `variance_flag`, so the phylogeny
+            # adds no penalty, as in a head (#1303).
             @test haskey(m2, :W) &&
-                  haskey(m2, :set_risk_sdp_1) &&
-                  !haskey(m2, :set_risk_soc_1)
-            # The semidefinite row bounds tr(ΣW), which lies above the variance. The pair
-            # phylogeny forbids W = w wᵀ, so the variance of the answer stays below the
-            # ceiling, while the cone without the phylogeny binds at it.
-            S3 = cov(R)
+                  haskey(m2, :variance_risk_1_ub) &&
+                  haskey(m2, :sdp_plg_1) &&
+                  haskey(m2, :variance_flag)
+            @test !haskey(m2, :dev_1) && !haskey(m2, :sdp_plg_p_1)
+            # The source of the matrix does not change the formulation: the ceiling that
+            # holds its matrix and the ceiling fitted on the prior give one projection, with
+            # the phylogeny and without it (#1303).
+            S3 = po.prior(EmpiricalPrior(), rdR).sigma
             vub3 = 0.3 * dot(free, S3, free)
-            vc3 = Variance(; sigma = S3, settings = ub_of(vub3))
-            wsd = proj(resolve(ProgrammeAllocationSet(; slv = slv, r = vc3,
-                                                      ple = po.SemiDefinitePhylogeny(;
-                                                                                     A = [0 1 0;
-                                                                                          1 0 0;
-                                                                                          0 0 0],
-                                                                                     p = 10.0)),
-                               3))
-            @test dot(wsd, S3, wsd) < 0.7 * vub3
-            wsoc = proj(resolve(ProgrammeAllocationSet(; slv = slv, r = vc3), 3))
+            pair = po.SemiDefinitePhylogeny(; A = [0 1 0; 1 0 0; 0 0 0], p = 10.0)
+            ceil3(; kw...) = Variance(; settings = ub_of(vub3), kw...)
+            mk3(r, ple) = resolve(ProgrammeAllocationSet(; slv = slv, r = r, ple = ple), 3)
+            wsd = proj(mk3(ceil3(; sigma = S3), pair))
+            @test isapprox(wsd, proj(mk3(ceil3(), pair)); atol = 1e-6)
+            # The semidefinite row bounds tr(ΣW), which lies above the variance, so the
+            # variance of the answer does not exceed the ceiling.
+            @test dot(wsd, S3, wsd) <= vub3 * (1 + 1e-6)
+            wsoc = proj(mk3(ceil3(; sigma = S3), nothing))
+            @test isapprox(wsoc, proj(mk3(ceil3(), nothing)); atol = 1e-6)
             @test isapprox(dot(wsoc, S3, wsoc), vub3; rtol = 1e-6)
+            # Without the phylogeny both routes write the shared builder's cone.
+            m3 = JuMP.Model()
+            po.set_model_scales!(m3, 1, 1)
+            po.set_model_observations!(m3, 0)
+            JuMP.@expression(m3, k, 1)
+            JuMP.@variable(m3, w[1:3])
+            po.set_allocation_set_constraints!(m3, mk3(ceil3(; sigma = S3), nothing), w3,
+                                               nothing)
+            @test haskey(m3, :dev_1) && haskey(m3, :cdev_soc_1) && haskey(m3, :dev_1_ub)
+            @test !haskey(m3, :W)
+            # A matrix ceiling after a variance with risk-contribution rows takes the
+            # semidefinite form on the same `W`, as the second variance of a head does.
+            rc3 = Variance(; rc = LinearConstraintEstimator(; val = :(A <= 0.5)),
+                           settings = ub_of(vub3))
+            m4 = JuMP.Model()
+            po.set_model_scales!(m4, 1, 1)
+            po.set_model_observations!(m4, T)
+            JuMP.@expression(m4, k, 1)
+            JuMP.@variable(m4, w[1:3])
+            inside(() -> po.set_allocation_set_constraints!(m4,
+                                                            resolve(ProgrammeAllocationSet(;
+                                                                                           slv = slv,
+                                                                                           sets = sets3,
+                                                                                           r = [rc3,
+                                                                                                ceil3(;
+                                                                                                      sigma = S3)]),
+                                                                    3), w3, rdR))
+            @test haskey(m4, :rc_variance) && haskey(m4, :variance_risk_2_ub)
+            @test !haskey(m4, :dev_2)
+            # In a leader's model both routes build the ceiling on the leader's `W` and mark
+            # the leader's `variance_flag`; only the set's rows take the prefix.
+            for r in (ceil3(; sigma = S3), ceil3())
+                ml = JuMP.Model()
+                po.set_model_scales!(ml, 1, 1)
+                po.set_model_observations!(ml, T)
+                JuMP.@expression(ml, k, 1)
+                JuMP.@variable(ml, w[1:3])
+                inside(() -> po.add_allocation_set_constraints!(ml, mk3(r, pair), w3, rdR))
+                @test haskey(ml, :W) && !haskey(ml, :aset_W)
+                @test haskey(ml, :variance_flag) && !haskey(ml, :aset_variance_flag)
+                @test haskey(ml, :aset_variance_risk_1_ub) && haskey(ml, :aset_sdp_plg_1)
+                @test !haskey(ml, :aset_sdp_plg_p_1)
+                @test po.weights_prefix(ml, :aset_) === Symbol("")
+            end
+            # A prefix without the set's mark owns itself, as a tracking build's does, even
+            # when it holds the model's own `w`.
+            mt = JuMP.Model()
+            JuMP.@variable(mt, w[1:3])
+            mt[:tr_w] = w
+            @test po.weights_prefix(mt, :tr_) === :tr_
+            @test po.weights_prefix(mt, Symbol("")) === Symbol("")
+            po.mark_state!(mt, :tr_, :w_shared)
+            @test po.weights_prefix(mt, :tr_) === Symbol("")
             # A Variance with risk-contribution rows reads the rows and builds through the
             # shared semidefinite builder.
             rcv = Variance(; rc = LinearConstraintEstimator(; val = :(A <= 0.5)),

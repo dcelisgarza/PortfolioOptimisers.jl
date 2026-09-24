@@ -196,17 +196,24 @@ which the head built from another prior; there the ceiling's entries live under 
 namespace with the head's `w` registered under it, so a ceiling of the same kind as a head measure
 never meets it. The measure's `rke` is cleared: the ceiling is a constraint, and the objective is
 the geometry's divergence plus the set's penalties. A `Variance` or `StandardDeviation` holding its
-matrix reads no rows and no prior, and there is no prior result without rows, so that one ceiling
-stays the set's own cone — the second-order cone the shared builder writes, or `tr(ΣW) ≤ ub` on
-the lifted `W` when a semidefinite phylogeny is present, as `sdp_variance_flag!` decides for a
-head — and keeps the ceiling from row one.
+matrix reads no rows and no prior, and there is no prior result without rows, so that ceiling goes
+through the same builder with no prior result and keeps the ceiling from row one. The source of the
+matrix, the measure or the prior, does not change the formulation. The builder writes the
+second-order cone, or `tr(ΣW) ≤ ub k` on the lifted `W` under the conditions that select it for a
+head in `sdp_variance_flag!`: risk-contribution rows, an earlier variance with such rows on the
+same weights, or a semidefinite phylogeny. Issue #1303 removed the set's own cone, which chose its
+formulation and its penalty rule apart from the builder's.
 
 A semidefinite kind costs nothing the set does not have. `set_sdp_constraints!` builds the lifted
 `W` and its cone from `w`, `k` and the constraint scale alone, and the phylogeny rows `A ⊙ W = 0`
 are pinned by the `p · tr(W)` penalty the builder folds into the Objective Penalty, so they bite
-on a projection exactly as they bite on a head whose objective carries no `W`. A kurtosis
+on a projection exactly as they bite on a head whose objective carries no `W`. The rule for the
+penalty is the head's: a `Variance` built on the same weights marks `variance_flag`, and then the
+penalty is not added, whether the variance is in the objective or is a ceiling. A kurtosis
 ceiling on the set already built `W` this way. In a leader's model the set reuses the leader's
-`W`, because one `W` belongs to one `w`, and prefixes only its own rows.
+`W`, because one `W` belongs to one `w`. The set registers the leader's `w` under `:aset_` and
+marks the prefix `w_shared`. `weights_prefix` reads the mark, so `W`, `variance_flag` and
+`rc_variance` stay in the bare namespace, and only the set's rows take the prefix.
 
 It refuses, by having no field for them: a budget, below; fees, which are a deduction from an
 expected return the projection does not have, and which ADR 0160 placed on the head; the
