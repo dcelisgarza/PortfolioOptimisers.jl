@@ -81,6 +81,7 @@ A MIP space tells the shared builders which expression the binary indicators gat
 
   - [`AssetMIPSpace`](@ref)
   - [`SubsetMIPSpace`](@ref)
+  - [`FactorMIPSpace`](@ref)
 """
 abstract type AbstractMIPSpace end
 """
@@ -121,7 +122,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Map a logical MIP builder name to the model key for the given space.
 
-Asset space returns the name unchanged; sub-group space returns `Symbol(pfx, name, :_, i, :_)`.
+Asset space returns the name unchanged; sub-group space returns `Symbol(pfx, name, :_, i, :_)`; factor space ([`FactorMIPSpace`](@ref)) returns `Symbol(:frc_, name)`.
 
 # Related
 
@@ -138,7 +139,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the weight expression the MIP indicators gate.
 
-Asset space returns the portfolio weights `w`; sub-group space registers and returns the sub-group weight expression `smtx * w` under the space's `:mtx_expr` key.
+Asset space returns the portfolio weights `w`; sub-group space registers and returns the sub-group weight expression `smtx * w` under the space's `:mtx_expr` key; factor space returns the factor weights `w1`.
 
 # Related
 
@@ -156,7 +157,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Map a weight bound vector into the MIP space.
 
-Asset space returns the bounds unchanged; sub-group space maps them through the selection matrix, `smtx * b`.
+Asset space returns the bounds unchanged; sub-group space maps them through the selection matrix, `smtx * b`; factor space returns them unchanged, because [`factor_weight_bounds`](@ref) states them on the factor axis already.
 
 # Related
 

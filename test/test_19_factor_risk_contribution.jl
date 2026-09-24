@@ -250,13 +250,20 @@ end
     @test maximum(abs, A .* (w1 * transpose(w1))) < 1e-8
 
     # A vector skips an entry that is not semidefinite, and indexes the rows by position.
-    m = build(ConditionalValueatRisk(), MinimumRisk();
-              ple = [IntegerPhylogeny(; A = A, B = 1),
-                     SemiDefinitePhylogeny(; A = A, p = 0.05)])
+    # The integer entry adds rows of its own, which need a MIP solver, so the model is
+    # built directly and not solved. The next testset solves it.
+    m = JuMP.Model()
+    PortfolioOptimisers.set_model_scales!(m, 1, 1)
+    JuMP.@variable(m, w1[1:3])
+    m[:k] = 1
+    PortfolioOptimisers.set_sdp_frc_phylogeny_constraints!(m,
+                                                           [IntegerPhylogeny(; A = A,
+                                                                             B = 1),
+                                                            SemiDefinitePhylogeny(; A = A,
+                                                                                  p = 0.05)])
     @test !haskey(m, :frc_sdp_plg_1) && haskey(m, :frc_sdp_plg_2)
     @test haskey(m, :frc_sdp_plg_p_2)
-    # The asset phylogeny skips the same way. An integer entry needs a MIP solver, so the
-    # model is built directly and not solved.
+    # The asset phylogeny skips the same way.
     m = JuMP.Model()
     PortfolioOptimisers.set_model_scales!(m, 1, 1)
     JuMP.@variable(m, w[1:3])
@@ -294,4 +301,104 @@ end
     @test maximum(abs, Aa .* (w * transpose(w))) < 1e-8
     w = asset_w(1.0)
     @test maximum(abs, Aa .* (w * transpose(w))) > 0.01
+end
+@testset "An integer factor phylogeny gates the factor weights" begin
+    using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Clarabel, HiGHS, Pajarito
+    import JuMP
+
+    rng = StableRNG(123)
+    T, N, Nf = 300, 6, 3
+    F = randn(rng, T, Nf) .* 0.02
+    B = randn(rng, N, Nf)
+    X = F * transpose(B) .+ randn(rng, T, N) .* 0.01 .+ 0.001
+    rd = ReturnsResult(; X = X, nx = string.(1:N), F = F, nf = string.(1:Nf))
+    cl = Solver(; solver = Clarabel.Optimizer, settings = Dict("verbose" => false),
+                check_sol = (; allow_local = true, allow_almost = true))
+    mip = Solver(;
+                 solver = JuMP.optimizer_with_attributes(Pajarito.Optimizer,
+                                                         "verbose" => false,
+                                                         "oa_solver" =>
+                                                             JuMP.optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                            JuMP.MOI.Silent() =>
+                                                                                                true),
+                                                         "conic_solver" =>
+                                                             JuMP.optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                            "verbose" =>
+                                                                                                false)),
+                 check_sol = (; allow_local = true, allow_almost = true))
+    pr = prior(EmpiricalPrior(), rd)
+    A = [0 1 0; 1 0 0; 0 0 0]
+    k_of(m) = isa(m[:k], Number) ? m[:k] : JuMP.value(m[:k])
+    w1_of(m) = JuMP.value.(m[:w1]) / k_of(m)
+    function solve(obj, slv; frc = IntegerPhylogeny(; A = A, B = 1), kwargs...)
+        res = optimise(FactorRiskContribution(; obj = obj,
+                                              opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                                  kwargs...),
+                                              frc_ple = frc), rd)
+        @test isa(res.retcode, OptimisationSuccess)
+        return res
+    end
+
+    # Without the rows, factors 1 and 2 both carry weight. The rows let one of the two be
+    # held, and the factor weights stay the loadings' image of the asset weights, which is
+    # what the bounds of the gate are derived from.
+    for obj in (MinimumRisk(), MaximumReturn(), MaximumRatio())
+        w1 = w1_of(solve(obj, cl; frc = nothing).model)
+        @test all(x -> abs(x) > 0.2, w1[1:2])
+        res = solve(obj, mip)
+        m = res.model
+        w1 = w1_of(m)
+        ib = round.(Int, JuMP.value.(m[:frc_ib]))
+        @test ib == [1, 0, 1]
+        @test abs(w1[2]) < 1e-9 && abs(w1[1]) > 1
+        @test all(A * ib .<= 1)
+        @test haskey(m, :frc_card_plg_1)
+        @test maximum(abs, transpose(res.rr.L) * res.w - w1) < 1e-10
+        @test isa(res.frc_plr, IntegerPhylogeny) && res.frc_plr.B == 1
+        # A variable budget gates with the continuous product of the bits and `k`.
+        @test haskey(m, :frc_ibf) == isa(obj, MaximumRatio)
+    end
+
+    # An estimator resolves on the factor returns. The network of the three factors gives
+    # the row `[1 1 1]`, and with `B = 1` it would let one factor be held: no single factor
+    # spans a long-only portfolio of this panel, so the solve would be infeasible. `B = 2`
+    # holds two of the three.
+    res = solve(MinimumRisk(), mip; frc = IntegerPhylogenyEstimator(; B = 2))
+    @test isa(res.frc_plr, IntegerPhylogeny) && size(res.frc_plr.A, 2) == Nf
+    @test haskey(res.model, :frc_card_plg_1)
+    @test sum(round.(Int, JuMP.value.(res.model[:frc_ib]))) == 2
+    @test count(x -> abs(x) < 1e-9, w1_of(res.model)) == 1
+    # A vector indexes the rows by position, and the asset phylogeny keeps its own bits
+    # beside the factor ones. Assets 4 and 5 are both held without the asset rows.
+    Aa = zeros(Int, N, N)
+    Aa[4, 5] = Aa[5, 4] = 1
+    frc = [SemiDefinitePhylogeny(; A = A, p = 0.05), IntegerPhylogeny(; A = A, B = 1)]
+    w = solve(MinimumRisk(), mip; frc = frc).w
+    @test min(abs(w[4]), abs(w[5])) > 1e-3
+    res = solve(MinimumRisk(), mip; frc = frc, ple = IntegerPhylogeny(; A = Aa, B = 1))
+    m = res.model
+    @test haskey(m, :frc_sdp_plg_1) && !haskey(m, :frc_card_plg_1)
+    @test haskey(m, :frc_card_plg_2) && haskey(m, :card_plg_1)
+    @test PortfolioOptimisers.held_bin(PortfolioOptimisers.mip_indicators(m)) === m[:ib]
+    @test abs(w1_of(m)[2]) < 1e-9
+    @test min(abs(res.w[4]), abs(res.w[5])) < 1e-9
+
+    # The bounds are the image of the asset box under the loadings, widened to hold zero.
+    Bt = [1.0 -2.0; 0.5 0.5]
+    fwb = PortfolioOptimisers.factor_weight_bounds(WeightBounds(; lb = [-0.5, 0.0],
+                                                                ub = [1.0, 0.25]), Bt)
+    @test fwb.lb == [-1.0, -0.25] && fwb.ub == [1.0, 0.625]
+    fwb = PortfolioOptimisers.factor_weight_bounds(WeightBounds(; lb = 0.25, ub = 1.0),
+                                                   [1.0 1.0])
+    @test fwb.lb == [0.0] && fwb.ub == [2.0]
+    # A factor weight has no bound of its own, so the asset bounds must be finite.
+    for wb in (nothing, WeightBounds(; lb = nothing, ub = 1.0),
+               WeightBounds(; lb = 0.0, ub = [1.0, Inf]))
+        @test_throws ArgumentError PortfolioOptimisers.factor_weight_bounds(wb, Bt)
+    end
+    # A phylogeny with no integer entry adds no bits.
+    m = JuMP.Model()
+    PortfolioOptimisers.set_frc_iplg_constraints!(m, SemiDefinitePhylogeny(; A = A),
+                                                  nothing, Bt, nothing)
+    @test !haskey(m, :frc_ib)
 end

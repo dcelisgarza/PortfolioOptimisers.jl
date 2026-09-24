@@ -1,9 +1,12 @@
 ```@meta
-Description = "Integer Phylogeny Constraints, private API of PortfolioOptimisers.jl: set_iplg_constraints!."
+Description = "Integer Phylogeny Constraints, private API of PortfolioOptimisers.jl: set_iplg_constraints!, FactorMIPSpace, factor_weight_bounds, set_frc_iplg_constraints!."
 ```
 
 # Integer Phylogeny Constraints: private API
 
 ```@docs
 set_iplg_constraints!
+FactorMIPSpace
+factor_weight_bounds
+set_frc_iplg_constraints!
 ```

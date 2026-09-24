@@ -309,7 +309,7 @@
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl" = { map = 11, units = 14, swept = false }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/04_WeightConstraints.jl" = { map = 11, units = 5, swept = false }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/05_SDPConstraints.jl" = { map = 11, units = 7, algorithm = 2, swept = true, bindings = ["mark_objective_variance!", "mark_risk_minimised!", "set_sdp_constraints!", "set_sdp_frc_constraints!", "set_sdp_frc_phylogeny_constraints!", "set_sdp_phylogeny_constraints!", "weights_prefix"] }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/06_IntegerPhylogenyConstraints.jl" = { map = 11, units = 1, swept = false }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/06_IntegerPhylogenyConstraints.jl" = { map = 11, units = 4, swept = false }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/07_CardinalityConstraints.jl" = { map = 11, units = 10, algorithm = 4, swept = true, bindings = ["assert_subgroup_mip_fields", "assert_subgrouped_constraint_width", "assert_subgrouped_mip_fields", "set_all_smip_constraints!", "set_card_constraints!", "set_gcard_constraints!", "set_scardmip_constraints!", "set_sgcardmip_constraints!", "set_smip_constraints!", "subgroup_entry"] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/08_ThresholdConstraints.jl" = { map = 11, units = 1, swept = false }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/09_TurnoverConstraints.jl" = { map = 11, units = 2, swept = false }

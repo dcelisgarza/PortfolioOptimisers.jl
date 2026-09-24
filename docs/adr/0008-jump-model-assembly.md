@@ -393,3 +393,19 @@ keyword arguments to `phylogeny_constraints` as positional arguments, which thre
 accepts. Found by the sweep of `05_SDPConstraints.jl` (#1304). Verified in
 `test_19_factor_risk_contribution.jl`, "A semidefinite factor phylogeny reads the marks of the
 assembled model".
+
+## Amendment 5 (2026-09-24)
+
+Decision 5 now covers two builders in FRC's tail. `set_frc_iplg_constraints!` applies an
+`IntegerPhylogeny` of `frc_ple` to the factor weights `w1`, beside
+`set_sdp_frc_phylogeny_constraints!`. Before it, the field accepted an integer entry and dropped it
+without a message (#1311). The middle is unchanged: an asset `IntegerPhylogeny` in the optimiser's
+own phylogeny field still reaches `set_iplg_constraints!` there, and it gates on the asset bits that
+`set_mip_constraints!` registers in Model State.
+
+The factor builder declares its own held bits in a `FactorMIPSpace`, under the prefix `frc_`, and
+reads them in the same call. It registers no bundle, so the asset bits stay the ones that
+`mip_indicators` returns. A factor weight is free in sign and has no bound of its own, so the gate
+takes its bounds from the asset weight bounds through `w1 = Bᵀw`, and the builder refuses asset
+bounds that are not finite. Verified in `test_19_factor_risk_contribution.jl`, "An integer factor
+phylogeny gates the factor weights".

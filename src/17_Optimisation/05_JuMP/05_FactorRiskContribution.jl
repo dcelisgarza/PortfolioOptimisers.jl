@@ -253,7 +253,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     obj
     """
-    Phylogeny constraints on the factor weights, an estimator or a result, or a vector of them. Only a semidefinite entry adds rows, [`set_sdp_frc_phylogeny_constraints!`](@ref).
+    Phylogeny constraints on the factor weights, an estimator or a result, or a vector of them. A semidefinite entry adds rows through [`set_sdp_frc_phylogeny_constraints!`](@ref), and an integer entry through [`set_frc_iplg_constraints!`](@ref), which needs a MIP solver and finite asset weight bounds.
     """
     frc_ple
     """
@@ -413,6 +413,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     # variance builders and `mark_risk_minimised!` write, as the asset phylogeny does.
     frc_plr = phylogeny_constraints(frc.frc_ple, rd.F)
     set_sdp_frc_phylogeny_constraints!(model, frc_plr)
+    set_frc_iplg_constraints!(model, frc_plr, attrs.wb, transpose(rr.L), frc.opt.ss)
     set_portfolio_objective_function!(model, frc.obj, frc, attrs)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(attrs.pr.X))
     return FactorRiskContributionResult(;

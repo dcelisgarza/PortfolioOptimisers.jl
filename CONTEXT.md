@@ -752,7 +752,7 @@ The user-facing utilities converting high-level specifications into the numeric 
 - **ExposureConstraintEstimator**: re-bases a linear constraint into another Constraint Space.
 - **WeightBounds**: per-asset lower and upper bounds. Group-level sum bounds are linear constraints, not Weight Bounds.
 - **RiskBudget**: per-name or per-group risk-contribution targets.
-- **Phylogeny constraints**: `SemiDefinitePhylogeny` (SDP coupling) and `IntegerPhylogeny` (cardinality and grouping); `CentralityConstraint` constrains by centrality.
+- **Phylogeny constraints**: `SemiDefinitePhylogeny` (SDP coupling) and `IntegerPhylogeny` (cardinality and grouping); `CentralityConstraint` constrains by centrality. Both phylogeny kinds also apply to the factor weights of a `FactorRiskContribution` through its `frc_ple` field, where an `IntegerPhylogeny` takes the bounds of its gate from the asset weight bounds.
 - **Threshold**: buy-in thresholds, the minimum non-zero position size.
 - **AssetSetsMatrixEstimator**: builds binary group-membership matrices.
 
