@@ -5,7 +5,7 @@
 [provenance]
 julia = "1.13.0"
 rules = 1
-commit = "3086100756"
+commit = "dc47b62404"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { slice_copy = 6, reduce_temporary = 4, unfused_broadcast = 0, search_temporary = 1, linalg_temporary = 0, repeated_call = 1, loop_allocation = 6, raw = 18 }
@@ -145,7 +145,7 @@ commit = "3086100756"
 "src/08_Phylogeny/06_DBHT/02_PMFG.jl" = { slice_copy = 2, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 1, raw = 3 }
 "src/08_Phylogeny/06_DBHT/03_GraphTraversal.jl" = { slice_copy = 1, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 4, raw = 5 }
 "src/08_Phylogeny/06_DBHT/04_CliqueHierarchy.jl" = { slice_copy = 8, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 5, raw = 13 }
-"src/08_Phylogeny/06_DBHT/05_BubbleTree.jl" = { slice_copy = 1, reduce_temporary = 1, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 2, repeated_call = 0, loop_allocation = 5, raw = 9 }
+"src/08_Phylogeny/06_DBHT/05_BubbleTree.jl" = { slice_copy = 1, reduce_temporary = 1, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 1, repeated_call = 0, loop_allocation = 5, raw = 8 }
 "src/08_Phylogeny/06_DBHT/06_DBHTDendrogram.jl" = { slice_copy = 1, reduce_temporary = 1, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 7, raw = 9 }
 "src/08_Phylogeny/06_DBHT/07_DBHTClustering.jl" = { slice_copy = 3, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 1, raw = 4 }
 "src/08_Phylogeny/07_LoGo.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }

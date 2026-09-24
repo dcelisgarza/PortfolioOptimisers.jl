@@ -275,8 +275,10 @@ function BubbleCluster8s(Rpm::MatNum, Dpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::M
         v, ci, _ = SparseArrays.findnz(Mdjv)
         Tc[v] .= ci
 
-        # Compute the distance between a vertex and the converging bubbles
-        Udjv = Dpm * Mdjv * LinearAlgebra.diagm(1 ⊘ vec(sum(Mdjv .!= 0; dims = 1)))
+        # Compute the distance between a vertex and the converging bubbles. Scale the sparse
+        # `Mdjv` first, as the reference does: both products then read only its stored
+        # entries, so an unreachable vertex keeps its `Inf` and never meets a zero (#1314).
+        Udjv = Dpm * (Mdjv * LinearAlgebra.Diagonal(1 ⊘ vec(sum(Mdjv .!= 0; dims = 1))))
         Udjv[Adjv .== 0] .= typemax(eltype(Dpm))
 
         imn = vec(getindex.(argmin(Udjv[vec(sum(Mdjv; dims = 2)) .== 0, :]; dims = 2), 2))  # Look for the closest converging bubble

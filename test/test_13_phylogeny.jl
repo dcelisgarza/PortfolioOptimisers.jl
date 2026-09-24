@@ -1122,16 +1122,26 @@
                                                   nte = NetworkEstimator(;
                                                                          alg = MaximumDistanceSimilarity()),
                                                   alg = DBHT()), pr.X)
-        clr_t = Hclust{Float64}([-1 -13; -7 -4; -9 -3; -5 -17; -20 4; -2 -6; -16 1; 3 2;
-                                 6 5; 8 7; 10 9; -14 -10; 12 -19; -11 -8; -15 -12; 13 -18;
-                                 15 14; 17 16; 11 18],
-                                [0.09090909090909091, 0.1, 0.1111111111111111, 0.125,
+        #=
+        `P` is zero on every PMFG edge here, so `DBHTs` sees a graph with no edge, and 380
+        of the 400 shortest path lengths are `Inf`. The reference `DBHTs.m` drops the same
+        edges. The pin below was the output of a `NaN` that `Inf * 0` made in
+        `BubbleCluster8s` until #1314. The discrete clusters `T8` are the ones `DBHTs.m`
+        returns on these two matrices under Octave.
+        =#
+        @test PortfolioOptimisers.DBHTs(clr.P, clr.S)[1] ==
+              [1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1]
+        clr_t = Hclust{Float64}([-1 -13; -7 -4; -9 -3; -17 -5; 4 -20; -15 -12; -6 -2;
+                                 -11 -16; 1 -19; 3 2; 6 5; 7 8; 9 10; 11 12; 13 14; -10 -14;
+                                 -8 -18; 16 17; 15 18],
+                                [0.06666666666666667, 0.07142857142857142,
+                                 0.07692307692307693, 0.08333333333333333,
+                                 0.09090909090909091, 0.1, 0.1111111111111111, 0.125,
                                  0.14285714285714285, 0.16666666666666666, 0.2, 0.25,
-                                 0.3333333333333333, 0.5, 1.0, 0.14285714285714285,
-                                 0.16666666666666666, 0.2, 0.25, 0.3333333333333333, 0.5,
-                                 1.0, 2.0],
-                                [9, 3, 7, 4, 16, 1, 13, 2, 6, 20, 5, 17, 15, 12, 11, 8, 14,
-                                 10, 19, 18], :DBHT)
+                                 0.3333333333333333, 0.5, 1.0, 0.3333333333333333, 0.5, 1.0,
+                                 2.0],
+                                [1, 13, 19, 9, 3, 7, 4, 15, 12, 17, 5, 20, 6, 2, 11, 16, 10,
+                                 14, 8, 18], :DBHT)
         @test clr.res.merges == clr_t.merges
         @test isapprox(clr.res.heights, clr_t.heights)
         @test clr.res.labels == clr_t.labels
