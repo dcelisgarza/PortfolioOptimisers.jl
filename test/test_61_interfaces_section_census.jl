@@ -280,7 +280,7 @@ end
     SHRINK: a type that gains a section is removed from it in the same edit, and a type
     that gains a concrete member without a section is a failure, never an addition here.
     =#
-    debt = Set([:AbstractAlgorithm, :AbstractAssetPanelEstimator, :AbstractAssetSelector,
+    debt = Set([:AbstractAlgorithm, :AbstractAssetPanelEstimator,
                 :AbstractCalibrationSeries, :AbstractCentralityConstraint,
                 :AbstractCentralityEstimator, :AbstractCentralityPolarity,
                 :AbstractClusteringResult, :AbstractClustersEstimator,
