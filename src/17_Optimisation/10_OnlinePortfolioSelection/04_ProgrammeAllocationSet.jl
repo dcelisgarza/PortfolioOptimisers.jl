@@ -1,18 +1,48 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-The Allocation Set of the full constraint vocabulary: every constraint kind a [`JuMPOptimiser`](@ref) takes, under the optimiser's field names and type bounds, plus the optimiser's direct objective penalties, with a solver required by its field bound, because a projection onto it is a programme.
+Constrains an online allocation with every constraint kind of a JuMP optimiser, and projects onto the set with a solver.
 
-The projection is a bare JuMP model in the Weight Finaliser's idiom — `w`, `k = 1`, `Σw = 1`, the constraint scale and the objective scale — assembled by the shared builders through [`set_allocation_set_constraints!`](@ref) in the order [`assemble_jump_model!`](@ref) runs them, and given the objective of the rule's Projection Geometry: ``\\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{q} \\rVert^2`` for [`EuclideanProjection`](@ref), ``\\sum_i w_i \\log (w_i / q_i)`` for [`EntropicProjection`](@ref), an exponential-cone programme, and ``(\\boldsymbol{w} - \\boldsymbol{q})^\\intercal A (\\boldsymbol{w} - \\boldsymbol{q})`` for [`GramProjection`](@ref), plus the set's penalties through the Objective Penalty. The budget is one and there is no budget field: cash is an asset with price relative one, which the rule allocates like any other.
+The set takes the field names and the type bounds of [`JuMPOptimiser`](@ref), and the direct objective penalties of the optimiser. A projection onto the set is a programme, so `slv` has no default. The budget is one, and the set has no budget field. Cash is an asset whose price relative is one, and the rule allocates it as any other asset.
 
-**The kinds, by the data they read.**
+The projection is a bare JuMP model with the variables and rows of the Weight Finaliser, which are `w`, `k = 1`, `Σw = 1`, the constraint scale and the objective scale. [`set_allocation_set_constraints!`](@ref) adds the constraint kinds through the builders of the optimiser, in the order that [`assemble_jump_model!`](@ref) runs them. [`set_projection_objective!`](@ref) sets the objective, the divergence of the rule's Projection Geometry plus the set's penalties.
 
-  - The caller's object, or a name resolved over `sets` once per fold: `wb`, `sbgt`, `gbgt`, `xbgt`, `lt`, `st`, `lcse`, `gcarde`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `card`, `scard`, `ss`, `l2c`, `lpc`, `linfc`, `ccnt`, `l1`, `l2`, `lp`, `linf` and `cobj`, each through the builder [`JuMPOptimiser`](@ref) hands it to. The turnover ceiling's reference is replaced by [`factory`](@ref) at every step with the Price-Adjusted Allocation ``\\hat{\\boldsymbol{w}}_t = \\boldsymbol{w}_t \\odot \\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` of the step — the book the fund trades from, never the distance between two targets — unless the object is `fixed`, in which case the caller's book stays the reference.
-  - The head's rows, resolved at every step on the prior result of `pe` fitted on them: `r`, the risk ceilings, each measure's own JuMP builder with the set as the [`RiskConstraintOwner`](@ref) and `settings.ub` as the ceiling, the measure materialised against that prior through [`factory`](@ref) first, so a moment it carries itself is the one it is built on; `tr`, the tracking errors, a `WeightsTracking` that is not `fixed` given the Price-Adjusted Allocation as the turnover is; `cte`, the centrality rows; `ple`, the integer and semidefinite phylogeny kinds; an exposure row in `lcse`, re-based through the loadings its `FactorSpace` pins, because the rows carry no factor returns to refit them from; and `ret`, a return floor on the prior's expected returns. A [`Variance`](@ref) or [`StandardDeviation`](@ref) that holds its matrix reads no rows and no prior: it goes through the same builder with no prior, so the source of the matrix does not change the formulation ([`set_allocation_risk_ceiling!`](@ref)).
+The kinds read their data at two times. Once per fold, [`resolve_allocation_set`](@ref) resolves the kinds that hold the caller's object or a name over `sets`. These are `wb`, `sbgt`, `gbgt`, `xbgt`, `lt`, `st`, `lcse`, `gcarde`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `card`, `scard`, `ss`, `l2c`, `lpc`, `linfc`, `ccnt`, `l1`, `l2`, `lp`, `linf` and `cobj`. Each goes to the builder that [`JuMPOptimiser`](@ref) gives it to. At every step, [`resolve_allocation_set_rows`](@ref) resolves the kinds that read the head's rows, on the prior result of `pe` fitted on those rows:
 
-A set that reads the rows — [`rows_needed`](@ref) answers `nothing` — costs one prior fit over the whole prefix at every step on top of its programme; a caller who wants a window states it on `pe`. A covariance of one observation does not exist, so while the head holds fewer than two rows the fit is not attempted and the step is a Held Step, recorded as such ([`allocation_set_ready`](@ref)); a caller who wants a covariance ceiling from row one gives `r` its matrix. A MIP projection is not unique, so the identity between the Causal Pass and the Recursion Read-out is a claim about the code path — the same solves in the same order on the same rows — and holds exactly with a deterministic solver.
+  - `r`, the risk ceilings. Each measure goes through its own JuMP builder, with the set as the [`RiskConstraintOwner`](@ref) and `settings.ub` as the ceiling. [`factory`](@ref) first materialises the measure against the prior, so a moment that the measure carries is the moment its row uses. A [`Variance`](@ref) or [`StandardDeviation`](@ref) that holds its matrix reads no rows and no prior. It goes through the same builder with no prior, so the source of the matrix does not change the formulation ([`set_allocation_risk_ceiling!`](@ref)).
+  - `tr`, the tracking errors, and `cte`, the centrality rows.
+  - `ple`, the integer and semidefinite phylogeny kinds.
+  - An exposure row in `lcse`. The row goes through the loadings that its `FactorSpace` fixes, because the rows carry no factor returns to fit the loadings again.
+  - `ret`, a floor on the prior's expected return of the allocation.
 
-The set refuses, by having no field for them: a budget, fees, the return term as an objective, the scalariser, the optimiser's execution knobs and a `TimeDependent` schedule. A frontier or a per-asset `ub` on a measure is refused at construction because a ceiling is one number ([`assert_risk_ceiling`](@ref)). A measure's `rke` and `scale` are not read: the ceiling is a constraint, and the objective is the geometry's divergence plus the penalties. A negative lower bound is admitted under the Euclidean and Gram geometries and refused under the entropic one, at the head's construction when the bound is a value and at the projection when it is resolved from an estimator. The wealth factor of a leveraged allocation can reach zero on an extreme day, where the log wealth and the next gradient are undefined; that is documented here, not guarded.
+At every step [`factory`](@ref) replaces the reference of a turnover ceiling, and of a [`WeightsTracking`](@ref), with the Price-Adjusted Allocation of the step. That is the book the fund trades from. A `fixed` object keeps the caller's reference.
+
+A set that reads the rows, for which [`rows_needed`](@ref) returns `nothing`, fits its prior once over the whole prefix at every step, and then solves its programme. A caller who wants a window states it on `pe`. A covariance of one observation does not exist. So while the head holds fewer than two rows, the set fits no prior, and the step is a Held Step with its reason recorded ([`allocation_set_ready`](@ref)). A caller who wants a covariance ceiling from the first row gives `r` its matrix. A MIP projection is not unique. So the identity between the Causal Pass and the Recursion Read-out is a property of the code path, the same solves in the same order on the same rows, and it holds exactly only with a deterministic solver.
+
+The set has no field for a budget, fees, the return term as an objective, the scalariser, the execution settings of the optimiser or a `TimeDependent` schedule. At construction [`assert_risk_ceiling`](@ref) refuses a frontier or a per-asset `ub` on a measure, because a ceiling is one number. The set does not read the `rke` or the `scale` of a measure. The ceiling is a constraint, and the objective is the divergence plus the penalties. The Euclidean, Gram and diagonal geometries admit a negative lower bound. The entropic, Tsallis and log-barrier geometries refuse it, at the head's construction when the bound is a value ([`assert_geometry_admits_set`](@ref)) and at the projection when an estimator resolves it. The wealth factor of a leveraged allocation can reach zero on an extreme day. At that point the log wealth and the next gradient are undefined, and the set does not guard against it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{W} &= \\left\\{ \\boldsymbol{w} \\in \\mathbb{R}^N : \\boldsymbol{1}^\\intercal \\boldsymbol{w} = 1,\\; \\boldsymbol{w} \\in \\mathcal{C}_k \\text{ for every kind } k \\text{ of the set} \\right\\}\\,, \\\\
+\\boldsymbol{w}^{+} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; D_\\Psi(\\boldsymbol{w}, \\boldsymbol{q}) + \\pi(\\boldsymbol{w})\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:W_aset])
+  - $(math_dict[:w_port])
+  - $(math_dict[:N])
+  - ``\\mathcal{C}_k``: Feasible set of the constraint kind ``k``, which the builder of [`JuMPOptimiser`](@ref) for that kind writes. A risk ceiling, a tracking error, a centrality row, a phylogeny kind, an exposure row and a return floor take ``\\mathcal{C}_k`` from the prior of the step, and a turnover ceiling takes it from the Price-Adjusted Allocation.
+  - $(math_dict[:w_plus_proj])
+  - $(math_dict[:D_Psi_breg])
+  - $(math_dict[:Psi_pot])
+  - $(math_dict[:q_raw])
+  - $(math_dict[:pi_obj_pen])
+
+[`set_projection_objective!`](@ref) states the divergence of each geometry.
 
 # Fields
 
@@ -61,19 +91,28 @@ $(DocStringExtensions.FIELDS)
         linf::Option{<:Num_AmbRadCal} = nothing
     ) -> ProgrammeAllocationSet
 
-Keywords correspond to the struct's fields. `slv` has no default: a set that needs a solver cannot be built without one.
+Keywords correspond to the struct's fields. `slv` has no default, because every projection onto the set is a programme.
 
 ## Validation
 
-  - If any slot holds an estimator keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
-  - If `slv` is a vector: non-empty. If `sbgt` or `gbgt` is a number: non-negative and finite. `assert_gross_budget_admissible` under the budget of one.
-  - If `r` is given: every measure's `settings.ub` is a finite non-negative number, the ceiling ([`assert_risk_ceiling`](@ref)).
-  - If `card` is given: `card > 0` and finite. If `cte`, `tn`, `tr`, `l2`, `lp` or `lpc` is a vector: non-empty. If `l2c`, `linfc`, `l1` or `linf` is a number: `> 0` and finite.
-  - The sub-group and sub-grouped MIP slots agree in shape ([`assert_subgroup_mip_fields`](@ref), [`assert_subgrouped_mip_fields`](@ref)), and an [`LpRegularisation`](@ref) is a coefficient in `lp` and a ceiling in `lpc`.
+  - If `slv` is a vector: `!isempty(slv)`. An `IsEmptyError` is thrown otherwise.
+  - If `sbgt` or `gbgt` is a number: non-negative and finite. A `DomainError` is thrown otherwise.
+  - If `gbgt` is given: `sbgt` is not a number, because the budget of one and a number in `sbgt` already fix the gross exposure. If `wb` is a [`WeightBounds`](@ref), one of its bounds admits a short weight. An `ArgumentError` is thrown otherwise.
+  - If `r` is given: the `settings.ub` of every measure is a finite non-negative number, the ceiling ([`assert_risk_ceiling`](@ref)). An `ArgumentError` is thrown otherwise, and an `IsEmptyError` for an empty vector.
+  - If `cte`, `tn`, `tr`, `l2`, `lp`, `lpc` or `ret` is a vector: `!isempty(x)`. An `IsEmptyError` is thrown otherwise.
+  - If `card` is given: `card > 0` and finite. If `l2c`, `linfc`, `l1` or `linf` is a number: `> 0` and finite. A `DomainError` is thrown otherwise.
+  - An [`LpRegularisation`](@ref) in `lp` holds no norm ceiling rule, and one in `lpc` holds no ambiguity radius rule. An `ArgumentError` is thrown otherwise.
+  - The sub-group and sub-grouped MIP slots agree in shape ([`assert_subgroup_mip_fields`](@ref), [`assert_subgrouped_mip_fields`](@ref)).
+  - If a slot holds an estimator keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, every slot with a per-asset axis is viewed recursively as [`JuMPOptimiser`](@ref)'s is, and the rest is carried unchanged. A precomputed [`LinearConstraint`](@ref) is the identity under a view, as it is everywhere.
+`ProgrammeAllocationSet` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method passes the arguments after `i` to the tracking errors `tr` alone. It views the risk ceilings `r` with `nothing` in place of those arguments.
+  - The prior estimator `pe`, the per-asset slots `wb`, `lt`, `st`, `lcse`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `sets`, `ret`, `ccnt` and `cobj`, and the ceilings and tracking errors recurse through [`port_opt_view`](@ref), as the fields of [`JuMPOptimiser`](@ref) do.
+  - The centrality rows `cte`, the grouped cardinality slots `gcarde` and `sgcarde`, and the phylogeny kinds `ple` pass through unchanged, as they do on the optimiser. A precomputed [`LinearConstraint`](@ref) is the identity under a view.
+  - When a sub-group slot and its sub-grouped slot hold one object, such as `smtx` and `sgmtx`, the method views it once, and the two slots stay one object.
 
 # Examples
 
@@ -155,16 +194,21 @@ ProgrammeAllocationSet
 # Related
 
   - [`AbstractAllocationSet`](@ref)
-  - [`BoundedAllocationSet`](@ref)
+  - [`BoundedAllocationSet`](@ref): the set of weight bounds alone, with a scalar root for every geometry but the Gram one.
   - [`JuMPOptimiser`](@ref)
   - [`project`](@ref)
+  - [`projection_programme`](@ref)
   - [`set_allocation_set_constraints!`](@ref)
+  - [`set_projection_objective!`](@ref)
+  - [`resolve_allocation_set`](@ref)
+  - [`resolve_allocation_set_rows`](@ref)
   - [`HeldStep`](@ref)
   - [`OnlinePortfolioSelection`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @concrete struct ProgrammeAllocationSet <: AbstractProgrammeAllocationSet
     """
-    The prior estimator the ceilings, the tracking errors, the centrality and phylogeny rows, an exposure row and the return floor are built on, fitted on the head's rows at every step; unread when no slot reads the rows.
+    The prior estimator that the set fits on the head's rows at every step. The risk ceilings, the tracking errors, the centrality and phylogeny rows, an exposure row and the return floor use its result. The set does not read it when no slot reads the rows.
     """
     pe
     """
@@ -240,7 +284,7 @@ ProgrammeAllocationSet
     """
     sgst
     """
-    The turnover ceilings, a [`Turnover`](@ref), a [`TurnoverEstimator`](@ref) resolved over `sets`, or a vector of them, the reference of each replaced at every step by the Price-Adjusted Allocation unless the object is `fixed`.
+    The turnover ceilings: a [`Turnover`](@ref), a [`TurnoverEstimator`](@ref) that resolves over `sets`, or a vector of them. At every step the set replaces the reference of each ceiling with the Price-Adjusted Allocation, unless the ceiling is `fixed`.
     """
     tn
     """
@@ -458,7 +502,7 @@ function port_opt_view(set::ProgrammeAllocationSet, i, args...)
         sst = port_opt_view(set.sst, i)
         sgst = port_opt_view(set.sgst, i)
     end
-    return ProgrammeAllocationSet(; pe = set.pe, slv = set.slv,
+    return ProgrammeAllocationSet(; pe = port_opt_view(set.pe, i), slv = set.slv,
                                   r = port_opt_view(set.r, i, nothing),
                                   wb = port_opt_view(set.wb, i), sbgt = set.sbgt,
                                   gbgt = set.gbgt, xbgt = set.xbgt,
@@ -482,7 +526,13 @@ end
     name_keyed(x)
     name_keyed(x::AbstractVector)
 
-Whether a constraint slot holds an estimator that resolves its names over `sets`, so its owner must carry them: a [`WeightBoundsEstimator`](@ref), a [`LinearConstraintEstimator`](@ref), an [`ExposureConstraintEstimator`](@ref), a [`ThresholdEstimator`](@ref), an [`AssetSetsMatrixEstimator`](@ref), a [`TurnoverEstimator`](@ref), or a vector holding one.
+Tells whether a constraint slot holds an estimator that resolves its names over `sets`.
+
+The owner of such a slot must carry `sets`. The estimators are [`WeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A vector is keyed by name when one of its entries is.
+
+# Returns
+
+  - `::Bool`: `true` when the slot holds such an estimator.
 
 # Related
 
@@ -503,7 +553,31 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The first stage of a [`ProgrammeAllocationSet`](@ref)'s resolution, once per fold: every constraint keyed by name is resolved to a value over `N` assets through `sets` — the weight bounds, the thresholds, the linear and grouped cardinality constraints, the sub-group selection matrices and thresholds, and the turnover — as [`processed_jump_optimiser_attributes`](@ref) resolves them. A slot that reads the head's rows is carried unchanged to the second stage, [`resolve_allocation_set_rows`](@ref), which runs at every step.
+Resolves the slots of a [`ProgrammeAllocationSet`](@ref) that hold a name or an estimator, once per fold.
+
+This is the first stage of the set's resolution. It resolves each slot to a value over the `N` assets through `sets`, as [`processed_jump_optimiser_attributes`](@ref) resolves the same slot of a [`JuMPOptimiser`](@ref). The slots that read the head's rows go unchanged to the second stage, [`resolve_allocation_set_rows`](@ref), which runs at every step.
+
+# Algorithm
+
+ 1. Resolve the weight bounds `wb` over the `N` assets with [`weight_bounds_constraints`](@ref).
+ 2. Resolve the thresholds `lt` and `st` with [`threshold_constraints`](@ref).
+ 3. Resolve the grouped cardinality constraints `gcarde` and `sgcarde` with [`linear_constraints`](@ref), with integer values.
+ 4. Resolve the sub-group matrices `smtx` and `sgmtx` with [`asset_sets_matrix`](@ref). When the two slots hold one object, resolve it once and give the result to both slots.
+ 5. Resolve the sub-group thresholds `slt` and `sglt`, then `sst` and `sgst`, with [`threshold_constraints`](@ref), in the same way.
+ 6. Resolve the turnover ceilings `tn` with [`turnover_constraints`](@ref).
+ 7. When `lcse` holds no exposure estimator ([`exposure_keyed`](@ref)), resolve it with [`linear_constraints`](@ref). Otherwise keep it for the second stage, because an exposure row needs the loadings of the prior.
+ 8. Return a new set that holds the resolved slots and every other slot of `set`.
+
+# Arguments
+
+  - `set`: The programme set.
+  - `N`: The number of assets.
+  - $(arg_dict[:strict])
+  - `datatype`: The element type of the resolved values. The grouped cardinality constraints take `Int`.
+
+# Returns
+
+  - `set'::ProgrammeAllocationSet`: The set with its named slots resolved.
 
 # Related
 
@@ -568,7 +642,13 @@ end
     exposure_keyed(x)
     exposure_keyed(x::AbstractVector)
 
-Whether a linear-constraint slot holds an [`ExposureConstraintEstimator`](@ref), whose rows are written in another basis and re-based through a factor prior's loadings, so it resolves on the head's rows and not once per fold.
+Tells whether a linear-constraint slot holds an [`ExposureConstraintEstimator`](@ref).
+
+An exposure estimator writes its rows in the basis of the factors, and the loadings of a factor prior take them to the assets. So such a slot resolves on the head's rows at every step, and not once per fold. A vector is keyed by exposure when one of its entries is.
+
+# Returns
+
+  - `::Bool`: `true` when the slot holds an exposure estimator.
 
 # Related
 
@@ -588,7 +668,13 @@ end
     fitted_on_rows(x)
     fitted_on_rows(x::AbstractVector)
 
-Whether a centrality or phylogeny slot holds an estimator, which is fitted on the head's rows at every step; a precomputed [`LinearConstraint`](@ref), [`IntegerPhylogeny`](@ref) or [`SemiDefinitePhylogeny`](@ref) reads none.
+Tells whether a centrality or phylogeny slot holds an estimator that the set fits on the head's rows at every step.
+
+A precomputed [`LinearConstraint`](@ref), [`IntegerPhylogeny`](@ref) or [`SemiDefinitePhylogeny`](@ref) reads no rows. A vector reads the rows when one of its entries does.
+
+# Returns
+
+  - `::Bool`: `true` when the slot holds a centrality or phylogeny estimator.
 
 # Related
 
@@ -608,7 +694,13 @@ end
 """
     rows_needed(set::ProgrammeAllocationSet)
 
-The rows a programme set reads at a step: `nothing`, every row folded, when any slot reads the head's rows — a ceiling that reads them ([`risk_reads_rows`](@ref)), a tracking error, a centrality or phylogeny estimator ([`fitted_on_rows`](@ref)), an exposure row ([`exposure_keyed`](@ref)), a return floor, or a Calibration Rule in a norm ceiling or a penalty ([`calibrated`](@ref)); `0` otherwise.
+Returns the number of rows that a programme set reads at a step.
+
+The set reads every row that the head has folded when one of its slots reads the rows. These slots are a risk ceiling that reads them ([`risk_reads_rows`](@ref)), a tracking error, a centrality or phylogeny estimator ([`fitted_on_rows`](@ref)), an exposure row ([`exposure_keyed`](@ref)), a return floor, and a Calibration Rule in a norm ceiling or in a penalty ([`calibrated`](@ref)).
+
+# Returns
+
+  - `::Union{Nothing, Int}`: `nothing`, every row folded, when a slot reads the rows, and `0` otherwise.
 
 # Related
 
@@ -629,19 +721,35 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The Tsallis Projection Geometry: the raw step is projected onto the Allocation Set in the Bregman divergence of the power potential ``\\Psi_\\alpha(\\boldsymbol{w}) = \\sum_i w_i^\\alpha / (\\alpha (\\alpha - 1))``, ``\\alpha \\in (0, 1)``.
+Projects the raw step onto the Allocation Set in the Bregman divergence of the Tsallis potential of power `alpha`.
+
+This is the geometry of the Tsallis-entropy steps of Abernethy, Lee and Tewari (2015) and of the Tsallis-INF algorithm of Zimmert and Seldin (2021). The potential of the first paper is ``\\alpha \\Psi_\\alpha`` plus a constant, and the potential of the second is ``\\Psi_\\alpha`` plus an affine term. So each divergence is ``D_{\\Psi_\\alpha}`` times a constant factor, which a learning rate absorbs. Both papers bound the regret of the multi-armed bandit with bounded losses. At the tuned rate the expected regret is at most ``\\sqrt{2 T N / (\\alpha (1 - \\alpha))}`` (Abernethy, Lee and Tewari, 2015, Corollary 3.2). The log-wealth loss of a portfolio has no bounded gradient, so that bound does not apply to it as it stands. The geometry cannot set a positive entry to zero, and a zero entry stays zero. The geometry refuses a negative lower bound, because the potential is undefined below zero.
 
 # Mathematical definition
 
-The mirror image of an allocation is ``\\nabla \\Psi_\\alpha(\\boldsymbol{w})_i = w_i^{\\alpha - 1} / (\\alpha - 1)``, so a first-order step of length ``\\eta`` on a gradient ``\\boldsymbol{g}`` and its projection onto the default set are one scalar root,
-
 ```math
 \\begin{align}
-w_{t+1, i} &= \\left( w_{t, i}^{\\alpha - 1} + (1 - \\alpha) (\\eta g_i + \\lambda) \\right)^{1 / (\\alpha - 1)}\\,,
+\\Psi_\\alpha(\\boldsymbol{w}) &= \\frac{1}{\\alpha (\\alpha - 1)} \\sum_i w_i^{\\alpha}\\,, \\\\
+\\mathrm{Proj}^{\\alpha}_{\\mathcal{W}}(\\boldsymbol{q}) &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; D_{\\Psi_\\alpha}(\\boldsymbol{w}, \\boldsymbol{q})\\,, \\\\
+w_i(\\theta) &= \\min\\left(\\max\\left(\\left(q_i^{\\alpha - 1} + \\theta\\right)^{1 / (\\alpha - 1)},\\, l_i\\right),\\, u_i\\right)\\,, \\\\
+w_{t+1, i} &= \\left( w_{t, i}^{\\alpha - 1} + (1 - \\alpha) \\eta_t g_{t, i} + \\theta \\right)^{1 / (\\alpha - 1)}\\,.
 \\end{align}
 ```
 
-with ``\\lambda`` the budget multiplier, in which the budget is monotone. On a [`BoundedAllocationSet`](@ref) the bounds are clips of the same root, as the entropic arm's are; on a [`ProgrammeAllocationSet`](@ref) the projection is the programme ``\\min_{\\boldsymbol{w}} \\Psi_\\alpha(\\boldsymbol{w}) - \\langle \\nabla \\Psi_\\alpha(\\boldsymbol{q}), \\boldsymbol{w} \\rangle`` through a power cone on the set's solver. The limit ``\\alpha \\to 1`` is the relative entropy of [`EntropicProjection`](@ref) and ``\\alpha \\to 0`` the log barrier of [`LogBarrierProjection`](@ref); the shipped range is the open interval between them. It is the geometry of the Tsallis-entropy mirror-descent and follow-the-regularised-leader steps of Abernethy, Lee and Tewari (2015) and Zimmert and Seldin (2021), whose regret on the simplex is ``O(\\sqrt{T N / (\\alpha (1 - \\alpha))})`` at the tuned rate. Like the entropic map, it cannot zero a positive entry, a zero entry stays zero, and a negative lower bound is refused, because the potential is undefined below zero.
+Where:
+
+  - ``\\Psi_\\alpha``: Tsallis potential, the potential of this geometry.
+  - ``\\alpha``: Power of the potential, in ``(0, 1)``.
+  - $(math_dict[:D_Psi_breg])
+  - $(math_dict[:q_raw])
+  - $(math_dict[:W_aset])
+  - $(math_dict[:lu_i_aset])
+  - $(math_dict[:theta_aset])
+  - $(math_dict[:w_t_iter])
+  - $(math_dict[:eta_t_lr])
+  - $(math_dict[:g_t_loss])
+
+The mirror image is ``\\nabla \\Psi_\\alpha(\\boldsymbol{w})_i = w_i^{\\alpha - 1} / (\\alpha - 1)``, so the projection sets ``\\nabla \\Psi_\\alpha(\\boldsymbol{w}) - \\nabla \\Psi_\\alpha(\\boldsymbol{q})`` to one constant over the free entries. On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at the root. A base ``q_i^{\\alpha - 1} + \\theta`` at or below zero puts its asset at ``u_i``. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``. The last line is a first-order step from ``\\boldsymbol{w}_t`` and its projection onto the simplex together, one scalar root. As ``\\alpha \\to 1``, ``D_{\\Psi_\\alpha}`` tends to the relative entropy of [`EntropicProjection`](@ref). As ``\\alpha \\to 0``, it tends to the Itakura–Saito divergence of [`LogBarrierProjection`](@ref).
 
 # Fields
 
@@ -695,19 +803,35 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The log-barrier Projection Geometry: the raw step is projected onto the Allocation Set in the Bregman divergence of the Burg entropy ``\\Psi(\\boldsymbol{w}) = -\\sum_i \\log w_i``, which is the Itakura–Saito divergence ``\\sum_i \\left( w_i / q_i - 1 - \\log (w_i / q_i) \\right)``.
+Projects the raw step onto the Allocation Set in the Itakura–Saito divergence, the Bregman divergence of the Burg entropy.
+
+Orseau, Lattimore and Legg (2017, §7) name the Burg entropy as the natural regulariser of mirror descent on the log loss, the alternative to their Soft-Bayes step. They state, without a proof in the paper, that its regret is ``O(\\sqrt{N T \\log (T / N)})`` and does not depend on the largest gradient. For a portfolio, this means that the bound needs no lower bound on the price relatives. The geometry cannot set a positive entry to zero, and a zero entry stays zero. The geometry refuses a negative lower bound, because the logarithm is undefined below zero.
 
 # Mathematical definition
 
-The mirror image is ``\\nabla \\Psi(\\boldsymbol{w})_i = -1 / w_i``, so a first-order step of length ``\\eta`` on a gradient ``\\boldsymbol{g}`` and its projection onto the default set are one scalar root,
-
 ```math
 \\begin{align}
-w_{t+1, i} &= \\frac{1}{1 / w_{t, i} + \\eta g_i + \\lambda}\\,,
+\\Psi(\\boldsymbol{w}) &= -\\sum_i \\log w_i\\,, \\\\
+D_\\Psi(\\boldsymbol{w}, \\boldsymbol{q}) &= \\sum_i \\left( \\frac{w_i}{q_i} - 1 - \\log \\frac{w_i}{q_i} \\right)\\,, \\\\
+\\mathrm{Proj}^{\\mathrm{IS}}_{\\mathcal{W}}(\\boldsymbol{q}) &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; D_\\Psi(\\boldsymbol{w}, \\boldsymbol{q})\\,, \\\\
+w_i(\\theta) &= \\min\\left(\\max\\left(\\frac{1}{1 / q_i + \\theta},\\, l_i\\right),\\, u_i\\right)\\,, \\\\
+w_{t+1, i} &= \\frac{1}{1 / w_{t, i} + \\eta_t g_{t, i} + \\theta}\\,.
 \\end{align}
 ```
 
-with ``\\lambda`` the budget multiplier, in which the budget is monotone. On a [`BoundedAllocationSet`](@ref) the bounds are clips of the same root; on a [`ProgrammeAllocationSet`](@ref) the projection is the programme ``\\min_{\\boldsymbol{w}} -\\sum_i \\log w_i + \\sum_i w_i / q_i`` through an exponential cone on the set's solver. It is the geometry Orseau, Lattimore and Legg (2017, §7) name as the mirror-descent alternative to their Soft-Bayes step: the one first-order geometry whose portfolio regret, ``O(\\sqrt{N T \\log (T / N)})``, needs no lower bound on the price relatives, because a weight that has shrunk towards zero moves by its own scale. It cannot zero a positive entry, a zero entry stays zero, and a negative lower bound is refused, because the logarithm is undefined below zero.
+Where:
+
+  - ``\\Psi``: Burg entropy, the potential of this geometry.
+  - $(math_dict[:D_Psi_breg])
+  - $(math_dict[:q_raw])
+  - $(math_dict[:W_aset])
+  - $(math_dict[:lu_i_aset])
+  - $(math_dict[:theta_aset])
+  - $(math_dict[:w_t_iter])
+  - $(math_dict[:eta_t_lr])
+  - $(math_dict[:g_t_loss])
+
+The mirror image is ``\\nabla \\Psi(\\boldsymbol{w})_i = -1 / w_i``, so the projection sets ``\\nabla \\Psi(\\boldsymbol{w}) - \\nabla \\Psi(\\boldsymbol{q})`` to one constant over the free entries. On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at the root. A base ``1 / q_i + \\theta`` at or below zero puts its asset at ``u_i``. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``. The last line is a first-order step from ``\\boldsymbol{w}_t`` and its projection onto the simplex together, one scalar root. The Hessian of ``\\Psi`` is ``\\mathrm{diag}(1 / w_i^2)``, so the step moves a small weight in proportion to its square.
 
 # Examples
 
@@ -735,13 +859,50 @@ struct LogBarrierProjection <: AbstractProjectionGeometry end
     mirror_step(proj::TsallisProjection, u::AbstractVector, s::AbstractVector)
     mirror_step(proj::LogBarrierProjection, u::AbstractVector, s::AbstractVector)
 
-The unconstrained mirror step from the iterate `u` along the scaled gradient `s = η g`, in the geometry's potential: the raw step ``\\nabla \\Psi^*(\\nabla \\Psi(\\boldsymbol{u}) - \\boldsymbol{s})`` that [`project`](@ref) then puts onto the Allocation Set.
+Takes the unconstrained mirror step from the iterate `u` along the scaled gradient `s`, in the potential of the geometry.
 
-The Euclidean arm is `u - s`, the entropic `u ⊙ exp(-s)`, the Tsallis ``(u_i^{\\alpha - 1} + (1 - \\alpha) s_i)^{1 / (\\alpha - 1)}`` and the log-barrier ``1 / (1 / u_i + s_i)``. The last two are defined while every base is positive: under the log barrier that is ``\\eta \\hat{w}_{t, i} < 1`` for every asset, with ``\\hat{\\boldsymbol{w}}_t`` the Price-Adjusted Allocation, so it always holds at a rate below one and fails only where one asset carries more than ``1 / \\eta`` of the period's wealth; the Tsallis condition is ``(1 - \\alpha) \\eta \\hat{w}_{t, i} w_{t, i}^{-\\alpha} < 1``. A base at or below zero is a step to an unbounded allocation, and it is refused, not clipped.
+The answer is the raw step that [`project`](@ref) then puts onto the Allocation Set. A barrier geometry has a step only while every base is positive. A base at or below zero is a step to an unbounded allocation, and the function refuses it and does not clip it. Under the plain log-wealth gradient every rate below one has a step. A transformed gradient changes that condition. The first step of [`AdaptiveMomentGradient`](@ref) with `gamma1 = 0.9` and `gamma2 = 0.999` scales every entry of the gradient to about `-3.16`, so at the rate `0.9` the log-barrier step fails when one asset holds more than 0.352 of the iterate.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{q} &= \\nabla \\Psi^{*}\\left(\\nabla \\Psi(\\boldsymbol{u}) - \\boldsymbol{s}\\right)\\,, \\\\
+q^{\\mathrm{E}}_i &= u_i - s_i\\,, \\\\
+q^{\\mathrm{KL}}_i &= u_i \\exp(-s_i)\\,, \\\\
+q^{\\alpha}_i &= \\left( u_i^{\\alpha - 1} + (1 - \\alpha) s_i \\right)^{1 / (\\alpha - 1)}\\,, \\\\
+q^{\\mathrm{IS}}_i &= \\frac{1}{1 / u_i + s_i}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:q_raw])
+  - $(math_dict[:Psi_pot])
+  - ``\\nabla \\Psi^{*}``: Inverse of the mirror map ``\\nabla \\Psi``.
+  - ``\\boldsymbol{u}``: The iterate the step starts from.
+  - ``\\boldsymbol{s}``: The scaled gradient, ``\\eta_t \\boldsymbol{g}_t`` for a plain gradient.
+  - ``q^{\\mathrm{E}}``, ``q^{\\mathrm{KL}}``, ``q^{\\alpha}``, ``q^{\\mathrm{IS}}``: The raw step under [`EuclideanProjection`](@ref), [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref).
+  - ``\\alpha``: Power of the Tsallis potential, in ``(0, 1)``.
+  - $(math_dict[:eta_t_lr])
+  - $(math_dict[:g_t_loss])
+  - $(math_dict[:x_t_rel])
+
+Under the log-wealth loss with a plain gradient, ``\\boldsymbol{s} = -\\eta_t \\boldsymbol{x}_t / \\langle \\boldsymbol{u}, \\boldsymbol{x}_t \\rangle``. The log-barrier base ``1 / u_i + s_i`` is then positive exactly while ``\\eta_t \\hat{u}_i < 1`` for every asset, with ``\\hat{\\boldsymbol{u}} = \\boldsymbol{u} \\odot \\boldsymbol{x}_t / \\langle \\boldsymbol{u}, \\boldsymbol{x}_t \\rangle`` the Price-Adjusted Allocation of the iterate. Each ``\\hat{u}_i`` is at most one, so a rate below one always has a step. The Tsallis base is positive exactly while ``(1 - \\alpha) \\eta_t \\hat{u}_i u_i^{-\\alpha} < 1`` for every asset.
+
+# Arguments
+
+  - `proj`: The Projection Geometry.
+  - `u`: The iterate the step starts from.
+  - `s`: The scaled gradient.
 
 # Validation
 
-  - Under [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref): every base is positive. A `DomainError` naming the rate is thrown otherwise.
+  - Under [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref): every base is positive. A `DomainError` is thrown otherwise ([`assert_mirror_base`](@ref)).
+
+# Returns
+
+  - `q::AbstractVector`: The raw step.
 
 # Related
 
@@ -768,7 +929,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuses a barrier mirror step one of whose bases is not positive, naming the scaled gradient that produced it.
+Refuses a barrier mirror step that has a base at or below zero.
+
+The error names the scaled gradient `s` that gave the base.
+
+# Validation
+
+  - `all(> 0, base)`. A `DomainError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -777,15 +948,26 @@ Refuses a barrier mirror step one of whose bases is not positive, naming the sca
 function assert_mirror_base(base::AbstractVector, s::AbstractVector)::Nothing
     @argcheck(all(x -> x > zero(x), base),
               DomainError(s,
-                          "the mirror step leaves the geometry's domain: a base of the barrier potential is not positive, so the unconstrained step is unbounded in some asset. Lower the learning rate; under the log barrier the step exists while `eta * w_i * x_i / <w, x> < 1` for every asset."))
+                          "the mirror step leaves the geometry's domain: a base of the barrier potential is not positive, so the unconstrained step is unbounded in some asset. Lower the learning rate. Under the log barrier with the plain log-wealth gradient, the step exists while `eta * w_i * x_i / <w, x> < 1` for every asset."))
     return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The scalar root of a barrier geometry's projection onto a bounded set: the budget multiplier `μ` at which `Σ_i clip(φ(b_i + μ), lb_i, ub_i)` is one, with `b` the mirror image of the raw step and `φ` the inverse mirror map, read as the upper bound where the base is not positive.
+Projects a raw step onto a bounded set in a barrier geometry, through the scalar root of the budget.
 
-`φ` is decreasing on positive bases and unbounded as the base falls to zero, so the clipped budget is non-increasing and continuous in `μ`: every base at or below zero puts its asset at its cap, every base at infinity — a zero raw entry — at its floor. The bracket is `[-max_i b_i, hi]`, where the lower end caps every finite entry and `hi` is widened by doubling until the budget is at most one, and [`bounded_root`](@ref) bisects it. A set whose floors already sum to one is the point `lb`.
+The root is the budget multiplier `mu` at which `Σ_i clip(phi(b_i + mu), lb_i, ub_i)` is one. Here `b` is the mirror image of the raw step and `phi` is the inverse mirror map. A base at or below zero puts its asset at its cap. `phi` decreases on positive bases and has no bound as the base falls to zero, so the clipped budget does not increase in `mu` and has no jump. A zero raw entry has the base `Inf`, and it stays at its floor. [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref) state the root as ``\\boldsymbol{w}(\\theta)``.
+
+# Algorithm
+
+ 1. Check that `Σ lb ≤ 1 ≤ Σ ub` with [`assert_feasible_bounds`](@ref).
+ 2. When the floors sum to one, return `lb`.
+ 3. Collect the finite entries of `b` in `finite`, and refuse an empty `finite`.
+ 4. Write the clipped budget `f(mu)`. An asset whose base `b_i + mu` is at or below zero takes `ub_i`, and every other asset takes `clamp(phi(b_i + mu), lb_i, ub_i)`.
+ 5. Set the lower end `lo = -maximum(finite)`, at which every finite entry is at its cap. Refuse `f(lo) < 1`.
+ 6. Find the upper end `hi` with [`barrier_upper_bracket`](@ref).
+ 7. Bisect `[lo, hi]` for `mu` with [`bounded_root`](@ref).
+ 8. Return the clipped allocation at `mu`.
 
 # Arguments
 
@@ -796,11 +978,12 @@ The scalar root of a barrier geometry's projection onto a bounded set: the budge
 # Validation
 
   - `Σ lb ≤ 1 ≤ Σ ub`. An `ArgumentError` is thrown otherwise.
-  - At least one raw entry is positive, and the caps of the positive entries together with the floors of the zero ones reach the budget. A `DomainError` is thrown otherwise: the zeros stay zero under a barrier, and the rest cannot fill the budget.
+  - At least one raw entry is positive. A `DomainError` is thrown otherwise.
+  - The caps of the positive entries and the floors of the zero entries reach the budget. A `DomainError` is thrown otherwise, because a zero entry stays at its floor under a barrier.
 
 # Returns
 
-  - `w'::Vector`: The projected allocation.
+  - `w'::Vector`: The projected allocation, a new vector.
 
 # Related
 
@@ -831,7 +1014,24 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The upper end of a barrier root's bracket: a multiplier above `lo` and above zero at which the clipped budget is at most one, found by doubling.
+Finds the upper end of the bracket of a barrier root, a positive multiplier above `lo` at which the clipped budget is at most one.
+
+The loop stops, because the clipped budget tends to `Σ lb < 1` as the multiplier grows. [`barrier_projection`](@ref) returns `lb` before it calls this function when `Σ lb = 1`.
+
+# Algorithm
+
+ 1. Start from `hi = max(lo, 0) + 1`.
+ 2. Double `hi` while `f(hi) > 1`.
+ 3. Return `hi`.
+
+# Arguments
+
+  - `f`: The clipped budget as a function of the multiplier, non-increasing.
+  - `lo`: The lower end of the bracket.
+
+# Returns
+
+  - `hi`: The upper end of the bracket.
 
 # Related
 
@@ -848,12 +1048,33 @@ end
     project(proj::TsallisProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
     project(proj::LogBarrierProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
 
-The barrier arms of the Constrained Update on the bounded set: the scalar root of [`barrier_projection`](@ref) in the geometry's mirror image, on every bound, the simplex included, because neither potential has a closed form there. A root whose allocation misses the budget in floating point is the Held Step ([`budget_or_held_step`](@ref)): under the log barrier a raw entry of `1e-20` has the base `1e20`, and the multiplier that brings it to a share of the budget cancels against that base.
+Projects the raw step `q` onto a [`BoundedAllocationSet`](@ref) in the Tsallis or the log-barrier geometry. These are the barrier arms of the Constrained Update, and `w` is the Price-Adjusted Allocation.
+
+Neither potential has a closed-form projection onto the simplex, so the arms use the scalar root of [`barrier_projection`](@ref) on every bound, the simplex included. A root whose allocation misses the budget in floating point gives the Held Step ([`budget_or_held_step`](@ref)). This happens, for example, under the log barrier when a raw entry is `1e-20`. Its base is `1e20`, and the multiplier that brings the entry to a share of the budget cancels against that base.
+
+# Algorithm
+
+ 1. Refuse a negative or non-finite entry of `q` and a negative floor, with [`assert_barrier_raw_step`](@ref).
+ 2. Map `q` to its mirror image `b`, `q .^ (alpha - 1)` under the Tsallis geometry and `inv.(q)` under the log barrier. A zero entry maps to `Inf`.
+ 3. Find the allocation `wn` with [`barrier_projection`](@ref), on `b`, the inverse mirror map and the bounds of `set`.
+ 4. Return `wn`, or the Held Step `w` when `wn` misses the budget in floating point, with [`budget_or_held_step`](@ref).
+
+# Arguments
+
+  - `proj`: The barrier geometry.
+  - `set`: The bounded set, its bounds resolved.
+  - `q`: The raw step.
+  - `w`: The Price-Adjusted Allocation the step trades from, the answer of a Held Step.
 
 # Validation
 
   - `all(>= 0, q)` and every entry finite. A `DomainError` is thrown otherwise.
   - `all(>= 0, lb)` over the resolved bounds. A `DomainError` is thrown otherwise.
+  - Everything [`barrier_projection`](@ref) refuses.
+
+# Returns
+
+  - `w'::Vector`: The projected allocation, or `w` copied on a Held Step.
 
 # Related
 
@@ -877,7 +1098,18 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuses, for a barrier geometry, a raw step with a negative or non-finite entry and a bound with a negative floor: the potential is undefined below zero.
+Refuses, for a barrier geometry, a raw step with a negative or non-finite entry, and a bound with a negative floor.
+
+The potential of a barrier geometry is undefined below zero.
+
+# Validation
+
+  - Every entry of `q` is finite and non-negative. A `DomainError` is thrown otherwise.
+  - `all(>= 0, wb.lb)`. A `DomainError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -897,18 +1129,24 @@ end
 """
     assert_geometry_admits_set(proj::AbstractProjectionGeometry, set::AbstractAllocationSet)
 
-Refuses, where the head's `alg` and `set` meet, a negative lower bound under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref), whose potentials are undefined below zero.
+Refuses a negative lower bound under a geometry whose potential is undefined below zero.
 
-The refusal is at construction when the bound is a value; a bound resolved from an estimator is refused at the projection. Any other geometry admits a negative bound, so a long-short reversion costs nothing.
+The head calls this function at its construction, with the geometry of its rule and its set. The entropic, Tsallis and log-barrier geometries refuse a negative bound. This function refuses a bound that is a value. The projection refuses a bound that an estimator resolves. The Euclidean, Gram and diagonal geometries admit a negative bound, so a long-short rule needs no other set.
 
 # Validation
 
   - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) or [`LogBarrierProjection`](@ref) with a [`WeightBounds`](@ref) whose `lb` is a number or a vector: `all(>= 0, lb)`. A `DomainError` is thrown otherwise.
 
+# Returns
+
+  - `nothing`.
+
 # Related
 
   - [`OnlinePortfolioSelection`](@ref)
   - [`EntropicProjection`](@ref)
+  - [`TsallisProjection`](@ref)
+  - [`LogBarrierProjection`](@ref)
   - [`project`](@ref)
 """
 function assert_geometry_admits_set(::AbstractProjectionGeometry,

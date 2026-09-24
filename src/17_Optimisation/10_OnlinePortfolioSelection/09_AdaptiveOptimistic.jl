@@ -19,8 +19,8 @@ Where:
   - $(math_dict[:q_raw])
   - $(math_dict[:W_aset])
   - ``\\boldsymbol{h}``: Positive diagonal of the norm, one entry for each asset.
-  - ``l_i``, ``u_i``: Lower and upper bounds of asset ``i`` on a [`BoundedAllocationSet`](@ref).
-  - ``\\theta``: Multiplier of the budget, the root of ``\\sum_i w_i(\\theta) = 1``.
+  - $(math_dict[:lu_i_aset])
+  - $(math_dict[:theta_aset])
 
 On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at that root. At ``\\boldsymbol{h} = \\boldsymbol{1}`` it is the Euclidean projection.
 

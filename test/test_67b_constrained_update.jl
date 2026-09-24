@@ -1399,6 +1399,71 @@ end
             @test 0.05 * (1 - 1e-4) <= short <= 0.2 * (1 + 1e-4)
         end
     end
+    @testset "The set's view, the barrier roots and the mirror step's domain (#1192)" begin
+        # The view of the set viewed every per-asset slot but the prior estimator, so a
+        # Black-Litterman view keyed by name kept four assets over three columns of rows,
+        # and the prior threw a DimensionMismatch.
+        rng = StableRNG(1)
+        X4 = randn(rng, 60, 4) .* 0.01 .+ 0.001
+        sets4 = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A", "B", "C", "D"]))
+        bl = BlackLittermanPrior(; sets = sets4,
+                                 views = LinearConstraintEstimator(; val = ["A == 0.03"]))
+        pset4 = ProgrammeAllocationSet(; slv = slv, pe = bl,
+                                       r = Variance(;
+                                                    settings = RiskMeasureSettings(;
+                                                                                   ub = 1e-4)))
+        vset = po.port_opt_view(pset4, [1, 2, 3])
+        @test vset.pe.sets.dict["nx"] == ["A", "B", "C"]
+        @test size(prior(vset.pe, X4[:, 1:3]).X) == (60, 3)
+        # The barrier root on the bounds equals the programme on the same bounds, with a
+        # floor active and two entries free.
+        wbC = WeightBounds(; lb = [0.0, 0.2, 0.0], ub = [0.5, 0.6, 0.6])
+        qC = [0.6, 0.05, 0.35]
+        bC = resolve(BoundedAllocationSet(; wb = wbC), 3)
+        pC = resolve(ProgrammeAllocationSet(; slv = slv, wb = wbC), 3)
+        for proj in (LogBarrierProjection(), TsallisProjection(; alpha = 0.5),
+                     TsallisProjection(; alpha = 0.3))
+            wr = po.project(proj, bC, qC, wh)
+            @test wr[2] == 0.2 && all(0.2 .< wr[[1, 3]] .< 0.5)
+            @test isapprox(wr, po.project(proj, pC, qC, wh); atol = 1e-6)
+        end
+        # The Tsallis projection tends to the entropic one as alpha tends to one, and to the
+        # log-barrier one as alpha tends to zero.
+        @test isapprox(po.project(TsallisProjection(; alpha = 1 - 1e-6), bC, qC, wh),
+                       po.project(EntropicProjection(), bC, qC, wh); atol = 1e-5)
+        @test isapprox(po.project(TsallisProjection(; alpha = 1e-6), bC, qC, wh),
+                       po.project(LogBarrierProjection(), bC, qC, wh); atol = 1e-5)
+        # The domain of the barrier mirror step under the plain log-wealth gradient.
+        u = [0.6, 0.3, 0.1]
+        x = [1.5, 0.9, 1.0]
+        g = -x ./ dot(u, x)
+        uh = u .* x ./ dot(u, x)
+        for (proj, thr) in ((LogBarrierProjection(), 1 / maximum(uh)),
+                            (TsallisProjection(; alpha = 0.5), 1 / maximum(0.5 .* uh .* u .^ -0.5)))
+            @test all(isfinite, po.mirror_step(proj, u, (thr * (1 - 1e-9)) .* g))
+            @test_throws DomainError po.mirror_step(proj, u, (thr * (1 + 1e-9)) .* g)
+        end
+        # A transformed gradient changes the domain: at the rate 0.9 the step fails where
+        # one asset holds more than 0.352 of the iterate.
+        adam = po.AdaptiveMomentGradient(; gamma1 = 0.9, gamma2 = 0.999)
+        sa = po.transform_gradient!(adam, (zeros(3), zeros(3)), g)
+        @test all(isapprox.(sa, -3.16; atol = 0.01))
+        @test_throws DomainError po.mirror_step(LogBarrierProjection(), u, 0.9 .* sa)
+        @test all(isfinite,
+                  po.mirror_step(LogBarrierProjection(), [0.35, 0.35, 0.3], 0.9 .* sa))
+        # Three geometries refuse a negative lower bound, and three admit it.
+        neg = ProgrammeAllocationSet(; slv = slv, wb = WeightBounds(; lb = -0.1, ub = 1.0))
+        A3 = [2.0 0.3 0.1; 0.3 1.0 0.2; 0.1 0.2 1.5]
+        for p in (EuclideanProjection(), GramProjection(; slv = slv, A = A3),
+                  po.DiagonalProjection([1.0, 2.0, 3.0]))
+            @test isnothing(po.assert_geometry_admits_set(p, neg))
+        end
+        for p in (EntropicProjection(), TsallisProjection(), LogBarrierProjection())
+            @test_throws DomainError po.assert_geometry_admits_set(p, neg)
+        end
+        @test_throws po.IsEmptyError ProgrammeAllocationSet(; slv = slv,
+                                                            ret = po.JuMPReturnsEstimator[])
+    end
     @testset "Docs and the search seam" begin
         @test occursin("Held Step", string(@doc(po.HeldStep)))
         @test occursin("per-asset", string(@doc(ProgrammeAllocationSet)))

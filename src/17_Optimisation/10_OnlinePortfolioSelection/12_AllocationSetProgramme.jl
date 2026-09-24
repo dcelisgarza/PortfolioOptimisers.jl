@@ -1004,12 +1004,12 @@ A set that reads the rows fits its prior on the step's rows carrier, as a batch 
 
 Where:
 
-  - ``\\boldsymbol{w}^{+}``: The projected allocation.
+  - $(math_dict[:w_plus_proj])
   - $(math_dict[:W_aset]) Under an Investable Mask it also holds ``w_i = 0`` for every asset ``i`` outside the mask.
   - $(math_dict[:D_Psi_breg])
   - $(math_dict[:Psi_pot])
   - $(math_dict[:q_raw])
-  - ``\\pi``: Objective Penalty of the set, zero when the set has no penalty.
+  - $(math_dict[:pi_obj_pen])
 
 [`set_projection_objective!`](@ref) states the objective each geometry writes for ``D_\\Psi``.
 

@@ -37,7 +37,7 @@ Keywords correspond to the struct's fields. `set`, `fees` and `fb` may hold a [`
 
   - `w0`: non-empty and finite, when given; it is projected onto the set at the first step, so it need not lie in it.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(set.sets)`. A schedule on `set` is held to it per entry.
-  - Everything [`assert_geometry_admits_set`](@ref) refuses: a negative lower bound under an entropic rule. A schedule on `set` is held to it per entry.
+  - Everything [`assert_geometry_admits_set`](@ref) refuses: a negative lower bound under an entropic, Tsallis or log-barrier rule. A schedule on `set` is held to it per entry.
   - Everything [`assert_rule_admits_set`](@ref) refuses: a solver-free leader under a programme set. A schedule on `set` is held to it per entry.
   - `fb` schedules: `bind !== :nearest`.
 

@@ -1309,7 +1309,12 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :w_star_lead => "``\\boldsymbol{w}^\\star_t``: Leader of period ``t``, the allocation that the held optimisation estimator solves for on the sample ``C_t``.",#
                        :w_var_lead => "``\\boldsymbol{w}``: Decision allocation of the leader's programme.",#
                        :w_win => "``w``: Window length, the number of periods in each window that a pattern-matching selector compares.",#
-                       :x_win => "``\\boldsymbol{x}_{a}^{b}``: Window of periods ``a`` to ``b``, the price relatives of those periods concatenated into one vector.")
+                       :x_win => "``\\boldsymbol{x}_{a}^{b}``: Window of periods ``a`` to ``b``, the price relatives of those periods concatenated into one vector.",#
+                       # The scalar roots of the Projection Geometries on a bounded set.
+                       :lu_i_aset => "``l_i``, ``u_i``: Lower and upper bounds of asset ``i`` on a [`BoundedAllocationSet`](@ref).",#
+                       :theta_aset => "``\\theta``: Budget multiplier, the root of ``\\sum_i w_i(\\theta) = 1``.",#
+                       :w_plus_proj => "``\\boldsymbol{w}^{+}``: Projected allocation, the answer of the projection onto the Allocation Set.",#
+                       :pi_obj_pen => "``\\pi``: Objective Penalty of the set, zero when the set has no penalty.")
 """
     ref_dict
 
