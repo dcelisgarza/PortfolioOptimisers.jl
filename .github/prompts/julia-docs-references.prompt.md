@@ -5,7 +5,7 @@ description: Add docstrings to markdown files.
 
 Docstrings should be referenced in a `@docs` codeblock in their respective `*.md` file. For example:
 
-- If the item associated with the docstring is found in `src/folder/myfile.jl`, it should appear in `docs/src/public_api/myfile.md` or `docs/src/private_api/myfile.md`, whichever side its classification puts it on.
+- If the item associated with the docstring is found in `src/folder/myfile.jl`, it should appear in `docs/src/public_api/folder/myfile.md` or `docs/src/private_api/folder/myfile.md`, whichever side its classification puts it on. A file at the top level of `src/` maps to a page at the top level of each tree.
 - If the `*.md` file does not exist, create it.
 - If the file exists and has a `@docs` codeblock, add it to the block, otherwise create the codeblock and add the item inside.
 - Some functions have multiple methods (overloads). If this is the case, you can disambiguate the methods by using their respective type signatures. For example:
@@ -29,7 +29,7 @@ function my_function(a::Tuple{Float64, <:Real}, b::Float64, args...; kwargs...)
 end
 ```
 
-They would be disambiguated by using their type signatures inside the `@doc` codblock.
+They would be disambiguated by using their type signatures inside the `@docs` block.
 
 ```@docs
 my_function(a::Int, b::Int, args...; kwargs...)

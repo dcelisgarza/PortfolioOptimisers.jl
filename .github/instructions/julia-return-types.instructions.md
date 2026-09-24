@@ -89,8 +89,8 @@ Prefer the most specific concrete type when it is always the same; use the abstr
 All functions that exist solely for side effects (validation, in-place mutation, printing) and explicitly `return nothing` should be annotated `::Nothing`:
 
 ```julia
-function denoise!(dn::SpectralDenoise, X::MatNum, q::Number)::Nothing
-    ...
+function record_non_investable_drop!(ledger::AbstractVector, what::AbstractString)::Nothing
+    push!(ledger, what)
     return nothing
 end
 ```

@@ -93,6 +93,4 @@ If the addition creates a new file under `src/`, give it a row in [`code_health/
 
 ## Step 10 — Final checks
 
-Run the full pre-commit, test, and doctest suite following [`.github/prompts/pre-commit-and-test.prompt.md`](pre-commit-and-test.prompt.md).
-
-All three steps must pass before committing.
+Run the pre-commit checks, the tests for the area you changed, and the doctests, in the order [`.github/prompts/pre-commit-and-test.prompt.md`](pre-commit-and-test.prompt.md) gives.

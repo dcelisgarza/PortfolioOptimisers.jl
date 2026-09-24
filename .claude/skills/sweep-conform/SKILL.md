@@ -50,10 +50,10 @@ Steps 3 and 4 write to the tracker. The `sweep-file-issues` skill does them.
 ## What each failure means
 
 **`no row in code_health/sweep_manifest.toml`.** Paste the line the check printed, and choose `map` yourself.
-**`map` is not derivable from a path.** Each of the nine subdirectories of `src/` and `ext/` uses
-exactly one child map, and there the check names it outright. The top level of `src/` holds files
-across five maps, and the numeric prefix does not rescue the lookup: the blocks are not contiguous.
-The check prints the candidates and you choose by subject.
+**`map` is not always derivable from a path.** When the file's directory uses one child map, the
+check names it outright. When the directory uses several, as the top level of `src/` and
+`src/17_Optimisation/` do, the numeric prefix does not rescue the lookup: the blocks are not
+contiguous. The check prints the candidates and you choose by subject.
 
 **`the unit count moved`.** A documented unit joined the file. This is the case the rule is really
 aimed at — a type or a function added to an *existing* file, which already has a row — so record

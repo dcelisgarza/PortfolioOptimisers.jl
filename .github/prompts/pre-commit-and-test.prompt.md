@@ -3,7 +3,7 @@ agent: ask
 description: Run pre-commit checks and tests before committing changes to PortfolioOptimisers.jl.
 ---
 
-Run the full pre-commit and test suite to verify that changes are correct and ready to commit.
+Run the pre-commit checks, the tests for the area you changed, and the doctests before you commit.
 
 ## Step 1 — Run pre-commit checks
 
@@ -16,21 +16,15 @@ pre-commit run -a
 All hooks must pass (exit code 0) before proceeding. If any hook fails:
 
 - **JuliaFormatter**: Auto-fixes are applied. Run `pre-commit run -a` again to confirm they pass.
-- **Spelling / grammar**: Fix flagged issues manually, then re-run.
 - **Other hooks**: Read the output carefully and fix the root cause.
 
 Do not proceed to tests until `pre-commit run -a` exits with no failures.
 
-## Step 2 — Run the test suite
+## Step 2 — Run the tests for the area you changed
 
-Start a Julia REPL in the repository root and run:
+Run the targeted `test_*.jl` files for the area you changed. [`CLAUDE.md`](../../CLAUDE.md) § *Running Julia* owns how to run them, and why the full suite is the maintainer's to run.
 
-```julia-repl
-julia> ] activate .
-julia> ] test
-```
-
-All tests must pass. If any test fails:
+All of them must pass. If any test fails:
 
 1. Read the full failure message to identify the failing test and file.
 2. Determine whether the failure is caused by your changes or is a pre-existing failure.
@@ -39,24 +33,7 @@ All tests must pass. If any test fails:
 
 ## Step 3 — Run doctests
 
-Doctests are **not** run by `] test` — they are a separate step. Run them from the repository root:
-
-```bash
-julia --color=yes --project=docs -e '
-  using Pkg
-  Pkg.develop(PackageSpec(path=pwd()))
-  Pkg.instantiate()'
-```
-
-Then:
-
-```bash
-julia --color=yes --project=docs -e '
-  using Documenter: DocMeta, doctest
-  using PortfolioOptimisers
-  DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers, StatsBase, Statistics, LinearAlgebra, Dates, Distributions, StableRNGs, TimeSeries); recursive=true)
-  doctest(PortfolioOptimisers)'
-```
+Doctests are **not** run by `] test` — they are a separate step. The `run-doctests` skill owns the invocation, which mirrors the `doctest` job of `.github/workflows/Docs.yml`, and the fresh-process rule.
 
 All doctests must pass. If a doctest fails:
 
@@ -70,7 +47,7 @@ Once all three steps pass with no failures, report the result to the user:
 
 ```text
 pre-commit run -a  ✓  All N hooks passed.
-] test             ✓  All N tests passed.
+targeted tests     ✓  All N tests passed.
 doctest            ✓  All doctests passed.
 ```
 

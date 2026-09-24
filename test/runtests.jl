@@ -10,7 +10,7 @@ auto-discovered and executed in its own isolated worker module. Don't add
 setup (the common `using` core and `find_tol`) lives here once rather than being
 duplicated per file. Files still `using` their own rare/heavy deps (StatsPlots,
 GraphRecipes, Pajarito, HiGHS, SCS, Clustering, AverageShiftedHistograms, FLoops).
-See docs/adr/0001-parallelise-test-suite.md.
+See docs/adr/0003-parallelise-test-suite.md.
 =#
 const init_code = quote
     using Test, PortfolioOptimisers

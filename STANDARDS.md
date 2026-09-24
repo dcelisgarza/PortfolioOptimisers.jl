@@ -110,7 +110,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | `.github/instructions/julia-docstrings.instructions.md` | docstring sections, dictionaries, maths, the algorithm and JuMP formulation blocks, the sections an alias carries, `jldoctest`, the `/unslop` pass over a docstring and over a dictionary value, and the pointers to the reference docstrings | `src/**/*.jl`, `ext/**/*.jl`, `docs/**/*.md` |
 | `.github/instructions/julia-prose.instructions.md` | the prose a user reads as a page: the `/unslop` pass, the dash, the voice, the vocabulary, a narrated check, the paragraph, the page's furniture, the printed strings and the code comments of a page, the derived text the rule does not read, and the census | `examples/**/*.jl`, `user_guide/*.jl`, `docs/src/**/*.md`, `README.md`, `docs/capability_catalogue.jl` |
 | `.github/instructions/julia-return-types.instructions.md` | when to annotate a return type | `src/**/*.jl` |
-| `.github/instructions/julia-test-writing.instructions.md` | test file layout, `@safetestset`, validation tests | `test/` |
+| `.github/instructions/julia-test-writing.instructions.md` | test file layout, the per-file module and its `init_code` preamble, validation tests | `test/` |
 | `.github/prompts/*.prompt.md` | the order of the work for adding a type or shipping a change; every step links to the Authority that owns its rule, and a prompt states no rule of its own | task-scoped |
 | `docs/src/contribute/` | contributor and developer guides, release checklist | the repository |
 

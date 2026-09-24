@@ -9,7 +9,7 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
 - **Modular Design:** The main module (`src/PortfolioOptimisers.jl`) includes a large set of submodules, each focused on a specific aspect (moments, risk, priors, constraints, optimisation, etc.). Each submodule is further split into fine-grained files (e.g., different covariance estimators, risk measures, etc.).
 - **Abstract Types:** All estimators, algorithms, and results are built on a hierarchy of abstract types (e.g., `AbstractEstimator`, `AbstractAlgorithm`, `AbstractResult`). New functionality should extend these types for consistency and dispatch.
 - **Composability:** Estimators and algorithms are designed to be composed. For example, a covariance estimator can be wrapped with a matrix post-processing estimator, or a mean estimator can be combined with a shrinkage algorithm.
-- **Validation:** The codebase uses `@argcheck` (from ArgCheck.jl) extensively for input validation and defensive programming. Always validate arguments in new methods.
+- **Validation:** The codebase validates input with `@argcheck` (from ArgCheck.jl) and shared assertion helpers. [`julia-source-code.instructions.md`](instructions/julia-source-code.instructions.md) § *Input Validation* owns the rule.
 - **Documentation:** All public types and methods are documented with docstrings, including usage examples and references to related types.
 
 ## Developer Workflows
@@ -26,7 +26,7 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
 
 - **Linting and Formatting:**
 
-  - **ALWAYS** run `pre-commit run -a` before committing changes.
+  - Run `pre-commit run -a` before committing changes.
   - The repository uses pre-commit hooks for linting and formatting.
   - Julia code is formatted using JuliaFormatter.jl.
   - **Commits will be rejected if pre-commit tests fail.**
@@ -34,15 +34,7 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
 
 - **Testing:**
 
-  - **ALWAYS** run tests after making code changes and before committing.
-
-  - From Julia REPL:
-
-        ```julia
-        using Pkg
-        Pkg.activate(".")
-        Pkg.test()
-        ```
+  - Run the tests for the area you changed before committing. [`CLAUDE.md`](../CLAUDE.md) § *Running Julia* owns how to run them.
 
   - Add new tests as `test_*.jl` in `test/`.
   - Tests must pass before creating a pull request.
@@ -83,7 +75,7 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
   - For new matrix processing or post-processing steps, implement the appropriate interface and document usage.
 - **Validation:**
 
-  - Use `@argcheck` for all input validation, especially in constructors and public methods.
+  - Validate input as [`julia-source-code.instructions.md`](instructions/julia-source-code.instructions.md) § *Input Validation* states: prefer a shared assertion helper over an inline `@argcheck`.
 - **Dispatch:**
 
   - Prefer multiple dispatch over conditionals for algorithm selection and extension.
@@ -141,25 +133,18 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
 
 ## Code Review & Maintenance
 
-- Ensure tests cover new functionality and edge cases.
-- Keep documentation up to date with code changes.
 - Follow semantic versioning for releases.
-- Check spelling and grammar in code, docstrings and docs.
-- Ensure new code follows established patterns and conventions.
-- Ensure new documentation adheres to established patterns and conventions.
 
 ## Before Finalizing Work
 
-Before completing any task or creating a pull request, **ALWAYS**:
+Before completing any task or creating a pull request:
 
  1. **Run pre-commit checks**: `pre-commit run -a` - All checks must pass.
- 2. **Run tests**: Activate environment and run tests in Julia REPL - All tests must pass.
- 3. **Run doctests**: Doctests are separate from `] test` — run them via the `docs` project environment (see `.github/prompts/pre-commit-and-test.prompt.md` for the exact commands).
- 4. **Verify changes**: Ensure all file changes align with the task requirements.
- 5. **Update documentation**: If adding new features, update relevant docstrings and docs.
- 6. **Update the Capability Catalogue**: Any new type on the Choice Surface, and any new exported function, must be placed in `docs/capability_catalogue.jl` (or listed in `NOT_A_FEATURE`, for a function, or `NOT_A_CHOICE`, for a type the library constructs for itself, with a reason). The surface is every concrete type the package declares that is a leaf `AbstractEstimator`, a leaf `AbstractAlgorithm`, a leaf `AbstractCovarianceEstimator`, or an export under its own name, less the Results and the errors. Do not write a description — it comes from the first sentence of the docstring. `test/test_26_docs.jl` fails if you skip this. See ADR 0040.
- 7. **Conform an addition to the sweep**: A file added or changed under `src/` or `ext/` owes the four steps of `CLAUDE.md` § *Functionality you add*. Run `julia --project=code_health code_health/sweep_check.jl --fetch`, which reports every one of them and prints the manifest line to paste. See ADR 0084.
- 8. **Check code quality**: Ensure code follows established patterns and conventions.
+ 2. **Run tests**: Run the tests for the area you changed, as `CLAUDE.md` § *Running Julia* states - All of them must pass.
+ 3. **Run doctests**: Doctests are separate from `] test`. The `run-doctests` skill owns the exact command.
+ 4. **Update documentation**: If adding new features, update relevant docstrings and docs.
+ 5. **Update the Capability Catalogue**: Any new type on the Choice Surface, and any new exported function, must be placed in `docs/capability_catalogue.jl` (or listed in `NOT_A_FEATURE`, for a function, or `NOT_A_CHOICE`, for a type the library constructs for itself, with a reason). The surface is every concrete type the package declares that is a leaf `AbstractEstimator`, a leaf `AbstractAlgorithm`, a leaf `AbstractCovarianceEstimator`, or an export under its own name, less the Results and the errors. Do not write a description — it comes from the first sentence of the docstring. `test/test_26_docs.jl` fails if you skip this. See ADR 0040.
+ 6. **Conform an addition to the sweep**: A file added or changed under `src/` or `ext/` owes the four steps of `CLAUDE.md` § *Functionality you add*. Run `julia --project=code_health code_health/sweep_check.jl --fetch`, which reports every one of them and prints the manifest line to paste. See ADR 0084.
 
 * * *
 

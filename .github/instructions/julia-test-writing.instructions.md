@@ -12,19 +12,18 @@ applyTo: "test/test_*.jl"
 
 ## Test Patterns
 
-- **Use `@safetestset`**: All top-level test sets must use `@safetestset` to ensure isolation.
+- **Each file runs in its own module**: `test/runtests.jl` runs every `test_*.jl` file in an isolated module through ParallelTestRunner.jl (ADR 0003), after its `init_code` preamble loads the common packages. Group a file's tests in top-level `@testset` blocks.
 
     ```julia
-    @safetestset "Feature name tests" begin
-        using Test, PortfolioOptimisers
+    @testset "Feature name tests" begin
         @testset "Specific functionality" begin
             # test code here
         end
     end
     ```
 
-- **Import required packages**: Import all necessary packages inside the `@safetestset` block.
-- **Nested test sets**: Use `@testset` for grouping related tests within a `@safetestset`.
+- **Import rare packages**: write `using` at the top of the file for a package that `init_code` does not load.
+- **Nested test sets**: Use `@testset` for grouping related tests within a top-level `@testset`.
 
 ## Validation Testing
 
@@ -50,7 +49,7 @@ applyTo: "test/test_*.jl"
   - Error conditions (invalid inputs, dimension mismatches, etc.).
   - Type stability where relevant.
 
-- Aim for comprehensive coverage of new functionality and edge cases.
+- A new file enters with every line covered, or with a Coverage Exemption. ADR 0082 owns that rule.
 
 ## Test Data
 
@@ -132,10 +131,10 @@ end
 When adding new functionality:
 
  1. Create a new test file `test_<feature>.jl` or add to existing test file.
- 2. Use `@safetestset` for top-level organisation.
+ 2. Use a top-level `@testset` for organisation.
  3. Test both success and failure cases.
  4. Verify all validation logic works correctly.
  5. Test each dispatch variant for functions with multiple methods.
  6. Test composability with other estimators where applicable.
  7. Test result passthrough where applicable.
- 8. Run pre-commit checks, tests, and doctests before committing following `.github/prompts/pre-commit-and-test.prompt.md`. Note: doctests are **not** run by `] test` — they require a separate step.
+ 8. Before committing, run the pre-commit checks, the tests for the area you changed, and the doctests, as `.github/prompts/pre-commit-and-test.prompt.md` orders them. `] test` does not run the doctests.

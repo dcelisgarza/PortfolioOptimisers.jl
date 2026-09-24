@@ -136,8 +136,9 @@ build when a file carries no row, and when a file's unit count leaves its row.
 
 Wire your addition into the audit in the same change:
 
-1. Add or correct the file's row. The census prints the line to paste. Take `map` from the row of a
-   neighbouring file in the same directory, and set `swept = false`. A swept row also records the
+1. Add or correct the file's row. The census prints the line to paste. Take `map` from the check
+   below: it names the map when the directory uses one, and lists the candidates when the directory
+   uses several. Set `swept = false`. A swept row also records the
    name of the binding each unit attaches to, so a unit replaced one for one in a swept file owes
    the same four steps as an addition, and the row keeps `swept = true` (ADR 0148).
 2. Cover every line of a new file, or give it a Coverage Exemption. ADR 0082 owns that rule.
