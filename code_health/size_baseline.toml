@@ -10,7 +10,7 @@ commit = "0ecb3ce47c"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2993, doc = 0, comment = 241, blank = 48, total = 3282 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1319, doc = 113, comment = 146, blank = 43, total = 1621 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1324, doc = 113, comment = 147, blank = 43, total = 1627 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -268,7 +268,7 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/10_FeesConstraints.jl" = { code = 121, doc = 247, comment = 12, blank = 106, total = 486 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/11_TrackingErrorConstraints.jl" = { code = 180, doc = 64, comment = 3, blank = 22, total = 269 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { code = 221, doc = 442, comment = 11, blank = 205, total = 879 }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { code = 92, doc = 160, comment = 2, blank = 70, total = 324 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { code = 92, doc = 207, comment = 2, blank = 96, total = 397 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl" = { code = 651, doc = 706, comment = 72, blank = 184, total = 1613 }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { code = 252, doc = 435, comment = 4, blank = 127, total = 818 }
 "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl" = { code = 157, doc = 223, comment = 6, blank = 73, total = 459 }
