@@ -15,6 +15,8 @@ unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempt
                  :c3c2 => "`c3 > c2`.",#
                  :sbn => "`0 <= n`. `Inf` is permitted and `NaN` is not.",#
                  :dims => "`dims in (1, 2)`.",#
+                 :fd_panel => "The panel resolves. [`asset_panel`](@ref) raises an [`IsNothingError`](@ref) naming the site when it does not.",#
+                 :fd_strict => "Under `de.strict = true`, every entry of `de.sel` names a Panel Field, a level or a label that the panel holds. Raises an `ArgumentError`. Under `de.strict = false`, such an entry warns and is dropped.",#
                  :alpha => "`0 < alpha < 1`.",#
                  :beta => "`0 < beta < 1`.",#
                  :bins => "If `bins` is an integer, `0 < bins <= RESOURCE_LIMITS[].max_bins` (the joint histogram is `bins × bins`; see [`RESOURCE_LIMITS`](@ref)).",#

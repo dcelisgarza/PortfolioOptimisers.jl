@@ -8,7 +8,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :pe_ucs => "`pe`: Prior estimator the set fits on the returns it is handed, or `nothing`. With `nothing` the set holds no prior of its own and is calibrated on the prior result it is handed — inside an optimiser, the prior the optimiser is solving on, so its centre is the objective's own — through the prior-result arm of the ucs triple; the returns-data form then refuses by name. The default, `EmpiricalPrior()`, fits an empirical prior on the returns.",#
                  :pr => "`pr`: Prior result.",#
                  :per => "`pr`: Prior estimator or result.",#
-                 :pr_rr => "`pr`: Prior result or returns result. Both carry the asset returns matrix `X` and the feature matrix `Z`, so either can supply them.",#
+                 :pr_rr => "`pr`: Prior result or returns result. Both carry the asset returns matrix `X`, so either can supply it.",#
                  # The risk-free rate of the Black-Litterman update.
                  :bl_rf => "`rf`: Risk-free rate. The Black-Litterman update blends the prior mean against the view returns, so it runs on the total-return scale those are written on. A mean taken from a wrapped prior estimator is on that scale already; an equilibrium mean is a bare risk premium, and the rate converts it before the update. A member with no equilibrium branch has nothing to convert and adds the rate to the posterior asset expected returns instead. It is added exactly once either way, and the wrapped prior estimators are left alone, so a risk-free rate one of them applied internally stays where it is.",#
                  # Prior results.

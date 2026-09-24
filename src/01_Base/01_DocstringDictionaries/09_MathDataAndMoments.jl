@@ -55,6 +55,8 @@ unique_key_dict!(math_dict, :math_dict,
                  :d_ij_dist => "``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.",#
                  :rho_ij => "``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.",#
                  :D_mat_dist => "``\\mathbf{D}``: Distance matrix.",#
+                 :D_ij_dist => "``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.",#
+                 :S_ij_sim => "``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.",#
                  # Feature matrices and the collapse of a feature window.
                  :z_i_feature => "``\\boldsymbol{z}_{i}``: Feature vector of asset ``i``, its row of the feature matrix.",#
                  :z_tik_feature => "``z_{t,\\,i,\\,k}``: Feature window entry: feature ``k`` of asset ``i`` at observation ``t``.",#

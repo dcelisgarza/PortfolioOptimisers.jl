@@ -415,34 +415,34 @@ $(DocStringExtensions.TYPEDEF)
 
 Turns a feature matrix into a distance matrix, by applying a metric to the rows of that matrix.
 
-A feature matrix describes assets by their exposures, memberships, loadings or adjacencies rather than by their returns. This estimator is a peer of [`Distance`](@ref) and [`DistanceDistance`](@ref): unlike them, it never consults a correlation matrix, so it is usable where returns are uninformative or unavailable.
+A feature matrix describes assets by their exposures, memberships, loadings or adjacencies rather than by their returns. This estimator is a peer of [`Distance`](@ref) and [`DistanceDistance`](@ref). Unlike them, it never reads a correlation matrix, so it works where returns are uninformative or unavailable.
 
-Any `Distances.SemiMetric` is accepted, including a user-defined one, and every metric yields a similarity, so no combination throws **on this path**. The remarks below are about the metric a caller chooses, not about this type.
+The estimator accepts any `Distances.SemiMetric`, including a user-defined one, and every metric has a similarity, so no combination throws on this path. The remarks below are about the metric a caller chooses, not about this type.
 
 !!! warning "A metric is not automatically in the similarity's domain"
 
-    A metric returning a distance above `1` gives similarities outside ``[-1,\\,1]`` under the default [`ComplementSimilarity`](@ref), which [`plot_clusters`](@ref) silently clips. The threshold is `1`, not "the metric is unbounded" — `Distances.CosineDist` and `Distances.CorrDist` are bounded by `2` and cross it routinely.
+    Under the default [`ComplementSimilarity`](@ref), a distance above `1` gives a negative similarity, and a distance above `2` gives a similarity below `-1`, which [`plot_clusters`](@ref) clips silently. The first threshold is `1`, not "the metric is unbounded". `Distances.CosineDist` and `Distances.CorrDist` are bounded by `2`, and they cross `1` at every negative cosine or correlation. `Distances.Euclidean` has no bound, and it crosses `2` on features of large magnitude.
 
     That claim is scoped to this path. Handing this estimator to a [`NetworkEstimator`](@ref), [`DBHT`](@ref) or [`LoGo`](@ref) as their `de` puts the resulting distance matrix on the PMFG path, where **their own** similarity field applies rather than `sim`, and where [`assert_similarity_domain`](@ref) refuses a distance above `1` under [`ComplementSimilarity`](@ref) and a non-finite one under [`MaximumDistanceSimilarity`](@ref).
 
-Every metric other than [`AngularDist`](@ref) and `Distances.CorrDist` is scale-sensitive, and even [`AngularDist`](@ref) is invariant to scaling an asset's feature vector but not to scaling a feature across assets. Heterogeneous features should be standardised before use. `Distances.CorrDist` is `NaN` against any constant feature vector, hence unusable with a single feature.
+Every metric other than [`AngularDist`](@ref) and `Distances.CorrDist` is scale-sensitive, and even [`AngularDist`](@ref) is invariant to scaling an asset's feature vector but not to scaling a feature across assets. Standardise heterogeneous features before use. `Distances.CorrDist` leaves `NaN` against a constant feature vector that is not zero, so it cannot measure a single feature, where every feature vector is constant.
 
-`Distances.Jaccard` is the general non-negative-real (Ruzicka) form, not the binary-set Jaccard, and returns values up to `2` on signed input *without erroring*. It, `Distances.BrayCurtis` and `Distances.ChiSqDist` therefore require a non-negative feature matrix, which [`assert_metric_domain`](@ref) checks in the kernel rather than at construction, because the feature matrix is not known here.
+`Distances.Jaccard` is the general Ruzicka form over the non-negative reals, not the binary-set Jaccard, and it returns values up to `2` on signed input without an error. It, `Distances.BrayCurtis` and `Distances.ChiSqDist` therefore require a non-negative feature matrix, which [`assert_metric_domain`](@ref) checks in the kernel rather than at construction, because the feature matrix is not known here.
 
 ## Choosing the columns
 
-`sel` names the Panel Fields the Feature Matrix stacks, and `nothing` stacks every Panel Field's values. Without it this estimator swallows the whole panel, which is harmless while a panel holds only features and wrong the moment it holds anything else.
+`sel` names the Panel Fields the Feature Matrix stacks, and `nothing` stacks every Panel Field's values. Without it, this estimator stacks the whole panel, which is harmless while a panel holds only features and wrong as soon as it holds anything else.
 
 An entry of `sel` takes one of four forms, and they mix freely in one vector:
 
-  - `"industry"` is a **Panel Field name**, and stands for that Panel Field's value columns alone.
-  - `"industry" => ["Tech", "Energy"]` keeps the **levels or labels** it names, in that order.
-  - `"industry" => "Tech"` keeps **one** level or label. This is the form a column label takes.
-  - `"mcap" => :observed` is the Panel Field's **observed mask**, one `0`/`1` column.
+  - `"industry"` is a Panel Field name, and stands for the value columns of that Panel Field alone.
+  - `"industry" => ["Tech", "Energy"]` keeps the levels or labels it names, in that order.
+  - `"industry" => "Tech"` keeps one level or label. A column label takes this form.
+  - `"mcap" => :observed` is the observed mask of the Panel Field, one `0`/`1` column.
 
-There is no integer entry: every Panel Field, level and label carries a name, so a position has nothing to index. A taxonomy is selected by the name of the categorical Panel Field it entered the panel as.
+There is no integer entry. Every Panel Field, level and label carries a name, so a position has nothing to index. A taxonomy is selected by the name of the categorical Panel Field it entered the panel as.
 
-`strict` decides what an entry naming a field, a level or a label the panel does not hold does: it throws when `strict` is `true`, and warns and drops the entry otherwise.
+An entry that names a field, a level or a label that the panel does not hold throws when `strict` is `true`. Otherwise it warns, and the estimator drops the entry.
 
 The order of `sel` is the column order the metric reads, so a caller decides it. [`feature_matrix`](@ref) stacks the matrix and [`feature_labels`](@ref) names its columns, one selector entry per column.
 
@@ -457,8 +457,8 @@ S_{i,\\,j} &= \\sigma\\left(D_{i,\\,j}\\right)\\,,
 
 Where:
 
-  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
-  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
+  - $(math_dict[:D_ij_dist])
+  - $(math_dict[:S_ij_sim])
   - $(math_dict[:z_i_feature])
   - ``m``: Distance metric, `metric`.
   - ``\\sigma``: Similarity transformation, `sim`.
@@ -478,11 +478,10 @@ $(DocStringExtensions.FIELDS)
         strict::Bool = false
     ) -> FeatureDistance
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. `sim` defaults to [`default_similarity`](@ref) of `metric` at construction, so the printed object shows the resolved similarity, and the distance kernel resolves nothing.
 
 ## Validation
 
-  - `sim` is defaulted from `metric` via [`default_similarity`](@ref), so the resolved value is visible on the printed object rather than hidden inside the distance kernel.
   - `sel` is checked by [`assert_feature_selector`](@ref): `nothing`, or a non-empty vector of distinct entries, each of the four admitted forms.
 
 ## Propagated parameters
@@ -529,7 +528,7 @@ FeatureDistance
   - [`select_fields`](@ref): the one resolution of `sel` against an [`AssetPanel`](@ref).
   - [`feature_matrix`](@ref): the stacking itself.
   - [`feature_labels`](@ref): one selector entry per column of the stacked matrix.
-  - [`DBHT`](@ref): carries a `sim` field of its own, deliberately named alike — same type, same job. When both are set DBHT's wins, because [`clusterise`](@ref) overwrites the similarity matrix immediately after [`cor_and_dist`](@ref) returns.
+  - [`DBHT`](@ref): carries a `sim` field of its own, named alike on purpose: it has the same type and the same job. When both are set DBHT's wins, because [`clusterise`](@ref) overwrites the similarity matrix immediately after [`cor_and_dist`](@ref) returns.
   - [`factory`](@ref)
 """
 @propagatable @concrete struct FeatureDistance <: AbstractDistanceEstimator
@@ -744,7 +743,7 @@ end
 """
     feature_distance(metric::Distances.SemiMetric, Z::MatNum, dims::Integer)
 
-Turn a 2-D feature matrix into a distance matrix. This is the shared kernel behind every [`FeatureDistance`](@ref) entry point: the collapse algorithms differ only in the matrix they hand it, except for [`AggregateDistances`](@ref), which calls it once per observation and aggregates the results.
+Turn a 2-D feature matrix into a distance matrix. This is the shared kernel behind every [`FeatureDistance`](@ref) entry point, and three of the collapse algorithms differ only in the matrix they hand it. [`AggregateDistances`](@ref) does not call it. It runs the same two steps once per observation, into one buffer that it reuses, and aggregates the results.
 
 # Algorithm
 
@@ -1122,9 +1121,9 @@ end
 
 Stack the Feature Matrix a [`FeatureDistance`](@ref) measures, from the panel its `ape` slot resolves.
 
-The resolution has **one** site. `asset_panel(de.ape, pr, rd, X)` answers the carrier's panel under a `nothing` producer and builds one otherwise, and [`feature_matrix`](@ref)'s panel method then stacks the columns `de.sel` names, over the observation rows `de.alg` reads. The kernel calls this, and a caller who asks what a clustering measured calls [`feature_labels`](@ref) with the arguments the optimiser received, so the caller's rebuild is the kernel's measurement by construction.
+One site resolves the panel. Under a `nothing` producer, `asset_panel(de.ape, pr, rd, X)` returns the panel that the carrier holds, and otherwise it builds one. The panel method of [`feature_matrix`](@ref) then stacks the columns that `de.sel` names, over the observation rows that `de.alg` reads. The kernel calls this method, and [`feature_labels`](@ref) resolves the panel through the same call, so the labels that a caller rebuilds name the columns that the kernel measured.
 
-The rows are the collapse algorithm's, read through [`collapse_rows`](@ref): under [`LastObservation`](@ref) a time-varying panel stacks its last observation alone, `1 × assets × features`, which is the slice that collapse measures and the whole of what a caller asking what was measured is answered with. Every other collapse stacks every observation.
+The collapse algorithm names the rows, through [`collapse_rows`](@ref). Under [`LastObservation`](@ref), a time-varying panel stacks its last observation alone, `1 × assets × features`, which is the slice that the collapse measures. Every other collapse stacks every observation.
 
 # Algorithm
 
@@ -1136,11 +1135,17 @@ The rows are the collapse algorithm's, read through [`collapse_rows`](@ref): und
   - `de`: Feature distance estimator.
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd])
-  - `X`: Returns matrix of the subproblem, observations × assets. A producer reads it.
+  - $(arg_dict[:X_sub]) A producer reads it.
+
+# Validation
+
+  - $(val_dict[:fd_panel])
+  - $(val_dict[:fd_strict])
+  - The panel holds a Panel Field, and `de.sel` resolves to at least one column. See [`select_fields`](@ref).
 
 # Returns
 
-  - The Feature Matrix, `assets × features` or `observations × assets × features`, where the observation count is the one `de.alg` reads.
+  - `Z::Array`: The Feature Matrix, `assets × features` or `observations × assets × features`, where the observation count is the one that `de.alg` reads.
 
 # Related
 
@@ -1161,9 +1166,9 @@ end
 
 Name each column of the Feature Matrix a [`FeatureDistance`](@ref) measures.
 
-The sibling of [`feature_matrix`](@ref), and it resolves the panel and the selector the same way, so the two agree by construction. A label is the selector entry that selects exactly that column, so the label vector is itself a selector that rebuilds the matrix — which is what a caller who asks *what was measured* needs.
+It is the sibling of [`feature_matrix`](@ref). It resolves the panel and the selector the same way, so the two agree by construction. A label is the selector entry that selects exactly that column, so the label vector is itself a selector that rebuilds the matrix. A caller who asks *what was measured* needs exactly that.
 
-The kernel never calls it: no clustering or phylogeny result records the labels, because the estimator and the carriers derive them with no distance computed. A caller who wants them calls `feature_labels(de, res.pr, rd, rd.X)` with the arguments the optimiser received.
+The kernel never calls it, and no clustering or phylogeny result records the labels, because the estimator and the carriers derive them without a distance computation. A caller who wants them calls `feature_labels(de, res.pr, rd, rd.X)` with the arguments the optimiser received.
 
 # Algorithm
 
@@ -1175,11 +1180,17 @@ The kernel never calls it: no clustering or phylogeny result records the labels,
   - `de`: Feature distance estimator.
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd])
-  - `X`: Returns matrix of the subproblem, observations × assets. A producer reads it.
+  - $(arg_dict[:X_sub]) A producer reads it.
+
+# Validation
+
+  - $(val_dict[:fd_panel])
+  - $(val_dict[:fd_strict])
+  - The panel holds a Panel Field, and `de.sel` resolves to at least one column. See [`select_fields`](@ref).
 
 # Returns
 
-  - One label per column of the Feature Matrix.
+  - `labels::Vector`: One Feature Selector entry per column of the Feature Matrix, in column order.
 
 # Related
 
@@ -1193,51 +1204,91 @@ function feature_labels(de::FeatureDistance, pr, rd, X)
 end
 """
     distance(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)
-    cor_and_dist(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)
 
-Three-argument entry points, for the clustering and network estimators.
+Compute the distance matrix of the Feature Matrix that [`feature_matrix`](@ref) stacks from the carriers, for the clustering and network estimators.
 
-Every consumer in the clustering and network stack calls `cor_and_dist(de, ce, X; …)` or `distance(de, pl, X; …)`, passing a covariance estimator (or, in [`logo!`](@ref)'s case, a similarity matrix) and a returns matrix. [`FeatureDistance`](@ref) uses the covariance positional not at all, and it is typed `::Any` rather than bounded — `logo!` puts a similarity matrix where the others put a covariance estimator. It **does** read `X`, which a producer measures.
+Every consumer in the clustering and network stack calls `cor_and_dist(de, ce, X; …)` or `distance(de, pl, X; …)`, and passes a covariance estimator and a returns matrix. [`logo!`](@ref) passes a similarity matrix in place of the covariance estimator, so the second positional is typed `::Any` rather than bounded. [`FeatureDistance`](@ref) does not read that positional. It **does** read `X`, because a producer measures it.
 
-The two carriers ride the keyword tail as `pr` and `rd`, and [`feature_matrix`](@ref) resolves the panel from them and from `de.ape`. A forwarder that takes a prior result passes both through; preselection passes `rd` alone.
+The two carriers come in the keyword tail as `pr` and `rd`, and [`feature_matrix`](@ref) resolves the panel from them and from `de.ape`. A forwarder that takes a prior result passes both. Preselection passes `rd` alone.
 
-**`dims` is ignored and the kernel is called with `dims = 1`.** The ambient `dims` describes the returns matrix `X`, and a stacked Feature Matrix is canonically assets-major regardless of it. `dims` stays meaningful only at the raw-matrix entry point `distance(de, Z; dims)`.
+**This method ignores `dims` and calls the kernel with `dims = 1`.** The ambient `dims` describes the returns matrix `X`, and a stacked Feature Matrix is assets-major whatever `dims` says. `dims` has a meaning only at the raw-matrix entry point `distance(de, Z; dims)`.
 
 # Algorithm
 
- 1. Stack the Feature Matrix with [`feature_matrix`](@ref), which resolves the panel and cuts it to `de.sel` and to the observation rows `de.alg` reads.
- 2. Call the matching two-argument entry point on it, at `dims = 1`.
+ 1. Stack the Feature Matrix with [`feature_matrix`](@ref), which resolves the panel and cuts it to `de.sel` and to the observation rows that `de.alg` reads.
+ 2. Compute the distance matrix `D` of that stack with the two-argument method, at `dims = 1`.
 
 # Arguments
 
   - `de`: Feature distance estimator.
-  - The second positional: ignored. Present so this estimator matches the signature every consumer calls.
-  - `X`: Returns matrix of the subproblem, observations × assets.
+  - The second positional: ignored. It is present so that this estimator matches the signature every consumer calls.
+  - $(arg_dict[:X_sub]) A producer reads it.
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd])
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored), `dims` among them.
 
 # Validation
 
-  - The panel resolves. See [`asset_panel`](@ref), which raises an [`IsNothingError`](@ref) naming the site when it does not.
+  - $(val_dict[:fd_panel])
+  - $(val_dict[:fd_strict])
+  - The stacked Feature Matrix passes [`assert_feature_matrix`](@ref) at `dims = 1`: it is not empty, every entry is finite, and it lies in the domain of `de.metric`.
 
 # Returns
 
-  - From [`distance`](@ref): $(ret_dict[:Ddist])
-  - From [`cor_and_dist`](@ref): the tuple `(S, D)` of the similarity matrix and that same distance matrix.
+  - $(ret_dict[:Ddist])
 
 # Related
 
   - [`FeatureDistance`](@ref)
+  - [`cor_and_dist`](@ref): the same stack, with the similarity matrix as well.
   - [`feature_matrix`](@ref)
   - [`feature_labels`](@ref)
   - [`asset_panel`](@ref)
-  - [`clusterise`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
 function distance(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)
     return distance(de, feature_matrix(de, pr, rd, X); dims = 1)
 end
+"""
+    cor_and_dist(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)
+
+Compute the similarity and distance matrices of the Feature Matrix that [`feature_matrix`](@ref) stacks from the carriers, for the clustering and network estimators.
+
+This is the form that [`clusterise`](@ref) and the network estimators call. It reads its arguments as the three-argument [`distance`](@ref) method does: the second positional is ignored, `X` reaches a producer, the carriers `pr` and `rd` resolve the panel, and `dims` is ignored.
+
+# Algorithm
+
+ 1. Stack the Feature Matrix with [`feature_matrix`](@ref), which resolves the panel and cuts it to `de.sel` and to the observation rows that `de.alg` reads.
+ 2. Compute the similarity matrix `S` and the distance matrix `D` of that stack with the two-argument method, at `dims = 1`.
+
+# Arguments
+
+  - `de`: Feature distance estimator.
+  - The second positional: ignored. It is present so that this estimator matches the signature every consumer calls.
+  - $(arg_dict[:X_sub]) A producer reads it.
+  - $(arg_dict[:pr_rr])
+  - $(arg_dict[:rd])
+  - `kwargs...`: Additional keyword arguments (ignored), `dims` among them.
+
+# Validation
+
+  - $(val_dict[:fd_panel])
+  - $(val_dict[:fd_strict])
+  - The stacked Feature Matrix passes [`assert_feature_matrix`](@ref) at `dims = 1`: it is not empty, every entry is finite, and it lies in the domain of `de.metric`.
+
+# Returns
+
+  - `S::Matrix{<:Number}`: Similarity matrix, `assets × assets`, derived from `D` under `de.sim`.
+  - $(ret_dict[:Ddist])
+
+# Related
+
+  - [`FeatureDistance`](@ref)
+  - [`distance`](@ref): the same stack, without the similarity matrix.
+  - [`feature_matrix`](@ref)
+  - [`feature_labels`](@ref)
+  - [`clusterise`](@ref)
+"""
 function cor_and_dist(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)
     return cor_and_dist(de, feature_matrix(de, pr, rd, X); dims = 1)
 end
