@@ -1268,6 +1268,9 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :eps_cw => "``\\epsilon``: Reversion threshold on the gross return of the period.",#
                        :w_1_start => "``\\boldsymbol{w}_1``: Start Allocation, the allocation that the recursion starts from.",#
                        :G_t_cumlog => "``\\boldsymbol{G}_t = \\sum_{s \\leq t} \\log \\boldsymbol{x}_s``: Cumulative log wealth after period ``t``, one entry for each asset, or for each expert on an expert mixture.",#
+                       :M_t_hint => "``M_t``: Hint of period ``t``, the forecast of the gradient ``\\boldsymbol{g}_t`` that the Gradient Predictor makes one period earlier.",#
+                       :v_t_sec => "``\\boldsymbol{v}_t``: Secondary iterate of the optimistic step at period ``t``, the allocation that the first half-step of period ``t`` starts from.",#
+                       :dual_norm_geo => "``\\lVert \\cdot \\rVert_*``: Dual norm of the norm that the potential of the Projection Geometry is strongly convex against.",#
                        # The Constrained Update: the raw step, the set it is projected onto,
                        # and the divergence of the projection.
                        :q_raw => "``\\boldsymbol{q}``: Raw step, the vector the rule's unconstrained step gives before the projection onto the Allocation Set.",#

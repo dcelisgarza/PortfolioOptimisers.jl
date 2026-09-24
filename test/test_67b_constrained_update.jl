@@ -288,7 +288,11 @@ end
                  (TsallisProjection(; alpha = 0.5), w -> w .^ -0.5 ./ -0.5, 0.2, 1e-6),
                  (TsallisProjection(; alpha = 0.3), w -> w .^ -0.7 ./ -0.7, 0.1, 1e-6),
                  (LogBarrierProjection(), w -> -1 ./ w, 0.2, 1e-5),
-                 (GramProjection(; slv = slv, A = A), w -> A * w, 0.2, 1e-6))
+                 (GramProjection(; slv = slv, A = A), w -> A * w, 0.2, 1e-6),
+                 # The diagonal arm set its own objective and dropped the penalty: it
+                 # returned q, and the spread was 0.051 (#1198).
+                 (po.DiagonalProjection([1.5, 0.7, 2.0]), w -> [1.5, 0.7, 2.0] .* w, 0.2,
+                  1e-6))
         for (proj, grad, lam, tol) in cases
             set = resolve(ProgrammeAllocationSet(; slv = slv,
                                                  l2 = L2Regularisation(; val = lam)), 3)

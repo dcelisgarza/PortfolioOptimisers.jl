@@ -51,6 +51,14 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
                                   ::AbstractVector, ::Any, ::Integer)
         return nothing, zero(g)
     end
+    # A hint with equal entries, the hint of a flat forecast: the projection onto the budget
+    # undoes its uniform shift.
+    struct FlatHint <: po.AbstractGradientPredictor end
+    function po.predict_gradient!(::FlatHint, ::Nothing, ::po.AbstractOnlineObjective,
+                                  g::AbstractVector, ::AbstractVector, ::AbstractVector,
+                                  ::AbstractVector, ::Any, ::Integer)
+        return nothing, fill(-1.3, length(g))
+    end
     # The weighted projection onto a bounded set as a quadratic programme, independent of
     # the scalar root.
     function qp_projection(q, h, lb, ub)
@@ -171,6 +179,10 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
                                     ReturnsResult(; nx = ["A", "B"], X = zeros(1, 2)),
                                     simplex2)
         @test wz == w && stz.s == [0.0, 0.0] && stz.n == 1
+        # At delta = 0 an asset whose every price relative so far is zero has no mass, and
+        # the projection refuses the zero entry of its diagonal.
+        @test_throws DomainError po.online_update!(alg, po.rule_state_seed(alg, w), w,
+                                                   [1.2, 0.0], nothing, simplex2)
         # Equal price relatives are the one case the first step holds.
         st0 = po.rule_state_seed(alg, w)
         _, wh = po.online_update!(alg, st0, w, [1.05, 1.05], nothing, simplex2)
@@ -258,8 +270,13 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         u ./= sum(u)
         @test isapprox(ste.v, v; atol = 1e-15)
         @test isapprox(w2e, u; atol = 1e-15)
-        # The entropic residual is in the maximum norm.
+        # The entropic residual is in the maximum norm, and the Tsallis and log-barrier
+        # residuals are too. A MirrorDescent takes no other geometry, and none has a method.
         @test ste.res == [1.2^2, 0.0]
+        @test po.hint_residual(TsallisProjection(), [1.0, -2.0]) == 4.0
+        @test po.hint_residual(LogBarrierProjection(), [1.0, -2.0]) == 4.0
+        @test_throws MethodError po.hint_residual(po.DiagonalProjection([1.0, 1.0]),
+                                                  [1.0, -2.0])
         # The second period reads the gradient at the played w₂, not at v₂, and steps
         # both halves from v₂.
         x2 = [0.9, 1.1]
@@ -278,6 +295,10 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         mp = -x ./ dot([0.52, 0.48], x)
         @test isapprox(w2p, po.project_simplex([0.52, 0.48] .- 0.1 .* mp); atol = 1e-12)
         @test stp.m ≈ mp
+        # The two hints differ from the first period on: the Mirror-Prox hint is read at
+        # v₂ = [0.52, 0.48], not at the played w₁ = [0.5, 0.5].
+        @test maxerr(stp.m, st.m) > 5e-3
+        @test round.(w2p; digits = 5) == [0.53984, 0.46016]
         # The mean-gradient hint is the running mean, one after the first row.
         algm = OptimisticStep(; alg = GradientProjection(; eta = 0.1),
                               predictor = MeanGradient())
@@ -300,6 +321,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
             a = libpath(OptimisticStep(; alg = md, predictor = ZeroHint()))
             b = libpath(md)
             @test maxerr(a, b) < 1e-14
+            @test maxerr(libpath(OptimisticStep(; alg = md, predictor = FlatHint())), b) <
+                  1e-14
         end
         # A forecast hint moves the path off the plain step and keeps it on the simplex.
         me = PriceLevelExpectedReturns(; alg = MovingAverage(; window = 3))
@@ -460,6 +483,20 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
                                                                                    eta = SelfConfidentRate()))),
                               rows(rd, 1:6))
         @test osc.cache.st.s[1] > 0 && osc.cache.st.s[2] == log(N)
+        # Under the mean-gradient hint the residual sum is at most ‖g₁‖² plus twice the
+        # spread of the gradients about their mean: 4.066 against 4.113 on the fixture.
+        algv = OptimisticStep(; alg = GradientProjection(; eta = 0.1),
+                              predictor = MeanGradient())
+        stv = po.rule_state_seed(algv, fill(1 / N, N))
+        G = zeros(T - 1, N)
+        for t in 1:(T - 1)
+            G[t, :] .= -X[t, :] ./ dot(stv.u, X[t, :])
+            stv, _ = po.online_update!(algv, stv, stv.u, X[t, :], nothing,
+                                       resolve(BoundedAllocationSet(), N))
+        end
+        spread = sum(abs2, G .- sum(G; dims = 1) ./ (T - 1))
+        @test stv.res[1] <= sum(abs2, G[1, :]) + 2 * spread
+        @test round(stv.res[1]; digits = 3) == 4.066
     end
 
     @testset "The batch-online identity at block sizes 10, 7 and 1" begin

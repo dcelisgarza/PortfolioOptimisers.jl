@@ -615,6 +615,7 @@ end
     set_projection_objective!(model::JuMP.Model, proj::EuclideanProjection, q::AbstractVector)
     set_projection_objective!(model::JuMP.Model, proj::EntropicProjection, q::AbstractVector)
     set_projection_objective!(model::JuMP.Model, proj::GramProjection, q::AbstractVector)
+    set_projection_objective!(model::JuMP.Model, proj::DiagonalProjection, q::AbstractVector)
     set_projection_objective!(model::JuMP.Model, proj::TsallisProjection, q::AbstractVector)
     set_projection_objective!(model::JuMP.Model, proj::LogBarrierProjection, q::AbstractVector)
 
@@ -642,8 +643,8 @@ Where:
   - $(math_dict[:q_raw])
   - ``\\pi``: Objective Penalty, the sum of the set's penalties and of the other terms added to the objective before it.
   - ``f_{\\mathrm{E}}``, ``f_{\\mathrm{E}}^{\\pi}``: Divergence of [`EuclideanProjection`](@ref), without and with an Objective Penalty.
-  - ``f_{\\mathrm{G}}``, ``f_{\\mathrm{G}}^{\\pi}``: Divergence of [`GramProjection`](@ref), without and with an Objective Penalty.
-  - ``\\mathbf{G}``: Upper Cholesky factor of the geometry's Gram matrix ``\\mathbf{A}``, so ``\\mathbf{G}^\\intercal \\mathbf{G} = \\mathbf{A}``.
+  - ``f_{\\mathrm{G}}``, ``f_{\\mathrm{G}}^{\\pi}``: Divergence of [`GramProjection`](@ref) and of [`DiagonalProjection`](@ref), without and with an Objective Penalty.
+  - ``\\mathbf{G}``: Upper Cholesky factor of the geometry's Gram matrix ``\\mathbf{A}``, so ``\\mathbf{G}^\\intercal \\mathbf{G} = \\mathbf{A}``. Under [`DiagonalProjection`](@ref) it is ``\\mathrm{diag}(\\sqrt{\\boldsymbol{h}})`` and ``\\mathbf{A} = \\mathrm{diag}(\\boldsymbol{h})``.
   - ``f_{\\mathrm{KL}}``: Relative entropy, the divergence of [`EntropicProjection`](@ref).
   - ``f_{\\alpha}``: Tsallis divergence, the divergence of [`TsallisProjection`](@ref).
   - ``\\alpha``: Power of the Tsallis potential, in ``(0, 1)``.
@@ -659,18 +660,18 @@ Each ``f`` differs from the Bregman divergence ``D_\\Psi(\\boldsymbol{w}, \\bold
 ## Variables
 
   - `w`: read from the model.
-  - `t_proj`: created. It is a scalar under the Euclidean, Gram and entropic arms, and a vector with one entry for each index in ``P`` under the Tsallis and log-barrier arms.
+  - `t_proj`: created. It is a scalar under the Euclidean, Gram, diagonal and entropic arms, and a vector with one entry for each index in ``P`` under the Tsallis and log-barrier arms.
 
 ## Constraints
 
-  - Euclidean and Gram arms: the row of [`set_distance_cone!`](@ref) on ``\\boldsymbol{x} = s_c (\\boldsymbol{w} - \\boldsymbol{q})`` or ``\\boldsymbol{x} = s_c \\mathbf{G} (\\boldsymbol{w} - \\boldsymbol{q})``.
+  - Euclidean, Gram and diagonal arms: the row of [`set_distance_cone!`](@ref) on ``\\boldsymbol{x} = s_c (\\boldsymbol{w} - \\boldsymbol{q})`` or ``\\boldsymbol{x} = s_c \\mathbf{G} (\\boldsymbol{w} - \\boldsymbol{q})``.
   - Entropic arm, `proj_zero`: ``s_c w_i = 0`` for each ``i \\notin P``, when such an ``i`` exists.
   - Entropic arm, `proj_rec`: ``s_c t \\geq \\sum_{i \\in P} s_c w_i \\log (w_i / q_i)``, the relative entropy cone over ``(s_c t, s_c \\boldsymbol{q}_P, s_c \\boldsymbol{w}_P)``.
   - Tsallis arm, under no name: ``t_j \\leq w_j^{\\alpha}`` for each ``j \\in P``, the power cone of power ``\\alpha`` over ``(s_c w_j, s_c, s_c t_j)``.
   - Log-barrier arm, under no name: ``t_j \\leq \\log w_j`` for each ``j \\in P``, the exponential cone over ``(s_c t_j, s_c, s_c w_j)``.
   - Tsallis and log-barrier arms: the rows of [`barrier_objective_entries`](@ref), which fix ``w_i = 0`` for each ``i \\notin P``.
 
-The divergence each arm hands to [`set_divergence_objective!`](@ref) is ``t`` under the Euclidean, Gram and entropic arms, ``\\frac{1}{1 - \\alpha} \\left( \\sum_{j \\in P} q_j^{\\alpha - 1} w_j - \\frac{1}{\\alpha} \\sum_{j \\in P} t_j \\right)`` under the Tsallis arm, and ``\\sum_{j \\in P} w_j / q_j - \\sum_{j \\in P} t_j`` under the log-barrier arm.
+The divergence each arm hands to [`set_divergence_objective!`](@ref) is ``t`` under the Euclidean, Gram, diagonal and entropic arms, ``\\frac{1}{1 - \\alpha} \\left( \\sum_{j \\in P} q_j^{\\alpha - 1} w_j - \\frac{1}{\\alpha} \\sum_{j \\in P} t_j \\right)`` under the Tsallis arm, and ``\\sum_{j \\in P} w_j / q_j - \\sum_{j \\in P} t_j`` under the log-barrier arm.
 
 Where:
 

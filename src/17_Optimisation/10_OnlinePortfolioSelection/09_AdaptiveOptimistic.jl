@@ -1,9 +1,28 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-The diagonal Projection Geometry: the raw step is projected onto the Allocation Set in the norm of a positive diagonal matrix, ``\\min \\tfrac{1}{2} (\\boldsymbol{w} - \\boldsymbol{q})^\\intercal \\mathrm{diag}(\\boldsymbol{h}) (\\boldsymbol{w} - \\boldsymbol{q})``.
+Projects the raw step onto the Allocation Set in the norm of a positive diagonal matrix.
 
-It is the geometry of the diagonal adaptive subgradient method (Duchi, Hazan and Singer 2011), whose proximal term is ``\\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{w}_t \\rVert^2_{H_t}`` with ``H_t = \\delta I + \\mathrm{diag}(\\boldsymbol{s}_t)`` the accrued gradient mass. The weight vector is the rule's: [`AdaptiveSubgradient`](@ref) constructs the geometry from its carrier's ``\\boldsymbol{h}_t`` at every step, as [`NewtonStep`](@ref) binds its Gram matrix onto [`GramProjection`](@ref). [`EuclideanProjection`](@ref) is the case ``\\boldsymbol{h} = \\boldsymbol{1}``: on a [`BoundedAllocationSet`](@ref) the projection is the weighted scalar root ``w_i = \\mathrm{clip}(q_i - \\theta / h_i, lb_i, ub_i)`` with ``\\theta`` the budget's root, which shares its root with the Euclidean one ([`bounded_quadratic_projection`](@ref)) and costs what it costs; on a [`ProgrammeAllocationSet`](@ref) it is the weighted quadratic programme through a second-order cone, on the set's solver. The Start Allocation is projected before any gradient is seen, where no mass has accrued, so [`projection_geometry`](@ref) answers [`EuclideanProjection`](@ref) for it. A negative lower bound is admitted, as under the Euclidean geometry.
+This is the geometry of the diagonal adaptive subgradient method of Duchi, Hazan and Singer (2011). [`AdaptiveSubgradient`](@ref) builds one at every step from the gradient mass it has accrued, as [`NewtonStep`](@ref) binds its Gram matrix onto [`GramProjection`](@ref). The rule projects the Start Allocation before it sees a gradient, so [`projection_geometry`](@ref) returns [`EuclideanProjection`](@ref) for that projection. The geometry admits a negative lower bound, as the Euclidean geometry does.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{Proj}^{\\boldsymbol{h}}_{\\mathcal{W}}(\\boldsymbol{q}) &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; \\tfrac{1}{2} (\\boldsymbol{w} - \\boldsymbol{q})^\\intercal \\mathrm{diag}(\\boldsymbol{h}) (\\boldsymbol{w} - \\boldsymbol{q})\\,, \\\\
+w_i(\\theta) &= \\min\\left(\\max\\left(q_i - \\theta / h_i,\\, l_i\\right),\\, u_i\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:q_raw])
+  - $(math_dict[:W_aset])
+  - ``\\boldsymbol{h}``: Positive diagonal of the norm, one entry for each asset.
+  - ``l_i``, ``u_i``: Lower and upper bounds of asset ``i`` on a [`BoundedAllocationSet`](@ref).
+  - ``\\theta``: Multiplier of the budget, the root of ``\\sum_i w_i(\\theta) = 1``.
+
+On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at that root. At ``\\boldsymbol{h} = \\boldsymbol{1}`` it is the Euclidean projection.
 
 # Fields
 
@@ -13,7 +32,7 @@ $(DocStringExtensions.FIELDS)
 
     DiagonalProjection(h::AbstractVector) -> DiagonalProjection
 
-The positional argument is the struct's field. The rule constructs the geometry at each step; a caller never holds one.
+The positional argument is the struct's field. The rule builds the geometry at each step, and a caller never holds one.
 
 ## Validation
 
@@ -31,8 +50,10 @@ PortfolioOptimisers.DiagonalProjection
 
   - [`AbstractProjectionGeometry`](@ref)
   - [`EuclideanProjection`](@ref)
+  - [`GramProjection`](@ref): the full-matrix geometry, whose programme arm this geometry shares.
   - [`AdaptiveSubgradient`](@ref)
   - [`project`](@ref)
+  - [`set_projection_objective!`](@ref)
 
 # References
 
@@ -40,7 +61,7 @@ PortfolioOptimisers.DiagonalProjection
 """
 struct DiagonalProjection{T1 <: AbstractVector} <: AbstractProjectionGeometry
     """
-    The diagonal of the norm the projection is taken in, the rule's accrued gradient mass at the step.
+    The diagonal of the norm of the projection. The rule sets it to `delta` plus its gradient mass at the step.
     """
     h::T1
     function DiagonalProjection(h::AbstractVector)
@@ -53,13 +74,27 @@ end
     project(proj::DiagonalProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
     project(proj::DiagonalProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
 
-The diagonal arms of the Constrained Update: the weighted scalar root of [`bounded_quadratic_projection`](@ref) on the bounded set, on every bound, the simplex included, because the weights break the sort, with a root that misses the budget in floating point as the Held Step ([`budget_or_held_step`](@ref)); and the bare-model programme of [`projection_programme`](@ref) on the programme set.
+Projects the raw step `q` onto the Allocation Set `set` in the norm of `diag(proj.h)`. These are the diagonal arms of the Constrained Update, and `w` is the Price-Adjusted Allocation.
+
+On a bounded set the weights of the norm break the sort that projects onto the simplex in the Euclidean geometry. So the bounded arm finds the scalar root on every bound, the simplex included.
+
+# Algorithm
+
+On a [`BoundedAllocationSet`](@ref):
+
+ 1. Find the allocation `wn` at the weighted scalar root with [`bounded_quadratic_projection`](@ref), on the bounds of `set` and the weights `proj.h`.
+ 2. Return `wn`, or the Held Step `w` when `wn` misses the budget in floating point, with [`budget_or_held_step`](@ref).
+
+On a [`ProgrammeAllocationSet`](@ref):
+
+ 1. Solve the programme of [`projection_programme`](@ref), whose objective [`set_projection_objective!`](@ref) writes, and return its allocation.
 
 # Related
 
   - [`project`](@ref)
   - [`DiagonalProjection`](@ref)
   - [`bounded_quadratic_projection`](@ref)
+  - [`budget_or_held_step`](@ref)
   - [`projection_programme`](@ref)
 """
 function project(proj::DiagonalProjection, set::BoundedAllocationSet, q::AbstractVector,
@@ -77,16 +112,14 @@ function set_projection_objective!(model::JuMP.Model, proj::DiagonalProjection,
     sc = get_constraint_scale(model)
     so = get_objective_scale(model)
     JuMP.@variable(model, t_proj)
-    JuMP.@constraint(model, proj_soc,
-                     [sc * t_proj; sc * (sqrt.(proj.h) .* (w - q))] in
-                     JuMP.SecondOrderCone())
-    JuMP.@objective(model, Min, so * t_proj)
+    set_distance_cone!(model, t_proj, sc * (sqrt.(proj.h) .* (w - q)), sc)
+    set_divergence_objective!(model, t_proj, so)
     return nothing
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The carrier of [`AdaptiveSubgradient`](@ref): the per-asset gradient mass.
+Holds the gradient mass of each asset, the carrier of the adaptive subgradient rule.
 
 # Fields
 
@@ -103,7 +136,7 @@ $(DocStringExtensions.FIELDS)
     """
     n
     """
-    The gradient mass ``\\boldsymbol{s}_t``, ``s_{t, i}^2 = \\sum_{s \\leq t} g_{s, i}^2``, `assets × 1`, written in place.
+    The gradient mass ``\\boldsymbol{s}_t``, with ``s_{t, i}^2 = \\sum_{s \\leq t} g_{s, i}^2``, `assets × 1`. The rule writes it in place.
     """
     s
 end
@@ -119,23 +152,56 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The diagonal adaptive subgradient method of Duchi, Hazan and Singer (2011) in its composite-mirror-descent form (their Algorithm 1 and Corollary 6): a first-order step whose rate is set per asset by the gradient mass that asset has accrued (AdaGrad).
+Steps each asset at its own rate, set by the gradient mass that the asset has accrued (AdaGrad).
+
+This is the diagonal adaptive subgradient method of Duchi, Hazan and Singer (2011, Algorithm 1) with its composite mirror descent update. The rule projects in the norm of its gradient mass, through a [`DiagonalProjection`](@ref) that it builds at every step, so it holds no `proj` slot.
+
+At `delta = 0` an asset whose every price relative so far is zero has no gradient mass. The diagonal of the norm then has a zero entry, and [`DiagonalProjection`](@ref) refuses it with a `DomainError`. The paper takes a pseudo-inverse there, but the projection in a seminorm has no unique answer, so the rule refuses instead.
 
 # Mathematical definition
 
-With ``\\boldsymbol{g}_t = -\\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` the gradient of the period's log-wealth loss,
-
 ```math
 \\begin{align}
-s_{t, i}^2 &= \\sum_{s \\leq t} g_{s, i}^2\\,,\\quad
-H_t = \\delta I + \\mathrm{diag}(\\boldsymbol{s}_t)\\,,\\\\
-\\boldsymbol{w}_{t+1} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; \\eta \\langle \\boldsymbol{g}_t, \\boldsymbol{w} \\rangle + \\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{w}_t \\rVert^2_{H_t} = \\mathrm{Proj}^{H_t}_{\\mathcal{W}} \\left( \\boldsymbol{w}_t - \\eta H_t^{-1} \\boldsymbol{g}_t \\right)\\,,
+s_{t, i} &= \\sqrt{\\textstyle\\sum_{s \\leq t} g_{s, i}^2}\\,, \\\\
+H_t &= \\delta I + \\mathrm{diag}(\\boldsymbol{s}_t)\\,, \\\\
+\\boldsymbol{w}_{t+1} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; \\eta \\langle \\boldsymbol{g}_t, \\boldsymbol{w} \\rangle + \\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{w}_t \\rVert^2_{H_t} = \\mathrm{Proj}^{H_t}_{\\mathcal{W}} \\left( \\boldsymbol{w}_t - \\eta H_t^{-1} \\boldsymbol{g}_t \\right)\\,.
 \\end{align}
 ```
 
-the raw step ``\\boldsymbol{w}_t + \\eta \\boldsymbol{x}_t / (\\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle (\\delta + \\boldsymbol{s}_t))`` followed by the projection onto the Allocation Set **in the norm of ``H_t``**, the [`DiagonalProjection`](@ref) the rule constructs from its accrued gradient mass at every step. The regret is ``O(\\sum_i \\lVert \\boldsymbol{g}_{1:T, i} \\rVert_2)`` (Corollary 6 at ``\\eta = 1 / \\sqrt{2}`` on a set of ``\\ell_\\infty`` diameter one), small when the gradients are sparse or a few assets carry most of their mass, and never worse than online gradient descent's ``O(\\sqrt{T N})`` by more than a constant. The rule is [`NewtonStep`](@ref) one rank down: the full-matrix variant of the paper is the Newton carrier under a square root, and the diagonal keeps the step at ``O(N)``.
+Where:
 
-The per-coordinate normalisation cancels the first gradient exactly, so the first raw step is a uniform shift of the Start Allocation; the projection in the norm of ``H_1 = \\delta I + \\mathrm{diag}(\\lvert \\boldsymbol{g}_1 \\rvert)`` then lets the assets with the smaller gradient absorb more of the shift back, so the first step moves weight toward the assets that rose the most, and is a no-op only when every price relative is equal. At `delta = 0`, the paper's default, the projection's diagonal is the gradient mass alone, which is positive from the first row in every asset whose price relative is positive; a price relative of zero in an asset that has never moved gives that asset no mass, and the projection refuses it. A zero gradient — a [`RiskLoss`](@ref) while the head holds fewer than two rows — is a zero step: no mass accrues, and the iterate is projected in the Euclidean geometry, as the zero step of every first-order rule is.
+  - $(math_dict[:g_t_loss]) Under [`LogWealth`](@ref) it is ``-\\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle``.
+  - $(math_dict[:x_t_rel])
+  - $(math_dict[:w_t_iter])
+  - $(math_dict[:t_period])
+  - ``\\boldsymbol{s}_t``: Gradient mass after period ``t``, with one entry for each asset.
+  - ``\\delta``: Offset that the rule adds to the gradient mass of every asset.
+  - ``H_t``: Diagonal matrix of the norm of the step at period ``t``.
+  - ``\\eta``: Fixed learning rate of the rule.
+  - $(math_dict[:W_aset])
+  - ``\\lVert \\boldsymbol{z} \\rVert^2_{H} = \\boldsymbol{z}^\\intercal H \\boldsymbol{z}``: Squared norm of a vector ``\\boldsymbol{z}`` in a positive diagonal matrix ``H``.
+  - ``\\mathrm{Proj}^{H}_{\\mathcal{W}}``: Projection onto ``\\mathcal{W}`` in the norm of ``H``, which is [`DiagonalProjection`](@ref) with the diagonal of ``H``.
+
+Under log wealth the raw step is ``\\boldsymbol{w}_t + \\eta \\boldsymbol{x}_t / (\\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle (\\delta + \\boldsymbol{s}_t))``, with the division taken asset by asset. At ``\\delta = 0`` the first raw step is ``\\boldsymbol{w}_1 + \\eta \\boldsymbol{1}``, a uniform shift, because ``s_{1, i} = \\lvert g_{1, i} \\rvert``. The projection in the norm of ``H_1`` then takes more of the shift back from the assets with the smaller gradient, so the first step moves weight toward the assets that rose the most. It leaves the allocation unchanged only when every price relative is equal.
+
+Let ``D_\\infty = \\sup_{\\boldsymbol{w} \\in \\mathcal{W}} \\lVert \\boldsymbol{w} - \\boldsymbol{w}^* \\rVert_\\infty`` for a fixed comparator ``\\boldsymbol{w}^*``. At ``\\delta = 0`` and ``\\eta = D_\\infty / \\sqrt{2}``, Corollary 6 of the paper bounds the regret against ``\\boldsymbol{w}^*`` by ``\\sqrt{2} D_\\infty \\sum_i \\lVert \\boldsymbol{g}_{1:T, i} \\rVert_2``, with ``\\boldsymbol{g}_{1:T, i}`` the gradients of asset ``i`` over ``T`` periods. On the simplex ``D_\\infty \\leq 1``, and the default ``\\eta = 1 / \\sqrt{2}`` is that rate. The bound is small when a few assets carry most of the gradient mass. The paper shows that the bound is below the bound of online gradient descent on a box. On the simplex, with dense gradients, it can be larger by a factor of up to ``\\sqrt{N / 2}``, and log-wealth gradients are dense.
+
+The full-matrix variant of the paper (Algorithm 2) uses ``H_t = \\delta I + (\\sum_{s \\leq t} \\boldsymbol{g}_s \\boldsymbol{g}_s^\\intercal)^{1/2}``, the root of the sum that [`NewtonStep`](@ref) accrues. This rule keeps the diagonal alone, and the diagonal keeps the step at ``O(N)``.
+
+# Algorithm
+
+The seven-argument [`online_update!`](@ref) runs these steps at the period's row `x`. The six-argument form calls it with the book `w` as the Gradient Point `point`.
+
+ 1. Take the gradient `g` of `obj` at `point`, from `x` and the head's `rows`, with [`loss_gradient`](@ref).
+ 2. Form the Price-Adjusted Allocation `wh` of the book `w` after the row.
+ 3. When every entry of `g` is zero, project `w` onto the set from `wh` in the Euclidean geometry. Count the period, keep the gradient mass, and return that allocation. Stop.
+ 4. Add `g` to the gradient mass `st.s` in place, as the root of the sum of squares of each asset.
+ 5. Form the diagonal `h = delta .+ st.s`.
+ 6. Form the raw step `q = w .- eta .* g ./ h`.
+ 7. Project `q` onto the set from `wh` in the geometry `DiagonalProjection(h)`, which gives the new allocation.
+ 8. Return the state, with the period count raised by one, and the new allocation.
+
+A zero gradient accrues no mass, and the norm of step 7 has no meaning there. So step 3 takes the zero step of every first-order rule. A [`RiskLoss`](@ref) gives a zero gradient while the head holds fewer than two rows.
 
 # Fields
 
@@ -149,7 +215,7 @@ $(DocStringExtensions.FIELDS)
         obj::AbstractOnlineObjective = LogWealth()
     ) -> AdaptiveSubgradient
 
-Keywords correspond to the struct's fields. The defaults are the paper's. The rule projects in its own geometry, a [`DiagonalProjection`](@ref) it constructs at each step, so it holds no `proj` slot. `obj` is the slot of [`MirrorDescent`](@ref): log wealth, or a [`RiskLoss`](@ref) over the head's rows, whose gradient [`loss_gradient`](@ref) answers at the iterate; the rule's `rows_needed` is the objective's.
+Keywords correspond to the struct's fields. The paper fixes no default. `eta = 1 / sqrt(2)` is the rate of its Corollary 6 on the simplex, and the paper states that `delta = 0` works in practice. `obj` is the slot of [`MirrorDescent`](@ref). It takes log wealth, or a [`RiskLoss`](@ref) over the head's rows, whose gradient [`loss_gradient`](@ref) gives at the Gradient Point. The rule needs as many rows as its objective.
 
 ## Validation
 
@@ -181,15 +247,15 @@ AdaptiveSubgradient
 struct AdaptiveSubgradient{T1 <: Real, T2 <: Real, T3 <: AbstractOnlineObjective} <:
        AbstractOnlinePortfolioSelectionAlgorithm
     """
-    Learning rate. Larger reacts faster and is less stable.
+    The learning rate of the step. A larger rate reacts faster and is less stable.
     """
     eta::T1
     """
-    The paper's ``\\delta``, added to every asset's gradient mass; `0` is the paper's rule.
+    The paper's ``\\delta``, which the rule adds to the gradient mass of every asset.
     """
     delta::T2
     """
-    The objective the gradient is taken of: log wealth, or a Risk Loss over the head's rows.
+    The objective whose gradient the rule takes, log wealth or a Risk Loss over the head's rows.
     """
     obj::T3
     function AdaptiveSubgradient(eta::Real, delta::Real, obj::AbstractOnlineObjective)
@@ -240,17 +306,19 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the Gradient Predictors an [`OptimisticStep`](@ref) plays its second half-step along: the hint ``M_{t+1}`` for the gradient of the period not yet seen.
+Abstract supertype for the Gradient Predictors, which give the hint of an optimistic step for the gradient of the next period.
+
+An [`OptimisticStep`](@ref) takes its second half-step along the hint ``M_{t+1}``.
 
 # Interfaces
 
-In order to implement a new predictor, subtype `AbstractGradientPredictor` and implement:
+To implement a new predictor, subtype `AbstractGradientPredictor` and implement:
 
-  - `predictor_state_seed(pred::AbstractGradientPredictor, w::AbstractVector)`: The carrier the predictor keeps on the Rule State before the first row, or `nothing`, the default; `w` is the Start Allocation, whose length and element type the carrier takes.
-  - `predict_gradient!(pred::AbstractGradientPredictor, ps, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, xm::AbstractVector, rows, t::Integer) -> Tuple`: The carrier after the period and the hint, from the wrapped rule's objective `obj`, the period's gradient `g` at the played allocation, the secondary iterate `v` the second half-step is taken from, the period's price relative `x` as traded, the same relative `xm` with the uniform mix applied where the wrapped rule mixes — the vector `g` was read on, and `x` itself where the rule does not mix — the rows the head holds through the period and the period count `t`. A predictor that reads the relative as a price folds `x`; one that re-evaluates the wrapped rule's loss reads `xm`, so the hint sees the loss `g` saw.
+  - `predictor_state_seed(pred::AbstractGradientPredictor, w::AbstractVector)`: Returns the carrier that the predictor keeps on the Rule State before the first row, `nothing` by default. `w` is the Start Allocation, whose length and element type the carrier takes.
+  - `predict_gradient!(pred::AbstractGradientPredictor, ps, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, xm::AbstractVector, rows, t::Integer) -> Tuple`: Returns the carrier after the period and the hint. The arguments are the objective `obj` of the wrapped rule, the gradient `g` of the period at the played allocation, the secondary iterate `v` that the second half-step starts from, the price relative `x` of the period as traded, the same relative `xm` after the uniform mix of the wrapped rule, the rows that the head holds through the period, and the period count `t`. `g` reads `xm`, and `xm` is `x` where the wrapped rule does not mix. A predictor that reads the relative as a price folds `x`. A predictor that evaluates the loss of the wrapped rule again reads `xm`, so the hint sees the loss that `g` saw.
   - `rows_needed(pred::AbstractGradientPredictor)`: The rows the predictor reads at a step, `0` by default.
 
-A carrier that is `nothing`, a vector or a Partial Fit State is sliced and copied with the head's state already; a carrier of another shape needs a slice and a copy of its own, through the two private helpers [`OptimisticStepState`](@ref) names.
+The head's state already slices and copies a carrier that is `nothing`, a vector or a Partial Fit State. A carrier of another shape needs its own methods of [`predictor_state_view`](@ref) and [`copy_predictor_state`](@ref).
 
 # Related
 
@@ -263,9 +331,31 @@ abstract type AbstractGradientPredictor <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The last gradient as the hint: ``M_{t+1} = \\boldsymbol{g}_t``, the gradient of the period's loss at the played allocation, under which the optimistic step is the two-projection algorithm of Chiang, Yang, Lee, Mahdavi, Lu, Jin and Zhu (2012) and the regret sum ``\\sum_t \\lVert \\boldsymbol{g}_t - M_t \\rVert_*^2`` is the path length of the gradients. The default of [`OptimisticStep`](@ref).
+Takes the last gradient as the hint of the optimistic step.
 
-With `at_played = false` the hint is the period's loss re-evaluated at the new secondary iterate through [`loss_gradient`](@ref), ``M_{t+1} = -\\boldsymbol{x}_t / \\langle \\boldsymbol{v}_{t+1}, \\boldsymbol{x}_t \\rangle`` under log wealth: the Mirror-Prox form of Nemirovski (2004), which Rakhlin and Sridharan (2013) recover from the optimistic step by taking the hint at the secondary point. The two coincide when the played and the secondary allocations do, so they part only after the first period.
+This is the default predictor of [`OptimisticStep`](@ref). Under it the optimistic step is the two-projection algorithm of Chiang, Yang, Lee, Mahdavi, Lu, Jin and Zhu (2012), and the residual sum ``\\sum_t \\lVert \\boldsymbol{g}_t - \\boldsymbol{g}_{t-1} \\rVert_*^2`` is the path length of the gradients.
+
+With `at_played = false` the predictor reads the loss of the period again at the new secondary iterate, through [`loss_gradient`](@ref). This is the online form of the Mirror-Prox method of Nemirovski (2004). Rakhlin and Sridharan [rakhlin2013nips](@cite) recover Mirror Prox from the optimistic step with the hint at the secondary point, for one fixed objective, so the two agree when every period has the same loss. The secondary iterate ``\\boldsymbol{v}_{t+1}`` is not the played allocation ``\\boldsymbol{w}_t``, so the two hints of this type differ in general from the first period on.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+M_{t+1} &= \\boldsymbol{g}_t\\,, \\\\
+M_{t+1}^{\\mathrm{MP}} &= -\\boldsymbol{x}_t / \\langle \\boldsymbol{v}_{t+1}, \\boldsymbol{x}_t \\rangle\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:M_t_hint]) ``M_{t+1}`` is the hint at `at_played = true`.
+  - ``M_{t+1}^{\\mathrm{MP}}``: Hint at `at_played = false` under [`LogWealth`](@ref).
+  - $(math_dict[:g_t_loss]) The optimistic step takes it at the played allocation ``\\boldsymbol{w}_t``.
+  - $(math_dict[:w_t_iter])
+  - $(math_dict[:x_t_rel]) Where the wrapped rule mixes, it is the mixed price relative that ``\\boldsymbol{g}_t`` reads.
+  - $(math_dict[:v_t_sec])
+  - $(math_dict[:t_period])
+  - $(math_dict[:dual_norm_geo])
 
 # Fields
 
@@ -299,7 +389,7 @@ LastGradient
 """
 struct LastGradient <: AbstractGradientPredictor
     """
-    Whether the hint is the gradient at the played allocation, or the period's loss re-evaluated at the new secondary iterate.
+    Whether the hint is the gradient at the played allocation. When it is `false`, the hint is the gradient of the loss of the period at the new secondary iterate.
     """
     at_played::Bool
 end
@@ -309,7 +399,25 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The running mean of the gradients as the hint: ``M_{t+1} = \\frac{1}{t} \\sum_{s \\leq t} \\boldsymbol{g}_s``, under which the regret sum of Rakhlin and Sridharan (2013) is the variance of the gradients about their mean, the bound of Hazan and Kale (2010) up to a constant. The mean is kept on the carrier and updated in one pass.
+Takes the running mean of the past gradients as the hint of the optimistic step.
+
+Rakhlin and Sridharan [rakhlin2013colt](@cite) call the regret bound under this hint a variance bound. The carrier holds the mean, and the predictor updates it in one pass.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+M_{t+1} &= \\frac{1}{t} \\sum_{s \\leq t} \\boldsymbol{g}_s\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:M_t_hint])
+  - $(math_dict[:g_t_loss])
+  - $(math_dict[:t_period])
+
+With ``M_1 = \\boldsymbol{0}``, the residual sum is at most the squared first gradient plus twice the spread of the gradients about their mean, ``\\sum_{t \\leq T} \\lVert \\boldsymbol{g}_t - M_t \\rVert_2^2 \\leq \\lVert \\boldsymbol{g}_1 \\rVert_2^2 + 2 \\sum_{t \\leq T} \\lVert \\boldsymbol{g}_t - \\bar{\\boldsymbol{g}}_T \\rVert_2^2``, with ``\\bar{\\boldsymbol{g}}_T`` the mean of the first ``T`` gradients. The maximum norm is at most the Euclidean norm, so the bound holds for the residuals in the maximum norm too.
 
 # Examples
 
@@ -332,7 +440,26 @@ struct MeanGradient <: AbstractGradientPredictor end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A gradient formed from a Price Relative Forecast as the hint: ``M_{t+1} = -\\hat{\\boldsymbol{x}}_{t+1} / \\langle \\boldsymbol{v}_{t+1}, \\hat{\\boldsymbol{x}}_{t+1} \\rangle``, the gradient the next period's log-wealth loss would have at the secondary iterate the second half-step is taken from, were the forecast the outcome. The forecaster is any expected-returns estimator, folded on the carrier where it has an exact fold and refit from the head's rows otherwise, exactly as on the `me` slot of [`ForecastReversion`](@ref); a flat forecast is a zero hint up to a constant, on which the second half-step is a uniform shift the projection undoes. Not in the optimistic-step papers, whose hints are functions of the past gradients: the natural hint of the portfolio problem, where every reversion and tracking rule already holds one.
+Forms the hint of the optimistic step from a Price Relative Forecast.
+
+The hint is the gradient that the log-wealth loss of the next period would have at the secondary iterate, if the forecast were the outcome. The forecaster is any expected-returns estimator. The carrier folds it where it has an exact fold, and the predictor fits it again from the head's rows otherwise, as the `me` slot of [`ForecastReversion`](@ref) does. A flat forecast gives a hint with equal entries, and the projection onto the budget undoes the uniform shift of such a hint.
+
+The optimistic-step papers take their hints from the past gradients, and this hint is not in them. It is the natural hint of the portfolio problem, where every reversion rule and every tracking rule already holds a forecast.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+M_{t+1} &= -\\hat{\\boldsymbol{x}}_{t+1} / \\langle \\boldsymbol{v}_{t+1}, \\hat{\\boldsymbol{x}}_{t+1} \\rangle\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:M_t_hint])
+  - ``\\hat{\\boldsymbol{x}}_{t+1}``: Price Relative Forecast for period ``t + 1``, made after the row of period ``t``.
+  - $(math_dict[:v_t_sec])
+  - $(math_dict[:t_period])
 
 # Fields
 
@@ -342,7 +469,7 @@ $(DocStringExtensions.FIELDS)
 
     ForecastGradient(; me::AbstractExpectedReturnsEstimator) -> ForecastGradient
 
-Keywords correspond to the struct's fields. `rows_needed` forwards to `me`; the wrapper's is the larger of the predictor's and the wrapped rule's.
+Keywords correspond to the struct's fields. The predictor needs as many rows as `me`, and the wrapper needs as many rows as the larger of the predictor and the wrapped rule.
 
 ## Validation
 
@@ -368,7 +495,7 @@ ForecastGradient
 """
 struct ForecastGradient{T1 <: AbstractExpectedReturnsEstimator} <: AbstractGradientPredictor
     """
-    The forecaster whose Price Relative Forecast the hint is formed from.
+    The forecaster whose Price Relative Forecast gives the hint.
     """
     me::T1
     function ForecastGradient(me::AbstractExpectedReturnsEstimator)
@@ -393,7 +520,7 @@ end
     predictor_state_seed(pred::MeanGradient, w::AbstractVector)
     predictor_state_seed(pred::ForecastGradient, w::AbstractVector)
 
-The carrier a Gradient Predictor keeps on the Rule State before the first row: `nothing`, the zero mean, or the forecaster's own carrier through [`forecaster_seed`](@ref).
+Returns the carrier that a Gradient Predictor keeps on the Rule State before the first row. It is `nothing` by default, the zero mean under [`MeanGradient`](@ref), and the carrier of the forecaster from [`forecaster_seed`](@ref) under [`ForecastGradient`](@ref).
 
 # Related
 
@@ -414,7 +541,13 @@ end
     predict_gradient!(pred::MeanGradient, m::AbstractVector, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, xm::AbstractVector, rows, t::Integer)
     predict_gradient!(pred::ForecastGradient, ps, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, xm::AbstractVector, rows, t::Integer)
 
-The hint of the period, the carrier written in place: the gradient `g` itself or the period's loss `obj` at the secondary iterate `v` on the mixed relative `xm` the gradient `g` was read on, the updated running mean `m`, or the log-wealth gradient of the forecast at `v` from the forecaster folded on or refit through [`forecast_relative`](@ref) on the traded relative `x`, which reads no objective because a forecast is a price relative. A forecaster folds the path that traded, not the mixed one, so its statistic is not compressed toward one by the mix; the hint `-x̂ / ⟨v, x̂⟩` is scale-free, so the forecast needs no mix applied after.
+Returns the carrier after the period and the hint of the period, and writes the carrier in place.
+
+  - Under [`LastGradient`](@ref) the hint is a copy of `g`. At `at_played = false` it is the gradient of `obj` at the secondary iterate `v`, on the mixed relative `xm` that `g` reads.
+  - Under [`MeanGradient`](@ref) the method updates the running mean `m`, and the hint is a copy of it.
+  - Under [`ForecastGradient`](@ref) the method folds or fits the forecaster on the traded relative `x` through [`forecast_relative`](@ref), and the hint is the log-wealth gradient of the forecast at `v`. It reads no objective, because a forecast is a price relative.
+
+A forecaster folds the path that traded, not the mixed one, so the mix does not pull its statistic toward one. The rule applies no mix to the forecast.
 
 # Returns
 
@@ -451,7 +584,7 @@ end
     predictor_state_view(ps::AbstractVector, i)
     predictor_state_view(ps::AbstractPartialFitState, i)
 
-A Gradient Predictor's carrier sliced to the assets `i`, as a copy.
+Returns the carrier of a Gradient Predictor sliced to the assets `i`, as a copy.
 
 # Related
 
@@ -472,7 +605,7 @@ end
     copy_predictor_state(ps::AbstractVector)
     copy_predictor_state(ps::AbstractPartialFitState)
 
-A copy of a Gradient Predictor's carrier sharing no array with it.
+Returns a copy of the carrier of a Gradient Predictor that shares no array with it.
 
 # Related
 
@@ -491,17 +624,32 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The adaptive rate of Rakhlin and Sridharan (2013, Corollary 2), read from the hint residuals an [`OptimisticStep`](@ref) keeps on its carrier:
+Sets the learning rate of an optimistic step from the hint residuals that the step has accrued.
+
+This is the adaptive rate of Corollary 2 of [rakhlin2013nips](@cite). It needs no horizon and no bound on the residual sum ahead of time. The schedule reads the residuals that an [`OptimisticStep`](@ref) keeps on its carrier, and it refuses the carrier of any other rule by name. [`hint_residual`](@ref) states the norm of the residuals in each geometry.
+
+# Mathematical definition
 
 ```math
 \\begin{align}
-\\eta_t &= R_{\\max} \\min \\left\\lbrace \\left( \\sqrt{\\textstyle\\sum_{i \\leq t-1} \\lVert \\boldsymbol{g}_i - M_i \\rVert_*^2} + \\sqrt{\\textstyle\\sum_{i \\leq t-2} \\lVert \\boldsymbol{g}_i - M_i \\rVert_*^2} \\right)^{-1},\\, 1 \\right\\rbrace\\,,
+S_t &= \\sum_{i \\leq t} \\lVert \\boldsymbol{g}_i - M_i \\rVert_*^2\\,, \\\\
+\\eta_t &= R_{\\max} \\min \\left\\lbrace \\left( \\sqrt{S_{t-1}} + \\sqrt{S_{t-2}} \\right)^{-1},\\, 1 \\right\\rbrace\\,.
 \\end{align}
 ```
 
-with ``R_{\\max}^2`` the diameter of the Allocation Set in the geometry's divergence, which the caller supplies: one for the Euclidean geometry on the simplex, and for the entropic geometry a bound the uniform mix `alpha` of the wrapped rule makes finite. Under it the regret is ``3.5 R_{\\max} \\sqrt{\\sum_t \\lVert \\boldsymbol{g}_t - M_t \\rVert_*^2 + 1}`` with no horizon and no residual sum known ahead. The residual is measured in the dual norm the geometry's potential is strongly convex against: the Euclidean norm under [`EuclideanProjection`](@ref), and the maximum norm under the entropic and barrier maps, whose potentials are taken against the ``\\ell_1`` norm. The rate is the cap ``R_{\\max}`` while the residual sum is zero.
+Where:
 
-The schedule reads the residuals an [`OptimisticStep`](@ref) alone accrues, and refuses any other rule's carrier by name.
+  - $(math_dict[:eta_t_lr])
+  - $(math_dict[:t_period])
+  - ``S_t``: Sum of the squared hint residuals through period ``t``, zero for ``t \\leq 0``.
+  - $(math_dict[:g_t_loss])
+  - $(math_dict[:M_t_hint])
+  - $(math_dict[:dual_norm_geo])
+  - ``R_{\\max}``: Scale and cap of the rate. The paper sets ``R_{\\max}^2 = \\sup_{\\boldsymbol{w}, \\boldsymbol{w}' \\in \\mathcal{W}} D_\\Psi(\\boldsymbol{w}, \\boldsymbol{w}')``.
+  - $(math_dict[:W_aset])
+  - $(math_dict[:D_Psi_breg])
+
+The rate is the cap ``R_{\\max}`` while ``S_{t-1} = 0``. With ``R_{\\max}`` at that supremum, the paper bounds the regret over ``T`` periods by ``3.5 R_{\\max} (\\sqrt{S_T} + 1)``. Under the Euclidean geometry on the simplex the supremum is one, the default `rmax`. Under the entropic geometry the supremum is infinite, and the uniform mix `alpha` of the wrapped rule does not bound it, because the mix applies to the played allocation and not to the secondary iterate. There `rmax` is a tuning constant, and the bound does not hold.
 
 # Fields
 
@@ -537,7 +685,7 @@ HintResidualRate
 """
 struct HintResidualRate{T1 <: Real} <: AbstractLearningRateSchedule
     """
-    The paper's ``R_{\\max}``, the root of the set's diameter in the geometry's divergence, which scales the rate and caps it.
+    The paper's ``R_{\\max}``, which scales the rate and caps it.
     """
     rmax::T1
     function HintResidualRate(rmax::Real)
@@ -551,7 +699,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The carrier of [`OptimisticStep`](@ref): the secondary iterate, the wrapped rule's own carrier laid flat beside it, the last hint and the running hint residuals, and the Gradient Predictor's carrier.
+Holds the two iterates of an optimistic step, its hint residuals and the carriers of its schedule and its predictor.
 
 # Fields
 
@@ -569,31 +717,31 @@ $(DocStringExtensions.FIELDS)
     """
     n
     """
-    The secondary iterate ``\\boldsymbol{v}_t``, over the full pinned universe, summing to one, which both half-steps are taken from.
+    The secondary iterate ``\\boldsymbol{v}_t`` over the full pinned universe, summing to one. The first half-step of the period starts from it.
     """
     v
     """
-    The unmixed played iterate ``\\boldsymbol{w}_t``, at which the period's gradient is read.
+    The unmixed played iterate ``\\boldsymbol{w}_t``, at which the rule reads the gradient of the period.
     """
     u
     """
-    The Start Allocation projected onto the Allocation Set, which a restart returns both iterates to.
+    The Start Allocation projected onto the Allocation Set. A restart returns both iterates to it.
     """
     w0
     """
-    The wrapped rule's schedule statistic, or `nothing`.
+    The schedule statistic of the wrapped rule, or `nothing`.
     """
     s
     """
-    The running sums of the squared hint residuals through the last period and the one before, `[Σ_{i ≤ t-1}, Σ_{i ≤ t-2}]`, which [`HintResidualRate`](@ref) reads.
+    The sums of the squared hint residuals through the last period and the period before it, ``[S_{t-1}, S_{t-2}]`` at period ``t``. [`HintResidualRate`](@ref) reads them.
     """
     res
     """
-    The hint ``M_t`` the played iterate was stepped along, `assets × 1`, against which the period's gradient is measured.
+    The hint ``M_t`` along which the rule stepped the played iterate, `assets × 1`. The rule measures the gradient of the period against it.
     """
     m
     """
-    The Gradient Predictor's carrier, or `nothing`.
+    The carrier of the Gradient Predictor, or `nothing`.
     """
     ps
 end
@@ -622,7 +770,28 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The squared hint residual ``\\lVert \\boldsymbol{g}_t - M_t \\rVert_*^2`` of a period in the dual norm of the geometry: the Euclidean norm under [`EuclideanProjection`](@ref), the maximum norm under every other map.
+Returns the squared hint residual of a period in the dual norm of the geometry.
+
+A [`MirrorDescent`](@ref) rule takes only the four geometries below, so an [`OptimisticStep`](@ref) never reads the residual under [`GramProjection`](@ref) or [`DiagonalProjection`](@ref), and no method serves them.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+r_{\\mathrm{E}} &= \\lVert \\boldsymbol{g}_t - M_t \\rVert_2^2\\,, \\\\
+r_{\\infty} &= \\lVert \\boldsymbol{g}_t - M_t \\rVert_\\infty^2\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``r_{\\mathrm{E}}``: Squared residual under [`EuclideanProjection`](@ref).
+  - ``r_{\\infty}``: Squared residual under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref).
+  - $(math_dict[:g_t_loss])
+  - $(math_dict[:M_t_hint])
+  - $(math_dict[:t_period])
+
+Each is the square of the dual norm ``\\lVert \\boldsymbol{g}_t - M_t \\rVert_*``. On the simplex the Euclidean potential is 1-strongly convex against the ``\\ell_2`` norm, whose dual is the ``\\ell_2`` norm. The entropic, Tsallis and log-barrier potentials are strongly convex against the ``\\ell_1`` norm with a modulus of at least one, and the dual of the ``\\ell_1`` norm is the ``\\ell_\\infty`` norm.
 
 # Related
 
@@ -632,28 +801,63 @@ The squared hint residual ``\\lVert \\boldsymbol{g}_t - M_t \\rVert_*^2`` of a p
 function hint_residual(::EuclideanProjection, d::AbstractVector)
     return sum(abs2, d)
 end
-function hint_residual(::AbstractProjectionGeometry, d::AbstractVector)
+function hint_residual(::Union{<:EntropicProjection, <:TsallisProjection,
+                               <:LogBarrierProjection}, d::AbstractVector)
     return abs2(maximum(abs, d))
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The optimistic mirror descent of Rakhlin and Sridharan (2013): a wrapper over a [`MirrorDescent`](@ref) rule that plays two half-steps a period, the second along a hint for the gradient not yet seen (OMD).
+Plays two half-steps of a first-order rule each period, the second along a hint for the gradient of the next period (OMD).
+
+This is the optimistic mirror descent of Rakhlin and Sridharan (2013), as a wrapper over a [`MirrorDescent`](@ref) rule. The carrier holds two iterates. The secondary iterate is where the step of the next period starts, and the played allocation is one hint step ahead of it.
+
+`eta`, `proj`, `alpha` and `obj` are those of the wrapped rule. Both half-steps are its mirror step in its geometry, and the gradient is that of its objective, through [`loss_gradient`](@ref). A [`RiskLoss`](@ref) reads the head's rows, and the wrapper needs as many rows as the larger of the objective and the predictor. A schedule on `eta` counts the periods of the wrapper and reads its carrier. The wrapper reads the uniform mix `alpha` as the wrapped rule does.
 
 # Mathematical definition
 
-With ``\\boldsymbol{g}_t = -\\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` the gradient of the period's log-wealth loss at the played allocation, ``M_{t+1}`` the Gradient Predictor's hint, ``D_\\Psi`` the divergence of the wrapped rule's Projection Geometry and ``\\eta`` its rate,
-
 ```math
 \\begin{align}
-\\boldsymbol{v}_{t+1} &= \\underset{\\boldsymbol{v} \\in \\mathcal{W}}{\\arg\\min} \\; \\eta \\langle \\boldsymbol{g}_t, \\boldsymbol{v} \\rangle + D_\\Psi(\\boldsymbol{v}, \\boldsymbol{v}_t)\\,,\\\\
-\\boldsymbol{w}_{t+1} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; \\eta \\langle M_{t+1}, \\boldsymbol{w} \\rangle + D_\\Psi(\\boldsymbol{w}, \\boldsymbol{v}_{t+1})\\,.
+\\boldsymbol{v}_{t+1} &= \\underset{\\boldsymbol{v} \\in \\mathcal{W}}{\\arg\\min} \\; \\eta_t \\langle \\boldsymbol{g}_t, \\boldsymbol{v} \\rangle + D_\\Psi(\\boldsymbol{v}, \\boldsymbol{v}_t)\\,, \\\\
+\\boldsymbol{w}_{t+1} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; \\eta_{t+1} \\langle M_{t+1}, \\boldsymbol{w} \\rangle + D_\\Psi(\\boldsymbol{w}, \\boldsymbol{v}_{t+1})\\,.
 \\end{align}
 ```
 
-The secondary sequence ``\\boldsymbol{v}_t`` is what the next period's step continues from, and the played ``\\boldsymbol{w}_t`` is one hint-step ahead of it; the carrier holds both. The regret is ``\\eta^{-1} R_{\\max}^2 + \\tfrac{\\eta}{2} \\sum_t \\lVert \\boldsymbol{g}_t - M_t \\rVert_*^2`` (their Lemma 2), ``O(\\sqrt{\\sum_t \\lVert \\boldsymbol{g}_t - M_t \\rVert_*^2})`` at the rate tuned to the residuals — the gradient path length under [`LastGradient`](@ref), where the step is the two-projection algorithm of Chiang and co-authors (2012), and the gradient variance under [`MeanGradient`](@ref) — and never worse than the wrapped rule's bound by more than a constant when the hints are wrong. A zero hint is the wrapped rule exactly. [`HintResidualRate`](@ref) on the wrapped rule's `eta` is the paper's adaptive rate, which reads the residuals the carrier accrues.
+Where:
 
-`eta`, `proj`, `alpha` and `obj` are the wrapped rule's: both half-steps are its mirror step in its geometry, the gradient is its objective's through [`loss_gradient`](@ref) — a [`RiskLoss`](@ref) reads the head's rows, and the wrapper's `rows_needed` is the larger of the objective's and the predictor's — a schedule on its `eta` counts the wrapper's periods and reads the wrapper's carrier, and the uniform mix `alpha` is read as the wrapped rule reads it — mixed relatives ([`mixed_relatives`](@ref)) at the unmixed played iterate, and the played mix from the unmixed ``\\boldsymbol{w}_{t+1}``, projected once more where the set excludes it ([`reprojection`](@ref)). The first half-step is taken at the rate of the period, ``\\eta_t``, and the second at the rate of the next, ``\\eta_{t+1}``, which every schedule answers from the carrier once the period's row is in it — the paper forms ``\\boldsymbol{w}_{t+1}`` with ``\\eta_{t+1}``, and its adaptive rate reads the residual of the period just closed — so a number is one rate for both and a schedule is two. A restart the schedule names returns both iterates to the Start Allocation, re-entered onto the set from the book the fund holds, and every carrier to its seed. The wrapped rule's Gradient Transform must be the identity, because the transforms keep a carrier written once a period from one gradient, and the optimistic step reads two.
+  - $(math_dict[:v_t_sec])
+  - $(math_dict[:w_t_iter]) Here it is the played allocation before the uniform mix.
+  - $(math_dict[:g_t_loss]) The rule takes it at ``\\boldsymbol{w}_t``. Under [`LogWealth`](@ref) it is ``-\\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle``.
+  - $(math_dict[:x_t_rel])
+  - $(math_dict[:M_t_hint])
+  - $(math_dict[:eta_t_lr])
+  - $(math_dict[:t_period])
+  - $(math_dict[:W_aset])
+  - $(math_dict[:Psi_pot])
+  - $(math_dict[:D_Psi_breg])
+  - $(math_dict[:dual_norm_geo])
+
+The rates follow equation (1) of [rakhlin2013nips](@cite), which forms ``\\boldsymbol{w}_{t+1}`` at ``\\eta_{t+1}``. A fixed rate is one rate for both half-steps. Under the zero hint the second half-step returns ``\\boldsymbol{v}_{t+1}``, so the rule is the wrapped rule.
+
+For a fixed rate ``\\eta`` and a comparator ``\\boldsymbol{w}^*`` with ``D_\\Psi(\\boldsymbol{w}^*, \\boldsymbol{v}_1) \\leq R^2``, Lemma 1 of [rakhlin2013nips](@cite), with its equation (3) at ``\\rho = \\eta``, bounds the regret by ``\\eta^{-1} R^2 + \\tfrac{\\eta}{2} \\sum_t \\lVert \\boldsymbol{g}_t - M_t \\rVert_*^2``. At the rate tuned to the residual sum, the bound is ``O(\\sqrt{\\sum_t \\lVert \\boldsymbol{g}_t - M_t \\rVert_*^2})``. The residual sum is the path length of the gradients under [`LastGradient`](@ref), and the spread of the gradients about their mean bounds it under [`MeanGradient`](@ref). [rakhlin2013colt](@cite) states that a hint that misses keeps the bound of mirror descent up to a constant, for hints no larger than the gradients in the dual norm. [`HintResidualRate`](@ref) on the `eta` of the wrapped rule is the adaptive rate of [rakhlin2013nips](@cite).
+
+# Algorithm
+
+The seven-argument [`online_update!`](@ref) runs these steps at the period's row `x`. The six-argument form calls it with the unmixed played iterate `st.u` as the Gradient Point `point`.
+
+ 1. Set the period `t = st.n + 1`, and form the Price-Adjusted Allocation `wh` of the book `w` after the row.
+ 2. When the schedule of `eta` names a restart at `t`, re-enter the Start Allocation `st.w0` onto the set from `wh` with [`reprojection`](@ref). Put both iterates at that allocation and every carrier at its seed, keep `t`, and return that allocation. Stop.
+ 3. When the schedule reads the period's row before the rate, write its statistic from `w` and `x`.
+ 4. Read the rate `eta` and the share `alpha` of period `t`.
+ 5. Mix the price relatives into `xm` with [`mixed_relatives`](@ref).
+ 6. Take the gradient `g` of `obj` at `point`, from `xm` and the head's `rows`, with [`loss_gradient`](@ref).
+ 7. Take the first half-step from the secondary iterate `st.v` on `eta .* g` with [`half_step`](@ref), which gives the new secondary iterate `v`.
+ 8. Form the hint `m` and the carrier `ps` of the predictor with [`predict_gradient!`](@ref), from `g`, `v`, `x` and `xm`.
+ 9. Measure the residual `r` of `g` against the last hint `st.m` with [`hint_residual`](@ref), and shift the residual sums into `res`.
+10. When the schedule reads the past alone, write its statistic `s` from `w` and `x`.
+11. Read the rate of period `t + 1` from a carrier that holds the period's row. Take the second half-step from `v` on that rate times `m`, which gives the unmixed played iterate `u`.
+12. Form the played allocation from `u` with [`played_allocation`](@ref). When `alpha` is positive, project it with [`reprojection`](@ref).
+13. Return the new state and the played allocation.
 
 # Fields
 
@@ -666,7 +870,7 @@ $(DocStringExtensions.FIELDS)
         predictor::AbstractGradientPredictor = LastGradient()
     ) -> OptimisticStep
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. The Gradient Transform of the wrapped rule must be the identity. A transform keeps a carrier that one gradient writes each period, and the optimistic step reads two gradients a period.
 
 ## Validation
 
@@ -705,11 +909,11 @@ OptimisticStep
 struct OptimisticStep{T1 <: MirrorDescent, T2 <: AbstractGradientPredictor} <:
        AbstractOnlinePortfolioSelectionAlgorithm
     """
-    The first-order rule both half-steps are taken with.
+    The first-order rule that takes both half-steps.
     """
     alg::T1
     """
-    The Gradient Predictor whose hint the second half-step is taken along.
+    The Gradient Predictor whose hint the second half-step follows.
     """
     predictor::T2
     function OptimisticStep(alg::MirrorDescent, predictor::AbstractGradientPredictor)
@@ -741,7 +945,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-One half-step of an [`OptimisticStep`](@ref): the wrapped rule's mirror step from `u` along the scaled gradient `s`, projected onto the set in its geometry from the Price-Adjusted Allocation `w`.
+Takes one half-step of an [`OptimisticStep`](@ref). This is the mirror step of the wrapped rule from `u` on the scaled gradient `s`, projected onto the set in the rule's geometry from the Price-Adjusted Allocation `w`.
 
 # Related
 
