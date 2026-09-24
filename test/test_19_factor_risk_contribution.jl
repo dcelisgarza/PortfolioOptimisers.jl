@@ -176,6 +176,18 @@ end
     @test factor_risk_contribution(r, w, prE; rd = rd) ≈
           factor_risk_contribution(r, w, prE.X; rd = rd)
 
+    # A `ReturnsResult` carries the caller's own matrix, so it agrees with the bare matrix.
+    @test factor_risk_contribution(r, w, rd; rd = rd) ≈ frc_X
+
+    # The decomposition of Roncalli and Weisang, by hand: the factor exposures times the
+    # marginal risks mapped through the pseudoinverse of the loadings, then the off-factor
+    # part over an orthonormal basis of the null space of the transposed loadings.
+    L = rr.L
+    g = risk_contribution(r, w, X; marginal = true)
+    Bn = transpose(nullspace(transpose(L)))
+    hand = [(transpose(L) * w) .* (pinv(L) * g); dot(Bn * w, transpose(pinv(Bn)) * g)]
+    @test frc_X ≈ hand
+
     # The optimiser follows the same precedence, so a factor prior answers what used to be a
     # throw: no returns data at all, and a regression estimator.
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,

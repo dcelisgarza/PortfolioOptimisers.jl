@@ -10,7 +10,7 @@ commit = "0ecb3ce47c"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2993, doc = 0, comment = 241, blank = 48, total = 3282 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1285, doc = 113, comment = 138, blank = 43, total = 1579 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1295, doc = 113, comment = 141, blank = 43, total = 1592 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -231,7 +231,7 @@ commit = "0ecb3ce47c"
 "src/16_RiskMeasures/21_MedianAbsoluteDeviationRisk.jl" = { code = 95, doc = 186, comment = 3, blank = 74, total = 358 }
 "src/16_RiskMeasures/22_NonOptimisationRiskMeasures.jl" = { code = 116, doc = 279, comment = 5, blank = 108, total = 508 }
 "src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { code = 55, doc = 46, comment = 0, blank = 13, total = 114 }
-"src/16_RiskMeasures/24_ExpectedRisk.jl" = { code = 347, doc = 535, comment = 42, blank = 236, total = 1160 }
+"src/16_RiskMeasures/24_ExpectedRisk.jl" = { code = 371, doc = 784, comment = 52, blank = 347, total = 1554 }
 "src/16_RiskMeasures/25_RiskMeasureTools.jl" = { code = 84, doc = 95, comment = 0, blank = 51, total = 230 }
 "src/17_Optimisation/01_Base_Optimisation.jl" = { code = 965, doc = 1765, comment = 35, blank = 865, total = 3630 }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 646, doc = 1202, comment = 44, blank = 480, total = 2372 }

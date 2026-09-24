@@ -230,7 +230,7 @@ commit = "3086100756"
 "src/16_RiskMeasures/21_MedianAbsoluteDeviationRisk.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/16_RiskMeasures/22_NonOptimisationRiskMeasures.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
-"src/16_RiskMeasures/24_ExpectedRisk.jl" = { slice_copy = 0, reduce_temporary = 1, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 1 }
+"src/16_RiskMeasures/24_ExpectedRisk.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/16_RiskMeasures/25_RiskMeasureTools.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/17_Optimisation/01_Base_Optimisation.jl" = { slice_copy = 0, reduce_temporary = 2, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 2 }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }

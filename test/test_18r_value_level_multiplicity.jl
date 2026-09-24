@@ -199,6 +199,12 @@ end
         num = expected_risk(rrks, w, pr.X; sca = SumScalariser())
         den = expected_risk(rrks, w, pr.X; sca = MaxScalariser())
         @test expected_risk(r, w, pr.X) ≈ num / den
+        # On a precomputed series the functor divides the two scalarised risks of the series,
+        # so it agrees with the matrix route at constant weights.
+        rs2 = [ConditionalValueatRisk(), MaximumDrawdown()]
+        r2 = NonOptimisationRiskRatio(; r1 = rs2, sca1 = SumScalariser(), r2 = rs2,
+                                      sca2 = MaxScalariser())
+        @test r2(pr.X * w) ≈ expected_risk(r2, w, pr.X)
     end
 
     @testset "the ratio family routes its risk axis through the prior" begin
@@ -296,6 +302,32 @@ end
     @testset "and it survives the combination weights too" begin
         mixed = [Variance(; settings = RiskMeasureSettings(; scale = 3.0)), rc]
         @test sum(risk_contribution(mixed, w, pr)) ≈ expected_risk(mixed, w, pr) rtol=1e-5
+    end
+
+    @testset "a maximum or a minimum decomposes the element it picks" begin
+        #=
+        The scaled variance sits above the CVaR, and below it once it is divided by its
+        degree. The scalariser used to pick its element after the homogeneity correction, so
+        the maximum decomposed the CVaR and the minimum decomposed the variance, and neither
+        sum matched the figure `expected_risk` reports.
+        =#
+        v = expected_risk(rv, w, pr)
+        c = expected_risk(rc, w, pr)
+        s = 1.3 * c / v
+        mixed = [Variance(; settings = RiskMeasureSettings(; scale = s)), rc]
+        for sca in (MaxScalariser(), MinScalariser())
+            @test sum(risk_contribution(mixed, w, pr; sca = sca)) ≈
+                  expected_risk(mixed, w, pr; sca = sca) rtol=1e-5
+        end
+        # The log-sum-exp is not homogeneous, so the contributions sum to the
+        # softmax-weighted mean of the scaled risks and not to the aggregate.
+        gamma = 200.0
+        vals = [s * v, c]
+        p = exp.(gamma .* (vals .- maximum(vals)))
+        p ./= sum(p)
+        lse = LogSumExpScalariser(; gamma = gamma)
+        @test sum(risk_contribution(mixed, w, pr; sca = lse)) ≈ dot(p, vals) rtol=1e-5
+        @test dot(p, vals) < expected_risk(mixed, w, pr; sca = lse)
     end
 end
 

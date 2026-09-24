@@ -1124,6 +1124,19 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :so_scale => "``s_o``: Objective scale. It multiplies the objective, so a positive value leaves the argument of the optimum unchanged.",#
                        :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
                        :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.",#
+                       # The value level of a risk measure: a vector of measures, its
+                       # scalariser, the homogeneity correction of a risk contribution and
+                       # the rolling window.
+                       :S_sca_vec => "``S``: Scalariser that combines the scaled risks of a vector of risk measures into one number.",#
+                       :s_k_scale => "``s_k``: `scale` of the ``k``-th risk measure of a vector, its weight in the combination.",#
+                       :R_k_vec => "``R_k(\\boldsymbol{w})``: Element risk, the risk of the ``k``-th risk measure of a vector.",#
+                       :p_k_chain => "``p_k``: Chain-rule weight of the ``k``-th risk measure of a vector, the partial derivative of ``S`` with respect to its ``k``-th argument at ``s_k R_k(\\boldsymbol{w})``.",#
+                       :d_homog => "``d``: Degree of homogeneity of the risk measure, the ``d`` for which ``R(c \\boldsymbol{w}) = c^{d} R(\\boldsymbol{w})`` at every ``c > 0``.",#
+                       :w_i_asset => "``w_i``: Weight of asset ``i``.",#
+                       :n_rm_vec => "``n``: Size of the vector of risk measures.",#
+                       :W_roll => "``W``: Rolling window size, in observations.",#
+                       :R_t_roll => "``R_t``: Rolling risk, the risk of the window that ends at observation ``t``.",#
+                       :R_w_rows => "``R(\\boldsymbol{w};\\, \\mathbf{X}_{a:b})``: Window risk, the risk of the portfolio on the rows ``a`` to ``b`` of the returns matrix.",#
                        # The risk measure layer of a JuMP model.
                        :R_i_riskvec => "``\\mathcal{R}_i``: Entry ``i`` of `risk_vec`, the risk expression of the ``i``-th risk measure times the `scale` of the measure.",#
                        :rhat_t_net => "``\\hat{r}_t``: Net portfolio return at observation ``t``, ``\\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` less the fees charged at ``t``.",#

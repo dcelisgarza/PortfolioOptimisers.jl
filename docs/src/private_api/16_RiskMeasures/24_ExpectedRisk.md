@@ -18,4 +18,5 @@ adjusted_risk
 finite_difference_gradient
 measure_gradient
 scalariser_gradient_weights
+scalariser_element_weights
 ```
