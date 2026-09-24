@@ -115,10 +115,14 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test po.select_rows(CorrelationMatch(; window = 2, rho = 0.1), H) ==
               (3:6)[c .>= 0.1]
         @test po.select_rows(CorrelationMatch(; window = 2, rho = -1), H) == 3:6
-        # A constant window has no correlation and never matches.
+        # A constant window has no correlation, and CORN sets it to zero: it matches at a
+        # threshold of zero or less, and at no positive threshold.
         Hc = copy(H)
         Hc[1:2, :] .= 1
-        @test !(3 in po.select_rows(CorrelationMatch(; window = 2, rho = -1), Hc))
+        @test isnan(cor(vec(Hc[1:2, :]), vec(Hc[5:6, :])))
+        @test 3 in po.select_rows(CorrelationMatch(; window = 2, rho = -1), Hc)
+        @test 3 in po.select_rows(CorrelationMatch(; window = 2, rho = 0), Hc)
+        @test !(3 in po.select_rows(CorrelationMatch(; window = 2, rho = 0.1), Hc))
         # Clusters: fewer than two candidates is the empty selection; on a fixture of
         # two clear regimes the latest window's cluster is its own regime.
         @test isempty(po.select_rows(ClusterMatch(; window = 2), H[1:3, :]))
@@ -301,6 +305,12 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         rl = optimise(long, rows(rd, 1:30))
         @test rl.retcode.res.converged
         @test isapprox(rl.w, w30; atol = 1e-8)
+        # The numbers the docstring of FollowTheLeader states for this fixture.
+        @test 0.06 < maximum(abs.(wfp .- w30)) < 0.07
+        @test 6e-5 < log_wealth(w30, X[1:30, :]) - log_wealth(wfp, X[1:30, :]) < 6.5e-5
+        @test 1.4e6 < rl.retcode.res.iterations < 1.5e6
+        @test rl.retcode.res.gap <= 1e-12
+        @test maximum(abs.(rl.w .- w30)) < 2e-9
         @test isapprox(optimise(OPS(; alg = FollowTheLeader(; opt = long)), rows(rd, 1:30)).w,
                        w30; atol = 1e-8)
     end
@@ -658,6 +668,70 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test maximum(wn) <= 0.4 + 1e-10 && sum(wn) ≈ 1
     end
 
+    @testset "The papers' rules by hand (sweep of 08_FollowTheLeader.jl)" begin
+        # Follow the leading history of Hazan and Seshadhri (2009), Algorithm 1, by hand over
+        # a buy-and-hold base: the copy started at period k holds the uniform allocation
+        # drifted through rows k to t - 1, so every copy has a closed form. The lifetime is
+        # counted independently of `expert_alive`, by halving.
+        function drift(k, t)
+            if k == t
+                return fill(0.25, 4)
+            end
+            v = vec(prod(X[k:(t - 1), :]; dims = 1))
+            return v ./ sum(v)
+        end
+        twos(b) = iseven(b) ? 1 + twos(b ÷ 2) : 0
+        alive(b, t) = b <= t <= b + 2^(twos(b) + 2) + 1
+        function hand_flh(n, a, prune)
+            live, q = [1], [1.0]
+            for t in 1:n
+                ret = [dot(drift(k, t), X[t, :]) for k in live]
+                qh = q .* ret .^ a
+                qh ./= sum(qh)
+                live, q = [live; t + 1], [(1 - 1 / (t + 1)) .* qh; 1 / (t + 1)]
+                if prune
+                    keep = alive.(live, t + 1)
+                    live, q = live[keep], q[keep] ./ sum(q[keep])
+                end
+            end
+            return live, q, sum(q[j] .* drift(live[j], n + 1) for j in eachindex(live))
+        end
+        for (n, a, prune) in
+            ((12, 1.0, true), (12, 2.5, true), (9, 0.5, false), (T, 1.0, true))
+            born_h, p_h, w_h = hand_flh(n, a, prune)
+            alg = FollowTheLeadingHistory(; alg = BuyAndHold(), alpha = a, prune = prune)
+            st = po.partial_fit!(OPS(; alg = alg), rows(rd, 1:n)).cache.st
+            @test st.born == born_h
+            @test isapprox(st.p, p_h; atol = 1e-14)
+            @test isapprox(optimise(OPS(; alg = alg), rows(rd, 1:n)).w, w_h; atol = 1e-14)
+        end
+        # The working set: O(log t) copies, and a start period in [s, (s + t) / 2] for every
+        # s <= t. A copy is alive in 2^(j + 2) + 2 periods, one more than the paper's
+        # lifetime 2^(j + 2) + 1, because the paper's interval includes both ends.
+        wset(t) = [k for k in 1:t if po.expert_alive(k, t)]
+        @test maximum(length(wset(t)) / log2(t) for t in 2:4096) < 2.5
+        @test all(t -> all(s -> any(k -> s <= k <= (s + t) / 2, wset(t)), 1:t), 1:300)
+        @test all(k -> count(t -> po.expert_alive(k, t), k:(k + 200)) == 2^(twos(k) + 2) + 2,
+                  1:40)
+        # The nearest neighbours: the earlier period wins a tie at the boundary. With a
+        # window of one, rows 2, 4 and 6 follow a window equal to the latest one.
+        Ht = [1.0 1.0; 1.1 1.0; 1.0 1.0; 1.1 1.0; 1.0 1.0; 1.2 1.0; 1.0 1.0]
+        @test po.select_rows(NearestNeighbourMatch(; window = 1, neighbours = 2), Ht) ==
+              [2, 4]
+        @test po.select_rows(NearestNeighbourMatch(; window = 1, neighbours = 1), Ht) == [2]
+        # RACORN penalises the standard deviation of the log return. The library's
+        # StandardDeviation reads the covariance of the return, so the two differ, and they
+        # agree to the first order in the return.
+        wr = [0.4, 0.3, 0.2, 0.1]
+        Rr = 0.2 .* randn(StableRNG(3), 12, 4)
+        sdr = expected_risk(StandardDeviation(), wr, prior(EmpiricalPrior(), Rr))
+        @test sdr ≈ std(Rr * wr)
+        @test !isapprox(sdr, std(log.(1 .+ Rr * wr)); rtol = 1e-2)
+        @test isapprox(expected_risk(StandardDeviation(), wr,
+                                     prior(EmpiricalPrior(), 1e-3 .* Rr)),
+                       std(log.(1 .+ 1e-3 .* Rr * wr)); rtol = 1e-3)
+    end
+
     @testset "Configurations: the pattern-matching aggregations" begin
         # The kernel paper's grid of (window, radius) experts under the wealth weighting:
         # the mixture's wealth is at least the best expert's over the count.
@@ -679,8 +753,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                                 window = w))
                                          for w in 1:3])
         @test sum(optimise(OPS(; alg = cornu), rd).w) ≈ 1
-        # RACORN-K: correlation-matched samples under a standard-deviation penalty on
-        # the log return, one expert per threshold, the top-k of them by wealth.
+        # RACORN-K: correlation-matched samples under a standard-deviation penalty beside
+        # the mean log return, over a grid of thresholds at one window and one λ, the top-k
+        # of them by wealth. The paper's grid also runs over windows and λ.
         sdopt = MeanRisk(; r = StandardDeviation(), obj = MaximumUtility(; l = 1),
                          opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
                                              ret = LogarithmicReturn()))

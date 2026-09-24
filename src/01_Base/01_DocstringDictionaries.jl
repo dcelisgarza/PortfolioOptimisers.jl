@@ -1296,7 +1296,15 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :T_regret => "``T``: Regret horizon, the number of periods that a regret bound covers.",#
                        :D_diam => "``D``: Diameter of the feasible set in the Euclidean norm.",#
                        :G_gradbound => "``G``: Bound on the Euclidean norm of the gradient of every online loss over the feasible set.",#
-                       :P_T_path => "``P_T = \\sum_{t=2}^{T} \\lVert \\boldsymbol{u}_t - \\boldsymbol{u}_{t-1} \\rVert_2``: Path length of a comparator sequence ``\\boldsymbol{u}_1, \\ldots, \\boldsymbol{u}_T`` in the feasible set.")
+                       :P_T_path => "``P_T = \\sum_{t=2}^{T} \\lVert \\boldsymbol{u}_t - \\boldsymbol{u}_{t-1} \\rVert_2``: Path length of a comparator sequence ``\\boldsymbol{u}_1, \\ldots, \\boldsymbol{u}_T`` in the feasible set.",#
+                       # The follow-the-leader rules: the sample a leader re-solves on, and the
+                       # windows a pattern-matching selector compares.
+                       :Delta_N_simplex => "``\\Delta_N``: Probability simplex over the ``N`` assets.",#
+                       :C_t_sample => "``C_t``: Sample of period ``t``, the past periods whose price relatives the leader re-solves on.",#
+                       :w_star_lead => "``\\boldsymbol{w}^\\star_t``: Leader of period ``t``, the allocation that the held optimisation estimator solves for on the sample ``C_t``.",#
+                       :w_var_lead => "``\\boldsymbol{w}``: Decision allocation of the leader's programme.",#
+                       :w_win => "``w``: Window length, the number of periods in each window that a pattern-matching selector compares.",#
+                       :x_win => "``\\boldsymbol{x}_{a}^{b}``: Window of periods ``a`` to ``b``, the price relatives of those periods concatenated into one vector.")
 """
     ref_dict
 

@@ -399,7 +399,7 @@ Where:
   - $(math_dict[:eps_cw])
   - $(math_dict[:N])
   - ``\\theta``: Confidence level of the constraint, with ``\\phi = \\Phi^{-1}(\\theta)``.
-  - ``\\Delta_N``: Probability simplex over the ``N`` assets.
+  - $(math_dict[:Delta_N_simplex])
   - ``D_{\\mathrm{KL}}``: Relative entropy between two Gaussian distributions.
   - ``\\boldsymbol{b}``: Allocation drawn from the new belief.
   - ``\\tilde{\\boldsymbol{w}}_{t+1}``, ``\\tilde{\\Sigma}_{t+1}``: Mean and covariance before the projection and the rescale.

@@ -1,25 +1,25 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the Sample Selectors a [`FollowTheLeader`](@ref) rule holds on `sel`: the part of a solved rule that names which past rows the held optimisation estimator re-solves on.
+Names the past periods on which a follow-the-leader rule re-solves its held estimator.
 
-Every solved row of the online selection literature is one programme over a sample of past price relatives, and the rows differ in the sample alone: every row so far (follow the leader), the last `W` (the variable rebalanced portfolio), or the rows whose preceding window resembles the latest one — by histogram cell, kernel radius, nearest neighbours, correlation or cluster — which is the pattern-matching family. A selector reads the price relatives the head holds and answers row indices; it holds no rows of its own.
+A [`FollowTheLeader`](@ref) rule holds a Sample Selector on `sel`. The solved rules of the online selection literature solve one programme and differ in the sample alone. Follow the leader takes every period so far, and the successive variable rebalanced portfolio takes the last `W`. The pattern-matching rules take the periods whose preceding window resembles the latest window, by histogram cell, kernel radius, nearest neighbours, correlation or cluster. A selector reads the price relatives that the head holds and returns row indices. It holds no rows of its own.
 
 # Interfaces
 
 In order to implement a new selector, subtype `AbstractSampleSelector` with the paper's parameters as part of the struct, and implement:
 
-  - `select_rows(sel::AbstractSampleSelector, X::AbstractMatrix) -> AbstractVector{<:Integer}`: The indices of the rows of `X` the rule re-solves on, `X` the price relatives the head holds through the period, `observations × assets`, in time order, one at a gap ([`price_relative`](@ref)): a selector is a kernel over price relatives, so a window that straddles a listing is compared as a window in which that leg sat in cash, the same number the step reads there. An empty vector is the empty selection.
-  - `rows_needed(sel::AbstractSampleSelector) -> Union{Nothing, Integer}`: The rows the selector reads at a step, `nothing` for every row folded so far.
+  - `select_rows(sel::AbstractSampleSelector, X::AbstractMatrix) -> AbstractVector{<:Integer}`: The indices of the rows of `X` in the sample, in time order. An empty vector is the empty sample.
+  - `rows_needed(sel::AbstractSampleSelector) -> Union{Nothing, Integer}`: The number of rows that the selector reads at a step, or `nothing` for every row folded so far.
 
 ## Arguments
 
   - `sel`: The selector.
-  - `X`: The price relatives, `1 .+ r` and one at a gap, every row the head holds.
+  - `X`: The price relatives `1 .+ r` of every row that the head holds, `observations × assets`, in time order. A gap reads as one, through [`price_relative`](@ref). So a window that spans a listing compares as a window in which that asset sat in cash, which is the number that the step reads there.
 
 ## Returns
 
-  - `idx::AbstractVector{<:Integer}`: The selected row indices, in time order.
+  - `idx::AbstractVector{<:Integer}`: The row indices of the sample, in time order.
 
 # Related
 
@@ -36,7 +36,16 @@ abstract type AbstractSampleSelector <: AbstractAlgorithm end
 """
     select_rows(sel::AbstractSampleSelector, X::AbstractMatrix)
 
-The indices of the rows a Sample Selector names, from the price relatives the head holds through the period.
+Returns the row indices of the sample that a Sample Selector names, from the price relatives that the head holds.
+
+# Arguments
+
+  - `sel`: The selector.
+  - `X`: The price relatives, `observations × assets`, in time order.
+
+# Returns
+
+  - `idx::AbstractVector{<:Integer}`: The row indices of the sample ``C_t``, in time order, with ``t`` the row count of `X`.
 
 # Related
 
@@ -47,7 +56,22 @@ function select_rows end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The Sample Selector of follow the leader: every row so far, so the re-solve is the best constant rebalanced portfolio to date (Gaivoronski and Stella 2000's successive constant rebalanced portfolio, SCRP).
+Selects every period so far, the sample of follow the leader.
+
+Under the default log-optimal estimator the leader is the best constant rebalanced portfolio to date. This is the successive constant rebalanced portfolio (SCRP) of Gaivoronski and Stella (2000).
+
+# Mathematical definition
+
+```math
+\\begin{align}
+C_t &= \\left\\lbrace 1, \\ldots, t \\right\\rbrace\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:C_t_sample])
+  - $(math_dict[:t_period])
 
 # Examples
 
@@ -60,11 +84,12 @@ Prefix()
 
   - [`AbstractSampleSelector`](@ref)
   - [`FollowTheLeader`](@ref)
-  - [`LastRows`](@ref)
+  - [`LastRows`](@ref): the sample of the last `W` periods, which equals this sample while ``t \\leq W``.
 
 # References
 
   - $(ref_dict[:gaivoronski2000])
+  - $(ref_dict[:lihoi2014]) Section 3.2.3.
 """
 struct Prefix <: AbstractSampleSelector end
 function select_rows(::Prefix, X::AbstractMatrix)
@@ -76,9 +101,23 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The Sample Selector of the variable rebalanced portfolio: the last `W` rows, so the re-solve is the best constant rebalanced portfolio of a moving window (Gaivoronski and Stella 2000, VRP).
+Selects the last `W` periods, the sample of the successive variable rebalanced portfolio.
 
-Before `W` rows exist the selection is every row so far, the window filling as the rows arrive: the rule re-solves on what it holds, as the forecast-reading rules read a statistic over the rows they have.
+Under the default log-optimal estimator the leader is the best constant rebalanced portfolio of a moving window. Gaivoronski and Stella (2000) call the rule the successive variable rebalanced portfolio, and Li and Hoi (2014) call it the variable rebalanced portfolio (VRP). Before `W` periods exist the sample is every period so far, as in the paper of Gaivoronski and Stella.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+C_t &= \\left\\lbrace \\max(1,\\, t - W + 1), \\ldots, t \\right\\rbrace\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:C_t_sample])
+  - ``W``: Window of the sample, the `W` field.
+  - $(math_dict[:t_period])
 
 # Fields
 
@@ -106,11 +145,12 @@ LastRows
 
   - [`AbstractSampleSelector`](@ref)
   - [`FollowTheLeader`](@ref)
-  - [`Prefix`](@ref)
+  - [`Prefix`](@ref): the sample of every period so far, which this sample equals while ``t \\leq W``.
 
 # References
 
   - $(ref_dict[:gaivoronski2000])
+  - $(ref_dict[:lihoi2014]) Section 3.2.3.
 """
 struct LastRows{T1 <: Integer} <: AbstractSampleSelector
     """
@@ -135,15 +175,39 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the pattern-matching Sample Selectors: the ones that name the rows whose preceding window of `window` price relatives resembles the latest window.
+Selects the periods whose preceding window resembles the latest window, the pattern-matching family.
+
+The selector compares each candidate period through the window of the `window` periods before it. The latest window holds the last `window` periods, and it precedes the next period, which has no price relative yet. Before `window + 1` periods exist no candidate exists, the sample is empty, and the rule plays the uniform portfolio. Every selector of the family reads every row folded so far.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+C_t &= \\left\\lbrace w < i \\leq t : m\\left(\\boldsymbol{x}_{i-w}^{i-1},\\, \\boldsymbol{x}_{t-w+1}^{t}\\right) \\right\\rbrace\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:C_t_sample])
+  - $(math_dict[:w_win])
+  - $(math_dict[:x_win])
+  - ``m``: Similarity test of the selector, true when a candidate window matches the latest window.
+  - $(math_dict[:t_period])
+
+# Algorithm
+
+The steps of [`select_rows`](@ref) on every selector of the family:
+
+ 1. Call `pattern_candidates` on `sel.window` and `X`, giving the candidate rows `rows`, their flattened windows `cands` and the flattened latest window `latest`. When it returns `nothing`, return the empty vector.
+ 2. Call `matched_rows` on `sel`, `X`, `cands` and `latest`, giving the matched positions.
+ 3. Return `rows` at those positions.
 
 # Interfaces
 
 In order to implement a new pattern-matching selector, subtype `AbstractPatternMatchSelector` with a `window` field and the paper's similarity parameters, and implement:
 
-  - `matched_rows(sel::AbstractPatternMatchSelector, X::AbstractMatrix, cands::AbstractVector, latest::AbstractVector) -> AbstractVector{<:Integer}`: Which of the candidate rows match, from the candidates' flattened preceding windows `cands` — one vector per candidate, the window's rows concatenated — and the latest window flattened the same way.
-
-[`select_rows`](@ref) forms the candidates for it: at `T` rows, the candidate rows are `window + 1` to `T`, each compared through its preceding `window` rows, and the latest window is the last `window` rows. Before `window + 1` rows exist there is no candidate and the selection is empty, which the rule answers with the uniform portfolio. Every selector of the kind reads every row folded so far.
+  - `matched_rows(sel::AbstractPatternMatchSelector, X::AbstractMatrix, cands::AbstractVector, latest::AbstractVector) -> AbstractVector{<:Integer}`: The positions in `cands` of the candidates that match. `cands` holds one flattened window for each candidate, and `latest` is the latest window flattened the same way.
 
 # Related
 
@@ -158,7 +222,18 @@ abstract type AbstractPatternMatchSelector <: AbstractSampleSelector end
 """
     matched_rows(sel::AbstractPatternMatchSelector, X::AbstractMatrix, cands::AbstractVector, latest::AbstractVector)
 
-Which candidate rows a pattern-matching selector matches, as indices into `cands`, the candidates' flattened preceding windows, against `latest`, the latest window flattened the same way.
+Returns the positions of the candidates that a pattern-matching selector matches against the latest window.
+
+# Arguments
+
+  - `sel`: The selector.
+  - `X`: The price relatives that the head holds, for a selector that reads more than the windows.
+  - `cands`: One flattened window for each candidate period, in time order.
+  - `latest`: The latest window, flattened the same way.
+
+# Returns
+
+  - `idx::AbstractVector{<:Integer}`: The positions in `cands` of the matched candidates, increasing.
 
 # Related
 
@@ -172,7 +247,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The candidate rows of a pattern-matching selector and their flattened preceding windows, beside the latest window: rows `window + 1` to `T`, each window the `window` rows before the row concatenated column-major, `nothing` when fewer than `window + 1` rows exist.
+Forms the candidate periods of a pattern-matching selector, their flattened windows and the flattened latest window.
+
+A window flattens column by column, so the entries of one asset stay together.
+
+# Arguments
+
+  - `window`: The number of rows in each window.
+  - `X`: The price relatives, `T × N`, in time order.
+
+# Returns
+
+  - `nothing` when `T <= window`, because no candidate exists.
+  - `(rows, cands, latest)` otherwise. `rows` is `(window + 1):T`. The entry of `cands` for the candidate row `i` is `vec(X[(i - window):(i - 1), :])`. `latest` is `vec(X[(T - window + 1):T, :])`.
 
 # Related
 
@@ -200,7 +287,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuses a window of less than one row.
+Checks that the window of a pattern-matching selector holds at least one row.
+
+# Arguments
+
+  - `window`: The number of rows in each window.
+
+# Validation
+
+  - `window >= 1`. A `DomainError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -213,19 +312,30 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The histogram-based Sample Selector of Györfi and Schäfer (2003): the rows whose preceding window falls in the same cell of a partition of the price relatives as the latest window (BH).
+Selects the periods whose preceding window falls in the same histogram cell as the latest window (BH).
+
+This is the histogram rule of Györfi and Schäfer (2003). The paper quantises each price relative vector by a partition of the positive orthant, and a period matches when its window gives the same string of cell labels as the latest window. The paper leaves the partition to the user. Its consistency theorem asks for a nested sequence of partitions whose cells shrink, and the paper mixes the experts of that sequence by wealth. That mixture is an [`ExpertMixture`](@ref) over [`FollowTheLeader`](@ref) rules with one selector each.
 
 # Mathematical definition
 
-With ``G`` the partition of the positive orthant into product cells, every entry of a window binned by `edges`,
-
 ```math
 \\begin{align}
-C_t &= \\left\\lbrace w < i \\leq t : G\\left(\\boldsymbol{x}_{i-w}^{i-1}\\right) = G\\left(\\boldsymbol{x}_{t-w+1}^{t}\\right) \\right\\rbrace\\,.
+C_t &= \\left\\lbrace w < i \\leq t : G\\left(\\boldsymbol{x}_{i-w}^{i-1}\\right) = G\\left(\\boldsymbol{x}_{t-w+1}^{t}\\right) \\right\\rbrace\\,, \\\\
+G(\\boldsymbol{v})_j &= \\left\\lvert \\left\\lbrace k : e_k \\leq v_j \\right\\rbrace \\right\\rvert\\,.
 \\end{align}
 ```
 
-The paper leaves the partition to the user and asks that a finer one exists; here it is the product of one binning of every entry, an entry's cell being the number of `edges` at or below it. The default `edges = [1]` splits every price relative at one — the asset rose or it fell — so two windows match when every asset moved in the same direction on every row, the coarsest partition that reads the market at all; more edges make a finer partition and a smaller sample.
+Where:
+
+  - $(math_dict[:C_t_sample])
+  - $(math_dict[:w_win])
+  - $(math_dict[:x_win])
+  - ``G``: Cell map, which sends a flattened window to the bin index of each of its entries.
+  - ``e_1 < \\cdots < e_m``: Cell edges, the `edges` field.
+  - ``v_j``: Entry ``j`` of a flattened window ``\\boldsymbol{v}``.
+  - $(math_dict[:t_period])
+
+The bins of every entry form a partition of the positive orthant into products of intervals, which is one partition of the paper's kind. At the default `edges = [1]` the bin of an entry shows whether the asset rose or fell. So two windows match when every asset moved the same way in every period of the window. More edges give a finer partition and a smaller sample.
 
 # Fields
 
@@ -240,7 +350,8 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `window >= 1`. A `DomainError` is thrown otherwise.
-  - `edges` is non-empty, finite and sorted in increasing order. An `ArgumentError` is thrown otherwise.
+  - `!isempty(edges)`. An `IsEmptyError` is thrown otherwise.
+  - `edges` is finite and strictly increasing. An `ArgumentError` is thrown otherwise.
 
 # Examples
 
@@ -255,11 +366,13 @@ HistogramMatch
 
   - [`AbstractPatternMatchSelector`](@ref)
   - [`FollowTheLeader`](@ref)
-  - [`KernelMatch`](@ref)
+  - [`KernelMatch`](@ref): the rule that matches by distance in place of a cell.
+  - [`ExpertMixture`](@ref): the mixture by wealth over a grid of these selectors.
 
 # References
 
   - $(ref_dict[:gyorfischafer2003])
+  - $(ref_dict[:lihoi2014]) Section 3.4.1.
 """
 struct HistogramMatch{T1 <: Integer, T2 <: AbstractVector{<:Real}} <:
        AbstractPatternMatchSelector
@@ -286,7 +399,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The cell of a flattened window under a binning: one bin index per entry, the number of `edges` at or below it.
+Returns the histogram cell of a flattened window, the bin index of each of its entries.
+
+# Arguments
+
+  - `edges`: The cell edges, increasing.
+  - `v`: The flattened window.
+
+# Returns
+
+  - `cell::AbstractVector{<:Integer}`: Entry `j` is the number of `edges` at or below `v[j]`.
 
 # Related
 
@@ -303,17 +425,27 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The kernel-based Sample Selector of Györfi, Lugosi and Udina (2006): the rows whose preceding window lies within `radius` of the latest window, in the Euclidean norm of the concatenated windows, a uniform kernel (BK).
+Selects the periods whose preceding window lies within `radius` of the latest window (BK).
+
+This is the kernel rule of Györfi, Lugosi and Udina (2006) under the uniform kernel, in the Euclidean norm of the flattened windows. The paper's experts run over a grid of windows ``w`` and radii ``c / \\ell``, and the paper mixes them by wealth. That mixture is an [`ExpertMixture`](@ref) over [`FollowTheLeader`](@ref) rules with one selector each, and each selector holds one radius.
+
+Three later rules use this selector under another objective, which the held estimator on the rule's `opt` states. The semi-log-optimal rule of Györfi, Urbán and Vajda (2007) maximises the second-order expansion of the log at one. The Markowitz-type rule of Ottucsák and Vajda (2007) maximises a mean-variance utility. The rule of Györfi and Vajda (2008) compares windows of one period and maximises the log return net of proportional costs.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-C_t &= \\left\\lbrace w < i \\leq t : \\left\\lVert \\boldsymbol{x}_{i-w}^{i-1} - \\boldsymbol{x}_{t-w+1}^{t} \\right\\rVert \\leq r \\right\\rbrace\\,.
+C_t &= \\left\\lbrace w < i \\leq t : \\left\\lVert \\boldsymbol{x}_{i-w}^{i-1} - \\boldsymbol{x}_{t-w+1}^{t} \\right\\rVert_2 \\leq r \\right\\rbrace\\,.
 \\end{align}
 ```
 
-The paper's experts run over a grid of windows and radii `r = c / l` and are aggregated by wealth, which is an [`ExpertMixture`](@ref) over [`FollowTheLeader`](@ref) rules with one selector each; a selector holds one radius. The kernel-based semi-log-optimal (Györfi, Urbán and Vajda 2007), Markowitz-type (Ottucsák and Vajda 2007) and transaction-cost (Györfi and Vajda 2008) rules are this selector under another objective on the rule's `opt`.
+Where:
+
+  - $(math_dict[:C_t_sample])
+  - $(math_dict[:w_win])
+  - $(math_dict[:x_win])
+  - ``r``: Radius of the uniform kernel, the `radius` field.
+  - $(math_dict[:t_period])
 
 # Fields
 
@@ -323,7 +455,7 @@ $(DocStringExtensions.FIELDS)
 
     KernelMatch(; window::Integer = 5, radius::Real) -> KernelMatch
 
-Keywords correspond to the struct's fields. The radius has no paper default: the papers scan it, and its scale is the scale of a window of price relatives.
+Keywords correspond to the struct's fields. The radius has no default, because the papers scan it. Its scale is the scale of a window of price relatives.
 
 ## Validation
 
@@ -343,7 +475,8 @@ KernelMatch
 
   - [`AbstractPatternMatchSelector`](@ref)
   - [`FollowTheLeader`](@ref)
-  - [`NearestNeighbourMatch`](@ref)
+  - [`NearestNeighbourMatch`](@ref): the rule that keeps a count of the nearest windows in place of a radius.
+  - [`ExpertMixture`](@ref): the mixture by wealth over a grid of these selectors.
 
 # References
 
@@ -378,17 +511,30 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The nearest-neighbour Sample Selector of Györfi, Udina and Walk (2008): the rows whose preceding window is among the `neighbours` nearest to the latest window, in the Euclidean norm of the concatenated windows (BNN).
+Selects the periods whose preceding windows are the `neighbours` nearest to the latest window (BNN).
+
+This is the nearest-neighbour rule of Györfi, Udina and Walk (2008), in the Euclidean norm of the flattened windows. The paper invests at period ``n = t + 1`` with ``\\lfloor p\\, n \\rfloor`` neighbours, a count that grows with the history. So `neighbours` is an `Integer` count or a fraction in `(0, 1)`. The fraction applies to the ``t - w`` candidates and not to the period, so the count never exceeds the candidates. It is below the paper's count by at most ``\\lceil p (w + 1) \\rceil``. A fraction that rounds down to zero gives the empty sample. The paper assumes that ties have zero probability. Here the earlier period wins a tie at the boundary.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-C_t &= \\left\\lbrace w < i \\leq t : \\boldsymbol{x}_{i-w}^{i-1} \\text{ is among the } \\ell \\text{ nearest neighbours of } \\boldsymbol{x}_{t-w+1}^{t} \\right\\rbrace\\,.
+C_t &= \\left\\lbrace w < i \\leq t : \\boldsymbol{x}_{i-w}^{i-1} \\text{ is one of the } \\ell \\text{ windows nearest to } \\boldsymbol{x}_{t-w+1}^{t} \\right\\rbrace\\,, \\\\
+\\ell &= \\begin{cases} \\min(k,\\, t - w) & \\text{for a count } k\\,, \\\\ \\lfloor p\\, (t - w) \\rfloor & \\text{for a fraction } p\\,. \\end{cases}
 \\end{align}
 ```
 
-The paper takes ``\\ell = \\lfloor p_\\ell\\, n \\rfloor`` neighbours at period ``n``, a count that grows with the history, so `neighbours` is either an `Integer` count or a fraction in `(0, 1)`. The fraction is taken of the candidate rows, ``n - 1 - w`` of them, and not of the period, so the count never exceeds the candidates and is below the paper's by at most ``\\lceil p_\\ell (w + 1) \\rceil``; a fraction that rounds to no neighbour is the empty selection. Ties at the boundary are broken by the order of the rows.
+Where:
+
+  - $(math_dict[:C_t_sample])
+  - $(math_dict[:w_win])
+  - $(math_dict[:x_win])
+  - ``\\ell``: Neighbour count at period ``t``.
+  - ``k``: Count, the `neighbours` field when it is an `Integer`.
+  - ``p``: Fraction, the `neighbours` field when it is a real in `(0, 1)`.
+  - $(math_dict[:t_period])
+
+The distance between two windows is the Euclidean norm of their difference.
 
 # Fields
 
@@ -403,7 +549,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `window >= 1`. A `DomainError` is thrown otherwise.
-  - `neighbours`: an `Integer` at least `1`, or a real in `(0, 1)`. A `DomainError` is thrown otherwise.
+  - `neighbours >= 1` for an `Integer`, and `0 < neighbours < 1` for another real. A `DomainError` is thrown otherwise.
 
 # Examples
 
@@ -418,7 +564,7 @@ NearestNeighbourMatch
 
   - [`AbstractPatternMatchSelector`](@ref)
   - [`FollowTheLeader`](@ref)
-  - [`KernelMatch`](@ref)
+  - [`KernelMatch`](@ref): the rule that keeps every window within a radius in place of a count.
 
 # References
 
@@ -430,7 +576,7 @@ struct NearestNeighbourMatch{T1 <: Integer, T2 <: Real} <: AbstractPatternMatchS
     """
     window::T1
     """
-    The neighbours kept: an `Integer` count, or a fraction in `(0, 1)` of the candidate rows.
+    The number of neighbours to keep, an `Integer` count or a fraction in `(0, 1)` of the candidate rows.
     """
     neighbours::T2
     function NearestNeighbourMatch(window::Integer, neighbours::Real)
@@ -453,7 +599,16 @@ end
     neighbour_count(neighbours::Integer, n::Integer)
     neighbour_count(neighbours::Real, n::Integer)
 
-The number of neighbours kept out of `n` candidates: a count capped at `n`, or the floor of a fraction of `n`.
+Returns the number of neighbours that a nearest-neighbour selector keeps out of `n` candidates.
+
+# Arguments
+
+  - `neighbours`: The count, an `Integer`, or the fraction, a real in `(0, 1)`.
+  - `n`: The number of candidates.
+
+# Returns
+
+  - `l::Integer`: `min(neighbours, n)` for a count, and `floor(Int, neighbours * n)` for a fraction.
 
 # Related
 
@@ -477,17 +632,34 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The correlation-driven Sample Selector of Li, Hoi and Gopalkrishnan (2011): the rows whose preceding window correlates with the latest window at `rho` or above, the Pearson correlation of the two concatenated windows (CORN).
+Selects the periods whose preceding window correlates with the latest window at `rho` or more (CORN).
+
+This is the correlation-driven rule of Li, Hoi and Gopalkrishnan (2011). The correlation is the Pearson correlation of the two flattened windows.
+
+The paper's CORN-U mixes the experts of the windows 1 to ``W`` at one threshold, from a uniform start and by wealth. Its CORN-K runs over the windows 1 to ``W`` and the thresholds ``0, 1/P, \\ldots, (P - 1)/P``, and it keeps the ``K`` wealthiest experts, weighted by wealth. Both are an [`ExpertMixture`](@ref) over [`FollowTheLeader`](@ref) rules with one selector each, CORN-K under the [`TopK`](@ref) weighting. The paper sets ``W = 5``, ``P = 10`` and ``K = 5``, and it runs CORN-U at the threshold 0.1 with no tuning. The defaults of one selector take the window 5 and the threshold 0.1 from these values.
+
+Wang, Wang, Wang and Zhang (2018) add a risk penalty to each expert (RACORN-K). Their programme maximises the mean log return over the sample less ``\\lambda`` times the standard deviation of the log return ``\\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_i \\rangle``. Their experts run over windows, thresholds and values of ``\\lambda``, and the wealthiest tenth of them combine as in CORN-K. The nearest programme of the library is [`MeanRisk`](@ref) under [`MaximumUtility`](@ref) at `l = λ` over [`StandardDeviation`](@ref), with [`LogarithmicReturn`](@ref). It penalises the standard deviation of the return ``\\langle \\boldsymbol{w}, \\boldsymbol{x}_i \\rangle - 1`` in place of the log return, and the two penalties agree to the first order in the return.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-C_t &= \\left\\lbrace w < i \\leq t : \\operatorname{corr}\\left(\\boldsymbol{x}_{i-w}^{i-1},\\, \\boldsymbol{x}_{t-w+1}^{t}\\right) \\geq \\rho \\right\\rbrace\\,.
+C_t &= \\left\\lbrace w < i \\leq t : \\rho\\left(\\boldsymbol{x}_{i-w}^{i-1},\\, \\boldsymbol{x}_{t-w+1}^{t}\\right) \\geq \\bar{\\rho} \\right\\rbrace\\,, \\\\
+\\rho(\\boldsymbol{u}, \\boldsymbol{v}) &= \\begin{cases} \\dfrac{\\operatorname{cov}(\\boldsymbol{u}, \\boldsymbol{v})}{\\sigma(\\boldsymbol{u})\\, \\sigma(\\boldsymbol{v})} & \\text{if } \\sigma(\\boldsymbol{u})\\, \\sigma(\\boldsymbol{v}) > 0\\,, \\\\ 0 & \\text{otherwise}\\,. \\end{cases}
 \\end{align}
 ```
 
-A window with no variation has no correlation and never matches. The paper's `CORN-U` mixes the experts of windows `1` to `W` uniformly by wealth and `CORN-K` keeps the top `K`, both an [`ExpertMixture`](@ref) over [`FollowTheLeader`](@ref) rules with one selector each; the defaults are the paper's `w = 5`, `ρ = 0.1`. The risk-aversion rule of Wang, Wang, Wang and Zhang (2018) is the same selector under a standard-deviation penalty on the log return — [`MeanRisk`](@ref) with a [`MaximumUtility`](@ref) objective over [`StandardDeviation`](@ref) under [`LogarithmicReturn`](@ref) on the rule's `opt` — one expert per threshold, and the [`TopK`](@ref) weighting over them (RACORN-K).
+Where:
+
+  - $(math_dict[:C_t_sample])
+  - $(math_dict[:w_win])
+  - $(math_dict[:x_win])
+  - ``\\rho(\\boldsymbol{u}, \\boldsymbol{v})``: Correlation of two flattened windows, taken over their entries.
+  - ``\\operatorname{cov}``, ``\\sigma``: Covariance and standard deviation over the entries of a flattened window.
+  - ``\\bar{\\rho}``: Threshold, the `rho` field.
+  - $(math_dict[:t_period])
+
+A window with no variation correlates at zero, as the paper sets it. So it matches at a threshold of zero or less, and at no positive threshold.
 
 # Fields
 
@@ -517,12 +689,13 @@ CorrelationMatch
 
   - [`AbstractPatternMatchSelector`](@ref)
   - [`FollowTheLeader`](@ref)
-  - [`ExpertMixture`](@ref)
+  - [`ExpertMixture`](@ref): CORN-U and CORN-K combine rules over this selector.
+  - [`TopK`](@ref): the weighting of CORN-K and RACORN-K.
 
 # References
 
-  - $(ref_dict[:li2011corn])
-  - $(ref_dict[:wang2018racorn])
+  - $(ref_dict[:li2011corn]) Equation 6, Algorithms 1 to 3 and Section 5.2.
+  - $(ref_dict[:wang2018racorn]) Equation 3.
 """
 struct CorrelationMatch{T1 <: Integer, T2 <: Real} <: AbstractPatternMatchSelector
     """
@@ -546,15 +719,41 @@ function matched_rows(sel::CorrelationMatch, ::AbstractMatrix, cands::AbstractVe
                       latest::AbstractVector)
     return findall(cands) do c
         r = Statistics.cor(c, latest)
-        return isfinite(r) && r >= sel.rho
+        # A window with no variation has no correlation, and the paper sets it to zero.
+        return ifelse(isnan(r), zero(r), r) >= sel.rho
     end
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The cluster-based Sample Selector of Khedmati and Azin (2020): the rows whose preceding window falls in the same cluster as the latest window, the windows clustered by one of the library's clustering estimators (KMNLOG).
+Selects the periods whose preceding window falls in the same cluster as the latest window (KMNLOG).
 
-The candidate windows and the latest one are laid out as the columns of one matrix, each window's rows concatenated, and handed to the clusterer as the units it partitions; a candidate whose label is the latest window's is selected. The paper clusters the windows by k-means, k-medoids, spectral and hierarchical methods; the slot is bound to the library's [`AbstractClustersEstimator`](@ref), which partitions its units through a distance the estimator forms from them, `KMeansAlgorithm` and `HClustAlgorithm` among its algorithms. The paper's transaction-cost term is the `fees` slot of the rule's `opt`. Fewer than two candidates cannot be partitioned and are the empty selection.
+This follows the cluster-based rule of Khedmati and Azin (2020). The paper clusters the windows by k-means (KMNLOG), k-medoids (KMDLOG), spectral clustering (SPCLOG) and hierarchical clustering (HRCLOG). The `clusterer` field takes one of the library's clustering estimators, which partitions the windows through a distance that it forms from them. [`KMeansAlgorithm`](@ref) and [`HClustAlgorithm`](@ref) are among its algorithms. The paper puts a transaction cost into its programme, and the `fees` slot of the rule's `opt` holds that cost. Fewer than two candidates cannot be partitioned, so they give the empty sample.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+C_t &= \\left\\lbrace w < i \\leq t : \\kappa\\left(\\boldsymbol{x}_{i-w}^{i-1}\\right) = \\kappa\\left(\\boldsymbol{x}_{t-w+1}^{t}\\right) \\right\\rbrace\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:C_t_sample])
+  - $(math_dict[:w_win])
+  - $(math_dict[:x_win])
+  - ``\\kappa``: Cluster label of a window, from one clustering of the ``t - w`` candidate windows and the latest window together.
+  - $(math_dict[:t_period])
+
+# Algorithm
+
+The steps of `matched_rows` on this selector:
+
+ 1. When `cands` holds fewer than two windows, return the empty vector.
+ 2. Lay the candidate windows and `latest` out as the columns of `M`, with `latest` in the last column.
+ 3. Cluster the columns of `M` with `clusterise` on `sel.clusterer`, giving `labels`.
+ 4. Return the positions of the candidates whose label is the label of `latest`.
 
 # Fields
 
@@ -584,8 +783,9 @@ julia> ClusterMatch(; clusterer = ClustersEstimator()).window
 
   - [`AbstractPatternMatchSelector`](@ref)
   - [`FollowTheLeader`](@ref)
-  - [`ClustersEstimator`](@ref)
-  - [`KMeansAlgorithm`](@ref)
+  - [`ClustersEstimator`](@ref): the default clusterer.
+  - [`KMeansAlgorithm`](@ref): the default algorithm of the clusterer, the paper's KMNLOG.
+  - [`HClustAlgorithm`](@ref): the paper's HRCLOG.
 
 # References
 
@@ -628,9 +828,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The Allocation Set Constraint: the adapter through which a [`FollowTheLeader`](@ref) rule's re-solve honours the head's Allocation Set.
+Adds the head's Allocation Set to the programme of a follow-the-leader re-solve, the Allocation Set Constraint.
 
-It wraps the resolved set, the step's Price-Adjusted Allocation and the head's rows as a [`CustomJuMPConstraint`](@ref), which the rule appends to its held optimiser's `ccnt` for that solve; [`add_custom_constraint!`](@ref) on it calls [`add_allocation_set_constraints!`](@ref), the set's own builders on the leader's model, so the programme's feasible region is the set intersected with whatever the held optimiser carries itself. The turnover ceiling measures from the Price-Adjusted Allocation and the variance ceiling and tracking error read the set's own `pe` on the head's rows, as they do in a projection. Both homes hold: a caller who wants one leaves the held optimiser bare of constraints and writes them on the set.
+The type is a [`CustomJuMPConstraint`](@ref) that holds the resolved set, the Price-Adjusted Allocation of the step and the head's rows. A [`FollowTheLeader`](@ref) rule appends it to the `ccnt` of its held optimiser for one solve. [`add_custom_constraint!`](@ref) on it calls [`add_allocation_set_constraints!`](@ref), which runs the set's own builders on the leader's model. So the feasible region of the programme is the set intersected with the region of the held optimiser. The turnover ceiling measures from the Price-Adjusted Allocation. The variance ceiling and the tracking error read the set's own `pe` on the head's rows, as they do in a projection. A constraint can live on the set or on the held optimiser, and a caller who wants one home leaves the other bare.
 
 # Fields
 
@@ -638,15 +838,15 @@ $(DocStringExtensions.FIELDS)
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets: `set` through its own view, against the carrier's unreduced returns matrix where there is one, as a tracking estimator's view asks; `w` sliced; `X` through the carrier's view. The held estimator's reduction to its Investable Mask views its `ccnt` with the rest of the optimiser, so the set the leader honours travels with the reduced programme instead of being dropped, as a custom constraint with no view is.
+When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets. `set` takes its own view, against the unreduced returns matrix of the carrier when one exists, because the view of a tracking estimator asks for it. The view slices `w`, and `X` takes the view of the carrier. The reduction of the held estimator to its Investable Mask views its `ccnt` with the rest of the optimiser. So the set stays in the reduced programme. A custom constraint with no view drops out of it.
 
 # Related
 
   - [`FollowTheLeader`](@ref)
-  - [`add_allocation_set_constraints!`](@ref)
+  - [`add_allocation_set_constraints!`](@ref): the builders that this constraint calls.
   - [`CustomJuMPConstraint`](@ref)
   - [`AbstractAllocationSet`](@ref)
-  - [`investable_reduction`](@ref)
+  - [`investable_reduction`](@ref): the reduction that views this constraint with the held optimiser.
 """
 struct AllocationSetConstraint{T1 <: AbstractAllocationSet, T2 <: AbstractVector,
                                T3 <: Option{<:ReturnsResult}} <: CustomJuMPConstraint
@@ -679,28 +879,81 @@ end
 """
     const LeaderOptimiser = Union{<:BestConstantRebalancedPortfolio, <:JuMPOptimisationEstimator}
 
-The optimisation estimators a [`FollowTheLeader`](@ref) rule re-solves: the solver-free [`BestConstantRebalancedPortfolio`](@ref), and any JuMP head, whose `ccnt` takes the [`AllocationSetConstraint`](@ref).
+Groups the optimisation estimators that a follow-the-leader rule can re-solve under the head's Allocation Set.
+
+A leader of a [`FollowTheLeader`](@ref) rule must honour the set. The solver-free [`BestConstantRebalancedPortfolio`](@ref) takes a bounded set on its own `wb` and `sets` slots. A JuMP estimator takes any set through the [`AllocationSetConstraint`](@ref) on its `ccnt`. No other estimator has a slot for the set, so the alias excludes it.
 
 # Related
 
   - [`FollowTheLeader`](@ref)
+  - [`BestConstantRebalancedPortfolio`](@ref)
+  - [`JuMPOptimisationEstimator`](@ref)
 """
 const LeaderOptimiser = Union{<:BestConstantRebalancedPortfolio,
                               <:JuMPOptimisationEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 
-The follow-the-leader rule: at every period, the optimisation estimator on `opt` is re-solved on the past rows the Sample Selector on `sel` names, and the answer is the solved allocation damped towards the current one, ``(1 - \\gamma)\\, \\boldsymbol{w}^\\star_t + \\gamma\\, \\boldsymbol{w}_t``.
+Re-solves an optimisation estimator on a sample of past periods at every step, the follow-the-leader rule.
 
-Every solved row of the literature is this rule under one selector and one objective. [`Prefix`](@ref) with the log-optimal objective is follow the leader, the successive constant rebalanced portfolio of Gaivoronski and Stella (2000), and `gamma > 0` their weighted one (WSCRP); [`LastRows`](@ref) is their variable rebalanced portfolio; the pattern-matching selectors are the histogram, kernel, nearest-neighbour, correlation and cluster rules, whose papers aggregate a grid of selectors by wealth — an [`ExpertMixture`](@ref) over rules of this kind. The objective is the held estimator's: [`BestConstantRebalancedPortfolio`](@ref), the default, is the log-optimal portfolio with no solver, and [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref) is the same programme on a solver, where `L2Regularisation(; val = 1 / (2n), alg = QuadRiskExpr())` on `n` selected rows is the exp-concave leader of Hazan and Kale (2012) — the log return is the mean over the rows, so the paper's ``\\tfrac{1}{2} \\lVert \\boldsymbol{w} \\rVert^2`` against the sum of the logs is `1 / (2n)` against their mean, and one fixed `val` is that leader at one sample size alone — a [`MaximumUtility`](@ref) objective over a risk the Markowitz-type row, a quadratic objective the semi-log-optimal row, and `fees` the cost-aware row.
+The Sample Selector on `sel` names the sample, and the estimator on `opt` solves on it. The solution is the leader. The rule plays the leader, or at `gamma > 0` the leader damped towards the allocation that it held.
 
-The solver-free default runs Cover's fixed point, which stops on a certificate that bounds the shortfall of its log wealth from the leader's. At a leader that drops an asset the weight of that asset decays sublinearly, so the default budget can stop before the certificate meets `tol`: on thirty rows of four assets with 2 % Gaussian returns it stops `7e-2` from the leader in weight and `6e-5` in log wealth. The rule then warns once that the leader stopped short, and names the certificate. With a budget of ten million steps the certificate meets `tol = 1e-12` after 1.4 million steps, `2e-9` from the leader in weight. The solved form on a JuMP head is exact to the solver's tolerance, and an interior leader is exact under both.
+Every solved rule of the online selection literature is this rule under one selector and one objective. [`Prefix`](@ref) under the log-optimal objective is follow the leader, the successive constant rebalanced portfolio of Gaivoronski and Stella (2000). At `gamma > 0` it is their weighted rule (WSCRP). [`LastRows`](@ref) gives their successive variable rebalanced portfolio. The pattern-matching selectors give the histogram, kernel, nearest-neighbour, correlation and cluster rules. The papers of those rules mix a grid of selectors by wealth, which is an [`ExpertMixture`](@ref) over rules of this kind.
 
-**The re-solve takes the head's Allocation Set as its feasible region.** The update forms the step's Price-Adjusted Allocation, wraps the resolved set, that allocation and the head's rows into an [`AllocationSetConstraint`](@ref), appends it to the held JuMP estimator's `ccnt` for the solve, threads the allocation through [`factory`](@ref) as a fold loop does — so a turnover term or a fee on `opt` reads the same book — and takes the optimum as it is, with no projection: the projected leader is not the leader. The solver-free [`BestConstantRebalancedPortfolio`](@ref) has no model to add to, so a [`BoundedAllocationSet`](@ref) goes into its `wb` and `sets` and the answer is its repaired fixed point, and a [`ProgrammeAllocationSet`](@ref) is refused by name at the head's construction: the constrained leader under a programme set is [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref).
+The objective is the held estimator's. [`BestConstantRebalancedPortfolio`](@ref), the default, is the log-optimal portfolio with no solver. [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref) solves the same programme on a solver. Under [`Prefix`](@ref) and on the simplex, that estimator with `l2 = L2Regularisation(; val = 1 / (2t), alg = QuadRiskExpr())` on its [`JuMPOptimiser`](@ref) and ``t`` rows is the Exp-Concave-FTL of Hazan and Kale (2015). The paper subtracts ``\\tfrac{1}{2} \\lVert \\boldsymbol{w} \\rVert^2`` from the sum of the log returns, and [`LogarithmicReturn`](@ref) states their mean, so the weight is ``1 / (2t)``. One fixed `val` is that leader at one sample size alone. [`MaximumUtility`](@ref) over a risk measure gives a mean-risk leader, and `fees` on the estimator gives a cost-aware leader.
 
-**Only the damped mix is projected**, in the Euclidean geometry on `proj`, with the Price-Adjusted Allocation as the reference: the identity on every static convex kind, the repair a turnover ceiling or a MIP kind needs on the day the mix leaves the set, skipped by type on a [`BoundedAllocationSet`](@ref) and at `gamma = 0`. An empty selection, or one too small for the estimator — a JuMP head fits a covariance and needs two rows — answers the uniform portfolio projected onto the set in the same geometry, as the papers do; [`LastRows`](@ref) re-solves on the rows it has until its window fills, and a pattern-matching selector has no candidate until `window + 1` rows exist. A re-solve that does not succeed after the held estimator's own fallback chain is a Held Step: the update answers the Price-Adjusted Allocation, so the fund trades nothing that period.
+The solver-free default runs Cover's fixed point, which stops on a certificate, a bound on the shortfall of its log wealth from the leader's. At a leader that drops an asset, the weight of that asset decays slowly. So the default budget can stop before the certificate meets `tol`, and the rule then warns once and names the certificate. On the first 30 rows of the returns `0.02 .* randn(StableRNG(11), 40, 4)` the default stops 0.066 from the leader in weight and 6.2e-5 short of it in log wealth. At `iters = 10_000_000` the certificate meets `tol = 1e-12` after 1 437 030 steps, 1.6e-9 from the leader in weight. A JuMP head solves the leader to the solver's tolerance, and the two forms agree to that tolerance at a leader inside the simplex.
 
-**Under a time-varying panel the re-solve is the batch path.** The selected rows reach the estimator as the head's rows carrier viewed at them — returns verbatim, `NaN` where there was no return, the active mask beside them — so the estimator reduces to its own universe as it does on any carrier and writes a zero at every asset outside it: the Coverage Universe of the selected rows for the solver-free leader and any prior-free head, the Investable Mask of its prior for a JuMP head. A leg unlisted for part of the selection is outside a plain estimator's universe until the selection clears the span, which a [`Prefix`](@ref) never does and a [`LastRows`](@ref) does once its window has passed the listing; a mask-aware prior admits it from its own warm-up. The selector itself is a kernel over price relatives and reads a gap as one, the leg sat in cash, so a window that straddles a listing is compared as such rather than dropped. The damped mix and the projection read the zero the leader answers at such a leg exactly as they read a zero the recursion parked.
+**The re-solve takes the head's Allocation Set as its feasible region.** The rule wraps the set, the Price-Adjusted Allocation and the head's rows into an [`AllocationSetConstraint`](@ref), and appends it to the `ccnt` of the held JuMP estimator for the solve. It passes the Price-Adjusted Allocation through [`factory`](@ref) as a fold loop does, so a turnover term or a fee on `opt` reads the same book. It plays the optimum with no projection, because the projected leader is not the leader. The solver-free estimator has no model. So a [`BoundedAllocationSet`](@ref) goes into its `wb` and `sets`, and the rule plays its repaired fixed point. The head refuses a [`ProgrammeAllocationSet`](@ref) over the solver-free estimator at construction. Under a programme set the constrained leader is [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref).
+
+**The rule projects the damped mix alone.** It uses the Euclidean geometry on `proj`, with the Price-Adjusted Allocation as the reference. On a static convex set the projection returns the mix unchanged. A turnover ceiling or a MIP kind needs the repair on a day when the mix leaves the set. The rule skips the projection by type on a [`BoundedAllocationSet`](@ref), and at `gamma = 0`. An empty sample, or a sample too small for the estimator, gives the uniform portfolio projected onto the set, as the papers do. A JuMP head fits a covariance, so it needs two rows. A re-solve that fails after the fallback chain of the held estimator is a Held Step. The rule then plays the Price-Adjusted Allocation, so the fund trades nothing that period.
+
+**Under a time-varying panel the re-solve is the batch path.** The estimator reads the head's rows carrier viewed at the sample, with the returns as they are, `NaN` where no return exists, and the active mask. So the estimator reduces to its own universe, as it does on any carrier, and writes a zero at every asset outside it. That universe is the Coverage Universe of the sample for the solver-free leader and for a head with no prior, and the Investable Mask of its prior for a JuMP head. An asset that is not listed for a part of the sample stays outside the universe of a plain estimator until the sample clears that span. A [`Prefix`](@ref) sample never clears it, and a [`LastRows`](@ref) sample clears it when its window has passed the listing. A prior that reads the mask admits the asset after its own warm-up. The selector reads a gap as a price relative of one, as if the asset sat in cash, so it compares a window that spans a listing and does not drop it. The damped mix and the projection read a zero from the leader at such an asset as they read any other zero.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{w}^\\star_t &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\max}\\; \\sum_{i \\in C_t} \\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_i \\rangle\\,, \\\\
+\\boldsymbol{w}_{t+1} &= \\mathrm{Proj}_{\\mathcal{W}}\\left( (1 - \\gamma)\\, \\boldsymbol{w}^\\star_t + \\gamma\\, \\boldsymbol{w}_t \\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_star_lead]) The first line is the leader under the default log-optimal estimator. Another estimator on `opt` replaces the objective.
+  - $(math_dict[:w_var_lead])
+  - $(math_dict[:W_aset])
+  - $(math_dict[:C_t_sample])
+  - $(math_dict[:x_t_rel])
+  - $(math_dict[:w_t_iter])
+  - ``\\gamma``: Damping towards the held allocation, in ``[0, 1]``, the `gamma` field.
+  - $(math_dict[:Proj_W_euclid])
+  - $(math_dict[:t_period])
+
+At ``\\gamma = 0`` the rule plays the leader. The leader lies in ``\\mathcal{W}``, so the mix leaves ``\\mathcal{W}`` only when ``\\boldsymbol{w}_t`` is outside it, as under a turnover ceiling, or when ``\\mathcal{W}`` is not convex, as under a cardinality bound. Under the log-optimal estimator and [`Prefix`](@ref), the leader on ``\\mathcal{W} = \\Delta_N`` is the best constant rebalanced portfolio of the first ``t`` periods. The Exp-Concave-FTL of Hazan and Kale is
+
+```math
+\\begin{align}
+\\boldsymbol{w}^\\star_t &= \\underset{\\boldsymbol{w} \\in \\Delta_N}{\\arg\\max}\\; \\sum_{i=1}^{t} \\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_i \\rangle - \\frac{1}{2} \\lVert \\boldsymbol{w} \\rVert_2^2\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:Delta_N_simplex])
+  - $(math_dict[:N])
+
+# Algorithm
+
+The steps of the Online Update:
+
+ 1. Compute `wh`, the Price-Adjusted Allocation of `w` over `x`.
+ 2. Select `idx`, the rows of the sample, with `select_rows` on `alg.sel` and the price relatives of `rows`.
+ 3. When `idx` holds fewer rows than `leader_min_rows(alg.opt)`, set `wstar` to the uniform portfolio projected onto `set` with `alg.proj`, from `wh`. Otherwise set `wstar` to the result of `leader_allocation` on `alg.opt`, the view of `rows` at `idx`, `wh`, `set` and `rows`.
+ 4. When `wstar` is `nothing`, the step is a Held Step. Return the carrier `st` and a copy of `wh`.
+ 5. When `alg.gamma` is zero, return `st` and `wstar`.
+ 6. Set `mix` to `(1 - alg.gamma) .* wstar .+ alg.gamma .* w`. Return `st` and the result of `blend_projection` of `mix` onto `set` with `alg.proj`, from `wh`.
 
 # Fields
 
@@ -752,17 +1005,18 @@ FollowTheLeader
   - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
   - [`OnlinePortfolioSelection`](@ref)
   - [`AbstractSampleSelector`](@ref)
-  - [`AllocationSetConstraint`](@ref)
-  - [`BestConstantRebalancedPortfolio`](@ref)
-  - [`ExpertMixture`](@ref)
+  - [`AllocationSetConstraint`](@ref): the adapter that adds the head's set to the programme.
+  - [`BestConstantRebalancedPortfolio`](@ref): the default estimator.
+  - [`ExpertMixture`](@ref): the mixture by wealth over a grid of these rules.
   - [`FollowTheLeadingHistory`](@ref)
-  - [`ShortTermLossControlPortfolio`](@ref)
+  - [`ShortTermLossControlPortfolio`](@ref): this rule over [`LastRows`](@ref) under a loss-control programme.
+  - [`LowDimensionEnsemblePortfolio`](@ref): this rule over [`LastRows`](@ref) under an ensemble forecast.
 
 # References
 
   - $(ref_dict[:gaivoronski2000])
-  - $(ref_dict[:hazankale2012])
-  - $(ref_dict[:lihoi2014])
+  - $(ref_dict[:hazankale2012]) Section 2.2, Equation 1.
+  - $(ref_dict[:lihoi2014]) Sections 3.2.3 and 3.4.
 """
 struct FollowTheLeader{T1 <: AbstractSampleSelector, T2 <: LeaderOptimiser, T3 <: Real,
                        T4 <: EuclideanProjection} <:
@@ -776,7 +1030,7 @@ struct FollowTheLeader{T1 <: AbstractSampleSelector, T2 <: LeaderOptimiser, T3 <
     """
     opt::T2
     """
-    The damping towards the current allocation, in `[0, 1]`; `0` plays the solved allocation.
+    The damping towards the held allocation, in `[0, 1]`. At `0` the rule plays the leader.
     """
     gamma::T3
     """
@@ -813,7 +1067,17 @@ end
 """
     leader_min_rows(opt::LeaderOptimiser)
 
-The fewest selected rows the held estimator re-solves on: two for an estimator whose tree holds a second moment, whose covariance of one observation does not exist, one otherwise, and the floor any estimator in the tree states through [`fit_min_rows`](@ref) where that is larger.
+Returns the fewest sample rows on which the held estimator can re-solve.
+
+An estimator whose tree holds a second moment needs two rows, because the covariance of one observation does not exist. Any estimator in the tree can state a larger floor through [`fit_min_rows`](@ref).
+
+# Arguments
+
+  - `opt`: The held estimator.
+
+# Returns
+
+  - `n::Integer`: The larger of `2` for a tree that holds a second moment, `1` otherwise, and `fit_min_rows(opt)`.
 
 # Related
 
@@ -829,7 +1093,16 @@ end
     append_custom_constraint(ccnt::CustomJuMPConstraint, c::CustomJuMPConstraint)
     append_custom_constraint(ccnt::AbstractVector{<:CustomJuMPConstraint}, c::CustomJuMPConstraint)
 
-The held estimator's custom constraints with the [`AllocationSetConstraint`](@ref) appended: the constraint alone, a vector of two, or the vector with one more.
+Appends the Allocation Set Constraint to the custom constraints of the held estimator.
+
+# Arguments
+
+  - `ccnt`: The custom constraints of the held estimator, `nothing`, one constraint, or a vector of them.
+  - `c`: The [`AllocationSetConstraint`](@ref) to append.
+
+# Returns
+
+  - `c` alone when `ccnt` is `nothing`, the vector `[ccnt, c]` for one constraint, and `vcat(ccnt, c)` for a vector.
 
 # Related
 
@@ -849,11 +1122,37 @@ end
     leader_allocation(opt::BestConstantRebalancedPortfolio, rd::ReturnsResult, w::AbstractVector, set::BoundedAllocationSet, X)
     leader_allocation(opt::JuMPOptimisationEstimator, rd::ReturnsResult, w::AbstractVector, set::AbstractAllocationSet, X)
 
-The leader: the held estimator re-solved on the selected rows, the carrier `rd`, under the head's set, or `nothing` on a Held Step.
+Re-solves the held estimator on the sample under the head's Allocation Set, and returns the leader, or `nothing` on a Held Step.
 
-`rd` is the head's rows carrier viewed at the selected rows — the returns verbatim, `NaN` where there was no return, under the pinned names and the buffer's Asset Panel — so the estimator runs the batch path it runs on any carrier: a prior-free head reduces to the Coverage Universe of the selected rows, a prior-fitting one to the Investable Mask of its prior, and both answer a zero at every asset outside it. A leg unlisted for part of the selection is therefore outside a plain estimator's universe until the selection clears the span, which a [`Prefix`](@ref) selection never does, and inside a mask-aware prior's from its own warm-up.
+The estimator runs the batch path that it runs on any carrier. An estimator with no prior reduces to the Coverage Universe of the sample, an estimator with a prior reduces to the Investable Mask of its prior, and both return a zero at every asset outside it. A leader that stopped short of its certificate still trades, so the solver-free method warns and plays the fixed point.
 
-The solver-free arm takes the bounded set's `wb` and `sets` onto the fixed point's own slots and answers the repaired fixed point. When the fixed point stops at `iters` before its certificate meets `tol`, the arm warns once, with the certificate, and still answers the fixed point: a leader that stopped short still trades. The JuMP arm threads the Price-Adjusted Allocation `w` through [`factory`](@ref), appends the [`AllocationSetConstraint`](@ref) over the set, `w` and the head's rows carrier `X` to the estimator's `ccnt`, and takes the optimum as it is; a result whose retcode is not an [`OptimisationSuccess`](@ref) records a Held Step through [`record_held_step!`](@ref) with the solver's trials and answers `nothing`.
+# Algorithm
+
+The solver-free method:
+
+ 1. Build `bcrp`, a copy of `opt` whose `wb` and `sets` are those of `set`.
+ 2. Optimise `factory(bcrp, w)` on `rd`, giving `res`.
+ 3. When the fixed point stopped at `iters` before its certificate met `tol`, warn once and name the certificate.
+ 4. Return `res.w`.
+
+The JuMP method:
+
+ 1. Pass `w` into `opt` with [`factory`](@ref).
+ 2. Append an [`AllocationSetConstraint`](@ref) over `set`, `w` and `X` to the `ccnt` of the estimator.
+ 3. Optimise on `rd`, giving `res`. When its retcode is an [`OptimisationSuccess`](@ref), return `res.w`.
+ 4. Otherwise record a Held Step through [`record_held_step!`](@ref) with the trials of the solver, and return `nothing`.
+
+# Arguments
+
+  - `opt`: The held estimator.
+  - `rd`: The head's rows carrier viewed at the sample. It holds the returns as they are, `NaN` where no return exists, under the pinned names and the Asset Panel of the buffer.
+  - `w`: The Price-Adjusted Allocation of the step.
+  - `set`: The resolved Allocation Set of the head, a [`BoundedAllocationSet`](@ref) for the solver-free method.
+  - `X`: The head's rows carrier over every row that it holds, or `nothing`. The JuMP method passes it to the set's builders, and the solver-free method does not read it.
+
+# Returns
+
+  - `w::Union{Nothing, AbstractVector}`: The leader, or `nothing` on a Held Step.
 
 # Related
 
@@ -910,30 +1209,50 @@ end
 """
     ShortTermLossControlPortfolio(; window::Integer = 5, gamma::Real = 0.025, slv::Slv_VecSlv, pe::AbstractPriorEstimator = EmpiricalPrior(; ce = RankOneCovariance()), proj::EuclideanProjection = EuclideanProjection())
 
-The short-term portfolio optimisation with loss control of Lai, Tan, Wu and Fang (2020): a [`FollowTheLeader`](@ref) over the last `window` rows whose programme maximises the worst increasing factor of the window minus `gamma` times the portfolio variance under the [`RankOneCovariance`](@ref) (SPOLC).
+Builds the short-term portfolio optimisation with loss control of Lai, Tan, Wu and Fang (2020) (SPOLC).
+
+The rule is a [`FollowTheLeader`](@ref) over the last `window` periods. Its programme maximises the worst increasing factor of the window less `gamma` times the portfolio variance under the [`RankOneCovariance`](@ref). [`MeanRisk`](@ref) states it as the minimum of [`WorstRealisation`](@ref) plus [`Variance`](@ref) scaled by `gamma`. The variance reads the rank-one matrix as a quadratic form under [`QuadRiskExpr`](@ref), which needs no factor of the singular matrix. The head's Allocation Set enters the programme as in every follow-the-leader programme. The paper does not state the rule before the window fills. Here the rule re-solves on the periods that it has, and on one period it plays the uniform portfolio, because the programme reads a covariance.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\hat{\\boldsymbol{b}} &= \\underset{\\boldsymbol{b} \\in \\Delta^N}{\\arg\\max} \\min_{1 \\leq i \\leq w} \\boldsymbol{x}_i^\\intercal \\boldsymbol{b} - \\gamma\\, \\boldsymbol{b}^\\intercal \\hat{\\Sigma}_{\\mathrm{RO}} \\boldsymbol{b}\\,,
+\\boldsymbol{w}^\\star_t &= \\underset{\\boldsymbol{w} \\in \\Delta_N}{\\arg\\max}\\; \\min_{i \\in C_t} \\langle \\boldsymbol{w}, \\boldsymbol{x}_i \\rangle - \\gamma\\, \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}}_{\\mathrm{RO}} \\boldsymbol{w}\\,, \\\\
+C_t &= \\left\\lbrace \\max(1,\\, t - w + 1), \\ldots, t \\right\\rbrace\\,.
 \\end{align}
 ```
 
-the paper's equation 51, which [`MeanRisk`](@ref) states as the minimum of [`WorstRealisation`](@ref) beside [`Variance`](@ref) scaled by `gamma`, the sum scalarisation of the two: the worst realisation over the window's returns is the worst increasing factor less one, and the variance takes the rank-one matrix as a quadratic form under [`QuadRiskExpr`](@ref), which needs no factor of a singular matrix. The head's Allocation Set enters the programme as every follow-the-leader programme takes it; before the window fills the rule re-solves on the rows it has, and on one row answers the uniform portfolio.
+Where:
+
+  - $(math_dict[:w_star_lead])
+  - $(math_dict[:w_var_lead])
+  - $(math_dict[:Delta_N_simplex])
+  - $(math_dict[:C_t_sample])
+  - $(math_dict[:x_t_rel])
+  - ``\\gamma``: Weight of the variance against the worst increasing factor, the paper's ``\\gamma``.
+  - ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{RO}}``: Rank-one covariance estimate of the paper on the sample.
+  - ``w``: Window of the rule, the paper's ``w``.
+  - $(math_dict[:N])
+  - $(math_dict[:t_period])
+
+This is the paper's equation 51 at period ``t``. On the simplex ``\\langle \\boldsymbol{w}, \\boldsymbol{x}_i \\rangle - 1`` is the portfolio return of period ``i``. So the worst increasing factor less one is the negative of the worst realisation over the sample, and the two programmes have one maximiser.
 
 # Arguments
 
-  - `window`: The paper's `w`, the rows of the window.
-  - `gamma`: The paper's `γ`, the weight of the variance against the worst increasing factor.
-  - `slv`: The solver the programme runs on.
+  - `window`: The paper's ``w``, the number of periods of the window.
+  - `gamma`: The paper's ``\\gamma``, the weight of the variance against the worst increasing factor.
+  - `slv`: The solver of the programme.
   - `pe`: The prior estimator of the programme, whose covariance is the rank-one estimate.
-  - `proj`: The geometry of the damped mix, unused at the rule's `gamma = 0`.
+  - `proj`: The geometry of the damped mix. The rule's `gamma = 0` does not read it.
 
 # Validation
 
   - `window >= 1`. A `DomainError` is thrown otherwise.
   - `gamma >= 0`. A `DomainError` is thrown otherwise.
+
+# Returns
+
+  - `alg::FollowTheLeader`: The rule over [`LastRows`](@ref) at `W = window`, whose `opt` is the loss-control programme.
 
 # Examples
 
@@ -952,14 +1271,14 @@ julia> alg.opt.r[2].settings.scale
 
   - [`FollowTheLeader`](@ref)
   - [`LastRows`](@ref)
-  - [`RankOneCovariance`](@ref)
+  - [`RankOneCovariance`](@ref): the paper's rank-one estimate.
   - [`WorstRealisation`](@ref)
   - [`Variance`](@ref)
   - [`MeanRisk`](@ref)
 
 # References
 
-  - $(ref_dict[:lai2020spolc])
+  - $(ref_dict[:lai2020spolc]) Equation 51 and Section 4.2.1.
 """
 function ShortTermLossControlPortfolio(; window::Integer = 5, gamma::Real = 0.025,
                                        slv::Slv_VecSlv,
@@ -973,7 +1292,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The programme of [`ShortTermLossControlPortfolio`](@ref): [`MeanRisk`](@ref) minimising [`WorstRealisation`](@ref) beside [`Variance`](@ref) scaled by `gamma` under [`QuadRiskExpr`](@ref), on the solver and prior given. Typed on both, so the optimiser it builds is concrete for the solver and prior it was given.
+Builds the programme of the short-term portfolio optimisation with loss control.
+
+The programme is [`MeanRisk`](@ref) under [`MinimumRisk`](@ref) over [`WorstRealisation`](@ref) plus [`Variance`](@ref) scaled by `gamma` under [`QuadRiskExpr`](@ref). The method is typed on the solver and the prior, so the optimiser that it builds is concrete for them.
+
+# Arguments
+
+  - `gamma`: The weight of the variance.
+  - `slv`: The solver of the programme.
+  - `pe`: The prior estimator of the programme.
+
+# Returns
+
+  - `opt::MeanRisk`: The programme.
 
 # Related
 
@@ -991,31 +1322,46 @@ end
 """
     LowDimensionEnsemblePortfolio(; N::Integer, window::Integer = 5, gamma::Real = 0.25, xi::Real = 0.002, slv::Slv_VecSlv, pe::AbstractPriorEstimator = LowDimensionEnsemblePrior(), proj::EuclideanProjection = EuclideanProjection())
 
-The online low-dimension ensemble method of Xi, Li, Song and Ning (2023): a [`FollowTheLeader`](@ref) over the last `window` regression pairs whose programme maximises the ensemble's forecast return less `gamma` times the portfolio variance under the ensemble's predictive covariance, less a linear turnover fee of `xi` against the Price-Adjusted Allocation.
+Builds the online low-dimension ensemble method of Xi, Li, Song and Ning (2023) (OLDEM).
+
+The rule is a [`FollowTheLeader`](@ref) over the last `window` regression pairs. Its programme maximises the forecast return of the ensemble, less `gamma` times the portfolio variance under the predictive covariance of the ensemble, less a linear turnover fee at the rate `xi`. [`MeanRisk`](@ref) states it as [`MaximumUtility`](@ref) at the risk aversion `gamma` over [`Variance`](@ref) under [`QuadRiskExpr`](@ref). The ensemble prior on `pe` gives the forecast and the covariance from one fit. A [`Fees`](@ref) whose [`Turnover`](@ref) rate is `xi` gives the ``\\ell_1`` term, and the head passes the reference allocation through [`factory`](@ref), as it does for every fee. The head's Allocation Set enters the programme as in every follow-the-leader programme.
+
+The paper relaxes ``\\boldsymbol{w} \\geq \\boldsymbol{0}``, runs a coordinate-wise descent on the change of the allocation, and projects the result onto the simplex. The programme here keeps ``\\boldsymbol{w} \\geq \\boldsymbol{0}`` inside the solve. So it returns the minimiser of the paper's programme, which the relaxed and projected result is not in general. `window` regression pairs need `window + 1` rows, so the selector holds one row more than the paper's ``w``. Before the window fills the rule re-solves on the rows that it has. Below three rows the covariance of the regressors does not exist, and the rule plays the uniform portfolio.
+
+The turnover fee holds a reference allocation of the universe's length from construction, and the head replaces it at every update. So the constructor takes the number of assets `N`, as [`UniversalPortfolio`](@ref) does.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\hat{\\boldsymbol{b}}_{t + 1} &= \\underset{\\boldsymbol{b} \\in \\Delta^N}{\\arg\\min} \\left\\{ -\\hat{\\boldsymbol{x}}_{t + 1}^\\intercal \\boldsymbol{b} + \\gamma\\, \\boldsymbol{b}^\\intercal \\hat{\\Sigma}_{t + 1} \\boldsymbol{b} + \\xi\\, \\lVert \\boldsymbol{b} - \\hat{\\boldsymbol{w}}_t \\rVert_1 \\right\\}\\,,
+\\boldsymbol{w}^\\star_t &= \\underset{\\boldsymbol{w} \\in \\Delta_N}{\\arg\\min}\\; -\\hat{\\boldsymbol{x}}_{t+1}^\\intercal \\boldsymbol{w} + \\gamma\\, \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}}_{t+1} \\boldsymbol{w} + \\xi\\, \\lVert \\boldsymbol{w} - \\hat{\\boldsymbol{w}}_t \\rVert_1\\,.
 \\end{align}
 ```
 
-the paper's equation 14, which [`MeanRisk`](@ref) states as [`MaximumUtility`](@ref) at risk aversion `gamma` over [`Variance`](@ref) under [`QuadRiskExpr`](@ref), with the ensemble prior on `pe` supplying both ``\\hat{\\boldsymbol{x}}_{t + 1} - \\boldsymbol{1}`` and ``\\hat{\\Sigma}_{t + 1}`` from one fit, and a [`Fees`](@ref) whose [`Turnover`](@ref) rate `xi` is the ``\\ell_1`` penalty against the current allocation ``\\hat{\\boldsymbol{w}}_t``, which the head threads through [`factory`](@ref) as every fee reads it. On the simplex ``\\hat{\\boldsymbol{x}}^\\intercal \\boldsymbol{b}`` and ``(\\hat{\\boldsymbol{x}} - \\boldsymbol{1})^\\intercal \\boldsymbol{b}`` differ by a constant, so the two programmes share their minimiser.
+Where:
 
-The paper relaxes ``\\boldsymbol{b} \\geq \\boldsymbol{0}``, runs a coordinate-wise descent on ``\\boldsymbol{c} = \\boldsymbol{b} - \\hat{\\boldsymbol{w}}_t`` and projects the answer onto the simplex; the programme here keeps the non-negativity inside the solve, so it answers the minimiser of the stated problem, which the relax-then-project answer is not in general. The head's Allocation Set enters the programme as every follow-the-leader programme takes it. `window` regression pairs need `window + 1` rows, so the selector holds one row more than the paper's `w`; before the window fills the rule re-solves on the rows it has, and below three rows, where the regressor covariance does not exist, it answers the uniform portfolio.
+  - $(math_dict[:w_star_lead])
+  - $(math_dict[:w_var_lead])
+  - $(math_dict[:Delta_N_simplex])
+  - ``\\hat{\\boldsymbol{x}}_{t+1}``: Price relative forecast of the ensemble for period ``t + 1``.
+  - ``\\gamma``: Risk aversion over the predictive variance, the paper's ``\\gamma``.
+  - ``\\hat{\\mathbf{\\Sigma}}_{t+1}``: Predictive covariance of the ensemble for period ``t + 1``.
+  - ``\\xi``: Rate of the linear turnover fee, the paper's ``\\xi``.
+  - $(math_dict[:w_hat_t_padj])
+  - $(math_dict[:N])
+  - $(math_dict[:t_period])
 
-The turnover fee reads a reference allocation of the universe's length at construction, replaced by the Price-Adjusted Allocation at every update, so the constructor takes the number of assets `N`, as [`UniversalPortfolio`](@ref) does.
+This is the paper's equation 14, with one change. The paper measures the turnover from its own last allocation ``\\hat{\\boldsymbol{b}}_t``, and the programme here measures it from the Price-Adjusted Allocation ``\\hat{\\boldsymbol{w}}_t``, the book that the fund holds when it trades. On the simplex ``\\hat{\\boldsymbol{x}}^\\intercal \\boldsymbol{w}`` and ``(\\hat{\\boldsymbol{x}} - \\boldsymbol{1})^\\intercal \\boldsymbol{w}`` differ by one, so the programme over the forecast return has the same minimiser.
 
 # Arguments
 
-  - `N`: The number of assets, the length of the fee's reference allocation.
-  - `window`: The paper's `w`, the regression pairs of the window; the selector holds `window + 1` rows.
-  - `gamma`: The paper's `γ`, the risk aversion over the predictive variance.
-  - `xi`: The paper's `ξ`, the linear turnover fee rate.
-  - `slv`: The solver the programme runs on.
-  - `pe`: The prior estimator of the programme, the ensemble by default; any prior supplies the two moments the programme reads.
-  - `proj`: The geometry of the damped mix, unused at the rule's `gamma = 0`.
+  - `N`: The number of assets, the length of the reference allocation of the fee.
+  - `window`: The paper's ``w``, the number of regression pairs of the window. The selector holds `window + 1` rows.
+  - `gamma`: The paper's ``\\gamma``, the risk aversion over the predictive variance.
+  - `xi`: The paper's ``\\xi``, the rate of the linear turnover fee.
+  - `slv`: The solver of the programme.
+  - `pe`: The prior estimator of the programme, the ensemble by default. Any prior gives the two moments that the programme reads.
+  - `proj`: The geometry of the damped mix. The rule's `gamma = 0` does not read it.
 
 # Validation
 
@@ -1023,6 +1369,10 @@ The turnover fee reads a reference allocation of the universe's length at constr
   - `window >= 2`, the fewest pairs whose regressor covariance exists. A `DomainError` is thrown otherwise.
   - `gamma >= 0`. A `DomainError` is thrown otherwise.
   - `xi >= 0`. A `DomainError` is thrown otherwise.
+
+# Returns
+
+  - `alg::FollowTheLeader`: The rule over [`LastRows`](@ref) at `W = window + 1`, whose `opt` is the ensemble programme.
 
 # Examples
 
@@ -1048,7 +1398,7 @@ Turnover
 
   - [`FollowTheLeader`](@ref)
   - [`LastRows`](@ref)
-  - [`LowDimensionEnsemblePrior`](@ref)
+  - [`LowDimensionEnsemblePrior`](@ref): the ensemble that gives the forecast and the predictive covariance.
   - [`MaximumUtility`](@ref)
   - [`Variance`](@ref)
   - [`Fees`](@ref)
@@ -1057,7 +1407,7 @@ Turnover
 
 # References
 
-  - $(ref_dict[:xi2023oldem])
+  - $(ref_dict[:xi2023oldem]) Equation 14, Section 4.2 and Section 5.3.
 """
 function LowDimensionEnsemblePortfolio(; N::Integer, window::Integer = 5,
                                        gamma::Real = 0.25, xi::Real = 0.002,
@@ -1080,7 +1430,20 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The programme of [`LowDimensionEnsemblePortfolio`](@ref): [`MeanRisk`](@ref) under [`MaximumUtility`](@ref) at risk aversion `gamma` over [`Variance`](@ref) under [`QuadRiskExpr`](@ref), charging `fees`, on the solver and prior given. Typed on both, so the optimiser it builds is concrete for the solver and prior it was given.
+Builds the programme of the online low-dimension ensemble method.
+
+The programme is [`MeanRisk`](@ref) under [`MaximumUtility`](@ref) at the risk aversion `gamma` over [`Variance`](@ref) under [`QuadRiskExpr`](@ref), and it charges `fees`. The method is typed on the solver and the prior, so the optimiser that it builds is concrete for them.
+
+# Arguments
+
+  - `gamma`: The risk aversion over the predictive variance.
+  - `fees`: The fees of the programme, a [`Turnover`](@ref) fee for the rule.
+  - `slv`: The solver of the programme.
+  - `pe`: The prior estimator of the programme.
+
+# Returns
+
+  - `opt::MeanRisk`: The programme.
 
 # Related
 
@@ -1095,7 +1458,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The carrier of [`FollowTheLeadingHistory`](@ref): the working set of experts, each with its Rule State and the period it was started, and the weight over them.
+Holds the live experts of a follow-the-leading-history rule, with their Rule States, start periods and weights.
+
+It is the carrier of [`FollowTheLeadingHistory`](@ref). The rule refuses a merge of two carriers, because the head's allocation depends on the order of the rows.
 
 # Fields
 
@@ -1112,19 +1477,19 @@ $(DocStringExtensions.FIELDS)
     """
     n
     """
-    Each live expert's carrier, one entry per expert, `nothing` where the base rule carries nothing.
+    The carrier of each live expert, `nothing` when the base rule carries nothing.
     """
     st
     """
-    Each live expert's allocation held during the current period, one vector per expert.
+    The allocation that each live expert holds during the current period.
     """
     h
     """
-    The weight over the live experts held during the current period.
+    The weight over the live experts during the current period.
     """
     p
     """
-    The period each live expert was started at, which its lifetime is counted from.
+    The start period of each live expert, from which its lifetime counts.
     """
     born
 end
@@ -1143,24 +1508,51 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Follow the leading history of Hazan and Seshadhri (2009): a mixture over copies of one rule started at different periods, weighted by a multiplicative update with a fixed share for the newest copy, and pruned to a working set of logarithmic size (FLH).
+Mixes copies of one rule started at different periods, with a fixed share for the newest copy (FLH).
+
+This is follow the leading history of Hazan and Seshadhri (2009). A multiplicative update weights the copies by their returns, and at every period a new copy starts with a fixed share of the weight. Under `prune` the rule keeps a working set of copies of logarithmic size. The paper's experiments use the Online Newton Step as the base rule, which is [`NewtonStep`](@ref) here, and any rule of the family serves.
+
+A new copy starts at the base rule's own start from the uniform portfolio, projected onto the Allocation Set in the base rule's geometry. So a constant rebalanced base starts at the projection of its own `w`. The rule reads nothing of a given Start Allocation beyond its first copy, which starts there through [`project_start`](@ref). The rule projects the weight vector onto the Expert Set on `eset` in the entropic geometry, after the share and the pruning. So a cap on `eset` caps the trust in one copy. The working set changes size, so `eset` admits a scalar bound alone. The rule projects the blend onto the head's Allocation Set once more in the Euclidean geometry on `proj`, as an [`ExpertMixture`](@ref) does, and skips it by type on a [`BoundedAllocationSet`](@ref).
 
 # Mathematical definition
 
-With ``\\boldsymbol{h}_j(t)`` the allocation of the expert started at period ``j`` and ``v_t^{(j)}`` its weight,
-
 ```math
 \\begin{align}
-\\hat{v}_{t+1}^{(j)} &\\propto v_t^{(j)} \\left\\langle \\boldsymbol{h}_j(t), \\boldsymbol{x}_t \\right\\rangle^{\\alpha}\\,,\\quad
-v_{t+1}^{(t+1)} = \\frac{1}{t + 1}\\,,\\quad
-v_{t+1}^{(j)} = \\left( 1 - \\frac{1}{t + 1} \\right) \\hat{v}_{t+1}^{(j)}\\,,\\\\
-\\boldsymbol{w}_{t+1} &= \\sum_{j \\in S_{t+1}} v_{t+1}^{(j)}\\, \\boldsymbol{h}_j(t+1)\\,.
+\\hat{p}_{t+1, k} &= \\frac{p_{t, k}\\, r_{t, k}^{\\alpha}}{\\sum_{j \\in S_t} p_{t, j}\\, r_{t, j}^{\\alpha}}\\,, \\quad k \\in S_t\\,, \\\\
+\\bar{p}_{t+1, k} &= \\begin{cases} \\left( 1 - \\dfrac{1}{t + 1} \\right) \\hat{p}_{t+1, k} & k \\in S_t\\,, \\\\ \\dfrac{1}{t + 1} & k = t + 1\\,, \\end{cases} \\\\
+p_{t+1, k} &= \\frac{\\bar{p}_{t+1, k}}{\\sum_{j \\in S_{t+1}} \\bar{p}_{t+1, j}}\\,, \\quad k \\in S_{t+1}\\,, \\\\
+\\boldsymbol{w}_{t+1} &= \\sum_{k \\in S_{t+1}} p_{t+1, k}\\, \\boldsymbol{h}_k(t+1)\\,.
 \\end{align}
 ```
 
-The multiplicative update is the paper's ``e^{-\\alpha f_t}`` on the log-wealth loss, the wealth weighting at `alpha = 1`, and the fixed share is what lets a newly started expert win an interval: the paper's adaptive regret on every interval `[r, s]` is `O(α⁻¹(log r + log |I|))` beyond the base rule's regret on that interval. A new expert is started at every period at the base rule's own start from the uniform portfolio, projected onto the Allocation Set in the base rule's geometry, so a constant rebalanced base starts at the projection of its own `w`. Under `prune`, the working set is Woodruff's streaming set the paper adopts: an expert started at period ``i = r\\,2^k`` with ``r`` odd lives for ``2^{k+2} + 1`` periods, so the set holds `O(log t)` experts at period `t`, every interval still holds an expert started within its first half, and the weights are renormalised over the survivors; without it every expert lives, which is the paper's first algorithm at `O(t)` experts. The base rule of the paper is the [`NewtonStep`](@ref); any rule of the family serves.
+Where:
 
-The weight vector is projected onto the Expert Set on `eset` in the entropic geometry after the fixed share and the pruning, so a cap on `eset` caps the trust in any one copy; the working set changes size, so `eset` admits a scalar bound alone. The blend is projected onto the head's Allocation Set once more in the Euclidean geometry on `proj`, as an [`ExpertMixture`](@ref)'s is, skipped by type on a [`BoundedAllocationSet`](@ref). The rule reads nothing of a given Start Allocation beyond its first expert, which starts there, projected onto the Allocation Set as the newcomers are ([`project_start`](@ref)).
+  - $(math_dict[:p_t_expert]) Here expert ``k`` is the copy started at period ``k``, and ``p_{1, 1} = 1``.
+  - ``\\hat{p}_{t+1, k}``, ``\\bar{p}_{t+1, k}``: Weights after the multiplicative update, and after the share of the new copy.
+  - $(math_dict[:r_t_expert])
+  - $(math_dict[:h_kt_expert])
+  - $(math_dict[:x_t_rel])
+  - ``\\alpha``: Exponent of the multiplicative update, the `alpha` field.
+  - ``S_t``: Working set of period ``t``, the start periods of the live copies, with ``S_1 = \\lbrace 1 \\rbrace``.
+  - $(math_dict[:w_t_iter])
+  - $(math_dict[:t_period])
+
+The factor ``r_{t, k}^{\\alpha}`` is the paper's ``e^{-\\alpha f_t}`` under the log-wealth loss ``f_t(\\boldsymbol{w}) = -\\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_t \\rangle``, and at ``\\alpha = 1`` it is the wealth weighting. Without `prune`, ``S_{t+1} = \\lbrace 1, \\ldots, t + 1 \\rbrace`` and the last normalisation divides by one. Under `prune`, ``S_{t+1}`` holds the start periods that are alive at ``t + 1`` under the lifetime of [`expert_alive`](@ref), which the paper takes from Woodruff. Then ``S_t`` holds ``O(\\log t)`` copies, and for every ``s \\leq t`` it holds a start period in ``[s, (s + t)/2]``.
+
+Suppose that the base rule's regret on every interval ``I`` is ``\\alpha^{-1} \\log |I|``, and that every loss is ``\\alpha``-exp-concave. When the copy started at ``r`` lives through ``I = [r, s]``, the paper bounds the regret of the rule on ``I`` by ``O(\\alpha^{-1} (\\ln r + \\ln |I|))`` (Lemma 3.1). Without `prune` every copy lives, so this bound holds on every interval. Under `prune` the paper's bound on every interval is ``O(\\alpha^{-1} \\log s \\cdot \\log |I| + 1)`` (Lemma 3.2).
+
+# Algorithm
+
+The steps of the Online Update:
+
+ 1. Set `t` to `st.n + 1`, and `r` to the return ``\\langle \\boldsymbol{h}, \\boldsymbol{x} \\rangle`` of the allocation `h` of each live copy.
+ 2. Set `phat` to `st.p .* r .^ alg.alpha`, divided by its sum.
+ 3. Step every live copy with its own Online Update, which gives its Rule State and its allocation for the next period.
+ 4. Start a new copy at the base rule's start from the uniform portfolio, projected onto `set` in the base rule's geometry, with the start period `t + 1`.
+ 5. Set `p` to `(1 - 1 / (t + 1)) .* phat`, followed by the share `1 / (t + 1)` of the new copy.
+ 6. Under `alg.prune`, keep the copies that `expert_alive` finds alive at `t + 1`, with their entries of `p`.
+ 7. Project `p` onto the Expert Set with the entropic projection. On the bare simplex over the copies this divides `p` by its sum.
+ 8. Set `q` to the sum of `p[k] .* h` over the copies. Return the new carrier, and the result of `blend_projection` of `q` onto `set` with `alg.proj`, from the Price-Adjusted Allocation.
 
 # Fields
 
@@ -1208,12 +1600,13 @@ FollowTheLeadingHistory
   - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
   - [`OnlinePortfolioSelection`](@ref)
   - [`FollowTheLeadingHistoryState`](@ref)
-  - [`ExpertMixture`](@ref)
-  - [`NewtonStep`](@ref)
+  - [`ExpertMixture`](@ref): the mixture over a fixed set of experts.
+  - [`NewtonStep`](@ref): the base rule of the paper's experiments.
+  - [`expert_alive`](@ref): the lifetime that the pruning reads.
 
 # References
 
-  - $(ref_dict[:hazanseshadhri2009])
+  - $(ref_dict[:hazanseshadhri2009]) Algorithm 1, Lemmas 3.1 and 3.2, and Appendix A.
 """
 struct FollowTheLeadingHistory{T1 <: AbstractOnlinePortfolioSelectionAlgorithm, T2 <: Real,
                                T3 <: Bool, T4 <: Option{<:BoundedAllocationSet},
@@ -1224,19 +1617,19 @@ struct FollowTheLeadingHistory{T1 <: AbstractOnlinePortfolioSelectionAlgorithm, 
     """
     alg::T1
     """
-    The exponent of the multiplicative update, the paper's ``\\alpha``; `1` is the wealth weighting.
+    The exponent of the multiplicative update, the paper's ``\\alpha``. At `1` the update is the wealth weighting.
     """
     alpha::T2
     """
-    Whether the working set is pruned to the paper's streaming set of logarithmic size.
+    Whether the rule prunes the working set to the paper's streaming set of logarithmic size.
     """
     prune::T3
     """
-    The Expert Set the weight vector is projected onto, a scalar bound over the live experts, or `nothing` for the bare simplex over them.
+    The Expert Set onto which the rule projects the weight vector, a scalar bound over the live experts, or `nothing` for the bare simplex over them.
     """
     eset::T4
     """
-    The geometry the blend is projected onto the head's Allocation Set in, once more.
+    The geometry of the last projection of the blend onto the head's Allocation Set.
     """
     proj::T5
     function FollowTheLeadingHistory(alg::AbstractOnlinePortfolioSelectionAlgorithm,
@@ -1290,11 +1683,40 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Whether the expert started at period `born` is alive at period `t` under the paper's streaming rule: with `born = r 2^k`, `r` odd, it lives from `born` through `born + 2^(k + 2) + 1`.
+Checks whether the copy started at period `born` is alive at period `t`, under the lifetime of Hazan and Seshadhri (2009).
+
+The function reads `t >= born` as given.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+k &= r\\, 2^{j}\\,, \\quad r \\text{ odd}\\,, \\\\
+k &\\in S_t \\iff k \\leq t \\leq k + 2^{j + 2} + 1\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``k``: Start period of the copy, `born`.
+  - ``r``, ``j``: Odd part of ``k`` and the exponent of the largest power of two that divides ``k``.
+  - ``S_t``: Working set of period ``t``.
+  - $(math_dict[:t_period])
+
+The paper calls ``2^{j + 2} + 1`` the lifetime of ``k``, so the copy is alive in ``2^{j + 2} + 2`` periods.
+
+# Arguments
+
+  - `born`: The start period of the copy.
+  - `t`: The period.
+
+# Returns
+
+  - `alive::Bool`: `t <= born + 2^(j + 2) + 1`, with `j` the number of trailing zeros of `born`.
 
 # Related
 
-  - [`FollowTheLeadingHistory`](@ref)
+  - [`FollowTheLeadingHistory`](@ref): the rule whose pruning reads the lifetime.
 """
 function expert_alive(born::Integer, t::Integer)
     k = trailing_zeros(born)
