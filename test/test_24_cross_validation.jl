@@ -955,6 +955,107 @@
         fold = quiet.pred[1]
         @test PopulationPredictionResult(; pred = [fold]).pred[1] === fold
     end
+    @testset "NearestQuantilePrediction selects the path nearest the quantile (#1251)" begin
+        quantile = PortfolioOptimisers.Statistics.quantile
+        resok = NaiveOptimisationResult(; pr = nothing, wb = nothing,
+                                        retcode = OptimisationSuccess(), w = [0.5, 0.5],
+                                        fb = nothing)
+        resbad = NaiveOptimisationResult(; pr = nothing, wb = nothing,
+                                         retcode = OptimisationFailure(; res = nothing),
+                                         w = [0.5, 0.5], fb = nothing)
+        function fold(X; res = resok)
+            return PredictionResult(; res = res,
+                                    rd = PredictionReturnsResult(; nx = ["A", "B"], X = X,
+                                                                 ts = nothing))
+        end
+        member(X; kwargs...) = MultiPeriodPredictionResult(; pred = [fold(X; kwargs...)])
+        rng = StableRNG(42)
+        Xs = [0.02 .* randn(rng, 30) for _ in 1:9]
+        ppred = PopulationPredictionResult(; pred = member.(Xs))
+        r = ConditionalValueatRisk()
+        rks = [expected_risk(r, p) for p in ppred.pred]
+
+        # the selected path is the first argmin of the distance to the quantile
+        for q in 0:0.05:1
+            sel = NearestQuantilePrediction(; r = r, q = q)(ppred)
+            @test findfirst(p -> p === sel, ppred.pred) ==
+                  argmin(abs.(rks .- quantile(rks, q)))
+        end
+        # q = 0 and q = 1 select the least and the greatest risk, whatever the definition
+        for (a, b) in ((1.0, 1.0), (0.0, 0.0), (0.0, 1.0), (1.0, 0.0), (0.5, 0.5))
+            nqp(q) = NearestQuantilePrediction(; r = r, q = q,
+                                               q_kwargs = (alpha = a, beta = b))(ppred)
+            @test nqp(0.0) === ppred.pred[argmin(rks)]
+            @test nqp(1.0) === ppred.pred[argmax(rks)]
+        end
+        # sign = -1 at q selects the path of sign = 1 at 1 - q when alpha equals beta
+        for (a, b) in ((1.0, 1.0), (0.0, 0.0), (0.5, 0.5)), q in 0:0.05:1
+            s(q) = NearestQuantilePrediction(; r = r, q = q,
+                                             q_kwargs = (alpha = a, beta = b))
+            @test s(q)(ppred, -1) === s(1 - q)(ppred, 1)
+        end
+        # and not always when alpha differs from beta
+        asym = NearestQuantilePrediction(; r = r, q = 0.3,
+                                         q_kwargs = (alpha = 0.0, beta = 1.0))
+        asym_flip = NearestQuantilePrediction(; r = r, q = 0.7,
+                                              q_kwargs = (alpha = 0.0, beta = 1.0))
+        @test asym(ppred, -1) !== asym_flip(ppred, 1)
+        # a tie goes to the first member in population order
+        tie = PopulationPredictionResult(;
+                                         pred = [member(Xs[1]), member(Xs[1]),
+                                                 member(Xs[2])])
+        @test expected_risk(r, tie.pred[1]) == expected_risk(r, tie.pred[2])
+        @test NearestQuantilePrediction(; r = r, q = 0.0)(tie).id ==
+              argmin([expected_risk(r, p) for p in tie.pred])
+        @test NearestQuantilePrediction(; r = r, q = 1.0)(tie).id == 1
+        # a vector of measures is scalarised through r_kwargs, and sums by default
+        rv = [ConditionalValueatRisk(), MaximumDrawdown()]
+        vmax = [max(expected_risk(rv[1], p), expected_risk(rv[2], p)) for p in ppred.pred]
+        vsum = [expected_risk(rv[1], p) + expected_risk(rv[2], p) for p in ppred.pred]
+        @test NearestQuantilePrediction(; r = rv, r_kwargs = (sca = MaxScalariser(),))(ppred) ===
+              ppred.pred[argmin(abs.(vmax .- quantile(vmax, 0.5)))]
+        @test NearestQuantilePrediction(; r = rv)(ppred) ===
+              ppred.pred[argmin(abs.(vsum .- quantile(vsum, 0.5)))]
+        # a mixed-polarity vector is admitted here and refused by sort_by_measure
+        mixed = [MeanReturn(), MaximumDrawdown()]
+        @test NearestQuantilePrediction(; r = mixed)(ppred) isa MultiPeriodPredictionResult
+        @test_throws ArgumentError sort_by_measure(ppred, mixed)
+        # a failed fold takes its path out, and no solved path leaves nothing to rank
+        bad = member(Xs[1]; res = resbad)
+        @test !PortfolioOptimisers.member_solved(bad)
+        @test !PortfolioOptimisers.member_solved(bad.pred[1])
+        @test PortfolioOptimisers.member_solved(ppred.pred[1])
+        p2 = PopulationPredictionResult(; pred = [bad; ppred.pred[2:end]])
+        @test length(PortfolioOptimisers.successful_members(p2)) == 8
+        @test all(q -> NearestQuantilePrediction(; r = r, q = q)(p2) !== p2.pred[1],
+                  0:0.1:1)
+        @test_throws ArgumentError NearestQuantilePrediction()(PopulationPredictionResult(;
+                                                                                          pred = [bad]))
+        @test_throws ArgumentError NearestQuantilePrediction()(PopulationPredictionResult())
+        @test_throws DomainError NearestQuantilePrediction(; q = NaN)
+        @test_throws DomainError NearestQuantilePrediction(; q = 1.1)
+
+        #=
+        A population of single folds is admitted, and every consumer reads it. Each of the
+        three below threw on it before, because it read the member as a multi-period result.
+        =#
+        fpop = PopulationPredictionResult(; pred = fold.(Xs))
+        @test length(PortfolioOptimisers.successful_members(fpop)) == 9
+        fpop2 = PopulationPredictionResult(;
+                                           pred = [fold(Xs[1]; res = resbad);
+                                                   fpop.pred[2:end]])
+        @test length(PortfolioOptimisers.successful_members(fpop2)) == 8
+        @test expected_risk(r, fpop) == rks
+        @test rolling_window_measure(r, fpop, 10) ==
+              [rolling_window_measure(r, p, 10) for p in fpop.pred]
+        @test rolling_window_measure(r, ppred, 10) ==
+              [rolling_window_measure(r, p, 10) for p in ppred.pred]
+        sel = NearestQuantilePrediction(; r = r)(fpop)
+        @test sel isa PredictionResult
+        @test findfirst(p -> p === sel, fpop.pred) ==
+              argmin(abs.(rks .- quantile(rks, 0.5)))
+        @test expected_risk(r, sort_by_measure(fpop, r)[1]) == minimum(rks)
+    end
     @testset "A clustering optimiser in the fold loop refuses a precomputed prior (#1277)" begin
         # A precomputed prior is the full sample's, so every fold would read its test rows.
         hopt = HierarchicalOptimiser(; pe = prior(EmpiricalPrior(), rd))

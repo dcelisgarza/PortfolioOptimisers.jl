@@ -1261,7 +1261,7 @@ function expected_risk(r::BaseRM_VecBaseRM, preds::VecMPredRes; kwargs...)
     return [expected_risk(r, pred; kwargs...) for pred in preds]
 end
 function expected_risk(r::BaseRM_VecBaseRM, ppred::PopulationPredictionResult; kwargs...)
-    return expected_risk(r, ppred.pred; kwargs...)
+    return [expected_risk(r, p; kwargs...) for p in ppred.pred]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1295,7 +1295,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Roll a risk measure over every path of a population prediction result.
 
-Delegates to the vector method on `ppred.pred`, which is the route [`expected_risk`](@ref) takes on the same type.
+Rolls `r` over each member of `ppred.pred`, as [`expected_risk`](@ref) does on the same type, so a member can be a single fold or a multi-period result.
 
 # Arguments
 
@@ -1315,7 +1315,7 @@ Delegates to the vector method on `ppred.pred`, which is the route [`expected_ri
 """
 function rolling_window_measure(r::BaseRM_VecBaseRM, ppred::PopulationPredictionResult,
                                 window::Integer; kwargs...)
-    return rolling_window_measure(r, ppred.pred, window; kwargs...)
+    return [rolling_window_measure(r, p, window; kwargs...) for p in ppred.pred]
 end
 """
     sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)

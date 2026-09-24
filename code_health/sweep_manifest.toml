@@ -287,7 +287,7 @@
 "src/17_Optimisation/02_CrossValidation/04_WalkForward.jl" = { map = 12, units = 28, swept = false }
 "src/17_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { map = 12, units = 21, swept = false }
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { map = 12, units = 1, swept = false }
-"src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { map = 12, units = 10, swept = false }
+"src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { map = 12, units = 11, algorithm = 1, swept = true, bindings = ["AbstractCrossValidationScorer", "NearestQuantilePrediction", "PopulationCrossValScorer", "PopulationScorer", "PredictionCrossValScorer", "PredictionScorer", "lacks_id", "member_solved", "population_ids", "successful_members", "with_position_id"] }
 "src/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { map = 12, units = 2, swept = false }
 "src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { map = 12, units = 23, swept = false }
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { map = 12, units = 3, swept = false }
