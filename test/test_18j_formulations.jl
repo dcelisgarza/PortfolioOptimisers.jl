@@ -528,3 +528,53 @@ end
                                                                            alg = RSOCRiskExpr())))).w
     @test isapprox(w_of(1), w_of(4); rtol = 5e-4)
 end
+@testset "Under MaximumRatio the semidefinite variance maximises return per unit of variance" begin
+    # Issue #1321. The semidefinite variance tr(Σ W), with W ⪰ y y' / k, has degree one in
+    # (y, k). The SOC variance y' Σ y has degree two. So MaximumRatio maximises
+    # mu' w / w' Σ w on the first and the Sharpe ratio on the second. By Dinkelbach's theorem
+    # the maximiser of mu' w / w' Σ w also maximises mu' w - l * w' Σ w at l equal to the
+    # largest ratio, which is a MaximumUtility on the SOC variance.
+    ohf = mean(abs.(pr.mu))
+    mv(w) = dot(pr.mu, w) / dot(w, pr.sigma, w)
+    sharpe(w) = dot(pr.mu, w) / sqrt(dot(w, pr.sigma, w))
+    opt = JuMPOptimiser(; pe = pr, slv = slv)
+    wsoc = optimise(MeanRisk(; r = Variance(), obj = MaximumRatio(; ohf = ohf), opt = opt)).w
+    wstd = optimise(MeanRisk(; r = StandardDeviation(), obj = MaximumRatio(; ohf = ohf),
+                             opt = opt)).w
+    @test isapprox(wsoc, wstd; atol = 1e-3)
+    # Rows that never bind, and a phylogeny that links no pair: each only moves the variance
+    # to the semidefinite formulation.
+    rc = LinearConstraintEstimator(; val = ["$a <= 1000" for a in rd.nx])
+    plg = SemiDefinitePhylogeny(; A = zeros(length(pr.mu), length(pr.mu)), p = 0)
+    for (r, kw) in ((Variance(; rc = rc), (; sets = sets)), (Variance(), (; ple = plg)))
+        res_of(ohf) = optimise(MeanRisk(; r = r, obj = MaximumRatio(; ohf = ohf),
+                                        opt = JuMPOptimiser(; pe = pr, slv = slv, kw...));
+                               save = true)
+        res = res_of(ohf)
+        @test isa(res.retcode, OptimisationSuccess)
+        @test haskey(res.model, :W)
+        @test haskey(res.model, :sr_ret)
+        w = res.w
+        wu = optimise(MeanRisk(; r = Variance(), obj = MaximumUtility(; l = mv(w)),
+                               opt = opt)).w
+        @test isapprox(w, wu; atol = 2e-4)
+        # The maximiser is free of ohf. The phylogeny's solve at 10 * ohf stops 1.3e-3 away
+        # in the weights, so compare the ratio, which moves by 1e-4.
+        @test isapprox(mv(w), mv(res_of(10 * ohf).w); rtol = 5e-4)
+        @test norm(w - wsoc, Inf) > 0.1
+        @test mv(w) > mv(wsoc)
+        @test sharpe(w) < sharpe(wsoc)
+    end
+    # The risk form reaches the same maximiser. A logarithmic return selects it.
+    lr(w) = expected_return(LogarithmicReturn(), w, pr)
+    res = optimise(MeanRisk(; r = Variance(; rc = rc), obj = MaximumRatio(),
+                            opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
+                                                ret = LogarithmicReturn())); save = true)
+    @test haskey(res.model, :sr_risk)
+    w = res.w
+    wu = optimise(MeanRisk(; r = Variance(),
+                           obj = MaximumUtility(; l = lr(w) / dot(w, pr.sigma, w)),
+                           opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                               ret = LogarithmicReturn()))).w
+    @test isapprox(w, wu; atol = 2e-4)
+end

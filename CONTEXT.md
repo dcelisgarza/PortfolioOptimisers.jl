@@ -699,6 +699,7 @@ One term of the objective's return expression: `ArithmeticReturn` (dot-product) 
 
 **Objective Functions**
 `MinimumRisk`, `MaximumUtility`, `MaximumRatio` (Sharpe-type), `MaximumReturn`.
+`MaximumRatio` divides the excess return by the risk raised to `1/d`, where `d` is the degree of the risk expression in the homogenised weights and `k`. So the SOC and quadratic `Variance` give the Sharpe ratio, and the semidefinite `Variance` (risk-contribution rows, a semidefinite phylogeny, `FactorRiskContribution`) gives the excess return per unit of variance. This is a property of the formulation. Issue #1321.
 
 **Solver**
 A wrapper around a single external backend (Clarabel, HiGHS, …): its module, settings, name, and the checks that validate a returned solution.

@@ -247,6 +247,8 @@ Where:
   - ``\\mathbb{S}^{N}``: Set of real symmetric ``N \\times N`` matrices.
   - ``\\mathcal{W}``: Rest of the feasible set.
 
+A [`Variance`](@ref) in a model that holds this constraint takes the constraint form, whatever its `alg` says. The trace has degree one in the weights and ``k``, so under [`MaximumRatio`](@ref) the model maximises the excess return per unit of variance, not the Sharpe ratio. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)

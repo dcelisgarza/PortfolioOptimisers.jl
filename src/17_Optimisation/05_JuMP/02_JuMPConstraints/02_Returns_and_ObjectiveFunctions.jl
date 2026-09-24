@@ -808,6 +808,42 @@ expression, whatever number of terms built it. `rf` is therefore a single rate o
 aggregate, and a term that is not in return units belongs out of the numerator through
 `settings.rte = false`, not through a per-term rate.
 
+## The degree of the risk
+
+The quotient above holds for a risk expression of degree one in ``(\\boldsymbol{y}, k)``. The
+model builds the risk on ``\\boldsymbol{y}``, so a risk expression of degree ``d`` equals
+``k^{d} R(\\boldsymbol{w})``, and both normalisations reach the maximiser of
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\max}\\; \\frac{\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f}{R(\\boldsymbol{w})^{1/d}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{y}``: The homogenised weights, ``\\boldsymbol{y} = k \\boldsymbol{w}``.
+  - $(math_dict[:k_budget])
+  - ``r_f``: Risk-free rate.
+  - $(math_dict[:R_w])
+  - $(math_dict[:d_homog]) Here it is the degree of the expression that the model builds.
+  - ``\\mathbf{\\Sigma}``: The covariance matrix of the variance.
+  - ``\\sigma(\\boldsymbol{w})``: The portfolio's standard deviation, ``\\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}``.
+  - ``\\mathbf{W}``: The symmetric lifted matrix of [`set_sdp_constraints!`](@ref).
+
+The return form fixes ``k = \\mathrm{ohf} / (\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f)``
+and minimises ``\\mathrm{ohf}^{d} R(\\boldsymbol{w}) / (\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f)^{d}``.
+The risk form meets its bound at ``k = (\\mathrm{ohf} / R(\\boldsymbol{w}))^{1/d}`` and maximises
+``k (\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f)``. Neither maximiser depends on `ohf`.
+
+The degree belongs to the formulation, not to the measure, and [`Variance`](@ref) has two:
+
+  - A measure of degree one, such as [`StandardDeviation`](@ref) or [`ConditionalValueatRisk`](@ref), gives the quotient of the first equation.
+  - [`Variance`](@ref) in the [`SquaredSOCRiskExpr`](@ref) or [`QuadRiskExpr`](@ref) formulation builds ``\\boldsymbol{y}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{y} = k^{2} \\sigma^{2}(\\boldsymbol{w})``, of degree two. The model maximises ``(\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f) / \\sigma(\\boldsymbol{w})``, the Sharpe ratio.
+  - [`Variance`](@ref) in the semidefinite formulation builds ``\\mathrm{tr}(\\mathbf{\\Sigma} \\mathbf{W})`` with ``\\mathbf{W} \\succeq \\boldsymbol{y}\\boldsymbol{y}^\\intercal / k``. The trace is at least ``k \\sigma^{2}(\\boldsymbol{w})``, with equality at ``\\mathbf{W} = \\boldsymbol{y}\\boldsymbol{y}^\\intercal / k``, so it has degree one. The model maximises ``(\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f) / \\sigma^{2}(\\boldsymbol{w})``, the excess return per unit of variance. A variance takes this formulation when it holds risk-contribution rows `rc`, when the constraints hold a [`SemiDefinitePhylogeny`](@ref), and always under [`FactorRiskContribution`](@ref).
+
 # Fields
 
 $(DocStringExtensions.FIELDS)

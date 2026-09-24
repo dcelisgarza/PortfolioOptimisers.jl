@@ -380,6 +380,11 @@ Build the SDP variance risk expression using the semidefinite matrix `W`.
 Computes `sigma_W = sigma * W` and registers `tr(sigma_W)` as the `:variance_risk_` entry
 at index `i`.
 
+The trace has degree one in the weights and `k`, where the SOC and quadratic expressions have
+degree two. So under [`MaximumRatio`](@ref) the model maximises the excess return per unit of
+variance, not the Sharpe ratio. The `## The degree of the risk` subsection of
+[`MaximumRatio`](@ref) states the rule.
+
 # Arguments
 
   - $(arg_dict[:model])

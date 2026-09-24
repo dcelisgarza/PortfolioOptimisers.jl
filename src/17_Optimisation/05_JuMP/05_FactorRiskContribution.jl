@@ -118,6 +118,8 @@ The asset weights are recovered from the exposures through the factor loadings, 
 
 Under [`Variance`](@ref) those rows sit on the semidefinite relaxation of [sdprp](@cite), formulation 16, over the factor weights. A solve can report success while the factor shares of the returned portfolio miss the rows, so compare [`factor_risk_contribution`](@ref) of the result with them. The `## Risk contribution constraints` subsection of [`Variance`](@ref) states the relaxation and the condition under which the rows bind.
 
+A [`Variance`](@ref) always takes this semidefinite formulation here, with or without rows. Its trace has degree one in the factor weights and ``k``, so under [`MaximumRatio`](@ref) the model maximises the excess return per unit of variance, not the Sharpe ratio. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule.
+
 # Mathematical definition
 
 The factor model of the loadings, fitted by `re` or carried by the prior:
