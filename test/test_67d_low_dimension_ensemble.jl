@@ -138,6 +138,84 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, StatsBas
         @test prior(pe_free, W6).mu != prior(pe_free, W6).mu
     end
 
+    @testset "The prior against the paper's equations, loop by loop" begin
+        # Equations 4 to 10 written out asset by asset and subsystem by subsystem, with the
+        # pseudo-inverse for the coefficients and a BigFloat kernel that does not underflow.
+        function paper(X, idxs, sigma)
+            P = 1 .+ X
+            nt, na = size(P)
+            w = nt - 1
+            nl = length(idxs)
+            Rk = zeros(nl, na)
+            Fk = zeros(nl, na)
+            Sl = Vector{Matrix{Float64}}(undef, nl)
+            for l in 1:nl
+                A = idxs[l]
+                Xl = P[1:(end - 1), A]
+                B = zeros(na, length(A))
+                for k in 1:na
+                    y = P[2:end, k]
+                    b = pinv(Xl) * y
+                    B[k, :] = b
+                    Rk[l, k] = sum(abs2, y .- Xl * b) / w
+                    Fk[l, k] = dot(P[end, A], b)
+                end
+                Zl = P[2:end, A]
+                zb = vec(sum(Zl; dims = 1)) ./ w
+                S = [sum((Zl[:, p] .- zb[p]) .* (Zl[:, q] .- zb[q])) / (w - 1)
+                     for p in eachindex(A), q in eachindex(A)]
+                Sl[l] = B * S * B'
+            end
+            V = exp.(-big.(Rk) ./ big(sigma)^2)
+            V ./= sum(V; dims = 1)
+            xhat = vec(sum(V .* Fk; dims = 1))
+            num = sum(l -> (V[l, :] * V[l, :]') .* Sl[l], 1:nl)
+            return Float64.(xhat .- 1), Float64.(num ./ (V' * V)), Float64.(V)
+        end
+        draw(pe, N, s) = (drng = po.resolve_rng(pe.rng, pe.seed);
+                          [StatsBase.sample(drng, 1:N, s; replace = false)
+                           for _ in 1:(pe.n_subsystems)])
+        R6 = 0.02 .* randn(StableRNG(11), 40, 6)
+        # The paper's settings: L = 300, s = 3, sigma = 0.025, w = 5.
+        for (seed, rws) in ((1, 1:6), (2, 10:15), (3, 30:35), (4, 1:12))
+            pe = LowDimensionEnsemblePrior(; seed = seed, pdm = nothing)
+            mu, S, _ = paper(R6[rws, :], draw(pe, 6, 3), 0.025)
+            pr = prior(pe, R6[rws, :])
+            @test isapprox(pr.mu, mu; atol = 1e-14)
+            @test isapprox(pr.sigma, S; atol = 1e-16)
+            # The paper's window of five pairs gives an indefinite aggregate here.
+            length(rws) == 6 && @test eigmin(Symmetric(pr.sigma)) < 0
+        end
+        # Errors far above the bandwidth. The product of two assets' Float64 weights
+        # underflows to zero on every subsystem for some pairs, and the pair's own shift
+        # still gives the paper's ratio there.
+        pe = LowDimensionEnsemblePrior(; n_subsystems = 40, subsystem_size = 2, seed = 3,
+                                       sigma = 1e-3, pdm = nothing)
+        Xb = 5 .* R6[1:6, :]
+        mu, S, V = paper(Xb, draw(pe, 6, 2), 1e-3)
+        pr = prior(pe, Xb)
+        z = iszero.(V' * V)
+        @test count(z) == 24
+        @test maximum(abs, S[z]) > 0.01
+        @test isapprox(pr.mu, mu; atol = 1e-14)
+        @test isapprox(pr.sigma, S; atol = 1e-15)
+        # Fewer regression pairs than the subsystem has assets: the least-norm coefficients.
+        pe = LowDimensionEnsemblePrior(; n_subsystems = 20, subsystem_size = 3, seed = 9,
+                                       pdm = nothing)
+        mu, S, _ = paper(R6[1:3, :], draw(pe, 6, 3), 0.025)
+        pr = prior(pe, R6[1:3, :])
+        @test isapprox(pr.mu, mu; atol = 1e-13)
+        @test isapprox(pr.sigma, S; atol = 1e-13)
+        # The floor reaches the rule through a field that holds a vector of estimators.
+        opt = JuMPOptimiser(; slv = slv)
+        rv = Variance(; sigma = LowDimensionEnsemblePrior())
+        @test po.fit_min_rows(MeanRisk(; r = rv, opt = opt)) == 3
+        @test po.fit_min_rows(MeanRisk(; r = [rv, ConditionalValueatRisk()], opt = opt)) ==
+              3
+        @test po.fit_min_rows([EmpiricalPrior(), LowDimensionEnsemblePrior()]) == 3
+        @test po.fit_min_rows([1.0, 2.0]) == 1
+    end
+
     @testset "The repair and the default" begin
         # The aggregate under entry-wise weights need not be positive semidefinite; the
         # default repairs it and `nothing` leaves it.

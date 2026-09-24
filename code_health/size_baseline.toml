@@ -10,7 +10,7 @@ commit = "0ecb3ce47c"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2993, doc = 0, comment = 241, blank = 48, total = 3282 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1284, doc = 113, comment = 138, blank = 43, total = 1578 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1285, doc = 113, comment = 138, blank = 43, total = 1579 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -189,7 +189,7 @@ commit = "0ecb3ce47c"
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { code = 189, doc = 233, comment = 27, blank = 68, total = 517 }
 "src/10_Prior/12_PriorPartialFit.jl" = { code = 216, doc = 421, comment = 20, blank = 214, total = 871 }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { code = 37, doc = 77, comment = 1, blank = 28, total = 143 }
-"src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { code = 72, doc = 99, comment = 15, blank = 35, total = 221 }
+"src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { code = 90, doc = 163, comment = 13, blank = 48, total = 314 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { code = 319, doc = 1074, comment = 5, blank = 515, total = 1913 }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { code = 65, doc = 269, comment = 2, blank = 94, total = 430 }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { code = 335, doc = 1008, comment = 2, blank = 374, total = 1719 }

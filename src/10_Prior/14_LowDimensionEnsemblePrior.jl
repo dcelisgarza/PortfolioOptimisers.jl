@@ -3,30 +3,60 @@ $(DocStringExtensions.TYPEDEF)
 
 Forecasts the next price relative and its covariance by averaging many low-dimensional lagged regressions, weighted by their in-sample fit.
 
-The prior of Xi, Li, Song and Ning (2023): the market is treated as a high-dimensional system whose next relatives are predicted from many random low-dimensional subsystems, each an ordinary least-squares regression of every asset's relative on the lagged relatives of `subsystem_size` assets over the window the rows span. Each subsystem's forecast is weighted by a Gaussian kernel of its in-sample mean squared error, and its predictive covariance — the sample covariance of the regressors pushed through the coefficients — is aggregated under the product of the two assets' weights. The mean and the covariance are read off the **same** regressions, which is what makes the pair consistent: the risk term of a programme that holds this prior is the uncertainty of the very forecast its return term reads.
+This is the prior of Xi, Li, Song and Ning (2023). It treats the market as one high-dimensional system and draws many small subsystems of `subsystem_size` assets from it at random. In each subsystem, the price relative of every asset is regressed on the price relatives of the subsystem's assets one period earlier. The forecast of a subsystem counts in proportion to a Gaussian kernel of its in-sample mean squared error. Each subsystem also gives a predictive covariance, and the aggregate weighs it by the product of the kernel weights of the two assets.
+
+The mean and the covariance come from the same regressions. So the risk term of a programme that reads this prior measures the uncertainty of the forecast that its return term reads. A window of ``w`` regression pairs needs ``w + 1`` rows.
 
 # Mathematical definition
 
-With ``\\boldsymbol{x}_\\tau = \\boldsymbol{1} + \\boldsymbol{r}_\\tau`` the price relatives of the ``T`` rows handed in, ``w = T - 1`` the regression window, and ``\\mathcal{A}_l = (l_1, \\ldots, l_s)`` the assets of the ``l``-th of ``L`` subsystems drawn uniformly without replacement,
+The rows are the periods ``t - w`` to ``t``. Subsystem ``l`` holds the assets ``\\mathcal{A}_l = (l_1, \\ldots, l_s)``. For every asset ``k``, every subsystem ``l`` and ``i = 0, \\ldots, w - 1``,
 
 ```math
 \\begin{align}
-x_{\\tau, k} &= \\sum_{j = 1}^{s} \\beta^{(l)}_{k, j}\\, x_{\\tau - 1, l_j} + \\varepsilon^{(l)}_{\\tau, k}\\,, \\quad \\tau = T - w + 1, \\ldots, T\\,,\\\\
-\\hat{x}^{(l)}_{T + 1, k} &= \\boldsymbol{x}_{T, \\mathcal{A}_l}^\\intercal \\hat{\\boldsymbol{\\beta}}^{(l)}_k\\,, \\quad
-R^{(l)}_k = \\frac{1}{w} \\sum_{\\tau} \\left( x_{\\tau, k} - \\boldsymbol{x}_{\\tau - 1, \\mathcal{A}_l}^\\intercal \\hat{\\boldsymbol{\\beta}}^{(l)}_k \\right)^2\\,,\\\\
-v^{(l)}_k &= \\frac{\\exp\\left(-R^{(l)}_k / \\sigma^2\\right)}{\\sum_{m = 1}^{L} \\exp\\left(-R^{(m)}_k / \\sigma^2\\right)}\\,, \\quad
-\\hat{x}_{T + 1, k} = \\sum_{l = 1}^{L} v^{(l)}_k\\, \\hat{x}^{(l)}_{T + 1, k}\\,, \\quad
-\\hat{\\boldsymbol{\\mu}} = \\hat{\\boldsymbol{x}}_{T + 1} - \\boldsymbol{1}\\,,\\\\
-\\hat{\\Sigma}^{(l)} &= B^{(l)} S^{(l)} B^{(l)\\intercal}\\,, \\quad
-\\hat{\\Sigma}_{k h} = \\frac{\\sum_{l = 1}^{L} v^{(l)}_k v^{(l)}_h\\, \\hat{\\Sigma}^{(l)}_{k h}}{\\sum_{l = 1}^{L} v^{(l)}_k v^{(l)}_h}\\,,
+x_{t-i,k} &= \\sum_{j = 1}^{s} \\beta^{(l)}_{k,j}\\, x_{t-i-1,l_j} + \\varepsilon^{(l)}_{t-i,k}\\,,\\\\
+\\hat{\\boldsymbol{\\beta}}^{(l)}_k &= \\left(\\mathbf{X}^{(l)}\\right)^{+} \\boldsymbol{y}_k\\,,\\\\
+\\hat{x}^{(l)}_{t+1,k} &= \\boldsymbol{x}_{t,\\mathcal{A}_l}^\\intercal \\hat{\\boldsymbol{\\beta}}^{(l)}_k\\,,\\\\
+R^{(l)}_k &= \\frac{1}{w} \\sum_{i = 0}^{w - 1} \\left(x_{t-i,k} - \\boldsymbol{x}_{t-i-1,\\mathcal{A}_l}^\\intercal \\hat{\\boldsymbol{\\beta}}^{(l)}_k\\right)^2\\,,\\\\
+v^{(l)}_k &= \\frac{\\exp\\left(-R^{(l)}_k / \\sigma^2\\right)}{\\sum_{m = 1}^{L} \\exp\\left(-R^{(m)}_k / \\sigma^2\\right)}\\,,\\\\
+\\hat{x}_{t+1,k} &= \\sum_{l = 1}^{L} v^{(l)}_k\\, \\hat{x}^{(l)}_{t+1,k}\\,,\\\\
+\\hat{\\boldsymbol{\\mu}} &= \\hat{\\boldsymbol{x}}_{t+1} - \\boldsymbol{1}\\,,\\\\
+S^{(l)}_{pq} &= \\frac{1}{w - 1} \\sum_{i = 0}^{w - 1} \\left(x_{t-i,l_p} - \\bar{x}_{l_p}\\right) \\left(x_{t-i,l_q} - \\bar{x}_{l_q}\\right)\\,,\\\\
+\\hat{\\mathbf{\\Sigma}}^{(l)} &= \\mathbf{B}^{(l)} \\mathbf{S}^{(l)} \\mathbf{B}^{(l)\\intercal}\\,,\\\\
+\\left(\\hat{\\mathbf{\\Sigma}}_{t+1}\\right)_{kh} &= \\frac{\\sum_{l = 1}^{L} v^{(l)}_k v^{(l)}_h\\, \\hat{\\Sigma}^{(l)}_{kh}}{\\sum_{l = 1}^{L} v^{(l)}_k v^{(l)}_h}\\,.
 \\end{align}
 ```
 
-where ``\\hat{\\boldsymbol{\\beta}}^{(l)}_k`` is the least-squares coefficient vector of asset ``k`` on subsystem ``l`` with no intercept, ``B^{(l)}`` the ``N \\times s`` matrix whose rows are those vectors, and ``S^{(l)}`` the ``s \\times s`` sample covariance of the subsystem's relatives over the last ``w`` rows, with the ``w - 1`` denominator. The paper's equations 4 to 10. The subsystems are the same for every target asset and are drawn afresh at every fit, so a rule that refits the prior each period re-samples them each period, as the paper does; a `seed` draws the same subsystems at every fit instead, for a reproducible run.
+Where:
 
-The kernel weights are computed after subtracting each asset's smallest error, which leaves every ratio unchanged and stops a window whose errors all exceed ``\\sigma^2`` by hundreds from underflowing every weight to zero. When two assets' weights nonetheless collapse onto different subsystems, so that no subsystem carries weight for both, their covariance entry has no support and is zero. A window of fewer rows than the subsystem has regressors makes the regression underdetermined, and the least-norm coefficients are taken. The aggregate covariance is a weighted average of positive semidefinite matrices under weights that differ entry by entry, so it need not be positive semidefinite itself; `pdm` repairs it to the nearest positive definite matrix and `nothing` leaves it as aggregated, for a consumer that takes it as a quadratic form.
+  - $(math_dict[:x_t_rel])
+  - ``x_{t,k}``: Entry ``k`` of ``\\boldsymbol{x}_t``, and ``\\boldsymbol{x}_{t,\\mathcal{A}_l}`` the entries of the assets of ``\\mathcal{A}_l``.
+  - $(math_dict[:t_period])
+  - ``w``: Regression window, the number of regression pairs. The rows number ``w + 1``.
+  - ``L``: Number of subsystems.
+  - ``s``: Number of assets in each subsystem.
+  - ``\\mathcal{A}_l``: Assets of subsystem ``l``, drawn uniformly without replacement. The same subsystems serve every asset ``k``.
+  - ``\\beta^{(l)}_{k,j}``, ``\\varepsilon^{(l)}_{t-i,k}``: Coefficient and error term of the regression of asset ``k`` on subsystem ``l``, with no intercept.
+  - ``\\mathbf{X}^{(l)}``: ``w \\times s`` matrix whose row ``i + 1`` is ``\\boldsymbol{x}_{t-i-1,\\mathcal{A}_l}^\\intercal``.
+  - ``(\\cdot)^{+}``: Moore–Penrose pseudo-inverse.
+  - ``\\boldsymbol{y}_k = (x_{t,k}, \\ldots, x_{t-w+1,k})^\\intercal``: Targets of the regression of asset ``k``.
+  - ``\\hat{\\boldsymbol{\\beta}}^{(l)}_k``: Least-squares coefficient vector of asset ``k`` on subsystem ``l``.
+  - ``\\hat{x}^{(l)}_{t+1,k}``: Forecast of subsystem ``l`` for asset ``k``.
+  - ``R^{(l)}_k``: In-sample mean squared error of that regression.
+  - ``\\sigma``: Kernel bandwidth.
+  - ``v^{(l)}_k``: Kernel weight of subsystem ``l`` for asset ``k``. The weights of one asset sum to one.
+  - $(math_dict[:xhat_fc])
+  - ``\\hat{x}_{t+1,k}``: Entry ``k`` of ``\\hat{\\boldsymbol{x}}_{t+1}``.
+  - ``\\hat{\\boldsymbol{\\mu}}``: Forecast return vector, the Price Relative Forecast less one.
+  - ``\\mathbf{S}^{(l)}``: ``s \\times s`` sample covariance of the price relatives of the assets of ``\\mathcal{A}_l`` over the last ``w`` rows, with entries ``S^{(l)}_{pq}``.
+  - ``\\bar{x}_{l_p} = \\frac{1}{w} \\sum_{i = 0}^{w - 1} x_{t-i,l_p}``: Mean of the price relatives of asset ``l_p`` over the last ``w`` rows.
+  - ``\\mathbf{B}^{(l)}``: ``N \\times s`` matrix whose row ``k`` is ``\\hat{\\boldsymbol{\\beta}}^{(l)\\intercal}_k``.
+  - ``\\hat{\\mathbf{\\Sigma}}^{(l)}``: Predictive covariance of subsystem ``l``, with entries ``\\hat{\\Sigma}^{(l)}_{kh}``.
+  - $(math_dict[:Sigma_hat_pred])
+  - $(math_dict[:N])
 
-The estimator reads returns, as every prior does, and forms the relatives at its door. It admits asset returns only; factor returns handed to it are ignored. A window of `w` regression pairs needs `w + 1` rows.
+These are the equations 4 to 10 of the paper. When ``\\mathbf{X}^{(l)}`` has full column rank, the pseudo-inverse gives the paper's ``(\\mathbf{X}^{(l)\\intercal} \\mathbf{X}^{(l)})^{-1} \\mathbf{X}^{(l)\\intercal} \\boldsymbol{y}_k``. When the window has fewer pairs than the subsystem has assets, it gives the least-squares coefficients of least norm.
+
+Every ``\\hat{\\mathbf{\\Sigma}}^{(l)}`` is positive semidefinite. But ``\\hat{\\mathbf{\\Sigma}}_{t+1}`` averages them under weights that differ from entry to entry, so it need not be positive semidefinite itself.
 
 # Fields
 
@@ -36,7 +66,7 @@ $(DocStringExtensions.FIELDS)
 
     LowDimensionEnsemblePrior(; n_subsystems::Integer = 300, subsystem_size::Integer = 3, sigma::Real = 0.025, pdm::Option{<:Posdef} = Posdef(), rng::Random.AbstractRNG = Random.default_rng(), seed::Option{<:Integer} = nothing) -> LowDimensionEnsemblePrior
 
-Keywords correspond to the struct's fields. The paper's defaults: `L = 300` subsystems, which its scan to two thousand converges by, `s = 3` assets each, and a kernel bandwidth of `0.025`.
+Keywords correspond to the struct's fields. The defaults are the paper's. The paper scans ``L`` from 100 to 2000 and finds that the mean squared prediction error converges once ``L`` exceeds 300. It sets three assets in each subsystem and a kernel bandwidth of `0.025`.
 
 ## Validation
 
@@ -70,26 +100,26 @@ LowDimensionEnsemblePrior
 
 # References
 
-  - $(ref_dict[:xi2023oldem])
+  - $(ref_dict[:xi2023oldem]) Equations 4 to 10 and Section 5.3.
 """
 struct LowDimensionEnsemblePrior{T1 <: Integer, T2 <: Integer, T3 <: Real,
                                  T4 <: Option{<:Posdef}, T5 <: Random.AbstractRNG,
                                  T6 <: Option{<:Integer}} <:
        AbstractLowOrderPriorEstimator_A
     """
-    The number of low-dimensional subsystems drawn at every fit, the paper's `L`.
+    The number of subsystems that every fit draws, the paper's ``L``.
     """
     n_subsystems::T1
     """
-    The number of assets in every subsystem, the paper's `s`; clipped to the number of assets in the rows when the universe is smaller.
+    The number of assets in every subsystem, the paper's ``s``. When the rows hold fewer assets, the fit uses all of them.
     """
     subsystem_size::T2
     """
-    The kernel bandwidth of the subsystem weights, the paper's `σ`: a subsystem's weight is the Gaussian kernel of its in-sample mean squared error at this bandwidth.
+    The kernel bandwidth of the subsystem weights, the paper's ``\\sigma``.
     """
     sigma::T3
     """
-    The positive definite repair of the aggregated covariance, or `nothing` to leave it as aggregated.
+    The positive definite repair of the aggregated covariance, or `nothing` to leave the aggregate as it is. On short windows the aggregate is usually indefinite.
     """
     pdm::T4
     """
@@ -128,9 +158,34 @@ end
 """
     fit_min_rows(est)
 
-The fewest observations an estimator tree fits on: the largest floor any estimator in the tree states, and one where none does.
+Returns the fewest observations that an estimator tree can fit on.
 
-An estimator whose fit is undefined below some number of rows states that number with a method of its own; every other estimator answers the largest floor among its estimator-valued fields, so a floor stated on a prior three slots deep reaches the rule that holds the head. [`LowDimensionEnsemblePrior`](@ref) states three: two regression pairs, the fewest whose regressor covariance exists.
+An estimator whose fit is undefined below some number of rows states that number with a method of its own. [`LowDimensionEnsemblePrior`](@ref) states three, because two regression pairs are the fewest whose regressor covariance exists. Every other estimator returns the largest floor in its fields, so a floor that a prior states three levels down reaches the rule that holds the head.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+n(e) &= \\begin{cases}
+n_e & \\text{if } e \\text{ states a floor}\\,,\\\\
+\\max\\left(1,\\, \\max_{f \\in \\mathcal{F}(e)} n(f)\\right) & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``n(e)``: Fewest rows that estimator ``e`` can fit on.
+  - ``n_e``: Floor that the type of ``e`` states.
+  - ``\\mathcal{F}(e)``: Estimators that the fields of ``e`` hold, one for each estimator-valued field and one for each entry of a field that holds a vector of estimators. A value that is not an estimator has ``n = 1``.
+
+# Arguments
+
+  - `est`: The estimator tree, or any value.
+
+# Returns
+
+  - `n::Integer`: The fewest rows.
 
 # Related
 
@@ -139,7 +194,11 @@ An estimator whose fit is undefined below some number of rows states that number
   - [`forecast_min_rows`](@ref)
 """
 function fit_min_rows(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
-    return maximum(f -> fit_min_rows(getfield(est, f)), estimator_fields(est); init = 1)
+    return maximum(f -> fit_min_rows(getfield(est, f)), fieldnames(typeof(est)); init = 1)
+end
+function fit_min_rows(v::AbstractVector{<:Union{<:AbstractEstimator,
+                                                <:StatsBase.CovarianceEstimator}})
+    return maximum(fit_min_rows, v; init = 1)
 end
 function fit_min_rows(::Any)
     return 1
@@ -150,24 +209,44 @@ end
 """
     prior(pe::LowDimensionEnsemblePrior, X::MatNum, F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
 
-The low-dimension ensemble prior of the rows: the kernel-weighted one-step forecast of the price relatives less one as `mu`, and the aggregated predictive covariance as `sigma`, over every row handed in. The fit reduces to the Coverage Universe of the window first, as every prior does — an asset with a non-finite return, or an inactive row of the panel, anywhere in the window is left out — and both moments are expanded back to the full universe with `NaN` outside it, so a consumer's Investable Mask reads the departure and the rows carried keep every column as given.
+Computes the low-dimension ensemble prior of the rows, with the forecast return as `mu` and the aggregated predictive covariance as `sigma`.
+
+The fit reads the Coverage Universe of the rows, as every prior does. An asset with a non-finite return, or with an inactive row of the panel, at any observation is left out. Both moments are expanded back to the full universe with `NaN` outside it, so the Investable Mask of a consumer reads the departure. The returned rows keep every column as given.
+
+# Algorithm
+
+ 1. Orient `X` to observations by assets, giving `Xf`.
+ 2. Reduce `Xf` to its Coverage Universe with [`coverage_reduction`](@ref), giving the mask `cmsk` and the reduced returns `X` of `T` rows and `N` assets.
+ 3. Check that `T >= 3`.
+ 4. Form the price relatives `P = 1 + X`. Split them into the targets `Y`, every row but the first, the regressors `Z`, every row but the last, and the last row `z`.
+ 5. Clip the subsystem size to `N`, giving `s`.
+ 6. Resolve the random number generator from `rng` and `seed`, and draw `L` subsystems `idxs` of `s` assets each, without replacement. One draw serves every target asset. With a `seed`, every call draws the same subsystems. Without one, every call draws new ones, so a rule that refits the prior at every period draws new subsystems at every period, as the paper does.
+ 7. Solve one least-squares problem for each subsystem, for all the targets at once, giving the `s × N` coefficient matrices `Bs`. Julia's `\\` gives the coefficients of least norm when the window has fewer pairs than `s`.
+ 8. Compute the `L × N` in-sample mean squared errors `R` and the subsystem forecasts `F`.
+ 9. Subtract the smallest error of each asset from its column of `R`, giving `E`. This leaves every kernel ratio unchanged. It also stops the kernel from underflowing to zero for every subsystem when the errors are large against ``\\sigma^2``.
+10. Compute the kernel weights `V` from `E`, and scale each column to sum to one.
+11. Compute `mu` as the weighted forecasts less one.
+12. For each pair of assets, find the smallest sum `m` of their two shifted errors over the subsystems. The covariance weight of subsystem `l` for the pair is the kernel of its sum less `m`. The two shifts cancel in the ratio, and the largest weight of each pair is one, so no denominator underflows to zero.
+13. Accumulate the weighted subsystem covariances in `num` and the weights in `den`, and divide, giving `sigma`.
+14. Symmetrise `sigma`, because a matrix product need not be symmetric to the bit.
+15. Repair `sigma` with [`posdef`](@ref) under `pdm`, and expand `mu` and `sigma` to the full universe with [`expand_moment`](@ref).
 
 # Arguments
 
   - `pe`: The ensemble prior estimator.
   - `X`: Asset returns matrix (observations × assets).
-  - `F`: Factor returns matrix (ignored).
+  - `F`: Factor returns matrix, ignored.
   - `pnl`: Asset Panel, whose active mask enters the Coverage Universe.
   - $(arg_dict[:dims])
   - `kwargs...`: Ignored.
 
 # Validation
 
-  - `size(X, 1) >= 3` after orientation: two regression pairs, the fewest whose regressor covariance exists. An `ArgumentError` is thrown otherwise.
+  - `size(X, 1) >= 3` after orientation, because two regression pairs are the fewest whose regressor covariance exists. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
-  - `pr::LowOrderPrior`: The rows as given, the forecast mean and the predictive covariance, `NaN` outside the Coverage Universe.
+  - `pr::LowOrderPrior`: The rows as given, the forecast mean and the predictive covariance, with `NaN` outside the Coverage Universe.
 
 # Related
 
@@ -201,20 +280,30 @@ function prior(pe::LowDimensionEnsemblePrior, X::MatNum, ::Option{<:MatNum} = no
     R = stack(map(l -> vec(sum(abs2, Y .- Z[:, idxs[l]] * Bs[l]; dims = 1)) ./ w, 1:L);
               dims = 1)
     F = stack(map(l -> transpose(Bs[l]) * z[idxs[l]], 1:L); dims = 1)
-    # The kernel weights, shifted by each asset's smallest error: the ratios are unchanged
-    # and a window of large errors no longer underflows every weight to zero.
-    V = exp.(-(R .- minimum(R; dims = 1)) ./ abs2(pe.sigma))
+    # Each asset's errors above its smallest: every kernel ratio is unchanged, and a window
+    # of large errors no longer underflows every weight to zero.
+    s2 = abs2(pe.sigma)
+    E = R .- minimum(R; dims = 1)
+    V = exp.(.-E ./ s2)
     V ./= sum(V; dims = 1)
     mu = vec(sum(V .* F; dims = 1)) .- one(eltype(F))
-    # The covariance of subsystem `l` is the regressors' sample covariance pushed through its
-    # coefficients, weighted entry by entry by the product of the two assets' weights.
-    num = sum(map(l -> (V[l, :] .* transpose(V[l, :])) .*
-                       (transpose(Bs[l]) * Statistics.cov(Y[:, idxs[l]]) * Bs[l]), 1:L))
-    den = transpose(V) * V
-    # An entry whose weights vanish on every subsystem — the two assets' kernels collapsed
-    # onto different subsystems — has no support, and the paper's ratio is undefined; it is
-    # zero here.
-    sigma = ifelse.(iszero.(den), zero(eltype(num)), num ./ den)
+    # The covariance weight of a pair is the product of the two kernels. Shifted by its
+    # largest value over the subsystems, it is exact in the ratio and never underflows to
+    # zero for every subsystem, so every entry has a denominator of at least one.
+    m = view(E, 1, :) .+ transpose(view(E, 1, :))
+    for l in 2:L
+        m .= min.(m, view(E, l, :) .+ transpose(view(E, l, :)))
+    end
+    u = similar(m)
+    num = zero(m)
+    den = zero(m)
+    for l in 1:L
+        u .= exp.((m .- view(E, l, :) .- transpose(view(E, l, :))) ./ s2)
+        sl = transpose(Bs[l]) * Statistics.cov(view(Y, :, idxs[l])) * Bs[l]
+        num .+= u .* sl
+        den .+= u
+    end
+    sigma = num ./ den
     # Symmetrised to the bit, so a consumer's Hermitian check holds; a matrix product need
     # not be.
     sigma = (sigma .+ transpose(sigma)) ./ 2

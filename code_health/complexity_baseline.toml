@@ -188,7 +188,7 @@ commit = "0ecb3ce47c"
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { cyc = 5, cog = 8, arg = 19, cyc_sum = 14, cog_sum = 13, arg_sum = 38, macros = ["@propagatable"] }
 "src/10_Prior/12_PriorPartialFit.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 50, cog_sum = 36, arg_sum = 96, macros = [] }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 10, cog_sum = 8, arg_sum = 19, macros = [] }
-"src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { cyc = 2, cog = 1, arg = 6, cyc_sum = 8, cog_sum = 3, arg_sum = 16, macros = [] }
+"src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 11, cog_sum = 5, arg_sum = 17, macros = [] }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 63, cog_sum = 30, arg_sum = 92, macros = [] }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 11, cog_sum = 4, arg_sum = 34, macros = [] }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 33, cog_sum = 8, arg_sum = 114, macros = [] }

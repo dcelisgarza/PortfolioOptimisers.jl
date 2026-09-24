@@ -1343,9 +1343,9 @@ Where:
   - $(math_dict[:w_star_lead])
   - $(math_dict[:w_var_lead])
   - $(math_dict[:Delta_N_simplex])
-  - ``\\hat{\\boldsymbol{x}}_{t+1}``: Price relative forecast of the ensemble for period ``t + 1``.
+  - $(math_dict[:xhat_fc])
   - ``\\gamma``: Risk aversion over the predictive variance, the paper's ``\\gamma``.
-  - ``\\hat{\\mathbf{\\Sigma}}_{t+1}``: Predictive covariance of the ensemble for period ``t + 1``.
+  - $(math_dict[:Sigma_hat_pred])
   - ``\\xi``: Rate of the linear turnover fee, the paper's ``\\xi``.
   - $(math_dict[:w_hat_t_padj])
   - $(math_dict[:N])

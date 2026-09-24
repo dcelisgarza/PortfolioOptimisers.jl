@@ -1282,6 +1282,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :xtilde_fc => "``\\tilde{\\boldsymbol{x}}_{t+1} = \\hat{\\boldsymbol{x}}_{t+1} - \\bar{x}_{t+1} \\boldsymbol{1}``: Centred Price Relative Forecast, with ``\\bar{x}_{t+1}`` the mean of the entries of ``\\hat{\\boldsymbol{x}}_{t+1}``. Its entries sum to zero.",#
                        :p_t_level => "``\\boldsymbol{p}_t``: Price level vector of period ``t``, one entry per asset.",#
                        :w_levels => "``w``: Price-level window, the number of price levels a statistic reads, the current one included.",#
+                       :Sigma_hat_pred => "``\\hat{\\mathbf{\\Sigma}}_{t+1}``: Predictive covariance of the price relatives of period ``t + 1``, made after the row of period ``t``.",#
                        # The Constrained Update: the raw step, the set it is projected onto,
                        # and the divergence of the projection.
                        :q_raw => "``\\boldsymbol{q}``: Raw step, the vector the rule's unconstrained step gives before the projection onto the Allocation Set.",#
