@@ -1,6 +1,6 @@
 ---
 name: sweep-file-issues
-description: Write, wire and reopen the sweep parent and sub-issues of #404 on the GitHub tracker for a file that joined the library without conforming — reopen the closed child map and the umbrella, open one sub-issue per file, and parent it. Use when sweep-conform reports step 3 or step 4 unmet, or when an addition already landed unswept.
+description: "Write, wire and reopen the sweep parent and sub-issues of #404 on the GitHub tracker for a file that joined the library without conforming — reopen the closed child map and the umbrella, open one sub-issue per file, and parent it. Use when sweep-conform reports step 3 or step 4 unmet, or when an addition already landed unswept."
 ---
 
 # Filing the sweep issues

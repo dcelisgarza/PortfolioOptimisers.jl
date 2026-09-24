@@ -17,8 +17,6 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
   behaviour, so an ADR describing superseded behaviour is correct history, not a bug. An ADR whose
   decision has **not** reached `main` is still a draft — rewrite it in place, because no reader
   outside the branch ever saw the text you would be amending.
-- To find code, prefer kaimon's `search_code` (semantic) when you can only *describe* what you
-  want, and `grep_code` when you already hold an exact token.
 
 ## Parallel sessions
 
@@ -56,8 +54,7 @@ before you merge so you lower the number that is current.
 - **Single-threaded**: `julia -t 1`, `BLAS.set_num_threads(1)`. Never kick off the full test suite
   or a docs build — those are the maintainer's to run.
 - Run **targeted** `test_*.jl` files for the area you changed. `test/runtests.jl` supplies a shared
-  `init_code` preamble (`Test`, `Logging`, `CSV`, `TimeSeries`, `DataFrames`, `StableRNGs`,
-  `StatsBase`, `LinearAlgebra`, `find_tol`); reproduce it if you include a test file directly.
+  `init_code` preamble; reproduce it if you include a test file directly.
 - On a Revise world-age warning, **restart the session and cold-load**. If a session wedges, shut it
   down and start a new one rather than fighting it.
 
@@ -75,10 +72,8 @@ before you merge so you lower the number that is current.
 - **JuliaFormatter runs over the whole repository, and every file it reaches is formatted in
   place.** It escapes a quote inside a jldoctest block as `\"`, which is normal output: inside a
   `"""` docstring `\"` renders as `"`, and the doctests pass. **Do not revert the escaping.**
-  The gate is `.github/workflows/FormatCheck.yml`, which runs `format(".")`, and the
-  `julia-formatter` pre-commit hook, which excludes only `.github/`.
-- Margin is 92 (`.JuliaFormatter.toml`, `yas` style). Long string literals and docstring prose are
-  exempt in practice; code lines are not.
+- Long string literals and docstring prose are exempt from the margin in practice; code lines are
+  not.
 
 ## Doctests
 

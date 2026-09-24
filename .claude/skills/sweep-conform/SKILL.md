@@ -1,6 +1,6 @@
 ---
 name: sweep-conform
-description: Make an addition under src/ or ext/ conform to the sweep of #404 before the commit — the manifest row, the unit count, the child map, the coverage entry, the include line, and the two tracker steps no Julia test can reach. Use after adding or changing any file under src/ or ext/, and before committing.
+description: "Make an addition under src/ or ext/ conform to the sweep of #404 before the commit — the manifest row, the unit count, the child map, the coverage entry, the include line, and the two tracker steps no Julia test can reach. Use after adding or changing any file under src/ or ext/, and before committing."
 ---
 
 # Conforming to the sweep
