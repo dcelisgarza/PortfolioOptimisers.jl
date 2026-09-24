@@ -15,6 +15,7 @@ PortfolioOptimisers.breakpoint_segment
 PortfolioOptimisers.bounded_root
 PortfolioOptimisers.bisection_cap
 PortfolioOptimisers.project_simplex
+PortfolioOptimisers.budget_rounding
 PortfolioOptimisers.gram_geometry
 PortfolioOptimisers.HeldStep
 PortfolioOptimisers.ProjectionStep

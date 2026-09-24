@@ -160,6 +160,43 @@ end
         end
     end
 
+    @testset "A zero weight stays exact under the Euclidean step (#1308)" begin
+        # The Price-Adjusted Allocation sums to one by rounding alone, and the exact sort
+        # spread that rounding over the zeros as a residue of about 1e-16.
+        w = [0.5, 0.0, 0.25, 0.25]
+        x = [1.0123, 0.9871, 1.0311, 0.9642]
+        v = po.price_adjusted_allocation(w, x)
+        @test po.project_simplex(v)[2] == 0
+        @test po.project_simplex(v) == v ./ sum(v)
+        # Later steps compounded the residue: 11 eps after 1000 rows at N = 4, which no
+        # fixed multiple of eps in the Held Gap check could hold.
+        rng = StableRNG(1)
+        wt = [1 / 3, 0.0, 1 / 3, 1 / 3]
+        for _ in 1:1000
+            wt = po.project_simplex(po.price_adjusted_allocation(wt,
+                                                                 1 .+ 0.02 .* randn(rng, 4)))
+        end
+        @test wt[2] == 0 && isapprox(sum(wt), 1; atol = 1e-14)
+        # The reproduction of #1308: a gap at an active asset with a zero weight is silent.
+        R = 0.02 .* randn(StableRNG(7), 40, 4)
+        R[3, 2] = NaN
+        rdh = ReturnsResult(; nx = ["A", "B", "C", "D"], X = R,
+                            ts = Date(2020, 1, 1) .+ Day.(0:39))
+        wz = @test_nowarn optimise(OPS(; alg = BuyAndHold(), w0 = w, strict = true), rdh).w
+        @test wz[2] == 0
+        # A vector off the budget by more than the bound still takes the sort.
+        @test po.project_simplex([0.5, 0.0, 0.4]) ≈ [0.5, 0.0, 0.4] .+ 1 / 30
+        @test po.project_simplex([0.6, 0.0, 0.5]) ≈ [0.55, 0.0, 0.45]
+        # The bound is deterministic, and zero on an exact type.
+        @test po.budget_rounding(Float64, 4) == 5 * eps(Float64)
+        @test po.budget_rounding(Float32, 4) === 5 * eps(Float32)
+        @test po.budget_rounding(Rational{Int}, 4) === 0 // 1
+        @test po.budget_rounding(Int, 4) === 0
+        @test po.project_simplex([1 // 2, 0 // 1, 1 // 2]) == [1 // 2, 0 // 1, 1 // 2]
+        @test po.project_simplex([1 // 1, 1 // 1]) == [1 // 2, 1 // 2]
+        @test po.project_simplex([1 // 2, 0 // 1, 1 // 4]) == [7 // 12, 1 // 12, 1 // 3]
+    end
+
     @testset "Parity 3: the programme under a slack constraint equals the closed form" begin
         # A linear constraint no step hits: the programme and the root agree in both
         # geometries, and under a binding cap too.

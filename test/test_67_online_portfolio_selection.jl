@@ -256,10 +256,12 @@ end
         @test_logs (:warn, r"the first at observation 3\.") po.partial_fit!(o12,
                                                                             rows(rdh, 3:5))
         # A gap at an asset to which the recursion gives no weight is silent. The
-        # entropic step keeps the zero exact.
-        @test_nowarn optimise(OPS(; alg = ExponentiatedGradient(),
-                                  w0 = [0.5, 0.0, 0.25, 0.25], strict = true),
-                              rows(rdh, 1:5))
+        # entropic step keeps the zero exact, and so does a Euclidean step that moves no
+        # weight onto it (#1308).
+        for alg in (ExponentiatedGradient(), BuyAndHold())
+            @test_nowarn optimise(OPS(; alg = alg, w0 = [0.5, 0.0, 0.25, 0.25],
+                                      strict = true), rows(rdh, 1:5))
+        end
         # The step reads x = 1 at the gap: the same answer as a zero return.
         Rz = copy(R)
         Rz[3, 2] = 0.0

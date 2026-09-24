@@ -894,11 +894,29 @@ Where:
 
 The entries of ``\\boldsymbol{v}`` below ``\\theta`` become exactly zero. That is the sparsity of every rule under the Euclidean geometry.
 
+A non-negative ``\\boldsymbol{v}`` whose sum misses one by rounding alone is on the simplex already, and the projection renormalises it:
+
+```math
+\\begin{align}
+\\boldsymbol{w}^{+} &= \\frac{\\boldsymbol{v}}{s} \\quad \\text{if } \\boldsymbol{v} \\geq 0 \\text{ and } \\lvert s - 1 \\rvert \\leq (N + 1) \\varepsilon\\,,\\quad s = \\boldsymbol{1}^\\intercal \\boldsymbol{v}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``s``: Sum of the entries of ``\\boldsymbol{v}``.
+  - $(math_dict[:eps_machine])
+
+The bound ``(N + 1) \\varepsilon`` is [`budget_rounding`](@ref).
+
+The exact projection of such a vector lifts every zero entry by ``(1 - s) / N`` when ``s < 1``, and a later step compounds that residue as a real holding. The quotient keeps a zero exactly zero. It differs from the exact projection by at most ``\\lVert \\boldsymbol{v} - \\boldsymbol{v} / s \\rVert``, because a projection is non-expansive and ``\\boldsymbol{v} / s`` is its own projection. That distance is within the rounding of ``\\boldsymbol{v}`` itself.
+
 # Algorithm
 
- 1. Sort `v` in decreasing order, giving `u`.
- 2. For each `j`, add `u[j]` to the running sum `css` and take `t = (css - 1) / j`. When `u[j] - t > 0`, set `rho = j` and `theta = t`.
- 3. Return `max.(v .- theta, 0)`.
+ 1. Sum `v`, giving `s`. When every entry of `v` is non-negative and `abs(s - 1)` is at most [`budget_rounding`](@ref), return `v ./ s`.
+ 2. Sort `v` in decreasing order, giving `u`.
+ 3. For each `j`, add `u[j]` to the running sum `css` and take `t = (css - 1) / j`. When `u[j] - t > 0`, set `rho = j` and `theta = t`.
+ 4. Return `max.(v .- theta, 0)`.
 
 # Arguments
 
@@ -912,12 +930,17 @@ The entries of ``\\boldsymbol{v}`` below ``\\theta`` become exactly zero. That i
 
   - [`project`](@ref)
   - [`EuclideanProjection`](@ref)
+  - [`budget_rounding`](@ref)
 
 # References
 
   - $(ref_dict[:duchi2008])
 """
 function project_simplex(v::AbstractVector)
+    s = sum(v)
+    if all(x -> x >= zero(x), v) && abs(s - one(s)) <= budget_rounding(typeof(s), length(v))
+        return v ./ s
+    end
     u = sort(v; rev = true)
     css = zero(eltype(u))
     rho = 1
@@ -931,6 +954,40 @@ function project_simplex(v::AbstractVector)
         end
     end
     return max.(v .- theta, zero(theta))
+end
+"""
+    budget_rounding(::Type{T}, n::Integer) where {T <: Union{Integer, Rational}}
+    budget_rounding(::Type{T}, n::Integer)
+
+Returns the rounding bound on the sum of an `n`-vector of type `T` that sums to one in exact arithmetic.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+b(T, n) &= (n + 1) \\varepsilon\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``b(T, n)``: Bound on ``\\lvert \\boldsymbol{1}^\\intercal \\boldsymbol{v} - 1 \\rvert`` for a computed ``\\boldsymbol{v}`` of ``n`` entries of type ``T``.
+  - $(math_dict[:eps_machine])
+
+The bound is deterministic, to first order in ``u``. The Price-Adjusted Allocation `w .* x ./ ⟨w, x⟩` sums to one in exact arithmetic whatever `Σ w` is. Each of its entries carries a relative error of at most ``(n + 2) u``: one rounding in the product, one in the quotient, and ``n`` in the dot product. The pairwise `sum` adds at most ``\\lceil \\log_2 n \\rceil u``. The total, ``(n + 2 + \\lceil \\log_2 n \\rceil) u``, is at most ``2 (n + 1) u = b(T, n)`` for every ``n \\geq 1``.
+
+The probabilistic bound ``\\sqrt{n} \\varepsilon`` holds at one step with high probability, but not at every step of a long recursion. One miss leaves a residue that later steps compound. An integer or `Rational` type takes zero, because its sums carry no rounding. An AD dual takes the bound of its value type, through its own `eps`.
+
+# Related
+
+  - [`project_simplex`](@ref)
+  - [`price_adjusted_allocation`](@ref)
+"""
+function budget_rounding(::Type{T}, n::Integer) where {T <: Union{Integer, Rational}}
+    return zero(T)
+end
+function budget_rounding(::Type{T}, n::Integer) where {T}
+    return (n + 1) * eps(T)
 end
 """
     online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet)
