@@ -1365,7 +1365,15 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :ell_t_pa => "``\\ell_t = \\max(0, \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle - \\epsilon)``: Hinge loss of period ``t``, the part of the gross return above the reversion threshold.",#
                        :xbar_t_pa => "``\\bar{x}_t``: Cross-sectional mean of the price relative of period ``t``, the average of its ``N`` entries.",#
                        :C_pa => "``C``: Aggressiveness of a passive-aggressive slack rule, positive.",#
-                       :E_eset => "``\\mathcal{E}``: Expert Set, the Allocation Set over the experts that the weighting of an expert mixture projects onto.")
+                       :E_eset => "``\\mathcal{E}``: Expert Set, the Allocation Set over the experts that the weighting of an expert mixture projects onto.",#
+                       # A meta-optimiser's sub-portfolios, the synthetic assets of its outer
+                       # problem, and the combination of the two solves.
+                       :K_sub => "``K``: Sub-portfolio count of a meta-optimiser, which is also the number of synthetic assets of its outer problem.",#
+                       :W_inner => "``\\mathbf{W}``: Inner weight matrix `assets × sub-portfolios`. Column ``k`` holds the weights of sub-portfolio ``k`` over all ``N`` assets, and zero at an asset outside the sub-portfolio.",#
+                       :W_tilde_syn => "``\\tilde{\\mathbf{W}}``: Normalised inner weight matrix, ``\\tilde{W}_{ik} = |W_{ik}| / \\sum_{j=1}^{N} |W_{jk}|``. A column of zeros stays a column of zeros.",#
+                       :v_outer => "``\\boldsymbol{v}``: Outer weight vector, the weights that the outer optimiser gives the ``K`` synthetic assets.",#
+                       :s_k_comb => "``s_k``: Combination Weight of sub-portfolio ``k``.",#
+                       :c_k_comb => "``c_k``: Coefficient of sub-portfolio ``k`` in the combination.")
 """
     ref_dict
 

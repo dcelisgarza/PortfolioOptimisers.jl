@@ -347,7 +347,7 @@ end
                 :RiskJuMPOptimisationResult, :SchurComplementAlgorithm,
                 :SecondMomentFormulation, :SequentialCrossValidationResult,
                 :SmythBrobyCovarianceAlgorithm, :SquaredOrderedWeightsArrayAlgorithm,
-                :SubPortfolioUniverse, :UnstandardisedHighOrderMomentMeasureAlgorithm,
+                :UnstandardisedHighOrderMomentMeasureAlgorithm,
                 :UnstandardisedLowOrderMomentMeasureAlgorithm, :ValueatRiskFormulation,
                 :VariableTracking, :VarianceFormulation, :WalkForwardEstimator])
 

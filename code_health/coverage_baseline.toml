@@ -285,7 +285,7 @@ commit = "8610300"
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/16_TrackingRiskMeasureConstraints.jl" = { lines = 119, misses = 12 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/17_VarianceSkewKurtosisConstraints.jl" = { lines = 43, misses = 0 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/18_GenericValueatRiskRangeConstraints.jl" = { lines = 2, misses = 0 }
-"src/17_Optimisation/06_Meta/01_Base_MetaOptimisation.jl" = { lines = 167, misses = 17 }
+"src/17_Optimisation/06_Meta/01_Base_MetaOptimisation.jl" = { lines = 167, misses = 0 }
 "src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { lines = 159, misses = 10 }
 "src/17_Optimisation/06_Meta/03_Stacking.jl" = { lines = 104, misses = 6 }
 "src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { lines = 112, misses = 5 }

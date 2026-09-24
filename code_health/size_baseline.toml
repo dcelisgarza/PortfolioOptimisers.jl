@@ -10,7 +10,7 @@ commit = "0ecb3ce47c"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2993, doc = 0, comment = 241, blank = 48, total = 3282 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1310, doc = 113, comment = 143, blank = 43, total = 1609 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1316, doc = 113, comment = 145, blank = 43, total = 1617 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -297,9 +297,9 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/16_TrackingRiskMeasureConstraints.jl" = { code = 201, doc = 211, comment = 4, blank = 77, total = 493 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/17_VarianceSkewKurtosisConstraints.jl" = { code = 70, doc = 21, comment = 1, blank = 9, total = 101 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/18_GenericValueatRiskRangeConstraints.jl" = { code = 6, doc = 20, comment = 0, blank = 8, total = 34 }
-"src/17_Optimisation/06_Meta/01_Base_MetaOptimisation.jl" = { code = 276, doc = 370, comment = 23, blank = 180, total = 849 }
+"src/17_Optimisation/06_Meta/01_Base_MetaOptimisation.jl" = { code = 262, doc = 544, comment = 24, blank = 243, total = 1073 }
 "src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { code = 389, doc = 334, comment = 23, blank = 121, total = 867 }
-"src/17_Optimisation/06_Meta/03_Stacking.jl" = { code = 278, doc = 280, comment = 19, blank = 88, total = 665 }
+"src/17_Optimisation/06_Meta/03_Stacking.jl" = { code = 277, doc = 280, comment = 19, blank = 88, total = 664 }
 "src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { code = 275, doc = 300, comment = 14, blank = 88, total = 677 }
 "src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { code = 165, doc = 309, comment = 11, blank = 122, total = 607 }
 "src/17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl" = { code = 244, doc = 268, comment = 25, blank = 82, total = 619 }

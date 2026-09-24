@@ -345,7 +345,7 @@
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/16_TrackingRiskMeasureConstraints.jl" = { map = 11, units = 9, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/17_VarianceSkewKurtosisConstraints.jl" = { map = 11, units = 1, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/18_GenericValueatRiskRangeConstraints.jl" = { map = 11, units = 1, swept = false }
-"src/17_Optimisation/06_Meta/01_Base_MetaOptimisation.jl" = { map = 10, units = 20, swept = false }
+"src/17_Optimisation/06_Meta/01_Base_MetaOptimisation.jl" = { map = 10, units = 20, algorithm = 10, swept = true, bindings = ["ClusterUniverse", "FullUniverse", "SubPortfolioUniverse", "assert_fold_alignment", "combination_weights", "fold_asset_panel", "fold_feature_anchors", "fold_row_indices", "fold_weight_matrix", "outer_optimisation_finaliser", "panel_field_stack", "predict_outer_returns", "prepare_outer_rd", "rebuild_asset_panel", "rebuild_returns_result", "sub_portfolio_count", "sub_portfolio_cv", "sub_portfolio_predict", "sub_portfolio_predictions", "sub_portfolio_view"] }
 "src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { map = 10, units = 19, swept = false }
 "src/17_Optimisation/06_Meta/03_Stacking.jl" = { map = 10, units = 13, swept = false }
 "src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { map = 10, units = 14, swept = false }

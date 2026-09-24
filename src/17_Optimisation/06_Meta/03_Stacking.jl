@@ -258,12 +258,12 @@ c_k &= \\frac{s_k v_k}{\\sum_{j=1}^{K} s_j v_j} \\sum_{j=1}^{K} v_j\\,,\\\\
 Where:
 
   - ``\\boldsymbol{w}^*``: Final stacked portfolio weights.
-  - ``K``: Number of inner optimisers.
+  - $(math_dict[:K_sub]) Here it is the number of inner optimisers.
   - ``\\boldsymbol{X}``: Asset returns matrix.
   - ``\\boldsymbol{R}``: Returns proxy matrix, one column per synthetic asset.
-  - ``\\boldsymbol{v}``: Outer optimiser weights over the synthetic universe.
-  - ``s_k``: Combination Weight of inner optimiser ``k``. Absent, or uniform, ``\\boldsymbol{c} = \\boldsymbol{v}``.
-  - ``c_k``: Coefficient inner optimiser ``k`` carries in the combination.
+  - $(math_dict[:v_outer])
+  - $(math_dict[:s_k_comb]) Absent, or uniform, ``\\boldsymbol{c} = \\boldsymbol{v}``.
+  - $(math_dict[:c_k_comb])
   - ``\\mathrm{opto}``: Outer optimiser applied to the synthetic universe.
 
 The outer problem is built from ``\\boldsymbol{w}_k``, never from ``s_k \\boldsymbol{w}_k``: the weight acts at the combination alone, so a cross-validated run and a fold-less one agree on it (see [`combination_weights`](@ref)).
