@@ -460,8 +460,8 @@ online arm, [`online_folds`](@ref), is taken first, when the scheme is an Online
 ([`folds_are_stepped`](@ref)): the loop then warms one estimator up on the first training window,
 folds each fold's new rows into it, and hands the callback a [`Fold`](@ref) whose `train` is
 `nothing` — steps 2 and 3 run on a per-fold copy of the threaded estimator, so a schedule and
-the previous weights still reach the fold, and a schedule the *step* reads is resolved one
-fold earlier through [`online_step_fold`](@ref). Otherwise a run is sequential only when two
+the previous weights still reach the fold, and a schedule the *step* reads is resolved earlier
+in the same fold through [`online_step_fold`](@ref). Otherwise a run is sequential only when two
 facts hold at once: the fold enumeration of `cv` is a timeline
 ([`folds_are_time_ordered`](@ref)), *and* `est` needs the previous fold's weights
 ([`needs_previous_weights`](@ref)). The conjunction routes through [`run_folds`](@ref).
@@ -520,7 +520,7 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
         w_prev = previous_weights(pws, prev)
         # Resolve time-dependent entries first, so a freshly swapped-in per-fold entry also
         # receives the previous weights from the factory pass below. The online arm builds
-        # the same record one fold earlier, for the schedules its step reads.
+        # the same record earlier in the fold, for the schedules its step reads.
         if td_flag
             esti = update_time_dependent_estimator(esti,
                                                    fold_context(i, n, rdi, train_idx,

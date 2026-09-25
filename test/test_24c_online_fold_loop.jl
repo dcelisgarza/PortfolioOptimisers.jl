@@ -497,6 +497,42 @@ assets is what keeps the JuMP families cheap.
         @test threaded(o1.pred[2]) == tnw
     end
 
+    @testset "A frontier population is refused after fold 1, and one fold equals batch" begin
+        # The online arm refuses a population as the batch arms do: fold 1 reads no previous
+        # weights and solves, and fold 2 is refused by name. A fixed turnover reads none.
+        front_tn(tn) = MeanRisk(;
+                                opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
+                                                    tn = tn,
+                                                    ret = ArithmeticReturn(;
+                                                                           settings = JuMPReturnsSettings(;
+                                                                                                          lb = Frontier(;
+                                                                                                                        N = 5)))))
+        cvr = split(online_cv, rd)
+        n = length(cvr.train_idx)
+        seen = Int[]
+        err = try
+            po.fold_loop(front_tn(Turnover(; val = 0.5, w = fill(inv(N), N))), n,
+                         FLoops.SequentialEx(); rd = rd, train_idx = cvr.train_idx,
+                         test_idx = cvr.test_idx, cv = online_cv) do fold
+                push!(seen, fold.i)
+                return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+            end
+            nothing
+        catch e
+            e
+        end
+        @test seen == [1]
+        @test isa(err, ArgumentError) && occursin("population of 5 portfolios", err.msg)
+        fx = front_tn(Turnover(; val = 0.5, w = fill(inv(N), N), fixed = true))
+        @test length(cross_val_predict(fx, rd, online_cv).pred) == n
+        # A scheme with one fold: the warm-up is the whole run, and fold 1 gains no row.
+        one_b = IndexWalkForward(T - t, t; expand_train = true)
+        one_o = OnlineIndexWalkForward(T - t, t)
+        @test n_splits(one_o, rd) == 1
+        @test isapprox(cross_val_predict(mr, rd, one_o).pred[1].res.w,
+                       cross_val_predict(mr, rd, one_b).pred[1].res.w; atol = 1e-5)
+    end
+
     @testset "The read-out entry: a hand-stepped estimator equals the cold one" begin
         cvr = split(online_cv, rd)
         for i in (1, 3)

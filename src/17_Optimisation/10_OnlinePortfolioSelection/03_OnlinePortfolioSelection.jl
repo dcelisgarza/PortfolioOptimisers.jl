@@ -707,7 +707,7 @@ end
 
 Folds the fold's rows into the head inside the fold's own Allocation Set.
 
-The head is the one family whose online step is the optimisation. The Constrained Update projects the raw step of every row onto `set`, so the step reads a schedule on `set`, and not only the read-out. So the method resolves the entry here, one fold before the read-out resolves the other schedules. The head that the loop threads on keeps the schedule, so fold `i + 1` resolves from the schedule and not from entry `i`. The step writes no field but the state, so the method returns the head with its `cache` rebound.
+The head is the one family whose online step is the optimisation. The Constrained Update projects the raw step of every row onto `set`, so the step reads a schedule on `set`, and not only the read-out. So the method resolves the entry here, in the same fold and before the read-out resolves the other schedules. The head that the loop threads on keeps the schedule, so fold `i + 1` resolves from the schedule and not from entry `i`. The step writes no field but the state, so the method returns the head with its `cache` rebound.
 
 # Arguments
 
