@@ -344,7 +344,7 @@
 "src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { map = 12, units = 7, swept = false }
 "src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { map = 12, units = 19, swept = false }
 "src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { map = 12, units = 6, swept = false }
-"src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { map = 12, units = 15, swept = false }
+"src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { map = 12, units = 15, algorithm = 5, swept = true, bindings = ["OptimiserResume", "Resume", "assert_resume_folds", "assert_resume_full_fold", "assert_resume_scheme", "carrier_timestamps", "context_timestamps", "copy_state", "copy_states", "cross_val_predict", "is_time_dependent", "online_folds", "resume_fold_count", "search_cross_validation", "vcat"] }
 "src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl" = { map = 12, units = 22, algorithm = 5, swept = true, bindings = ["BudgetedHindsightPath", "BudgetedHindsightPathResult", "LogWealthRegretResult", "_optimise", "assert_path_rows", "comparator_path_length", "factory", "first_member", "fold_held", "fold_target", "log_wealth_regret", "path_budget_constraint!", "path_norm_epigraph!", "path_row_constraints!", "path_row_fold", "path_row_masks", "predict", "regret_series", "row_bound_view", "row_coverage_mask", "row_universe_error", "stacked_fold_weights"] }
 "src/17_Optimisation/03_NaiveOptimisation.jl" = { map = 10, units = 28, swept = false }
 "src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl" = { map = 10, units = 16, swept = false }

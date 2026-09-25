@@ -182,6 +182,49 @@ assets is what keeps the JuMP families cheap.
         same_weights(vcat(old, cross_val_predict(Resume(old), rd, online_cv)), one, tn)
     end
 
+    @testset "What the timestamp check pins, and a chain whose held folds all failed" begin
+        # Under a cap the state holds its last `w` rows only, so the check pins those rows
+        # and nothing before them: a carrier without its first step resumes to the weights
+        # of the full carrier. Without a cap the same carrier is refused.
+        capped = MeanRisk(;
+                          opt = JuMPOptimiser(;
+                                              pe = po.Online(EmpiricalPrior();
+                                                             max_history = w), slv = slv))
+        old = cross_val_predict(capped, rd_T, online_cv)
+        short = rows(rd, (t + 1):T)
+        full = cross_val_predict(Resume(old), rd, online_cv)
+        cut = cross_val_predict(Resume(old), short, online_cv)
+        @test length(cut.pred) == length(full.pred)
+        @test all(isapprox(a, b; atol = 1e-10)
+                  for (a, b) in zip(weights(cut), weights(full)))
+        uncapped = cross_val_predict(mr, rd_T, online_cv)
+        @test occursin("do not carry them",
+                       msg(() -> cross_val_predict(Resume(uncapped), short, online_cv)))
+        # The previous weights come from the Result alone. A Result whose one fold failed
+        # hands the first new fold none, so the turnover reads its own `w`; the stacked
+        # Result hands it the last threadable fold of the earlier run, as a one-shot run
+        # whose fold failed does.
+        function with_field(x, k, v)
+            R = typeof(x)
+            nt = NamedTuple{fieldnames(R)}(ntuple(i -> getfield(x, i), fieldcount(R)))
+            return R.name.wrapper(; merge(nt, NamedTuple{(k,)}((v,)))...)
+        end
+        old = cross_val_predict(tn, rd_T, online_cv)
+        mid = cross_val_predict(Resume(old), rows(rd, 1:160), online_cv)
+        fold1 = mid.pred[1]
+        failed = with_field(fold1, :res,
+                            with_field(fold1.res, :jr,
+                                       with_field(fold1.res.jr, :retcode,
+                                                  OptimisationFailure(; res = nothing))))
+        @test !po.threads_weights(nothing, failed)
+        mid_failed = MultiPeriodPredictionResult(; pred = [failed], id = nothing,
+                                                 opt = mid.opt)
+        alone = cross_val_predict(Resume(mid_failed), rd, online_cv)
+        @test alone.pred[1].res.jr.pa.tn.w == fill(inv(N), N)
+        stacked = cross_val_predict(Resume(vcat(old, mid_failed)), rd, online_cv)
+        @test stacked.pred[1].res.jr.pa.tn.w == old.pred[end].res.w
+    end
+
     @testset "A deployment step in the value form leaves the Result resumable" begin
         # ADR 0144 names the deployment of a resumed state as one hand step from the last
         # training end. The value form folds a copy of every state, so the Result it came
@@ -276,6 +319,18 @@ assets is what keeps the JuMP families cheap.
         pw = cross_val_predict(PreviousWeights(; w = fill(inv(N), N)), rd_T, online_cv)
         @test isnothing(po.held_timestamps(pw.opt))
         @test_throws ArgumentError cross_val_predict(Resume(pw), rd, online_cv)
+        # A head whose fee reads the previous weights needs a Previous-Weights Source on
+        # the resume too, as the one-shot online arm refuses it without one.
+        tnfees = Fees(; tn = Turnover(; w = zeros(N), val = 0.02), l = 0.001)
+        ops = OnlinePortfolioSelection(; alg = ExponentiatedGradient(), fees = tnfees,
+                                       w0 = fill(inv(N), N))
+        online_pws = OnlineIndexWalkForward(w, t; purged_size = p, pws = DriftedWeights())
+        old_ops = cross_val_predict(ops, rd_T, online_pws)
+        @test_throws ArgumentError cross_val_predict(ops, rd, online_cv)
+        @test_throws ArgumentError cross_val_predict(Resume(old_ops), rd, online_cv)
+        @test occursin("Previous-Weights Source",
+                       msg(() -> cross_val_predict(Resume(old_ops), rd, online_cv)))
+        @test length(cross_val_predict(Resume(old_ops), rd, online_pws).pred) == 3
     end
 
     @testset "vcat stacks a run and its resume, and refuses a pair that does not abut" begin
