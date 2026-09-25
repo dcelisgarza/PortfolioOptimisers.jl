@@ -1,19 +1,8 @@
 ```@meta
-Description = "Preprocessing, private API of PortfolioOptimisers.jl: AbstractPreprocessingEstimator, AbstractPricesPreprocessingEstimator, …"
+Description = "Preprocessing, private API of PortfolioOptimisers.jl: is_missing_value."
 ```
 
 # Preprocessing: private API
-
-## Types
-
-```@docs
-AbstractPreprocessingEstimator
-AbstractPricesPreprocessingEstimator
-AbstractReturnsPreprocessingEstimator
-AbstractPreprocessingResult
-AbstractPricesPreprocessingResult
-AbstractReturnsPreprocessingResult
-```
 
 ## Functions
 

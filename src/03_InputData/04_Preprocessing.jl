@@ -252,3 +252,6 @@ function apply_preprocessing(fitted::Union{<:AbstractPreprocessingEstimator,
     return throw(ArgumentError("$(typeof(fitted)) subtypes AbstractPreprocessingEstimator or AbstractPreprocessingResult but does not implement apply_preprocessing. Extension authors: a preprocessing estimator must implement both halves of the interface, fit_preprocessing(est, data) -> fitted and apply_preprocessing(fitted, data) -> data′; a stateless estimator returns itself from fit_preprocessing and does the work here."))
 end
 export fit_preprocessing, apply_preprocessing
+public AbstractPreprocessingEstimator, AbstractPricesPreprocessingEstimator,
+       AbstractReturnsPreprocessingEstimator, AbstractPreprocessingResult,
+       AbstractPricesPreprocessingResult, AbstractReturnsPreprocessingResult

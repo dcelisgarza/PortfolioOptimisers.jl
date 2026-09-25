@@ -728,3 +728,4 @@ function assert_asset_panel_supplied(::Nothing)
 end
 
 export ReturnsResult, returns_result_picker
+public AbstractReturnsResult

@@ -53,7 +53,10 @@
     tells an author to subtype one of them — joined on 2026-09-17 too (issue #1146), and
     the five online-selection types below — the rule, the geometry, the set, the slack and
     the price-level statistic — joined on 2026-09-18 with their `# Interfaces` sections
-    (issue #1161). They are held to their own list for the same reason — public is API too.
+    (issue #1161). The nine types whose `# Interfaces` sections the sweeps of #1040, #1042,
+    #1044 and #1052 wrote — the six preprocessing types, `AbstractReturnsResult`,
+    `AbstractAssetSelector` and `SubPortfolioUniverse` — joined on 2026-09-25 (issue #1301).
+    They are held to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
                           :AbstractAmbiguityTailWeightCalibrationAlgorithm, :AbstractBins,
@@ -120,7 +123,12 @@
                           :TimeDependentCallable, :TimeDependentConstraintCallable,
                           :TimeDependentOptimiserCallable, :VecJuMPConstr, :VecJuMPObj,
                           :VectorAbstractEstimatorValueAlgorithm, :VectorToScalarMeasure,
-                          :WeightFinaliser])
+                          :WeightFinaliser, :AbstractPreprocessingEstimator,
+                          :AbstractPricesPreprocessingEstimator,
+                          :AbstractReturnsPreprocessingEstimator,
+                          :AbstractPreprocessingResult, :AbstractPricesPreprocessingResult,
+                          :AbstractReturnsPreprocessingResult, :AbstractReturnsResult,
+                          :AbstractAssetSelector, :SubPortfolioUniverse])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&

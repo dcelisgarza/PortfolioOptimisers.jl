@@ -1071,3 +1071,5 @@ function predict_outer_returns(cv::OptimisationCrossValidation{<:CombinatorialCr
     scorer = isnothing(cv.scorer) ? NearestQuantilePrediction() : cv.scorer
     return rebuild_returns_result(rd, [scorer(prediction) for prediction in predictions], u)
 end
+public SubPortfolioUniverse, sub_portfolio_count, sub_portfolio_predict, sub_portfolio_view,
+       fold_weight_matrix

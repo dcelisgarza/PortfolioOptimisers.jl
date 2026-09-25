@@ -177,3 +177,4 @@ function apply_preprocessing(res::AssetSelectorResult, rd::AbstractReturnsResult
     return port_opt_view(rd, idx)
 end
 export AssetSelectorResult
+public AbstractAssetSelector

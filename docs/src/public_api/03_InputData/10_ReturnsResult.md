@@ -1,5 +1,5 @@
 ```@meta
-Description = "Returns result, public API of PortfolioOptimisers.jl: ReturnsResult, asset_panel, port_opt_view, returns_result_picker."
+Description = "Returns result, public API of PortfolioOptimisers.jl: AbstractReturnsResult, ReturnsResult, asset_panel, port_opt_view, returns_result_picker."
 ```
 
 # Returns result
@@ -10,7 +10,10 @@ Every optimiser works on returns, except a [`FiniteAllocationOptimisationEstimat
 
 ## Types
 
+A new returns result subtypes `AbstractReturnsResult`, carries the fields `nx`, `X`, `ts` and `pnl`, and adds a method of `port_opt_view`.
+
 ```@docs
+PortfolioOptimisers.AbstractReturnsResult
 ReturnsResult
 ```
 

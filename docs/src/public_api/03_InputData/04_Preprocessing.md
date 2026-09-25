@@ -1,5 +1,5 @@
 ```@meta
-Description = "Preprocessing, public API of PortfolioOptimisers.jl: fit_preprocessing, apply_preprocessing."
+Description = "Preprocessing, public API of PortfolioOptimisers.jl: fit_preprocessing, apply_preprocessing, AbstractPreprocessingEstimator, …"
 ```
 
 # Preprocessing
@@ -13,4 +13,17 @@ A preprocessing estimator does not depend on a pipeline. A [`Pipeline`](@ref) ca
 ```@docs
 fit_preprocessing
 apply_preprocessing
+```
+
+## Types
+
+A new estimator subtypes `AbstractPricesPreprocessingEstimator` or `AbstractReturnsPreprocessingEstimator`. Its fitted result subtypes `AbstractPricesPreprocessingResult` or `AbstractReturnsPreprocessingResult`.
+
+```@docs
+PortfolioOptimisers.AbstractPreprocessingEstimator
+PortfolioOptimisers.AbstractPricesPreprocessingEstimator
+PortfolioOptimisers.AbstractReturnsPreprocessingEstimator
+PortfolioOptimisers.AbstractPreprocessingResult
+PortfolioOptimisers.AbstractPricesPreprocessingResult
+PortfolioOptimisers.AbstractReturnsPreprocessingResult
 ```
