@@ -108,7 +108,7 @@
 "src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 34, swept = false }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { map = 2, units = 23, swept = false }
 "src/03_InputData/03_ListingSpan.jl" = { map = 2, units = 4, swept = false }
-"src/03_InputData/04_Preprocessing.jl" = { map = 2, units = 9, algorithm = 1, swept = false }
+"src/03_InputData/04_Preprocessing.jl" = { map = 2, units = 9, algorithm = 1, swept = true, bindings = ["AbstractPreprocessingEstimator", "AbstractPreprocessingResult", "AbstractPricesPreprocessingEstimator", "AbstractPricesPreprocessingResult", "AbstractReturnsPreprocessingEstimator", "AbstractReturnsPreprocessingResult", "apply_preprocessing", "fit_preprocessing", "is_missing_value"] }
 "src/03_InputData/05_CarrierViews.jl" = { map = 2, units = 4, algorithm = 4, swept = true, bindings = ["feature_row_indices", "matched_row_indices", "panel_carrier_view", "panel_feature_names"] }
 "src/03_InputData/06_PricesResult.jl" = { map = 2, units = 4, algorithm = 1, swept = false }
 "src/03_InputData/07_PriceIngestion.jl" = { map = 2, units = 22, swept = false }

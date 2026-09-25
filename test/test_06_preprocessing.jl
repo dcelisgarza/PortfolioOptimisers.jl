@@ -1010,4 +1010,65 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                                                     [2, 5], [1, 3], nothing)
         @test panel_feature_matrix(st)[2] == Z3[1, [1, 3], :]
     end
+    @testset "the preprocessing family: its levels, its missing values and its stubs" begin
+        PO = PortfolioOptimisers
+        # `missing` and a `NaN` of any number type are missing. An infinity, a zero, a
+        # rational infinity and a value that is not a number are not, and the answer is a Bool.
+        for v in (missing, NaN, NaN32, big(NaN), complex(NaN, 0.0))
+            @test PO.is_missing_value(v) === true
+        end
+        for v in (Inf, -Inf, 0.0, 1, 1 // 0, nothing, "a", Date(2020, 1, 1), :x)
+            @test PO.is_missing_value(v) === false
+        end
+
+        # An estimator that reads and writes one level subtypes that level. The two that
+        # change the level or work at both subtype the root alone.
+        @test PriceGapFill <: PO.AbstractPricesPreprocessingEstimator
+        @test MissingDataFilter <: PO.AbstractPricesPreprocessingEstimator
+        @test PO.AbstractAssetSelector <: PO.AbstractReturnsPreprocessingEstimator
+        for T in (PricesToReturns, TrainTestSplit)
+            @test T <: PO.AbstractPreprocessingEstimator
+            @test !(T <: PO.AbstractPricesPreprocessingEstimator)
+            @test !(T <: PO.AbstractReturnsPreprocessingEstimator)
+        end
+        @test PriceGapFillResult <: PO.AbstractPricesPreprocessingResult
+        @test MissingDataFilterResult <: PO.AbstractPricesPreprocessingResult
+        @test AssetSelectorResult <: PO.AbstractReturnsPreprocessingResult
+        # A holdout applies to no other window, so its result is not a preprocessing result.
+        @test !(TrainTestSplitResult <: PO.AbstractPreprocessingResult)
+
+        pr = PricesResult(;
+                          X = TimeArray(collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 4)),
+                                        [1.0 2.0; 1.1 2.2; 1.2 2.1; 1.3 2.3], [:a, :b]))
+        # A stateless estimator is its own fitted object, and the conversion changes the level.
+        ptr = PricesToReturns()
+        @test fit_preprocessing(ptr, pr) === ptr
+        rd = apply_preprocessing(ptr, pr)
+        @test rd isa ReturnsResult
+        @test fit_preprocessing(TrainTestSplit(), pr) isa TrainTestSplitResult
+
+        # A pipeline runs a price-level estimator on the prices slot alone, and a fitted
+        # result of one level passes a window of the other level through with no change.
+        ctx = PO.PipelineContext(; prices = pr)
+        res, ctx′ = PO.run_step(MissingDataFilter(; col_thr = 0.0), ctx)
+        @test res isa MissingDataFilterResult
+        @test ctx′.prices isa PricesResult
+        @test isnothing(ctx′.returns)
+        @test PO.apply_fitted_step(res, rd) === rd
+        @test PO.apply_fitted_step(AssetSelectorResult([:a]), pr) === pr
+        # A direct subtype of the root with no step method of its own is refused.
+        @test_throws "is not steppable" PO.run_step(UnimplementedPreprocessing(), ctx)
+
+        # Both stubs name the type that does not implement the method.
+        msg(f) =
+            try
+                f()
+            catch e
+                e isa ArgumentError ? e.msg : rethrow()
+            end
+        @test occursin("UnimplementedPreprocessing subtypes AbstractPreprocessingEstimator",
+                       msg(() -> fit_preprocessing(UnimplementedPreprocessing(), pr)))
+        @test occursin("UnimplementedPreprocessingResult subtypes AbstractPreprocessingEstimator or AbstractPreprocessingResult",
+                       msg(() -> apply_preprocessing(UnimplementedPreprocessingResult(), pr)))
+    end
 end
