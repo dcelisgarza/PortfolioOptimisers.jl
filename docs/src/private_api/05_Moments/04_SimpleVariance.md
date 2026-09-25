@@ -9,6 +9,7 @@ The library uses the variance of each asset in several places, such as some esti
 ```@docs
 show_fields(::SimpleVariance)
 simple_variance_kernel
+simple_variance_count
 ```
 
 ## Incremental fit

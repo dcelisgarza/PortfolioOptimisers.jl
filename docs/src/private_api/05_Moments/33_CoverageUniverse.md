@@ -29,6 +29,7 @@ PortfolioOptimisers.reduce_columns
 PortfolioOptimisers.expand_rows
 PortfolioOptimisers.expand_vector
 PortfolioOptimisers.expand_moment
+PortfolioOptimisers.expand_count
 PortfolioOptimisers.expand_regression
 PortfolioOptimisers.expand_idiosyncratic_covariance
 ```

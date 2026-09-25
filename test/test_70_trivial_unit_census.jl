@@ -320,7 +320,6 @@ end
                                 # names it for a subtype to answer.
                                 :matrix_processing_algorithm => "public seam, the out-of-place arm of an Open Family",
                                 # Private names that are simple and convenient.
-                                :compact_radius_sample_size => "one rule, Kish's size, named where three calibration rules read it",
                                 :pipe_config_field => "the fallback of a family `@pipe_delegates` generates methods for",
                                 :cv_sequential_info => "the one message of the sequential fold loop, named beside the rule that sends a run there",
                                 :_expr_to_lens => "the base case of the lens-building recursion of `expr_to_lens_chain`",

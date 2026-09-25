@@ -48,6 +48,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :L => "`L`: Reduced dimensionality coefficient (loadings) matrix `assets × reduced_dimensions`.",#
                  :b => "`b`: Regression intercept vector.",#
                  :esigma => "`esigma`: Idiosyncratic covariance. A vector holds the variances alone, and a matrix holds the full covariance.",#
+                 :edof => "`edof`: Degrees of freedom of each residual series, one entry per asset. It is the effective count of the observations that measure the variance of the asset, less the parameters that the fit spent on the asset. A regression estimator writes it over equally weighted observations, and a prior that writes `esigma` restates it in the count of its variance estimator.",#
+                 :ediv => "`ediv`: Divisor of each idiosyncratic variance, one entry per asset, in the effective count of `edof`. The variance is the weighted residual sum of squares in that count, divided by this entry. A prior that writes `esigma` writes it.",#
                  :rf_mu => "`mu`: The latest Return Forecast, one entry per asset of the coverage universe, in return units, `NaN` for an asset the member forecasts nothing for.",#
                  :rf_hist => "`hist`: Return Forecast history `observations × assets`, in return units, or `nothing` for a member that computes none.",#
                  :rf_scores => "`scores`: The recipe that turns the Descriptors into cross-sectional scores.",#

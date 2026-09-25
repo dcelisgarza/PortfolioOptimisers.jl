@@ -465,7 +465,8 @@ The reduction is fitted on `F` alone, so it does not depend on the assets and on
  3. For each asset `i`, fit that column of `X` in the reduced basis and map the coefficients back, and write the result into row `i` of `rr`.
  4. Take the first column of `rr` as `b` and its remaining columns as `M`.
  5. Undo the rescaling and the projection of `M` in turn, giving `L`, the coefficients in the reduced basis.
- 6. Build a [`Regression`](@ref) from `b`, `M` and `L`.
+ 6. Take `edof`, the degrees of freedom of the residuals, as the number of rows of `f1` less its number of columns, for every asset.
+ 7. Build a [`Regression`](@ref) from `b`, `M`, `L` and `edof`.
 
 # Arguments
 
@@ -480,6 +481,7 @@ The reduction is fitted on `F` alone, so it does not depend on the assets and on
       + `b`: Intercept of each asset, a view of the first column of `rr`.
       + `M`: Coefficient of each asset and factor in the original factor space, a view of the remaining columns of `rr`. Every asset keeps every factor, so `M` carries no structural zero.
       + `L`: Coefficient of each asset and retained component, ``(\\mathbf{M} \\odot \\boldsymbol{\\sigma}^{\\intercal}) \\mathbf{V}_p^{+\\intercal}``. It reproduces the reduced-space coefficients the fits of step 3 produced, checked at `2.2e-16` against them on a 200×5 sample, and `size(L, 2)` is the number of retained components, which is the width risk is decomposed in.
+      + `edof`: Degrees of freedom of the residuals of each asset, the number of observations less the intercept and the retained components. Every asset spends the same count.
 
 # Related
 
@@ -503,7 +505,8 @@ function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
     b = view(rr, :, 1)
     M = view(rr, :, 2:cols)
     L = transpose(LinearAlgebra.pinv(Vp) * transpose(M .* transpose(sigma)))
-    return Regression(; b = b, M = M, L = L)
+    edof = fill(size(f1, 1) - size(f1, 2), rows)
+    return Regression(; b = b, M = M, L = L, edof = edof)
 end
 
 export PCA, PPCA, DimensionReductionRegression

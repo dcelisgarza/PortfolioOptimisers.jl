@@ -91,6 +91,43 @@ function idiosyncratic_covariance_view(esigma::MatNum, i)
     return view(esigma, i, i)
 end
 """
+    assert_idiosyncratic_count(x::Nothing, N::Integer, sym::Symbol)
+    assert_idiosyncratic_count(x::VecNum, N::Integer, sym::Symbol)
+
+Check a per-asset count of a loadings block, `edof` or `ediv`, against the asset count `N`.
+
+The count is a vector with one entry per asset, or `nothing` when the fit recorded none. The method over `Nothing` accepts the absent count, so no caller writes an `isnothing` test. The check reads the length alone. An entry that is not finite or not positive is a valid record of a short fit, and the consumer that reads the count refuses it.
+
+# Arguments
+
+  - `x`: The count, or `nothing`.
+  - `N`: Number of assets the block carries.
+  - `sym`: Name of the field, for the error message.
+
+# Validation
+
+  - `!isempty(x)`, and `length(x) == N`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`Regression`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`assert_idiosyncratic_covariance`](@ref)
+"""
+function assert_idiosyncratic_count(::Nothing, ::Integer, ::Symbol)::Nothing
+    return nothing
+end
+function assert_idiosyncratic_count(x::VecNum, N::Integer, sym::Symbol)::Nothing
+    @argcheck(!isempty(x), IsEmptyError("$(sym) cannot be empty"))
+    @argcheck(length(x) == N,
+              DimensionMismatch("$(sym) ($(length(x))) must match the asset count ($N)"))
+    return nothing
+end
+"""
     cs_history_assets(A::Nothing, N::Integer, sym::Symbol)
     cs_history_assets(A::MatNum, N::Integer, sym::Symbol)
 
@@ -324,6 +361,8 @@ $(DocStringExtensions.FIELDS)
         Ms::Option{<:Arr3Num} = nothing,
         vs::Option{<:MatNum} = nothing,
         esigma::Option{<:VecNum_MatNum} = nothing,
+        edof::Option{<:VecNum} = nothing,
+        ediv::Option{<:VecNum} = nothing,
         rw::Option{<:MatNum} = nothing,
         bw::Option{<:MatNum} = nothing,
         nf::Option{<:VecStr} = nothing,
@@ -347,6 +386,7 @@ Keywords correspond to the struct's fields.
   - If provided, `!isempty(vs)`, `!isempty(rw)`, `!isempty(bw)`, and each carries `size(M, 1)` columns.
   - Every two of `vs`, `rw` and `bw` that are present agree on the observation axis, so `size(rw) == size(bw) == size(vs)` when all three are present.
   - If provided, `!isempty(esigma)`, and `esigma` carries `size(M, 1)` entries when it is a vector, or is square with `size(M, 1)` rows when it is a matrix.
+  - If provided, `edof` and `ediv` each carry `size(M, 1)` entries.
   - If provided, `lag >= 0`.
   - If provided, `length(rf.mu) == size(M, 1)`, and `rf.hist` carries `size(M, 1)` columns when the member computes one.
 
@@ -359,6 +399,7 @@ Keywords correspond to the struct's fields.
   - `Ms` is sliced on its **second** axis, which is the asset axis of a slice.
   - `vs`, `rw` and `bw` are sliced on their **second** axis, which is the asset axis of a per-asset history.
   - `esigma` is sliced by [`idiosyncratic_covariance_view`](@ref), on one axis or on both.
+  - `edof` and `ediv` are sliced on their only axis, which is the asset axis.
   - `rf` is viewed by its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
   - `nf`, `fam`, `fcb` and `lag` pass through unchanged. Each is indexed by factor, or by nothing at all, and neither follows an asset selection.
 
@@ -375,6 +416,8 @@ CrossSectionalFactorModel
       Ms ┼ nothing
       vs ┼ nothing
   esigma ┼ Vector{Float64}: [0.4, 0.5, 0.6]
+    edof ┼ nothing
+    ediv ┼ nothing
       rw ┼ nothing
       bw ┼ nothing
       nf ┼ nothing
@@ -423,6 +466,14 @@ CrossSectionalFactorModel
     """
     esigma
     """
+    $(field_dict[:edof])
+    """
+    edof
+    """
+    $(field_dict[:ediv])
+    """
+    ediv
+    """
     Regression weight history `observations × assets`. Entry `(t, i)` is the weight asset `i` carried in the fit of observation `t`, and a weight of zero excluded the pair.
     """
     rw
@@ -454,6 +505,7 @@ CrossSectionalFactorModel
                                        csr::Option{<:CrossSectionalRegression},
                                        Ms::Option{<:Arr3Num}, vs::Option{<:MatNum},
                                        esigma::Option{<:VecNum_MatNum},
+                                       edof::Option{<:VecNum}, ediv::Option{<:VecNum},
                                        rw::Option{<:MatNum}, bw::Option{<:MatNum},
                                        nf::Option{<:VecStr}, fam::Option{<:VecStr},
                                        fcb::Option{<:AbstractFactorFamilyBasis},
@@ -489,6 +541,8 @@ CrossSectionalFactorModel
         assert_exposure_history(Ms, N, K)
         assert_cs_regression_assets(csr, N)
         assert_idiosyncratic_covariance(esigma, N)
+        assert_idiosyncratic_count(edof, N, :edof)
+        assert_idiosyncratic_count(ediv, N, :ediv)
         assert_return_forecast_assets(rf, N)
         tvs = cs_history_assets(vs, N, :vs)
         trw = cs_history_assets(rw, N, :rw)
@@ -497,9 +551,16 @@ CrossSectionalFactorModel
         assert_cs_history_obs(trw, tvs, :rw, :vs)
         assert_cs_history_obs(tbw, tvs, :bw, :vs)
         return new{typeof(M), typeof(L), typeof(b), typeof(csr), typeof(Ms), typeof(vs),
-                   typeof(esigma), typeof(rw), typeof(bw), typeof(nf), typeof(fam),
-                   typeof(fcb), typeof(lag), typeof(rf)}(M, L, b, csr, Ms, vs, esigma, rw,
-                                                         bw, nf, fam, fcb, lag, rf)
+                   typeof(esigma), typeof(edof), typeof(ediv), typeof(rw), typeof(bw),
+                   typeof(nf), typeof(fam), typeof(fcb), typeof(lag), typeof(rf)}(M, L, b,
+                                                                                  csr, Ms,
+                                                                                  vs,
+                                                                                  esigma,
+                                                                                  edof,
+                                                                                  ediv, rw,
+                                                                                  bw, nf,
+                                                                                  fam, fcb,
+                                                                                  lag, rf)
     end
 end
 function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b::VecNum,
@@ -507,6 +568,8 @@ function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b
                                    Ms::Option{<:Arr3Num} = nothing,
                                    vs::Option{<:MatNum} = nothing,
                                    esigma::Option{<:VecNum_MatNum} = nothing,
+                                   edof::Option{<:VecNum} = nothing,
+                                   ediv::Option{<:VecNum} = nothing,
                                    rw::Option{<:MatNum} = nothing,
                                    bw::Option{<:MatNum} = nothing,
                                    nf::Option{<:VecStr} = nothing,
@@ -514,8 +577,8 @@ function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b
                                    fcb::Option{<:AbstractFactorFamilyBasis} = nothing,
                                    lag::Option{<:Integer} = nothing,
                                    rf::Option{<:AbstractReturnForecastResult} = nothing)::CrossSectionalFactorModel
-    return CrossSectionalFactorModel(M, L, b, csr, Ms, vs, esigma, rw, bw, nf, fam, fcb,
-                                     lag, rf)
+    return CrossSectionalFactorModel(M, L, b, csr, Ms, vs, esigma, edof, ediv, rw, bw, nf,
+                                     fam, fcb, lag, rf)
 end
 """
     idiosyncratic_variances(rr::AbstractLoadingsRegressionResult)
@@ -584,7 +647,7 @@ end
 # `Nothing` specialisation needs a rule (see [`@forward_properties`](@ref)'s `swap`).
 @forward_properties CrossSectionalFactorModel{<:Any, Nothing, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                              <:Any, <:Any} begin
+                                              <:Any, <:Any, <:Any, <:Any} begin
     swap(L, M)
 end
 """
@@ -638,7 +701,7 @@ Return a view of a [`CrossSectionalFactorModel`](@ref) result, selecting only th
  2. Take a row view of `M`, of `L` when step 1 found a matrix, and an element view of `b`, giving the loadings and the factor-orthogonal expected return of the selected assets.
  3. View the nested fit with its own [`port_opt_view`](@ref) method, which cuts its residuals on the asset axis.
  4. Take a view of `Ms` on its second axis, and of `vs`, `rw` and `bw` on their second axis, giving the histories of the selected assets.
- 5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape.
+ 5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape, and view `edof` and `ediv` with [`nothing_scalar_array_view`](@ref).
  6. View the Return Forecast with its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
  7. Build a new [`CrossSectionalFactorModel`](@ref) from the views, passing `nf`, `fam`, `fcb` and `lag` through, which re-runs every guard of the constructor.
 
@@ -696,6 +759,8 @@ function port_opt_view(csfm::CrossSectionalFactorModel, i,
                                      end, Ms = isnothing(Ms) ? nothing : view(Ms, :, i, :),
                                      vs = isnothing(vs) ? nothing : view(vs, :, i),
                                      esigma = idiosyncratic_covariance_view(csfm.esigma, i),
+                                     edof = nothing_scalar_array_view(csfm.edof, i),
+                                     ediv = nothing_scalar_array_view(csfm.ediv, i),
                                      rw = isnothing(rw) ? nothing : view(rw, :, i),
                                      bw = isnothing(bw) ? nothing : view(bw, :, i),
                                      nf = csfm.nf, fam = csfm.fam, fcb = csfm.fcb,

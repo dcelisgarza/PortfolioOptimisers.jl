@@ -17,3 +17,7 @@
       window ┴ nothing
     """
 end
+function variance_count(ve::WindowedVariance, X::MatNum)
+    inner, Xw, _ = windowed_preamble(ve.ve, ve.w, ve.window, X)
+    return variance_count(inner, Xw)
+end

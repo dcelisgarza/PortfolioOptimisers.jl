@@ -454,6 +454,7 @@ A neighbourhood of a specific quantity — a mean vector or a covariance matrix 
 **Compact Covariance Uncertainty Set**
 The covariance shape stated as a radius, a diagonal metric square root and a basis of the directions the worst case spares, rather than as a shape matrix on the vectorised covariance. Its worst-case variance is a quadratic penalty on the weights, so the consumer adds one cone and one free coefficient vector rather than the lifted semidefinite block the Ellipsoidal shape needs. `CompactCovarianceUncertaintySet` builds it.
 Its radius is a size the caller states, or one a rule of the compact-radius family sizes in family from the sample and the span — `ResidualInflation`, a chi-squared bound on the idiosyncratic variances, or `VarianceFraction`, a stated fraction of the nominal variance at a reference portfolio — because the radius's units move with the Orthogonality Metric (below) of the same estimator, which no Calibration Rule can read (ADR 0127).
+`ResidualInflation` reads the sampling law of each idiosyncratic variance off the loadings block: the fit that measured the variance records its degrees of freedom and its divisor beside it, per asset, and a block that records none is refused unless the rule states its own count (ADR 0127, amended).
 *Avoid*: Ellipsoidal (above), whose radius is a quantile of a dimension; this one's is a penalty multiplier, dimensionless under the default metric and in variance units under the identity.
 
 **Norm-Ball Uncertainty Set**

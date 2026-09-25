@@ -618,7 +618,8 @@ Each asset takes its own search, so the searches see one another only through th
  3. Run the stepwise search of `re` on column `i` of `X`, giving `included`.
  4. Fit `re.tgt` to an intercept column and the columns `included` of `F`, and read its coefficients, giving `params`. Warn, naming the asset, and fit the intercept column alone when `included` is empty.
  5. Write `params[1]` into `rr[i, 1]`, and the remaining coefficients into the columns of `rr` that `included` names, in the order `included` holds them.
- 6. Build a [`Regression`](@ref) from the first column of `rr` and its remaining columns.
+ 6. Write the number of observations less the number of columns of the fit of step 4 into `edof[i]`, the degrees of freedom that the fit left in the residuals of the asset.
+ 7. Build a [`Regression`](@ref) from the first column of `rr`, its remaining columns, and `edof`.
 
 # Arguments
 
@@ -633,6 +634,7 @@ Each asset takes its own search, so the searches see one another only through th
       + `b`: Intercept of each asset, a view of the first column of `rr`.
       + `M`: Coefficient of each asset and factor, a view of the remaining columns of `rr`. An unselected factor is an exact zero. A whole row is zero when the search selected no factor for that asset, which only [`BackwardElimination`](@ref) under a [`MinMaxValStepwiseRegressionCriterion`](@ref) can do, and which the loop warns about.
       + `L`: Left **unset**. The regression runs in the original factor basis, so `reg.L` reads back as `reg.M` through the result's `swap(L, M)` property rule, and `size(reg.L, 2)` is the number of columns of `F`.
+      + `edof`: Degrees of freedom of the residuals of each asset, the number of observations less the intercept and the factors that the search selected for that asset. The count reads the selected factors alone, and not the search that selected them.
 
 # Related
 
@@ -649,6 +651,7 @@ function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
     N, rows = size(X)
     ovec = range(one(eltype(F)), one(eltype(F)); length = N)
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
+    edof = Vector{Int}(undef, rows)
     for i in axes(rr, 1)
         included = _regression(re, view(X, :, i), F)
         if isempty(included)
@@ -659,8 +662,9 @@ function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
         params = StatsAPI.coef(fri)
         rr[i, 1] = params[1]
         view(rr, i, 2:cols)[included] = view(params, 2:lastindex(params))
+        edof[i] = N - size(x1, 2)
     end
-    return Regression(; b = view(rr, :, 1), M = view(rr, :, 2:cols))
+    return Regression(; b = view(rr, :, 1), M = view(rr, :, 2:cols), edof = edof)
 end
 
 export PValue, ForwardSelection, BackwardElimination, StepwiseRegression

@@ -508,12 +508,44 @@ function expand_vector(v::VecNum, cmsk::BitVector)
     return frame
 end
 """
+    expand_count(x::Nothing, cmsk::BitVector) -> nothing
+    expand_count(x::VecNum, cmsk::BitVector) -> VecNum
+
+Write a per-asset count of a loadings block, `edof` or `ediv`, back onto the full asset universe.
+
+A count differs from a moment in what an absent asset reads. No observation of an asset outside the Coverage Universe entered the fit, so its count is zero, which is a true count and not a gap. Zero also exists in every number type, so an integer count expands in its own type, where a `NaN` frame would need a type that holds `NaN`.
+
+# Arguments
+
+  - `x`: The count on the Coverage Universe, or `nothing`.
+  - `cmsk`: The Coverage Universe.
+
+# Returns
+
+  - `x::Option{<:VecNum}`: The count on the full asset universe, zero outside the Coverage Universe, or `nothing`.
+
+# Related
+
+  - [`expand_regression`](@ref)
+  - [`expand_vector`](@ref)
+  - [`Regression`](@ref)
+"""
+function expand_count(::Nothing, ::BitVector)::Nothing
+    return nothing
+end
+function expand_count(x::VecNum, cmsk::BitVector)
+    frame = similar(x, length(cmsk))
+    fill!(frame, zero(eltype(x)))
+    frame[cmsk] = x
+    return frame
+end
+"""
     expand_regression(re, cmsk::Nothing) -> re
     expand_regression(re::Regression, cmsk::BitVector) -> Regression
 
 Write a regression result fitted on the Coverage Universe back onto the full asset universe.
 
-A Prior Result has no mask field, so **every** block it carries lives on the full asset universe, and the regression result it carries is one of those blocks. Its loadings, its intercepts and its idiosyncratic covariance are all per-asset, so all three expand along their asset axis.
+A Prior Result has no mask field, so **every** block it carries lives on the full asset universe, and the regression result it carries is one of those blocks. Its loadings, its intercepts, its idiosyncratic covariance and the counts `edof` and `ediv` of that covariance are all per-asset, so each expands along its asset axis. An asset outside the Coverage Universe reads zero in each count, through [`expand_count`](@ref).
 
 `L` is read with `getfield`, as [`port_opt_view`](@ref) reads it: the `swap(L, M)` property rule makes `re.L` return `re.M` where `L` is unset, so an expanded result would materialise `L` as a copy of `M` and lose the unset-ness that the rule exists to express.
 
@@ -532,6 +564,7 @@ A Prior Result has no mask field, so **every** block it carries lives on the ful
   - [`port_opt_view`](@ref)
   - [`expand_rows`](@ref)
   - [`expand_moment`](@ref)
+  - [`expand_count`](@ref)
 """
 function expand_regression(re, ::Nothing)
     return re
@@ -542,7 +575,9 @@ function expand_regression(re::Regression, cmsk::BitVector)
     return Regression(; M = expand_rows(re.M, cmsk),
                       L = isnothing(L) ? nothing : expand_rows(L, cmsk),
                       b = isnothing(b) ? nothing : expand_vector(b, cmsk),
-                      esigma = expand_idiosyncratic_covariance(re.esigma, cmsk))
+                      esigma = expand_idiosyncratic_covariance(re.esigma, cmsk),
+                      edof = expand_count(re.edof, cmsk),
+                      ediv = expand_count(re.ediv, cmsk))
 end
 """
     expand_idiosyncratic_covariance(esigma::Nothing, cmsk) -> nothing

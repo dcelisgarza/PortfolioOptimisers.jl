@@ -813,4 +813,53 @@ end
 function supports_partial_fit(::ExpWeightedVariance)
     return true
 end
+"""
+    exp_weighted_variance_count(decay::Number, X::MatNum)
+
+Effective count and divisor of an exponentially weighted variance, for each column of `X`.
+
+Each column enters the recursion on its finite rows alone, and the recursion divides out the weights that the cold start never accumulated. The weights of a column of ``n`` finite rows are therefore proportional to ``\\lambda^{k}``, ``k = 0, \\ldots, n - 1``, and they sum to one. Their Kish count is the effective count, and because they sum to one it is also the divisor. [`ExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedVariance`](@ref) share this count.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+n_{i}^{\\mathrm{eff}} &= \\dfrac{\\left(\\sum_{k=0}^{n_{i}-1} \\lambda^{k}\\right)^{2}}{\\sum_{k=0}^{n_{i}-1} \\lambda^{2k}} = \\dfrac{\\left(1 - \\lambda^{n_{i}}\\right)\\left(1 + \\lambda\\right)}{\\left(1 - \\lambda\\right)\\left(1 + \\lambda^{n_{i}}\\right)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``n_{i}^{\\mathrm{eff}}``: Effective count of the observations of asset ``i``, and the divisor of its variance.
+  - ``n_{i}``: Number of finite rows of column ``i``.
+  - ``\\lambda``: `decay`.
+
+The count tends to ``(1 + \\lambda) / (1 - \\lambda)`` as ``n_{i}`` grows, which is about ``115`` at the default half-life of ``40`` observations.
+
+# Arguments
+
+  - `decay`: Decay of the recursion.
+  - `X`: Data matrix `observations × assets`.
+
+# Returns
+
+  - `(; n, m)::NamedTuple`: The effective count `n` and the divisor `m`, one entry per column of `X`. The two vectors are equal.
+
+# Related
+
+  - [`variance_count`](@ref)
+  - [`ExpWeightedVariance`](@ref)
+  - [`RegimeAdjustedExpWeightedVariance`](@ref)
+"""
+function exp_weighted_variance_count(decay::Number, X::MatNum)
+    n = map(axes(X, 2)) do i
+        lk = decay^count(isfinite, view(X, :, i))
+        return (one(lk) - lk) * (one(decay) + decay) /
+               ((one(decay) - decay) * (one(lk) + lk))
+    end
+    return (; n = n, m = n)
+end
+function variance_count(ve::ExpWeightedVariance, X::MatNum)
+    return exp_weighted_variance_count(ve.decay, X)
+end
 export ExpWeightedVariance

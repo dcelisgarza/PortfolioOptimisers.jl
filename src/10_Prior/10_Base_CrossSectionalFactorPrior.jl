@@ -451,6 +451,57 @@ function assert_cross_sectional_factor_moments(mu::VecNum, sigma::MatNum,
     return nothing
 end
 """
+    cross_sectional_variance_counts(cnt::Nothing, csr::CrossSectionalRegression)
+    cross_sectional_variance_counts(cnt::NamedTuple, csr::CrossSectionalRegression)
+
+Degrees of freedom and divisor of each idiosyncratic variance of a Cross-Sectional Factor Prior.
+
+A cross-sectional fit spends its parameters on the assets of each period, not on the observations of each asset. Observation ``t`` regresses ``n_{t}`` eligible assets on ``K`` factors and, when the fit carries one, an intercept. So the ``\\sum_{t} n_{t}`` residuals keep the fraction ``\\phi`` of their degrees of freedom, and each asset is charged that fraction of the effective count that its variance estimator reads.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\phi &= \\dfrac{\\sum_{t} \\left(n_{t} - p\\right)}{\\sum_{t} n_{t}}\\,, \\\\
+\\nu_{i} &= \\phi \\, n_{i}^{\\mathrm{eff}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\phi``: Fraction of the degrees of freedom that the fit leaves.
+  - ``n_{t}``: Number of eligible assets at observation ``t``, `csr.n`.
+  - ``p``: Number of parameters of each period, the columns of `csr.f` plus one when `csr.b` is set.
+  - ``\\nu_{i}``: Degrees of freedom of the idiosyncratic variance of asset ``i``.
+  - ``n_{i}^{\\mathrm{eff}}``: Effective count of the observations of asset ``i``, `cnt.n`.
+
+The fraction spreads the spend evenly over the assets, as the count ``T (N - K) / N`` of a balanced panel does. Under the default exponentially weighted variance the law of the variance is an approximation, so the level of a bound read from these counts is approximate too.
+
+# Arguments
+
+  - `cnt`: The count and divisor that [`variance_count`](@ref) states for the variance estimator, or `nothing` when it states none.
+  - `csr`: The cross-sectional fit.
+
+# Returns
+
+  - `(; edof, ediv)::NamedTuple`: The degrees of freedom and the divisor of each variance, both `nothing` when the variance estimator states no count.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`variance_count`](@ref)
+  - [`ResidualInflation`](@ref)
+"""
+function cross_sectional_variance_counts(::Nothing, ::CrossSectionalRegression)
+    return (; edof = nothing, ediv = nothing)
+end
+function cross_sectional_variance_counts(cnt::NamedTuple, csr::CrossSectionalRegression)
+    p = size(csr.f, 2) + !isnothing(csr.b)
+    phi = sum(nt - p for nt in csr.n) / sum(csr.n)
+    return (; edof = phi * cnt.n, ediv = cnt.m)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the idiosyncratic covariance of the latest observation.
@@ -1206,7 +1257,8 @@ function cross_sectional_return_forecast(rfe::AbstractReturnForecastEstimator,
     return (;
             rr = CrossSectionalFactorModel(; M = csfm.M, L = getfield(csfm, :L), b = c * ap,
                                            csr = csfm.csr, Ms = csfm.Ms, vs = csfm.vs,
-                                           esigma = csfm.esigma, rw = rw, bw = csfm.bw,
+                                           esigma = csfm.esigma, edof = csfm.edof,
+                                           ediv = csfm.ediv, rw = rw, bw = csfm.bw,
                                            nf = csfm.nf, fam = csfm.fam, fcb = csfm.fcb,
                                            lag = csfm.lag, rf = rf), g = g)
 end

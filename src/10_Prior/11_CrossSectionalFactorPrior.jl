@@ -250,7 +250,7 @@ This is the returns-matrix method every prior estimator implements, and it holds
  6. Build the Factor Family Basis with [`cross_sectional_family_basis`](@ref), and reduce the exposures through it.
  7. Lag the reduced exposures and the market capitalisation by `pe.lag`, and take the eligibility mask of the fit with [`cross_sectional_eligible`](@ref).
  8. Regress each observation's returns on its lagged reduced exposures, through [`cs_weights_initial`](@ref), [`needs_second_pass`](@ref) and [`cs_weights_refine`](@ref).
- 9. Take the idiosyncratic variance history with [`variance_series`](@ref), standardise the idiosyncratic returns by it with [`cross_sectional_standardised_residuals`](@ref), and take the latest idiosyncratic covariance with [`cross_sectional_idiosyncratic_covariance`](@ref).
+ 9. Take the idiosyncratic variance history with [`variance_series`](@ref), standardise the idiosyncratic returns by it with [`cross_sectional_standardised_residuals`](@ref), and take the latest idiosyncratic covariance with [`cross_sectional_idiosyncratic_covariance`](@ref). Record the degrees of freedom and the divisor of each variance with [`variance_count`](@ref) and [`cross_sectional_variance_counts`](@ref).
 10. Fit `pe.pe` on the reduced factor returns, refuse a non-finite factor moment with [`assert_cross_sectional_factor_moments`](@ref), and process the factor covariance in place under `pe.f_mp`, which is the factor axis's own matrix processing estimator and not the asset one. `strict` reaches `pe.pe`, as it does in [`FactorPrior`](@ref), because the slot admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
 11. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the **whole** carrier, so that a Descriptor of the forecast warms up over every observation the panel has, and blend its spanned part into the factor mean with [`cross_sectional_forecast_mu`](@ref). The block carries the orthogonal part in `b`, and the Result in `rf`.
 12. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref), so `fpr` states the distribution of the factors the caller named.
@@ -356,6 +356,7 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
         csr = cross_sectional_regression(pe.cre, Zl, Xr, W)
     end
     vs = variance_series(pe.ve, csr.eps; dims = 1)
+    (; edof, ediv) = cross_sectional_variance_counts(variance_count(pe.ve, csr.eps), csr)
     S = cross_sectional_standardised_residuals(csr.eps, vs, amr)
     esigma = cross_sectional_idiosyncratic_covariance(pe.th, pe.ce, pe.mp.pdm, S,
                                                       vs[end, :], amr)
@@ -381,8 +382,9 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     csfm = CrossSectionalFactorModel(; M = Msr[end, :, :],
                                      L = cross_sectional_reduced_loadings(fnow, L),
                                      b = zeros(Tb, size(X, 2)), csr = csr, Ms = Msr,
-                                     vs = vs, esigma = esigma, rw = W, bw = bwr, nf = nf,
-                                     fam = fam, fcb = fnow, lag = pe.lag)
+                                     vs = vs, esigma = esigma, edof = edof, ediv = ediv,
+                                     rw = W, bw = bwr, nf = nf, fam = fam, fcb = fnow,
+                                     lag = pe.lag)
     (; rr, g) = cross_sectional_return_forecast(pe.rfe, rd, csfm, pe.cre, pe.c)
     f_mu = cross_sectional_forecast_mu(pe.lambda, f_pr.mu, g)
     ex = cross_sectional_expand(fb.fcb, r, pe.lag, csr.f, f_mu, f_pr.sigma)

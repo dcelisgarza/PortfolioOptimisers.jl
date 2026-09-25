@@ -463,11 +463,13 @@ pretty_table(DataFrame("kappa" => first.(calibrated),
 
 #=
 The two rules give very different radii. Here
-`ResidualInflation` returns about `0.13`, three orders of magnitude below the `100.0` the sweep
-above needed to move the book. A
+`ResidualInflation` returns about `0.43`, more than two orders of magnitude below the `100.0` the
+sweep above needed to move the book. A
 chi-squared bound on a residual variance measures estimation error, and over this sample that
-error is small. A radius of that size moves the book very little, and the table shows 90% of the
-metric-scaled weight still outside the factor span. Reach for `VarianceFraction` when you want the
+error is small. The fit records how many observations each variance is worth, and the default
+exponentially weighted variance is worth about 115 of them, not the 440 rows of the fit, so the
+bound is wider than the row count suggests. A radius of that size still moves the book very
+little, and the table shows about 89% of the metric-scaled weight still outside the factor span. Reach for `VarianceFraction` when you want the
 book to move, because it is sized against the nominal variance rather than against the sampling
 error. It is also linear in `f`, so the resolved radius of the `f = 0.5` row is five times that of
 the `f = 0.1` row.

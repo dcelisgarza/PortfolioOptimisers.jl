@@ -1667,6 +1667,9 @@ end
 function supports_partial_fit(::RegimeAdjustedExpWeightedVariance)
     return true
 end
+function variance_count(ve::RegimeAdjustedExpWeightedVariance, X::MatNum)
+    return exp_weighted_variance_count(ve.decay, X)
+end
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
        RegimeAdjustedExpWeightedVariance
 public RegimeAdjustedMethod, regime_multiplier

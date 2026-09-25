@@ -1,110 +1,33 @@
 """
-    compact_radius_dof(rr::Regression, T::Number, N::Integer, K::Integer)
-    compact_radius_dof(rr::CrossSectionalFactorModel, T::Number, N::Integer, K::Integer)
-
-Degrees of freedom that the fit behind a loadings block leaves in each idiosyncratic variance.
-
-The block records no count, so this function states the count that each kind of fit spends. [`FactorPrior`](@ref) writes `esigma` as the column variances of the reconstruction error under its own variance estimator, and a Cross-Sectional Factor Prior writes the idiosyncratic covariance of its own fit. A caller whose fit spent a different count states it in the `dof` field of [`ResidualInflation`](@ref).
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\nu &= \\begin{cases}
-T_{e} - K - 1 & \\textrm{on a time-series fit}\\\\
-\\dfrac{T_{e} (N - K)}{N} & \\textrm{on a cross-sectional fit}
-\\end{cases}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\nu``: Degrees of freedom of each idiosyncratic variance.
-  - $(math_dict[:cal_T_e])
-  - $(math_dict[:N])
-  - $(math_dict[:K])
-
-A time-series fit regresses each asset on ``K`` factors and an intercept, so each residual series spends ``K + 1`` of its ``T_{e}`` observations. A cross-sectional fit regresses the ``N`` assets of each period on ``K`` factors. Its ``T_{e} N`` residuals then carry ``T_{e} (N - K)`` degrees of freedom, which is ``T_{e} (N - K) / N`` for each asset.
-
-# Algorithm
-
- 1. On a [`Regression`](@ref), return the time-series count.
- 2. On a [`CrossSectionalFactorModel`](@ref), return the cross-sectional count.
-
-# Arguments
-
-  - `rr`: Fitted loadings block.
-  - `T`: Sample size, the effective one when the prior carries observation weights.
-  - `N`: Number of assets.
-  - `K`: Number of factors the fit spent.
-
-# Returns
-
-  - `dof::Number`: Degrees of freedom. The caller refuses a count that is not positive.
-
-# Related
-
-  - [`ResidualInflation`](@ref)
-  - [`compact_radius_sample_size`](@ref)
-  - [`Regression`](@ref)
-  - [`CrossSectionalFactorModel`](@ref)
-"""
-function compact_radius_dof(::Regression, T::Number, ::Integer, K::Integer)
-    return T - K - one(K)
-end
-function compact_radius_dof(::CrossSectionalFactorModel, T::Number, N::Integer, K::Integer)
-    return T * (N - K) / N
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Effective sample size of a prior result, Kish's when the result carries observation weights.
-
-A rule that prices estimation error reads the number of equally weighted observations that the estimate is worth, not the row count of `pr.X`. This function is [`effective_sample_size`](@ref) on the result's own weights, so it also reads the count that a Scenario Cap states in `pr.ens`. [`ConcentrationRadius`](@ref) reads the same count.
-
-# Arguments
-
-  - `pr`: Prior result.
-
-# Returns
-
-  - `T::Number`: Kish's effective sample size when `pr.w` is set, the count `pr.ens` states otherwise, and the row count of `pr.X` when neither is set.
-
-# Related
-
-  - [`ResidualInflation`](@ref)
-  - [`compact_radius_dof`](@ref)
-  - [`effective_sample_size`](@ref)
-"""
-function compact_radius_sample_size(pr::AbstractPriorResult)
-    return effective_sample_size(pr, pr.w)
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Sizes the compact radius from a chi-squared upper confidence bound on each idiosyncratic variance.
 
-The compact set adds no variance on the directions that the factors span. On the other directions it adds variance in proportion to ``\\mathbf{D}``, the idiosyncratic variances of the loadings block, and this rule sizes that addition from the estimation error of ``\\mathbf{D}``. Under the default [`InverseIdiosyncraticVarianceMetric`](@ref) the radius equals ``\\rho`` and has no units. Under [`IdentityMetric`](@ref) it has the units of a variance. One formula serves every [`AbstractOrthogonalityMetric`](@ref), so no method dispatches on the metric.
+The compact set adds no variance on the directions that the factors span. On the other directions it adds variance in proportion to ``\\mathbf{D}``, the idiosyncratic variances of the loadings block, and this rule sizes that addition from the estimation error of ``\\mathbf{D}``. Under the default [`InverseIdiosyncraticVarianceMetric`](@ref) the radius has no units. Under [`IdentityMetric`](@ref) it has the units of a variance. One formula serves every [`AbstractOrthogonalityMetric`](@ref), so no method dispatches on the metric.
 
-The level `1 - q` is exact only when each variance of the block is a residual sum of squares divided by ``\\nu``. The default fits of the library do not write that, so the bound holds with a lower probability. The mathematical definition gives that probability. To hold the bound at a stated level, state a smaller `q`, or use [`VarianceFraction`](@ref), which assumes no sampling law.
+The rule reads the sampling law of each variance off the block, because only the fit knows it. The `edof` field of the block is the degrees of freedom of each variance, and its `ediv` field is the divisor. [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and a Cross-Sectional Factor Prior write both beside `esigma`, per asset, so a stepwise fit that keeps a different number of factors for each asset is priced per asset. A block that records no degrees of freedom is refused unless `dof` states them. That is a block built by hand, a block from a regression estimator that records no count, or a block whose variance estimator states no count through [`variance_count`](@ref). [`VarianceFraction`](@ref) assumes no sampling law, so it serves such a block.
 
-The `q` of the owning [`OrthogonalUncertaintySet`](@ref) also sizes its mean set. Under the default [`ChiSqKUncertaintyAlgorithm`](@ref) the mean set inverts a chi-squared distribution at the dimension of the Orthogonal Subspace and reads no sample size, while this rule inverts one at ``\\nu`` degrees of freedom. A smaller `q` makes both radii larger, so `q = nothing` reads the owner's `q` and one level sets both.
+The level `1 - q` is exact for Gaussian residuals whose variance is an unweighted sum of squares. Under observation weights, and under the exponentially weighted variance that a Cross-Sectional Factor Prior uses by default, the counts are Kish's, and the level is an approximation.
+
+The `q` of the owning [`OrthogonalUncertaintySet`](@ref) also sizes its mean set. Under the default [`ChiSqKUncertaintyAlgorithm`](@ref) the mean set inverts a chi-squared distribution at the dimension of the Orthogonal Subspace and reads no sample size, while this rule inverts one at the degrees of freedom of each variance. A smaller `q` makes both radii larger, so `q = nothing` reads the owner's `q` and one level sets both.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\rho &= \\dfrac{\\nu}{\\chi^{2,\\,-1}_{\\nu}(q)} - 1\\,, \\\\
-\\kappa &= \\rho \\left\\lVert \\mathbf{D}^{1/2}\\mathbf{W}^{1/2}\\mathbf{P} \\right\\rVert_{2}^{2}\\,, \\\\
+\\rho_{i} &= \\max\\left(\\dfrac{m_{i}}{\\chi^{2,\\,-1}_{\\nu_{i}}(q)} - 1,\\, 0\\right)\\,, \\\\
+\\kappa &= \\left\\lVert \\mathbf{R}^{1/2}\\mathbf{D}^{1/2}\\mathbf{W}^{1/2}\\mathbf{P} \\right\\rVert_{2}^{2}\\,, \\\\
 \\mathbf{P} &= \\mathbf{I} - \\mathbf{Q}\\mathbf{Q}^{\\intercal}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\rho``: Relative inflation, the excess of the variance bound over the estimate, as a fraction of the estimate.
+  - ``\\rho_{i}``: Relative inflation of asset ``i``, the excess of the variance bound over the estimate, as a fraction of the estimate.
+  - ``\\mathbf{R}``: Diagonal matrix of the relative inflations ``\\rho_{i}``.
   - $(math_dict[:kappa_cpt])
-  - ``\\nu``: Degrees of freedom of each idiosyncratic variance, [`compact_radius_dof`](@ref) when `dof` is `nothing`.
+  - ``\\nu_{i}``: Degrees of freedom of the idiosyncratic variance of asset ``i``, the `edof` of the block, or `dof` when the rule states it.
+  - ``m_{i}``: Divisor of the idiosyncratic variance of asset ``i``, the `ediv` of the block, or ``\\nu_{i}`` when the block records none.
   - ``\\chi^{2,\\,-1}_{\\nu}(q)``: Lower ``q`` quantile of the chi-squared distribution with ``\\nu`` degrees of freedom.
   - ``q``: Confidence level of the bound, which holds with probability ``1 - q``.
   - ``\\mathbf{D}``: Diagonal matrix of the idiosyncratic variances of the loadings block.
@@ -114,31 +37,28 @@ Where:
   - $(math_dict[:C_cpt])
   - $(math_dict[:w_port])
 
-Let ``\\hat{d}_{i}`` be the estimated idiosyncratic variance of asset ``i`` and ``d_{i}`` its true value. When the residuals are Gaussian and ``\\hat{d}_{i}`` is their sum of squares divided by ``\\nu``, ``\\nu \\hat{d}_{i} / d_{i}`` follows the chi-squared distribution with ``\\nu`` degrees of freedom. Then ``d_{i} \\leq (1 + \\rho)\\hat{d}_{i}`` with probability ``1 - q``, and ``\\rho`` is the smallest inflation with that property.
+Let ``\\hat{d}_{i}`` be the estimated idiosyncratic variance of asset ``i`` and ``d_{i}`` its true value. The estimate is a sum of squares divided by ``m_{i}``, and ``m_{i} \\hat{d}_{i} / d_{i}`` follows the chi-squared distribution with ``\\nu_{i}`` degrees of freedom. Then ``d_{i} \\leq (1 + \\rho_{i})\\hat{d}_{i}`` with probability ``1 - q``, and ``\\rho_{i}`` is the smallest inflation with that property. The default variance estimator of [`FactorPrior`](@ref) divides by ``T - 1``, while a time-series fit over ``K`` factors leaves ``T - K - 1`` degrees of freedom. So ``m_{i} > \\nu_{i}``, and the inflation is larger than the one that ``m_{i} = \\nu_{i}`` gives. The floor at zero applies only when a stated `dof` exceeds the recorded divisor by more than the quantile allows, where no inflation is needed.
 
-When ``\\hat{d}_{i}`` divides the sum of squares by ``m`` instead of ``\\nu``, the probability is ``1 - F_{\\nu}\\left(m \\chi^{2,\\,-1}_{\\nu}(q) / \\nu\\right)``, where ``F_{\\nu}`` is the chi-squared distribution function with ``\\nu`` degrees of freedom. It is less than ``1 - q`` when ``m > \\nu``. The default variance estimator of [`FactorPrior`](@ref) divides by ``T - 1``, which is larger than ``\\nu = T - K - 1`` on a time-series fit of ``T`` observations over ``K`` factors. At ``T = 260``, ``K = 3`` and ``q = 0.05`` the probability is about ``0.936``. A Cross-Sectional Factor Prior writes an exponentially weighted variance by default, which does not follow a chi-squared law with ``\\nu`` degrees of freedom, so the level is approximate there too.
+When ``m_{i} = \\nu_{i}`` and ``\\nu_{i}`` is large, ``\\rho_{i} \\approx z_{1-q} \\sqrt{2 / \\nu_{i}}``, where ``z_{1-q}`` is the ``1 - q`` quantile of the standard normal distribution. So the radius falls like the inverse square root of the sample size.
 
-For large ``\\nu``, ``\\rho \\approx z_{1-q} \\sqrt{2 / \\nu}``, where ``z_{1-q}`` is the ``1 - q`` quantile of the standard normal distribution. So the radius falls like the inverse square root of the sample size.
+For a portfolio ``\\boldsymbol{w}``, let ``\\boldsymbol{v} = \\mathbf{P}\\mathbf{C}\\boldsymbol{w}``. The penalty of the set is ``\\kappa \\lVert \\boldsymbol{v} \\rVert_{2}^{2}``. Because ``\\mathbf{C} = \\mathbf{W}^{-1/2}``, the inflation of the idiosyncratic variance of ``\\mathbf{C}^{-1}\\boldsymbol{v}``, the part of ``\\boldsymbol{w}`` that the span does not cover, is ``\\lVert \\mathbf{R}^{1/2}\\mathbf{D}^{1/2}\\mathbf{W}^{1/2}\\boldsymbol{v} \\rVert_{2}^{2}``. The ``\\kappa`` of the definition is the smallest radius whose penalty covers that inflation for every ``\\boldsymbol{v}`` in the range of ``\\mathbf{P}``.
 
-For a portfolio ``\\boldsymbol{w}``, let ``\\boldsymbol{v} = \\mathbf{P}\\mathbf{C}\\boldsymbol{w}``. The penalty of the set is ``\\kappa \\lVert \\boldsymbol{v} \\rVert_{2}^{2}``. Because ``\\mathbf{C} = \\mathbf{W}^{-1/2}``, the inflation of the idiosyncratic variance of ``\\mathbf{C}^{-1}\\boldsymbol{v}``, the part of ``\\boldsymbol{w}`` that the span does not cover, is ``\\rho \\lVert \\mathbf{D}^{1/2}\\mathbf{W}^{1/2}\\boldsymbol{v} \\rVert_{2}^{2}``. The ``\\kappa`` of the definition is the smallest radius whose penalty covers that inflation for every ``\\boldsymbol{v}`` in the range of ``\\mathbf{P}``.
-
-Under ``\\mathbf{W} = \\mathbf{D}^{-1}`` the norm is ``\\lVert \\mathbf{P} \\rVert_{2}^{2} = 1`` when ``\\mathbf{P} \\neq \\mathbf{0}``, so ``\\kappa = \\rho``. When the factors span the whole cross-section, ``\\mathbf{P} = \\mathbf{0}`` and ``\\kappa = 0``, which is also the radius of the mean set for the same span.
+Under ``\\mathbf{W} = \\mathbf{D}^{-1}`` the norm is ``\\lVert \\mathbf{R}^{1/2}\\mathbf{P} \\rVert_{2}^{2}``, which is at most the largest ``\\rho_{i}``, and equals ``\\rho`` when every asset has the same inflation ``\\rho`` and ``\\mathbf{P} \\neq \\mathbf{0}``. When the factors span the whole cross-section, ``\\mathbf{P} = \\mathbf{0}`` and ``\\kappa = 0``, which is also the radius of the mean set for the same span.
 
 # Algorithm
 
 The branch of [`k_compact`](@ref) that this rule selects runs these steps.
 
  1. Read `N`, the number of assets, as the row count of `Q`.
- 2. Read `T`, the sample size, with [`compact_radius_sample_size`](@ref).
- 3. Read `K`, the number of factors, as the column count of the loadings `rr.M`.
- 4. Settle `dof` as `alg.dof`, or as [`compact_radius_dof`](@ref) over `T`, `N` and `K` when the rule states none.
- 5. Refuse a `dof` that is not finite and positive, with a `DomainError` that names `T`, `N` and `K`.
+ 2. Read `d`, the idiosyncratic variances of the block, with [`idiosyncratic_variances`](@ref).
+ 3. Settle `nu`, the degrees of freedom, as `alg.dof` for every asset when the rule states it, and as the `edof` of the block otherwise. Refuse a block that records none when the rule states none.
+ 4. Settle `m`, the divisors, as the `ediv` of the block, or as `nu` when the block records none.
+ 5. Refuse an entry of `nu` that is not finite and positive, with a `DomainError` that names the asset.
  6. Settle `qe` as `alg.q`, or as the owner's `q` when the rule states none.
- 7. Form `rho`, the relative inflation ``\\rho`` at `qe` and `dof`.
- 8. Read `d`, the idiosyncratic variances of the block, with [`idiosyncratic_variances`](@ref).
- 9. Form `P`, the projector ``\\mathbf{P}``.
-10. Scale row `i` of `P` by `sqrt(d[i]) / C[i]`, the diagonal entry of ``\\mathbf{D}^{1/2}\\mathbf{W}^{1/2}``.
-11. Return `rho` times the squared operator norm of the scaled matrix.
+ 7. Form `rho`, the relative inflation of each asset at `qe`, floored at zero.
+ 8. Form `P`, the projector ``\\mathbf{P}``.
+ 9. Scale row `i` of `P` by `sqrt(rho[i] * d[i]) / C[i]`, the diagonal entry of ``\\mathbf{R}^{1/2}\\mathbf{D}^{1/2}\\mathbf{W}^{1/2}``.
+10. Return the squared operator norm of the scaled matrix.
 
 # Fields
 
@@ -151,7 +71,7 @@ $(DocStringExtensions.FIELDS)
         dof::Option{<:Number} = nothing
     ) -> ResidualInflation
 
-Keywords correspond to the struct's fields. Both default to `nothing`, so a bare call reads the confidence level of the owner and the degrees of freedom of the fit behind the block.
+Keywords correspond to the struct's fields. Both default to `nothing`, so a bare call reads the confidence level of the owner and the degrees of freedom that the fit recorded on the block.
 
 ## Validation
 
@@ -179,7 +99,7 @@ ResidualInflation
   - [`AbstractCompactRadiusAlgorithm`](@ref)
   - [`VarianceFraction`](@ref)
   - [`k_compact`](@ref)
-  - [`compact_radius_dof`](@ref)
+  - [`variance_count`](@ref)
   - [`OrthogonalUncertaintySet`](@ref)
   - [`idiosyncratic_variances`](@ref)
 """
@@ -189,7 +109,7 @@ ResidualInflation
     """
     q
     """
-    Degrees of freedom the fit left in each idiosyncratic variance, or `nothing` to derive them with [`compact_radius_dof`](@ref).
+    Degrees of freedom of every idiosyncratic variance, or `nothing` to read the `edof` that the fit recorded on the block. A stated count serves every asset, and the divisor is still read off the block when the block records one.
     """
     dof
     function ResidualInflation(q::Option{<:Number}, dof::Option{<:Number})
@@ -399,8 +319,9 @@ Radius of a [`CompactCovarianceUncertaintySet`](@ref), from the prior result and
 
 # Validation
 
-  - On a [`ResidualInflation`](@ref): the settled degrees of freedom are finite and `> 0`, else a `DomainError` that names the sample size, the number of assets and the number of factors.
   - On a [`ResidualInflation`](@ref): [`idiosyncratic_variances`](@ref) refuses a block that carries no `esigma`.
+  - On a [`ResidualInflation`](@ref): the rule states `dof`, or the block records `edof`, else an `IsNothingError`.
+  - On a [`ResidualInflation`](@ref): every settled degree of freedom is finite and `> 0`, else a `DomainError` that names the asset.
   - On a [`VarianceFraction`](@ref): [`compact_reference_weights`](@ref) refuses a reference portfolio of the wrong length, and an optimiser with no returns data.
 
 # Returns
@@ -420,25 +341,29 @@ function k_compact(kappa::Number, args...)::Number
     return kappa
 end
 function k_compact(alg::ResidualInflation, q::Number, ::AbstractOrthogonalityMetric,
-                   pr::AbstractPriorResult, rr::AbstractLoadingsRegressionResult, C::VecNum,
+                   ::AbstractPriorResult, rr::AbstractLoadingsRegressionResult, C::VecNum,
                    Q::MatNum, ::Any)
     N = size(Q, 1)
-    T = compact_radius_sample_size(pr)
-    K = size(rr.M, 2)
-    dof = isnothing(alg.dof) ? compact_radius_dof(rr, T, N, K) : alg.dof
-    @argcheck(isfinite(dof) && dof > zero(dof),
-              DomainError(dof,
-                          "the fit behind the loadings block left no degrees of freedom in its idiosyncratic variances, so no variance bound is defined.\nFit the prior on a longer sample, or state `dof` on the rule.\nGot\nT => $(T)\nN => $(N)\nK => $(K)\ndof => $(dof)"))
-    qe = isnothing(alg.q) ? q : alg.q
-    rho = dof / Distributions.quantile(Distributions.Chisq(dof), qe) - one(dof)
-    # `C` is the inverse square root of the metric, so its element-wise inverse is `W^{1/2}`
-    # and `sqrt.(d) ./ C` is the diagonal of `D^{1/2}W^{1/2}`. The squared operator norm of
-    # that matrix against the orthogonal projector is the tightest radius satisfying the
-    # set's own bound, and it is exactly `1` when the metric is the inverse idiosyncratic
-    # variance, which leaves a bare projector inside the norm.
     d = idiosyncratic_variances(rr)
+    nu = isnothing(alg.dof) ? rr.edof : fill(alg.dof, N)
+    @argcheck(!isnothing(nu),
+              IsNothingError("`ResidualInflation` reads the degrees of freedom of each idiosyncratic variance off the loadings block, and the block records none. The block was built by hand, fitted by a regression estimator that records no count, or measured by a variance estimator that states no count through `variance_count`.\nState `dof` on the rule, or use `VarianceFraction`, which assumes no sampling law."))
+    m = isnothing(rr.ediv) ? nu : rr.ediv
+    for (i, nui) in pairs(nu)
+        @argcheck(isfinite(nui) && nui > zero(nui),
+                  DomainError(nui,
+                              "the fit behind the loadings block left no degrees of freedom in the idiosyncratic variance of asset $i, so no variance bound is defined.\nFit the prior on a longer sample, or state `dof` on the rule.\nGot\ni => $(i)\ndof => $(nui)"))
+    end
+    qe = isnothing(alg.q) ? q : alg.q
+    rho = m ./ Distributions.quantile.(Distributions.Chisq.(nu), qe) .- one(qe)
+    rho = max.(rho, zero(eltype(rho)))
+    # `C` is the inverse square root of the metric, so its element-wise inverse is `W^{1/2}`
+    # and `sqrt.(rho .* d) ./ C` is the diagonal of `R^{1/2}D^{1/2}W^{1/2}`. The squared
+    # operator norm of that matrix against the orthogonal projector is the tightest radius
+    # satisfying the set's own bound. Under the inverse idiosyncratic variance metric it is
+    # the norm of `R^{1/2}P`, which is `rho` itself when every asset shares one inflation.
     P = LinearAlgebra.I - Q * transpose(Q)
-    return rho * LinearAlgebra.opnorm((sqrt.(d) ./ C) .* P)^2
+    return LinearAlgebra.opnorm((sqrt.(rho .* d) ./ C) .* P)^2
 end
 function k_compact(alg::VarianceFraction, ::Number, ::AbstractOrthogonalityMetric,
                    pr::AbstractPriorResult, ::AbstractLoadingsRegressionResult, C::VecNum,

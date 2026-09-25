@@ -1276,4 +1276,74 @@ end
 function supports_partial_fit(::SimpleVariance)
     return true
 end
+"""
+    simple_variance_count(w::Nothing, corrected::Bool, f::AbstractVector{Bool})
+    simple_variance_count(w::StatsBase.FrequencyWeights, corrected::Bool,
+                          f::AbstractVector{Bool})
+    simple_variance_count(w::StatsBase.AbstractWeights, corrected::Bool,
+                          f::AbstractVector{Bool})
+
+Effective count and divisor of one column of a [`SimpleVariance`](@ref), over the rows that `f` marks.
+
+The weight type is the dispatch. Frequency weights count replicated observations, so their count is their sum. A column with no gap reads the weights as they stand, so the common case copies nothing. Every other weight type counts with Kish's formula. The divisor is the divisor of `StatsBase`, restated in the count, so it follows the bias correction of each weight type without a copy of it here.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+n &= \\begin{cases}
+\\left\\lvert \\mathcal{F} \\right\\rvert & \\textrm{with no weights}\\\\
+\\sum_{t \\in \\mathcal{F}} w_{t} & \\textrm{with frequency weights}\\\\
+\\dfrac{\\left(\\sum_{t \\in \\mathcal{F}} w_{t}\\right)^{2}}{\\sum_{t \\in \\mathcal{F}} w_{t}^{2}} & \\textrm{otherwise}
+\\end{cases}\\,, \\\\
+m &= \\dfrac{n \\, D}{\\sum_{t \\in \\mathcal{F}} w_{t}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``n``: Effective count of the observations.
+  - ``m``: Divisor of the variance in that count. With no weights it is ``n - 1`` when `corrected` is `true`, and ``n`` otherwise.
+  - ``\\mathcal{F}``: Rows that `f` marks.
+  - $(math_dict[:w_t_obs])
+  - ``D``: Divisor of the weighted variance of `StatsBase`, the inverse of `StatsBase.varcorrection(w, corrected)`.
+
+# Arguments
+
+  - `w`: Observation weights, or `nothing`.
+  - `corrected`: The `corrected` field of the estimator.
+  - `f`: Rows of the column that enter the estimate.
+
+# Returns
+
+  - `(; n, m)::NamedTuple`: The effective count and the divisor.
+
+# Related
+
+  - [`variance_count`](@ref)
+  - [`SimpleVariance`](@ref)
+"""
+function simple_variance_count(::Nothing, corrected::Bool, f::AbstractVector{Bool})
+    n = count(f)
+    return (; n = n, m = n - corrected)
+end
+function simple_variance_count(w::StatsBase.FrequencyWeights, corrected::Bool,
+                               f::AbstractVector{Bool})
+    wf = all(f) ? w : w[f]
+    n = sum(wf)
+    return (; n = n, m = inv(StatsBase.varcorrection(wf, corrected)))
+end
+function simple_variance_count(w::StatsBase.AbstractWeights, corrected::Bool,
+                               f::AbstractVector{Bool})
+    wf = all(f) ? w : w[f]
+    s = sum(wf)
+    n = s^2 / sum(abs2, wf)
+    return (; n = n, m = n / (s * StatsBase.varcorrection(wf, corrected)))
+end
+function variance_count(ve::SimpleVariance, X::MatNum)
+    w = get_observation_weights(ve.w, X; dims = 1)
+    cnt = [simple_variance_count(w, ve.corrected, isfinite.(view(X, :, i)))
+           for i in axes(X, 2)]
+    return (; n = getindex.(cnt, :n), m = getindex.(cnt, :m))
+end
 export SimpleVariance, var, std
