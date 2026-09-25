@@ -1,24 +1,25 @@
 """
-    port_opt_view(opt, i, args...)
+    port_opt_view(opt::AbstractOptimisationEstimator, i, args...) -> AbstractOptimisationEstimator
 
-Return a view or subset of an optimisation estimator for a given cluster index `i`.
+Return an optimisation estimator unchanged under an asset-subset view.
 
-Default fallback returns the estimator unchanged. Overridden for composite estimators (e.g. [`JuMPOptimiser`](@ref), [`HierarchicalRiskParity`](@ref)) to slice all sub-estimators for the `i`-th cluster.
+This is the fallback for an optimisation estimator with no view method of its own. An estimator declared through `@propagatable` gets a generated method that views each asset-indexed field it carries, and a head such as [`JuMPOptimiser`](@ref) writes its own. This method serves the rest, so an asset-indexed field of such an estimator keeps the width of the full universe.
 
 # Arguments
 
-  - `opt`: Optimisation estimator or result.
-  - `i`: Cluster or asset index.
-  - `args...`: Additional arguments (e.g. asset returns matrix).
+  - `opt`: The optimisation estimator.
+  - `i`: The asset index of the subset: an asset subset of a fold, a cluster of a nested optimisation, or the Investable Mask.
+  - `args...`: Ignored. A caller that views a tracking estimator passes the unreduced returns matrix here.
 
 # Returns
 
-  - Sliced or unchanged optimisation estimator.
+  - `opt`: The estimator, unchanged.
 
 # Related
 
   - [`JuMPOptimiser`](@ref)
   - [`NestedClustered`](@ref)
+  - [`investable_reduction`](@ref)
 """
 function port_opt_view(opt::AbstractOptimisationEstimator, ::Any, args...)
     return opt
@@ -28,7 +29,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 A precomputed optimisation result cannot be restricted to an asset subset.
 
-Its weights were solved over the full universe and a sub-portfolio of them has no defined meaning, so an asset-subset view of a result throws. In particular, a [`TimeDependent`](@ref) schedule holding result entries is incompatible with asset-subsampling cross-validation ([`MultipleRandomised`](@ref)), whose fold loops view the optimiser to each fold's asset subset before the swap. The trivial all-assets view (`Colon`) passes the result through unchanged.
+Its weights were solved over the full universe, and a sub-portfolio of them has no defined meaning, so an asset-subset view of a result throws. A [`TimeDependent`](@ref) schedule that holds a result is therefore refused by asset-subsampling cross-validation ([`MultipleRandomised`](@ref)), whose fold loop views the optimiser to the asset subset of each fold before the swap. The all-assets view (`Colon`) passes the result through unchanged.
+
+# Validation
+
+  - `i` must be `Colon()`. Any other index throws an `ArgumentError`.
+
+# Returns
+
+  - `res`: The result, unchanged.
 
 # Related
 
@@ -43,14 +52,13 @@ function port_opt_view(::NonFiniteAllocationOptimisationResult, ::Any, args...)
     return throw(ArgumentError("a precomputed optimisation result cannot be viewed to an asset subset: its weights were solved over the full universe and a sub-portfolio of them has no defined meaning. A TimeDependent schedule holding precomputed results is therefore incompatible with asset-subsampling cross-validation (e.g. MultipleRandomised); use estimator entries there instead."))
 end
 """
-    non_investable_universe(opt::AbstractOptimisationEstimator, ni::VecStr)
     non_investable_universe(opt, ni::VecStr)
 
-Mint the Non-Investable Axis on the [`UniverseSets`](@ref) an optimisation estimator carries.
+Declare the Non-Investable Axis on the [`UniverseSets`](@ref) that an optimisation estimator carries.
 
-A door calls this **after** it has viewed the estimator, and it is the only caller. Minting before the view would not survive it: [`port_opt_view`](@ref)`(::UniverseSets, i)` drops the axis, precisely so that a cluster of a nested optimisation cannot inherit its parent's departures and charge every one of them again. So the door reads the departed names off the *unreduced* returns data, takes the view, and declares the axis on what comes back.
+A door calls this **after** it has viewed the estimator, and no other code calls it. An axis declared before the view would not survive it: [`port_opt_view`](@ref)`(::UniverseSets, i)` drops the axis, so that a cluster of a nested optimisation does not inherit the departures of its parent and charge each of them again. So the door reads the departed names off the *unreduced* returns data, takes the view, and declares the axis on the viewed estimator.
 
-The generic method returns `opt` untouched, and it is the right answer for every estimator that carries no sets: there is no axis to declare one on. A head that owns a `sets` field writes one method beside its own [`port_opt_view`](@ref), and a head that reaches one through a nested optimiser forwards to that optimiser's method. Both are one line, and they are written per type rather than derived by reflection for the reason [`port_opt_view`](@ref) is: a field's meaning is the type's to state.
+The generic method returns `opt` unchanged. That is correct for every estimator that carries no sets, because it has no axis to declare. A head that owns a `sets` field writes one method beside its own [`port_opt_view`](@ref), and a head that reaches one through a nested optimiser forwards to the method of that optimiser. Each method is one line, and it is written per type rather than derived by reflection, for the same reason as [`port_opt_view`](@ref): the type states what its field means.
 
 # Arguments
 
@@ -77,29 +85,33 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Derive the Investable Mask of a fitted prior, and reduce the prior, the optimiser and the returns data to the assets it keeps.
 
-A Prior Estimator fits on the coverage universe and hands back a result on the full asset universe, in which an asset it could not estimate carries `NaN` in `mu` and on the diagonal of `sigma`. Nothing downstream of the fit can solve over such an asset, so the reduction happens once, at the optimiser's entry, and every constraint the caller stated over the full universe is sliced by the same index.
+A Prior Estimator fits on the Coverage Universe and returns a result on the full asset universe, in which an asset that it could not estimate carries `NaN` in `mu` and on the diagonal of `sigma`. No code after the fit can solve over such an asset. So the reduction happens once, at the entry of the optimiser, and the same index slices every constraint that the caller stated over the full universe.
 
-Every optimisation family reduces through this one verb, which is why it is bound to [`AbstractOptimisationEstimator`](@ref) and lives here rather than beside the JuMP prelude: the hierarchical, naive and meta files load before that prelude and reach it without a back reference. A meta-optimiser composes two masks, its own at its entry and each inner head's inside its own solve, and both expand.
+Every optimisation family reduces through this one verb. That is why it is bound to [`AbstractOptimisationEstimator`](@ref) and lives here rather than beside the JuMP prelude: the hierarchical, naive and meta files load before that prelude and reach this verb without a back reference. A meta-optimiser composes two masks, its own at its entry and the mask of each inner head inside the solve of that head, and both expand.
 
-Three methods, and the branch is dispatch rather than a condition. The first derives the mask; the `nothing` method is the all-investable path and returns its arguments untouched; the `BitVector` method takes the three views. A universe with nothing to exclude therefore costs one pass over two vectors and no allocation.
+The branch is dispatch rather than a condition, over three methods. The first derives the mask. The `nothing` method is the all-investable path and returns its arguments unchanged. The `BitVector` method takes the three views. A universe with nothing to exclude therefore costs the derivation of the mask and nothing more: no view, no copy of the data and no expansion.
 
-The optimiser is viewed at `pr.X`, the *unreduced* returns matrix, because [`port_opt_view`](@ref) slices a tracking estimator against it by the same asset index. The prior is reduced after, so the matrix the view reads is still the full one.
+The optimiser is viewed with `pr.X`, the *unreduced* returns matrix, because [`port_opt_view`](@ref) slices a tracking estimator against it by the same asset index. The prior is reduced after the optimiser, so the view reads the full matrix.
 
-The mask rides as a `BitVector` because the expansion needs the length of the full universe and nothing else carries it once the prior is reduced. The three views take `findall(imsk)` instead, which is the integer index every other caller of [`port_opt_view`](@ref) passes.
+The mask stays a `BitVector` because the expansion needs the length of the full universe, and nothing else carries that length once the prior is reduced. The three views take `findall(imsk)` instead, which is the integer index that every other caller of [`port_opt_view`](@ref) passes.
 
 # Algorithm
 
  1. Derive the Investable Mask from the fitted prior with [`investable_mask`](@ref).
  2. Return the mask, the prior, the optimiser and the returns data unchanged when the mask is `nothing`.
- 3. Otherwise read the departed names off the *unreduced* `rd.nx` with [`non_investable_names`](@ref), and announce them once with [`announce_non_investable`](@ref).
+ 3. Otherwise read the departed names `ni` off the *unreduced* `rd.nx` with [`non_investable_names`](@ref), and announce them once with [`announce_non_investable`](@ref).
  4. Take a [`port_opt_view`](@ref) of each of the three at `findall(imsk)`.
- 5. Declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref), and return it beside the mask and the other two views. The axis is declared after the view because the view drops one, so a name-keyed constraint stated for a departed asset resolves here and nowhere deeper.
+ 5. Declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref), and return it beside the mask and the other two views. The axis is declared after the view because the view drops it, so a name-keyed constraint stated for a departed asset resolves here and nowhere deeper.
 
 # Arguments
 
   - $(arg_dict[:pr])
   - `opt::AbstractOptimisationEstimator`: The optimisation estimator, holding every constraint estimator the caller stated over the full universe.
   - $(arg_dict[:rd])
+
+# Validation
+
+  - At least one asset must be investable. [`investable_mask`](@ref) throws an `IsEmptyError` otherwise.
 
 # Returns
 
@@ -139,19 +151,19 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Derive the Coverage Universe of a window, and reduce a prior-free optimiser and its returns data to the assets it keeps.
 
-This is the twin of [`investable_reduction`](@ref) for a head that fits no prior. No Prior Result exists to derive an Investable Mask from, so the head derives the Coverage Universe of its own window instead, through the verb the priors use: an asset is kept when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window. A stale finite price during an inactive spell is therefore outside the mask, and the asset weights nothing.
+This is the twin of [`investable_reduction`](@ref) for a head that fits no prior. No Prior Result exists to derive an Investable Mask from, so the head derives the Coverage Universe of its own window through the verb that the priors use. An asset is kept when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window. A stale finite price during an inactive spell is therefore outside the mask, and the asset gets a zero weight.
 
-The two masks are the same object downstream. The head carries the Coverage Universe as the `imsk` of its result, and the result's keyword constructor expands the weights through [`expand_investable_weights`](@ref), as every other family's does, so every optimisation result of the library carries a mask and a reader has one idiom.
+Downstream, the two masks are one object. The head carries the Coverage Universe as the `imsk` of its result, and the keyword constructor of the result expands the weights through [`expand_investable_weights`](@ref), as it does in every other family. So every optimisation result of the library carries a mask, and a reader meets one idiom.
 
-Three methods, and the branch is dispatch rather than a condition, as it is in [`investable_reduction`](@ref). The first derives the mask; the `nothing` method is the all-covered path and returns its arguments untouched; the `BitVector` method takes the two views. The optimiser is viewed at `rd.X`, the *unreduced* returns matrix, because [`port_opt_view`](@ref) slices an estimator against it by the same asset index.
-
-An all-dead window throws an `IsEmptyError` where the mask is derived, so the refusal is [`coverage_mask`](@ref)'s and every prior-free head has it for free.
+The branch is dispatch rather than a condition, over three methods, as in [`investable_reduction`](@ref). The first derives the mask. The `nothing` method is the all-covered path and returns its arguments unchanged. The `BitVector` method takes the two views. The optimiser is viewed with `rd.X`, the *unreduced* returns matrix, because [`port_opt_view`](@ref) slices an estimator against it by the same asset index.
 
 # Algorithm
 
- 1. Derive the Coverage Universe of `rd.X` and `rd.pnl` with [`coverage_mask`](@ref).
+ 1. Derive the Coverage Universe `cmsk` of `rd.X` and `rd.pnl` with [`coverage_mask`](@ref).
  2. Return the mask, the optimiser and the returns data unchanged when the mask is `nothing`.
- 3. Otherwise read the departed names with [`non_investable_names`](@ref), announce them once with [`announce_non_investable`](@ref), take a [`port_opt_view`](@ref) of each of the two at `findall(cmsk)`, and declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref).
+ 3. Otherwise read the departed names `ni` off the *unreduced* `rd.nx` with [`non_investable_names`](@ref), and announce them once with [`announce_non_investable`](@ref).
+ 4. Take a [`port_opt_view`](@ref) of the optimiser and of the returns data at `findall(cmsk)`.
+ 5. Declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref), and return it beside the mask and the viewed returns data.
 
 # Arguments
 
@@ -162,7 +174,7 @@ An all-dead window throws an `IsEmptyError` where the mask is derived, so the re
 # Validation
 
   - $(val_dict[:dims])
-  - At least one asset must be in the Coverage Universe.
+  - At least one asset must be in the Coverage Universe. [`coverage_mask`](@ref) throws an `IsEmptyError` otherwise, so every prior-free head refuses an all-dead window in one place.
 
 # Returns
 
@@ -199,13 +211,35 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Expand a solved weight vector from the investable subset back onto the full asset universe.
 
-The optimiser solves over the assets the Investable Mask keeps, so its weight vector is shorter than the universe the caller stated. This puts each solved weight back at its own asset and writes a zero everywhere else, which is what a non-investable asset holds: the optimiser could not trade it.
+The optimiser solves over the assets that the Investable Mask keeps, so its weight vector is shorter than the universe that the caller stated. This puts each solved weight back at its own asset and writes a zero at every other asset. A zero is what a non-investable asset holds, because the optimiser could not trade it.
 
-A failed solve carries `NaN` at every solved position. The expansion keeps that distinction — `NaN` where the optimiser tried and failed, zero where it never could — rather than flattening both to zero.
+A failed solve carries `NaN` at every solved position. The expansion keeps two cases apart: `NaN` where the optimiser tried and failed, and zero where it could not try. It does not flatten both to zero.
 
-The `nothing` mask returns the weights unchanged, so nothing is copied when every asset is investable, and a `nothing` weight vector stays `nothing`, which is what a naive head records when its finaliser gave up. The vector-of-vectors method serves the efficient-frontier route, where one weight vector is recorded per sweep point. [`JuMPOptimisationSolution`](@ref) carries its own methods beside the JuMP prelude, and they delegate to the plain weight vector here, so one length check and one message serve every family.
+The `nothing` mask returns the weights unchanged, so nothing is copied when every asset is investable. A `nothing` weight vector stays `nothing`, which is what a naive head records when its finaliser gave up. The vector-of-vectors method serves the efficient-frontier route, which records one weight vector per sweep point. [`JuMPOptimisationSolution`](@ref) carries its own methods beside the JuMP prelude, and they delegate to the plain weight vector here, so one length check and one message serve every family.
 
-The **keyword** constructor of each optimisation result is the caller, and every family builds its result through it. The positional constructor never expands, because every return-code rebuild goes through it and a second pass would expand twice.
+The **keyword** constructor of each optimisation result is the caller, and every family builds its result through it. The positional constructor never expands, because every rebuild of a return code goes through it, and a second pass would expand twice.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{w}_{i} &= \\begin{cases}
+    w_{k(i)} & \\text{if } m_{i} = 1\\,, \\\\
+    0 & \\text{if } m_{i} = 0\\,,
+\\end{cases} \\quad i = 1, \\ldots, N\\,, \\\\
+k(i) &= \\sum_{j=1}^{i} m_{j}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{w}_{i}``: Weight of asset ``i`` on the full asset universe.
+  - ``w_{k}``: Solved weight at position ``k`` of the investable assets, in their order in the full universe.
+  - ``m_{i}``: Entry ``i`` of the Investable Mask, ``1`` when asset ``i`` is investable.
+  - ``k(i)``: Position of asset ``i`` among the investable assets.
+  - $(math_dict[:N])
+
+The expansion keeps the sum of the weights, ``\\sum_{i=1}^{N} \\tilde{w}_{i} = \\sum_{k} w_{k}``, so a budget stated over the investable assets holds over the full universe.
 
 # Arguments
 
@@ -246,17 +280,17 @@ end
     optimise(opt::OptimisationEstimator, args...; kwargs...) -> OptimisationResult
     optimise(opt::OptimisationResult, args...; kwargs...) -> OptimisationResult
 
-Run portfolio optimisation using the given estimator `opt` and return an [`OptimisationResult`](@ref).
+Run a portfolio optimisation with the estimator `opt`, and return an [`OptimisationResult`](@ref).
 
-If `opt` returns an [`OptimisationFailure`](@ref), the fallback estimator is tried automatically until either a successful result is obtained or all fallbacks are exhausted.
+When the solve of `opt` returns an [`OptimisationFailure`](@ref), the fallback in `opt.fb` runs next, and the chain continues until one attempt succeeds or no fallback is left. A fallback can also be a precomputed result, which is then the answer.
 
-Passing an [`OptimisationResult`](@ref) directly returns it unchanged (pass-through method).
+A result passed as `opt` is returned unchanged.
 
 # Arguments
 
-  - `opt`: Optimisation estimator (e.g. a [`JuMPOptimisationEstimator`](@ref) subtype).
-  - $(arg_dict[:ignargs])
-  - $(arg_dict[:ignkwargs])
+  - `opt`: Optimisation estimator (for example a [`JuMPOptimisationEstimator`](@ref) subtype), or a result to pass through.
+  - `args`: Positional arguments forwarded to the solve of the estimator, usually the [`ReturnsResult`](@ref). A result ignores them.
+  - `kwargs`: Keyword arguments forwarded to the solve of the estimator. A result ignores them.
 
 # Returns
 
@@ -273,24 +307,21 @@ function optimise(opt::OptimisationResult, args...; kwargs...)
     return opt
 end
 """
-    _optimise(opt, rd, args...; dims, str_names, save, kwargs...)
+    _optimise(opt, args...; kwargs...)
 
-Internal dispatch function for portfolio optimisation.
+Solve one optimisation estimator once, with no fallback.
 
-Called by [`optimise`](@ref) to perform the actual optimisation. Each optimisation estimator type implements its own overload. Returns the estimator-specific result type.
+[`optimise`](@ref) calls it for each attempt of the fallback chain, and it is the method that a new optimisation estimator writes. Each estimator type writes its own method, and the method returns the result type of that estimator. A precomputed result in the chain answers itself, because it has nothing to solve.
 
 # Arguments
 
-  - `opt`: Optimisation estimator (e.g. [`MeanRisk`](@ref), [`RiskBudgeting`](@ref), etc.).
-  - `rd::ReturnsResult`: Returns data.
-  - `dims::Int`: Observation dimension.
-  - `str_names::Bool`: Whether to use string names in the JuMP model.
-  - `save::Bool`: Whether to save the JuMP model in the result.
-  - `kwargs...`: Additional keyword arguments.
+  - `opt`: Optimisation estimator (for example [`MeanRisk`](@ref) or [`RiskBudgeting`](@ref)), or a precomputed result.
+  - `args`: The data that the estimator solves over: a [`ReturnsResult`](@ref) for a continuous optimiser, or a [`FiniteAllocationInput`](@ref) for a finite allocator.
+  - `kwargs`: The keyword arguments that the estimator reads. A continuous optimiser reads `dims`, the observation dimension, and a JuMP head also reads `str_names` and `save`, which name the model variables and keep the model on the result. Every method ignores the keywords it does not read.
 
 # Returns
 
-  - Estimator-specific optimisation result.
+  - `res::OptimisationResult`: The result of the estimator. Its `retcode` decides whether [`optimise`](@ref) runs the fallback.
 
 # Related
 
@@ -308,11 +339,22 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-High level optimisation function that wraps around estimator-specific optimisation functions. This takes care of fallback methods if the primary optimisation fails. It returns the first successful optimisation result, or the last failure when every fallback fails, and stores the `(estimator, result)` pair of every failed attempt in the `fb` field of that result, in the order they ran (see [`FbChain`](@ref)). When no fallback was needed, `fb` is `nothing`.
+Solve an optimisation estimator, and walk its fallback chain when a solve fails.
 
-This is a fold-less entry point, so time-dependent schedules are inert here: the estimator is reset to its fold-less values (see [`reset_time_dependent_estimator`](@ref)) before the solve — in particular a scheduled fallback resets to its `default`, or to `nothing` (no fallback) when it has none, *before* the fallback chain is walked. Inside a fold loop this reset is a no-op, because the loop resolves every schedule before optimising.
+The answer is the first attempt that succeeds, or the last failure when every attempt fails. The `fb` field of that answer records the `(estimator, result)` pair of each failed attempt, in the order they ran (see [`FbChain`](@ref)). When no fallback was needed, `fb` is `nothing`. A fallback that is a precomputed result ends the chain: it has nothing to solve, and it is the answer whatever its return code.
 
-It is a batch fit, so an [`Online`](@ref) anywhere in the estimator's tree is refused by name through [`assert_batch_entry`](@ref) before any solve: the wrapper resolves only at the warm-up of the fold loop's online arm, and a plain `optimise` runs none. The read-out of a stepped estimator, `optimise(opt)`, never meets this refusal, because the warm-up that seeded its buffer replaced the wrapper.
+This is a fold-less entry point, so a time-dependent schedule has no fold to select an entry from. The estimator is reset to its fold-less values before the solve (see [`reset_time_dependent_estimator`](@ref)). A scheduled fallback resets to its `default`, or to `nothing` when it has none, *before* the chain is walked. Inside a fold loop the reset changes nothing, because the loop resolves every schedule before it optimises.
+
+It is a batch fit, so [`assert_batch_entry`](@ref) refuses an [`Online`](@ref) anywhere in the tree of the estimator before any solve. The wrapper resolves only at the warm-up of the online arm of the fold loop, and a plain `optimise` runs no warm-up. The read-out of a stepped estimator, `optimise(opt)`, never meets this refusal, because the warm-up that seeded its buffer replaced the wrapper.
+
+# Algorithm
+
+ 1. Refuse an [`Online`](@ref) in the tree of `opt` with [`assert_batch_entry`](@ref).
+ 2. Reset every time-dependent schedule of `opt` to its fold-less value with [`reset_time_dependent_estimator`](@ref), giving `current_opt`.
+ 3. Solve `current_opt` with [`_optimise`](@ref), giving `res`. A precomputed result gives itself.
+ 4. Stop when `res.retcode` is an [`OptimisationSuccess`](@ref), when `current_opt` is a precomputed result, or when `current_opt.fb` is `nothing`.
+ 5. Otherwise record `(current_opt, res)` in the chain `fb`, take `current_opt.fb` as the new `current_opt`, warn that the fallback runs, and return to step 3.
+ 6. Return `res` when `fb` is empty. Otherwise return `res` rebuilt with `fb` through [`factory`](@ref).
 
 # Arguments
 
@@ -323,21 +365,32 @@ It is a batch fit, so an [`Online`](@ref) anywhere in the estimator's tree is re
 # Validation
 
   - No field in the tree of `opt` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise.
+
+# Returns
+
+  - `res::OptimisationResult`: The answer of the chain, carrying the failed attempts in `fb`.
+
+# Related
+
+  - [`_optimise`](@ref)
+  - [`FbChain`](@ref)
+  - [`reset_time_dependent_estimator`](@ref)
+  - [`assert_batch_entry`](@ref)
 """
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
     assert_batch_entry(opt, "`optimise`")
     fb = Tuple{OptimisationEstimator, OptimisationResult}[]
     current_opt = reset_time_dependent_estimator(opt)
-    res = nothing
-    while true
+    res = _optimise(current_opt, args...; kwargs...)
+    # A precomputed result answers itself and ends the chain: its own `fb` records how it
+    # was answered, and is not a fallback to walk on to.
+    while !isa(res.retcode, OptimisationSuccess) &&
+          isa(current_opt, OptimisationEstimator) &&
+          !isnothing(current_opt.fb)
+        push!(fb, (current_opt, res))
+        current_opt = current_opt.fb
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         res = _optimise(current_opt, args...; kwargs...)
-        if isa(res.retcode, OptimisationSuccess) || isnothing(current_opt.fb)
-            break
-        else
-            push!(fb, (current_opt, res))
-            current_opt = current_opt.fb
-            @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        end
     end
     return isempty(fb) ? res : factory(res, fb)
 end
@@ -346,7 +399,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Optimise with a [`TimeDependent`](@ref) schedule standing in for the optimiser, outside any fold loop.
 
-There are no folds to index, so the schedule resolves to its `default` and that optimiser runs (see [`reset_time_dependent_estimator`](@ref)); a schedule with no `default` throws a [`TimeDependentDefaultError`](@ref). Inside a fold loop this method is never reached — the loop resolves entry `i` first.
+There are no folds to index, so the schedule resolves to its `default`, and that optimiser runs (see [`reset_time_dependent_estimator`](@ref)). A fold loop never reaches this method, because the loop resolves the entry of each fold first.
+
+# Validation
+
+  - The schedule must carry a `default`. A [`TimeDependentDefaultError`](@ref) is thrown otherwise.
 
 # Related
 
@@ -360,12 +417,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that `res` is a valid internal optimisation result.
+Accept a precomputed optimisation result where an optimiser must run on assets that it did not choose.
 
-Default no-op. Overridden for result types that must satisfy internal constraints before use.
+A meta-optimiser calls `assert_internal_optimiser` on an inner optimiser, and a cross-validation entry calls it on the optimiser of each fold. The methods for estimators refuse a precomputed input that a subset of the assets cannot reuse. A result holds no estimator to refit, so it passes. An asset-subset view of it still throws, in [`port_opt_view`](@ref).
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
+  - [`assert_external_optimiser`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`NestedClustered`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
 function assert_internal_optimiser(::NonFiniteAllocationOptimisationResult)::Nothing
@@ -374,12 +438,18 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that `res` is a valid external optimisation result.
+Accept a precomputed optimisation result where an optimiser must run on a universe that it does not know in advance.
 
-Default no-op. Overridden for result types that must satisfy external interface constraints.
+A meta-optimiser calls `assert_external_optimiser` on its outer optimiser, which solves over synthetic assets, and a cross-validation entry calls it on the optimiser of each fold. The methods for estimators refuse a precomputed prior or constraint that such a universe cannot reuse. A result holds no estimator to refit, so it passes.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
+  - [`assert_internal_optimiser`](@ref)
+  - [`NestedClustered`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
 function assert_external_optimiser(::NonFiniteAllocationOptimisationResult)::Nothing

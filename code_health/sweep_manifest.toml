@@ -326,7 +326,7 @@
 "src/17_Optimisation/01_Base_Optimisation/02_PipeRouting.jl" = { map = 10, units = 8, swept = false }
 "src/17_Optimisation/01_Base_Optimisation/03_TimeDependent.jl" = { map = 10, units = 56, swept = false }
 "src/17_Optimisation/01_Base_Optimisation/04_WeightFinalisers.jl" = { map = 10, units = 11, swept = false }
-"src/17_Optimisation/01_Base_Optimisation/05_InvestableUniverse.jl" = { map = 10, units = 12, swept = false }
+"src/17_Optimisation/01_Base_Optimisation/05_InvestableUniverse.jl" = { map = 10, units = 12, algorithm = 3, swept = true, bindings = ["_optimise", "assert_external_optimiser", "assert_internal_optimiser", "coverage_reduction", "expand_investable_weights", "investable_reduction", "non_investable_universe", "optimise", "optimise", "optimise", "port_opt_view", "port_opt_view"] }
 "src/17_Optimisation/01_Base_Optimisation/06_PanelCollapse.jl" = { map = 10, units = 9, swept = false }
 "src/17_Optimisation/01_Base_Optimisation/07_ResultInvestableView.jl" = { map = 10, units = 6, swept = false }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl" = { map = 12, units = 56, swept = false }

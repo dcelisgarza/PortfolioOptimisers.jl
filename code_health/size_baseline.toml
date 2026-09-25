@@ -278,7 +278,7 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/01_Base_Optimisation/02_PipeRouting.jl" = { code = 64, doc = 93, comment = 4, blank = 55, total = 216 }
 "src/17_Optimisation/01_Base_Optimisation/03_TimeDependent.jl" = { code = 438, doc = 645, comment = 4, blank = 295, total = 1382 }
 "src/17_Optimisation/01_Base_Optimisation/04_WeightFinalisers.jl" = { code = 123, doc = 297, comment = 0, blank = 127, total = 547 }
-"src/17_Optimisation/01_Base_Optimisation/05_InvestableUniverse.jl" = { code = 93, doc = 186, comment = 6, blank = 100, total = 385 }
+"src/17_Optimisation/01_Base_Optimisation/05_InvestableUniverse.jl" = { code = 94, doc = 233, comment = 10, blank = 123, total = 460 }
 "src/17_Optimisation/01_Base_Optimisation/06_PanelCollapse.jl" = { code = 94, doc = 168, comment = 5, blank = 89, total = 356 }
 "src/17_Optimisation/01_Base_Optimisation/07_ResultInvestableView.jl" = { code = 66, doc = 109, comment = 10, blank = 48, total = 233 }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl" = { code = 493, doc = 897, comment = 34, blank = 385, total = 1809 }

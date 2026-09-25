@@ -1741,3 +1741,38 @@ end
         @test_throws ArgumentError PO.result_investable_view(res, nothing, other)
     end
 end
+
+@testset "A precomputed fallback result ends the chain as the answer" begin
+    # The `fb` field of an estimator admits a precomputed result. `optimise` called
+    # `_optimise` on it and raised a MethodError, because no method solves a result.
+    rd3 = ReturnsResult(; nx = ["A", "B", "C"], X = randn(StableRNG(3), 10, 3))
+    pre = optimise(EqualWeighted(), rd3)
+    slv0 = Solver(; name = :none, solver = nothing)
+    mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv0), fb = pre)
+    res = optimise(mr, rd3)
+    @test isa(res, NaiveOptimisationResult)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test res.w == pre.w
+    @test length(res.fb) == 1
+    @test res.fb[1][1] === mr
+    @test isa(res.fb[1][2].retcode, OptimisationFailure)
+    # A failed precomputed result is still the answer: nothing follows it.
+    failed = optimise(PreviousWeights(), rd3)
+    res = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv0), fb = failed), rd3)
+    @test isa(res.retcode, OptimisationFailure)
+    @test all(isnan, res.w)
+    @test length(res.fb) == 1
+    # Its own chain is replaced by the chain of this walk, and not walked.
+    chained = PortfolioOptimisers.factory(failed, [(EqualWeighted(), pre)])
+    res = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv0), fb = chained), rd3)
+    @test isa(res.retcode, OptimisationFailure)
+    @test length(res.fb) == 1
+    @test isa(res.fb[1][1], MeanRisk)
+    # The result may sit behind an estimator fallback.
+    res = optimise(PreviousWeights(; fb = pre), rd3)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test res.w == pre.w
+    # A result has no estimator to refit, so both meta-optimiser checks pass it.
+    @test isnothing(PortfolioOptimisers.assert_internal_optimiser(pre))
+    @test isnothing(PortfolioOptimisers.assert_external_optimiser(pre))
+end
