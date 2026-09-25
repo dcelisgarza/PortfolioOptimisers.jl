@@ -610,3 +610,108 @@ end
     @test collect(lc.ineq.A) == [-1.0 0.0 0.0]
     @test lc.ineq.B == [-1.0]
 end
+@testset "The docstrings of 02_LinearConstraintGeneration against numbers" begin
+    using PortfolioOptimisers, Test, Logging
+    PO = PortfolioOptimisers
+    sorted(r) = (p = sortperm(r.vars); (r.vars[p], r.coef[p], r.rhs))
+    # The parser writes a product of three factors as one call, `*(2, 3, x)`. Every
+    # numeric factor joins the coefficient, so no factor is lost.
+    @test sorted(parse_equation("2*3*x <= 1")) == (["x"], [6.0], 1.0)
+    @test sorted(parse_equation("2*x*3 <= 1")) == (["x"], [6.0], 1.0)
+    @test sorted(parse_equation("0.5*2*x + y <= 1")) == (["x", "y"], [1.0, 1.0], 1.0)
+    # More than one factor that is not a number makes one opaque term, and the numeric
+    # factors stay in its coefficient.
+    @test sorted(parse_equation("2*x*y + z <= 1")) == (["x * y", "z"], [2.0, 1.0], 1.0)
+    @test sorted(parse_equation("x/y + 2*sqrt(z) <= 1")) ==
+          (["sqrt(z)", "x / y"], [2.0, 1.0], 1.0)
+    # A string literal is a variable named by its text, and it is no longer dropped.
+    @test sorted(parse_equation("\"w_A\" + w_B <= 1")) == (["w_A", "w_B"], [1.0, 1.0], 1.0)
+    # Julia reads `2f1` as the Float32 literal 20 and `2e1` as the Float64 literal 20, so
+    # a name that starts like an exponent needs an explicit `*`.
+    @test sorted(parse_equation("2e1 + 2f1 <= 1")) == (String[], Float64[], -39.0)
+    @test sorted(parse_equation("2*f1 <= 1")) == (["f1"], [2.0], 1.0)
+    @test isnothing(PO.collect_terms!(:x, 1.0, []))
+    @test PO._collect_terms(:(2 * 3 * 4)) == Any[(24.0, nothing)]
+    @test PO._collect_terms(:(x + 1)) isa Vector{Any}
+    # The right-hand side is accumulated in `datatype`.
+    @test PO._parse_equation(:x, "<=", 1, Rational{Int}).rhs === 1 // 1
+    # The uniform value is computed in `datatype`, so a Rational is exact.
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+    u = PO.estimator_to_val(UniformValues(), sets; datatype = Rational{Int})
+    @test all(==(1 // 3), u)
+    @test sum(u) == 1
+    @test PO.estimator_to_val(UniformValues(), sets) == fill(inv(3.0), 3)
+    @test eltype(PO.estimator_to_val(UniformValues(), sets; datatype = BigFloat)) ==
+          BigFloat
+    # An empty group stays empty when the counterpart axis is not empty.
+    @test PO.shed_departed_members(String[], ["D"], nothing, "e", "e == 1") == String[]
+    @test PO.shed_departed_members(String[], String[], ["D"], nothing, "(e, e)", "x") ==
+          (String[], String[])
+    # A group that sheds every member keeps its first member, and the row that then names
+    # a departed asset is dropped in silence, with one entry in the ledger.
+    sets2 = UniverseSets(;
+                         dict = Dict("nx" => ["A", "B", "C"], "h" => ["D", "E"],
+                                     "g" => ["A", "B", "D"], "e" => String[],
+                                     "ni" => ["D", "E"]))
+    ledger = String[]
+    res = replace_group_by_assets(parse_equation("h + A <= 1"), sets2; ledger = ledger)
+    @test sorted(res) == (["A", "D"], [1.0, 1.0], 1.0)
+    @test ledger == ["the row `h + A <= 1.0`, whose group `h` lost every member"]
+    @test isnothing(PO.get_linear_constraints(res, sets2))
+    # A group that holds no member expands to nothing: the sum over it is zero.
+    @test sorted(replace_group_by_assets(parse_equation("e + A <= 1"), sets2)) ==
+          (["A"], [1.0], 1.0)
+    # The sum expansion repeats the coefficient, and the mean expansion divides it by the
+    # surviving count, here two of three members.
+    @test sorted(replace_group_by_assets(parse_equation("g == 0.3"), sets2)) ==
+          (["A", "B"], [1.0, 1.0], 0.3)
+    @test sorted(replace_group_by_assets(parse_equation("g == 0.3"), sets2, true)) ==
+          (["A", "B"], [0.5, 0.5], 0.3)
+    led = String[]
+    PO.record_group_shed!(led, "g", 1, 2, "g <= 1")
+    PO.record_group_shed!(led, "g", 0, 2, "g <= 1")
+    @test led == ["1 departed member(s) of the group `g` in the row `g <= 1`"]
+    # A `>=` row is negated into the `<=` sense of the inequality half.
+    lc = linear_constraints(["A + B == 1", "A >= 0.1", "C <= 0.5"], sets)
+    @test collect(lc.ineq.A) == [-1.0 0.0 0.0; 0.0 0.0 1.0]
+    @test lc.ineq.B == [-0.1, 0.5]
+    @test collect(lc.eq.A) == [1.0 1.0 0.0]
+    @test lc.eq.B == [1.0]
+    # Merging the halves of two constraints equals one call over all their equations.
+    l1 = linear_constraints(["A + B == 1", "A >= 0.1"], sets)
+    l2 = linear_constraints(["C <= 0.5", "B - C == 0"], sets)
+    la = linear_constraints(["A + B == 1", "A >= 0.1", "C <= 0.5", "B - C == 0"], sets)
+    mg = PO.merge_linear_constraints([l1, l2])
+    @test collect(mg.ineq.A) == collect(la.ineq.A)
+    @test mg.ineq.B == la.ineq.B
+    @test collect(mg.eq.A) == collect(la.eq.A)
+    @test mg.eq.B == la.eq.B
+    # A row written in factor names is re-based as (M a)' w over the assets.
+    M = [1.0 2.0; 3.0 4.0; 5.0 6.0]
+    rr = PO.Regression(; M = M, b = zeros(3))
+    fs = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nf" => ["f1", "f2"]))
+    lr = PO.get_linear_constraints(parse_equation("2*f1 - f2 <= 0.1"), fs, "nf"; rr = rr)
+    @test vec(collect(lr.ineq.A)) == M * [2.0, -1.0]
+    @test PO.factor_axis_key(fs, rr) == "nf"
+    # The view slices the asset axis, rebuilds a unique-entry group from the sliced
+    # partition, drops the exact `nikey` entry, and keeps the seven key prefixes.
+    vs = UniverseSets(;
+                      dict = Dict("nx" => ["A", "B", "C"], "nx_s" => ["x", "y", "x"],
+                                  "ux_s" => ["x", "y"], "ni" => ["D"], "nikkei" => ["A"],
+                                  "nf" => ["f1"]))
+    v = PO.port_opt_view(vs, [1, 3])
+    @test v.dict["nx"] == ["A", "C"]
+    @test v.dict["ux_s"] == ["x"]
+    @test !haskey(v.dict, "ni")
+    @test v.dict["nikkei"] == ["A"]
+    @test v.dict["nf"] == ["f1"]
+    @test (v.xkey, v.uxkey, v.tfkey, v.utfkey, v.cfkey, v.ucfkey, v.nikey) ==
+          (vs.xkey, vs.uxkey, vs.tfkey, vs.utfkey, vs.cfkey, vs.ucfkey, vs.nikey)
+    # The depth counts the levels of `Expr` along the deepest path.
+    @test [PO._expr_depth_exceeds(:(a + b), l) for l in 0:2] == [true, false, false]
+    @test PO._expr_depth_exceeds(:(a + (b + c)), 1)
+    @test !PO._expr_depth_exceeds(:(a + (b + c)), 2)
+    # A precomputed constraint wider than the investable universe is refused.
+    @test_throws DimensionMismatch PO.assert_investable_constraint_width(lc, 2, "lcse")
+    @test_throws PO.IsEmptyError LinearConstraintEstimator(; val = "A <= 1", key = "")
+end

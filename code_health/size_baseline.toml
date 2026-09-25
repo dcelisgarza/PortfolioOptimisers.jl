@@ -194,8 +194,8 @@ commit = "0ecb3ce47c"
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { code = 35, doc = 106, comment = 8, blank = 51, total = 200 }
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { code = 13, doc = 64, comment = 0, blank = 33, total = 110 }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { code = 41, doc = 169, comment = 0, blank = 95, total = 305 }
-"src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { code = 475, doc = 929, comment = 23, blank = 416, total = 1843 }
-"src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { code = 370, doc = 536, comment = 43, blank = 232, total = 1181 }
+"src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { code = 471, doc = 932, comment = 22, blank = 417, total = 1842 }
+"src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { code = 370, doc = 544, comment = 42, blank = 235, total = 1191 }
 "src/09_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { code = 50, doc = 263, comment = 10, blank = 119, total = 442 }
 "src/09_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { code = 192, doc = 585, comment = 5, blank = 210, total = 992 }
 "src/09_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { code = 135, doc = 389, comment = 0, blank = 163, total = 687 }
