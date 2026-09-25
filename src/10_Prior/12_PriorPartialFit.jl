@@ -72,6 +72,77 @@ function sample_buffer(state::PriorCarryState)
     return sample_buffer(state.buf)
 end
 """
+    returns_buffer(state::SampleBufferState)
+    returns_buffer(state::PriorCarryState)
+    returns_buffer(state::AbstractPartialFitState)
+
+Reads the buffer of asset returns out of the state that a prior carries.
+
+Two states hold rows at the prior layer, each in a different place. A [`SampleBufferState`](@ref) is the rows, and a [`PriorCarryState`](@ref) keeps them in `buf`. The read-out of an optimiser and the read-out of a forwarding host read the returns through this function and never through the fields of a state, so a new state that holds rows adds one method here. Where the tree of the prior reads factor returns, the buffer holds the factor rows too, and the read-out of an optimiser takes them with [`factor_buffer`](@ref) when the fold context keeps no factor column. This function refuses, by name, a state that holds no rows, such as the exact-fold state of a moment estimator.
+
+# Arguments
+
+  - `state`: The state that the prior carries.
+
+# Validation
+
+  - `state` holds rows. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `buffer::SampleBufferState`: The rows, the masks folded beside them, and the factor rows where the prior records them.
+
+# Related
+
+  - [`prior_returns_buffer`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`PriorCarryState`](@ref)
+  - [`factor_buffer`](@ref)
+"""
+function returns_buffer(state::SampleBufferState)
+    return state
+end
+function returns_buffer(state::PriorCarryState)
+    return state.buf
+end
+function returns_buffer(state::AbstractPartialFitState)
+    return throw(ArgumentError("a `$(typeof(state))` carries no rows, so no read-out can rebuild the returns it folded from it. The read-out reads the observations from the prior's own buffer, which a `SampleBufferState` or a `PriorCarryState` holds."))
+end
+"""
+    prior_returns_buffer(pe::AbstractPriorEstimator)
+    prior_returns_buffer(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior})
+
+Reads the buffer of asset returns out of the prior that owns the folded rows.
+
+One prior in the chain owns the rows. [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) build their result around the prior they embed and own no rows, so this function reads the buffer of the embedded prior, at any depth. Every other prior keeps its rows in its own `cache`. Two read-outs call it. The read-out of an optimiser rebuilds the returns it forwarded, and the read-out of a [`HighOrderPriorEstimator`](@ref) refits a co-moment that does not fold over the rows.
+
+# Arguments
+
+  - `pe`: The prior estimator that received the observations.
+
+# Validation
+
+  - The prior that owns the rows carries a state. [`partial_fit_cache`](@ref) throws an `ArgumentError` otherwise.
+  - Everything [`returns_buffer`](@ref) refuses.
+
+# Returns
+
+  - `buffer::SampleBufferState`: The rows that the prior folded, and the masks beside them.
+
+# Related
+
+  - [`returns_buffer`](@ref)
+  - [`partial_fit_cache`](@ref)
+  - [`returns_result`](@ref)
+  - [`sample_buffer`](@ref)
+"""
+function prior_returns_buffer(pe::AbstractPriorEstimator)
+    return returns_buffer(partial_fit_cache(pe))
+end
+function prior_returns_buffer(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior})
+    return prior_returns_buffer(pe.pe)
+end
+"""
     partial_fit!(state::PriorCarryState, x::VecNum; kwargs...)
     partial_fit!(state::PriorCarryState, X::MatNum; dims::Int = 1, kwargs...)
 
@@ -849,9 +920,9 @@ end
 
 Reads a [`HighOrderPriorEstimator`](@ref) out of its fold, with no data matrix.
 
-The embedded prior answers first. A co-moment that folded answers from its state, and the read-out refits a co-moment that did not fold over `pr.X`. [`assemble_high_order_prior`](@ref) then builds the result as the batch method does.
+The embedded prior answers first. A co-moment that folded answers from its state. The read-out refits a co-moment that did not fold over the rows that the embedded prior folded, which [`prior_returns_buffer`](@ref) reads. [`assemble_high_order_prior`](@ref) then builds the result as the batch method does.
 
-`pr.X` holds the scenarios of the embedded prior's result, and these are not always the folded rows. A Scenario Cap on the embedded prior keeps only the last rows. The scenario fill writes zeros into the early rows of an asset that lists late. In both cases a co-moment that does not fold differs from the batch fit, which fits it over every folded row, `NaN` entries included. A co-moment that folds reads every observation as it arrives, so it agrees with the batch fit. A caller who needs the two routes to agree under a cap gives the co-moments a `FullMoment` algorithm, which folds.
+The refit reads the folded rows and not `pr.X`, because `pr.X` holds the scenarios of the embedded prior's result, and these are not always the folded rows. A Scenario Cap on the embedded prior keeps only the last rows, and the scenario fill writes zeros into the early rows of an asset that lists late. The batch method fits both co-moments over every row that the caller passes, `NaN` entries included, so a refit over `pr.X` differs from it in both cases. Under an [`Online`](@ref) window the buffer holds the last `max_history` rows, which is the window that the batch equal of that route fits over. The host keeps no copy of the rows, because the embedded prior already holds them.
 
 # Mathematical definition
 
@@ -867,14 +938,15 @@ Where:
   - $(math_dict[:P_batch_prior])
   - $(math_dict[:X_returns])
 
-The equality holds for the embedded result and for every co-moment that folds. It holds for a co-moment that does not fold only when the scenarios of the embedded result are ``\\mathbf{X}`` itself.
+The equality holds for the embedded result and for every co-moment, the ones that fold and the ones that the read-out refits. In floating point, each co-moment differs from the batch co-moment by rounding.
 
 # Algorithm
 
  1. Read the embedded result `pr` out of `pe.pe` with [`prior`](@ref).
- 2. Read `kt` out of `pe.kte` through [`read_member`](@ref), which refits it over `pr.X` where it did not fold.
- 3. Read `sk` and `V` out of `pe.ske` through [`read_member`](@ref), on the same terms.
- 4. Build the result with [`assemble_high_order_prior`](@ref), and return it.
+ 2. Read the rows that the embedded prior folded with [`prior_returns_buffer`](@ref) and [`sample_buffer`](@ref), giving `X`.
+ 3. Read `kt` out of `pe.kte` through [`read_member`](@ref), which refits it over `X` where it did not fold.
+ 4. Read `sk` and `V` out of `pe.ske` through [`read_member`](@ref), on the same terms.
+ 5. Build the result with [`assemble_high_order_prior`](@ref), and return it.
 
 # Arguments
 
@@ -884,6 +956,7 @@ The equality holds for the embedded result and for every co-moment that folds. I
 # Validation
 
   - Every condition that the read-out of `pe.pe` checks.
+  - Everything [`prior_returns_buffer`](@ref) refuses.
 
 # Returns
 
@@ -894,12 +967,14 @@ The equality holds for the embedded result and for every co-moment that folds. I
   - [`HighOrderPriorEstimator`](@ref)
   - [`assemble_high_order_prior`](@ref)
   - [`read_member`](@ref)
+  - [`prior_returns_buffer`](@ref)
   - [`partial_fit!`](@ref)
 """
 function prior(pe::HighOrderPriorEstimator; kwargs...)
     pr = prior(pe.pe; kwargs...)
-    kt = read_member(cokurtosis, pe.kte, pr.X; kwargs...)
-    sk, V = read_member(coskewness, pe.ske, pr.X; kwargs...)
+    X = sample_buffer(prior_returns_buffer(pe.pe))
+    kt = read_member(cokurtosis, pe.kte, X; kwargs...)
+    sk, V = read_member(coskewness, pe.ske, X; kwargs...)
     return assemble_high_order_prior(pe, pr, kt, sk, V)
 end
 """

@@ -1,12 +1,10 @@
 ```@meta
-Description = "The optimiser on the partial-fit seam, private API of PortfolioOptimisers.jl: returns_buffer, prior_returns_buffer, step_active_mask, fold_prior, …"
+Description = "The optimiser on the partial-fit seam, private API of PortfolioOptimisers.jl: step_active_mask, fold_prior, fold_context, fold_returns, …"
 ```
 
 # The optimiser on the partial-fit seam: private API
 
 ```@docs
-PortfolioOptimisers.returns_buffer
-PortfolioOptimisers.prior_returns_buffer
 PortfolioOptimisers.step_active_mask
 PortfolioOptimisers.fold_prior
 PortfolioOptimisers.fold_context

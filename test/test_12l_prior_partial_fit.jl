@@ -281,14 +281,15 @@ end
     end
 
     @testset "A mixed host folds what folds and refits the rest from its own rows" begin
-        # A `SemiMoment` co-moment cannot fold; the host runs its batch verb over `pr.X`.
+        # A `SemiMoment` co-moment cannot fold; the host runs its batch verb over the rows
+        # that the embedded prior folded.
         mixed = HighOrderPriorEstimator(; ske = Coskewness(; alg = SemiMoment()))
         @test !pe.supports_partial_fit(mixed.ske)
         @test pe.supports_partial_fit(mixed.kte)
         o = prior(fold(mixed, X))
         b = prior(mixed, X)
         @test isapprox(o.kt, b.kt; rtol = 1e-10)
-        @test o.sk == b.sk
+        @test isapprox(o.sk, b.sk; rtol = 1e-12)
         # The same rule one layer down: a `SemiMoment` covariance inside an empirical prior.
         semi = EmpiricalPrior(;
                               ce = PortfolioOptimisersCovariance(;
@@ -586,19 +587,58 @@ end
         @test isapprox(o.mu, b.mu; rtol = 1e-12)
         @test isapprox(o.sigma, b.sigma; rtol = 1e-12)
         @test o.X == X
-        # The high order read-out refits a co-moment that does not fold over `pr.X`, which a
-        # Scenario Cap on the embedded prior cuts. The batch method fits it over every row.
-        # A co-moment that folds agrees with the batch fit. Issue #1328 holds the decision.
+        # The high order read-out refits a co-moment that does not fold over the rows that
+        # the embedded prior folded, not over `pr.X`, which a Scenario Cap on the embedded
+        # prior cuts. The batch method fits it over every row too (#1328), so the two agree
+        # while `pr.X` keeps the last `w` rows.
         w = 25
         h = HighOrderPriorEstimator(; pe = EmpiricalPrior(; max_scenarios = w),
                                     ske = Coskewness(; alg = SemiMoment()))
         o = prior(fold(h, X))
         b = prior(h, X)
-        tail = X[(end - w + 1):end, :]
         @test isapprox(o.kt, b.kt; rtol = 1e-12)
         @test b.sk == coskewness(Coskewness(; alg = SemiMoment()), X)[1]
-        @test o.sk == coskewness(Coskewness(; alg = SemiMoment()), tail)[1]
-        @test !isapprox(o.sk, b.sk; rtol = 1e-2)
+        @test isapprox(o.sk, b.sk; rtol = 1e-12)
+        @test isapprox(o.V, b.V; rtol = 1e-12)
+        @test o.X == b.X == X[(end - w + 1):end, :]
+        # The scenario fill writes zeros into the rows of `pr.X` before an asset lists. The
+        # refit reads the folded rows, `NaN` entries included, so it answers the batch fit,
+        # and a refit over the filled zeros misses it by more than a quarter.
+        cvg = CoveragePolicy(; min_coverage = 0.2)
+        Xg = copy(X)
+        Xg[1:30, 3] .= NaN
+        skg = Coskewness(; alg = SemiMoment(), cvg = cvg)
+        ktg = Cokurtosis(; cvg = cvg)
+        hg = HighOrderPriorEstimator(;
+                                     pe = EmpiricalPrior(;
+                                                         me = SimpleExpectedReturns(;
+                                                                                    cvg = cvg),
+                                                         ce = PortfolioOptimisersCovariance(;
+                                                                                            ce = Covariance(;
+                                                                                                            cvg = cvg)),
+                                                         fill_limit = 0.8), kte = ktg,
+                                     ske = skg)
+        @test !pe.supports_partial_fit(hg.ske)
+        @test !pe.supports_partial_fit(hg.kte)
+        og = prior(fold(hg, Xg))
+        bg = prior(hg, Xg)
+        @test iszero(og.X[1:30, 3])
+        @test isapprox(og.sk, bg.sk; rtol = 1e-12)
+        @test isapprox(og.kt, bg.kt; rtol = 1e-12)
+        @test !isapprox(coskewness(skg, og.X)[1], bg.sk; rtol = 1e-1)
+        @test !isapprox(cokurtosis(ktg, og.X), bg.kt; rtol = 1e-1)
+        # An `Online` window: the buffer holds the last `m` rows, and the refit reads them,
+        # which is the batch fit over the same window.
+        m = 30
+        ho = pe.update_online_estimator(HighOrderPriorEstimator(;
+                                                                pe = pe.Online(EmpiricalPrior();
+                                                                               max_history = m),
+                                                                ske = Coskewness(;
+                                                                                 alg = SemiMoment())))
+        oo = prior(fold(ho, X))
+        @test isapprox(oo.sk,
+                       coskewness(Coskewness(; alg = SemiMoment()),
+                                  X[(end - m + 1):end, :])[1]; rtol = 1e-12)
         # `combine_factor_answers` is Kleene's strong disjunction, `nothing` the unknown
         # value, over every tuple of one to three answers.
         kleene(a, b) =

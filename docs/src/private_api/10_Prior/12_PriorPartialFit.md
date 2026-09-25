@@ -7,6 +7,8 @@ Description = "The prior family on the partial-fit seam, private API of Portfoli
 ```@docs
 PortfolioOptimisers.PriorCarryState
 PortfolioOptimisers.sample_buffer(state::PortfolioOptimisers.PriorCarryState)
+PortfolioOptimisers.returns_buffer
+PortfolioOptimisers.prior_returns_buffer
 PortfolioOptimisers.fold_carry
 Base.copy(x::PortfolioOptimisers.PriorCarryState)
 PortfolioOptimisers.needs_factor_returns
