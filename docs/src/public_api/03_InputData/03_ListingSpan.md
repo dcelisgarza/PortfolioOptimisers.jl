@@ -18,9 +18,10 @@ masks that an [`AssetPanel`](@ref) carries. The active mask marks the assets tha
 each observation. The estimation mask is the active mask where the return is also finite. A return
 needs the earlier price of its pair. A span from `first` to `last` on the prices therefore becomes
 `[first + 1, last]` on padded returns, and `[first, last - 1]` on returns without padding. The active
-mask then covers exactly the finite returns of a column, so the listing of an asset never shows
-as a missing return. The two masks differ only inside a gap with prices on both sides. There
-the asset is listed but has no return, and a cross-validation fold that holds the asset reports
+mask then starts at the first return whose two prices are both in the listing, so the first price
+of an asset never shows as a missing return. The two masks differ only at a return that reads a
+gap with prices on both sides. This is also true when the gap is next to the first or the last
+price of the listing. There the asset is listed but has no return, and a cross-validation fold that holds the asset reports
 the observation and counts its return as zero.
 
 Both functions take plain arrays, and neither needs an estimator. `universe_masks` also accepts

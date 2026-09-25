@@ -148,4 +148,14 @@ unique_key_dict!(math_dict, :math_dict,
                  :a_i_cvg => "``a_{i}``: Active flag of asset ``i`` at the last observation folded, ``1`` when the asset is active and ``0`` when it is not.",#
                  :nu_k_cvg => "``\\nu_{k}``: Observation count of cell ``k``, the number of observations at which every asset of the cell is finite and active.",#
                  :v_k_cvg => "``v_{k}``: Entry ``k`` of the answer of an available-case fit.",#
-                 :A_adm_cvg => "``\\mathcal{A}``: Admitted assets, those that [`admits`](@ref) lets into the answer. A cell is admitted when every asset of the cell is in ``\\mathcal{A}``.")
+                 :A_adm_cvg => "``\\mathcal{A}``: Admitted assets, those that [`admits`](@ref) lets into the answer. A cell is admitted when every asset of the cell is in ``\\mathcal{A}``.",#
+                 # The Listing Span of `03_InputData/03_ListingSpan.jl` and its projection
+                 # onto the returns clock. Each symbol is stated by two or more Units of
+                 # that file.
+                 :f_i_span => "``f_{i}``: First observation of the Listing Span of asset ``i``, on the price clock.",#
+                 :l_i_span => "``l_{i}``: Last observation of the Listing Span of asset ``i``, on the price clock.",#
+                 :a_ti_span => "``a_{t,\\,i}``: Listing indicator of asset ``i`` at observation ``t`` of the price clock, ``1`` when the asset is listed and ``0`` when it is not.",#
+                 :a_tilde_ti_act => "``\\tilde{a}_{t,\\,i}``: Active mask entry of asset ``i`` at observation ``t`` of the returns clock, ``1`` when both prices of the return lie inside the listing of the asset.",#
+                 :n_span => "``n``: Price clock length, the number of price observations.",#
+                 :m_span => "``m``: Returns clock length, the number of return observations.",#
+                 :o_span => "``o = n - m``: Clock offset, ``0`` when padding keeps the first observation and ``1`` when it does not.")
