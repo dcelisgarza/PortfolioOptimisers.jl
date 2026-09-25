@@ -290,8 +290,8 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                   size(panel_feature_matrix(rr3.pnl)[2], 1) ==
                   size(rr3.X, 1)
 
-            # Under collapse_args the aggregated period takes the features of the row at its
-            # representative timestamp -- last-observation semantics. The collapse is the
+            # Under collapse_args the aggregated period takes the features of the last row of
+            # its group -- last-observation semantics. The collapse is the
             # step that renumbers the observation, so `price_ingestion` is what projects the
             # panel onto the clock it emits; the conversion moves no clock and cuts only the
             # observation `padding` costs.

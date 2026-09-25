@@ -4,7 +4,7 @@
 
 Recover the positional row indices of a time-varying [`AssetPanel`](@ref) from a timestamp window.
 
-A Panel Field holds a plain array, so its observation axis follows the carrier's clock by position and not by timestamp. A routine that selects rows of `X` by timestamp calls this function to match the surviving timestamps back into the original clock, and the panel keeps the rows it finds. A surviving timestamp that is absent from that clock throws. Such a timestamp comes from a timestamp function that makes new timestamps, or from an outer join that adds a row `X` never had. A positional slice past such a timestamp pairs each asset with the values of another period.
+A Panel Field holds a plain array, so its observation axis follows the carrier's clock by position and not by timestamp. A routine that selects rows of `X` by timestamp calls this function to match the surviving timestamps back into the original clock, and the panel keeps the rows it finds. A surviving timestamp that is absent from that clock throws. Such a timestamp comes from an outer join that adds a row `X` never had. A positional slice past such a timestamp pairs each asset with the values of another period.
 
 Two kinds of caller use it. At the price level, the clock is `TimeSeries.timestamp(X)` and the selection is a timestamp window. Where cross-validation assembles its folds, the clock is `ReturnsResult.ts` and the selection is a fold. There [`fold_row_indices`](@ref) recovers the rows of each fold from the timestamps that the fold's view of the returns holds. This is why `ts` must be unique. It is the key of the observation axis, and a repeated timestamp matches only its first position.
 
@@ -93,7 +93,7 @@ function matched_row_indices(ts_new, ts_old)
     rows = indexin(ts_new, ts_old)
     missed = findfirst(isnothing, rows)
     @argcheck(isnothing(missed),
-              ArgumentError("a time-varying Asset Panel or Listing Span holds its observation axis parallel to a clock, but the timestamp $(ts_new[missed]) selected here is absent from that clock, so the row it corresponds to cannot be recovered. This happens when the surviving timestamps are not a subset of the original clock, for example after a `collapse_args` timestamp function that makes new timestamps, or an outer join that adds rows the asset prices never had. Pass a static Asset Panel, or align the panel to the clock first."))
+              ArgumentError("a time-varying Asset Panel or Listing Span holds its observation axis parallel to a clock, but the timestamp $(ts_new[missed]) selected here is absent from that clock, so the row it corresponds to cannot be recovered. This happens when the surviving timestamps are not a subset of the original clock, for example after an outer join that adds rows the asset prices never had. Pass a static Asset Panel, or align the panel to the clock first."))
     return Vector{Int}(rows)
 end
 """

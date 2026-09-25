@@ -985,9 +985,9 @@ end
     @test reinterpret(UInt32, values(M)[5, 3]) ===
           reinterpret(UInt32, PortfolioOptimisers.absent_value(Float32))
 
-    # A collapse projects a time-varying Panel Field at the representative timestamp, which
-    # the timestamp function picks: `last` is last-observation semantics, and `first` takes
-    # the first row even where the value function takes the last price.
+    # A collapse projects a time-varying Panel Field at the last row of each period, whatever
+    # the timestamp function picks (#1329): a period's prices and Panel Field values come
+    # from one day under `last` and under `first` with a `last` value function alike.
     T = 21
     tsd = collect(Date(2020, 1, 6):Day(1):(Date(2020, 1, 6) + Day(T - 1)))
     Xd = TimeArray(tsd, 100.0 .+ reshape(collect(1.0:(2T)), T, 2), ["A", "B"])
@@ -1001,7 +1001,22 @@ end
                           pnl = pnl)
     @test values(prl.X)[:, 1] == values(prf.X)[:, 1] == [107.0, 114.0, 121.0]
     @test PortfolioOptimisers.panel_field(prl.pnl, "row").vals[:, 1] == [7.0, 14.0, 21.0]
-    @test PortfolioOptimisers.panel_field(prf.pnl, "row").vals[:, 1] == [1.0, 8.0, 15.0]
+    @test PortfolioOptimisers.panel_field(prf.pnl, "row").vals[:, 1] == [7.0, 14.0, 21.0]
+    # A timestamp function that makes timestamps `X` never had no longer refuses: the
+    # projection reads the rows of each period, not the emitted timestamps.
+    prn = price_ingestion(PriceIngestion(;
+                                         collapse_args = (Dates.week, t -> last(t) + Day(1),
+                                                          last)), Xd; pnl = pnl)
+    @test TimeSeries.timestamp(prn.X) == tsd[[7, 14, 21]] .+ Day(1)
+    @test PortfolioOptimisers.panel_field(prn.pnl, "row").vals[:, 1] == [7.0, 14.0, 21.0]
+    # An inner join that drops the last day of a week reduces that week over the rows it
+    # kept, and the Panel Field takes the last of those rows too.
+    Bd = TimeArray(tsd[1:(T - 1)], collect(1.0:(T - 1)), ["bm"])
+    pri = price_ingestion(PriceIngestion(; join_method = :inner,
+                                         collapse_args = (Dates.week, first, last)), Xd;
+                          B = Bd, pnl = pnl)
+    @test values(pri.X)[:, 1] == [107.0, 114.0, 120.0]
+    @test PortfolioOptimisers.panel_field(pri.pnl, "row").vals[:, 1] == [7.0, 14.0, 20.0]
     # An outer join that adds a row the asset table never had cannot project a
     # time-varying panel, and says so.
     tv5 = AssetPanel(;

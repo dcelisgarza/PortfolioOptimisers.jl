@@ -37,6 +37,11 @@ the asset prices, `timestamp(pr.X) == timestamp(X)`, unless `collapse_args` is n
 `PriceIngestion` reports every observation it padded, with the table, the number of observations
 and the columns. It warns by default, and throws an error when `strict` is set.
 
+A collapse puts the observations of one period into one row. A time-varying [`AssetPanel`](@ref)
+then takes the values of the last observation of each period, whatever timestamp function
+`collapse_args` names. With `collapse_args = (week, first, last)`, the prices and the panel values
+of a week both come from its last day.
+
 The element type of the result comes from the input series. A `Float32` panel stays `Float32`,
 `Float32` next to `Float64` gives `Float64`, and an integer panel takes the floating-point type of
 its returns. A type that has no value for an absent number throws an error that names the type.
