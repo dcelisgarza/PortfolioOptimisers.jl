@@ -1360,7 +1360,7 @@ end
         @test p.summary.max_drawdown < 0
     end
 
-    @testset "The turnover into and out of the gap is dropped with it" begin
+    @testset "The turnover into the gap is dropped with it, and the one out of it is kept" begin
         @test isnan(p.turnover[1])
         @test isnan(p.turnover[2])
         @test isfinite(p.turnover[3])
@@ -3452,5 +3452,91 @@ end
         @test eltype(forecast_coverage(f32)) === Float32
         @test eltype(forecast_ic(f32, ones(Float64, 4, 4))) === Float64
         @test eltype(forecast_coverage(f32, ones(Float64, 4, 4))) === Float64
+    end
+end
+
+@testset "The docstrings of 10_ForecastPortfolios.jl against numbers" begin
+    PO = PortfolioOptimisers
+
+    @testset "A flat cross-section holds no book under either kind" begin
+        # The mean of equal values rounds off them at 3, 5, 6 and 7 assets, so a centring
+        # that trusts it writes a short book of 200 % gross instead of a zero row.
+        for na in 1:7, v in (0.1, 0.3, 0.7, 1 / 3, 0.123456789, -0.2, 2.2),
+            kind in (:rank, :zscore)
+
+            a = fill(v, 1, na)
+            wf = PO.forecast_portfolio_weights(a, a, [1], kind)
+            @test kind === :rank && na > 1 ? isapprox(sum(abs, wf), 2) : all(iszero, wf)
+        end
+        @test all(iszero,
+                  PO.forecast_portfolio_weights(fill(0.1, 1, 3), fill(0.0, 1, 3), [1],
+                                                :zscore))
+    end
+
+    @testset "A constant series has a zero volatility and no ratio" begin
+        for ns in 2:9, v in (0.1, 0.3, 0.7, 1 / 3, 0.123456789, -0.2, 2.2)
+            sm = PO.forecast_series_summary(fill(v, ns), 12)
+            @test sm.ann_mean == 12 * v
+            @test iszero(sm.ann_vol)
+            @test isnan(sm.ann_ir)
+        end
+        @test all(isnan, values(PO.forecast_series_summary(Float64[], 12)))
+        sm = PO.forecast_series_summary([NaN, 0.2], 12)
+        @test sm.ann_mean ≈ 2.4
+        @test isnan(sm.ann_vol) && isnan(sm.ann_ir)
+        @test PO.forecast_hit_rate([1.0, -1.0, NaN, 0.0, Inf]) == 1 / 3
+        @test isnan(PO.forecast_hit_rate([NaN]))
+    end
+
+    # Date 2 carries two assets under `min_count = 3`. Its book is built, and its return
+    # is not scored.
+    alpha = [1.0 2.0 3.0 4.0
+             1.0 2.0 NaN NaN
+             1.0 2.0 3.0 4.0]
+    gap_y(g) = [0.0 0.0 0.0 -0.1
+                -g g 0.0 0.0
+                0.0 0.0 0.0 -0.1]
+
+    @testset "A date below the threshold keeps its book, and the next turnover reads it" begin
+        fe = forecast_evaluation(alpha, gap_y(0.1); min_count = 3, ppy = 1, step = 1)
+        p = forecast_portfolio(fe; kind = :rank)
+        @test p.w[2, :] == [-1.0, 1.0, 0.0, 0.0]
+        @test isnan(p.ret[2])
+        @test isnan(p.turnover[2])
+        @test p.turnover[3] ≈ sum(abs, p.w[3, :] - p.w[2, :])
+        @test p.turnover[3] ≈ 2.5
+    end
+
+    @testset "A gap hides its own return, so the compressed drawdown moves either way" begin
+        for (g, deeper) in ((0.1, true), (-0.1, false))
+            fe = forecast_evaluation(alpha, gap_y(g); min_count = 3, ppy = 1, step = 1)
+            p = forecast_portfolio(fe; kind = :rank)
+            held = copy(p.ret)
+            held[2] = sum(p.w[2, i] * gap_y(g)[2, i] for i in 1:4)
+            full = performance_summary(held; periods_per_year = 1)
+            @test p.summary.max_drawdown ≈ -0.15
+            @test (p.summary.max_drawdown < full.max_drawdown) == deeper
+        end
+    end
+
+    @testset "The quantile spread reports the four figures of the series summary" begin
+        fe = forecast_evaluation(alpha[[1, 3], :], gap_y(0.1)[[1, 3], :]; min_count = 3,
+                                 ppy = 4, step = 1)
+        q = forecast_quantile_spread(fe; quantiles = [0.25, 0.5])
+        @test keys(q) == (:spread, :ann_mean, :ann_vol, :ann_ir, :hit_rate)
+        for j in 1:2
+            sm = PO.forecast_series_summary(q.spread[:, j], 4)
+            @test isequal((q.ann_mean[j], q.ann_vol[j], q.ann_ir[j], q.hit_rate[j]),
+                          values(sm))
+        end
+        @test isequal(forecast_quantile_spread(fe; quantiles = 0.25).spread,
+                      q.spread[:, 1:1])
+    end
+
+    @testset "Both tails are inclusive, so a small cross-section puts one asset in both" begin
+        @test PO.forecast_tail_spread([1.0], [2.0], 0.1) == 0
+        # At q = 0.5 the median asset is in both tails.
+        @test PO.forecast_tail_spread([1.0, 2.0, 3.0], [10.0, 20.0, 30.0], 0.5) ≈
+              (20 + 30) / 2 - (10 + 20) / 2
     end
 end

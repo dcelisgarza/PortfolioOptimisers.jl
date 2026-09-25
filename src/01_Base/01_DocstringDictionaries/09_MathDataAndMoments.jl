@@ -186,6 +186,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :b_k_pair => "``b_{k}``: Forward target of the ``k``-th scorable pair.",#
                  :q_k_pair => "``q_{k}``: Cross-sectional weight of the ``k``-th scorable pair, zero where that weight is not finite.",#
                  :n_pool => "``n``: Number of scorable pairs in the pooling.",#
+                 :V_t_cs => "``\\mathcal{V}_{t}``: Cross-section of observation ``t``, the assets whose forecast and target are both finite there.",#
                  # The cross-sectional correlations of `32_CrossSectionalFactorModel/`.
                  # Each symbol is stated by two or more Units of those files.
                  :alpha_t_fc => "``\\boldsymbol{\\alpha}_{t}``: Return Forecast cross-section at observation ``t``.",#

@@ -3,7 +3,20 @@
 
 Return the fraction of the finite entries of a series that are positive.
 
-The denominator is the number of finite entries rather than the length of the series, so the hit rate is read against the same observations as the mean and the volatility that sit beside it. It is the convention every summary of the library holds: [`exposure_ic_summary`](@ref) reads its hit rate on the same terms, and a `NaN` is an observation at which nothing was measured rather than a miss.
+The denominator counts the finite entries and not the length of the series, so the hit rate reads the same observations as the mean and the volatility beside it. [`exposure_ic_summary`](@ref) reads its hit rate the same way. A `NaN` marks an observation at which nothing was measured, so it is not a miss.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{hit} &= \\dfrac{\\left| \\left\\{ t \\in \\mathcal{F} : x_{t} > 0 \\right\\} \\right|}{\\left| \\mathcal{F} \\right|}\\,, \\qquad \\mathcal{F} = \\left\\{ t : x_{t} \\text{ is finite} \\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``x_{t}``: Entry ``t`` of the series.
+  - ``\\mathcal{F}``: The finite entries. An empty ``\\mathcal{F}`` gives a `NaN`.
 
 # Arguments
 
@@ -20,7 +33,7 @@ The denominator is the number of finite entries rather than the length of the se
   - [`exposure_ic_summary`](@ref)
 """
 function forecast_hit_rate(x::AbstractVector{<:Real})
-    Tf = real(eltype(x))
+    Tf = eltype(x)
     n = 0
     h = 0
     for xi in x
@@ -38,9 +51,9 @@ end
 
 Return the annualised mean, volatility and information ratio of a series, and its hit rate.
 
-This is the summary a quantity that is not a portfolio earns. A series of weights has a path, so it earns the whole of [`performance_summary`](@ref); a spread of two cross-sectional means has none, so a drawdown of it would state nothing and these four figures are what remain.
+A series of weights has a path, so it gets the whole of [`performance_summary`](@ref). A spread of two cross-sectional means has no path, and a drawdown of it states nothing, so it gets these four figures.
 
-Each figure is read over the entries at which the series is finite, so a date the evaluation could not score enters none of them.
+Each figure reads the finite entries of the series, so a date that the evaluation could not score enters none of them.
 
 # Mathematical definition
 
@@ -58,9 +71,9 @@ Where:
 # Algorithm
 
  1. Drop the non-finite entries of `x`, giving `s`.
- 2. Take the mean of `s`, giving `m`. An empty `s` gives a `NaN`.
- 3. Take its corrected standard deviation, giving `v`. Fewer than two entries give a `NaN`.
- 4. Annualise both by `ppy`, and divide. A non-positive volatility gives a `NaN` ratio.
+ 2. Take the mean of `s` and clamp it to the least and the greatest entry of `s`, giving `m`. An empty `s` gives a `NaN`. The clamp moves nothing in exact arithmetic. The rounded mean of a constant `s` can differ from its common value, and the clamp makes `m` equal that value.
+ 3. Take the corrected standard deviation of `s` about `m`, giving `v`. Fewer than two entries give a `NaN`, and a constant `s` gives exactly zero.
+ 4. Annualise `m` and `v` by `ppy`, and divide. A non-positive volatility gives a `NaN` ratio.
  5. Read the hit rate of `x` with [`forecast_hit_rate`](@ref).
 
 # Arguments
@@ -79,9 +92,9 @@ Where:
   - [`performance_summary`](@ref)
 """
 function forecast_series_summary(x::AbstractVector{<:Real}, ppy::Real)
-    Tf = real(eltype(x))
+    Tf = eltype(x)
     s = x[isfinite.(x)]
-    m = isempty(s) ? Tf(NaN) : sum(s) / length(s)
+    m = isempty(s) ? Tf(NaN) : clamp(sum(s) / length(s), extrema(s)...)
     v = length(s) > 1 ? Statistics.std(s; mean = m, corrected = true) : Tf(NaN)
     ann_mean = m * ppy
     ann_vol = v * sqrt(Tf(ppy))
@@ -94,9 +107,24 @@ end
                             alpha::AbstractMatrix{<:Real}, y::AbstractMatrix{<:Real},
                             t::Integer)
 
-Mark the assets one evaluation date can be scored on, and build their sort key.
+Mark the assets that one evaluation date can score, and build their sort key.
 
-An asset enters the cross-section of a date only where both the forecast and the target are finite there, so an asset the panel does not carry, and one whose forward window does not close, take no part in the statistic. The key is the forecast inside the mask and `Inf` outside it, which is the form [`cs_ordinal_ranks`](@ref) takes: the mask then sorts to the end and takes no rank.
+An asset enters the cross-section of a date only where its forecast and its target are both finite there. So an asset that the panel does not carry, and an asset whose forward window does not close, take no part in the statistic. The key is the forecast inside the mask and `Inf` outside it, which is the form [`cs_ordinal_ranks`](@ref) takes. The masked assets then sort to the end and take no rank.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+k_{i} &= \\begin{cases} \\alpha_{ti} & i \\in \\mathcal{V}_{t}\\,,\\\\ \\infty & \\text{otherwise}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``k_{i}``: Sort key of asset ``i``.
+  - $(math_dict[:V_t_cs])
+  - $(math_dict[:alpha_ti_fc])
+  - $(math_dict[:y_ti_fwd])
 
 # Arguments
 
@@ -108,7 +136,7 @@ An asset enters the cross-section of a date only where both the forecast and the
 
 # Returns
 
-  - `n::Int`: Number of assets in the cross-section.
+  - `n::Int`: Number of assets in the cross-section, ``\\left| \\mathcal{V}_{t} \\right|``.
 
 # Related
 
@@ -136,9 +164,9 @@ end
 
 Centre one cross-sectional signal and write it into a row of the weight matrix at 200 % gross.
 
-Centring makes the book dollar neutral, and the rescaling makes it carry one unit long and one unit short whatever the spread of the signal is. That fixes the scale across dates and across members, which is what makes two forecasts comparable on the statistic built from it.
+Centring makes the book dollar neutral. The rescaling makes the book hold one unit long and one unit short whatever the spread of the signal is. That fixes the scale across dates and across members, so two forecasts are comparable on a statistic built from their books.
 
-A signal that is identically zero once centred — one asset, or a flat cross-section — leaves the row at whatever it held, which is zero: there is no long side to fund a short one.
+A signal that is identically zero once centred leaves the row as it was, which is zero. One asset and a flat cross-section give such a signal, and neither has a long side to fund a short side.
 
 # Mathematical definition
 
@@ -158,8 +186,8 @@ Where:
 
 # Algorithm
 
- 1. Average the marked entries of `s`, giving `m`.
- 2. Subtract `m` from each marked entry, giving `c`, which is zero outside the mask, and accumulate the absolute values into `g`.
+ 1. Average the marked entries of `s` and clamp the average to the least and the greatest marked entry, giving `m`. The clamp moves nothing in exact arithmetic. The rounded average of a flat cross-section can differ from its common value, and without the clamp every entry would centre to the same sign and fill a one-sided book.
+ 2. Subtract `m` from each marked entry, giving `c`, which is zero outside the mask, and sum the absolute values into `g`.
  3. Write `2c / g` into row `k` of `w`. A zero `g` writes nothing.
 
 # Arguments
@@ -184,10 +212,17 @@ function forecast_centred_weights!(w::AbstractMatrix{<:Real}, k::Integer,
                                    n::Integer)
     Tf = eltype(w)
     m = zero(Tf)
+    lo = Tf(Inf)
+    hi = Tf(-Inf)
     for i in eachindex(valid)
-        m += valid[i] ? s[i] : zero(Tf)
+        if !(valid[i])
+            continue
+        end
+        m += s[i]
+        lo = min(lo, s[i])
+        hi = max(hi, s[i])
     end
-    m /= n
+    m = clamp(m / n, lo, hi)
     g = zero(Tf)
     for i in eachindex(valid)
         g += valid[i] ? abs(s[i] - m) : zero(Tf)
@@ -203,11 +238,13 @@ end
     forecast_portfolio_weights(alpha::AbstractMatrix{<:Real}, y::AbstractMatrix{<:Real},
                                dates::AbstractVector{<:Integer}, kind::Symbol)
 
-Build the weights of the long-short portfolio a Return Forecast states on its own.
+Build the weights of the long-short portfolio that a Return Forecast states by itself.
 
-The portfolio holds the forecast and nothing else: it takes no covariance, no constraint and no solver, so what it earns is what the ordering of the forecast is worth. `kind` chooses what that ordering is read off. `:rank` reads the ordinal rank of the cross-section, which measures the order alone and lets one extreme forecast move the book no more than one ordinary forecast does. `:zscore` reads the forecast value, which lets a conviction that is twice as large take twice the weight.
+The portfolio holds the forecast and nothing else. It reads no covariance, no constraint and no solver, so its return measures what the ordering of the forecast is worth. `kind` chooses what the ordering reads. `:rank` reads the ordinal rank in the cross-section, which measures the order alone, so one extreme forecast moves the book no more than one ordinary forecast does. `:zscore` reads the forecast value, so a conviction twice as large takes twice the weight.
 
-Both are centred and rescaled by [`forecast_centred_weights!`](@ref), so both are dollar neutral at 200 % gross.
+[`forecast_centred_weights!`](@ref) centres and rescales both kinds, so both are dollar neutral at 200 % gross. A date with an empty cross-section, one asset or a flat signal holds no book.
+
+This builder reads no threshold. A date whose cross-section is smaller than the `min_count` of an evaluation still gets its book, and [`forecast_portfolio`](@ref) decides which dates it scores.
 
 # Algorithm
 
@@ -219,7 +256,7 @@ Both are centred and rescaled by [`forecast_centred_weights!`](@ref), so both ar
 # Arguments
 
   - `alpha`: Return Forecast history `observations × assets`, in return units.
-  - `y`: Forward target `observations × assets`, on the same axis as `alpha`. It is read for its finiteness alone, which is what defines the cross-section of a date.
+  - `y`: Forward target `observations × assets`, on the same axis as `alpha`. The builder reads only whether each entry is finite, which defines the cross-section of a date.
   - `dates`: Row indices of the observations to build a portfolio at.
   - `kind`: `:rank` or `:zscore`.
 
@@ -255,7 +292,7 @@ function forecast_portfolio_weights(alpha::AbstractMatrix{<:Real},
                                     dates::AbstractVector{<:Integer}, kind::Symbol)
     @argcheck(kind in (:rank, :zscore),
               ConflictingArgumentError("kind must be :rank or :zscore, got :$(kind)"))
-    Tf = promote_type(real(eltype(alpha)), real(eltype(y)))
+    Tf = promote_type(eltype(alpha), eltype(y))
     N = size(alpha, 2)
     w = zeros(Tf, length(dates), N)
     key = Vector{Tf}(undef, N)
@@ -272,23 +309,44 @@ end
 """
     forecast_portfolio(fe::ForecastEvaluationResult; kind::Symbol = :rank) -> NamedTuple
 
-Score the long-short portfolio a Return Forecast states on its own.
+Score the long-short portfolio that a Return Forecast states by itself.
 
-This is the second of the two readings of a forecast. The information coefficient states how well the forecast orders the cross-section; this verb states what that ordering is worth once it is held as a book, which is the reading a caller acts on. The portfolio takes no covariance, no constraint and no solver, so nothing but the forecast itself is being measured.
+The information coefficient states how well the forecast orders the cross-section. This verb states what that ordering earns as a book, which is the reading a caller acts on. The book reads no covariance, no constraint and no solver, so the forecast is the only thing it measures.
 
-The return series **is** a portfolio, so it earns the whole of [`performance_summary`](@ref) rather than a mean and a volatility: a Sharpe ratio and its standard error, a Sortino ratio, a Calmar ratio, a maximum drawdown and a conditional value at risk. `fe.ppy` is what annualises it, mapped onto that verb's `periods_per_year`.
+The return series is the return of a portfolio, so it gets the whole of [`performance_summary`](@ref) and not only a mean and a volatility. That is a Sharpe ratio and its standard error, a Sortino ratio, a Calmar ratio, a maximum drawdown and a conditional value at risk. `fe.ppy` annualises it, as the `periods_per_year` of that verb.
 
-# The drawdown is of the compressed path
+# Mathematical definition
 
-A date whose cross-section carries fewer than `fe.min_count` assets has no portfolio return, and [`performance_summary`](@ref) states the Precomputed-returns contract: its series must be finite, because a `NaN` orders last under `partialsort` and the tail figure then answers a finite wrong number rather than a `NaN`. The gaps are therefore dropped with `ret[isfinite.(ret)]` before the call, which is the remedy that docstring prescribes.
+```math
+\\begin{align}
+r_{j} &= \\begin{cases} \\sum_{i \\in \\mathcal{V}_{t_{j}}} w_{ji} \\, y_{t_{j} i} & \\left| \\mathcal{V}_{t_{j}} \\right| \\geq n_{\\min}\\,,\\\\ \\mathrm{NaN} & \\text{otherwise}\\,, \\end{cases}\\\\
+\\tau_{j} &= \\begin{cases} \\sum_{i} \\left\\lvert w_{ji} - w_{j-1,i} \\right\\rvert & j > 1 \\text{ and } r_{j} \\text{ is finite}\\,,\\\\ \\mathrm{NaN} & \\text{otherwise}\\,. \\end{cases}
+\\end{align}
+```
 
-The mean, the volatility and the two ratios built on them are unaffected by that, because each is a sum over the dates that carry a number. `max_drawdown` and `calmar` are **not**: they read a path, and the compressed path joins the date before a gap to the date after it, so a drawdown that opened inside the gap is invisible and one that spans it is understated. No guard is applied and no threshold is imposed — the figure is reported as it stands, and this paragraph is the caveat that rides beside it. A caller who needs the drawdown of the real path lowers `min_count`, or reads `ret` and builds it.
+Where:
+
+  - ``r_{j}``: Portfolio return at evaluation date ``t_{j}``.
+  - ``\\tau_{j}``: Turnover at evaluation date ``t_{j}``.
+  - ``w_{ji}``: Weight of asset ``i`` at evaluation date ``t_{j}``, from [`forecast_portfolio_weights`](@ref).
+  - ``n_{\\min}``: The threshold `fe.min_count`.
+  - $(math_dict[:V_t_cs])
+  - $(math_dict[:y_ti_fwd])
+  - $(math_dict[:t_j_eval])
+
+# The gaps of the return series
+
+A date whose cross-section holds fewer than `fe.min_count` assets has no portfolio return. [`performance_summary`](@ref) states the Precomputed-returns contract, which needs a finite series. A `NaN` sorts last under `partialsort`, so the tail figure would be a finite wrong number and not a `NaN`. This verb therefore drops the gaps with `ret[isfinite.(ret)]` before the call, which is the remedy that docstring gives.
+
+The gaps do not change the mean, the volatility or the two ratios built on them, because each is a sum over the dates that carry a number. They change `max_drawdown` and `calmar`, which read a path. The compressed path joins the date before a gap to the date after it, and the return that the book earned inside the gap is not in it. A loss inside the gap makes the compressed drawdown shallower than the drawdown of the held book, and a gain inside the gap can make it deeper. This verb applies no guard and no threshold, and reports the figure as it is. A caller who needs the drawdown of the held book lowers `min_count`, or contracts `w` with the target at the gap dates.
+
+The book of a gap date stays in `w`, because [`forecast_portfolio_weights`](@ref) reads no threshold. Its turnover is a `NaN`, as its return is. The turnover of the next date reads the trade out of that book.
 
 # Algorithm
 
  1. Build the weights of every evaluation date with [`forecast_portfolio_weights`](@ref), giving `w`.
  2. For each date, contract its weights with its target over the assets that carry both a finite forecast and a finite target, giving `ret`. A date with fewer than `fe.min_count` such assets gets a `NaN` instead.
- 3. Take the turnover of `w` with [`calc_turnover`](@ref), and write a `NaN` into every date whose return is one, so the two series read against the same dates.
+ 3. Take the turnover of `w` with [`calc_turnover`](@ref), and write a `NaN` into every date whose return is a `NaN`, so the two series read the same dates.
  4. Drop the gaps of `ret` and summarise the remainder with [`performance_summary`](@ref) at `periods_per_year = fe.ppy`.
  5. Read the hit rate of `ret` with [`forecast_hit_rate`](@ref), and the mean of the finite entries of the turnover.
 
@@ -300,13 +358,13 @@ The mean, the volatility and the two ratios built on them are unaffected by that
 # Validation
 
   - The rules of [`forecast_portfolio_weights`](@ref).
-  - [`performance_summary`](@ref) needs at least one finite return, so a `fe` no date of which reaches `fe.min_count` raises from that verb rather than from this one.
+  - [`performance_summary`](@ref) needs at least one finite return. If no date of `fe` reaches `fe.min_count`, that verb raises, and this one does not check first.
 
 # Returns
 
   - `portfolio::NamedTuple`: `(; w, ret, turnover, summary, hit_rate, mean_turnover)`.
 
-      + `w::MatNum`: Portfolio weights, `evaluation dates × assets`.
+      + `w::MatNum`: Portfolio weights, `evaluation dates × assets`. A date below `fe.min_count` keeps its book.
       + `ret::VecNum`: Portfolio target return, one entry per evaluation date, `NaN` below `fe.min_count`.
       + `turnover::VecNum`: Turnover, one entry per evaluation date, `NaN` at the first and wherever `ret` is.
       + `summary::PerformanceSummaryResult`: The summary of `ret` with its gaps dropped.
@@ -356,9 +414,25 @@ end
 
 Return the top-minus-bottom target of one cross-section at one quantile.
 
-The spread is the mean target of the assets the forecast puts in its top tail, less the mean target of those it puts in its bottom tail. It answers a narrower question than a weighted portfolio does, and a more robust one: only the two tails are read, so the middle of the cross-section — where a forecast carries the least information and the most noise — cannot move the answer.
+The spread is the mean target of the assets in the top tail of the forecast, less the mean target of the assets in its bottom tail. It reads only the two tails, so the middle of the cross-section cannot move it. The middle is where a forecast carries the least information and the most noise.
 
-The quantile is read symmetrically, `q` against `1 - q`, and the cut is inclusive on both sides, so an asset that sits exactly on a threshold enters that tail and a cross-section too small to separate the two tails puts the same asset in both.
+The two cuts are symmetric, `q` and `1 - q`, and inclusive. An asset exactly on a threshold enters that tail, and a cross-section too small to separate the two tails puts one asset in both.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+S &= \\dfrac{1}{\\left| \\mathcal{H} \\right|} \\sum_{i \\in \\mathcal{H}} y_{i} - \\dfrac{1}{\\left| \\mathcal{L} \\right|} \\sum_{i \\in \\mathcal{L}} y_{i}\\,,\\\\
+\\mathcal{L} &= \\left\\{ i : a_{i} \\leq Q_{a}(q) \\right\\}\\,, \\qquad \\mathcal{H} = \\left\\{ i : a_{i} \\geq Q_{a}(1 - q) \\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``S``: The spread.
+  - ``a_{i}``, ``y_{i}``: Forecast and target of asset ``i`` of the cross-section.
+  - ``Q_{a}(p)``: The ``p``-quantile of the forecasts, from `Statistics.quantile`.
+  - ``\\mathcal{L}``, ``\\mathcal{H}``: The bottom and the top tail. Neither is empty, because the least forecast is in ``\\mathcal{L}`` and the greatest is in ``\\mathcal{H}``.
 
 # Arguments
 
@@ -377,7 +451,7 @@ The quantile is read symmetrically, `q` against `1 - q`, and the cut is inclusiv
 """
 function forecast_tail_spread(av::AbstractVector{<:Real}, yv::AbstractVector{<:Real},
                               q::Real)
-    Tf = promote_type(real(eltype(av)), real(eltype(yv)))
+    Tf = promote_type(eltype(av), eltype(yv))
     lo = Statistics.quantile(av, q)
     hi = Statistics.quantile(av, one(q) - q)
     sl = zero(Tf)
@@ -396,20 +470,20 @@ end
     forecast_quantile_spread(fe::ForecastEvaluationResult;
                              quantiles = (0.1,)) -> NamedTuple
 
-Score the top-minus-bottom spread of a Return Forecast, one entry per quantile.
+Score the top-minus-bottom spread of a Return Forecast, one column per quantile.
 
-[`forecast_tail_spread`](@ref) states what the spread of one date is; this verb runs it over the evaluation dates and summarises each column. A spread is a difference of two means and not a book, so it carries no weights and no turnover, and a drawdown of it means nothing: it gets the three figures of [`forecast_series_summary`](@ref) rather than the whole of [`performance_summary`](@ref).
+[`forecast_tail_spread`](@ref) states the spread of one date. This verb runs it over the evaluation dates and summarises each column. A spread is a difference of two means and not a book. It has no weights and no turnover, and a drawdown of it states nothing, so it gets the four figures of [`forecast_series_summary`](@ref) and not the whole of [`performance_summary`](@ref).
 
 # Algorithm
 
- 1. For each evaluation date, mark its cross-section with [`forecast_cross_section!`](@ref) and collect the forecasts and targets of its assets into `av` and `yv`. A date with fewer than `fe.min_count` of them is left at `NaN`.
+ 1. For each evaluation date, mark its cross-section with [`forecast_cross_section!`](@ref) and take the forecasts and the targets of its assets as `av` and `yv`. A date with fewer than `fe.min_count` of them stays `NaN`.
  2. For each quantile, take the spread of that cross-section with [`forecast_tail_spread`](@ref), giving a column of `spread`.
  3. Summarise each column with [`forecast_series_summary`](@ref) at `fe.ppy`.
 
 # Arguments
 
   - `fe`: The [`ForecastEvaluationResult`](@ref) to score.
-  - `quantiles`: The tail fractions to cut. Each is read against `1 - q` on the other side.
+  - `quantiles`: The tail fractions to cut. The other side of each cut is `1 - q`.
 
 # Validation
 
@@ -443,7 +517,7 @@ function forecast_quantile_spread(fe::ForecastEvaluationResult; quantiles = (0.1
     dates::AbstractVector{<:Integer} = fe.dates
     min_count::Integer = fe.min_count
     ppy::Real = fe.ppy
-    Tf = promote_type(real(eltype(alpha)), real(eltype(y)))
+    Tf = promote_type(eltype(alpha), eltype(y))
     N = size(alpha, 2)
     Q = length(quantiles)
     spread = fill(Tf(NaN), length(dates), Q)
@@ -453,7 +527,7 @@ function forecast_quantile_spread(fe::ForecastEvaluationResult; quantiles = (0.1
         n = forecast_cross_section!(valid, key, alpha, y, t)
         if n >= min_count
             av = key[valid]
-            yv = Tf[y[t, i] for i in 1:N if valid[i]]
+            yv = view(y, t, valid)
             for (j, q) in enumerate(quantiles)
                 spread[k, j] = forecast_tail_spread(av, yv, q)
             end

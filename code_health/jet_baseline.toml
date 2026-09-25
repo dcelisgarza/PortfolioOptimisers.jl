@@ -154,7 +154,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/07_ForecastEvaluation.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/08_ForecastHistory.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/10_ForecastPortfolios.jl" = { raw = 1, reviewed = 1 }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/10_ForecastPortfolios.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/11_ForecastFactorCorrelation.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { raw = 0, reviewed = 0 }
@@ -539,7 +539,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/07_ForecastEvaluation.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/08_ForecastHistory.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/10_ForecastPortfolios.jl" = { raw = 2, reviewed = 2 }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/10_ForecastPortfolios.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/11_ForecastFactorCorrelation.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { raw = 0, reviewed = 0 }

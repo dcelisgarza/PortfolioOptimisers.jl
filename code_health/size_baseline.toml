@@ -149,7 +149,7 @@ commit = "0ecb3ce47c"
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/07_ForecastEvaluation.jl" = { code = 139, doc = 324, comment = 4, blank = 132, total = 599 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/08_ForecastHistory.jl" = { code = 61, doc = 67, comment = 0, blank = 32, total = 160 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { code = 73, doc = 210, comment = 0, blank = 99, total = 382 }
-"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/10_ForecastPortfolios.jl" = { code = 155, doc = 212, comment = 0, blank = 102, total = 469 }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/10_ForecastPortfolios.jl" = { code = 162, doc = 261, comment = 0, blank = 120, total = 543 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/11_ForecastFactorCorrelation.jl" = { code = 43, doc = 104, comment = 0, blank = 41, total = 188 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl" = { code = 121, doc = 239, comment = 0, blank = 102, total = 462 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { code = 92, doc = 169, comment = 0, blank = 82, total = 343 }
