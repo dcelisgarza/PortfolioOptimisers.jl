@@ -1,16 +1,17 @@
 """
     SHARED_STATE
 
-The Model State entries deliberately shared **bare** across a nested risk build.
+The names of the Model State entries that a nested risk build shares with its enclosing build, under the bare key.
 
-The complement of Per-Build Risk State: an entry belongs here iff it is *not* a function of
-the weights being optimised and *not* a build-scoped presence flag, so the inner and outer
-builds want the same object and prefixing it would break sharing rather than protect it.
-[`shared_get`](@ref) and friends validate against this set, so the classification
-is enforced at run time rather than only by the seam-lock test.
+It is the complement of Per-Build Risk State. A name belongs here if and only if its entry is not a function of the weights under optimisation and is not a presence flag of one build. The inner and the outer build then want the same object, and a prefix would break the sharing that it exists to protect. [`shared_get`](@ref), [`shared_has`](@ref) and [`shared_set!`](@ref) check each name against this set, so the classification holds at run time, in addition to the seam-lock test.
 
-Each grouping records *why* those entries are shared. Adding a name here is a claim that a
-nested build may safely see the enclosing build's copy — check that claim before adding.
+The comments in the source group the names and give the reason for each group. A new name here states that a nested build can safely read the copy of the enclosing build. Check that statement before you add a name.
+
+# Related
+
+  - [`assert_shared_state`](@ref)
+  - [`shared_get`](@ref)
+  - [`state_key`](@ref)
 """
 const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical in the inner
                                   # and outer build (Cholesky/eigendecompositions, factor
@@ -24,8 +25,8 @@ const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical 
                                   :sc, :so, :T, :k, :w, :ret, :risk, :fees, :unit_budget,
                                   # The fee spine, established once by the fee builder and
                                   # read by the return and the net-series builders. `:fees`
-                                  # holds the per period terms and `:one_time_fees` the two
-                                  # fixed ones, and `:fee_fa` names the clock the second
+                                  # holds the per period terms and `:one_time_fees` the
+                                  # one-off terms, and `:fee_fa` names the clock the second
                                   # falls on. A nested build charges the same fee as its
                                   # parent, so all three are shared rather than prefixed.
                                   :one_time_fees, :fee_fa, :decomposition_contract,
@@ -64,11 +65,17 @@ const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical 
 """
     assert_shared_state(name::Symbol)
 
-Assert `name` is a sanctioned bare Model State entry.
+Check that `name` is on [`SHARED_STATE`](@ref), the list of the Model State entries that a nested build reads under the bare key.
 
-Guards the [`shared_get`](@ref) family so that reaching for a per-build entry without a
-prefix fails loudly at the call site, rather than silently aliasing the enclosing build's
-copy — the regression class that broke `IndependentVariableTracking`.
+[`shared_get`](@ref), [`shared_has`](@ref) and [`shared_set!`](@ref) call it first. A read of an entry of one build without its prefix then fails at the call, and does not read the copy of the enclosing build in silence. That silent read is the defect that once broke `IndependentVariableTracking`.
+
+# Validation
+
+  - `name in SHARED_STATE`. Otherwise an `ArgumentError` names the two verbs for Per-Build Risk State, [`state_get`](@ref) and [`state_build!`](@ref).
+
+# Returns
+
+  - `nothing`.
 """
 function assert_shared_state(name::Symbol)
     @argcheck(name in SHARED_STATE,
@@ -78,9 +85,13 @@ end
 """
     shared_set!(model::JuMP.Model, name::Symbol, val)
 
-Register `val` as the sanctioned bare Model State entry `name` and return it.
+Register `val` as the shared Model State entry `name`, under the bare key, and return `val`.
 
-The unprefixed counterpart of [`state_set!`](@ref), for entries on [`SHARED_STATE`](@ref).
+It is the verb without a prefix that matches [`state_set!`](@ref), for a name on [`SHARED_STATE`](@ref). Unlike [`state_set!`](@ref) it does not check that the key is free, so a second call replaces the entry.
+
+# Validation
+
+  - `name` is on [`SHARED_STATE`](@ref), checked by [`assert_shared_state`](@ref).
 
 # Related
 
@@ -94,7 +105,11 @@ end
 """
     shared_has(model::JuMP.Model, name::Symbol)
 
-Return `true` if the sanctioned bare Model State entry `name` is registered.
+Return `true` when the shared Model State entry `name` is registered.
+
+# Validation
+
+  - `name` is on [`SHARED_STATE`](@ref), checked by [`assert_shared_state`](@ref).
 """
 function shared_has(model::JuMP.Model, name::Symbol)
     assert_shared_state(name)
@@ -103,10 +118,14 @@ end
 """
     shared_get(model::JuMP.Model, name::Symbol)
 
-Return the sanctioned bare Model State entry `name`, asserting it has been registered.
+Return the shared Model State entry `name`.
 
-The unprefixed counterpart of [`state_get`](@ref). Prefer a named accessor
-([`get_w`](@ref), [`get_k`](@ref), [`get_ret`](@ref), …) where one exists.
+It is the verb without a prefix that matches [`state_get`](@ref). Use a named accessor, such as [`get_w`](@ref), [`get_k`](@ref) or [`get_ret`](@ref), where one exists.
+
+# Validation
+
+  - `name` is on [`SHARED_STATE`](@ref), checked by [`assert_shared_state`](@ref).
+  - The entry is registered. Otherwise an `ArgumentError` states that a reader ran before the builder of the entry.
 
 # Related
 
@@ -123,24 +142,16 @@ end
     state_key(prefix::Symbol, name::Symbol)
     state_key(prefix::Symbol, name::Symbol, i)
 
-Resolve the Model State key for entry `name` under `prefix`, optionally at measure index `i`.
+Compose the Model State key of the entry `name` under `prefix`, and at the measure index `i` when it is given.
 
-Internal to the Model State interface: the single place the two namespacing conventions are
-spelled. A Model State key is disambiguated on two axes, and both are resolved here:
+It is the one place that spells the two conventions of the namespace. A key separates entries on two axes:
 
-  - `prefix` separates one *build* from another, so a nested risk build cannot collide with
-    the build that encloses it.
-  - `i` separates one *measure instance* from another inside a single build, so two
-    `ConditionalValueatRisk` measures in the same vector get their own scratch entries.
+  - `prefix` separates one build from another, so a nested risk build cannot collide with the build that encloses it.
+  - `i` separates one measure from another inside one build, so two `ConditionalValueatRisk` measures in one vector get their own scratch entries.
 
-Keeping both here is what lets the seam-lock test assert that no emitter builds a key by
-hand — emitters reach Model State through [`state_get`](@ref), [`state_has`](@ref),
-[`state_set!`](@ref) and [`state_build!`](@ref).
+The seam-lock test checks that no builder composes a key by hand. A builder reaches Model State through [`state_get`](@ref), [`state_has`](@ref), [`state_set!`](@ref) and [`state_build!`](@ref).
 
-Neither axis carries a delimiter, so composition is **not injective**: `(:tr_dr_, 11)` and
-`(:tr_dr_1, 1)` both give `:tr_dr_11`. The spelling is kept — a delimiter would move every
-top-level key a caller reads — and the collision is caught where it does harm, by
-[`assert_state_key_free`](@ref) at registration.
+The key is the concatenation of the parts, with no delimiter, so two different sets of parts can give one key: `(:tr_dr_, 11)` and `(:tr_dr_1, 1)` both give `:tr_dr_11`. A delimiter would change every key that a caller reads at the top level, so the spelling stays, and [`assert_state_key_free`](@ref) refuses the collision when an entry is registered.
 
 # Related
 
@@ -157,30 +168,19 @@ end
 """
     assert_state_key_free(model::JuMP.Model, key::Symbol)
 
-Assert Model State key `key` is not registered yet, so a write cannot replace an entry.
+Check that the Model State key `key` is not registered, so that a registration cannot replace an entry.
 
-Neither axis of [`state_key`](@ref) is separated by a delimiter, so key composition is
-**not injective**: a name that ends in a digit and a low index compose the same `Symbol` as
-a shorter name and a higher index — `state_key(p, :tr_dr_, 11) == state_key(p, :tr_dr_1, 1)`.
-Without this guard the second write wins, the model carries one entry where the build
-expected two, and a constraint binds the wrong variable. That is a wrong answer, not a
-crash, so the registration verb fails closed instead.
+[`state_key`](@ref) joins its parts with no delimiter, so a name that ends in a digit at a low index gives the same key as a shorter name at a higher index: `state_key(p, :tr_dr_, 11) == state_key(p, :tr_dr_1, 1)`. Without this check the second registration replaces the first. The model then holds one entry where the build expects two, and a constraint binds the wrong variable. That is a wrong answer and not a crash, so the registration raises.
 
-A delimiter was rejected as the fix: it would move every top-level key spelling
-(`state_key(Symbol(""), :ret_, 1)` is `:ret_1`, a key callers read), and it would still let
-one emitter overwrite another's entry under a key both spell correctly. The guard closes
-both. Re-registration under one key has no legitimate reading either: the build-once case
-is [`state_build!`](@ref), which returns the existing entry untouched, and the flag case is
-[`mark_state!`](@ref), which is idempotent.
+A delimiter is not the fix. It changes every key that a caller reads at the top level: `state_key(Symbol(""), :ret_, 1)` is `:ret_1`, a key that callers read. It also still lets one builder replace the entry of another under a key that both spell correctly. The check refuses both cases. A second registration under one key has no valid use. To build an entry once, use [`state_build!`](@ref), which returns the existing entry, and to set a flag, use [`mark_state!`](@ref), which has no effect the second time.
+
+# Validation
+
+  - `!haskey(model, key)`. Otherwise an `ArgumentError` names the key and the two verbs that accept a repeat.
 
 # Returns
 
   - `nothing`.
-
-# Throws
-
-  - `ArgumentError` if `key` is already registered. The message names the key and the two
-    verbs that do accept a repeat.
 
 # Related
 
@@ -197,23 +197,21 @@ end
     state_set!(model::JuMP.Model, prefix::Symbol, name::Symbol, val)
     state_set!(model::JuMP.Model, prefix::Symbol, name::Symbol, i, val)
 
-Register `val` in the model under the prefixed Model State key and return it.
+Register `val` under the Model State key of `name` and `prefix`, and return `val`.
 
-A nested risk build (e.g. risk tracking) passes a non-empty `prefix` so the shared
-infrastructure entries it creates (`:X`, `:net_X`, `:W`, `:dd`, …) do not collide with the
-outer model's; the default empty prefix reproduces the bare key.
+A nested risk build, such as a risk tracking measure, passes a non-empty `prefix`, so the entries it makes (`:X`, `:net_X`, `:W`, `:dd` and others) do not collide with the entries of the outer model. The empty prefix gives the bare key.
 
-The indexed method registers per-measure scratch (`:cvar_risk_`, `:z_cvar_`, …) at measure
-index `i`, so two instances of the same measure in one build get their own entries. Both
-disambiguators are resolved by [`state_key`](@ref).
+The method with `i` registers the scratch of one measure, such as `:cvar_risk_` or `:z_cvar_`, at the measure index `i`, so two measures of one type in one build get their own entries. [`state_key`](@ref) composes both parts of the key.
 
-Registration is *fresh*: the composed key must be free, because key composition is not
-injective and a replaced entry is a wrong answer rather than an error
-([`assert_state_key_free`](@ref)). Reuse is the other two verbs' job.
+# Algorithm
 
-# Throws
+ 1. Compose the key with [`state_key`](@ref).
+ 2. Check with [`assert_state_key_free`](@ref) that the key is free.
+ 3. Register `val` under the key.
 
-  - `ArgumentError` if the composed key is already registered.
+# Validation
+
+  - The composed key is free. Otherwise [`assert_state_key_free`](@ref) raises an `ArgumentError`. To reuse an entry, use [`state_build!`](@ref) or [`mark_state!`](@ref).
 
 # Related
 
@@ -237,7 +235,7 @@ end
     state_has(model::JuMP.Model, prefix::Symbol, name::Symbol)
     state_has(model::JuMP.Model, prefix::Symbol, name::Symbol, i)
 
-Return `true` if Model State entry `name` is registered under `prefix`, at index `i` if given.
+Return `true` when the Model State entry `name` is registered under `prefix`, and at the index `i` when it is given.
 
 # Related
 
@@ -253,13 +251,13 @@ end
     state_get(model::JuMP.Model, prefix::Symbol, name::Symbol)
     state_get(model::JuMP.Model, prefix::Symbol, name::Symbol, i)
 
-Return Model State entry `name` under `prefix`, asserting it has been registered.
+Return the Model State entry `name` under `prefix`, and at the index `i` when it is given.
 
-Prefer a named accessor ([`get_X`](@ref), [`get_net_X`](@ref), [`get_dd`](@ref), …) where
-one exists: those name the builder that produces the entry, so an out-of-order read reports
-which builder to call instead of a generic missing-entry error.
+Use a named accessor, such as [`get_X`](@ref), [`get_net_X`](@ref) or [`get_dd`](@ref), where one exists. Its error names the builder of the entry, where this error names only the key.
 
-The indexed method reads per-measure scratch registered at measure index `i`.
+# Validation
+
+  - The entry is registered. Otherwise an `ArgumentError` names the key and states that a reader ran before the builder of the entry.
 
 # Related
 
@@ -282,17 +280,18 @@ end
     state_build!(f, model::JuMP.Model, prefix::Symbol, name::Symbol)
     state_build!(f, model::JuMP.Model, prefix::Symbol, name::Symbol, i)
 
-Return Model State entry `name` under `prefix`, building it with `f()` exactly once.
+Return the Model State entry `name` under `prefix`, and build it with `f()` the first time.
 
-The memoise-on-prefixed-key idiom shared by every risk and constraint emitter: if the entry
-is already registered — an earlier measure in the same build produced it, or an outer build
-already did — it is returned untouched; otherwise `f()` runs and its value is registered
-under the prefixed key. Companion entries created inside `f` register with
-[`state_set!`](@ref).
+Every risk and constraint builder uses it to build an entry once. An entry that an earlier measure of the same build, or an outer build, already registered comes back unchanged. The builder `f` registers each companion entry that it makes with [`state_set!`](@ref).
 
-Because the key is resolved here rather than at the call site, a Model State entry added in
-future participates in the prefix discipline with no further work. That is what closes a
-residual hole an earlier, more permissive design left open.
+This verb composes the key, not the caller, so a new Model State entry gets the prefix of its build with no more work.
+
+# Algorithm
+
+ 1. Compose the key with [`state_key`](@ref).
+ 2. When the key is registered, return its entry.
+ 3. Otherwise call `f()`, giving `val`.
+ 4. Register `val` under the key and return it.
 
 # Related
 
@@ -319,13 +318,15 @@ function state_build!(f, model::JuMP.Model, prefix::Symbol, name::Symbol, i)
 end
 """
     mark_state!(model::JuMP.Model, prefix::Symbol, name::Symbol)
+    mark_state!(model::JuMP.Model, prefix::Symbol, name::Symbol, i)
 
-Record that this build has `name` present, idempotently.
+Record that this build has `name`, under `prefix` and at the index `i` when it is given.
 
-A build-scoped presence flag: `name` carries no value beyond its own existence, and readers
-test it with [`state_has`](@ref) rather than reading it. Marking under `prefix` is what keeps
-a nested build's flags out of the enclosing build — the second half of Per-Build Risk State,
-the half that is not weight-dependent.
+The entry is a presence flag of one build. It holds `true` and nothing more, and a reader tests it with [`state_has`](@ref). A second call has no effect. The prefix keeps the flags of a nested build out of the enclosing build. This is the half of Per-Build Risk State that does not depend on the weights.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -344,12 +345,9 @@ end
     nested_prefix(prefix::Symbol, tag::Symbol)
     nested_prefix(prefix::Symbol, tag::Symbol, i)
 
-Compose the Model State namespace a nested build threads down its own spine.
+Compose the Model State prefix that a nested build passes down to its own builders.
 
-Distinct from a Model State *key*: this produces a `prefix`, not an entry name, so a nested
-build's entries cannot alias the enclosing build's. `tag` names the nesting kind (`:tr_iv_`,
-`:tr_dv_`, `:tr_ir_`, `:tr_dr_`, `:gain_`) and the optional `i` disambiguates the measure
-index, which is what makes tracking-nested-in-tracking collision-free.
+It gives a prefix and not a key, so no entry of the nested build can take the key of an entry of the enclosing build. `tag` names the kind of nesting (`:tr_iv_`, `:tr_dv_`, `:tr_ir_`, `:tr_dr_`, `:gain_`). The method with `i` adds the measure index and a closing `_`, so `nested_prefix(:a_, :tr_dr_, 3)` is `:a_tr_dr_3_`. The index keeps a tracking measure inside a tracking measure free of collisions.
 
 # Related
 
@@ -365,16 +363,11 @@ end
 """
     nested_index(tag::Symbol, i)
 
-Compose the Model State measure index a sub-measure build threads down.
+Compose the Model State measure index that the parts of a composite measure pass down.
 
-The twin of [`nested_prefix`](@ref) on the other disambiguating axis. A composite measure
-that builds its parts *in the same build* — `GenericValueatRiskRange` over its `loss` and
-`gain` sides — separates the parts by index rather than by namespace, because they share
-the build's infrastructure entries and must not each rebuild them. `tag` names the part
-(`:loss_`, `:gain_`), and the composition nests, so a range inside a range stays
-collision-free.
+It is the twin of [`nested_prefix`](@ref) on the other axis of the key. A composite measure that builds its parts in the same build, such as `GenericValueatRiskRange` over its `loss` and `gain` sides, separates the parts by index and not by prefix. The parts share the infrastructure entries of the build, and neither may build them a second time. `tag` names the part (`:loss_`, `:gain_`), and the composition nests: `nested_index(:gain_, nested_index(:loss_, 2))` is `:gain_loss_2`, so a range inside a range stays free of collisions.
 
-Distinct from a Model State *key*: this produces an index, not an entry name.
+The result is an index and not a key.
 
 # Related
 

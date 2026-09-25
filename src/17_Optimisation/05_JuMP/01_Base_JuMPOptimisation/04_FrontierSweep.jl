@@ -2,12 +2,9 @@
     frontier_point_count(front::Frontier)
     frontier_point_count(front::VecNum)
 
-Number of sweep points one frontier bound asks for.
+Return the number of sweep points that one frontier bound asks for.
 
-A [`Frontier`](@ref) states its count in `N`; a stated vector of bounds states it in its
-length. Both shapes are admissible in `:ret_frontier` and `:risk_frontier` (see
-[`Front_NumVec`](@ref)), and at Model Assembly time a `Frontier` has not yet been resolved
-into its range, so the count is read from the shape rather than from a materialised vector.
+A [`Frontier`](@ref) states the count in its field `N`, and a vector of bounds states it in its length. The registries `:ret_frontier` and `:risk_frontier` accept both forms (see [`Front_NumVec`](@ref)). During Model Assembly a `Frontier` is not yet resolved into its points, so the count comes from the form of the bound and not from a vector of points.
 
 # Related
 
@@ -23,20 +20,18 @@ end
 """
     frontier_sweep_points(model::JuMP.Model)
 
-Count the solves the model's frontier sweep runs, and the factors that make up the count.
+Count the solves of the frontier sweep of the model, and return the factors of the count.
 
-The sweep is a **product**: every swept return term and every swept risk measure joins the
-same `Iterators.product`, so `k` bounds of `N` points each cost `N^k` full solves rather
-than `k * N`. This reads both frontier registries — `:ret_frontier` and `:risk_frontier` —
-and multiplies their per-entry counts together.
+Every swept return term and every swept risk measure joins one product, so `k` bounds of `N` points each cost ``N^k`` solves and not ``k N``.
 
-The product is accumulated as a `BigInt`, so it is exact and cannot overflow into a value
-that would pass a cap it should fail.
+# Algorithm
+
+ 1. For each registry, `:ret_frontier` first and `:risk_frontier` second, that the model holds, push one `bound_key => count` pair per entry onto `factors`. The count is [`frontier_point_count`](@ref) of the bound of the entry.
+ 2. Multiply the counts as `BigInt` values, starting from one, giving `total`. The product is exact, so an overflow cannot give a value that passes a cap that it must fail.
 
 # Returns
 
-  - `(total, factors)`: the total number of sweep points, and a `bound_key => count` pair
-    per swept entry, in registration order (return terms first).
+  - `(total, factors)`: The total number of sweep points, a `BigInt`, and the vector of `bound_key => count` pairs in the order of step 1. A model with no frontier gives `(1, [])`.
 
 # Related
 
@@ -59,25 +54,26 @@ end
 """
     assert_frontier_sweep_cap(model::JuMP.Model)
 
-Assert the **total** frontier sweep does not exceed the active `max_frontier` ceiling.
+Check that the total number of points of the frontier sweep does not exceed the `max_frontier` ceiling.
 
-[`Frontier`](@ref)'s constructor caps the `N` of one bound; nothing there sees the product,
-so `k` bounds at the ceiling cost `max_frontier^k` solves and no guard fires. This is the
-guard, and it runs at Model Assembly — the point at which both frontier registries are
-complete and no sweep solve has started yet.
+The constructor of [`Frontier`](@ref) caps the `N` of one bound and does not see the product, so `k` bounds at the ceiling cost ``\\mathrm{max\\_frontier}^k`` solves. This check caps the product. It runs during Model Assembly, when both registries are complete and no solve of the sweep has started.
 
-Every sweep point runs a full inner `optimise_JuMP_model!` solve, so the product is the
-compute-exhaustion sink `max_frontier` exists to bound (see [`RESOURCE_LIMITS`](@ref)). The
-cap applies to the risk side and the return side alike.
+Each point runs a full solve with [`optimise_JuMP_model!`](@ref), so the product is the cost that `max_frontier` bounds (see [`RESOURCE_LIMITS`](@ref)). The cap applies to the return side and the risk side alike.
+
+# Algorithm
+
+ 1. Count the points with [`frontier_sweep_points`](@ref), giving `total` and `factors`.
+ 2. Return when `factors` is empty, because the model sweeps no frontier.
+ 3. Read the ceiling `cap` from `RESOURCE_LIMITS[].max_frontier`.
+ 4. Check that `total <= cap`.
+
+# Validation
+
+  - `total <= RESOURCE_LIMITS[].max_frontier`. Otherwise a `DomainError` names the product, the factors that make it, and how to raise the ceiling.
 
 # Returns
 
   - `nothing`.
-
-# Throws
-
-  - `DomainError` if the product exceeds `RESOURCE_LIMITS[].max_frontier`. The message names
-    the product, the factors that made it, and the knob that raises the ceiling.
 
 # Related
 
@@ -100,23 +96,22 @@ end
 """
     frontier_axis(frontier::VecPair)
 
-Turn one resolved frontier registry into the sweep axis it stands for.
+Turn one resolved frontier registry into the sweep axis that it defines.
 
-Both registries — `:ret_frontier` and `:risk_frontier` — hold
-`(bound_var_key, bound_key) => (expr, points, …)` entries, and both are swept as a **product**
-across their own entries: two swept risk measures of `N` points each cost `N^2` solves on the
-risk axis alone. This is that product, in two halves — the keys of the bound parameters, and
-the values to write into them — so [`set_frontier_point!`](@ref) can zip one against the
-other.
+Each registry, `:ret_frontier` or `:risk_frontier`, holds entries of the form `(bound_var_key, bound_key) => (expr, points, …)`. The entries of one registry form a product, so two swept risk measures of `N` points each cost ``N^2`` solves on the risk axis alone. The axis is that product in two parts: the keys of the bound parameters, and the values to write into them.
+
+# Algorithm
+
+ 1. For each entry, pair the key `bound_var_key`, repeated once per point, with the vector of points.
+ 2. Take the product of the repeated keys over the entries, giving `keys`, and the product of the points over the entries, giving `points`.
 
 # Arguments
 
-  - `frontier::VecPair`: A resolved frontier registry. Every entry's bound is already a vector
-    of sweep points.
+  - `frontier::VecPair`: A resolved frontier registry. The bound of each entry is a vector of sweep points.
 
 # Returns
 
-  - `(keys, points)`: Two product iterators of equal length.
+  - `(keys, points)`: Two product iterators of equal length. [`set_frontier_point!`](@ref) reads them in pairs.
 
 # Related
 
@@ -132,11 +127,27 @@ end
 """
     set_ret_frontier_parameters!(model::JuMP.Model, ret_frontier::VecPair)
 
-Register one parameter and one lower-bound constraint per swept return term.
+Register one parameter and one floor row for each swept return term.
 
-Each term's bound binds on that term's **own** expression, so the return side is a product
-across terms rather than a single ladder. The bound is homogenised by `k`, exactly as the
-scalar bound in [`set_return_bounds!`](@ref) is.
+The bound of each term acts on the expression of that term, so the return side is a product over the terms and not one ladder. `k` multiplies the bound, as it multiplies the scalar bound of [`set_return_bounds!`](@ref).
+
+# JuMP formulation
+
+## Variables
+
+  - `bound_var_key` of each entry: a new parameter ``b_j``, with the value zero until [`set_frontier_point!`](@ref) writes a point into it.
+  - `k`: read from the model.
+
+## Constraints
+
+  - `bound_key` of each entry: ``s_c \\left(\\mathrm{ret}_j - b_j k\\right) \\geq 0``.
+
+Where:
+
+  - ``\\mathrm{ret}_j``: The return expression of the ``j``-th swept return term, the first value of the entry.
+  - ``b_j``: The return floor of the ``j``-th swept return term, a parameter.
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:k_budget])
 
 # Arguments
 
@@ -166,15 +177,28 @@ end
 """
     set_risk_frontier_parameters!(model::JuMP.Model, risk_frontier::VecPair)
 
-Register one parameter and one bound constraint per swept risk measure.
+Register one parameter and one bound row for each swept risk measure.
 
-The twin of [`set_ret_frontier_parameters!`](@ref), and the one place the risk side's two
-extra pieces are stated: the polarity `d`, which flips the inequality for a measure whose
-bigger value is better, and the homogenisation `k`, which the scalar bound in
-[`set_risk_upper_bound!`](@ref) also applies. `k` is the literal `1` under every head whose
-objective is fixed — [`NearOptimalCentering`](@ref) minimises a barrier, so its head registers
-`k = 1` and the factor is a no-op there — and the ratio variable under [`MaximumRatio`](@ref).
-Reading it here rather than at each call site is what keeps the two heads from drifting apart.
+It is the twin of [`set_ret_frontier_parameters!`](@ref). The risk side adds the direction ``d`` of the bound, which turns the ceiling into a floor for a measure whose flag is `false`. `k` multiplies the bound, as it multiplies the scalar bound of [`set_risk_upper_bound!`](@ref). Two heads call this builder. Under [`MeanRisk`](@ref), `k` is the ratio variable for a [`MaximumRatio`](@ref) objective and the number `1` for any other objective. [`NearOptimalCentering`](@ref) minimises a barrier and registers `k = 1`, so the factor has no effect there. One builder for both heads keeps the two from drifting apart.
+
+# JuMP formulation
+
+## Variables
+
+  - `bound_var_key` of each entry: a new parameter ``u_j``, with the value zero until [`set_frontier_point!`](@ref) writes a point into it.
+  - `k`: read from the model.
+
+## Constraints
+
+  - `bound_key` of each entry: ``d_j s_c \\left(R_j - u_j k\\right) \\leq 0``. With ``d_j = 1`` the row is the ceiling ``R_j \\leq u_j k``, and with ``d_j = -1`` it is the floor ``R_j \\geq u_j k``.
+
+Where:
+
+  - ``R_j``: The risk expression of the ``j``-th swept risk measure, the first value of the entry.
+  - ``u_j``: The bound of the ``j``-th swept risk measure, a parameter.
+  - ``d_j``: ``1`` when the flag of the entry, its third value, is `true`, and ``-1`` otherwise.
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:k_budget])
 
 # Arguments
 
@@ -208,12 +232,7 @@ end
 
 Join the two sweep axes into the flat sequence of sweep points.
 
-The risk axis varies **fastest**, so the flat order is return-outer and risk-inner. That order
-is load-bearing rather than cosmetic: [`NearOptimalCentering`](@ref) solves its anchor
-portfolios as one [`MeanRisk`](@ref) sweep over the same two frontiers, and pairs anchor `i`
-with sweep point `i`. Stating the order once here is what keeps the two sweeps aligned. Either
-axis may be `nothing`, which means that side is not swept. If both axes are `nothing`, the
-sweep is one point that writes nothing.
+The risk axis changes fastest, so the flat order runs over the risk points inside each return point. [`NearOptimalCentering`](@ref) solves its anchor portfolios as one [`MeanRisk`](@ref) sweep over the same two frontiers and pairs anchor `i` with sweep point `i`, so this one statement of the order keeps the two sweeps aligned. An axis that is `nothing` is not swept. When both are `nothing`, the sweep is one point that writes nothing.
 
 # Arguments
 
@@ -222,8 +241,7 @@ sweep is one point that writes nothing.
 
 # Returns
 
-  - An iterator of sweep points. Each point is a tuple of `(keys, bounds)` pairs, one per
-    swept axis, and its `length` is the number of solves the sweep runs.
+  - An iterator of sweep points. Each point is a tuple of `(keys, bounds)` pairs, one for each swept axis, and its `length` is the number of solves that the sweep runs.
 
 # Related
 
@@ -246,13 +264,16 @@ end
 """
     set_frontier_point!(model::JuMP.Model, point::Tuple)
 
-Write one sweep point's bounds into the frontier parameters.
+Write the bounds of one sweep point into the frontier parameters.
+
+# Algorithm
+
+ 1. For each `(keys, bounds)` pair of `point`, and for each `key` and `bound` of the pair, set the value of the parameter `model[key]` to `bound`.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `point::Tuple`: One element of a [`frontier_sweep_axes`](@ref) iterator. An empty tuple
-    writes nothing, which is the sweep that has no frontier at all.
+  - `point::Tuple`: One element of a [`frontier_sweep_axes`](@ref) iterator. The empty tuple, the one point of a sweep with no frontier, writes nothing.
 
 # Returns
 
@@ -276,20 +297,23 @@ end
     frontier_sweep!(point!, model, opt, ::Type{T}, n::Integer)
     frontier_sweep!(model, opt, ::Type{T}, points)
 
-Solve one model per sweep point and collect the outcomes.
+Solve the model once for each sweep point and collect the outcomes.
 
-The collect tail every frontier sweep shares. The model is assembled once and its objective is
-set once; a sweep point changes only parameter values, so no constraint is rebuilt between
-solves. `point!` is the per-optimiser hook, called with the **flat 1-based index** of the point
-after its bounds are written — [`NearOptimalCentering`](@ref) uses it to move `noc_rk` and
-`noc_rt` onto that point's anchor, and [`MeanRisk`](@ref) needs no hook at all.
+Every frontier sweep ends in this loop. The head builds the model once and sets its objective once. A sweep point changes only the values of the parameters, so the loop builds no constraint between two solves. `point!` is the hook of the optimiser. The loop calls it with the flat index of the point, from one, after it writes the bounds of the point. [`NearOptimalCentering`](@ref) uses it to move `noc_rk` and `noc_rt` to the anchor of that point, and [`MeanRisk`](@ref) passes no hook.
 
-The `n::Integer` method sweeps `n` points with no frontier bound to write, which is the
-unconstrained [`NearOptimalCentering`](@ref) sweep over a vector of anchors.
+The method with `n::Integer` sweeps `n` points that write no bound. It is the [`NearOptimalCentering`](@ref) sweep over a vector of anchors with no frontier.
+
+# Algorithm
+
+ 1. For each sweep point, with its flat index `i`:
+     1. Write the bounds of the point with [`set_frontier_point!`](@ref).
+     2. Call `point!(i)`.
+     3. Solve the model with [`optimise_JuMP_model!`](@ref), giving `retcode` and `sol`.
+     4. Push `retcode` onto `retcodes` and `sol` onto `sols`.
 
 # Arguments
 
-  - `point!`: Hook of one argument, the flat index of the sweep point. Defaults to a no-op.
+  - `point!`: Hook with one argument, the flat index of the sweep point. The method without it passes a hook that does nothing.
   - $(arg_dict[:model])
   - `opt::JuMPOptimisationEstimator`: The optimiser, for [`optimise_JuMP_model!`](@ref).
   - `::Type{T}`: Element type of the returns matrix.
@@ -297,7 +321,7 @@ unconstrained [`NearOptimalCentering`](@ref) sweep over a vector of anchors.
 
 # Returns
 
-  - `(retcodes, sols)`: One entry per sweep point, in flat sweep order.
+  - `(retcodes, sols)`: One entry for each sweep point, in the flat order of the sweep.
 
 # Related
 

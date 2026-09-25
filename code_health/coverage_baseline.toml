@@ -291,11 +291,11 @@ commit = "8610300"
 "src/17_Optimisation/04_Hierarchical/02_HierarchicalRiskParity.jl" = { lines = 101, misses = 2 }
 "src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl" = { lines = 187, misses = 8 }
 "src/17_Optimisation/04_Hierarchical/04_HierarchicalEqualRiskContribution.jl" = { lines = 244, misses = 4 }
-"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/01_JuMPOptimisationTypes.jl" = { lines = 54, misses = 14 }
-"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/02_JuMPModelAccessors.jl" = { lines = 67, misses = 23 }
+"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/01_JuMPOptimisationTypes.jl" = { lines = 54, misses = 0 }
+"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/02_JuMPModelAccessors.jl" = { lines = 67, misses = 0 }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/03_JuMPModelState.jl" = { lines = 64, misses = 0 }
-"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/04_FrontierSweep.jl" = { lines = 70, misses = 2 }
-"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/05_JuMPModelSetup.jl" = { lines = 75, misses = 7 }
+"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/04_FrontierSweep.jl" = { lines = 70, misses = 0 }
+"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/05_JuMPModelSetup.jl" = { lines = 75, misses = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/01_MIPIndicators.jl" = { lines = 173, misses = 10 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/01_ReturnEstimators.jl" = { lines = 73, misses = 1 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/02_ObjectiveFunctions.jl" = { lines = 132, misses = 5 }

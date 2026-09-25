@@ -1,16 +1,27 @@
 """
     set_model_scales!(model::JuMP.Model, sc::Number, so::Number)
 
-Register constraint scale `sc` and objective scale `so` as named expressions in the JuMP model.
+Register the constraint scale `sc` and the objective scale `so` in the JuMP model.
 
-The positional order is `sc` first, matching every head, which passes `opt.sc, opt.so`
-straight out of its [`JuMPOptimiser`](@ref).
+The constraint scale comes first, in the order in which every head passes `opt.sc, opt.so` from its [`JuMPOptimiser`](@ref). JuMP stores a number given to `@expressions` as the number itself, so `model[:sc]` and `model[:so]` hold `sc` and `so` with their own types.
+
+# JuMP formulation
+
+## Expressions
+
+  - `so`: ``s_o``, the factor that multiplies the objective.
+  - `sc`: ``s_c``, the factor that multiplies both sides of each scaled row.
+
+Where:
+
+  - $(math_dict[:so_scale])
+  - $(math_dict[:sc_scale])
 
 # Arguments
 
   - `model::JuMP.Model`: JuMP optimisation model.
-  - `sc::Number`: Constraint scale factor, read back by [`get_constraint_scale`](@ref).
-  - `so::Number`: Objective scale factor, read back by [`get_objective_scale`](@ref).
+  - `sc::Number`: Constraint scale, read back by [`get_constraint_scale`](@ref).
+  - `so::Number`: Objective scale, read back by [`get_objective_scale`](@ref).
 
 # Returns
 
@@ -32,16 +43,11 @@ end
 """
     set_model_observations!(model::JuMP.Model, T::Integer)
 
-Register the observation count of the fit as the named entry `model[:T]`.
+Register the observation count of the fit as the model entry `model[:T]`.
 
-The sibling of [`set_model_scales!`](@ref), and every head calls it in the same place, before
-any builder runs. The count is a model-wide singleton: one fit produces one returns matrix, and
-its row count is the holding period every builder measures against. Registering it here rather
-than inside a builder means a reader may rely on it whatever the model carries, and
-[`get_T`](@ref) reads it back.
+Every head calls it beside [`set_model_scales!`](@ref), before a builder runs. One fit has one returns matrix, and its row count is the holding period that every builder measures against, so the count is one entry for the whole model. A builder can therefore read it with [`get_T`](@ref) whatever else the model carries.
 
-The row count of a **fold**, of a **benchmark**, or of a stacked meta-optimisation panel is a
-different number. A site that means one of those keeps its own `size(..., 1)`.
+The row count of a fold, of a benchmark or of a stacked meta-optimisation panel is a different number. A builder that needs one of those reads the row count of its own matrix.
 
 # Arguments
 
@@ -76,9 +82,11 @@ end
 """
     get_constraint_scale(model::JuMP.Model)
 
-Return the constraint scale expression `model[:sc]`.
+Return the constraint scale `model[:sc]`.
 
-Asserts the scale has been registered (via [`set_model_scales!`](@ref)); errors otherwise.
+# Validation
+
+  - `model[:sc]` is registered, by [`set_model_scales!`](@ref). Otherwise an `ArgumentError` names that builder.
 
 # Related
 
@@ -93,9 +101,11 @@ end
 """
     get_objective_scale(model::JuMP.Model)
 
-Return the objective scale expression `model[:so]`.
+Return the objective scale `model[:so]`.
 
-Asserts the scale has been registered (via [`set_model_scales!`](@ref)); errors otherwise.
+# Validation
+
+  - `model[:so]` is registered, by [`set_model_scales!`](@ref). Otherwise an `ArgumentError` names that builder.
 
 # Related
 
@@ -112,11 +122,11 @@ end
 
 Return the observation count of the fit, `model[:T]`.
 
-Asserts the count has been registered (via [`set_model_observations!`](@ref)); errors otherwise.
+It is the row count of the returns matrix of the fit. It is not the row count of a fold, of a tracking benchmark or of a stacked meta-optimisation panel. A builder that needs one of those reads its own matrix.
 
-This is the row count of the **fit's own** returns matrix. It is not the row count of a fold, of
-a tracking benchmark, or of a stacked meta-optimisation panel; a site that means one of those
-reads its own matrix instead.
+# Validation
+
+  - `model[:T]` is registered, by [`set_model_observations!`](@ref). Otherwise an `ArgumentError` names that builder.
 
 # Related
 
@@ -130,11 +140,15 @@ function get_T(model::JuMP.Model)
     return model[:T]
 end
 """
-    get_w(model::JuMP.Model)
+    get_w(model::JuMP.Model, prefix::Symbol = Symbol(""))
 
-Return the portfolio weight variables `model[:w]`.
+Return the portfolio weight variables `model[Symbol(prefix, :w)]`.
 
-Asserts the weights have been registered (via [`set_w!`](@ref)); errors otherwise.
+A nested build passes its `prefix` and reads the shifted weights that it registered under that prefix. The empty prefix reads the weights of the head.
+
+# Validation
+
+  - The weights are registered, by [`set_w!`](@ref) for the empty prefix. Otherwise an `ArgumentError` names the missing key.
 
 # Related
 
@@ -150,20 +164,14 @@ end
 
 Return the homogenisation variable `model[:k]`.
 
-`k` is the auxiliary scaling variable used to homogenise fractional/ratio objectives (e.g.
-maximum ratio); recovered weights are `w / k`. Asserts `:k` has been registered; errors
-otherwise.
+A ratio objective such as [`MaximumRatio`](@ref) solves for the scaled weights ``k \\boldsymbol{w}``, and [`process_model`](@ref) divides the solved weights by `k`. Two builders register `k`, and a head reaches one of them. The error message names both.
 
-Two producers register it, and the error message names both because a head reaches only
-one of them:
+  - [`set_maximum_ratio_factor_variables!`](@ref) registers a variable ``k \\geq 0`` under [`MaximumRatio`](@ref), and the number `1` under any other objective. Every head that builds an objective calls it.
+  - [`_set_risk_budgeting_constraints!`](@ref) declares a free variable `k`, because its log barrier fixes the scale. The same head calls [`set_unit_budget!`](@ref), so a builder that reads [`effective_k`](@ref) gets `1` and not the free variable.
 
-  - [`set_maximum_ratio_factor_variables!`](@ref) is the head-level producer. Every head
-    that shapes `w` from an objective calls it: `k >= 0` under [`MaximumRatio`](@ref), and
-    the literal `1` otherwise.
-  - [`_set_risk_budgeting_constraints!`](@ref) declares a *free* `k` instead, because the
-    log barrier it builds is what pins the scale. That head also declares
-    [`set_unit_budget!`](@ref), so downstream builders read [`effective_k`](@ref) and get
-    `1` rather than the free variable.
+# Validation
+
+  - `model[:k]` is registered. Otherwise an `ArgumentError` names the two builders and the heads that call each.
 
 # Related
 
@@ -180,13 +188,13 @@ end
 """
     set_unit_budget!(model::JuMP.Model)
 
-Record that the head normalised the model's budget scale to unit.
+Record that the head fixed the budget scale of the model to one.
 
-A head declares this when its own constraints make the formulation scale-invariant, so
-downstream builders may substitute the literal `1` for the homogenisation variable `k`.
-[`RiskBudgeting`](@ref) is the only such head: its log-barrier normalisation pins the scale,
-and the weights are renormalised after the solve. Note that `k` remains a *free variable*
-under this declaration — it is the budget *scale* that is unit, not `k` that is constant.
+A head calls it when its own constraints make the formulation invariant to scale, so a builder can use the number `1` in place of the homogenisation variable `k`. [`RiskBudgeting`](@ref) is the only such head. Its log barrier fixes the scale, and it normalises the weights after the solve. `k` stays a free variable under this record. The budget scale is one, and `k` is not a constant.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -200,7 +208,7 @@ end
 """
     is_unit_budget(model::JuMP.Model)
 
-Return whether the head normalised the budget scale to unit (see [`set_unit_budget!`](@ref)).
+Return `true` when the head fixed the budget scale to one through [`set_unit_budget!`](@ref).
 
 # Related
 
@@ -213,10 +221,13 @@ end
 """
     effective_k(model::JuMP.Model)
 
-Return the budget scale a builder should use: `1` under a unit budget, else `model[:k]`.
+Return the budget scale that a builder multiplies a bound by: `1` under a unit budget, and `model[:k]` otherwise.
 
-Builders that multiply a bound by the budget want this rather than [`get_k`](@ref), so a
-scale-invariant head is honoured without each builder re-deriving that fact for itself.
+A builder that multiplies a bound by the budget reads this and not [`get_k`](@ref). A head that is invariant to scale then needs no check in each builder.
+
+# Validation
+
+  - `model[:k]` is registered, also under a unit budget, because the function reads it on both branches. Otherwise [`get_k`](@ref) raises.
 
 # Related
 
@@ -229,13 +240,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the head's *decomposition contract*: how `model[:w]` relates to the
-long/short parts `model[:lw]` and `model[:sw]`.
+Abstract supertype for how the head relates the weights to their long and short parts.
 
-Heads build that relationship in one of two incompatible ways, and a builder that pins the
-decomposition needs to know which, because the two need different constraints to become exact.
-The head declares its own with [`set_decomposition_contract!`](@ref); builders read it back
-with [`decomposition_contract`](@ref) and dispatch.
+The weights are `model[:w]`, the long part is `model[:lw]` and the short part is `model[:sw]`. A head builds that relation in one of two ways, and a builder that pins the split into parts needs different constraints for each. The head records its way with [`set_decomposition_contract!`](@ref). A builder reads it back with [`decomposition_contract`](@ref) and dispatches on it.
 
 # Related
 
@@ -248,12 +255,11 @@ abstract type AbstractDecompositionContract end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The head defines the weights *from* the parts: `w = lw - sw` is an identity, `lw` and `sw`
-being the primitive variables. Declared by [`set_rb_mip_w!`](@ref).
+Selects the relation in which the head defines the weights from their long and short parts.
 
-Because the identity always holds, forcing the long-xor-short sign pattern is enough to pin the
-decomposition: with `sw = 0` the identity leaves `lw == w`, and `lw >= 0` makes that
-`max(w, 0)`. No slack remains to close.
+The relation is ``\\boldsymbol{w} = \\boldsymbol{w}^{l} - \\boldsymbol{w}^{s}``, with `lw` and `sw` the model variables. [`set_rb_mip_w!`](@ref) records it.
+
+The identity always holds, so a long-or-short sign pattern pins the parts. With `sw = 0` the identity gives `lw == w`, and `lw >= 0` makes that ``\\max(w_i, 0)``. No slack is left to close.
 
 # Related
 
@@ -264,13 +270,11 @@ struct WeightsFromParts <: AbstractDecompositionContract end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The head defines the parts as *bounds* on the weights: `lw >= w`, `sw >= -w`, `lw, sw >= 0`,
-`w` being the primitive variable. Declared by [`set_weight_constraints!`](@ref).
+Selects the relation in which the long and short parts bound the weights.
 
-The parts are only upper bounds on the true long/short exposures, so every budget built on
-them (`bgt`, `sbgt`, `gbgt`) bounds the realised exposure rather than pinning it. Forcing the
-sign pattern does not change that — the slack survives it — so pinning the decomposition under
-this contract needs two further constraints to close it.
+The relation is ``\\boldsymbol{w}^{l} \\geq \\boldsymbol{w}``, ``\\boldsymbol{w}^{s} \\geq -\\boldsymbol{w}`` and ``\\boldsymbol{w}^{l}, \\boldsymbol{w}^{s} \\geq 0``, with `w` the model variable. [`set_weight_constraints!`](@ref) records it.
+
+The parts are upper bounds on the true long and short exposures. A budget built on them, `bgt`, `sbgt` or `gbgt`, therefore bounds the exposure that the weights realise and does not fix it. A sign pattern leaves that slack in place, so a builder that pins the parts under this relation adds two more rows to close it.
 
 # Related
 
@@ -281,12 +285,18 @@ struct PartsBoundWeights <: AbstractDecompositionContract end
 """
     set_decomposition_contract!(model::JuMP.Model, dc::AbstractDecompositionContract)
 
-Record how the head related `model[:w]` to `model[:lw]`/`model[:sw]`.
+Record how the head relates `model[:w]` to `model[:lw]` and `model[:sw]`, unless a head already recorded it.
 
-The first declaration wins: a head may run both builders (the mixed-integer
-[`RiskBudgeting`](@ref) head calls [`set_rb_mip_w!`](@ref), then hands the same `lw`/`sw` to
-[`set_weight_constraints!`](@ref), which re-states them as bounds). The identity is the
-stronger statement and still holds, so the bounds must not overwrite it.
+A head can run both builders. The mixed-integer [`RiskBudgeting`](@ref) head calls [`set_rb_mip_w!`](@ref), which records [`WeightsFromParts`](@ref), and then passes the same `lw` and `sw` to [`set_weight_constraints!`](@ref), which adds them as bounds and tries to record [`PartsBoundWeights`](@ref). The identity is the stronger statement and still holds, so the first record stays.
+
+# Algorithm
+
+ 1. When the model has no entry `:decomposition_contract`, register `dc` under that key.
+ 2. Otherwise leave the entry unchanged.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -302,10 +312,9 @@ end
 """
     decomposition_contract(model::JuMP.Model)
 
-Return the head's decomposition contract, or `nothing` when no head declared one.
+Return the relation that the head recorded, or `nothing` when the head recorded none.
 
-`nothing` means the model has no short side — the weights are their own long part, `lw` is an
-alias for `w` and there is no `sw`, so there is no decomposition to pin.
+`nothing` means that the model has no short side. The weights are their own long part, `lw` is a second name for `w`, and the model has no `sw`, so no split needs to be pinned.
 
 # Related
 
@@ -318,26 +327,30 @@ end
 """
     get_ret(model::JuMP.Model)
 
-Return the portfolio expected-return expression `model[:ret]`.
+Return the expected portfolio return expression `model[:ret]`.
 
-Asserts the return expression has been registered; errors otherwise.
+# Validation
+
+  - `model[:ret]` is registered, by [`scalarise_return_expression!`](@ref). Otherwise an `ArgumentError` names that builder.
 
 # Related
 
+  - [`scalarise_return_expression!`](@ref)
   - [`get_risk`](@ref)
 """
 function get_ret(model::JuMP.Model)
     @argcheck(haskey(model, :ret),
-              ArgumentError("model[:ret] (portfolio expected-return expression) has not been registered; call set_return_constraints! first"))
+              ArgumentError("model[:ret] (portfolio expected-return expression) has not been registered; call scalarise_return_expression! first"))
     return model[:ret]
 end
 """
     get_risk(model::JuMP.Model)
 
-Return the scalarised portfolio risk expression `model[:risk]`.
+Return the scalar portfolio risk expression `model[:risk]`.
 
-Asserts the risk expression has been registered (via [`scalarise_risk_expression!`](@ref));
-errors otherwise.
+# Validation
+
+  - `model[:risk]` is registered, by [`scalarise_risk_expression!`](@ref). Otherwise an `ArgumentError` names that builder.
 
 # Related
 
@@ -352,8 +365,7 @@ end
 """
     has_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
 
-Return `true` if the portfolio returns `model[Symbol(prefix, :X)]` have been
-registered (via [`set_portfolio_returns!`](@ref)).
+Return `true` when [`set_portfolio_returns!`](@ref) registered the portfolio returns `model[Symbol(prefix, :X)]`.
 
 # Related
 
@@ -367,7 +379,9 @@ end
 
 Return the portfolio returns expression `model[Symbol(prefix, :X)]`.
 
-Asserts it has been registered (via [`set_portfolio_returns!`](@ref)); errors otherwise.
+# Validation
+
+  - The entry is registered, by [`set_portfolio_returns!`](@ref). Otherwise an `ArgumentError` names that builder.
 
 # Related
 
@@ -382,8 +396,7 @@ end
 """
     has_net_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
 
-Return `true` if the net portfolio returns `model[Symbol(prefix, :net_X)]` have been
-registered (via [`set_net_portfolio_returns!`](@ref)).
+Return `true` when [`set_net_portfolio_returns!`](@ref) registered the net portfolio returns `model[Symbol(prefix, :net_X)]`.
 
 # Related
 
@@ -397,7 +410,9 @@ end
 
 Return the net portfolio returns expression `model[Symbol(prefix, :net_X)]`.
 
-Asserts it has been registered (via [`set_net_portfolio_returns!`](@ref)); errors otherwise.
+# Validation
+
+  - The entry is registered, by [`set_net_portfolio_returns!`](@ref). Otherwise an `ArgumentError` names that builder.
 
 # Related
 
@@ -412,8 +427,7 @@ end
 """
     has_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
 
-Return `true` if the gross portfolio returns `model[Symbol(prefix, :Xap1)]` have been
-registered (via [`set_asset_returns_plus_one!`](@ref)).
+Return `true` when [`set_asset_returns_plus_one!`](@ref) registered the gross asset returns `model[Symbol(prefix, :Xap1)]`.
 
 # Related
 
@@ -425,9 +439,11 @@ end
 """
     get_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
 
-Return the gross portfolio returns expression `model[Symbol(prefix, :Xap1)]` (`X .+ 1`).
+Return the gross asset returns `model[Symbol(prefix, :Xap1)]`, the matrix ``\\mathbf{X} + 1``.
 
-Asserts it has been registered (via [`set_asset_returns_plus_one!`](@ref)); errors otherwise.
+# Validation
+
+  - The entry is registered, by [`set_asset_returns_plus_one!`](@ref). Otherwise an `ArgumentError` names that builder.
 
 # Related
 
@@ -442,8 +458,7 @@ end
 """
     has_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
 
-Return `true` if the drawdowns-plus-one `model[Symbol(prefix, :ddap1)]` have been
-registered (via [`set_portfolio_drawdowns_plus_one!`](@ref)).
+Return `true` when [`set_portfolio_drawdowns_plus_one!`](@ref) registered the asset drawdowns plus one `model[Symbol(prefix, :ddap1)]`.
 
 # Related
 
@@ -455,9 +470,11 @@ end
 """
     get_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
 
-Return the drawdowns-plus-one expression `model[Symbol(prefix, :ddap1)]`.
+Return the asset drawdowns plus one, `model[Symbol(prefix, :ddap1)]`.
 
-Asserts it has been registered (via [`set_portfolio_drawdowns_plus_one!`](@ref)); errors otherwise.
+# Validation
+
+  - The entry is registered, by [`set_portfolio_drawdowns_plus_one!`](@ref). Otherwise an `ArgumentError` names that builder.
 
 # Related
 
@@ -472,8 +489,7 @@ end
 """
     has_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
 
-Return `true` if the cumulative-drawdown variables `model[Symbol(prefix, :dd)]` have
-been registered (via [`set_drawdown_constraints!`](@ref)).
+Return `true` when [`set_drawdown_constraints!`](@ref) registered the drawdown variables `model[Symbol(prefix, :dd)]`.
 
 # Related
 
@@ -485,9 +501,11 @@ end
 """
     get_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
 
-Return the cumulative-drawdown variables `model[Symbol(prefix, :dd)]`.
+Return the drawdown variables `model[Symbol(prefix, :dd)]`, one more than the number of observations.
 
-Asserts they have been registered (via [`set_drawdown_constraints!`](@ref)); errors otherwise.
+# Validation
+
+  - The entry is registered, by [`set_drawdown_constraints!`](@ref). Otherwise an `ArgumentError` names that builder.
 
 # Related
 
