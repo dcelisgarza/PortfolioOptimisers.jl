@@ -575,6 +575,45 @@ what keeps the JuMP families cheap.
         @test po.step_online_cap(MeanRisk(; opt = JuMPOptimiser(; pe = cpe, slv = slv))) ==
               w
         @test po.step_online_cap(PortfolioOptimisersCovariance()) === nothing
+        # The two walks read a wrapper at any depth, as the warm-up resolves it: a capped
+        # prior two levels under a hierarchical owner is refused behind a row-local step,
+        # and a wrapper there under `Online(pipe)` is refused by the refit route's message,
+        # not by the batch door's.
+        deep(pe) = HierarchicalRiskParity(;
+                                          opt = HierarchicalOptimiser(;
+                                                                      pe = HighOrderPriorEstimator(;
+                                                                                                   pe = pe)))
+        @test po.step_online_cap(deep(cpe)) == w
+        @test po.step_online_member(deep(cpe)) == "opt.pe.pe"
+        msg = refusal(() -> cross_val_predict(Pipeline(; steps = (prep..., deep(cpe))), pr,
+                                              online_cv))
+        @test occursin("PriceGapFill", msg) && occursin("max_history = $(w)", msg)
+        wrapped = po.Online(Pipeline(;
+                                     steps = (prep..., deep(po.Online(EmpiricalPrior())))))
+        msg = refusal(() -> cross_val_predict(wrapped, pr, online_cv))
+        @test occursin("opt.opt.pe.pe", msg) && occursin("Online(pipe)", msg)
+        @test po.pipeline_online_member(Pipeline(;
+                                                 steps = (Pipeline(;
+                                                                   steps = (po.Online(EmpiricalPrior()),
+                                                                            hrp)),))) ==
+              "opt.prior"
+        # A row-local step on returns input is refused before a capped owner too.
+        msg = refusal(() -> cross_val_predict(Pipeline(;
+                                                       steps = (MissingDataFilter(), cpe,
+                                                                hrp)), rd,
+                                              OnlineIndexWalkForward(w + p, t;
+                                                                     purged_size = p)))
+        @test occursin("MissingDataFilter", msg) && occursin("max_history = $(w)", msg)
+        # A hand-driven fold of a wrapper no warm-up resolved is refused, where it would
+        # drop the wrapper and fold the prior with no cap.
+        msg = refusal(() -> po.partial_fit!(Pipeline(; steps = (cpe, hrp)), rows(rd, 1:80)))
+        @test occursin("`prior` step", msg) && occursin("warm-up", msg)
+        # A cold pipeline holds no timestamps, whatever its owner.
+        @test isnothing(po.held_timestamps(Pipeline(;
+                                                    steps = (prep..., EmpiricalPrior(),
+                                                             hrp))))
+        @test isnothing(po.held_timestamps(Pipeline(; steps = (prep..., sched))))
+        @test isnothing(po.held_timestamps(Pipeline(; steps = (PricesToReturns(),))))
         # An Online(pipe) under a batch scheme, and an Online step at a fold-less fit.
         hpipe = Pipeline(; steps = (prep..., EmpiricalPrior(), hrp))
         msg = refusal(() -> cross_val_predict(po.Online(hpipe), pr, batch_cv))

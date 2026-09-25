@@ -385,7 +385,7 @@ commit = "0ecb3ce47c"
 "src/21_Pipeline/03_Pipeline.jl" = { code = 441, doc = 409, comment = 4, blank = 220, total = 1074 }
 "src/21_Pipeline/04_PredictionCV.jl" = { code = 193, doc = 151, comment = 15, blank = 70, total = 429 }
 "src/21_Pipeline/05_SearchCrossValidation.jl" = { code = 160, doc = 105, comment = 20, blank = 52, total = 337 }
-"src/21_Pipeline/06_OnlinePipeline.jl" = { code = 391, doc = 372, comment = 0, blank = 162, total = 925 }
+"src/21_Pipeline/06_OnlinePipeline.jl" = { code = 389, doc = 476, comment = 0, blank = 226, total = 1091 }
 "src/22_Plotting.jl" = { code = 150, doc = 2298, comment = 111, blank = 797, total = 3356 }
 "src/23_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
 "src/PortfolioOptimisers.jl" = { code = 357, doc = 3, comment = 29, blank = 5, total = 394 }
