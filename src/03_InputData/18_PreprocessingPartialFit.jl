@@ -888,7 +888,7 @@ Reads a stepped [`MissingDataFilter`](@ref) out as the [`MissingDataFilterResult
 # Algorithm
 
  1. Read the state with [`partial_fit_cache`](@ref).
- 2. Keep the assets whose fraction of missing observations `miss / n` does not exceed `col_thr`, giving `keep`, and check that one asset at least survives.
+ 2. Keep the assets whose share of missing observations `miss / n` does not exceed `col_thr`, giving `keep`, and check that one asset at least survives. [`share_at_most`](@ref) computes the share in the type of `col_thr`, as the batch fit does.
  3. Build the [`MissingDataFilterResult`](@ref) from the surviving asset names and `row_thr`.
 
 # Validation
@@ -907,7 +907,7 @@ Reads a stepped [`MissingDataFilter`](@ref) out as the [`MissingDataFilterResult
 """
 function fit_preprocessing(mdf::MissingDataFilter)
     state = partial_fit_cache(mdf)
-    keep = state.miss / state.n .<= mdf.col_thr
+    keep = share_at_most.(state.miss, state.n, mdf.col_thr)
     @argcheck(any(keep),
               IsEmptyError("MissingDataFilter with col_thr = $(mdf.col_thr) drops every asset over the observations folded"))
     return MissingDataFilterResult(state.nx[keep], mdf.row_thr)

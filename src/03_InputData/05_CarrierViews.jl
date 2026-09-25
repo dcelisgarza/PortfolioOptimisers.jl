@@ -143,7 +143,7 @@ end
 
 View a carrier's [`AssetPanel`](@ref), or return `nothing` when the carrier holds none.
 
-[`port_opt_view`](@ref) of a [`PricesResult`](@ref) or of a [`ReturnsResult`](@ref), and [`MissingDataFilter`](@ref), call it. So the `nothing` case has one method, and no call site needs a branch for it.
+[`port_opt_view`](@ref) of a [`PricesResult`](@ref) or of a [`ReturnsResult`](@ref) calls it, and [`MissingDataFilter`](@ref) reaches it through that view. So the `nothing` case has one method, and no call site needs a branch for it.
 
 # Algorithm
 

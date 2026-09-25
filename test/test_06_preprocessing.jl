@@ -635,9 +635,94 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test_throws PortfolioOptimisers.IsEmptyError fit_preprocessing(MissingDataFilter(;
                                                                                           col_thr = 0.5),
                                                                         allmissing)
-        # A window that carries none of the fitted universe is refused the same way.
+        # A window that carries none of the fitted universe is refused, and the message names
+        # the first fitted asset it lacks.
         other = PricesResult(; X = TimeArray(ts, Float64.(reshape(1:5, 5, 1)), [:zz]))
-        @test_throws PortfolioOptimisers.IsEmptyError apply_preprocessing(fitted, other)
+        @test_throws ArgumentError apply_preprocessing(fitted, other)
+    end
+
+    @testset "MissingDataFilter agrees with its docstrings" begin
+        share_at_most = PortfolioOptimisers.share_at_most
+        # A share is k / n in the type of the threshold. `100 * 0.29` is 28.999999999999996,
+        # so a test of k <= n * thr dropped 29 missing entries of 100 at 0.29.
+        @test all(k -> share_at_most(k, 100, k / 100), 0:100)
+        @test all(k -> share_at_most(k, 100, Float32(k / 100)), 0:100)
+        @test all(k -> !share_at_most(k + 1, 100, k / 100), 0:99)
+        @test share_at_most(1, 3, 1 // 3) && !share_at_most(2, 3, 1 // 3)
+        @test share_at_most(0, 7, 0) && !share_at_most(1, 7, 0) && share_at_most(7, 7, 1)
+
+        ts100 = collect(Date(2020, 1, 1):Day(1):(Date(2020, 1, 1) + Day(99)))
+        # A row with 29 of 100 assets missing has the share 0.29, so row_thr = 0.29 keeps it
+        # and row_thr = 0.28 drops it.
+        v = fill(1.0, 100, 100)
+        v[1, 1:29] .= NaN
+        pr = PricesResult(; X = TimeArray(ts100, v, Symbol.("a", 1:100)))
+        keep29 = apply_preprocessing(fit_preprocessing(MissingDataFilter(; row_thr = 0.29),
+                                                       pr), pr)
+        @test size(values(keep29.X), 1) == 100
+        drop28 = apply_preprocessing(fit_preprocessing(MissingDataFilter(; row_thr = 0.28),
+                                                       pr), pr)
+        @test TimeSeries.timestamp(drop28.X) == ts100[2:end]
+
+        # A column with 29 of 100 observations missing survives col_thr = 0.29 in Float64,
+        # Float32 and Rational, in the batch fit and in the online read-out alike.
+        w = fill(1.0, 100, 2)
+        w[1:29, 1] .= NaN
+        pc = PricesResult(; X = TimeArray(ts100, w, [:a, :b]))
+        for thr in (0.29, 0.29f0, 29 // 100)
+            mdf = MissingDataFilter(; col_thr = thr)
+            @test fit_preprocessing(mdf, pc).nx == [:a, :b]
+            stepped, _ = PortfolioOptimisers.partial_fit_transform(mdf, pc)
+            @test fit_preprocessing(stepped).nx == [:a, :b]
+        end
+        for thr in (0.28, 0.28f0, 28 // 100)
+            @test fit_preprocessing(MissingDataFilter(; col_thr = thr), pc).nx == [:b]
+        end
+
+        # The apply step replays the fitted universe by name, in the fitted order, and
+        # refuses a window that lacks a fitted asset.
+        t5 = ts100[1:5]
+        p3 = PricesResult(;
+                          X = TimeArray(t5,
+                                        [1.0 2.0 3.0; 1.1 2.1 3.1; 1.2 2.2 3.2;
+                                         1.3 2.3 3.3; 1.4 2.4 3.4], [:a, :b, :c]))
+        r3 = fit_preprocessing(MissingDataFilter(), p3)
+        swapped = PricesResult(; X = p3.X[[:c, :a, :b]])
+        out = apply_preprocessing(r3, swapped)
+        @test TimeSeries.colnames(out.X) == [:a, :b, :c]
+        @test values(out.X) == values(p3.X)
+        partial = PricesResult(; X = p3.X[[:a, :c]])
+        e = try
+            apply_preprocessing(r3, partial)
+        catch err
+            err
+        end
+        @test e isa ArgumentError
+        @test occursin("variable `b` not in asset universe", e.msg)
+
+        # A vector ivpa follows the kept columns when the carrier holds no iv series.
+        x = [NaN 1.0; NaN 2.0; NaN 3.0; 1.0 4.0; 2.0 5.0]
+        pv = PricesResult(; X = TimeArray(t5, x, [:a, :b]), ivpa = [1.0, 2.0])
+        av = apply_preprocessing(fit_preprocessing(MissingDataFilter(; col_thr = 0.5), pv),
+                                 pv)
+        @test TimeSeries.colnames(av.X) == [:b]
+        @test av.ivpa == [2.0]
+        @test size(prices_to_returns(av).X) == (4, 1)
+
+        # A window whose every observation the row filter drops is refused by name.
+        allgap = PricesResult(; X = TimeArray(t5, fill(NaN, 5, 2), [:a, :b]))
+        e = try
+            apply_preprocessing(fit_preprocessing(MissingDataFilter(; row_thr = 0.0), pv),
+                                allgap)
+        catch err
+            err
+        end
+        @test e isa PortfolioOptimisers.IsEmptyError
+        @test occursin("row_thr = 0.0 drops every observation", e.msg)
+
+        # Both thresholds are shares in [0, 1].
+        @test_throws DomainError MissingDataFilter(; col_thr = -0.1)
+        @test_throws DomainError MissingDataFilter(; row_thr = 1.1)
     end
 
     @testset "prices_to_returns filters neither axis" begin
