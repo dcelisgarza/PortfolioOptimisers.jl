@@ -122,7 +122,7 @@
 "src/03_InputData/15_FeatureSelector.jl" = { map = 2, units = 14, swept = false }
 "src/03_InputData/16_PanelDataFrame.jl" = { map = 2, units = 8, swept = false }
 "src/03_InputData/17_ReturnsBufferState.jl" = { map = 2, units = 17, swept = false }
-"src/03_InputData/18_PreprocessingPartialFit.jl" = { map = 2, units = 21, swept = false }
+"src/03_InputData/18_PreprocessingPartialFit.jl" = { map = 2, units = 21, algorithm = 13, swept = true, bindings = ["MissingDataFilterState", "PriceGapFillState", "PricesToReturnsState", "advance_anchor", "assert_pinned_carrier", "block_gap_return!", "carrier_rows", "fit_preprocessing", "fit_preprocessing", "fit_preprocessing", "partial_fit_transform", "partial_fit_transform", "partial_fit_transform", "partial_fit_transform", "returns_with_series", "series_values", "series_values_returns", "show_fields", "vcat_carrier_rows", "vcat_optional", "vcat_panel_rows"] }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { map = 2, units = 4, algorithm = 2, swept = true, bindings = ["AbstractPosdefEstimator", "Posdef", "posdef", "posdef!"] }
 "src/04_MatrixProcessing/02_Denoise.jl" = { map = 2, units = 10, algorithm = 7, swept = true, bindings = ["AbstractDenoiseAlgorithm", "AbstractDenoiseEstimator", "Denoise", "FixedDenoise", "ShrunkDenoise", "SpectralDenoise", "_denoise!", "denoise", "denoise!", "find_max_eval"] }
 "src/04_MatrixProcessing/03_Detone.jl" = { map = 2, units = 4, algorithm = 2, swept = true, bindings = ["AbstractDetoneEstimator", "Detone", "detone", "detone!"] }

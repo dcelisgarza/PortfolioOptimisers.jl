@@ -1309,7 +1309,11 @@ function assert_panel_masks(ax::Tuple, amsk::Option{<:AbstractMatrix{Bool}},
               DimensionMismatch("an Asset Panel with universe masks is time-varying, so its Panel Fields carry an observation axis; got Panel Fields of shape $ax. Drop the masks, or prepend the observation axis."))
     @argcheck(size(amsk) == ax && size(emsk) == ax,
               DimensionMismatch("the universe masks of an Asset Panel are observations × assets, so they match its Panel Fields, got size(amsk) = $(size(amsk)), size(emsk) = $(size(emsk)) and Panel Fields of shape $ax"))
-    idx = findfirst(k -> emsk[k] && !amsk[k], eachindex(emsk))
+    #! `findfirst` with a predicate throws a `BoundsError` on an empty matrix under Julia
+    #! 1.13, and a conversion of one price row gives masks with no row. The search runs
+    #! over the indices as a vector, which an empty mask leaves empty, and `idx` is a
+    #! linear index that `CartesianIndices(emsk)` reads below.
+    idx = findfirst(k -> emsk[k] && !amsk[k], vec(CartesianIndices(emsk)))
     @argcheck(isnothing(idx),
               ArgumentError("the estimation mask (emsk) must be a subset of the active mask (amsk): an asset that is not in the universe at an observation cannot enter that observation's estimate. Intersect them yourself with `emsk .& amsk` — the rule is checked rather than coerced, because a coercion allocates and port_opt_view returns views. The first offending entry is at $(isnothing(idx) ? "" : string(Tuple(CartesianIndices(emsk)[idx])))"))
     return nothing

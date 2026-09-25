@@ -679,4 +679,109 @@ what keeps the JuMP families cheap.
                                                                                      r = r),
                                                            pr)
     end
+
+    @testset "The online data steps: the universe, the first block and a caller's step" begin
+        function message(f)
+            err = try
+                f()
+                nothing
+            catch e
+                e
+            end
+            return isnothing(err) ? "" : sprint(showerror, err)
+        end
+        # A block of prices with other column names is refused by the field, for the
+        # assets and for the factors, and a factor column that one block lacks by presence.
+        other = price_ingestion(PriceIngestion(),
+                                TimeArray(ts[11:20], P[11:20, :], ["B$i" for i in 1:N]))
+        msg = message(() -> po.vcat_carrier_rows(rows(pr, 1:10), other))
+        @test occursin("the columns of `X`", msg) && occursin("\"B1\"", msg)
+        @test occursin("the columns of `X`",
+                       message(() -> po.partial_fit_transform(po.partial_fit!(PricesToReturns(),
+                                                                              rows(pr,
+                                                                                   1:10)),
+                                                              other)))
+        F1 = TimeArray(ts, P[:, 1:2], ["F1", "F2"])
+        F2 = TimeArray(ts, P[:, 1:2], ["F2", "F1"])
+        prf1 = price_ingestion(PriceIngestion(), TimeArray(ts, P, nx); F = F1)
+        prf2 = price_ingestion(PriceIngestion(), TimeArray(ts, P, nx); F = F2)
+        @test occursin("the columns of `F`",
+                       message(() -> po.vcat_carrier_rows(rows(prf1, 1:10),
+                                                          rows(prf2, 11:20))))
+        @test occursin("the `F` column",
+                       message(() -> po.vcat_carrier_rows(rows(prf1, 1:10), rows(pr, 11:20))))
+
+        # A first block of one price row has no return without padding, and the batch
+        # conversion of that row refuses it as empty rather than out of bounds. With
+        # padding the row converts, and the stream from one row equals the batch.
+        @test_throws po.IsEmptyError po.partial_fit_transform(PricesToReturns(),
+                                                              rows(pr, 1:1))
+        @test_throws po.IsEmptyError apply_preprocessing(PricesToReturns(), rows(pr, 1:1))
+        @test isnothing(po.assert_panel_masks((0, 2), po.AllTrueMask(0, 2),
+                                              po.AllTrueMask(0, 2)))
+        for ptr in (PricesToReturns(; padding = true),
+                    PricesToReturns(; padding = true, gap_return_alg = CatchUpGapReturn()))
+            e1, o1 = po.partial_fit_transform(ptr, rows(pr, 1:1))
+            e2, o2 = po.partial_fit_transform(e1, rows(pr, 2:160))
+            @test same_carrier(po.vcat_carrier_rows(o1, o2), apply_preprocessing(ptr, pr))
+        end
+
+        # A caller's Gap Return rule that reads the next price. The batch writes a zero at
+        # row 97 of A4, whose next price is observed; a block that ends at row 97 cannot
+        # see that price, so the verb refuses the rule by name.
+        struct NextPriceGapReturn <: po.AbstractGapReturnAlgorithm end
+        function po.gap_return(::NextPriceGapReturn, p::AbstractVector, r::AbstractVector,
+                               ::Symbol)
+            out = copy(r)
+            off = length(p) - length(r)
+            for j in eachindex(r)
+                if j + off < length(p) && !isnan(p[j + off + 1])
+                    out[j] = zero(eltype(r))
+                end
+            end
+            return out
+        end
+        nptr = PricesToReturns(; gap_return_alg = NextPriceGapReturn())
+        @test Matrix(apply_preprocessing(nptr, pr).X)[96, 4] == 0
+        msg = message(() -> po.partial_fit!(nptr, rows(pr, 1:97)))
+        @test occursin("NextPriceGapReturn", msg) && occursin("no online form", msg)
+
+        # A caller's own row-local step joins the host route with three methods and no
+        # `partial_fit!`: the stepped pipeline reads out as the batch fit.
+        struct PriceDoubler{C} <: po.AbstractPricesPreprocessingEstimator
+            cache::C
+        end
+        doubled(x) = PricesResult(;
+                                  X = TimeArray(timestamp(x.X), 2 .* values(x.X),
+                                                colnames(x.X)), F = x.F, B = x.B, iv = x.iv,
+                                  ivpa = x.ivpa, pnl = x.pnl, span = x.span)
+        po.fit_preprocessing(d::PriceDoubler, ::PricesResult) = d
+        po.apply_preprocessing(::PriceDoubler, x::PricesResult) = doubled(x)
+        po.partial_fit_transform(d::PriceDoubler, x::PricesResult) = (d, doubled(x))
+        po.fit_preprocessing(d::PriceDoubler) = d
+        po.supports_partial_fit(::PriceDoubler) = true
+        dpipe = Pipeline(;
+                         steps = (PriceGapFill(), PriceDoubler(nothing), PricesToReturns(),
+                                  EmpiricalPrior(), hrp))
+        @test isnothing(po.assert_online_entry(dpipe))
+        @test isapprox(fit(stepped(dpipe, pr, blocks)).w, fit(dpipe, rows(pr, 1:80)).w;
+                       atol = 1e-10)
+        @test_throws MethodError po.partial_fit!(PriceDoubler(nothing), rows(pr, 1:10))
+
+        # The anchor moves to the last observed price of a column, keeps its value where
+        # the block observes none, and is a new vector.
+        a0 = [1.0, 2.0, NaN]
+        a1 = po.advance_anchor(a0, [3.0 NaN NaN; NaN NaN 5.0])
+        @test isequal(a1, [3.0, 2.0, 5.0]) && isequal(a0, [1.0, 2.0, NaN])
+        # The series of a carrier lie side by side: the assets, the factors, the benchmark.
+        prfb = price_ingestion(PriceIngestion(), TimeArray(ts, P, nx); F = F1,
+                               B = TimeArray(ts, P[:, 1:1] .* 3, ["B"]))
+        S = po.series_values(rows(prfb, 1:3))
+        @test isequal(S, hcat(P[1:3, :], P[1:3, 1:2], P[1:3, 1:1] .* 3))
+        rfb = apply_preprocessing(PricesToReturns(), rows(prfb, 1:3))
+        R = po.series_values_returns(rfb)
+        @test isequal(R, hcat(Matrix(rfb.X), Matrix(rfb.F), collect(rfb.B)))
+        R[1, 1] = 99.0
+        @test Matrix(rfb.X)[1, 1] != 99.0
+    end
 end

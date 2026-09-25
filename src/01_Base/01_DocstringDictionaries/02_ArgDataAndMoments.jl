@@ -176,6 +176,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Partial fit states.
                  :pf_M => "`M`: Running second-moment accumulator of the observations folded into the state, about `mu`.",
                  :pf_max_history => "`max_history`: Optional cap on the number of observations the buffer keeps. `nothing` keeps every observation folded so far. A capped buffer drops its oldest observations as new ones arrive and holds the last `max_history` of them. A read-out over the buffer reads those rows only. The cap is the window of the fit: an estimator wrapped in [`Online`](@ref) returns the batch fit over the last `max_history` observations, also when its statistic has an exact update.",#
+                 :pf_nx_pinned => "`nx`: The names of the asset columns, which the first block pins.",#
                  # The masks of a returns buffer.
                  :pf_buffer_A => "`A`: Backing matrix of the active mask, of the shape of `X`, or `nothing` when the buffer records no activity. Rows `off + 1` to `off + n` are the mask of the observations, cell for cell with them. It is fixed by the first append, and it is what lets a read-out tell a delisting from a holiday.",#
                  :pf_buffer_E => "`E`: Backing matrix of the estimation mask, of the shape of `X`, or `nothing` when the buffer records none. It is the second per-observation mask the batch verbs take, it is carried on the same terms as `A`, and only the two regime-adjusted families read it.",#
