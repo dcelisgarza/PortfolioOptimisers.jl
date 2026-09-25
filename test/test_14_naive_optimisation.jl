@@ -46,4 +46,18 @@
                                                                        dims = 2)
     @test_throws PortfolioOptimisers.ConflictingArgumentError optimise(RandomWeighted(), rd;
                                                                        dims = 2)
+
+    # The assertion splits the two refusals: a selector outside `(1, 2)` is malformed, and
+    # `dims = 2` is a valid selector that conflicts with the fixed layout. The message names
+    # the remedy and the argument the caller passed.
+    @test isnothing(PortfolioOptimisers.assert_returns_result_dims(1))
+    @test_throws DomainError PortfolioOptimisers.assert_returns_result_dims(3)
+    err = try
+        PortfolioOptimisers.assert_returns_result_dims(2, :d)
+    catch e
+        e
+    end
+    @test err isa PortfolioOptimisers.ConflictingArgumentError
+    @test occursin("Pass d = 1", sprint(showerror, err))
+    @test occursin("d => 2", sprint(showerror, err))
 end

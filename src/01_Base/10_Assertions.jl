@@ -8,7 +8,7 @@ No-op for `Pair` and `Number` inputs; emptiness does not apply to scalars.
 # Arguments
 
   - `val`: Container to check; one of `AbstractDict`, `VecPair`, or `ArrNum`.
-  - `sym`: Symbolic name used in the error message.
+  - $(arg_dict[:sym_msg])
 
 # Validation
 
@@ -74,7 +74,7 @@ The method Julia selects on the type of `val` is the algorithm. Each method chec
 # Arguments
 
   - `val`: Value to check.
-  - `sym`: Symbolic name used in the error message.
+  - $(arg_dict[:sym_msg])
 
 # Validation
 
@@ -131,7 +131,7 @@ Assert that *every* element of `val` is finite, failing closed with an [`IsNonFi
 # Arguments
 
   - `val`: Array to check.
-  - `sym`: Symbolic name used in the error message.
+  - $(arg_dict[:sym_msg])
 
 # Validation
 
@@ -274,7 +274,7 @@ The method Julia selects on the type of `val` is the algorithm. Each method chec
 # Arguments
 
   - `val`: Value to check.
-  - `sym`: Symbolic name used in the error message.
+  - $(arg_dict[:sym_msg])
 
 # Validation
 
@@ -336,7 +336,7 @@ The method Julia selects on the type of `val` is the algorithm. Each method chec
 # Arguments
 
   - `val`: Value to check.
-  - `sym`: Symbolic name used in the error message.
+  - $(arg_dict[:sym_msg])
 
 # Validation
 
@@ -391,7 +391,7 @@ A value of any other type selects the `args...` method, which checks nothing. Th
 # Arguments
 
   - `val`: Value to check.
-  - `sym`: Symbolic name used in the error message.
+  - $(arg_dict[:sym_msg])
 
 # Validation
 
@@ -430,7 +430,7 @@ A value of any other type selects the `args...` method, which checks nothing, on
 # Arguments
 
   - `val`: Value to check.
-  - `sym`: Symbolic name used in the error message.
+  - $(arg_dict[:sym_msg])
 
 # Validation
 
@@ -465,7 +465,7 @@ Source selectors pick which of the two carriers a matrix is read from: `:prior` 
 # Arguments
 
   - `src`: Selector to check.
-  - `sym`: Symbolic name used in the error message.
+  - $(arg_dict[:sym_msg])
 
 # Validation
 
@@ -677,8 +677,8 @@ Assert that `dims` selects a valid matrix dimension (`dims in (1, 2)`).
 
 # Arguments
 
-  - `dims`: Dimension selector to check.
-  - `sym`: Symbolic name used in the error message.
+  - $(arg_dict[:dims_chk])
+  - $(arg_dict[:sym_msg])
 
 # Validation
 
@@ -701,14 +701,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that `dims` names the one layout a `ReturnsResult` can hold.
+Assert that `dims` is `1`, because a `ReturnsResult` always holds its observations along the rows.
 
-A `ReturnsResult` is always observations × assets, so its asset axis is always `2`, whatever `dims` a caller passes. This assertion refuses `dims == 2` instead of flipping the axis, and names `prices_to_returns` as the way to build a `ReturnsResult` in a different layout.
+A [`ReturnsResult`](@ref) is always observations × assets, so its asset axis is always `2`, whatever `dims` a caller passes. This assertion refuses `dims == 2` instead of flipping the axis. Its error message names [`prices_to_returns`](@ref), which builds a `ReturnsResult` in that one layout.
 
 # Arguments
 
-  - `dims`: Dimension selector to check.
-  - `sym`: Symbolic name used in the error message.
+  - $(arg_dict[:dims_chk])
+  - $(arg_dict[:sym_msg])
 
 # Validation
 
@@ -723,11 +723,13 @@ A `ReturnsResult` is always observations × assets, so its asset axis is always 
 
   - [`assert_dims`](@ref)
   - [`ConflictingArgumentError`](@ref)
+  - [`ReturnsResult`](@ref)
+  - [`prices_to_returns`](@ref)
 """
 function assert_returns_result_dims(dims::Integer, sym::Sym_Str = :dims)::Nothing
     assert_dims(dims, sym)
     @argcheck(isone(dims),
-              ConflictingArgumentError("$sym must be 1 for a ReturnsResult: its layout is fixed at observations × assets, so its asset axis is always 2. Build a ReturnsResult in that layout with `prices_to_returns`. Got\n$sym => $(dims)"))
+              ConflictingArgumentError("$sym must be 1 for a ReturnsResult. A ReturnsResult holds observations along its rows and assets along its columns, so its asset axis is always 2. Pass $sym = 1, or leave it at its default, and put the observations along the rows of the ReturnsResult, as `prices_to_returns` does. Got\n$sym => $(dims)"))
     return nothing
 end
 """

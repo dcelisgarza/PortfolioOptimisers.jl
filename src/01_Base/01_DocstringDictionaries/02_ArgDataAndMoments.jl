@@ -116,6 +116,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :plfe => "`pl`: Structure source, always an estimator so that it refits per fold: a network estimator (a graph, whose `sep` measures the separations `alg` grades) or a clustering estimator (a partition, for which `alg` is inert). A precomputed result is not accepted -- an Estimator does not hold a Result.",#
                  :plfalg => "`alg`: Phylogeny feature algorithm: the rule turning the source's separations into feature values. Inert for a partition source, which has no separation to grade.",#
                  :dims => "`dims`: Dimension along which to perform the computation.",#
+                 :dims_chk => "`dims`: Dimension selector to check.",#
+                 :sym_msg => "`sym`: Symbolic name used in the error message.",#
                  :omean => "`mean`: Optional mean value to use for centering.",
                  :ex => "`ex`: Parallel execution strategy.",#
                  :alpha => "`alpha`: Quantile level for the lower tail. The bound is [`Num_SigCal`](@ref), so the slot takes the level itself, an [`AbstractSignificanceCalibrationAlgorithm`](@ref) that computes it from the prior result, or a plain function of the same five arguments.",#

@@ -48,7 +48,7 @@ The ingestion layer carries an absent implied volatility as `NaN`, as it carries
 # Arguments
 
   - `val`: The array to check.
-  - `sym`: Symbolic name used in the error message.
+  - $(arg_dict[:sym_msg])
 
 # Validation
 
