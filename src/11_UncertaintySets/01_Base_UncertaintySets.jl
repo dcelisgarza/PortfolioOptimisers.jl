@@ -218,7 +218,7 @@ A rule is named for the **method** it runs, and neither bare word is claimed els
 
 ## `k_compact`
 
-  - `k_compact(alg::AbstractCompactRadiusAlgorithm, q::Number, metric::AbstractOrthogonalityMetric, pr::AbstractPriorResult, rr::AbstractLoadingsRegressionResult, C::VecNum, Q::MatNum) -> Number`: Returns the radius, finite and `>= 0`. The owner's own constructor states the range, so a rule writes no range check of its own.
+  - `k_compact(alg::AbstractCompactRadiusAlgorithm, q::Number, metric::AbstractOrthogonalityMetric, pr::AbstractPriorResult, rr::AbstractLoadingsRegressionResult, C::VecNum, Q::MatNum, rd) -> Number`: Returns the radius, finite and `>= 0`. `rd` is the returns data of the fit, or `nothing`. The owner's own constructor states the range, so a rule writes no range check of its own.
 
 # Related
 

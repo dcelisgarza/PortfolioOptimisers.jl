@@ -809,6 +809,78 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
             @test v.kappa === s.kappa
             @test length(v.C) == 4
         end
+
+        @testset "ResidualInflation is the smallest radius that covers the inflation" begin
+            #=
+            With `v = P C w`, the penalty is `kappa |v|^2` and the inflation it covers is
+            `rho |D^{1/2} W^{1/2} v|^2`. In weight space that is
+            `kappa C P C >= rho Pi D Pi'` with `Pi = C P C^{-1}`: the radius satisfies it,
+            and a radius one part in a million smaller does not.
+            =#
+            for metric946 in (PortfolioOptimisers.InverseIdiosyncraticVarianceMetric(),
+                              IdentityMetric())
+                ue946 = OrthogonalUncertaintySet(; kappa = ResidualInflation(), q = 0.05,
+                                                 metric = metric946)
+                s946 = sigma_ucs(ue946, pr928)
+                C946 = collect(s946.C)
+                P946 = I - s946.Q * transpose(s946.Q)
+                rho946 = rho928(0.05, T928 - K928 - 1)
+                Pi946 = Diagonal(C946) * P946 * Diagonal(inv.(C946))
+                M946(k946) = Symmetric(k946 * Diagonal(C946) * P946 * Diagonal(C946) -
+                                       rho946 * Pi946 * Diagonal(d928) * transpose(Pi946))
+                scale946 = s946.kappa * opnorm(Diagonal(C946) * P946 * Diagonal(C946))
+                @test eigmin(M946(s946.kappa)) >= -1e-10 * scale946
+                @test eigmin(M946(s946.kappa * (1 - 1e-6))) < -1e-8 * scale946
+            end
+        end
+
+        @testset "ResidualInflation's level is 1 - q only when the variance divides by dof" begin
+            #=
+            The bound `d <= (1 + rho) dhat` holds with probability `1 - q` when `dhat` is the
+            residual sum of squares over `nu = T - K - 1`. A divisor `m` gives the level
+            `1 - F_nu(m * quantile(Chisq(nu), q) / nu)`, which is below `1 - q` for `m > nu`.
+            `FactorPrior`'s default variance estimator divides by `T - 1`. Both levels are
+            measured over 400 fits of 50 Gaussian assets, 20000 draws, whose standard error
+            is about 0.002.
+            =#
+            rngl946 = StableRNG(946)
+            Tl946, Nl946, Kl946, q946 = 30, 50, 3, 0.05
+            nu946 = Tl946 - Kl946 - 1
+            dtrue946 = 0.0004 .* (1 .+ rand(rngl946, Nl946))
+            hits_nu946 = 0
+            hits_var946 = 0
+            for _ in 1:400
+                F946 = randn(rngl946, Tl946, Kl946) * 0.01
+                Bl946 = randn(rngl946, Nl946, Kl946)
+                Xl946 = F946 * transpose(Bl946) .+
+                        randn(rngl946, Tl946, Nl946) .* transpose(sqrt.(dtrue946))
+                Z946 = hcat(ones(Tl946), F946)
+                E946 = Xl946 - Z946 * (Z946 \ Xl946)
+                rss946 = vec(sum(abs2, E946; dims = 1))
+                fprl946 = LowOrderPrior(; X = F946, mu = vec(mean(F946; dims = 1)),
+                                        sigma = cov(F946))
+                for (m946, dhat946) in
+                    ((nu946, rss946 ./ nu946), (Tl946 - 1, vec(var(E946; dims = 1))))
+                    prl946 = LowOrderPrior(; X = Xl946, mu = vec(mean(Xl946; dims = 1)),
+                                           sigma = cov(Xl946),
+                                           rr = Regression(; M = Bl946, b = zeros(Nl946),
+                                                           esigma = dhat946), fpr = fprl946)
+                    k946 = sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation(),
+                                                              q = q946), prl946).kappa
+                    h946 = count(dtrue946 .<= dhat946 .* (1 + k946))
+                    if m946 == nu946
+                        hits_nu946 += h946
+                    else
+                        hits_var946 += h946
+                    end
+                end
+            end
+            @test isapprox(hits_nu946 / (400 * Nl946), 1 - q946; atol = 0.01)
+            level946 = 1 -
+                       cdf(Chisq(nu946), (Tl946 - 1) * quantile(Chisq(nu946), q946) / nu946)
+            @test isapprox(hits_var946 / (400 * Nl946), level946; atol = 0.01)
+            @test level946 < 1 - q946 - 0.03
+        end
     end
 
     #=

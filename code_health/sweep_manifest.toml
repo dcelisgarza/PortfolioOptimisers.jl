@@ -287,7 +287,7 @@
 "src/11_UncertaintySets/07_CompactUncertaintySets.jl" = { map = 7, units = 5, swept = false }
 "src/11_UncertaintySets/08_NormBallUncertaintySets.jl" = { map = 7, units = 13, swept = false }
 "src/11_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { map = 7, units = 16, swept = false }
-"src/11_UncertaintySets/10_CompactRadiusRules.jl" = { map = 7, units = 6, swept = false }
+"src/11_UncertaintySets/10_CompactRadiusRules.jl" = { map = 7, units = 6, algorithm = 5, swept = true, bindings = ["ResidualInflation", "VarianceFraction", "compact_radius_dof", "compact_radius_sample_size", "compact_reference_weights", "k_compact"] }
 "src/12_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true, bindings = ["TnE_Tn", "TnE_Tn_VecTnE_Tn", "Tn_VecTn", "Turnover", "TurnoverEstimator", "VecTn", "VecTnE_Tn", "factory", "factory", "factory", "needs_previous_weights", "port_opt_view", "turnover_constraints", "turnover_constraints", "turnover_constraints"] }
 "src/13_Fees.jl" = { map = 8, units = 38, algorithm = 24, swept = false }
 "src/14_NetReturnsDrawdowns.jl" = { map = 8, units = 48, algorithm = 11, swept = false }

@@ -288,7 +288,7 @@ Where:
   - ``\\mathbf{\\Lambda}``: Scaling the [`AbstractOrthogonalScaling`](@ref) names, ``r \\times r``.
   - ``\\mathbf{L}``: Geometry map of the mean set.
   - ``\\kappa_{\\boldsymbol{\\mu}}``: Radius of the mean set, at ``r`` degrees of freedom.
-  - ``\\mathbf{C}``: Diagonal metric square root of the covariance set.
+  - $(math_dict[:C_cpt])
 
 The rank of the mean set is the dimension of the Orthogonal Subspace, not the number of assets, because a flat set is a confidence region of its own subspace and not of the ambient space. A model whose loadings span the whole cross-section leaves ``r = 0``, a radius of zero, and no correction at all.
 

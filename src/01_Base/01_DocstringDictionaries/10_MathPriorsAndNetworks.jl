@@ -1,4 +1,5 @@
-# `math_dict`: entropy pooling, phylogeny, centrality, clusters and preselection.
+# `math_dict`: entropy pooling, phylogeny, centrality, clusters, preselection and the compact
+# covariance set.
 # `01_Tables.jl` declares the table. `unique_key_dict!` refuses a key that another
 # entry holds with a different description, in this file or in another one.
 unique_key_dict!(math_dict, :math_dict,
@@ -53,4 +54,10 @@ unique_key_dict!(math_dict, :math_dict,
                  # The online step of the prior family. `12_PriorPartialFit.jl` states each
                  # read-out as the batch prior of the rows it folded.
                  :P_batch_prior => "``\\mathcal{P}(\\cdot)``: Batch prior, the result that the estimator's batch verb gives on the matrices in the parentheses.",#
-                 :P_fold_prior => "``\\mathcal{P}_T``: Folded prior, the result that the estimator's read-out gives after it folds the observations ``\\boldsymbol{x}_1, \\ldots, \\boldsymbol{x}_T`` in order, one at a time or in blocks of any size.")
+                 :P_fold_prior => "``\\mathcal{P}_T``: Folded prior, the result that the estimator's read-out gives after it folds the observations ``\\boldsymbol{x}_1, \\ldots, \\boldsymbol{x}_T`` in order, one at a time or in blocks of any size.",#
+                 # The compact covariance set and the rules that size its radius.
+                 # `10_CompactRadiusRules.jl` states both rules over these symbols, and
+                 # `09_OrthogonalUncertaintySets.jl` builds the set from them.
+                 :kappa_cpt => "``\\kappa \\geq 0``: Radius of the compact covariance set, the multiplier of its penalty.",#
+                 :C_cpt => "``\\mathbf{C}``: Diagonal metric square root of the covariance set.",#
+                 :Q_cpt => "``\\mathbf{Q}``: Orthonormal basis of the weighted factor span.")
