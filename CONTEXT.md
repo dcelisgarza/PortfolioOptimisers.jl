@@ -873,6 +873,10 @@ The problem data fed to a Finite Allocation optimiser: target weights, asset pri
 A fee charged inside a Finite Allocation, on the money in each position rather than on a weight. The allocator holds the share counts and the prices, so `shares ⊙ prices` is that money exactly. The charge enters the budget constraint of each sub-problem and never its objective, so every unit of fee competes with a unit of position, and the result carries the charge it paid. The cash held before the trade is a field of the FiniteAllocationInput, because the turnover term prices the money traded. See ADR 0123.
 *Avoid*: a fee taken out of the cash before the allocation runs, and any fee priced as a rate times a weight times a price, which names no quantity.
 
+**Collateral Algorithm**
+The rule that gives each side of a Finite Allocation its cash. The short side trades first, so the rule gives the short side its cash from the target weights and the cash, and the long side its cash from the money that the short side sold and the fee that it paid. It is a field of the FiniteAllocationInput, not of the allocator, so every allocator of a fallback chain reads one rule. **ProceedsCollateral** (the default) spends the short proceeds on the long side and bounds the net money of the book. **CashCollateral** gives the short proceeds to no side and bounds the gross money of the book by a collateral amount, the cash when none is stated. See ADR 0180.
+*Avoid*: margin (a broker's requirement, which a Collateral Algorithm can model but does not name), budget (the sum of the target weights), and a rule whose sign changes with the budget.
+
 ## 5. Risk Measures
 
 **Risk Measure**

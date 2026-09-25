@@ -590,7 +590,7 @@ Where:
   - [`set_discrete_error!`](@ref)
   - [`set_allocation_fees!`](@ref)
   - [`setup_alloc_optim`](@ref)
-  - [`adjust_long_cash`](@ref)
+  - [`AbstractCollateralAlgorithm`](@ref)
 """
 function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
                                sf::Option{<:NamedTuple}, da::DiscreteAllocation,
@@ -656,17 +656,16 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
 end
 function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    w, p, cash, pcash, T, fees = fai.w, fai.prices, fai.cash, fai.prev_cash, fai.horizon,
-                                 fai.fees
-    bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, cash)
+    w, p, cash, pcash, T, fees, ca = fai.w, fai.prices, fai.cash, fai.prev_cash,
+                                     fai.horizon, fai.fees, fai.ca
+    lbgt, sbgt, lidx, sidx = setup_alloc_optim(w)
     lsf, ssf = allocation_side_fees(fees, T, pcash, lidx, sidx)
-    sshares, scost, sw, scash, sfee, sretcode, smodel = finite_sub_allocation(-view(w,
-                                                                                    sidx),
-                                                                              view(p, sidx),
-                                                                              scash, sbgt,
-                                                                              ssf, da,
-                                                                              str_names)
-    lcash = adjust_long_cash(bgt, lcash, scash)
+    sshares, scost, sw, _, sfee, sretcode, smodel = finite_sub_allocation(-view(w, sidx),
+                                                                          view(p, sidx),
+                                                                          ca(w, p, cash),
+                                                                          sbgt, ssf, da,
+                                                                          str_names)
+    lcash = ca(w, p, cash, sum(scost), sfee)
     lshares, lcost, lw, lcash, lfee, lretcode, lmodel = finite_sub_allocation(view(w, lidx),
                                                                               view(p, lidx),
                                                                               lcash, lbgt,
@@ -709,10 +708,10 @@ This method takes `da.fb === nothing` only. An allocator with a fallback goes th
 
 # Algorithm
 
- 1. Split the book into its long and its short side, and share the cash between them, with [`setup_alloc_optim`](@ref).
+ 1. Split the book into its long and its short side with [`setup_alloc_optim`](@ref).
  2. Split the fee into the charge of each side with [`allocation_side_fees`](@ref).
- 3. Solve the short side with [`finite_sub_allocation`](@ref), on its negated weights.
- 4. Correct the long side's cash with the cash the short side did not spend, with [`adjust_long_cash`](@ref).
+ 3. Solve the short side with [`finite_sub_allocation`](@ref), on its negated weights, with the short cash that `fai.ca` gives.
+ 4. Compute the long side's cash with `fai.ca`, from the money of the shares that the short side sold and the fee that it paid. See [`AbstractCollateralAlgorithm`](@ref).
  5. Solve the long side with [`finite_sub_allocation`](@ref).
  6. Recombine the two sides over the whole universe, and negate the short side's shares, cost and weights.
  7. Set `retcode` to an [`OptimisationFailure`](@ref) when either side failed, with one warning per failed side, and to an [`OptimisationSuccess`](@ref) otherwise.
@@ -720,14 +719,14 @@ This method takes `da.fb === nothing` only. An allocator with a fallback goes th
 # Arguments
 
   - `da`: The discrete allocation optimiser.
-  - `fai`: The [`FiniteAllocationInput`](@ref) carrying the target weights, the prices, the cash, and the optional horizon and fees.
+  - `fai`: The [`FiniteAllocationInput`](@ref) carrying the target weights, the prices, the cash, the collateral algorithm, and the optional horizon and fees.
   - `str_names`: Whether the JuMP variables get string names.
   - `save`: Whether the result keeps the two JuMP models.
   - `kwargs`: Accepted, so that every optimiser takes one call, and ignored.
 
 # Returns
 
-  - `res::DiscreteAllocationResult`: The realised allocation. `cash` is the cash the long side leaves, which holds what the short side did not spend, and `fees` is the sum of the two sides' fees.
+  - `res::DiscreteAllocationResult`: The realised allocation. `cash` is the cash that the long side leaves, and `fees` is the sum of the two sides' fees.
 
 # Related
 

@@ -113,14 +113,19 @@ unique_key_dict!(math_dict, :math_dict,
                  :m_money => "``\\boldsymbol{m} = \\boldsymbol{x} \\odot \\boldsymbol{p}``: Position money vector, the money in each position of one side.",#
                  :F_side_fee => "``F(\\boldsymbol{x})``: Side fee, the fee that one side pays over the whole horizon. It is zero when the input states no fee.",#
                  # A finite allocation splits the book into a long and a short side, and
-                 # charges each side's fee on money. `setup_alloc_optim`, `adjust_long_cash`
-                 # and the fee helpers of `01_Base_FiniteAllocation.jl` share these symbols.
+                 # charges each side's fee on money. `setup_alloc_optim`, the collateral
+                 # algorithms and the fee helpers of `01_Base_FiniteAllocation.jl` share
+                 # these symbols.
                  :C_tot_alloc => "``C_{\\text{tot}}``: Total cash of a finite allocation, the `cash` of [`FiniteAllocationInput`](@ref).",#
                  :b_alloc => "``b = \\sum_{i=1}^{N} w_i``: Total budget of a finite allocation, the sum of the target weights.",#
                  :b_L_alloc => "``b_L``: Long budget, the sum of the non-negative target weights.",#
                  :b_S_alloc => "``b_S``: Short budget, the negated sum of the negative target weights. It is non-negative.",#
-                 :C_L_alloc => "``C_L = C_{\\text{tot}}\\, b_L``: Long cash, the cash that the long side can spend before [`adjust_long_cash`](@ref) corrects it.",#
-                 :C_S_alloc => "``C_S = C_{\\text{tot}}\\, b_S``: Short cash, the cash that the short side can spend.",#
+                 :C_L_alloc => "``C_L = C_{\\text{tot}}\\, b_L``: Long target, the money of the long side at its target weights.",#
+                 :C_S_alloc => "``C_S = C_{\\text{tot}}\\, b_S``: Short target, the money of the short side at its target weights.",#
+                 :C_S_prime_alloc => "``C_S^{\\prime}``: Short cash, the cash that the short side can spend.",#
+                 :C_L_prime_alloc => "``C_L^{\\prime}``: Long cash, the cash that the long side can spend after the short side trades.",#
+                 :m_S_alloc => "``m_S``: Short money, the money of the shares that the short side sold. It is non-negative.",#
+                 :F_S_alloc => "``F_S``: Short fee, the fee that the short side paid over the whole horizon.",#
                  :T_alloc => "``T``: Allocation horizon, the number of periods over which a finite allocation charges its rates, the `horizon` of [`FiniteAllocationInput`](@ref).",#
                  :C_prev_alloc => "``C^{\\text{prev}}``: Previous cash, the cash that the portfolio held before the trade, the `prev_cash` of [`FiniteAllocationInput`](@ref).",#
                  :m_prev_alloc => "``\\boldsymbol{m}^{\\text{prev}}``: Previous money vector, the money in each position of one side before the trade.",#

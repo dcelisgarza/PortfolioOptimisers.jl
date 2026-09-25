@@ -809,39 +809,17 @@ end
     PO = PortfolioOptimisers
     rng = StableRNG(905)
 
-    # `setup_alloc_optim`: the budgets and the side cash of its `# Mathematical definition`,
-    # and the two consequences it states.
+    # `setup_alloc_optim`: the two side budgets of its `# Mathematical definition`, and the
+    # consequence it states.
     w = [0.5, -0.2, 0.0, 0.7]
-    C = 100.0
-    bgt, lbgt, sbgt, lidx, sidx, lcash, scash = PO.setup_alloc_optim(w, C)
-    @test (bgt, lbgt, sbgt, lcash, scash) == (1.0, 1.2, 0.2, 120.0, 20.0)
+    lbgt, sbgt, lidx, sidx = PO.setup_alloc_optim(w)
+    @test (lbgt, sbgt) == (1.2, 0.2)
     @test lidx == [true, false, true, true]
     @test sidx == .!lidx
-    @test bgt ≈ lbgt - sbgt
-    @test lcash - scash ≈ C * bgt
-    bgt, lbgt, sbgt, lidx, sidx, lcash, scash = PO.setup_alloc_optim([0.5, 0.0, 0.5], C)
+    @test sum(w) ≈ lbgt - sbgt
+    lbgt, sbgt, lidx, sidx = PO.setup_alloc_optim([0.5, 0.0, 0.5])
     @test isempty(sidx) && all(lidx)
-    @test (lbgt, sbgt, lcash, scash) == (1.0, 0.0, 100.0, 0.0)
-
-    # `adjust_long_cash`: the two branches of its `# Mathematical definition`. From a unit
-    # budget up, the net money of the book is `C b`.
-    @test PO.adjust_long_cash(1.0, 130.0, 3.0) == 127.0
-    @test PO.adjust_long_cash(1.2, 150.0, 3.0) == 147.0
-    @test PO.adjust_long_cash(0.5, 80.0, 3.0) == 83.0
-    @test PO.adjust_long_cash(0.5, 80.0, 0.0) == 80.0
-    @test PO.adjust_long_cash(1.0, 130.0, 0.0) == 130.0
-    # Through the allocator: the short side cannot sell one share, so it leaves its cash.
-    alloc(w) = optimise(GreedyAllocation(),
-                        FiniteAllocationInput(; w = w, prices = [1.0, 1000.0],
-                                              cash = 100.0))
-    r = alloc([1.3, -0.3])
-    @test collect(r.shares) == [100.0, 0.0]
-    # Below a unit budget the long side takes the short side's unspent cash, and spends
-    # more than the cash of the allocation, as the docstring states.
-    r = alloc([0.9, -0.8])
-    @test collect(r.shares) == [170.0, 0.0]
-    r = alloc([0.5, -0.5])
-    @test collect(r.shares) == [100.0, 0.0]
+    @test (lbgt, sbgt) == (1.0, 0.0)
 
     # `allocation_turnover_money`: a position that changes side has a negative previous
     # money, and the short side's money is negated.
@@ -938,4 +916,102 @@ end
     @test_throws PO.IsNothingError FiniteAllocationInput(; w = [1.0], prices = [1.0],
                                                          fees = Fees(; l = 0.01))
     @test FiniteAllocationInput(; w = [1.0], prices = [1.0], cash = 5.0).prev_cash == 5.0
+end
+@testset "The collateral algorithms against their docstrings (#1337)" begin
+    using PortfolioOptimisers, Test, StableRNGs, HiGHS
+    PO = PortfolioOptimisers
+
+    # The two methods of each algorithm against its `# Mathematical definition`. With
+    # C = 100 and w = [1.2, -0.5]: b = 0.7, b_L = 1.2, b_S = 0.5, C_L = 120 and C_S = 50.
+    w = [1.2, -0.5]
+    p = [1.0, 1000.0]
+    C = 100.0
+    pc = ProceedsCollateral()
+    @test pc(w, p, C) ≈ 50.0
+    # The whole target sold with no fee gives the long target back.
+    @test pc(w, p, C, 50.0, 0.0) ≈ 120.0
+    @test pc(w, p, C, 30.0, 2.0) ≈ 70.0 + 30.0 - 2.0
+    @test pc(w, p, C, 0.0, 0.0) ≈ 70.0
+    # A book with b < 0 whose short side sells nothing buys nothing long.
+    @test pc([0.2, -0.5], p, C, 0.0, 0.0) == 0.0
+    # A long-only book: no short cash, and the long target.
+    @test iszero(pc([0.5, 0.5], p, C))
+    @test pc([0.5, 0.5], p, C, 0.0, 0.0) ≈ 100.0
+
+    cc = CashCollateral()
+    @test isnothing(cc.amount)
+    @test cc(w, p, C) ≈ 50.0
+    # K = C binds: min(C (b_L + b_S), K) = min(170, 100).
+    @test cc(w, p, C, 0.0, 0.0) ≈ 100.0
+    @test cc(w, p, C, 30.0, 2.0) ≈ 68.0
+    # A large K: the long target plus the collateral that the short side did not use.
+    ck = CashCollateral(; amount = 1000.0)
+    @test ck(w, p, C, 0.0, 0.0) ≈ 120.0 + 50.0
+    @test ck(w, p, C, 50.0, 0.0) ≈ 120.0
+    # A small K caps the short side too, and the long side then gets nothing.
+    cs = CashCollateral(; amount = 30.0)
+    @test cs(w, p, C) ≈ 30.0
+    @test iszero(cs(w, p, C, 30.0, 0.0))
+    # A long-only book above a unit budget is capped at K.
+    @test cc([0.9, 0.6], p, C, 0.0, 0.0) ≈ 100.0
+    @test_throws DomainError CashCollateral(; amount = 0.0)
+    @test_throws DomainError CashCollateral(; amount = -1)
+
+    # The input holds the algorithm, and the default is `ProceedsCollateral`.
+    fai = FiniteAllocationInput(; w = w, prices = p, cash = C)
+    @test fai.ca === ProceedsCollateral()
+    @test FiniteAllocationInput(; w = w, prices = p, cash = C, ca = cc).ca === cc
+
+    # The rows of #1337. The short side cannot sell one share at a price of 1000, so it
+    # leaves its whole cash. Under the default the long side spends `C b`, a continuous rule,
+    # and under `CashCollateral()` it never spends more than the cash.
+    mip = Solver(; name = :highs1337, solver = HiGHS.Optimizer,
+                 settings = Dict("log_to_console" => false),
+                 check_sol = (; allow_local = true, allow_almost = true))
+    rows = [[1.3, -0.3], [0.5, -0.5], [1.2, -0.5], [0.9, -0.8], [1.0999, -0.1], [1.1, -0.1]]
+    proceeds = [100.0, 0.0, 70.0, 10.0, 99.0, 100.0]
+    for alg in (GreedyAllocation(), DiscreteAllocation(; slv = mip, fb = nothing))
+        alloc(w, ca) = collect(optimise(alg,
+                                        FiniteAllocationInput(; w = w, prices = p, cash = C,
+                                                              ca = ca)).shares)
+        for (w, n) in zip(rows, proceeds)
+            @test alloc(w, ProceedsCollateral()) == [n, 0.0]
+            @test alloc(w, CashCollateral()) == [100.0, 0.0]
+        end
+    end
+
+    # The cash identity of each algorithm, on books whose short side sells and pays a fee.
+    # `sum(cost)` is the long money less the short money, and `fees` holds both sides' fees,
+    # so the reported cash is the long cash less the long money and the long fee. A long
+    # cash floored at zero buys nothing and pays no fee here, so its cash is zero.
+    rng = StableRNG(1337)
+    fees = Fees(; l = 0.002, s = 0.003, fl = 0.5, fs = 0.7)
+    for _ in 1:20
+        w = randn(rng, 6) / 3
+        p = 5.0 .+ 50.0 * rand(rng, 6)
+        C = 1000.0 + 5000.0 * rand(rng)
+        for ga in (GreedyAllocation(), DiscreteAllocation(; slv = mip, fb = nothing))
+            fai = FiniteAllocationInput(; w = w, prices = p, cash = C, horizon = 3,
+                                        fees = fees)
+            r = optimise(ga, fai)
+            cost = collect(r.cost)
+            @test r.cash ≈ max(0.0, C * sum(w) - sum(cost) - r.fees) atol = 1e-8
+            K = 0.9 * C
+            fai = FiniteAllocationInput(; w = w, prices = p, cash = C, horizon = 3,
+                                        fees = fees, ca = CashCollateral(; amount = K))
+            r = optimise(ga, fai)
+            cost = collect(r.cost)
+            @test r.cash ≈ max(0.0, min(C * sum(abs, w), K) - sum(abs, cost) - r.fees) atol = 1e-8
+            @test sum(abs, cost) + r.fees <= min(C * sum(abs, w), K) + 1e-8
+        end
+    end
+
+    # A fallback chain reads one rule, because the input holds it. A solver-less head fails,
+    # and its greedy fallback answers with the head's collateral algorithm.
+    fai = FiniteAllocationInput(; w = [1.2, -0.5], prices = [1.0, 1000.0], cash = 100.0,
+                                ca = CashCollateral())
+    da0 = DiscreteAllocation(; slv = Solver(; name = :none, solver = nothing))
+    r = @test_logs((:warn,), match_mode = :any, optimise(da0, fai))
+    @test collect(r.shares) == collect(optimise(GreedyAllocation(), fai).shares)
+    @test collect(r.shares) == [100.0, 0.0]
 end

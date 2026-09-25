@@ -433,13 +433,13 @@ function finite_sub_allocation!(w::VecNum, p::VecNum, cash::Number, bgt::Number,
     return view(shares, idx), view(cost, idx), view(aw, idx), acash, fee
 end
 function _optimise(ga::GreedyAllocation, fai::FiniteAllocationInput; kwargs...)
-    w, p, cash, pcash, T, fees = fai.w, fai.prices, fai.cash, fai.prev_cash, fai.horizon,
-                                 fai.fees
-    bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, cash)
+    w, p, cash, pcash, T, fees, ca = fai.w, fai.prices, fai.cash, fai.prev_cash,
+                                     fai.horizon, fai.fees, fai.ca
+    lbgt, sbgt, lidx, sidx = setup_alloc_optim(w)
     lsf, ssf = allocation_side_fees(fees, T, pcash, lidx, sidx)
-    sshares, scost, sw, scash, sfee = finite_sub_allocation!(-view(w, sidx), view(p, sidx),
-                                                             scash, sbgt, ssf, ga)
-    lcash = adjust_long_cash(bgt, lcash, scash)
+    sshares, scost, sw, _, sfee = finite_sub_allocation!(-view(w, sidx), view(p, sidx),
+                                                         ca(w, p, cash), sbgt, ssf, ga)
+    lcash = ca(w, p, cash, sum(scost), sfee)
     lshares, lcost, lw, lcash, lfee = finite_sub_allocation!(view(w, lidx), view(p, lidx),
                                                              lcash, lbgt, lsf, ga)
     res = Matrix{eltype(w)}(undef, length(w), 3)
@@ -464,10 +464,10 @@ This method takes a `GreedyAllocation` with no fallback. The generic `optimise` 
 
 # Algorithm
 
- 1. Split the target weights into the long and the short side, and share the cash between them, with [`setup_alloc_optim`](@ref).
+ 1. Split the target weights into the long and the short side with [`setup_alloc_optim`](@ref).
  2. Split the fee into the charge of each side with [`allocation_side_fees`](@ref).
- 3. Allocate the short side on its negated weights with [`finite_sub_allocation!`](@ref).
- 4. Correct the long side's cash with the cash that the short side did not spend, with [`adjust_long_cash`](@ref).
+ 3. Allocate the short side on its negated weights with [`finite_sub_allocation!`](@ref), with the short cash that `fai.ca` gives.
+ 4. Compute the long side's cash with `fai.ca`, from the money of the shares that the short side sold and the fee that it paid. See [`AbstractCollateralAlgorithm`](@ref).
  5. Allocate the long side with [`finite_sub_allocation!`](@ref).
  6. Negate the short side's shares, costs and weights, and put the two sides into one vector per quantity, in the caller's asset order.
  7. Return the long side's leftover cash as `cash`, and the sum of the fees of the two sides as `fees`.
@@ -475,7 +475,7 @@ This method takes a `GreedyAllocation` with no fallback. The generic `optimise` 
 # Arguments
 
   - `ga`: The greedy allocation optimiser to use.
-  - `fai`: The [`FiniteAllocationInput`](@ref) that holds the target weights, the prices, the cash, and the optional horizon and fees.
+  - `fai`: The [`FiniteAllocationInput`](@ref) that holds the target weights, the prices, the cash, the collateral algorithm, and the optional horizon and fees.
   - `kwargs`: Ignored.
 
 # Returns

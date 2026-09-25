@@ -356,7 +356,7 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { cyc = 9, cog = 8, arg = 15, cyc_sum = 76, cog_sum = 42, arg_sum = 70, macros = ["@propagatable"] }
 "src/17_Optimisation/06_Meta/03_Stacking.jl" = { cyc = 9, cog = 11, arg = 14, cyc_sum = 48, cog_sum = 34, arg_sum = 49, macros = ["@propagatable"] }
 "src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { cyc = 6, cog = 7, arg = 16, cyc_sum = 44, cog_sum = 32, arg_sum = 66, macros = ["@propagatable"] }
-"src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 34, cog_sum = 23, arg_sum = 50, macros = [] }
+"src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { cyc = 5, cog = 5, arg = 8, cyc_sum = 37, cog_sum = 22, arg_sum = 64, macros = [] }
 "src/17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl" = { cyc = 6, cog = 9, arg = 11, cyc_sum = 28, cog_sum = 24, arg_sum = 61, macros = [] }
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { cyc = 9, cog = 14, arg = 7, cyc_sum = 23, cog_sum = 20, arg_sum = 38, macros = [] }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { cyc = 2, cog = 2, arg = 2, cyc_sum = 15, cog_sum = 6, arg_sum = 15, macros = [] }

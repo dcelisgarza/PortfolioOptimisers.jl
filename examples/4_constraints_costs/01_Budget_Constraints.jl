@@ -167,7 +167,10 @@ buys whole shares, and the costs differ from those numbers by the price of less 
 of each asset.
 
 The discrete allocation splits the cash between the long and the short positions from the
-weights, so you do not split it yourself.
+weights, so you do not split it yourself. By default the short sales pay for the long positions,
+which is what `ProceedsCollateral` states. The last line is `true` when the costs plus the
+remaining cash equal the cash times the budget, which is zero here. `CashCollateral` is the other
+rule: the short sales give no cash, and the long and short costs together stay within the cash.
 =#
 
 mip_res2 = optimise(da,
@@ -180,7 +183,7 @@ println("long cost + short cost = cost = $(sum(mip_res2.cost))")
 println("long cost: $(sum(mip_res2.cost[mip_res2.cost .>= zero(eltype(mip_res2.cost))]))")
 println("short cost: $(sum(mip_res2.cost[mip_res2.cost .< zero(eltype(mip_res2.cost))]))")
 println("remaining cash: $(mip_res2.cash)")
-println("used cash ≈ available cash: $(isapprox(sum(abs.(mip_res2.cost)) + mip_res2.cash, 4206.9 * sum(abs.(res2.w))))")
+println("used cash ≈ available cash: $(isapprox(sum(mip_res2.cost) + mip_res2.cash, 4206.9 * sum(res2.w); atol = 1e-6))")
 
 #=
 #### 3.1.3 Short-only portfolio
@@ -267,7 +270,7 @@ println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res5.w))")
 
 #=
 This time we allocate `4506.9` units of cash. The long and short costs sum to about half of it,
-because the budget is 0.5.
+because the budget is 0.5, and the costs plus the remaining cash equal half of it.
 =#
 
 mip_res5 = optimise(da,
@@ -280,7 +283,7 @@ println("long cost + short cost = cost = $(sum(mip_res5.cost))")
 println("long cost: $(sum(mip_res5.cost[mip_res5.cost .>= zero(eltype(mip_res5.cost))]))")
 println("short cost: $(sum(mip_res5.cost[mip_res5.cost .< zero(eltype(mip_res5.cost))]))")
 println("remaining cash: $(mip_res5.cash)")
-println("used cash ≈ available cash: $(isapprox(sum(abs.(mip_res5.cost)) + mip_res5.cash, 4506.9 * sum(abs.(res5.w))))")
+println("used cash ≈ available cash: $(isapprox(sum(mip_res5.cost) + mip_res5.cash, 4506.9 * sum(res5.w)))")
 
 #=
 We plot the weights of the five portfolios side by side.
