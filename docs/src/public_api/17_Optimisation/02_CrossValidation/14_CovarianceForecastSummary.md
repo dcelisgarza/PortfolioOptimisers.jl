@@ -13,3 +13,10 @@ covariance_forecast_summary
 covariance_forecast_compare
 covariance_forecast_portfolio
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

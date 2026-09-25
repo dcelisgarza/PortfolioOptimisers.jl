@@ -421,6 +421,52 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         # Without the forecasts there is nothing to re-project.
         @test isnothing(rerun.sigma)
         @test isnothing(rerun.location)
+        # An online state updates its location in place, so each step stores its own copy
+        # and the re-projection of an online run reproduces its columns too (#1028).
+        o = cfe(Covariance(), rdg, online_cv; store_forecasts = true)
+        @test o.location[1] !== o.location[2]
+        @test o.location[1] != o.location[end]
+        op = covariance_forecast_portfolio(o, rdg, nothing)
+        @test op.standardised_return == o.standardised_return
+        @test op.portfolio_qlike == o.portfolio_qlike
+    end
+
+    @testset "The summary and the comparison at their edges (#1028)" begin
+        # One step: the Mahalanobis columns are that step's ratio, and the bias statistic,
+        # a sample standard deviation over the steps, is NaN with its percentiles.
+        one = cfe(Covariance(), rd, IndexWalkForward(T - h, h))
+        @test length(one.dates) == 1
+        s1 = covariance_forecast_summary(one)
+        @test s1.mahalanobis_mean == one.mahalanobis_ratio
+        @test s1.mahalanobis_p5 == one.mahalanobis_ratio
+        @test all(isnan,
+                  (s1.bias_statistic[1], s1.bias_p5[1], s1.bias_p25[1], s1.bias_p75[1],
+                   s1.bias_p95[1]))
+        @test isfinite(s1.portfolio_qlike_mean[1])
+        @test isnan(po.summary_quantile([1.0, NaN, 3.0], 0.5))
+        @test po.summary_quantile([1.0, 2.0, 3.0], 0.25) == quantile([1.0, 2.0, 3.0], 0.25)
+        # A listing and a delisting change the active count under an index walk-forward,
+        # so the Mahalanobis mean weights each step by N_t h and is not the plain mean. The
+        # diagonal mean weights each step by h alone, so it is the plain mean.
+        g = cfe(Covariance(), rdg, batch_cv)
+        @test length(unique(g.n_valid)) > 1
+        sg = covariance_forecast_summary(g)
+        nu = g.n_valid .* g.horizon
+        @test sg.mahalanobis_mean[1] ≈ dot(nu, g.mahalanobis_ratio) / sum(nu)
+        @test !isapprox(sg.mahalanobis_mean[1], mean(g.mahalanobis_ratio); rtol = 1e-4)
+        dbar = [mean(filter(isfinite, r)) for r in eachrow(g.diagonal_ratio)]
+        @test sg.diagonal_mean[1] ≈ mean(dbar)
+        # The default lags are the largest horizon less one, capped at M - 1.
+        two = cfe(Covariance(), rd, IndexWalkForward(T - 2h, h))
+        two_b = cfe(ExpWeightedCovariance(; decay = 0.8), rd, IndexWalkForward(T - 2h, h))
+        @test length(two.dates) == 2
+        c2 = covariance_forecast_compare(two, two_b)
+        @test c2.lags == 1
+        @test c2.variance ≈ covariance_forecast_compare(two, two_b; lags = 1).variance
+        # The Bartlett weights keep the long-run variance non-negative, even on an
+        # alternating series whose autocovariances are all of the largest size.
+        alt = [(-1.0)^t for t in 1:9]
+        @test all(l -> po.newey_west_variance(alt, l) >= 0, 0:8)
     end
 
     @testset "Every refusal by name" begin

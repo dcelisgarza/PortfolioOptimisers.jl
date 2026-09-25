@@ -886,7 +886,8 @@ function covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator
                          train_idx = train_idx, test_idx = test_idx, cv = cv) do fold
         sigma, c = forecast_moments(fold.est, fold.rd, fold.train)
         step = covariance_forecast_step(sigma, view(fold.rd.X, fold.test, :), c, w, target)
-        return store_forecasts ? (; step..., sigma = sigma, location = c) : step
+        # An online state updates its location in place, so a stored step keeps a copy.
+        return store_forecasts ? (; step..., sigma = copy(sigma), location = copy(c)) : step
     end
     X = rd.X
     N = size(X, 2)

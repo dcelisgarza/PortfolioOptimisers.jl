@@ -222,4 +222,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :bhatia2007 => "[bhatia2007](@cite) R. Bhatia. *Positive Definite Matrices* (Princeton University Press, 2007).",#
                  :musolas2021 => "[musolas2021](@cite) A. Musolas, S. T. Smith and Y. Marzouk. *Geodesically parameterized covariance estimation*. SIAM Journal on Matrix Analysis and Applications 42, 528–556 (2021).",#
                  :schaferstrimmer2005 => "[schaferstrimmer2005](@cite) J. Schäfer and K. Strimmer. *A shrinkage approach to large-scale covariance matrix estimation and implications for functional genomics*. Statistical Applications in Genetics and Molecular Biology 4, Article 32 (2005).",#
-                 :joanesgill1998 => "[joanesgill1998](@cite) D. N. Joanes and C. A. Gill. *Comparing measures of sample skewness and kurtosis*. Journal of the Royal Statistical Society: Series D (The Statistician) 47, 183–189 (1998).")
+                 :joanesgill1998 => "[joanesgill1998](@cite) D. N. Joanes and C. A. Gill. *Comparing measures of sample skewness and kurtosis*. Journal of the Royal Statistical Society: Series D (The Statistician) 47, 183–189 (1998).",#
+                 :dieboldmariano1995 => "[dieboldmariano1995](@cite) F. X. Diebold and R. S. Mariano. *Comparing predictive accuracy*. Journal of Business & Economic Statistics 13, 253–263 (1995).",#
+                 :west1996 => "[west1996](@cite) K. D. West. *Asymptotic inference about predictive ability*. Econometrica 64, 1067–1084 (1996).",#
+                 :neweywest1987 => "[neweywest1987](@cite) W. K. Newey and K. D. West. *A simple, positive semi-definite, heteroskedasticity and autocorrelation consistent covariance matrix*. Econometrica 55, 703–708 (1987).")

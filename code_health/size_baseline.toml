@@ -34,7 +34,7 @@ commit = "0ecb3ce47c"
 "src/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.jl" = { code = 31, doc = 0, comment = 21, blank = 0, total = 52 }
 "src/01_Base/01_DocstringDictionaries/11_MathRiskAndOptimisation.jl" = { code = 77, doc = 0, comment = 36, blank = 0, total = 113 }
 "src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { code = 86, doc = 0, comment = 16, blank = 0, total = 102 }
-"src/01_Base/01_DocstringDictionaries/13_References.jl" = { code = 222, doc = 0, comment = 3, blank = 0, total = 225 }
+"src/01_Base/01_DocstringDictionaries/13_References.jl" = { code = 225, doc = 0, comment = 3, blank = 0, total = 228 }
 "src/01_Base/02_TypeRoots.jl" = { code = 20, doc = 241, comment = 0, blank = 115, total = 376 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -294,8 +294,8 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { code = 102, doc = 71, comment = 11, blank = 24, total = 208 }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { code = 34, doc = 39, comment = 0, blank = 18, total = 91 }
 "src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { code = 50, doc = 106, comment = 1, blank = 30, total = 187 }
-"src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { code = 309, doc = 448, comment = 4, blank = 163, total = 924 }
-"src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { code = 168, doc = 263, comment = 0, blank = 69, total = 500 }
+"src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { code = 309, doc = 448, comment = 5, blank = 163, total = 925 }
+"src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { code = 173, doc = 310, comment = 0, blank = 90, total = 573 }
 "src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { code = 155, doc = 272, comment = 2, blank = 127, total = 556 }
 "src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl" = { code = 280, doc = 617, comment = 5, blank = 258, total = 1160 }
 "src/17_Optimisation/03_NaiveOptimisation.jl" = { code = 463, doc = 734, comment = 35, blank = 225, total = 1457 }
