@@ -232,8 +232,8 @@ The model's `:fees` expression holds the per period terms `l`, `s`, `tn` and `lq
 
  1. When the series is registered under `prefix`, return it.
  2. Build the portfolio return series with [`set_portfolio_returns!`](@ref), giving `Xe`.
- 3. When the model holds no `:fees`, register `Xe` as the net series and return it.
- 4. Subtract `:fees` from each entry of `Xe`, giving `net`.
+ 3. When the model holds neither `:fees` nor `:one_time_fees`, register `Xe` as the net series and return it.
+ 4. Subtract `:fees`, or zero when the model holds none, from each entry of `Xe`, giving `net`.
  5. When the model holds `:one_time_fees` and `net` is not empty, charge them on the clock `:fee_fa` with [`charge_one_time_fees`](@ref), over the count [`get_T`](@ref).
  6. Register `net` and return it.
 
@@ -247,9 +247,9 @@ Where:
 
   - $(math_dict[:x_t_obs])
   - $(math_dict[:w_port])
-  - ``f_r``: The per period fee, `:fees`, or zero when the model holds none.
-  - ``f_o``: The one-off fee, `:one_time_fees`, or zero when the model holds none.
-  - ``c_t``: The share of the one-off fee that observation ``t`` pays. Under a `nothing` or [`FirstObservationFees`](@ref) clock ``c_1 = 1`` and ``c_t = 0`` for ``t > 1``. Under an [`AmortisedFees`](@ref) clock ``c_t = 1 / T``.
+  - $(math_dict[:f_r_fee]) It is zero when the model holds none.
+  - $(math_dict[:f_o_fee]) It is zero when the model holds none.
+  - $(math_dict[:c_t_one_off])
   - $(math_dict[:T])
 
 # Arguments
@@ -276,10 +276,12 @@ function set_net_portfolio_returns!(model::JuMP.Model, X::MatNum;
     Xe = set_portfolio_returns!(model, X; prefix = prefix)
     # `:fees` and `:one_time_fees` are shared and not recreated by a nested build, so both
     # are read bare.
-    if !haskey(model, :fees)
+    if !haskey(model, :fees) && !haskey(model, :one_time_fees)
         return state_set!(model, prefix, :net_X, JuMP.@expression(model, Xe))
     end
-    fees = model[:fees]
+    # A fee with fixed terms alone registers `:one_time_fees` and no `:fees`. The broadcast
+    # still builds new expressions, so the charge below never writes into `Xe`.
+    fees = haskey(model, :fees) ? model[:fees] : zero(eltype(Xe))
     net = JuMP.@expression(model, Xe .- fees)
     if haskey(model, :one_time_fees) && !isempty(net)
         # The clock the fee states decides where the two fixed terms land, exactly as

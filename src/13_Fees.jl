@@ -408,6 +408,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - The constructor checks `l`, `s`, `fl` and `fs` with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - The `val` of `tn`, `lq` and `flq` is finite. [`Turnover`](@ref) accepts a `+Inf` rate, which is an uncapped bound, but a fee rate of `+Inf` gives the model an infinite coefficient.
 
 ## Propagated parameters
 
@@ -538,6 +539,11 @@ Fees
         assert_nonempty_nonneg_finite_val(s, :s)
         assert_nonempty_nonneg_finite_val(fl, :fl)
         assert_nonempty_nonneg_finite_val(fs, :fs)
+        # A `Turnover` lets a `+Inf` rate through, because as a bound it is the uncapped cap.
+        # As a fee it prices a trade at infinity, and the model cannot hold that coefficient.
+        isnothing(tn) || assert_finite(tn.val, "tn.val")
+        isnothing(lq) || assert_finite(lq.val, "lq.val")
+        isnothing(flq) || assert_finite(flq.val, "flq.val")
         return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs), typeof(lq),
                    typeof(flq), typeof(fa), typeof(kwargs), typeof(imsk)}(tn, l, s, fl, fs,
                                                                           lq, flq, fa,

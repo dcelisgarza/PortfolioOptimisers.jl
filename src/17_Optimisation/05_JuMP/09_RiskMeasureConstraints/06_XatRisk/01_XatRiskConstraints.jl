@@ -397,7 +397,7 @@ function mip_fees_keep_spread(model::JuMP.Model, ::NetReturnsRiskSeries)
            isa(shared_get(model, :fee_fa), AmortisedFees)
 end
 function mip_fees_keep_spread(model::JuMP.Model, ::DrawdownRiskSeries)
-    return !shared_has(model, :fees)
+    return !shared_has(model, :fees) && !shared_has(model, :one_time_fees)
 end
 """
     mip_big_m(model::JuMP.Model, b::Option{<:Number}, s::Number,

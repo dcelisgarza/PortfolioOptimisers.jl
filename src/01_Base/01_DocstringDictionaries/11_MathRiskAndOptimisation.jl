@@ -92,6 +92,10 @@ unique_key_dict!(math_dict, :math_dict,
                  # The risk measure layer of a JuMP model.
                  :R_i_riskvec => "``\\mathcal{R}_i``: Entry ``i`` of `risk_vec`, the risk expression of the ``i``-th risk measure times the `scale` of the measure.",#
                  :rhat_t_net => "``\\hat{r}_t``: Net portfolio return at observation ``t``, ``\\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` less the fees charged at ``t``.",#
+                 # The two fee expressions of a JuMP model, and the clock of the second.
+                 :f_r_fee => "``f_r``: Per period fee, the model's `:fees` expression. Each observation of the net return series pays it in full.",#
+                 :f_o_fee => "``f_o``: One-off fee, the model's `:one_time_fees` expression. The holding period pays it one time.",#
+                 :c_t_one_off => "``c_t``: Charge fraction of observation ``t``, the part of ``f_o`` that the observation pays. Under a `nothing` or [`FirstObservationFees`](@ref) clock ``c_1 = 1`` and ``c_t = 0`` for ``t > 1``. Under an [`AmortisedFees`](@ref) clock ``c_t = 1 / T``.",#
                  :dd_t_model => "``dd_t``: Drawdown variable of observation ``t``, with ``dd_0 = 0``. The rows hold it at or above the drawdown ``-d_t``.",#
                  :s_t_series => "``s_t``: Entry ``t`` of the series that a conic risk measure reduces. It carries the sign of a return, so a loss is a negative entry.",#
                  # Second-moment formulations.

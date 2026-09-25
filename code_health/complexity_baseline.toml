@@ -240,7 +240,7 @@ commit = "0ecb3ce47c"
 "src/11_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { cyc = 4, cog = 5, arg = 6, cyc_sum = 35, cog_sum = 16, arg_sum = 72, macros = [] }
 "src/11_UncertaintySets/10_CompactRadiusRules.jl" = { cyc = 6, cog = 8, arg = 8, cyc_sum = 21, cog_sum = 16, arg_sum = 32, macros = [] }
 "src/12_Turnover.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 18, cog_sum = 11, arg_sum = 9, macros = ["@propagatable"] }
-"src/13_Fees.jl" = { cyc = 3, cog = 5, arg = 4, cyc_sum = 92, cog_sum = 31, arg_sum = 160, macros = ["@propagatable"] }
+"src/13_Fees.jl" = { cyc = 4, cog = 5, arg = 4, cyc_sum = 95, cog_sum = 34, arg_sum = 160, macros = ["@propagatable"] }
 "src/14_NetReturnsDrawdowns.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 136, cog_sum = 81, arg_sum = 227, macros = [] }
 "src/15_Tracking.jl" = { cyc = 2, cog = 3, arg = 3, cyc_sum = 14, cog_sum = 7, arg_sum = 16, macros = ["@propagatable"] }
 "src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { cyc = 6, cog = 12, arg = 4, cyc_sum = 131, cog_sum = 62, arg_sum = 176, macros = [] }

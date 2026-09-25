@@ -203,11 +203,16 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
         # returns, and amortised it charges every observation the same.
         m = mr(JuMPOptimiser(; pe = pr, slv = slv, fees = Fees(; fl = 1e-4)))
         @test PO.shared_has(m, :one_time_fees)
+        @test !PO.shared_has(m, :fees)
         @test bm(m, ret) == 1e3
+        # A drawdown adds up the fee of every period, so a fixed fee alone changes its
+        # spread on either clock.
+        @test bm(m, dd) == 1e3
         m = mr(JuMPOptimiser(; pe = pr, slv = slv,
                              fees = Fees(; fl = 1e-4, fa = AmortisedFees())))
         @test PO.shared_has(m, :one_time_fees)
         @test bm(m, ret) == d_ret
+        @test bm(m, dd) == 1e3
         # A build on shifted weights does not read the bound of the head's weights.
         @test PO.mip_big_m(mr(JuMPOptimiser(; pe = pr, slv = slv)), nothing, 1e-5, ret, pr;
                            prefix = :shifted_) == 1e3
