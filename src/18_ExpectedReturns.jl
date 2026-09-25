@@ -1400,14 +1400,14 @@ The expression corrects for the third and fourth moments and **not** for serial 
 Every method reduces to [`summarise_returns`](@ref), which runs the steps. A method that takes weights nets the returns through [`calc_net_returns`](@ref) first, and the method that takes a prediction result takes the first series when it carries several, and reads the turnover of its held path.
 
  1. Check `alpha` and `periods_per_year`, as `# Validation` states.
- 2. Take `T`, the number of periods, and `m` and `s`, the sample mean and the corrected sample standard deviation of `ret`.
+ 2. Take `T`, the number of periods, and `m` and `s`, the sample mean and the corrected sample standard deviation of `ret` about `m`. Clamp the mean to the least and the greatest entry of `ret`. The clamp moves nothing in exact arithmetic. The rounded mean of a constant `ret` can differ from its common value, and the clamp makes `m` equal that value, so `s` is exactly zero.
  3. Annualise the two, giving `ann_ret` and `ann_vol`.
  4. Divide, giving `sharpe`. A non-positive `ann_vol` gives a `NaN` in its place.
  5. Clip every positive entry of `ret` to zero, square, average over all `T` periods, annualise and take the square root, giving the downside deviation `ddev`. Divide, giving `sortino`. A non-positive `ddev` gives a `NaN`.
  6. Build the cumulative wealth series with [`cumulative_returns`](@ref), take its drawdown path with [`drawdowns`](@ref), and read `max_dd`, the minimum of that path. Divide, giving `calmar`. A non-negative `max_dd` gives a `NaN`.
  7. Evaluate [`ConditionalValueatRisk`](@ref) at `alpha` on `ret` and negate it, giving `cvar_val` in return space.
  8. Form the per-period Sharpe ratio `sr_p`, correct its variance `var_sr` by the sample skewness and the sample excess kurtosis of `ret`, and annualise the square root, giving `sharpe_se`. A non-positive `var_sr` gives a `NaN`.
- 9. Through [`excess_statistics`](@ref): with a `benchmark`, check its length, take `e = ret - benchmark`, annualise its mean and its standard deviation, giving `excess_ret` and `tracking_error`, and divide, giving `information_ratio`; a `tracking_error` that is not positive gives a `NaN`. Without one, all three are `NaN`.
+ 9. Through [`excess_statistics`](@ref): with a `benchmark`, check its length, take `e = ret - benchmark`, annualise its mean, clamped to its least and greatest entry as in step 2, and its standard deviation about that mean, giving `excess_ret` and `tracking_error`, and divide, giving `information_ratio`; a `tracking_error` that is not positive gives a `NaN`. Without one, all three are `NaN`.
 10. Take the turnover the prediction-result method computed through [`held_path_turnover`](@ref). A `nothing` from it, and every other method, gives a `NaN`.
 11. Collect the four inputs and the twelve statistics into a [`PerformanceSummaryResult`](@ref).
 
@@ -1490,8 +1490,11 @@ function excess_statistics(ret::VecNum, benchmark::VecNum, ann::Number, ::Number
     @argcheck(length(benchmark) == length(ret),
               DimensionMismatch("`length(benchmark) == length(ret)` must hold.\nlength(benchmark) => $(length(benchmark))\nlength(ret) => $(length(ret))"))
     e = ret .- benchmark
-    excess_ret = mean(e) * ann
-    tracking_error = std(e) * sqrt(ann)
+    # The clamp moves nothing in exact arithmetic. On a constant excess series it makes the
+    # mean the common value, so the tracking error is exactly zero and the guard fires.
+    me = clamp(mean(e), extrema(e)...)
+    excess_ret = me * ann
+    tracking_error = std(e; mean = me) * sqrt(ann)
     information_ratio = if tracking_error > zero(tracking_error)
         excess_ret / tracking_error
     else
@@ -1580,8 +1583,10 @@ function summarise_returns(ret::VecNum, turnover::Option{<:Number};
               DomainError(periods_per_year, "periods_per_year must be positive"))
     T = length(ret)
     ann = periods_per_year
-    m = mean(ret)
-    s = std(ret)
+    # The clamp moves nothing in exact arithmetic. On a constant series it makes the mean the
+    # common value, so `s` is exactly zero and every guard below fires.
+    m = clamp(mean(ret), extrema(ret)...)
+    s = std(ret; mean = m)
     ann_ret = m * ann
     ann_vol = s * sqrt(ann)
     # A guarded statistic's `NaN` takes the number type its unguarded branch lands in, read
