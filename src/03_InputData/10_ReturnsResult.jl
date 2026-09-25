@@ -301,7 +301,7 @@ This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref). It restr
 
 !!! warning
 
-    This two-argument method indexes **assets**, as every other `port_opt_view` method does. The four-argument method `port_opt_view(rd, i, j, k)` indexes **observations** first and assets second. So `i` means a different axis in each of the two methods. See [`port_opt_view(rd::ReturnsResult, i, j, k)`](@ref).
+    This two-argument method indexes **assets**, as every other `port_opt_view` method does except those of [`PricesResult`](@ref), which index observations first. The four-argument method `port_opt_view(rd, i, j, k)` indexes **observations** first and assets second. So `i` means a different axis in each of the two methods. See [`port_opt_view(rd::ReturnsResult, i, j, k)`](@ref).
 
 # Algorithm
 
@@ -375,7 +375,7 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
 
 !!! warning
 
-    The first index of this method selects **observations**, not assets, and the second index selects assets. Every other [`port_opt_view`](@ref) method, [`port_opt_view(rd::ReturnsResult, i)`](@ref) too, takes the assets first. Cross-validation splits observations and assets together, and this method exists for it.
+    The first index of this method selects **observations**, not assets, and the second index selects assets. Every other [`port_opt_view`](@ref) method, [`port_opt_view(rd::ReturnsResult, i)`](@ref) too, takes the assets first. The methods of [`PricesResult`](@ref) are the exception, and they take the observations first, as this method does. Cross-validation splits observations and assets together, and this method exists for it.
 
 # Algorithm
 

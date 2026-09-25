@@ -121,7 +121,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Risk-free rate.
                  :rf => "`rf`: Risk-free rate.",#
                  # Data carrier fields.
-                 :ivpa_iv => "`ivpa`: Implied volatility risk premium adjustment, if a vector (assets × 1).",#
+                 :ivpa_iv => "`ivpa`: Implied volatility risk premium adjustment, a positive number that every asset shares, or a vector of positive numbers with one entry per asset.",#
                  # Cross-sectional transforms.
                  :min_group_size => "`min_group_size`: Smallest estimation set a group may carry and still be estimated from. A group below it, and every asset that carries no group, takes the whole observation's statistics instead.",#
                  :atol_cs => "`atol`: Absolute tolerance below which a cross-sectional scale counts as zero. An observation at or below it carries no dispersion, so its finite cells score zero rather than dividing by that scale.",#

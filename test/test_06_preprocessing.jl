@@ -3,6 +3,9 @@
 # which is the mistake the stubs exist to name.
 struct UnimplementedPreprocessing <: PortfolioOptimisers.AbstractPreprocessingEstimator end
 struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreprocessingResult end
+# A price-level carrier that implements no `port_opt_view`, used to reach the fallback of
+# the family.
+struct BarePricesResult <: PortfolioOptimisers.AbstractPricesResult end
 # A Gap Return algorithm that ignores the invariant entirely and answers the whole column with
 # one sentinel. `apply_gap_return` reads back only the writable cells, so the invariant is the
 # driver's and not the algorithm's, and this is what proves it.
@@ -489,6 +492,87 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                                                                                          "f2"],
                                                                                         Z3),
                                                                            nothing, ts)
+    end
+
+    @testset "PricesResult and its views agree with their docstrings" begin
+        port_opt_view = PortfolioOptimisers.port_opt_view
+        ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 5))
+        Xv = [100.0 200 300; 101 201 301; 102 202 302; 103 203 303; 104 204 304]
+        X = TimeArray(ts, Xv, [:A, :B, :C])
+        iv = TimeArray(ts, repeat([0.1 0.2 0.3], 5), [:A, :B, :C])
+        B = TimeArray(ts, 10 .* Xv, [:bA, :bB, :bC])
+        span = trues(5, 3)
+        span[1, 3] = false
+        ivpa = [1.0, 2.0, 3.0]
+        pr = PricesResult(; X = X, iv = iv, B = B, ivpa = ivpa, span = span)
+
+        # The TimeArray fields are copies, the other fields can share memory with the
+        # parent, and two Colons return the parent itself.
+        v = port_opt_view(pr, 1:2, 1:2)
+        @test values(v.X) == Xv[1:2, 1:2]
+        v.ivpa[1] = 9.0
+        @test pr.ivpa[1] == 9.0
+        pr.ivpa[1] = 1.0
+        @test port_opt_view(pr, :, :) === pr
+
+        # Rows come back in clock order whatever the order of `i`, and a timestamp that
+        # `X` does not hold selects no row.
+        @test timestamp(port_opt_view(pr, [3, 1]).X) == ts[[1, 3]]
+        va = port_opt_view(pr, [ts[2], Date(2021, 1, 1)])
+        @test timestamp(va.X) == ts[[2]]
+        @test size(va.span) == (1, 3)
+        @test_throws PortfolioOptimisers.IsEmptyError port_opt_view(pr, [Date(2021, 1, 1)])
+
+        # `j` keeps the order it gives, on every field with an asset axis.
+        vr = port_opt_view(pr, :, [3, 1])
+        @test values(vr.X)[1, :] == [300.0, 100.0]
+        @test values(vr.iv)[1, :] == [0.3, 0.1]
+        @test string.(TimeSeries.colnames(vr.B)) == ["bC", "bA"]
+        @test vr.ivpa == [3.0, 1.0]
+        @test vr.span[1, :] == [false, true]
+
+        # A call shape that no method takes names itself, not a leaf helper.
+        msg(f) =
+            try
+                f()
+                ""
+            catch e
+                e isa ArgumentError ? sprint(showerror, e) : string(typeof(e))
+            end
+        m1 = msg(() -> port_opt_view(pr, 2))
+        @test occursin("PricesResult with the index argument type(s) (Int64)", m1)
+        @test occursin("port_opt_view(pr, observations, assets)", m1)
+        @test occursin("(UnitRange{Int64}, UnitRange{Int64}, Colon)",
+                       msg(() -> port_opt_view(pr, 1:2, 1:2, :)))
+        @test occursin("keyword argument(s) foo",
+                       msg(() -> port_opt_view(pr, 1:2; foo = 1)))
+        @test occursin("BarePricesResult",
+                       msg(() -> port_opt_view(BarePricesResult(), 1:2)))
+        # The fallback takes no call that a method of PricesResult takes.
+        @test !any(p -> p[1].name === :port_opt_view,
+                   Test.detect_ambiguities(PortfolioOptimisers))
+
+        # The constructor accepts an absent implied volatility, NaN or missing, and refuses
+        # a present value that is negative or infinite.
+        ivn = TimeArray(ts, [fill(NaN, 5) fill(0.2, 5) fill(0.3, 5)], [:A, :B, :C])
+        @test PricesResult(; X = X, iv = ivn) isa PricesResult
+        ivmv = Matrix{Union{Missing, Float64}}(fill(0.1, 5, 3))
+        ivmv[1, 1] = missing
+        ivm = TimeArray(ts, ivmv, [:A, :B, :C])
+        @test PricesResult(; X = X, iv = ivm) isa PricesResult
+        for bad in (Inf, -0.1)
+            ivb = TimeArray(ts, [fill(bad, 5) fill(0.2, 5) fill(0.3, 5)], [:A, :B, :C])
+            @test_throws DomainError PricesResult(; X = X, iv = ivb)
+        end
+        @test PortfolioOptimisers.assert_nonneg_where_present([0.0, -0.0, NaN, 1], :iv) ===
+              nothing
+        # The other raises of the Validation list.
+        @test_throws PortfolioOptimisers.IsEmptyError PricesResult(; X = X,
+                                                                   ivpa = Float64[])
+        @test_throws DomainError PricesResult(; X = X, ivpa = [1.0, -1.0, 1.0])
+        @test_throws DimensionMismatch PricesResult(; X = X, ivpa = [1.0, 1.0])
+        @test_throws DimensionMismatch PricesResult(; X = X, B = B[:bA, :bB])
+        @test_throws DimensionMismatch PricesResult(; X = X, span = trues(5, 2))
     end
 
     @testset "the preprocessing interface refuses a half-implemented estimator" begin
