@@ -4,7 +4,7 @@
     # Model State (the `JuMP.Model` object dictionary shared by every constraint and risk
     # builder) is reached through the typed interface in `01_Base_JuMPOptimisation/`:
     # `state_key` / `state_set!` / `state_has` / `state_get` / `state_build!` /
-    # `nested_prefix`, plus the named accessors built on them (`get_X`, `get_dd`, …).
+    # `nested_prefix`, plus the named accessors built on them (`get_w`, `get_net_X`, …).
     #
     # Three rules hold the seam shut (ADR 0037, amending ADR 0004 §2 and §6.5):
     #

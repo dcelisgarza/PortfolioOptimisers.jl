@@ -304,10 +304,10 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl" = { code = 371, doc = 554, comment = 32, blank = 193, total = 1150 }
 "src/17_Optimisation/04_Hierarchical/04_HierarchicalEqualRiskContribution.jl" = { code = 400, doc = 330, comment = 18, blank = 90, total = 838 }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/01_JuMPOptimisationTypes.jl" = { code = 126, doc = 274, comment = 4, blank = 140, total = 544 }
-"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/02_JuMPModelAccessors.jl" = { code = 109, doc = 268, comment = 11, blank = 115, total = 503 }
+"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/02_JuMPModelAccessors.jl" = { code = 77, doc = 198, comment = 11, blank = 111, total = 397 }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/03_JuMPModelState.jl" = { code = 107, doc = 177, comment = 36, blank = 64, total = 384 }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/04_FrontierSweep.jl" = { code = 97, doc = 165, comment = 0, blank = 68, total = 330 }
-"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/05_JuMPModelSetup.jl" = { code = 115, doc = 138, comment = 4, blank = 76, total = 333 }
+"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/05_JuMPModelSetup.jl" = { code = 108, doc = 193, comment = 4, blank = 107, total = 412 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/01_MIPIndicators.jl" = { code = 331, doc = 534, comment = 20, blank = 211, total = 1096 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/01_ReturnEstimators.jl" = { code = 167, doc = 350, comment = 8, blank = 128, total = 653 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/02_ObjectiveFunctions.jl" = { code = 201, doc = 451, comment = 0, blank = 164, total = 816 }

@@ -253,7 +253,7 @@ end
 
 Return the Model State entry `name` under `prefix`, and at the index `i` when it is given.
 
-Use a named accessor, such as [`get_X`](@ref), [`get_net_X`](@ref) or [`get_dd`](@ref), where one exists. Its error names the builder of the entry, where this error names only the key.
+Use a named accessor, such as [`get_w`](@ref) or [`get_net_X`](@ref), where one exists. Its error names the builder of the entry, where this error names only the key.
 
 # Validation
 

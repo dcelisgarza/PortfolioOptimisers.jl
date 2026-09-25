@@ -363,37 +363,6 @@ function get_risk(model::JuMP.Model)
     return model[:risk]
 end
 """
-    has_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
-
-Return `true` when [`set_portfolio_returns!`](@ref) registered the portfolio returns `model[Symbol(prefix, :X)]`.
-
-# Related
-
-  - [`get_X`](@ref)
-"""
-function has_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
-    return haskey(model, Symbol(prefix, :X))
-end
-"""
-    get_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
-
-Return the portfolio returns expression `model[Symbol(prefix, :X)]`.
-
-# Validation
-
-  - The entry is registered, by [`set_portfolio_returns!`](@ref). Otherwise an `ArgumentError` names that builder.
-
-# Related
-
-  - [`set_portfolio_returns!`](@ref)
-  - [`has_X`](@ref)
-"""
-function get_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
-    @argcheck(has_X(model, prefix),
-              ArgumentError("model[$(Symbol(prefix, :X))] (portfolio returns) have not been registered; call set_portfolio_returns! first"))
-    return model[Symbol(prefix, :X)]
-end
-"""
     has_net_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
 
 Return `true` when [`set_net_portfolio_returns!`](@ref) registered the net portfolio returns `model[Symbol(prefix, :net_X)]`.
@@ -423,99 +392,6 @@ function get_net_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
     @argcheck(has_net_X(model, prefix),
               ArgumentError("model[$(Symbol(prefix, :net_X))] (net portfolio returns) have not been registered; call set_net_portfolio_returns! first"))
     return model[Symbol(prefix, :net_X)]
-end
-"""
-    has_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
-
-Return `true` when [`set_asset_returns_plus_one!`](@ref) registered the gross asset returns `model[Symbol(prefix, :Xap1)]`.
-
-# Related
-
-  - [`get_Xap1`](@ref)
-"""
-function has_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
-    return haskey(model, Symbol(prefix, :Xap1))
-end
-"""
-    get_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
-
-Return the gross asset returns `model[Symbol(prefix, :Xap1)]`, the matrix ``\\mathbf{X} + 1``.
-
-# Validation
-
-  - The entry is registered, by [`set_asset_returns_plus_one!`](@ref). Otherwise an `ArgumentError` names that builder.
-
-# Related
-
-  - [`set_asset_returns_plus_one!`](@ref)
-  - [`has_Xap1`](@ref)
-"""
-function get_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
-    @argcheck(has_Xap1(model, prefix),
-              ArgumentError("model[$(Symbol(prefix, :Xap1))] (gross asset returns X.+1) have not been registered; call set_asset_returns_plus_one! first"))
-    return model[Symbol(prefix, :Xap1)]
-end
-"""
-    has_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
-
-Return `true` when [`set_portfolio_drawdowns_plus_one!`](@ref) registered the asset drawdowns plus one `model[Symbol(prefix, :ddap1)]`.
-
-# Related
-
-  - [`get_ddap1`](@ref)
-"""
-function has_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
-    return haskey(model, Symbol(prefix, :ddap1))
-end
-"""
-    get_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
-
-Return the asset drawdowns plus one, `model[Symbol(prefix, :ddap1)]`.
-
-# Validation
-
-  - The entry is registered, by [`set_portfolio_drawdowns_plus_one!`](@ref). Otherwise an `ArgumentError` names that builder.
-
-# Related
-
-  - [`set_portfolio_drawdowns_plus_one!`](@ref)
-  - [`has_ddap1`](@ref)
-"""
-function get_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
-    @argcheck(has_ddap1(model, prefix),
-              ArgumentError("model[$(Symbol(prefix, :ddap1))] (drawdowns-plus-one) have not been registered; call set_portfolio_drawdowns_plus_one! first"))
-    return model[Symbol(prefix, :ddap1)]
-end
-"""
-    has_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
-
-Return `true` when [`set_drawdown_constraints!`](@ref) registered the drawdown variables `model[Symbol(prefix, :dd)]`.
-
-# Related
-
-  - [`get_dd`](@ref)
-"""
-function has_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
-    return haskey(model, Symbol(prefix, :dd))
-end
-"""
-    get_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
-
-Return the drawdown variables `model[Symbol(prefix, :dd)]`, one more than the number of observations.
-
-# Validation
-
-  - The entry is registered, by [`set_drawdown_constraints!`](@ref). Otherwise an `ArgumentError` names that builder.
-
-# Related
-
-  - [`set_drawdown_constraints!`](@ref)
-  - [`has_dd`](@ref)
-"""
-function get_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
-    @argcheck(has_dd(model, prefix),
-              ArgumentError("model[$(Symbol(prefix, :dd))] (cumulative-drawdown variables) have not been registered; call set_drawdown_constraints! first"))
-    return model[Symbol(prefix, :dd)]
 end
 
 public get_w, get_k, get_constraint_scale

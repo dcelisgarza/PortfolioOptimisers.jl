@@ -303,10 +303,10 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl" = { cyc = 10, cog = 24, arg = 10, cyc_sum = 58, cog_sum = 65, arg_sum = 69, macros = ["@propagatable"] }
 "src/17_Optimisation/04_Hierarchical/04_HierarchicalEqualRiskContribution.jl" = { cyc = 6, cog = 9, arg = 8, cyc_sum = 49, cog_sum = 36, arg_sum = 98, macros = ["@propagatable"] }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/01_JuMPOptimisationTypes.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 27, cog_sum = 14, arg_sum = 48, macros = [] }
-"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/02_JuMPModelAccessors.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 26, cog_sum = 3, arg_sum = 39, macros = [] }
+"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/02_JuMPModelAccessors.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 18, cog_sum = 3, arg_sum = 23, macros = [] }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/03_JuMPModelState.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 22, cog_sum = 2, arg_sum = 61, macros = [] }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/04_FrontierSweep.jl" = { cyc = 4, cog = 5, arg = 5, cyc_sum = 24, cog_sum = 14, arg_sum = 33, macros = [] }
-"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/05_JuMPModelSetup.jl" = { cyc = 8, cog = 12, arg = 3, cyc_sum = 29, cog_sum = 22, arg_sum = 28, macros = [] }
+"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/05_JuMPModelSetup.jl" = { cyc = 8, cog = 12, arg = 3, cyc_sum = 27, cog_sum = 21, arg_sum = 25, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/01_MIPIndicators.jl" = { cyc = 22, cog = 13, arg = 15, cyc_sum = 88, cog_sum = 43, arg_sum = 129, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/01_ReturnEstimators.jl" = { cyc = 5, cog = 4, arg = 6, cyc_sum = 34, cog_sum = 17, arg_sum = 68, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/02_ObjectiveFunctions.jl" = { cyc = 8, cog = 8, arg = 5, cyc_sum = 49, cog_sum = 40, arg_sum = 47, macros = [] }

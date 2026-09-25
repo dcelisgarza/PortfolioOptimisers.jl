@@ -100,3 +100,12 @@ the seam preserves the agreement exactly. Correcting the tail itself is a separa
 - [0005](0005-prefix-namespaced-risk-state.md) — the prefix namespacing the tails build under.
 - [0007](0007-precomputed-returns-functor-contract.md) — the functor contract the tails mirror.
 - [0037](0037-model-state-accessor-interface.md) — the Model State keys the tails register.
+
+## Amendment (2026-09-25) — `set_asset_neg_returns_plus_one!` is deleted
+
+The consequences above keep `set_asset_neg_returns_plus_one!`, with no caller, on its API page.
+The helper is now deleted (#1336), because a unit with no caller is a dead end (the ruling
+on #1212). The DR-CVaR gain tail still reaches `1 - X` through `set_asset_returns_plus_one!` with
+`-X` under its `gain_` prefix, so no result changes. The key `:nXap1` has no builder now.
+ADR [0037](0037-model-state-accessor-interface.md) records the same deletion for four accessor
+pairs.

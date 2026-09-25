@@ -322,3 +322,20 @@ guard** — they reproduce with it bypassed. `MeanRiskIT.csv.gz` columns 16
 (`EntropicValueatRiskRange`) and 25 (`Kurtosis`) had drifted by 6.1e-6 and 1.6e-6 in absolute
 weight, past their own `rtol`, against the range and index reworks recorded in ADR 0057 and in
 the amendment above. Both columns were regenerated; the other 46 were left byte-identical.
+
+## Amendment (2026-09-25) — eight named accessors had no reader, and are deleted
+
+§2 kept the named `get_*`/`has_*` pairs beside `state_get`, for the specific diagnostic that
+each one gives. The sweep of #903 measured who reads them. Four pairs had no caller in `src/`
+or `ext/`: `has_X`/`get_X`, `has_Xap1`/`get_Xap1`, `has_ddap1`/`get_ddap1` and
+`has_dd`/`get_dd`. No code read their keys through `state_get` or `model[…]` either.
+
+The cause is the builders. `set_portfolio_returns!`, `set_asset_returns_plus_one!`,
+`set_portfolio_drawdowns_plus_one!` and `set_drawdown_constraints!` return the entry to their
+caller, and every caller uses the returned value. A reader never runs apart from its builder,
+so the out-of-order read that §2 wanted to diagnose cannot happen for these entries.
+
+The four pairs are deleted (#1336). An accessor with no caller is a dead end, and a dead end
+must not exist (the ruling on #1212). §2 still holds for each named accessor that has a reader:
+`get_w`, `get_k`, `get_T`, `get_ret`, `get_risk` and `has_net_X`/`get_net_X` stay. A new
+accessor earns its place with a reader. It does not earn it because its entry has a builder.

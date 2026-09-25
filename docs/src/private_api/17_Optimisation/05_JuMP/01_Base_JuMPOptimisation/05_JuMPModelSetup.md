@@ -12,7 +12,6 @@ set_w!
 set_portfolio_returns!
 set_net_portfolio_returns!
 set_asset_returns_plus_one!
-set_asset_neg_returns_plus_one!
 set_portfolio_drawdowns_plus_one!
 set_risk_constraints!
 ```

@@ -50,13 +50,10 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         model = JuMP.Model()
         for f in
             (PO.get_constraint_scale, PO.get_objective_scale, PO.get_T, PO.get_w, PO.get_k,
-             PO.get_ret, PO.get_risk, PO.get_X, PO.get_net_X, PO.get_Xap1, PO.get_ddap1,
-             PO.get_dd)
+             PO.get_ret, PO.get_risk, PO.get_net_X)
             @test_throws ArgumentError f(model)
         end
-        for f in (PO.has_X, PO.has_net_X, PO.has_Xap1, PO.has_ddap1, PO.has_dd)
-            @test !f(model)
-        end
+        @test !PO.has_net_X(model)
         # The message names the builder that registers `:ret`.
         msg = try
             PO.get_ret(model)
@@ -191,7 +188,7 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         @test all(isnothing, JuMP.start_value.(PO.get_w(model2)))
         Xw = PO.set_portfolio_returns!(model, X)
         @test PO.set_portfolio_returns!(model, X) === Xw
-        @test PO.has_X(model) && PO.get_X(model) === Xw
+        @test PO.state_get(model, Symbol(""), :X) === Xw
         wv = [0.6, 0.4]
         val(e) = JuMP.value(v -> wv[JuMP.index(v).value], e)
         @test val.(Xw) ≈ X * wv
@@ -231,10 +228,7 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         a = PO.set_asset_returns_plus_one!(model, X)
         @test a == X .+ 1
         @test PO.set_asset_returns_plus_one!(model, X) === a
-        @test PO.has_Xap1(model) && PO.get_Xap1(model) === a
-        b = PO.set_asset_neg_returns_plus_one!(model, X)
-        @test b == 1 .- X
-        @test PO.set_asset_neg_returns_plus_one!(model, X) === b
+        @test PO.state_get(model, Symbol(""), :Xap1) === a
         d = PO.set_portfolio_drawdowns_plus_one!(model, X)
         # The drawdown of each column of the cumulative sum, the peak seeded at zero.
         c = cumsum(X; dims = 1)
@@ -242,20 +236,21 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         @test d ≈ [1.0 1.0; 0.97 1.0; 0.99 0.98]
         @test all(<=(1), d)
         @test PO.set_portfolio_drawdowns_plus_one!(model, X) === d
-        @test PO.has_ddap1(model) && PO.get_ddap1(model) === d
+        @test PO.state_get(model, Symbol(""), :ddap1) === d
         # The prefix keeps a second build apart.
         @test PO.set_asset_returns_plus_one!(model, -X; prefix = :gain_) == 1 .- X
-        @test PO.get_Xap1(model, :gain_) == 1 .- X
+        @test PO.state_get(model, :gain_, :Xap1) == 1 .- X
+        @test PO.state_get(model, Symbol(""), :Xap1) === a
     end
 
-    @testset "the drawdown accessors read the drawdown builder" begin
+    @testset "the drawdown builder registers its variables" begin
         X = [0.01 0.02; -0.03 0.03; 0.02 -0.02]
         model = JuMP.Model()
         PO.set_model_scales!(model, 1.0, 1.0)
         PO.set_w!(model, X, nothing)
-        @test !PO.has_dd(model)
+        @test !PO.state_has(model, Symbol(""), :dd)
         dd = PO.set_drawdown_constraints!(model, X)
-        @test PO.has_dd(model) && PO.get_dd(model) === dd
+        @test PO.state_get(model, Symbol(""), :dd) === dd
         # One more variable than observations.
         @test length(dd) == size(X, 1) + 1
     end

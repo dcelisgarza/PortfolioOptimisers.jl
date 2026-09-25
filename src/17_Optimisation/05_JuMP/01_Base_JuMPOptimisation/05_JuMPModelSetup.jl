@@ -212,7 +212,6 @@ Where:
 # Related
 
   - [`set_net_portfolio_returns!`](@ref)
-  - [`get_X`](@ref)
   - [`JuMPOptimiser`](@ref)
 """
 function set_portfolio_returns!(model::JuMP.Model, X::MatNum; prefix::Symbol = Symbol(""))
@@ -319,8 +318,6 @@ Where:
 
 # Related
 
-  - [`get_Xap1`](@ref)
-  - [`set_asset_neg_returns_plus_one!`](@ref)
   - [`set_portfolio_drawdowns_plus_one!`](@ref)
 """
 function set_asset_returns_plus_one!(model::JuMP.Model, X::MatNum;
@@ -329,44 +326,6 @@ function set_asset_returns_plus_one!(model::JuMP.Model, X::MatNum;
         return model[Symbol(prefix, :Xap1)]
     end
     return state_set!(model, prefix, :Xap1, JuMP.@expression(model, X .+ one(eltype(X))))
-end
-"""
-    set_asset_neg_returns_plus_one!(model::JuMP.Model, X::MatNum; prefix::Symbol = Symbol(""))
-
-Register the negated gross asset returns ``1 - \\mathbf{X}`` in the JuMP model, and return them.
-
-The value is the constant matrix `-X .+ 1`, not a JuMP expression. A second call returns the registered matrix and builds nothing.
-
-# JuMP formulation
-
-## Expressions
-
-  - `nXap1` under `prefix`: ``1 - \\mathbf{X}``, entry by entry.
-
-Where:
-
-  - $(math_dict[:X_returns])
-
-# Arguments
-
-  - `model::JuMP.Model`: JuMP optimisation model.
-  - `X::MatNum`: Asset returns matrix.
-  - `prefix::Symbol`: Model State namespace of the build. The empty default gives the bare key.
-
-# Returns
-
-  - The negated gross asset returns matrix.
-
-# Related
-
-  - [`set_asset_returns_plus_one!`](@ref)
-"""
-function set_asset_neg_returns_plus_one!(model::JuMP.Model, X::MatNum;
-                                         prefix::Symbol = Symbol(""))
-    if haskey(model, Symbol(prefix, :nXap1))
-        return model[Symbol(prefix, :nXap1)]
-    end
-    return state_set!(model, prefix, :nXap1, JuMP.@expression(model, -X .+ one(eltype(X))))
 end
 """
     set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum; prefix::Symbol = Symbol(""))
@@ -413,7 +372,6 @@ Where:
 
 # Related
 
-  - [`get_ddap1`](@ref)
   - [`absolute_drawdown_arr`](@ref)
   - [`set_asset_returns_plus_one!`](@ref)
 """
