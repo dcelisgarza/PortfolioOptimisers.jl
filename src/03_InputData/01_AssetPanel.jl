@@ -790,6 +790,52 @@ function panel_field_observed_labels(f::AbstractPanelField)::Vector{String}
     end
 end
 """
+    assert_panel_feature_names(pf::AbstractVector{<:AbstractPanelField}) -> nothing
+
+Check that no two columns of the Feature Matrix derived from the Panel Fields share a name.
+
+Each Panel Field checks its own levels or labels, and the [`AssetPanel`](@ref) checks the Panel Field names. A derived name joins a Panel Field name to a level, a label or `"::observed"`, so two Panel Fields with different names can derive one name. A numeric Panel Field `"beta=size"` and a tensor Panel Field `"beta"` with the label `"size"` both derive `"beta=size"`, and a consumer that finds a column by its name then reads the wrong column. The constructor runs this check, so no panel exists without a valid Feature Matrix.
+
+# Algorithm
+
+ 1. Walk the Panel Fields in order. Read each one's value column names from [`panel_field_labels`](@ref), then its observed-mask column names from [`panel_field_observed_labels`](@ref) when it carries a mask. This is the column order of [`panel_feature_matrix`](@ref).
+ 2. Record the Panel Field that gives each name first.
+ 3. Refuse the first name that a second column gives, and name the Panel Fields that give it.
+
+# Arguments
+
+  - `pf`: The Panel Fields.
+
+# Validation
+
+  - Every derived column name is unique. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`AssetPanel`](@ref)
+  - [`panel_feature_matrix`](@ref)
+  - [`panel_field_labels`](@ref)
+  - [`panel_field_observed_labels`](@ref)
+  - [`assert_panel_labels`](@ref)
+"""
+function assert_panel_feature_names(pf::AbstractVector{<:AbstractPanelField})::Nothing
+    owner = Dict{String, String}()
+    for f in pf
+        obs = isnothing(f.omsk) ? String[] : panel_field_observed_labels(f)
+        for l in Iterators.flatten((panel_field_labels(f), obs))
+            g = get(owner, l, nothing)
+            @argcheck(isnothing(g),
+                      ArgumentError("two columns of a derived Feature Matrix cannot share a name, because a consumer finds a column by its name; \"$l\" is derived twice, first by the Panel Field \"$g\" and then by \"$(f.name)\". Rename a Panel Field, a level or a label"))
+            owner[l] = f.name
+        end
+    end
+    return nothing
+end
+"""
     panel_field_stack!(Z::AbstractArray, f::NumericPanelField, cols::VecInt) -> nothing
     panel_field_stack!(Z::AbstractArray, f::CategoricalPanelField, cols::VecInt) -> nothing
     panel_field_stack!(Z::AbstractArray, f::TensorPanelField, cols::VecInt) -> nothing
@@ -1155,6 +1201,7 @@ $(DocStringExtensions.FIELDS)
 
   - The panel carries at least one Panel Field or an active mask. See [`panel_axes`](@ref).
   - The Panel Field names are non-empty and unique. See [`assert_panel_labels`](@ref).
+  - No two columns of the derived Feature Matrix share a name. See [`assert_panel_feature_names`](@ref).
   - Every Panel Field shares one [`panel_field_axes`](@ref). Raises a `DimensionMismatch`.
   - The masks are both `nothing` when the Panel Fields are static, and both given when they are time-varying. See [`assert_panel_masks`](@ref).
 
@@ -1191,6 +1238,7 @@ $(DocStringExtensions.FIELDS)
         ax = panel_axes(pf, amsk)
         if !isempty(pf)
             assert_panel_labels([f.name for f in pf], "the Panel Field names")
+            assert_panel_feature_names(pf)
             k = findfirst(f -> panel_field_axes(f) != ax, pf)
             @argcheck(isnothing(k),
                       DimensionMismatch("every Panel Field of one Asset Panel shares its observation axis and its asset axis, and \"$(isnothing(k) ? "" : pf[k].name)\" does not: got $(isnothing(k) ? "" : string(panel_field_axes(pf[k]))) against the $ax of \"$(pf[1].name)\""))

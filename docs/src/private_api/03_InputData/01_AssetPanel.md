@@ -29,6 +29,7 @@ PortfolioOptimisers.panel_mask_view
 PortfolioOptimisers.panel_claim!
 PortfolioOptimisers.check_asset_panel
 PortfolioOptimisers.assert_panel_labels
+PortfolioOptimisers.assert_panel_feature_names
 PortfolioOptimisers.assert_panel_field_name
 PortfolioOptimisers.assert_panel_field_shape
 PortfolioOptimisers.assert_panel_field_mask
