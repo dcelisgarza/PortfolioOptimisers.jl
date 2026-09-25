@@ -49,4 +49,8 @@ unique_key_dict!(math_dict, :math_dict,
                  :s_i_score => "``s_{i}``: Score of asset ``i``, the risk measure evaluated on that asset's own return series.",#
                  :K_keep_set => "``\\mathcal{K}``: Set of the assets a selector keeps.",#
                  :k_tail_count => "``k``: Number of assets taken from one end of the score ordering.",#
-                 :t_corr_threshold => "``t``: Correlation at or above which two assets are redundant.")
+                 :t_corr_threshold => "``t``: Correlation at or above which two assets are redundant.",#
+                 # The online step of the prior family. `12_PriorPartialFit.jl` states each
+                 # read-out as the batch prior of the rows it folded.
+                 :P_batch_prior => "``\\mathcal{P}(\\cdot)``: Batch prior, the result that the estimator's batch verb gives on the matrices in the parentheses.",#
+                 :P_fold_prior => "``\\mathcal{P}_T``: Folded prior, the result that the estimator's read-out gives after it folds the observations ``\\boldsymbol{x}_1, \\ldots, \\boldsymbol{x}_T`` in order, one at a time or in blocks of any size.")

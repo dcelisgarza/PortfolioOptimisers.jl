@@ -553,6 +553,89 @@ end
         @test isapprox(o.mu[isfinite.(o.mu)], b.mu[isfinite.(b.mu)]; rtol = 1e-12)
     end
 
+    @testset "The docstrings of 12_PriorPartialFit.jl against numbers" begin
+        # `dims = 2` reaches the batch fit on both arms, and the carry state holds the rows
+        # in the observation-by-row orientation.
+        for est in (EmpiricalPrior(), EmpiricalPrior(; horizon = 21))
+            o = prior(partial_fit!(est, permutedims(X); dims = 2))
+            b = prior(est, X)
+            @test isapprox(o.mu, b.mu; rtol = 1e-12)
+            @test isapprox(o.sigma, b.sigma; rtol = 1e-12)
+            @test o.X == b.X
+        end
+        @test pe.sample_buffer(partial_fit!(pe.PriorCarryState(), permutedims(X); dims = 2)) ==
+              X
+        # The identity holds for `ens` under a Scenario Cap, on both arms: it reads the
+        # number of observations folded, not the number of rows carried.
+        for est in (EmpiricalPrior(; max_scenarios = 25),
+                    EmpiricalPrior(; horizon = 21, max_scenarios = 25))
+            o = prior(fold(est, X))
+            b = prior(est, X)
+            @test o.ens == b.ens == 80
+            @test o.X == b.X
+        end
+        @test isnothing(prior(fold(EmpiricalPrior(; max_scenarios = 500), X)).ens)
+        # The horizon arm refits a member that does not fold on the log rows it would have
+        # folded, and carries the arithmetic rows.
+        semi = EmpiricalPrior(; horizon = 21,
+                              ce = PortfolioOptimisersCovariance(;
+                                                                 ce = Covariance(;
+                                                                                 alg = SemiMoment())))
+        o = prior(fold(semi, X))
+        b = prior(semi, X)
+        @test isapprox(o.mu, b.mu; rtol = 1e-12)
+        @test isapprox(o.sigma, b.sigma; rtol = 1e-12)
+        @test o.X == X
+        # The high order read-out refits a co-moment that does not fold over `pr.X`, which a
+        # Scenario Cap on the embedded prior cuts. The batch method fits it over every row.
+        # A co-moment that folds agrees with the batch fit. Issue #1328 holds the decision.
+        w = 25
+        h = HighOrderPriorEstimator(; pe = EmpiricalPrior(; max_scenarios = w),
+                                    ske = Coskewness(; alg = SemiMoment()))
+        o = prior(fold(h, X))
+        b = prior(h, X)
+        tail = X[(end - w + 1):end, :]
+        @test isapprox(o.kt, b.kt; rtol = 1e-12)
+        @test b.sk == coskewness(Coskewness(; alg = SemiMoment()), X)[1]
+        @test o.sk == coskewness(Coskewness(; alg = SemiMoment()), tail)[1]
+        @test !isapprox(o.sk, b.sk; rtol = 1e-2)
+        # `combine_factor_answers` is Kleene's strong disjunction, `nothing` the unknown
+        # value, over every tuple of one to three answers.
+        kleene(a, b) =
+            if a === true || b === true
+                true
+            elseif a === false && b === false
+                false
+            else
+                nothing
+            end
+        vals = (true, false, nothing)
+        for k in 1:3, c in Iterators.product(ntuple(_ -> vals, k)...)
+            @test pe.combine_factor_answers(c) === foldl(kleene, c)
+        end
+        # A member that holds observation weights refuses the fold by name.
+        ww = eweights(1:80, inv(40); scale = true)
+        @test_throws ArgumentError fold(EmpiricalPrior(;
+                                                       me = SimpleExpectedReturns(; w = ww)),
+                                        X)
+        # The slice of a carry state takes a `Bool` mask and one index.
+        s = pe.partial_fit_cache(fold(EmpiricalPrior(), X))
+        push!(s.named, 2, 5)
+        v = pe.port_opt_view(s, BitVector([0, 1, 0, 0, 1, 1]))
+        @test v.named == Set([1, 2])
+        @test pe.sample_buffer(v) == X[:, [2, 5, 6]]
+        @test pe.port_opt_view(s, 5).named == Set([1])
+        # The refusal names both routes that give a factor matrix.
+        msg = try
+            pe.assert_factor_returns(EntropyPoolingPrior(; pe = FactorPrior()), nothing)
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("ReturnsResult.F", msg)
+        @test occursin("partial_fit!", msg)
+    end
+
     @testset "A read-out before the first fold refuses by name" begin
         @test_throws ArgumentError prior(EmpiricalPrior())
         @test_throws ArgumentError prior(EntropyPoolingPrior())
