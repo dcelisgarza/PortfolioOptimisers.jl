@@ -186,9 +186,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes the Value-at-Risk as the empirical quantile of the sample, through a mixed-integer programme.
 
-The programme has one binary indicator per observation. The functor of the measure that holds this formulation computes the same order statistic directly, so the model and the functor report one number. The default big-M constant, ``b = 1000``, exceeds any loss of a return series, so the programme is exact with it.
+The programme has one binary indicator per observation. The functor of the measure that holds this formulation computes the same order statistic directly, so the model and the functor report one number.
 
-A solver accepts an indicator that is within its integrality tolerance ``\\varepsilon`` of zero as zero. The exceedance row of that observation then holds for a risk as low as ``\\ell_{t} - b \\varepsilon``. So the risk that the model reports can be smaller than the order statistic of the weights that it returns, by up to ``b \\varepsilon``, and those weights need not be optimal. With the default ``b = 1000`` and a tolerance of ``10^{-6}`` the gap can reach ``10^{-3}``, which is large next to the scale of daily returns. A big-M constant that fits the scale of the losses, or a tighter integrality tolerance of the solver, makes the gap smaller.
+A solver accepts an indicator that is within its integrality tolerance ``\\varepsilon`` of zero as zero. The exceedance row of that observation then holds for a risk as low as ``\\ell_{t} - b \\varepsilon``. So the risk that the model reports can be smaller than the order statistic of the weights that it returns, by up to ``b \\varepsilon``, and those weights need not be optimal. A constant ``b = 1000`` and a tolerance of ``10^{-6}`` give a gap of up to ``10^{-3}``, which is large next to the scale of daily returns. So the default `b = nothing` derives the smallest exact constant from the data, with [`mip_big_m`](@ref). It is the largest spread of the losses of one asset times a bound on the gross exposure of the weights, about ``10^{-1}`` for a long-only portfolio of daily returns. Where the model admits no such bound, for example under [`MaximumRatio`](@ref), the default is ``b = 1000``, and a tighter integrality tolerance of the solver makes the gap smaller.
 
 # Mathematical definition
 
@@ -217,7 +217,7 @@ Where:
 
 The minimum is the ``k``-th largest loss, the order statistic that [`ValueatRisk`](@ref) defines. The programme exempts the largest losses first, and it can exempt them while their cumulative weight stays within ``(\\alpha - s) W_{T}``. The slack keeps the exempt weight strictly below ``\\alpha W_{T}``, and it absorbs the rounding error of ``\\alpha W_{T}``.
 
-The programme is exact when ``b`` is at least the largest loss minus the minimum. It needs ``s < \\alpha``, because the cardinality row has no solution for ``s > \\alpha``.
+The programme is exact when ``b`` is at least the largest loss minus the minimum, which the derived default is. It needs ``s < \\alpha``, because the cardinality row has no solution for ``s > \\alpha``.
 
 # Fields
 
@@ -292,9 +292,9 @@ end
 """
     mip_var_bounds(b, s) -> Tuple
 
-Resolve the big-M constant `b` and the cardinality slack `s` of the empirical quantile programme to numbers.
+Resolve the cardinality slack `s` of the empirical quantile programme to a number, and pass the big-M constant `b` on.
 
-A `nothing` takes the default, `b = 1e3` or `s = 1e-5`. The `JuMP` builder and the functor read the pair from this one function, so both select the same order statistic.
+A `nothing` slack takes the default, `s = 1e-5`. The `JuMP` builder and the functor read the pair from this one function, so both select the same order statistic. The functor does not read `b`. A `nothing` constant stays `nothing`, and the `JuMP` builder derives it from the data and the weight bounds with [`mip_big_m`](@ref).
 
 # Arguments
 
@@ -303,16 +303,17 @@ A `nothing` takes the default, `b = 1e3` or `s = 1e-5`. The `JuMP` builder and t
 
 # Returns
 
-  - `(b, s)`: The two numbers, each the stated value or its default.
+  - `(b, s)`: `b` as it is, and the stated `s` or its default.
 
 # Related
 
   - [`MIPValueatRisk`](@ref)
   - [`DrawdownatRisk`](@ref)
   - [`empirical_value_at_risk`](@ref)
+  - [`mip_big_m`](@ref)
 """
 function mip_var_bounds(b::Option{<:Number}, s::Option{<:Number})
-    return ifelse(isnothing(b), 1e3, b), ifelse(isnothing(s), 1e-5, s)
+    return b, ifelse(isnothing(s), 1e-5, s)
 end
 """
 $(DocStringExtensions.TYPEDEF)

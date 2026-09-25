@@ -117,9 +117,100 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
     end
     @testset "The defaults of the big-M constant and the slack" begin
         PO = PortfolioOptimisers
-        @test PO.mip_var_bounds(nothing, nothing) == (1e3, 1e-5)
+        # A `nothing` constant passes on, for the builder to derive from the data.
+        @test PO.mip_var_bounds(nothing, nothing) === (nothing, 1e-5)
         @test PO.mip_var_bounds(2.0, nothing) == (2.0, 1e-5)
-        @test PO.mip_var_bounds(nothing, 0.01) == (1e3, 0.01)
+        @test PO.mip_var_bounds(nothing, 0.01) === (nothing, 0.01)
+    end
+    @testset "The bound on the gross exposure" begin
+        PO = PortfolioOptimisers
+        function g(wb; bgt = nothing, sbgt = nothing, gbgt = nothing)
+            return PO.gross_exposure_bound(wb, bgt, sbgt, gbgt, 4)
+        end
+        # Long-only weights have a gross exposure equal to their sum.
+        @test g(WeightBounds(); bgt = 1.0) == 1.0
+        @test g(WeightBounds(); bgt = BudgetRange(; lb = 0.8, ub = 1.2)) == 1.2
+        # Without a budget the bounds alone bound it, asset by asset.
+        @test g(WeightBounds()) == 4.0
+        @test g(WeightBounds(; lb = 0.0, ub = [0.1, 0.2, 0.3, 0.4])) == 1.0
+        # With shorts the long parts sum to at most bgt + sbgt and the short parts to sbgt.
+        @test g(WeightBounds(; lb = -1.0, ub = 1.0); bgt = 1.0, sbgt = 0.5) == 2.0
+        @test g(WeightBounds(; lb = -1.0, ub = 1.0); bgt = 1.0) == 4.0
+        @test g(WeightBounds(; lb = -1.0, ub = 1.0); gbgt = 1.5) == 1.5
+        @test g(WeightBounds(; lb = -1.0, ub = 1.0);
+                bgt = BudgetRange(; lb = nothing, ub = 1.0),
+                sbgt = BudgetRange(; lb = nothing, ub = 0.2)) == 1.4
+        # No finite bound gives none.
+        @test g(WeightBounds(; lb = -Inf, ub = Inf); bgt = 1.0) == Inf
+        @test g(WeightBounds(; lb = nothing, ub = 1.0); bgt = 1.0) == Inf
+        # Two weight builds on one model constrain the same weights, so the smaller bound holds.
+        m = JuMP.Model()
+        @test PO.set_gross_exposure_bound!(m, 2.0) == 2.0
+        @test PO.set_gross_exposure_bound!(m, 3.0) == 2.0
+        @test PO.set_gross_exposure_bound!(m, 1.5) == 1.5
+        @test m[:w_gross_ub] == 1.5
+    end
+    @testset "The derived big-M constant keeps the programme exact at the default tolerance" begin
+        PO = PortfolioOptimisers
+        rng = StableRNG(1046)
+        X = 0.01 .* randn(rng, 100, 4) .+ 0.0005
+        pr = prior(EmpiricalPrior(), X)
+        opts = Dict("log_to_console" => false, "mip_rel_gap" => 0.0)
+        slv = Solver(; name = :highs, solver = HiGHS.Optimizer, settings = opts)
+        tslv = Solver(; name = :highs, solver = HiGHS.Optimizer,
+                      settings = merge(opts, Dict("mip_feasibility_tolerance" => 1e-9)))
+        # With b = 1000 the default tolerance of 1e-6 left these three about 1e-4 apart (#1323).
+        for r in (ValueatRisk(; alpha = 0.29), DrawdownatRisk(; alpha = 0.29),
+                  ValueatRiskRange(; alpha = 0.29, beta = 0.1))
+            sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
+                                    opt = JuMPOptimiser(; pe = pr, slv = slv)))
+            tsol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
+                                     opt = JuMPOptimiser(; pe = pr, slv = tslv)))
+            @test isapprox(JuMP.value(sol.model[:risk]), expected_risk(r, sol.w, X);
+                           atol = 1e-12)
+            @test isapprox(JuMP.value(sol.model[:risk]), JuMP.value(tsol.model[:risk]);
+                           atol = 1e-12)
+        end
+        # The constant is the gross bound times the largest spread per unit of weight.
+        c = [zeros(1, 4); cumsum(X; dims = 1)]
+        d_ret = maximum(maximum(X; dims = 1) - minimum(X; dims = 1))
+        d_dd = maximum(maximum(c; dims = 1) - minimum(c; dims = 1))
+        bm(model, alg, b = nothing) = PO.mip_big_m(model, b, 1e-5, alg, pr)
+        ret, dd = PO.NetReturnsRiskSeries(), PO.DrawdownRiskSeries()
+        mr(opt; obj = MinimumRisk(), r = ValueatRisk()) = optimise(MeanRisk(; r = r,
+                                                                            obj = obj,
+                                                                            opt = opt)).model
+        m = mr(JuMPOptimiser(; pe = pr, slv = slv))
+        @test m[:w_gross_ub] == 1.0
+        @test bm(m, ret) == d_ret
+        @test bm(m, dd) ≈ d_dd
+        m = mr(JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1),
+                             sbgt = 0.5))
+        @test m[:w_gross_ub] == 2.0
+        @test bm(m, ret) == 2 * d_ret
+        # A stated constant is kept, and it must exceed the slack.
+        @test bm(m, ret, 0.5) == 0.5
+        @test_throws DomainError bm(m, ret, 1e-6)
+        # A free scale of the weights has no bound, so the constant is Cajas's 1000.
+        m = mr(JuMPOptimiser(; pe = pr, slv = slv); obj = MaximumRatio())
+        @test bm(m, ret) == 1e3
+        # A per period fee leaves the spread of the returns but not of the drawdowns.
+        m = mr(JuMPOptimiser(; pe = pr, slv = slv, fees = Fees(; l = 1e-4)))
+        @test PO.shared_has(m, :fees)
+        @test bm(m, ret) == d_ret
+        @test bm(m, dd) == 1e3
+        # A fixed fee is one-time. On the first observation it changes the spread of the
+        # returns, and amortised it charges every observation the same.
+        m = mr(JuMPOptimiser(; pe = pr, slv = slv, fees = Fees(; fl = 1e-4)))
+        @test PO.shared_has(m, :one_time_fees)
+        @test bm(m, ret) == 1e3
+        m = mr(JuMPOptimiser(; pe = pr, slv = slv,
+                             fees = Fees(; fl = 1e-4, fa = AmortisedFees())))
+        @test PO.shared_has(m, :one_time_fees)
+        @test bm(m, ret) == d_ret
+        # A build on shifted weights does not read the bound of the head's weights.
+        @test PO.mip_big_m(mr(JuMPOptimiser(; pe = pr, slv = slv)), nothing, 1e-5, ret, pr;
+                           prefix = :shifted_) == 1e3
     end
     @testset "The constructors validate b, s and the weights" begin
         @test_throws DomainError MIPValueatRisk(; b = -1.0)
