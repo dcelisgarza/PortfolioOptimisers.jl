@@ -476,3 +476,146 @@ end
     @test PO.factory(res, GreedyAllocation()).fb == GreedyAllocation()
     @test isnothing(PO.factory(res, nothing).fb)
 end
+@testset "The docstrings of 03_GreedyFiniteAllocation.jl against numbers" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    PO = PortfolioOptimisers
+
+    # The two passes as the `# Mathematical definition` of `GreedyAllocation` states them,
+    # on one long side. `F` is `allocation_fee`, and each `ΔF` is a difference of two
+    # whole fees, so this checks `greedy_fee_delta` as well.
+    function documented_greedy(w, p, C, unit, sf; kwargs = (;))
+        N = length(w)
+        o = sortperm(w; rev = true)
+        w = w[o] / sum(w[o])
+        p = p[o]
+        sfo = PO.permute_side_fees(sf, o)
+        F = x -> PO.allocation_fee(sfo, p, x)
+        x = zeros(N)
+        r = C - F(x)
+        for i in 1:N
+            y = copy(x)
+            y[i] = round(floor(w[i] * C / (p[i] * unit)) * unit; kwargs...)
+            c = y[i] * p[i] + F(y) - F(x)
+            if c > r
+                break
+            end
+            r -= c
+            x = y
+        end
+        while r > 0
+            held = sum(x .* p)
+            d = w - (iszero(held) ? zeros(N) : x .* p / held)
+            best = 0
+            for i in 1:N
+                y = copy(x)
+                y[i] += unit
+                if p[i] * unit + F(y) - F(x) <= r &&
+                   d[i] > 0 &&
+                   (best == 0 || d[i] > d[best])
+                    best = i
+                end
+            end
+            if best == 0
+                break
+            end
+            y = copy(x)
+            y[best] += unit
+            r -= p[best] * unit + F(y) - F(x)
+            x = y
+        end
+        xo = similar(x)
+        xo[o] = x
+        return xo, C - sum(x .* p) - F(x)
+    end
+    rng = StableRNG(907)
+    for _ in 1:200
+        N = rand(rng, 2:7)
+        w = rand(rng, N) .^ 2
+        if rand(rng) < 0.3
+            w[rand(rng, 1:N)] = 0.0
+        end
+        w ./= sum(w)
+        p = round.(1 .+ 300 * rand(rng, N); digits = 2)
+        C = round(100 + 20_000 * rand(rng); digits = 2)
+        unit = rand(rng, (1, 2, 5, 0.5))
+        kw = unit == 0.5 ? (digits = 1,) : (;)
+        T = rand(rng, (1, 3))
+        w0 = rand(rng, N)
+        w0 ./= sum(w0)
+        fee = rand(rng,
+                   (nothing, Fees(; l = 0.001),
+                    Fees(; l = rand(rng, N) / 500, fl = 2.0,
+                         tn = Turnover(; w = w0, val = rand(rng, N) / 200))))
+        r = optimise(GreedyAllocation(; unit = unit, kwargs = kw),
+                     FiniteAllocationInput(; w = w, prices = p, cash = C, horizon = T,
+                                           fees = fee))
+        lsf, _ = PO.allocation_side_fees(fee, T, C, trues(N), Float64[])
+        x, cash = documented_greedy(w, p, C, unit, lsf; kwargs = kw)
+        @test collect(r.shares) ≈ x
+        @test isapprox(r.cash, cash; atol = 1e-8)
+    end
+
+    # When the first pass buys nothing, the realised weight is zero rather than 0 / 0, so
+    # the deficit is the target and an asset with a zero target is never bought. The old
+    # code bought one share of the second asset here, from a deficit of NaN.
+    r0 = optimise(GreedyAllocation(),
+                  FiniteAllocationInput(; w = [1.0, 0.0], prices = [200.0, 1.0],
+                                        cash = 150.0))
+    @test collect(r0.shares) == [0.0, 0.0]
+    @test r0.cash == 150.0
+    # A side whose target weights are all zero buys nothing. The long side of this short
+    # book holds one zero weight, and the old code renormalised it to NaN.
+    rz = optimise(GreedyAllocation(),
+                  FiniteAllocationInput(; w = [-1.0, 0.0], prices = [10.0, 20.0],
+                                        cash = 100.0))
+    @test collect(rz.shares) == [-10.0, 0.0]
+    @test collect(rz.w) == [-1.0, 0.0]
+    @test rz.cash == 0.0
+
+    # `finite_sub_allocation!` changes none of its arguments.
+    ga = GreedyAllocation()
+    wv = [0.3, 0.5]
+    PO.finite_sub_allocation!(view(wv, 1:2), [10.0, 20.0], 1000.0, 1.0, nothing, ga)
+    @test wv == [0.3, 0.5]
+    # An empty side still pays the forced exit, out of its cash.
+    sf = (T = 1, prop = nothing, fixed = nothing, tn_val = nothing, prev_money = nothing,
+          liq = 7.0)
+    re = PO.finite_sub_allocation!(Float64[], Float64[], 100.0, 0.0, sf, ga)
+    @test isempty(re[1]) && isempty(re[2]) && isempty(re[3])
+    @test re[4] == 93.0
+    @test re[5] == 7.0
+
+    # `roundmult` rounds to an integer by default, so a `prec` below one can lose the
+    # multiple. `RoundDown` loses it too, and `digits` keeps it.
+    @test PO.roundmult(1.25, 0.3) == 1.0
+    @test PO.roundmult(1.25, 0.3, RoundDown) == 1.0
+    @test PO.roundmult(1.25, 0.3; digits = 1) == 1.2
+
+    # The turnover term of `greedy_fee_delta` is negative when the purchase moves the
+    # position towards the money it held before the trade, and the delta is still the
+    # difference of two whole fees.
+    f = Fees(; l = [0.01, 0.02], fl = [5.0, 3.0],
+             tn = Turnover(; w = [0.4, 0.6], val = [0.002, 0.004]))
+    lsf, _ = PO.allocation_side_fees(f, 12, 1e4, [true, true], Float64[])
+    p = [100.0, 200.0]
+    sh = [10.0, 0.0]
+    @test isapprox(PO.greedy_fee_delta(lsf, p, sh, 1, 2.0),
+                   12 * 0.01 * 200 + 12 * 0.002 * (abs(1200 - 4000) - abs(1000 - 4000)))
+    @test isapprox(PO.greedy_fee_delta(lsf, p, sh, 1, 2.0),
+                   PO.allocation_fee(lsf, p, sh + [2.0, 0.0]) -
+                   PO.allocation_fee(lsf, p, sh))
+    @test isapprox(PO.greedy_fee_delta(lsf, p, sh, 2, 3.0),
+                   PO.allocation_fee(lsf, p, sh + [0.0, 3.0]) -
+                   PO.allocation_fee(lsf, p, sh))
+    @test iszero(PO.greedy_fee_delta(nothing, p, sh, 1, 2.0))
+
+    # A `GreedyAllocation` with a fallback goes through the generic `optimise`, and the
+    # greedy passes answer it.
+    fai = FiniteAllocationInput(; w = [0.6, 0.4], prices = p, cash = 1e4)
+    gfb = GreedyAllocation(; fb = GreedyAllocation())
+    @test which(optimise, Tuple{typeof(gfb), typeof(fai)}) !=
+          which(optimise, Tuple{typeof(ga), typeof(fai)})
+    rfb = optimise(gfb, fai)
+    @test isa(rfb, GreedyAllocationResult)
+    @test collect(rfb.shares) == collect(optimise(ga, fai).shares)
+end

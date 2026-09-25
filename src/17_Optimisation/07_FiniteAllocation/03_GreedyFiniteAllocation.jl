@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for [`GreedyAllocation`](@ref).
 
-`shares`, `cost` and `w` are signed: a short position carries a negative share count, a negative cost and a negative weight. `fees` is the charge the two sides paid over the whole horizon, and it is never signed. `cash` is the cash left over after the long side is allocated.
+`shares`, `cost` and `w` carry the sign of the position. A short position has a negative share count, a negative cost and a negative weight. `fees` is the charge that the two sides paid over the whole horizon, and the short side's part of it is not negated. `cash` is the cash left over after the allocation of the long side.
 
 # Fields
 
@@ -79,13 +79,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Greedy Allocation portfolio optimiser.
 
-`GreedyAllocation` converts continuous portfolio weights to discrete share quantities using a greedy two-pass allocation: the first pass buys down the target weights in descending order, and the second pass spends the leftover cash on the asset whose realised weight falls furthest short of its target.
+`GreedyAllocation` converts continuous portfolio weights to discrete share quantities with a greedy allocation in two passes. The first pass buys each asset up to its target weight, in descending order of target weight. The second pass spends the leftover cash, one `unit` at a time, on the asset whose realised weight is furthest below its target.
 
-The long and the short side of a portfolio are allocated as two separate sub-problems. Each sub-problem receives its own share of the cash, and its own weights are renormalised to sum to one. The definition below describes one such sub-problem, whose targets ``\\boldsymbol{w}`` therefore satisfy ``\\sum_i w_i = 1``. Short shares are negated when the two sides are recombined.
+[`optimise`](@ref) allocates the long and the short side of a portfolio as two separate sub-problems. Each sub-problem receives its own share of the cash, and renormalises its own weights to sum to one. The definition below describes one sub-problem, so its targets ``\\boldsymbol{w}`` satisfy ``\\sum_i w_i = 1``. A side whose target weights are all zero buys nothing. `optimise` negates the short side's shares when it recombines the two sides.
 
 # Mathematical definition
 
-Order the assets so that ``w_1 \\geq w_2 \\geq \\ldots \\geq w_N``. The first pass walks that order and buys
+Order the assets so that ``w_1 \\geq w_2 \\geq \\ldots \\geq w_N``. The first pass goes through that order and buys
 
 ```math
 \\begin{align}
@@ -94,7 +94,7 @@ r &\\leftarrow r - x_i p_i - \\Delta F_i\\,,
 \\end{align}
 ```
 
-starting from ``r = C - F(\\boldsymbol{0})``. The pass **stops at the first asset it cannot afford**, so every later asset in the order is left at zero for the second pass to reach.
+starting from ``r = C - F(\\boldsymbol{0})``. The pass stops at the first asset it cannot afford. Every later asset in the order then holds zero shares until the second pass.
 
 The second pass repeats, while ``r > 0``,
 
@@ -107,7 +107,7 @@ r &\\leftarrow r - p_{i^*} \\mathrm{unit} - \\Delta F_{i^*}\\,.
 \\end{align}
 ```
 
-The pass stops when no affordable asset has a positive deficit. The selection is by **deficit**, not by target weight: an asset the first pass already filled has a small deficit however large its target weight is.
+While the book holds no shares, ``\\sum_j x_j p_j = 0`` and the realised weight of every asset is zero, so ``\\boldsymbol{d} = \\boldsymbol{w}``. The pass stops when no affordable asset has a positive deficit. It selects by deficit, not by target weight. An asset that the first pass filled has a small deficit, whatever its target weight is. An asset with a zero target weight never has a positive deficit, so neither pass buys it.
 
 Where:
 
@@ -116,15 +116,15 @@ Where:
   - ``\\boldsymbol{w}``: Target weight vector of this sub-problem, renormalised to sum to one.
   - ``C``: Cash allocated to this sub-problem.
   - ``\\boldsymbol{p}``: Asset price vector.
-  - ``\\mathrm{unit}``: Minimum share purchase unit.
+  - ``\\mathrm{unit}``: Number of shares that one purchase buys.
   - ``\\boldsymbol{d}``: Weight deficit, the target weight less the realised weight.
-  - ``F(\\boldsymbol{x})``: Fee of this sub-problem, of [`allocation_fee`](@ref). It is zero when the input states no fee, and it carries the constant forced exit of [`allocation_liquidation_fee`](@ref) when the universe lost an asset.
-  - ``\\Delta F_i``: What buying the asset ``i`` adds to the fee, of [`greedy_fee_delta`](@ref).
+  - ``F(\\boldsymbol{x})``: Fee of this sub-problem, from [`allocation_fee`](@ref). It is zero when the input states no fee, and it includes the constant forced exit of [`allocation_liquidation_fee`](@ref) when the universe lost an asset.
+  - ``\\Delta F_i``: Amount that a purchase of the asset ``i`` adds to the fee, from [`greedy_fee_delta`](@ref).
   - ``i^*``: Affordable asset with the largest weight deficit.
   - ``\\odot``: Element-wise (Hadamard) product.
   - ``N``: Number of assets in this sub-problem.
 
-The rounding is a **floor** to a multiple of `unit`, followed by `Base.round` under `args` and `kwargs`. See [`roundmult`](@ref): it is not a round to the nearest multiple.
+The rounding truncates to a multiple of `unit`, and then applies `Base.round` with `args` and `kwargs`, as [`roundmult`](@ref) does. It does not round to the nearest multiple. With the default `args` and `kwargs`, `Base.round` rounds to an integer, so a fractional `unit` needs `digits` or `sigdigits` in `kwargs` to keep a multiple of `unit`.
 
 # Fields
 
@@ -201,7 +201,20 @@ end
 
 Truncate `val` towards zero to a multiple of `prec`, then round that multiple with `Base.round`.
 
-Equivalent to `round(div(val, prec) * prec, args...; kwargs...)`. This is **not** a round to the nearest multiple of `prec`: `div` truncates, so `roundmult(7.5, 2)` is `6.0` where the nearest multiple of `2` is `8.0`. The trailing `Base.round` acts on the truncated product, so a `prec` below one can leave a value that is no longer a multiple of `prec` unless `args` or `kwargs` say otherwise. Pass `RoundDown` in `args` to suppress it.
+This is not a round to the nearest multiple of `prec`. `div` truncates, so `roundmult(7.5, 2)` is `6.0`, and the nearest multiple of `2` is `8.0`. The default `Base.round` rounds to an integer, so a `prec` below one can give a value that is not a multiple of `prec`. For example, `roundmult(1.25, 0.3)` is `1.0`. Pass `digits` or `sigdigits` in `kwargs` to keep the multiple, as in `roundmult(1.25, 0.3; digits = 1)`, which is `1.2`. `RoundDown` in `args` does not keep it, because it also rounds to an integer.
+
+# Mathematical definition
+
+```math
+\\mathrm{roundmult}(v, q) = \\mathrm{round}\\!\\left(\\mathrm{trunc}\\!\\left(\\frac{v}{q}\\right) q\\right)\\,.
+```
+
+Where:
+
+  - ``v``: Value to truncate, `val`.
+  - ``q``: Multiple to truncate to, `prec`.
+  - ``\\mathrm{trunc}``: Truncation towards zero, which `div` computes.
+  - ``\\mathrm{round}``: `Base.round` with `args` and `kwargs`.
 
 # Arguments
 
@@ -235,19 +248,22 @@ end
     greedy_fee_delta(::Nothing, ::VecNum, shares::VecNum, ::Integer, ::Number)
     greedy_fee_delta(sf::NamedTuple, p::VecNum, shares::VecNum, i::Integer, qty::Number)
 
-Charge what buying `qty` shares of asset `i` adds to one side's fee.
+Charge the amount that a purchase of `qty` shares of asset `i` adds to one side's fee.
 
-The greedy allocator buys one asset at a time against a running cash figure, so it needs the fee charged as it goes. The delta of each term is exact and costs no loop, so the affordability test of both passes is a test against the cost of the shares **plus** this number.
+The greedy allocator buys one asset at a time against a running cash figure, so it charges the fee purchase by purchase. The delta of each term is exact and needs no loop. The affordability test of both passes compares the cash with the cost of the shares plus this number.
 
 # Algorithm
 
- 1. Proportional: `T * f_p[i] * qty * p[i]`, the money the purchase adds.
- 2. Turnover: `T * f_Tn[i]` times the change in the money traded, which can be **negative** when the purchase moves the position towards the money it held before the trade.
- 3. Fixed: `f_f[i]`, and only when the position was zero and becomes non-zero.
+ 1. On a `nothing` charge, return a zero.
+ 2. Compute `m0 = shares[i] * p[i]`, the money in the position before the purchase, and `m1 = m0 + qty * p[i]`, the money after it.
+ 3. Proportional term: add `T * prop[i] * (m1 - m0)`.
+ 4. Turnover term: add `T * tn_val[i] * (abs(m1 - prev) - abs(m0 - prev))`, where `prev` is the money that the position held before the trade. This term is negative when the purchase moves the position towards `prev`.
+ 5. Fixed term: add `fixed[i]` when `m0` is zero and `m1` is not.
+ 6. Return `delta`, the sum of the terms.
 
 # Arguments
 
-  - `sf`: One side's charge, of [`allocation_side_fees`](@ref), or `nothing`.
+  - `sf`: One side's charge, from [`allocation_side_fees`](@ref), or `nothing`.
   - `p::VecNum`: Asset prices of this side.
   - `shares::VecNum`: Share count per asset, before the purchase.
   - `i::Integer`: The asset bought.
@@ -294,31 +310,36 @@ end
 
 Run the greedy two-pass allocation over one side, long or short, of the portfolio.
 
-Implements the two passes of [`GreedyAllocation`](@ref) for a single side. An empty `w` returns three empty vectors, the untouched `cash` and a zero fee.
+This method runs the two passes of [`GreedyAllocation`](@ref) for a single side. It changes none of its arguments, because it sorts through views and renormalises into a new vector. The affordability test of both passes compares the cash with the cost of the purchase plus the amount of [`greedy_fee_delta`](@ref), so a stated fee cannot overdraw the budget.
+
+# Algorithm
+
+ 1. If `w` is empty, charge `fee`, the [`allocation_fee`](@ref) of the empty book. Return three empty vectors, `cash - fee` and `fee`. An empty side can still owe the forced exit of [`allocation_liquidation_fee`](@ref).
+ 2. Sort the assets by descending target weight into `idx`. View `w` and `p` in that order, and put the charge in that order with [`permute_side_fees`](@ref).
+ 3. Charge `fee`, the fee of the empty book, and start the running cash `acash = cash - fee`. This fee is not zero when the side held money before the trade, because the turnover fee charges the sale, or when the universe lost an asset.
+ 4. Renormalise `w` to sum to one. A side whose target weights are all zero keeps them at zero.
+ 5. In the first pass, go through the order and buy `n_shares` of each asset. Stop at the first asset whose `cost` is more than `acash`.
+ 6. In the second pass, while `acash > 0`, compute the `deficit` of each asset. Buy `unit` shares of the affordable asset with the largest positive deficit, and stop when no such asset remains.
+ 7. Compute `cost = p .* shares` and the realised weights `aw`, rescaled to sum to `bgt`. Charge `fee`, the fee of the whole book, and compute `acash = cash - sum(cost) - fee`.
+ 8. Permute `shares`, `cost` and `aw` back to the caller's order with `invperm(idx)`.
 
 # Arguments
 
-  - `w::VecNum`: Target weights of this side. The routine writes `w ./= sum(w)` through the view it is given, so a caller that needs the original weights must pass a copy.
+  - `w::VecNum`: Target weights of this side.
   - `p::VecNum`: Asset prices of this side, in the same order as `w`.
   - `cash::Number`: Cash allocated to this side.
   - `bgt::Number`: Budget of this side, used to rescale the realised weights.
-  - `sf::Option{<:NamedTuple}`: This side's charge, of [`allocation_side_fees`](@ref), or `nothing`.
-  - `ga::GreedyAllocation`: Allocator carrying `unit`, `args` and `kwargs`.
-  - `args...`: Ignored. Present so that both allocators share one call shape.
+  - `sf::Option{<:NamedTuple}`: This side's charge, from [`allocation_side_fees`](@ref), or `nothing`.
+  - `ga::GreedyAllocation`: Allocator that holds `unit`, `args` and `kwargs`.
+  - `args...`: Ignored. The discrete allocator's method takes the same positional arguments.
 
 # Returns
 
-  - `shares::VecNum`: Share count per asset, restored to the caller's asset order.
+  - `shares::VecNum`: Share count per asset, in the caller's asset order.
   - `cost::VecNum`: `shares .* p`, in the caller's order.
   - `aw::VecNum`: Realised weights, rescaled to sum to `bgt`. All zero when nothing was bought.
-  - `acash::Number`: Cash left over, after the fee is paid.
-  - `fee::Number`: The fee this side paid over the whole horizon.
-
-# Details
-
-  - The assets are sorted by descending target weight, and the answer is permuted back before it is returned. [`permute_side_fees`](@ref) puts the rates into the same order.
-  - The affordability test of both passes is on the cost of the purchase **plus** what it adds to the fee, which is [`greedy_fee_delta`](@ref). Testing the shares alone overdraws the budget whenever a fee is stated.
-  - The pass starts owing [`allocation_fee`](@ref) of the empty book. That is zero unless the side held money before the trade, because selling out is a trade and the turnover fee charges it, or unless the universe lost an asset, because the forced exit of [`allocation_liquidation_fee`](@ref) is owed whatever the side buys.
+  - `acash::Number`: Cash left over after the shares and the fee.
+  - `fee::Number`: The fee that this side paid over the whole horizon.
 
 # Related
 
@@ -350,7 +371,9 @@ function finite_sub_allocation!(w::VecNum, p::VecNum, cash::Number, bgt::Number,
     # Selling out is a trade, so a side that held money owes a turnover fee before it buys.
     fee = allocation_fee(sf, p, shares)
     acash = cash - fee
-    w /= sum(w)
+    # A side whose target weights are all zero keeps them at zero, and buys nothing.
+    sw = sum(w)
+    w /= ifelse(iszero(sw), one(sw), sw)
     unit = ga.unit
 
     # First loop
@@ -366,9 +389,12 @@ function finite_sub_allocation!(w::VecNum, p::VecNum, cash::Number, bgt::Number,
 
     # Second loop
     while acash > 0
-        # Calculate equivalent continuous w of what has already been bought.
+        # Calculate equivalent continuous w of what has already been bought. While nothing is
+        # held, that weight is zero, so the deficit is the target and a zero target is never
+        # bought.
         current_w = p .* shares
-        current_w /= sum(current_w)
+        held = sum(current_w)
+        current_w /= ifelse(iszero(held), one(held), held)
 
         deficit = w - current_w
 
@@ -434,11 +460,23 @@ end
 
 Run the Greedy Allocation portfolio optimisation.
 
+This method takes a `GreedyAllocation` with no fallback. The generic `optimise` of a finite allocation runs one with a fallback through its fallback chain.
+
+# Algorithm
+
+ 1. Split the target weights into the long and the short side, and share the cash between them, with [`setup_alloc_optim`](@ref).
+ 2. Split the fee into the charge of each side with [`allocation_side_fees`](@ref).
+ 3. Allocate the short side on its negated weights with [`finite_sub_allocation!`](@ref).
+ 4. Correct the long side's cash with the cash that the short side did not spend, with [`adjust_long_cash`](@ref).
+ 5. Allocate the long side with [`finite_sub_allocation!`](@ref).
+ 6. Negate the short side's shares, costs and weights, and put the two sides into one vector per quantity, in the caller's asset order.
+ 7. Return the long side's leftover cash as `cash`, and the sum of the fees of the two sides as `fees`.
+
 # Arguments
 
   - `ga`: The greedy allocation optimiser to use.
-  - `fai`: The [`FiniteAllocationInput`](@ref) carrying the target weights, prices, cash budget, and optional horizon and fees.
-  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+  - `fai`: The [`FiniteAllocationInput`](@ref) that holds the target weights, the prices, the cash, and the optional horizon and fees.
+  - `kwargs`: Ignored.
 
 # Returns
 

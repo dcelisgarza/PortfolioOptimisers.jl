@@ -181,7 +181,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :cost_alloc => "`cost`: Cost of the allocation.",#
                  :cash_alloc => "`cash`: Remaining uninvested cash after allocation.",#
                  :fees_alloc => "`fees`: Fee the allocation paid over the whole horizon. It is the sum of the two sides' charges, and it is never signed.",#
-                 :unit => "`unit`: Minimum purchase unit (e.g., price per share or lot size).",#
+                 :unit => "`unit`: Number of shares that one purchase buys, such as a lot size. A fractional `unit` buys fractional shares.",#
                  # Hierarchical and Schur complement optimisers.
                  :ri => "`ri`: Inner risk measure.",#
                  :ri_res => "`ri`: The intra-cluster risk measure the optimisation ran under, or a vector of them, stored **resolved**.",#
