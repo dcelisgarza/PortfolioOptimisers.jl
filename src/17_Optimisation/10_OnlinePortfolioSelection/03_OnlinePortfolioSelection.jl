@@ -475,7 +475,9 @@ function online_selection_pin(::OnlinePortfolioSelection,
     assert_pinned_context(cache.nx, rd.nx, :nx)
     static = isnothing(rd.pnl) || panel_is_static(rd.pnl)
     assert_pinned_context(cache.pnl, static ? rd.pnl : nothing, :pnl)
-    assert_column_presence(cache.ts, rd.ts, cache.n, :ts)
+    if !iszero(cache.n)
+        assert_column_presence(cache.ts, rd.ts, :ts)
+    end
     return cache
 end
 """

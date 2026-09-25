@@ -22,7 +22,6 @@ PortfolioOptimisers.sample_buffer_seed
 PortfolioOptimisers.fold_buffer
 PortfolioOptimisers.assert_buffer_factor_width
 PortfolioOptimisers.assert_buffer_presence_agreement
-PortfolioOptimisers.reset_empty_buffer
 PortfolioOptimisers.seed_sample_buffer
 PortfolioOptimisers.seed_buffer_array
 PortfolioOptimisers.copy_buffer_rows!

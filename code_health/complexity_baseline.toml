@@ -47,7 +47,7 @@ commit = "0ecb3ce47c"
 "src/01_Base/12_NormError.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 28, cog_sum = 6, arg_sum = 52, macros = [] }
 "src/01_Base/13_KappaLog.jl" = { cyc = 1, cog = 0, arg = 2, cyc_sum = 1, cog_sum = 0, arg_sum = 2, macros = [] }
 "src/01_Base/14_PartialFit.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 16, cog_sum = 7, arg_sum = 26, macros = [] }
-"src/01_Base/15_Online.jl" = { cyc = 6, cog = 6, arg = 6, cyc_sum = 103, cog_sum = 59, arg_sum = 125, macros = [] }
+"src/01_Base/15_Online.jl" = { cyc = 6, cog = 6, arg = 6, cyc_sum = 100, cog_sum = 58, arg_sum = 121, macros = [] }
 "src/01_Base/16_CoveragePolicy.jl" = { cyc = 6, cog = 9, arg = 5, cyc_sum = 61, cog_sum = 54, arg_sum = 56, macros = [] }
 "src/02_Tools/01_Operators.jl" = { cyc = 1, cog = 0, arg = 2, cyc_sum = 20, cog_sum = 0, arg_sum = 40, macros = [] }
 "src/02_Tools/02_ArrayViews.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 27, cog_sum = 5, arg_sum = 66, macros = [] }
