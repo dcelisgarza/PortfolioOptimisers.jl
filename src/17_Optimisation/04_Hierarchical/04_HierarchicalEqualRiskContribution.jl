@@ -326,7 +326,8 @@ function port_opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum,
     end
     opt = port_opt_view(hec.opt, i, X)
     return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt, scai = hec.scai,
-                                             scao = hec.scao, ex = hec.ex, fb = hec.fb)
+                                             scao = hec.scao, ex = hec.ex,
+                                             fb = view_child(hec.fb, i, X))
 end
 function non_investable_universe(hec::HierarchicalEqualRiskContribution, ni::VecStr)
     return rebuild_estimator(hec, (; opt = non_investable_universe(hec.opt, ni)))

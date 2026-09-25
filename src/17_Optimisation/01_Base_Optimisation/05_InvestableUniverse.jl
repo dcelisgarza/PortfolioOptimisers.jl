@@ -51,6 +51,11 @@ end
 function port_opt_view(::NonFiniteAllocationOptimisationResult, ::Any, args...)
     return throw(ArgumentError("a precomputed optimisation result cannot be viewed to an asset subset: its weights were solved over the full universe and a sub-portfolio of them has no defined meaning. A TimeDependent schedule holding precomputed results is therefore incompatible with asset-subsampling cross-validation (e.g. MultipleRandomised); use estimator entries there instead."))
 end
+# A precomputed fallback answers on the universe it was solved on, so the view of its
+# holder keeps it. See `view_child`.
+function view_child(res::NonFiniteAllocationOptimisationResult, ::Any, args...)
+    return res
+end
 """
     non_investable_universe(opt, ni::VecStr)
 

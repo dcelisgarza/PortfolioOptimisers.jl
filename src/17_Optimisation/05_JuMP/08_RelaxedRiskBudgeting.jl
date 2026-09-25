@@ -391,7 +391,8 @@ function port_opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum,
     opt = port_opt_view(rrb.opt, i, X)
     rba = port_opt_view(rrb.rba, i)
     wi = nothing_scalar_array_view(rrb.wi, i)
-    return RelaxedRiskBudgeting(; opt = opt, rba = rba, wi = wi, alg = rrb.alg, fb = rrb.fb)
+    return RelaxedRiskBudgeting(; opt = opt, rba = rba, wi = wi, alg = rrb.alg,
+                                fb = view_child(rrb.fb, i, X))
 end
 function non_investable_universe(rrb::RelaxedRiskBudgeting,
                                  ni::VecStr)::RelaxedRiskBudgeting

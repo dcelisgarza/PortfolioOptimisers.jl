@@ -743,7 +743,7 @@ function port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
     opto = port_opt_view(nco.opto, i, X)
     return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, fees = fees, sets = sets,
                            opti = opti, opto = opto, cv = nco.cv, wf = nco.wf, ex = nco.ex,
-                           fb = nco.fb, brt = nco.brt, x_src = nco.x_src,
+                           fb = view_child(nco.fb, i, X), brt = nco.brt, x_src = nco.x_src,
                            strict = nco.strict, cache = port_opt_view(nco.cache, i))
 end
 function non_investable_universe(nco::NestedClustered, ni::VecStr)::NestedClustered

@@ -211,6 +211,41 @@ function port_opt_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator,
     return [port_opt_view(xi, i, args...; kwargs...) for xi in x]
 end
 """
+    view_child(v, i, args...)
+
+Per-field view helper called by [`@propagatable`](@ref)-generated [`port_opt_view`](@ref) methods, and by the hand-written view of every optimiser that holds a fallback `fb`.
+
+It is the view twin of [`factory_child`](@ref). A child is viewed at the asset index, with one exception: a precomputed optimisation result is kept as it is. A result sits in a field as a fallback `fb`, and the fallback loop of [`optimise`](@ref) answers it without a solve, on the universe it was solved on. A door such as [`investable_reduction`](@ref) views an optimiser whose own fallback it never reads, so a refusal there would reject a fallback that nothing reaches.
+
+A [`TimeDependent`](@ref) schedule is not a result, so it reaches [`port_opt_view`](@ref), and a schedule that holds a result still refuses a subset view.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `v` is a precomputed optimisation result: return `v` unchanged.
+ 2. `v` is anything else: return [`port_opt_view`](@ref) of `v` at `i`, and forward `args...`.
+
+# Arguments
+
+  - `v`: The field value.
+  - `i`: Index selection.
+  - `args...`: Threaded tail, forwarded to [`port_opt_view`](@ref).
+
+# Returns
+
+  - The viewed field value, or `v` itself when it is a precomputed optimisation result.
+
+# Related
+
+  - [`port_opt_view`](@ref)
+  - [`factory_child`](@ref)
+  - [`@vprop`](@ref)
+"""
+function view_child(v, i, args...)
+    return port_opt_view(v, i, args...)
+end
+"""
     obs_weights_view(x, i) -> typeof(x)
 
 Sub-select an estimator's **observation weights** to the observations `i`.

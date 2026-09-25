@@ -225,7 +225,7 @@ The channel is read first, and then the tag, because one tag has two transforms.
      2. `tag` is `:fprop`: return `obs_weights_view(xf, thread...)`. The field is a composed child, so the verb recurses into it.
  2. `channel` is any other channel:
      1. `tag` is `:fprop`: return `factory_child(xf, thread..., args...; kwargs...)`.
-     2. `tag` is `:vprop`: return `port_opt_view(xf, thread..., args...)`. This channel forwards no keywords.
+     2. `tag` is `:vprop`: return `view_child(xf, thread..., args...)`, which calls [`port_opt_view`](@ref) on every value but a precomputed optimisation result. This channel forwards no keywords.
      3. `tag` is `:pprop`: return `sel(xf, getproperty(pr, fname))`, which is why the field name is an argument. The prior result supplies the property of the **same name**.
      4. `tag` is `:cprop`: return `sel(xf, _ctx(args...))`, which reads the context out of the threaded arguments rather than the prior.
      5. `tag` is `:wprop`: return `_wprop(xf, args...; kwargs...)`, which **replaces** the field with an incoming [`ObsWeights`](@ref).
@@ -269,7 +269,7 @@ function prop_tag_expr(channel::Symbol, tag::Symbol, fname::Symbol, xf, mod::Mod
             return :($mod.factory_child($xf, $(thread...), args...; kwargs...))
         end
         if tag === :vprop
-            return :($mod.port_opt_view($xf, $(thread...), args...))
+            return :($mod.view_child($xf, $(thread...), args...))
         end
         if tag === :pprop
             return :($mod.sel($xf, getproperty(pr, $(QuoteNode(fname)))))
@@ -721,7 +721,7 @@ The tag never expands. [`@propagatable`](@ref) runs first and consumes it, so th
 
  1. [`propagatable_parse_body`](@ref) peels the tag off the field, records the field name under `:vprop`, and puts the **stripped** field into the struct body. Neither Julia nor a wrapped macro such as `@concrete` ever sees the tag.
  2. [`prop_channel_active`](@ref) reads the recorded name. The channels this tag gates are the `view` channel alone, and each active channel makes [`@propagatable`](@ref) emit one method.
- 3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value: `port_opt_view(x.field, i, args...)`. The channel forwards the threaded tail and **no** keywords.
+ 3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value: `view_child(x.field, i, args...)`, which is `port_opt_view(x.field, i, args...)` for every value but a precomputed optimisation result, kept as it is. The channel forwards the threaded tail and **no** keywords.
  4. The generated method rebuilds the struct with its keyword constructor, so every validation the constructor carries runs again on the propagated value.
 
 Step 3 is the whole meaning of the tag. `@vprop` appears in one channel, so it carries one transform and no channel can give it a second meaning. The index that the method threads selects **assets**; the observation axis has its own verb, [`obs_weights_view`](@ref).

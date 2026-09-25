@@ -246,7 +246,8 @@ function port_opt_view(opt::OnlinePortfolioSelection, i, args...)
     return OnlinePortfolioSelection(; alg = port_opt_view(opt.alg, i, args...),
                                     set = port_opt_view(opt.set, i, args...),
                                     w0 = renormalised_view(opt.w0, i),
-                                    fees = port_opt_view(opt.fees, i, args...), fb = opt.fb,
+                                    fees = port_opt_view(opt.fees, i, args...),
+                                    fb = view_child(opt.fb, i, args...),
                                     strict = opt.strict,
                                     cache = port_opt_view(opt.cache, i, args...))
 end

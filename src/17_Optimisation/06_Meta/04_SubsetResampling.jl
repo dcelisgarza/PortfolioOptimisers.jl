@@ -486,8 +486,8 @@ function port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)::SubsetResam
     return SubsetResampling(; pe = pe, wb = wb, fees = fees, sets = sets, opt = opt,
                             wf = sr.wf, ex = sr.ex, subset_size = sr.subset_size,
                             n_subsets = sr.n_subsets, max_comb = sr.max_comb, rng = sr.rng,
-                            seed = sr.seed, fb = sr.fb, brt = sr.brt, strict = sr.strict,
-                            cache = port_opt_view(sr.cache, i))
+                            seed = sr.seed, fb = view_child(sr.fb, i, X), brt = sr.brt,
+                            strict = sr.strict, cache = port_opt_view(sr.cache, i))
 end
 function non_investable_universe(sr::SubsetResampling, ni::VecStr)::SubsetResampling
     return rebuild_estimator(sr, (; sets = non_investable_sets(sr.sets, ni)))

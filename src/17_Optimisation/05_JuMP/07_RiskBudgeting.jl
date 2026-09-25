@@ -643,7 +643,8 @@ function port_opt_view(rb::RiskBudgeting, i, X::MatNum, args...)::RiskBudgeting
     r = port_opt_view(rb.r, i, X)
     rba = port_opt_view(rb.rba, i)
     wi = nothing_scalar_array_view(rb.wi, i)
-    return RiskBudgeting(; opt = opt, r = r, rba = rba, wi = wi, fb = rb.fb)
+    return RiskBudgeting(; opt = opt, r = r, rba = rba, wi = wi,
+                         fb = view_child(rb.fb, i, X))
 end
 """
     risk_budget_universe_key(rba::RiskBudgetingAlgorithm,

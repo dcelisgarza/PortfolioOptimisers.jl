@@ -256,7 +256,8 @@ function port_opt_view(hrp::HierarchicalRiskParity, i, X::MatNum,
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = port_opt_view(hrp.r, i, X)
     opt = port_opt_view(hrp.opt, i, X)
-    return HierarchicalRiskParity(; r = r, opt = opt, sca = hrp.sca, fb = hrp.fb)
+    return HierarchicalRiskParity(; r = r, opt = opt, sca = hrp.sca,
+                                  fb = view_child(hrp.fb, i, X))
 end
 function non_investable_universe(hrp::HierarchicalRiskParity,
                                  ni::VecStr)::HierarchicalRiskParity

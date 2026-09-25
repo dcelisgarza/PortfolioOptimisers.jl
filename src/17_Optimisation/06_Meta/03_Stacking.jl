@@ -562,7 +562,7 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
     opto = port_opt_view(st.opto, i, X)
     return Stacking(; pe = pe, wb = wb, fees = fees, sets = sets, scale = st.scale,
                     opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex,
-                    fb = st.fb, brt = st.brt, strict = st.strict,
+                    fb = view_child(st.fb, i, X), brt = st.brt, strict = st.strict,
                     cache = port_opt_view(st.cache, i))
 end
 function non_investable_universe(st::Stacking, ni::VecStr)::Stacking

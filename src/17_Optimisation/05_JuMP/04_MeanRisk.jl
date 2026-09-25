@@ -359,7 +359,7 @@ function port_opt_view(mr::MeanRisk, i, X::MatNum, args...)::MeanRisk
     opt = port_opt_view(mr.opt, i, X)
     r = port_opt_view(mr.r, i, X)
     wi = nothing_scalar_array_view(mr.wi, i)
-    return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = wi, fb = mr.fb)
+    return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = wi, fb = view_child(mr.fb, i, X))
 end
 """
     solve_mean_risk!(model, mr, pr, ::Val{false}, ::Val{false}, fees, attrs)

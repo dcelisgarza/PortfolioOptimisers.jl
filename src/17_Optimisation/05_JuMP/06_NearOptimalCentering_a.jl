@@ -477,7 +477,8 @@ function port_opt_view(noc::NearOptimalCentering, i, X::MatNum,
     return NearOptimalCentering(; alg = noc.alg, ucs_flag = noc.ucs_flag, r = r,
                                 obj = noc.obj, opt = opt, bins = noc.bins, w_min = w_min,
                                 w_min_ini = w_min_ini, w_opt = w_opt, w_opt_ini = w_opt_ini,
-                                w_max = w_max, w_max_ini = w_max_ini, fb = noc.fb)
+                                w_max = w_max, w_max_ini = w_max_ini,
+                                fb = view_child(noc.fb, i, X))
 end
 """
     near_optimal_centering_risks(scalariser, r, pr, fees, slv, w_min, w_opt, w_max)

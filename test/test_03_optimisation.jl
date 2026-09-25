@@ -626,3 +626,46 @@ end
     @test failed_mr.fb === mr_res.fb
     @test PO.set_retcode(failed_mr, OptimisationSuccess()).fb === mr_res.fb
 end
+@testset "A PreviousWeights fallback holds its slice under an asset-subset view (#1339)" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    PO = PortfolioOptimisers
+    slv = Solver(; name = :none, solver = nothing)
+    X4 = randn(StableRNG(2), 10, 4)
+    # The view slices `w`, and recurses into the fallback of the fallback.
+    pw = PreviousWeights(; w = [0.4, 0.3, 0.2, 0.1],
+                         fb = PreviousWeights(; w = fill(0.25, 4)))
+    pwv = PO.port_opt_view(pw, [1, 3], X4)
+    @test pwv.w == [0.4, 0.2]
+    @test pwv.fb.w == [0.25, 0.25]
+    @test isnothing(PO.port_opt_view(PreviousWeights(), [1, 3], X4).w)
+    # Every holder views its fallback: a JuMP head, a hierarchical head and a naive head.
+    fb = PreviousWeights(; w = fill(0.25, 4))
+    mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv), fb = fb)
+    @test PO.port_opt_view(mr, [1, 2], X4).fb.w == [0.25, 0.25]
+    hrp = HierarchicalRiskParity(; fb = fb)
+    @test PO.port_opt_view(hrp, [2, 4], X4).fb.w == [0.25, 0.25]
+    ew = EqualWeighted(; fb = fb)
+    @test PO.port_opt_view(ew, [1, 2, 3], X4).fb.w == fill(0.25, 3)
+    # A precomputed fallback answers on the universe it was solved on, so a view keeps
+    # it. A schedule that holds one still refuses a subset view.
+    rd4 = ReturnsResult(; nx = string.('a':'d'), X = X4)
+    res = optimise(EqualWeighted(), rd4)
+    @test PO.port_opt_view(MeanRisk(; opt = JuMPOptimiser(; slv = slv), fb = res), [1, 2],
+                           X4).fb === res
+    @test PO.port_opt_view(EqualWeighted(; fb = res), [1, 2], X4).fb === res
+    @test_throws ArgumentError PO.port_opt_view(MeanRisk(; opt = JuMPOptimiser(; slv = slv),
+                                                         fb = TimeDependent([EqualWeighted(),
+                                                                             res])), [1, 2],
+                                                X4)
+    # The reproduction of #1339: a cluster whose solve fails falls back to the held
+    # book, sliced to the cluster, where it used to throw a `DimensionMismatch`.
+    X8 = randn(StableRNG(2), 200, 8) ./ 100 .+ 0.001
+    rd8 = ReturnsResult(; nx = string.('a':'h'), X = X8)
+    w8 = collect(1.0:8.0) ./ 36
+    inner = MeanRisk(; opt = JuMPOptimiser(; slv = slv), fb = PreviousWeights(; w = w8))
+    nres = optimise(NestedClustered(; opti = inner, opto = EqualWeighted()), rd8)
+    @test length(nres.w) == 8
+    cls = [findall(==(k), PO.assignments(nres.clr)) for k in 1:(nres.clr.k)]
+    @test all(nres.resi[k].w == w8[cls[k]] for k in eachindex(cls))
+    @test all(isa(r.retcode, OptimisationSuccess) for r in nres.resi)
+end

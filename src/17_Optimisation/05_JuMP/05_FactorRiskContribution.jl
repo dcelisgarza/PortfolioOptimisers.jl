@@ -336,7 +336,7 @@ function port_opt_view(frc::FactorRiskContribution, i, X::MatNum,
     r = port_opt_view(frc.r, i, X)
     return FactorRiskContribution(; opt = opt, re = re, r = r, obj = frc.obj,
                                   frc_ple = frc.frc_ple, sets = frc.sets, wi = frc.wi,
-                                  flag = frc.flag, fb = frc.fb)
+                                  flag = frc.flag, fb = view_child(frc.fb, i, X))
 end
 """
     set_factor_risk_contribution_constraints!(model, re, rd, pr, flag, wi)

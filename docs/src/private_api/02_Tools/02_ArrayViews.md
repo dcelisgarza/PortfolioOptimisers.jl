@@ -14,7 +14,7 @@ get_window
 
 ## View functions
 
-An optimisation over a subset of the assets, such as each inner optimisation of [`NestedClustered`](@ref), needs the part of every input that belongs to those assets. The functions below take that part of a vector, a matrix or a higher moment, and return `nothing` or a scalar unchanged. [`fourth_moment_index_generator`](@ref) gives the indices that select the entries of the subset from a fourth-moment matrix.
+An optimisation over a subset of the assets, such as each inner optimisation of [`NestedClustered`](@ref), needs the part of every input that belongs to those assets. The functions below take that part of a vector, a matrix or a higher moment, and return `nothing` or a scalar unchanged. [`fourth_moment_index_generator`](@ref) gives the indices that select the entries of the subset from a fourth-moment matrix. [`view_child`](@ref) views one field of an estimator for [`port_opt_view`](@ref), and keeps a precomputed optimisation result, such as a fallback, as it is.
 
 ```@docs
 nothing_scalar_array_view
@@ -22,4 +22,5 @@ nothing_scalar_array_view_odd_order
 nothing_scalar_array_getindex
 nothing_scalar_array_getindex_odd_order
 fourth_moment_index_generator
+view_child
 ```

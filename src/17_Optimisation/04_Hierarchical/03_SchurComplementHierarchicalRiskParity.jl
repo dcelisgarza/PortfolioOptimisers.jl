@@ -649,7 +649,8 @@ function port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum,
     X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
     opt = port_opt_view(sh.opt, i, X)
     params = port_opt_view(sh.params, i, X)
-    return SchurComplementHierarchicalRiskParity(; opt = opt, params = params, fb = sh.fb)
+    return SchurComplementHierarchicalRiskParity(; opt = opt, params = params,
+                                                 fb = view_child(sh.fb, i, X))
 end
 function non_investable_universe(sh::SchurComplementHierarchicalRiskParity, ni::VecStr)
     return rebuild_estimator(sh, (; opt = non_investable_universe(sh.opt, ni)))

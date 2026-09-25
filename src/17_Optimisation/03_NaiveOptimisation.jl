@@ -291,6 +291,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
   - `wb`: Recursively viewed via [`port_opt_view`](@ref).
   - `fees`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `fb`: Recursively viewed via [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
 
 # Examples
 
@@ -370,7 +371,7 @@ InverseVolatility
     """
     $(field_dict[:fb])
     """
-    @fprop fb
+    @fprop @vprop fb
     """
     $(field_dict[:sq])
     """
@@ -581,6 +582,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
   - `wb`: Recursively viewed via [`port_opt_view`](@ref).
   - `fees`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `fb`: Recursively viewed via [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
 
 # Examples
 
@@ -628,7 +630,7 @@ EqualWeighted
     """
     $(field_dict[:fb])
     """
-    @fprop fb
+    @fprop @vprop fb
     """
     $(field_dict[:strict_opt])
     """
@@ -791,6 +793,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
   - `wb`: Recursively viewed via [`port_opt_view`](@ref).
   - `fees`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `fb`: Recursively viewed via [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
 
 # Examples
 
@@ -851,7 +854,7 @@ RandomWeighted
     """
     $(field_dict[:fb])
     """
-    @fprop fb
+    @fprop @vprop fb
     """
     $(field_dict[:strict_opt])
     """
@@ -1053,6 +1056,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
   - `wb`: Recursively viewed via [`port_opt_view`](@ref).
   - `fees`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `fb`: Recursively viewed via [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
 
 # Examples
 
@@ -1107,7 +1111,7 @@ BestConstantRebalancedPortfolio
     """
     $(field_dict[:fb])
     """
-    @fprop fb
+    @fprop @vprop fb
     """
     Maximum number of fixed-point iterations.
     """
@@ -1287,7 +1291,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the weights it was handed, and solves nothing.
 
-The hold-only head. Its weights are the previous fold's, threaded into `w` by the fold loop through [`factory`](@ref) exactly as they reach a [`TurnoverEstimator`](@ref), and it returns them verbatim on the full asset universe: no prior, no Coverage Universe, no weight bounds, so a hold is never rewritten. Its one use is as the fallback `fb` of an optimiser inside a walk-forward, where a failed solve then holds the book instead of writing `NaN` weights and losing the fold; a weight on an asset that left the panel is still held, and its returns are zeroed as a Held Gap. It is also a primary: `PreviousWeights(; w = w)` is a walk-forward that holds `w` on every fold. It refuses nothing at construction and fails at solve time when `w` is `nothing`, which is what fold 1 of a walk-forward, and a fold-less `optimise` with no `w`, hand it.
+The hold-only head. Its weights are the previous fold's, threaded into `w` by the fold loop through [`factory`](@ref) exactly as they reach a [`TurnoverEstimator`](@ref), and it returns them verbatim on the full asset universe: no prior, no Coverage Universe, no weight bounds, so a hold is never rewritten. Its one use is as the fallback `fb` of an optimiser inside a walk-forward, where a failed solve then holds the book instead of writing `NaN` weights and losing the fold; a weight on an asset that left the panel is still held, and its returns are zeroed as a Held Gap. It is also a primary: `PreviousWeights(; w = w)` is a walk-forward that holds `w` on every fold. A view to an asset subset, such as a cluster of [`NestedClustered`](@ref) or the asset subset of a [`MultipleRandomised`](@ref) fold, slices `w` to the subset, and the head holds that slice verbatim: the slice is not rescaled to the budget of the subset. It refuses nothing at construction and fails at solve time when `w` is `nothing`, which is what fold 1 of a walk-forward, and a fold-less `optimise` with no `w`, hand it.
 
 `needs_previous_weights` is `true`, so an optimiser that carries it as a fallback runs sequentially, and the loop threads the previous weights into it.
 
@@ -1313,6 +1317,14 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
+  - `fb`: Recursively viewed via [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+
 # Examples
 
 ```jldoctest
@@ -1337,15 +1349,15 @@ PreviousWeights
     """
     Weights to hold, or `nothing` before the fold loop threads any.
     """
-    w
+    @vprop w
     """
     $(field_dict[:fees_res])
     """
-    @fprop fees
+    @fprop @vprop fees
     """
     $(field_dict[:fb])
     """
-    @fprop fb
+    @fprop @vprop fb
     function PreviousWeights(w::Option{<:VecNum}, fees::Option{<:Fees},
                              fb::TDO_Option{<:OptE_Opt})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :PreviousWeights)
