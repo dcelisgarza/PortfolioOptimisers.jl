@@ -148,7 +148,8 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test isapprox(raw.mahalanobis_ratio - cen.mahalanobis_ratio, term; rtol = 1e-10)
         @test raw.mahalanobis_ratio > cen.mahalanobis_ratio
         # The location is the estimator's: a covariance estimator centres on its own
-        # mean, a centred exponentially weighted one on zero, a prior on its `mu`.
+        # mean, a centred exponentially weighted one on zero, a prior on the centre of its
+        # `sigma`, which the default empirical prior publishes as its `mu`.
         @test po.forecast_location(Covariance(), Xm[1:60, :]) ≈ c
         @test po.forecast_location(GeneralCovariance(), Xm[1:60, :]) ≈ c
         ow = StatsBase.pweights(collect(1.0:60))
@@ -187,6 +188,65 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         # mean of the window.
         @test po.forecast_location(NoLocationCovariance(), Xg[1:60, :])[3] ≈
               mean(Xg[31:60, 3])
+    end
+
+    @testset "A prior centres on the centre of its sigma, not on the mu it publishes" begin
+        # Issue #1327. A shrunk mean moves the `mu` of an empirical prior and leaves its
+        # `sigma`, which `ce` forms about the sample mean. The location follows `sigma`.
+        sh = ShrunkExpectedReturns()
+        rdv = po.port_opt_view(rd, 1:60, :)
+        pe = EmpiricalPrior(; me = sh)
+        c = po.forecast_location(pe, rdv)
+        @test c ≈ vec(mean(X[1:60, :]; dims = 1))
+        @test maximum(abs, c - prior(pe, rdv).mu) > 1e-5
+        @test last(po.forecast_moments(pe, rd, 1:60)) == c
+        @test po.forecast_location(EmpiricalPrior(), rdv) == prior(EmpiricalPrior(), rdv).mu
+        ps = EmpiricalPrior(; ce = StatsBase.SimpleCovariance(), me = sh)
+        @test po.forecast_location(ps, rdv) ≈ c
+        @test po.forecast_location(HighOrderPriorEstimator(; pe = pe), rdv) ≈ c
+        # The horizon arm maps the log location as `mu` maps the log mean.
+        Xl = log1p.(X[1:60, :])
+        ch = expm1.(5 * vec(mean(Xl; dims = 1)) + 5 * diag(cov(Xl)) / 2)
+        @test po.forecast_location(EmpiricalPrior(; me = sh, horizon = 5), rdv) ≈ ch
+        @test po.forecast_location(EmpiricalPrior(; horizon = 5), rdv) ≈
+              prior(EmpiricalPrior(; horizon = 5), rdv).mu
+        # A factor prior lifts the location of its factor prior.
+        Fm = randn(StableRNG(1327), T, 2) ./ 100 .+ 0.0002
+        rdf = ReturnsResult(; nx = nx, X = X, nf = ["F1", "F2"], F = Fm, ts = ts)
+        rdfv = po.port_opt_view(rdf, 1:60, :)
+        fp = FactorPrior(; pe = pe)
+        fpr = prior(fp, rdfv)
+        cf = fpr.rr.M * vec(mean(Fm[1:60, :]; dims = 1)) + fpr.rr.b
+        @test po.forecast_location(fp, rdfv) ≈ cf
+        @test maximum(abs, cf - fpr.mu) > 1e-7
+        @test po.forecast_location(HighOrderFactorPriorEstimator(; pe = fp), rdfv) ≈ cf
+        @test po.forecast_location(FactorPrior(), rdfv) == prior(FactorPrior(), rdfv).mu
+        # A posterior forms its `sigma` about its `mu`.
+        bl = BlackLittermanPrior(; pe = pe,
+                                 views = LinearConstraintEstimator(; val = ["A1 == 0.001"]),
+                                 sets = UniverseSets(; dict = Dict("nx" => nx)))
+        @test po.forecast_location(bl, rdv) == prior(bl, rdv).mu
+        # The data-less form reads the fold: a folded `ce`, a `ce` refitted over the
+        # carried rows, the horizon arm, and a host whose wrapped posterior answers `mu`.
+        @test po.forecast_location(po.partial_fit!(pe, X[1:60, :])) ≈ c
+        @test po.forecast_location(po.partial_fit!(ps, X[1:60, :])) ≈ c
+        @test po.forecast_location(po.partial_fit!(EmpiricalPrior(; me = sh, horizon = 5),
+                                                   X[1:60, :])) ≈ ch
+        hb = po.partial_fit!(HighOrderPriorEstimator(; pe = bl), X[1:60, :])
+        @test po.forecast_location(hb) == prior(hb).mu
+        # So the mean estimator no longer moves the evaluation of a `sigma` it never read.
+        for cv in (batch_cv, online_cv)
+            a = cfe(pe, rd, cv)
+            b = cfe(EmpiricalPrior(), rd, cv)
+            for f in columns
+                @test finite_max(getfield(a, f), getfield(b, f)) == 0
+            end
+        end
+        a = cfe(fp, rdf, batch_cv)
+        b = cfe(FactorPrior(), rdf, batch_cv)
+        for f in columns
+            @test finite_max(getfield(a, f), getfield(b, f)) <= 1e-12
+        end
     end
 
     @testset "The online identity over a panel with a listing and a delisting" begin
@@ -242,7 +302,11 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         for (est, r) in
             ((Covariance(), rd), (GeneralCovariance(), rd), (EmpiricalPrior(), rd),
              (Covariance(; cvg = CoveragePolicy()), rdg), (EmpiricalPrior(), rdg),
-             (ExpWeightedCovariance(), rdg))
+             (ExpWeightedCovariance(), rdg),
+             (EmpiricalPrior(; me = ShrunkExpectedReturns(), horizon = 2), rd),
+             (FactorPrior(; pe = EmpiricalPrior(; me = ShrunkExpectedReturns())),
+              ReturnsResult(; nx = nx, X = X, nf = ["F1", "F2"],
+                            F = randn(StableRNG(1327), T, 2) ./ 100, ts = ts)))
             b = cfe(est, r, rolling)
             o = cfe(po.Online(est; max_history = w), r, stepped)
             @test b.n_valid == o.n_valid

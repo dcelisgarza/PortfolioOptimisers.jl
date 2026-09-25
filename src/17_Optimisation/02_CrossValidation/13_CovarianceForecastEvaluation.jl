@@ -248,8 +248,8 @@ end
     forecast_location(ce::PortfolioOptimisersCovariance)
     forecast_location(ce::CorrelationCovariance)
     forecast_location(ce::AbstractCovarianceEstimator)
-    forecast_location(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
-    forecast_location(pe::AbstractPriorEstimator; kwargs...)
+    forecast_location(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = false, kwargs...)
+    forecast_location(pe::AbstractPriorEstimator; strict::Bool = false, kwargs...)
 
 Read the location that a covariance forecast is about, off the estimator that formed it.
 
@@ -263,7 +263,7 @@ Each family has two arities. The data form answers for a batch fit over `X`. The
   - [`PortfolioOptimisersCovariance`](@ref) and [`CorrelationCovariance`](@ref) answer what the estimator that they hold answers, because a matrix transform moves no centre. A `StatsBase.CovarianceEstimator` that they hold is read as a [`GeneralCovariance`](@ref), as `cov` reads it.
   - Any other [`AbstractCovarianceEstimator`](@ref) answers the sample mean of the window, over the finite rows of each column. Its data-less form reads the state through [`forecast_state_location`](@ref), which refuses a state of a shape that it does not know.
   - Under [`Online`](@ref), every family answers its data form over the rows and masks of the buffer, because a buffer means the batch verb over its rows at every read-out.
-  - An [`AbstractPriorEstimator`](@ref) answers the `mu` that the prior publishes. This is the centre of the prior's `sigma` only when the prior forms both about one mean. An [`EmpiricalPrior`](@ref) whose `me` shrinks the mean publishes the shrunk `mu`, but its `ce` centres the covariance on its own estimate of the mean.
+  - An [`AbstractPriorEstimator`](@ref) answers the centre of its `sigma` through [`prior_forecast_location`](@ref). That is the `mu` it publishes for a family that forms both moments about one mean. An [`EmpiricalPrior`](@ref) whose `me` shrinks the mean publishes the shrunk `mu`, but its `ce` centres the covariance on its own estimate of the mean, so it answers the location of its `ce`. A factor prior and a high-order prior answer the centre of the prior that they lift or wrap. The keyword `strict` reaches [`prior`](@ref) alone.
 
 The Asset Panel form follows the moment seam of the estimator's own `cov`. Under no policy it reduces the window to its Coverage Universe and frames the answer with `NaN` outside it. Under a policy, and for the two mask-aware exponentially weighted families, it hands the active mask of the panel to the estimator. A [`PortfolioOptimisersCovariance`](@ref) hands the panel to the estimator that it holds, as its `cov` does.
 
@@ -293,6 +293,7 @@ The Asset Panel form follows the moment seam of the estimator's own `cov`. Under
   - [`covariance_forecast_evaluation`](@ref)
   - [`weighted_centre`](@ref)
   - [`partial_fit!`](@ref)
+  - [`prior_forecast_location`](@ref)
 """
 function forecast_location(ce::Covariance, X::MatNum; dims::Int = 1,
                            active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
@@ -377,11 +378,218 @@ end
 function forecast_location(ce::AbstractCovarianceEstimator)
     return forecast_state_location(ce, partial_fit_cache(ce))
 end
-function forecast_location(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
-    return prior(pe, rd; kwargs...).mu
+function forecast_location(pe::AbstractPriorEstimator, rd::ReturnsResult;
+                           strict::Bool = false, kwargs...)
+    return prior_forecast_location(pe, prior(pe, rd; strict = strict, kwargs...), rd;
+                                   kwargs...)
 end
-function forecast_location(pe::AbstractPriorEstimator; kwargs...)
-    return prior(pe; kwargs...).mu
+function forecast_location(pe::AbstractPriorEstimator; strict::Bool = false, kwargs...)
+    return prior_forecast_location(pe, prior(pe; strict = strict, kwargs...); kwargs...)
+end
+"""
+    prior_forecast_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult, rd::ReturnsResult; kwargs...)
+    prior_forecast_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
+    prior_forecast_location(pe::EmpiricalPrior, pr::AbstractPriorResult, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
+    prior_forecast_location(pe::FactorPrior, pr::AbstractPriorResult, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
+    prior_forecast_location(pe::Union{<:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator}, pr::HighOrderPrior, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
+    prior_forecast_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult; kwargs...)
+    prior_forecast_location(pe::HighOrderPriorEstimator, pr::HighOrderPrior; kwargs...)
+
+Read the location that the `sigma` of a prior is about, from the estimator and the result `pr` that it fitted.
+
+The rule is the same for every family. The location is the `mu` that the prior would publish if its mean estimator were the centring estimator of its covariance estimator. Only a family that takes its two moments from two independent estimators, or that lifts the moments of such a prior, answers something other than `pr.mu`:
+
+  - [`EmpiricalPrior`](@ref) answers [`forecast_location`](@ref) of its `ce` over the rows that `ce` saw. The horizon arm fits `ce` on the log-returns, so it maps that log location through the map that `mu` takes, ``c_i = \\exp(h c_{\\log, i} + \\tfrac{1}{2} h \\sigma_{\\log, ii}) - 1``. It reads ``h \\sigma_{\\log, ii} = \\log(1 + \\sigma_{ii} / (\\mu_i + 1)^2)`` back off the published pair.
+  - [`FactorPrior`](@ref) answers the lift of the location of its factor prior, ``\\mathbf{M} \\boldsymbol{c}_f + \\boldsymbol{b}``, which it writes as ``\\boldsymbol{\\mu} + \\mathbf{M} (\\boldsymbol{c}_f - \\boldsymbol{\\mu}_f)``.
+  - [`HighOrderPriorEstimator`](@ref) and [`HighOrderFactorPriorEstimator`](@ref) answer the location of the prior that they wrap, because they publish its `mu` and `sigma` unchanged.
+  - Every other family answers `pr.mu`. The Black–Litterman and entropy pooling families and [`OpinionPoolingPrior`](@ref) form `sigma` about their posterior or pooled `mu`. [`CrossSectionalFactorPrior`](@ref) and [`LowDimensionEnsemblePrior`](@ref) publish a forecast of the next return as `mu`.
+
+For the default [`EmpiricalPrior`](@ref), the mean estimator is the centring estimator of `ce`, so every family answers `pr.mu`. The data-less form reads the state as [`prior`](@ref) does, through [`prior_state_location`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:pe])
+  - $(arg_dict[:pr]) It is the result that `pe` fitted over the same rows.
+  - $(arg_dict[:rd])
+  - `X`: Asset returns matrix, `observations × assets`.
+  - `F`: Factor returns matrix, `observations × factors`, or `nothing`.
+  - $(arg_dict[:pnl_moment])
+  - `kwargs...`: Additional keyword arguments, passed to the centring estimator as [`prior`](@ref) passes them to `ce`.
+
+# Returns
+
+  - `c::VecNum`: The location, `assets × 1`.
+
+# Related
+
+  - [`forecast_location`](@ref)
+  - [`forecast_moments`](@ref)
+  - [`prior_state_location`](@ref)
+  - [`prior`](@ref)
+"""
+function prior_forecast_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult,
+                                 rd::ReturnsResult; kwargs...)
+    return prior_forecast_location(pe, pr, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa,
+                                   kwargs...)
+end
+function prior_forecast_location(::AbstractPriorEstimator, pr::AbstractPriorResult,
+                                 ::MatNum, ::Option{<:MatNum}, ::Option{<:AssetPanel};
+                                 kwargs...)
+    return pr.mu
+end
+function prior_forecast_location(pe::EmpiricalPrior{<:Any, <:Any, Nothing},
+                                 ::AbstractPriorResult, X::MatNum, ::Option{<:MatNum},
+                                 pnl::Option{<:AssetPanel}; kwargs...)
+    return forecast_location(library_covariance_estimator(pe.ce), X, pnl; dims = 1,
+                             kwargs...)
+end
+function prior_forecast_location(pe::EmpiricalPrior{<:Any, <:Any, <:Number},
+                                 pr::AbstractPriorResult, X::MatNum, ::Option{<:MatNum},
+                                 pnl::Option{<:AssetPanel}; kwargs...)
+    c = forecast_location(library_covariance_estimator(pe.ce), log1p.(X), pnl; dims = 1,
+                          kwargs...)
+    return horizon_location(c, pr, pe.horizon)
+end
+function prior_forecast_location(pe::FactorPrior, pr::AbstractPriorResult, ::MatNum,
+                                 F::MatNum, ::Option{<:AssetPanel}; kwargs...)
+    # The factor prior is fitted on `F` alone, so its location is read over `F` alone.
+    fpr = pr.fpr
+    c = prior_forecast_location(pe.pe, fpr, F, nothing, nothing)
+    return c === fpr.mu ? pr.mu : pr.mu + pr.rr.M * (c - fpr.mu)
+end
+function prior_forecast_location(pe::Union{<:HighOrderPriorEstimator,
+                                           <:HighOrderFactorPriorEstimator},
+                                 pr::HighOrderPrior, X::MatNum, F::Option{<:MatNum},
+                                 pnl::Option{<:AssetPanel}; kwargs...)
+    return prior_forecast_location(pe.pe, pr.pr, X, F, pnl; kwargs...)
+end
+function prior_forecast_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult;
+                                 kwargs...)
+    cache = hasfield(typeof(pe), :cache) ? getfield(pe, :cache) : nothing
+    return prior_state_location(pe, pr, cache; kwargs...)
+end
+function prior_forecast_location(pe::HighOrderPriorEstimator, pr::HighOrderPrior; kwargs...)
+    # The host owns no buffer, and `prior(pe)` reads the prior that it wraps.
+    return prior_forecast_location(pe.pe, pr.pr; kwargs...)
+end
+"""
+    prior_state_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult, state; kwargs...)
+    prior_state_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult, state::SampleBufferState; kwargs...)
+    prior_state_location(pe::EmpiricalPrior, pr::AbstractPriorResult, state::PriorCarryState; kwargs...)
+
+Read the location of a prior out of the state that its estimator carries, by the type of the state.
+
+This is the data-less arm of [`prior_forecast_location`](@ref), and it takes the routes that the data-less [`prior`](@ref) takes:
+
+  - A [`SampleBufferState`](@ref) is a refit, so the method answers the data form over the rows, the factor rows and the masks of the buffer.
+  - The [`PriorCarryState`](@ref) of an [`EmpiricalPrior`](@ref) answers the location of `ce`. A `ce` that folds answers [`forecast_location`](@ref) of its state. A `ce` that does not fold answers the data form over the carried rows, as [`read_member`](@ref) refits it. The horizon arm reads the log-returns of the rows, and maps the location as the data form does.
+  - Every other state, and `nothing`, answers `pr.mu`.
+
+# Arguments
+
+  - $(arg_dict[:pe])
+  - $(arg_dict[:pr])
+  - `state`: The state that `pe` carries, or `nothing`.
+  - `kwargs...`: Additional keyword arguments, passed to the data form or to the refit.
+
+# Returns
+
+  - `c::VecNum`: The location, `assets × 1`.
+
+# Related
+
+  - [`prior_forecast_location`](@ref)
+  - [`prior`](@ref)
+  - [`read_member`](@ref)
+"""
+function prior_state_location(::AbstractPriorEstimator, pr::AbstractPriorResult, ::Any;
+                              kwargs...)
+    return pr.mu
+end
+function prior_state_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult,
+                              state::SampleBufferState; kwargs...)
+    return prior_forecast_location(pe, pr, sample_buffer(state), factor_buffer(state),
+                                   nothing; sample_buffer_kwargs(state)..., kwargs...)
+end
+function prior_state_location(pe::EmpiricalPrior{<:Any, <:Any, Nothing},
+                              ::AbstractPriorResult, state::PriorCarryState; kwargs...)
+    return carried_location(pe.ce, sample_buffer(state); kwargs...)
+end
+function prior_state_location(pe::EmpiricalPrior{<:Any, <:Any, <:Number},
+                              pr::AbstractPriorResult, state::PriorCarryState; kwargs...)
+    c = carried_location(pe.ce, log1p.(sample_buffer(state)); kwargs...)
+    return horizon_location(c, pr, pe.horizon)
+end
+"""
+    carried_location(ce, X::MatNum; kwargs...)
+
+Read the location of a covariance estimator that a fold-and-carry prior holds, out of its state or over the rows that the prior carries.
+
+This is [`read_member`](@ref) for [`forecast_location`](@ref). A `StatsBase.CovarianceEstimator` does not fold, and it is read as a [`GeneralCovariance`](@ref) over the rows, as `cov` reads it.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `X`: The rows that the prior carries, `observations × assets`.
+  - `kwargs...`: Additional keyword arguments, passed to the refit alone.
+
+# Returns
+
+  - `c::VecNum`: The location, `assets × 1`.
+
+# Related
+
+  - [`read_member`](@ref)
+  - [`prior_state_location`](@ref)
+"""
+function carried_location(ce, X::MatNum; kwargs...)
+    return if supports_partial_fit(ce)
+        forecast_location(ce)
+    else
+        forecast_location(library_covariance_estimator(ce), X; dims = 1, kwargs...)
+    end
+end
+"""
+    horizon_location(c::VecNum, pr::AbstractPriorResult, horizon::Number)
+
+Map the log location of a covariance estimator to the arithmetic location at an investment horizon, as [`horizon_moments!`](@ref) maps the log mean.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+h \\sigma_{\\log, ii} &= \\log\\!\\left(1 + \\frac{\\sigma_{ii}}{(\\mu_i + 1)^2}\\right)\\,, \\\\
+c_i &= \\exp\\!\\left(h c_{\\log, i} + \\tfrac{1}{2} h \\sigma_{\\log, ii}\\right) - 1\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``h``: Investment horizon.
+  - ``\\mu_i``, ``\\sigma_{ii}``: The arithmetic mean and variance that the prior publishes.
+  - ``\\sigma_{\\log, ii}``: The log-return variance that the prior fitted. The first line inverts the second closed form of [`horizon_moments!`](@ref) on the diagonal.
+  - ``c_{\\log, i}``: The log location of the covariance estimator.
+
+When `c` is the log mean of the prior, ``c_i = \\mu_i``.
+
+# Arguments
+
+  - `c`: The log location, `assets × 1`.
+  - $(arg_dict[:pr])
+  - `horizon`: The investment horizon.
+
+# Returns
+
+  - `c::VecNum`: The arithmetic location, `assets × 1`.
+
+# Related
+
+  - [`horizon_moments!`](@ref)
+  - [`prior_forecast_location`](@ref)
+"""
+function horizon_location(c::VecNum, pr::AbstractPriorResult, horizon::Number)
+    hs = log1p.(LinearAlgebra.diag(pr.sigma) ./ abs2.(pr.mu .+ one(eltype(pr.mu))))
+    return expm1.(horizon * c + hs / 2)
 end
 """
     forecast_state_location(ce, state)
@@ -748,7 +956,7 @@ These are the two arms of the callback of [`covariance_forecast_evaluation`](@re
 
  1. With a training window, take the view of the carrier on its rows, giving `rdt`. Fit a covariance estimator through the Asset Panel seam of the moment verbs, `cov(ce, rdt.X, rdt.pnl)` and [`forecast_location`](@ref)`(ce, rdt.X, rdt.pnl)`. Fit a prior once over the view, giving `pr`.
  2. With `nothing`, read `cov(ce)` and `forecast_location(ce)` out of the state of a covariance estimator, or `pr = prior(pe)` out of the state of a prior.
- 3. Return the forecast and the location, which are `pr.sigma` and `pr.mu` for a prior.
+ 3. Return the forecast and the location. For a prior they are `pr.sigma` and [`prior_forecast_location`](@ref) of `pr`, which reads the centre of `pr.sigma` without a second fit.
 
 # Arguments
 
@@ -779,12 +987,13 @@ function forecast_moments(ce::AbstractCovarianceEstimator, ::ReturnsResult, ::No
     return Statistics.cov(ce), forecast_location(ce)
 end
 function forecast_moments(pe::AbstractPriorEstimator, rd::ReturnsResult, train_idx::VecInt)
-    pr = prior(pe, port_opt_view(rd, train_idx, :))
-    return pr.sigma, pr.mu
+    rdt = port_opt_view(rd, train_idx, :)
+    pr = prior(pe, rdt)
+    return pr.sigma, prior_forecast_location(pe, pr, rdt)
 end
 function forecast_moments(pe::AbstractPriorEstimator, ::ReturnsResult, ::Nothing)
     pr = prior(pe)
-    return pr.sigma, pr.mu
+    return pr.sigma, prior_forecast_location(pe, pr)
 end
 """
 $(DocStringExtensions.TYPEDEF)
