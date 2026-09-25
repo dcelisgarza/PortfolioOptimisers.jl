@@ -14,7 +14,19 @@ commit = "0ecb3ce47c"
 load_set = ["GraphRecipes", "StatsPlots"]
 
 [run.main.file]
-"ext/PortfolioOptimisersPlotsExt.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/02_DrawdownAndHistogramPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/03_MeasurePlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/04_CompositionPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/05_ClusteringPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/06_MomentPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/07_FactorMomentPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/08_AttributionPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/09_CrossValidationPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { raw = 0, reviewed = 0 }
@@ -387,7 +399,19 @@ load_set = ["GraphRecipes", "StatsPlots"]
 load_set = ["GraphRecipes", "StatsPlots"]
 
 [run.plots_ext.file]
-"ext/PortfolioOptimisersPlotsExt.jl" = { raw = 6, reviewed = 6 }
+"ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { raw = 1, reviewed = 1 }
+"ext/PortfolioOptimisersPlotsExt/02_DrawdownAndHistogramPlots.jl" = { raw = 1, reviewed = 1 }
+"ext/PortfolioOptimisersPlotsExt/03_MeasurePlots.jl" = { raw = 3, reviewed = 3 }
+"ext/PortfolioOptimisersPlotsExt/04_CompositionPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/05_ClusteringPlots.jl" = { raw = 2, reviewed = 2 }
+"ext/PortfolioOptimisersPlotsExt/06_MomentPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/07_FactorMomentPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/08_AttributionPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/09_CrossValidationPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { raw = 0, reviewed = 0 }

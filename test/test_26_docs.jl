@@ -507,7 +507,7 @@ An extension is a module of its own, so `Base.undocumented_names` -- the instrum
 first testset in this file already uses -- answers for it directly. It also answers the
 right question rather than a widened one, and what the one file holds is why:
 
-  - `ext/PortfolioOptimisersPlotsExt.jl` defines 171 methods of 34 functions, and every one
+  - `ext/PortfolioOptimisersPlotsExt/` defines 171 methods of 34 functions, and every one
     of the 34 is declared as a bare `function ... end` stub in `src/22_Plotting.jl`, which
     carries its docstring. Beyond those methods it declares four module-local `const`s
     holding error-message text, and nothing else.

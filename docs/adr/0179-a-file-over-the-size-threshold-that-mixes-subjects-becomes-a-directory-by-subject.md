@@ -72,11 +72,33 @@ baselines, the Exemptions and the perf dismissals, the link targets in the ADRs,
 the comments and prompts that named a file.
 
 **The Plots extension takes the same rule in a commit of its own**, because its code sits inside
-a `module` block and its parts must be included from the module file.
+a `module` block. `ext/PortfolioOptimisersPlotsExt.jl` becomes `ext/PortfolioOptimisersPlotsExt/`,
+where Julia also finds an extension: the module file `PortfolioOptimisersPlotsExt.jl` keeps the
+`using` and `import` lines and the two helpers every subject reads, and includes twelve files in
+order. Its returns subject alone stood at 810 code lines, so it takes three files, and the factor
+moments leave the moment plots, which stood at 495.
+
+| New file | What it holds |
+| -------- | ------------- |
+| `01_CumulativeReturnsPlots` | cumulative portfolio and asset returns, the benchmark |
+| `02_DrawdownAndHistogramPlots` | drawdowns, rolling drawdowns, histograms |
+| `03_MeasurePlots` | risk measures, rolling measures, the performance summary |
+| `04_CompositionPlots` | composition, stacked composition, risk and factor risk contribution |
+| `05_ClusteringPlots` | network, dendrogram, clusters, centrality |
+| `06_MomentPlots` | correlation, expected returns, covariance, eigenspectrum, prior, coskewness, cokurtosis |
+| `07_FactorMomentPlots` | factor loadings, factor covariance, factor expected returns |
+| `08_AttributionPlots` | the factor attribution plots |
+| `09_CrossValidationPlots` | cross-validation scores, turnover, weight stability, the dashboard |
+| `10_FrontierPlots` | the portfolio dashboard and the efficient frontier |
+| `11_FactorDiagnosticsPlots` | the cross-sectional regression, exposure and idiosyncratic diagnostics, the factor summary and forecasts |
+| `12_ForecastEvaluationPlots` | the forecast evaluation plots |
+
+Every definition of the extension is a method or a `const` string that a method reads when it
+runs, so no move can break the load order. The extension loads, and `test_25_plotting.jl` passes.
 
 ## Consequences
 
-- No file under `src/` stands over the size threshold.
+- No file under `src/` or `ext/` stands over the size threshold.
 - A new definition goes to the file of its subject. A new subject in one of these directories
   takes the next number.
 - The entry test of ADR 0074 reads each new file as an addition, so each definition over a

@@ -57,7 +57,19 @@
 "13" = "Plotting and extensions"
 
 [file]
-"ext/PortfolioOptimisersPlotsExt.jl" = { map = 13, units = 0, swept = false }
+"ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { map = 13, units = 0, swept = false }
+"ext/PortfolioOptimisersPlotsExt/02_DrawdownAndHistogramPlots.jl" = { map = 13, units = 0, swept = false }
+"ext/PortfolioOptimisersPlotsExt/03_MeasurePlots.jl" = { map = 13, units = 0, swept = false }
+"ext/PortfolioOptimisersPlotsExt/04_CompositionPlots.jl" = { map = 13, units = 0, swept = false }
+"ext/PortfolioOptimisersPlotsExt/05_ClusteringPlots.jl" = { map = 13, units = 0, swept = false }
+"ext/PortfolioOptimisersPlotsExt/06_MomentPlots.jl" = { map = 13, units = 0, swept = false }
+"ext/PortfolioOptimisersPlotsExt/07_FactorMomentPlots.jl" = { map = 13, units = 0, swept = false }
+"ext/PortfolioOptimisersPlotsExt/08_AttributionPlots.jl" = { map = 13, units = 0, swept = false }
+"ext/PortfolioOptimisersPlotsExt/09_CrossValidationPlots.jl" = { map = 13, units = 0, swept = false }
+"ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl" = { map = 13, units = 0, swept = false }
+"ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { map = 13, units = 0, swept = false }
+"ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { map = 13, units = 0, swept = false }
+"ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { map = 13, units = 0, swept = false }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { map = 1, units = 8, algorithm = 1, swept = true, bindings = ["arg_dict", "err_name_dict", "field_dict", "math_dict", "ref_dict", "ret_dict", "unique_key_dict!", "val_dict"] }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { map = 1, units = 0, algorithm = 0, swept = true, bindings = [] }
 "src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { map = 1, units = 0, algorithm = 0, swept = true, bindings = [] }

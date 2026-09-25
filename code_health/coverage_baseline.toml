@@ -7,7 +7,19 @@ julia = "1.13.0"
 commit = "8610300"
 
 [file]
-"ext/PortfolioOptimisersPlotsExt.jl" = { lines = 979, misses = 376 }
+"ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { lines = 139, misses = 79 }
+"ext/PortfolioOptimisersPlotsExt/02_DrawdownAndHistogramPlots.jl" = { lines = 137, misses = 33 }
+"ext/PortfolioOptimisersPlotsExt/03_MeasurePlots.jl" = { lines = 94, misses = 48 }
+"ext/PortfolioOptimisersPlotsExt/04_CompositionPlots.jl" = { lines = 120, misses = 40 }
+"ext/PortfolioOptimisersPlotsExt/05_ClusteringPlots.jl" = { lines = 103, misses = 12 }
+"ext/PortfolioOptimisersPlotsExt/06_MomentPlots.jl" = { lines = 209, misses = 96 }
+"ext/PortfolioOptimisersPlotsExt/07_FactorMomentPlots.jl" = { lines = 73, misses = 38 }
+"ext/PortfolioOptimisersPlotsExt/08_AttributionPlots.jl" = { lines = 30, misses = 0 }
+"ext/PortfolioOptimisersPlotsExt/09_CrossValidationPlots.jl" = { lines = 49, misses = 23 }
+"ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl" = { lines = 60, misses = 11 }
+"ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { lines = 199, misses = 0 }
+"ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { lines = 170, misses = 0 }
+"ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { lines = 8, misses = 0 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { lines = 8, misses = 0 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { lines = 0, misses = 0 }
 "src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { lines = 0, misses = 0 }

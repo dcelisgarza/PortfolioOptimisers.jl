@@ -8,7 +8,19 @@ julia_syntax = "1.0.2"
 commit = "0ecb3ce47c"
 
 [file]
-"ext/PortfolioOptimisersPlotsExt.jl" = { cyc = 10, cog = 15, arg = 16, cyc_sum = 520, cog_sum = 436, arg_sum = 1208, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/02_DrawdownAndHistogramPlots.jl" = { cyc = 10, cog = 15, arg = 10, cyc_sum = 57, cog_sum = 68, arg_sum = 148, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/03_MeasurePlots.jl" = { cyc = 7, cog = 14, arg = 10, cyc_sum = 38, cog_sum = 56, arg_sum = 74, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/04_CompositionPlots.jl" = { cyc = 10, cog = 10, arg = 13, cyc_sum = 49, cog_sum = 43, arg_sum = 116, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/05_ClusteringPlots.jl" = { cyc = 6, cog = 6, arg = 8, cyc_sum = 31, cog_sum = 24, arg_sum = 71, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/06_MomentPlots.jl" = { cyc = 5, cog = 6, arg = 5, cyc_sum = 79, cog_sum = 46, arg_sum = 167, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/07_FactorMomentPlots.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 29, cog_sum = 16, arg_sum = 66, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/08_AttributionPlots.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 14, cog_sum = 13, arg_sum = 29, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/09_CrossValidationPlots.jl" = { cyc = 4, cog = 7, arg = 4, cyc_sum = 13, cog_sum = 11, arg_sum = 24, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl" = { cyc = 5, cog = 9, arg = 16, cyc_sum = 18, cog_sum = 20, arg_sum = 66, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { cyc = 4, cog = 6, arg = 8, cyc_sum = 75, cog_sum = 38, arg_sum = 169, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { cyc = 5, cog = 8, arg = 8, cyc_sum = 60, cog_sum = 40, arg_sum = 174, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 4, cog_sum = 3, arg_sum = 5, macros = [] }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { cyc = 4, cog = 4, arg = 3, cyc_sum = 4, cog_sum = 4, arg_sum = 3, macros = [] }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
 "src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }

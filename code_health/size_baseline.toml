@@ -9,7 +9,19 @@ julia_syntax = "1.0.2"
 commit = "0ecb3ce47c"
 
 [file]
-"ext/PortfolioOptimisersPlotsExt.jl" = { code = 2993, doc = 0, comment = 241, blank = 48, total = 3282 }
+"ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
+"ext/PortfolioOptimisersPlotsExt/02_DrawdownAndHistogramPlots.jl" = { code = 315, doc = 0, comment = 20, blank = 13, total = 348 }
+"ext/PortfolioOptimisersPlotsExt/03_MeasurePlots.jl" = { code = 208, doc = 0, comment = 22, blank = 2, total = 232 }
+"ext/PortfolioOptimisersPlotsExt/04_CompositionPlots.jl" = { code = 283, doc = 0, comment = 19, blank = 2, total = 304 }
+"ext/PortfolioOptimisersPlotsExt/05_ClusteringPlots.jl" = { code = 197, doc = 0, comment = 8, blank = 0, total = 205 }
+"ext/PortfolioOptimisersPlotsExt/06_MomentPlots.jl" = { code = 365, doc = 0, comment = 28, blank = 9, total = 402 }
+"ext/PortfolioOptimisersPlotsExt/07_FactorMomentPlots.jl" = { code = 130, doc = 0, comment = 22, blank = 3, total = 155 }
+"ext/PortfolioOptimisersPlotsExt/08_AttributionPlots.jl" = { code = 79, doc = 0, comment = 6, blank = 1, total = 86 }
+"ext/PortfolioOptimisersPlotsExt/09_CrossValidationPlots.jl" = { code = 84, doc = 0, comment = 14, blank = 4, total = 102 }
+"ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl" = { code = 147, doc = 0, comment = 13, blank = 2, total = 162 }
+"ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { code = 434, doc = 0, comment = 38, blank = 3, total = 475 }
+"ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { code = 430, doc = 0, comment = 35, blank = 0, total = 465 }
+"ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { code = 40, doc = 0, comment = 8, blank = 5, total = 53 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { code = 17, doc = 125, comment = 0, blank = 44, total = 186 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { code = 162, doc = 0, comment = 20, blank = 0, total = 182 }
 "src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { code = 126, doc = 0, comment = 14, blank = 0, total = 140 }

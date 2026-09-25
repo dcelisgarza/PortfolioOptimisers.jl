@@ -685,6 +685,33 @@ definition = "@forward_properties"
 metric = "cog"
 rationale = "a-definition-a-file-split-moved-unchanged"
 
+# The split by subject of the Plots extension (ADR 0179) moved each definition below unchanged
+# into a file of its subject, where it now drives the file's maximum.
+
+[[exemption]]
+path = "ext/PortfolioOptimisersPlotsExt/04_CompositionPlots.jl"
+definition = "PortfolioOptimisers.plot_factor_risk_contribution"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "ext/PortfolioOptimisersPlotsExt/04_CompositionPlots.jl"
+definition = "PortfolioOptimisers.plot_risk_contribution"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl"
+definition = "PortfolioOptimisers.plot_efficient_frontier"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl"
+definition = "PortfolioOptimisers.plot_portfolio_dashboard"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
 # --- coverage exemptions ---------------------------------------------------
 #
 # ADR 0082. One row per definition that holds an uncovered line no test can reach, keyed
