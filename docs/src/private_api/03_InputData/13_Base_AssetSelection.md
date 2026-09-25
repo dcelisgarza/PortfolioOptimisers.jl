@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base asset selection, private API of PortfolioOptimisers.jl: AbstractAssetSelector, find_complete_indices."
+Description = "Base asset selection, private API of PortfolioOptimisers.jl: AbstractAssetSelector."
 ```
 
 # Base asset selection: private API
@@ -8,10 +8,4 @@ Description = "Base asset selection, private API of PortfolioOptimisers.jl: Abst
 
 ```@docs
 AbstractAssetSelector
-```
-
-## Functions
-
-```@docs
-find_complete_indices
 ```

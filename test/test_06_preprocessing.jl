@@ -546,7 +546,6 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
     end
 
     @testset "the missing-data path on both axes" begin
-        find_complete_indices = PortfolioOptimisers.find_complete_indices
         is_missing_value = PortfolioOptimisers.is_missing_value
 
         # `missing` and `NaN` are the two conventions for an absent price, and one predicate
@@ -555,14 +554,6 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test is_missing_value(NaN)
         @test !is_missing_value(1.0)
         @test !is_missing_value("a")
-
-        # `dims = 1` reports the complete columns, `dims = 2` the complete rows. One entry
-        # is enough to remove the whole column or row.
-        Xm = [1.0 2.0 NaN; 4.0 missing 6.0]
-        @test find_complete_indices(Xm) == [1]
-        @test find_complete_indices(Xm; dims = 2) == Int[]
-        @test find_complete_indices([1.0 2.0; 3.0 4.0]) == [1, 2]
-        @test find_complete_indices([1.0 2.0; 3.0 4.0]; dims = 2) == [1, 2]
 
         # `MissingDataFilter` splits the two axes across the fit/apply seam: `col_thr`
         # selects the universe at fit time and `row_thr` drops rows at apply time.

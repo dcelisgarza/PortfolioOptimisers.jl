@@ -150,3 +150,20 @@ each" is a helper two of the three redundancy algorithms happen to use.
   surfaced it: a view cannot be resized. They now carry the peak in a scalar, so they read
   `x` and never write it, and any `AbstractVector` works. Fixed as a prerequisite rather
   than worked around in `asset_scores`.
+
+## Amendment (2026-09-25)
+
+`find_complete_indices` is deleted. Decision 8 kept it as the internal of
+`CompleteAssetSelector`, but the Coverage Universe (ADR 0120) replaced that use: the shared
+`fit_preprocessing` reduces the training window before it calls `select_assets`, and
+`CompleteAssetSelector` returns all trues on the reduced window. After that change no method
+under `src/` or `ext/` called the function, and its rule no longer matched the selector's. It
+read `missing` and `NaN` alone, so it counted a column with an `Inf` entry as complete, while
+the Coverage Universe drops that column and a column that the Asset Panel marks inactive.
+
+Decision 2 still holds. Its reason is restated: `assert_universe_aligned` compares the asset
+names and reads no row, so a row drop does not break it. A selector drops columns only
+because observation filtering is a price-level policy, which `MissingDataFilter` owns.
+
+`find_uncorrelated_indices` is unchanged. `RedundancySelector` still calls it, through its
+`PairwiseCorrelation` algorithm.

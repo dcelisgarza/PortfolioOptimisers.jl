@@ -278,9 +278,6 @@ end
         @test_throws TypeError ReturnsResult(; nx = ["A", "B"],
                                              X = Union{Missing, Float64}[0.1 0.2
                                                                          0.3 missing])
-        # the helper itself does read both sentinels
-        @test PO.find_complete_indices(Union{Missing, Float64}[1.0 missing; 2.0 3.0];
-                                       dims = 1) == [1]
     end
 
     #=
@@ -360,14 +357,10 @@ end
     end
 
     @testset "the base of the family agrees with its docstrings" begin
-        # find_complete_indices reads missing and NaN alone, so an Inf column is complete,
-        # while CompleteAssetSelector keeps the Coverage Universe, which drops it
+        # CompleteAssetSelector keeps the Coverage Universe, which drops an Inf column too
         Xi = [1.0 Inf; 2.0 3.0]
-        @test PO.find_complete_indices(Xi) == [1, 2]
-        @test PO.find_complete_indices(Xi; dims = 2) == [1, 2]
         @test fit_preprocessing(CompleteAssetSelector(),
                                 ReturnsResult(; nx = ["A", "B"], X = Xi)).nx == ["A"]
-        @test_throws DomainError PO.find_complete_indices(Xi; dims = 3)
 
         # the fitted names keep the column order of the training window, not a sorted one
         rd = ReturnsResult(; nx = ["C", "A", "B"],
