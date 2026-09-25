@@ -97,11 +97,14 @@ The measured roots of ADR 0072. A tracked `.jl` file outside them must be a name
 const MEASURED_ROOTS = ("src/", "ext/")
 
 """
-The four files that declare a Declaration Macro, per ADR 0072.
+The files that declare a Declaration Macro, per ADR 0072. `src/02_Tools.jl` and
+`src/17_Optimisation/01_Base_Optimisation.jl` became directories (ADR 0179), so each names the
+part that holds its macros.
 """
-const DECLARING_FILES = ("src/01_Base/03_PrettyShow.jl", "src/02_Tools.jl",
+const DECLARING_FILES = ("src/01_Base/03_PrettyShow.jl", "src/02_Tools/05_Propagatable.jl",
+                         "src/02_Tools/06_ForwardProperties.jl",
                          "src/05_Moments/01_Base_Moments.jl",
-                         "src/17_Optimisation/01_Base_Optimisation.jl")
+                         "src/17_Optimisation/01_Base_Optimisation/02_PipeRouting.jl")
 
 in_scope(path::AbstractString) = any(r -> startswith(path, r), MEASURED_ROOTS)
 
@@ -536,7 +539,8 @@ the Expansion Bound's key set needs.
 
 `declaring` is the set of files searched for a declaration. It is a parameter for the same reason
 `root` is: a fixture tree holds no `src/01_Base.jl`, so a hard-coded list admits only the live
-checkout. The default is ADR 0072's four files.
+checkout. The default is `DECLARING_FILES`: ADR 0072's four files, with the two that became
+directories named by the part that holds their macros.
 """
 function declaration_macros(files; root = REPO_ROOT, declaring = DECLARING_FILES)
     declared = Set{String}()

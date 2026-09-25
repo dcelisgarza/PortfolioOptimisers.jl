@@ -16,7 +16,7 @@ The library calibrated the radius on one fit and applied it to a different one. 
 it.**
 
 On the mean axis,
-[`set_return_constraints!`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl)
+[`set_return_constraints!`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/03_ReturnConstraints.jl)
 took the centre from the outer prior:
 
 ```julia

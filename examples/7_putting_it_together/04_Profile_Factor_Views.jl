@@ -171,7 +171,7 @@ plot_stacked_bar_composition([desk], rd; xticks = (1:1, ["Factor-views desk"]))
 #src   errored under MaximumRatio ("Subtraction between an array and a JuMP scalar") because
 #src   set_weight_constraints! built `w - k*lb` / `w - k*ub` without broadcasting; vector bounds
 #src   worked by accident. Fixed to use the project's `⊖` operator (src/.../03_WeightConstraints.jl),
-#src   matching the sibling in 01_Base_Optimisation.jl. Regression test added in
+#src   matching the sibling in 01_Base_Optimisation/. Regression test added in
 #src   test/test_18k_constraints.jl ("Scalar weight bounds (broadcast ⊖ regression)").
 #src - Contrast with the other profiles: retail = cost control, desk monthly = view + frontier,
 #src   institutional = constraints + benchmark, factor-views = factor-space view + sector caps.

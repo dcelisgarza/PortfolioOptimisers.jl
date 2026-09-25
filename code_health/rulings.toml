@@ -628,6 +628,63 @@ definition = "replace_group_by_assets"
 metric = "cog"
 rationale = "a-definition-a-file-split-moved-unchanged"
 
+# The splits by subject of ADR 0179 moved each definition below unchanged into a file of its
+# subject, where it now drives the file's maximum.
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/04_EntropyPoolingSolvers.jl"
+definition = "entropy_pooling"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/04_EntropyPoolingSolvers.jl"
+definition = "ep_var_views!"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/04_EntropyPoolingSolvers.jl"
+definition = "entropy_pooling"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/04_EntropyPoolingSolvers.jl"
+definition = "ep_var_views!"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/05_EntropyPoolingMomentViews.jl"
+definition = "replace_coprior_views"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/05_EntropyPoolingMomentViews.jl"
+definition = "replace_coprior_views"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/02_Tools/05_Propagatable.jl"
+definition = "propagatable_parse_body"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/02_Tools/06_ForwardProperties.jl"
+definition = "@forward_properties"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/02_Tools/06_ForwardProperties.jl"
+definition = "@forward_properties"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
 # --- coverage exemptions ---------------------------------------------------
 #
 # ADR 0082. One row per definition that holds an uncovered line no test can reach, keyed
@@ -693,13 +750,13 @@ rationale = "a-closure-inside-a-top-level-const"
 # covers every Finding of the rule in the definition. Issue #1312 wrote the first rows.
 
 [[perf_dismissal]]
-file = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior.jl"
+file = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/02_EntropyPoolingMeanViews.jl"
 rule = "loop_allocation"
 definition = "replace_prior_views"
 rationale = "an-allocation-the-loop-keeps"
 
 [[perf_dismissal]]
-file = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior.jl"
+file = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/05_EntropyPoolingMomentViews.jl"
 rule = "loop_allocation"
 definition = "replace_coprior_views"
 rationale = "an-allocation-the-loop-keeps"

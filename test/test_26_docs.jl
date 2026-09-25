@@ -777,7 +777,7 @@ in the sense of `STANDARDS.md`.
     a caller reads the entry back by that name. THAT IS NOT A PROPERTY OF A ROW.
     `model[:sc]`, `model[:w]`, `model[:ret]` and `model[:risk]` are each a variable or an
     expression, `src/` reads a model key back by name in 51 places over 16 distinct keys, and
-    `01_Base_JuMPOptimisation.jl` wraps nine of those keys in an accessor that raises a named
+    `01_Base_JuMPOptimisation/02_JuMPModelAccessors.jl` wraps nine of those keys in an accessor that raises a named
     `ArgumentError` when its builder has not run. A row name is public, and so is every one
     of those.
 
@@ -1040,7 +1040,7 @@ in the sense of `STANDARDS.md`.
 
     The kind is read from the parse, not from a name. An acronym and a factory are scoped to
     `src/23_Aliases.jl`, which is where both live and is itself part of the rule. Without
-    that scope `const PROP_TAG_MACRO_NAMES = ...` in `src/02_Tools.jl` reads as an acronym
+    that scope `const PROP_TAG_MACRO_NAMES = ...` in `src/02_Tools/05_Propagatable.jl` reads as an acronym
     alias, and it is a computed constant.
 
     Three checks, and the split between them is the one ADR 0081 drew and ADR 0085 reused. A
@@ -1230,10 +1230,10 @@ in the sense of `STANDARDS.md`.
 
     A glyph is not owned by a key. `\boldsymbol{w}` is `math_dict[:w_port]`, the portfolio
     weights vector, inside a risk measure; it is the observation weights in
-    `src/02_Tools.jl` and the OWA weight vector in
+    `src/02_Tools/07_VectorToScalarMeasures.jl` and the OWA weight vector in
     `src/16_RiskMeasures/07_OWARiskMeasures_a.jl`. Matching on the symbol alone reported 149
     sites, and the great majority of them define a different quantity that the key would
-    state wrongly -- `src/02_Tools.jl` among them, the one such site inside a swept file.
+    state wrongly -- `src/02_Tools/07_VectorToScalarMeasures.jl` among them, the one such site inside a swept file.
     Matching the whole bullet against the whole value reports only a COPY of the dictionary
     text. That copy is the drift the rule exists to stop, and the match cannot fire on a
     glyph that two families share.

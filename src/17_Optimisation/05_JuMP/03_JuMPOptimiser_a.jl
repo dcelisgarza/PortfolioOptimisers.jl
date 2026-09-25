@@ -268,7 +268,7 @@ Shared field core for JuMP-based optimisation results.
 
 Holds the fields common to every JuMP optimisation result. Embedded as the first field (`jr`) of each concrete JuMP result, analogous to how [`JuMPOptimiser`](@ref) is embedded as `opt` in each JuMP optimiser. The concrete result keeps only its unique fields plus the trailing `fb`.
 
-Defined here (rather than in `01_Base_JuMPOptimisation.jl`, where its [`BaseJuMPOptimisationResult`](@ref) supertype lives) so its typed constructor can bind `pa::ProcessedJuMPOptimiserAttributes` and `sol::JuMPOptimisationSolution`, both in scope at this point in load order.
+Defined here (rather than in `01_Base_JuMPOptimisation/01_JuMPOptimisationTypes.jl`, where its [`BaseJuMPOptimisationResult`](@ref) supertype lives) so its typed constructor can bind `pa::ProcessedJuMPOptimiserAttributes` and `sol::JuMPOptimisationSolution`, both in scope at this point in load order.
 
 # Fields
 

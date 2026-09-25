@@ -851,7 +851,7 @@ Where:
 """
 ````
 
-**Example that registers no row.** The following is the formulation of `set_model_scales!` in `src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation.jl`. It registers two expressions and nothing else, so it carries one subsection:
+**Example that registers no row.** The following is the formulation of `set_model_scales!` in `src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/02_JuMPModelAccessors.jl`. It registers two expressions and nothing else, so it carries one subsection:
 
 ````julia
 """

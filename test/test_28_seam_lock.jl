@@ -2,7 +2,7 @@
     using Test
 
     # Model State (the `JuMP.Model` object dictionary shared by every constraint and risk
-    # builder) is reached through the typed interface in `01_Base_JuMPOptimisation.jl`:
+    # builder) is reached through the typed interface in `01_Base_JuMPOptimisation/`:
     # `state_key` / `state_set!` / `state_has` / `state_get` / `state_build!` /
     # `nested_prefix`, plus the named accessors built on them (`get_X`, `get_dd`, …).
     #
@@ -44,7 +44,7 @@
     # threshold/fee/xbgt model (ADR 0033/0034).
 
     srcdir = normpath(joinpath(@__DIR__, "..", "src"))
-    interface = "01_Base_JuMPOptimisation.jl"
+    interface = "17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/"
 
     # Files that build a DIFFERENT `JuMP.Model` — not the portfolio model, so the Model
     # State vocabulary does not apply to them at all.
@@ -108,12 +108,13 @@
     read_violations = String[]
     index_violations = String[]
     for (root, _, files) in walkdir(srcdir), file in files
-        if !endswith(file, ".jl") || file == interface
+        if !endswith(file, ".jl")
             continue
         end
         path = joinpath(root, file)
         rel = replace(relpath(path, srcdir), '\\' => '/')
-        if rel in other_models
+        # The interface is the directory of the JuMP base files (ADR 0179).
+        if startswith(rel, interface) || rel in other_models
             continue
         end
         for (lineno, raw) in code_lines(path)

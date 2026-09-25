@@ -554,7 +554,7 @@ function port_opt_view(smtx::VecMatNum_ASetMatE, i, args...; kwargs...)
                                              for smtxi in smtx])
 end
 # A vector of estimators alone matches both the signature above and the generic vector method
-# in `02_Tools.jl`, and neither is more specific: `MatNum` is outside the generic's element
+# in `02_Tools/02_ArrayViews.jl`, and neither is more specific: `MatNum` is outside the generic's element
 # union, `Nothing` is outside this one's. This method is that intersection, so the two never
 # tie. Its body is the one above, because a membership matrix and its estimator must produce
 # the same element type.

@@ -53,7 +53,7 @@ typo is obvious while a legitimately-absent asset stays quiet.**
   Black-Litterman view generator
   ([05_BlackLittermanViewsGeneration.jl](../../src/10_Prior/05_BlackLitterman/01_BlackLittermanViewsGeneration.jl)), and
   the entropy-pooling view generator
-  ([10_Base_EntropyPoolingPrior.jl](../../src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior.jl)).
+  ([10_Base_EntropyPoolingPrior.jl](../../src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/)).
 - `unknown_variable_msg` takes an optional `candidates` pool (default: the asset universe `nx`) that
   is searched for the typo suggestion, while the *reported* universe size stays `length(nx)`.
   `group_to_val!` passes `[nx; keys(sdict)]` so a mistyped **group** name — valid only in the group

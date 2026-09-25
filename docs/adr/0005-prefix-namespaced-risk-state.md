@@ -26,7 +26,7 @@ so they never collide with the outer model's keys and nothing has to be saved,
 unregistered, or restored.
 
 A single helper, `preg!(model, prefix, name, val)` in
-[08_Base_JuMPOptimisation.jl](../../src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation.jl),
+[08_Base_JuMPOptimisation.jl](../../src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/),
 registers `val` under `Symbol(prefix, name)`. Shared-infrastructure builders and the
 read accessors take a `prefix::Symbol = Symbol("")` keyword: the default empty prefix
 reproduces the original bare key (so the change is behaviour-preserving everywhere

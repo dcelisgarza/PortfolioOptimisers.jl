@@ -235,7 +235,7 @@ julia --project=code_health -e '
     include(joinpath(pwd(), "code_health", "jet.jl"))
     end
     m = Jet.measure()
-    for r in m.reviewed["src/02_Tools.jl"]
+    for r in m.reviewed["src/02_Tools/05_Propagatable.jl"]
         println(r.run, "  ", r.kind, ": ", r.message)
     end'
 ```

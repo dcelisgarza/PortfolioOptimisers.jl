@@ -37,7 +37,13 @@ commit = "0ecb3ce47c"
 "src/01_Base/14_PartialFit.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 16, cog_sum = 7, arg_sum = 26, macros = [] }
 "src/01_Base/15_Online.jl" = { cyc = 6, cog = 6, arg = 6, cyc_sum = 103, cog_sum = 59, arg_sum = 125, macros = [] }
 "src/01_Base/16_CoveragePolicy.jl" = { cyc = 8, cog = 15, arg = 5, cyc_sum = 57, cog_sum = 53, arg_sum = 55, macros = [] }
-"src/02_Tools.jl" = { cyc = 45, cog = 96, arg = 6, cyc_sum = 238, cog_sum = 233, arg_sum = 262, macros = ["@propagatable"] }
+"src/02_Tools/01_Operators.jl" = { cyc = 1, cog = 0, arg = 2, cyc_sum = 20, cog_sum = 0, arg_sum = 40, macros = [] }
+"src/02_Tools/02_ArrayViews.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 27, cog_sum = 5, arg_sum = 66, macros = [] }
+"src/02_Tools/03_TypeUtilities.jl" = { cyc = 4, cog = 6, arg = 2, cyc_sum = 7, cog_sum = 8, arg_sum = 4, macros = [] }
+"src/02_Tools/04_Factory.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 8, cog_sum = 2, arg_sum = 25, macros = [] }
+"src/02_Tools/05_Propagatable.jl" = { cyc = 10, cog = 19, arg = 6, cyc_sum = 84, cog_sum = 92, arg_sum = 41, macros = [] }
+"src/02_Tools/06_ForwardProperties.jl" = { cyc = 45, cog = 96, arg = 4, cyc_sum = 60, cog_sum = 117, arg_sum = 10, macros = [] }
+"src/02_Tools/07_VectorToScalarMeasures.jl" = { cyc = 3, cog = 4, arg = 3, cyc_sum = 32, cog_sum = 9, arg_sum = 76, macros = ["@propagatable"] }
 "src/03_InputData/01_AssetPanel.jl" = { cyc = 7, cog = 9, arg = 6, cyc_sum = 110, cog_sum = 66, arg_sum = 113, macros = [] }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { cyc = 7, cog = 10, arg = 6, cyc_sum = 70, cog_sum = 55, arg_sum = 56, macros = [] }
 "src/03_InputData/03_ListingSpan.jl" = { cyc = 5, cog = 8, arg = 3, cyc_sum = 21, cog_sum = 15, arg_sum = 20, macros = [] }
@@ -193,7 +199,12 @@ commit = "0ecb3ce47c"
 "src/10_Prior/05_BlackLitterman/03_BayesianBlackLittermanPrior.jl" = { cyc = 2, cog = 2, arg = 9, cyc_sum = 6, cog_sum = 4, arg_sum = 18, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/05_BlackLitterman/04_FactorBlackLittermanPrior.jl" = { cyc = 4, cog = 6, arg = 14, cyc_sum = 8, cog_sum = 7, arg_sum = 23, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/05_BlackLitterman/05_AugmentedBlackLittermanPrior.jl" = { cyc = 7, cog = 10, arg = 14, cyc_sum = 12, cog_sum = 12, arg_sum = 23, macros = ["@forward_properties", "@propagatable"] }
-"src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior.jl" = { cyc = 20, cog = 44, arg = 8, cyc_sum = 179, cog_sum = 189, arg_sum = 238, macros = [] }
+"src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/01_EntropyPoolingAlgorithms.jl" = { cyc = 2, cog = 1, arg = 6, cyc_sum = 7, cog_sum = 4, arg_sum = 13, macros = [] }
+"src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/02_EntropyPoolingMeanViews.jl" = { cyc = 6, cog = 9, arg = 7, cyc_sum = 20, cog_sum = 19, arg_sum = 36, macros = [] }
+"src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/03_EntropyPoolingViewTypes.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 28, cog_sum = 17, arg_sum = 40, macros = [] }
+"src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/04_EntropyPoolingSolvers.jl" = { cyc = 16, cog = 18, arg = 8, cyc_sum = 48, cog_sum = 59, arg_sum = 35, macros = [] }
+"src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/05_EntropyPoolingMomentViews.jl" = { cyc = 20, cog = 44, arg = 6, cyc_sum = 56, cog_sum = 73, arg_sum = 86, macros = [] }
+"src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/06_EntropyPoolingTailViewSolve.jl" = { cyc = 7, cog = 10, arg = 8, cyc_sum = 20, cog_sum = 16, arg_sum = 30, macros = [] }
 "src/10_Prior/06_EntropyPooling/02_MeucciEntropyPoolingPrior.jl" = { cyc = 20, cog = 24, arg = 16, cyc_sum = 67, cog_sum = 71, arg_sum = 58, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl" = { cyc = 8, cog = 11, arg = 16, cyc_sum = 63, cog_sum = 60, arg_sum = 135, macros = [] }
 "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_b.jl" = { cyc = 6, cog = 6, arg = 16, cyc_sum = 96, cog_sum = 68, arg_sum = 264, macros = [] }
@@ -250,7 +261,13 @@ commit = "0ecb3ce47c"
 "src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { cyc = 1, cog = 0, arg = 3, cyc_sum = 5, cog_sum = 0, arg_sum = 15, macros = [] }
 "src/16_RiskMeasures/24_ExpectedRisk.jl" = { cyc = 5, cog = 4, arg = 10, cyc_sum = 74, cog_sum = 41, arg_sum = 253, macros = [] }
 "src/16_RiskMeasures/25_RiskMeasureTools.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 22, cog_sum = 2, arg_sum = 33, macros = [] }
-"src/17_Optimisation/01_Base_Optimisation.jl" = { cyc = 9, cog = 10, arg = 7, cyc_sum = 235, cog_sum = 153, arg_sum = 267, macros = [] }
+"src/17_Optimisation/01_Base_Optimisation/01_OptimisationTypes.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 10, cog_sum = 2, arg_sum = 12, macros = [] }
+"src/17_Optimisation/01_Base_Optimisation/02_PipeRouting.jl" = { cyc = 4, cog = 7, arg = 3, cyc_sum = 13, cog_sum = 13, arg_sum = 10, macros = [] }
+"src/17_Optimisation/01_Base_Optimisation/03_TimeDependent.jl" = { cyc = 5, cog = 6, arg = 7, cyc_sum = 112, cog_sum = 71, arg_sum = 68, macros = [] }
+"src/17_Optimisation/01_Base_Optimisation/04_WeightFinalisers.jl" = { cyc = 5, cog = 6, arg = 4, cyc_sum = 16, cog_sum = 11, arg_sum = 23, macros = [] }
+"src/17_Optimisation/01_Base_Optimisation/05_InvestableUniverse.jl" = { cyc = 5, cog = 7, arg = 4, cyc_sum = 24, cog_sum = 11, arg_sum = 48, macros = [] }
+"src/17_Optimisation/01_Base_Optimisation/06_PanelCollapse.jl" = { cyc = 4, cog = 6, arg = 5, cyc_sum = 30, cog_sum = 23, arg_sum = 55, macros = [] }
+"src/17_Optimisation/01_Base_Optimisation/07_ResultInvestableView.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 18, cog_sum = 9, arg_sum = 48, macros = [] }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl" = { cyc = 21, cog = 30, arg = 9, cyc_sum = 115, cog_sum = 80, arg_sum = 193, macros = ["@forward_properties"] }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { cyc = 10, cog = 14, arg = 12, cyc_sum = 30, cog_sum = 21, arg_sum = 67, macros = [] }
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { cyc = 6, cog = 9, arg = 7, cyc_sum = 12, cog_sum = 11, arg_sum = 14, macros = [] }
@@ -273,9 +290,15 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/04_Hierarchical/02_HierarchicalRiskParity.jl" = { cyc = 4, cog = 3, arg = 9, cyc_sum = 23, cog_sum = 16, arg_sum = 31, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl" = { cyc = 10, cog = 24, arg = 10, cyc_sum = 58, cog_sum = 65, arg_sum = 69, macros = ["@propagatable"] }
 "src/17_Optimisation/04_Hierarchical/04_HierarchicalEqualRiskContribution.jl" = { cyc = 6, cog = 9, arg = 8, cyc_sum = 49, cog_sum = 36, arg_sum = 98, macros = ["@propagatable"] }
-"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation.jl" = { cyc = 8, cog = 12, arg = 5, cyc_sum = 128, cog_sum = 55, arg_sum = 209, macros = [] }
+"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/01_JuMPOptimisationTypes.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 27, cog_sum = 14, arg_sum = 48, macros = [] }
+"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/02_JuMPModelAccessors.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 26, cog_sum = 3, arg_sum = 39, macros = [] }
+"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/03_JuMPModelState.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 22, cog_sum = 2, arg_sum = 61, macros = [] }
+"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/04_FrontierSweep.jl" = { cyc = 4, cog = 5, arg = 5, cyc_sum = 24, cog_sum = 14, arg_sum = 33, macros = [] }
+"src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/05_JuMPModelSetup.jl" = { cyc = 8, cog = 12, arg = 3, cyc_sum = 29, cog_sum = 22, arg_sum = 28, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/01_MIPIndicators.jl" = { cyc = 22, cog = 13, arg = 15, cyc_sum = 88, cog_sum = 43, arg_sum = 129, macros = [] }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { cyc = 8, cog = 8, arg = 6, cyc_sum = 126, cog_sum = 89, arg_sum = 206, macros = [] }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/01_ReturnEstimators.jl" = { cyc = 5, cog = 4, arg = 6, cyc_sum = 34, cog_sum = 17, arg_sum = 68, macros = [] }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/02_ObjectiveFunctions.jl" = { cyc = 8, cog = 8, arg = 5, cyc_sum = 49, cog_sum = 40, arg_sum = 47, macros = [] }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/03_ReturnConstraints.jl" = { cyc = 5, cog = 7, arg = 6, cyc_sum = 43, cog_sum = 32, arg_sum = 91, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl" = { cyc = 13, cog = 12, arg = 7, cyc_sum = 73, cog_sum = 56, arg_sum = 104, macros = ["@propagatable"] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/04_WeightConstraints.jl" = { cyc = 9, cog = 10, arg = 6, cyc_sum = 24, cog_sum = 15, arg_sum = 21, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/05_SDPConstraints.jl" = { cyc = 8, cog = 9, arg = 3, cyc_sum = 30, cog_sum = 25, arg_sum = 21, macros = [] }
