@@ -431,6 +431,8 @@ Pair a Return Forecast with the forward target it is answerable for, out of samp
 
 This is the bottom of the evaluation hierarchy. The bare method takes the two matrices and computes nothing but the evaluation dates, so every statistic above it is testable without a fit, and a caller scores a forecast the library did not produce; it takes the universe as a keyword, defaults it to every asset, and writes the forecast onto it. The Result method reads the forecast history off a fitted member and builds the target from the carrier and the block, so a caller who holds a Result writes one call. The Estimator method asks [`forecast_history`](@ref) for the history instead, which refits a member that publishes none, so every member the family ships is evaluable through it.
 
+The evaluation and every statistic above it compute in the element types of `alpha` and `y`, so each of the two must hold every value a statistic writes: a fraction, and `NaN` for a value that cannot be scored. A floating-point type holds both. An integer type holds neither, so an integer forecast or target raises an `InexactError` at the first statistic that writes one, and at the pairing itself when a universe mask writes `NaN` into the forecast. A `Rational` holds a fraction and no `NaN`, so [`forecast_ic`](@ref) scores it and [`forecast_portfolio`](@ref) raises. Convert such a matrix before the call, for example with `float.(alpha)`. The evaluation does not convert the pair and does not refuse it by its type, because both would close it to number types it has never seen: a conversion picks a floating-point type on the caller's behalf, and a check for `AbstractFloat` refuses a type that holds both values without being one, such as an automatic-differentiation dual number. A `Float32` or a `BigFloat` pair is therefore scored in its own precision.
+
 # Algorithm
 
  1. For the Result method, read `hist` through [`forecast_evaluation_history`](@ref), which refuses a member that carries none. For the Estimator method, build the history through [`forecast_history`](@ref) at the evaluation's own `step`, so a refit lands on every date the evaluation scores.
@@ -441,8 +443,8 @@ This is the bottom of the evaluation hierarchy. The bare method takes the two ma
 
 # Arguments
 
-  - `alpha`: Return Forecast history `observations × assets`, in return units.
-  - `y`: Forward target `observations × assets`, on the same axis as `alpha`. The bare method takes it already matured, and records `horizon` and `lag` as the parameters that matured it.
+  - `alpha`: Return Forecast history `observations × assets`, in return units. Its element type holds a fraction and `NaN`, as the summary states.
+  - `y`: Forward target `observations × assets`, on the same axis as `alpha`, with an element type that holds the same two values. The bare method takes it already matured, and records `horizon` and `lag` as the parameters that matured it.
   - `umsk`: Universe mask `observations × assets`, on the same axis as `alpha`, `true` where the asset is in the estimation universe of the observation. It is the denominator of [`forecast_coverage`](@ref), and the forecast is written `NaN` off it, so no statistic reads an asset outside the universe. The bare method takes it, and defaults it to every asset; the two others read it off the Asset Panel's estimation mask, cut to the block's rows.
   - `rfr`: A fitted Return Forecast Result.
   - `rfe`: A Return Forecast Estimator.
