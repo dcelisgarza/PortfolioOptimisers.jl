@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype of the realised quantities a covariance forecast is judged against.
+Abstract supertype of the realised quantities that the evaluation judges a covariance forecast against.
 
-A covariance forecast ``\\hat{\\mathbf{\\Sigma}}_t`` is formed at a step and judged on the ``h`` returns that follow it. The member of this family says **which** statistic of those returns stands in for the covariance they were drawn from: their realised covariance, or the outer product of their sum. Both have the same expectation, ``h\\, \\mathbf{\\Sigma}_t`` when the returns are serially uncorrelated, and both coincide at ``h = 1``, so the member decides the variance of the per-step diagnostic and the question it answers, never its target.
+The evaluation forms a covariance forecast ``\\hat{\\mathbf{\\Sigma}}_t`` at a step and judges it on the ``h`` returns that follow the step. A member of this family chooses the statistic of those returns that stands in for the covariance they were drawn from. The two members the library defines take the realised covariance of the returns and the outer product of their sum. When the returns are serially uncorrelated, both statistics have the expectation ``h\\, \\mathbf{\\Sigma}_t``, and at ``h = 1`` they are equal. So the member changes the variance of the per-step diagnostic and the question that it answers, but not its target.
 
 All concrete subtypes should subtype `AbstractRealisedTarget`.
 
@@ -21,7 +21,7 @@ In order to implement a new concrete type that works seamlessly with the library
 ### Arguments
 
   - `target`: The concrete subtype instance.
-  - `Zc`: The centred test rows, `observations × assets`; a cell an asset did not trade is non-finite.
+  - `Zc`: The centred test rows, `observations × assets`. A cell that an asset did not trade is non-finite.
   - `n`: The number of active assets at the step.
   - `h`: The horizon of the step.
 
@@ -52,7 +52,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Judges a covariance forecast against the realised covariance of the returns that follow it.
 
-This is the default target. It sums the outer product of every centred return of the step, so it is a per-row statistic: under a Gaussian null the step's Mahalanobis ratio has variance ``2 / (N h)``, the smaller of the two members' by a factor of ``h``, which is why it is the default when the better statistic costs nothing. It asks whether the forecast describes each day's dispersion.
+This is the default target. It sums the outer products of the centred returns of the step, one per row. Under a Gaussian null the Mahalanobis ratio of the step then has variance ``2 / (N h)``, smaller by a factor of ``h`` than under [`HorizonReturn`](@ref). The two targets cost the same to compute, so the default is the one with the smaller variance. It asks whether the forecast describes the dispersion of each observation.
 
 # Mathematical definition
 
@@ -71,7 +71,7 @@ Where:
   - ``\\mathbf{\\Sigma}_t``: True conditional covariance of the returns that follow step ``t``.
   - ``\\mathcal{F}_t``: Information available at step ``t``.
 
-The expectation holds when the ``h`` returns are serially uncorrelated, and it makes ``\\mathbf{S}_t / h`` a conditionally unbiased proxy of ``\\mathbf{\\Sigma}_t`` whatever the distribution of the returns. At ``h = 1`` the proxy has rank one and equals the [`HorizonReturn`](@ref) member's. A cell whose two assets share no finite row is zero, and its count is zero.
+The expectation holds when the ``h`` returns are serially uncorrelated. It makes ``\\mathbf{S}_t / h`` a conditionally unbiased proxy of ``\\mathbf{\\Sigma}_t`` for every distribution of the returns. At ``h = 1`` the proxy has rank one and equals the proxy of [`HorizonReturn`](@ref). A cell whose two assets share no finite row is zero, and its count is zero.
 
 # Examples
 
@@ -93,7 +93,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Judges a covariance forecast against the outer product of the return earned over the horizon.
 
-This is the ``h``-day holder's question: the return summed over the step is what a book held for the whole horizon earns, and its outer product is a rank-one proxy of ``h\\, \\mathbf{\\Sigma}_t``. Under a Gaussian null the step's Mahalanobis ratio has variance ``2 / N``, whatever ``h``, so it is the noisier member at every horizon above one.
+It asks the question of a holder over the ``h`` observations of the step. The return summed over the step is what a book held for the whole horizon earns, and its outer product is a rank-one proxy of ``h\\, \\mathbf{\\Sigma}_t``. Under a Gaussian null the Mahalanobis ratio of the step has variance ``2 / N`` at every ``h``, so this target is the noisier of the two at every horizon above one.
 
 # Mathematical definition
 
@@ -114,7 +114,7 @@ Where:
   - ``\\mathbf{\\Sigma}_t``: True conditional covariance of the returns that follow step ``t``.
   - ``\\mathcal{F}_t``: Information available at step ``t``.
 
-The expectation holds when the ``h`` returns are serially uncorrelated. At ``h = 1`` the proxy equals the [`RealisedCovariance`](@ref) member's. A non-finite cell contributes nothing to the sum, and the count of a cell is the number of rows at which both of its assets are finite.
+The expectation holds when the ``h`` returns are serially uncorrelated. At ``h = 1`` the proxy equals the proxy of [`RealisedCovariance`](@ref). A non-finite cell adds nothing to the sum, and the count of a cell is the number of rows at which both of its assets are finite.
 
 # Examples
 
@@ -137,7 +137,14 @@ struct HorizonReturn <: AbstractRealisedTarget end
 
 Form the realised matrix of a step and the count of rows behind each of its cells.
 
-The two arms of the [`AbstractRealisedTarget`](@ref) interface the library ships. A non-finite cell of `Zc` is an observation the asset did not trade, so it contributes nothing to the sum and is not counted; the count `H` is the pairwise number of finite rows, and it is what scales the forecast cell by cell, `H ⊙ Σ̂`, so that a gap in the test window moves the target and not the reading.
+These are the two methods of the [`AbstractRealisedTarget`](@ref) interface that the library defines. A non-finite cell of `Zc` is an observation that the asset did not trade. It adds nothing to the sum, and the count leaves it out. The count `H` holds, for each pair of assets, the number of rows at which both are finite. The kernel scales the forecast by it cell by cell, `H ⊙ Σ̂`, so a gap in the test window changes the target and not the reading.
+
+# Algorithm
+
+ 1. Mark the finite cells of `Zc`, giving `fin`.
+ 2. Replace each non-finite cell of `Zc` with zero, giving `Zf`.
+ 3. Under [`RealisedCovariance`](@ref), form the realised matrix `S = Zf' Zf`. Under [`HorizonReturn`](@ref), sum each column of `Zf`, giving `R`, and form `S = R R'`.
+ 4. Count the rows at which both assets of each pair are finite, giving `H = fin' fin`.
 
 # Arguments
 
@@ -173,7 +180,7 @@ end
 
 Degrees of freedom of a step's Mahalanobis statistic under a Gaussian null, by realised quantity.
 
-The statistic is the trace of the whitened realised matrix: `n * h` under [`RealisedCovariance`](@ref), because every one of the `h` returns contributes `n` whitened coordinates, and `n` under [`HorizonReturn`](@ref), because the horizon return is one draw whatever `h`. The summary reads it to weight the steps of a run and to width the band on the mean ratio, and the exceedance rate reads it for its chi-squared threshold.
+The statistic is the trace of the whitened realised matrix. Under [`RealisedCovariance`](@ref) it has `n * h` degrees of freedom, because each of the `h` returns adds `n` whitened coordinates. Under [`HorizonReturn`](@ref) it has `n`, because the horizon return is one draw at every `h`. The summary reads the count to weight the steps of a run and to set the width of the band on the mean ratio. The exceedance rate reads it for its chi-squared threshold. Under a Gaussian null the statistic is chi-squared on this count when the test window has no gap, and only then.
 
 # Arguments
 
@@ -203,7 +210,7 @@ end
 
 Degrees of freedom of one asset's, or one portfolio's, step ratio under a Gaussian null, by realised quantity.
 
-`h` under [`RealisedCovariance`](@ref), one squared whitened coordinate per return, and `1` under [`HorizonReturn`](@ref), one draw whatever `h`. The summary reads it to weight the steps of the diagonal ratio and to width its band.
+The count is `h` under [`RealisedCovariance`](@ref), one squared whitened coordinate per return. It is `1` under [`HorizonReturn`](@ref), one draw at every `h`. The summary reads it to weight the steps of the diagonal ratio and to set the width of its band.
 
 # Arguments
 
@@ -234,6 +241,7 @@ end
     forecast_location(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
     forecast_location(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     forecast_location(ce::Union{<:ExpWeightedCovariance, <:RegimeAdjustedExpWeightedCovariance}, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    forecast_location(ce::PortfolioOptimisersCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     forecast_location(ce::Covariance)
     forecast_location(ce::GeneralCovariance)
     forecast_location(ce::Union{<:ExpWeightedCovariance, <:RegimeAdjustedExpWeightedCovariance})
@@ -243,21 +251,21 @@ end
     forecast_location(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
     forecast_location(pe::AbstractPriorEstimator; kwargs...)
 
-Read the location a covariance forecast is about, off the estimator that formed it.
+Read the location that a covariance forecast is about, off the estimator that formed it.
 
-A second moment is always of returns about some centre, ``\\mathbb{E}[(\\boldsymbol{z} - \\boldsymbol{c})(\\boldsymbol{z} - \\boldsymbol{c})^\\intercal] = \\hat{\\mathbf{\\Sigma}}``, and the centre is the estimator's own: the mean its centring estimator fitted, the weighted sample mean it subtracted, the exponentially weighted location its state carries, or zero for an estimator that assumed it. An evaluation that judged the forecast against the raw outer product ``\\boldsymbol{z}\\boldsymbol{z}^\\intercal`` would be judging it against a proxy of ``\\mathbf{\\Sigma} + (\\boldsymbol{\\mu} - \\boldsymbol{c})(\\boldsymbol{\\mu} - \\boldsymbol{c})^\\intercal``, and read a bias of ``\\boldsymbol{c}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{c} / N`` into a forecast that has none. So the evaluation centres the test rows here, and there is no flag: the location is the estimator's, not the caller's.
+A second moment is always taken about some centre, ``\\mathbb{E}[(\\boldsymbol{z} - \\boldsymbol{c})(\\boldsymbol{z} - \\boldsymbol{c})^\\intercal] = \\hat{\\mathbf{\\Sigma}}``, and the centre belongs to the estimator. It is the mean that its centring estimator fitted, the weighted sample mean that it subtracted, the exponentially weighted location that its state carries, or zero for an estimator that assumes a zero mean. An evaluation against the raw outer product ``\\boldsymbol{z}\\boldsymbol{z}^\\intercal`` would judge the forecast against a proxy of ``\\mathbf{\\Sigma} + (\\boldsymbol{\\mu} - \\boldsymbol{c})(\\boldsymbol{\\mu} - \\boldsymbol{c})^\\intercal``. It would then read a bias of ``\\boldsymbol{c}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{c} / N`` into a forecast that has none. So the evaluation centres the test rows on this location. No flag turns the centring off, because the location belongs to the estimator and not to the caller.
 
-Two arities per family. The data form answers for a batch fit over `X`, and the data-less form answers for the state the estimator carries after [`partial_fit!`](@ref), so a refit fold and a stepped fold centre on the same quantity.
+Each family has two arities. The data form answers for a batch fit over `X`. The data-less form answers for the state that the estimator carries after [`partial_fit!`](@ref), so a refit fold and a stepped fold centre on the same quantity. For a family state, the data-less form returns the vector of the state itself, which the next fold writes in place.
 
-  - [`Covariance`](@ref): the centre [`weighted_centre`](@ref) resolves from `ce.me` and `ce.w`, or `state.mu`. Under a [`CoveragePolicy`](@ref) the batch fit *is* the fold, so the data form folds the window and reads the same `state.mu`: the diagonal of the per-pair centre, each asset's own available-case mean. The off-diagonal products of the forecast are centred on the mean of the observations the pair shares, which is not a location the vector can carry; the diagonal is the one the per-asset ratios read.
-  - [`GeneralCovariance`](@ref): the sample mean, weighted by `ce.w` when it carries observation weights, or `state.mu`.
-  - [`ExpWeightedCovariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref): `state.location`, or zero for every asset when `centred = true`, because the estimator then assumed it. The data form runs the same pass over the window that the batch fit runs, and reads the location the pass ends on.
-  - [`PortfolioOptimisersCovariance`](@ref) and [`CorrelationCovariance`](@ref): the answer of the estimator they hold, because a matrix transform moves no centre.
-  - Any other [`AbstractCovarianceEstimator`](@ref): the window's own sample mean over the finite rows of each column. An estimator that carries a state of its own and no method is refused by name, because there is no window to read.
-  - Under [`Online`](@ref), whatever the family: the family's data form over the buffer's rows and masks, because a buffer means the batch verb over the buffer's rows for every read-out.
-  - An [`AbstractPriorEstimator`](@ref): the `mu` the prior publishes.
+  - [`Covariance`](@ref) answers the centre that [`weighted_centre`](@ref) resolves from `ce.me` and `ce.w`, or `state.mu`. Under a [`CoveragePolicy`](@ref) the batch fit and the fold are one computation, so the data form folds the window and reads the same `state.mu`. That vector is the diagonal of the per-pair centre, the available-case mean of each asset. The forecast centres each off-diagonal product on the mean of the observations that the pair shares, and one vector cannot carry that centre. The per-asset ratios read the diagonal only.
+  - [`GeneralCovariance`](@ref) answers the sample mean, weighted by `ce.w` when it carries observation weights, or `state.mu`.
+  - [`ExpWeightedCovariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref) answer `state.location`, or zero for every asset when `centred = true`, because the estimator then assumes a zero mean. The data form runs over the window the same pass that the batch fit runs, and reads the location at the end of the pass.
+  - [`PortfolioOptimisersCovariance`](@ref) and [`CorrelationCovariance`](@ref) answer what the estimator that they hold answers, because a matrix transform moves no centre. A `StatsBase.CovarianceEstimator` that they hold is read as a [`GeneralCovariance`](@ref), as `cov` reads it.
+  - Any other [`AbstractCovarianceEstimator`](@ref) answers the sample mean of the window, over the finite rows of each column. Its data-less form reads the state through [`forecast_state_location`](@ref), which refuses a state of a shape that it does not know.
+  - Under [`Online`](@ref), every family answers its data form over the rows and masks of the buffer, because a buffer means the batch verb over its rows at every read-out.
+  - An [`AbstractPriorEstimator`](@ref) answers the `mu` that the prior publishes. This is the centre of the prior's `sigma` only when the prior forms both about one mean. An [`EmpiricalPrior`](@ref) whose `me` shrinks the mean publishes the shrunk `mu`, but its `ce` centres the covariance on its own estimate of the mean.
 
-The Asset Panel form follows the moment seam of the estimator's own `cov`: under no policy it reduces the window to its Coverage Universe and frames the answer with `NaN` outside it, and under a policy, or for the two mask-aware exponentially weighted families, it hands the estimator the panel's active mask.
+The Asset Panel form follows the moment seam of the estimator's own `cov`. Under no policy it reduces the window to its Coverage Universe and frames the answer with `NaN` outside it. Under a policy, and for the two mask-aware exponentially weighted families, it hands the active mask of the panel to the estimator. A [`PortfolioOptimisersCovariance`](@ref) hands the panel to the estimator that it holds, as its `cov` does.
 
 # Arguments
 
@@ -273,7 +281,7 @@ The Asset Panel form follows the moment seam of the estimator's own `cov`: under
 # Validation
 
   - The data-less form requires a state. An `ArgumentError` is thrown otherwise.
-  - The data-less fallback requires the state to be a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
+  - The data-less form requires a state of a shape that [`forecast_state_location`](@ref) reads: a [`CovarianceState`](@ref), an exponentially weighted state or a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -323,7 +331,7 @@ function forecast_location(ce::Union{<:ExpWeightedCovariance,
 end
 function forecast_location(ce::Union{<:PortfolioOptimisersCovariance,
                                      <:CorrelationCovariance}, X::MatNum; kwargs...)
-    return forecast_location(ce.ce, X; kwargs...)
+    return forecast_location(library_covariance_estimator(ce.ce), X; kwargs...)
 end
 function forecast_location(::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1,
                            kwargs...)
@@ -340,6 +348,11 @@ function forecast_location(ce::Union{<:ExpWeightedCovariance,
                            pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return forecast_location(ce, X; dims = dims, active_mask = amsk, kwargs...)
+end
+function forecast_location(ce::PortfolioOptimisersCovariance, X::MatNum,
+                           pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    return forecast_location(library_covariance_estimator(ce.ce), X, pnl; dims = dims,
+                             kwargs...)
 end
 function forecast_location(ce::Covariance)
     return forecast_state_location(ce, ce.cache)
@@ -373,9 +386,21 @@ end
 """
     forecast_state_location(ce, state)
 
-Read the location out of the state a covariance estimator carries, by the state's type.
+Read the location out of the state that a covariance estimator carries, by the type of the state.
 
-The data-less arm of [`forecast_location`](@ref), one method per state shape: a [`CovarianceState`](@ref) carries `mu`, the two exponentially weighted states carry `location`, a [`SampleBufferState`](@ref) carries the rows and the masks they were folded with, and answers the estimator's own data form over them, because a buffer means the batch verb over the buffer's rows for every read-out; and a composite whose own `cache` is `nothing` forwards to the estimator it holds, which carries the state. `nothing` is refused by name, because there is nothing to read, and so is a state of a shape the verb does not know.
+This is the data-less arm of [`forecast_location`](@ref), with one method per shape of state:
+
+  - A [`CovarianceState`](@ref) carries `mu`.
+  - The two exponentially weighted states carry `location`.
+  - A [`SampleBufferState`](@ref) carries the rows and the masks that it folded. The method answers the data form of the estimator over them, because a buffer means the batch verb over its rows at every read-out.
+  - A [`PortfolioOptimisersCovariance`](@ref) whose own `cache` is `nothing` forwards to the estimator that it holds, which carries the state.
+
+The first two methods return the vector of the state itself, and the next fold writes that vector in place. A caller that keeps the location across a fold must copy it, as [`covariance_forecast_evaluation`](@ref) does when it stores the forecasts.
+
+# Validation
+
+  - `state` is not `nothing`. An `ArgumentError` is thrown otherwise, because there is nothing to read.
+  - `state` has one of the shapes above. An `ArgumentError` is thrown otherwise.
 
 # Related
 
@@ -407,7 +432,7 @@ end
 
 Read the [`CoveragePolicy`](@ref) that decides the Asset Panel arm of [`forecast_location`](@ref), out of an estimator that may have no such field.
 
-[`coverage_policy`](@ref) answers for the two families that can carry one; every other covariance estimator answers `nothing`, so the panel form reduces to the Coverage Universe as the moment seam does for them.
+[`coverage_policy`](@ref) answers for the two families that can carry a policy. Every other covariance estimator answers `nothing`, so the panel form reduces the window to the Coverage Universe, as the moment seam does for those estimators. A [`PortfolioOptimisersCovariance`](@ref) does not reach this verb, because its panel form forwards to the estimator that it holds.
 
 # Related
 
@@ -423,7 +448,7 @@ end
 """
     finite_column_mean(X::MatNum)
 
-Mean of each column of `X` over its finite entries, `NaN` for a column with none.
+Mean of each column of `X` over its finite entries, and `NaN` for a column that has none.
 
 # Related
 
@@ -439,7 +464,7 @@ end
 
 Score one covariance forecast against the returns realised after it.
 
-The per-step kernel of [`covariance_forecast_evaluation`](@ref), on bare arrays, so a caller holding forecasts of their own builds the same Result by hand. It reads the forecast on the assets that are active at the step, centres the test rows on the location the forecast is about, forms the realised matrix through the target, and answers the diagnostics of the step: three that read the forecast without a portfolio, and two per test portfolio.
+This is the per-step kernel of [`covariance_forecast_evaluation`](@ref). It takes bare arrays, so a caller who holds forecasts of their own can build the same Result by hand. The kernel reads the forecast on the assets that are active at the step, and centres the test rows on the location of the forecast. It then forms the realised matrix through the target and returns the diagnostics of the step. Four diagnostics read the forecast without a portfolio, and two more come once per test portfolio.
 
 # Mathematical definition
 
@@ -472,21 +497,31 @@ Where:
   - ``\\boldsymbol{z}_{t+s}``: Centred return of observation ``t + s``, zero at a cell the asset did not trade.
   - $(math_dict[:w_port])
 
-With no gap in the test window ``\\mathbf{H} = h \\mathbf{1}\\mathbf{1}^\\intercal``, and the forms reduce to ``m_t = \\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_t^{-1} \\mathbf{S}_t) / (N h)``, ``d_{t,i} = (\\mathbf{S}_t)_{ii} / (h (\\hat{\\mathbf{\\Sigma}}_t)_{ii})``, ``L^{\\mathrm{QLIKE}}_t = h \\log|\\hat{\\mathbf{\\Sigma}}_t| + \\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_t^{-1} \\mathbf{S}_t)``, ``L^{\\mathrm{F}}_t = \\lVert \\mathbf{S}_t / h - \\hat{\\mathbf{\\Sigma}}_t \\rVert_F^2`` and ``b_t = \\boldsymbol{w}^\\intercal \\boldsymbol{R}_t / \\sqrt{h\\, \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}}_t \\boldsymbol{w}}``. When the forecast is the true covariance, ``\\mathbb{E}[m_t] = \\mathbb{E}[d_{t,i}] = 1`` and ``b_t`` has mean zero and variance one, whatever the distribution of the returns; under Gaussian returns ``m_t`` times its degrees of freedom is chi-squared on them ([`target_dof`](@ref)). A ratio above one is an under-prediction of the dispersion in the metric of the forecast, and one below it an over-prediction. ``L^{\\mathrm{QLIKE}}_t`` is ``-2`` times the Gaussian log-likelihood of the step's returns under the forecast, up to a constant, and ``L^{\\mathrm{F}}_t`` the squared distance of the forecast from the per-cell proxy; the expected value of each is minimised by the true covariance under any conditionally unbiased proxy, so either ranks two forecasts on the proxy as it would on the truth, and neither's level is a calibration reading on its own. ``L^{\\mathrm{P}}_t`` is the univariate QLIKE of the portfolio's variance, and it reads the per-row portfolio returns whichever target formed ``\\mathbf{S}_t``.
+With no gap in the test window ``\\mathbf{H} = h \\mathbf{1}\\mathbf{1}^\\intercal``, and the forms reduce to ``m_t = \\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_t^{-1} \\mathbf{S}_t) / (N h)``, ``d_{t,i} = (\\mathbf{S}_t)_{ii} / (h (\\hat{\\mathbf{\\Sigma}}_t)_{ii})``, ``L^{\\mathrm{QLIKE}}_t = h \\log|\\hat{\\mathbf{\\Sigma}}_t| + \\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_t^{-1} \\mathbf{S}_t)``, ``L^{\\mathrm{F}}_t = \\lVert \\mathbf{S}_t / h - \\hat{\\mathbf{\\Sigma}}_t \\rVert_F^2`` and ``b_t = \\boldsymbol{w}^\\intercal \\boldsymbol{R}_t / \\sqrt{h\\, \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}}_t \\boldsymbol{w}}``.
+
+When the forecast is the true covariance, ``\\mathbb{E}[m_t] = \\mathbb{E}[d_{t,i}] = 1``, and ``b_t`` has mean zero and variance one, for every distribution of the returns. These moments hold under a gap too, because the count scales each cell of the forecast. With no gap and under Gaussian returns, ``m_t`` times its degrees of freedom is chi-squared on them ([`target_dof`](@ref)). A ratio above one means that the forecast under-predicts the dispersion, in the metric of the forecast, and a ratio below one means that it over-predicts it.
+
+Under [`RealisedCovariance`](@ref), ``L^{\\mathrm{QLIKE}}_t`` is ``-2`` times the Gaussian log-likelihood of the returns of the step under the forecast, up to a constant. Under [`HorizonReturn`](@ref) at ``h > 1`` it is not a log-likelihood, but it has the same expectation. ``L^{\\mathrm{F}}_t`` is the squared distance of the forecast from the per-cell proxy. With no gap, the true covariance minimises the expected value of each loss under any conditionally unbiased proxy. So either loss ranks two forecasts on the proxy as it would rank them on the truth. Under a gap this holds for ``L^{\\mathrm{F}}_t`` only, and the expected ``L^{\\mathrm{QLIKE}}_t`` can be lower at a forecast that is not the truth. The level of neither loss is a calibration reading on its own.
+
+``L^{\\mathrm{P}}_t`` is the univariate QLIKE of the variance of the portfolio. It reads the per-row portfolio returns, whichever target formed ``\\mathbf{S}_t``.
 
 # Algorithm
 
- 1. Take the active subset `a`: the assets whose forecast variance and location are finite and which have at least one finite test return. Refuse an empty subset by name.
- 2. Centre the test rows of `a` on `c[a]`, leaving a non-finite cell non-finite, giving `Zc`.
- 3. Form `(S, H)` through [`realised_target`](@ref), and the effective forecast `H .* sigma[a, a]`.
- 4. Factor `sigma[a, a]` once by Cholesky, for its log-determinant and, when `H` is uniform, for the whitening; a `H` that varies by cell factors the effective forecast a second time.
- 5. Read the Mahalanobis ratio, the diagonal ratio of each active asset (`NaN` outside `a`), the QLIKE loss and the Frobenius loss.
- 6. Resolve the test portfolios over `a` through [`resolve_forecast_weights`](@ref), and read each one's standardised return and portfolio QLIKE from the column sums and the per-row portfolio returns of `Zc`, a non-finite cell counting zero.
+ 1. Find the active subset `a`, the assets whose forecast variance and location are finite and which have at least one finite test return. Refuse an empty subset by name.
+ 2. Take the forecast on the active subset, giving `sa = sigma[a, a]`.
+ 3. Centre the test rows of `a` on `c[a]`, giving `Zc`. A non-finite cell stays non-finite.
+ 4. Form `(S, H)` through [`realised_target`](@ref), and the effective forecast `seff = H .* sa`.
+ 5. Factor `sa` by Cholesky, giving `ch`.
+ 6. When every entry of `H` is equal, compute `trace`, the trace of `seff⁻¹ S`, through `ch`. Otherwise factor `seff` by Cholesky and compute `trace` through that factor.
+ 7. Read the Mahalanobis ratio `m` and the QLIKE loss `qlike` from `ch` and `trace`, the Frobenius loss `frob` over the cells with a positive count, and the diagonal ratio `d` of each active asset. `d` is `NaN` outside `a`.
+ 8. Replace each non-finite cell of `Zc` with zero, giving `Zf`, and sum each column of `Zf`, giving `R`.
+ 9. Resolve the test portfolios over `a` through [`resolve_forecast_weights`](@ref), giving `ws`.
+10. For each portfolio, read the standardised return `b` from `R`, and the portfolio QLIKE `pq` from the per-row portfolio returns `Zf * wk`.
 
 # Arguments
 
-  - `sigma`: The forecast, `assets × assets`; a `NaN` diagonal marks an inactive asset.
-  - `Z`: The test rows, `observations × assets`; a non-finite cell is an observation the asset did not trade.
+  - `sigma`: The forecast, `assets × assets`. A `NaN` diagonal marks an inactive asset.
+  - `Z`: The test rows, `observations × assets`. A non-finite cell is an observation that the asset did not trade.
   - `c`: The location the forecast is about, `assets × 1`.
   - `w`: The test portfolios on the full universe: `nothing` for inverse volatility over the active subset, a vector for one portfolio, a vector of vectors for several. Each is renormalised over the active subset.
   - `target`: The realised quantity.
@@ -495,10 +530,11 @@ With no gap in the test window ``\\mathbf{H} = h \\mathbf{1}\\mathbf{1}^\\interc
 
   - `sigma` is square and `Z`, `c` and every portfolio of `w` have its width. A `DimensionMismatch` is thrown otherwise.
   - At least one asset is active: a finite forecast variance, a finite location, and a finite test return. An `ArgumentError` is thrown otherwise.
+  - The forecast on the active subset is positive definite. A `LinearAlgebra.PosDefException` is thrown otherwise.
 
 # Returns
 
-  - `step::NamedTuple`: `n_valid`, the active count; `mahalanobis_ratio`; `diagonal_ratio`, `assets × 1`; `qlike`; `frobenius`; `standardised_return`, one per portfolio; and `portfolio_qlike`, one per portfolio.
+  - `step::NamedTuple`: The diagnostics of the step. `n_valid` is the count of active assets. `mahalanobis_ratio`, `qlike` and `frobenius` are scalars, `diagonal_ratio` is `assets × 1`, and `standardised_return` and `portfolio_qlike` hold one entry per portfolio.
 
 # Related
 
@@ -562,7 +598,7 @@ end
 
 Resolve the test portfolios of a step over its active subset.
 
-`nothing` is inverse volatility recomputed from the step's forecast, ``w_i \\propto 1 / \\sqrt{(\\hat{\\mathbf{\\Sigma}}_t)_{ii}}`` over the active assets, which stops the most volatile asset dominating the reading. A vector is one static portfolio and a vector of vectors several; each is cut to the active subset and renormalised to sum to one there, so a delisted asset's weight is spread over the assets that remain. No guard is placed on a subset whose weights sum to zero: the portfolio is then not a portfolio, and its ratio is not a number.
+`nothing` means inverse volatility, recomputed from the forecast of the step over the active assets, ``w_i \\propto 1 / \\sqrt{(\\hat{\\mathbf{\\Sigma}}_t)_{ii}}``. It keeps the most volatile asset from dominating the reading. A vector is one static portfolio, and a vector of vectors is several. The method cuts each portfolio to the active subset and rescales it to sum to one there. So the weight of a delisted asset moves to the remaining assets, in proportion to their weights. The method does not check a subset whose weights sum to zero. Such a portfolio has no scale, and its diagnostics are not finite.
 
 # Arguments
 
@@ -602,7 +638,14 @@ end
 
 Fold the observations of a carrier into a covariance estimator, or into a prior.
 
-The carrier arity the fold loop's online arm calls, [`online_folds`](@ref), for the two kinds of estimator [`covariance_forecast_evaluation`](@ref) threads through it. A prior takes [`fold_prior`](@ref), the one forward the optimiser's step makes. A covariance estimator takes `rd.X` in its own arity, with the active mask of a time-varying Asset Panel as the keyword its step reads, through [`step_active_mask`](@ref), which also refuses what the step cannot carry.
+This is the carrier arity that [`online_folds`](@ref), the online arm of the fold loop, calls for the two kinds of estimator that [`covariance_forecast_evaluation`](@ref) threads through it. A prior folds through [`fold_prior`](@ref), the same forward that the step of an optimiser makes. A covariance estimator folds `rd.X` in its own arity. When the Asset Panel varies in time, the method reads its active mask through [`step_active_mask`](@ref) and passes it as the `active_mask` keyword. That verb also refuses a mask that the step cannot carry.
+
+# Algorithm
+
+ 1. For a prior, return [`fold_prior`](@ref)`(pe, rd)`. The steps below are for a covariance estimator.
+ 2. Check that `rd.X` is not `nothing`.
+ 3. Read the active mask of the step through [`step_active_mask`](@ref), giving `amsk`.
+ 4. Fold `rd.X` into `ce` through `partial_fit!(ce, rd.X)`, with `active_mask = amsk` when `amsk` is not `nothing`.
 
 # Arguments
 
@@ -642,9 +685,9 @@ end
     is_time_dependent(est::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator, <:Online})
     needs_previous_weights(est::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator, <:Online})
 
-Answer the two per-type predicates [`fold_loop`](@ref) reads, for an estimator that is not an optimiser.
+Answer the two per-type predicates that [`fold_loop`](@ref) reads, for an estimator that is not an optimiser.
 
-No covariance estimator and no prior holds a [`TimeDependent`](@ref) schedule — the schedule type is declared after both families, so no field of theirs can name it — and neither reads a previous fold's weights. An [`Online`](@ref) wrapper at the root answers the same, because the loop resolves it before the first fold. Both answer `false`, so the loop neither resolves a context nor threads weights, and a batch run of the evaluation takes the parallel arm under the sequential executor it is handed.
+No covariance estimator and no prior holds a [`TimeDependent`](@ref) schedule, and neither reads the weights of a previous fold. The schedule type is declared after both families, so no field of theirs can name it. An [`Online`](@ref) wrapper at the root answers the same, because the loop resolves it before the first fold. Both predicates answer `false`. The loop then neither resolves a context nor threads weights, and a batch run of the evaluation takes the parallel arm under the sequential executor that it receives.
 
 # Related
 
@@ -662,9 +705,9 @@ end
 """
     online_entry_state(o::Online)
 
-Name the state a wrapped estimator carries at the entry of the fold loop's online arm, or answer `nothing`.
+Name the state that a wrapped estimator carries at the entry of the online arm of the fold loop, or answer `nothing`.
 
-The [`Online`](@ref) arm of [`online_entry_state`](@ref), for the wrapper at the root of [`covariance_forecast_evaluation`](@ref): a wrapper holds no `cache` of its own, so the walk descends into the estimator it wraps and prefixes `est` to what it finds there, `est.cache` for a covariance estimator handed over already folded. The generic walk would reach the same answer through [`estimator_fields`](@ref); this arm states it without asking the wrapper for a field it does not have.
+This is the [`Online`](@ref) method of [`online_entry_state`](@ref), for a wrapper at the root of [`covariance_forecast_evaluation`](@ref). A wrapper holds no `cache` of its own, so the walk enters the estimator that it wraps and puts `est.` before the path that it finds there. For a covariance estimator that the caller folded before the call, the path is `est.cache`. The generic walk through [`estimator_fields`](@ref) would give the same answer. This method gives it without a request for a field that the wrapper does not have.
 
 # Related
 
@@ -679,9 +722,9 @@ end
 """
     advance_previous_fold(pws, prev, step::NamedTuple)
 
-Hand the next fold what the last one held, when the fold's result is a step record and not a prediction.
+Hand the next fold what the last fold held, when the result of the fold is a step record and not a prediction.
 
-The kernel's step record carries no weights, so there is nothing to thread and `prev` stays where it was. This is the arm [`online_folds`](@ref) reaches under [`covariance_forecast_evaluation`](@ref).
+The step record of the kernel carries no weights, so the method threads nothing and returns `prev` unchanged. [`online_folds`](@ref) reaches this method under [`covariance_forecast_evaluation`](@ref).
 
 # Related
 
@@ -697,9 +740,15 @@ end
     forecast_moments(pe::AbstractPriorEstimator, rd::ReturnsResult, train_idx::VecInt)
     forecast_moments(pe::AbstractPriorEstimator, rd::ReturnsResult, ::Nothing)
 
-Read a fold's forecast and the location it is about, by whether the fold carries a training window.
+Read the forecast of a fold and the location that it is about, by whether the fold carries a training window.
 
-The two arms of [`covariance_forecast_evaluation`](@ref)'s callback, chosen by dispatch on the fold's `train` exactly as [`fit_fold_result`](@ref) chooses the optimiser's. A window fits the estimator over it through the Asset Panel seam of the moment verbs, `cov(ce, X, pnl)` and [`forecast_location`](@ref)`(ce, X, pnl)`, or `prior(pe, rd)`, the refit every batch fold runs. `nothing` says *the estimator holds its window*, so the fold reads the state out, `cov(ce)` and `forecast_location(ce)`, or `prior(pe)`. A prior is read once for both moments.
+These are the two arms of the callback of [`covariance_forecast_evaluation`](@ref). Dispatch on the `train` of the fold chooses the arm, as it does for the optimiser in [`fit_fold_result`](@ref). A training window means a refit, which every batch fold runs. `nothing` means that the estimator holds its window, so the fold reads the moments out of the state. The method reads a prior once for both moments.
+
+# Algorithm
+
+ 1. With a training window, take the view of the carrier on its rows, giving `rdt`. Fit a covariance estimator through the Asset Panel seam of the moment verbs, `cov(ce, rdt.X, rdt.pnl)` and [`forecast_location`](@ref)`(ce, rdt.X, rdt.pnl)`. Fit a prior once over the view, giving `pr`.
+ 2. With `nothing`, read `cov(ce)` and `forecast_location(ce)` out of the state of a covariance estimator, or `pr = prior(pe)` out of the state of a prior.
+ 3. Return the forecast and the location, which are `pr.sigma` and `pr.mu` for a prior.
 
 # Arguments
 
@@ -742,7 +791,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The per-step diagnostics of a covariance forecast over a walk-forward, and its forecasts on request.
 
-`CovarianceForecastEvaluationResult` is what [`covariance_forecast_evaluation`](@ref) returns. It keeps every diagnostic per step — three that read the forecast on its own, two per test portfolio — so the summary, the comparison and the plots are verbs over it, and it keeps the forecasts themselves only when asked, because a run of `M` steps over `N` assets pairs `N² × M` numbers with `N × M`, and the run the online form exists for is a step at every observation.
+`CovarianceForecastEvaluationResult` is what [`covariance_forecast_evaluation`](@ref) returns. It keeps every diagnostic per step, four that read the forecast on its own and two per test portfolio. The summary, the comparison and the plots are verbs over it. It keeps the forecasts themselves only on request. A run of `M` steps over `N` assets holds `N² × M` numbers of forecasts against `N × M` diagonal ratios, and the online form is meant for a step at every observation.
 
 # Fields
 
@@ -755,7 +804,7 @@ $(DocStringExtensions.FIELDS)
         qlike, frobenius, standardised_return, portfolio_qlike, w, sigma, location
     ) -> CovarianceForecastEvaluationResult
 
-Arguments correspond to the struct's fields, in the order they are declared. The type is a Result, so [`covariance_forecast_evaluation`](@ref) builds it and a caller reads it; there is no keyword constructor, and the type validates nothing of its own.
+The arguments correspond to the fields of the struct, in the order of their declaration. The type is a Result, which [`covariance_forecast_evaluation`](@ref) builds and a caller reads. It has no keyword constructor, and it validates nothing of its own.
 
 # Related
 
@@ -767,39 +816,39 @@ Arguments correspond to the struct's fields, in the order they are declared. The
 """
 @concrete struct CovarianceForecastEvaluationResult <: AbstractResult
     """
-    Label of each step: the timestamp of its first test row when the carrier holds one, else the row's index. One entry per step.
+    Label of each step, one entry per step. It is the timestamp of the first test row of the step when the carrier holds timestamps, and the index of that row otherwise.
     """
     dates
     """
-    Test rows of each step, in split order. One window per step.
+    Test rows of each step, one window per step, in the order of the split.
     """
     test_idx
     """
-    Horizon of each step, the number of test rows the forecast was judged on. One entry per step; every entry is the scheme's `test_size` under an index walk-forward, and a calendar period's own length under a date walk-forward.
+    Horizon of each step, the number of test rows that the evaluation judged the forecast on, one entry per step. Every entry is the `test_size` of the scheme under an index walk-forward, and the length of the calendar period under a date walk-forward.
     """
     horizon
     """
-    Realised quantity the forecasts were judged against.
+    Realised quantity that the evaluation judged the forecasts against.
     """
     target
     """
-    Number of active assets at each step: a finite forecast variance and at least one finite test return. One entry per step.
+    Number of active assets at each step, one entry per step. An active asset has a finite forecast variance, a finite location and at least one finite test return.
     """
     n_valid
     """
-    Mahalanobis ratio of each step. One entry per step; the target is one.
+    Mahalanobis ratio of each step, one entry per step. Its target value is one.
     """
     mahalanobis_ratio
     """
-    Diagonal ratio of each asset at each step, `steps × assets`; `NaN` where the asset was not active. The target is one.
+    Diagonal ratio of each asset at each step, `steps × assets`, and `NaN` where the asset was not active. Its target value is one.
     """
     diagonal_ratio
     """
-    QLIKE loss of each step. One entry per step; lower is better, and only a difference between two forecasts is a reading.
+    QLIKE loss of each step, one entry per step. Lower is better, and only the difference between two forecasts is a reading.
     """
     qlike
     """
-    Frobenius loss of each step. One entry per step; lower is better, and only a difference between two forecasts is a reading.
+    Frobenius loss of each step, one entry per step. Lower is better, and only the difference between two forecasts is a reading.
     """
     frobenius
     """
@@ -807,11 +856,11 @@ Arguments correspond to the struct's fields, in the order they are declared. The
     """
     standardised_return
     """
-    QLIKE loss of each test portfolio's variance at each step, `steps × portfolios`; lower is better.
+    QLIKE loss of the variance of each test portfolio at each step, `steps × portfolios`. Lower is better.
     """
     portfolio_qlike
     """
-    Test portfolios as handed to the evaluation: `nothing` for inverse volatility per step, a vector for one portfolio, a vector of vectors for several.
+    Test portfolios as the caller gave them to the evaluation. `nothing` means inverse volatility per step, a vector is one portfolio, and a vector of vectors is several.
     """
     w
     """
@@ -819,7 +868,7 @@ Arguments correspond to the struct's fields, in the order they are declared. The
     """
     sigma
     """
-    Location each forecast was centred on, one `assets × 1` vector per step, or `nothing` unless `store_forecasts = true`.
+    Location that the evaluation centred each forecast on, one `assets × 1` vector per step, or `nothing` unless `store_forecasts = true`.
     """
     location
 end
@@ -831,25 +880,41 @@ end
 
 Evaluate a covariance forecast out of sample over a walk-forward, in batch or online.
 
-One verb through the one fold loop. Per fold the callback reads the forecast and its location off the fold's estimator — a refit over the training window when the fold carries one, the threaded state when the scheme is an Online Scheme — and scores it on the test rows through [`covariance_forecast_step`](@ref). The batch expanding, batch rolling, online expanding and online rolling forms are therefore the four compositions the walk-forward and the [`Online`](@ref) wrapper already express: `expand_train = true`, `expand_train = false`, `OnlineIndexWalkForward(…)`, and `OnlineIndexWalkForward(…)` with `Online(est; max_history = w)`. The verb reads none of them, so the online run reaches the batch expanding run's rows fold for fold, to the tolerance of the estimator's own fold, and the date form, the purge and a listing or delisting come for free.
+The verb runs through the one fold loop of the library. At each fold the callback reads the forecast and its location off the estimator of the fold, and scores them on the test rows through [`covariance_forecast_step`](@ref). That estimator is a refit over the training window when the fold carries one, and the threaded state under an Online Scheme. The four forms of the evaluation are compositions that the walk-forward and the [`Online`](@ref) wrapper already express:
 
-The estimator is threaded as the configuration alone. Under an Online Scheme the loop warms one estimator up on the first training window and folds each fold's new rows into it, so an estimator entering with a state, or one that cannot fold, is refused at the door by name; wrap such an estimator in [`Online`](@ref) to fold it from a buffer, and the read-out is then a batch fit over the buffer's rows.
+  - `expand_train = true` gives the batch expanding form.
+  - `expand_train = false` gives the batch rolling form.
+  - `OnlineIndexWalkForward(…)` gives the online expanding form.
+  - `OnlineIndexWalkForward(…)` with `Online(est; max_history = w)` gives the online rolling form.
+
+The verb reads none of these settings. So the online run gives the rows of the batch expanding run fold for fold, to the tolerance of the estimator's own fold. The date form, the purge, and a listing or a delisting need no code of their own.
+
+The loop receives the estimator as a configuration only. Under an Online Scheme it warms up one estimator on the first training window and folds the new rows of each fold into it. So the loop refuses, by name, an estimator that enters with a state or that cannot fold. An estimator that cannot fold but has a `cache` field can be wrapped in [`Online`](@ref), which folds it from a buffer. Each read-out is then a batch fit over the rows of the buffer. An estimator with no `cache` field has nowhere to carry a buffer, and `Online` refuses it.
+
+# Algorithm
+
+ 1. Check `rd.X`, and check that an [`Online`](@ref) at the root comes with an Online Scheme.
+ 2. Split the carrier by `cv`, giving `train_idx` and `test_idx`, and check that the folds are not shuffled.
+ 3. Run [`fold_loop`](@ref) over the `n` folds, giving `steps`. At each fold, read `(sigma, c)` through [`forecast_moments`](@ref) and score the test rows through [`covariance_forecast_step`](@ref). When `store_forecasts = true`, add copies of `sigma` and `c` to the step record, because an online state writes its location in place.
+ 4. Stack the diagonal ratios, the standardised returns and the portfolio QLIKE losses of the steps into the matrices `d`, `b` and `pq`, one row per step.
+ 5. Label each step with the timestamp of its first test row, or with the index of that row when `rd.ts` is `nothing`, giving `dates`.
+ 6. Build the Result from the columns, the horizons `length.(test_idx)`, `target` and `w`.
 
 # Arguments
 
-  - `est`: The covariance estimator, or the prior estimator whose `sigma` is the forecast; either may be wrapped in [`Online`](@ref) under an Online Scheme, to fold from a buffer and, with `max_history`, over a rolling window.
+  - `est`: The covariance estimator, or the prior estimator whose `sigma` is the forecast. Under an Online Scheme either can be wrapped in [`Online`](@ref), to fold from a buffer and, with `max_history`, over a rolling window.
   - $(arg_dict[:rd])
-  - `cv`: The walk-forward, index or date form, or its split.
-  - `w`: The test portfolios on the full universe: `nothing` for inverse volatility recomputed from each step's forecast, a vector for one static portfolio, a vector of vectors for several.
-  - `target`: The realised quantity the forecasts are judged against.
-  - `store_forecasts`: Whether to keep every step's forecast and location in the Result, for [`covariance_forecast_portfolio`](@ref).
+  - `cv`: The walk-forward, in its index or date form, or its split.
+  - `w`: The test portfolios on the full universe. `nothing` means inverse volatility recomputed from the forecast of each step, a vector is one static portfolio, and a vector of vectors is several.
+  - `target`: The realised quantity that the evaluation judges the forecasts against.
+  - `store_forecasts`: Whether to keep the forecast and the location of every step in the Result, for [`covariance_forecast_portfolio`](@ref).
 
 # Validation
 
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
-  - The scheme's folds are not shuffled, through [`assert_unshuffled_folds`](@ref).
-  - An [`Online`](@ref) at the root is handed an Online Scheme. An `ArgumentError` is thrown otherwise: a batch fold would never seed the buffer.
-  - Everything [`covariance_forecast_step`](@ref) refuses at a step, and everything the fold loop's online arm refuses at entry under an Online Scheme.
+  - The folds of the scheme are not shuffled, through [`assert_unshuffled_folds`](@ref). An `ArgumentError` is thrown otherwise.
+  - An [`Online`](@ref) at the root comes with an Online Scheme. An `ArgumentError` is thrown otherwise, because a batch fold would never seed the buffer.
+  - Everything that [`covariance_forecast_step`](@ref) refuses at a step, and everything that the online arm of the fold loop refuses at entry under an Online Scheme.
 
 # Returns
 

@@ -429,6 +429,20 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         op = covariance_forecast_portfolio(o, rdg, nothing)
         @test op.standardised_return == o.standardised_return
         @test op.portfolio_qlike == o.portfolio_qlike
+        # The stored forecasts of an online run are the batch run's, fold for fold, for
+        # every family state that the fold writes in place.
+        for est in (Covariance(), GeneralCovariance(), ExpWeightedCovariance(),
+                    Covariance(; cvg = CoveragePolicy()))
+            o = cfe(est, rd, online_cv; store_forecasts = true)
+            b = cfe(est, rd, batch_cv; store_forecasts = true)
+            @test length(unique(o.location)) == length(o.dates)
+            @test maximum(maximum(abs, x - y) for (x, y) in zip(o.location, b.location)) <=
+                  1e-12
+            @test maximum(maximum(abs, x - y) for (x, y) in zip(o.sigma, b.sigma)) <= 1e-12
+            pjo = covariance_forecast_portfolio(o, rd, wt)
+            ro = cfe(est, rd, online_cv; w = wt)
+            @test finite_max(pjo.standardised_return, ro.standardised_return) <= 1e-12
+        end
     end
 
     @testset "The summary and the comparison at their edges (#1028)" begin
@@ -469,6 +483,31 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test all(l -> po.newey_west_variance(alt, l) >= 0, 0:8)
     end
 
+    @testset "A wrapper centres where the estimator it holds centres" begin
+        # The panel arm of the wrapper's `cov` hands the panel to the estimator it holds, so a
+        # mask-aware estimator inside it admits the young asset; the location follows.
+        for inner in (Covariance(; cvg = CoveragePolicy()),
+                      ExpWeightedCovariance(; decay = 0.94, min_obs = 4))
+            poc = PortfolioOptimisersCovariance(; ce = inner)
+            pw = po.port_opt_view(rdg, 1:60, :).pnl
+            @test isequal(po.forecast_location(poc, Xg[1:60, :], pw),
+                          po.forecast_location(inner, Xg[1:60, :], pw))
+            @test cfe(poc, rdg, batch_cv).n_valid == cfe(inner, rdg, batch_cv).n_valid
+        end
+        # A StatsBase estimator inside a wrapper is read as the library reads it in `cov`.
+        for ce in (PortfolioOptimisersCovariance(; ce = StatsBase.SimpleCovariance()),
+                   po.CorrelationCovariance(; ce = StatsBase.SimpleCovariance()))
+            @test po.forecast_location(ce, X[1:60, :]) ≈ vec(mean(X[1:60, :]; dims = 1))
+            @test length(cfe(ce, rd, batch_cv).dates) ==
+                  length(split(batch_cv, rd).test_idx)
+        end
+        @test isequal(po.forecast_location(PortfolioOptimisersCovariance(;
+                                                                         ce = StatsBase.SimpleCovariance()),
+                                           Xg[1:60, :], po.port_opt_view(rdg, 1:60, :).pnl),
+                      po.forecast_location(GeneralCovariance(), Xg[1:60, :],
+                                           po.port_opt_view(rdg, 1:60, :).pnl))
+    end
+
     @testset "Every refusal by name" begin
         sig = cov(Covariance(), X[1:60, :])
         Z = X[61:65, :]
@@ -496,6 +535,10 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         cn[2] = NaN
         @test covariance_forecast_step(sig, Z, cn, nothing, RealisedCovariance()).n_valid ==
               N - 1
+        # A singular forecast has no Cholesky factor.
+        v1 = randn(StableRNG(3), N)
+        @test_throws PosDefException covariance_forecast_step(v1 * v1', Z, c, nothing,
+                                                              RealisedCovariance())
         # The verb.
         @test_throws po.IsNothingError cfe(Covariance(), ReturnsResult(; nx = nx), batch_cv)
         e = @test_throws ArgumentError cfe(po.Online(Covariance()), rd, batch_cv)
