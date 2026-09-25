@@ -231,6 +231,18 @@ using Statistics
             @test eltype(f(e32, v32)) == Float32
         end
         @test idio_calibration_summary(e32, v32).mean_cs_std isa Float32
+        # Each series takes its type from its own operation, never from `float`. A square
+        # root is inexact, so a `Rational` history answers in the type `sqrt` lands in. A
+        # rate and the moment ratio of the kurtosis only divide, so an exact `z` stays exact.
+        er = Rational{Int}.(round.(Int, 8 .* e32)) .// 8
+        vr = Rational{Int}.(round.(Int, 8 .* v32)) .// 8
+        @test eltype(standardised_idio_returns(er, vr)) == typeof(sqrt(1 // 1))
+        @test eltype(idio_vol_ic(er, vr)) == typeof(sqrt(1 // 1))
+        zr = [1//2 -3//2 2//1 1//4 -1//1; 3//1 -1//3 1//5 2//1 -2//1]
+        @test idio_tail_rate(zr; threshold = 2) == [0 // 1, 1 // 5]
+        @test eltype(idio_kurtosis(zr)) == Rational{Int}
+        @test eltype(idio_skewness(zr)) == typeof(sqrt(1 // 1))
+        @test PortfolioOptimisers.idio_nan_mean([1 // 2, 1 // 3]) === 5 // 12
     end
 
     @testset "the refusals" begin

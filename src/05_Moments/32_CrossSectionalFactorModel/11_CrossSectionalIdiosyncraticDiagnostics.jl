@@ -101,7 +101,7 @@ function standardised_idio_returns(eps::MatNum, vs::MatNum)
     @argcheck(!isempty(eps), IsEmptyError("eps cannot be empty"))
     @argcheck(size(vs, 1) == size(eps, 1) && size(vs, 2) == size(eps, 2),
               DimensionMismatch("vs ($(size(vs, 1))×$(size(vs, 2))) must match eps ($(size(eps, 1))×$(size(eps, 2)))"))
-    Tf = float(promote_type(real(eltype(eps)), real(eltype(vs))))
+    Tf = typeof(one(real(eltype(eps))) / sqrt(one(real(eltype(vs)))))
     T, N = size(eps)
     z = Matrix{Tf}(undef, T, N)
     for i in 1:N, t in 1:T
@@ -144,7 +144,7 @@ Where:
   - [`standardised_idio_value`](@ref)
 """
 function idio_predicted_volatility(vs::MatNum)
-    Tf = float(real(eltype(vs)))
+    Tf = typeof(sqrt(one(real(eltype(vs)))))
     T, N = size(vs)
     s = Matrix{Tf}(undef, T, N)
     for i in 1:N, t in 1:T
@@ -204,7 +204,7 @@ A cross-section whose finite entries are all equal has ``m_{pt} = 0`` for every 
   - [`idio_skewness`](@ref)
 """
 function idio_row_moments(z::MatNum, t::Integer)
-    Tf = float(real(eltype(z)))
+    Tf = typeof(zero(real(eltype(z))) / one(Int))
     N = size(z, 2)
     n = 0
     s = zero(Tf)
@@ -292,7 +292,7 @@ The deviation is the sample one, so it divides by ``n_{t} - 1``. It is not defin
   - [`CrossSectionalFactorModel`](@ref)
 """
 function idio_calibration(z::MatNum)
-    Tf = float(real(eltype(z)))
+    Tf = typeof(sqrt(zero(real(eltype(z))) / one(Int)))
     T = size(z, 1)
     c = Vector{Tf}(undef, T)
     for t in 1:T
@@ -364,7 +364,7 @@ The rate is not defined for ``n_{t} = 0``. An entry that is not finite enters ne
   - [`CrossSectionalFactorModel`](@ref)
 """
 function idio_tail_rate(z::MatNum; threshold::Real = 3)
-    Tf = float(real(eltype(z)))
+    Tf = typeof(zero(real(eltype(z))) / one(Int))
     T, N = size(z)
     r = Vector{Tf}(undef, T)
     for t in 1:T
@@ -444,7 +444,7 @@ It is the bias-corrected sample excess kurtosis, the estimator ``G_{2}`` of Joan
   - $(ref_dict[:joanesgill1998])
 """
 function idio_kurtosis(z::MatNum)
-    Tf = float(real(eltype(z)))
+    Tf = typeof(zero(real(eltype(z))) / one(Int))
     T = size(z, 1)
     k = Vector{Tf}(undef, T)
     for t in 1:T
@@ -524,7 +524,7 @@ It is the bias-corrected sample skewness, the estimator ``G_{1}`` of Joanes and 
   - $(ref_dict[:joanesgill1998])
 """
 function idio_skewness(z::MatNum)
-    Tf = float(real(eltype(z)))
+    Tf = typeof(sqrt(zero(real(eltype(z))) / one(Int)))
     T = size(z, 1)
     s = Vector{Tf}(undef, T)
     for t in 1:T
@@ -590,7 +590,7 @@ function idio_vol_dependence(eps::MatNum, vs::MatNum, standardise::Bool)
     T, N = size(eps)
     @argcheck(T > 1,
               DimensionMismatch("eps ($T observations) must carry more than one observation"))
-    Tf = float(promote_type(real(eltype(eps)), real(eltype(vs))))
+    Tf = typeof(one(real(eltype(eps))) / sqrt(one(real(eltype(vs)))))
     sig = idio_predicted_volatility(vs)
     c = Vector{Tf}(undef, T - 1)
     a = Vector{Tf}(undef, N)
@@ -762,7 +762,7 @@ The mean is not defined for an empty ``\\mathcal{A}``.
   - [`idio_nan_median`](@ref)
 """
 function idio_nan_mean(v::VecNum)
-    Tf = float(real(eltype(v)))
+    Tf = typeof(zero(real(eltype(v))) / one(Int))
     s = zero(Tf)
     n = 0
     for x in v
@@ -810,7 +810,7 @@ The median is not defined for an empty ``\\mathcal{A}``.
   - [`idio_nan_mean`](@ref)
 """
 function idio_nan_median(v::VecNum)
-    Tf = float(real(eltype(v)))
+    Tf = typeof(zero(real(eltype(v))) / one(Int))
     f = Vector{Tf}(undef, 0)
     sizehint!(f, length(v))
     for x in v
