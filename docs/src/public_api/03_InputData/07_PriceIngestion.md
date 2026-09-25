@@ -39,10 +39,11 @@ and the columns. It warns by default, and throws an error when `strict` is set.
 
 The element type of the result comes from the input series. A `Float32` panel stays `Float32`,
 `Float32` next to `Float64` gives `Float64`, and an integer panel takes the floating-point type of
-its returns. A type that has no value for an absent number throws an error at the first gap, and
-the error names the type. An absent implied volatility is kept like an absent price, and
-[`ImpliedVolatility`](@ref) then fits only on the columns whose implied volatilities have no
-gaps.
+its returns. A type that has no value for an absent number throws an error that names the type.
+The error comes at a gap, before a join that can pad, and when `PriceIngestion` aligns the implied
+volatilities, even if the join or the alignment then pads nothing. An absent implied volatility
+is kept like an absent price, and [`ImpliedVolatility`](@ref) then fits only on the columns whose
+implied volatilities have no gaps.
 
 ## Types
 
