@@ -90,16 +90,18 @@ function PortfolioOptimisers.plot_measures(ppred::Union{<:PredictionResult,
         z = isnothing(z) ? nothing : PortfolioOptimisers.factory(z, nothing, slv)
         c = PortfolioOptimisers.factory(c, nothing, slv)
     end
-    xr = expected_risk(x, ppred)
-    yr = expected_risk(y, ppred)
-    zr = isnothing(z) ? nothing : expected_risk(z, ppred)
-    cr = expected_risk(c, ppred)
+    # A prediction and a walk-forward path score to one number and a population to one per
+    # member, so `vcat` gives the scatter a vector either way: one point, or one per member.
+    xr = vcat(expected_risk(x, ppred))
+    yr = vcat(expected_risk(y, ppred))
+    zr = isnothing(z) ? nothing : vcat(expected_risk(z, ppred))
+    cr = vcat(expected_risk(c, ppred))
     return if isnothing(zr)
         if isnothing(plt)
             scatter(xr, yr; zcolor = cr, title = "Pareto Front", xlabel = "X", ylabel = "Y",
                     colorbar_title = "C", label = nothing, legend = true, kwargs...)
         else
-            scatter!(xr, yr; zcolor = cr, title = "Pareto Front", xlabel = "X",
+            scatter!(plt, xr, yr; zcolor = cr, title = "Pareto Front", xlabel = "X",
                      ylabel = "Y", colorbar_title = "C", label = nothing, legend = true,
                      kwargs...)
         end

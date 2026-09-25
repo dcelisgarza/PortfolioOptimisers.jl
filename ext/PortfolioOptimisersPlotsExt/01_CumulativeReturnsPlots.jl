@@ -90,7 +90,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
                                                            ts::AbstractVector = 1:size(X, 1),
                                                            nx::AbstractVector = 1:size(X, 2),
                                                            compound::Bool = false,
-                                                           N::Option{<:Integer} = nothing,
+                                                           N::Option{<:Number} = nothing,
                                                            kwargs...)
     net_asset_ret = calc_net_asset_returns(w, X, fees)
     ret = cumulative_returns(net_asset_ret, compound)
@@ -123,7 +123,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, pr::Pr_RR,
                                                            nx::AbstractVector = 1:size(pr.X,
                                                                                        2),
                                                            compound::Bool = false,
-                                                           N::Option{<:Integer} = nothing,
+                                                           N::Option{<:Number} = nothing,
                                                            kwargs...)
     if isa(pr, ReturnsResult)
         ts = isnothing(pr.ts) ? (1:size(pr.X, 1)) : pr.ts
@@ -137,7 +137,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResu
                                                            pr::Pr_RR;
                                                            fees::Option{<:Fees} = nothing,
                                                            compound::Bool = false,
-                                                           N::Option{<:Integer} = nothing,
+                                                           N::Option{<:Number} = nothing,
                                                            kwargs...)
     imsk, w, pr, fees = result_investable_view(res, pr, fees)
     # The per-asset matrix is on the investable universe, where a liquidated asset has no
@@ -155,7 +155,7 @@ end
 function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResult;
                                                            fees::Option{<:Fees} = nothing,
                                                            compound::Bool = false,
-                                                           N::Option{<:Integer} = nothing,
+                                                           N::Option{<:Number} = nothing,
                                                            kwargs...)
     imsk, w, pr, fees = result_investable_view(res, nothing, fees)
     return PortfolioOptimisers.plot_asset_cumulative_returns(w, pr,
@@ -169,14 +169,14 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResu
 end
 function PortfolioOptimisers.plot_asset_cumulative_returns(pred::PredictionResult;
                                                            compound::Bool = false,
-                                                           N::Option{<:Integer} = nothing,
+                                                           N::Option{<:Number} = nothing,
                                                            kwargs...)
     return PortfolioOptimisers.plot_asset_cumulative_returns(pred.res; compound = compound,
                                                              N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_asset_cumulative_returns(pred::MultiPeriodPredictionResult;
                                                            compound::Bool = false,
-                                                           N::Option{<:Integer} = nothing,
+                                                           N::Option{<:Number} = nothing,
                                                            kwargs...)
     res_vec = pred.res
     X = Vector{eltype(first(res_vec).rd.X)}[]
@@ -218,7 +218,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(pred::MultiPeriodPred
 end
 function PortfolioOptimisers.plot_asset_cumulative_returns(pred::PopulationPredictionResult;
                                                            compound::Bool = false,
-                                                           N::Option{<:Integer} = nothing,
+                                                           N::Option{<:Number} = nothing,
                                                            kwargs...)
     plt = plot(; kwargs...)
     for p in pred.pred

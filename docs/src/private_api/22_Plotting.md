@@ -9,6 +9,7 @@ relevant_assets
 finite_magnitudes
 finite_symmetric_clim
 finite_columns
+factor_plot_prior
 investable_plot_view
 attribution_plot_axis
 ```

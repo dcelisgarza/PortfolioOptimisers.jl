@@ -84,7 +84,7 @@ end
 # would let the overlay be drawn under a threshold the books were not.
 function forecast_overlay_series(fes::AbstractVector{<:PortfolioOptimisers.ForecastEvaluationResult},
                                  names, f, title::AbstractString, ylabel::AbstractString;
-                                 kwargs...)
+                                 reference::Real = 0.0, kwargs...)
     PortfolioOptimisers.forecast_summary_assert_comparable(fes)
     labels = PortfolioOptimisers.forecast_summary_names(names, length(fes))
     dates::AbstractVector{<:Integer} = first(fes).dates
@@ -98,7 +98,7 @@ function forecast_overlay_series(fes::AbstractVector{<:PortfolioOptimisers.Forec
         vals[:, k] = series[k]
     end
     plt = forecast_plot_series(dates, vals, labels, title, "Observation", ylabel; kwargs...)
-    return idio_diagnostic_reference!(plt, 0.0)
+    return idio_diagnostic_reference!(plt, reference)
 end
 function forecast_overlay_ic(fe::PortfolioOptimisers.ForecastEvaluationResult, w,
                              col::Integer)
@@ -189,7 +189,10 @@ function PortfolioOptimisers.plot_forecast_cumulative_returns(fes::AbstractVecto
     return forecast_overlay_series(fes, names,
                                    fe -> forecast_overlay_book(fe, kind, compound),
                                    "Forecast $(book) Book Cumulative Returns ($comp)",
-                                   "Cumulative Return"; kwargs...)
+                                   "Cumulative Return";
+                                   # A compounded book is a wealth index that starts near
+                                   # one, so its break-even line is one and not zero.
+                                   reference = compound ? 1.0 : 0.0, kwargs...)
 end
 function PortfolioOptimisers.plot_forecast_quantile_returns(fe::PortfolioOptimisers.ForecastEvaluationResult;
                                                             quantiles = (0.1,),

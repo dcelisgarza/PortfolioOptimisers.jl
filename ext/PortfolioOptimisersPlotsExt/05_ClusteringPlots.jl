@@ -75,7 +75,10 @@ function PortfolioOptimisers.plot_dendrogram(cle::HClE_HCl, pr::PortfolioOptimis
     if isa(pr, ReturnsResult) && !isnothing(pr.nx)
         nx = pr.nx
     end
-    return PortfolioOptimisers.plot_dendrogram(cle, pr.X, nx; dims = dims, kwargs...)
+    # A clustering is fitted by a plain moment estimator, which refuses a gapped sample, so
+    # the prior reduces to the Investable Mask first, as `plot_network` does.
+    pr_i, nx_i = investable_plot_view(pr, nx)
+    return PortfolioOptimisers.plot_dendrogram(cle, pr_i.X, nx_i; dims = dims, kwargs...)
 end
 ## plot_clusters
 function PortfolioOptimisers.plot_clusters(clr::AbstractClusteringResult,
@@ -158,7 +161,8 @@ function PortfolioOptimisers.plot_clusters(cle::HClE_HCl, pr::PortfolioOptimiser
     if isa(pr, ReturnsResult) && !isnothing(pr.nx)
         nx = pr.nx
     end
-    return PortfolioOptimisers.plot_clusters(cle, pr.X, nx; kwargs...)
+    pr_i, nx_i = investable_plot_view(pr, nx)
+    return PortfolioOptimisers.plot_clusters(cle, pr_i.X, nx_i; dims = dims, kwargs...)
 end
 ## plot_centrality
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator, X::MatNum,

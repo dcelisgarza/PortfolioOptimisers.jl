@@ -385,6 +385,6 @@ commit = "0ecb3ce47c"
 "src/21_Pipeline/04_PredictionCV.jl" = { cyc = 4, cog = 5, arg = 12, cyc_sum = 40, cog_sum = 19, arg_sum = 67, macros = [] }
 "src/21_Pipeline/05_SearchCrossValidation.jl" = { cyc = 8, cog = 15, arg = 3, cyc_sum = 34, cog_sum = 30, arg_sum = 36, macros = [] }
 "src/21_Pipeline/06_OnlinePipeline.jl" = { cyc = 6, cog = 7, arg = 5, cyc_sum = 118, cog_sum = 71, arg_sum = 149, macros = [] }
-"src/22_Plotting.jl" = { cyc = 4, cog = 7, arg = 4, cyc_sum = 89, cog_sum = 20, arg_sum = 25, macros = [] }
+"src/22_Plotting.jl" = { cyc = 5, cog = 8, arg = 4, cyc_sum = 93, cog_sum = 24, arg_sum = 27, macros = [] }
 "src/23_Aliases.jl" = { cyc = 1, cog = 0, arg = 8, cyc_sum = 21, cog_sum = 0, arg_sum = 30, macros = [] }
 "src/PortfolioOptimisers.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }

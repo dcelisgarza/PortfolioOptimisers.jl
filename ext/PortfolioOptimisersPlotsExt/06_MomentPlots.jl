@@ -154,12 +154,15 @@ function PortfolioOptimisers.plot_prior(pred::PredictionResult, rd::ReturnsResul
     return PortfolioOptimisers.plot_prior(pr, nx; N = N, kwargs...)
 end
 ## plot_coskewness
+# The axis names default to `nothing` and resolve after the guard: a default taken off
+# `pr.sk` or `pr.kt` would run before the guard and raise a `MethodError` on `size(nothing)`.
 function PortfolioOptimisers.plot_coskewness(pr::HighOrderPrior,
-                                             nx::AbstractVector = 1:size(pr.sk, 1);
+                                             nx::Option{<:AbstractVector} = nothing;
                                              kwargs...)
     if isnothing(pr.sk)
         throw(ArgumentError("prior has no coskewness matrix (`sk` is `nothing`)"))
     end
+    nx = isnothing(nx) ? (1:size(pr.sk, 1)) : nx
     return PortfolioOptimisers.plot_coskewness(pr.sk, nx; kwargs...)
 end
 function PortfolioOptimisers.plot_coskewness(pr::HighOrderPrior, rd::ReturnsResult;
@@ -202,12 +205,13 @@ function PortfolioOptimisers.plot_coskewness(pred::PredictionResult, rd::Returns
 end
 ## plot_cokurtosis
 function PortfolioOptimisers.plot_cokurtosis(pr::HighOrderPrior,
-                                             nx::AbstractVector = 1:isqrt(size(pr.kt, 1));
+                                             nx::Option{<:AbstractVector} = nothing;
                                              heatmap::Bool = false, reference::Bool = true,
                                              kwargs...)
     if isnothing(pr.kt)
         throw(ArgumentError("prior has no cokurtosis matrix (`kt` is `nothing`)"))
     end
+    nx = isnothing(nx) ? (1:isqrt(size(pr.kt, 1))) : nx
     if heatmap
         return PortfolioOptimisers.plot_cokurtosis(pr.kt, nx; heatmap = true,
                                                    reference = reference, kwargs...)

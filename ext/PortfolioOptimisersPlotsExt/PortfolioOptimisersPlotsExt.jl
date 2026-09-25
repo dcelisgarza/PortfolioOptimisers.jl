@@ -11,7 +11,7 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Arr3Num, Option, VecNum_VecV
                             Scalariser, SumScalariser, measure_label, extract_pr,
                             relevant_assets, extract_fees, OptimisationResult,
                             finite_magnitudes, finite_symmetric_clim, finite_columns,
-                            investable_plot_view, result_investable_mask,
+                            factor_plot_prior, investable_plot_view, result_investable_mask,
                             investable_weights_view, fold_factor_returns, fold_fees,
                             result_investable_view, strip_liquidation_carriers
 

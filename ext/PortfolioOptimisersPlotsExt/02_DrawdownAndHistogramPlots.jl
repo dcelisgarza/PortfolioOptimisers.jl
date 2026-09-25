@@ -206,8 +206,7 @@ function PortfolioOptimisers.plot_histogram(ret::VecNum;
 
     colours = palette(:Paired_10, length(risk_labels) + 2)
     plt = histogram(ret; normalize = :pdf, label = "", color = colours[1], alpha = 0.5,
-                    ylabel = "Probability Density", xlabel = "Percentage Returns",
-                    kwargs...)
+                    ylabel = "Probability Density", xlabel = "Returns", kwargs...)
     for (i, (risk, lbl)) in enumerate(zip(risks, risk_labels))
         vline!([risk]; label = lbl, color = colours[i + 1], linewidth = 2)
     end
@@ -301,6 +300,10 @@ function PortfolioOptimisers.plot_rolling_drawdowns(ret::VecNum; ts::AbstractVec
     end
     T = length(ret)
     window = rolling == 0 ? ceil(Int, sqrt(T)) : rolling
+    if window > T
+        throw(DomainError(rolling,
+                          "rolling must be no longer than the return series, which has $T observations"))
+    end
     # Each window is drawn down from its own entry value, so hand `drawdowns` the window's
     # returns rather than a slice of the whole-history cumulative series -- the running peak
     # is seeded with the capital at the start of the window, not the capital at inception.

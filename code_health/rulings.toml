@@ -146,6 +146,17 @@ constructors show the two shapes it is not: `PartialLinearConstraint`, whose sig
 line, carries 215 there, and `UniverseSets`, whose signature is three, carries 67. A row here is \
 therefore keyed to the one definition that shows it, never to multi-line signatures as a class."""
 
+[rationale.a-signature-line-counter-on-a-method-whose-body-is-reached]
+text = """
+A method whose body runs can still read zero on its `function` line. Julia allocates that counter \
+to a method of some signatures and not to its siblings, and the call that reaches the body does not \
+increment it. Measured by the sweep of issue #1075 over `test_25_plotting.jl` alone: the \
+`BitVector` method of `investable_plot_view` carries 12 on its `return` line and 0 on its \
+`function` line, the `Nothing` method beside it has no counter on its `function` line at all, and \
+Codecov records the same single miss on that line for `dev`. The body is reached by every test that \
+draws a computed figure of a gapped prior, so no test can pay the line. A row here is keyed to the \
+one definition that shows it."""
+
 [rationale.a-return-after-an-unconditional-throw]
 text = """
 A fallback method that exists only to reject a term has one unconditional `throw` for a body, and \
@@ -770,6 +781,12 @@ path = "src/05_Moments/20_Base_Regression.jl"
 definition = "MaxValStepwiseRegressionCriterion"
 misses = 1
 rationale = "a-closure-inside-a-top-level-const"
+
+[[coverage_exemption]]
+path = "src/22_Plotting.jl"
+definition = "investable_plot_view"
+misses = 1
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 
 # --- performance dismissals ------------------------------------------------
 #

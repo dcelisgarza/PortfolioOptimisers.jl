@@ -28,8 +28,11 @@ function PortfolioOptimisers.plot_composition(res::OptimisationResult,
 end
 function PortfolioOptimisers.plot_composition(pred::PredictionResult;
                                               N::Option{<:Number} = nothing, kwargs...)
-    nx = isnothing(pred.rd.nx) ? (1:length(pred.res.w)) : pred.rd.nx
-    return PortfolioOptimisers.plot_composition(pred.res.w, nx; N = N, kwargs...)
+    # The weights are on the caller's universe and the fold's `nx` on the investable one, so
+    # the weights are viewed at the mask, as the fold method of `plot_risk_contribution` does.
+    w = investable_weights_view(result_investable_mask(pred.res), pred.res.w)
+    nx = isnothing(pred.rd.nx) ? (1:length(w)) : pred.rd.nx
+    return PortfolioOptimisers.plot_composition(w, nx; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_composition(pred::MultiPeriodPredictionResult;
                                               N::Option{<:Number} = nothing, kwargs...)
@@ -59,7 +62,12 @@ function PortfolioOptimisers.plot_composition(pred::PopulationPredictionResult;
 end
 ## plot_stacked_bar_composition / plot_stacked_area_composition
 function PortfolioOptimisers.plot_stacked_bar_composition(w::VecNum_VecVecNum,
-                                                          nx::AbstractVector = 1:size(w, 1);
+                                                          nx::AbstractVector = 1:(if isa(w,
+                                                                                         VecVecNum)
+                                                                                      length(first(w))
+                                                                                  else
+                                                                                      length(w)
+                                                                                  end);
                                                           kwargs...)
     wmat = isa(w, VecVecNum) ? hcat(w...) : w
     M = size(wmat, 2)
@@ -71,11 +79,16 @@ end
 function PortfolioOptimisers.plot_stacked_bar_composition(res_vec::AbstractVector{<:OptimisationResult},
                                                           rd::ReturnsResult; kwargs...)
     w = getproperty.(res_vec, :w)
-    nx = isnothing(rd.nx) ? (1:size(w, 1)) : rd.nx
+    nx = isnothing(rd.nx) ? (1:length(first(w))) : rd.nx
     return PortfolioOptimisers.plot_stacked_bar_composition(w, nx; kwargs...)
 end
 function PortfolioOptimisers.plot_stacked_area_composition(w::VecNum_VecVecNum,
-                                                           nx::AbstractVector = 1:size(w, 1);
+                                                           nx::AbstractVector = 1:(if isa(w,
+                                                                                          VecVecNum)
+                                                                                       length(first(w))
+                                                                                   else
+                                                                                       length(w)
+                                                                                   end);
                                                            kwargs...)
     wmat = isa(w, VecVecNum) ? hcat(w...) : w
     M = size(wmat, 2)
@@ -86,7 +99,7 @@ end
 function PortfolioOptimisers.plot_stacked_area_composition(res_vec::AbstractVector{<:OptimisationResult},
                                                            rd::ReturnsResult; kwargs...)
     w = getproperty.(res_vec, :w)
-    nx = isnothing(rd.nx) ? (1:size(w, 1)) : rd.nx
+    nx = isnothing(rd.nx) ? (1:length(first(w))) : rd.nx
     return PortfolioOptimisers.plot_stacked_area_composition(w, nx; kwargs...)
 end
 function PortfolioOptimisers.plot_stacked_area_composition(pred::MultiPeriodPredictionResult;
@@ -181,7 +194,8 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseR
 end
 function PortfolioOptimisers.plot_risk_contribution(::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                     ::PredictionResult{<:Any, <:Any,
-                                                                       Nothing}; kwargs...)
+                                                                       Nothing},
+                                                    ::Option{<:Fees} = nothing; kwargs...)
     return throw(ArgumentError("`plot_risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`. Set one of them so the fold records its asset returns, or call `plot_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
 end
 ## plot_factor_risk_contribution
@@ -219,7 +233,8 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
 end
 function PortfolioOptimisers.plot_factor_risk_contribution(::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                            ::PredictionResult{<:Any, <:Any,
-                                                                              Nothing};
+                                                                              Nothing},
+                                                           ::Option{<:Fees} = nothing;
                                                            kwargs...)
     return throw(ArgumentError("`plot_factor_risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`. Set one of them so the fold records its asset returns, or call `plot_factor_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
 end

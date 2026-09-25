@@ -94,7 +94,10 @@ function PortfolioOptimisers.plot_cs_regression_t_stat_exceedance_rate(csfm::Por
               title = "t-Statistic Exceedance Rate (|t| > $threshold)", xlabel = "Factor",
               ylabel = "Fraction of observations", xrotation = 90, legend = false,
               kwargs...)
-    hline!(plt, [0.05]; label = "", linewidth = 2, color = :red, linestyle = :dash)
+    # The rate a t-statistic of no explanatory power reaches: |t| > c under a standard
+    # normal law.
+    hline!(plt, [2 * ccdf(Normal(), threshold)]; label = "", linewidth = 2, color = :red,
+           linestyle = :dash)
     return plt
 end
 function PortfolioOptimisers.plot_cs_regression_t_stat_exceedance_rate(pr::PortfolioOptimisers.AbstractPriorResult;
@@ -341,9 +344,9 @@ function PortfolioOptimisers.plot_factor_forecast_correlation(pr::PortfolioOptim
                                                               nf::Option{<:AbstractVector} = nothing;
                                                               kwargs...)
     PortfolioOptimisers.assert_prior_regression(pr, :pr; lead = NO_FACTOR_FORECAST_LEAD)
-    nf_use = isnothing(nf) ? (1:size(pr.fpr.sigma, 1)) : nf
-    return PortfolioOptimisers.plot_factor_forecast_correlation(pr.fpr.sigma, nf_use;
-                                                                kwargs...)
+    nf_use = isnothing(nf) ? (1:size(factor_plot_prior(pr).sigma, 1)) : nf
+    return PortfolioOptimisers.plot_factor_forecast_correlation(factor_plot_prior(pr).sigma,
+                                                                nf_use; kwargs...)
 end
 function PortfolioOptimisers.plot_factor_forecast_volatilities(f_sigma::MatNum,
                                                                nf::AbstractVector = 1:size(f_sigma,
@@ -361,9 +364,10 @@ function PortfolioOptimisers.plot_factor_forecast_volatilities(pr::PortfolioOpti
                                                                nf::Option{<:AbstractVector} = nothing;
                                                                ppy::Number = 1, kwargs...)
     PortfolioOptimisers.assert_prior_regression(pr, :pr; lead = NO_FACTOR_FORECAST_LEAD)
-    nf_use = isnothing(nf) ? (1:size(pr.fpr.sigma, 1)) : nf
-    return PortfolioOptimisers.plot_factor_forecast_volatilities(pr.fpr.sigma, nf_use;
-                                                                 ppy = ppy, kwargs...)
+    nf_use = isnothing(nf) ? (1:size(factor_plot_prior(pr).sigma, 1)) : nf
+    return PortfolioOptimisers.plot_factor_forecast_volatilities(factor_plot_prior(pr).sigma,
+                                                                 nf_use; ppy = ppy,
+                                                                 kwargs...)
 end
 function PortfolioOptimisers.plot_factor_cumulative_returns(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
                                                             nf::Option{<:AbstractVector} = nothing,

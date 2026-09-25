@@ -78,7 +78,8 @@ function attribution_plot_rows(v::VecNum, N::Option{<:Number})
         throw(DomainError(N, "N must be > 0"))
     end
     n = clamp(ceil(Int, N), 1, M)
-    return sort!(partialsortperm(abs.(v), 1:n; rev = true))
+    # `finite_magnitudes`, so a `NaN` row (a currency family, say) never takes a top slot.
+    return sort!(partialsortperm(finite_magnitudes(v), 1:n; rev = true))
 end
 # The labels of the rows an attribution plot draws.
 function attribution_plot_labels(labels, idx)
