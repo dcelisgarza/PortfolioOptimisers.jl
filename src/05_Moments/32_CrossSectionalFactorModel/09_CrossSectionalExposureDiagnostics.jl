@@ -314,9 +314,9 @@ The level-2 method answers on the **raw** factor axis, because the exposure hist
 
 Where:
 
-  - ``\\mathbf{B}_{t \\cdot k}``: Cross-section of factor ``k`` at observation ``t``.
-  - ``\\boldsymbol{u}_{t}``: Cross-sectional weights of observation ``t``.
-  - ``\\rho``: The weighted correlation of two cross-sections.
+  - $(math_dict[:B_tk_cs])
+  - $(math_dict[:u_t_cs])
+  - $(math_dict[:rho_w_cs])
   - ``\\mathcal{T}_{kl}``: The observations at which the pair is defined.
 
 # Algorithm
@@ -526,7 +526,7 @@ y_{ti} = \\frac{1}{H} \\sum_{h=1}^{H} r_{t+h,i}
 
 Where:
 
-  - ``\\mathbf{B}_{t \\cdot k}``: Cross-section of factor ``k`` at observation ``t``.
+  - $(math_dict[:B_tk_cs])
   - ``\\boldsymbol{y}_{t}``: Forward mean asset return of observation ``t``.
   - ``\\rho``: The rank correlation when `rank`, and the weighted correlation otherwise.
   - ``H``: Forward window, in observations.
@@ -816,9 +816,9 @@ The level-2 method answers on the raw factor axis, and it reads the unlagged his
 
 Where:
 
-  - ``\\mathbf{B}_{t \\cdot k}``: Cross-section of factor ``k`` at observation ``t``.
+  - $(math_dict[:B_tk_cs])
   - ``\\boldsymbol{u}_{t}``: Cross-sectional weights of observation ``t``, the earlier of the two.
-  - ``\\rho``: The weighted correlation of two cross-sections.
+  - $(math_dict[:rho_w_cs])
   - ``s``: Number of observations between the two cross-sections.
 
 # Arguments

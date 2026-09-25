@@ -1473,6 +1473,25 @@ end
         @test all(isfinite, forecast_factor_correlation(fg, FC_B; min_count = 2)[2, :])
     end
 
+    @testset "A weight removes an asset, and a constant cross-section is NaN in the weighted form only" begin
+        # Issue #951. Every asset carries a finite pair, so each NaN below comes from the
+        # weight or from the constant exposure, and not from a missing value.
+        w0 = ones(size(FC_ALPHA))
+        w0[1, 2] = 0.0
+        w0[2, 3] = NaN
+        cz = forecast_factor_correlation(fe, FC_B, w0; min_count = 4)
+        @test all(isnan, cz[1:2, :])
+        @test all(isfinite, cz[3:T, :])
+        # A constant exposure has no weighted correlation. The rank form ranks equal
+        # values by their position on the asset axis, so it answers the rank correlation
+        # of the forecast with that order.
+        bc = cat(FC_TIED, fill(1.0, size(FC_ALPHA)); dims = 3)
+        @test all(isnan, forecast_factor_correlation(fe, bc)[:, 2])
+        crc = forecast_factor_correlation(fe, bc; rank = true)
+        @test crc[:, 2] == crc[:, 1]
+        @test crc[:, 2] ≈ ones(T)
+    end
+
     @testset "The evaluation grid is opt-in, and any row set is read the same way" begin
         # `dates = fe.dates` is the row subset of the whole-axis answer, entry for entry,
         # so a caller who wants the correlations beside the coefficients of the same dates

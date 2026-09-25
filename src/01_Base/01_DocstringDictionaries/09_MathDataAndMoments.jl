@@ -185,4 +185,11 @@ unique_key_dict!(math_dict, :math_dict,
                  :a_k_pair => "``a_{k}``: Forecast of the ``k``-th scorable pair.",#
                  :b_k_pair => "``b_{k}``: Forward target of the ``k``-th scorable pair.",#
                  :q_k_pair => "``q_{k}``: Cross-sectional weight of the ``k``-th scorable pair, zero where that weight is not finite.",#
-                 :n_pool => "``n``: Number of scorable pairs in the pooling.")
+                 :n_pool => "``n``: Number of scorable pairs in the pooling.",#
+                 # The cross-sectional correlations of `32_CrossSectionalFactorModel/`.
+                 # Each symbol is stated by two or more Units of those files.
+                 :alpha_t_fc => "``\\boldsymbol{\\alpha}_{t}``: Return Forecast cross-section at observation ``t``.",#
+                 :B_tk_cs => "``\\mathbf{B}_{t \\cdot k}``: Exposure cross-section of factor ``k`` at observation ``t``.",#
+                 :u_t_cs => "``\\boldsymbol{u}_{t}``: Cross-sectional weights of observation ``t``.",#
+                 :rho_rank_cs => "``\\rho^{\\mathrm{S}}``: The correlation of the ordinal ranks of two cross-sections, over the assets at which both values are finite.",#
+                 :rho_w_cs => "``\\rho``: The weighted correlation of two cross-sections, over the assets at which both values are finite and the weight is finite and positive.")

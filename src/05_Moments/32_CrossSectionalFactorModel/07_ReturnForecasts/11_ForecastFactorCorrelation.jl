@@ -1,11 +1,11 @@
 """
     forecast_factor_exposures(alpha::MatNum, B::Arr3Num)
 
-Return the exposure history the factor correlation reads, checking it against the forecast.
+Return the exposure history that the factor correlation reads, after a check of its axes against the forecast.
 
-The correlation scores one cross-section of the forecast against one cross-section of an exposure, so the two must be written on the same observations and the same assets. The check is stated once, here, because both methods of [`forecast_factor_correlation`](@ref) reach the same loop and a mismatched axis is otherwise caught as a silent `NaN` rather than as an error.
+The correlation scores one cross-section of the forecast against one cross-section of an exposure, so the two histories must hold the same observations and the same assets. Both methods of [`forecast_factor_correlation`](@ref) reach this check, so it is stated once. Without it, a tensor with fewer observations or fewer assets than the forecast throws a `BoundsError` inside the loop, and a larger tensor is read by position, so an offset axis gives a wrong correlation and no error.
 
-A block writes its exposure history on its own rows, and a Return Forecast history is cut to those rows by [`forecast_target_history`](@ref), so the two already agree when the evaluation was built on the block the exposures come from. A caller who passes a tensor of their own is told when it does not.
+A block writes its exposure history on its own rows, and [`forecast_history`](@ref) returns a Return Forecast history on the same rows. The two therefore agree when the evaluation was built on the block that the exposures come from, and the check matters for a tensor that the caller builds.
 
 # Arguments
 
@@ -24,6 +24,7 @@ A block writes its exposure history on its own rows, and a Return Forecast histo
 # Related
 
   - [`forecast_factor_correlation`](@ref)
+  - [`forecast_history`](@ref)
   - [`cs_diagnostic_exposures`](@ref)
   - [`forecast_ic_weights`](@ref)
 """
@@ -48,13 +49,15 @@ end
 
 Return the contemporaneous correlation of a Return Forecast against every factor exposure, one row per observation.
 
-A Return Forecast is meant to add alpha **over** the risk factors, not to restate them. This verb asks whether it does: it correlates the cross-section of the forecast against the cross-section of each exposure at the same observation, so a forecast that is a repackaged size tilt reads near `±1` on the size factor and a forecast that is neutral to the model reads near `0` on every one of them.
+A Return Forecast must add alpha over the risk factors. This verb measures how much of the forecast restates them instead. At each observation it correlates the cross-section of the forecast with the cross-section of each exposure. A forecast that is a size tilt under another name reads near `±1` on the size factor, and a forecast that is neutral to the model reads near `0` on every factor.
 
-The correlation is contemporaneous rather than forward-looking, which is what separates it from [`forecast_ic`](@ref): the information coefficient asks whether the forecast predicts the future, and this asks what the forecast is made of. A high information coefficient earned by a high factor correlation is a factor premium wearing a forecast's clothes, and reading the two together is the only way to tell them apart.
+The correlation is contemporaneous, and this separates it from [`forecast_ic`](@ref). The information coefficient measures whether the forecast predicts the forward target, and this verb measures what the forecast is made of. When a forecast with a high information coefficient also correlates highly with a factor, part of its score is the premium of that factor, and the two verbs read together show it.
 
-Because the statistic is contemporaneous, it has no window to mature and nothing forward to keep disjoint, so every observation at which the forecast and an exposure are both written is a sample of it. The verb therefore reads the whole observation axis of `fe.alpha` by default rather than the evaluation grid `fe.dates`, which exists to keep the forward windows of [`forecast_ic`](@ref) from overlapping and has no meaning here: under the default `step = horizon`, the grid holds `1 / horizon` of the observations, and a summary taken over it carries a t-statistic smaller by the root of that ratio for the same forecast. The grid is opt-in through `dates = fe.dates`, and any other row set is admitted the same way. A member that computes no history is refit along the grid by [`forecast_history`](@ref) and carries `NaN` off it, so its correlation is `NaN` on every row it was never asked for, and [`exposure_ic_summary`](@ref) reads such a row as one at which nothing was measured, so the summary of the whole axis is the summary of the rows the member wrote.
+The statistic reads no forward window, so every observation at which the forecast and an exposure are both finite is a sample of it. The verb therefore reads the whole observation axis of `fe.alpha` by default, and not the evaluation grid `fe.dates`. The grid keeps the forward windows of [`forecast_ic`](@ref) apart, and this verb has no forward window. Under the default `step = horizon`, the grid holds about `1 / horizon` of the observations, so a summary over the grid carries a t-statistic about `sqrt(horizon)` times smaller for the same forecast. Pass `dates = fe.dates` to read the grid, or any other vector of rows.
 
-The summary is the one [`exposure_ic_summary`](@ref) already answers over a `dates × factors` correlation series, so no summary of its own ships: a coefficient of a factor exposure and a correlation of a forecast against one are summarised on the same terms, through the same kernel.
+A member that computes no history is refit along the grid by [`forecast_history`](@ref), and its history is `NaN` off the grid. Its correlation is then `NaN` on those rows. [`exposure_ic_summary`](@ref) drops a `NaN` row, so the summary of the whole axis equals the summary of the rows that the member wrote.
+
+This verb has no summary of its own. [`exposure_ic_summary`](@ref) summarises any `dates × factors` correlation series, so the coefficients of an exposure and the correlations of a forecast with an exposure share one summary kernel.
 
 # Mathematical definition
 
@@ -67,28 +70,29 @@ c_{jk} = \\begin{cases}
 
 Where:
 
-  - ``\\boldsymbol{\\alpha}_{t}``: Cross-section of the Return Forecast at observation ``t``.
-  - ``\\mathbf{B}_{t \\cdot k}``: Cross-section of factor ``k``'s exposure at observation ``t``.
-  - ``\\boldsymbol{u}_{t}``: Cross-sectional weights of observation ``t``.
-  - ``\\rho^{\\mathrm{S}}``: The rank correlation of two cross-sections.
-  - ``\\rho``: The weighted correlation of two cross-sections.
+  - $(math_dict[:alpha_t_fc])
+  - $(math_dict[:B_tk_cs])
+  - $(math_dict[:u_t_cs])
+  - $(math_dict[:rho_rank_cs])
+  - $(math_dict[:rho_w_cs])
   - ``t_{j}``: The ``j``-th row of `dates`, every observation by default.
 
 # Algorithm
 
- 1. Check the exposure history against the forecast with [`forecast_factor_exposures`](@ref), and resolve the weight history with [`forecast_ic_weights`](@ref).
- 2. At each row of `dates` and each factor, correlate the forecast against the exposure with [`cs_spearman_correlation`](@ref) when `rank`, and with [`cs_weighted_correlation`](@ref) otherwise.
+ 1. Check the exposure history against the forecast with [`forecast_factor_exposures`](@ref).
+ 2. Make the weight history with [`forecast_ic_weights`](@ref). An absent history becomes a history of ones.
+ 3. At each row of `dates` and each factor, compute ``c_{jk}`` with [`cs_spearman_correlation`](@ref) when `rank`, and with [`cs_weighted_correlation`](@ref) otherwise.
 
 # Arguments
 
   - `fe`: The evaluation, from [`forecast_evaluation`](@ref).
   - `B`: Exposure history `observations × assets × factors`, unlagged, on the axis of `fe.alpha`.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of `fe.alpha`, or `nothing` for equal weights. The rank form reads no weights.
-  - `csfm`: The fitted factor-model block the evaluation was built on. It supplies the exposure history, through [`cs_diagnostic_exposures`](@ref), and the weight history the metric names.
-  - `dates`: Row indices of `fe.alpha` the correlation is read on. The default is every observation; `fe.dates` reads the evaluation grid, so the correlations sit beside the coefficients of the same dates.
-  - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise. It is the spelling [`exposure_ic`](@ref) already uses, and it defaults to the weighted form because the levels are what a neutralisation acts on.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the weighted form is taken under, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis. The default reads equal weights.
-  - `min_count`: Least number of assets a cross-section needs before a correlation of it is reported. It defaults to the threshold the evaluation carries, and a caller overrides it to read the same pairing at a second threshold.
+  - `csfm`: The fitted factor-model block that the evaluation was built on. [`cs_diagnostic_exposures`](@ref) reads the exposure history from it, and [`cs_diagnostic_weights`](@ref) reads the weight history that `weighting` names.
+  - `dates`: Row indices of `fe.alpha` at which the verb reads the correlation. The default is every observation. `fe.dates` reads the evaluation grid, which puts each correlation on the date of a coefficient of [`forecast_ic`](@ref).
+  - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise. [`exposure_ic`](@ref) uses the same keyword. The default is the weighted form, because a neutralisation acts on the levels. The rank form gives two equal values two ranks in the order of the asset axis, as [`cs_spearman_correlation`](@ref) states. So against a factor with many equal exposures, such as an industry dummy, the rank correlation depends on the order of the assets. A constant exposure reads the rank correlation of the forecast with the asset order, and not `NaN`.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history of the weighted form, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis. The default, [`IdentityMetric`](@ref), gives equal weights.
+  - `min_count`: Least number of assets that must enter a cross-section for the verb to report its correlation. The default is the threshold of the evaluation. Pass another value to read the same pairing at a second threshold.
 
 # Validation
 
@@ -99,7 +103,7 @@ Where:
 
 # Returns
 
-  - `c::Matrix{<:Real}`: `length(dates) × factors`, `observations × factors` by default. Entry `(j, k)` scores the observation `dates[j]` against factor `k`. An observation at which fewer than `min_count` assets carry both a finite forecast and a finite exposure of that factor carries `NaN` there.
+  - `c::Matrix{<:Real}`: `length(dates) × factors`, which is `observations × factors` by default. Entry `(j, k)` scores the observation `dates[j]` against factor `k`. An asset enters entry `(j, k)` when its forecast and its exposure to factor `k` are finite and, in the weighted form, its weight is finite and positive. The entry is `NaN` when fewer than `min_count` assets enter, and, in the weighted form, when the forecast or the exposure is constant over the assets that enter.
 
 # Examples
 
@@ -128,7 +132,7 @@ julia> forecast_factor_correlation(fe, B; dates = fe.dates)
  1.0   0.169031
 ```
 
-The forecast is the first exposure, so it correlates `1` with it at every observation, and it is unrelated to the second, which wanders. The last observation has no forward target, so it is off the evaluation grid, but it carries a forecast and an exposure, so the contemporaneous read scores it; the grid is read by passing `fe.dates`.
+The first exposure is the forecast itself, so the first column is `1` at every observation. The second exposure is a pattern of zeros and ones that changes with the observation, and its column moves between `-0.47` and `0.57`. The last observation has no forward target, so it is not on the evaluation grid. It carries a forecast and an exposure, so the default read scores it, and `dates = fe.dates` leaves it out.
 
 # Related
 
@@ -136,8 +140,11 @@ The forecast is the first exposure, so it correlates `1` with it at every observ
   - [`forecast_evaluation`](@ref)
   - [`ForecastEvaluationResult`](@ref)
   - [`forecast_factor_exposures`](@ref)
+  - [`forecast_history`](@ref)
+  - [`forecast_ic_weights`](@ref)
   - [`exposure_ic_summary`](@ref)
   - [`cs_diagnostic_exposures`](@ref)
+  - [`cs_diagnostic_weights`](@ref)
   - [`cs_spearman_correlation`](@ref)
   - [`cs_weighted_correlation`](@ref)
 """

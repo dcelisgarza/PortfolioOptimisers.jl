@@ -63,11 +63,11 @@ The ranks are ordinal, as [`cs_ordinal_ranks`](@ref) states, so two equal values
 
 Where:
 
-  - ``\\boldsymbol{\\alpha}_{t}``: Cross-section of the Return Forecast at observation ``t``.
+  - $(math_dict[:alpha_t_fc])
   - ``\\boldsymbol{y}_{t}``: Cross-section of the forward target at observation ``t``.
-  - ``\\boldsymbol{u}_{t}``: Cross-sectional weights of observation ``t``.
-  - ``\\rho^{\\mathrm{S}}``: The correlation of the ordinal ranks of two cross-sections, over the assets at which both values are finite.
-  - ``\\rho``: The weighted correlation of two cross-sections, over the assets at which both values are finite and the weight is finite and positive.
+  - $(math_dict[:u_t_cs])
+  - $(math_dict[:rho_rank_cs])
+  - $(math_dict[:rho_w_cs])
   - $(math_dict[:t_j_eval])
 
 # Algorithm
