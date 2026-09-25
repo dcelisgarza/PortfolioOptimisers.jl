@@ -586,7 +586,7 @@ Only a time-varying Asset Panel needs the rows. A static panel has no observatio
 """
 function fold_row_indices(rd::ReturnsResult, pred::VecPredRes)
     @argcheck(!isnothing(rd.ts),
-              IsNothingError("a time-varying feature matrix (Z) has its observation axis parallel to the returns result's timestamps, so collapsing it onto a meta-optimiser's synthetic assets fold by fold needs `ts` to say which observation of Z each fold's observations are. Got ts => nothing. Supply timestamps, or pass a static assets × features Z, which has no observation axis to align."))
+              IsNothingError("a time-varying Asset Panel holds its observation axis parallel to the returns result's timestamps, so collapsing it onto a meta-optimiser's synthetic assets fold by fold needs `ts` to find the rows of the panel that each fold covers. Got ts => nothing. Supply timestamps, or pass a static Asset Panel, which has no observation axis to align."))
     return [feature_row_indices(rd.pnl, p.rd.ts, rd.ts) for p in pred]
 end
 """

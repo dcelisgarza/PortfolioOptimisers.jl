@@ -203,6 +203,12 @@
 
         rd_nots = ReturnsResult(; nx = string.(1:N), X = X)
         @test_throws PO.IsNothingError PO.fold_row_indices(rd_nots, preds[1].pred)
+        err = try
+            PO.fold_row_indices(rd_nots, preds[1].pred)
+        catch e
+            e
+        end
+        @test occursin("time-varying Asset Panel", sprint(showerror, err))
     end
 
     @testset "a scheme with no rng is shared" begin
