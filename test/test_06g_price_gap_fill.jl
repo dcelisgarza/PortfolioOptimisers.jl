@@ -156,7 +156,10 @@ end
                                          102.0, 1)
     @test isnan(bounded[1])
     @test isnan(bounded[5])
-    @test bounded[2:4] == [102.0, 130.0, 130.0]
+    # Row 1 is an absence from the listing, so the seed, a price from before it, does not
+    # reach row 2: the return at row 3 would be a move across the absence.
+    @test isnan(bounded[2])
+    @test bounded[3:4] == [130.0, 130.0]
 end
 @testset "The seed is written only after the training window (#1068)" begin
     # Issue #1068. The seed is the last observed training price, so on a window that follows
@@ -288,4 +291,132 @@ end
     other = PricesResult(; X = TimeArray(collect(ts), X[:, 1:1], ["Z"]),
                          span = listing_span(X[:, 1:1]))
     @test isequal(values(pgf_970_quiet_apply(res, other).X), values(other.X))
+end
+#=
+The docstrings of `08_PriceGapFill.jl` state the fill as a closed form: a gap inside the listing
+takes the last observed price of its own listed run, or the seed from `t0` on while no absence
+precedes it, or the fitted value under a statistic. The references below restate that form cell
+by cell, and the fill must equal them on random panels and random spans.
+=#
+function pgf_978_is_gap(x)
+    return ismissing(x) || (isa(x, Number) && isnan(x))
+end
+function pgf_978_held_price(X::AbstractMatrix, span::AbstractMatrix{Bool}, i::Integer,
+                            v::Number, t0::Integer)
+    Y = copy(X)
+    for t in axes(X, 1)
+        if !(span[t, i] && pgf_978_is_gap(X[t, i]))
+            continue
+        end
+        a = findlast(u -> !span[u, i], 1:(t - 1))
+        r = isnothing(a) ? 1 : a + 1
+        s = findlast(u -> !pgf_978_is_gap(X[u, i]), r:(t - 1))
+        if !isnothing(s)
+            Y[t, i] = X[r + s - 1, i]
+        elseif t >= t0 && r == 1
+            Y[t, i] = v
+        end
+    end
+    return Y
+end
+function pgf_978_constant(X::AbstractMatrix, span::AbstractMatrix{Bool}, i::Integer,
+                          v::Number)
+    Y = copy(X)
+    for t in axes(X, 1)
+        if span[t, i] && pgf_978_is_gap(X[t, i])
+            Y[t, i] = v
+        end
+    end
+    return Y
+end
+@testset "The docstrings of 08_PriceGapFill.jl against numbers" begin
+    rng = StableRNG(978)
+    for trial in 1:1500
+        nobs, nas = rand(rng, 1:9), rand(rng, 1:3)
+        P = Matrix{Union{Missing, Float64}}(100 .+ 10 .* rand(rng, nobs, nas))
+        for k in eachindex(P)
+            if rand(rng) < 0.3
+                P[k] = isodd(trial) && rand(rng) < 0.5 ? missing : NaN
+            end
+        end
+        # A Span Rule span, or a caller's span that can leave the listing and join again.
+        span = rand(rng) < 0.5 ? rand(rng, Bool, nobs, nas) : listing_span(P)
+        for i in 1:nas
+            v = 1000.0 + i
+            t0 = rand(rng, 1:(nobs + 1))
+            held = PortfolioOptimisers.gap_fill_column!(CarriedPrice(), copy(P), span, i, v,
+                                                        t0)
+            @test isequal(held, pgf_978_held_price(P, span, i, v, t0))
+            con = PortfolioOptimisers.gap_fill_column!(MedianValue(), copy(P), span, i, v,
+                                                       t0)
+            @test isequal(con, pgf_978_constant(P, span, i, v))
+        end
+    end
+    # A caller's span takes the asset out of the listing at row 3 and back in at row 4. The
+    # gap at row 4 takes neither the price before the absence nor the seed, so the return at
+    # row 5 is not a move across the absence. The fill leaves the returns as they are.
+    P = reshape([10.0, 11.0, 50.0, NaN, 12.0, 13.0], :, 1)
+    span = reshape(Bool[1, 1, 0, 1, 1, 1], :, 1)
+    @test isequal(vec(PortfolioOptimisers.gap_fill_column!(CarriedPrice(), copy(P), span, 1,
+                                                           9.0, 1)),
+                  [10.0, 11.0, 50.0, NaN, 12.0, 13.0])
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 6)
+    pr = PricesResult(; X = TimeArray(collect(ts), P, [:A]), span = span)
+    filled = pgf_970_quiet_apply(fit_preprocessing(PriceGapFill(), pr), pr)
+    @test isequal(values(prices_to_returns(filled).X), values(prices_to_returns(pr).X))
+    # Without the absence, the same gap takes the price before it.
+    @test vec(PortfolioOptimisers.gap_fill_column!(CarriedPrice(), copy(P), trues(6, 1), 1,
+                                                   9.0, 1))[4] == 50.0
+    # The fitted value: the last observed training price, or the reduction of the observed
+    # training prices. An asset with no observed price has no fitted value.
+    P = [100.0 NaN 5.0; NaN NaN 6.0; 103.0 NaN NaN]
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 3)
+    pr = PricesResult(; X = TimeArray(collect(ts), P, [:a, :b, :c]), span = listing_span(P))
+    held = fit_preprocessing(PriceGapFill(), pr)
+    @test held.nx == [:a, :c]
+    @test held.v == [103.0, 6.0]
+    @test held.te == Date(2020, 1, 3)
+    med = fit_preprocessing(PriceGapFill(; fill = MedianValue()), pr)
+    @test med.v == [median([100.0, 103.0]), median([5.0, 6.0])]
+    @test PortfolioOptimisers.gap_fill_seed(CarriedPrice(), [1.0, 2.0, 7.0]) == 7.0
+    @test PortfolioOptimisers.gap_fill_seed(MeanValue(), [1.0, 2.0, 6.0]) == 3.0
+    # The Held Price conserves wealth: across p0, _, _, p3 the returns are 0, 0, p3/p0 - 1.
+    P = reshape([100.0, NaN, NaN, 130.0], :, 1)
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 4)
+    pr = PricesResult(; X = TimeArray(collect(ts), P, [:A]), span = listing_span(P))
+    rr = prices_to_returns(pgf_970_quiet_apply(fit_preprocessing(PriceGapFill(), pr), pr))
+    @test vec(values(rr.X)) ≈ [0.0, 0.0, 0.3]
+    @test prod(1 .+ vec(values(rr.X))) ≈ 130.0 / 100.0
+    # The replay start: one past the end on the training window, the first row of a later
+    # window, and the row after the end of training on a window that overlaps it.
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 8)
+    P = reshape([100.0, 101.0, 102.0, NaN, NaN, 105.0, NaN, 107.0], :, 1)
+    full = PricesResult(; X = TimeArray(collect(ts), P, [:A]), span = listing_span(P))
+    res = fit_preprocessing(PriceGapFill(), PortfolioOptimisers.port_opt_view(full, 1:3))
+    later = PortfolioOptimisers.port_opt_view(full, 4:8)
+    @test vec(values(pgf_970_quiet_apply(res, later).X)) ==
+          [102.0, 102.0, 105.0, 105.0, 107.0]
+    overlap = PortfolioOptimisers.port_opt_view(full, 2:6)
+    @test vec(values(pgf_970_quiet_apply(res, overlap).X)) ==
+          [101.0, 102.0, 102.0, 102.0, 105.0]
+    # A Float32 panel and a panel with `missing` keep their element types.
+    P32 = Float32[1 NaN; NaN 2; 3 4]
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 3)
+    pr32 = PricesResult(; X = TimeArray(collect(ts), P32, [:a, :b]),
+                        span = listing_span(P32))
+    for fill in (CarriedPrice(), MedianValue())
+        res32 = fit_preprocessing(PriceGapFill(; fill = fill), pr32)
+        @test eltype(res32.v) == Float32
+        @test eltype(values(pgf_970_quiet_apply(res32, pr32).X)) == Float32
+    end
+    Pm = Union{Missing, Float64}[1.0 missing; missing 2.0; 3.0 4.0]
+    prm = PricesResult(; X = TimeArray(collect(ts), Pm, [:a, :b]), span = listing_span(Pm))
+    outm = pgf_970_quiet_apply(fit_preprocessing(PriceGapFill(), prm), prm)
+    @test isequal(values(outm.X), Union{Missing, Float64}[1.0 missing; 1.0 2.0; 3.0 4.0])
+    # A statistic fill has no online form.
+    @test !PortfolioOptimisers.supports_partial_fit(PriceGapFill(; fill = MedianValue()))
+    @test PortfolioOptimisers.supports_partial_fit(PriceGapFill())
+    @test_throws ArgumentError PortfolioOptimisers.partial_fit_transform(PriceGapFill(;
+                                                                                      fill = MedianValue()),
+                                                                         pr32)
 end

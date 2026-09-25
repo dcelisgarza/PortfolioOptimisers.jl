@@ -181,4 +181,6 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :pf_buffer_A => "`A`: Backing matrix of the active mask, of the shape of `X`, or `nothing` when the buffer records no activity. Rows `off + 1` to `off + n` are the mask of the observations, cell for cell with them. It is fixed by the first append, and it is what lets a read-out tell a delisting from a holiday.",#
                  :pf_buffer_E => "`E`: Backing matrix of the estimation mask, of the shape of `X`, or `nothing` when the buffer records none. It is the second per-observation mask the batch verbs take, it is carried on the same terms as `A`, and only the two regime-adjusted families read it.",#
                  :pf_active_mask => "`active_mask`: The active mask of the block, of the shape of `X`, or `nothing`. A buffer records it for every observation it holds or for none of them.",#
-                 :pf_estimation_mask => "`estimation_mask`: The estimation mask of the block, of the shape of `X`, or `nothing`. It is carried on the same terms as `active_mask`.")
+                 :pf_estimation_mask => "`estimation_mask`: The estimation mask of the block, of the shape of `X`, or `nothing`. It is carried on the same terms as `active_mask`.",#
+                 # The price gap fill.
+                 :strict_span => "`strict`: If `true`, a window with a gap from a price carrier that states no Listing Span raises an `ArgumentError`. If `false`, it issues a warning.")

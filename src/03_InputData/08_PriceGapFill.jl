@@ -1,11 +1,39 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-States that a price did not move across a gap, so the last priced observation is held forward.
+States that a price did not move across a gap, so the fill holds the last observed price forward.
 
-`CarriedPrice` is the **Held Price** convention: inside a Held Gap the price is the last observed one, so the returns across the gap are flat and the whole move lands on the observation that ends it. Wealth is conserved, which a per-asset constant cannot do — filling a suspension with an asset's median manufactures one large move into the gap and another out of it.
+`CarriedPrice` is the **Held Price** convention. Inside a Held Gap the price is the last observed price of the listed run, so every return inside the gap is zero and the return at the observation that ends the gap carries the whole move. The fill thus conserves wealth. A constant per asset cannot conserve it, because a fill with the median of an asset makes one large move into a suspension and a second one out of it.
 
-It names a convention rather than a value, so it is the one member of [`PriceGapFill`](@ref)'s `fill` slot that is not a number: the value it fills with is read off the data, and the fitted state is only the seed a later window that opens inside a gap starts from.
+It names a convention and not a value, so it is the one member of the `fill` slot of [`PriceGapFill`](@ref) that is not a number. The fill reads each price off the data. The fitted value is only the seed for a later window that opens inside a gap.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{p}_{t,\\,i} &= \\begin{cases}
+p_{s_{t,\\,i},\\,i} & a_{t,\\,i} = 1\\,,\\ t \\notin \\mathcal{O}_{i}\\,,\\ s_{t,\\,i} \\text{ exists} \\\\
+v_{i} & a_{t,\\,i} = 1\\,,\\ t \\notin \\mathcal{O}_{i}\\,,\\ s_{t,\\,i} \\text{ does not exist}\\,,\\ t \\geq t_{0}\\,,\\ r_{t,\\,i} = 1 \\\\
+p_{t,\\,i} & \\text{otherwise}
+\\end{cases}\\,, \\\\
+r_{t,\\,i} &= \\min\\left\\{u \\leq t : a_{u',\\,i} = 1 \\text{ for } u \\leq u' \\leq t\\right\\}\\,, \\\\
+s_{t,\\,i} &= \\max\\left(\\mathcal{O}_{i} \\cap \\{r_{t,\\,i}, \\ldots, t - 1\\}\\right)\\,.
+\\end{align}
+```
+
+The third case holds a gap that no case fills, so that gap stays absent. Let ``b < c`` be two consecutive members of ``\\mathcal{O}_{i}`` in one listed run. Then ``\\tilde{p}_{t,\\,i} = p_{b,\\,i}`` for ``b < t < c``, so the returns at ``b + 1, \\ldots, c - 1`` are zero and the return at ``c`` is ``p_{c,\\,i} / p_{b,\\,i} - 1``. A gap after an absence from the listing takes no price from before the absence.
+
+Where:
+
+  - $(math_dict[:p_tilde_ti_fill])
+  - $(math_dict[:p_ti_price])
+  - $(math_dict[:a_ti_span])
+  - $(math_dict[:O_i_fill])
+  - $(math_dict[:r_ti_run])
+  - $(math_dict[:s_ti_carry])
+  - $(math_dict[:v_i_fill])
+  - $(math_dict[:t0_fill])
+  - $(math_dict[:n_span])
 
 # Constructors
 
@@ -28,31 +56,74 @@ struct CarriedPrice end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Fills the price gaps inside an asset's listing with a stated convention, and touches nothing outside it.
+Fills the price gaps inside the listing of each asset with a stated convention, and changes no other price.
 
-`PriceGapFill` is the ingestion layer's one fill, and it is off unless a caller adds it. A fill exists to **state a price convention** across a suspension or a holiday, not to remove a gap: a gap is carried through the conversion, so nothing downstream needs it gone. The fill is bounded by the **Listing Span**, so it touches **Held Gaps** alone and can never fabricate a price where an asset was not yet listed or has been delisted.
+`PriceGapFill` is the one fill of the ingestion layer, and it runs only when a caller adds it. A fill states a price convention across a suspension or a holiday. Its purpose is not to remove a gap, because the conversion keeps a gap and no later step needs it gone. The **Listing Span** bounds the fill, so the fill writes into **Held Gaps** alone and never makes a price before an asset is listed or after it is delisted.
 
-It runs at the price level, before [`PricesToReturns`](@ref), because a carried price is a statement about a price and cannot be expressed after the conversion: across a gapped run `p₀, _, _, p₃` the unfilled returns are all non-finite, and zeroing them discards the `p₀ → p₃` move entirely. Carried forward at the price level the same run gives `0, 0, p₃/p₀ - 1`. A filled cell is therefore finite in the returns and its estimation mask entry is `true`, which is the design rather than an oversight: a caller who filled has said the asset traded.
+The fill runs on prices, before [`PricesToReturns`](@ref), because a carried price is a statement about a price and the returns cannot state it. Across a run of prices `p₀, _, _, p₃` the unfilled returns are all non-finite, and a zero in their place loses the move from `p₀` to `p₃`. The carried prices give the returns `0, 0, p₃/p₀ - 1`. A filled cell thus has a finite return and a `true` estimation mask entry. That is the intent, because a caller who fills states that the asset traded.
+
+Under [`CarriedPrice`](@ref) the fitted value is only a seed. A window that opens inside a gap after the training window takes the last observed training price, and every later gap of that window takes the most recent price that the window observed in the same listed run. The fill writes the seed onto no observation at or before the end of the training window. A [`Pipeline`](@ref) transforms the training window with the step that it just fitted, and on that window a gap that opens the window stays a Held Gap. It does not take the last price of the window. No fill thus reads a later price.
+
+# Mathematical definition
+
+Under [`CarriedPrice`](@ref):
+
+```math
+\\begin{align}
+\\tilde{p}_{t,\\,i} &= \\begin{cases}
+p_{s_{t,\\,i},\\,i} & a_{t,\\,i} = 1\\,,\\ t \\notin \\mathcal{O}_{i}\\,,\\ s_{t,\\,i} \\text{ exists} \\\\
+v_{i} & a_{t,\\,i} = 1\\,,\\ t \\notin \\mathcal{O}_{i}\\,,\\ s_{t,\\,i} \\text{ does not exist}\\,,\\ t \\geq t_{0}\\,,\\ r_{t,\\,i} = 1 \\\\
+p_{t,\\,i} & \\text{otherwise}
+\\end{cases}\\,, \\\\
+v_{i} &= p_{\\max \\mathcal{O}_{i}^{\\mathrm{tr}},\\,i}\\,.
+\\end{align}
+```
+
+Under a [`Num_VecToScaM`](@ref):
+
+```math
+\\begin{align}
+\\tilde{p}_{t,\\,i} &= \\begin{cases}
+v_{i} & a_{t,\\,i} = 1\\,,\\ t \\notin \\mathcal{O}_{i} \\\\
+p_{t,\\,i} & \\text{otherwise}
+\\end{cases}\\,, \\\\
+v_{i} &= \\phi\\left(\\left\\{p_{u,\\,i} : u \\in \\mathcal{O}_{i}^{\\mathrm{tr}}\\right\\}\\right)\\,.
+\\end{align}
+```
+
+An asset with an empty ``\\mathcal{O}_{i}^{\\mathrm{tr}}`` has no ``v_{i}``, and every price of that asset stays as it is.
+
+Where:
+
+  - $(math_dict[:p_tilde_ti_fill])
+  - $(math_dict[:p_ti_price])
+  - $(math_dict[:a_ti_span])
+  - $(math_dict[:O_i_fill])
+  - ``\\mathcal{O}_{i}^{\\mathrm{tr}}``: Observed set of asset ``i`` over the training window.
+  - $(math_dict[:r_ti_run])
+  - $(math_dict[:s_ti_carry])
+  - $(math_dict[:v_i_fill])
+  - $(math_dict[:phi_fill])
+  - $(math_dict[:t0_fill])
+  - $(math_dict[:n_span])
 
 # Algorithm
 
 ## Fit
 
- 1. For each asset column, collect the observed prices of the training window. An entry [`is_missing_value`](@ref) accepts is left out.
- 2. Skip an asset whose column holds no observed price. It gets no fitted value, and no entry in the result, so it is left untouched at apply time.
- 3. Reduce the observed prices of the column to one value with [`PortfolioOptimisers.gap_fill_seed`](@ref), giving that asset's fitted value.
- 4. Return a [`PriceGapFillResult`](@ref) holding the fitted asset names, their values, the last timestamp of the training window, the convention and `strict`.
+ 1. For each asset column, collect the observed prices of the training window into `obs`. The step leaves out every entry that [`is_missing_value`](@ref) accepts.
+ 2. Skip an asset whose column holds no observed price. The asset gets no fitted value and no entry in the result, so the apply step does not change it.
+ 3. Reduce `obs` to one value with [`PortfolioOptimisers.gap_fill_seed`](@ref), giving the fitted value of the asset.
+ 4. Return a [`PriceGapFillResult`](@ref) that holds the fitted asset names, their values, the last timestamp of the training window, the convention and `strict`.
 
 ## Apply
 
- 1. Copy the price values of the window, so the input is not mutated.
- 2. Read the Listing Span that bounds the fill with [`PortfolioOptimisers.gap_fill_span`](@ref). A carrier that states none bounds the fill by nothing, so no cell is written.
- 3. Find the first observation of the window after the training window's end, `t0`. On the training window itself there is none; on a window that follows it, `t0` is the first row.
- 4. For each fitted asset name, find its column in the window. Skip a name the window does not carry.
- 5. Run the convention forward through that column with [`PortfolioOptimisers.gap_fill_column!`](@ref), seeded by the fitted value from `t0` and bounded by the span.
- 6. Rebuild `X` from the filled values, keeping the timestamps and the column names, then rebuild the [`PricesResult`](@ref). Every other field passes through untouched.
-
-The fitted value is a **seed**, and under [`CarriedPrice`](@ref) it is only that: a window that opens inside a gap *after* the training window fills from the last observed training price, and every later gap of that window fills from the most recent price the window itself observed. The seed is the last training price, so it precedes every observation it is written onto, and it is written onto none before that: on the training window itself, which a [`Pipeline`](@ref) transforms with the step it just fitted, a gap that opens the window has no price before it and stays a Held Gap rather than taking a price from the window's end. So no fill reads the future, and the convention still tracks the data it is replayed on.
+ 1. Copy the price values of the window into `vals`, so the input does not change.
+ 2. Read the Listing Span `span` that bounds the fill with [`PortfolioOptimisers.gap_fill_span`](@ref). A carrier that states no span gives an all-`false` span, and the fill writes no cell.
+ 3. Find `t0`, the first observation of the window after the end of the training window. On the training window itself `t0` is one past the last row. On a window that follows the training window, `t0` is the first row.
+ 4. For each fitted asset name, find its column `j` in the window. Skip a name that the window does not carry.
+ 5. Fill column `j` of `vals` with [`PortfolioOptimisers.gap_fill_column!`](@ref), with the fitted value as the seed from `t0` and `span` as the bound.
+ 6. Rebuild `X` from `vals` with the same timestamps and column names, then rebuild the [`PricesResult`](@ref). Every other field passes through unchanged.
 
 # Fields
 
@@ -70,7 +141,7 @@ Keywords correspond to the struct's fields.
 
 # Online form
 
-A `PriceGapFill` with a [`CarriedPrice`](@ref) fill takes the online step: [`partial_fit_transform`](@ref) fills a block of prices from the carried prices and advances them, and [`fit_preprocessing`](@ref) with no data reads the [`PriceGapFillResult`](@ref) of the whole history out of `cache`. A statistic fill has no online form, because a longer window re-prices every earlier gap; [`supports_partial_fit`](@ref) answers `false` for it, and a [`Pipeline`](@ref) refuses it at warm-up by name.
+A `PriceGapFill` with a [`CarriedPrice`](@ref) fill has an online step. [`partial_fit_transform`](@ref) fills a block of prices from the carried prices and moves the carried prices forward. [`fit_preprocessing`](@ref) with no data reads the [`PriceGapFillResult`](@ref) of the whole history out of `cache`. A statistic fill has no online form, because a longer window changes the value of every earlier gap. [`supports_partial_fit`](@ref) returns `false` for it, and a [`Pipeline`](@ref) refuses it at warm-up with a message that names the step.
 
 # Examples
 
@@ -97,11 +168,11 @@ julia> res.v
 """
 @concrete struct PriceGapFill <: AbstractPricesPreprocessingEstimator
     """
-    The convention a gap inside the Listing Span takes. [`CarriedPrice`](@ref) holds the last priced observation forward; a [`Num_VecToScaM`](@ref) reduces the asset's observed training prices to the one value every gap of that column takes.
+    Convention for a gap inside the Listing Span. [`CarriedPrice`](@ref) holds the last observed price forward. A [`Num_VecToScaM`](@ref) reduces the observed training prices of an asset to one value, and every gap of that asset takes the value.
     """
     fill
     """
-    Whether a price carrier that states no Listing Span is refused (`true`) or warned about (`false`).
+    $(field_dict[:strict_span])
     """
     strict
     """
@@ -121,9 +192,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Fitted result of a [`PriceGapFill`](@ref).
+Holds the value that a price gap fill fitted for each asset, with the end of the training window and the convention.
 
-Carries the per-asset value fitted on the training window, the timestamp that window ended on, and the convention the value is read under. One result type serves both conventions, as [`AssetSelectorResult`](@ref) serves the whole selector family: the convention is a field rather than a second type, because it is what [`apply_preprocessing`](@ref) dispatches on and nothing else about the two differs.
+[`PriceGapFill`](@ref) makes it, and [`apply_preprocessing`](@ref) replays it on a window. One result type serves both conventions, as [`AssetSelectorResult`](@ref) serves the whole selector family. The convention is a field and not a second type, because [`PortfolioOptimisers.gap_fill_column!`](@ref) dispatches on it and the two conventions differ in nothing else.
 
 # Fields
 
@@ -141,19 +212,19 @@ $(DocStringExtensions.FIELDS)
     """
     nx
     """
-    Fitted values, aligned with `nx`. The last observed training price under [`CarriedPrice`](@ref), and the reduced scalar under a [`Num_VecToScaM`](@ref).
+    Fitted values, aligned with `nx`. Under [`CarriedPrice`](@ref) each value is the last observed training price of its asset. Under a [`Num_VecToScaM`](@ref) each value is the reduction of the observed training prices of its asset.
     """
     v
     """
-    The last timestamp of the training window. Under [`CarriedPrice`](@ref) the seed in `v` is written onto an observation after it and onto none at or before it, so a window that opens inside a gap fills from the seed only when the seed precedes it; a [`Num_VecToScaM`](@ref) reads it by nothing.
+    Last timestamp of the training window. Under [`CarriedPrice`](@ref) the fill writes a seed of `v` only onto an observation after `te`. A gap at or before `te` thus never takes the seed. A [`Num_VecToScaM`](@ref) does not read `te`.
     """
     te
     """
-    The convention `v` is read under, copied from the estimator.
+    Convention that reads `v`, copied from the estimator.
     """
     fill
     """
-    Whether a price carrier that states no Listing Span is refused (`true`) or warned about (`false`).
+    $(field_dict[:strict_span])
     """
     strict
 end
@@ -161,24 +232,24 @@ end
     carrier_listing_span(pr::AbstractPricesResult) -> Nothing
     carrier_listing_span(pr::PricesResult) -> Option{<:AbstractMatrix{Bool}}
 
-Read the Listing Span a price carrier states, or `nothing` when it states none.
+Read the Listing Span that a price carrier states, or `nothing` when it states none.
 
-The Listing Span rides on the price carrier, so a step that needs one asks the carrier rather than deriving its own. A [`PricesResult`](@ref) answers with its `span` field, which [`price_ingestion`](@ref) fills and a carrier assembled by hand leaves `nothing`; every other member of the family answers `nothing`, because a carrier that carries no span states no listing calendar and the step that asked must fall back and say so.
+The price carrier holds the Listing Span, so a step that needs a span asks the carrier and does not derive one. A [`PricesResult`](@ref) returns its `span` field. [`price_ingestion`](@ref) fills that field, and a carrier that a caller builds by hand leaves it `nothing`. Every other member of the family returns `nothing`, because it states no listing calendar. The step that asked then uses its fallback and reports it.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. Any price carrier: `nothing`. The family states no span of its own.
- 2. A [`PricesResult`](@ref): its `span` field.
+ 1. Any other price carrier: return `nothing`, because the family states no span of its own.
+ 2. A [`PricesResult`](@ref): return its `span` field.
 
 # Arguments
 
-  - `pr`: The price carrier the fill is running on.
+  - `pr`: The price carrier that the fill reads.
 
 # Returns
 
-  - `span::Option{<:AbstractMatrix{Bool}}`: The carrier's Listing Span, or `nothing`.
+  - `span::Option{<:AbstractMatrix{Bool}}`: The Listing Span of the carrier, or `nothing`.
 
 # Related
 
@@ -200,22 +271,22 @@ end
 
 Resolve the Listing Span that bounds a [`PriceGapFill`](@ref) over one window.
 
-The span is the carrier's, because a listing calendar is a fact about the instruments and a window cannot see all of it. A carrier that states none leaves only the window in hand, and the window cannot answer: a suspension straddling its edge reads there as an inception or a delisting, so a window-local derivation fills the wrong cells rather than fewer of them. So the fill is bounded by nothing at all — an all-`false` span, under which every cell lies outside a listing and no price is written — and it says so by name, refusing under `strict`. The diagnostic fires only when the window actually holds a gap, since a gapless window has nothing to fill and nothing to get wrong.
+The span comes from the carrier, because a listing calendar is a fact about the instruments and a window cannot see all of it. A carrier that states no span leaves only the window, and the window cannot give the span. A suspension across the edge of a window reads there as an inception or a delisting, so a span derived from the window fills the wrong cells, not fewer cells. The fill therefore takes an all-`false` span, under which every cell lies outside a listing and the fill writes no price. The function reports this with a warning, or with an error under `strict`. It reports only when the window holds a gap, because a window with no gap has nothing to fill.
 
-The refusal is [`strict_diagnostic`](@ref)'s, which is the library's one strictness policy.
+[`strict_diagnostic`](@ref) raises the warning or the error. It is the one strictness policy of the library.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `span` is an `AbstractMatrix{Bool}`: check its shape against `X` and answer it. A caller's own declaration and a derived [`PortfolioOptimisers.ListingSpan`](@ref) enter alike, under the public bound.
- 2. `span` is `nothing`: report through [`strict_diagnostic`](@ref) when `X` holds a gap, then answer an all-`false` span of `X`'s shape, which fills nothing.
+ 1. `span` is an `AbstractMatrix{Bool}`: check its shape against `X` and return it. A caller's own declaration and a derived [`PortfolioOptimisers.ListingSpan`](@ref) enter alike, under the public bound.
+ 2. `span` is `nothing`: report through [`strict_diagnostic`](@ref) when `X` holds a gap, then return an all-`false` span of the shape of `X`, which fills nothing.
 
 # Arguments
 
-  - `span`: The listing statement the carrier holds, `observations × assets`, or `nothing`.
-  - `X`: The price values of the window being transformed, `observations × assets`.
-  - `strict`: If `true`, throws an `ArgumentError` when the carrier states no span; if `false`, issues a warning.
+  - `span`: The listing statement that the carrier holds, `observations × assets`, or `nothing`.
+  - `X`: The price values of the window that the fill transforms, `observations × assets`.
+  - $(arg_dict[:strict_span])
 
 # Validation
 
@@ -249,23 +320,50 @@ end
     gap_fill_seed(fill::CarriedPrice, obs::VecNum) -> Number
     gap_fill_seed(fill::Num_VecToScaM, obs::VecNum) -> Number
 
-Reduce one asset's observed training prices to the value [`apply_preprocessing`](@ref) replays.
+Reduce the observed training prices of one asset to the value that [`apply_preprocessing`](@ref) replays.
+
+# Mathematical definition
+
+Under [`CarriedPrice`](@ref):
+
+```math
+\\begin{align}
+v_{i} &= p_{\\max \\mathcal{O}_{i},\\,i}\\,.
+\\end{align}
+```
+
+Under a [`Num_VecToScaM`](@ref):
+
+```math
+\\begin{align}
+v_{i} &= \\phi\\left(\\left\\{p_{u,\\,i} : u \\in \\mathcal{O}_{i}\\right\\}\\right)\\,.
+\\end{align}
+```
+
+Here ``\\mathcal{O}_{i}`` is the observed set of asset ``i`` over the training window, and it is not empty.
+
+Where:
+
+  - $(math_dict[:v_i_fill])
+  - $(math_dict[:p_ti_price])
+  - $(math_dict[:O_i_fill])
+  - $(math_dict[:phi_fill])
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. [`CarriedPrice`](@ref): the last observed training price, which seeds a carry-forward on a later window that opens inside a gap.
- 2. [`Num_VecToScaM`](@ref): the reduction of the observed training prices, through [`vec_to_real_measure`](@ref).
+ 1. [`CarriedPrice`](@ref): return the last entry of `obs`. It is the seed for a later window that opens inside a gap.
+ 2. [`Num_VecToScaM`](@ref): return the reduction of `obs` through [`vec_to_real_measure`](@ref).
 
 # Arguments
 
   - `fill`: The convention, read off [`PriceGapFill`](@ref).
-  - `obs`: One asset's observed training prices, in observation order.
+  - `obs`: The observed training prices of one asset, in observation order.
 
 # Returns
 
-  - `v::Number`: The asset's fitted value.
+  - `v::Number`: The fitted value of the asset.
 
 # Related
 
@@ -283,27 +381,68 @@ end
     gap_fill_column!(fill::CarriedPrice, X::AbstractMatrix, span::AbstractMatrix{Bool}, j::Integer, v::Number, t0::Integer) -> AbstractMatrix
     gap_fill_column!(fill::Num_VecToScaM, X::AbstractMatrix, span::AbstractMatrix{Bool}, j::Integer, v::Number, t0::Integer) -> AbstractMatrix
 
-Write one column's fill in place, inside the asset's listing and nowhere else.
+Write the fill of one column in place, inside the listing of the asset and nowhere else.
 
-Both methods read `span` before they read the price, so an observation outside the listing is never written whatever the convention states. That is where the guarantee sits: the fill cannot fabricate a price before an asset's first listing or after its delisting, because those observations are outside the span by the Span Rule.
+Both methods read `span` before they read the price, so they never write an observation outside the listing, whatever the convention. The Span Rule puts every observation before the first listing of an asset and after its delisting outside the span, so the fill cannot make a price there.
 
-Under [`CarriedPrice`](@ref) the seed `v` is a price observed at the end of the training window, so it may be written only onto an observation after that window, which `t0` names. The walk starts with nothing to write; it may write the seed once it reaches `t0` without having met an observed price, and it writes the most recent observed price wherever it has met one. A gap before `t0` that no observed price precedes stays a gap: on the training window, which a [`Pipeline`](@ref) transforms with the step it just fitted, that is every observation, so a gap that opens the window is not filled from the window's own end.
+Under [`CarriedPrice`](@ref) the seed `v` is a price that the training window observed last, so the method writes it only onto an observation after that window. `t0` names the first such observation. A gap before `t0` with no observed price before it stays a gap. On the training window, which a [`Pipeline`](@ref) transforms with the step that it just fitted, every observation comes before `t0`, so a gap that opens the window does not take the last price of the window.
+
+The carry also stops at an observation outside the listing. A caller's own span can take an asset out of the listing and back in. A gap after the return takes no price from before the absence and no seed, because with such a price the next return is a move across the absence. [`PortfolioOptimisers.project_span`](@ref) books no return across an absence, and the fill keeps that statement true.
+
+# Mathematical definition
+
+Under [`CarriedPrice`](@ref):
+
+```math
+\\begin{align}
+\\tilde{p}_{t,\\,i} &= \\begin{cases}
+p_{s_{t,\\,i},\\,i} & a_{t,\\,i} = 1\\,,\\ t \\notin \\mathcal{O}_{i}\\,,\\ s_{t,\\,i} \\text{ exists} \\\\
+v_{i} & a_{t,\\,i} = 1\\,,\\ t \\notin \\mathcal{O}_{i}\\,,\\ s_{t,\\,i} \\text{ does not exist}\\,,\\ t \\geq t_{0}\\,,\\ r_{t,\\,i} = 1 \\\\
+p_{t,\\,i} & \\text{otherwise}
+\\end{cases}\\,.
+\\end{align}
+```
+
+Under a [`Num_VecToScaM`](@ref):
+
+```math
+\\begin{align}
+\\tilde{p}_{t,\\,i} &= \\begin{cases}
+v_{i} & a_{t,\\,i} = 1\\,,\\ t \\notin \\mathcal{O}_{i} \\\\
+p_{t,\\,i} & \\text{otherwise}
+\\end{cases}\\,.
+\\end{align}
+```
+
+Here ``i`` is the asset of the column, and ``\\mathcal{O}_{i}`` is its observed set over the window.
+
+Where:
+
+  - $(math_dict[:p_tilde_ti_fill])
+  - $(math_dict[:p_ti_price])
+  - $(math_dict[:a_ti_span])
+  - $(math_dict[:O_i_fill])
+  - $(math_dict[:r_ti_run])
+  - $(math_dict[:s_ti_carry])
+  - $(math_dict[:v_i_fill])
+  - $(math_dict[:t0_fill])
+  - $(math_dict[:n_span])
 
 # Algorithm
 
-The method that Julia selects is the algorithm, and the two differ in what they write.
+The method that Julia selects is the algorithm, and the two methods differ in what they write.
 
- 1. [`CarriedPrice`](@ref): walk the observation axis carrying a price. Nothing is written until the walk meets an observed price or reaches `t0`, whichever is first; from `t0` on, the carry is `v` until an observed price replaces it. Inside the listing, write the carry onto a gap once there is one to write, and take an observed price as the new carry.
- 2. [`Num_VecToScaM`](@ref): write `v` onto every gap inside the listing. The value is already the reduction, so nothing is carried, an observed price is read by nothing, and `t0` is read by nothing.
+ 1. [`CarriedPrice`](@ref): walk the observation axis with the carry `carry`, which starts as the seed `v`, and the flag `carried`, which states whether the walk can write `carry`. At an observation outside the listing, clear `carried` and retire the seed. Inside the listing, set `carried` from `t0` on while the seed is not retired. Take an observed price as the new `carry` and set `carried`, or write `carry` onto a gap when `carried` is set.
+ 2. [`Num_VecToScaM`](@ref): write `v` onto every gap inside the listing. The value is already the reduction, so the method carries no price and reads neither an observed price nor `t0`.
 
 # Arguments
 
   - `fill`: The convention, read off [`PriceGapFillResult`](@ref).
-  - `X`: The price values of the window, mutated in place.
-  - `span`: The listing statement bounding the fill, `observations × assets`.
+  - `X`: The price values of the window. The method changes them in place.
+  - `span`: The listing statement that bounds the fill, `observations × assets`.
   - `j`: Index of the column to fill.
-  - `v`: The asset's fitted value.
-  - `t0`: Index of the first observation after the training window. `size(X, 1) + 1` when the window holds none, as on the training window itself, and `1` when every observation follows the training window.
+  - `v`: The fitted value of the asset.
+  - `t0`: Index of the first observation after the training window. It is `size(X, 1) + 1` when the window holds none, as on the training window itself, and `1` when every observation follows the training window.
 
 # Returns
 
@@ -320,22 +459,24 @@ function gap_fill_column!(::CarriedPrice, X::AbstractMatrix, span::AbstractMatri
                           j::Integer, v::Number, t0::Integer)
     #! `carry` holds the seed from the start and `carried` says whether it may be written:
     #! it may once the walk reaches `t0`, the first observation the seed precedes, or once
-    #! an observed price has replaced the seed. A gap before either stays a gap.
+    #! an observed price has replaced the seed. A gap before either stays a gap. An absence
+    #! from the listing ends the carry and retires the seed, so a gap after the asset
+    #! rejoins waits for a price of its own run.
     carry = v
     carried = false
+    seeded = true
     for t in axes(X, 1)
-        carried |= t >= t0
         if !span[t, j]
+            carried = seeded = false
             continue
         end
+        carried |= seeded & (t >= t0)
         x = X[t, j]
-        if is_missing_value(x)
-            if carried
-                X[t, j] = carry
-            end
-        else
+        if !is_missing_value(x)
             carry = x
             carried = true
+        elseif carried
+            X[t, j] = carry
         end
     end
     return X

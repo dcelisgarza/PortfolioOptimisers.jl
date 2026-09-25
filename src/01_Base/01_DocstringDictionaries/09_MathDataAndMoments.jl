@@ -158,4 +158,14 @@ unique_key_dict!(math_dict, :math_dict,
                  :a_tilde_ti_act => "``\\tilde{a}_{t,\\,i}``: Active mask entry of asset ``i`` at observation ``t`` of the returns clock, ``1`` when both prices of the return lie inside the listing of the asset.",#
                  :n_span => "``n``: Price clock length, the number of price observations.",#
                  :m_span => "``m``: Returns clock length, the number of return observations.",#
-                 :o_span => "``o = n - m``: Clock offset, ``0`` when padding keeps the first observation and ``1`` when it does not.")
+                 :o_span => "``o = n - m``: Clock offset, ``0`` when padding keeps the first observation and ``1`` when it does not.",#
+                 # The price gap fill of `03_InputData/08_PriceGapFill.jl`. Each symbol is
+                 # stated by two or more Units of that file.
+                 :p_ti_price => "``p_{t,\\,i}``: Price of asset ``i`` at observation ``t`` of the price clock, absent at a gap.",#
+                 :p_tilde_ti_fill => "``\\tilde{p}_{t,\\,i}``: Filled price of asset ``i`` at observation ``t``, the price after the fill.",#
+                 :O_i_fill => "``\\mathcal{O}_{i}``: Observed set of asset ``i``, the observations at which its price is neither `missing` nor `NaN`.",#
+                 :v_i_fill => "``v_{i}``: Fitted value of asset ``i``, read off its observed prices over the training window.",#
+                 :phi_fill => "``\\phi``: Reduction that a [`Num_VecToScaM`](@ref) states, from the observed prices of an asset to one number. A plain number is the constant reduction.",#
+                 :t0_fill => "``t_{0}``: Replay start, the first observation of the window after the end of the training window, or ``n + 1`` when the window holds none.",#
+                 :r_ti_run => "``r_{t,\\,i}``: Run start of asset ``i`` at observation ``t``, the first observation of the unbroken listed run that holds ``t``.",#
+                 :s_ti_carry => "``s_{t,\\,i}``: Carry source of asset ``i`` at observation ``t``, the last member of ``\\mathcal{O}_{i}`` before ``t`` in the listed run that holds ``t``.")
