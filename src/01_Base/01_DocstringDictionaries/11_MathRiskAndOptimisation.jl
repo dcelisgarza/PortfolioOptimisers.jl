@@ -101,6 +101,17 @@ unique_key_dict!(math_dict, :math_dict,
                  # Weight finalisation.
                  :w_0_finaliser => "``\\boldsymbol{w}_{0}``: Portfolio weights vector ``N \\times 1`` that the optimisation produced, which the finaliser repairs.",#
                  :lb_ub_finaliser => "``\\boldsymbol{l}``, ``\\boldsymbol{u}``: Lower and upper weight bounds. An absent bound is dropped from the programme rather than set to an infinity.",#
+                 # A finite allocation solves one integer programme per side of the book,
+                 # so its symbols are those of one side. `DiscreteAllocation` and its
+                 # model builders state one programme, and share these symbols.
+                 :x_shares => "``\\boldsymbol{x} \\in \\mathbb{Z}_{\\geq 0}^{N}``: Share count vector of one side of a finite allocation, the model variable `x`.",#
+                 :p_prices => "``\\boldsymbol{p}``: Asset price vector of one side of a finite allocation.",#
+                 :C_side_cash => "``C``: Side cash, the cash that one side of a finite allocation can spend.",#
+                 :w_side_target => "``\\boldsymbol{w}``: Side target weights, the weights of one side of a finite allocation normalised to sum to one. The short side is negated first, so every entry is non-negative.",#
+                 :u_alloc_err => "``u``: Allocation error bound, the model variable `u` that bounds the deviation of the book from its target.",#
+                 :r_cash_left => "``r = C - \\boldsymbol{x}^{\\intercal} \\boldsymbol{p}``: Leftover cash of one side, before the fee.",#
+                 :m_money => "``\\boldsymbol{m} = \\boldsymbol{x} \\odot \\boldsymbol{p}``: Position money vector, the money in each position of one side.",#
+                 :F_side_fee => "``F(\\boldsymbol{x})``: Side fee, the fee that one side pays over the whole horizon. It is zero when the input states no fee.",#
                  # The risk tracking family.
                  :w_b_track => "``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``, the `w` of the tracking specification `tr`.",#
                  :rho_track => "``\\rho``: Tracked risk measure, the `r` field. Its value at a weight vector is the risk of that vector as [`expected_risk`](@ref) reports it.",#

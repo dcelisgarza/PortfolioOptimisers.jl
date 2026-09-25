@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for [`DiscreteAllocation`](@ref).
 
-`shares`, `cost` and `w` are signed: a short position carries a negative share count, a negative cost and a negative weight. `fees` is the charge the two sub-problems paid over the whole horizon, and it is never signed. `retcode` is a failure when either sub-problem failed; `s_retcode` and `l_retcode` carry the short-side and long-side return codes on their own, and `s_model` and `l_model` carry the two JuMP models when `save` is `true`.
+`shares`, `cost` and `w` are signed, so a short position carries a negative share count, a negative cost and a negative weight. `fees` is the charge the two sub-problems paid over the whole horizon, and it is never signed. `retcode` is a failure when either sub-problem failed. `s_retcode` and `l_retcode` carry the return code of the short and of the long side, and `s_model` and `l_model` carry the two JuMP models when `save` is `true`.
 
 # Fields
 
@@ -110,9 +110,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Discrete Allocation portfolio optimiser.
 
-`DiscreteAllocation` allocates a portfolio by solving a Mixed-Integer Programming (MIP) problem to find the optimal number of shares for each asset, minimising the deviation between the target continuous weights and the realised discrete allocation.
+`DiscreteAllocation` turns target weights into whole share counts by solving a Mixed-Integer Programming (MIP) problem. The book tracks the target as closely as the error of `wf` measures it, and leaves as little cash idle as it can.
 
-The long and the short side of a portfolio are allocated as two separate MIP sub-problems, each with its own share of the cash and its own budget. Each sub-problem holds a non-negative share vector, and the short side is negated when the two are recombined. `s_retcode` and `l_retcode` of the result carry the two return codes.
+The long and the short side of a book are two separate sub-problems, each with its own cash and its own budget. Each sub-problem holds a non-negative share vector, and [`optimise`](@ref) negates the short side when it recombines the two. `s_retcode` and `l_retcode` of the result carry the two return codes.
 
 # Mathematical definition
 
@@ -120,8 +120,8 @@ One sub-problem, under the default [`AbsoluteErrorWeightFinaliser`](@ref):
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x} \\in \\mathbb{Z}_{\\geq 0}^N}{\\min} \\quad & u + r\\,, \\\\
-\\text{s.t.} \\quad & u \\geq \\lVert \\boldsymbol{w} C - \\boldsymbol{x} \\odot \\boldsymbol{p} \\rVert_1\\,, \\\\
+\\underset{\\boldsymbol{x} \\in \\mathbb{Z}_{\\geq 0}^{N}}{\\min} \\quad & u + r\\,, \\\\
+\\text{s.t.} \\quad & u \\geq \\lVert C \\boldsymbol{w} - \\boldsymbol{x} \\odot \\boldsymbol{p} \\rVert_1\\,, \\\\
 & r = C - \\boldsymbol{x}^\\intercal \\boldsymbol{p}\\,, \\\\
 & r - F(\\boldsymbol{x}) \\geq 0\\,.
 \\end{align}
@@ -129,32 +129,39 @@ One sub-problem, under the default [`AbsoluteErrorWeightFinaliser`](@ref):
 
 Where:
 
-  - ``\\boldsymbol{x}``: Integer share vector.
-  - ``u``: Tracking error auxiliary variable.
-  - ``r``: Residual cash.
-  - ``F(\\boldsymbol{x})``: Fee of this sub-problem, of [`set_allocation_fees!`](@ref). It is zero when the input states no fee.
-  - ``\\boldsymbol{w}``: Target weight vector of this sub-problem.
-  - ``C``: Cash allocated to this sub-problem.
-  - ``\\boldsymbol{p}``: Asset price vector.
+  - $(math_dict[:x_shares])
+  - $(math_dict[:u_alloc_err])
+  - $(math_dict[:r_cash_left])
+  - $(math_dict[:F_side_fee])
+  - $(math_dict[:w_side_target])
+  - $(math_dict[:C_side_cash])
+  - $(math_dict[:p_prices])
   - ``\\odot``: Element-wise (Hadamard) product.
-  - ``N``: Number of assets in this sub-problem.
+  - $(math_dict[:N])
 
-The fee enters the budget and never the objective. The objective reads *track well, and leave no capital idle*, so a fee added to ``r`` and minimised would reward the model for paying **more** fees: a larger fee shrinks the leftover. The budget instead states that the fee must be affordable. The objective still pushes ``\\boldsymbol{x}^\\intercal \\boldsymbol{p}`` up, so every unit of fee competes with a unit of position, and the model drops a position whose fixed fee buys too little tracking.
+``C \\boldsymbol{w}`` is the target money of each position. ``C`` is already the side's share of the cash, so the side's weights are normalised before they are multiplied by it, and the targets of a side sum to its cash.
 
-`wf` selects the deviation that ``u`` bounds. The objective, the integrality and the cash constraint do not change with it.
+The fee of [`set_allocation_fees!`](@ref) enters the budget and never the objective. The objective reads *track well, and leave no capital idle*, so a fee added to ``r`` and minimised would reward the model for paying more fees, because a larger fee shrinks the leftover. The budget instead states that the fee must be affordable. The objective still pushes ``\\boldsymbol{x}^\\intercal \\boldsymbol{p}`` up, so every unit of fee competes with a unit of position, and the model drops a position whose fixed fee buys too little tracking.
 
-| `wf`                                          | Constraint on ``u``                                                                                                 |
-|:--------------------------------------------- |:------------------------------------------------------------------------------------------------------------------- |
-| [`AbsoluteErrorWeightFinaliser`](@ref)        | ``u \\geq \\lVert \\boldsymbol{w} C - \\boldsymbol{x} \\odot \\boldsymbol{p} \\rVert_1``                            |
-| [`SquaredAbsoluteErrorWeightFinaliser`](@ref) | ``u \\geq \\lVert \\boldsymbol{w} C - \\boldsymbol{x} \\odot \\boldsymbol{p} \\rVert_2``                            |
-| [`RelativeErrorWeightFinaliser`](@ref)        | ``u \\geq \\lVert \\boldsymbol{x} C \\oslash (\\boldsymbol{w} \\odot \\boldsymbol{p}) - \\boldsymbol{1} \\rVert_1`` |
-| [`SquaredRelativeErrorWeightFinaliser`](@ref) | ``u \\geq \\lVert \\boldsymbol{x} C \\oslash (\\boldsymbol{w} \\odot \\boldsymbol{p}) - \\boldsymbol{1} \\rVert_2`` |
+`wf` selects the row that bounds ``u``, and the error term ``e`` that takes the place of ``u`` in the objective ``e + r``. The integrality and the budget do not change with it.
 
-Where ``\\oslash`` is element-wise division, and ``\\boldsymbol{1}`` is the vector of ones.
+| `wf`                                          | Row on ``u``                                                                                                          | ``e``   |
+|:--------------------------------------------- |:--------------------------------------------------------------------------------------------------------------------- |:------- |
+| [`AbsoluteErrorWeightFinaliser`](@ref)        | ``u \\geq \\lVert C \\boldsymbol{w} - \\boldsymbol{x} \\odot \\boldsymbol{p} \\rVert_1``                              | ``u``   |
+| [`SquaredAbsoluteErrorWeightFinaliser`](@ref) | ``u \\geq \\lVert C \\boldsymbol{w} - \\boldsymbol{x} \\odot \\boldsymbol{p} \\rVert_2``                              | ``u``   |
+| [`RelativeErrorWeightFinaliser`](@ref)        | ``u \\geq \\lVert (\\boldsymbol{x} \\odot \\boldsymbol{p}) \\oslash (C \\boldsymbol{w}) - \\boldsymbol{1} \\rVert_1`` | ``C u`` |
+| [`SquaredRelativeErrorWeightFinaliser`](@ref) | ``u \\geq \\lVert (\\boldsymbol{x} \\odot \\boldsymbol{p}) \\oslash (C \\boldsymbol{w}) - \\boldsymbol{1} \\rVert_2`` | ``C u`` |
+
+Where:
+
+  - $(math_dict[:oslash])
+  - ``\\boldsymbol{1}``: Vector of ones.
+
+The absolute error is money, and so is ``r``. The relative error is the realised weight of each position over its target weight, less one, and it has no unit. The relative formulations price it in money as ``C u``, so a relative error of one over the whole side is worth the whole side's cash. Without that factor the model gives up any amount of tracking to leave one unit less of cash idle.
 
 !!! note
 
-    The two `Squared` formulations bound the ``\\ell_2`` **norm** itself, not its square: they build a `JuMP.SecondOrderCone` over ``[u;\\, \\cdot]``. The square is monotonic on a non-negative norm, so the minimiser is the one a squared objective would give, but the objective *value* is the norm. The two relative formulations replace a zero target weight with `eps` so that the division is defined.
+    The two `Squared` formulations bound the ``\\ell_2`` norm itself, not its square. They build a `JuMP.SecondOrderCone` over ``[u;\\, \\cdot]``. The square is monotonic on a non-negative norm, so the minimiser is the one a squared objective would give, but the objective *value* is the norm. The two relative formulations replace a zero target weight with `eps` so that the division is defined.
 
 # Fields
 
@@ -250,29 +257,55 @@ function DiscreteAllocation(; slv::Slv_VecSlv, sc::Number = 1, so::Number = 1,
 end
 """
     set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
-                        wf::JuMPWeightFinaliserFormulation) -> Nothing
+                        wf::JuMPWeightFinaliserFormulation)
 
-Bound the model's auxiliary variable `u` by the allocation error that `wf` selects.
+Bound the model's error variable `u` by the allocation error that `wf` selects, and return the error term of the objective.
 
-Adds the one constraint that separates the four formulations of [`DiscreteAllocation`](@ref). The model already holds the share vector `x` and the auxiliary variable `u`; this method adds the cone that ties them together. The objective and the cash constraint are set by [`finite_sub_allocation`](@ref) and do not depend on `wf`.
+This row is the one part of the model that separates the four formulations of [`DiscreteAllocation`](@ref). [`finite_sub_allocation`](@ref) creates `x` and `u` before it calls this method, and it builds the objective from the term this method returns.
+
+# JuMP formulation
+
+## Variables
+
+  - `x`: Share count vector, read from the model.
+  - `u`: Allocation error bound, read from the model.
+
+## Constraints
+
+One row, which `wf` names:
+
+  - `cabs_err`, under [`AbsoluteErrorWeightFinaliser`](@ref): ``(s_c u,\\, s_c (C \\boldsymbol{w} - \\boldsymbol{x} \\odot \\boldsymbol{p})) \\in \\mathcal{K}_{1}``.
+  - `csqabs_err`, under [`SquaredAbsoluteErrorWeightFinaliser`](@ref): ``(s_c u,\\, s_c (C \\boldsymbol{w} - \\boldsymbol{x} \\odot \\boldsymbol{p})) \\in \\mathcal{K}_{2}``.
+  - `crel_err`, under [`RelativeErrorWeightFinaliser`](@ref): ``(s_c u,\\, s_c ((\\boldsymbol{x} \\odot \\boldsymbol{p}) \\oslash (C \\tilde{\\boldsymbol{w}}) - \\boldsymbol{1})) \\in \\mathcal{K}_{1}``.
+  - `csqrel_err`, under [`SquaredRelativeErrorWeightFinaliser`](@ref): ``(s_c u,\\, s_c ((\\boldsymbol{x} \\odot \\boldsymbol{p}) \\oslash (C \\tilde{\\boldsymbol{w}}) - \\boldsymbol{1})) \\in \\mathcal{K}_{2}``.
+
+Each row is the epigraph of a norm. The objective of [`finite_sub_allocation`](@ref) minimises ``u`` with a positive coefficient, so ``u`` equals the norm at the optimum.
+
+Where:
+
+  - $(math_dict[:x_shares])
+  - $(math_dict[:u_alloc_err])
+  - $(math_dict[:w_side_target])
+  - ``\\tilde{\\boldsymbol{w}}``: ``\\boldsymbol{w}`` with each zero entry replaced by `eps(eltype(w))`, so that the division is defined.
+  - $(math_dict[:C_side_cash])
+  - $(math_dict[:p_prices])
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:K_q_norm])
+  - ``\\odot``: Element-wise (Hadamard) product.
+  - $(math_dict[:oslash])
+  - ``\\boldsymbol{1}``: Vector of ones.
 
 # Arguments
 
-  - `model::JuMP.Model`: Model holding `x`, `u` and the constraint scale.
-  - `w::VecNum`: Target weights of this sub-problem.
-  - `p::VecNum`: Asset prices, in the same order as `w`.
-  - `cash::Number`: Cash allocated to this sub-problem.
+  - $(arg_dict[:model])
+  - `w::VecNum`: Side target weights, normalised to sum to one. The relative formulations replace a zero entry on a **copy**, so the caller's vector does not change.
+  - `p::VecNum`: Asset prices of this side, in the same order as `w`.
+  - `cash::Number`: Cash of this side.
   - `wf::JuMPWeightFinaliserFormulation`: Selects the error. See the table in [`DiscreteAllocation`](@ref).
 
 # Returns
 
-  - `nothing`.
-
-# Details
-
-  - The absolute formulations bound the error `w * cash - x .* p`; the relative ones bound `(x * cash) ⊘ (w .* p) .- 1`.
-  - The unsquared formulations use a `JuMP.MOI.NormOneCone`; the squared ones use a `JuMP.SecondOrderCone`, which bounds the ``\\ell_2`` norm itself rather than its square.
-  - The relative formulations replace a zero target weight with `eps(eltype(w))` on a **copy** of `w`, so the caller's vector is untouched and the division is defined.
+  - `err`: The error term of the objective, in money: `u` under an absolute formulation, and `cash * u` under a relative one, whose error has no unit.
 
 # Related
 
@@ -293,9 +326,10 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     JuMP.@constraint(model, crel_err,
                      [sc * u
                       sc *
-                      ((x * cash) ⊘ (w .* p) .- one(promote_type(eltype(w), eltype(p))))] in
+                      ((x .* p) ⊘ (w * cash) .- one(promote_type(eltype(w), eltype(p))))] in
                      JuMP.MOI.NormOneCone(length(x) + 1))
-    return nothing
+    # A relative error has no unit, and the leftover cash of the objective is money.
+    return cash * u
 end
 function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
                              ::SquaredRelativeErrorWeightFinaliser)
@@ -310,9 +344,9 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     JuMP.@constraint(model, csqrel_err,
                      [sc * u;
                       sc *
-                      ((x * cash) ⊘ (w .* p) .- one(promote_type(eltype(w), eltype(p))))] in
+                      ((x .* p) ⊘ (w * cash) .- one(promote_type(eltype(w), eltype(p))))] in
                      JuMP.SecondOrderCone())
-    return nothing
+    return cash * u
 end
 function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
                              ::AbsoluteErrorWeightFinaliser)
@@ -322,7 +356,7 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     JuMP.@constraint(model, cabs_err,
                      [sc * u; sc * (w * cash .- x .* p)] in
                      JuMP.MOI.NormOneCone(length(x) + 1))
-    return nothing
+    return u
 end
 function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
                              ::SquaredAbsoluteErrorWeightFinaliser)
@@ -332,53 +366,94 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     JuMP.@constraint(model, csqabs_err,
                      [sc * u;
                       sc * (w * cash .- x .* p)] in JuMP.SecondOrderCone())
-    return nothing
+    return u
 end
 """
     set_allocation_fees!(model::JuMP.Model, p::VecNum, cash::Number, sf::Option{<:NamedTuple})
 
 Write one side's fee in the allocation model's own variables, and return it.
 
-A fee is a cost of the portfolio the allocator actually buys. The model holds the share vector `x` and the prices `p`, so `x .* p` is the money in each position exactly. Every term is written against that money, and no weight and no price appears on its own.
+A fee is a cost of the book the allocator buys. The model holds the share vector `x` and the prices `p`, so `x .* p` is the money in each position exactly. Every term is written against that money, and no weight and no price appears on its own.
 
-`sf` is one side's charge, of [`allocation_side_fees`](@ref). A `nothing` `sf` writes nothing and returns a zero expression, so the caller needs no branch.
+`sf` is one side's charge, of [`allocation_side_fees`](@ref). A `nothing` `sf` registers only a zero `fee`, so the caller needs no branch.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\boldsymbol{m} &= \\boldsymbol{x} \\odot \\boldsymbol{p}\\,, \\\\
-t_{i} &\\geq \\lvert m_{i} - m_{0,i} \\rvert\\,, \\\\
-b_{i} &\\leq x_{i} \\leq \\left\\lfloor C / p_{i} \\right\\rfloor b_{i}\\,, \\\\
-F(\\boldsymbol{x}) &= T \\left( \\boldsymbol{f}_{\\text{p}}^\\intercal \\boldsymbol{m} + \\boldsymbol{f}_{\\text{Tn}}^\\intercal \\boldsymbol{t} \\right) + \\boldsymbol{f}_{\\text{f}}^\\intercal \\boldsymbol{b} + F_{\\text{lq}}\\,.
+F(\\boldsymbol{x}) &= T \\left( \\boldsymbol{f}_{\\text{p}}^\\intercal \\boldsymbol{m} + \\boldsymbol{f}_{\\text{Tn}}^\\intercal \\lvert \\boldsymbol{m} - \\boldsymbol{m}_{0} \\rvert \\right) + \\boldsymbol{f}_{\\text{f}}^\\intercal \\mathbf{1}[\\boldsymbol{x} > 0] + F_{\\text{lq}}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{m}``: Money in each position.
+  - $(math_dict[:F_side_fee])
+  - $(math_dict[:m_money])
   - ``\\boldsymbol{m}_{0}``: Money in each position before the trade, `sf.prev_money`.
-  - ``\\boldsymbol{t}``: Epigraph of the money traded.
-  - ``\\boldsymbol{b}``: Binary saying whether the position is held at all.
-  - ``C``: Cash allocated to this sub-problem.
+  - ``\\mathbf{1}[\\boldsymbol{x} > 0]``: Indicator vector of a held position.
+  - ``T``: Horizon, in periods.
+  - ``\\boldsymbol{f}_{\\text{p}},\\, \\boldsymbol{f}_{\\text{Tn}},\\, \\boldsymbol{f}_{\\text{f}}``: Proportional, turnover and fixed rates of this side.
+  - ``F_{\\text{lq}}``: Forced exit of [`allocation_liquidation_fee`](@ref), `sf.liq`.
+
+The rates `l`, `s` and `tn` charge on each of the `T` periods, and the fixed amounts `fl` and `fs` charge one time for the whole horizon. That is the rule [`calc_total_fees`](@ref) states, written in the money of the book.
+
+# JuMP formulation
+
+## Variables
+
+  - `x`: Share count vector, read from the model.
+  - `t_ftn`: Epigraph of the money traded, created when `sf` states a turnover rate.
+  - `b`: Binary indicator of a held position, created when `sf` states a fixed fee.
+
+## Expressions
+
+  - `money`: ``\\boldsymbol{m}``.
+  - `fee_prop`: ``\\boldsymbol{f}_{\\text{p}}^\\intercal \\boldsymbol{m}``, when `sf` states a proportional rate.
+  - `fee_tn`: ``\\boldsymbol{f}_{\\text{Tn}}^\\intercal \\boldsymbol{t}``, when `sf` states a turnover rate.
+  - `fee_fixed`: ``\\boldsymbol{f}_{\\text{f}}^\\intercal \\boldsymbol{b}``, when `sf` states a fixed fee.
+  - `fee`: ``T (f_{\\text{p}} + f_{\\text{Tn}}) + f_{\\text{f}} + F_{\\text{lq}}`` over the terms `sf` states, stored under `model[:fee]`. It is a zero expression when `sf` is `nothing`.
+
+## Constraints
+
+  - `cftn_ub`: ``s_c (\\boldsymbol{m} - \\boldsymbol{m}_{0} - \\boldsymbol{t}) \\leq \\boldsymbol{0}``.
+  - `cftn_lb`: ``s_c (\\boldsymbol{m}_{0} - \\boldsymbol{m} - \\boldsymbol{t}) \\leq \\boldsymbol{0}``.
+  - `cb_ub`: ``s_c (\\boldsymbol{x} - \\lfloor C \\oslash \\boldsymbol{p} \\rfloor \\odot \\boldsymbol{b}) \\leq \\boldsymbol{0}``.
+  - `cb_lb`: ``s_c (\\boldsymbol{b} - \\boldsymbol{x}) \\leq \\boldsymbol{0}``.
+
+`x` is integer and non-negative, so `cb_lb` holds ``b_i`` at zero when ``x_i = 0``, and `cb_ub` holds it at one when ``x_i \\geq 1``. `cb_ub` removes no book: the budget of [`finite_sub_allocation`](@ref) holds ``x_i p_i \\leq C`` under a non-negative fee, so ``x_i \\leq \\lfloor C / p_i \\rfloor``. The binary is an exact indicator.
+
+Where:
+
+  - $(math_dict[:x_shares])
+  - $(math_dict[:m_money])
+  - ``\\boldsymbol{m}_{0}``: Money in each position before the trade, `sf.prev_money`.
+  - ``\\boldsymbol{t}``: Epigraph of the money traded, `t_ftn`.
+  - ``\\boldsymbol{b}``: Binary indicator of a held position.
+  - $(math_dict[:C_side_cash])
+  - $(math_dict[:p_prices])
   - ``T``: Horizon, in periods.
   - ``\\boldsymbol{f}_{\\text{p}},\\, \\boldsymbol{f}_{\\text{Tn}},\\, \\boldsymbol{f}_{\\text{f}}``: Proportional, turnover and fixed rates of this side.
   - ``F_{\\text{lq}}``: Forced exit of [`allocation_liquidation_fee`](@ref), `sf.liq`. It is a constant, because the assets it sells are not among the share counts this model solves for.
+  - $(math_dict[:sc_scale])
+  - ``\\odot``: Element-wise (Hadamard) product.
+  - $(math_dict[:oslash])
 
-The rates `l`, `s` and `tn` charge on each of the `T` periods, and the fixed amounts `fl` and `fs` charge one time for the whole horizon. That is the rule [`calc_total_fees`](@ref) states, written in the model's own variables.
+## Relaxation
 
-A binary is emitted only when the side states a fixed fee, so a problem that states none keeps the variable count it had. `x` is integer and non-negative, so `b <= x` and `x <= ub * b` make `b` the indicator of `x > 0` exactly.
+$(val_dict[:relax])
+
+`model[:fee]` lies at or above the fee of the book, ``F(\\boldsymbol{x})``, and the quantity bounded is `t_ftn`, which `fee_tn` and `fee` read. The bound is tight where the solver puts ``\\boldsymbol{t}`` at ``\\lvert \\boldsymbol{m} - \\boldsymbol{m}_{0} \\rvert``, and no objective term pulls it there. The set of books the model admits is exact all the same. A book whose exact fee fits the budget admits ``\\boldsymbol{t} = \\lvert \\boldsymbol{m} - \\boldsymbol{m}_{0} \\rvert``. That is why [`finite_sub_allocation`](@ref) reports [`allocation_fee`](@ref) of the realised book, and not the value of `fee`.
 
 # Arguments
 
   - $(arg_dict[:model])
   - `p::VecNum`: Asset prices of this side.
-  - `cash::Number`: Cash allocated to this side. It bounds the shares a binary can switch on.
+  - `cash::Number`: Cash of this side. It bounds the shares a binary can switch on.
   - `sf::Option{<:NamedTuple}`: This side's charge, or `nothing`.
 
 # Returns
 
-  - `fee`: The fee expression. It is registered as `model[:fee]`.
+  - `fee`: The fee expression, also stored under `model[:fee]`.
 
 # Related
 
@@ -440,37 +515,74 @@ end
                           sf::Option{<:NamedTuple}, da::DiscreteAllocation,
                           str_names::Bool = false)
 
-Build and solve the discrete allocation MIP for one side, long or short, of the portfolio.
+Build and solve the discrete allocation MIP for one side, long or short, of the book.
 
-Implements the sub-problem of [`DiscreteAllocation`](@ref). An empty `w` returns three empty vectors, the untouched `cash`, a zero fee, and `nothing` for both the return code and the model.
+This is the sub-problem of [`DiscreteAllocation`](@ref). The share vector is integer and non-negative, so a short side must come in with its weights already negated.
+
+# Algorithm
+
+ 1. On an empty `w`, return three empty vectors, `cash` less the fee of the empty book, that fee, and `nothing` for the return code and for the model. The fee is [`allocation_fee`](@ref) of the empty book, because a side that buys nothing can still owe a turnover fee or the forced exit.
+ 2. Normalise `w` to sum to one. A side whose weights sum to zero keeps them.
+ 3. Build the model of the `# JuMP formulation` below, and solve it with `da.slv`.
+ 4. Read the share vector back with `round(Int, ...)`, because a MIP solver returns an integer only to within its own tolerance. A model that holds no finite value gives an empty book. A solver that never ran holds no value, and a fee larger than the cash makes the budget infeasible, so neither model has a finite value.
+ 5. Make the cost `shares .* p`, and the realised weights `cost / sum(cost) * bgt`. The realised weights are all zero when nothing was bought.
+ 6. Price the fee with [`allocation_fee`](@ref) of the realised shares, and not with the value of `model[:fee]`, which can lie above it. See the `## Relaxation` of [`set_allocation_fees!`](@ref).
+ 7. Make the leftover cash, `cash` less the cost and the fee.
+
+# JuMP formulation
+
+## Variables
+
+  - `x`: Share count vector, integer and non-negative.
+  - `u`: Allocation error bound.
+
+## Expressions
+
+  - `sc`: ``s_c``, `da.sc`.
+  - `so`: ``s_o``, `da.so`.
+  - `r`: ``r``.
+
+[`set_allocation_fees!`](@ref) registers `fee` and the entries behind it, and [`set_discrete_error!`](@ref) registers the row on ``u`` and returns the error term ``e``.
+
+## Constraints
+
+  - `cr`: ``s_c (r - F(\\boldsymbol{x})) \\geq 0``.
+
+## Objective
+
+  - `Min`: ``s_o (e + r)``.
+
+Where:
+
+  - $(math_dict[:x_shares])
+  - $(math_dict[:u_alloc_err])
+  - $(math_dict[:r_cash_left])
+  - $(math_dict[:F_side_fee])
+  - ``e``: Error term of `da.wf`, ``u`` under an absolute formulation and ``C u`` under a relative one.
+  - $(math_dict[:C_side_cash])
+  - $(math_dict[:p_prices])
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:so_scale])
 
 # Arguments
 
   - `w::VecNum`: Target weights of this side, non-negative.
   - `p::VecNum`: Asset prices of this side, in the same order as `w`.
-  - `cash::Number`: Cash allocated to this side.
+  - `cash::Number`: Cash of this side.
   - `bgt::Number`: Budget of this side, used to rescale the realised weights.
   - `sf::Option{<:NamedTuple}`: This side's charge, of [`allocation_side_fees`](@ref), or `nothing`.
   - `da::DiscreteAllocation`: Allocator carrying the solvers, the scales and the formulation `wf`.
-  - `str_names::Bool = false`: Whether to give the JuMP variables string names.
+  - `str_names::Bool = false`: Whether the JuMP variables get string names.
 
 # Returns
 
-  - `shares::VecNum`: Share count per asset, rounded to `Int`.
+  - `shares::VecNum`: Share count per asset.
   - `cost::VecNum`: `shares .* p`.
-  - `aw::VecNum`: Realised weights, rescaled to sum to `bgt`. All zero when nothing was bought.
+  - `aw::VecNum`: Realised weights, rescaled to sum to `bgt`.
   - `acash::Number`: Cash left over, `cash` less the cost of the shares and the fee.
   - `fee::Number`: The fee this side paid over the whole horizon.
   - `res::OptimisationReturnCode`: An [`OptimisationSuccess`](@ref) or an [`OptimisationFailure`](@ref) carrying the solver trials.
   - `model::JuMP.Model`: The solved model.
-
-# Details
-
-  - The share vector is declared integer and non-negative, so a short side must be passed with its weights already negated.
-  - [`set_discrete_error!`](@ref) adds the one constraint that `da.wf` selects. Everything else in the model is common to the four formulations.
-  - [`set_allocation_fees!`](@ref) adds the fee. It enters the budget constraint and never the objective.
-  - The fee this verb **reports** is [`allocation_fee`](@ref) of the realised shares, not the value of the model's own expression. The turnover term of that expression is an epigraph, and only the budget pushes it down, so a solver leaves it slack whenever the budget does not bind. A slack epigraph overstates the fee, so the allocation the model bought is affordable under the exact charge.
-  - `shares` is read back with `round(Int, ...)`, because a MIP solver returns an integer only to within its own tolerance. A fee larger than the cash makes the budget infeasible, and an infeasible model holds no finite value, so the book is then read as empty and `res` carries the failure.
 
 # Related
 
@@ -491,25 +603,26 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
         return Vector{eltype(w)}(undef, 0), Vector{eltype(w)}(undef, 0),
                Vector{eltype(w)}(undef, 0), cash - fee, fee, nothing, nothing
     end
+    # `cash` is this side's cash, so the target money of an asset is its share of the side,
+    # `w / sum(w)`, times that cash. A side whose weights are all zero keeps them.
+    sw = sum(w)
+    w = w / ifelse(iszero(sw), one(sw), sw)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     JuMP.@expression(model, sc, da.sc)
     JuMP.@expression(model, so, da.so)
     N = length(w)
-    # Integer allocation
-    # x := number of shares
-    # u := bounding variable
+    # x: the share counts. u: the bound on the allocation error.
     JuMP.@variables(model, begin
                         x[1:N] >= 0, Int
                         u
                     end)
-    # r := remaining money
-    # eta := ideal_investment - discrete_investment
+    # r: the cash left before the fee.
     JuMP.@expression(model, r, cash - LinearAlgebra.dot(x, p))
     fee = set_allocation_fees!(model, p, cash, sf)
     JuMP.@constraint(model, cr, sc * (r - fee) >= 0)
-    set_discrete_error!(model, w, p, cash, da.wf)
-    JuMP.@objective(model, Min, so * (u + r))
+    err = set_discrete_error!(model, w, p, cash, da.wf)
+    JuMP.@objective(model, Min, so * (err + r))
     res = optimise_JuMP_model!(model, da.slv)
     res = if res.success
         OptimisationSuccess(; res = res.trials)
@@ -590,19 +703,31 @@ end
              fai::FiniteAllocationInput; str_names::Bool = false,
              save::Bool = true, kwargs...) -> DiscreteAllocationResult
 
-Run the Discrete Allocation portfolio optimisation.
+Allocate a book into whole shares with a [`DiscreteAllocation`](@ref) that carries no fallback.
+
+This method takes `da.fb === nothing` only. An allocator with a fallback goes through the generic `optimise` of an [`OptimisationEstimator`](@ref), which walks the fallback chain and runs the same steps.
+
+# Algorithm
+
+ 1. Split the book into its long and its short side, and share the cash between them, with [`setup_alloc_optim`](@ref).
+ 2. Split the fee into the charge of each side with [`allocation_side_fees`](@ref).
+ 3. Solve the short side with [`finite_sub_allocation`](@ref), on its negated weights.
+ 4. Correct the long side's cash with the cash the short side did not spend, with [`adjust_long_cash`](@ref).
+ 5. Solve the long side with [`finite_sub_allocation`](@ref).
+ 6. Recombine the two sides over the whole universe, and negate the short side's shares, cost and weights.
+ 7. Set `retcode` to an [`OptimisationFailure`](@ref) when either side failed, with one warning per failed side, and to an [`OptimisationSuccess`](@ref) otherwise.
 
 # Arguments
 
-  - `da`: The discrete allocation optimiser to use.
-  - `fai`: The [`FiniteAllocationInput`](@ref) carrying the target weights, prices, cash budget, and optional horizon and fees.
-  - `str_names`: Whether to use string names for the assets in the optimisation.
-  - `save`: Whether to save the JuMP model in the optimisation result.
-  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+  - `da`: The discrete allocation optimiser.
+  - `fai`: The [`FiniteAllocationInput`](@ref) carrying the target weights, the prices, the cash, and the optional horizon and fees.
+  - `str_names`: Whether the JuMP variables get string names.
+  - `save`: Whether the result keeps the two JuMP models.
+  - `kwargs`: Accepted, so that every optimiser takes one call, and ignored.
 
 # Returns
 
-  - `res::DiscreteAllocationResult`: The realised allocation. `retcode` is an [`OptimisationFailure`](@ref) when either sub-problem failed, and each failure raises a warning naming the side.
+  - `res::DiscreteAllocationResult`: The realised allocation. `cash` is the cash the long side leaves, which holds what the short side did not spend, and `fees` is the sum of the two sides' fees.
 
 # Related
 

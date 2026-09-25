@@ -22,7 +22,7 @@
     @test isapprox(sum(res_da.cost), 4206.9 * 0.5, rtol = 5e-3)
     @test isapprox(sum(res.w[res.w .< 0]), -1, rtol = 1e-4)
     @test isapprox(res_da.shares .* vec(values(X[end])), res_da.cost)
-    @test isapprox(rmsd(res.w, res_da.w), 0.0838, rtol = 5e-4)
+    @test isapprox(rmsd(res.w, res_da.w), 0.01186776139758978, rtol = 5e-4)
 
     res_ga = optimise(ga,
                       FiniteAllocationInput(; w = res.w, prices = vec(values(X[end])),
@@ -42,10 +42,13 @@
     res_da = optimise(da,
                       FiniteAllocationInput(; w = res.w, prices = vec(values(X[end])),
                                             cash = 4206.9))
-    @test isapprox(sum(res_da.cost), 4206.9 * 1.2, rtol = 1e-4)
+    # Each side's targets sum to its cash, so the book spends the budget down to a leftover
+    # that buys no further long share.
+    @test isapprox(sum(res_da.cost) + res_da.cash, 4206.9 * 1.2)
+    @test 0 <= res_da.cash < minimum(vec(values(X[end]))[res.w .>= 0])
     @test isapprox(sum(res.w[res.w .< 0]), -1, rtol = 1e-3)
     @test isapprox(res_da.shares .* vec(values(X[end])), res_da.cost)
-    @test isapprox(rmsd(res.w, res_da.w), 0.2662, rtol = 5e-4)
+    @test isapprox(rmsd(res.w, res_da.w), 0.011295820717513184, rtol = 5e-4)
 
     res_ga = optimise(ga,
                       FiniteAllocationInput(; w = res.w, prices = vec(values(X[end])),
@@ -63,19 +66,10 @@
                       FiniteAllocationInput(; w = res.w, prices = vec(values(X[end])),
                                             cash = 4206.9))
 
-    rtol = if Sys.isapple()
-        1e-2
-    else
-        5e-3
-    end
-    result = isapprox(sum(res_da.cost), 4206.9 * 0.8; rtol = rtol)
-    if !result
-        @test isapprox(3337.326, 3337.326; rtol = 0.005)
-    else
-        @test result
-    end
+    @test isapprox(sum(res_da.cost) + res_da.cash, 4206.9 * 0.8)
+    @test 0 <= res_da.cash < minimum(vec(values(X[end]))[res.w .> 0])
     @test isapprox(res_da.shares .* vec(values(X[end])), res_da.cost)
-    @test isapprox(rmsd(res.w, res_da.w), 0.029094976416644103, rtol = 5e-2)
+    @test isapprox(rmsd(res.w, res_da.w), 0.001331170818965931, rtol = 5e-2)
     res_ga = optimise(ga,
                       FiniteAllocationInput(; w = res.w, prices = vec(values(X[end])),
                                             cash = 4206.9))
@@ -618,4 +612,195 @@ end
     rfb = optimise(gfb, fai)
     @test isa(rfb, GreedyAllocationResult)
     @test collect(rfb.shares) == collect(optimise(ga, fai).shares)
+end
+# Issue #906: the sweep of `02_DiscreteFiniteAllocation.jl`. Each claim of the docstrings is
+# checked with numbers: the four error formulations against an enumeration of every
+# affordable book, the target money of a side, and the model entries of the fee.
+# `JuMP` must be bound before the testset below expands its macros.
+using JuMP
+@testset "Discrete allocation: the programme, checked against enumeration (#906)" begin
+    using PortfolioOptimisers, HiGHS, Clarabel, Pajarito, JuMP, Test, LinearAlgebra
+    PO = PortfolioOptimisers
+    mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
+                     settings = Dict("log_to_console" => false),
+                     check_sol = (; allow_local = true, allow_almost = true))
+    # HiGHS takes no cone, so the two `Squared` formulations need a conic MIP solver.
+    conic_slv = Solver(; name = :pajarito,
+                       solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                          "verbose" => false,
+                                                          "oa_solver" =>
+                                                              optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                        JuMP.MOI.Silent() =>
+                                                                                            true),
+                                                          "conic_solver" =>
+                                                              optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                        "verbose" =>
+                                                                                            false)),
+                       check_sol = (; allow_local = true, allow_almost = true))
+    wfs = (AbsoluteErrorWeightFinaliser(), SquaredAbsoluteErrorWeightFinaliser(),
+           RelativeErrorWeightFinaliser(), SquaredRelativeErrorWeightFinaliser())
+    da(wf) = DiscreteAllocation(; slv = conic_slv, wf = wf, fb = nothing)
+
+    @testset "validation" begin
+        @test_throws PO.IsEmptyError DiscreteAllocation(; slv = Solver[])
+        @test_throws DomainError DiscreteAllocation(; slv = mip_slv, sc = 0)
+        @test_throws DomainError DiscreteAllocation(; slv = mip_slv, so = -1)
+    end
+
+    @testset "each formulation solves the programme its docstring states" begin
+        # The objective of the docstring, written out by hand: the error term `e` plus the
+        # leftover cash, over every book the cash affords.
+        function objective(wf, w, p, C, x)
+            we = map(v -> iszero(v) ? eps(eltype(w)) : v, w)
+            r = C - dot(x, p)
+            return r + if isa(wf, AbsoluteErrorWeightFinaliser)
+                norm(w * C - x .* p, 1)
+            elseif isa(wf, SquaredAbsoluteErrorWeightFinaliser)
+                norm(w * C - x .* p, 2)
+            elseif isa(wf, RelativeErrorWeightFinaliser)
+                C * norm((x .* p) ./ (we * C) .- 1, 1)
+            else
+                C * norm((x .* p) ./ (we * C) .- 1, 2)
+            end
+        end
+        function enumerate_best(wf, w, p, C)
+            best = (Inf, Int[])
+            ub = floor.(Int, C ./ p)
+            for i in 0:ub[1], j in 0:ub[2], k in 0:ub[3]
+                x = [i, j, k]
+                dot(x, p) > C && continue
+                o = objective(wf, w, p, C, x)
+                o < best[1] && (best = (o, x))
+            end
+            return best
+        end
+        # The weights sum to 0.8, so the long side's cash is 0.8 of the cash, and the side's
+        # own weights are normalised before they are multiplied by it.
+        w = [0.36, 0.28, 0.16]
+        p = [13.0, 29.0, 47.0]
+        cash = 750.0
+        C = 0.8 * cash
+        for wf in wfs
+            r = optimise(da(wf), FiniteAllocationInput(; w = w, prices = p, cash = cash))
+            obj, x = enumerate_best(wf, w / sum(w), p, C)
+            @test isa(r.retcode, OptimisationSuccess)
+            @test collect(r.shares) == x
+            @test isapprox(JuMP.objective_value(r.l_model), obj; rtol = 1e-6)
+            # The objective is `e + r`: `u` under an absolute error, `C u` under a relative one.
+            m = r.l_model
+            e = JuMP.value(m[:u]) * (if isa(wf,
+                                            Union{RelativeErrorWeightFinaliser,
+                                                  SquaredRelativeErrorWeightFinaliser})
+                                         C
+                                     else
+                                         1
+                                     end)
+            @test isapprox(JuMP.objective_value(m), e + JuMP.value(m[:r]); rtol = 1e-6)
+        end
+        # The row that `wf` names is the one in the model.
+        rows = [:cabs_err, :csqabs_err, :crel_err, :csqrel_err]
+        for (wf, row) in zip(wfs, rows)
+            m = optimise(da(wf), FiniteAllocationInput(; w = w, prices = p, cash = cash)).l_model
+            @test haskey(m, row)
+            @test all(!haskey(m, other) for other in setdiff(rows, [row]))
+        end
+    end
+
+    @testset "a side's targets sum to its cash" begin
+        # A long-only book with a budget of 0.8 spends the whole side cash, 1000 of 1250,
+        # and the exact book of the target is reachable.
+        fai = FiniteAllocationInput(; w = [0.4, 0.4], prices = [10.0, 100.0], cash = 1250.0)
+        for wf in wfs
+            r = optimise(da(wf), fai)
+            @test collect(r.shares) == [50.0, 5.0]
+            @test iszero(r.cash)
+            @test collect(r.w) == [0.4, 0.4]
+        end
+        # A long-short book: each side's targets sum to its own cash.
+        rls = optimise(DiscreteAllocation(; slv = mip_slv, fb = nothing),
+                       FiniteAllocationInput(; w = [0.9, 0.6, -0.5],
+                                             prices = [9.0, 6.0, 5.0], cash = 900.0))
+        @test collect(rls.shares) == [90.0, 90.0, -90.0]
+        # A long side whose weights are all zero keeps them, and buys nothing.
+        r0 = optimise(DiscreteAllocation(; slv = mip_slv, fb = nothing),
+                      FiniteAllocationInput(; w = [0.0, -1.0], prices = [10.0, 20.0],
+                                            cash = 1000.0))
+        @test collect(r0.shares) == [0.0, -50.0]
+    end
+
+    @testset "a relative error is priced in money" begin
+        # The 50/50 book is 71 and 5 shares with 3 left idle. A relative error with no unit
+        # beside the idle cash gives up the tracking, 100 and 3 shares, to spend those 3.
+        fai = FiniteAllocationInput(; w = [0.5, 0.5], prices = [7.0, 100.0], cash = 1000.0)
+        for wf in wfs
+            r = optimise(da(wf), fai)
+            @test collect(r.shares) == [71.0, 5.0]
+            @test isapprox(r.cash, 3.0)
+        end
+        # A zero target weight is replaced by `eps` on a copy, so the division is defined and
+        # the caller's weights do not change.
+        w = [0.5, 0.0, 0.5]
+        wc = copy(w)
+        for wf in wfs[3:4]
+            r = optimise(da(wf),
+                         FiniteAllocationInput(; w = w, prices = [10.0, 20.0, 100.0],
+                                               cash = 1000.0))
+            @test collect(r.shares) == [50.0, 0.0, 5.0]
+        end
+        @test w == wc
+        model = JuMP.Model()
+        JuMP.@expression(model, sc, 1)
+        JuMP.@variables(model, begin
+                            x[1:3] >= 0, Int
+                            u
+                        end)
+        wv = [0.5, 0.0, 0.5]
+        err = PO.set_discrete_error!(model, wv, [10.0, 20.0, 100.0], 1000.0,
+                                     RelativeErrorWeightFinaliser())
+        @test wv == [0.5, 0.0, 0.5]
+        @test isequal(err, 1000.0 * u)
+    end
+
+    @testset "the fee rows" begin
+        w = [0.6, 0.4]
+        p = [10.0, 20.0]
+        fee = Fees(; tn = Turnover(; w = [0.6, 0.4], val = 0.002), fl = 2.0, l = 0.001)
+        r = optimise(DiscreteAllocation(; slv = mip_slv, fb = nothing),
+                     FiniteAllocationInput(; w = w, prices = p, cash = 1000.0,
+                                           prev_cash = 500.0, horizon = 3, fees = fee))
+        m = r.l_model
+        for k in
+            (:money, :fee_prop, :fee_tn, :fee_fixed, :fee, :t_ftn, :b, :cftn_ub, :cftn_lb,
+             :cb_ub, :cb_lb, :cr, :r, :x, :u, :sc, :so, :cabs_err)
+            @test haskey(m, k)
+        end
+        x = JuMP.value.(m[:x])
+        money = x .* p
+        # `b` is the indicator of a held position.
+        @test JuMP.value.(m[:b]) ≈ Float64.(x .> 0.5)
+        # `t_ftn` is an epigraph of the money traded, so it never lies below it.
+        @test all(JuMP.value.(m[:t_ftn]) .>= abs.(money - 500.0 * w) .- 1e-6)
+        # The model fee bounds the fee of the book, and the reported fee is the exact one:
+        # 3 * 0.001 * 990 + 3 * 0.002 * 490 + 2 * 2 on this book.
+        lsf, _ = PO.allocation_side_fees(fee, 3, 500.0, [true, true], Float64[])
+        @test JuMP.value(m[:fee]) >= r.fees - 1e-6
+        @test r.fees == PO.allocation_fee(lsf, p, collect(r.shares))
+        @test isapprox(r.fees, 3 * 0.001 * 990 + 3 * 0.002 * 490 + 2 * 2)
+        # The budget row holds the fee inside the leftover cash.
+        @test JuMP.value(m[:r]) >= r.fees - 1e-6
+    end
+
+    @testset "a failed side warns by name" begin
+        # A solver-less allocation fails on both sides of a long-short book, and each side
+        # warns in turn: the short side is solved first.
+        fai = FiniteAllocationInput(; w = [0.7, -0.3], prices = [10.0, 20.0], cash = 1000.0)
+        da0 = DiscreteAllocation(; slv = Solver(; name = :none, solver = nothing),
+                                 fb = nothing)
+        r = @test_logs((:warn, r"s_retcode"), (:warn, r"l_retcode"), match_mode = :any,
+                       optimise(da0, fai))
+        @test isa(r.retcode, OptimisationFailure)
+        @test isa(r.s_retcode, OptimisationFailure)
+        @test isa(r.l_retcode, OptimisationFailure)
+        @test all(iszero, collect(r.shares))
+    end
 end
