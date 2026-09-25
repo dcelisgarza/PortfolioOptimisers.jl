@@ -1,11 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for finite allocation portfolio optimisation estimators.
+Abstract supertype for estimators that turn continuous portfolio weights into share counts.
 
-Finite allocation estimators convert continuous portfolio weights into discrete share quantities given an investment budget and asset prices.
-
-The library ships two: [`DiscreteAllocation`](@ref), which solves a mixed-integer programme, and [`GreedyAllocation`](@ref), which walks the target weights. Both take a [`FiniteAllocationInput`](@ref) as the second argument to [`optimise`](@ref), and both split the portfolio into a long and a short sub-problem.
+A finite allocation estimator buys share counts with a stated cash budget at stated prices. The library has two. [`DiscreteAllocation`](@ref) solves a mixed-integer programme, and [`GreedyAllocation`](@ref) buys in two greedy passes. [`optimise`](@ref) takes either one with a [`FiniteAllocationInput`](@ref) as its second argument, and allocates the long and the short side of the portfolio as two separate sub-problems.
 
 # Related
 
@@ -23,9 +21,9 @@ abstract type FiniteAllocationOptimisationEstimator <: OptimisationEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for finite allocation optimisation result types.
+Abstract supertype for the results of a finite allocation.
 
-Every subtype carries `shares`, `cost`, `w`, `cash`, `fees` and a trailing `fb`, in that order, which is what lets the generic [`factory`](@ref) rebuild any of them by swapping the last field alone.
+Every subtype has the fields `shares`, `cost`, `w`, `cash` and `fees`, and its last field is `fb`. The generic [`factory`](@ref) method rebuilds a subtype from its fields and replaces the last one alone, so a new subtype must keep `fb` last.
 
 # Related
 
@@ -40,9 +38,9 @@ abstract type FiniteAllocationOptimisationResult <: OptimisationResult end
     const FOptE_FOpt = Union{<:FiniteAllocationOptimisationEstimator,
                              <:FiniteAllocationOptimisationResult}
 
-Alias for a finite allocation optimisation estimator or result.
+Alias for a finite allocation estimator or a finite allocation result.
 
-Matches either a [`FiniteAllocationOptimisationEstimator`](@ref) or a [`FiniteAllocationOptimisationResult`](@ref).
+It is the type of the `fb` field of a finite allocation estimator. The fallback is an estimator that [`optimise`](@ref) runs when the first one fails, or a precomputed result that `optimise` returns as it is.
 
 # Related
 
@@ -54,7 +52,9 @@ const FOptE_FOpt = Union{<:FiniteAllocationOptimisationEstimator,
 """
     const FOptE_FOpt_FbChain = Union{<:FOptE_FOpt, <:FbChain}
 
-Alias for what the `fb` field of a finite allocation result admits: a fallback finite allocation estimator or precomputed result ([`FOptE_FOpt`](@ref)), or the fallback chain that answered the result ([`FbChain`](@ref)).
+Alias for the values that the `fb` field of a finite allocation result can hold.
+
+[`optimise`](@ref) writes `nothing` when the estimator that the caller gave answered, and the [`FbChain`](@ref) of the failed attempts when a fallback answered. The alias also admits a [`FOptE_FOpt`](@ref), so [`factory`](@ref) can put a fallback estimator or result in the field.
 
 # Related
 
@@ -66,13 +66,11 @@ const FOptE_FOpt_FbChain = Union{<:FOptE_FOpt, <:FbChain}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Problem data fed to a finite allocation optimiser.
+Holds the target weights, prices and cash that a finite allocation reads.
 
-`FiniteAllocationInput` bundles the inputs shared by every finite allocation optimiser — the target continuous weights, current asset prices, cash budget, the cash held before the trade, and an optional time horizon, fee and Investable Mask — into a single value passed as the second argument to [`optimise`](@ref). It is consumed by both [`DiscreteAllocation`](@ref) and [`GreedyAllocation`](@ref).
+[`optimise`](@ref) takes it as the second argument, with a [`DiscreteAllocation`](@ref) or a [`GreedyAllocation`](@ref). It also holds the cash before the trade, and an optional horizon, fee and Investable Mask. It subtypes [`AbstractEstimator`](@ref) and not [`OptimisationResult`](@ref), because it is the input of an allocation. The methods that dispatch on a result, such as the plots and the result [`factory`](@ref), cannot read its fields.
 
-It subtypes [`AbstractEstimator`](@ref) rather than the [`FiniteAllocationOptimisationResult`](@ref) tree: it is the *input* to an allocation, not a computed output, and is deliberately kept clear of the `OptimisationResult` dispatch surface (plotting, result `factory`) that its fields cannot honour.
-
-`imsk` is what lets a reduced optimisation be allocated. An optimisation reduces to its Investable Mask and expands the solved weights back to the caller's universe, so a result pairs a **full-length** `w` with a fee on two **reduced** axes. The mask records that reduction, and [`allocation_side_fees`](@ref) lifts the fee back onto the axis `w` and `prices` already live on with [`lift_fees`](@ref), so the forced exit of a delisted asset is charged on the money it traded. The fee carries the mask it was reduced on in its own `imsk`, and the lift reads that, so the constructor reconciles the two through [`mark_fees`](@ref): a stated `imsk` marks an unmarked fee, a marked fee supplies a missing `imsk`, and a pair that disagrees is refused.
+An optimisation over a reduced universe solves on its Investable Mask, and expands the weights back to the full universe. Its result then has a full-length `w` and a fee on two reduced axes. `imsk` records the reduction. [`allocation_side_fees`](@ref) calls [`lift_fees`](@ref) to put the fee back on the axis of `w` and `prices`, so the allocation charges the forced exit of an asset that left the universe on the money that the exit sold. The fee records its mask in its own `imsk` field too, and the constructor makes the two agree through [`mark_fees`](@ref). A stated `imsk` marks a fee that has no mask. A marked fee gives its mask when `imsk` is `nothing`. The constructor refuses two masks that differ.
 
 # Fields
 
@@ -103,22 +101,22 @@ Keywords correspond to the struct's fields.
         imsk::Option{<:BitVector} = nothing
     ) -> FiniteAllocationInput
 
-Reads from a fitted optimisation everything an allocation can take from it, so a caller states the prices and the cash alone. A stated keyword always wins, and every derivation falls back to `nothing` on a result that carries no answer, so a family holding fewer objects than another is allocated by the same call:
+Reads from a fitted optimisation every value that an allocation can take from it, so the caller states only the prices and the cash. A stated keyword takes priority. A value that the result does not carry becomes `nothing`, so one call serves every optimisation family:
 
   - `w` from `res.w`, which every optimisation result carries on the full universe.
-  - `fees` through [`extract_fees`](@ref), from the `fees` property when the result exposes one.
-  - `imsk` through [`result_investable_mask`](@ref), which answers `nothing` when the optimisation reduced on nothing.
-  - `horizon` through [`allocation_horizon`](@ref), the observation count of the result's prior. An equal weighted optimisation built without a prior derives none, and the rule below then asks the caller for one, and only when the input also carries a fee.
+  - `fees` through [`extract_fees`](@ref), from the `fees` property when the result has one.
+  - `imsk` through [`result_investable_mask`](@ref), which gives `nothing` when the optimisation did not reduce its universe.
+  - `horizon` through [`allocation_horizon`](@ref), the number of observations of the result's prior. An equal weighted optimisation without a prior gives none. The constructor then needs a stated horizon, but only when the input also has a fee.
 
 ## Validation
 
-  - `!isempty(w)`, `!isempty(prices)`.
-  - `length(w) == length(prices)`.
-  - `cash > 0`.
-  - `prev_cash >= 0`.
-  - `horizon` must not be `nothing` when `fees` is provided.
-  - `fees` and `imsk` are reconciled through [`mark_fees`](@ref), which refuses a marked fee beside a different `imsk`.
-  - `imsk`, when stated or read off the fee: `length(imsk) == length(w)` and `any(imsk)`.
+  - `!isempty(w)` and `!isempty(prices)`, else an [`IsEmptyError`](@ref).
+  - `length(w) == length(prices)`, else a `DimensionMismatch`.
+  - `cash > 0`, else a `DomainError`.
+  - `prev_cash >= 0`, else a `DomainError`.
+  - `horizon` is not `nothing` when `fees` is not `nothing`, else an [`IsNothingError`](@ref).
+  - The mask of `fees` is `nothing` or equal to `imsk`. [`mark_fees`](@ref) throws an `ArgumentError` otherwise.
+  - `imsk`, stated or read from the fee, has `length(imsk) == length(w)`, else a `DimensionMismatch`, and `any(imsk)`, else an [`IsEmptyError`](@ref).
 
 # Examples
 
@@ -151,31 +149,31 @@ FiniteAllocationInput
 """
 @concrete struct FiniteAllocationInput <: AbstractEstimator
     """
-    Target (continuous) portfolio weights to be discretised.
+    Target portfolio weights, the continuous weights that the allocation turns into share counts.
     """
     w
     """
-    Current asset prices, in the same order as `w`.
+    Asset prices, in the order of `w`.
     """
     prices
     """
-    Cash budget available for the allocation.
+    Cash of the allocation, which the long and the short side share.
     """
     cash
     """
-    Cash held in the portfolio before the trade. A turnover fee is charged on the money traded, and the money held per asset before the trade is `prev_cash * fees.tn.w`. Defaults to `cash`, which is the caller that states no separate figure.
+    Cash that the portfolio held before the trade. The money of a position before the trade is `prev_cash` times its previous weight, which `fees.tn.w` and `fees.lq.w` hold. The default is `cash`.
     """
     prev_cash
     """
-    Optional time horizon, in periods. `l`, `s` and `tn` are rates per period, so each of them charges on every one of the `horizon` periods. Required when `fees` is provided.
+    Horizon of the fee, in periods. `l`, `s`, `tn` and `lq` are rates per period, so the allocation charges each of them `horizon` times. `fl`, `fs` and `flq` are charged one time. It can be `nothing` only when `fees` is `nothing`.
     """
     horizon
     """
-    Optional fees to charge against the allocation over `horizon`. A fee an optimisation reduced to its Investable Mask spans two axes and carries that mask in its own `imsk`, which is what puts it back on the axis `w` lives on.
+    Fee of the allocation, or `nothing`. A fee that an optimisation reduced to its Investable Mask is on two reduced axes, and its own `imsk` records the mask that puts it back on the axis of `w`.
     """
     fees
     """
-    Optional Investable Mask the optimisation `w` came from reduced on, `true` at every asset it traded. `nothing` says the weights and the fees are on the full universe already, which is what an unreduced optimisation answers. The constructor reconciles it with the fee's own mark through [`mark_fees`](@ref).
+    Investable Mask of the optimisation that gave `w`, `true` for each asset that it traded. `nothing` means that the weights and the fee are on the full universe. The constructor makes it agree with the mask of the fee through [`mark_fees`](@ref).
     """
     imsk
     function FiniteAllocationInput(w::VecNum, prices::VecNum, cash::Number,
@@ -228,20 +226,24 @@ export FiniteAllocationInput
     allocation_horizon(res::NonFiniteAllocationOptimisationResult,
                        horizon::Option{<:Number} = nothing)
 
-Read the horizon a finite allocation charges its rates over, from an optimisation result.
+Read the horizon of a finite allocation from an optimisation result.
 
-A stated `horizon` wins. Otherwise the horizon is the observation count of the result's prior, which is the period count [`calc_total_fees`](@ref) charges `l`, `s` and `tn` over on the window the fit saw. A result exposing no prior, or one whose prior is `nothing`, derives none and answers `nothing`; [`FiniteAllocationInput`](@ref) then asks the caller for a horizon, and only when the input also carries a fee.
+The horizon is the number of observations of the result's prior, which is the number of periods over which [`calc_total_fees`](@ref) charges the rates on the window that the fit saw. A stated `horizon` takes priority. The method reads the prior with `hasproperty` and not by dispatch, as [`extract_fees`](@ref) reads `fees`. The families that keep a prior keep it under the name `pr`, and a result that keeps none gives `nothing`. [`FiniteAllocationInput`](@ref) then needs a stated horizon, but only when the input also has a fee.
 
-The property is read through `hasproperty` rather than by dispatch, exactly as [`extract_fees`](@ref) reads `fees`: the families that keep a prior keep it under the same name, and the ones that keep none are the point of the fallback.
+# Algorithm
+
+ 1. If `horizon` is not `nothing`, return it.
+ 2. If `res` has a `pr` property, and `pr` is not `nothing` and has an `X` property, return `size(pr.X, 1)`.
+ 3. Otherwise return `nothing`.
 
 # Arguments
 
-  - `res`: Fitted optimisation result, potentially carrying a `pr` property.
-  - `horizon`: Horizon stated by the caller, which wins when it is not `nothing`.
+  - `res`: Fitted optimisation result, which can have a `pr` property.
+  - `horizon`: Horizon that the caller states, or `nothing`.
 
 # Returns
 
-  - `horizon::Option{<:Number}`: The horizon in periods, or `nothing` when none can be derived.
+  - `horizon::Option{<:Number}`: The horizon in periods, or `nothing` when the method finds none.
 
 # Related
 
@@ -263,9 +265,14 @@ end
 """
     factory(res::FiniteAllocationOptimisationResult, fb::Option{<:FOptE_FOpt_FbChain})
 
-Rebuild a finite allocation result with an updated fallback record `fb`.
+Rebuild a finite allocation result with a new fallback record `fb`.
 
-Like the continuous-result generic, every finite allocation result carries `fb` as its last field, so the rebuild copies all fields unchanged except the trailing `fb`. Concrete result types may override this method when rebuilding requires more than swapping `fb`. [`optimise`](@ref) is the one caller, and it hands in the [`FbChain`](@ref) it walked.
+Every finite allocation result has `fb` as its last field, as the continuous results do. [`optimise`](@ref) calls this method with the [`FbChain`](@ref) of the failed attempts when a fallback answered. A concrete result type can define its own method when a rebuild needs more than a new `fb`.
+
+# Algorithm
+
+ 1. Read every field of `res`, in order, into the tuple `flds`.
+ 2. Call the constructor of the type of `res`, without its type parameters, with every entry of `flds` except the last, and then `fb`.
 
 # Related
 
@@ -280,31 +287,56 @@ end
 """
     setup_alloc_optim(w::VecNum, cash::Number)
 
-Split a portfolio into its long and its short side, and share the cash between them.
+Split a portfolio into its long and its short side, and give each side its share of the cash.
 
-Both finite allocators solve one sub-problem per side. This routine computes the budget of each side, and gives each side the share of the cash its budget calls for.
+Both finite allocators solve one sub-problem per side. A zero weight is on the long side. The method charges no fee. Each sub-problem charges the fee of its own side on the money that it buys, through [`allocation_fee`](@ref) or [`set_allocation_fees!`](@ref).
 
-The routine charges no fee. A fee is a cost of the portfolio the allocator actually buys, so each sub-problem charges its own side inside its own model, on the money it buys. See [`set_allocation_fees!`](@ref).
+# Mathematical definition
+
+```math
+\\begin{align}
+b &= \\sum_{i=1}^{N} w_i\\,, \\\\
+b_L &= \\sum_{i:\\, w_i \\geq 0} w_i\\,, \\\\
+b_S &= -\\sum_{i:\\, w_i < 0} w_i\\,, \\\\
+C_L &= C_{\\text{tot}}\\, b_L\\,, \\\\
+C_S &= C_{\\text{tot}}\\, b_S\\,.
+\\end{align}
+```
+
+It follows that ``b = b_L - b_S`` and ``C_L - C_S = C_{\\text{tot}}\\, b``.
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:N])
+  - $(math_dict[:b_alloc])
+  - $(math_dict[:b_L_alloc])
+  - $(math_dict[:b_S_alloc])
+  - $(math_dict[:C_tot_alloc])
+  - $(math_dict[:C_L_alloc])
+  - $(math_dict[:C_S_alloc])
+
+# Algorithm
+
+ 1. Compute `bgt`, the sum of `w`, and `lidx`, the mask `w .>= 0`.
+ 2. If every weight is non-negative, set `lbgt = bgt`, set `sbgt` and `scash` to zero, and set `sidx` to an empty vector.
+ 3. Otherwise set `sidx = .!lidx`, compute `lbgt` and `sbgt` over the two masks, and compute `scash = cash * sbgt`.
+ 4. Compute `lcash = cash * lbgt`.
 
 # Arguments
 
-  - `w::VecNum`: Target portfolio weights over the whole universe.
-  - `cash::Number`: Cash available.
+  - `w::VecNum`: Target portfolio weights over the full universe.
+  - `cash::Number`: Cash of the allocation.
 
 # Returns
 
-  - `bgt::Number`: Total budget, `sum(w)`.
-  - `lbgt::Number`: Long-side budget, the sum of the non-negative weights.
-  - `sbgt::Number`: Short-side budget, the **negated** sum of the negative weights, so it is non-negative.
+  - `bgt::Number`: Total budget ``b``.
+  - `lbgt::Number`: Long budget ``b_L``.
+  - `sbgt::Number`: Short budget ``b_S``, which is non-negative.
   - `lidx`: Mask of the long side, `w .>= 0`.
-  - `sidx`: Mask of the short side. Empty when the portfolio is long only.
-  - `lcash::Number`: `cash * lbgt`, before [`adjust_long_cash`](@ref) corrects it.
-  - `scash::Number`: `cash * sbgt`. Zero when the portfolio is long only.
-
-# Details
-
-  - A zero weight counts as long, because the test is `w .>= 0`.
-  - `lcash` is the long side's share of the cash. It is only correct once the short side has reported what it did not spend, which is why [`adjust_long_cash`](@ref) runs between the two sub-problems.
+  - `sidx`: Mask of the short side. When every weight is non-negative, it is an empty vector of the element type of `w`. Both forms select no asset in that case.
+  - `lcash::Number`: Long cash ``C_L``, before [`adjust_long_cash`](@ref) corrects it.
+  - `scash::Number`: Short cash ``C_S``.
 
 # Related
 
@@ -336,25 +368,39 @@ end
     allocation_turnover_money(::Nothing, ::Number, ::Any, ::Bool)
     allocation_turnover_money(tn::Turnover, prev_cash::Number, idx, short::Bool)
 
-Give one side its turnover rate and the money it held per asset before the trade.
+Give one side its turnover rate and the money that each of its positions held before the trade.
 
-`tn.w` is a weight vector, so the money held per asset before the trade is `prev_cash * tn.w`. A short side is allocated with its weights negated, so its money is negated too, and both sides then hold a non-negative figure.
+The allocator solves the short side on its negated weights, so the method negates the short side's previous money too. A position that is on the same side before and after the trade has a non-negative previous money. A position that changes side has a negative one, and the turnover term ``|\\boldsymbol{m} - \\boldsymbol{m}^{\\text{prev}}|`` of [`allocation_fee`](@ref) is then the money that closes the old position plus the money of the new one. A `nothing` `tn` gives `nothing` for both values.
+
+# Mathematical definition
+
+```math
+\\boldsymbol{m}^{\\text{prev}} = s\\, C^{\\text{prev}}\\, \\boldsymbol{w}^{\\text{prev}}\\,.
+```
+
+Where:
+
+  - $(math_dict[:m_prev_alloc])
+  - ``s``: Sign of the side, ``1`` for the long side and ``-1`` for the short side.
+  - $(math_dict[:C_prev_alloc])
+  - ``\\boldsymbol{w}^{\\text{prev}}``: Previous weights of the assets of this side, `tn.w` viewed to `idx`.
 
 # Arguments
 
-  - `tn`: The turnover of the fee, or `nothing` when the fee states none.
-  - `prev_cash::Number`: Cash held in the portfolio before the trade.
+  - `tn`: Turnover of the fee, or `nothing` when the fee has none.
+  - `prev_cash::Number`: Cash that the portfolio held before the trade.
   - `idx`: Mask of this side.
-  - `short::Bool`: Whether this side is the short one.
+  - `short::Bool`: `true` for the short side.
 
 # Returns
 
-  - `val`: The turnover rate of this side, or `nothing`.
-  - `prev_money`: The money held per asset before the trade, or `nothing`.
+  - `val`: Turnover rate of this side, or `nothing`.
+  - `prev_money`: Previous money ``\\boldsymbol{m}^{\\text{prev}}`` of this side, or `nothing`.
 
 # Related
 
   - [`allocation_side_fees`](@ref)
+  - [`allocation_fee`](@ref)
   - [`Turnover`](@ref)
 """
 function allocation_turnover_money(::Nothing, ::Number, ::Any, ::Bool)
@@ -370,28 +416,45 @@ end
 
 Charge the forced exit of every asset that left the universe, as one constant.
 
-A [`Fees`](@ref) carries two liquidation carriers. `lq` is a rate and `flq` is a currency amount, and both key on the **previous** weight of a position the optimisation was forced to sell. The exiting assets are not among the share counts an allocator solves for, so neither carrier needs a variable and the whole charge is a constant of the sub-problem — which is what [`set_liquidation_fees!`](@ref) and [`set_fixed_liquidation_fees!`](@ref) found for the JuMP model.
+A [`Fees`](@ref) has two liquidation carriers. `lq` is a rate and `flq` is an amount of money, and the `w` of each holds the previous weights of the positions that the optimisation had to sell. The allocator solves no share count for these assets, so the charge needs no variable and is a constant of the sub-problem. [`set_liquidation_fees!`](@ref) and [`set_fixed_liquidation_fees!`](@ref) add the same charge to the JuMP model as a constant.
 
-The charge is in money, as every term of an allocation must be. `lq.w` is a weight, so the money the exit sold is `prev_cash * lq.w`, the rule [`allocation_turnover_money`](@ref) reads for `tn`. `flq` is already a currency amount, so it is charged once for each entry whose previous weight is not `isapprox` to zero, on both sides of the book, exactly as [`calc_fixed_liquidation_fees`](@ref) charges it.
+The long sub-problem pays the whole charge. Every asset that left has a zero target weight, and [`setup_alloc_optim`](@ref) puts a zero weight on the long side. The total fee does not depend on the side that pays, but that side has less cash for shares, and a long-only book has no other side.
 
-The whole charge falls on the long sub-problem. Every exiting asset carries a zero target weight, and [`setup_alloc_optim`](@ref) puts a zero weight on the long side, so that side is the one the allocator's own split gives them. It is a constant, so the split moves no reported number; it decides which budget pays, and a long-only book has no other.
+# Mathematical definition
+
+```math
+L = T\\, C^{\\text{prev}} \\left\\lvert \\boldsymbol{w}_{\\text{lq}} \\right\\rvert \\cdot \\boldsymbol{f}_{\\text{lq}} + 1\\left\\{\\boldsymbol{w}_{\\text{flq}} \\neq 0\\right\\} \\cdot \\boldsymbol{f}_{\\text{flq}}\\,.
+```
+
+This is ``T F_{\\text{lq}} + F_{\\text{flq}}`` of [`Fees`](@ref), with the rate term in money.
+
+Where:
+
+  - $(math_dict[:L_liq_alloc])
+  - $(math_dict[:T_alloc])
+  - $(math_dict[:C_prev_alloc])
+  - ``\\boldsymbol{w}_{\\text{lq}}``, ``\\boldsymbol{w}_{\\text{flq}}``: Previous weights of the assets that left, `lq.w` and `flq.w`.
+  - ``\\boldsymbol{f}_{\\text{lq}}``: Liquidation rate per period, `lq.val`. A scalar applies to every asset.
+  - ``\\boldsymbol{f}_{\\text{flq}}``: Fixed liquidation amount per position, `flq.val`. A scalar applies to every asset.
+  - ``1\\left\\{\\cdot\\right\\}``: Elementwise indicator, `1` where the condition holds and `0` elsewhere. ``\\boldsymbol{w}_{\\text{flq}} \\neq 0`` is `!isapprox(w, 0; kwargs...)` with the `kwargs` of the fee.
 
 # Algorithm
 
- 1. On a `nothing` `fees`, return a zero. Both carriers are `nothing`, so nothing left the universe.
- 2. Per period: contract `lq.val` with `abs.(prev_cash * lq.w)`, and multiply by `T`.
- 3. One time: charge `flq` through [`calc_fixed_liquidation_fees`](@ref), which sums the liquidated long and the liquidated short side.
- 4. Return the sum of the two.
+ 1. If `fees` is `nothing`, return zero, because no asset left the universe.
+ 2. Set `fee` to zero.
+ 3. If `lq` is not `nothing`, add `T` times the contraction of `lq.val` with `abs.(prev_cash * lq.w)`.
+ 4. If `flq` is not `nothing`, add [`calc_fixed_liquidation_fees`](@ref) of `flq`, which charges the long and the short positions that left.
+ 5. Return `fee`.
 
 # Arguments
 
-  - `fees`: The fee carrying the two liquidation carriers, or `nothing`.
+  - `fees`: Fee with the two liquidation carriers, or `nothing`.
   - `T::Number`: Horizon, in periods.
-  - `prev_cash::Number`: Cash held in the portfolio before the trade.
+  - `prev_cash::Number`: Cash that the portfolio held before the trade.
 
 # Returns
 
-  - `fee::Number`: The whole forced-exit charge over the horizon.
+  - `fee::Number`: The forced-exit charge ``L`` over the whole horizon.
 
 # Related
 
@@ -424,19 +487,26 @@ end
     allocation_side_fees(::Nothing, ::Option{<:Number}, ::Number, ::Any, ::Any)
     allocation_side_fees(fees::Fees, T::Number, prev_cash::Number, lidx, sidx)
 
-Split a fee into the long side's charge and the short side's charge.
+Split a fee into the charge of the long side and the charge of the short side.
 
-Each sub-problem charges its own side. The long side takes `l` and `fl`, the short side takes `s` and `fs`, and both take the turnover rate and the money they held before the trade. A rate that is a vector is viewed to the side, and a rate that is a scalar is carried through, which is what [`nothing_scalar_array_view`](@ref) does.
+Each sub-problem charges its own side. The long side takes `l` and `fl`, the short side takes `s` and `fs`, and both take the turnover rate and their previous money from [`allocation_turnover_money`](@ref). [`nothing_scalar_array_view`](@ref) views a vector rate to the side and passes a scalar rate through. A `nothing` `fees` gives `nothing` for both charges.
 
-`lidx` and `sidx` are masks of the **full** universe, because they are derived from the weights an optimisation expanded back to it. A fee that same optimisation reduced to its Investable Mask is on a shorter axis, and carries that mask in `imsk`, so this verb lifts it with [`lift_fees`](@ref) before it takes a single view. An unmarked fee lifts nothing, which is the fee a caller wrote by hand and the fee of an optimisation that reduced on nothing.
+`lidx` and `sidx` are masks of the full universe, because they come from weights that an optimisation expanded back to it. A fee that the same optimisation reduced to its Investable Mask is on a shorter axis and records the mask in `imsk`, so the method lifts it with [`lift_fees`](@ref) before it takes a view. [`lift_fees`](@ref) returns a fee that has no mask unchanged.
 
-The forced exit of [`allocation_liquidation_fee`](@ref) is a constant of the whole allocation rather than of one side, and it rides on the long side's charge as `liq`. The short side carries a zero in that slot, so both charges read alike.
+The forced exit of [`allocation_liquidation_fee`](@ref) is a constant of the whole allocation. It is the `liq` entry of the long side's charge, and the short side's `liq` is zero, so both charges have the same entries.
+
+# Algorithm
+
+ 1. Lift `fees` onto the full universe with [`lift_fees`](@ref).
+ 2. Compute `ltn_val` and `lprev` for the long side, and `stn_val` and `sprev` for the short side, with [`allocation_turnover_money`](@ref).
+ 3. Compute `liq`, the forced-exit charge, with [`allocation_liquidation_fee`](@ref).
+ 4. Return the long side's charge, from `l`, `fl`, `ltn_val`, `lprev` and `liq`, and the short side's charge, from `s`, `fs`, `stn_val`, `sprev` and a zero `liq`.
 
 # Arguments
 
-  - `fees`: The fee to split, or `nothing` when the caller states none.
+  - `fees`: Fee to split, or `nothing`.
   - `T`: Horizon, in periods.
-  - `prev_cash::Number`: Cash held in the portfolio before the trade.
+  - `prev_cash::Number`: Cash that the portfolio held before the trade.
   - `lidx`: Mask of the long side.
   - `sidx`: Mask of the short side.
 
@@ -451,6 +521,7 @@ Each charge is a named tuple of `T`, `prop`, `fixed`, `tn_val`, `prev_money` and
 
   - [`allocation_liquidation_fee`](@ref)
   - [`allocation_turnover_money`](@ref)
+  - [`allocation_fee`](@ref)
   - [`lift_fees`](@ref)
   - [`set_allocation_fees!`](@ref)
   - [`setup_alloc_optim`](@ref)
@@ -476,36 +547,64 @@ end
     allocation_fee(::Nothing, ::VecNum, shares::VecNum)
     allocation_fee(sf::NamedTuple, p::VecNum, shares::VecNum)
 
-Charge one side's whole fee against a share vector.
+Charge the whole fee of one side on a vector of share counts.
 
-`shares .* p` is the money in each position exactly, and every term is charged against that money. No weight and no price appears on its own. This is the rule every term of an allocation follows, and it is the number both allocators report.
+The method charges every term on the money in each position, which is exact for share counts. Both allocators report this number. A `nothing` `sf` charges zero.
 
-`sf` is one side's charge, of [`allocation_side_fees`](@ref). A `nothing` `sf` charges nothing.
+A side that held money before the trade owes a turnover fee when it buys nothing, because a sale to zero is a trade. A book whose universe lost an asset owes the forced exit whatever it buys. For these reasons, both allocators charge this method on the empty book too.
+
+# Mathematical definition
+
+```math
+F(\\boldsymbol{x}) = L + T \\left(\\boldsymbol{m} \\cdot \\boldsymbol{f}_{\\text{p}} + \\left\\lvert \\boldsymbol{m} - \\boldsymbol{m}^{\\text{prev}} \\right\\rvert \\cdot \\boldsymbol{f}_{\\text{Tn}}\\right) + 1\\left\\{\\boldsymbol{m} \\neq 0\\right\\} \\cdot \\boldsymbol{f}_{\\text{f}}\\,.
+```
+
+The sum of the two sides is the fee of [`Fees`](@ref) on the weights of the book. Sign the money of the short side negative, and set ``\\boldsymbol{w} = \\boldsymbol{m} / C^{\\text{prev}}``. The sum is then ``C^{\\text{prev}}\\, T F_{\\text{r}}(\\boldsymbol{w}) + F_{\\text{o}}(\\boldsymbol{w})``, which [`calc_periodic_fees`](@ref) and [`calc_one_off_fees`](@ref) compute.
+
+Where:
+
+  - $(math_dict[:F_side_fee])
+  - ``\\boldsymbol{x}``: Share count vector of one side, `shares`.
+  - $(math_dict[:p_prices])
+  - $(math_dict[:m_money])
+  - $(math_dict[:m_prev_alloc])
+  - $(math_dict[:L_liq_alloc])
+  - $(math_dict[:T_alloc])
+  - ``\\boldsymbol{f}_{\\text{p}}``: Proportional rate per period of the side, `l` on the long side and `s` on the short side.
+  - ``\\boldsymbol{f}_{\\text{Tn}}``: Turnover rate per period, `tn.val`.
+  - ``\\boldsymbol{f}_{\\text{f}}``: Fixed amount per position of the side, `fl` on the long side and `fs` on the short side.
+  - ``1\\left\\{\\cdot\\right\\}``: Elementwise indicator, `1` where the condition holds and `0` elsewhere.
+  - $(math_dict[:C_prev_alloc])
+  - ``F_{\\text{r}}``, ``F_{\\text{o}}``: Fee per period and one-off fee of [`Fees`](@ref).
+  - ``\\boldsymbol{w}``: Signed weights of the book on the previous cash.
+
+A scalar rate applies to every asset.
 
 # Algorithm
 
- 1. Proportional, per period: the rate contracted with the money.
- 2. Turnover, per period: the rate contracted with the money traded, `|money - prev_money|`.
- 3. Fixed, one time: the rate contracted with the indicator of a non-zero position.
- 4. Forced exit, `sf.liq`: a constant of [`allocation_liquidation_fee`](@ref), already over the horizon.
- 5. Return `T` times the first two terms, plus the third and the fourth.
-
-A side that held money before the trade owes a turnover fee even when it buys nothing, because selling out is a trade, and a book whose universe lost an asset owes the forced exit whatever it buys. That is why both allocators charge this verb against an empty book.
+ 1. Compute `money = shares .* p`.
+ 2. Set `fee` to `sf.liq`.
+ 3. If `prop` is not `nothing`, add `T` times its contraction with `money`.
+ 4. If `tn_val` is not `nothing`, add `T` times its contraction with `abs.(money - prev_money)`.
+ 5. If `fixed` is not `nothing`, add its contraction with the indicator `.!iszero.(money)`.
+ 6. Return `fee`.
 
 # Arguments
 
-  - `sf`: One side's charge, of [`allocation_side_fees`](@ref), or `nothing`.
+  - `sf`: One side's charge, from [`allocation_side_fees`](@ref), or `nothing`.
   - `p::VecNum`: Asset prices of this side.
   - `shares::VecNum`: Share count per asset.
 
 # Returns
 
-  - `fee::Number`: The whole charge of this side over the horizon.
+  - `fee::Number`: The fee of this side over the whole horizon.
 
 # Related
 
   - [`allocation_liquidation_fee`](@ref)
   - [`allocation_side_fees`](@ref)
+  - [`calc_periodic_fees`](@ref)
+  - [`calc_one_off_fees`](@ref)
   - [`greedy_fee_delta`](@ref)
   - [`set_allocation_fees!`](@ref)
   - [`finite_sub_allocation`](@ref)
@@ -537,18 +636,18 @@ end
     permute_side_fees(::Nothing, ::Any)
     permute_side_fees(sf::NamedTuple, idx)
 
-Put one side's charge into the order `idx` names.
+Put one side's charge in the order that `idx` gives.
 
-[`finite_sub_allocation!`](@ref) sorts its assets by descending target weight, so the rates and the previous money must take the same order. A rate that is a vector is viewed to `idx`, and a rate that is a scalar is carried through, which is what [`nothing_scalar_array_view`](@ref) does. `liq` is a constant of the whole side rather than a per asset rate, so it carries through whatever the order is.
+[`finite_sub_allocation!`](@ref) sorts its assets by descending target weight, so the rates and the previous money must take the same order. [`nothing_scalar_array_view`](@ref) views a vector entry to `idx` and passes a scalar entry through. `T` and `liq` are constants of the side, so they do not change. The fee does not change either. [`allocation_fee`](@ref) of the permuted charge, prices and shares is equal to the fee in the first order.
 
 # Arguments
 
-  - `sf`: One side's charge, of [`allocation_side_fees`](@ref), or `nothing`.
-  - `idx`: The order to put it in.
+  - `sf`: One side's charge, from [`allocation_side_fees`](@ref), or `nothing`.
+  - `idx`: The new order.
 
 # Returns
 
-  - `sf`: The charge in the order `idx` names, or `nothing`.
+  - `sf`: The charge in the order of `idx`, or `nothing`.
 
 # Related
 
@@ -567,25 +666,42 @@ end
 """
     adjust_long_cash(bgt::Number, lcash::Number, scash::Number) -> Number
 
-Correct the long side's cash with the cash the short side did not spend.
+Correct the long side's cash by the cash that the short side did not spend.
 
-Runs between the two sub-problems, once the short side has reported its leftover cash. The correction has opposite signs above and below a unit budget, so the long side never spends cash the portfolio does not hold.
+The method runs between the two sub-problems, after the short side reports its leftover cash. The sign of the correction depends on the total budget.
+
+With a total budget below one, the long side can spend more than the cash of the allocation. It takes the short side's unspent cash in addition to its own share, so a book whose short side sells nothing is all long, and the long cash exceeds ``C_{\\text{tot}}`` when ``r_S > C_{\\text{tot}} (1 - b_L)``. The correction also changes by ``2 r_S`` at ``b = 1``.
+
+# Mathematical definition
+
+```math
+C_L^{\\prime} = \\begin{cases}
+C_L - r_S & b \\geq 1\\,, \\\\
+C_L + r_S & b < 1\\,.
+\\end{cases}
+```
+
+With ``b \\geq 1``, the short sales pay for the long side. ``C_L^{\\prime} = C_{\\text{tot}}\\, b + (C_S - r_S)`` is the net budget plus the money of the short sales that happened, so the net money of the book is ``C_{\\text{tot}}\\, b``. With ``b < 1``, ``C_L^{\\prime} = C_{\\text{tot}}\\, b_L + r_S``.
+
+Where:
+
+  - ``C_L^{\\prime}``: Corrected long cash.
+  - $(math_dict[:C_L_alloc])
+  - ``r_S``: Leftover cash of the short side, the cash that it did not spend on shares and fees.
+  - $(math_dict[:b_alloc])
+  - $(math_dict[:b_L_alloc])
+  - $(math_dict[:C_tot_alloc])
+  - $(math_dict[:C_S_alloc])
 
 # Arguments
 
-  - `bgt::Number`: Total budget, `sum(w)`.
-  - `lcash::Number`: Long side's share of the gross cash, from [`setup_alloc_optim`](@ref).
-  - `scash::Number`: Cash the short side did not spend.
+  - `bgt::Number`: Total budget ``b``.
+  - `lcash::Number`: Long cash ``C_L``, from [`setup_alloc_optim`](@ref).
+  - `scash::Number`: Leftover cash ``r_S`` of the short side.
 
 # Returns
 
-  - `res::Number`: The corrected long-side cash.
-
-# Details
-
-  - `scash == 0`: `lcash` is returned unchanged. A long-only portfolio takes this branch.
-  - `bgt >= 1`: `lcash` exceeds the cash actually available, so the unspent short cash is **subtracted**. It is not available to the long side.
-  - `bgt < 1`: `lcash` falls short of the cash actually available, so the unspent short cash is **added** without exceeding the true budget.
+  - `res::Number`: The corrected long cash ``C_L^{\\prime}``.
 
 # Related
 
@@ -594,14 +710,7 @@ Runs between the two sub-problems, once the short side has reported its leftover
   - [`finite_sub_allocation!`](@ref)
 """
 function adjust_long_cash(bgt::Number, lcash::Number, scash::Number)
-    if iszero(scash)
-        return lcash
-    end
-    return if bgt >= one(bgt)
-        # lcash is more than the actual available cash, so if we want to remain under the available cash, we need to remove any uninvested short cash because it is not available for long positions.
-        lcash - scash
-    elseif bgt < one(bgt)
-        # lcash is less than the actual available cash, so if we have leftover cash from the short allocation we can add it to the long positions without exceeding the actual available cash.
-        lcash + scash
-    end
+    # From a unit budget up, the short sales pay for the long side, so cash the short side did
+    # not spend is cash the long side does not have. Below it, the long side takes that cash.
+    return ifelse(bgt >= one(bgt), lcash - scash, lcash + scash)
 end

@@ -345,7 +345,7 @@ commit = "8610300"
 "src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { lines = 159, misses = 10 }
 "src/17_Optimisation/06_Meta/03_Stacking.jl" = { lines = 104, misses = 6 }
 "src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { lines = 112, misses = 5 }
-"src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { lines = 36, misses = 3 }
+"src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { lines = 36, misses = 0 }
 "src/17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl" = { lines = 91, misses = 0 }
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { lines = 68, misses = 0 }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { lines = 23, misses = 8 }

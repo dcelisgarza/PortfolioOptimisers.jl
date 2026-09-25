@@ -300,6 +300,11 @@ Called by [`optimise`](@ref) to perform the actual optimisation. Each optimisati
   - [`NearOptimalCentering`](@ref)
 """
 function _optimise end
+# A precomputed result is a fallback that the `fb` aliases admit, so the fallback loop of
+# `optimise` answers it as it stands.
+function _optimise(res::OptimisationResult, args...; kwargs...)
+    return res
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

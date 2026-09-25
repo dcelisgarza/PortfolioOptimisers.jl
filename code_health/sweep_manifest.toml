@@ -405,7 +405,7 @@
 "src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { map = 10, units = 19, swept = false }
 "src/17_Optimisation/06_Meta/03_Stacking.jl" = { map = 10, units = 13, swept = false }
 "src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { map = 10, units = 14, swept = false }
-"src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { map = 10, units = 14, swept = false }
+"src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { map = 10, units = 14, algorithm = 6, swept = true, bindings = ["FOptE_FOpt", "FOptE_FOpt_FbChain", "FiniteAllocationInput", "FiniteAllocationOptimisationEstimator", "FiniteAllocationOptimisationResult", "adjust_long_cash", "allocation_fee", "allocation_horizon", "allocation_liquidation_fee", "allocation_side_fees", "allocation_turnover_money", "factory", "permute_side_fees", "setup_alloc_optim"] }
 "src/17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl" = { map = 10, units = 6, algorithm = 2, swept = true, bindings = ["DiscreteAllocation", "DiscreteAllocationResult", "finite_sub_allocation", "optimise", "set_allocation_fees!", "set_discrete_error!"] }
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { map = 10, units = 6, algorithm = 3, swept = true, bindings = ["GreedyAllocation", "GreedyAllocationResult", "finite_sub_allocation!", "greedy_fee_delta", "optimise", "roundmult"] }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { map = 10, units = 3, swept = false }

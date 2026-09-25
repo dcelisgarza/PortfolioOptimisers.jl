@@ -112,6 +112,19 @@ unique_key_dict!(math_dict, :math_dict,
                  :r_cash_left => "``r = C - \\boldsymbol{x}^{\\intercal} \\boldsymbol{p}``: Leftover cash of one side, before the fee.",#
                  :m_money => "``\\boldsymbol{m} = \\boldsymbol{x} \\odot \\boldsymbol{p}``: Position money vector, the money in each position of one side.",#
                  :F_side_fee => "``F(\\boldsymbol{x})``: Side fee, the fee that one side pays over the whole horizon. It is zero when the input states no fee.",#
+                 # A finite allocation splits the book into a long and a short side, and
+                 # charges each side's fee on money. `setup_alloc_optim`, `adjust_long_cash`
+                 # and the fee helpers of `01_Base_FiniteAllocation.jl` share these symbols.
+                 :C_tot_alloc => "``C_{\\text{tot}}``: Total cash of a finite allocation, the `cash` of [`FiniteAllocationInput`](@ref).",#
+                 :b_alloc => "``b = \\sum_{i=1}^{N} w_i``: Total budget of a finite allocation, the sum of the target weights.",#
+                 :b_L_alloc => "``b_L``: Long budget, the sum of the non-negative target weights.",#
+                 :b_S_alloc => "``b_S``: Short budget, the negated sum of the negative target weights. It is non-negative.",#
+                 :C_L_alloc => "``C_L = C_{\\text{tot}}\\, b_L``: Long cash, the cash that the long side can spend before [`adjust_long_cash`](@ref) corrects it.",#
+                 :C_S_alloc => "``C_S = C_{\\text{tot}}\\, b_S``: Short cash, the cash that the short side can spend.",#
+                 :T_alloc => "``T``: Allocation horizon, the number of periods over which a finite allocation charges its rates, the `horizon` of [`FiniteAllocationInput`](@ref).",#
+                 :C_prev_alloc => "``C^{\\text{prev}}``: Previous cash, the cash that the portfolio held before the trade, the `prev_cash` of [`FiniteAllocationInput`](@ref).",#
+                 :m_prev_alloc => "``\\boldsymbol{m}^{\\text{prev}}``: Previous money vector, the money in each position of one side before the trade.",#
+                 :L_liq_alloc => "``L``: Forced-exit charge, the constant fee over the whole horizon for the assets that left the universe.",#
                  # The risk tracking family.
                  :w_b_track => "``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``, the `w` of the tracking specification `tr`.",#
                  :rho_track => "``\\rho``: Tracked risk measure, the `r` field. Its value at a weight vector is the risk of that vector as [`expected_risk`](@ref) reports it.",#

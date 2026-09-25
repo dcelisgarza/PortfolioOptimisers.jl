@@ -804,3 +804,138 @@ using JuMP
         @test all(iszero, collect(r.shares))
     end
 end
+@testset "The docstrings of 01_Base_FiniteAllocation.jl against numbers" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    PO = PortfolioOptimisers
+    rng = StableRNG(905)
+
+    # `setup_alloc_optim`: the budgets and the side cash of its `# Mathematical definition`,
+    # and the two consequences it states.
+    w = [0.5, -0.2, 0.0, 0.7]
+    C = 100.0
+    bgt, lbgt, sbgt, lidx, sidx, lcash, scash = PO.setup_alloc_optim(w, C)
+    @test (bgt, lbgt, sbgt, lcash, scash) == (1.0, 1.2, 0.2, 120.0, 20.0)
+    @test lidx == [true, false, true, true]
+    @test sidx == .!lidx
+    @test bgt ≈ lbgt - sbgt
+    @test lcash - scash ≈ C * bgt
+    bgt, lbgt, sbgt, lidx, sidx, lcash, scash = PO.setup_alloc_optim([0.5, 0.0, 0.5], C)
+    @test isempty(sidx) && all(lidx)
+    @test (lbgt, sbgt, lcash, scash) == (1.0, 0.0, 100.0, 0.0)
+
+    # `adjust_long_cash`: the two branches of its `# Mathematical definition`. From a unit
+    # budget up, the net money of the book is `C b`.
+    @test PO.adjust_long_cash(1.0, 130.0, 3.0) == 127.0
+    @test PO.adjust_long_cash(1.2, 150.0, 3.0) == 147.0
+    @test PO.adjust_long_cash(0.5, 80.0, 3.0) == 83.0
+    @test PO.adjust_long_cash(0.5, 80.0, 0.0) == 80.0
+    @test PO.adjust_long_cash(1.0, 130.0, 0.0) == 130.0
+    # Through the allocator: the short side cannot sell one share, so it leaves its cash.
+    alloc(w) = optimise(GreedyAllocation(),
+                        FiniteAllocationInput(; w = w, prices = [1.0, 1000.0],
+                                              cash = 100.0))
+    r = alloc([1.3, -0.3])
+    @test collect(r.shares) == [100.0, 0.0]
+    # Below a unit budget the long side takes the short side's unspent cash, and spends
+    # more than the cash of the allocation, as the docstring states.
+    r = alloc([0.9, -0.8])
+    @test collect(r.shares) == [170.0, 0.0]
+    r = alloc([0.5, -0.5])
+    @test collect(r.shares) == [100.0, 0.0]
+
+    # `allocation_turnover_money`: a position that changes side has a negative previous
+    # money, and the short side's money is negated.
+    tn = Turnover(; w = [-0.2, 1.2, 0.3, -0.3], val = [0.01, 0.02, 0.03, 0.04])
+    lidx = [true, true, false, false]
+    lv, lprev = PO.allocation_turnover_money(tn, 100.0, lidx, false)
+    sv, sprev = PO.allocation_turnover_money(tn, 100.0, .!lidx, true)
+    @test collect(lprev) ≈ [-20.0, 120.0]
+    @test collect(sprev) ≈ [-30.0, 30.0]
+    @test collect(lv) == [0.01, 0.02]
+    @test collect(sv) == [0.03, 0.04]
+    @test PO.allocation_turnover_money(nothing, 100.0, lidx, false) === (nothing, nothing)
+
+    # `allocation_liquidation_fee` is `T F_lq + F_flq` of `Fees`, with the rate term in money.
+    lq = Turnover(; w = [0.25, -0.4], val = [0.01, 0.02])
+    flq = Turnover(; w = [0.25, -0.4, 0.0], val = [5.0, 7.0, 11.0])
+    fees = Fees(; lq = lq, flq = flq)
+    @test PO.allocation_liquidation_fee(fees, 3, 1e4) ≈
+          3 * 1e4 * PO.calc_liquidation_fees(lq) +
+          PO.calc_fixed_liquidation_fees(flq, fees.kwargs)
+    @test PO.allocation_liquidation_fee(fees, 3, 1e4) ≈ 3 * 1e4 * (0.0025 + 0.008) + 12.0
+    fees = Fees(; lq = Turnover(; w = [0.25, -0.4], val = 0.01))
+    @test PO.allocation_liquidation_fee(fees, 3, 1e4) ≈ 3 * 1e4 * 0.01 * 0.65
+    @test iszero(PO.allocation_liquidation_fee(nothing, 3, 1e4))
+
+    # `allocation_fee` summed over the two sides is `C_prev T F_r(w) + F_o(w)` of `Fees`, on
+    # the signed weights `w = m / C_prev` of the book.
+    errs = map(1:200) do _
+        N = 6
+        Cp = 1e4
+        T = rand(rng, 1:30)
+        p = 1 .+ 99 .* rand(rng, N)
+        x = round.(20 .* randn(rng, N))
+        x[rand(rng, 1:N)] = 0
+        m = x .* p
+        fees = Fees(; l = 0.001 .* rand(rng, N), s = 0.002 .* rand(rng, N),
+                    fl = 5 .* rand(rng, N), fs = 3 .* rand(rng, N),
+                    tn = Turnover(; w = 0.2 .* randn(rng, N), val = 0.003 .* rand(rng, N)),
+                    lq = Turnover(; w = [0.1, -0.2], val = [0.01, 0.02]),
+                    flq = Turnover(; w = [0.1, -0.2], val = [4.0, 6.0]))
+        lidx = x .>= 0
+        sidx = .!lidx
+        lsf, ssf = PO.allocation_side_fees(fees, T, Cp, lidx, sidx)
+        F = PO.allocation_fee(lsf, p[lidx], x[lidx]) +
+            PO.allocation_fee(ssf, p[sidx], -x[sidx])
+        ref = Cp * T * PO.calc_periodic_fees(m / Cp, fees) +
+              PO.calc_one_off_fees(m / Cp, fees)
+        abs(F - ref) / abs(ref)
+    end
+    @test maximum(errs) < 1e-12
+    @test PO.allocation_side_fees(nothing, 3, 1e4, lidx, .!lidx) === (nothing, nothing)
+    @test iszero(PO.allocation_fee(nothing, [1.0, 2.0], [3.0, 4.0]))
+    # The empty book owes the sale of what the side held, and the forced exit.
+    fees = Fees(; tn = Turnover(; w = [0.3, 0.7], val = 0.01),
+                flq = Turnover(; w = [0.1], val = 4.0))
+    lsf, _ = PO.allocation_side_fees(fees, 2, 1e3, [true, true], Float64[])
+    @test PO.allocation_fee(lsf, [10.0, 20.0], [0.0, 0.0]) ≈ 2 * 0.01 * 1e3 + 4.0
+
+    # `permute_side_fees` does not change the fee.
+    N = 5
+    p = 1 .+ 9 .* rand(rng, N)
+    x = round.(10 .* rand(rng, N))
+    fees = Fees(; l = rand(rng, N) / 100, fl = rand(rng, N),
+                tn = Turnover(; w = rand(rng, N) / N, val = 0.01),
+                lq = Turnover(; w = [0.1], val = 0.02))
+    lsf, _ = PO.allocation_side_fees(fees, 7, 1e3, trues(N), Float64[])
+    o = sortperm(rand(rng, N))
+    @test PO.allocation_fee(PO.permute_side_fees(lsf, o), view(p, o), view(x, o)) ≈
+          PO.allocation_fee(lsf, p, x)
+    @test isnothing(PO.permute_side_fees(nothing, o))
+
+    # `factory` keeps every field and replaces the last one, `fb`.
+    fai = FiniteAllocationInput(; w = [0.6, 0.4], prices = [10.0, 20.0], cash = 1000.0)
+    g = optimise(GreedyAllocation(), fai)
+    chain = Tuple{PO.OptimisationEstimator, PO.OptimisationResult}[(GreedyAllocation(), g)]
+    gf = PO.factory(g, chain)
+    @test gf.fb === chain
+    @test all(getfield(gf, i) === getfield(g, i) for i in 1:(fieldcount(typeof(g)) - 1))
+
+    # `FOptE_FOpt`: a precomputed result is a fallback, and `optimise` returns it as it is.
+    da = DiscreteAllocation(; slv = Solver(; name = :none, solver = nothing), fb = g)
+    rfb = optimise(da, fai)
+    @test isa(rfb, GreedyAllocationResult)
+    @test collect(rfb.shares) == collect(g.shares)
+    @test isa(rfb.fb, PO.FbChain) && rfb.fb[1][1] === da
+
+    # `FiniteAllocationInput`: every raise of its `## Validation`.
+    @test_throws PO.IsEmptyError FiniteAllocationInput(; w = Float64[], prices = [1.0])
+    @test_throws PO.IsEmptyError FiniteAllocationInput(; w = [1.0], prices = Float64[])
+    @test_throws DimensionMismatch FiniteAllocationInput(; w = [1.0], prices = [1.0, 2.0])
+    @test_throws DomainError FiniteAllocationInput(; w = [1.0], prices = [1.0], cash = 0.0)
+    @test_throws DomainError FiniteAllocationInput(; w = [1.0], prices = [1.0],
+                                                   prev_cash = -1.0)
+    @test_throws PO.IsNothingError FiniteAllocationInput(; w = [1.0], prices = [1.0],
+                                                         fees = Fees(; l = 0.01))
+    @test FiniteAllocationInput(; w = [1.0], prices = [1.0], cash = 5.0).prev_cash == 5.0
+end
