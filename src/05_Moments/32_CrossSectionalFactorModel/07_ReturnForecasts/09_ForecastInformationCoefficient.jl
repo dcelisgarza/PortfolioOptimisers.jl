@@ -64,7 +64,7 @@ Where:
   - ``\\boldsymbol{u}_{t}``: Cross-sectional weights of observation ``t``.
   - ``\\rho^{\\mathrm{S}}``: The rank correlation of two cross-sections.
   - ``\\rho``: The weighted correlation of two cross-sections.
-  - ``t_{j}``: The ``j``-th evaluation date.
+  - $(math_dict[:t_j_eval])
 
 # Algorithm
 
@@ -151,7 +151,7 @@ L = \\left\\lceil \\frac{h}{s} \\right\\rceil - 1
 Where:
 
   - ``h``: The forward window, in observations.
-  - ``s``: The stride between two evaluation dates.
+  - $(math_dict[:s_eval_stride])
 
 # Arguments
 
@@ -286,12 +286,12 @@ c_{j} = \\frac{\\left| \\left\\{ i \\in \\mathcal{U}_{t_{j}} : \\alpha_{t_{j} i}
 
 Where:
 
-  - ``\\alpha_{ti}``: Return Forecast of asset ``i`` at observation ``t``.
-  - ``y_{ti}``: Forward target of asset ``i`` at observation ``t``.
-  - ``m_{ti}``: Universe mask of asset ``i`` at observation ``t``, `true` where the asset is in the estimation universe.
-  - ``u_{ti}``: Cross-sectional weight of asset ``i`` at observation ``t``.
-  - ``\\mathcal{U}_{t}``: Universe of observation ``t``, the assets in the mask that carry a positive weight.
-  - ``t_{j}``: The ``j``-th evaluation date.
+  - $(math_dict[:alpha_ti_fc])
+  - $(math_dict[:y_ti_fwd])
+  - $(math_dict[:m_ti_univ])
+  - $(math_dict[:u_ti_cs])
+  - $(math_dict[:U_t_univ])
+  - $(math_dict[:t_j_eval])
 
 # Algorithm
 

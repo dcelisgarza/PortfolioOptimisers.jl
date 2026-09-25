@@ -168,4 +168,16 @@ unique_key_dict!(math_dict, :math_dict,
                  :phi_fill => "``\\phi``: Reduction that a [`Num_VecToScaM`](@ref) states, from the observed prices of an asset to one number. A plain number is the constant reduction.",#
                  :t0_fill => "``t_{0}``: Replay start, the first observation of the window after the end of the training window, or ``n + 1`` when the window holds none.",#
                  :r_ti_run => "``r_{t,\\,i}``: Run start of asset ``i`` at observation ``t``, the first observation of the unbroken listed run that holds ``t``.",#
-                 :s_ti_carry => "``s_{t,\\,i}``: Carry source of asset ``i`` at observation ``t``, the last member of ``\\mathcal{O}_{i}`` before ``t`` in the listed run that holds ``t``.")
+                 :s_ti_carry => "``s_{t,\\,i}``: Carry source of asset ``i`` at observation ``t``, the last member of ``\\mathcal{O}_{i}`` before ``t`` in the listed run that holds ``t``.",#
+                 # The evaluation of a Return Forecast under
+                 # `32_CrossSectionalFactorModel/07_ReturnForecasts/`. Each symbol is
+                 # stated by two or more Units of those files.
+                 :alpha_ti_fc => "``\\alpha_{ti}``: Return Forecast of asset ``i`` at observation ``t``.",#
+                 :y_ti_fwd => "``y_{ti}``: Forward target of asset ``i`` at observation ``t``.",#
+                 :m_ti_univ => "``m_{ti}``: Universe mask of asset ``i`` at observation ``t``, `true` where the asset is in the estimation universe.",#
+                 :u_ti_cs => "``u_{ti}``: Cross-sectional weight of asset ``i`` at observation ``t``.",#
+                 :U_t_univ => "``\\mathcal{U}_{t}``: Universe of observation ``t``, the assets in the mask that carry a positive weight.",#
+                 :t_j_eval => "``t_{j}``: The ``j``-th evaluation date.",#
+                 :s_eval_stride => "``s``: The stride between two evaluation dates.",#
+                 :c_j_cov => "``c_{j}``: Coverage at evaluation date ``t_{j}``, the share of the universe the evaluation scored there.",#
+                 :n_j_scored => "``n_{j}``: Scored count at evaluation date ``t_{j}``, the assets of the universe that carry a finite forecast and a finite target there.")

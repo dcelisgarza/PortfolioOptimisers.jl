@@ -39,9 +39,9 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
 5. THE STATISTICS ARE ORACLED BY RUNNING THE REFERENCE, NOT BY READING IT. `IC_ALPHA` and
    its gapped variant were put through the reference's own diagnostic and its correlation
    summary, and the literals below are what it answered. The one place the port diverges is
-   the hit rate: the library reads it against every date, so a date with no coefficient is a
-   miss, where the reference reads it against the dates that carried one. That is
-   `exposure_ic_factor_summary`'s convention, which both summaries now share, and it is
+   the hit rate: the library reads it against the dates that carried a coefficient, where
+   the reference's exposure summary counts a date with no coefficient as a miss. That is
+   `exposure_ic_factor_summary`'s convention, which both summaries share, and it is
    asserted as a divergence rather than papered over. The second divergence is the
    t-statistic: the reference scales the ratio by the root of the date count wherever it
    is read, and the port's standard error reads the overlap of the forward windows through
@@ -61,9 +61,7 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
    `max_drawdown` and `calmar` read a path that joins the date before a gap to the date
    after it. The probes assert the compressed answer and, beside it, what the uncompressed
    series would have answered, which is what makes the caveat legible. The hit rate beside
-   that summary therefore counts against the FINITE dates, which is the opposite of
-   convention 5's denominator: the two summaries are computed on different series, and each
-   docstring states which.
+   that summary counts against the FINITE dates, which is convention 5's denominator.
 
 8. THE FACTOR CORRELATION IS PINNED BY A DESIGN, NOT BY A LITERAL. It is contemporaneous,
    so there is nothing forward-looking to oracle: the probes build a cross-section whose
@@ -107,10 +105,9 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
     which is what a summary that computes nothing of its own owes: a literal that matches
     proves the number, and the identity proves the number came from the verb rather than
     from a second copy of it. The gapped fixture is what separates `mean_coverage` from
-    `min_coverage`, because a full panel reads 1 for both. The two hit-rate denominators
-    of conventions 5 and 7 meet here for the first time, and they are asserted APART
-    rather than reconciled: a silenced date is a miss for a coefficient and no trade for
-    a book, and the Result names the two columns apart and states each denominator.
+    `min_coverage`, because a full panel reads 1 for both. The hit rates of conventions 5
+    and 7 meet here with one denominator: a date with no coefficient and a date with no
+    trade are both unmeasured, and the coverage columns count them.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 
@@ -2922,5 +2919,140 @@ end
               forecast_evaluation_summary(fes[2], px.csfm).spearman_mean_ic[1]
         @test fa.spearman_mean_ic[2] ==
               forecast_evaluation_summary(al[2], px.csfm).spearman_mean_ic[1]
+    end
+end
+
+#=
+The docstrings of `14_ForecastSummary.jl` against numbers. Each probe computes, by hand, the
+number a `# Mathematical definition` or a sentence of the file states, and compares it with
+the number the code returns. The fixture holds a date with no forecast, a date under the
+threshold and two late listers, so the hit rates, the shares and the counts each read a
+sample that differs from the evaluation dates.
+=#
+function summary_docstring_fixture()
+    T, N = 40, 12
+    rng = StableRNG(962)
+    alpha = randn(rng, T, N)
+    X = randn(rng, T, N)
+    y = PortfolioOptimisers.forward_mean_returns(X, 1, 1)
+    alpha[5, :] .= NaN
+    alpha[9, 1:10] .= NaN
+    umsk = trues(T, N)
+    umsk[1:6, 11:12] .= false
+    fe = forecast_evaluation(alpha, y; umsk = umsk, min_count = 3)
+    return (; T = T, N = N, y = y, umsk = umsk, fe = fe)
+end
+
+@testset "The docstrings of 14_ForecastSummary.jl against numbers" begin
+    PO = PortfolioOptimisers
+    sx = summary_docstring_fixture()
+    fe = sx.fe
+
+    @testset "The scored count is the universe assets that carry a finite pair" begin
+        u = PO.forecast_ic_weights(fe.alpha, nothing)
+        n = PO.forecast_summary_scored(fe, u)
+        nh = [count(i -> fe.umsk[t, i] &&
+                         u[t, i] > 0 &&
+                         isfinite(fe.alpha[t, i]) &&
+                         isfinite(fe.y[t, i]), 1:(sx.N)) for t in fe.dates]
+        @test n == nh
+        # It is the numerator of the coverage, over the universe of the date.
+        U = [count(i -> fe.umsk[t, i] && u[t, i] > 0, 1:(sx.N)) for t in fe.dates]
+        @test isequal(forecast_coverage(fe), n ./ U)
+        @test n[findfirst(==(5), fe.dates)] == 0
+    end
+
+    @testset "The four coverage figures are the means and the minima of the definition" begin
+        u = PO.forecast_ic_weights(fe.alpha, nothing)
+        c = forecast_coverage(fe)
+        n = PO.forecast_summary_scored(fe, u)
+        Jc = findall(isfinite, c)
+        cv = PO.forecast_summary_coverage(fe, nothing)
+        @test cv.mean_coverage ≈ sum(c[Jc]) / length(Jc)
+        @test cv.min_coverage == minimum(c[Jc])
+        @test cv.mean_n_scored ≈ sum(n) / length(n)
+        @test cv.min_n_scored == minimum(n) == 0
+        # A date whose universe is empty enters no share figure and counts zero assets.
+        w = ones(sx.T, sx.N)
+        w[3, :] .= 0
+        cw = forecast_coverage(fe, w)
+        nw = PO.forecast_summary_scored(fe, w)
+        j3 = findfirst(==(3), fe.dates)
+        @test isnan(cw[j3]) && nw[j3] == 0
+        cvw = PO.forecast_summary_coverage(fe, w)
+        @test cvw.mean_coverage ≈ sum(filter(isfinite, cw)) / count(isfinite, cw)
+        @test cvw.mean_n_scored ≈ sum(nw) / length(nw)
+        # Every universe empty: the two shares are NaN, and the two counts are zero.
+        cvz = PO.forecast_summary_coverage(fe, zeros(sx.T, sx.N))
+        @test isnan(cvz.mean_coverage) && isnan(cvz.min_coverage)
+        @test cvz.mean_n_scored == 0 && cvz.min_n_scored == 0
+    end
+
+    @testset "Every hit rate counts the scored dates and not every date" begin
+        fs = forecast_evaluation_summary(fe)
+        ic = forecast_ic(fe)
+        rk = forecast_portfolio(fe; kind = :rank)
+        zs = forecast_portfolio(fe; kind = :zscore)
+        scored(x) = count(>(0), filter(isfinite, x)) / count(isfinite, x)
+        every(x) = count(>(0), filter(isfinite, x)) / length(x)
+        @test fs.spearman_hit_rate[1] == scored(ic[:, 1]) != every(ic[:, 1])
+        @test fs.pearson_hit_rate[1] == scored(ic[:, 2]) != every(ic[:, 2])
+        @test fs.rank_hit_rate[1] == scored(rk.ret) != every(rk.ret)
+        @test fs.zscore_hit_rate[1] == scored(zs.ret) != every(zs.ret)
+    end
+
+    @testset "Each book reports three figures that read no order of the returns" begin
+        fs = forecast_evaluation_summary(fe)
+        rk = forecast_portfolio(fe; kind = :rank)
+        @test fs.rank_ann_return[1] == rk.summary.ann_return
+        @test fs.rank_ann_volatility[1] == rk.summary.ann_volatility
+        @test fs.rank_sharpe[1] == rk.summary.sharpe
+        r = filter(isfinite, rk.ret)
+        p = r[randperm(StableRNG(3), length(r))]
+        a = performance_summary(r)
+        b = performance_summary(p)
+        @test a.ann_return ≈ b.ann_return &&
+              a.ann_volatility ≈ b.ann_volatility &&
+              a.sharpe ≈ b.sharpe
+        @test a.sortino ≈ b.sortino && a.cvar ≈ b.cvar && a.sharpe_stderr ≈ b.sharpe_stderr
+        @test !(a.max_drawdown ≈ b.max_drawdown)
+        @test length(PO.forecast_summary_row(fe, nothing, 10)) == 30
+        @test collect(keys(PO.forecast_summary_row(fe, nothing, 10))) ==
+              collect(fieldnames(ForecastSummaryResult)[2:31])
+    end
+
+    @testset "The aligned grid is the set the definition states, on the later phase" begin
+        f1 = forecast_evaluation(fe.alpha, sx.y; umsk = sx.umsk, step = 2, min_count = 3)
+        late = copy(fe.alpha)
+        late[1:9, :] .= NaN
+        f2 = forecast_evaluation(late, sx.y; umsk = sx.umsk, step = 2, min_count = 3)
+        @test isodd(first(f1.dates)) && iseven(first(f2.dates))
+        lo = max(first(f1.dates), first(f2.dates))
+        hi = min(last(f1.dates), last(f2.dates))
+        D = [lo + 2 * q for q in 0:hi if lo + 2 * q <= hi]
+        al = forecast_evaluation_align([f1, f2])
+        @test al[1].dates == al[2].dates == D
+        @test al[1].alpha === f1.alpha && al[1].y === f1.y && al[1].umsk === f1.umsk
+        # Two grids that share no date are refused.
+        g1 = PO.ForecastEvaluationResult(fe.alpha, fe.y, fe.umsk, [1, 2, 3], fe.target,
+                                         fe.horizon, fe.lag, fe.step, fe.min_count, fe.ppy)
+        g2 = PO.ForecastEvaluationResult(fe.alpha, fe.y, fe.umsk, [10, 11], fe.target,
+                                         fe.horizon, fe.lag, fe.step, fe.min_count, fe.ppy)
+        @test_throws PO.IsEmptyError forecast_evaluation_align([g1, g2])
+    end
+
+    @testset "A single tail fraction is read as a vector of one" begin
+        a = forecast_evaluation_summary(fe; quantiles = 0.2)
+        b = forecast_evaluation_summary(fe; quantiles = [0.2])
+        @test a.quantiles == [0.2]
+        @test a.spread_sharpe == b.spread_sharpe && size(a.spread_sharpe) == (1, 1)
+    end
+
+    @testset "Two Panel Field targets are one target only when they name one field" begin
+        @test PO.forecast_summary_same_target(PanelFieldTarget(; name = "a"),
+                                              PanelFieldTarget(; name = "a"))
+        @test !PO.forecast_summary_same_target(PanelFieldTarget(; name = "a"),
+                                               PanelFieldTarget(; name = "b"))
+        @test !PO.forecast_summary_same_target(IdiosyncraticTarget(), AssetReturnTarget())
     end
 end
