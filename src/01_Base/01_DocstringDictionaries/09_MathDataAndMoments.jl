@@ -165,6 +165,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :p_tilde_ti_fill => "``\\tilde{p}_{t,\\,i}``: Filled price of asset ``i`` at observation ``t``, the price after the fill.",#
                  :O_i_fill => "``\\mathcal{O}_{i}``: Observed set of asset ``i``, the observations at which its price is neither `missing` nor `NaN`.",#
                  :v_i_fill => "``v_{i}``: Fitted value of asset ``i``, read off its observed prices over the training window.",#
+                 :o_i_fill => "``o_{i}``: Open flag of asset ``i``, ``1`` when no absence from the listing follows its last observed price in the window, so that the price can seed the next window.",#
                  :phi_fill => "``\\phi``: Reduction that a [`Num_VecToScaM`](@ref) states, from the observed prices of an asset to one number. A plain number is the constant reduction.",#
                  :t0_fill => "``t_{0}``: Replay start, the first observation of the window after the end of the training window, or ``n + 1`` when the window holds none.",#
                  :r_ti_run => "``r_{t,\\,i}``: Run start of asset ``i`` at observation ``t``, the first observation of the unbroken listed run that holds ``t``.",#

@@ -57,7 +57,9 @@ end
     @test isa(res.fill, CarriedPrice)
     # A column with no observed price gets no fitted value and no entry, so it is untouched.
     @test res.nx == [:A, :B, :C]
-    @test res.v == [122.0, 205.0, 304.0]
+    # C is delisted after its last price, so the window ends outside its listing and C gets
+    # no seed (#1330). It keeps its entry.
+    @test isequal(res.v, [122.0, 205.0, missing])
     Xc = values(pgf_970_quiet_apply(res, pr).X)
     # The k = 2 interior gap takes the last priced observation, and nothing else moved.
     @test Xc[4:5, 1] == [102.0, 102.0]
@@ -302,7 +304,7 @@ function pgf_978_is_gap(x)
     return ismissing(x) || (isa(x, Number) && isnan(x))
 end
 function pgf_978_held_price(X::AbstractMatrix, span::AbstractMatrix{Bool}, i::Integer,
-                            v::Number, t0::Integer)
+                            v::Union{Missing, Number}, t0::Integer)
     Y = copy(X)
     for t in axes(X, 1)
         if !(span[t, i] && pgf_978_is_gap(X[t, i]))
@@ -313,7 +315,7 @@ function pgf_978_held_price(X::AbstractMatrix, span::AbstractMatrix{Bool}, i::In
         s = findlast(u -> !pgf_978_is_gap(X[u, i]), r:(t - 1))
         if !isnothing(s)
             Y[t, i] = X[r + s - 1, i]
-        elseif t >= t0 && r == 1
+        elseif t >= t0 && r == 1 && !ismissing(v)
             Y[t, i] = v
         end
     end
@@ -344,6 +346,10 @@ end
         for i in 1:nas
             v = 1000.0 + i
             t0 = rand(rng, 1:(nobs + 1))
+            # A `missing` seed, which the fit gives after an absence, is never written.
+            held = PortfolioOptimisers.gap_fill_column!(CarriedPrice(), copy(P), span, i,
+                                                        missing, t0)
+            @test isequal(held, pgf_978_held_price(P, span, i, missing, t0))
             held = PortfolioOptimisers.gap_fill_column!(CarriedPrice(), copy(P), span, i, v,
                                                         t0)
             @test isequal(held, pgf_978_held_price(P, span, i, v, t0))
@@ -374,12 +380,17 @@ end
     pr = PricesResult(; X = TimeArray(collect(ts), P, [:a, :b, :c]), span = listing_span(P))
     held = fit_preprocessing(PriceGapFill(), pr)
     @test held.nx == [:a, :c]
-    @test held.v == [103.0, 6.0]
+    # The window ends after the delisting of `c`, so its carried seed is retired (#1330).
+    @test isequal(held.v, [103.0, missing])
     @test held.te == Date(2020, 1, 3)
     med = fit_preprocessing(PriceGapFill(; fill = MedianValue()), pr)
     @test med.v == [median([100.0, 103.0]), median([5.0, 6.0])]
-    @test PortfolioOptimisers.gap_fill_seed(CarriedPrice(), [1.0, 2.0, 7.0]) == 7.0
-    @test PortfolioOptimisers.gap_fill_seed(MeanValue(), [1.0, 2.0, 6.0]) == 3.0
+    @test PortfolioOptimisers.gap_fill_seed(CarriedPrice(), [1.0, 2.0, 7.0], true) == 7.0
+    @test PortfolioOptimisers.gap_fill_seed(MeanValue(), [1.0, 2.0, 6.0], true) == 3.0
+    # An absence after the last price retires a carried seed, and does not touch a statistic.
+    @test ismissing(PortfolioOptimisers.gap_fill_seed(CarriedPrice(), [1.0, 2.0, 7.0],
+                                                      false))
+    @test PortfolioOptimisers.gap_fill_seed(MeanValue(), [1.0, 2.0, 6.0], false) == 3.0
     # The Held Price conserves wealth: across p0, _, _, p3 the returns are 0, 0, p3/p0 - 1.
     P = reshape([100.0, NaN, NaN, 130.0], :, 1)
     ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 4)
@@ -419,4 +430,84 @@ end
     @test_throws ArgumentError PortfolioOptimisers.partial_fit_transform(PriceGapFill(;
                                                                                       fill = MedianValue()),
                                                                          pr32)
+end
+#=
+Issue #1330. `ff27cc22b8` (#978) stopped the carry at an absence inside the window, but a window
+cannot see an absence before its first row. When the listing breaks after the last observed
+training price, the fit must give no seed, or a later window books a return across the absence.
+The asset keeps its entry, with a `missing` seed, so a later window still fills its gaps from its
+own prices. The checks below pin the case from the issue, then pin on random caller's spans that
+a later window fills as the same rows of the full clock do, and that the online form agrees.
+=#
+@testset "A seed does not cross an absence at the end of the training window (#1330)" begin
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 6)
+    P = reshape([10.0, 11.0, NaN, NaN, 12.0, 13.0], :, 1)
+    span = reshape(Bool[1, 1, 0, 1, 1, 1], :, 1)
+    full = PricesResult(; X = TimeArray(collect(ts), P, [:A]), span = span)
+    res = fit_preprocessing(PriceGapFill(), PortfolioOptimisers.port_opt_view(full, 1:3))
+    # The asset stays in the result, but row 3 is an absence after its last price.
+    @test res.nx == [:A]
+    @test isequal(res.v, [missing])
+    later = pgf_970_quiet_apply(res, PortfolioOptimisers.port_opt_view(full, 4:6))
+    @test isequal(vec(values(later.X)), [NaN, 12.0, 13.0])
+    @test isequal(vec(values(pgf_970_quiet_apply(res, full).X)), vec(P))
+    # The last price lies before an absence inside the training window, and the window ends
+    # inside the listing again: the seed would still cross the absence.
+    res4 = fit_preprocessing(PriceGapFill(), PortfolioOptimisers.port_opt_view(full, 1:4))
+    @test isequal(res4.v, [missing])
+    # With no absence after the last price, the seed stays.
+    res2 = fit_preprocessing(PriceGapFill(), PortfolioOptimisers.port_opt_view(full, 1:2))
+    @test res2.v == [11.0]
+    # A statistic carries no price, so an absence does not retire it.
+    @test fit_preprocessing(PriceGapFill(; fill = MedianValue()),
+                            PortfolioOptimisers.port_opt_view(full, 1:3)).v == [10.5]
+    # A carrier that states no span states no absence, so the seed stays.
+    nospan = PricesResult(; X = TimeArray(collect(ts)[1:3], P[1:3, :], [:A]))
+    @test fit_preprocessing(PriceGapFill(), nospan).v == [11.0]
+    @test PortfolioOptimisers.gap_fill_open(span, 1, 2) === false
+    @test PortfolioOptimisers.gap_fill_open(span, 1, 4) === true
+    @test PortfolioOptimisers.gap_fill_open(nothing, 1, 2) === true
+    # The online form retires the carried price at the end of the block that holds the absence.
+    est = PortfolioOptimisers.partial_fit!(PriceGapFill(),
+                                           PortfolioOptimisers.port_opt_view(full, 1:3))
+    @test est.cache.held == [false]
+    blk = PortfolioOptimisers.partial_fit_transform(est,
+                                                    PortfolioOptimisers.port_opt_view(full,
+                                                                                      4:6))[2]
+    @test isequal(vec(values(blk.X)), [NaN, 12.0, 13.0])
+    @test isequal(fit_preprocessing(est).v, [missing])
+    rng = StableRNG(1330)
+    for trial in 1:800
+        nobs, nas = rand(rng, 2:10), rand(rng, 1:3)
+        X = 100 .+ 10 .* rand(rng, nobs, nas)
+        X[rand(rng, nobs, nas) .< 0.35] .= NaN
+        sp = rand(rng) < 0.8 ? rand(rng, nobs, nas) .< 0.75 : listing_span(X)
+        ts = Date(2020, 1, 1):Day(1):(Date(2020, 1, 1) + Day(nobs - 1))
+        full = PricesResult(; X = TimeArray(collect(ts), X, [:a, :b, :c][1:nas]), span = sp)
+        k = rand(rng, 1:(nobs - 1))
+        res = fit_preprocessing(PriceGapFill(),
+                                PortfolioOptimisers.port_opt_view(full, 1:k))
+        tail = pgf_970_quiet_apply(res,
+                                   PortfolioOptimisers.port_opt_view(full, (k + 1):nobs))
+        whole = pgf_970_quiet_apply(res, full)
+        @test isequal(values(tail.X), values(whole.X)[(k + 1):nobs, :])
+        # Two blocks fold to the batch fit over the whole clock, and two halves merge to it.
+        a = PortfolioOptimisers.partial_fit_transform(PriceGapFill(),
+                                                      PortfolioOptimisers.port_opt_view(full,
+                                                                                        1:k))
+        b = PortfolioOptimisers.partial_fit_transform(a[1],
+                                                      PortfolioOptimisers.port_opt_view(full,
+                                                                                        (k + 1):nobs))
+        bres = fit_preprocessing(PriceGapFill(), full)
+        @test isequal(vcat(values(a[2].X), values(b[2].X)),
+                      values(pgf_970_quiet_apply(bres, full).X))
+        @test isequal(fit_preprocessing(b[1]).nx, bres.nx)
+        @test isequal(fit_preprocessing(b[1]).v, bres.v)
+        h2 = PortfolioOptimisers.partial_fit!(PriceGapFill(),
+                                              PortfolioOptimisers.port_opt_view(full,
+                                                                                (k + 1):nobs))
+        m = PortfolioOptimisers.merge_states(a[1].cache, h2.cache)
+        @test isequal(m.v, b[1].cache.v)
+        @test m.held == b[1].cache.held
+    end
 end

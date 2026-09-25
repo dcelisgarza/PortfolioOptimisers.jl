@@ -616,17 +616,20 @@ Keeps the carried price of each asset and the end of the last block for an onlin
 
 [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref) keeps this state in `cache`. The carried price is the price that the gaps of the next block take, and the seed that the fitted result replays. The fitted result records the end of the last block as the end of its training window.
 
+An absence from the listing after the last observed price retires the carried price, because the next block cannot see that absence. The state keeps the price and clears its flag in `held`. The read-out then gives the asset a `missing` seed, as the batch fit over the same rows does.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    PriceGapFillState(; nx::AbstractVector{Symbol}, v::AbstractVector, te)
+    PriceGapFillState(; nx::AbstractVector{Symbol}, v::AbstractVector,
+                      held::AbstractVector{Bool}, te)
 
 ## Validation
 
-  - `length(nx) == length(v)`. A `DimensionMismatch` is thrown otherwise.
+  - `length(nx) == length(v) == length(held)`. A `DimensionMismatch` is thrown otherwise.
 
 # Related
 
@@ -644,40 +647,48 @@ $(DocStringExtensions.FIELDS)
     """
     v
     """
+    Whether the listing of each asset holds from its last observed price to the end of the last block, so that the price seeds the next block. For an asset with no observed price, whether the folded blocks hold no absence.
+    """
+    held
+    """
     The last timestamp of the last block folded. The carried prices precede each observation after it, and the fitted result records it as the end of its training window.
     """
     te
 end
 function PriceGapFillState(; nx::AbstractVector{Symbol}, v::AbstractVector,
-                           te)::PriceGapFillState
-    @argcheck(length(nx) == length(v), DimensionMismatch)
-    return PriceGapFillState(nx, v, te)
+                           held::AbstractVector{Bool}, te)::PriceGapFillState
+    @argcheck(length(nx) == length(v) == length(held), DimensionMismatch)
+    return PriceGapFillState(nx, v, held, te)
 end
 function Base.copy(x::PriceGapFillState)
-    return PriceGapFillState(copy(x.nx), copy(x.v), x.te)
+    return PriceGapFillState(copy(x.nx), copy(x.v), copy(x.held), x.te)
 end
 function merge_states(a::PriceGapFillState, b::PriceGapFillState)
     assert_pinned_carrier(a.nx, b.nx, :nx)
+    #! A column that `b` priced carries `b`'s flag. A column that `b` did not price carries
+    #! `a`'s price, which reaches the end of `b` only when `b` holds no absence either.
     return PriceGapFillState(; nx = a.nx,
                              v = [ismissing(y) ? x : y for (x, y) in zip(a.v, b.v)],
-                             te = b.te)
+                             held = map((y, p, q) -> ismissing(y) ? p & q : q, b.v, a.held,
+                                        b.held), te = b.te)
 end
 """
     partial_fit_transform(est::PriceGapFill, pr::PricesResult) -> (est′, pr′)
 
 Fills the gaps of a block of prices as the fit over the whole history does, and carries the last observed prices forward.
 
-A column that no earlier block priced has no carried price. A gap that opens such a column stays a gap until the first observed price of the column, because the batch replay of [`PriceGapFill`](@ref) leaves it so on the training window. A price later in the block is not a seed for a gap before it.
+A column that no earlier block priced has no carried price. A gap that opens such a column stays a gap until the first observed price of the column, because the batch replay of [`PriceGapFill`](@ref) leaves it so on the training window. A price later in the block is not a seed for a gap before it. A carried price that an absence from the listing follows is not a seed either, because the next return would be a move across the absence.
 
 # Algorithm
 
  1. Check that the convention is a [`CarriedPrice`](@ref).
- 2. Read the asset names `names` and a copy `vals` of the prices, with each gap as `NaN`. When the step keeps a state, check that `names` equals the names that the state pinned, and read the carried prices `v` from the state. Otherwise `v` is `missing` for each asset.
+ 2. Read the asset names `names` and a copy `vals` of the prices, with each gap as `NaN`. When the step keeps a state, check that `names` equals the names that the state pinned, and read the carried prices `v` and their flags `held` from the state. Otherwise `v` is `missing` and `held` is `true` for each asset.
  3. Resolve the Listing Span `span` that bounds the fill with [`gap_fill_span`](@ref), as the batch replay does.
  4. Find `t0`, the first row of the block after the end `te` of the state. With no state, `t0` is one row past the end of the block.
- 5. For each column `j`, find the last observed row `t`. Go to the next column when `v[j]` is `missing` and the block observes no price of the column. When `t` exists, the new carried price `vnew[j]` is `vals[t, j]`.
- 6. Fill the gaps of column `j` of `vals` with [`gap_fill_column!`](@ref). A column with a carried price takes it as the seed from row `t0`. A column with no carried price gets a seed from one row past the end of the block, which no row reads, so its gaps fill from the earlier prices of the block only.
- 7. Build the filled price carrier from `vals`, and the new state from `names`, `vnew` and the last timestamp of the block.
+ 5. For each column `j`, find the last observed row `t`.
+ 6. Fill the gaps of column `j` of `vals` with [`gap_fill_column!`](@ref). A column with a carried price and a set flag takes the price as the seed from row `t0`. Any other column gets a `missing` seed, so its gaps fill from the earlier prices of the block only.
+ 7. When `t` exists, the new carried price `vnew[j]` is `vals[t, j]`, and the new flag tells with [`gap_fill_open`](@ref) whether the Listing Span of the carrier holds from `t` to the end of the block. Otherwise the new flag is the old flag, cleared when the span breaks inside the block.
+ 8. Build the filled price carrier from `vals`, and the new state from `names`, `vnew`, the new flags and the last timestamp of the block.
 
 # Arguments
 
@@ -706,37 +717,39 @@ function partial_fit_transform(est::PriceGapFill, pr::PricesResult)
     names = TimeSeries.colnames(pr.X)
     vals = copy(values(unify_gaps(pr.X)))
     state = est.cache
-    v = if isnothing(state)
-        Vector{Union{Missing, eltype(vals)}}(missing, length(names))
+    v, held = if isnothing(state)
+        Vector{Union{Missing, eltype(vals)}}(missing, length(names)), trues(length(names))
     else
         assert_pinned_carrier(state.nx, names, :nx)
-        state.v
+        state.v, state.held
     end
-    span = gap_fill_span(carrier_listing_span(pr), vals, est.strict)
+    raw = carrier_listing_span(pr)
+    span = gap_fill_span(raw, vals, est.strict)
     ts = TimeSeries.timestamp(pr.X)
     #! A carried price is written only after the rows it was read from, as the batch replay
     #! writes its seed only after the training window. With no state nothing precedes the
     #! block, so no seed is written; with one, the block follows the state's end.
     t0 = isnothing(state) ? size(vals, 1) + 1 : searchsortedlast(ts, state.te) + 1
     vnew = copy(v)
+    hnew = copy(held)
     for j in axes(vals, 2)
         t = findlast(x -> !is_missing_value(x), view(vals, :, j))
-        if ismissing(v[j]) && isnothing(t)
-            continue
-        end
-        if !isnothing(t)
+        #! A column the state has not priced, or whose price an absence retired, has no
+        #! seed: its gaps fill from the block's own earlier prices alone.
+        gap_fill_column!(est.fill, vals, span, j, held[j] ? v[j] : missing, t0)
+        #! The next block cannot see an absence at the end of this one, so the flag is set
+        #! here. A block with no price of the column passes the old flag through its rows.
+        if isnothing(t)
+            hnew[j] = held[j] && gap_fill_open(raw, j, 1)
+        else
             vnew[j] = vals[t, j]
+            hnew[j] = gap_fill_open(raw, j, t)
         end
-        #! A column the state has not priced has no seed. The walk is handed the block's
-        #! last price with a start past the block's end, so no row reads it: the column's
-        #! gaps fill from the block's own earlier prices alone.
-        seed, tj = ismissing(v[j]) ? (vals[t, j], size(vals, 1) + 1) : (v[j], t0)
-        gap_fill_column!(est.fill, vals, span, j, seed, tj)
     end
     X = TimeSeries.TimeArray(ts, vals, TimeSeries.colnames(pr.X))
     out = PricesResult(; X = X, F = pr.F, B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
                        pnl = pr.pnl, span = pr.span)
-    cache = PriceGapFillState(; nx = names, v = vnew, te = last(ts))
+    cache = PriceGapFillState(; nx = names, v = vnew, held = hnew, te = last(ts))
     return rebuild_estimator(est, (; cache = cache)), out
 end
 """
@@ -744,12 +757,12 @@ end
 
 Reads a stepped [`PriceGapFill`](@ref) out as the [`PriceGapFillResult`](@ref) that the batch fit over the same rows gives.
 
-The result holds each asset that the folded blocks priced, with its last observed price, and the last folded timestamp as the end of the training window.
+The result holds each asset that the folded blocks priced, with its last observed price, and the last folded timestamp as the end of the training window. An asset whose carried price an absence retired has a `missing` seed.
 
 # Algorithm
 
  1. Read the state with [`partial_fit_cache`](@ref).
- 2. Keep the assets with a carried price, giving `keep`, and read their prices into `v`, whose element type drops `Missing`.
+ 2. Keep the assets with a carried price, giving `keep`. Read into `v` the price of each kept asset whose flag in `held` is set, and `missing` for the others. The element type of `v` drops `Missing` when no seed is `missing`.
  3. Build the [`PriceGapFillResult`](@ref) from the kept names, `v`, the end `te` of the state, and the `fill` and `strict` of the step.
 
 # Validation
@@ -768,7 +781,7 @@ The result holds each asset that the folded blocks priced, with its last observe
 function fit_preprocessing(est::PriceGapFill)
     state = partial_fit_cache(est)
     keep = findall(!ismissing, state.v)
-    v = identity.([state.v[j] for j in keep])
+    v = identity.([state.held[j] ? state.v[j] : missing for j in keep])
     return PriceGapFillResult(state.nx[keep], v, state.te, est.fill, est.strict)
 end
 function supports_partial_fit(est::PriceGapFill)

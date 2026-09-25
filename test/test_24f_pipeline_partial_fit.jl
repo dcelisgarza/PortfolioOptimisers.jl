@@ -145,7 +145,8 @@ what keeps the JuMP families cheap.
         bres = fit_preprocessing(PriceGapFill(), pr)
         @test isequal(values(online.X), values(apply_preprocessing(bres, pr).X))
         @test fit_preprocessing(est).nx == bres.nx
-        @test fit_preprocessing(est).v == bres.v
+        # A delisted asset has a `missing` seed on both sides (#1330).
+        @test isequal(fit_preprocessing(est).v, bres.v)
         @test fit_preprocessing(est).te == bres.te == ts[end]
         # Issue #1068: the online form takes the batch rule. A first block that opens inside
         # an asset's suspension has no price before its leading gap, so the gap is not filled
