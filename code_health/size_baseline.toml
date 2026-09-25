@@ -72,7 +72,7 @@ commit = "0ecb3ce47c"
 "src/03_InputData/13_Base_AssetSelection.jl" = { code = 29, doc = 95, comment = 0, blank = 55, total = 179 }
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { code = 479, doc = 732, comment = 0, blank = 346, total = 1557 }
 "src/03_InputData/15_FeatureSelector.jl" = { code = 208, doc = 315, comment = 0, blank = 158, total = 681 }
-"src/03_InputData/16_PanelDataFrame.jl" = { code = 140, doc = 219, comment = 0, blank = 100, total = 459 }
+"src/03_InputData/16_PanelDataFrame.jl" = { code = 150, doc = 264, comment = 0, blank = 124, total = 538 }
 "src/03_InputData/17_ReturnsBufferState.jl" = { code = 214, doc = 280, comment = 3, blank = 135, total = 632 }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { code = 308, doc = 239, comment = 12, blank = 103, total = 662 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { code = 45, doc = 155, comment = 0, blank = 73, total = 273 }

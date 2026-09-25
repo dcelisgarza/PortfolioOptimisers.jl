@@ -237,3 +237,114 @@ end
     @test df[!, "beta=value"] == [7.0, 11.0, 8.0, 12.0]
     @test DataFrames.nrow(panel_dataframe(v; nx = ["A", "C"], layout = :wide)) == 2
 end
+@testset "The docstrings of 16_PanelDataFrame.jl against numbers" begin
+    # panel_frame_columns returns the array of a numeric Panel Field, the codes of a
+    # categorical one when decode = false, and a view of a tensor one, never a copy.
+    pnl = panel_929_static()
+    num, cat, ten = pnl.pf
+    @test first(PortfolioOptimisers.panel_frame_columns(num, true))[2] === num.vals
+    @test first(PortfolioOptimisers.panel_frame_columns(cat, false))[2] === cat.codes
+    @test parent(first(PortfolioOptimisers.panel_frame_columns(ten, true))[2]) === ten.vals
+
+    # An entry of `fields` or `assets` can be a Symbol, and a repeated name in `nx`
+    # resolves to its first position.
+    df = panel_dataframe(pnl; nx = ["A", "B", "C"], fields = [:mcap], assets = [:C, :A])
+    @test names(df) == ["asset", "mcap"]
+    @test df.mcap == [3.0, 1.0]
+    @test PortfolioOptimisers.panel_frame_assets(["A", "B", "A"], ["A"]) == [1]
+
+    # `layout` is checked in every call, also when `fields` names one Panel Field.
+    @test_throws ArgumentError panel_dataframe(pnl; fields = "mcap", layout = :tall)
+
+    # The long layout of a time-varying panel: before the filter, row (t - 1) n + k holds
+    # observation t and asset k, and the filter keeps the rows where the active mask is true.
+    tv = AssetPanel(;
+                    pf = [NumericPanelField(; name = "x",
+                                            vals = [11.0 12.0 13.0; 21.0 22.0 23.0])],
+                    amsk = [true true true; true true true],
+                    emsk = [true false true; false true true])
+    df = panel_dataframe(tv; nx = ["A", "B", "C"], ts = ["t1", "t2"])
+    @test df.observation == ["t1", "t1", "t1", "t2", "t2", "t2"]
+    @test df.asset == ["A", "B", "C", "A", "B", "C"]
+    @test df.x == [11.0, 12.0, 13.0, 21.0, 22.0, 23.0]
+    @test df.emsk == [true, false, true, false, true, true]
+    @test df.observation isa Vector{String}
+
+    # A panel with no Panel Field and two masks gives the key and mask columns alone.
+    mo = AssetPanel(; amsk = [true false; true true], emsk = [true false; false true])
+    df = panel_dataframe(mo; nx = ["A", "B"])
+    @test names(df) == ["observation", "asset", "emsk"]
+    @test df.asset == ["A", "A", "B"]
+    @test df.emsk == [true, false, true]
+    df = panel_dataframe(mo; nx = ["A", "B"], layout = :wide)
+    @test names(df) == ["observation", "amsk@A", "amsk@B", "emsk@A", "emsk@B"]
+    @test df[!, "amsk@B"] == [false, true]
+
+    # An empty asset selection gives a table with its columns and no row.
+    df = panel_dataframe(tv; assets = String[])
+    @test names(df) == ["observation", "asset", "x", "emsk"]
+    @test DataFrames.nrow(df) == 0
+
+    # The element type of the values stays as the panel holds it.
+    @test eltype(panel_dataframe(AssetPanel(;
+                                            pf = [NumericPanelField(; name = "x",
+                                                                    vals = Float32[1, 2])])).x) ===
+          Float32
+    rp = AssetPanel(; pf = [NumericPanelField(; name = "x", vals = [1//2 1//3; 1//4 1//5])],
+                    amsk = trues(2, 2), emsk = trues(2, 2))
+    @test eltype(panel_dataframe(rp; layout = :wide)[!, "x@1"]) === Rational{Int}
+    @test panel_dataframe(rp; fields = "x")[!, "2"] == [1//3, 1//5]
+
+    # Every shape holds copies: a change to a cell of the table leaves the panel unchanged.
+    # The static long layout shared the memory of the panel before, through the view that
+    # `vec(permutedims(v))` returns for a vector.
+    for (kw, col) in (((;), "mcap"), ((; decode = false), "sector"), ((;), "beta=size"),
+                      ((; layout = :wide), "mcap@1"), ((; fields = "mcap"), "1"))
+        p = panel_929_static()
+        before = deepcopy(p)
+        df = panel_dataframe(p; kw...)
+        df[1, col] += 100
+        @test p.pf[1].vals == before.pf[1].vals
+        @test p.pf[2].codes == before.pf[2].codes
+        @test p.pf[3].vals == before.pf[3].vals
+    end
+    p = panel_929_timevarying()
+    df = panel_dataframe(p; layout = :wide)
+    df[1, "amsk@1"] = false
+    df[1, "mcap@1"] = -1.0
+    @test p.amsk[1, 1]
+    @test p.pf[1].vals[1, 1] == 1.0
+
+    # Two columns with one name raise an error. Before, the second column replaced the first
+    # and the table lost data with no error.
+    mk(names...) = AssetPanel(;
+                              pf = [NumericPanelField(; name = n,
+                                                      vals = [1.0 2.0; 3.0 4.0])
+                                    for n in names], amsk = [true true; true false],
+                              emsk = [true false; true false])
+    for (p, kw) in ((mk("asset"), (;)), (mk("observation"), (;)), (mk("emsk"), (;)),
+                    (mk("amsk"), (; layout = :wide)), (mk("emsk"), (; layout = :wide)),
+                    (mk("x"), (; nx = ["observation", "B"], fields = "x")),
+                    (mk("x"), (; nx = ["A", "A"], layout = :wide)),
+                    (AssetPanel(; pf = [NumericPanelField(; name = "asset", vals = [1.0, 2.0])]), (;)),
+                    (AssetPanel(;
+                                pf = [NumericPanelField(; name = "x", vals = [1.0, 2.0],
+                                                        omsk = [true, false]),
+                                      NumericPanelField(; name = "x::observed", vals = [5.0, 6.0])]),
+                     (;)),
+                    (AssetPanel(;
+                                pf = [NumericPanelField(; name = "beta=size", vals = [1.0, 2.0]),
+                                      TensorPanelField(; name = "beta", axis = "f", labels = ["size"],
+                                                       vals = reshape([7.0, 8.0], 2, 1))]), (;)))
+        @test_throws ArgumentError panel_dataframe(p; kw...)
+    end
+    msg = try
+        panel_dataframe(mk("asset"))
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("already holds a column named \"asset\"", msg)
+    df = DataFrames.DataFrame(; a = [1])
+    @test_throws ArgumentError PortfolioOptimisers.panel_frame_column!(df, "a", [2])
+    @test df.a == [1]
+end
