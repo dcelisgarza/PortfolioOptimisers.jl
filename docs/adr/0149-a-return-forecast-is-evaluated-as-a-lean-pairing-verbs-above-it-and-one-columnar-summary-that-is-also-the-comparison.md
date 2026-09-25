@@ -312,3 +312,30 @@ independent target, over many seeds, whose corrected statistic is dispersed like
 every depth of the holding-period table while the plain one widens with the depth. The
 reference-parity literals of the holding-period table at a stride of one are kept as the plain
 statistic and asserted as a deliberate divergence, beside the corrected one.
+
+## Amendment (2026-09-25)
+
+**A rank statistic ranks a tie by a named rule, and the default gives equal values their mean
+rank.** The rank helper gave the values of a tie consecutive ranks in the order of the asset axis,
+so the order of the assets set part of every rank statistic of a tied cross-section: a constant
+forecast scored a Spearman coefficient of `1` or `-1`, set by that order alone, where its Pearson
+coefficient is `NaN`, and two equal forecasts took two different weights in the `:rank` book.
+Issue [#1332](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1332) records it.
+
+The reference implementation ranks the same way through an unstable sort, so on a tied
+cross-section its answer comes from its sort algorithm and not from a rule. A tie block of five
+or twelve values kept the asset order, and one of seventeen or more did not, when measured with
+one version of the numerical library it runs on. There is therefore no reference behaviour on
+tied data that the port can reproduce in general, and on data with no tie the two rules give the
+same ranks, so parity there is unchanged bit for bit.
+
+The decision is a `ties::Symbol` choice with two values, `:average` and `:ordinal`, and
+`:average` is the default. It is a field of `ForecastEvaluationResult`, set by
+`forecast_evaluation`, and `forecast_ic`, `forecast_factor_correlation` and the `:rank` book of
+`forecast_portfolio` read it, so every statistic of one evaluation ranks a tie by one rule, as it
+reads one `min_count`. The summary refuses two evaluations whose rules differ, as it refuses two
+thresholds. The cross-sectional diagnostics, `exposure_ic`, `exposure_ic_summary`, `idio_vol_ic`,
+`idio_vol_residual_dependence` and `plot_cumulative_exposure_ic`, take it as a keyword with the
+same default. The rule is a named symbol and not a flag, as ADR 0044 decides for a named choice.
+`:ordinal` stays so that a caller can reproduce the reference's numbers where its sort keeps the
+asset order, which the parity fixtures of `test_08s` and `test_08t` do.

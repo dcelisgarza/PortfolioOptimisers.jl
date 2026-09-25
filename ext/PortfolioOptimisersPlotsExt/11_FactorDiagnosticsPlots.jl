@@ -171,8 +171,10 @@ end
 function PortfolioOptimisers.plot_cumulative_exposure_ic(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
                                                          nf::Option{<:AbstractVector} = nothing,
                                                          rank::Bool = true,
-                                                         reduced::Bool = false, kwargs...)
-    ic = PortfolioOptimisers.exposure_ic(csfm; horizon = 1, rank = rank, reduced = reduced)
+                                                         reduced::Bool = false,
+                                                         ties::Symbol = :average, kwargs...)
+    ic = PortfolioOptimisers.exposure_ic(csfm; horizon = 1, rank = rank, reduced = reduced,
+                                         ties = ties)
     cum = cumulative_exposure_ic(ic)
     labels = if reduced
         cs_diagnostic_labels(csfm, nf, size(ic, 2))
@@ -186,10 +188,11 @@ end
 function PortfolioOptimisers.plot_cumulative_exposure_ic(pr::PortfolioOptimisers.AbstractPriorResult;
                                                          nf::Option{<:AbstractVector} = nothing,
                                                          rank::Bool = true,
-                                                         reduced::Bool = false, kwargs...)
+                                                         reduced::Bool = false,
+                                                         ties::Symbol = :average, kwargs...)
     return PortfolioOptimisers.plot_cumulative_exposure_ic(cs_diagnostic_block(pr); nf = nf,
                                                            rank = rank, reduced = reduced,
-                                                           kwargs...)
+                                                           ties = ties, kwargs...)
 end
 # An observation whose information coefficient is not defined contributes nothing to the
 # running sum, so one missing cross-section breaks no series.

@@ -68,11 +68,11 @@ using Statistics
         # The reference ranks a cross-section with an unstable sort, so a tie block takes an
         # order the sort chose and not one a rule states. Observation ten carries seven
         # predicted volatilities that are exactly zero, and the reference answers
-        # `0.21428571428571427` there. `cs_ordinal_ranks` breaks a tie by the order of the
-        # asset axis, which is the deterministic reading, and the reference reproduces this
-        # series to the last bit once its own ranks are made stable. The entry below is the
-        # library's answer, and it is the only one of the ninety-eight this file asserts
-        # that parts from the reference as it runs.
+        # `0.21428571428571427` there. Under `ties = :ordinal`, `cs_ranks` breaks a tie by the
+        # order of the asset axis, which is the deterministic reading, and the reference
+        # reproduces this series to the last bit once its own ranks are made stable. The
+        # entry below is the library's answer under that rule, and it is the only one of the
+        # ninety-eight this file asserts that parts from the reference as it runs.
         ref_ic = [-0.09523809523809523, -0.5714285714285714, -0.047619047619047616,
                   -0.3333333333333333, -0.07142857142857142, -0.023809523809523808, NaN,
                   0.2857142857142857, -0.8095238095238095, 0.19047619047619047,
@@ -86,8 +86,22 @@ using Statistics
         @test idio_agrees(idio_tail_rate(eps, vs; threshold = 2), ref_tr2)
         @test idio_agrees(idio_kurtosis(eps, vs), ref_kur)
         @test idio_agrees(idio_skewness(eps, vs), ref_skw)
-        @test idio_agrees(idio_vol_ic(eps, vs), ref_ic)
+        @test idio_agrees(idio_vol_ic(eps, vs; ties = :ordinal), ref_ic)
+        @test idio_agrees(idio_vol_residual_dependence(eps, vs; ties = :ordinal), ref_rd)
+        # Under the default `ties = :average`, the two observations whose predictions tie
+        # move. Observation eleven predicts zero for every asset, so its ranks are constant
+        # and it has no coefficient. Observation ten gives its seven zeros their mean rank,
+        # which `tiedrank` states. No other entry has a tie, so each keeps the reference's
+        # number. The residual dependence divides by the zeros, so it has no tie to move.
+        ica = idio_vol_ic(eps, vs)
+        sig = PortfolioOptimisers.idio_predicted_volatility(vs)
+        @test idio_agrees(ica[1:9], ref_ic[1:9])
+        @test ica[10] ≈ cor(tiedrank(sig[10, :]), tiedrank(abs.(eps[11, :])))
+        @test isnan(ica[11])
         @test idio_agrees(idio_vol_residual_dependence(eps, vs), ref_rd)
+        @test isequal(idio_vol_ic(csfm), ica)
+        @test isequal(idio_vol_ic(csfm; ties = :ordinal),
+                      idio_vol_ic(eps, vs; ties = :ordinal))
 
         # The reference's own summary, under its own key names.
         s = idio_calibration_summary(eps, vs)

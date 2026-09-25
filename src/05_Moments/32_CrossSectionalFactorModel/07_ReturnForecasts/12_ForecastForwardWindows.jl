@@ -286,8 +286,9 @@ function forecast_window_table(fe::ForecastEvaluationResult, X::MatNum, w::Optio
     common = forecast_common_dates(alpha, ys, fe.dates, min_count)
     rows = [forecast_window_row(ForecastEvaluationResult(alpha, ys[p], fe.umsk, common,
                                                          fe.target, grid[p][1], grid[p][2],
-                                                         fe.step, min_count, fe.ppy), w,
-                                min_count) for p in eachindex(grid)]
+                                                         fe.step, min_count, fe.ties,
+                                                         fe.ppy), w, min_count)
+            for p in eachindex(grid)]
     return (; period = collect(eachindex(grid)), horizon = [g[1] for g in grid],
             lag = [g[2] for g in grid], dates = common,
             spearman_mean_ic = [r.spearman_mean_ic for r in rows],

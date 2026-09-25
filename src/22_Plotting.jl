@@ -2271,6 +2271,7 @@ function plot_exposure_correlation end
         nf::Option{<:AbstractVector} = nothing,
         rank::Bool = true,
         reduced::Bool = false,
+        ties::Symbol = :average,
         kwargs...
     ) -> Plot
     plot_cumulative_exposure_ic(
@@ -2278,6 +2279,7 @@ function plot_exposure_correlation end
         nf::Option{<:AbstractVector} = nothing,
         rank::Bool = true,
         reduced::Bool = false,
+        ties::Symbol = :average,
         kwargs...
     ) -> Plot
 
@@ -2307,6 +2309,7 @@ Where:
   - `nf`: Factor names of the axis of the answer. `nothing` reads them off the block, and falls back to the position of the factor.
   - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise.
   - `reduced`: Map the exposures through the family re-basis of the block before the correlation.
+  - $(arg_dict[:cs_ties]) The weighted correlation reads no rank, so it ignores `ties`.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation

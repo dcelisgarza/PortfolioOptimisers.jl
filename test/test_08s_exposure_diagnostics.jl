@@ -133,10 +133,25 @@ using Statistics
         @test exposure_agrees(exposure_correlation(csfm;
                                                    weighting = RegressionWeightMetric()),
                               ref_corr_rw)
-        @test exposure_agrees(exposure_ic(csfm3), ref_ic_spearman)
+        # The third factor is the constant intercept, so every asset of it is in one tie. The
+        # reference breaks a tie by its sort, which on this fixture is the order of the asset
+        # axis, and it scores a rank coefficient there. `ties = :ordinal` reproduces it.
+        @test exposure_agrees(exposure_ic(csfm3; ties = :ordinal), ref_ic_spearman)
         @test exposure_agrees(exposure_ic(csfm3; rank = false), ref_ic_pearson)
-        @test exposure_agrees(exposure_ic(csfm3; horizon = 2), ref_ic_h2)
-        s = exposure_ic_summary(csfm3)
+        @test exposure_agrees(exposure_ic(csfm3; horizon = 2, ties = :ordinal), ref_ic_h2)
+        # Under the default `ties = :average`, a constant exposure has constant ranks, so it
+        # has no rank coefficient, as it has no Pearson one. The two factors with no tie keep
+        # the reference's numbers.
+        ica = exposure_ic(csfm3)
+        @test all(isnan, ica[:, 3])
+        @test exposure_agrees(ica[:, 1:2], ref_ic_spearman[:, 1:2])
+        ica2 = exposure_ic(csfm3; horizon = 2)
+        @test all(isnan, ica2[:, 3])
+        @test exposure_agrees(ica2[:, 1:2], ref_ic_h2[:, 1:2])
+        @test isequal(exposure_ic_summary(csfm3).mean_ic[1:2],
+                      exposure_ic_summary(csfm3; ties = :ordinal).mean_ic[1:2])
+        @test isnan(exposure_ic_summary(csfm3).mean_ic[3])
+        s = exposure_ic_summary(csfm3; ties = :ordinal)
         @test exposure_agrees(s.mean_ic, ref_mean_ic)
         @test exposure_agrees(s.std_ic, ref_std_ic)
         @test exposure_agrees(s.ic_ir, ref_ic_ir)
@@ -173,12 +188,14 @@ using Statistics
         # the default window there is no overlap and the bare method's default agrees.
         ic2 = exposure_ic(csfm3; horizon = 2)
         s2 = exposure_ic_summary(csfm3; horizon = 2)
-        @test s2.t_stat == exposure_ic_summary(ic2; lags = 1).t_stat
-        @test s2.t_stat != exposure_ic_summary(ic2).t_stat
-        @test s2.mean_ic == exposure_ic_summary(ic2).mean_ic
-        @test s2.ic_ir == exposure_ic_summary(ic2).ic_ir
-        @test exposure_ic_summary(csfm3).t_stat ==
-              exposure_ic_summary(exposure_ic(csfm3)).t_stat
+        # The constant third factor has no rank coefficient, so its column is `NaN`, and
+        # the comparisons read `isequal`.
+        @test isequal(s2.t_stat, exposure_ic_summary(ic2; lags = 1).t_stat)
+        @test !isequal(s2.t_stat, exposure_ic_summary(ic2).t_stat)
+        @test isequal(s2.mean_ic, exposure_ic_summary(ic2).mean_ic)
+        @test isequal(s2.ic_ir, exposure_ic_summary(ic2).ic_ir)
+        @test isequal(exposure_ic_summary(csfm3).t_stat,
+                      exposure_ic_summary(exposure_ic(csfm3)).t_stat)
         @test_throws DomainError exposure_ic_summary(ic2; lags = -1)
     end
 
@@ -363,12 +380,49 @@ using Statistics
         # cross-section leaves it unchanged.
         @test PortfolioOptimisers.cs_spearman_correlation(a, exp.(b)) ≈ 1.0
         @test PortfolioOptimisers.cs_spearman_correlation(a, [1.0, 2.0, NaN, 4.0]) ≈ 1.0
-        # A tie takes the order of the asset axis, so the ranks are a permutation.
-        r = PortfolioOptimisers.cs_ordinal_ranks([1.0, 1.0, 1.0], fill(true, 3))
-        @test sort(r) == [1.0, 2.0, 3.0]
-        rn = PortfolioOptimisers.cs_ordinal_ranks([1.0, 2.0, Inf], [true, true, false])
-        @test rn[1:2] == [1.0, 2.0]
-        @test isnan(rn[3])
+        # Under the default, equal values share the mean of their positions, so a constant
+        # cross-section has constant ranks and no rank correlation (#1332).
+        ra = PortfolioOptimisers.cs_ranks([1.0, 1.0, 1.0], fill(true, 3), :average)
+        @test ra == [2.0, 2.0, 2.0]
+        @test isnan(PortfolioOptimisers.cs_spearman_correlation(ones(5), collect(1.0:5.0)))
+        @test isnan(PortfolioOptimisers.cs_spearman_correlation(ones(5),
+                                                                collect(5.0:-1:1.0)))
+        # Under `:ordinal`, a tie takes the order of the asset axis, so the ranks are a
+        # permutation, and the asset order sets the answer of a constant cross-section.
+        ro = PortfolioOptimisers.cs_ranks([1.0, 1.0, 1.0], fill(true, 3), :ordinal)
+        @test ro == [1.0, 2.0, 3.0]
+        @test PortfolioOptimisers.cs_spearman_correlation(ones(5), collect(1.0:5.0);
+                                                          ties = :ordinal) ≈ 1.0
+        @test PortfolioOptimisers.cs_spearman_correlation(ones(5), collect(5.0:-1:1.0);
+                                                          ties = :ordinal) ≈ -1.0
+        # Two targets that differ only inside the ties of the first cross-section get one
+        # answer under the default, and two under `:ordinal`.
+        tb = [1.0, 1.0, 2.0, 2.0]
+        for (yb, ordv) in (([1.0, 2.0, 3.0, 4.0], 1.0), ([2.0, 1.0, 4.0, 3.0], 0.6))
+            @test PortfolioOptimisers.cs_spearman_correlation(tb, yb) ≈ 4 / sqrt(20)
+            @test PortfolioOptimisers.cs_spearman_correlation(tb, yb; ties = :ordinal) ≈
+                  ordv
+        end
+        # A run of two and a run of three, with a masked entry sorted to the end.
+        rm = PortfolioOptimisers.cs_ranks([2.0, 1.0, 2.0, Inf, 2.0, 1.0],
+                                          [true, true, true, false, true, true], :average)
+        @test rm[[1, 2, 3, 5, 6]] == [4.0, 1.5, 4.0, 4.0, 1.5]
+        @test isnan(rm[4])
+        # The two rules give the same ranks to a cross-section with no tie.
+        xr = randn(StableRNG(1332), 20)
+        @test PortfolioOptimisers.cs_ranks(xr, trues(20), :average) ==
+              PortfolioOptimisers.cs_ranks(xr, trues(20), :ordinal)
+        for tr in (:average, :ordinal)
+            rn = PortfolioOptimisers.cs_ranks([1.0, 2.0, Inf], [true, true, false], tr)
+            @test rn[1:2] == [1.0, 2.0]
+            @test isnan(rn[3])
+        end
+        @test_throws PortfolioOptimisers.ConflictingArgumentError PortfolioOptimisers.cs_ranks([1.0],
+                                                                                               [true],
+                                                                                               :dense)
+        @test_throws PortfolioOptimisers.ConflictingArgumentError PortfolioOptimisers.cs_spearman_correlation(a,
+                                                                                                              b;
+                                                                                                              ties = :min)
     end
 
     @testset "a re-based block answers on the reduced axis when it is asked to" begin

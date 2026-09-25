@@ -81,7 +81,7 @@ Where:
 
  1. Check the exposure history against the forecast with [`forecast_factor_exposures`](@ref).
  2. Make the weight history with [`forecast_ic_weights`](@ref). An absent history becomes a history of ones.
- 3. At each row of `dates` and each factor, compute ``c_{jk}`` with [`cs_spearman_correlation`](@ref) when `rank`, and with [`cs_weighted_correlation`](@ref) otherwise.
+ 3. At each row of `dates` and each factor, compute ``c_{jk}`` with [`cs_spearman_correlation`](@ref) under `fe.ties` when `rank`, and with [`cs_weighted_correlation`](@ref) otherwise.
 
 # Arguments
 
@@ -90,7 +90,7 @@ Where:
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of `fe.alpha`, or `nothing` for equal weights. The rank form reads no weights.
   - `csfm`: The fitted factor-model block that the evaluation was built on. [`cs_diagnostic_exposures`](@ref) reads the exposure history from it, and [`cs_diagnostic_weights`](@ref) reads the weight history that `weighting` names.
   - `dates`: Row indices of `fe.alpha` at which the verb reads the correlation. The default is every observation. `fe.dates` reads the evaluation grid, which puts each correlation on the date of a coefficient of [`forecast_ic`](@ref).
-  - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise. [`exposure_ic`](@ref) uses the same keyword. The default is the weighted form, because a neutralisation acts on the levels. The rank form gives two equal values two ranks in the order of the asset axis, as [`cs_spearman_correlation`](@ref) states. So against a factor with many equal exposures, such as an industry dummy, the rank correlation depends on the order of the assets. A constant exposure reads the rank correlation of the forecast with the asset order, and not `NaN`.
+  - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise. [`exposure_ic`](@ref) uses the same keyword. The default is the weighted form, because a neutralisation acts on the levels. The rank form ranks a tie by `fe.ties`, as [`cs_spearman_correlation`](@ref) states. Under the default `:average`, a factor with many equal exposures, such as an industry dummy, compares the forecasts of its blocks, and the order of the assets inside a block does not move the correlation. A constant exposure then reads `NaN`. Under `:ordinal`, two equal values take two ranks in the order of the asset axis, so the correlation depends on that order, and a constant exposure reads the rank correlation of the forecast with the asset order.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history of the weighted form, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis. The default, [`IdentityMetric`](@ref), gives equal weights.
   - `min_count`: Least number of assets that must enter a cross-section for the verb to report its correlation. The default is the threshold of the evaluation. Pass another value to read the same pairing at a second threshold.
 
@@ -158,6 +158,7 @@ function forecast_factor_correlation(fe::ForecastEvaluationResult, B::Arr3Num,
     @argcheck(all(in(axes(alpha, 1)), dates),
               DomainError(dates,
                           "dates must be rows of fe.alpha, whose observation axis is $(axes(alpha, 1))"))
+    ties::Symbol = fe.ties
     Bf = forecast_factor_exposures(alpha, B)
     u = forecast_ic_weights(alpha, w)
     Tf = promote_type(real(eltype(alpha)), real(eltype(Bf)), real(eltype(u)))
@@ -167,7 +168,7 @@ function forecast_factor_correlation(fe::ForecastEvaluationResult, B::Arr3Num,
         a = view(alpha, t, :)
         b = view(Bf, t, :, k)
         c[j, k] = if rank
-            Tf(cs_spearman_correlation(a, b; min_count = min_count))
+            Tf(cs_spearman_correlation(a, b; min_count = min_count, ties = ties))
         else
             Tf(cs_weighted_correlation(a, b, view(u, t, :); min_count = min_count))
         end

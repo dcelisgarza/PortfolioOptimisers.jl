@@ -74,12 +74,13 @@ end
 
 Refuse a set of evaluations that do not answer one question, and name the field that differs.
 
-A summary puts one row per forecast beside the others, so the rows must answer one question. Six fields of a [`ForecastEvaluationResult`](@ref) define the question:
+A summary puts one row per forecast beside the others, so the rows must answer one question. Seven fields of a [`ForecastEvaluationResult`](@ref) define the question:
 
   - the forward target sets the quantity that the evaluation scores,
   - `horizon` and `lag` set the window of that quantity,
   - `step` sets the stride of the sample,
   - `min_count` sets which cross-sections enter the sample,
+  - `ties` sets how the rank statistics rank a tie,
   - `ppy` sets the units of the annualised columns.
 
 The check refuses a difference in any of them, because the summary would otherwise report that difference as a difference in skill.
@@ -95,7 +96,7 @@ The check does not compare the evaluation `dates` either. Two evaluations that a
 # Validation
 
   - `!isempty(fes)`. Raises an [`IsEmptyError`](@ref).
-  - Every evaluation agrees with the first on `target`, `horizon`, `lag`, `step`, `min_count`, `ppy`, the number of assets and `umsk`. Raises a [`ConflictingArgumentError`](@ref) that names the field.
+  - Every evaluation agrees with the first on `target`, `horizon`, `lag`, `step`, `min_count`, `ties`, `ppy`, the number of assets and `umsk`. Raises a [`ConflictingArgumentError`](@ref) that names the field.
 
 # Returns
 
@@ -123,6 +124,8 @@ function forecast_summary_assert_same_question(fes::AbstractVector{<:ForecastEva
                   ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `step`: $(b.step) against $(a.step)"))
         @argcheck(a.min_count == b.min_count,
                   ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `min_count`: $(b.min_count) against $(a.min_count)"))
+        @argcheck(a.ties === b.ties,
+                  ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `ties`: :$(b.ties) against :$(a.ties)"))
         @argcheck(a.ppy == b.ppy,
                   ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `ppy`: $(b.ppy) against $(a.ppy)"))
         @argcheck(size(a.alpha, 2) == size(b.alpha, 2),
@@ -257,7 +260,8 @@ function forecast_evaluation_align(fes::AbstractVector{<:ForecastEvaluationResul
               IsEmptyError("the evaluations share no date: the latest first date is $(lo) and the earliest last date is $(hi)"))
     dates = collect(lo:(first(fes).step):hi)
     return [ForecastEvaluationResult(fe.alpha, fe.y, fe.umsk, dates, fe.target, fe.horizon,
-                                     fe.lag, fe.step, fe.min_count, fe.ppy) for fe in fes]
+                                     fe.lag, fe.step, fe.min_count, fe.ties, fe.ppy)
+            for fe in fes]
 end
 """
     forecast_summary_scored(fe::ForecastEvaluationResult, u::MatNum) -> Vector{<:Real}

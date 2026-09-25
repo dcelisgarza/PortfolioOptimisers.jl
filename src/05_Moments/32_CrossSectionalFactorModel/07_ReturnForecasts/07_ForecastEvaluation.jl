@@ -300,7 +300,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ForecastEvaluationResult(
-        alpha, y, umsk, dates, target, horizon, lag, step, min_count, ppy
+        alpha, y, umsk, dates, target, horizon, lag, step, min_count, ties, ppy
     ) -> ForecastEvaluationResult
 
 Arguments correspond to the struct's fields, in the order they are declared. The type is a
@@ -352,6 +352,10 @@ keyword constructor, and the type validates nothing of its own.
     """
     min_count
     """
+    $(field_dict[:cs_ties]) Every rank statistic of the evaluation reads it.
+    """
+    ties
+    """
     $(field_dict[:ps_ppy]) It defaults to `1`, which reports the statistics per period.
     """
     ppy
@@ -362,6 +366,7 @@ end
                                 target::AbstractForecastTarget = IdiosyncraticTarget(),
                                 horizon::Integer = 1, lag::Integer = 1,
                                 step::Integer = horizon, min_count::Integer = 3,
+                                ties::Symbol = :average,
                                 ppy::Number = 1) -> ForecastEvaluationResult
 
 Pair a Return Forecast history with the forward target built from a carrier and a block.
@@ -378,6 +383,7 @@ The two methods of [`forecast_evaluation`](@ref) that take a carrier and a block
   - $(arg_dict[:rf_lag])
   - `step`: Number of observations between two evaluation dates.
   - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported.
+  - $(arg_dict[:cs_ties])
   - `ppy`: Periods per year.
 
 # Validation
@@ -401,6 +407,7 @@ function forecast_evaluation_pairing(alpha::MatNum, rd::ReturnsResult,
                                      target::AbstractForecastTarget = IdiosyncraticTarget(),
                                      horizon::Integer = 1, lag::Integer = 1,
                                      step::Integer = horizon, min_count::Integer = 3,
+                                     ties::Symbol = :average,
                                      ppy::Number = 1)::ForecastEvaluationResult
     X = forecast_target_history(target, rd, csfm)
     @argcheck(size(X, 1) == size(alpha, 1) && size(X, 2) == size(alpha, 2),
@@ -408,24 +415,28 @@ function forecast_evaluation_pairing(alpha::MatNum, rd::ReturnsResult,
     y = forward_mean_returns(X, horizon, lag)
     umsk = descriptor_asset_panel(rd).emsk[return_forecast_rows(rd, csfm), :]
     return forecast_evaluation(alpha, y; umsk = umsk, target = target, horizon = horizon,
-                               lag = lag, step = step, min_count = min_count, ppy = ppy)
+                               lag = lag, step = step, min_count = min_count, ties = ties,
+                               ppy = ppy)
 end
 """
     forecast_evaluation(alpha::MatNum, y::MatNum;
                         umsk::AbstractMatrix{Bool} = trues(size(alpha)),
                         target::AbstractForecastTarget = IdiosyncraticTarget(),
                         horizon::Integer = 1, lag::Integer = 1, step::Integer = horizon,
-                        min_count::Integer = 3, ppy::Number = 1) -> ForecastEvaluationResult
+                        min_count::Integer = 3, ties::Symbol = :average,
+                        ppy::Number = 1) -> ForecastEvaluationResult
     forecast_evaluation(rfr::AbstractReturnForecastResult, rd::ReturnsResult,
                         csfm::CrossSectionalFactorModel;
                         target::AbstractForecastTarget = IdiosyncraticTarget(),
                         horizon::Integer = 1, lag::Integer = 1, step::Integer = horizon,
-                        min_count::Integer = 3, ppy::Number = 1) -> ForecastEvaluationResult
+                        min_count::Integer = 3, ties::Symbol = :average,
+                        ppy::Number = 1) -> ForecastEvaluationResult
     forecast_evaluation(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
                         csfm::CrossSectionalFactorModel;
                         target::AbstractForecastTarget = IdiosyncraticTarget(),
                         horizon::Integer = 1, lag::Integer = 1, step::Integer = horizon,
-                        min_count::Integer = 3, ppy::Number = 1) -> ForecastEvaluationResult
+                        min_count::Integer = 3, ties::Symbol = :average,
+                        ppy::Number = 1) -> ForecastEvaluationResult
 
 Pair a Return Forecast with the forward target it is answerable for, out of sample.
 
@@ -455,6 +466,7 @@ The evaluation and every statistic above it compute in the element types of `alp
   - $(arg_dict[:rf_lag])
   - `step`: Number of observations between two evaluation dates. The default of `horizon` gives forward windows that do not overlap. A smaller stride scores more dates whose windows overlap, and the t-statistic of every summary reads that overlap through [`forecast_ic_lags`](@ref), so a smaller stride does not inflate it.
   - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported. It is carried rather than applied here, because the pairing is the same whatever the threshold.
+  - $(arg_dict[:cs_ties]) It is carried rather than applied here, and [`forecast_ic`](@ref), [`forecast_factor_correlation`](@ref) and the `:rank` book of [`forecast_portfolio`](@ref) read it. The default gives equal forecasts equal ranks. A caller who wants the other rule on the same pairing calls the bare method again on `fe.alpha`, `fe.y` and `umsk = fe.umsk`, which refits nothing.
   - `ppy`: Periods per year. `252` annualises a daily fit, and the default of `1` reports the statistics per period. It is carried rather than applied here, and the verbs above map it onto `performance_summary`'s `periods_per_year`.
 
 # Validation
@@ -462,6 +474,7 @@ The evaluation and every statistic above it compute in the element types of `alp
   - `!isempty(alpha)`. Raises an [`IsEmptyError`](@ref).
   - `size(alpha) == size(y)` and `size(alpha) == size(umsk)`. Raise a `DimensionMismatch`.
   - `horizon >= 1`, `lag >= 0`, `step >= 1`, `min_count >= 1` and `ppy > 0`. Raise a `DomainError`.
+  - `ties` is `:average` or `:ordinal`. Raises a [`ConflictingArgumentError`](@ref).
   - The rules of [`forecast_evaluation_mask`](@ref) and of [`forecast_evaluation_dates`](@ref).
   - For the Result method, the rules of [`forecast_evaluation_history`](@ref) and of [`forecast_evaluation_pairing`](@ref).
   - For the Estimator method, the rules of [`forecast_history`](@ref) and of [`forecast_evaluation_pairing`](@ref).
@@ -502,6 +515,7 @@ function forecast_evaluation(alpha::MatNum, y::MatNum;
                              target::AbstractForecastTarget = IdiosyncraticTarget(),
                              horizon::Integer = 1, lag::Integer = 1,
                              step::Integer = horizon, min_count::Integer = 3,
+                             ties::Symbol = :average,
                              ppy::Number = 1)::ForecastEvaluationResult
     @argcheck(!isempty(alpha), IsEmptyError("alpha cannot be empty"))
     @argcheck(size(alpha, 1) == size(y, 1) && size(alpha, 2) == size(y, 2),
@@ -513,10 +527,12 @@ function forecast_evaluation(alpha::MatNum, y::MatNum;
     @argcheck(step >= one(step), DomainError(step, "step must be >= 1"))
     @argcheck(min_count >= one(min_count), DomainError(min_count, "min_count must be >= 1"))
     @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
+    @argcheck(ties in (:average, :ordinal),
+              ConflictingArgumentError("ties must be :average or :ordinal, got :$(ties)"))
     am = forecast_evaluation_mask(alpha, umsk)
     dates = forecast_evaluation_dates(am, y, step)
     return ForecastEvaluationResult(am, y, umsk, dates, target, horizon, lag, step,
-                                    min_count, ppy)
+                                    min_count, ties, ppy)
 end
 """
     forecast_evaluation_mask(alpha::MatNum, umsk::AbstractMatrix{Bool}) -> MatNum
@@ -580,20 +596,24 @@ function forecast_evaluation(rfr::AbstractReturnForecastResult, rd::ReturnsResul
                              target::AbstractForecastTarget = IdiosyncraticTarget(),
                              horizon::Integer = 1, lag::Integer = 1,
                              step::Integer = horizon, min_count::Integer = 3,
+                             ties::Symbol = :average,
                              ppy::Number = 1)::ForecastEvaluationResult
     return forecast_evaluation_pairing(forecast_evaluation_history(rfr), rd, csfm;
                                        target = target, horizon = horizon, lag = lag,
-                                       step = step, min_count = min_count, ppy = ppy)
+                                       step = step, min_count = min_count, ties = ties,
+                                       ppy = ppy)
 end
 function forecast_evaluation(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
                              csfm::CrossSectionalFactorModel;
                              target::AbstractForecastTarget = IdiosyncraticTarget(),
                              horizon::Integer = 1, lag::Integer = 1,
                              step::Integer = horizon, min_count::Integer = 3,
+                             ties::Symbol = :average,
                              ppy::Number = 1)::ForecastEvaluationResult
     return forecast_evaluation_pairing(forecast_history(rfe, rd, csfm; step = step), rd,
                                        csfm; target = target, horizon = horizon, lag = lag,
-                                       step = step, min_count = min_count, ppy = ppy)
+                                       step = step, min_count = min_count, ties = ties,
+                                       ppy = ppy)
 end
 
 export IdiosyncraticTarget, AssetReturnTarget, PanelFieldTarget, ForecastEvaluationResult,

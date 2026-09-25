@@ -139,7 +139,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :m_pt_idio => "``m_{pt}``: Central moment of order ``p`` of the finite standardised returns of observation ``t``.",#
                  :a_t_series => "``a_{t}``: Diagnostic series value at observation ``t``.",#
                  :A_series_fin => "``\\mathcal{A}``: Finite observations of a diagnostic series, those at which ``a_{t}`` is finite.",#
-                 :rho_S_cs => "``\\rho_{S}``: Cross-sectional rank correlation, over the assets at which both cross-sections are finite. It correlates the ordinal ranks, so two equal values take two ranks, in the order of the asset axis.",#
+                 :rho_S_cs => "``\\rho_{S}``: Cross-sectional rank correlation, over the assets at which both cross-sections are finite. Under the default `ties = :average`, equal values share the mean of their ranks. Under `ties = :ordinal`, they take consecutive ranks, in the order of the asset axis.",#
                  # The coverage policy of `01_Base/16_CoveragePolicy.jl`. Each symbol is
                  # stated by two or more Units of that file.
                  :s_i_cvg => "``s_{i}``: Coverage share of asset ``i``, its own observation count over the number of observations folded.",#
@@ -192,5 +192,5 @@ unique_key_dict!(math_dict, :math_dict,
                  :alpha_t_fc => "``\\boldsymbol{\\alpha}_{t}``: Return Forecast cross-section at observation ``t``.",#
                  :B_tk_cs => "``\\mathbf{B}_{t \\cdot k}``: Exposure cross-section of factor ``k`` at observation ``t``.",#
                  :u_t_cs => "``\\boldsymbol{u}_{t}``: Cross-sectional weights of observation ``t``.",#
-                 :rho_rank_cs => "``\\rho^{\\mathrm{S}}``: The correlation of the ordinal ranks of two cross-sections, over the assets at which both values are finite.",#
+                 :rho_rank_cs => "``\\rho^{\\mathrm{S}}``: The correlation of the ranks of two cross-sections, over the assets at which both values are finite, with a tie ranked by `fe.ties`.",#
                  :rho_w_cs => "``\\rho``: The weighted correlation of two cross-sections, over the assets at which both values are finite and the weight is finite and positive.")

@@ -547,7 +547,7 @@ function idio_skewness(csfm::CrossSectionalFactorModel)
     return idio_skewness(ep, vh)
 end
 """
-    idio_vol_dependence(eps::MatNum, vs::MatNum, standardise::Bool)
+    idio_vol_dependence(eps::MatNum, vs::MatNum, standardise::Bool, ties::Symbol)
 
 Return the rank correlation of the predicted idiosyncratic volatility against the next observation's absolute idiosyncratic return, standardised or not.
 
@@ -558,19 +558,21 @@ It does the work of [`idio_vol_ic`](@ref) and of [`idio_vol_residual_dependence`
  1. Check that `eps` is not empty, that `vs` has its size, and that it has more than one observation.
  2. Compute the predicted volatility `sig` with [`idio_predicted_volatility`](@ref).
  3. For each observation `t` but the last, fill `a` with row `t` of `sig`. Fill `b` with the absolute idiosyncratic returns of observation `t + 1`. When `standardise` is `true`, divide each entry of `b` by the volatility predicted at observation `t`, through [`standardised_idio_value`](@ref).
- 4. Correlate `a` and `b` with [`cs_spearman_correlation`](@ref) under `min_count = 5`, giving entry `t` of `c`.
+ 4. Correlate `a` and `b` with [`cs_spearman_correlation`](@ref) under `min_count = 5` and `ties`, giving entry `t` of `c`.
 
 # Arguments
 
   - `eps`: Idiosyncratic return history `observations × assets`.
   - `vs`: Idiosyncratic variance history `observations × assets`.
   - `standardise`: Divide the absolute return of observation ``t + 1`` by the volatility predicted at observation ``t``.
+  - $(arg_dict[:cs_ties])
 
 # Validation
 
   - `!isempty(eps)`.
   - `size(vs) == size(eps)`.
   - `size(eps, 1) > 1`.
+  - The rules of [`cs_ranks`](@ref).
 
 # Returns
 
@@ -583,7 +585,7 @@ It does the work of [`idio_vol_ic`](@ref) and of [`idio_vol_residual_dependence`
   - [`cs_spearman_correlation`](@ref)
   - [`idio_predicted_volatility`](@ref)
 """
-function idio_vol_dependence(eps::MatNum, vs::MatNum, standardise::Bool)
+function idio_vol_dependence(eps::MatNum, vs::MatNum, standardise::Bool, ties::Symbol)
     @argcheck(!isempty(eps), IsEmptyError("eps cannot be empty"))
     @argcheck(size(vs, 1) == size(eps, 1) && size(vs, 2) == size(eps, 2),
               DimensionMismatch("vs ($(size(vs, 1))×$(size(vs, 2))) must match eps ($(size(eps, 1))×$(size(eps, 2)))"))
@@ -601,13 +603,13 @@ function idio_vol_dependence(eps::MatNum, vs::MatNum, standardise::Bool)
             m = abs(Tf(eps[t + 1, i]))
             b[i] = standardise ? standardised_idio_value(m, Tf(vs[t, i])) : m
         end
-        c[t] = cs_spearman_correlation(a, b; min_count = 5)
+        c[t] = cs_spearman_correlation(a, b; min_count = 5, ties = ties)
     end
     return c
 end
 """
-    idio_vol_ic(eps::MatNum, vs::MatNum) -> Vector{<:Real}
-    idio_vol_ic(csfm::CrossSectionalFactorModel) -> Vector{<:Real}
+    idio_vol_ic(eps::MatNum, vs::MatNum; ties::Symbol = :average) -> Vector{<:Real}
+    idio_vol_ic(csfm::CrossSectionalFactorModel; ties::Symbol = :average) -> Vector{<:Real}
 
 Return the information coefficient of the predicted idiosyncratic volatility, one entry per pair of observations.
 
@@ -639,12 +641,14 @@ The correlation is not defined over fewer than five common finite assets.
   - `eps`: Idiosyncratic return history `observations × assets`.
   - `vs`: Idiosyncratic variance history `observations × assets`.
   - `csfm`: A cross-sectional factor model block.
+  - $(arg_dict[:cs_ties])
 
 # Validation
 
   - `!isempty(eps)`, `size(vs) == size(eps)` and `size(eps, 1) > 1`.
   - `csfm.csr` is not `nothing`, else the verb raises an `IsNothingError` that names `csr`.
   - `csfm.vs` is not `nothing`, else the verb raises an `IsNothingError` that names `vs`.
+  - The rules of [`cs_ranks`](@ref).
 
 # Returns
 
@@ -657,16 +661,18 @@ The correlation is not defined over fewer than five common finite assets.
   - [`plot_idio_vol_ic`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
-function idio_vol_ic(eps::MatNum, vs::MatNum)
-    return idio_vol_dependence(eps, vs, false)
+function idio_vol_ic(eps::MatNum, vs::MatNum; ties::Symbol = :average)
+    return idio_vol_dependence(eps, vs, false, ties)
 end
-function idio_vol_ic(csfm::CrossSectionalFactorModel)
+function idio_vol_ic(csfm::CrossSectionalFactorModel; ties::Symbol = :average)
     ep, vh = idio_diagnostic_data(csfm)
-    return idio_vol_ic(ep, vh)
+    return idio_vol_ic(ep, vh; ties = ties)
 end
 """
-    idio_vol_residual_dependence(eps::MatNum, vs::MatNum) -> Vector{<:Real}
-    idio_vol_residual_dependence(csfm::CrossSectionalFactorModel) -> Vector{<:Real}
+    idio_vol_residual_dependence(eps::MatNum, vs::MatNum;
+                                 ties::Symbol = :average) -> Vector{<:Real}
+    idio_vol_residual_dependence(csfm::CrossSectionalFactorModel;
+                                 ties::Symbol = :average) -> Vector{<:Real}
 
 Return the rank correlation of the predicted idiosyncratic volatility against the next observation's standardised absolute idiosyncratic return, one entry per pair of observations.
 
@@ -700,12 +706,14 @@ The correlation is not defined over fewer than five common finite assets.
   - `eps`: Idiosyncratic return history `observations × assets`.
   - `vs`: Idiosyncratic variance history `observations × assets`.
   - `csfm`: A cross-sectional factor model block.
+  - $(arg_dict[:cs_ties])
 
 # Validation
 
   - `!isempty(eps)`, `size(vs) == size(eps)` and `size(eps, 1) > 1`.
   - `csfm.csr` is not `nothing`, else the verb raises an `IsNothingError` that names `csr`.
   - `csfm.vs` is not `nothing`, else the verb raises an `IsNothingError` that names `vs`.
+  - The rules of [`cs_ranks`](@ref).
 
 # Returns
 
@@ -718,12 +726,13 @@ The correlation is not defined over fewer than five common finite assets.
   - [`plot_idio_vol_residual_dependence`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
-function idio_vol_residual_dependence(eps::MatNum, vs::MatNum)
-    return idio_vol_dependence(eps, vs, true)
+function idio_vol_residual_dependence(eps::MatNum, vs::MatNum; ties::Symbol = :average)
+    return idio_vol_dependence(eps, vs, true, ties)
 end
-function idio_vol_residual_dependence(csfm::CrossSectionalFactorModel)
+function idio_vol_residual_dependence(csfm::CrossSectionalFactorModel;
+                                      ties::Symbol = :average)
     ep, vh = idio_diagnostic_data(csfm)
-    return idio_vol_residual_dependence(ep, vh)
+    return idio_vol_residual_dependence(ep, vh; ties = ties)
 end
 """
     idio_nan_mean(v::VecNum)

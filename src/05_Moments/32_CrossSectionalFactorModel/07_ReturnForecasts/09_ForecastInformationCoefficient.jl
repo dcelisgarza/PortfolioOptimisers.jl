@@ -51,7 +51,7 @@ The information coefficient is the cross-sectional correlation between the forec
 
 The function answers two coefficients, one per column, because each scores a different claim and a caller compares them. The Spearman coefficient correlates the ranks. It reads no weights, and one asset with an extreme forecast moves it no more than one ordinary asset does. The Pearson coefficient correlates the levels under the cross-sectional weights. It falls below the Spearman one when the forecast orders the assets well and spaces them badly.
 
-The ranks are ordinal, as [`cs_ordinal_ranks`](@ref) states, so two equal values take two different ranks in the order of the asset axis. At a date where the forecast gives every asset the same value, the order of the assets sets the Spearman coefficient, which can be `1` or `-1`, and the Pearson coefficient is `NaN`. A forecast that ties some of its assets moves the Spearman coefficient the same way, in part.
+The Spearman column ranks a tie by the rule in `fe.ties`, as [`cs_ranks`](@ref) states. Under the default `:average`, equal values share the mean of their ranks, so the order of the assets does not move the coefficient. At a date where the forecast gives every asset the same value, both columns are then `NaN`. Under `:ordinal`, equal values take consecutive ranks in the order of the asset axis. That order then sets part of the Spearman coefficient, and a constant forecast can score `1` or `-1`.
 
 # Mathematical definition
 
@@ -73,7 +73,7 @@ Where:
 # Algorithm
 
  1. Resolve the weight history with [`forecast_ic_weights`](@ref).
- 2. At each evaluation date, correlate the forecast against the target with [`cs_spearman_correlation`](@ref) for the first column and [`cs_weighted_correlation`](@ref) for the second.
+ 2. At each evaluation date, correlate the forecast against the target with [`cs_spearman_correlation`](@ref) under `fe.ties` for the first column, and with [`cs_weighted_correlation`](@ref) for the second.
 
 # Arguments
 
@@ -114,7 +114,7 @@ julia> forecast_ic(forecast_evaluation(alpha, y))
   - [`ForecastEvaluationResult`](@ref)
   - [`cs_spearman_correlation`](@ref)
   - [`cs_weighted_correlation`](@ref)
-  - [`cs_ordinal_ranks`](@ref)
+  - [`cs_ranks`](@ref)
   - [`exposure_ic`](@ref)
 """
 function forecast_ic(fe::ForecastEvaluationResult, w::Option{<:MatNum} = nothing;
@@ -123,13 +123,14 @@ function forecast_ic(fe::ForecastEvaluationResult, w::Option{<:MatNum} = nothing
     alpha::MatNum = fe.alpha
     y::MatNum = fe.y
     dates::AbstractVector{<:Integer} = fe.dates
+    ties::Symbol = fe.ties
     u = forecast_ic_weights(alpha, w)
     Tf = promote_type(real(eltype(alpha)), real(eltype(y)), real(eltype(u)))
     ic = Matrix{Tf}(undef, length(dates), 2)
     for (j, t) in enumerate(dates)
         a = view(alpha, t, :)
         b = view(y, t, :)
-        ic[j, 1] = Tf(cs_spearman_correlation(a, b; min_count = min_count))
+        ic[j, 1] = Tf(cs_spearman_correlation(a, b; min_count = min_count, ties = ties))
         ic[j, 2] = Tf(cs_weighted_correlation(a, b, view(u, t, :); min_count = min_count))
     end
     return ic

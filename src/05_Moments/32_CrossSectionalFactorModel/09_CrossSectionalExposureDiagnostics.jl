@@ -158,48 +158,110 @@ function cs_correlation_enters(a::AbstractVector, b::AbstractVector, u::Abstract
     return isfinite(a[i]) && isfinite(b[i]) && isfinite(u[i]) && u[i] > 0
 end
 """
-    cs_ordinal_ranks(key::AbstractVector, valid::AbstractVector{Bool})
+    cs_ranks(key::AbstractVector, valid::AbstractVector{Bool}, ties::Symbol)
 
-Return the ordinal rank of every entry of a cross-section, and `NaN` outside a mask.
+Return the rank of every entry of a cross-section, and `NaN` outside a mask.
 
-The rank is the position the entry takes in the sorted order, so two equal values take two different ranks, in the order of the asset axis. The masked entries are sorted to the end by their key and then written as `NaN`, so they take no rank and shift none.
+The rank is the position the entry takes in the sorted order. `ties` sets the rank of equal values. `:average` gives each value of a tie the mean of the positions the tie takes, so the ranks do not read the order of the assets. `:ordinal` gives the values of a tie consecutive positions, in the order of the asset axis, which the stable sort keeps. The masked entries sort to the end by their key and are written as `NaN`, so they take no rank and shift none.
+
+# Mathematical definition
+
+```math
+r_{i} = \\begin{cases}
+k_{i} + \\dfrac{m_{i} + 1}{2} & \\texttt{:average}\\,, \\\\
+\\pi_{i} & \\texttt{:ordinal}\\,.
+\\end{cases}
+```
+
+Where:
+
+  - ``r_{i}``: Rank of asset ``i``.
+  - ``k_{i}``: Number of assets in the mask whose key is below the key of asset ``i``.
+  - ``m_{i}``: Number of assets in the mask whose key equals the key of asset ``i``, asset ``i`` included.
+  - ``\\pi_{i}``: Position of asset ``i`` in the stable sort of the keys.
+
+# Algorithm
+
+ 1. Sort the positions of `key` with a stable sort, giving `p`.
+ 2. Walk `p` in runs. Under `:average`, a run holds every entry of one key. Under `:ordinal`, a run holds one entry.
+ 3. Write the mean position of the run to each entry of the run that is in the mask. Leave `NaN` at each entry outside it.
 
 # Arguments
 
   - `key`: Sort key of each asset. The key of a masked asset must be `Inf`, so the mask sorts to the end.
   - `valid`: Mask, one entry per asset. A `false` entry gets `NaN`.
+  - $(arg_dict[:cs_ties])
+
+# Validation
+
+  - `ties` is `:average` or `:ordinal`. Raises a [`ConflictingArgumentError`](@ref).
 
 # Returns
 
   - `r::VecNum`: Rank of each asset, or `NaN` outside the mask.
 
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.cs_ranks([3.0, 1.0, 1.0, 2.0], trues(4), :average)
+4-element Vector{Float64}:
+ 4.0
+ 1.5
+ 1.5
+ 3.0
+
+julia> PortfolioOptimisers.cs_ranks([3.0, 1.0, 1.0, 2.0], trues(4), :ordinal)
+4-element Vector{Float64}:
+ 4.0
+ 1.0
+ 2.0
+ 3.0
+```
+
 # Related
 
   - [`cs_spearman_correlation`](@ref)
+  - [`forecast_portfolio_weights`](@ref)
 """
-function cs_ordinal_ranks(key::AbstractVector, valid::AbstractVector{Bool})
+function cs_ranks(key::AbstractVector, valid::AbstractVector{Bool}, ties::Symbol)
+    @argcheck(ties in (:average, :ordinal),
+              ConflictingArgumentError("ties must be :average or :ordinal, got :$(ties)"))
     Tf = real(eltype(key))
     N = length(key)
     p = sortperm(key)
+    # `NaN` is written at a masked entry alone, so a key type that holds no `NaN`, such as a
+    # `Rational`, ranks a cross-section with no mask.
     r = Vector{Tf}(undef, N)
-    for pos in 1:N
-        i = p[pos]
-        r[i] = valid[i] ? Tf(pos) : Tf(NaN)
+    lo = 1
+    while lo <= N
+        hi = lo
+        while ties === :average && hi < N && key[p[hi + 1]] == key[p[lo]]
+            hi += 1
+        end
+        rk = Tf(lo + hi) / 2
+        for pos in lo:hi
+            i = p[pos]
+            r[i] = valid[i] ? rk : Tf(NaN)
+        end
+        lo = hi + 1
     end
     return r
 end
 """
     cs_spearman_correlation(a::AbstractVector, b::AbstractVector;
-                            min_count::Integer = 3, eps::Real = 1e-12)
+                            min_count::Integer = 3, eps::Real = 1e-12,
+                            ties::Symbol = :average)
 
 Return the rank correlation of two cross-sections of one observation.
 
-It is the unweighted correlation of the ordinal ranks of the two cross-sections, taken over the assets at which both values are finite. The rank measures the order of the assets and not their level, so one extreme value moves the answer no more than one ordinary value does.
+It is the unweighted correlation of the ranks of the two cross-sections, taken over the assets at which both values are finite. The rank measures the order of the assets and not their level, so one extreme value moves the answer no more than one ordinary value does.
+
+Under the default `ties = :average`, a cross-section that is constant over those assets has constant ranks, so the answer is `NaN`, as it is for [`cs_weighted_correlation`](@ref). Under `ties = :ordinal`, the order of the assets inside a tie sets part of the answer, and a constant cross-section can answer `1` or `-1`.
 
 # Algorithm
 
  1. Mark the assets at which both values are finite.
- 2. Rank each cross-section over those assets with [`cs_ordinal_ranks`](@ref).
+ 2. Rank each cross-section over those assets with [`cs_ranks`](@ref).
  3. Correlate the two rank vectors with [`cs_weighted_correlation`](@ref) under equal weights.
 
 # Arguments
@@ -208,19 +270,37 @@ It is the unweighted correlation of the ordinal ranks of the two cross-sections,
   - `b`: Second cross-section, one entry per asset.
   - `min_count`: Least number of assets an answer needs.
   - `eps`: Denominator at or under which the answer is `NaN`.
+  - $(arg_dict[:cs_ties])
+
+# Validation
+
+  - The rules of [`cs_ranks`](@ref).
 
 # Returns
 
   - `rho::Real`: The rank correlation, or `NaN`.
 
+# Examples
+
+```jldoctest
+julia> a = [1.0, 1.0, 2.0, 2.0];
+
+julia> PortfolioOptimisers.cs_spearman_correlation(a, [1.0, 2.0, 3.0, 4.0]) ≈ 4 / sqrt(20)
+true
+
+julia> PortfolioOptimisers.cs_spearman_correlation(a, [1.0, 2.0, 3.0, 4.0]; ties = :ordinal)
+1.0
+```
+
 # Related
 
-  - [`cs_ordinal_ranks`](@ref)
+  - [`cs_ranks`](@ref)
   - [`cs_weighted_correlation`](@ref)
   - [`exposure_ic`](@ref)
 """
 function cs_spearman_correlation(a::AbstractVector, b::AbstractVector;
-                                 min_count::Integer = 3, eps::Real = 1e-12)
+                                 min_count::Integer = 3, eps::Real = 1e-12,
+                                 ties::Symbol = :average)
     Tf = promote_type(real(eltype(a)), real(eltype(b)))
     N = length(a)
     ka = Vector{Tf}(undef, N)
@@ -232,8 +312,8 @@ function cs_spearman_correlation(a::AbstractVector, b::AbstractVector;
         ka[i] = v ? Tf(a[i]) : Tf(Inf)
         kb[i] = v ? Tf(b[i]) : Tf(Inf)
     end
-    ra = cs_ordinal_ranks(ka, valid)
-    rb = cs_ordinal_ranks(kb, valid)
+    ra = cs_ranks(ka, valid, ties)
+    rb = cs_ranks(kb, valid, ties)
     return cs_weighted_correlation(ra, rb, ones(Tf, N); min_count = min_count, eps = eps)
 end
 """
@@ -504,9 +584,10 @@ function exposure_pair_sums(B::Arr3Num, u::MatNum, t::Integer, k::Integer, l::In
 end
 """
     exposure_ic(B::Arr3Num, R::MatNum, w::Option{<:MatNum} = nothing;
-                horizon::Integer = 1, rank::Bool = true) -> Matrix{<:Real}
+                horizon::Integer = 1, rank::Bool = true,
+                ties::Symbol = :average) -> Matrix{<:Real}
     exposure_ic(csfm::CrossSectionalFactorModel; horizon::Integer = 1, rank::Bool = true,
-                reduced::Bool = false) -> Matrix{<:Real}
+                reduced::Bool = false, ties::Symbol = :average) -> Matrix{<:Real}
 
 Return the information coefficient of every factor exposure, one row per pair of observations.
 
@@ -531,6 +612,8 @@ Where:
   - ``\\rho``: The rank correlation when `rank`, and the weighted correlation otherwise.
   - ``H``: Forward window, in observations.
 
+A one-hot exposure, such as an industry, is a block of `0` and a block of `1`, so every asset of it is in a tie. Under the default `ties = :average`, its rank coefficient compares the forward returns of the two blocks. Under `ties = :ordinal`, the order of the assets inside each block sets most of it.
+
 # Algorithm
 
  1. Resolve the weight history with [`exposure_weights`](@ref).
@@ -546,6 +629,7 @@ Where:
   - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise.
   - `csfm`: A cross-sectional factor model block.
   - `reduced`: Map the exposures through the family re-basis of the block before the correlation.
+  - $(arg_dict[:cs_ties]) The weighted correlation reads no rank, so it ignores `ties`.
 
 # Validation
 
@@ -553,6 +637,7 @@ Where:
   - `size(R) == (size(B, 1), size(B, 2))`.
   - `horizon >= 1` and `size(B, 1) > horizon`.
   - `csfm.Ms` and `csfm.csr` are not `nothing`, else an `IsNothingError` naming the field is raised.
+  - The rules of [`cs_ranks`](@ref), when `rank`.
 
 # Returns
 
@@ -568,7 +653,7 @@ Where:
   - [`CrossSectionalFactorModel`](@ref)
 """
 function exposure_ic(B::Arr3Num, R::MatNum, w::Option{<:MatNum} = nothing;
-                     horizon::Integer = 1, rank::Bool = true)
+                     horizon::Integer = 1, rank::Bool = true, ties::Symbol = :average)
     u = exposure_weights(B, w)
     T, N, K = size(B)
     @argcheck(size(R, 1) == T && size(R, 2) == N,
@@ -582,7 +667,7 @@ function exposure_ic(B::Arr3Num, R::MatNum, w::Option{<:MatNum} = nothing;
         a = view(B, t, :, k)
         b = view(y, t, :)
         ic[t, k] = if rank
-            Tf(cs_spearman_correlation(a, b))
+            Tf(cs_spearman_correlation(a, b; ties = ties))
         else
             Tf(cs_weighted_correlation(a, b, view(u, t, :)))
         end
@@ -590,14 +675,15 @@ function exposure_ic(B::Arr3Num, R::MatNum, w::Option{<:MatNum} = nothing;
     return ic
 end
 function exposure_ic(csfm::CrossSectionalFactorModel; horizon::Integer = 1,
-                     rank::Bool = true, reduced::Bool = false)
+                     rank::Bool = true, reduced::Bool = false, ties::Symbol = :average)
     B, R, w = exposure_ic_data(csfm, reduced)
-    return exposure_ic(B, R, w; horizon = horizon, rank = rank)
+    return exposure_ic(B, R, w; horizon = horizon, rank = rank, ties = ties)
 end
 """
     exposure_ic_summary(ic::MatNum; lags::Integer = 0)
     exposure_ic_summary(csfm::CrossSectionalFactorModel; horizon::Integer = 1,
-                        rank::Bool = true, reduced::Bool = false)
+                        rank::Bool = true, reduced::Bool = false,
+                        ties::Symbol = :average)
 
 Return the summary of an information coefficient series, one entry per factor.
 
@@ -632,6 +718,7 @@ Where:
   - `horizon`: Forward window, in observations.
   - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise.
   - `reduced`: Map the exposures through the family re-basis of the block before the correlation.
+  - $(arg_dict[:cs_ties]) The weighted correlation reads no rank, so it ignores `ties`.
 
 # Validation
 
@@ -792,9 +879,11 @@ function exposure_ic_t_stat(c::VecNum, m::Real, q::Real, n::Integer, lags::Integ
     return isfinite(m) && isfinite(lrsd) ? m / lrsd * sqrt(Tf(n)) : Tf(NaN)
 end
 function exposure_ic_summary(csfm::CrossSectionalFactorModel; horizon::Integer = 1,
-                             rank::Bool = true, reduced::Bool = false)
+                             rank::Bool = true, reduced::Bool = false,
+                             ties::Symbol = :average)
     return exposure_ic_summary(exposure_ic(csfm; horizon = horizon, rank = rank,
-                                           reduced = reduced); lags = horizon - 1)
+                                           reduced = reduced, ties = ties);
+                               lags = horizon - 1)
 end
 """
     exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing;

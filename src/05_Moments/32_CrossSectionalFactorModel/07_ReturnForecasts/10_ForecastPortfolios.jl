@@ -109,7 +109,7 @@ end
 
 Mark the assets that one evaluation date can score, and build their sort key.
 
-An asset enters the cross-section of a date only where its forecast and its target are both finite there. So an asset that the panel does not carry, and an asset whose forward window does not close, take no part in the statistic. The key is the forecast inside the mask and `Inf` outside it, which is the form [`cs_ordinal_ranks`](@ref) takes. The masked assets then sort to the end and take no rank.
+An asset enters the cross-section of a date only where its forecast and its target are both finite there. So an asset that the panel does not carry, and an asset whose forward window does not close, take no part in the statistic. The key is the forecast inside the mask and `Inf` outside it, which is the form [`cs_ranks`](@ref) takes. The masked assets then sort to the end and take no rank.
 
 # Mathematical definition
 
@@ -142,7 +142,7 @@ Where:
 
   - [`forecast_portfolio_weights`](@ref)
   - [`forecast_quantile_spread`](@ref)
-  - [`cs_ordinal_ranks`](@ref)
+  - [`cs_ranks`](@ref)
 """
 function forecast_cross_section!(valid::AbstractVector{Bool}, key::AbstractVector{<:Real},
                                  alpha::AbstractMatrix{<:Real}, y::AbstractMatrix{<:Real},
@@ -236,11 +236,12 @@ function forecast_centred_weights!(w::AbstractMatrix{<:Real}, k::Integer,
 end
 """
     forecast_portfolio_weights(alpha::AbstractMatrix{<:Real}, y::AbstractMatrix{<:Real},
-                               dates::AbstractVector{<:Integer}, kind::Symbol)
+                               dates::AbstractVector{<:Integer}, kind::Symbol,
+                               ties::Symbol)
 
 Build the weights of the long-short portfolio that a Return Forecast states by itself.
 
-The portfolio holds the forecast and nothing else. It reads no covariance, no constraint and no solver, so its return measures what the ordering of the forecast is worth. `kind` chooses what the ordering reads. `:rank` reads the ordinal rank in the cross-section, which measures the order alone, so one extreme forecast moves the book no more than one ordinary forecast does. `:zscore` reads the forecast value, so a conviction twice as large takes twice the weight.
+The portfolio holds the forecast and nothing else. It reads no covariance, no constraint and no solver, so its return measures what the ordering of the forecast is worth. `kind` chooses what the ordering reads. `:rank` reads the rank in the cross-section, which measures the order alone, so one extreme forecast moves the book no more than one ordinary forecast does. `ties` ranks a tie. Under `:average`, equal forecasts take equal weights. Under `:ordinal`, the order of the asset axis gives them different weights. `:zscore` reads the forecast value, so a conviction twice as large takes twice the weight.
 
 [`forecast_centred_weights!`](@ref) centres and rescales both kinds, so both are dollar neutral at 200 % gross. A date with an empty cross-section, one asset or a flat signal holds no book.
 
@@ -250,7 +251,7 @@ This builder reads no threshold. A date whose cross-section is smaller than the 
 
  1. Allocate `w`, one row per evaluation date and one column per asset, and fill it with zeros.
  2. For each date, mark its cross-section with [`forecast_cross_section!`](@ref), giving `valid`, `key` and the count `n`. An empty cross-section leaves the row at zero.
- 3. Under `:rank`, rank `key` with [`cs_ordinal_ranks`](@ref), giving the signal `s`. Under `:zscore`, take `key` itself as `s`.
+ 3. Under `:rank`, rank `key` with [`cs_ranks`](@ref) under `ties`, giving the signal `s`. Under `:zscore`, take `key` itself as `s`.
  4. Centre and rescale `s` into row `k` with [`forecast_centred_weights!`](@ref).
 
 # Arguments
@@ -259,10 +260,12 @@ This builder reads no threshold. A date whose cross-section is smaller than the 
   - `y`: Forward target `observations × assets`, on the same axis as `alpha`. The builder reads only whether each entry is finite, which defines the cross-section of a date.
   - `dates`: Row indices of the observations to build a portfolio at.
   - `kind`: `:rank` or `:zscore`.
+  - $(arg_dict[:cs_ties]) `:zscore` reads no rank, so it ignores `ties`.
 
 # Validation
 
   - `kind` is `:rank` or `:zscore`. Raises a [`ConflictingArgumentError`](@ref).
+  - The rules of [`cs_ranks`](@ref), under `:rank`.
 
 # Returns
 
@@ -273,7 +276,7 @@ This builder reads no threshold. A date whose cross-section is smaller than the 
 ```jldoctest
 julia> alpha = [1.0 2.0 3.0; 3.0 2.0 1.0];
 
-julia> PortfolioOptimisers.forecast_portfolio_weights(alpha, alpha, [1, 2], :zscore)
+julia> PortfolioOptimisers.forecast_portfolio_weights(alpha, alpha, [1, 2], :zscore, :average)
 2×3 Matrix{Float64}:
  -1.0  0.0   1.0
   1.0  0.0  -1.0
@@ -284,12 +287,13 @@ julia> PortfolioOptimisers.forecast_portfolio_weights(alpha, alpha, [1, 2], :zsc
   - [`forecast_portfolio`](@ref)
   - [`forecast_cross_section!`](@ref)
   - [`forecast_centred_weights!`](@ref)
-  - [`cs_ordinal_ranks`](@ref)
+  - [`cs_ranks`](@ref)
   - [`ForecastEvaluationResult`](@ref)
 """
 function forecast_portfolio_weights(alpha::AbstractMatrix{<:Real},
                                     y::AbstractMatrix{<:Real},
-                                    dates::AbstractVector{<:Integer}, kind::Symbol)
+                                    dates::AbstractVector{<:Integer}, kind::Symbol,
+                                    ties::Symbol)
     @argcheck(kind in (:rank, :zscore),
               ConflictingArgumentError("kind must be :rank or :zscore, got :$(kind)"))
     Tf = promote_type(eltype(alpha), eltype(y))
@@ -300,7 +304,7 @@ function forecast_portfolio_weights(alpha::AbstractMatrix{<:Real},
     for (k, t) in enumerate(dates)
         n = forecast_cross_section!(valid, key, alpha, y, t)
         if !iszero(n)
-            s = kind === :rank ? cs_ordinal_ranks(key, valid) : key
+            s = kind === :rank ? cs_ranks(key, valid, ties) : key
             forecast_centred_weights!(w, k, s, valid, n)
         end
     end
@@ -344,7 +348,7 @@ The book of a gap date stays in `w`, because [`forecast_portfolio_weights`](@ref
 
 # Algorithm
 
- 1. Build the weights of every evaluation date with [`forecast_portfolio_weights`](@ref), giving `w`.
+ 1. Build the weights of every evaluation date with [`forecast_portfolio_weights`](@ref) under `fe.ties`, giving `w`.
  2. For each date, contract its weights with its target over the assets that carry both a finite forecast and a finite target, giving `ret`. A date with fewer than `fe.min_count` such assets gets a `NaN` instead.
  3. Take the turnover of `w` with [`calc_turnover`](@ref), and write a `NaN` into every date whose return is a `NaN`, so the two series read the same dates.
  4. Drop the gaps of `ret` and summarise the remainder with [`performance_summary`](@ref) at `periods_per_year = fe.ppy`.
@@ -386,7 +390,8 @@ function forecast_portfolio(fe::ForecastEvaluationResult; kind::Symbol = :rank)
     dates::AbstractVector{<:Integer} = fe.dates
     min_count::Integer = fe.min_count
     ppy::Real = fe.ppy
-    w = forecast_portfolio_weights(alpha, y, dates, kind)
+    ties::Symbol = fe.ties
+    w = forecast_portfolio_weights(alpha, y, dates, kind, ties)
     Tf = eltype(w)
     N = size(alpha, 2)
     ret = fill(Tf(NaN), length(dates))

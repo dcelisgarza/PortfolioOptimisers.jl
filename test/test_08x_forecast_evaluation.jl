@@ -287,6 +287,10 @@ end
         @test_throws DomainError forecast_evaluation(alpha, y; step = 0)
         @test_throws DomainError forecast_evaluation(alpha, y; min_count = 0)
         @test_throws DomainError forecast_evaluation(alpha, y; ppy = 0)
+        @test_throws PO.ConflictingArgumentError forecast_evaluation(alpha, y;
+                                                                     ties = :dense)
+        @test forecast_evaluation(alpha, y).ties === :average
+        @test forecast_evaluation(alpha, y; ties = :ordinal).ties === :ordinal
     end
 
     @testset "The pair is scored in its own element type, which must hold a fraction and NaN" begin
@@ -843,7 +847,7 @@ end
                                              PO.forward_mean_returns(X, h.horizon[p],
                                                                      h.lag[p]), fe1.umsk,
                                              h.dates, fe1.target, h.horizon[p], h.lag[p],
-                                             fe1.step, fe1.min_count, fe1.ppy)
+                                             fe1.step, fe1.min_count, fe1.ties, fe1.ppy)
             @test PO.forecast_ic_lags(fp) == p - 1
             @test isequal(h.spearman_t_stat[p],
                           forecast_ic_summary(forecast_ic(fp); lags = p - 1).spearman.t_stat)
@@ -851,7 +855,7 @@ end
                                              PO.forward_mean_returns(X, d.horizon[p],
                                                                      d.lag[p]), fe1.umsk,
                                              d.dates, fe1.target, d.horizon[p], d.lag[p],
-                                             fe1.step, fe1.min_count, fe1.ppy)
+                                             fe1.step, fe1.min_count, fe1.ties, fe1.ppy)
             @test PO.forecast_ic_lags(fq) == 0
             @test d.spearman_t_stat[p] ≈
                   forecast_ic_summary(forecast_ic(fq)).spearman.t_stat
@@ -1162,6 +1166,24 @@ end
                         view(forecast_portfolio(fe; kind = :zscore).w, 1, :))
     end
 
+    @testset "Equal forecasts take equal `:rank` weights under the default tie rule" begin
+        at = [1.0 1.0 2.0 3.0; 2.0 1.0 1.0 3.0; 1.0 2.0 3.0 4.0]
+        yt = [1.0 2.0 3.0 4.0; 4.0 3.0 2.0 1.0; 1.0 3.0 2.0 4.0]
+        wa = forecast_portfolio(forecast_evaluation(at, yt)).w
+        wo = forecast_portfolio(forecast_evaluation(at, yt; ties = :ordinal)).w
+        @test wa[1, 1] == wa[1, 2]
+        @test wa[2, 2] == wa[2, 3]
+        @test wo[1, 1] < wo[1, 2]
+        @test wo[2, 2] < wo[2, 3]
+        # A row with no tie is the same under both rules, and both books stay dollar
+        # neutral at 200 % gross.
+        @test wa[3, :] == wo[3, :]
+        @test all(k -> isapprox(sum(wa[k, :]), 0; atol = 1e-12), 1:3)
+        @test all(k -> sum(abs, wa[k, :]) ≈ 2, 1:3)
+        @test wa == PO.forecast_portfolio_weights(at, yt, 1:3, :rank, :average)
+        @test wo == PO.forecast_portfolio_weights(at, yt, 1:3, :rank, :ordinal)
+    end
+
     @testset "The portfolio return is the contraction of the weights with the target" begin
         p = forecast_portfolio(fe; kind = :rank)
         ref = map(enumerate(fe.dates)) do (k, t)
@@ -1200,7 +1222,8 @@ end
         @test_throws PO.ConflictingArgumentError PO.forecast_portfolio_weights(fe.alpha,
                                                                                fe.y,
                                                                                fe.dates,
-                                                                               :inverse_vol)
+                                                                               :inverse_vol,
+                                                                               :average)
     end
 end
 
@@ -1482,12 +1505,16 @@ end
         cz = forecast_factor_correlation(fe, FC_B, w0; min_count = 4)
         @test all(isnan, cz[1:2, :])
         @test all(isfinite, cz[3:T, :])
-        # A constant exposure has no weighted correlation. The rank form ranks equal
-        # values by their position on the asset axis, so it answers the rank correlation
-        # of the forecast with that order.
+        # A constant exposure has no weighted correlation. Under the default tie rule its
+        # ranks are equal, so it has no rank correlation either. Under `:ordinal`, equal
+        # values take their position on the asset axis, so the rank form answers the rank
+        # correlation of the forecast with that order.
         bc = cat(FC_TIED, fill(1.0, size(FC_ALPHA)); dims = 3)
         @test all(isnan, forecast_factor_correlation(fe, bc)[:, 2])
-        crc = forecast_factor_correlation(fe, bc; rank = true)
+        @test all(isnan, forecast_factor_correlation(fe, bc; rank = true)[:, 2])
+        fo = forecast_evaluation(FC_ALPHA, PO.forward_mean_returns(FC_ALPHA, 1, 1);
+                                 ties = :ordinal)
+        crc = forecast_factor_correlation(fo, bc; rank = true)
         @test crc[:, 2] == crc[:, 1]
         @test crc[:, 2] ≈ ones(T)
     end
@@ -1503,6 +1530,28 @@ end
         @test isequal(forecast_factor_correlation(fe, FC_B, FC_W; dates = fe.dates,
                                                   rank = true),
                       forecast_factor_correlation(fe, FC_B; rank = true)[fe.dates, :])
+    end
+
+    @testset "The rank form ranks a tie by `fe.ties`, and `:average` reads no asset order" begin
+        # Every row of `FC_G` is one-hot, two blocks of two, so every asset is in a tie. A
+        # reversal of the asset axis moves the `:ordinal` answer and not the default one.
+        yt = PO.forward_mean_returns(FC_ALPHA, 1, 1)
+        rv = size(FC_ALPHA, 2):-1:1
+        fo = forecast_evaluation(FC_ALPHA, yt; ties = :ordinal)
+        far = forecast_evaluation(FC_ALPHA[:, rv], yt[:, rv])
+        fro = forecast_evaluation(FC_ALPHA[:, rv], yt[:, rv]; ties = :ordinal)
+        ca = forecast_factor_correlation(fe, FC_BG; rank = true)
+        co = forecast_factor_correlation(fo, FC_BG; rank = true)
+        @test ca ≈ forecast_factor_correlation(far, FC_BG[:, rv, :]; rank = true)
+        @test !isapprox(co, forecast_factor_correlation(fro, FC_BG[:, rv, :]; rank = true))
+        # Row 1: the ranks of `[1, 2, 3, 4]` against the midranks of `[1, 0, 1, 0]`.
+        @test ca[1, 1] ≈ -2 / sqrt(20)
+        @test co[1, 1] ≈ 0.0 atol = 1e-12
+        for k in 1:2, t in 1:T
+            @test co[t, k] ==
+                  PO.cs_spearman_correlation(view(fe.alpha, t, :), view(FC_BG, t, :, k);
+                                             min_count = fe.min_count, ties = :ordinal)
+        end
     end
 
     @testset "An empty row set and a row off the axis are refused" begin
@@ -1901,9 +1950,20 @@ end
 @testset "The two tables reproduce the reference implementation" begin
     PO = PortfolioOptimisers
     alpha = WINDOW_ALPHA
-    fe = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1)
+    # The forward means of a longer window tie on this fixture, and the reference breaks a
+    # tie by the asset order here, so `ties = :ordinal` reproduces its numbers.
+    fe = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1,
+                             ties = :ordinal)
     h = forecast_holding_period(fe, alpha; n = 3)
     d = forecast_decay(fe, alpha; n = 3)
+
+    @testset "Under the default tie rule, the rows whose targets tie move and the first does not" begin
+        fa = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1)
+        ha = forecast_holding_period(fa, alpha; n = 3)
+        @test ha.spearman_mean_ic[1] ≈ h.spearman_mean_ic[1]
+        @test ha.pearson_mean_ic ≈ h.pearson_mean_ic
+        @test !isapprox(ha.spearman_mean_ic[2:3], h.spearman_mean_ic[2:3])
+    end
 
     @testset "Both tables carry fifteen columns and three rows" begin
         @test keys(h) ==
@@ -1941,7 +2001,7 @@ end
                                              PO.forward_mean_returns(alpha, h.horizon[p],
                                                                      h.lag[p]), fe.umsk,
                                              h.dates, fe.target, h.horizon[p], h.lag[p],
-                                             fe.step, fe.min_count, fe.ppy)
+                                             fe.step, fe.min_count, fe.ties, fe.ppy)
             s = forecast_ic_summary(forecast_ic(fp); lags = p - 1)
             @test isequal(h.spearman_t_stat[p], s.spearman.t_stat)
             @test isequal(h.pearson_t_stat[p], s.pearson.t_stat)
@@ -1982,7 +2042,7 @@ end
     h = forecast_holding_period(fe, alpha; n = 3)
     d = forecast_decay(fe, alpha; n = 3)
     fb = PO.ForecastEvaluationResult(alpha, y, fe.umsk, h.dates, fe.target, fe.horizon,
-                                     fe.lag, fe.step, fe.min_count, fe.ppy)
+                                     fe.lag, fe.step, fe.min_count, fe.ties, fe.ppy)
     ic = forecast_ic_summary(forecast_ic(fb))
     rk = forecast_portfolio(fb; kind = :rank)
     zs = forecast_portfolio(fb; kind = :zscore)
@@ -2786,7 +2846,7 @@ end
         @test a.y === early.y
         @test a.umsk === early.umsk
         @test b.alpha === late.alpha
-        for f in (:target, :horizon, :lag, :step, :min_count, :ppy)
+        for f in (:target, :horizon, :lag, :step, :min_count, :ties, :ppy)
             @test getfield(a, f) === getfield(early, f)
             @test getfield(b, f) === getfield(late, f)
         end
@@ -2841,6 +2901,7 @@ end
     @testset "A set that does not answer one question is refused before it is aligned" begin
         for (nm, other) in (("horizon", forecast_evaluation(late_alpha, y; horizon = 2)),
                             ("step", forecast_evaluation(late_alpha, y; step = 2)),
+                            ("ties", forecast_evaluation(late_alpha, y; ties = :ordinal)),
                             ("ppy", forecast_evaluation(late_alpha, y; ppy = 252)))
             err = try
                 forecast_evaluation_align([early, other])
@@ -3181,9 +3242,11 @@ end
         @test al[1].alpha === f1.alpha && al[1].y === f1.y && al[1].umsk === f1.umsk
         # Two grids that share no date are refused.
         g1 = PO.ForecastEvaluationResult(fe.alpha, fe.y, fe.umsk, [1, 2, 3], fe.target,
-                                         fe.horizon, fe.lag, fe.step, fe.min_count, fe.ppy)
+                                         fe.horizon, fe.lag, fe.step, fe.min_count, fe.ties,
+                                         fe.ppy)
         g2 = PO.ForecastEvaluationResult(fe.alpha, fe.y, fe.umsk, [10, 11], fe.target,
-                                         fe.horizon, fe.lag, fe.step, fe.min_count, fe.ppy)
+                                         fe.horizon, fe.lag, fe.step, fe.min_count, fe.ties,
+                                         fe.ppy)
         @test_throws PO.IsEmptyError forecast_evaluation_align([g1, g2])
     end
 
@@ -3251,7 +3314,8 @@ end
         t = forecast_holding_period(fe, alpha, wz; n = 2)
         @test 2 ∈ t.dates
         f1 = PO.ForecastEvaluationResult(fe.alpha, PO.forward_mean_returns(alpha, 1, 1),
-                                         fe.umsk, t.dates, fe.target, 1, 1, 1, 3, fe.ppy)
+                                         fe.umsk, t.dates, fe.target, 1, 1, 1, 3, fe.ties,
+                                         fe.ppy)
         ic = forecast_ic(f1, wz)
         j = findfirst(==(2), t.dates)
         @test isnan(ic[j, 2])
@@ -3348,15 +3412,32 @@ end
         end
     end
 
-    @testset "Equal forecasts take ordinal ranks, so the asset order sets the Spearman column" begin
+    @testset "Equal forecasts share a rank under `:average` and take the asset order under `:ordinal`" begin
         flat = [1.0 1.0 1.0 1.0 1.0; 0.0 0.0 0.0 0.0 0.0]
         up = [1.0 2.0 3.0 4.0 5.0; 0.0 0.0 0.0 0.0 0.0]
-        icu = forecast_ic(forecast_evaluation(flat, up))
-        icd = forecast_ic(forecast_evaluation(flat, reverse(up; dims = 2)))
+        # Under the default, a constant forecast has constant ranks, so the Spearman column
+        # is `NaN`, as the Pearson column is.
+        for yc in (up, reverse(up; dims = 2))
+            icc = forecast_ic(forecast_evaluation(flat, yc))
+            @test isnan(icc[1, 1])
+            @test isnan(icc[1, 2])
+        end
+        # Under `:ordinal`, the order of the assets sets the Spearman column.
+        icu = forecast_ic(forecast_evaluation(flat, up; ties = :ordinal))
+        icd = forecast_ic(forecast_evaluation(flat, reverse(up; dims = 2); ties = :ordinal))
         @test icu[1, 1] == 1.0
         @test icd[1, 1] == -1.0
         @test isnan(icu[1, 2])
         @test isnan(icd[1, 2])
+        # Two targets that differ only inside the ties of the forecast get one coefficient
+        # under the default, and two under `:ordinal`.
+        a2 = [1.0 1.0 2.0 2.0; 0.0 0.0 0.0 0.0]
+        y1 = [1.0 2.0 3.0 4.0; 0.0 0.0 0.0 0.0]
+        y2 = [2.0 1.0 4.0 3.0; 0.0 0.0 0.0 0.0]
+        @test forecast_ic(forecast_evaluation(a2, y1))[1, 1] ≈ 4 / sqrt(20)
+        @test forecast_ic(forecast_evaluation(a2, y2))[1, 1] ≈ 4 / sqrt(20)
+        @test forecast_ic(forecast_evaluation(a2, y1; ties = :ordinal))[1, 1] ≈ 1.0
+        @test forecast_ic(forecast_evaluation(a2, y2; ties = :ordinal))[1, 1] ≈ 0.6
     end
 
     @testset "A weight that is not finite is outside the universe of every verb" begin
@@ -3460,17 +3541,23 @@ end
 
     @testset "A flat cross-section holds no book under either kind" begin
         # The mean of equal values rounds off them at 3, 5, 6 and 7 assets, so a centring
-        # that trusts it writes a short book of 200 % gross instead of a zero row.
+        # that trusts it writes a short book of 200 % gross instead of a zero row. Under the
+        # default tie rule, the ranks of a flat cross-section are equal too. Under
+        # `:ordinal`, they follow the asset axis, so the rank kind holds a book.
         for na in 1:7, v in (0.1, 0.3, 0.7, 1 / 3, 0.123456789, -0.2, 2.2),
-            kind in (:rank, :zscore)
+            kind in (:rank, :zscore), tr in (:average, :ordinal)
 
             a = fill(v, 1, na)
-            wf = PO.forecast_portfolio_weights(a, a, [1], kind)
-            @test kind === :rank && na > 1 ? isapprox(sum(abs, wf), 2) : all(iszero, wf)
+            wf = PO.forecast_portfolio_weights(a, a, [1], kind, tr)
+            @test if kind === :rank && tr === :ordinal && na > 1
+                isapprox(sum(abs, wf), 2)
+            else
+                all(iszero, wf)
+            end
         end
         @test all(iszero,
                   PO.forecast_portfolio_weights(fill(0.1, 1, 3), fill(0.0, 1, 3), [1],
-                                                :zscore))
+                                                :zscore, :average))
     end
 
     @testset "A constant series has a zero volatility and no ratio" begin
