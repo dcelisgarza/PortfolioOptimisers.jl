@@ -361,7 +361,7 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl" = { code = 244, doc = 268, comment = 25, blank = 82, total = 619 }
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { code = 149, doc = 213, comment = 13, blank = 83, total = 458 }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { code = 42, doc = 61, comment = 4, blank = 20, total = 127 }
-"src/17_Optimisation/09_OnlineOptimisation.jl" = { code = 238, doc = 317, comment = 3, blank = 159, total = 717 }
+"src/17_Optimisation/09_OnlineOptimisation.jl" = { code = 253, doc = 408, comment = 3, blank = 207, total = 871 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { code = 312, doc = 622, comment = 5, blank = 253, total = 1192 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { code = 309, doc = 463, comment = 7, blank = 177, total = 956 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { code = 266, doc = 323, comment = 5, blank = 137, total = 731 }

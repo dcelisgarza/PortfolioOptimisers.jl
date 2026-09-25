@@ -238,6 +238,34 @@ assets is what keeps the JuMP families cheap.
                        weights(cross_val_predict(mr, rd, batch_cv)); atol = 1e-5)
     end
 
+    @testset "A wrapper the warm-up does not reach is refused at entry, by its path" begin
+        # The warm-up resolves the prior of the optimiser alone. A wrapper in an inner
+        # optimiser of a meta-optimiser, or in a fallback, never got a buffer, and the batch
+        # door of the read-out refused it by telling the caller to run the Online Scheme the
+        # caller was already running.
+        wrapped = MeanRisk(;
+                           opt = JuMPOptimiser(; pe = po.Online(EmpiricalPrior()),
+                                               slv = slv))
+        for (opt, path) in ((NestedClustered(; opti = wrapped, opto = mr), "opti.opt.pe"),
+                            (MeanRisk(; opt = jopt, fb = wrapped), "fb.opt.pe"))
+            @test po.online_unreached_path(opt) == path
+            err = try
+                cross_val_predict(opt, rd, online_cv)
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, ArgumentError)
+            @test occursin("`$(path)`", err.msg)
+            @test occursin("the warm-up does not resolve it", err.msg)
+        end
+        # A wrapper on the prior of the optimiser is resolved, and passes.
+        @test isnothing(po.online_unreached_path(wrapped))
+        @test isnothing(po.online_unreached_path(InverseVolatility(;
+                                                                   pe = po.Online(EmpiricalPrior()))))
+        @test isnothing(po.online_unreached_path(EqualWeighted()))
+    end
+
     @testset "A schedule reaches stateless fields only" begin
         cvr = split(online_cv, rd)
         n = length(cvr.train_idx)
@@ -301,6 +329,13 @@ assets is what keeps the JuMP families cheap.
             @test !isnothing(fold.est.opt.cache)
             return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
         end
+        # A schedule on an inner optimiser of a meta-optimiser carries no state either, so
+        # the online arm takes it and resolves it per fold.
+        mr_sd = MeanRisk(; opt = jopt, r = StandardDeviation())
+        sched_in = NestedClustered(;
+                                   opti = TimeDependent([isodd(i) ? mr : mr_sd for i in 1:n]),
+                                   opto = mr)
+        @test length(cross_val_predict(sched_in, rd, online_cv).pred) == n
     end
 
     @testset "The warm-up resolves every wrapper" begin

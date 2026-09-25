@@ -360,7 +360,7 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl" = { cyc = 6, cog = 9, arg = 11, cyc_sum = 28, cog_sum = 24, arg_sum = 61, macros = [] }
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { cyc = 9, cog = 14, arg = 7, cyc_sum = 23, cog_sum = 20, arg_sum = 38, macros = [] }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { cyc = 2, cog = 2, arg = 2, cyc_sum = 15, cog_sum = 6, arg_sum = 15, macros = [] }
-"src/17_Optimisation/09_OnlineOptimisation.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 61, cog_sum = 26, arg_sum = 75, macros = [] }
+"src/17_Optimisation/09_OnlineOptimisation.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 63, cog_sum = 26, arg_sum = 77, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { cyc = 5, cog = 7, arg = 7, cyc_sum = 73, cog_sum = 42, arg_sum = 98, macros = ["@propagatable"] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { cyc = 4, cog = 3, arg = 6, cyc_sum = 57, cog_sum = 30, arg_sum = 96, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { cyc = 7, cog = 10, arg = 7, cyc_sum = 64, cog_sum = 53, arg_sum = 59, macros = [] }
