@@ -139,4 +139,13 @@ unique_key_dict!(math_dict, :math_dict,
                  :m_pt_idio => "``m_{pt}``: Central moment of order ``p`` of the finite standardised returns of observation ``t``.",#
                  :a_t_series => "``a_{t}``: Diagnostic series value at observation ``t``.",#
                  :A_series_fin => "``\\mathcal{A}``: Finite observations of a diagnostic series, those at which ``a_{t}`` is finite.",#
-                 :rho_S_cs => "``\\rho_{S}``: Cross-sectional rank correlation, over the assets at which both cross-sections are finite. It correlates the ordinal ranks, so two equal values take two ranks, in the order of the asset axis.")
+                 :rho_S_cs => "``\\rho_{S}``: Cross-sectional rank correlation, over the assets at which both cross-sections are finite. It correlates the ordinal ranks, so two equal values take two ranks, in the order of the asset axis.",#
+                 # The coverage policy of `01_Base/16_CoveragePolicy.jl`. Each symbol is
+                 # stated by two or more Units of that file.
+                 :s_i_cvg => "``s_{i}``: Coverage share of asset ``i``, its own observation count over the number of observations folded.",#
+                 :c_cvg => "``c``: Coverage floor of the policy, its `min_coverage`.",#
+                 :tau_i_cvg => "``\\tau_{i}``: Staleness of asset ``i``, the number of observations folded since the asset was last finite and active.",#
+                 :a_i_cvg => "``a_{i}``: Active flag of asset ``i`` at the last observation folded, ``1`` when the asset is active and ``0`` when it is not.",#
+                 :nu_k_cvg => "``\\nu_{k}``: Observation count of cell ``k``, the number of observations at which every asset of the cell is finite and active.",#
+                 :v_k_cvg => "``v_{k}``: Entry ``k`` of the answer of an available-case fit.",#
+                 :A_adm_cvg => "``\\mathcal{A}``: Admitted assets, those that [`admits`](@ref) lets into the answer. A cell is admitted when every asset of the cell is in ``\\mathcal{A}``.")

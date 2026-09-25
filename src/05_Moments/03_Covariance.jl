@@ -750,7 +750,7 @@ function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:SemiMoment},
     assert_partial_fittable(ce.me, ce.w, "Covariance")
     @argcheck(isnothing(mean),
               ArgumentError("an available-case semi-covariance centres each asset on that asset's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
-    Xo, msk, mu, active, stale = coverage_valid_block(X, active_mask; dims = dims)
+    Xo, msk, mu, active, stale = coverage_valid_block(X, active_mask, cvg.alg; dims = dims)
     Y = min.(Xo .- transpose(mu), zero(eltype(mu)))
     Y[.!msk] .= zero(eltype(Y))
     mski = Int.(msk)

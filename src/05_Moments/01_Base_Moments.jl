@@ -788,7 +788,7 @@ The deviations are centred on each asset's **own** available-case mean and the i
 function coverage_comoment_block(alg::AbstractMomentAlgorithm, cvg::CoveragePolicy,
                                  X::MatNum, active_mask::Option{<:AbstractMatrix{<:Bool}},
                                  dims::Int)
-    Xo, msk, mu, active, stale = coverage_valid_block(X, active_mask; dims = dims)
+    Xo, msk, mu, active, stale = coverage_valid_block(X, active_mask, cvg.alg; dims = dims)
     Y = coverage_comoment_deviations(alg, Xo, mu)
     Y[.!msk] .= zero(eltype(Y))
     Mi = Int.(msk)
