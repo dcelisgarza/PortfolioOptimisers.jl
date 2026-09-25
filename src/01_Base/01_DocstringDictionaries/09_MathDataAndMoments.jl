@@ -181,4 +181,8 @@ unique_key_dict!(math_dict, :math_dict,
                  :t_j_eval => "``t_{j}``: The ``j``-th evaluation date.",#
                  :s_eval_stride => "``s``: The stride between two evaluation dates.",#
                  :c_j_cov => "``c_{j}``: Coverage at evaluation date ``t_{j}``, the share of the universe the evaluation scored there.",#
-                 :n_j_scored => "``n_{j}``: Scored count at evaluation date ``t_{j}``, the assets of the universe that carry a finite forecast and a finite target there.")
+                 :n_j_scored => "``n_{j}``: Scored count at evaluation date ``t_{j}``, the assets of the universe that carry a finite forecast and a finite target there.",#
+                 :a_k_pair => "``a_{k}``: Forecast of the ``k``-th scorable pair.",#
+                 :b_k_pair => "``b_{k}``: Forward target of the ``k``-th scorable pair.",#
+                 :q_k_pair => "``q_{k}``: Cross-sectional weight of the ``k``-th scorable pair, zero where that weight is not finite.",#
+                 :n_pool => "``n``: Number of scorable pairs in the pooling.")

@@ -2209,8 +2209,8 @@ end
 
     @testset "The edges are the quantiles, and they are answered once each" begin
         # The cut writes out the linear interpolation `Statistics.quantile` applies by
-        # default, so it must answer exactly what that verb answers -- which is what keeps
-        # the curve at parity with the reference implementation.
+        # default, so it answers what that verb answers to rounding. That keeps the curve at
+        # parity with the reference implementation.
         for x in ([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], [1.0, 1.0, 2.0, 40.0],
                   collect(range(-3.0, 5.0, 17)))
             for bins in (1, 2, 3, 10)
@@ -2361,6 +2361,108 @@ end
         @test forecast_ic(scaled)[:, 1] ≈ forecast_ic(fe)[:, 1]
         @test forecast_portfolio(scaled).ret ≈ forecast_portfolio(fe).ret
         @test forecast_calibration(scaled).slope ≈ forecast_calibration(fe).slope / 100
+    end
+end
+
+@testset "The docstrings of 13_ForecastCalibration.jl against numbers" begin
+    PO = PortfolioOptimisers
+
+    @testset "The pairs follow the order of `dates`, and a weight that is not finite is zero" begin
+        A = [1.0 NaN 3.0; 4.0 5.0 6.0; 7.0 8.0 NaN]
+        Y = [1.0 2.0 3.0; NaN 5.0 6.0; 7.0 8.0 9.0]
+        U = [1.0 1.0 NaN; 2.0 3.0 4.0; 5.0 Inf 6.0]
+        a, b, q = PO.forecast_calibration_pairs(A, Y, U, [3, 1])
+        @test a == [7.0, 8.0, 1.0, 3.0]
+        @test b == [7.0, 8.0, 1.0, 3.0]
+        @test q == [5.0, 0.0, 1.0, 0.0]
+    end
+
+    @testset "The slope is the weighted least-squares fit through the origin" begin
+        rng = StableRNG(953)
+        for _ in 1:50
+            n = rand(rng, 1:40)
+            a = randn(rng, n)
+            b = randn(rng, n)
+            q = rand(rng, n)
+            @test PO.forecast_calibration_slope(a, b, q) ≈ (sqrt.(q) .* a) \ (sqrt.(q) .* b) rtol = 1e-10
+        end
+        # A weight of zero at every pair leaves no positive weighted square.
+        @test isnan(PO.forecast_calibration_slope([1.0, 2.0], [1.0, 2.0], [0.0, 0.0]))
+    end
+
+    @testset "An edge that falls on an order statistic equals it exactly" begin
+        # At `n = 43` and `B = 14`, edge 9 sits at the order statistic `0.28`. A floating
+        # `h = (n - 1) i / B + 1` lands one ulp above 28, and the edge came out above
+        # `0.28`, so the pair at `0.28` fell into the bin below.
+        x = collect(1:43) ./ 100
+        e = PO.forecast_calibration_edges(x, 14)
+        @test e[10] == 0.28
+        @test all(i -> x[div(42 * i, 14) + 1] == e[i + 1], 0:14)
+        @test PO.forecast_calibration_curve(x, x, 14).count == [fill(3, 13); 4]
+        # Elsewhere the edges agree with `Statistics.quantile` to rounding.
+        rng = StableRNG(9532)
+        for _ in 1:200
+            n = rand(rng, 1:60)
+            y = round.(randn(rng, n); digits = 2)
+            B = rand(rng, 1:12)
+            @test PO.forecast_calibration_edges(y, B) ≈
+                  unique([quantile(y, p) for p in range(0, 1, B + 1)]) atol = 1e-12
+        end
+    end
+
+    @testset "Each bin holds the pairs between its edges, and the means rise" begin
+        rng = StableRNG(9533)
+        for _ in 1:100
+            n = rand(rng, 1:50)
+            a = round.(randn(rng, n); digits = 1)
+            b = randn(rng, n)
+            B = rand(rng, 1:10)
+            c = PO.forecast_calibration_curve(a, b, B)
+            e = PO.forecast_calibration_edges(a, B)
+            m = length(e)
+            @test sum(c.count) == n
+            @test all(>(0), diff(c.mean_alpha))
+            for (j, bj) in enumerate(c.bin)
+                lo = m == 1 ? -Inf : e[bj]
+                hi = (m == 1 || bj == m - 1) ? Inf : e[bj + 1]
+                k = findall(v -> lo <= v < hi, a)
+                @test length(k) == c.count[j]
+                @test c.mean_alpha[j] ≈ sum(a[k]) / length(k)
+                @test c.mean_y[j] ≈ sum(b[k]) / length(k)
+            end
+        end
+        # A bin with no pair between its edges is dropped, so `bin` skips its index.
+        @test PO.forecast_calibration_curve([0.0, 10.0], [1.0, 2.0], 4).bin == [1, 4]
+    end
+
+    @testset "The pooled moments are the mean and the corrected deviation" begin
+        v = [1.0, 2.0, 4.0, -3.0]
+        m = PO.forecast_pooled_moments(v)
+        @test m.mean == sum(v) / 4
+        @test m.std ≈ sqrt(sum(abs2, v .- sum(v) / 4) / 3)
+        @test isnan(PO.forecast_pooled_moments([1.0]).std)
+    end
+
+    @testset "Only a positive rescaling leaves the coefficients and the books unmoved" begin
+        rng = StableRNG(1)
+        A = randn(rng, 12, 8)
+        Y = PO.forward_mean_returns(A .+ 0.3 .* randn(rng, 12, 8), 1, 1)
+        fe = forecast_evaluation(A, Y)
+        fn = forecast_evaluation(-2 .* A, Y)
+        @test forecast_ic(forecast_evaluation(2 .* A, Y)) ≈ forecast_ic(fe)
+        @test forecast_ic(fn) ≈ -forecast_ic(fe)
+        @test filter(isfinite, forecast_portfolio(fn).ret) ≈
+              -filter(isfinite, forecast_portfolio(fe).ret)
+        @test forecast_calibration(fn).slope ≈ -forecast_calibration(fe).slope / 2
+    end
+
+    @testset "A Float32 evaluation stays Float32" begin
+        A = Float32[1 2 3 4; 2 4 6 8; 4 3 2 1]
+        c = forecast_calibration(forecast_evaluation(A, PO.forward_mean_returns(A, 1, 1)))
+        @test c.slope isa Float32
+        @test c.std_y isa Float32
+        @test eltype(c.curve.mean_alpha) == Float32
+        @test eltype(PO.forecast_calibration_edges(Float32[3, 1, 2, 5], 3)) == Float32
     end
 end
 

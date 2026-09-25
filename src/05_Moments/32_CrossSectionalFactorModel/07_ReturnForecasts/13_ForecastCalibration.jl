@@ -4,9 +4,32 @@
 
 Pool the scorable pairs of an evaluation into three vectors.
 
-Every statistic of this file is taken over the pairs of a forecast and its forward target rather than over the cross-sections that carry them, so the pooling is done once, here, and the three verbs above read vectors. A pair enters where both the forecast and the target are finite, which is the same cross-section [`forecast_cross_section!`](@ref) marks, and the pairs of every evaluation date are concatenated in date order.
+Every statistic of this file reads the pairs of a forecast and its forward target, not the cross-sections that hold them. This function pools the pairs once, and the verbs that follow read vectors. A pair enters where both the forecast and the target are finite, which is the cross-section that [`forecast_cross_section!`](@ref) marks. The pairs follow the order of `dates`, and the pairs of one date follow the order of the assets.
 
-The weight of a pair is carried beside it rather than applied to it, because the three readings do not agree on it: [`forecast_calibration_slope`](@ref) is taken under the weights, and [`forecast_calibration_curve`](@ref) and the pooled moments read every pair alike. A pair whose weight is not finite is carried at zero, so it shapes the curve and the moments and takes no part in the slope.
+The weight of a pair stays beside the pair and does not scale it, because the readings use it differently. [`forecast_calibration_slope`](@ref) reads the weights, and [`forecast_calibration_curve`](@ref) and the pooled moments read every pair alike. A pair whose weight is not finite gets a weight of zero, so it enters the curve and the moments and takes no part in the slope.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{P} &= \\left\\{ \\left( t_{j},\\, i \\right) : \\alpha_{t_{j} i} \\text{ and } y_{t_{j} i} \\text{ are finite} \\right\\}\\,,\\\\
+\\left( a_{k},\\, b_{k},\\, q_{k} \\right) &= \\begin{cases}
+\\left( \\alpha_{t_{j} i},\\, y_{t_{j} i},\\, u_{t_{j} i} \\right) & u_{t_{j} i} \\text{ is finite}\\,,\\\\
+\\left( \\alpha_{t_{j} i},\\, y_{t_{j} i},\\, 0 \\right) & \\text{otherwise}\\,,
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{P}``: The scorable pairs, ordered by ``j`` and then by ``i``. Pair ``k`` is the ``k``-th member ``\\left( t_{j},\\, i \\right)``.
+  - $(math_dict[:alpha_ti_fc])
+  - $(math_dict[:y_ti_fwd])
+  - $(math_dict[:u_ti_cs])
+  - $(math_dict[:t_j_eval])
+  - $(math_dict[:a_k_pair])
+  - $(math_dict[:b_k_pair])
+  - $(math_dict[:q_k_pair])
 
 # Arguments
 
@@ -52,9 +75,9 @@ end
 
 Return the scale multiplier that maps a forecast onto its realised target.
 
-It is the slope of a weighted regression of the target on the forecast with **no intercept**, which is what makes it a statement about scale alone: the line is pinned through the origin, so a forecast that is right on average about the level of the cross-section and wrong about its spread is not rescued by a free constant. A slope of `1` says the forecast is already in target units, a slope above `1` says its magnitude is too small, and a slope below `1` says it is too large.
+The slope comes from a weighted regression of the target on the forecast with **no intercept**. The line passes through the origin, so the slope states the scale and nothing else. A free constant cannot correct a forecast that has the right level for the cross-section and the wrong spread. A slope of `1` says that the forecast is in target units. A slope above `1` says that its magnitude is too small, a slope between `0` and `1` says that its magnitude is too large, and a negative slope says that its sign is wrong.
 
-The intercept is refused rather than fitted because a Return Forecast is a cross-sectional statement. The cross-sectional mean of the target is what the factor model is for, and the forecast is answerable for what is left; a fitted intercept would absorb that mean and report a scale measured against a level the forecast never claimed.
+The verb fits no intercept because a Return Forecast is a cross-sectional statement. The factor model accounts for the cross-sectional mean of the target, and the forecast answers for the rest. A fitted intercept would absorb that mean, and the slope would then measure the scale against a level that the forecast never stated.
 
 # Mathematical definition
 
@@ -64,9 +87,9 @@ The intercept is refused rather than fitted because a Return Forecast is a cross
 
 Where:
 
-  - ``a_{k}``: Forecast of pair ``k``.
-  - ``b_{k}``: Target of pair ``k``.
-  - ``q_{k}``: Weight of pair ``k``.
+  - $(math_dict[:a_k_pair])
+  - $(math_dict[:b_k_pair])
+  - $(math_dict[:q_k_pair])
 
 # Arguments
 
@@ -76,7 +99,7 @@ Where:
 
 # Returns
 
-  - `slope::Real`: The scale multiplier, or `NaN` when no pair carries a positive weighted square, which is the case of an empty pooling and the case of a forecast that is identically zero.
+  - `slope::Real`: The scale multiplier. It is `NaN` when no pair has a positive weighted square. An empty pooling, a forecast that is zero at every pair, and a weight of zero at every pair all give `NaN`.
 
 # Related
 
@@ -98,11 +121,13 @@ end
 """
     forecast_calibration_edges(a::AbstractVector{<:Real}, bins::Integer) -> VecNum
 
-Return the distinct quantile edges a pooled forecast is cut at.
+Return the distinct quantile edges at which the curve cuts a pooled forecast.
 
-The edges are the `bins + 1` evenly spaced quantiles of the pooling, taken by linear interpolation between the two order statistics each probability falls between — the rule `Statistics.quantile` applies by default, written out here so the cut reads one sorted copy rather than sorting once per probability.
+The edges are the `bins + 1` evenly spaced quantiles of the pooling. Each edge interpolates linearly between the two order statistics that its probability falls between, which is the default rule of `Statistics.quantile`. This function writes the rule out so that the cut sorts one copy of the forecast, not one copy per probability.
 
-They are answered through `unique`, so a tie that spans an edge leaves one edge rather than two and the bins it would have split collapse into one. A forecast that carries a single distinct value therefore answers a single edge, which [`forecast_calibration_curve`](@ref) reads as its one-bin case.
+The index ``\\lfloor h_{i} \\rfloor`` and the fraction ``h_{i} - \\lfloor h_{i} \\rfloor`` come from integer arithmetic. So an edge that falls on an order statistic equals that order statistic exactly, and a pair at that value falls in the bin above the edge. The edges agree with `Statistics.quantile` to rounding, not bit for bit.
+
+The function takes the edges through `unique`. A tie that spans an edge therefore leaves one edge and not two, and the bins it would split become one bin. A forecast with one distinct value gives one edge, which [`forecast_calibration_curve`](@ref) reads as its one-bin case.
 
 # Mathematical definition
 
@@ -112,19 +137,20 @@ e_{i} = x_{\\left\\lfloor h_{i} \\right\\rfloor} + \\left( h_{i} - \\left\\lfloo
 
 Where:
 
-  - ``x``: The pooled forecast, sorted.
-  - ``n``: Its length.
+  - ``e_{i}``: Edge ``i``, before `unique` removes the duplicates.
+  - ``x``: The pooled forecast, sorted in increasing order.
+  - $(math_dict[:n_pool])
   - ``B``: Number of bins.
-  - ``i``: The edge, from ``0`` to ``B``.
+  - ``i``: Index of the edge, from ``0`` to ``B``.
 
 # Arguments
 
-  - `a`: The forecast of each pair, from [`forecast_calibration_pairs`](@ref). It must carry no entry that is not finite.
-  - `bins`: Number of quantile bins the edges cut.
+  - `a`: The forecast of each pair, from [`forecast_calibration_pairs`](@ref). It must not be empty, and every entry must be finite.
+  - `bins`: Number of quantile bins that the edges cut. It must be at least `1`, which [`forecast_calibration_curve`](@ref) checks.
 
 # Returns
 
-  - `edges::VecNum`: The distinct edges, in increasing order. It carries at most `bins + 1` of them, and at least one.
+  - `edges::VecNum`: The distinct edges, in increasing order. There are at most `bins + 1` of them, and at least one.
 
 # Related
 
@@ -138,10 +164,10 @@ function forecast_calibration_edges(a::AbstractVector{<:Real}, bins::Integer)
     n = length(x)
     e = Vector{Tf}(undef, bins + 1)
     for i in 0:bins
-        h = (n - 1) * (i / bins) + 1
-        lo = floor(Int, h)
+        lo, r = divrem((n - 1) * i, bins)
+        lo += 1
         hi = min(lo + 1, n)
-        e[i + 1] = x[lo] + (h - lo) * (x[hi] - x[lo])
+        e[i + 1] = x[lo] + (Tf(r) / bins) * (x[hi] - x[lo])
     end
     return unique(e)
 end
@@ -151,21 +177,21 @@ end
 
 Return the mean forecast and the mean realised target of each quantile bin of a pooling.
 
-The slope states the scale of a forecast under one number and assumes it holds everywhere; the curve states it bin by bin and therefore shows where it does not. A forecast whose ordering is right and whose scale bends — flat in the middle of the cross-section and steep in the tails, which is the usual shape — reports a plausible slope and a curve that says otherwise.
+The slope states the scale of a forecast in one number, and it assumes that the scale holds everywhere. The curve states the scale bin by bin, so it shows where the scale changes. A common case is a forecast with the right order and a scale that bends, flat in the middle of the cross-section and steep in the tails. That forecast gets a plausible slope and a curve that shows the bend.
 
-The bins are quantile bins of the pooled forecast, so each carries roughly the same number of pairs rather than the same width, and the mean forecast of the bins is non-decreasing by construction. A tie that spans a bin edge collapses the two bins into one, because the edges are taken through `unique`, so a forecast that carries fewer distinct values than `bins` reports fewer bins rather than empty ones. A bin that no pair falls in is dropped, so `bin` is the index a bin carries among the edges and not its position in the answer.
+The bins are quantile bins of the pooled forecast. Each bin holds about the same number of pairs, not the same width, and the mean forecast rises from each bin to the next. The edges go through `unique`, so a tie that spans an edge joins the two bins on each side of it. A forecast with fewer distinct values than `bins` therefore gives fewer bins, not empty ones. The verb drops a bin that holds no pair, so `bin` is the index of a bin among the edges and not its position in the answer.
 
 # Algorithm
 
- 1. Cut `a` at the `bins + 1` evenly spaced quantiles with [`forecast_calibration_edges`](@ref). Fewer than two distinct edges leave one bin, which every pair falls in.
- 2. Place each pair in the bin its forecast falls in, counting the interior edges it stands at or above. The interval is closed on the left.
- 3. Average the forecast and the target of each non-empty bin, and count its pairs.
+ 1. Cut `a` at the `bins + 1` evenly spaced quantiles with [`forecast_calibration_edges`](@ref), giving the edges. Fewer than two distinct edges give one bin, which holds every pair.
+ 2. Put each pair in the bin of its forecast, giving its bin index. The index is one plus the number of interior edges at or below the forecast, so each bin is closed on the left and the last bin is closed on both sides.
+ 3. Average the forecast and the target over each non-empty bin, giving `mean_alpha` and `mean_y`, and count its pairs, giving `count`.
 
 # Arguments
 
   - `a`: The forecast of each pair, from [`forecast_calibration_pairs`](@ref).
   - `b`: The target of each pair.
-  - `bins`: Number of quantile bins to cut the forecast at.
+  - `bins`: Number of quantile bins at which to cut the forecast.
 
 # Validation
 
@@ -173,7 +199,7 @@ The bins are quantile bins of the pooled forecast, so each carries roughly the s
 
 # Returns
 
-  - `curve::NamedTuple`: `(; bin, mean_alpha, mean_y, count)`, four vectors of the same length, one entry per non-empty bin, in increasing order of the forecast. An empty pooling gives four empty vectors.
+  - `curve::NamedTuple`: `(; bin, mean_alpha, mean_y, count)`, four vectors of the same length. There is one entry per non-empty bin, in increasing order of the forecast. An empty pooling gives four empty vectors.
 
       + `bin::Vector{Int}`: Index of the bin among the edges.
       + `mean_alpha::VecNum`: Mean forecast of the bin.
@@ -218,7 +244,23 @@ end
 
 Return the mean and the standard deviation of a pooled vector.
 
-The two figures are pooled over pairs rather than taken per date and averaged, so they describe the whole sample the calibration was measured on. They are what puts the slope in context: a slope of `2` on a forecast whose standard deviation is a tenth of the target's is the same statement twice, and the two figures are what let a reader see that.
+The two figures pool the pairs of every date. They do not average figures taken per date, so they describe the whole sample that the calibration reads. They put the slope in context. When both means are near zero, the slope is about the correlation of the pairs times the ratio of the standard deviation of the target to that of the forecast. The two standard deviations separate that ratio from the correlation.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{v} &= \\frac{1}{n} \\sum_{k = 1}^{n} v_{k}\\,,\\\\
+s_{v} &= \\sqrt{\\frac{1}{n - 1} \\sum_{k = 1}^{n} \\left( v_{k} - \\bar{v} \\right)^{2}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``v_{k}``: Entry ``k`` of the pooled vector, which is the forecast or the target of the ``k``-th pair.
+  - ``\\bar{v}``: The mean of the pooled vector.
+  - ``s_{v}``: The standard deviation of the pooled vector.
+  - $(math_dict[:n_pool])
 
 # Arguments
 
@@ -226,7 +268,7 @@ The two figures are pooled over pairs rather than taken per date and averaged, s
 
 # Returns
 
-  - `moments::NamedTuple`: `(; mean, std)`. The mean is `NaN` on an empty vector, and the standard deviation, which removes one degree of freedom, is `NaN` on a vector shorter than two.
+  - `moments::NamedTuple`: `(; mean, std)`. The mean is `NaN` for an empty vector. The standard deviation divides by ``n - 1``, and it is `NaN` for a vector with fewer than two entries.
 
 # Related
 
@@ -248,36 +290,36 @@ end
                          weighting::AbstractOrthogonalityMetric = IdentityMetric(),
                          bins::Integer = 10) -> NamedTuple
 
-Score whether the magnitude of a Return Forecast is right, and not only its ordering.
+Score whether the magnitude of a Return Forecast is right, and not only its order.
 
-This is the third reading of a forecast, and the only one that asks anything of its scale. [`forecast_ic`](@ref) correlates, so it is invariant to a rescaling of the forecast; [`forecast_portfolio`](@ref) rescales every book to 200 % gross, so it is invariant by construction. A forecast that scores well under both can still state a return of five per cent where one is earned, and an optimiser that reads it as a mean will size the position on the five. The slope is the number that catches that, and the curve is where it bends.
+This is the third reading of a forecast, and the only one that tests its scale. [`forecast_ic`](@ref) correlates, so a positive rescaling of the forecast does not move it. [`forecast_portfolio`](@ref) rescales every book to 200 % gross, so a positive rescaling does not move it either. A forecast can score well on both and still state a return of five per cent where the asset earns one per cent. An optimiser that reads the forecast as a mean then sizes the position on the five. The slope finds that error, and the curve shows where the scale bends.
 
-# The word calibration is used three other ways in this library
+# Three other uses of the word calibration
 
-The three are different objects, and only this one is out of sample.
+The three are different objects, and only this verb reads out of sample.
 
-  - An [`AbstractCalibrationAlgorithm`](@ref) computes the radius of an uncertainty set, or another number a slot would otherwise state, from the Prior, and it has nothing to do with a forecast.
-  - [`idio_calibration`](@ref) states whether a fitted factor model predicted the size of its own idiosyncratic returns, in sample, by the standard deviation of the standardised residuals.
-  - `TargetReturnForecast`'s `calib` field is a member's **own** calibration coefficient, one exponentially weighted scalar regression fitted at fit time to put its transformed predictions back into return units. That one acts on the forecast; this verb measures, out of sample, whether the result landed in the right units. A member whose `calib` did its work reports a slope near `1` here, and a member that never calibrated reports whatever scale its predictions happen to carry.
+  - An [`AbstractCalibrationAlgorithm`](@ref) computes a quantity that a slot would otherwise state, such as the radius of an uncertainty set, from the data a prior result carries. It has nothing to do with a forecast.
+  - [`idio_calibration`](@ref) states whether a fitted factor model predicted the size of its own idiosyncratic returns. It reads in sample, through the standard deviation of the standardised residuals.
+  - The `calib` field of a [`TargetReturnForecastResult`](@ref) is the member's **own** calibration coefficient. The member fits it at fit time, as one exponentially weighted scalar regression, to put its transformed predictions back into return units. That coefficient acts on the forecast, and this verb measures out of sample whether the result is in the right units. A member whose `calib` did its work gets a slope near `1` here. A member that did not calibrate gets whatever scale its predictions carry.
 
 # The threshold does not apply here
 
-Every other statistic of an evaluation is a statistic of a cross-section. Each of them except [`forecast_coverage`](@ref), which explains why a date carries no statistic, refuses a cross-section that carries fewer than `fe.min_count` assets. This one is not a statistic of a cross-section: the slope, the curve and the moments pool the pairs of every evaluation date and read them as one sample, so a thin cross-section contributes few pairs rather than an unreliable number. There is no cross-sectional count to threshold, and this verb takes no `min_count`.
+Every other statistic of an evaluation is a statistic of a cross-section. Each of them except [`forecast_coverage`](@ref), which explains why a date has no statistic, refuses a cross-section with fewer than `fe.min_count` assets. This verb pools the pairs of every evaluation date and reads them as one sample, so a thin cross-section adds few pairs and not an unreliable number. There is no cross-sectional count to compare with a threshold, and this verb takes no `min_count`.
 
 # Algorithm
 
- 1. Resolve the weight history with [`forecast_ic_weights`](@ref).
- 2. Pool the scorable pairs with [`forecast_calibration_pairs`](@ref).
- 3. Take the slope with [`forecast_calibration_slope`](@ref) and the curve with [`forecast_calibration_curve`](@ref).
- 4. Take the pooled moments of the forecast and of the target with [`forecast_pooled_moments`](@ref).
+ 1. Resolve the weight history with [`forecast_ic_weights`](@ref), giving `u`.
+ 2. Pool the scorable pairs with [`forecast_calibration_pairs`](@ref), giving `a`, `b` and `q`.
+ 3. Take the slope with [`forecast_calibration_slope`](@ref), and the curve with [`forecast_calibration_curve`](@ref).
+ 4. Take the pooled moments of `a` and of `b` with [`forecast_pooled_moments`](@ref).
 
 # Arguments
 
   - `fe`: The [`ForecastEvaluationResult`](@ref) to score.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of `fe.alpha`, or `nothing` for equal weights. The curve and the moments read no weights.
-  - `csfm`: The fitted factor-model block the evaluation was built on. It supplies the weight history the metric names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the slope is taken under, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis. The default reads equal weights.
-  - `bins`: Number of quantile bins the curve cuts the forecast at.
+  - `csfm`: The fitted factor-model block of the evaluation. It supplies the weight history that the metric names.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history of the slope, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis. The default reads equal weights.
+  - `bins`: Number of quantile bins at which the curve cuts the forecast.
 
 # Validation
 
@@ -290,10 +332,10 @@ Every other statistic of an evaluation is a statistic of a cross-section. Each o
       + `slope::Real`: The scale multiplier, from [`forecast_calibration_slope`](@ref).
       + `curve::NamedTuple`: `(; bin, mean_alpha, mean_y, count)`, from [`forecast_calibration_curve`](@ref).
       + `mean_alpha::Real`: Mean forecast over the pooled pairs.
-      + `std_alpha::Real`: Its standard deviation.
+      + `std_alpha::Real`: Standard deviation of the forecast over the pooled pairs.
       + `mean_y::Real`: Mean realised target over the same pairs.
-      + `std_y::Real`: Its standard deviation.
-      + `n_bins::Int`: Number of non-empty bins the curve reports.
+      + `std_y::Real`: Standard deviation of the target over the same pairs.
+      + `n_bins::Int`: Number of non-empty bins in the curve.
 
 # Examples
 

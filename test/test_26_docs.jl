@@ -1372,9 +1372,16 @@ in the sense of `STANDARDS.md`.
                     # One quantity under two glyphs, ``s_{c1}`` and ``s_c``. A merge
                     # candidate: the entropy pooling optimiser states its own scale.
                     "constraint scale" => [:ep_sc1, :sc_scale],
-                    # Seven counts of seven different things.
-                    "number" => [:K, :N, :T, :k_tail_count, :n_network, :sigma_st_i_paths,
-                                 :sigma_st_paths],
+                    # A panel entry ``u_{ti}``, against the entry ``q_{k}`` of the pooled
+                    # vector that the calibration verbs read. Those verbs take vectors, not
+                    # the panel, so the pooled glyph cannot be the panel one.
+                    "cross-sectional weight" => [:q_k_pair, :u_ti_cs],
+                    # As `cross-sectional weight`, for ``y_{ti}`` and ``b_{k}``.
+                    "forward target" => [:b_k_pair, :y_ti_fwd],
+                    # Eight counts of eight different things.
+                    "number" =>
+                        [:K, :N, :T, :k_tail_count, :n_network, :n_pool, :sigma_st_i_paths,
+                         :sigma_st_paths],
                     # As `constraint scale`, and the same merge candidate.
                     "objective scale" => [:ep_so, :so_scale],
                     # The weights an optimisation produced, against the weights themselves.
