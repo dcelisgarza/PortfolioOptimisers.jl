@@ -3540,3 +3540,141 @@ end
               (20 + 30) / 2 - (10 + 20) / 2
     end
 end
+
+# A member that counts its fits and forwards each one to a shipped member. It carries no
+# method of `forecast_history`, so it also proves that a new member needs none.
+struct HistoryFitCounter{R} <: PortfolioOptimisers.AbstractReturnForecastEstimator
+    inner::R
+    n::Base.RefValue{Int}
+end
+function PortfolioOptimisers.return_forecast(c::HistoryFitCounter,
+                                             rd::PortfolioOptimisers.ReturnsResult,
+                                             csfm::CrossSectionalFactorModel)
+    c.n[] += 1
+    return PortfolioOptimisers.return_forecast(c.inner, rd, csfm)
+end
+
+@testset "The docstrings of 08_ForecastHistory.jl against numbers" begin
+    PO = PortfolioOptimisers
+    fx = evaluation_fixture()
+    rd, csfm, scores, rows = fx.rd, fx.csfm, fx.scores, fx.rows
+    Tb, N = fx.Tb, fx.N
+    fw = FixedWeightedReturnForecast(; scores = scores, scale = 1.0, weights = [0.4, 0.6])
+    ew = ExpWeightedReturnForecast(; scores = scores, horizon = 2, lag = 1, scale = 1.0,
+                                   min_obs = 3)
+    tgt = TargetReturnForecast(; scores = scores, horizon = 2, lag = 1, calibrate = false)
+    tgtc = TargetReturnForecast(; scores = scores, horizon = 2, lag = 1, calibrate = true)
+    members = (fw, ew, tgt, tgtc)
+
+    @testset "No member reads b, esigma, L, fcb, rf, or the values of M" begin
+        K = size(csfm.Ms, 3)
+        fcb = PO.FactorFamilyBasis(; fnm = ["industry"], fi = [collect(2:K)], di = [K - 1],
+                                   ratios = ones(Tb, K - 2), K = K)
+        full = CrossSectionalFactorModel(; M = 3 .* csfm.M .+ 1,
+                                         L = randn(StableRNG(3), N, K - 1),
+                                         b = randn(StableRNG(4), N), csr = csfm.csr,
+                                         Ms = csfm.Ms, vs = csfm.vs, esigma = fill(0.3, N),
+                                         nf = csfm.nf, fam = csfm.fam, fcb = fcb,
+                                         rf = return_forecast(fw, rd, csfm))
+        for m in members
+            mu = return_forecast(m, rd, full).mu
+            @test isequal(mu, return_forecast(m, rd, csfm).mu)
+            # The fit on the cut at the last row is the fit on the whole sample.
+            @test isequal(mu,
+                          return_forecast(m, PO.port_opt_view(rd, 1:rows[Tb], :),
+                                          PO.forecast_history_block(full, Tb)).mu)
+            @test isequal(forecast_history(m, rd, full; step = 3),
+                          forecast_history(m, rd, csfm; step = 3))
+        end
+        cut = PO.forecast_history_block(full, 10)
+        @test isequal(cut.M, full.Ms[10, :, :])
+        @test cut.b == full.b
+        @test cut.esigma == full.esigma
+        @test isnothing(getfield(cut, :L))
+        @test cut.L === cut.M
+        @test isnothing(cut.fcb)
+        @test isnothing(cut.rf)
+    end
+
+    @testset "A grid row is the fit at that row, and the last row is mu only on the grid" begin
+        mu = return_forecast(tgtc, rd, csfm).mu
+        for s in (1, 3, 5, 7)
+            h = forecast_history(tgtc, rd, csfm; step = s)
+            grid = 1:s:Tb
+            for tb in grid
+                tb == Tb && continue
+                @test isequal(h[tb, :],
+                              return_forecast(tgtc, PO.port_opt_view(rd, 1:rows[tb], :),
+                                              PO.forecast_history_block(csfm, tb)).mu)
+            end
+            @test all(t -> all(isnan, view(h, t, :)), setdiff(1:Tb, grid))
+            if Tb in grid
+                @test isequal(h[Tb, :], mu)
+            else
+                @test all(isnan, view(h, Tb, :))
+            end
+        end
+    end
+
+    @testset "Every evaluation date is a fitted row of the grid" begin
+        for s in 1:7, hz in (1, 2, 4)
+            fe = forecast_evaluation(tgt, rd, csfm; horizon = hz, lag = 1, step = s)
+            grid = 1:s:Tb
+            fin = [t
+                   for t in grid
+                   if any(i -> isfinite(fe.alpha[t, i]) && isfinite(fe.y[t, i]), 1:N)]
+            @test issubset(fe.dates, grid)
+            @test first(fe.dates) == first(fin)
+            @test last(fe.dates) == last(fin)
+        end
+    end
+
+    @testset "A member with a history is fitted once, and one without is refitted per row" begin
+        for (m, s) in ((fw, 1), (fw, 5), (ew, 3), (tgt, 1), (tgt, 3), (tgt, 5))
+            c = HistoryFitCounter(m, Ref(0))
+            h = forecast_history(c, rd, csfm; step = s)
+            grid = 1:s:Tb
+            @test c.n[] ==
+                  (m isa TargetReturnForecast ? 1 + length(grid) - (Tb in grid) : 1)
+            @test size(h) == (length(PO.return_forecast_rows(rd, csfm)), N)
+        end
+    end
+
+    @testset "A whole-history member reads nothing after the row it forecasts" begin
+        tw = TargetReturnForecast(; scores = scores, horizon = 2, lag = 1, calibrate = true,
+                                  whole_history = true)
+        h = forecast_history(tw, rd, csfm; step = 3)
+        for tb in 1:3:(Tb - 1)
+            @test isequal(h[tb, :],
+                          return_forecast(tw, PO.port_opt_view(rd, 1:rows[tb], :),
+                                          PO.forecast_history_block(csfm, tb)).mu)
+        end
+        @test isequal(h[Tb, :], return_forecast(tw, rd, csfm).mu)
+        tb = 31
+        rng = StableRNG(7)
+        rdp = deepcopy(rd)
+        csfmp = deepcopy(csfm)
+        ra = (rows[tb] + 1):(fx.T)
+        rdp.X[ra, :] .= 10 .* randn(rng, length(ra), N)
+        csfmp.csr.eps[(tb + 1):Tb, :] .= 5 .* randn(rng, Tb - tb, N)
+        csfmp.vs[(tb + 1):Tb, :] .= 9.0
+        hp = forecast_history(tw, rdp, csfmp; step = 3)
+        @test isequal(view(hp, 1:tb, :), view(h, 1:tb, :))
+        @test !isequal(view(hp, tb + 3, :), view(h, tb + 3, :))
+    end
+
+    @testset "A stated forecast is refused whatever the step" begin
+        cv = CustomValueReturnForecast(; mu = fill(0.01, N))
+        for s in (0, -1, 1, 3)
+            @test_throws PO.ConflictingArgumentError forecast_history(cv, rd, csfm;
+                                                                      step = s)
+        end
+    end
+
+    @testset "The refit history takes the element type of mu" begin
+        mu = Float32.(return_forecast(tgt, rd, csfm).mu)
+        h = PO.forecast_history_refit(tgt, rd, csfm, mu, 5)
+        @test eltype(h) === Float32
+        @test isequal(h[1, :], Float32.(forecast_history(tgt, rd, csfm; step = 5)[1, :]))
+    end
+end
