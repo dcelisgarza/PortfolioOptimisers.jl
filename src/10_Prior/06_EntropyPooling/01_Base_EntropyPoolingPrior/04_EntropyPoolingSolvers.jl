@@ -412,7 +412,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         return G
     end
     #! Start: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
-    @static if v"2.0.1" <= pkgversion(Optim) < v"2.3.0"
+    @static if v"2.0.1" <= pkgversion(Optim) < v"2.4.0"
         args = ifelse(isempty(opt.args), (Optim.Fminbox(; mu0 = 1e-5),), opt.args)
         result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, args...;
                                 opt.kwargs...)
@@ -501,7 +501,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         return G
     end
     #! Start: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
-    @static if v"2.0.1" <= pkgversion(Optim) < v"2.3.0"
+    @static if v"2.0.1" <= pkgversion(Optim) < v"2.4.0"
         args = ifelse(isempty(opt.args), (Optim.Fminbox(; mu0 = 1e-5),), opt.args)
         result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, args...;
                                 opt.kwargs...)
