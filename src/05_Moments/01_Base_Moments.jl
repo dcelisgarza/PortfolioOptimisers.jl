@@ -118,7 +118,7 @@ julia> function Statistics.cov(est::MyCovarianceEstimator, X::PortfolioOptimiser
            X = PortfolioOptimisers.dims_oriented(dims, X)
            w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
            X = X .* w
-           sigma = X * X'
+           sigma = X' * X
            return sigma
        end
 
@@ -127,23 +127,21 @@ julia> function Statistics.cor(est::MyCovarianceEstimator, X::PortfolioOptimiser
            X = PortfolioOptimisers.dims_oriented(dims, X)
            w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
-           sigma = X * X'
+           sigma = X' * X
            d = LinearAlgebra.diag(sigma)
            StatsBase.cov2cor!(sigma, sqrt.(d))
            return sigma
        end
 
 julia> cov(MyCovarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
-3×3 Matrix{Float64}:
- 5.0  1.7   2.7
- 1.7  0.58  0.92
- 2.7  0.92  1.46
+2×2 Matrix{Float64}:
+ 1.34  2.76
+ 2.76  5.7
 
 julia> cor(MyCovarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
-3×3 Matrix{Float64}:
- 1.0       0.998274  0.999315
- 0.998274  1.0       0.999764
- 0.999315  0.999764  1.0
+2×2 Matrix{Float64}:
+ 1.0       0.998664
+ 0.998664  1.0
 
 julia> PortfolioOptimisers.factory(MyCovarianceEstimator(), StatsBase.Weights([1, 2, 3]))
 MyCovarianceEstimator
@@ -241,8 +239,8 @@ julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.
            X = PortfolioOptimisers.dims_oriented(dims, X)
            w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
-           sigma = LinearAlgebra.diag(X * X')
-           return isone(dims) ? reshape(sigma, 1, :) : reshape(sigma, :, 2)
+           sigma = LinearAlgebra.diag(X' * X)
+           return isone(dims) ? reshape(sigma, 1, :) : reshape(sigma, :, 1)
        end
 
 julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
@@ -250,29 +248,37 @@ julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.
            X = PortfolioOptimisers.dims_oriented(dims, X)
            w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
-           sigma = sqrt.(LinearAlgebra.diag(X * X'))
+           sigma = sqrt.(LinearAlgebra.diag(X' * X))
            return isone(dims) ? reshape(sigma, 1, :) : reshape(sigma, :, 1)
        end
 
 julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.VecNum; kwargs...)
            w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
-           return mean(LinearAlgebra.diag(X' * X))
+           return sum(abs2, X)
        end
 
 julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.VecNum; kwargs...)
            w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
-           return sqrt(mean(LinearAlgebra.diag(X' * X)))
+           return sqrt(sum(abs2, X))
        end
 
 julia> var(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
-1×3 Matrix{Float64}:
- 5.0  0.58  1.46
+1×2 Matrix{Float64}:
+ 1.34  5.7
 
 julia> std(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
-1×3 Matrix{Float64}:
- 2.23607  0.761577  1.2083
+1×2 Matrix{Float64}:
+ 1.15758  2.38747
+
+julia> var(MyVarianceEstimator(), [1.0 0.3 0.5; 2.0 0.7 1.1]; dims = 2)
+2×1 Matrix{Float64}:
+ 1.34
+ 5.7
+
+julia> var(MyVarianceEstimator(), [1.0, 0.3, 0.5])
+1.34
 
 julia> PortfolioOptimisers.factory(MyVarianceEstimator(), StatsBase.Weights([1, 2, 3]))
 MyVarianceEstimator
