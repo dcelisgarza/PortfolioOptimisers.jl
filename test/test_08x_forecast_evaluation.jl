@@ -3081,3 +3081,101 @@ end
         @test !PO.forecast_summary_same_target(IdiosyncraticTarget(), AssetReturnTarget())
     end
 end
+
+@testset "The docstrings of 12_ForecastForwardWindows.jl against numbers" begin
+    PO = PortfolioOptimisers
+    alpha = WINDOW_ALPHA
+    fe = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1)
+
+    @testset "Each grid pair is the half-open window of the definition" begin
+        Xw = randn(StableRNG(952), 30, 3)
+        kinds = (:cumulative, :disjoint)
+        for (h, l, n) in ((1, 0, 4), (2, 1, 3), (3, 2, 3))
+            for kind in kinds
+                g = PO.forecast_window_grid(h, l, n, kind)
+                for p in 1:n
+                    lo = kind === :cumulative ? l : l + (p - 1) * h
+                    hi = l + p * h
+                    Yw = PO.forward_mean_returns(Xw, g[p]...)
+                    @test all(Yw[t, i] ≈ mean(Xw[(t + lo):(t + hi - 1), i])
+                              for t in 1:(30 - hi + 1), i in 1:3)
+                end
+            end
+        end
+    end
+
+    @testset "The common dates are the set of the definition" begin
+        rng = StableRNG(9520)
+        for _ in 1:100
+            nt, na = rand(rng, 5:12), rand(rng, 2:6)
+            a = randn(rng, nt, na)
+            a[rand(rng, nt, na) .< 0.25] .= NaN
+            xr = randn(rng, nt, na)
+            xr[rand(rng, nt, na) .< 0.2] .= NaN
+            g = PO.forecast_window_grid(rand(rng, 1:2), rand(rng, 0:2), rand(rng, 1:3),
+                                        rand(rng, (:cumulative, :disjoint)))
+            ys = [PO.forward_mean_returns(xr, h, l) for (h, l) in g]
+            mc = rand(rng, 1:na)
+            set = [t
+                   for t in 1:nt
+                   if all(count(i -> isfinite(a[t, i]) && isfinite(y[t, i]), 1:na) >= mc
+                          for y in ys)]
+            @test PO.forecast_common_dates(a, ys, 1:nt, mc) == set
+        end
+    end
+
+    @testset "A zero weight leaves the Pearson coefficient NaN on a kept date" begin
+        wz = ones(8, 4)
+        wz[2, 1:2] .= 0.0
+        t = forecast_holding_period(fe, alpha, wz; n = 2)
+        @test 2 ∈ t.dates
+        f1 = PO.ForecastEvaluationResult(fe.alpha, PO.forward_mean_returns(alpha, 1, 1),
+                                         fe.umsk, t.dates, fe.target, 1, 1, 1, 3, fe.ppy)
+        ic = forecast_ic(f1, wz)
+        j = findfirst(==(2), t.dates)
+        @test isnan(ic[j, 2])
+        @test isfinite(ic[j, 1])
+        @test all(isfinite, forecast_portfolio(f1; kind = :rank).ret)
+    end
+
+    @testset "Every figure of a row takes the element type of the pairing" begin
+        a32 = Float32.(alpha)
+        f32 = forecast_evaluation(a32, PO.forward_mean_returns(a32, 1, 1); step = 1)
+        for n in (2, 8)
+            t = forecast_holding_period(f32, a32, ones(Float64, 8, 4); n = n)
+            @test all(eltype(t[k]) === Float32 for k in keys(t)[5:end])
+        end
+    end
+
+    @testset "A wrong weight history raises at every depth" begin
+        @test_throws DimensionMismatch forecast_holding_period(fe, alpha, ones(3, 3); n = 2)
+        @test_throws DimensionMismatch forecast_holding_period(fe, alpha, ones(3, 3); n = 8)
+        @test_throws DimensionMismatch forecast_decay(fe, alpha, ones(3, 3); n = 8)
+        @test_throws DomainError forecast_holding_period(fe, alpha, -ones(8, 4); n = 8)
+    end
+
+    @testset "The plain t-ratio spreads with the depth only for a persistent forecast" begin
+        rng = StableRNG(9522)
+        nr, nt, na, depth = 100, 240, 20, 5
+        for (rho, grows) in ((1.0, true), (0.0, false))
+            plain = zeros(nr, depth)
+            corrected = zeros(nr, depth)
+            for m in 1:nr
+                xm = randn(rng, nt, na)
+                am = zeros(nt, na)
+                am[1, :] = randn(rng, na)
+                for t in 2:nt
+                    am[t, :] = rho .* am[t - 1, :] .+ sqrt(1 - rho^2) .* randn(rng, na)
+                end
+                fm = forecast_evaluation(am, PO.forward_mean_returns(xm, 1, 1))
+                tb = forecast_holding_period(fm, xm; n = depth)
+                plain[m, :] = tb.spearman_ic_ir .* sqrt(length(tb.dates))
+                corrected[m, :] = tb.spearman_t_stat
+            end
+            sp = vec(std(plain; dims = 1))
+            sc = vec(std(corrected; dims = 1))
+            @test (sp[depth] / sp[1] > 1.6) == grows
+            @test sc[depth] / sc[1] < 1.3
+        end
+    end
+end

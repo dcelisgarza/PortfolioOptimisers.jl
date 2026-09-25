@@ -2,9 +2,9 @@
     forecast_window_grid(horizon::Integer, lag::Integer, n::Integer,
                          kind::Symbol) -> Vector{Tuple{Int, Int}}
 
-Return the forward windows a holding-period or a decay table is read over.
+Return the forward windows that a holding-period table or a decay table reads.
 
-Both tables score one Return Forecast against `n` forward windows instead of one, and they differ only in how the `p`-th window is placed. `:cumulative` lengthens the window and holds its start, so period `p` asks what the forecast is worth to a caller who holds the book for `p` horizons. `:disjoint` holds the length and pushes the start out, so period `p` asks what is left of the forecast `p - 1` horizons after it could first be acted on. The two coincide at `p = 1`, which is the base evaluation's own window.
+Both tables score one Return Forecast against `n` forward windows, and they differ only in where the `p`-th window sits. `:cumulative` lengthens the window and keeps its start, so period `p` measures the forecast over a book held for `p` horizons. `:disjoint` keeps the length and moves the start, so period `p` measures what the forecast still predicts `p - 1` horizons after the first window it could act on. At `p = 1` both kinds give the base evaluation's own window.
 
 # Mathematical definition
 
@@ -17,9 +17,12 @@ Both tables score one Return Forecast against `n` forward windows instead of one
 
 Where:
 
+  - ``t``: The observation the forecast is scored at.
   - ``h``: The horizon of the base evaluation.
   - ``\\ell``: The lag of the base evaluation.
   - ``p``: The period, from ``1`` to ``n``.
+
+Each pair is the `(horizon, lag)` that [`forward_mean_returns`](@ref) reads, and its window of observations is `t + lag` to `t + lag + horizon - 1`, the half-open interval above.
 
 # Arguments
 
@@ -32,6 +35,8 @@ Where:
 
   - `n >= 1`. Raises a `DomainError`.
   - `kind` is `:cumulative` or `:disjoint`. Raises a [`ConflictingArgumentError`](@ref).
+
+The function does not check `horizon` and `lag`. Both tables read them from an evaluation, and [`forecast_evaluation`](@ref) checks them there.
 
 # Returns
 
@@ -76,11 +81,26 @@ end
                           dates::AbstractVector{<:Integer},
                           min_count::Integer) -> Vector{Int}
 
-Return the evaluation dates every forward window of a table can be scored at.
+Return the evaluation dates at which every forward window of a table can be scored.
 
-A table's rows are read down the column, so the row of period `10` is compared against the row of period `1`. That comparison means nothing unless both rows were computed on the same dates: a deeper window matures later, so it scores fewer dates at the end of the sample, and a row that quietly dropped them would fall or rise for a reason that is arithmetic rather than economic. The dates are therefore intersected across the whole grid **before** any statistic is taken, and every row of the table answers on the set this verb returns.
+A reader compares the rows of a table down the column, the row of period `10` with the row of period `1`. That comparison holds only when both rows use the same dates. A deeper window matures later, so it scores fewer dates at the end of the sample, and a row that dropped them would move for a reason that has nothing to do with the forecast. The two tables therefore intersect the dates across the whole grid before they take any statistic, and every row of a table reads the set this function returns.
 
-A date survives when at least `min_count` assets carry a finite forecast and a finite target there **under every window**, which is the same threshold the statistics themselves apply, so no surviving date is silenced by a row it was kept for.
+A date stays when at least `min_count` assets carry a finite forecast and a finite target under every window. The Spearman coefficient and the two books count the same assets, so none of them is `NaN` for lack of assets on a date this function keeps. The Pearson coefficient and the coverage also drop an asset whose weight is zero or not finite, so under such a weight history the Pearson coefficient can be `NaN` on a kept date.
+
+# Mathematical definition
+
+```math
+\\mathcal{D}_{c} = \\left\\{ t \\in \\mathcal{D} : \\left\\lvert \\left\\{ i : \\alpha_{ti} \\text{ and } y^{(p)}_{ti} \\text{ are finite} \\right\\} \\right\\rvert \\geq m \\text{ for } p = 1, \\ldots, P \\right\\}\\,.
+```
+
+Where:
+
+  - $(math_dict[:alpha_ti_fc])
+  - ``y^{(p)}_{ti}``: Forward target of asset ``i`` at observation ``t`` under the ``p``-th window, `ys[p]`.
+  - ``\\mathcal{D}``: The dates of the base evaluation, `dates`.
+  - ``P``: The number of windows, `length(ys)`.
+  - ``m``: The least number of assets, `min_count`.
+  - ``\\mathcal{D}_{c}``: The common dates.
 
 # Arguments
 
@@ -95,7 +115,7 @@ A date survives when at least `min_count` assets carry a finite forecast and a f
 
 # Returns
 
-  - `common::Vector{Int}`: The surviving dates, in increasing order. It is empty when no date survives, which is what a grid deeper than the sample answers.
+  - `common::Vector{Int}`: The common dates, in the order of `dates`. It is empty when no date stays, which is the answer for a grid deeper than the sample.
 
 # Examples
 
@@ -144,11 +164,19 @@ end
     forecast_window_row(fp::ForecastEvaluationResult, w::Option{<:MatNum},
                         min_count::Integer) -> NamedTuple
 
-Return the eleven figures one forward window contributes to a table.
+Return the eleven figures that one forward window adds to a table.
 
-The row computes no statistic of its own: it reads [`forecast_ic`](@ref) and its summary for the two information coefficients, [`forecast_portfolio`](@ref) for each of the two books, and [`forecast_coverage`](@ref) for the share of the universe the window scored. A window whose evaluation carries no date answers `NaN` throughout rather than raising, because a table is read as a whole and a grid deeper than the sample must still print.
+The row computes no statistic of its own. It reads [`forecast_ic`](@ref) and [`forecast_ic_summary`](@ref) for the two information coefficients, [`forecast_portfolio`](@ref) for each of the two books, and [`forecast_coverage`](@ref) for the share of the universe the window scored. A window whose evaluation carries no date gives `NaN` for every figure and raises nothing, because a table deeper than the sample must still print.
 
-The portfolio series of a row carries no gap. Every date of `fp` was kept by [`forecast_common_dates`](@ref) precisely because it reaches `min_count` under this window, so the compressed path [`forecast_portfolio`](@ref) summarises is the whole path, and the caveat that verb states does not bite here.
+In [`forecast_window_table`](@ref) the portfolio series of a row has no gap. [`forecast_common_dates`](@ref) kept every date of `fp` because at least `min_count` assets carry a finite pair there under this window, so the compressed path that [`forecast_portfolio`](@ref) summarises is the whole path, and its caveat about `max_drawdown` and `calmar` does not apply.
+
+# Algorithm
+
+ 1. If `fp.dates` is empty, give `NaN` for every figure.
+ 2. Score the two coefficients with [`forecast_ic`](@ref) at `min_count`, and summarise them with [`forecast_ic_summary`](@ref) at the [`forecast_ic_lags`](@ref) of `fp`.
+ 3. Build the `:rank` book and the `:zscore` book with [`forecast_portfolio`](@ref).
+ 4. Take the mean of the finite entries of [`forecast_coverage`](@ref), or `NaN` when no entry is finite.
+ 5. Convert every figure to the element type that `fp.alpha` and `fp.y` promote to.
 
 # Arguments
 
@@ -158,11 +186,11 @@ The portfolio series of a row carries no gap. Every date of `fp` was kept by [`f
 
 # Validation
 
-  - The rules of [`forecast_ic`](@ref), [`forecast_portfolio`](@ref) and [`forecast_coverage`](@ref).
+  - The rules of [`forecast_ic`](@ref), [`forecast_portfolio`](@ref) and [`forecast_coverage`](@ref), when `fp.dates` is not empty.
 
 # Returns
 
-  - `row::NamedTuple`: `(; spearman_mean_ic, spearman_ic_ir, spearman_t_stat, pearson_mean_ic, pearson_ic_ir, pearson_t_stat, rank_ann_return, rank_sharpe, zscore_ann_return, zscore_sharpe, mean_coverage)`.
+  - `row::NamedTuple`: `(; spearman_mean_ic, spearman_ic_ir, spearman_t_stat, pearson_mean_ic, pearson_ic_ir, pearson_t_stat, rank_ann_return, rank_sharpe, zscore_ann_return, zscore_sharpe, mean_coverage)`. Every figure has the element type that `fp.alpha` and `fp.y` promote to, whatever the element type of `w`.
 
 # Related
 
@@ -199,7 +227,7 @@ function forecast_window_row(fp::ForecastEvaluationResult, w::Option{<:MatNum},
             rank_sharpe = Tf(rk.summary.sharpe),
             zscore_ann_return = Tf(zs.summary.ann_return),
             zscore_sharpe = Tf(zs.summary.sharpe),
-            mean_coverage = isempty(fc) ? Tf(NaN) : sum(fc) / length(fc))
+            mean_coverage = isempty(fc) ? Tf(NaN) : Tf(sum(fc) / length(fc)))
 end
 """
     forecast_window_table(fe::ForecastEvaluationResult, X::MatNum, w::Option{<:MatNum},
@@ -208,27 +236,30 @@ end
 
 Score one Return Forecast against a grid of forward windows, on one common date set.
 
-This is the kernel both [`forecast_holding_period`](@ref) and [`forecast_decay`](@ref) run: the two verbs differ only in the grid [`forecast_window_grid`](@ref) hands it, so the date rule, the statistics and the shape of the answer are stated once, here.
+[`forecast_holding_period`](@ref) and [`forecast_decay`](@ref) both call this function, and they differ only in the grid that [`forecast_window_grid`](@ref) gives it. This docstring states the date rule, the statistics and the shape of the result once, for both.
 
 # Algorithm
 
- 1. Build each window's forward target from `X` with [`forward_mean_returns`](@ref).
- 2. Intersect the base evaluation's dates across the whole grid with [`forecast_common_dates`](@ref).
- 3. For each window, rebuild a [`ForecastEvaluationResult`](@ref) carrying `fe.alpha` and `fe.umsk`, that window's target, the common dates and that window's own `horizon` and `lag`, and read its row with [`forecast_window_row`](@ref).
- 4. Transpose the rows into columns, one entry per period.
+ 1. Check `w` against the shape of `fe.alpha`, so a wrong weight history raises at every depth, also when no date stays.
+ 2. Build the forward target of each window from `X` with [`forward_mean_returns`](@ref).
+ 3. Intersect the dates of the base evaluation across the whole grid with [`forecast_common_dates`](@ref).
+ 4. For each window, build a [`ForecastEvaluationResult`](@ref) that carries `fe.alpha` and `fe.umsk`, the window's target, the common dates, the window's own `horizon` and `lag`, and `min_count`, and read its row with [`forecast_window_row`](@ref).
+ 5. Transpose the rows into columns, one entry per period.
 
 # Arguments
 
-  - `fe`: The base evaluation, from [`forecast_evaluation`](@ref). Its `alpha`, `umsk`, `target`, `dates`, `step` and `ppy` are carried into every window.
-  - `X`: The target history `observations × assets` the forward windows are taken over, on the axis of `fe.alpha`. It is what [`forecast_target_history`](@ref) answers for `fe.target`.
+  - `fe`: The base evaluation, from [`forecast_evaluation`](@ref). Its `alpha`, `umsk`, `target`, `step` and `ppy` go into every window, and its `dates` are the dates the common set is taken from.
+  - `X`: The target history `observations × assets` the forward windows are taken over, on the axis of `fe.alpha`. It is what [`forecast_target_history`](@ref) gives for `fe.target`.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights.
   - `grid`: One `(horizon, lag)` pair per period, from [`forecast_window_grid`](@ref).
-  - `min_count`: Least number of assets a cross-section needs, applied to the date rule and to the statistics alike.
+  - `min_count`: Least number of assets a cross-section needs, for the date rule and for the statistics alike.
 
 # Validation
 
   - `size(X) == size(fe.alpha)`. Raises a `DimensionMismatch`.
   - `!isempty(grid)`. Raises an [`IsEmptyError`](@ref).
+  - `size(w) == size(fe.alpha)`, when `w` is not `nothing`. Raises a `DimensionMismatch`.
+  - No finite weight of `w` is negative. Raises a `DomainError`.
   - The rules of [`forecast_common_dates`](@ref) and [`forecast_window_row`](@ref).
 
 # Returns
@@ -250,6 +281,7 @@ function forecast_window_table(fe::ForecastEvaluationResult, X::MatNum, w::Optio
     @argcheck(size(X, 1) == size(alpha, 1) && size(X, 2) == size(alpha, 2),
               DimensionMismatch("the target history ($(size(X, 1))×$(size(X, 2))) must match the Return Forecast history ($(size(alpha, 1))×$(size(alpha, 2)))"))
     @argcheck(!isempty(grid), IsEmptyError("grid cannot be empty"))
+    forecast_ic_weights(alpha, w)
     ys = [forward_mean_returns(X, h, l) for (h, l) in grid]
     common = forecast_common_dates(alpha, ys, fe.dates, min_count)
     rows = [forecast_window_row(ForecastEvaluationResult(alpha, ys[p], fe.umsk, common,
@@ -282,19 +314,19 @@ end
 
 Score a Return Forecast against cumulative forward windows, one row per holding period.
 
-The base evaluation answers what the forecast is worth to a caller who holds a book for one horizon. This verb answers what it is worth over `p` horizons held end to end, for `p` from `1` to `n`, and the shape of that column is what a caller reads to choose a rebalancing frequency: a coefficient that holds as the window lengthens says the forecast is about a slow quantity, and one that falls away says the book must be turned over to capture it.
+The base evaluation measures the forecast over a book held for one horizon. This function measures it over `p` horizons held end to end, for `p` from `1` to `n`, and a caller reads the shape of that column to choose a rebalancing frequency. A coefficient that holds as the window lengthens says the forecast is about a slow quantity. A coefficient that falls says the book must turn over to capture it.
 
-# Every row is read on one date set
+# Every row uses one date set
 
-A deeper window matures later, so it scores fewer dates at the end of the sample. The dates are therefore intersected across the whole grid by [`forecast_common_dates`](@ref) before any statistic is taken, so a fall down the column is the forecast decaying rather than the sample changing under it.
+A deeper window matures later, so it scores fewer dates at the end of the sample. [`forecast_common_dates`](@ref) therefore intersects the dates across the whole grid before the table takes any statistic, so a fall down the column comes from the forecast and not from a change of sample.
 
-That set shrinks as `n` grows, so a table read at one depth is internally comparable and is **not** comparable to a table read at another. A caller who compares two depths reads the deeper table and truncates it.
+The set shrinks as `n` grows. The rows of one table are comparable with each other, but a table at one depth is not comparable with a table at another depth. To compare two depths, read the deeper table and truncate it.
 
-`n` is a keyword rather than a field of the evaluation, so a caller re-reads the table at a second depth without repeating the pairing that produced `fe`, which can cost a rolling refit.
+`n` is a keyword and not a field of the evaluation, so a caller reads the table at a second depth without a second pairing to build `fe`, which can cost a rolling refit.
 
-# The t-statistic of a deeper row reads its overlap
+# The t-statistic of a deeper row corrects for the overlap
 
-The stride between two dates is the base evaluation's, and it does not grow with the window, so from the second row on consecutive windows read the same returns: at the default stride row `p` overlaps its `p - 1` neighbours on either side. A t-statistic that treated the rows' coefficients as independent would grow by about ``\\sqrt{p}`` down the column for a forecast with no skill at all. The `t_stat` columns therefore read the long-run standard error over [`forecast_ic_lags`](@ref) autocovariances at each row, as [`forecast_ic_summary`](@ref) states, so a t-statistic that holds down the column is the forecast holding and not the overlap accumulating. The `ic_ir` columns are the per-date ratio and are left as they are.
+The stride between two dates is the base evaluation's, and it does not grow with the window. From the second row on, consecutive windows therefore share returns. At the default stride, which is `fe.horizon`, the window of row `p` overlaps the windows of its `p - 1` neighbours on each side. When the forecast keeps its ranking from one date to the next, the consecutive coefficients of a deep row are then correlated, and for a forecast with no skill a t-statistic that treated them as independent would spread by about ``\\sqrt{p}`` down the column. A forecast that draws a new ranking at every date gives uncorrelated coefficients at every depth. The `t_stat` columns use the long-run standard error over [`forecast_ic_lags`](@ref) autocovariances at each row, as [`forecast_ic_summary`](@ref) states, so a t-statistic that holds down the column means that the forecast holds. The `ic_ir` columns are the per-date ratio, with no correction.
 
 # Algorithm
 
@@ -303,14 +335,14 @@ The stride between two dates is the base evaluation's, and it does not grow with
 
 # Arguments
 
-  - `fe`: The base evaluation, from [`forecast_evaluation`](@ref). Its `horizon` and `lag` set the grid, and its `alpha`, `target`, `dates`, `step` and `ppy` are carried into every window.
-  - `X`: The target history `observations × assets` the forward windows are taken over, on the axis of `fe.alpha`. The block method builds it from `fe.target` with [`forecast_target_history`](@ref); the bare method takes it, so a caller scores a history the library did not build.
+  - `fe`: The base evaluation, from [`forecast_evaluation`](@ref). Its `horizon` and `lag` set the grid, its `alpha`, `umsk`, `target`, `step` and `ppy` go into every window, and its `dates` are the dates the common set is taken from.
+  - `X`: The target history `observations × assets` the forward windows are taken over, on the axis of `fe.alpha`. The block method builds it from `fe.target` with [`forecast_target_history`](@ref). The bare method takes it, so a caller can score a history that the library did not build.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights. Only the Pearson coefficient and the coverage read it.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
   - `csfm`: The fitted factor-model block the evaluation was built on.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), resolved by [`cs_diagnostic_weights`](@ref).
   - `n`: Number of forward periods, the depth of the table.
-  - `min_count`: Least number of assets a cross-section needs. It defaults to the threshold the evaluation carries, and it gates the common dates and the statistics alike.
+  - `min_count`: Least number of assets a cross-section needs. It defaults to the threshold the evaluation carries, and it applies to the common dates and to the statistics alike.
 
 # Validation
 
@@ -318,16 +350,16 @@ The stride between two dates is the base evaluation's, and it does not grow with
 
 # Returns
 
-  - `table::NamedTuple`: Fifteen columns, the last eleven of them one entry per period.
+  - `table::NamedTuple`: Fifteen columns. `dates` holds the common dates, and each of the other fourteen holds one entry per period.
 
       + `period::Vector{Int}`: `1` to `n`.
       + `horizon::Vector{Int}`: The window's horizon, `p` times `fe.horizon`.
       + `lag::Vector{Int}`: The window's lag, `fe.lag` at every period.
       + `dates::Vector{Int}`: The common evaluation dates every row was computed on.
-      + `spearman_mean_ic`, `spearman_ic_ir`, `spearman_t_stat`: The Spearman coefficient's summary, from [`forecast_ic_summary`](@ref), the t-statistic at the row's own [`forecast_ic_lags`](@ref).
+      + `spearman_mean_ic`, `spearman_ic_ir`, `spearman_t_stat`: The Spearman coefficient's summary, from [`forecast_ic_summary`](@ref), with the t-statistic at the row's own [`forecast_ic_lags`](@ref).
       + `pearson_mean_ic`, `pearson_ic_ir`, `pearson_t_stat`: The Pearson coefficient's summary.
-      + `rank_ann_return`, `rank_sharpe`: The `:rank` book's annualised return and its ratio, from [`forecast_portfolio`](@ref).
-      + `zscore_ann_return`, `zscore_sharpe`: The `:zscore` book's.
+      + `rank_ann_return`, `rank_sharpe`: The annualised return and the ratio of the `:rank` book, from [`forecast_portfolio`](@ref).
+      + `zscore_ann_return`, `zscore_sharpe`: The same two figures of the `:zscore` book.
       + `mean_coverage`: The mean of the finite entries of [`forecast_coverage`](@ref).
 
 # Examples
@@ -386,9 +418,9 @@ end
 
 Score a Return Forecast against disjoint forward windows, one row per period out.
 
-Where [`forecast_holding_period`](@ref) lengthens the window, this verb slides it: period `p` scores the same forecast against the horizon that begins `p - 1` horizons after the first one the forecast could be acted on. The column is the forecast's half-life. A coefficient that is large at `p = 1` and gone by `p = 2` says the information is consumed within one horizon and any delay in acting on it throws the forecast away; one that persists says a later entry still earns.
+[`forecast_holding_period`](@ref) lengthens the window, and this function moves it. Period `p` scores the same forecast against the horizon that starts `p - 1` horizons after the first window the forecast could act on, so the column shows how fast the forecast decays. A coefficient that is large at `p = 1` and near zero at `p = 2` says that the forecast is used up within one horizon, and a delay of one horizon loses it. A coefficient that persists says that a later entry still earns a return.
 
-The two tables agree at `p = 1`, which is the base evaluation's own window, and they answer different questions from `p = 2` on. Both are computed on the dates every window can be scored at, so the rows are comparable down the table and not across two depths.
+The two tables agree at `p = 1`, which is the base evaluation's own window, and they differ from `p = 2` on. Both use the dates at which every window can be scored, so the rows of one table are comparable with each other, and two tables of different depth are not.
 
 # Algorithm
 
@@ -404,7 +436,7 @@ The two tables agree at `p = 1`, which is the base evaluation's own window, and 
   - `csfm`: The fitted factor-model block the evaluation was built on.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), resolved by [`cs_diagnostic_weights`](@ref).
   - `n`: Number of forward periods, the depth of the table.
-  - `min_count`: Least number of assets a cross-section needs. It gates the common dates and the statistics alike.
+  - `min_count`: Least number of assets a cross-section needs. It applies to the common dates and to the statistics alike.
 
 # Validation
 
@@ -432,7 +464,7 @@ julia> t.spearman_mean_ic[1]
 1.0
 ```
 
-The forecast is the forward target itself, so the first period scores a perfect coefficient
+The forecast is the forward target itself, so the first period scores a perfect coefficient,
 and the second scores what is left of it one horizon later.
 
 # Related
