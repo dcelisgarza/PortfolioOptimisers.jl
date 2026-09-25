@@ -3765,3 +3765,86 @@ end
         @test isequal(h[1, :], Float32.(forecast_history(tgt, rd, csfm; step = 5)[1, :]))
     end
 end
+
+@testset "The docstrings of 07_ForecastEvaluation.jl against numbers" begin
+    PO = PortfolioOptimisers
+    fx = evaluation_fixture()
+    ew = ExpWeightedReturnForecast(; scores = fx.scores, half_life = 10.0, min_obs = 1,
+                                   horizon = 2, lag = 1)
+    rf = return_forecast(ew, fx.rd, fx.csfm)
+
+    @testset "Every method refuses a parameter outside its domain before it reads a history" begin
+        # The carrier methods read the history at `t + lag` to build the target, so a
+        # negative lag must be refused before that read, not by an index out of bounds.
+        for (k, v) in
+            ((:horizon, 0), (:lag, -1), (:lag, -3), (:step, 0), (:min_count, 0), (:ppy, 0))
+            kw = (k => v,)
+            @test_throws DomainError forecast_evaluation(rf, fx.rd, fx.csfm; kw...)
+            @test_throws DomainError forecast_evaluation(ew, fx.rd, fx.csfm; kw...)
+            @test_throws DomainError forecast_evaluation(rf.hist, rf.hist; kw...)
+            @test_throws DomainError PO.forecast_evaluation_pairing(rf.hist, fx.rd, fx.csfm;
+                                                                    kw...)
+        end
+        for fn in (() -> forecast_evaluation(rf, fx.rd, fx.csfm; ties = :dense),
+                   () -> forecast_evaluation(ew, fx.rd, fx.csfm; ties = :dense),
+                   () -> forecast_evaluation(rf.hist, rf.hist; ties = :dense))
+            @test_throws PO.ConflictingArgumentError fn()
+        end
+        @test isnothing(PO.forecast_evaluation_assert_parameters(; horizon = 1, lag = 0,
+                                                                 step = 1, min_count = 1,
+                                                                 ties = :ordinal, ppy = 1))
+    end
+
+    @testset "The dates are the stride from the first scorable observation" begin
+        for trial in 1:500
+            rng = StableRNG(trial)
+            nt, na = rand(rng, 1:9), rand(rng, 1:5)
+            ad = [rand(rng) < 0.3 ? rand(rng, (NaN, Inf, -Inf)) : randn(rng)
+                  for _ in 1:nt, _ in 1:na]
+            yd = [rand(rng) < 0.3 ? rand(rng, (NaN, Inf)) : randn(rng)
+                  for _ in 1:nt, _ in 1:na]
+            sd = rand(rng, 1:4)
+            sc = [t
+                  for t in 1:nt if any(i -> isfinite(ad[t, i]) && isfinite(yd[t, i]), 1:na)]
+            if isempty(sc)
+                @test_throws PO.IsEmptyError PO.forecast_evaluation_dates(ad, yd, sd)
+            else
+                dd = PO.forecast_evaluation_dates(ad, yd, sd)
+                @test dd == [first(sc) + (j - 1) * sd
+                             for j in 1:(fld(last(sc) - first(sc), sd) + 1)]
+            end
+        end
+        # The last date can come before the last scorable observation.
+        @test PO.forecast_evaluation_dates(ones(4, 1), ones(4, 1), 2) == [1, 3]
+    end
+
+    @testset "The mask writes NaN off the universe, and no more" begin
+        for trial in 1:200
+            rng = StableRNG(10_000 + trial)
+            am = randn(rng, rand(rng, 1:6), rand(rng, 1:5))
+            mm = rand(rng, Bool, size(am)...)
+            ac = copy(am)
+            wm = PO.forecast_evaluation_mask(am, mm)
+            @test all(k -> mm[k] ? wm[k] == am[k] : isnan(wm[k]), eachindex(mm))
+            @test (wm === am) == all(mm)
+            @test am == ac
+        end
+        @test eltype(PO.forecast_evaluation_mask(Float32[1 2; 3 4],
+                                                 [true false; true true])) === Float32
+    end
+
+    @testset "A perfect idiosyncratic ranking scores less than one on the asset return" begin
+        fi = forecast_evaluation(rf, fx.rd, fx.csfm; horizon = 2, lag = 1, step = 1)
+        fa = forecast_evaluation(rf, fx.rd, fx.csfm; target = AssetReturnTarget(),
+                                 horizon = 2, lag = 1, step = 1)
+        rho_i = [PO.cs_spearman_correlation(view(fi.y, t, :), view(fi.y, t, :))
+                 for t in axes(fi.y, 1)]
+        rho_a = [PO.cs_spearman_correlation(view(fi.y, t, :), view(fa.y, t, :))
+                 for t in axes(fi.y, 1)]
+        both = [t for t in axes(fi.y, 1) if isfinite(rho_i[t]) && isfinite(rho_a[t])]
+        @test !isempty(both)
+        @test all(t -> rho_i[t] ≈ 1, both)
+        @test all(t -> rho_a[t] <= 1 + 1e-12, both)
+        @test count(t -> rho_a[t] < 1 - 1e-12, both) > 0
+    end
+end
