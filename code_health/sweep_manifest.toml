@@ -114,7 +114,7 @@
 "src/03_InputData/07_PriceIngestion.jl" = { map = 2, units = 22, swept = false }
 "src/03_InputData/08_PriceGapFill.jl" = { map = 2, units = 7, swept = false }
 "src/03_InputData/09_PriceFilters.jl" = { map = 2, units = 2, algorithm = 2, swept = false }
-"src/03_InputData/10_ReturnsResult.jl" = { map = 2, units = 8, algorithm = 7, swept = false }
+"src/03_InputData/10_ReturnsResult.jl" = { map = 2, units = 8, algorithm = 4, swept = true, bindings = ["AbstractReturnsResult", "Prices_RR", "ReturnsResult", "assert_asset_panel_supplied", "asset_panel", "check_names_and_returns_matrix", "port_opt_view", "returns_result_picker"] }
 "src/03_InputData/11_PricesToReturns.jl" = { map = 2, units = 9, algorithm = 5, swept = false }
 "src/03_InputData/12_TrainTestSplit.jl" = { map = 2, units = 7, algorithm = 5, swept = true, bindings = ["TrainTestSplit", "TrainTestSplitResult", "fit_preprocessing", "safe_index", "split_count", "train_test_split", "train_test_split"] }
 "src/03_InputData/13_Base_AssetSelection.jl" = { map = 2, units = 5, algorithm = 2, swept = true, bindings = ["AbstractAssetSelector", "AssetSelectorResult", "apply_preprocessing", "fit_preprocessing", "select_assets"] }

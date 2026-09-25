@@ -3,13 +3,40 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all returns result types.
 
-All concrete and/or types representing the result of returns calculations should be subtypes of `AbstractReturnsResult`.
+Every concrete type that holds the result of a returns calculation subtypes `AbstractReturnsResult`. [`ReturnsResult`](@ref) is the member the library builds.
 
-## The asset-selector contract
+[`select_assets`](@ref), [`fit_preprocessing`](@ref) and the fold generation of cross-validation dispatch on this supertype. [`ClusterGroups`](@ref) reads the Feature Matrix from the [`AssetPanel`](@ref) of the carrier, because preselection runs before any prior exists and the carrier is the only source it can read. The `Pr_RR` alias names the concrete [`ReturnsResult`](@ref), and many methods dispatch on that alias, so these readers take this supertype instead. No check enforces the interface below.
 
-[`select_assets`](@ref) and [`fit_preprocessing`](@ref) dispatch on this supertype, so any subtype reaching an [`AbstractAssetSelector`](@ref) must carry `nx` and an `observations × assets` matrix `X`, plus a [`port_opt_view`](@ref) that replays a selected universe. [`ClusterGroups`](@ref) widens that to `{nx, X, pnl}`: it reads the Feature Matrix off the carrier's [`AssetPanel`](@ref), because preselection runs before any prior exists and no other source is reachable.
+[`PredictionReturnsResult`](@ref) subtypes this supertype, but its `X` is a vector of portfolio returns with no asset axis. It does not meet the interface, and every entry point that needs an asset axis throws an error for it.
 
-Widening the contract rather than the `Pr_RR` bridge is deliberate — that alias's concreteness is load-bearing at nine routing sites. The cost is that the contract is implicit: it is satisfied by [`ReturnsResult`](@ref) and enforced by nothing. [`PredictionReturnsResult`](@ref) subtypes this supertype, but its `X` is a *portfolio* return vector rather than an asset matrix — the asset axis is already collapsed away — so it satisfies neither the old contract nor the widened one, and every entry point refuses it loudly rather than measuring the wrong axis.
+# Interfaces
+
+To implement a new returns result that an asset selector, a cluster preselection and a cross-validation fold can read, subtype `AbstractReturnsResult` with these fields:
+
+  - `nx`: The asset names, one per column of `X`.
+  - `X`: The asset returns matrix, `observations × assets`. Fold generation reads its row count.
+  - `ts`: The timestamps of the rows of `X`, or `nothing`. Fold generation reads it.
+  - `pnl`: An [`AssetPanel`](@ref) over the assets of `X`, or `nothing`. [`ClusterGroups`](@ref) reads it.
+
+Then implement the following method:
+
+## `port_opt_view`
+
+  - `port_opt_view(rd::MyReturnsResult, i) -> MyReturnsResult`: Return a view of `rd` on the assets at `i`.
+  - `port_opt_view(rd::MyReturnsResult, i, j, k = :) -> MyReturnsResult`: Return a view of `rd` on the observations at `i`, the assets at `j` and the factors at `k`.
+
+A subtype that carries a panel subselects it together with `X`. A subtype that implements no method gets the fallback, which throws an `ArgumentError`.
+
+### Arguments
+
+  - `rd`: The concrete returns result.
+  - `i`: Indices of the assets to keep in the two-argument method, and of the observations to keep in the other.
+  - `j`: Indices of the assets to keep.
+  - `k`: Indices of the factors to keep.
+
+### Returns
+
+  - `rd::MyReturnsResult`: A view of the same type that holds only the selected indices.
 
 # Related
 
@@ -22,24 +49,26 @@ abstract type AbstractReturnsResult <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Validate that asset or factor names and their corresponding returns matrix are provided and consistent.
+Check that a list of column names and the returns matrix it names are both given or both `nothing`, and that they agree in size.
+
+[`ReturnsResult`](@ref) calls it for the asset, factor and benchmark pairs.
 
 # Arguments
 
-  - `names`: Asset or factor names.
-  - `mat`: Returns matrix.
-  - `names_sym`: Symbolic name for the names argument displayed in error messages.
-  - `mat_sym`: Symbolic name for the matrix argument displayed in error messages.
+  - `names`: The column names, or `nothing`.
+  - `mat`: The returns matrix, `observations × columns`, or `nothing`.
+  - `names_sym`: The name of the names argument, which the error messages print.
+  - `mat_sym`: The name of the matrix argument, which the error messages print.
 
 # Validation
 
-  - `allunique(names)`, whenever `names` is not `nothing`.
+  - `allunique(names)`, whenever `names` is not `nothing`. Raises an `ArgumentError`.
 
   - If either `names` or `mat` is not `nothing`:
 
-      + `!isnothing(names)` and `!isnothing(mat)`.
-      + `!isempty(names)` and `!isempty(mat)`.
-      + `length(names) == size(mat, 2)`.
+      + `!isnothing(names)` and `!isnothing(mat)`. Raises an [`IsNothingError`](@ref).
+      + `!isempty(names)` and `!isempty(mat)`. Raises an [`IsEmptyError`](@ref).
+      + `length(names) == size(mat, 2)`. Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -70,13 +99,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Stores the results of asset and factor returns calculations.
+Returns data of a universe: the asset returns, and optionally the factor returns, the benchmark returns, the timestamps, the implied volatilities and an Asset Panel.
 
-`ReturnsResult` is the standard result type returned by returns-processing routines, such as [`prices_to_returns`](@ref).
+[`prices_to_returns`](@ref) builds it, and the priors, the optimisers and the cross-validation folds read it. All of its matrices share the observation axis, which is the rows. `X`, `iv` and a matrix `B` also share the asset axis, which is the columns.
 
-It supports both asset and factor returns, as well as optional time series and implied volatility information, and is designed for downstream compatibility with optimisation and analysis routines.
-
-It also carries the optional [`AssetPanel`](@ref) `pnl`: the two universe masks the ingestion layer states, and the Panel Fields that [`FeatureDistance`](@ref) turns into a distance. The panel is *data*, not configuration, which is why it is held here rather than on an estimator: the clustering stack is asset-subset-blind by construction, so an estimator-held Feature Matrix would survive a nested-clustered subproblem or a cross-validation fold unsliced, with its asset axis silently pointing at the full universe. `ReturnsResult` implements [`port_opt_view`](@ref), so a carried panel is subselected in step with `X`.
+The optional [`AssetPanel`](@ref) `pnl` holds the two universe masks of the ingestion layer, and the Panel Fields that [`FeatureDistance`](@ref) turns into a distance. The panel is data, so this type holds it and no estimator does. The clustering code does not know which subset of assets it receives. A Feature Matrix on an estimator would reach a nested clustered subproblem or a cross-validation fold with every asset of the full universe, and its rows would no longer match the assets of the subproblem. `ReturnsResult` implements [`port_opt_view`](@ref), so a view subselects the panel together with `X`.
 
 # Fields
 
@@ -101,16 +128,19 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `nx` or `X` is not `nothing`, `!isempty(nx)`, `!isempty(X)`, and `length(nx) == size(X, 2)`.
-  - If `nf` or `F` is not `nothing`, `!isempty(nf)`, `!isempty(F)`, `length(nf) == size(F, 2)`, and `size(X, 1) == size(F, 1)`.
-  - If `nb` or `B` is not `nothing` and `B` is a matrix: `!isempty(nb)`, `!isempty(B)`, and `length(nb) == size(B, 2)`.
-  - If `nb` or `B` is not `nothing` and `B` is a vector: `length(nb) == 1`.
-  - If `X` and `B` are not `nothing`: if `B` is a vector, `size(X, 1) == size(B, 1)`; if `B` is a matrix, `size(X) == size(B)`.
-  - If `ts` is not `nothing`, `!isempty(ts)`, `allunique(ts)`, and `length(ts) == size(X, 1)`. Uniqueness is required because `ts` *keys* the observation axis rather than merely labelling it: [`feature_row_indices`](@ref) recovers a subset's rows by matching its surviving timestamps back into this clock, and a repeated timestamp would resolve to the first occurrence and pair an asset with another period's features.
-  - If `ts` and `B` are not `nothing`: `length(ts) == size(B, 1)`.
-  - If `iv` is not `nothing`, `!isempty(iv)`, `size(iv) == size(X)`, and every value is finite and non-negative where it is present (an absent one is `NaN`; see [`assert_nonneg_where_present`](@ref)).
-  - `ivpa` is validated in that same branch, so it is checked only when `iv` is given: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`, and, if a vector, `length(ivpa) == size(iv, 2)`. The bound is strict — a zero adjustment is rejected. An `ivpa` passed without an `iv` reaches no check, because it has no implied volatility to adjust.
-  - `pnl`'s asset axis is `length(nx)`, and its observation axis is `size(X, 1)` when it is time-varying. See [`check_asset_panel`](@ref).
+  - If `nx` or `X` is not `nothing`, [`check_names_and_returns_matrix`](@ref) holds for the pair: both are given, `allunique(nx)`, `!isempty(nx)`, `!isempty(X)`, and `length(nx) == size(X, 2)`.
+  - If `nf` or `F` is not `nothing`, the same checks hold for `nf` and `F`.
+  - If `X` and `F` are given, `size(X, 1) == size(F, 1)`.
+  - If `B` is a matrix, the same checks hold for `nb` and `B`.
+  - If `B` is a vector and `nb` is given, `length(nb) == 1`. A vector `B` needs no name.
+  - If `B` is `nothing`, `nb` is `nothing`.
+  - If `X` and a vector `B` are given, `size(X, 1) == size(B, 1)`. If `X` and a matrix `B` are given, `size(X) == size(B)`.
+  - If `ts` is not `nothing`, `!isempty(ts)`, `X` or `F` is given, and `allunique(ts)`. `length(ts)` equals the row count of each of `X`, `F` and `B` that is given. `ts` must be unique because it keys the observation axis. [`feature_row_indices`](@ref) finds the rows of a subset by matching its timestamps back into this clock, and a repeated timestamp resolves to its first occurrence, which pairs an asset with the features of another period.
+  - If `iv` is not `nothing`, `X` is given, `!isempty(iv)`, `size(iv) == size(X)`, and every present value is finite and non-negative. `NaN` marks an absent value. See [`assert_nonneg_where_present`](@ref).
+  - `ivpa` is checked only when `iv` is given, because with no implied volatility it adjusts nothing. Then `all(x -> x > 0, ivpa)` and `all(isfinite, ivpa)`, and a vector `ivpa` has `length(ivpa) == size(iv, 2)`. The bound is strict, so a zero adjustment is refused.
+  - The asset axis of `pnl` is `length(nx)`. The observation axis of a time-varying `pnl` is `size(X, 1)`. See [`check_asset_panel`](@ref).
+
+A missing partner raises an [`IsNothingError`](@ref), an empty input an [`IsEmptyError`](@ref), a repeated name or timestamp an `ArgumentError`, a size that does not agree a `DimensionMismatch`, and a value outside its domain a `DomainError`.
 
 # Examples
 
@@ -160,11 +190,11 @@ ReturnsResult
     """
     F
     """
-    Names or identifiers of benchmark columns (observations × 1) or (observations × assets).
+    Names or identifiers of benchmark columns (benchmarks × 1). A vector `B` takes at most one name.
     """
     nb
     """
-    Benchmark prices (observations × 1) or (observations × assets).
+    Benchmark returns, (observations × 1) for one benchmark that every asset shares, or (observations × assets) for one benchmark per asset.
     """
     B
     """
@@ -172,7 +202,7 @@ ReturnsResult
     """
     ts
     """
-    Implied volatilities matrix (observations × assets).
+    Implied volatilities matrix (observations × assets). `NaN` marks an absent value.
     """
     iv
     """
@@ -180,7 +210,7 @@ ReturnsResult
     """
     ivpa
     """
-    Optional [`AssetPanel`](@ref): the Panel Fields of the universe, and its two universe masks.
+    Optional [`AssetPanel`](@ref) that holds the Panel Fields of the universe and its two universe masks.
     """
     pnl
     function ReturnsResult(nx::Option{<:VecStr}, X::Option{<:MatNum}, nf::Option{<:VecStr},
@@ -193,7 +223,9 @@ ReturnsResult
         if isa(B, VecNum) && !isnothing(nb)
             @argcheck(length(nb) == 1,
                       DimensionMismatch("a single-column benchmark (B) admits exactly one benchmark name (nb), got length(nb) = $(length(nb))"))
-        elseif isa(B, MatNum)
+        elseif !isa(B, VecNum)
+            # A matrix `B` and a `nothing` `B` both take the pair check, so a name with no
+            # benchmark returns throws as `nx` without `X` does.
             check_names_and_returns_matrix(nb, B, :nb, :B)
         end
         if !isnothing(X) && !isnothing(F)
@@ -233,6 +265,8 @@ ReturnsResult
             end
         end
         if !isnothing(iv)
+            @argcheck(!isnothing(X),
+                      IsNothingError("X cannot be nothing if iv is not `nothing`: the implied volatilities (iv) are one per asset return (X). Got\n!isnothing(iv) => $(!isnothing(iv))\n!isnothing(X) => $(!isnothing(X))"))
             @argcheck(!isempty(iv), IsEmptyError)
             @argcheck(size(iv) == size(X),
                       DimensionMismatch("implied volatilities (iv) must match asset returns (X) in size, got size(iv) = $(size(iv)) and size(X) = $(size(X))"))
@@ -263,20 +297,20 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of the `ReturnsResult` object for the assets at indices `i`.
 
-This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref) — the View of the library's central data structure, restricting it to a subset of assets.
+This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref). It restricts the returns data to a subset of assets.
 
 !!! warning
 
-    This two-argument method indexes **assets**, matching the rest of the `port_opt_view` family. The four-argument method `port_opt_view(rd, i, j, k)` indexes **observations** first and assets second. The two arities therefore give `i` different meanings; see [`port_opt_view(rd::ReturnsResult, i, j, k)`](@ref).
+    This two-argument method indexes **assets**, as every other `port_opt_view` method does. The four-argument method `port_opt_view(rd, i, j, k)` indexes **observations** first and assets second. So `i` means a different axis in each of the two methods. See [`port_opt_view(rd::ReturnsResult, i, j, k)`](@ref).
 
 # Algorithm
 
  1. View the asset names `nx` at `i` with [`nothing_scalar_array_view`](@ref).
  2. View the asset returns as `view(rd.X, :, i)`. Axis 2 is the assets, and every observation is kept.
- 3. When `B` is a matrix, it holds one column per asset: view `nb` at `i`, and view `B` as `view(rd.B, :, i)`. Otherwise — a single shared benchmark, or none at all — `nb` and `B` both pass through untouched.
+ 3. When `B` is a matrix, it holds one column per asset, so view `nb` at `i` and view `B` as `view(rd.B, :, i)`. When `B` is a vector or `nothing`, `nb` and `B` pass through unchanged.
  4. View the implied volatilities as `view(rd.iv, :, i)`, and the adjustment `ivpa` at `i`.
- 5. View the [`AssetPanel`](@ref) `pnl` with [`panel_carrier_view`](@ref) at `i` on the asset axis, handing it the asset names `rd.nx`. The observation index is a `Colon`, so a time-varying panel keeps every observation. The view slices every Panel Field's values and both universe masks on the asset axis, and a tensor Panel Field whose labels *are* the asset names ([`features_are_assets`](@ref)) on its label axis as well; every other field's label axis addresses features, which an asset view does not reach.
- 6. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F` and the timestamps `ts` pass through untouched, because none of the three has an asset axis.
+ 5. View the [`AssetPanel`](@ref) `pnl` with [`panel_carrier_view`](@ref) at `i` on the asset axis, and give it the asset names `rd.nx`. The observation index is a `Colon`, so a time-varying panel keeps every observation. The view slices the values of every Panel Field and both universe masks on the asset axis. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). The label axis of every other field holds features, and an asset view does not change it.
+ 6. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F` and the timestamps `ts` pass through unchanged, because none of the three has an asset axis.
 
 Each field that is `nothing` stays `nothing`. No step copies data.
 
@@ -341,16 +375,16 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
 
 !!! warning
 
-    Unlike every other [`port_opt_view`](@ref) method — including [`port_opt_view(rd::ReturnsResult, i)`](@ref) — the first index of this method selects **observations**, not assets. Assets are the *second* index. Cross-validation splits observations and assets together, which is why this arity exists at all.
+    The first index of this method selects **observations**, not assets, and the second index selects assets. Every other [`port_opt_view`](@ref) method, [`port_opt_view(rd::ReturnsResult, i)`](@ref) too, takes the assets first. Cross-validation splits observations and assets together, and this method exists for it.
 
 # Algorithm
 
  1. View the asset names `nx` at `j` with [`nothing_scalar_array_view`](@ref).
  2. View the asset returns as `view(rd.X, i, j)`. Axis 1 is the observations, and axis 2 is the assets.
- 3. View the factor names `nf` at `k`, unless `k` is a `Colon`, in which case `nf` passes through. View the factor returns as `view(rd.F, i, k)`.
- 4. When `B` is a matrix, it holds one column per asset: view `nb` at `j`, and view `B` as `view(rd.B, i, j)`. When `B` is a vector, it is a single shared benchmark: view it as `view(rd.B, i)`, and carry `nb` through.
+ 3. View the factor names `nf` at `k`. When `k` is a `Colon`, `nf` passes through. View the factor returns as `view(rd.F, i, k)`.
+ 4. When `B` is a matrix, it holds one column per asset, so view `nb` at `j` and view `B` as `view(rd.B, i, j)`. When `B` is a vector, every asset shares it, so view it as `view(rd.B, i)` and pass `nb` through.
  5. View the timestamps `ts` at `i`, the implied volatilities as `view(rd.iv, i, j)`, and the adjustment `ivpa` at `j`.
- 6. View the [`AssetPanel`](@ref) `pnl` with [`panel_carrier_view`](@ref) at the observations `i` and the assets `j`, handing it the asset names `rd.nx`, which slices both axes of every Panel Field and of both universe masks, and the label axis of a tensor Panel Field whose labels *are* the asset names ([`features_are_assets`](@ref)). A static panel has no observation axis and ignores `i`, which is the same asymmetry `ivpa` has on the asset axis.
+ 6. View the [`AssetPanel`](@ref) `pnl` with [`panel_carrier_view`](@ref) at the observations `i` and the assets `j`, and give it the asset names `rd.nx`. The view slices both axes of every Panel Field and of both universe masks. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). A static panel has no observation axis and ignores `i`, as a scalar `ivpa` ignores `j`.
  7. Rebuild the [`ReturnsResult`](@ref).
 
 Each field that is `nothing` stays `nothing`. No step copies data.
@@ -365,15 +399,6 @@ Each field that is `nothing` stays `nothing`. No step copies data.
 # Returns
 
   - `new_rr::ReturnsResult`: A new `ReturnsResult` containing only the data for the specified indices.
-
-# Related
-
-  - [`ReturnsResult`](@ref)
-  - [`port_opt_view`](@ref)
-  - [`prices_to_returns`](@ref)
-  - [`Option`](@ref)
-  - [`VecStr`](@ref)
-  - [`MatNum`](@ref)
 
 # Examples
 
@@ -406,19 +431,28 @@ ReturnsResult
    pnl ┴ nothing
 ```
 
+# Related
+
+  - [`ReturnsResult`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`prices_to_returns`](@ref)
+  - [`Option`](@ref)
+  - [`VecStr`](@ref)
+  - [`MatNum`](@ref)
+
 * * *
 
     port_opt_view(rd::AbstractReturnsResult, args...; kwargs...)
 
-Erroring tripwire for [`AbstractReturnsResult`](@ref) subtypes that do not implement [`port_opt_view`](@ref).
+Fallback that throws for an [`AbstractReturnsResult`](@ref) subtype that does not implement [`port_opt_view`](@ref).
 
-Without it, the universal leaf fallback `port_opt_view(x, i, args...)` would hand back the returns result *unsubselected*, and a meta-optimiser or cross-validation fold would silently train on the full universe. Returns data is never a leaf value, so an unhandled subtype is a missing method, not a pass-through.
+Without it, the call reaches the generic fallback `port_opt_view(x, i, args...)`, which throws a `MethodError` for [`nothing_scalar_array_view`](@ref), a function that the author of the subtype never called. This method names the missing method instead. Returns data always has an asset axis, so no subtype can pass through a view unchanged.
 
-Subtypes carrying an [`AssetPanel`](@ref) owe it the same treatment as `X`: subselect its asset axis on every arity, its observation axis on the arities that take one, and — when a tensor Panel Field's labels *are* the assets ([`features_are_assets`](@ref)) — that field's label axis as well. A panel that survives a fold unsliced is the same silent-wrongness as an unsliced returns matrix, one level down: the distance it produces is finite, plausible, and computed over the wrong universe. [`port_opt_view`](@ref) implements the rule; the [`ReturnsResult`](@ref) methods are the reference.
+A subtype that carries an [`AssetPanel`](@ref) subselects it as it subselects `X`. It subselects the asset axis in every method, and the observation axis in the methods that take one. When the labels of a tensor Panel Field are the assets, see [`features_are_assets`](@ref), it subselects the label axis of that field too. A panel that a fold does not subselect gives a finite distance over the wrong universe, and no check catches it. The [`ReturnsResult`](@ref) methods are the reference implementation.
 
 # Algorithm
 
- 1. Throw an `ArgumentError` naming the concrete type and the number of index arguments the call gave. The method reads neither the indices nor the fields of `rd`.
+ 1. Throw an `ArgumentError` that names the concrete type and the number of index arguments of the call. The method reads neither the indices nor the fields of `rd`.
 
 # Related
 
@@ -429,9 +463,9 @@ Subtypes carrying an [`AssetPanel`](@ref) owe it the same treatment as `X`: subs
 
     port_opt_view(rd::ReturnsResult, args...; kwargs...)
 
-Erroring tripwire for [`ReturnsResult`](@ref) calls whose *call shape* no supported arity matches.
+Fallback that throws for a [`ReturnsResult`](@ref) call whose shape matches no supported method.
 
-`ReturnsResult` does implement [`port_opt_view`](@ref), so the [`AbstractReturnsResult`](@ref) tripwire above would misreport a mistyped call as an unimplemented subtype. This method takes the call instead and names the call shape: the supported arities take one, two, or three positional index arguments and no keyword arguments — in particular `factors` is the third *positional* index, not a keyword.
+`ReturnsResult` implements [`port_opt_view`](@ref), so the [`AbstractReturnsResult`](@ref) fallback above would report a wrong call as a missing method. This method takes the call and states its shape. The supported methods take one, two or three positional index arguments and no keyword argument. `factors` is the third positional index, not a keyword.
 
 # Algorithm
 
@@ -480,14 +514,14 @@ function port_opt_view(rd::ReturnsResult, args...; kwargs...)
     return throw(ArgumentError("port_opt_view(::ReturnsResult, ...) does not accept this call shape; got $(length(args)) positional index argument(s)$(kwmsg). Supported shapes: port_opt_view(rd, assets) to subselect assets; port_opt_view(rd, observations, assets) or port_opt_view(rd, observations, assets, factors) to subselect observations and assets together (note the reversed index order, and that `factors` is the third positional index, not a keyword)."))
 end
 function port_opt_view(rd::AbstractReturnsResult, args...; kwargs...)
-    return throw(ArgumentError("$(typeof(rd)) subtypes AbstractReturnsResult but does not implement port_opt_view for $(length(args)) index argument(s). Extension authors: implement port_opt_view for the subtype; without it a meta-optimiser or cross-validation fold would silently train on the unsubselected universe. See port_opt_view(rd::ReturnsResult, ...) for the method to mirror."))
+    return throw(ArgumentError("$(typeof(rd)) subtypes AbstractReturnsResult but does not implement port_opt_view for $(length(args)) index argument(s). Extension authors: implement port_opt_view for the subtype, so that a meta-optimiser or a cross-validation fold can subselect its assets and observations. See port_opt_view(rd::ReturnsResult, ...) for the method to mirror."))
 end
 """
     const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
 
 Union of the two data levels cross-validation folds can be computed on: returns-level ([`AbstractReturnsResult`](@ref)) and price-level ([`AbstractPricesResult`](@ref)) data.
 
-Fold generation only needs an observation count ([`cv_nobs`](@ref)) and a timestamp vector ([`cv_timestamps`](@ref)), so [`Base.split`](@ref) and [`n_splits`](@ref) accept either level. Price-level splitting is what lets a `Pipeline` be cross-validated on its *input* rows, keeping stateful preprocessing inside the fold.
+Fold generation needs only an observation count, from [`cv_nobs`](@ref), and a timestamp vector, from [`cv_timestamps`](@ref). So [`Base.split`](@ref) and [`n_splits`](@ref) accept either level. A split at the price level lets a `Pipeline` be cross-validated on its input rows, so its stateful preprocessing stays inside the fold.
 
 # Related
 
@@ -503,28 +537,32 @@ const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
 
 Return a `ReturnsResult` appropriate for benchmark-tracking optimisations.
 
-This helper inspects the `ReturnsResult`'s benchmark field `B` and the boolean flag `brt` (benchmark-tracking). If `brt` is `true` and a benchmark `B` is present it returns a new `ReturnsResult` in which asset returns `X` have the benchmark removed (i.e. `X - B` or broadcast `X .- B` for vector benchmarks). If `brt` is `false` or no benchmark is present, the original `ReturnsResult` is returned unchanged.
+The function reads the benchmark field `B` of `rd` and the flag `brt`, which asks for benchmark tracking. When `brt` is `true` and `rd` carries a benchmark, it returns a new `ReturnsResult` whose asset returns are the excess returns over the benchmark. Otherwise it returns `rd`.
 
 # Algorithm
 
-The first step is a method selected on the field type of `B`, so a carrier with no benchmark runs no branch at all.
+The method that Julia selects on the type of the field `B` is the first step, so a carrier with no benchmark runs no branch.
 
- 1. `rd` carries no benchmark, because its `B` field is `Nothing`: return `rd` itself.
- 2. `brt` is `false`: return `rd` itself.
- 3. `brt` is `true`: subtract the benchmark from the asset returns, giving `X`. A vector benchmark subtracts by broadcast, `rd.X .- rd.B`, which takes one benchmark value per observation from every asset column. A matrix benchmark subtracts elementwise, `rd.X - rd.B`.
- 4. Rebuild the [`ReturnsResult`](@ref) from `X`, and leave `nb` and `B` unset. The benchmark is spent on the subtraction, which is what makes a second call return its argument unchanged. Every other field — `nx`, `nf`, `F`, `ts`, `iv`, `ivpa` and `pnl` — is carried over. The argument itself is never modified.
+ 1. `rd` carries no benchmark, because its `B` field is `Nothing`. Return `rd`.
+ 2. `brt` is `false`. Return `rd`.
+ 3. `brt` is `true`. Subtract the benchmark from the asset returns, which gives `X`. A vector benchmark subtracts by broadcast, `rd.X .- rd.B`, which takes the benchmark value of each observation from every asset column. A matrix benchmark subtracts elementwise, `rd.X - rd.B`.
+ 4. Rebuild the [`ReturnsResult`](@ref) from `X`, with `nb` and `B` set to `nothing`. The subtraction uses up the benchmark, so a second call returns its argument unchanged. The fields `nx`, `nf`, `F`, `ts`, `iv`, `ivpa` and `pnl` pass through. The function does not modify `rd`.
 
 # Arguments
 
-  - `rd`: A `ReturnsResult` object containing asset, factor and/or benchmark returns.
-  - `brt`: Boolean flag indicating whether benchmark-tracking behaviour should be applied. When `true`, asset returns are adjusted by subtracting the benchmark `B` (if present).
+  - `rd`: A `ReturnsResult` that holds the asset returns, and optionally the factor and benchmark returns. When it carries a benchmark, it also holds `X`.
+  - `brt`: `true` to subtract the benchmark `B` from the asset returns, `false` to keep them. A carrier with no benchmark accepts any value.
+
+# Validation
+
+  - When `rd` carries a benchmark, `rd.X` is a matrix and `brt` is a `Bool`. Otherwise no method matches, and the call raises a `MethodError`.
 
 # Returns
 
   - `rd::ReturnsResult`:
 
-      + If `brt` is `true` and a benchmark `B` is present: A new `ReturnsResult` with adjusted asset returns
-      + Otherwise: The `rd` is returned unchanged. `nb` and `B` hold `nothing` on an adjusted result, which is what makes the adjustment idempotent.
+      + If `brt` is `true` and `rd` carries a benchmark, a new `ReturnsResult` that holds the excess returns in `X`. Its `nb` and `B` are `nothing`, so a second call returns it unchanged.
+      + Otherwise, `rd` itself.
 
 # Examples
 
@@ -602,9 +640,9 @@ end
 
 Resolve the [`AssetPanel`](@ref) a [`FeatureDistance`](@ref) with no producer measures.
 
-`nothing` in the `ape` slot says *read the panel the data carrier already holds*. The carriers reach the kernel as the two keywords `pr` and `rd`, and this verb resolves the source by dispatch: a [`ReturnsResult`](@ref) in either slot answers its `pnl`, and `rd` wins when both hold one, because the data carrier is where a panel is data rather than a by-product. `Pr_RR` admits a [`ReturnsResult`](@ref) in the `pr` slot, which is what `clusterise(cle, rd)` and every [`Pipeline`](@ref) step pass, so the second method is not a fallback but the shortest public call.
+`nothing` in the `ape` slot tells the kernel to read the panel that the data carrier holds. The carriers reach the kernel as the two keywords `pr` and `rd`, and this function selects the source by dispatch. A [`ReturnsResult`](@ref) in either slot gives its `pnl`. When both slots hold one, `rd` wins, because `rd` is the data carrier. `Pr_RR` admits a [`ReturnsResult`](@ref) in the `pr` slot, and `clusterise(cle, rd)` and every [`Pipeline`](@ref) step pass it there. So the second method serves the shortest public call.
 
-A prior result alone carries no panel, so it raises an [`IsNothingError`](@ref) naming the two ways forward.
+A prior result alone carries no panel, so the call raises an [`IsNothingError`](@ref) that names the two ways to supply one.
 
 # Algorithm
 
@@ -656,11 +694,11 @@ end
 
 Assert that the data carrier a [`FeatureDistance`](@ref) read holds an [`AssetPanel`](@ref), and return it.
 
-The carrier's `pnl` is optional, so a carrier built without one reaches the kernel as `nothing`. This is the one place that turns it into a diagnostic, and it returns the panel so the caller reads one verb rather than a check and an access.
+The `pnl` of a carrier is optional, so a carrier built without one gives `nothing`. This function turns that `nothing` into an error message. It returns the panel, so the caller makes one call for the check and the access.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. A panel is returned; `nothing` raises.
+The method that Julia selects is the algorithm. A panel returns itself, and `nothing` raises.
 
 # Arguments
 
