@@ -941,4 +941,73 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test_throws ConflictingArgumentError prices_to_returns(PricesResult(; X = Xc,
                                                                              B = Fc[tsc[1:4]]))
     end
+    @testset "the carrier views recover rows by timestamp and name the derived columns" begin
+        ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 6))
+        # The rows come back in the order of the selection, not sorted, as a Vector{Int}.
+        rows = PortfolioOptimisers.matched_row_indices(ts[[5, 2, 4]], ts)
+        @test rows == [5, 2, 4]
+        @test rows isa Vector{Int}
+        @test PortfolioOptimisers.matched_row_indices(Date[], ts) == Int[]
+        # A timestamp that appears twice in the clock matches its first position.
+        @test PortfolioOptimisers.matched_row_indices([ts[2]], ts[[1, 2, 2, 3]]) == [2]
+        # Both messages name the carriers that hold an axis on a clock, not the feature axis.
+        err = try
+            PortfolioOptimisers.matched_row_indices([Date(2019, 1, 1)], ts)
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("Asset Panel or Listing Span", err.msg)
+        @test occursin("2019-01-01", err.msg)
+        err = try
+            PortfolioOptimisers.matched_row_indices(nothing, ts)
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("Asset Panel or Listing Span", err.msg)
+
+        # A panel with its two masks and no Panel Field has an observation axis.
+        pm = AssetPanel(; pf = PortfolioOptimisers.AbstractPanelField[], amsk = trues(6, 3),
+                        emsk = trues(6, 3))
+        @test !PortfolioOptimisers.panel_is_static(pm)
+        @test PortfolioOptimisers.feature_row_indices(pm, ts[[6, 1]], ts) == [6, 1]
+        @test PortfolioOptimisers.panel_feature_names(pm) == String[]
+
+        # The names follow the column order of the derived Feature Matrix, observed masks
+        # after the values of their own field.
+        pnl = AssetPanel(;
+                         pf = [NumericPanelField(; name = "mcap", vals = [1.0, 2.0],
+                                                 omsk = [true, false]),
+                               TensorPanelField(; name = "beta", axis = "f",
+                                                labels = ["a", "b"],
+                                                vals = [1.0 2.0; 3.0 4.0],
+                                                omsk = trues(2, 2))])
+        @test PortfolioOptimisers.panel_feature_names(pnl) ==
+              ["mcap", "mcap::observed", "beta=a", "beta=b", "beta=a::observed",
+               "beta=b::observed"]
+        @test PortfolioOptimisers.panel_feature_names(pnl) == panel_feature_matrix(pnl)[1]
+
+        # The view cuts the label axis of a square tensor field only when it has the names.
+        @test isnothing(PortfolioOptimisers.panel_carrier_view(nothing, 1:2, 1:2, nothing))
+        sq = AssetPanel(;
+                        pf = [TensorPanelField(; name = "prox", axis = "asset",
+                                               labels = ["A", "B", "C"],
+                                               vals = [1.0 2.0 3.0; 4.0 5.0 6.0;
+                                                       7.0 8.0 9.0])])
+        @test panel_feature_matrix(PortfolioOptimisers.panel_carrier_view(sq, :, [2, 3],
+                                                                          ["A", "B", "C"])) ==
+              (["prox=B", "prox=C"], [5.0 6.0; 8.0 9.0])
+        @test panel_feature_matrix(PortfolioOptimisers.panel_carrier_view(sq, :, [2, 3],
+                                                                          nothing)) ==
+              (["prox=A", "prox=B", "prox=C"], [4.0 5.0 6.0; 7.0 8.0 9.0])
+        # A time-varying panel is cut on both axes, and a static one ignores the rows.
+        Z3 = reshape(Float64.(1:36), 6, 3, 2)
+        tv = PortfolioOptimisers.panel_carrier_view(matrix_panel(["f1", "f2"], Z3), [2, 5],
+                                                    [1, 3], nothing)
+        @test panel_feature_matrix(tv)[2] == Z3[[2, 5], [1, 3], :]
+        st = PortfolioOptimisers.panel_carrier_view(matrix_panel(["f1", "f2"], Z3[1, :, :]),
+                                                    [2, 5], [1, 3], nothing)
+        @test panel_feature_matrix(st)[2] == Z3[1, [1, 3], :]
+    end
 end

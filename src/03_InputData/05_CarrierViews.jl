@@ -4,33 +4,35 @@
 
 Recover the positional row indices of a time-varying [`AssetPanel`](@ref) from a timestamp window.
 
-A Panel Field holds a plain array, so its observation axis is parallel to the carrier's clock positionally rather than aligned by timestamp. Whenever a routine selects rows of `X` by timestamp, the surviving timestamps are matched back into the original clock to recover the rows the panel must keep. A surviving timestamp absent from that clock throws: it means the row bookkeeping has been broken (a synthesised timestamp, or an outer join that introduced a row `X` never had), and slicing the panel positionally from there would silently pair each asset with another period's values.
+A Panel Field holds a plain array, so its observation axis follows the carrier's clock by position and not by timestamp. A routine that selects rows of `X` by timestamp calls this function to match the surviving timestamps back into the original clock, and the panel keeps the rows it finds. A surviving timestamp that is absent from that clock throws. Such a timestamp comes from a timestamp function that makes new timestamps, or from an outer join that adds a row `X` never had. A positional slice past such a timestamp pairs each asset with the values of another period.
 
-Two sites use it. At **price level** the clock is `TimeSeries.timestamp(X)` and the selection is a timestamp window. At the **cross-validation assembly seam** the clock is `ReturnsResult.ts` and the selection is a fold: [`fold_row_indices`](@ref) recovers a fold's rows from the timestamps its view of the returns already carries, which is why `ts` must be unique — it *keys* the observation axis rather than merely labelling it.
+Two kinds of caller use it. At the price level, the clock is `TimeSeries.timestamp(X)` and the selection is a timestamp window. Where cross-validation assembles its folds, the clock is `ReturnsResult.ts` and the selection is a fold. There [`fold_row_indices`](@ref) recovers the rows of each fold from the timestamps that the fold's view of the returns holds. This is why `ts` must be unique. It is the key of the observation axis, and a repeated timestamp matches only its first position.
 
-The static and absent shapes have no observation axis, so they return `Colon` and cost nothing.
+A static panel and an absent panel have no observation axis, so they return `Colon` and read no timestamp.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `pnl` is `nothing`, or static: return `Colon()`. Neither has an observation axis, so there is no row to recover and the timestamps are not read.
- 2. `pnl` is time-varying: match `ts_new` into `ts_old` with [`matched_row_indices`](@ref), which throws when the selection kept no timestamp, or when a surviving timestamp is absent from the original clock.
+ 1. `pnl` is `nothing`, or static: return `Colon()`. Neither has an observation axis, so the function reads no timestamp.
+ 2. `pnl` is time-varying: match `ts_new` into `ts_old` with [`matched_row_indices`](@ref), giving the rows. That function throws when the selection kept no timestamp, or when a surviving timestamp is absent from the original clock.
 
 # Arguments
 
   - `pnl`: The Asset Panel, or `nothing`.
-  - `ts_new`: Timestamps surviving the selection.
-  - `ts_old`: Timestamps of the clock the panel's observation axis is parallel to.
+  - `ts_new`: The timestamps that survived the selection.
+  - `ts_old`: The timestamps of the clock that the panel's observation axis follows.
 
 # Validation
 
-  - `ts_new` is not `nothing` when the panel is time-varying.
-  - Every entry of `ts_new` appears in `ts_old`.
+When the panel is time-varying:
+
+  - `ts_new` is not `nothing`. Raises an `ArgumentError`.
+  - Every entry of `ts_new` appears in `ts_old`. Raises an `ArgumentError`.
 
 # Returns
 
-  - `Colon` for a static or absent panel; otherwise the row indices, as a `Vector{Int}`.
+  - `rows::Union{Colon, Vector{Int}}`: `Colon()` for a static or absent panel. Otherwise the position of each surviving timestamp in `ts_old`, in the order of `ts_new`.
 
 # Related
 
@@ -52,19 +54,21 @@ end
 
 Match the surviving timestamps back into the original clock, and return the rows they hold.
 
-The body [`feature_row_indices`](@ref) shares between the time-varying feature matrix and the time-varying [`AssetPanel`](@ref): both hold their observation axis parallel to the carrier's clock positionally, so both recover their rows the same way.
+[`feature_row_indices`](@ref) calls it for a time-varying [`AssetPanel`](@ref), and [`span_carrier_view`](@ref) calls it for a Listing Span. Both hold their observation axis parallel to the carrier's clock by position, so both recover their rows the same way.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `ts_new` is `nothing`: throw. The selection kept no timestamp, so the rows to keep cannot be named.
- 2. Otherwise match `ts_new` into `ts_old` with `indexin`, check that every surviving timestamp was found, and return the positions as a `Vector{Int}`.
+ 1. `ts_new` is `nothing`: throw. The selection kept no timestamp, so the function cannot name the rows to keep.
+ 2. Otherwise match `ts_new` into `ts_old` with `indexin`, giving `rows`. A timestamp that appears twice in `ts_old` matches its first position.
+ 3. Find the first entry of `rows` that `indexin` did not match, giving `missed`, and throw when there is one.
+ 4. Return `rows` as a `Vector{Int}`.
 
 # Arguments
 
-  - `ts_new`: Timestamps that survived the selection.
-  - `ts_old`: Timestamps of the clock the observation axis is parallel to.
+  - `ts_new`: The timestamps that survived the selection.
+  - `ts_old`: The timestamps of the clock that the observation axis follows.
 
 # Validation
 
@@ -73,22 +77,23 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `rows::Vector{Int}`: The position each surviving timestamp holds in the original clock.
+  - `rows::Vector{Int}`: The position of each surviving timestamp in `ts_old`, in the order of `ts_new`. An empty `ts_new` gives an empty vector.
 
 # Related
 
   - [`feature_row_indices`](@ref)
+  - [`span_carrier_view`](@ref)
   - [`AssetPanel`](@ref)
   - [`prices_to_returns`](@ref)
 """
 function matched_row_indices(::Nothing, ::Any)
-    return throw(ArgumentError("a time-varying feature axis has its observation axis parallel to the price timestamps, but no timestamps survived the conversion, so the rows to keep cannot be recovered. Pass a static Asset Panel instead."))
+    return throw(ArgumentError("a time-varying Asset Panel or Listing Span holds its observation axis parallel to a clock, but no timestamps survived the selection, so the rows to keep cannot be recovered. Supply the surviving timestamps, or pass a static Asset Panel, which has no observation axis."))
 end
 function matched_row_indices(ts_new, ts_old)
     rows = indexin(ts_new, ts_old)
     missed = findfirst(isnothing, rows)
     @argcheck(isnothing(missed),
-              ArgumentError("a time-varying feature axis has its observation axis parallel to the price timestamps, but the timestamp $(ts_new[missed]) selected here is absent from them, so the row it corresponds to cannot be recovered. This happens when the surviving timestamps are not a subset of the original clock — a `collapse_args` timestamp function that synthesises timestamps, or an outer join that introduced rows the asset prices never had. Pass a static Asset Panel, or align the feature axis to the price clock first."))
+              ArgumentError("a time-varying Asset Panel or Listing Span holds its observation axis parallel to a clock, but the timestamp $(ts_new[missed]) selected here is absent from that clock, so the row it corresponds to cannot be recovered. This happens when the surviving timestamps are not a subset of the original clock, for example after a `collapse_args` timestamp function that makes new timestamps, or an outer join that adds rows the asset prices never had. Pass a static Asset Panel, or align the panel to the clock first."))
     return Vector{Int}(rows)
 end
 """
@@ -97,14 +102,14 @@ end
 
 Name the columns an [`AssetPanel`](@ref) derives, without building the Feature Matrix.
 
-A consumer that needs the column names alone reads them here, and the values are not stacked to answer it.
+A consumer that needs only the column names calls this function, which reads no value of the panel.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. `pnl` is `nothing`: return `nothing`.
- 2. `pnl` is an [`AssetPanel`](@ref): walk its Panel Fields, appending each one's value column names and then its observed-mask column names.
+ 2. `pnl` is an [`AssetPanel`](@ref): read its Panel Fields in order into `nz`. For each field, append the names of its value columns, then the names of its observed-mask columns when the field has an observed mask.
 
 # Arguments
 
@@ -112,7 +117,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `nz::Option{Vector{String}}`: One name per derived column, or `nothing`.
+  - `nz::Option{Vector{String}}`: One name per derived column, in the column order of [`panel_feature_matrix`](@ref), or `nothing`. A panel with no Panel Field gives an empty vector.
 
 # Related
 
@@ -138,7 +143,7 @@ end
 
 View a carrier's [`AssetPanel`](@ref), or return `nothing` when the carrier holds none.
 
-The one-line wrapper every carrier view goes through, so the `nothing` case is written once rather than at each of the six sites that slice a panel.
+[`port_opt_view`](@ref) of a [`PricesResult`](@ref) or of a [`ReturnsResult`](@ref), and [`MissingDataFilter`](@ref), call it. So the `nothing` case has one method, and no call site needs a branch for it.
 
 # Algorithm
 
@@ -150,13 +155,13 @@ The method that Julia selects is the algorithm.
 # Arguments
 
   - `pnl`: The Asset Panel, or `nothing`.
-  - `i`: Observation index.
+  - `i`: Observation index. A static panel has no observation axis and ignores it.
   - `j`: Asset index.
-  - `nx`: The asset names, or `nothing`, handed to [`port_opt_view`](@ref) so that a tensor Panel Field whose labels *are* the asset names is cut on its label axis too.
+  - `nx`: The asset names, or `nothing`. [`port_opt_view`](@ref) uses them to cut a tensor Panel Field whose labels are the asset names on its label axis too. With `nothing`, every label axis stays whole.
 
 # Returns
 
-  - An Asset Panel over the selected observations and assets, or `nothing`.
+  - `pnl′::Option{<:AssetPanel}`: The Asset Panel over the selected observations and assets, or `nothing`.
 
 # Related
 
@@ -164,6 +169,7 @@ The method that Julia selects is the algorithm.
   - [`port_opt_view`](@ref)
   - [`ReturnsResult`](@ref)
   - [`PricesResult`](@ref)
+  - [`MissingDataFilter`](@ref)
 """
 function panel_carrier_view(::Nothing, ::Any, ::Any, ::Any)
     return nothing
