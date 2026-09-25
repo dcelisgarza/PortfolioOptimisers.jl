@@ -3281,3 +3281,157 @@ end
         end
     end
 end
+
+@testset "The docstrings of 09_ForecastInformationCoefficient.jl against numbers" begin
+    PO = PortfolioOptimisers
+    # The definitions, written out by hand. Every assignment is local, so no helper writes
+    # a variable of the testset.
+    function ic_hand_wcor(a, b, u, mc)
+        local k = [i
+                   for i in eachindex(a)
+                   if isfinite(a[i]) && isfinite(b[i]) && isfinite(u[i]) && u[i] > 0]
+        length(k) < mc && return NaN
+        local wk, xk, yk = u[k], a[k], b[k]
+        local mx, my = sum(wk .* xk) / sum(wk), sum(wk .* yk) / sum(wk)
+        local num = sum(wk .* (xk .- mx) .* (yk .- my))
+        local den = sqrt(sum(wk .* (xk .- mx) .^ 2) * sum(wk .* (yk .- my) .^ 2))
+        return den > 1e-12 ? num / den : NaN
+    end
+    function ic_hand_ranks(x)
+        local r = similar(x)
+        r[sortperm(x)] = 1:length(x)
+        return r
+    end
+    function ic_hand_spearman(a, b, mc)
+        local k = [i for i in eachindex(a) if isfinite(a[i]) && isfinite(b[i])]
+        length(k) < mc && return NaN
+        return ic_hand_wcor(ic_hand_ranks(a[k]), ic_hand_ranks(b[k]), ones(length(k)), mc)
+    end
+
+    @testset "Each column is its correlation over the assets the definition admits" begin
+        rng = StableRNG(948)
+        for _ in 1:150
+            nt, na = rand(rng, 5:10), rand(rng, 3:8)
+            a = randn(rng, nt, na)
+            a[rand(rng, nt, na) .< 0.1] .= NaN
+            wr = rand(rng, nt, na)
+            wr[rand(rng, nt, na) .< 0.15] .= rand(rng, [0.0, NaN, Inf])
+            mc = rand(rng, 1:4)
+            fr = forecast_evaluation(a, PO.forward_mean_returns(randn(rng, nt, na), 2, 1);
+                                     horizon = 2, step = rand(rng, 1:2), min_count = mc)
+            ic = forecast_ic(fr, wr)
+            for (j, t) in enumerate(fr.dates)
+                s = ic_hand_spearman(fr.alpha[t, :], fr.y[t, :], mc)
+                p = ic_hand_wcor(fr.alpha[t, :], fr.y[t, :], wr[t, :], mc)
+                @test isequal(s, ic[j, 1]) || isapprox(s, ic[j, 1]; atol = 1e-12)
+                @test isequal(p, ic[j, 2]) || isapprox(p, ic[j, 2]; atol = 1e-12)
+            end
+        end
+    end
+
+    @testset "Equal forecasts take ordinal ranks, so the asset order sets the Spearman column" begin
+        flat = [1.0 1.0 1.0 1.0 1.0; 0.0 0.0 0.0 0.0 0.0]
+        up = [1.0 2.0 3.0 4.0 5.0; 0.0 0.0 0.0 0.0 0.0]
+        icu = forecast_ic(forecast_evaluation(flat, up))
+        icd = forecast_ic(forecast_evaluation(flat, reverse(up; dims = 2)))
+        @test icu[1, 1] == 1.0
+        @test icd[1, 1] == -1.0
+        @test isnan(icu[1, 2])
+        @test isnan(icd[1, 2])
+    end
+
+    @testset "A weight that is not finite is outside the universe of every verb" begin
+        # A zero idiosyncratic variance gives an infinite weight under the inverse-variance
+        # metric, which reads 1 ./ vs. Asset 1 carries it at the first date, and no forecast
+        # there, so the coverage read it as a missed asset and reported 3/4.
+        vs = [0.0 1.0 1.0 1.0; 1.0 1.0 1.0 1.0]
+        wi = 1 ./ vs
+        a = [NaN 2.0 3.0 4.0; 2.0 1.0 4.0 3.0]
+        yi = [1.0 2.0 3.0 4.0; 0.0 0.0 0.0 0.0]
+        fi = forecast_evaluation(a, yi; min_count = 2)
+        @test isinf(wi[1, 1])
+        @test fi.dates == [1, 2]
+        @test forecast_coverage(fi, wi)[1] == 1.0
+        # With a finite forecast, asset 1 was counted as scored, 4 against the 3 the
+        # Pearson column reads.
+        a2 = [1.0 2.0 3.0 4.0; 2.0 1.0 4.0 3.0]
+        f2 = forecast_evaluation(a2, yi; min_count = 2)
+        @test PO.forecast_summary_scored(f2, PO.forecast_ic_weights(f2.alpha, wi)) ==
+              [3.0, 4.0]
+        @test forecast_coverage(f2, wi) == [1.0, 1.0]
+        @test forecast_ic(f2, wi)[1, 2] ≈ ic_hand_wcor(a2[1, 2:4], yi[1, 2:4], ones(3), 2)
+        wn = copy(wi)
+        wn[1, 1] = NaN
+        @test isequal(forecast_coverage(f2, wn), forecast_coverage(f2, wi))
+        @test isequal(forecast_ic(f2, wn), forecast_ic(f2, wi))
+    end
+
+    @testset "The lag counts the later dates whose windows overlap a given one" begin
+        for h in 1:12, s in 1:12
+            @test PO.forecast_ic_lags(h, s) == count(j -> j * s < h, 1:12)
+        end
+    end
+
+    @testset "The t-statistic is the mean over the long-run standard error" begin
+        rng = StableRNG(9480)
+        for _ in 1:100
+            nr = rand(rng, 4:30)
+            ic = randn(rng, nr, 2)
+            ic[rand(rng, nr, 2) .< 0.1] .= NaN
+            nl = rand(rng, 0:4)
+            sm = forecast_ic_summary(ic; lags = nl)
+            for (k, v) in ((1, sm.spearman), (2, sm.pearson))
+                c = ic[:, k]
+                f = filter(isfinite, c)
+                n = length(f)
+                n < 2 && continue
+                m = sum(f) / n
+                g = sum(abs2, f .- m)
+                for l in 1:nl, t in 1:(nr - l)
+                    if isfinite(c[t]) && isfinite(c[t + l])
+                        g += 2 * (c[t] - m) * (c[t + l] - m)
+                    end
+                end
+                tt = g > 0 ? m / sqrt(g / (n - 1)) * sqrt(n) : NaN
+                @test isequal(tt, v.t_stat) || isapprox(tt, v.t_stat; rtol = 1e-12)
+                @test v.mean_ic ≈ m
+                @test v.std_ic ≈ sqrt(sum(abs2, f .- m) / (n - 1))
+                @test v.hit_rate == count(>(0), f) / n
+            end
+        end
+    end
+
+    @testset "The plain ratio overstates a persistent forecast and not a fresh one" begin
+        rng = StableRNG(9481)
+        nr, nt, na, h = 100, 200, 16, 4
+        for (rho, overstated) in ((0.99, true), (0.0, false))
+            plain = zeros(nr)
+            corrected = zeros(nr)
+            for m in 1:nr
+                am = zeros(nt, na)
+                am[1, :] = randn(rng, na)
+                for t in 2:nt
+                    am[t, :] = rho .* am[t - 1, :] .+ sqrt(1 - rho^2) .* randn(rng, na)
+                end
+                xm = randn(rng, nt, na)
+                fm = forecast_evaluation(am, PO.forward_mean_returns(xm, h, 1); horizon = h,
+                                         step = 1)
+                icm = forecast_ic(fm)
+                plain[m] = forecast_ic_summary(icm).spearman.ic_ir *
+                           sqrt(count(isfinite, icm[:, 1]))
+                corrected[m] = forecast_ic_summary(icm; lags = PO.forecast_ic_lags(fm)).spearman.t_stat
+            end
+            @test (std(plain) > 1.5) == overstated
+            @test 0.75 < std(corrected) < 1.3
+        end
+    end
+
+    @testset "The columns and the coverage take the promotion of the pair and the weights" begin
+        a32 = Float32.(IC_ALPHA)
+        f32 = forecast_evaluation(a32, PO.forward_mean_returns(a32, 1, 1))
+        @test eltype(forecast_ic(f32)) === Float32
+        @test eltype(forecast_coverage(f32)) === Float32
+        @test eltype(forecast_ic(f32, ones(Float64, 4, 4))) === Float64
+        @test eltype(forecast_coverage(f32, ones(Float64, 4, 4))) === Float64
+    end
+end

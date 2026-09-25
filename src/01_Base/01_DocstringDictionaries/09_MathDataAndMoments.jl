@@ -177,7 +177,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :y_ti_fwd => "``y_{ti}``: Forward target of asset ``i`` at observation ``t``.",#
                  :m_ti_univ => "``m_{ti}``: Universe mask of asset ``i`` at observation ``t``, `true` where the asset is in the estimation universe.",#
                  :u_ti_cs => "``u_{ti}``: Cross-sectional weight of asset ``i`` at observation ``t``.",#
-                 :U_t_univ => "``\\mathcal{U}_{t}``: Universe of observation ``t``, the assets in the mask that carry a positive weight.",#
+                 :U_t_univ => "``\\mathcal{U}_{t}``: Universe of observation ``t``, the assets in the mask that carry a finite positive weight.",#
                  :t_j_eval => "``t_{j}``: The ``j``-th evaluation date.",#
                  :s_eval_stride => "``s``: The stride between two evaluation dates.",#
                  :c_j_cov => "``c_{j}``: Coverage at evaluation date ``t_{j}``, the share of the universe the evaluation scored there.",#

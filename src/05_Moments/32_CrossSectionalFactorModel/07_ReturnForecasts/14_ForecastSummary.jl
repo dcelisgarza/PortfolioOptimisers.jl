@@ -271,7 +271,7 @@ This count is the numerator of [`forecast_coverage`](@ref). A summary reports it
 ```math
 \\begin{align}
 n_{j} &= \\left| \\left\\{ i \\in \\mathcal{U}_{t_{j}} : \\alpha_{t_{j} i} \\text{ and } y_{t_{j} i} \\text{ are finite} \\right\\} \\right|\\,, \\\\
-\\mathcal{U}_{t} &= \\left\\{ i : m_{ti} \\text{ and } u_{ti} > 0 \\right\\}\\,.
+\\mathcal{U}_{t} &= \\left\\{ i : m_{ti} \\text{ and } 0 < u_{ti} < \\infty \\right\\}\\,.
 \\end{align}
 ```
 
@@ -310,7 +310,10 @@ function forecast_summary_scored(fe::ForecastEvaluationResult, u::MatNum)
     for (j, t) in enumerate(dates)
         s = 0
         for i in axes(alpha, 2)
-            s += umsk[t, i] && u[t, i] > 0 && isfinite(alpha[t, i]) && isfinite(y[t, i])
+            s += umsk[t, i] &&
+                 0 < u[t, i] < Inf &&
+                 isfinite(alpha[t, i]) &&
+                 isfinite(y[t, i])
         end
         n[j] = Tf(s)
     end
