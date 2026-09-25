@@ -3,29 +3,32 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve one side of a train/test split into a row count.
 
-A size is either an `Integer` count of observations, or an `AbstractFloat` fraction of them in `(0, 1)`. Counts saturate at `N` (asking for more rows than exist takes all of them); the [`safe_index`](@ref) window guards then reject a split that leaves either side empty.
+A size is an `Integer` count of observations, or a fraction of the observations given as any other `Real` in `(0, 1)`. A count larger than `N` takes all `N` rows. The window checks of [`safe_index`](@ref) then reject a split that leaves either side empty.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. Each step is one method, and the two mean different things: a count and a fraction.
+The method that Julia selects is the first step, because a count and a fraction mean different things.
 
- 1. `s` is an `Integer`, so it is a count of rows: check that `s > 0`, and return `min(Int(s), N)`. A count larger than the data takes every row.
- 2. `s` is an `AbstractFloat`, so it is a fraction of the rows: check that `0 < s < 1`, and return `clamp(floor(Int, s * N), 1, N)`. The fraction rounds **down** to whole rows, and the clamp keeps a small fraction of a short window from resolving to zero rows.
+ 1. `s` is an `Integer`, so it is a count of rows. Check that `s > 0`, and return `min(Int(s), N)`.
+ 2. `s` is any other `Real`, so it is a fraction of the rows. Check that `0 < s < 1`.
+ 3. Round `s * N` to the nearest integer, giving `n`.
+ 4. If `n / N`, computed in the type of `s`, exceeds `s`, subtract one from `n`. Now `n` is the largest count whose share of the rows does not exceed `s`, which is `floor(s * N)` in exact arithmetic. A direct `floor(Int, s * N)` loses a row when the product lands below a whole number, and `0.29 * 100` is `28.999999999999996`.
+ 5. Return `clamp(n, 1, N)`. The clamp stops a small fraction of a short window from resolving to zero rows.
 
 # Arguments
 
-  - `s`: One side of the split, as a row count (`Integer`) or a fraction of the observations (`AbstractFloat` in `(0, 1)`).
-  - `N`: Number of observations available.
-  - `name`: Symbolic name of the side, displayed in error messages.
+  - `s`: One side of the split, as a row count (`Integer`) or a fraction of the observations (any other `Real` in `(0, 1)`).
+  - `N`: The number of observations.
+  - `name`: The name of the side, which the error messages display.
 
 # Validation
 
-  - `s > 0` when `s` is an `Integer`.
-  - `0 < s < 1` when `s` is an `AbstractFloat`.
+  - `s > 0` when `s` is an `Integer`. Otherwise the method throws a `DomainError`.
+  - `0 < s < 1` when `s` is any other `Real`. Otherwise the method throws a `DomainError`.
 
 # Returns
 
-  - `n::Int`: The number of rows the side takes, in `1:N`.
+  - `n::Int`: The number of rows that the side takes, in `1:N`.
 
 # Related
 
@@ -37,47 +40,52 @@ function split_count(s::Integer, N::Integer, name::Symbol)::Int
               DomainError(s, "the $name of a train/test split must be > 0, got $s"))
     return min(Int(s), N)
 end
-function split_count(s::AbstractFloat, N::Integer, name::Symbol)::Int
+function split_count(s::Real, N::Integer, name::Symbol)::Int
     @argcheck(zero(s) < s < one(s),
               DomainError(s,
                           "the $name of a train/test split must lie in (0, 1) when given as a fraction, got $s"))
-    return clamp(floor(Int, s * N), 1, N)
+    n = round(Int, s * N)
+    if n * one(s) / N > s
+        n -= 1
+    end
+    return clamp(n, 1, N)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the `(train, test)` observation ranges of a holdout split over `N` time-ordered rows.
 
-Training rows come from the head of the data and test rows from the tail, so the test window is always the most recent one. Each size is a row count (`Integer`) or a fraction of the observations (`AbstractFloat` in `(0, 1)`), resolved by [`split_count`](@ref).
+The training window is the first rows of the data and the test window is the last rows, so the test window is always the most recent one. Each size is a row count or a fraction of the observations, and [`split_count`](@ref) resolves it to a count.
 
-  - **Neither given**: the split falls at `D` (75 % train, 25 % test).
-  - **One given**: the other side is its complement, so the two windows partition the data.
-  - **Both given**: the head supplies `lo` training rows, the tail supplies `hi` test rows, and any rows between them are **embargoed** — they belong to neither window. This is how a gap between train and test is expressed. The gap is declared by the two sizes and nothing else; a rule that derives one from the label horizon belongs to the purged cross-validators ([`CombinatorialCrossValidation`](@ref)), not here.
+  - If neither size is given, the training window takes the fraction `D` of the rows, 75 % by default, and the test window takes the rest.
+  - If one size is given, the other window takes the remaining rows. The two windows then partition the data.
+  - If both sizes are given, the training window takes the first `lo` rows and the test window takes the last `hi` rows. The rows between the two windows belong to neither window. This gap is an embargo, and only the two sizes set it. The cross-validators [`KFold`](@ref) and [`CombinatorialCrossValidation`](@ref) take a gap around each test fold as `purged_size` and `embargo_size`.
 
 # Algorithm
 
- 1. Resolve the two window lengths `N_l` and `N_h`, through the branch that `lo` and `hi` select:
+ 1. Resolve the two window lengths `N_l` and `N_h`, through the branch that `lo` and `hi` select.
 
-     1. Neither is given: take `n = clamp(floor(Int, D * N), 1, N)`, then `N_l = n` and `N_h = N - n`.
-     2. Only `lo` is given: resolve it with [`split_count`](@ref), then `N_l = n` and `N_h = N - n`.
-     3. Only `hi` is given: resolve it with [`split_count`](@ref), then `N_l = N - n` and `N_h = n`.
-     4. Both are given: resolve each with [`split_count`](@ref) on its own. Neither is the complement of the other, so the rows between the two windows are embargoed.
+     1. Neither is given. Resolve `D` with [`split_count`](@ref), giving `n`. Then `N_l = n` and `N_h = N - n`.
+     2. Only `lo` is given. Resolve it with [`split_count`](@ref), giving `n`. Then `N_l = n` and `N_h = N - n`.
+     3. Only `hi` is given. Resolve it with [`split_count`](@ref), giving `n`. Then `N_l = N - n` and `N_h = n`.
+     4. Both are given. Resolve each with [`split_count`](@ref) on its own. Neither length is the complement of the other, so the rows between the two windows belong to neither window.
 
- 2. Check that both windows are non-empty, and that the two do not overlap.
+ 2. Check that both windows are non-empty, and that `N_l + N_h <= N`.
 
- 3. Return the two ranges `1:N_l` and `(N - N_h + 1):N`. The training window is the head of the data, and the test window is the tail, so the embargoed rows sit between them.
+ 3. Return the two ranges `1:N_l` and `(N - N_h + 1):N`. The embargoed rows lie between them.
 
 # Arguments
 
-  - `lo`: Training rows, as a count (`Integer`) or a fraction (`AbstractFloat` in `(0, 1)`); `nothing` takes the complement of `hi`.
-  - `hi`: Test rows, likewise; `nothing` takes the complement of `lo`.
-  - `N`: Number of observations available.
-  - `D = 0.75`: Training fraction taken when neither size is given.
+  - `lo`: The training rows, as a count (`Integer`) or a fraction (any other `Real` in `(0, 1)`). `nothing` takes the complement of `hi`.
+  - `hi`: The test rows, as a count or a fraction. `nothing` takes the complement of `lo`.
+  - `N`: The number of observations.
+  - `D = 0.75`: The training fraction when neither size is given.
 
 # Validation
 
-  - Both windows are non-empty. A split whose sizes saturate the data on one side (`train_size = N`) leaves nothing to test on and throws.
-  - The windows do not overlap: `lo + hi <= N`.
+  - Each size passes the checks of [`split_count`](@ref), which throws a `DomainError` otherwise.
+  - Both windows are non-empty. Otherwise the function throws an `ArgumentError`. A size that takes every row, such as `train_size = N`, leaves no row for the other window.
+  - `N_l + N_h <= N`, so that the windows do not overlap. Otherwise the function throws an `ArgumentError`.
 
 # Returns
 
@@ -88,11 +96,12 @@ Training rows come from the head of the data and test rows from the tail, so the
   - [`train_test_split`](@ref)
   - [`TrainTestSplit`](@ref)
   - [`split_count`](@ref)
+  - [`KFold`](@ref)
   - [`CombinatorialCrossValidation`](@ref)
 """
 function safe_index(lo::Option{<:Number}, hi::Option{<:Number}, N::Integer, D = 0.75)
     N_l, N_h = if isnothing(lo) && isnothing(hi)
-        n = clamp(floor(Int, D * N), 1, N)
+        n = split_count(D, N, :train_size)
         n, N - n
     elseif isnothing(hi)
         n = split_count(lo, N, :train_size)
@@ -113,25 +122,29 @@ end
     train_test_split(rd::ReturnsResult; train_size, test_size) -> (train, test)
     train_test_split(pr::PricesResult; train_size, test_size) -> (train, test)
 
-Cut price- or returns-level data into a training window (the head) and a held-out test window (the tail).
+Cut price or returns data into a training window of the first rows and a test window of the last rows.
 
-The free-function form of [`TrainTestSplit`](@ref). The windows come from [`port_opt_view`](@ref). At the returns level they are views, so no data is copied. At the price level, [`port_opt_view`](@ref) indexes a `TimeArray`, which copies the rows. See [`safe_index`](@ref) for the sizing rules — complement when one side is given, embargo when both are.
+This is the function form of [`TrainTestSplit`](@ref). [`port_opt_view`](@ref) makes each window. At the returns level each window holds views of the input arrays, so the split copies no data. At the price level `port_opt_view` indexes a `TimeArray` by date, and that copies the rows. [`safe_index`](@ref) states the sizing rules.
 
 # Algorithm
 
- 1. Read the observation count `N` from the asset data: `size(rd.X, 1)` at returns level, and `size(TimeSeries.values(pr.X), 1)` at price level.
- 2. Resolve the two row ranges with [`safe_index`](@ref).
- 3. Return a [`port_opt_view`](@ref) of each range. The returns-level method passes a `Colon` asset index after the row range, because that arity indexes observations first and assets second.
+ 1. Read the observation count `N`, as `size(rd.X, 1)` at the returns level and as `size(TimeSeries.values(pr.X), 1)` at the price level.
+ 2. Resolve the two row ranges `train` and `test` with [`safe_index`](@ref).
+ 3. Return a [`port_opt_view`](@ref) of each range. The returns-level method gives `:` as the asset index after the row range, because the three-argument form of `port_opt_view` takes the observations first and the assets second.
 
 # Arguments
 
-  - `rd`/`pr`: The data to split.
-  - `train_size`: Training rows as a count (`Integer`) or a fraction (`AbstractFloat` in `(0, 1)`); `nothing` takes the complement of `test_size`.
-  - `test_size`: Test rows, likewise; `nothing` takes the complement of `train_size`. With neither given the split is 75/25.
+  - `rd`, `pr`: The data to split.
+  - `train_size`: The training rows, as a count (`Integer`) or a fraction (any other `Real` in `(0, 1)`). `nothing` takes the complement of `test_size`.
+  - `test_size`: The test rows, as a count or a fraction. `nothing` takes the complement of `train_size`. If neither size is given, the split is 75/25.
+
+# Validation
+
+  - The two sizes pass the checks of [`safe_index`](@ref) for `N` rows.
 
 # Returns
 
-  - `(train, test)`: The two windows, of the same type as the input.
+  - `(train, test)`: The two windows. Each is a `ReturnsResult` for a `ReturnsResult` input, and a `PricesResult` for a `PricesResult` input.
 
 # Examples
 
@@ -155,26 +168,26 @@ function train_test_split(rd::ReturnsResult; train_size::Option{<:Number} = noth
     train, test = safe_index(train_size, test_size, N)
     return port_opt_view(rd, train, :), port_opt_view(rd, test, :)
 end
-function train_test_split(rd::PricesResult; train_size::Option{<:Number} = nothing,
+function train_test_split(pr::PricesResult; train_size::Option{<:Number} = nothing,
                           test_size::Option{<:Number} = nothing)
-    N = size(TimeSeries.values(rd.X), 1)
+    N = size(TimeSeries.values(pr.X), 1)
     train, test = safe_index(train_size, test_size, N)
-    return port_opt_view(rd, train), port_opt_view(rd, test)
+    return port_opt_view(pr, train), port_opt_view(pr, test)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Preprocessing estimator reserving the tail of the observations as a held-out test window.
+Preprocessing estimator that holds out the last observations as a test window.
 
-The estimator form of [`train_test_split`](@ref), and the way the holdout protocol enters a [`Pipeline`](@ref): as the **first** step, it hands the training window to every step downstream and stashes the test window in its fitted [`TrainTestSplitResult`](@ref). `fit_predict(pipe, data)` then evaluates the fitted workflow on that held-out window in one line.
+It is the estimator form of [`train_test_split`](@ref), and it adds a holdout to a [`Pipeline`](@ref). It must be the first step of the pipeline. It passes the training window to every later step, and it keeps the test window in its fitted [`TrainTestSplitResult`](@ref). `fit_predict(pipe, data)` then predicts on the test window, which no fitted step has seen.
 
-It is the one preprocessing estimator that is not pinned to a data level: it splits whichever level the pipeline input provides, price or returns, since a holdout is a statement about *rows*, not about columns or units.
+It is the one preprocessing estimator that takes both data levels. It splits the price or returns data that the pipeline input holds, because a holdout selects rows and reads no column.
 
-Replaying a fitted split on an unseen window is a **pass-through** — the fitted rows are training-window state, and applying them to new data would be meaningless — so `predict(res, future_data)` keeps working on genuinely new observations.
+A fitted split passes new data through unchanged. Its rows index the fitting data alone, so `predict(res, future_data)` predicts on every new observation.
 
 !!! warning
 
-    A pipeline containing a `TrainTestSplit` may not also be cross-validated: the split and the cross-validator are two evaluation protocols, and cross-validation already defines its own train/test windows. [`search_cross_validation`](@ref) rejects such a pipeline rather than silently shaving a second holdout off every fold.
+    A pipeline that holds a `TrainTestSplit` cannot also be cross-validated. Cross-validation makes its own train and test windows, so a split inside each fold removes a second test window from every training window. [`cross_val_predict`](@ref) and [`search_cross_validation`](@ref) throw an `ArgumentError` for such a pipeline.
 
 # Fields
 
@@ -187,7 +200,7 @@ $(DocStringExtensions.FIELDS)
         test_size::Option{<:Number} = nothing,
     ) -> TrainTestSplit
 
-Keywords correspond to the struct's fields. Sizes follow [`safe_index`](@ref): a row count (`Integer`) or a fraction of the observations (`AbstractFloat` in `(0, 1)`); one side given makes the other its complement; both given embargoes the rows between them; neither given splits 75/25.
+Keywords correspond to the struct's fields. A size is a row count (`Integer`) or a fraction of the observations (any other `Real` in `(0, 1)`). One size makes the other window its complement, two sizes embargo the rows between the windows, and no size gives a 75/25 split. The constructor does not check the sizes. [`safe_index`](@ref) checks them when the split runs on data.
 
 # Examples
 
@@ -208,11 +221,11 @@ julia> pipe.names
 """
 @concrete struct TrainTestSplit <: AbstractPreprocessingEstimator
     """
-    Training observations as a count (`Integer`) or a fraction (`AbstractFloat` in `(0, 1)`); `nothing` takes the complement of `test_size`.
+    The training observations, as a count (`Integer`) or a fraction (any other `Real` in `(0, 1)`). `nothing` takes the complement of `test_size`.
     """
     train_size
     """
-    Test observations, likewise; `nothing` takes the complement of `train_size`.
+    The test observations, as a count or a fraction. `nothing` takes the complement of `train_size`.
     """
     test_size
     function TrainTestSplit(train_size::Option{<:Number}, test_size::Option{<:Number})
@@ -226,11 +239,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Fitted result of a [`TrainTestSplit`](@ref), carrying both windows of the holdout.
+Fitted holdout split that holds the training window and the test window.
 
-The `test` window is the payoff: it is the data the fitted pipeline has never seen, and what `fit_predict(pipe, data)` predicts on. The `train` window is kept alongside it so the raw data the workflow was fitted on is retrievable from the result rather than having to be re-derived.
+It is the result of a [`TrainTestSplit`](@ref). The `test` window is the data that the fitted pipeline has not seen, and `fit_predict(pipe, data)` predicts on it. The result also keeps the `train` window, so a caller can read the training data from the result without a second split.
 
-Both are [`port_opt_view`](@ref)s of the input at whichever level the split ran (price or returns).
+Both windows are [`port_opt_view`](@ref)s of the input, at the data level of the input.
 
 # Fields
 
@@ -243,11 +256,11 @@ $(DocStringExtensions.FIELDS)
 """
 @concrete struct TrainTestSplitResult <: AbstractResult
     """
-    The training window: the head of the observations, and the data every downstream step is fitted on.
+    The training window. It is the first rows of the observations, and every later step fits on it.
     """
     train
     """
-    The held-out test window: the tail of the observations, which no fitted step has seen.
+    The test window. It is the last rows of the observations, and no fitted step has seen it.
     """
     test
 end
@@ -256,13 +269,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Fit a [`TrainTestSplit`](@ref) by cutting the data into its two windows.
 
-Unlike the other preprocessing estimators, the fitted result is *not* replayed on unseen data: a holdout's rows are a fact about the fitting window alone, so [`apply_preprocessing`](@ref) on a [`TrainTestSplitResult`](@ref) passes the window through unchanged.
+The fitted result does not replay on new data, unlike the fitted results of the other preprocessing estimators. The rows of a holdout belong to the fitting data alone, so [`apply_preprocessing`](@ref) on a [`TrainTestSplitResult`](@ref) returns its data unchanged. `apply_preprocessing` on an unfitted `TrainTestSplit` also returns its data unchanged.
 
 # Algorithm
 
- 1. [`fit_preprocessing`](@ref) calls [`train_test_split`](@ref) on the data, and returns the [`TrainTestSplitResult`](@ref) that holds both windows.
- 2. [`apply_preprocessing`](@ref) on a [`TrainTestSplitResult`](@ref) returns its data argument unchanged.
- 3. [`apply_preprocessing`](@ref) on a [`TrainTestSplit`](@ref) returns its data argument unchanged, so an unfitted step is a pass-through as well.
+ 1. Call [`train_test_split`](@ref) with `tts` and `data`, which returns the [`TrainTestSplitResult`](@ref) of both windows.
+
+# Validation
+
+  - The sizes of `tts` pass the checks of [`safe_index`](@ref) for the rows of `data`.
 
 # Related
 
@@ -281,14 +296,18 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Split `data` under a [`TrainTestSplit`](@ref), returning both windows as a [`TrainTestSplitResult`](@ref).
+Split `data` under a [`TrainTestSplit`](@ref), and return both windows as a [`TrainTestSplitResult`](@ref).
 
-The estimator-form counterpart of the keyword form: `train_test_split(rd; test_size = 0.2)` hands back a bare `(train, test)` tuple, while this hands back the same fitted result a pipeline's split step produces, so a holdout configured once can be reused verbatim inside and outside a [`Pipeline`](@ref).
+This is the estimator form of the keyword method. `train_test_split(rd; test_size = 0.2)` returns a `(train, test)` tuple, and this method returns the result that the split step of a [`Pipeline`](@ref) makes. So one `TrainTestSplit` gives the same windows inside and outside a pipeline.
 
 # Algorithm
 
- 1. Call the keyword form of [`train_test_split`](@ref) with `tts.train_size` and `tts.test_size`, giving the two windows.
- 2. Wrap the pair in a [`TrainTestSplitResult`](@ref), in the order `(train, test)`.
+ 1. Call the keyword method of [`train_test_split`](@ref) with `tts.train_size` and `tts.test_size`, giving `train` and `test`.
+ 2. Return `TrainTestSplitResult(train, test)`.
+
+# Validation
+
+  - The sizes of `tts` pass the checks of [`safe_index`](@ref) for the rows of `data`.
 
 # Related
 
