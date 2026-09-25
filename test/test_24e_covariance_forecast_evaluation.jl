@@ -522,6 +522,8 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
                    s1.bias_p95[1]))
         @test isfinite(s1.portfolio_qlike_mean[1])
         @test isnan(po.summary_quantile([1.0, NaN, 3.0], 0.5))
+        # The `NaN` is read off the column, so it keeps the element type of the data.
+        @test po.summary_quantile(Float32[1, NaN, 3], 0.5) isa Float32
         @test po.summary_quantile([1.0, 2.0, 3.0], 0.25) == quantile([1.0, 2.0, 3.0], 0.25)
         # A listing and a delisting change the active count under an index walk-forward,
         # so the Mahalanobis mean weights each step by N_t h and is not the plain mean. The

@@ -321,7 +321,10 @@ Return the `p` quantile of a column of the summary, or `NaN` when the column hol
   - [`covariance_forecast_summary`](@ref)
 """
 function summary_quantile(x::VecNum, p::Number)
-    return any(isnan, x) ? convert(float(eltype(x)), NaN) : Statistics.quantile(x, p)
+    # The `NaN` answered is an element of `x`, so it carries the element type of the data
+    # and no type is chosen here.
+    i = findfirst(isnan, x)
+    return isnothing(i) ? Statistics.quantile(x, p) : x[i]
 end
 """
 $(DocStringExtensions.TYPEDEF)
