@@ -425,7 +425,7 @@ Without observation weights:
 
  1. Copy `x`, so that the caller's vector keeps its order.
  2. Partially sort the copy ascending, and compute `loss`, the CVaR at level `alpha` of the returns.
- 3. Partially sort the copy descending, and compute `gain`, minus the CVaR at level `beta` of the negated returns.
+ 3. Negate the copy and partially sort it ascending, which orders the returns descending, and compute `gain`, minus the CVaR at level `beta` of the negated returns.
  4. Return `loss - gain`.
 
 With observation weights:
@@ -795,11 +795,16 @@ function (r::RMCVaRRg{Nothing})(x::VecNum)
     beta = r.beta
     bT = beta * length(x)
     idx2 = ceil(Int, bT)
-    partialsort!(x, 1:idx2; rev = true)
-    var2 = -x[idx2]
+    # Negate the copy and sort it ascending, rather than sort it with `rev = true`. The two
+    # orders give the same values bit for bit, because negation is exact and `var2 - x[i]` is
+    # `var2 + (-x[i])`. The reverse ordering leads JET, over an abstract `x`, into a `StepRange`
+    # of an unknown index type, and from there into `Dates` (issue #1341).
+    x .= .-x
+    partialsort!(x, 1:idx2)
+    var2 = x[idx2]
     sum_var2 = zero(eltype(x))
     for i in 1:(idx2 - 1)
-        sum_var2 += x[i] + var2
+        sum_var2 += var2 - x[i]
     end
     gain = var2 - sum_var2 / bT
     return loss - gain

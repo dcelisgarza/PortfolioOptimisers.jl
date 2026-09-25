@@ -667,6 +667,10 @@ end
     @test_throws ArgumentError UniverseSets(;
                                             dict = Dict("nx" => ["a", "b", "c"],
                                                         "ni" => ["c"]))
+    # The message counts the names on both axes.
+    @test_throws "2 name(s) are on both" UniverseSets(;
+                                                      dict = Dict("nx" => ["a", "b", "c"],
+                                                                  "ni" => ["b", "c", "d"]))
     # The seventh prefix joins the mutual-exclusion grammar.
     @test_throws ArgumentError UniverseSets(; xkey = "ni", nikey = "n",
                                             dict = Dict("ni" => ["a", "b"]))

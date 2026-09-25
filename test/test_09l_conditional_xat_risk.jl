@@ -100,6 +100,24 @@ end
         end
     end
 
+    @testset "The upper tail of the range is the CVaR of the negated returns, bit for bit" begin
+        # The functor negates its copy and sorts it ascending, rather than sorting it with
+        # `rev = true` (issue #1341). Negation is exact, so the range must equal the two plain
+        # CVaRs exactly, ties and all, in every precision.
+        rng = StableRNG(1341)
+        for T in (Float32, Float64, BigFloat), n in (1, 7, 50), alpha in (0.05, 0.3, 0.99),
+            beta in (0.05, 0.3, 0.99)
+
+            x = T.(round.(randn(rng, n); digits = 1))
+            x0 = copy(x)
+            rg = ConditionalValueatRiskRange(; alpha = alpha, beta = beta)
+            @test isequal(rg(x),
+                          ConditionalValueatRisk(; alpha = alpha)(x) +
+                          ConditionalValueatRisk(; alpha = beta)(-x))
+            @test x == x0
+        end
+    end
+
     @testset "Every constructor refuses a negative weight" begin
         # `DistributionallyRobustConditionalValueatRisk` checked only that the weights were not
         # empty, and took a negative weight its six siblings refuse.

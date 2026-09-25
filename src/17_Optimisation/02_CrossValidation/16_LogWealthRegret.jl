@@ -225,8 +225,10 @@ function stacked_fold_weights(pred::MultiPeriodPredictionResult, read)
         nx = f.rd.nx
         @argcheck(length(ws[i]) == length(nx),
                   DimensionMismatch("fold $i carries $(length(ws[i])) weights over $(length(nx)) asset names, so its weights cannot be embedded by name"))
-        for (n, wn) in zip(nx, ws[i])
-            W[i, pos[n]] = wn
+        # `enumerate`, not `zip(nx, ws[i])`: the zip of two untyped values gives JET a false
+        # report inside `Base.Iterators` (issue #1341).
+        for (j, wn) in enumerate(ws[i])
+            W[i, pos[nx[j]]] = wn
         end
     end
     return W

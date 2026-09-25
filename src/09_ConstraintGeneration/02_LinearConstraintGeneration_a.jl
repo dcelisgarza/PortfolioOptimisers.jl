@@ -706,8 +706,10 @@ UniverseSets
             ni = dict[nikey]
             @argcheck(allunique(ni),
                       ArgumentError("the non-investable axis `$nikey` names an asset twice. A departure happens once, so a repeated name would price one forced exit more than once: deduplicate `dict[$nikey]`."))
-            @argcheck(isdisjoint(ni, dict[xkey]),
-                      ArgumentError("$(length(intersect(ni, dict[xkey]))) name(s) are on both the asset universe `$xkey` and the non-investable axis `$nikey`. An asset is investable or it is not, and a name on both would be priced twice, once as a holding and once as a forced exit: remove it from whichever axis it does not belong to."))
+            # `isdisjoint` over two untyped values leads JET into `Transducers` (issue #1341).
+            both = intersect(ni, dict[xkey])
+            @argcheck(isempty(both),
+                      ArgumentError("$(length(both)) name(s) are on both the asset universe `$xkey` and the non-investable axis `$nikey`. An asset is investable or it is not, and a name on both would be priced twice, once as a holding and once as a forced exit: remove it from whichever axis it does not belong to."))
         end
         for k in setdiff(keys(dict), (xkey, tfkey, cfkey, nikey))
             if startswith(k, xkey)
@@ -1186,7 +1188,7 @@ function shed_departed_members(members1::AbstractVector, members2::AbstractVecto
     if isempty(other)
         return members1, members2
     end
-    keep = [m1 ∉ other && m2 ∉ other for (m1, m2) in zip(members1, members2)]
+    keep = map((m1, m2) -> m1 ∉ other && m2 ∉ other, members1, members2)
     record_group_shed!(ledger, group, count(!, keep), count(keep), eqn)
     return if any(keep)
         members1[keep], members2[keep]

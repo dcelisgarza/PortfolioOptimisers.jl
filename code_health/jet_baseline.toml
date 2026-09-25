@@ -8,7 +8,7 @@ jet = "0.12.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "0ecb3ce47c"
+commit = "68c30b8bbf"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -70,7 +70,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/06_PricesResult.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/07_PriceIngestion.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/09_PriceFilters.jl" = { raw = 1, reviewed = 1 }
+"src/03_InputData/09_PriceFilters.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/10_ReturnsResult.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/11_PricesToReturns.jl" = { raw = 1, reviewed = 1 }
 "src/03_InputData/12_TrainTestSplit.jl" = { raw = 1, reviewed = 1 }
@@ -199,7 +199,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
-"src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { raw = 1, reviewed = 1 }
+"src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { raw = 1, reviewed = 1 }
 "src/09_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { raw = 1, reviewed = 1 }
@@ -254,7 +254,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/16_RiskMeasures/03_MomentRiskMeasures.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/04_Kurtosis.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/05_NegativeSkewness.jl" = { raw = 0, reviewed = 0 }
-"src/16_RiskMeasures/06_XatRisk/01_XatRisk.jl" = { raw = 7, reviewed = 7 }
+"src/16_RiskMeasures/06_XatRisk/01_XatRisk.jl" = { raw = 1, reviewed = 1 }
 "src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl" = { raw = 8, reviewed = 8 }
 "src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { raw = 3, reviewed = 3 }
 "src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { raw = 21, reviewed = 21 }
@@ -337,7 +337,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl" = { raw = 2, reviewed = 2 }
 "src/17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl" = { raw = 2, reviewed = 2 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { raw = 5, reviewed = 5 }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl" = { raw = 4, reviewed = 4 }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl" = { raw = 2, reviewed = 2 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.jl" = { raw = 6, reviewed = 6 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/04_KurtosisConstraints.jl" = { raw = 3, reviewed = 3 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/05_NegativeSkewnessConstraints.jl" = { raw = 0, reviewed = 0 }
@@ -374,7 +374,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { raw = 0, reviewed = 0 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { raw = 3, reviewed = 3 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { raw = 0, reviewed = 0 }
@@ -492,7 +492,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/18_Coskewness.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/19_Cokurtosis.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/20_Base_Regression.jl" = { raw = 5, reviewed = 5 }
-"src/05_Moments/21_TimeSeriesRegression/01_StepwiseRegression.jl" = { raw = 1, reviewed = 1 }
+"src/05_Moments/21_TimeSeriesRegression/01_StepwiseRegression.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/21_TimeSeriesRegression/02_DimensionReductionRegression.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/22_ImpliedVolatility.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/23_CorrelationCovariance.jl" = { raw = 0, reviewed = 0 }
