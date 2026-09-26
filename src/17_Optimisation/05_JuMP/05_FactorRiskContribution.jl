@@ -116,7 +116,7 @@ Solves a mean-risk problem whose decision variable is the vector of factor expos
 
 The asset weights are recovered from the exposures through the factor loadings, so a constraint written on the decision variable is a constraint on a factor. This is the change of basis alone: `FactorRiskContribution` sets **no** risk budget of its own. A target contribution per factor is stated through the risk measure's own `rc` constraints, exactly as it is for assets.
 
-Under [`Variance`](@ref) those rows sit on the semidefinite relaxation of [sdprp](@cite), formulation 16, over the factor weights. A solve can report success while the factor shares of the returned portfolio miss the rows, so compare [`factor_risk_contribution`](@ref) of the result with them. The `## Risk contribution constraints` subsection of [`Variance`](@ref) states the relaxation and the condition under which the rows bind.
+Under [`Variance`](@ref) those rows sit on the semidefinite relaxation of [sdprp](@cite), formulation 16, over the factor weights. With `flag = true` the lift covers the off-factor weights ``\\tilde{\\boldsymbol{y}}_{af}`` too, so the variance is that of the returned weights, and each row states the Euler contribution of a factor as a share of the whole variance, as [`factor_risk_contribution`](@ref) reports it. [`set_risk_constraints!`](@ref) states the formulation. A solve can report success while the factor shares of the returned portfolio miss the rows, so compare [`factor_risk_contribution`](@ref) of the result with them. The `## Risk contribution constraints` subsection of [`Variance`](@ref) states the relaxation and the condition under which the rows bind.
 
 A [`Variance`](@ref) always takes this semidefinite formulation here, with or without rows. Its trace has degree one in the factor weights and ``k``, so under [`MaximumRatio`](@ref) the model maximises the excess return per unit of variance, not the Sharpe ratio. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule.
 
@@ -362,7 +362,7 @@ The loadings come from [`resolve_factor_regression`](@ref), which is the same pr
 
 # Returns
 
-  - `b1, rr`: The factor basis and the loadings it was built from.
+  - `b1, b2, rr`: The factor basis, the off-factor basis, and the loadings they were built from. `b2` is `nothing` when `flag` is `false`.
 
 # Related
 
@@ -387,11 +387,12 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_R
                         end)
         JuMP.@expression(model, w, b1 * w1 + b2 * w2)
     else
+        b2 = nothing
         JuMP.@variable(model, w1[1:Nf])
         JuMP.@expression(model, w, b1 * w1)
     end
     set_initial_w!(w1, wi)
-    return b1, rr
+    return b1, b2, rr
 end
 function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
@@ -407,10 +408,13 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
     set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, frc.obj)
-    b1, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, attrs.pr,
-                                                       frc.flag, frc.wi)
+    b1, b2, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, attrs.pr,
+                                                           frc.flag, frc.wi)
+    # The risk builders read the basis of the whole decision vector, so a variance under
+    # `flag = true` prices the off-factor weights too (#1350).
+    b = isnothing(b2) ? b1 : hcat(b1, b2)
     set_weight_constraints!(model, attrs.wb, frc.opt)
-    assemble_jump_model!(model, frc, frc.opt, attrs, rd, frc.r, frc.obj, b1, false)
+    assemble_jump_model!(model, frc, frc.opt, attrs, rd, frc.r, frc.obj, b, false)
     # After the model is assembled, so the factor phylogeny reads the marks that the
     # variance builders and `mark_risk_minimised!` write, as the asset phylogeny does.
     frc_plr = phylogeny_constraints(frc.frc_ple, rd.F)

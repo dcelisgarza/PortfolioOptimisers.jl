@@ -800,8 +800,8 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                                            <:FactorRiskBudgeting, <:Any},
                                          pr::AbstractPriorResult, wb::WeightBounds,
                                          rd::ReturnsResult)
-    b1, rr = set_factor_risk_contribution_constraints!(model, rb.rba.re, rd, pr,
-                                                       rb.rba.flag, rb.wi)
+    b1, _, rr = set_factor_risk_contribution_constraints!(model, rb.rba.re, rd, pr,
+                                                          rb.rba.flag, rb.wi)
     rkb = _set_risk_budgeting_constraints!(model, rb, shared_get(model, :w1);
                                            strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt)

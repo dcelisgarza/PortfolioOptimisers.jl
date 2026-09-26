@@ -552,8 +552,8 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                                            <:Any, <:Any},
                                                  pr::AbstractPriorResult, wb::WeightBounds,
                                                  rd::ReturnsResult)
-    b1, rr = set_factor_risk_contribution_constraints!(model, rrb.rba.re, rd, pr,
-                                                       rrb.rba.flag, rrb.wi)
+    b1, _, rr = set_factor_risk_contribution_constraints!(model, rrb.rba.re, rd, pr,
+                                                          rrb.rba.flag, rrb.wi)
     rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, shared_get(model, :w1),
                                                    Matrix(LinearAlgebra.Symmetric(rr.L \
                                                                                   pr.sigma *

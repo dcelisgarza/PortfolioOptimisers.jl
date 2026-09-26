@@ -626,18 +626,18 @@ The method on `args...` does nothing, and it runs when the measure has no rows. 
 
 ## Constraints
 
-  - `rc_variance_ineq_`: ``s_c \\left(\\mathbf{A} \\, \\mathrm{diag}(\\mathbf{S}) - \\boldsymbol{b} \\, \\mathrm{Tr}(\\mathbf{S})\\right) \\leq 0``, registered when `rc` holds inequality rows.
-  - `rc_variance_eq_`: ``s_c \\left(\\mathbf{C} \\, \\mathrm{diag}(\\mathbf{S}) - \\boldsymbol{d} \\, \\mathrm{Tr}(\\mathbf{S})\\right) = 0``, registered when `rc` holds equality rows.
+  - `rc_variance_ineq_`: ``s_c \\left(\\mathbf{A} \\, \\mathrm{diag}(\\mathbf{S}) - \\boldsymbol{b} \\, V\\right) \\leq 0``, registered when `rc` holds inequality rows.
+  - `rc_variance_eq_`: ``s_c \\left(\\mathbf{C} \\, \\mathrm{diag}(\\mathbf{S}) - \\boldsymbol{d} \\, V\\right) = 0``, registered when `rc` holds equality rows.
 
 Where:
 
-  - ``\\mathbf{S}``: The `sigma_W_` expression, read from the model. It is ``\\mathbf{\\Sigma} \\mathbf{W}`` over the asset weights, and ``\\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\mathbf{B}_1 \\mathbf{W}_{f}`` over the factor weights of [`FactorRiskContribution`](@ref).
-  - ``\\mathbf{W}``, ``\\mathbf{W}_{f}``: The symmetric matrix variables that [`set_sdp_constraints!`](@ref) and [`set_sdp_frc_constraints!`](@ref) bound by ``\\mathbf{W} \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``.
+  - ``\\mathbf{S}``: The `sigma_W_` expression, read from the model. It is ``\\mathbf{\\Sigma} \\mathbf{W}`` over the asset weights. Over the decision vector ``\\boldsymbol{z}`` of [`FactorRiskContribution`](@ref) it is ``\\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\mathbf{P} \\mathbf{W}_{z}``, the ``N_f`` rows of the factors, with ``\\mathbf{P}`` the basis that maps ``\\boldsymbol{z}`` to the asset weights.
+  - ``\\mathbf{W}``, ``\\mathbf{W}_{z}``: The symmetric matrix variables that [`set_sdp_constraints!`](@ref) and [`set_sdp_frc_constraints!`](@ref) bound by ``\\mathbf{W} \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k`` and ``\\mathbf{W}_{z} \\succeq \\boldsymbol{z} \\boldsymbol{z}^\\intercal / k``.
   - ``\\mathbf{A}``, ``\\boldsymbol{b}``: The inequality rows of `rc` and their bounds.
   - ``\\mathbf{C}``, ``\\boldsymbol{d}``: The equality rows of `rc` and their targets.
-  - ``\\mathrm{Tr}(\\mathbf{S})``: The `variance_risk` argument.
+  - ``V``: The `variance_risk` argument. It is ``\\mathrm{Tr}(\\mathbf{S})`` over the asset weights, and ``\\mathrm{Tr}(\\mathbf{P}^\\intercal \\mathbf{\\Sigma} \\mathbf{P} \\mathbf{W}_{z})`` over ``\\boldsymbol{z}``.
   - $(math_dict[:w_port])
-  - $(math_dict[:w_1_factor]) It takes the place of ``\\boldsymbol{w}`` over the factor weights.
+  - ``\\boldsymbol{z}``: The decision vector of [`FactorRiskContribution`](@ref), the factor weights, followed by the off-factor weights when `flag = true`. It takes the place of ``\\boldsymbol{w}`` in the lift.
   - $(math_dict[:k_budget])
   - $(math_dict[:sc_scale])
 
@@ -645,7 +645,7 @@ Where:
 
 $(val_dict[:relax])
 
-  - The variance ``\\mathrm{Tr}(\\mathbf{S})`` in `variance_risk_` lies **above** its value at ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``, because ``\\mathbf{W} \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k`` and the covariance matrix is positive semidefinite.
+  - The variance ``V`` in `variance_risk_` lies **above** its value at ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``, because ``\\mathbf{W} \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k`` and the covariance matrix is positive semidefinite.
   - The rows bound the shares of ``\\mathrm{diag}(\\mathbf{S})`` in `sigma_W_`, not the risk contributions of the returned weights. Those can lie on either side of a bound.
   - Both are tight when ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``, a matrix of rank one. No term of the model forces this, so a solve that reports success can return weights whose shares miss the rows. This is formulations 9, 10 and 16 of [sdprp](@cite), which name the rank-one relaxation as their approximation.
 
@@ -654,7 +654,7 @@ $(val_dict[:relax])
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
   - `rc::LinearConstraint`: The resolved risk-contribution rows.
-  - `variance_risk::JuMP.AbstractJuMPScalar`: The variance expression, the trace of `sigma_W_`.
+  - `variance_risk::JuMP.AbstractJuMPScalar`: The variance expression ``V``.
 
 # Keyword arguments
 
@@ -750,27 +750,31 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add a variance to the model of a [`FactorRiskContribution`](@ref), always in the semidefinite formulation over the factor weights.
+Add a variance to the model of a [`FactorRiskContribution`](@ref), always in the semidefinite formulation over the decision vector.
 
-The model lifts the factor weights ``\\boldsymbol{w}_1`` into ``\\mathbf{W}_f``, and the variance is the trace of the factor covariance ``\\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\mathbf{B}_1`` times ``\\mathbf{W}_f``. The risk-contribution rows of `r.rc` then state factor shares. With `flag = true` the asset weights are ``\\mathbf{B}_1 \\boldsymbol{w}_1 + \\mathbf{B}_2 \\boldsymbol{w}_2``, and the expression omits the off-factor weights ``\\mathbf{B}_2 \\boldsymbol{w}_2``. It is then the variance of the factor part alone, which can lie below the variance of the returned weights. The objective and the bound act on the factor part alone.
+The asset weights are ``\\boldsymbol{w} = \\mathbf{P} \\boldsymbol{z}``. With `flag = false` the decision vector is the factor weights, ``\\boldsymbol{z} = \\boldsymbol{w}_1`` and ``\\mathbf{P} = \\mathbf{B}_1``, which is formulation 16 of [sdprp](@cite). With `flag = true` it holds the off-factor weights too, ``\\boldsymbol{z} = [\\boldsymbol{w}_1; \\boldsymbol{w}_2]`` and ``\\mathbf{P} = [\\mathbf{B}_1\\ \\mathbf{B}_2]``. ``\\mathbf{P}`` is then square and invertible, so the problem is the asset formulation of [`Variance`](@ref) in the basis of the factors. The model lifts ``\\boldsymbol{z}`` into ``\\mathbf{W}_z``, and the variance is the trace of ``\\mathbf{P}^\\intercal \\mathbf{\\Sigma} \\mathbf{P} \\mathbf{W}_z``. At rank one it is the variance of the returned weights under either value of `flag`.
+
+The risk-contribution rows of `r.rc` read the diagonal of `sigma_W_`, one entry for each factor. At rank one entry ``j`` is ``[\\boldsymbol{w}_1]_j [\\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}]_j``, the Euler contribution of factor ``j`` that [`factor_risk_contribution`](@ref) reports, and the rows state it as a share of the whole variance. The off-factor weights take no row, and their contribution is the remainder.
 
 # JuMP formulation
 
 ## Variables
 
-  - `frc_W`: read, ``\\mathbf{W}_f``, the lifted matrix that [`set_sdp_frc_constraints!`](@ref) builds once.
+  - `frc_W`: read, ``\\mathbf{W}_z``, the lifted matrix that [`set_sdp_frc_constraints!`](@ref) builds once.
 
 ## Expressions
 
-  - `sigma_W_`: ``\\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\mathbf{B}_1 \\mathbf{W}_f``.
-  - `variance_risk_`: ``\\mathrm{Tr}(\\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\mathbf{B}_1 \\mathbf{W}_f)``.
+  - `sigma_W_`: ``\\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\mathbf{P} \\mathbf{W}_z``, the ``N_f`` rows of the factors.
+  - `variance_risk_`: ``\\mathrm{Tr}(\\mathbf{P}^\\intercal \\mathbf{\\Sigma} \\mathbf{P} \\mathbf{W}_z)``.
 
 Each name carries the index `i` of the measure, and the namespace `prefix`.
 
 Where:
 
-  - ``\\mathbf{W}_f``: Lifted matrix of the factor weights, symmetric ``N_f \\times N_f``, with ``\\mathbf{W}_f \\succeq \\boldsymbol{w}_1 \\boldsymbol{w}_1^\\intercal / k``.
-  - ``\\mathbf{B}_1``: The pseudoinverse of ``\\mathbf{B}^\\intercal``, `b1`.
+  - ``\\boldsymbol{z}``: The decision vector, ``\\boldsymbol{w}_1`` or ``[\\boldsymbol{w}_1; \\boldsymbol{w}_2]``.
+  - ``\\mathbf{W}_z``: Lifted matrix of the decision vector, symmetric, with ``\\mathbf{W}_z \\succeq \\boldsymbol{z} \\boldsymbol{z}^\\intercal / k``.
+  - ``\\mathbf{P}``: The basis of the decision vector, `b`.
+  - ``\\mathbf{B}_1``: The pseudoinverse of ``\\mathbf{B}^\\intercal``, the first ``N_f`` columns of ``\\mathbf{P}``.
   - ``\\mathbf{B}_2``: The basis of the off-factor directions.
   - ``\\boldsymbol{w}_2``: The off-factor weights.
   - $(math_dict[:B_loadings])
@@ -782,7 +786,7 @@ Where:
 
 $(val_dict[:relax])
 
-  - `variance_risk_` lies at or above ``\\boldsymbol{w}_1^\\intercal \\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\mathbf{B}_1 \\boldsymbol{w}_1 / k``. It is tight at ``\\mathbf{W}_f = \\boldsymbol{w}_1 \\boldsymbol{w}_1^\\intercal / k``, and [`rc_variance_constraints!`](@ref) states the condition for its rows.
+  - `variance_risk_` lies at or above ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} / k``. It is tight at ``\\mathbf{W}_z = \\boldsymbol{z} \\boldsymbol{z}^\\intercal / k``, and [`rc_variance_constraints!`](@ref) states the condition for its rows.
 
 # Arguments
 
@@ -791,7 +795,7 @@ $(val_dict[:relax])
   - `r::Variance`: The measure.
   - `opt::FactorRiskContribution`: The optimisation estimator.
   - $(arg_dict[:pr])
-  - `b1::MatNum`: ``\\mathbf{B}_1``, the pseudoinverse of the transposed loadings, which maps the factor weights to the asset weights.
+  - `b::MatNum`: ``\\mathbf{P}``, the basis that maps the decision vector to the asset weights.
 
 # Returns
 
@@ -806,18 +810,21 @@ $(val_dict[:relax])
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::FactorRiskContribution, pr::AbstractPriorResult, ::Any,
-                               ::Any, b1::MatNum, args...; prefix::Symbol = Symbol(""),
+                               ::Any, b::MatNum, args...; prefix::Symbol = Symbol(""),
                                kwargs...)
     mark_objective_variance!(model, prefix, r.settings)
     rc = linear_constraints(r.rc, opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
-    set_sdp_frc_constraints!(model)
-    W = shared_get(model, :frc_W)
+    W = set_sdp_frc_constraints!(model)
+    Nf = length(shared_get(model, :w1))
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
+    # The covariance of the decision vector. Its first `Nf` rows are the factor rows, and
+    # the rest, present under `flag = true`, price the off-factor weights (#1350).
+    sigma_z = transpose(b) * sigma * b
     sigma_W = state_set!(model, prefix, :sigma_W_, i,
-                         JuMP.@expression(model, transpose(b1) * sigma * b1 * W))
+                         JuMP.@expression(model, view(sigma_z, 1:Nf, :) * W))
     variance_risk = state_set!(model, prefix, :variance_risk_, i,
-                               JuMP.@expression(model, LinearAlgebra.tr(sigma_W)))
+                               JuMP.@expression(model, LinearAlgebra.dot(sigma_z, W)))
     rc_variance_constraints!(model, i, rc, variance_risk; prefix = prefix)
     var_bound_expr, var_bound_name = variance_risk_bounds_expr(model, i, LinearBound();
                                                                prefix = prefix)

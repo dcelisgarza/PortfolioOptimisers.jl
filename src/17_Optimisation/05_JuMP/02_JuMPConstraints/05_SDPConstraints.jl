@@ -213,24 +213,29 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add the positive semidefinite (PSD) cone that lifts the factor weights of a [`FactorRiskContribution`](@ref) to a matrix variable.
+Add the positive semidefinite (PSD) cone that lifts the decision vector of a [`FactorRiskContribution`](@ref) to a matrix variable.
 
-It is [`set_sdp_constraints!`](@ref) on the factor weights ``\\boldsymbol{w}_1``. A second call returns the first call's matrix and adds nothing.
+It is [`set_sdp_constraints!`](@ref) on the decision vector ``\\boldsymbol{z}``. That vector is the factor weights ``\\boldsymbol{w}_1`` when `flag = false`, and the factor weights followed by the off-factor weights ``\\boldsymbol{w}_2`` when `flag = true`. A second call returns the first call's matrix and adds nothing.
+
+The lift covers the whole decision vector because the asset weights are ``\\mathbf{P} \\boldsymbol{z}``, with ``\\mathbf{P}`` the basis of [`set_factor_risk_contribution_constraints!`](@ref). So ``\\mathrm{tr}(\\mathbf{P}^\\intercal \\mathbf{\\Sigma} \\mathbf{P} \\mathbf{W}_z)`` is the variance of the asset weights at rank one. A lift of ``\\boldsymbol{w}_1`` alone gives the variance of ``\\mathbf{B}_1 \\boldsymbol{w}_1`` only, and omits the off-factor weights (#1350). The leading ``N_f \\times N_f`` block of ``\\mathbf{W}_z`` is a lift of ``\\boldsymbol{w}_1`` by itself, because a principal submatrix of a PSD matrix is PSD. The factor phylogeny reads that block.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathbf{M}_f &= \\begin{bmatrix} \\mathbf{W}_f & \\boldsymbol{w}_1 \\\\ \\boldsymbol{w}_1^\\intercal & k \\end{bmatrix} \\succeq 0 \\\\
-&\\quad\\Leftrightarrow\\quad \\mathbf{W}_f \\succeq \\frac{\\boldsymbol{w}_1\\boldsymbol{w}_1^\\intercal}{k} \\quad \\text{for } k > 0\\,.
+\\mathbf{M}_z &= \\begin{bmatrix} \\mathbf{W}_z & \\boldsymbol{z} \\\\ \\boldsymbol{z}^\\intercal & k \\end{bmatrix} \\succeq 0 \\\\
+&\\quad\\Leftrightarrow\\quad \\mathbf{W}_z \\succeq \\frac{\\boldsymbol{z}\\boldsymbol{z}^\\intercal}{k} \\quad \\text{for } k > 0\\,, \\\\
+\\boldsymbol{z} &= \\begin{cases} \\boldsymbol{w}_1 & \\text{if } \\texttt{flag} = \\texttt{false}\\,, \\\\ \\begin{bmatrix} \\boldsymbol{w}_1 \\\\ \\boldsymbol{w}_2 \\end{bmatrix} & \\text{if } \\texttt{flag} = \\texttt{true}\\,. \\end{cases}
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathbf{M}_f``: The bordered ``(N_f + 1) \\times (N_f + 1)`` matrix.
-  - ``\\mathbf{W}_f``: The symmetric ``N_f \\times N_f`` lifted matrix of the factor weights.
+  - ``\\mathbf{M}_z``: The bordered ``(N_z + 1) \\times (N_z + 1)`` matrix.
+  - ``\\mathbf{W}_z``: The symmetric ``N_z \\times N_z`` lifted matrix of the decision vector.
+  - ``\\boldsymbol{z}``: The decision vector, of length ``N_z``. ``N_z = N_f`` when `flag = false`, and ``N_z = N`` when `flag = true`.
   - $(math_dict[:w_1_factor])
+  - ``\\boldsymbol{w}_2``: Off-factor weights, one entry for each of the ``N - N_f`` directions the loadings do not span.
   - $(math_dict[:k_budget])
 
 # JuMP formulation
@@ -238,21 +243,22 @@ Where:
 ## Variables
 
   - `w1`: read, the factor weights.
+  - `w2`: read when present, the off-factor weights.
   - `k`: read through [`get_k`](@ref).
-  - `frc_W`: created, a symmetric ``N_f \\times N_f`` matrix.
+  - `frc_W`: created, a symmetric ``N_z \\times N_z`` matrix.
 
 ## Expressions
 
-  - `frc_M`: ``\\mathbf{M}_f``, the bordered matrix above.
+  - `frc_M`: ``\\mathbf{M}_z``, the bordered matrix above.
 
 ## Constraints
 
-  - `frc_M_PSD`: ``s_c \\mathbf{M}_f \\in \\mathcal{S}_{+}^{N_f + 1}``.
+  - `frc_M_PSD`: ``s_c \\mathbf{M}_z \\in \\mathcal{S}_{+}^{N_z + 1}``.
 
 Where:
 
   - $(math_dict[:sc_scale])
-  - ``\\mathcal{S}_{+}^{N_f + 1}``: The cone of positive semidefinite ``(N_f + 1) \\times (N_f + 1)`` matrices.
+  - ``\\mathcal{S}_{+}^{N_z + 1}``: The cone of positive semidefinite ``(N_z + 1) \\times (N_z + 1)`` matrices.
 
 # Arguments
 
@@ -260,7 +266,7 @@ Where:
 
 # Returns
 
-  - `frc_W`: The lifted matrix, a symmetric ``N_f \\times N_f`` matrix of JuMP variables.
+  - `frc_W`: The lifted matrix, a symmetric ``N_z \\times N_z`` matrix of JuMP variables.
 
 # Related
 
@@ -273,11 +279,12 @@ function set_sdp_frc_constraints!(model::JuMP.Model)
         return shared_get(model, :frc_W)
     end
     w1 = shared_get(model, :w1)
+    z = shared_has(model, :w2) ? vcat(w1, shared_get(model, :w2)) : w1
     sc = get_constraint_scale(model)
     k = get_k(model)
-    Nf = length(w1)
-    JuMP.@variable(model, frc_W[1:Nf, 1:Nf], Symmetric)
-    JuMP.@expression(model, frc_M, hcat(vcat(frc_W, transpose(w1)), vcat(w1, k)))
+    Nz = length(z)
+    JuMP.@variable(model, frc_W[1:Nz, 1:Nz], Symmetric)
+    JuMP.@expression(model, frc_M, hcat(vcat(frc_W, transpose(z)), vcat(z, k)))
     JuMP.@constraint(model, frc_M_PSD, sc * frc_M in JuMP.PSDCone())
     return frc_W
 end
@@ -378,7 +385,7 @@ It is [`set_sdp_phylogeny_constraints!`](@ref) on the factor weights, with the s
 # Algorithm
 
  1. Return when `plgs` holds no [`SemiDefinitePhylogeny`](@ref).
- 2. Get the lifted matrix `frc_W` from [`set_sdp_frc_constraints!`](@ref).
+ 2. Get the lifted matrix `frc_W` from [`set_sdp_frc_constraints!`](@ref), and take its leading block over the factor weights.
  3. For each semidefinite entry at position `i` of `plgs`, register the row `frc_sdp_plg_<i>`. Skip an entry of another kind.
  4. When the model does not carry both `risk_minimised` and `variance_flag`, register the penalty `frc_sdp_plg_p_<i>` and add it to the objective penalty with [`add_to_objective_penalty!`](@ref).
 
@@ -398,7 +405,7 @@ It is [`set_sdp_phylogeny_constraints!`](@ref) on the factor weights, with the s
 
 Where:
 
-  - ``\\mathbf{W}_f``: The symmetric ``N_f \\times N_f`` lifted matrix of the factor weights, ``\\mathbf{W}_f \\succeq \\boldsymbol{w}_1\\boldsymbol{w}_1^\\intercal / k``.
+  - ``\\mathbf{W}_f``: The leading ``N_f \\times N_f`` block of `frc_W`, the lifted matrix of the factor weights, ``\\mathbf{W}_f \\succeq \\boldsymbol{w}_1\\boldsymbol{w}_1^\\intercal / k``. It is the whole of `frc_W` when `flag = false`.
   - $(math_dict[:w_1_factor])
   - ``\\mathbf{A}``: The relatedness matrix of the entry over the factors, symmetric with a zero diagonal.
   - ``p``: The penalty of the entry.
@@ -436,7 +443,10 @@ function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
         return nothing
     end
     sc = get_constraint_scale(model)
-    W = set_sdp_frc_constraints!(model)
+    # The lift covers the off-factor weights under `flag = true`. The rows and the penalty
+    # read its factor block alone.
+    Nf = length(shared_get(model, :w1))
+    W = set_sdp_frc_constraints!(model)[1:Nf, 1:Nf]
     for (i, pl) in enumerate(plgs)
         if !isa(pl, SemiDefinitePhylogeny)
             continue

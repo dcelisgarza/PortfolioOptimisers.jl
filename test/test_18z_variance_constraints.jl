@@ -168,23 +168,43 @@ end
                    rtol = 1e-4, atol = 1e-10)
 end
 
-@testset "The factor variance omits the off-factor weights under flag = true" begin
+@testset "The factor variance prices the off-factor weights under flag = true" begin
     F = 0.01 * randn(StableRNG(11), 150, 3)
     Xf = F * randn(StableRNG(12), 3, N_vc) + 0.005 * randn(StableRNG(13), 150, N_vc)
     rdf = ReturnsResult(; X = Xf, nx = string.("A", 1:N_vc), F = F, nf = ["F1", "F2", "F3"])
     prf = prior(EmpiricalPrior(), rdf)
-    function frc_vc(flag)
-        r = optimise(FactorRiskContribution(; r = Variance(), obj = MinimumRisk(),
-                                            flag = flag,
+    function frc_vc(; rc = nothing)
+        r = optimise(FactorRiskContribution(; r = Variance(; rc = rc), obj = MinimumRisk(),
+                                            flag = true,
                                             opt = JuMPOptimiser(; pe = prf, slv = slv_vc)),
                      rdf)
         @test isa(r.retcode, OptimisationSuccess)
-        return value_vc(r, :variance_risk_), dot(r.w, prf.sigma, r.w)
+        return r
     end
-    # The expression is the variance of the factor part alone (#1350). Without the
-    # off-factor block, eight long-only weights in the span of three factors cannot sum to
-    # one on this panel, so only the block is solved.
-    model_var, true_var = frc_vc(true)
-    @test model_var < true_var
-    @test_broken isapprox(model_var, true_var; rtol = 1e-4)
+    # The lift covers the whole decision vector `[w1; w2]`, so the expression is the
+    # variance of the returned weights (#1350). Without the off-factor block, eight
+    # long-only weights in the span of three factors cannot sum to one on this panel, so
+    # only the block is solved. The basis `[b1 b2]` reaches every weight vector, so the
+    # minimum is the minimum variance of `MeanRisk`.
+    r = frc_vc()
+    @test size(r.model[:frc_W]) == (N_vc, N_vc)
+    @test isapprox(value_vc(r, :variance_risk_), dot(r.w, prf.sigma, r.w); rtol = 1e-4)
+    rm = optimise(MeanRisk(; r = Variance(), obj = MinimumRisk(),
+                           opt = JuMPOptimiser(; pe = prf, slv = slv_vc)), rdf)
+    @test isapprox(dot(r.w, prf.sigma, r.w), dot(rm.w, prf.sigma, rm.w); rtol = 1e-4)
+    # A factor row states the Euler contribution of the factor as a share of the whole
+    # variance, the share that `factor_risk_contribution` reports. Unconstrained, the first
+    # factor carries about 2 % of the variance. A row that asks for 30 % binds, and at rank
+    # one the share of the returned weights meets it.
+    f0 = factor_risk_contribution(Variance(), frc_vc().w, prf; rd = rdf)
+    @test f0[1] / sum(f0) < 0.1
+    r = frc_vc(;
+               rc = LinearConstraint(;
+                                     ineq = PartialLinearConstraint(; A = [-1.0 0.0 0.0],
+                                                                    B = [-0.3])))
+    f = factor_risk_contribution(Variance(), r.w, prf; rd = rdf)
+    sW = JuMP.value.(r.model[key_vc(:sigma_W_)])
+    @test size(sW) == (3, N_vc)
+    @test isapprox(diag(sW), f[1:3]; rtol = 1e-3, atol = 1e-9)
+    @test isapprox(f[1] / sum(f), 0.3; rtol = 1e-3)
 end

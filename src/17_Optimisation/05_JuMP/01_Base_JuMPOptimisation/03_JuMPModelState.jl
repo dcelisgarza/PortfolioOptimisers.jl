@@ -36,7 +36,7 @@ const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical 
                                   # reshape the long/short parts. `:w_gross_ub` bounds the
                                   # gross exposure of the head's weights, for the big-M
                                   # constant of the quantile programmes.
-                                  :lw, :sw, :wp, :wn, :w1, :w_obj, :wip, :w_gross_ub,
+                                  :lw, :sw, :wp, :wn, :w1, :w2, :w_obj, :wip, :w_gross_ub,
                                   # Returns and objective plumbing, outer level only. The
                                   # robust-cone scratch a return term raises (`bucs_w_i`,
                                   # `t_eucs_gw_i`) is index-suffixed and read by index, so

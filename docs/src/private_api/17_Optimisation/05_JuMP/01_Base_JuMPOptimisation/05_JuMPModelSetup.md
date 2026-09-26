@@ -15,3 +15,10 @@ set_asset_returns_plus_one!
 set_portfolio_drawdowns_plus_one!
 set_risk_constraints!
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```
