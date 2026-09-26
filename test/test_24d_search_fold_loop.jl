@@ -324,6 +324,70 @@ The fixture is the online fold loop's, because the identities are structural.
         @test thr.idx == seq.idx
     end
 
+    @testset "10. The grid, an empty value vector, and the combinatorial paths" begin
+        # The grid is the product of the value vectors, with the first key fastest, and a
+        # vector of sets concatenates the grids of its sets.
+        lg, vg = po.lens_val_grid(["opt.l1" => [1, 2, 3], "opt.l2" => [10, 20]])
+        @test vg == [(1, 10), (2, 10), (3, 10), (1, 20), (2, 20), (3, 20)]
+        @test length(lg) == 6 && all(==(lg[1]), lg)
+        sets = Union{Vector{Pair{String, Vector{Int}}}, Dict{String, Vector{Int}}}[["opt.l1" =>
+                                                                                        [1,
+                                                                                         2]],
+                                                                                   Dict("opt.l2" =>
+                                                                                            [10,
+                                                                                             20,
+                                                                                             30])]
+        @test po.lens_val_grid(sets)[2] == [(1,), (2,), (10,), (20,), (30,)]
+        # An empty value vector makes the product empty. The grid refuses it by name
+        # before any candidate is fitted; the search used to report that every candidate
+        # failed a fold.
+        for p in (["opt.l1" => Float64[], "opt.l2" => [0.1]], Dict("opt.l1" => Float64[]))
+            err = try
+                po.lens_val_grid(p)
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, IsEmptyError) && occursin("`opt.l1`", sprint(showerror, err))
+        end
+        err = try
+            search_cross_validation(mr, gs(KFold(; n = 3), ["opt.l1" => Float64[]]), rd)
+            nothing
+        catch e
+            e
+        end
+        @test isa(err, IsEmptyError)
+        # The combinatorial method scores each path by the risk of its pooled series, and
+        # scores each fold of a path over the fold's own training window, in path order.
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        cvr = split(ccv, rd)
+        res = search_cross_validation(mr,
+                                      gs(ccv, jgrid; train_score = true,
+                                         ex = FLoops.SequentialEx()), rd)
+        l1 = po.parse_lens("opt.l1")
+        for (i, val) in enumerate(jgrid[1][2])
+            pp = po.fit_and_predict(Accessors.set(mr, l1, val), rd, ccv)
+            @test res.test_scores[:, i] == [-expected_risk(r, path) for path in pp.pred]
+            for (q, path) in enumerate(pp.pred)
+                ks = [I[2] for I in findall(==(q), cvr.path_ids)]
+                @test all(k -> path.pred[k].res.pr.X == view(rd.X, cvr.train_idx[ks[k]], :),
+                          eachindex(path.pred))
+                @test res.train_scores[q][:, i] ==
+                      [-expected_risk(r, fp.res) for fp in path.pred]
+            end
+        end
+        # A candidate that fails a path never wins.
+        bad = WeightBounds(; lb = fill(0.5, N), ub = ones(N))
+        ok = WeightBounds(; lb = zeros(N), ub = ones(N))
+        base = MeanRisk(;
+                        opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
+                                            sets = UniverseSets(; dict = Dict("nx" => nx))))
+        fres = search_cross_validation(base, gs(ccv, ["opt.wb" => [bad, ok]]), rd)
+        @test all(isnan, fres.test_scores[:, 1])
+        @test all(isfinite, fres.test_scores[:, 2])
+        @test fres.idx == 2
+    end
+
     @testset "A result's own prior scores its weights at the result's mask" begin
         # A fit over a point-in-time window reduces to the Coverage Universe and expands
         # its weights back, so `expected_risk(r, res)` views the weights at the mask

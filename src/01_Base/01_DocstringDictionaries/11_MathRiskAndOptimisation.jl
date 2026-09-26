@@ -148,4 +148,13 @@ unique_key_dict!(math_dict, :math_dict,
                  :W_tilde_syn => "``\\tilde{\\mathbf{W}}``: Normalised inner weight matrix, ``\\tilde{W}_{ik} = |W_{ik}| / \\sum_{j=1}^{N} |W_{jk}|``. A column of zeros stays a column of zeros.",#
                  :v_outer => "``\\boldsymbol{v}``: Outer weight vector, the weights that the outer optimiser gives the ``K`` synthetic assets.",#
                  :s_k_comb => "``s_k``: Combination Weight of sub-portfolio ``k``.",#
-                 :c_k_comb => "``c_k``: Coefficient of sub-portfolio ``k`` in the combination.")
+                 :c_k_comb => "``c_k``: Coefficient of sub-portfolio ``k`` in the combination.",#
+                 # A search over a parameter grid. The two methods of the grid search score
+                 # folds and paths, and both select the winner by one rule.
+                 :Theta_grid => "``\\Theta``: Search grid, the sequence of grid points that [`lens_val_grid`](@ref) builds from `p`.",#
+                 :theta_i_cand => "``\\theta_i``: Candidate ``i``, the estimator with each tuned parameter set to its value at grid point ``i``. Column ``i`` of every score matrix belongs to it.",#
+                 :s_orient_search => "``s \\in \\{1, -1\\}``: Orientation of the score, ``1`` when [`bigger_is_better`](@ref) holds for `r` and ``-1`` otherwise, so a higher score is always better.",#
+                 :R_search => "``\\mathcal{R}``: Expected risk under `r`, as [`expected_risk`](@ref) computes it with the keyword arguments `kwargs`.",#
+                 :C_finite_cand => "``\\mathcal{C}``: Finite candidates, the candidates whose every score is finite. A failed fold scores `NaN`, so a candidate that failed one is not in ``\\mathcal{C}``.",#
+                 :sigma_scorer => "``\\sigma``: Search scorer `scorer`, a map from a score matrix to the position of its best column. The default [`HighestMeanScore`](@ref) takes the column of greatest mean.",#
+                 :i_star_cand => "``i^{\\star}``: Selected candidate, the position in the grid of the candidate that the search returns.")

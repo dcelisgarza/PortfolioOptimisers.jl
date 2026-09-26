@@ -279,7 +279,7 @@ commit = "8610300"
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { lines = 6, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { lines = 3, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { lines = 115, misses = 5 }
-"src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { lines = 73, misses = 2 }
+"src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { lines = 73, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { lines = 16, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { lines = 28, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { lines = 166, misses = 0 }

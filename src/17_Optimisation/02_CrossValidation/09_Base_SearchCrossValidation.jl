@@ -1006,13 +1006,14 @@ Concatenated parameter sets are a **sum** of products, not a product: each set i
   - `factors`: `key => value-count` pairs, one per tuned parameter.
   - `estval`: The parameter grid itself, from which the factors are derived.
 
+# Validation
+
+  - Every factor holds at least one value. An `IsEmptyError` names the first key whose value vector is empty, because the product of an empty set is an empty grid.
+  - The count does not exceed `RESOURCE_LIMITS[].max_search_grid`. A `DomainError` names the count, the factors that made it, and the knob that raises the ceiling.
+
 # Returns
 
   - `nothing`.
-
-# Throws
-
-  - `DomainError` if the count exceeds `RESOURCE_LIMITS[].max_search_grid`. The message names the count, the factors that made it, and the knob that raises the ceiling.
 
 # Related
 
@@ -1031,6 +1032,10 @@ end
 function assert_search_grid_cap(factors::AbstractVector{<:Pair})::Nothing
     if isempty(factors)
         return nothing
+    end
+    for (key, n) in factors
+        @argcheck(!iszero(n),
+                  IsEmptyError("the search grid parameter `$key` holds no candidate value, so the grid is the product of an empty set and holds no candidate for the search to score. Give every tuned parameter at least one value."))
     end
     return assert_search_grid_cap(prod(big(n) for (_, n) in factors; init = big(1)),
                                   "the product " *

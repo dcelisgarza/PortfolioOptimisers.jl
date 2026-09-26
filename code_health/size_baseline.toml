@@ -290,8 +290,8 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { code = 16, doc = 19, comment = 0, blank = 9, total = 44 }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { code = 28, doc = 77, comment = 0, blank = 28, total = 133 }
 "src/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { code = 14, doc = 33, comment = 0, blank = 13, total = 60 }
-"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { code = 299, doc = 438, comment = 9, blank = 160, total = 906 }
-"src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { code = 102, doc = 71, comment = 11, blank = 24, total = 208 }
+"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { code = 334, doc = 513, comment = 12, blank = 197, total = 1056 }
+"src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { code = 101, doc = 184, comment = 22, blank = 54, total = 361 }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { code = 34, doc = 39, comment = 0, blank = 18, total = 91 }
 "src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { code = 74, doc = 162, comment = 5, blank = 70, total = 311 }
 "src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { code = 314, doc = 491, comment = 5, blank = 180, total = 990 }

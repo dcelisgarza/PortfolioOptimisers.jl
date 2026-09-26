@@ -143,8 +143,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :path_ids => "`path_ids`: Path identifiers for cross-validation splits.",#
                  :train_scores => "`train_scores`: Training set scores.",#
                  :test_scores => "`test_scores`: Test set scores.",#
-                 :lens_grid => "`lens_grid`: Grid lengths for each parameter.",#
-                 :val_grid => "`val_grid`: Grid values for each parameter.",#
+                 :lens_grid => "`lens_grid`: Lenses of each candidate, one vector of lenses per column of the score matrices, in grid order.",#
+                 :val_grid => "`val_grid`: Values of each candidate, one tuple per column of the score matrices, in the order of the lenses of that candidate.",#
                  :opt_cv => "`opt`: Optimal estimator found by cross-validation.",#
                  :idx_cv => "`idx`: Index of the optimal parameter configuration.",#
                  :asset_idx => "`asset_idx`: Asset column indices per fold.",#
