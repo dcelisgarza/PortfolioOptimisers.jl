@@ -743,6 +743,60 @@ end
         @test isnothing(optimise(td, rd).fees)
     end
 
+    @testset "`strict` governs every name that `sets` does not hold (#1345)" begin
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        missing_name = "variable `Z` not in asset universe"
+        # A bound that names an asset outside `sets` warns and is dropped, or raises. A
+        # scalar side of the resolved estimator reaches the projection per asset.
+        set = BoundedAllocationSet(;
+                                   wb = WeightBoundsEstimator(;
+                                                              lb = Dict("A" => 0.1,
+                                                                        "Z" => 0.05),
+                                                              ub = 1.0), sets = sets)
+        for alg in (ExponentiatedGradient(), MirrorDescent(; proj = EuclideanProjection()))
+            r = @test_logs((:warn, Regex(missing_name)), match_mode = :any,
+                           optimise(OPS(; alg = alg, set = set), rd))
+            @test isa(r.retcode, OptimisationSuccess) && r.w[1] >= 0.1 - 1e-12
+            @test isapprox(sum(r.w), 1; atol = 1e-12)
+            @test_throws ArgumentError optimise(OPS(; alg = alg, set = set, strict = true),
+                                                rd)
+        end
+        # The same holds for the fee, which the read-out resolves.
+        fe = FeesEstimator(; l = Dict("A" => 0.01, "Z" => 0.02))
+        fset = BoundedAllocationSet(; sets = sets)
+        r = @test_logs((:warn, Regex(missing_name)), match_mode = :any,
+                       optimise(OPS(; alg = ExponentiatedGradient(), set = fset, fees = fe),
+                                rd))
+        @test r.fees.l == [0.01, 0.0, 0.0, 0.0]
+        @test_throws ArgumentError optimise(OPS(; alg = ExponentiatedGradient(), set = fset,
+                                                fees = fe, strict = true), rd)
+        # Composed under a meta-optimiser, the inner head sees a cluster or a subset of the
+        # universe, and a bound on an asset outside it is a name that its `sets` does not
+        # hold. The inner head's own `strict` decides.
+        iset = BoundedAllocationSet(; wb = WeightBoundsEstimator(; lb = Dict("A" => 0.1)),
+                                    sets = sets)
+        outside = "variable `A` not in asset universe"
+        for meta in (opti -> NestedClustered(; opti = opti, opto = EqualWeighted()),
+                     opti -> SubsetResampling(; opt = opti, subset_size = 2, n_subsets = 6, seed = 1))
+            inner = OPS(; alg = ExponentiatedGradient(), set = iset)
+            r = @test_logs((:warn, Regex(outside)), match_mode = :any,
+                           optimise(meta(inner), rd))
+            @test isapprox(sum(r.w), 1; atol = 1e-12)
+            strict_inner = OPS(; alg = ExponentiatedGradient(), set = iset, strict = true)
+            err = try
+                optimise(meta(strict_inner), rd)
+                nothing
+            catch e
+                e
+            end
+            # The threaded executors wrap the refusal once or twice.
+            while isa(err, TaskFailedException)
+                err = err.task.result
+            end
+            @test isa(err, ArgumentError) && occursin(outside, err.msg)
+        end
+    end
+
     @testset "Show, docs and the search seam" begin
         opt = po.partial_fit!(OPS(; alg = BuyAndHold()), rows(rd, 1:3))
         s = sprint(show, MIME("text/plain"), opt)

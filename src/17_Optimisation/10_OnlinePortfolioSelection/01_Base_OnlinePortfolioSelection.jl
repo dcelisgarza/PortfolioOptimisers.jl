@@ -439,7 +439,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolves the weight bounds of a [`BoundedAllocationSet`](@ref) to vectors over `N` assets.
 
-[`weight_bounds_constraints`](@ref) does the work, with the set's `sets` for a bound that names assets. The set that comes back keeps its `sets`.
+[`weight_bounds_constraints`](@ref) does the work, with the set's `sets` for a bound that names assets. A [`WeightBoundsEstimator`](@ref) resolves a side that it states as a scalar to that scalar, and the projections read a bound at each asset. So a second call expands the resolved pair to `N` entries. The set that comes back keeps its `sets`.
 
 # Related
 
@@ -450,6 +450,7 @@ function resolve_allocation_set(set::BoundedAllocationSet, N::Integer, strict::B
                                 datatype::DataType)
     wb = weight_bounds_constraints(set.wb, set.sets; N = N, strict = strict,
                                    datatype = datatype)
+    wb = weight_bounds_constraints(wb; N = N, datatype = datatype)
     return BoundedAllocationSet(; wb = wb, sets = set.sets)
 end
 function rows_needed(::BoundedAllocationSet)

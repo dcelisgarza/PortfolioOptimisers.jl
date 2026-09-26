@@ -149,7 +149,7 @@ OnlinePortfolioSelection
     """
     fb
     """
-    $(field_dict[:strict_opt])
+    $(field_dict[:strict_opt]) The flag reaches every constraint of the set, the fee and the read-out, and the constraints that a programme set resolves on the rows at each step. It also governs a Held Gap, which warns when it is `false` and raises an error when it is `true`.
     """
     strict
     """
@@ -326,7 +326,7 @@ The uniform start and a given `w0` meet the set in the same way. So the allocati
 
  1. Form `start`, which is `1/N` at each of the `N` pinned assets when `w0` is `nothing`, and `w0` otherwise.
  2. Project `start` once onto `set` in the rule's geometry through [`project_start`](@ref), giving `w0`. A set that reads rows returns `start` unchanged.
- 3. Seed the rule's carrier on `w0` and `set` through [`rule_state_seed`](@ref), giving `st`. Steps 2 and 3 run inside one [`with_projection_step`](@ref), which collects the holds in `held`.
+ 3. Seed the rule's carrier on `w0` and `set` through [`rule_state_seed`](@ref), giving `st`. Steps 2 and 3 run inside one [`with_projection_step`](@ref) under the head's `strict`, which collects the holds in `held`.
  4. Warn on a hold through [`report_held_steps`](@ref).
  5. Size the rows buffer `X` from [`rows_needed`](@ref). A count of `nothing` gives an uncapped buffer, a count of zero gives no buffer, and any other count caps the buffer at that count.
  6. Keep the carrier's panel as `pnl` when it is static, and `nothing` otherwise.
@@ -365,7 +365,7 @@ function online_selection_seed(opt::OnlinePortfolioSelection, rd::ReturnsResult,
     # the start is held as given and the first Online Update projects it; every other set
     # meets the start once, uniform or given. The rule's seed projects its experts' starts
     # in the same step, and a hold at the start is warned as a row's is.
-    (w0, st), held = with_projection_step(nothing, nothing) do
+    (w0, st), held = with_projection_step(nothing, nothing; strict = opt.strict) do
         w = project_start(projection_geometry(opt.alg), set, start)
         return w, rule_state_seed(opt.alg, w, set)
     end

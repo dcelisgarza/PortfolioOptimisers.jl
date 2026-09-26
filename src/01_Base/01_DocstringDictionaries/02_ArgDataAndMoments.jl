@@ -175,7 +175,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :N_msc => "`N`: Number of evenly spaced values of `gamma` the monotonic Schur complement scans for its turning point, both ends included.",#
                  :alpha_dirichlet => "`alpha`: Dirichlet concentration parameter.",#
                  :opt_hier => "`opt`: Base hierarchical optimiser configuration.",#
-                 :strict_opt => "`strict`: Whether to strictly enforce weight bounds.",#
+                 :strict_opt => "`strict`: Whether a constraint that names an asset or a group that `sets` does not hold raises an error. When it is `false`, the constraint generator warns and skips the entry.",#
                  :strict_conv => "`strict`: Whether to raise an error if convergence is not achieved.",#
                  :schalg => "`alg`: Algorithm that chooses the value of `gamma` that the allocation runs at.",#
                  # Partial fit states.
