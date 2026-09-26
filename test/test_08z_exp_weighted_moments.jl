@@ -663,3 +663,135 @@ end
     amskp = trues(EW_T - 5, EW_N)
     @test_throws DimensionMismatch cov(ExpWeightedCovariance(), Xc, oracle_panel(amskp))
 end
+
+# The mathematics of `ExpWeightedVariance`, written out one asset at a time: the valid returns
+# since the last reset, a location seeded at zero and not corrected for the cold start, the
+# deviation from the location before each return, and the corrected weighted sum of squares.
+function ewvar_reference(X, amsk, decay, min_obs, centred)
+    T, N = size(X)
+    out = fill(NaN, T, N)
+    for i in 1:N
+        hist = Float64[]
+        for t in 1:T
+            act = isnothing(amsk) || amsk[t, i]
+            if !act
+                empty!(hist)
+            elseif isfinite(X[t, i])
+                push!(hist, X[t, i])
+            end
+            n = length(hist)
+            if (!act || n < min_obs)
+                continue
+            end
+            m = 0.0
+            S = 0.0
+            for (k, x) in enumerate(hist)
+                e = centred ? x : x - m
+                m = decay * m + (1 - decay) * x
+                S += (1 - decay) * decay^(n - k) * e^2
+            end
+            out[t, i] = S / (1 - decay^n)
+        end
+    end
+    return out
+end
+
+@testset "The docstrings of 02_ExpWeightedVariance.jl against numbers" begin
+    # Issue #890. The recursion equals its # Mathematical definition on random panels with
+    # holidays, infinite returns and resets, through every verb that reads it.
+    rng = StableRNG(890)
+    for _ in 1:100
+        T = rand(rng, 3:30)
+        N = rand(rng, 1:4)
+        X = 0.02 .* randn(rng, T, N) .+ 0.001
+        X[rand(rng, T, N) .< 0.15] .= NaN
+        X[rand(rng, T, N) .< 0.03] .= Inf
+        amsk = rand(rng, Bool) ? nothing : rand(rng, T, N) .> 0.12
+        decay = rand(rng, (0.5, 0.9, exp2(-inv(40.0))))
+        min_obs = rand(rng, 1:4)
+        centred = rand(rng, Bool)
+        ce = ExpWeightedVariance(; decay = decay, min_obs = min_obs, centred = centred)
+        ref = ewvar_reference(X, amsk, decay, min_obs, centred)
+        vs = PortfolioOptimisers.variance_series(ce, X; active_mask = amsk)
+        @test isequal(isnan.(vs), isnan.(ref))
+        @test isapprox(filter(isfinite, vs), filter(isfinite, ref); rtol = 1e-12)
+        @test isequal(var(ce, X; active_mask = amsk), vs[end, :])
+        @test isequal(permutedims(PortfolioOptimisers.variance_series(ce, permutedims(X);
+                                                                      dims = 2,
+                                                                      active_mask = if isnothing(amsk)
+                                                                          nothing
+                                                                      else
+                                                                          permutedims(amsk)
+                                                                      end)), vs)
+        k = rand(rng, 0:T)
+        head = partial_fit!(ce, X[1:k, :];
+                            active_mask = isnothing(amsk) ? nothing : amsk[1:k, :])
+        both = partial_fit!(head, X[(k + 1):end, :];
+                            active_mask = isnothing(amsk) ? nothing : amsk[(k + 1):end, :])
+        @test isequal(var(both), vs[end, :])
+    end
+
+    # The location is the mean of `ExpWeightedExpectedReturns` without its correction, so it is
+    # that mean times `1 - decay^n`.
+    X = 0.02 .* randn(rng, 25, 3) .+ 0.01
+    X[1:7, 2] .= NaN
+    ce = ExpWeightedVariance(; decay = 0.9, min_obs = 1)
+    n = vec(count(isfinite, X; dims = 1))
+    mu = mean(ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 1), X)
+    @test partial_fit!(ce, X).cache.location ≈ (1 .- 0.9 .^ n) .* mu
+
+    # A reset puts the location back at its seed, zero.
+    amsk = trues(size(X))
+    amsk[end, 3] = false
+    state = partial_fit!(ce, X; active_mask = amsk).cache
+    @test iszero(state.location[3]) &&
+          iszero(state.variance[3]) &&
+          iszero(state.obs_count[3])
+
+    # One observation at a time folds to the matrix fit, and the volatility of a held state is
+    # the square root of its variance. The recursion folds in every configuration.
+    Xf = 0.02 .* randn(rng, 12, 3)
+    amskf = trues(size(Xf))
+    amskf[4:6, 2] .= false
+    ce = ExpWeightedVariance(; decay = 0.9, min_obs = 2)
+    one_by_one = foldl((c, t) -> partial_fit!(c, view(Xf, t, :);
+                                              active_mask = view(amskf, t, :)), axes(Xf, 1);
+                       init = ce)
+    @test isequal(var(one_by_one), var(ce, Xf; active_mask = amskf))
+    @test isequal(std(ce, one_by_one.cache), sqrt.(var(ce, one_by_one.cache)))
+    no_mask = foldl((c, t) -> partial_fit!(c, view(Xf, t, :)), axes(Xf, 1); init = ce)
+    @test isequal(var(no_mask), var(ce, Xf))
+    @test PortfolioOptimisers.supports_partial_fit(ce)
+
+    # The cold-start correction divides by `1 - decay^n` with no floor. A floor at `eps` of the
+    # element type halved the one-observation answer at `decay = prevfloat(1.0)`, and cut it
+    # to 0.84 of itself on `Float32` data at `decay = 1 - 1e-7`.
+    @test var(ExpWeightedVariance(; decay = prevfloat(1.0), min_obs = 1),
+              fill(0.01, 1, 1)) ≈ [1e-4]
+    @test var(ExpWeightedVariance(; decay = 1 - 1e-7, min_obs = 1), fill(0.01f0, 1, 1)) ≈
+          [1.0f-4] rtol = 1e-5
+
+    # An integer panel gets a floating-point state, and a `Float32` panel keeps `Float32`.
+    Xi = [1 2; 3 -1; 0 2; 2 1; -1 0]
+    ce = ExpWeightedVariance(; decay = 0.9, min_obs = 2)
+    @test var(ce, Xi) == var(ce, float.(Xi))
+    @test isequal(PortfolioOptimisers.variance_series(ce, Xi),
+                  PortfolioOptimisers.variance_series(ce, float.(Xi)))
+    @test eltype(var(ce, Float32.(Xi))) === Float32
+    @test eltype(PortfolioOptimisers.variance_series(ce, Float32.(Xi))) === Float32
+
+    # The effective count is Kish's count of the weights `decay^k` over the finite rows, and it
+    # is also the divisor, because the weights sum to one.
+    X[3:9, 1] .= NaN
+    cnt = PortfolioOptimisers.variance_count(ExpWeightedVariance(; decay = 0.9), X)
+    for i in axes(X, 2)
+        a = 0.9 .^ (0:(count(isfinite, view(X, :, i)) - 1))
+        a = a / sum(a)
+        @test cnt.n[i] ≈ sum(a)^2 / sum(abs2, a)
+    end
+    @test cnt.m == cnt.n
+    λ = exp2(-inv(40.0))
+    @test PortfolioOptimisers.exp_weighted_variance_count(λ, ones(10_000, 1)).n[1] ≈
+          (1 + λ) / (1 - λ)
+    @test round((1 + λ) / (1 - λ)) == 115
+end

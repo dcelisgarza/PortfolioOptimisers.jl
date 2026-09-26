@@ -115,7 +115,7 @@ commit = "0ecb3ce47c"
 "src/05_Moments/27_MedianExpectedReturns.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 5, cog_sum = 2, arg_sum = 9, macros = ["@propagatable"] }
 "src/05_Moments/28_CustomValueExpectedReturns.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 8, cog_sum = 2, arg_sum = 13, macros = [] }
 "src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { cyc = 5, cog = 7, arg = 6, cyc_sum = 25, cog_sum = 20, arg_sum = 48, macros = [] }
-"src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 39, cog_sum = 32, arg_sum = 78, macros = [] }
+"src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { cyc = 6, cog = 9, arg = 6, cyc_sum = 35, cog_sum = 25, arg_sum = 78, macros = [] }
 "src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 39, cog_sum = 31, arg_sum = 85, macros = [] }
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { cyc = 13, cog = 19, arg = 10, cyc_sum = 68, cog_sum = 62, arg_sum = 112, macros = [] }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { cyc = 12, cog = 25, arg = 12, cyc_sum = 84, cog_sum = 84, arg_sum = 105, macros = [] }
