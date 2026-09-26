@@ -115,7 +115,7 @@ commit = "0ecb3ce47c"
 "src/05_Moments/26_Windowed/05_WindowedCokurtosis.jl" = { code = 25, doc = 0, comment = 0, blank = 0, total = 25 }
 "src/05_Moments/27_MedianExpectedReturns.jl" = { code = 28, doc = 102, comment = 0, blank = 48, total = 178 }
 "src/05_Moments/28_CustomValueExpectedReturns.jl" = { code = 50, doc = 161, comment = 0, blank = 75, total = 286 }
-"src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { code = 142, doc = 327, comment = 2, blank = 157, total = 628 }
+"src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { code = 139, doc = 363, comment = 5, blank = 170, total = 677 }
 "src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { code = 189, doc = 426, comment = 5, blank = 196, total = 816 }
 "src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { code = 217, doc = 485, comment = 5, blank = 221, total = 928 }
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { code = 399, doc = 909, comment = 6, blank = 358, total = 1672 }

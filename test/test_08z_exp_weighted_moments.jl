@@ -489,3 +489,64 @@ end
                                                               active_mask = amsk)
     end
 end
+
+@testset "Exponentially weighted expected returns: the weighted mean it states" begin
+    # Issue #889. The docstring states the answer as a weighted mean of the valid returns
+    # after the last reset, with weights proportional to `decay^k`. This checks that statement
+    # against a direct sum, over a listing, a reset, a holiday and a return that is not finite.
+    rng = StableRNG(889)
+    T, N = 50, 3
+    Xw = randn(rng, T, N) / 100
+    aw = trues(T, N)
+    aw[1:12, 2] .= false
+    aw[20:25, 3] .= false
+    Xw[.!aw] .= NaN
+    Xw[30, 1] = NaN
+    Xw[31, 1] = Inf
+    lam = 0.93
+    function ew_direct_mean(x, a, lam)
+        reset = findlast(t -> t > 1 && !a[t] && a[t - 1], eachindex(a))
+        first_t = isnothing(reset) ? 1 : reset
+        r = [x[t] for t in first_t:length(x) if a[t] && isfinite(x[t])]
+        wt = lam .^ ((length(r) - 1):-1:0)
+        return sum(wt .* r) / sum(wt)
+    end
+    mu = mean(ExpWeightedExpectedReturns(; decay = lam, min_obs = 1), Xw; active_mask = aw)
+    @test isapprox(mu, [ew_direct_mean(view(Xw, :, i), view(aw, :, i), lam) for i in 1:N];
+                   rtol = 1e-14)
+    # Asset 3 has 25 valid returns after it returns, so a warm-up of 30 blanks it alone.
+    mu30 = mean(ExpWeightedExpectedReturns(; decay = lam, min_obs = 30), Xw;
+                active_mask = aw)
+    @test isnan(mu30[3]) && isequal(mu30[1:2], mu[1:2])
+
+    # The state of two blocks with no reset is `decay^n_b * S_a + S_b`.
+    Y = randn(rng, 40, 2) / 100
+    Y[25, 1] = NaN
+    sa = partial_fit!(ExpWeightedExpectedReturns(; decay = lam), view(Y, 1:20, :)).cache
+    sb = partial_fit!(ExpWeightedExpectedReturns(; decay = lam), view(Y, 21:40, :)).cache
+    sw = partial_fit!(ExpWeightedExpectedReturns(; decay = lam), Y).cache
+    @test isapprox(lam .^ sb.obs_count .* sa.mu .+ sb.mu, sw.mu; atol = 1e-17)
+
+    # The default warm-up is the half-life, rounded, and round-off does not move it.
+    @test all(h -> ExpWeightedExpectedReturns(; decay = exp2(-inv(h))).min_obs == h, 1:1000)
+end
+
+@testset "Exponentially weighted expected returns: the number type and the correction" begin
+    # Issue #889. The state was seeded with `eltype(X)`, so an integer sample threw
+    # `InexactError` at the first step. A mean divides, so the state now holds the type of a
+    # division: an integer sample lands in a float, and a `Float32` sample stays `Float32`.
+    me = ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 1)
+    Xi = [1 -2; -1 3; 2 -1; 0 1]
+    @test isequal(mean(me, Xi), mean(me, float.(Xi)))
+    @test eltype(mean(me, Float32.(Xi ./ 100))) === Float32
+
+    # With one observation the mean is that observation. The correction divided by
+    # `max(1 - decay^n, eps(T))`, which cut the answer when `1 - decay` fell below `eps(T)`:
+    # 0.0083886 for 0.01 on `Float32` data at `decay = 1 - 1e-7`, and half the answer at
+    # `decay = prevfloat(1.0)`. With `0 < decay < 1`, `1 - decay^n` is positive, and the
+    # division needs no floor.
+    @test mean(ExpWeightedExpectedReturns(; decay = 1 - 1e-7, min_obs = 1),
+               Float32[0.01 -0.02]) == Float32[0.01, -0.02]
+    @test mean(ExpWeightedExpectedReturns(; decay = prevfloat(1.0), min_obs = 1),
+               [0.01 -0.02]) == [0.01, -0.02]
+end

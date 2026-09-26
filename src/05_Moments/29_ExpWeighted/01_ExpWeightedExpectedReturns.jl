@@ -3,9 +3,47 @@ $(DocStringExtensions.TYPEDEF)
 
 Estimates expected returns by an exponentially weighted recursion that freezes on a holiday and resets on an inactive period.
 
-The recursion is seeded at zero, so a newly listed asset starts from a cold state and the output divides out the damping that the cold start costs. An asset below `min_obs` valid observations is `NaN`, and so is an asset that the active mask leaves inactive at the last observation.
+The state of each asset starts at zero, so a newly listed asset starts cold, and the answer divides out the weight that the zero start removes. An asset with fewer than `min_obs` valid observations is `NaN`, and so is an asset that is inactive at the last observation.
 
-Keeping a young asset investable has a cost the prior pays for it. A prior fitted with this estimator zero-fills the rows the asset was missing through [`scenario_fill`](@ref), because every consumer of a Prior Result reads its returns matrix; a scenario-based measure then reads a zero return where the asset had none and understates that asset's risk over those rows, while `mu` and `sigma` stay the estimate this recursion made from the rows it saw. The fill is silent at or below the fitting prior's own `fill_limit` field, a share of that asset's own observations, warns above it, and refuses any fill under `strict`; `fill_limit` defaults to `nothing`, and this family carries no `CoveragePolicy` to derive a limit from, so every fill is named.
+A young asset stays investable, and the prior pays a cost for it. Every consumer of a Prior Result reads its returns matrix, so a prior fitted with this estimator fills the rows that the asset misses with zero through [`scenario_fill`](@ref). A scenario-based risk measure then reads a zero return where the asset had none, and it understates the risk of that asset over those rows. `mu` and `sigma` stay the estimates that the recursion made from the rows it saw. The fill is silent when the filled share of the asset's observations is at or below the `fill_limit` field of the prior, warns above it, and raises for any fill under `strict`. `fill_limit` defaults to `nothing`, and this family has no `CoveragePolicy` to derive a limit from, so every fill warns.
+
+# Mathematical definition
+
+A valid observation of asset ``i`` has a finite return, and the active mask marks the asset active there. At each valid observation the state of asset ``i`` takes the step
+
+```math
+\\begin{align}
+S_i &\\leftarrow \\lambda S_i + (1 - \\lambda) r_{i, t}\\,, \\\\
+n_i &\\leftarrow n_i + 1\\,.
+\\end{align}
+```
+
+The state starts at ``S_i = 0`` and ``n_i = 0``. After ``n_i`` valid observations it is
+
+```math
+\\begin{align}
+S_i &= (1 - \\lambda) \\sum_{k=0}^{n_i - 1} \\lambda^{k} r_{i, t_{n_i - k}}\\,, \\\\
+\\hat{\\mu}_i &= \\frac{S_i}{1 - \\lambda^{n_i}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:lambda_ew])
+  - ``S_i``: State of asset ``i``, the exponentially weighted sum of its valid returns.
+  - $(math_dict[:n_i_ew])
+  - ``r_{i, t}``: Return of asset ``i`` at observation ``t``.
+  - ``t_k``: Observation of the ``k``-th valid return of asset ``i``.
+  - ``\\hat{\\mu}_i``: Expected return of asset ``i``.
+
+The weights of ``S_i`` sum to ``1 - \\lambda^{n_i}`` and not to one, because the state starts at zero. The division by ``1 - \\lambda^{n_i}`` makes them sum to one, so ``\\hat{\\mu}_i`` is a weighted mean of the valid returns with weights proportional to ``\\lambda^{k}``. When every asset has the same ``n``, this is the ordinary adjusted exponentially weighted mean. The correction is the first power of ``1 - \\lambda^{n_i}``. A second-moment estimator corrects by a different power, so the two forms are not interchangeable.
+
+An observation that is not valid changes the state in one of two ways:
+
+  - An active asset with a return that is not finite is on a holiday. Its ``S_i`` and ``n_i`` do not change.
+  - An asset that the active mask marks inactive, after it was active at the observation before, is reset to ``S_i = 0`` and ``n_i = 0``. If it becomes active again, the correction starts again.
+
+``\\hat{\\mu}_i`` is `NaN` when ``n_i`` is less than `min_obs`, or when asset ``i`` is inactive at the last observation.
 
 # Fields
 
@@ -21,32 +59,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+The default `min_obs` is the half-life ``h = 1 / \\log_2(1 / \\lambda)`` rounded to the nearest integer, and at least one. The half-life is the count of observations over which a weight falls to one half, so after ``h`` valid observations the weight ``\\lambda^{n_i}`` that the cold start removes is one half. The default `decay` is ``2^{-1/40}``, a half-life of 40. The rule rounds, and does not truncate, because ``1 / \\log_2(1 / \\lambda)`` of ``\\lambda = 2^{-1/h}`` often comes back a small amount below the integer ``h``.
+
 ## Validation
 
   - $(val_dict[:decay])
-  - `min_obs > 0`.
-
-# Mathematical definition
-
-The internal state of asset ``i`` after ``n_i`` valid observations is
-
-```math
-S_i = (1 - \\lambda) \\sum_{k=0}^{n_i - 1} \\lambda^{k} r_{i, n_i - k},
-```
-
-whose weights sum to ``1 - \\lambda^{n_i}`` rather than to one. The reported mean divides that sum out,
-
-```math
-\\hat{\\mu}_i = \\frac{S_i}{1 - \\lambda^{n_i}}.
-```
-
-Where:
-
-  - ``\\lambda``: `decay`.
-  - ``r_{i, t}``: the return of asset ``i`` at the valid observation ``t``.
-  - ``n_i``: the count of valid observations of asset ``i``.
-
-The correction is the **first** power of ``1 - \\lambda^{n_i}``. A second-moment estimator corrects by a different power, so the two forms are not interchangeable.
+  - $(val_dict[:min_obs])
 
 # Examples
 
@@ -99,9 +117,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Internal mutable cache for the online mean update in [`ExpWeightedExpectedReturns`](@ref).
+Holds the running state of an [`ExpWeightedExpectedReturns`](@ref) fit, the ``S_i``, ``n_i`` and active flag of each asset.
 
-This type is an implementation detail and is not intended for direct use.
+The struct is immutable, and each field is an array that a fold changes in place. [`partial_fit!`](@ref) keeps the state in the `cache` field of the estimator, and `mean(me, state)` reads the expected returns out of it. [`ExpWeightedExpectedReturns`](@ref) states the mathematics.
 
 # Fields
 
@@ -110,6 +128,8 @@ $(DocStringExtensions.FIELDS)
 # Related
 
   - [`ExpWeightedExpectedReturns`](@ref)
+  - [`exp_weighted_pass!`](@ref)
+  - [`exp_weighted_moment`](@ref)
 """
 @concrete struct ExpWeightedExpectedReturnsState <: AbstractPartialFitState
     """
@@ -128,20 +148,27 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Processes a single observation row (or column) to update the online mean cache.
+Folds one observation into the state of an exponentially weighted mean.
 
-An asset is valid when its return is finite and the active mask admits it. A valid asset takes the ordinary recursion, an active asset with a non-finite return freezes, and an asset that has just become inactive is reset to the cold state so that the bias correction restarts if it lists again.
+[`ExpWeightedExpectedReturns`](@ref) states the step and the rules for an observation that is not valid.
+
+# Algorithm
+
+ 1. Mark each asset valid when its return is finite and `active_mask` marks it active. With `active_mask = nothing`, every asset is active.
+ 2. If `active_mask` is not `nothing`, find each asset that `cache.active` marks active and `active_mask` marks inactive. Set its `mu` and its `obs_count` to zero. Then copy `active_mask` into `cache.active`. With `active_mask = nothing`, set every entry of `cache.active` to `true`.
+ 3. If no asset is valid, return `cache`.
+ 4. For each valid asset, set `mu = decay * mu + (1 - decay) * x`, and add one to its `obs_count`. Every other asset keeps its `mu` and its `obs_count`.
 
 # Arguments
 
-  - `cache::ExpWeightedExpectedReturnsState`: Online mean computation cache (mutated).
-  - `me::ExpWeightedExpectedReturns`: Expected returns estimator configuration.
-  - `X::VecNum`: Returns vector for the current observation.
-  - `active_mask::Option{<:AbstractVector{<:Bool}}`: Optional mask of currently active assets. An asset that becomes inactive has its mean and count reset. With `nothing` every asset is active, so a non-finite return reads as a holiday.
+  - `cache::ExpWeightedExpectedReturnsState`: State to fold the observation into. The method changes its arrays in place.
+  - `me::ExpWeightedExpectedReturns`: Exponentially weighted expected returns estimator.
+  - `X::VecNum`: Returns of the assets at one observation.
+  - `active_mask::Option{<:AbstractVector{<:Bool}}`: Optional mask of the assets that are active at this observation. With `nothing` every asset is active, so a return that is not finite is a holiday.
 
 # Returns
 
-  - `cache::ExpWeightedExpectedReturnsState`: The cache to read on and to pass to the next observation. Every field is an array that is mutated in place.
+  - `cache::ExpWeightedExpectedReturnsState`: The same state, after the observation.
 
 # Related
 
@@ -169,8 +196,8 @@ function process_observation!(cache::ExpWeightedExpectedReturnsState,
         return cache
     end
 
-    cache.mu[valid] .= me.decay * view(cache.mu, valid) +
-                       (one(me.decay) - me.decay) * view(X, valid)
+    cache.mu[valid] .= me.decay .* view(cache.mu, valid) .+
+                       (one(me.decay) - me.decay) .* view(X, valid)
     cache.obs_count[valid] .+= 1
 
     return cache
@@ -180,7 +207,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run one forward pass of an exponentially weighted update over the observations of `X`, and call `f` after each observation.
 
-The pass owns the argument validation, the orientation and the cache, so every verb of the family states the recursion once. `f` receives the observation index and the cache as it stands after that observation.
+Each verb of [`ExpWeightedExpectedReturns`](@ref) runs the recursion through this method. `f` receives the index of the observation and the cache after that observation, so a caller can read the mean at every observation in one pass.
+
+# Algorithm
+
+ 1. Check `dims`, and check that `active_mask` has the size of `X`.
+ 2. Count the assets `N` along the dimension that is not `dims`.
+ 3. If `state` is `nothing`, make a cold state: `mu` is `N` zeros, `obs_count` is `N` zeros, and `active` is `N` values `true`. The element type of `mu` is the type of `one(eltype(X)) / one(eltype(X))`, so an integer `X` gives a float state and a `Float32` `X` gives a `Float32` state. Otherwise, check that `state` holds `N` assets, and continue from it.
+ 4. For each observation `i` along `dims`, in order, fold the observation and its row of `active_mask` into the cache with [`process_observation!`](@ref). Then call `f(i, cache)`.
+ 5. Return the cache.
 
 # Arguments
 
@@ -220,7 +255,10 @@ function exp_weighted_pass!(f, est::ExpWeightedExpectedReturns, X::MatNum, dims:
     N = size(X, setdiff((1, 2), (dims,))[1])
 
     cache = if isnothing(state)
-        ExpWeightedExpectedReturnsState(zeros(eltype(X), N), zeros(Int, N), trues(N))
+        # A mean divides, so the state holds the type of a division: an integer sample
+        # lands in a float, and a `Float32` sample stays `Float32`.
+        ExpWeightedExpectedReturnsState(zeros(typeof(one(eltype(X)) / one(eltype(X))), N),
+                                        zeros(Int, N), trues(N))
     else
         @argcheck(length(state.mu) == N,
                   DimensionMismatch("the state holds $(length(state.mu)) assets, and `X` holds $N"))
@@ -239,7 +277,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run one forward pass of an exponentially weighted update over the observations of `X`, and read no intermediate cache.
 
-This is the callback method with a callback that does nothing, so a verb that wants the last cache alone states no callback of its own. The callback method owns the recursion, the argument validation and the cache.
+It calls the method that takes a callback, with a callback that does nothing. A verb that needs only the last cache calls this method.
 
 # Arguments
 
@@ -268,16 +306,23 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Read the exponentially weighted mean out of a cache, as it stands.
 
-Applies the cold-start bias correction and blanks every asset that is not ready. The cache is read, never written, so the same cache answers this call after every observation of a forward pass.
+The method reads the cache and does not write it, so the same cache answers this call after every observation of a forward pass. [`ExpWeightedExpectedReturns`](@ref) states the mathematics.
+
+# Algorithm
+
+ 1. Copy `cache.mu`.
+ 2. For each asset with `obs_count > 0`, divide its entry by `1 - decay^obs_count`. An asset with `obs_count = 0` keeps its zero.
+ 3. Set to `NaN` each asset that `cache.active` marks inactive, or that has `obs_count < est.min_obs`.
+ 4. Return the vector.
 
 # Arguments
 
-  - `cache::ExpWeightedExpectedReturnsState`: Online mean computation cache.
-  - `est::ExpWeightedExpectedReturns`: Expected returns estimator configuration.
+  - `cache::ExpWeightedExpectedReturnsState`: State to read.
+  - `est::ExpWeightedExpectedReturns`: Exponentially weighted expected returns estimator. The method reads its `decay` and its `min_obs`.
 
 # Returns
 
-  - `mu::Vector{<:Number}`: Per-asset expected returns vector. An asset that is inactive, or that carries fewer than `est.min_obs` valid observations, is `NaN`.
+  - `mu::Vector{<:Number}`: Per-asset expected returns vector. An asset that is inactive, or that has fewer than `est.min_obs` valid observations, is `NaN`.
 
 # Related
 
@@ -289,11 +334,8 @@ function exp_weighted_moment(cache::ExpWeightedExpectedReturnsState,
                              est::ExpWeightedExpectedReturns)
     mu = copy(cache.mu)
     counted = cache.obs_count .> zero(eltype(cache.obs_count))
-    correction = ones(eltype(mu), length(mu))
-    correction[counted] .= inv.(max.(one(est.decay) .-
-                                     est.decay .^ view(cache.obs_count, counted),
-                                     eps(eltype(mu))))
-    mu .*= correction
+    # `0 < decay < 1`, so `1 - decay^n >= 1 - decay > 0` in floating point as well.
+    mu[counted] ./= one(est.decay) .- est.decay .^ view(cache.obs_count, counted)
     not_ready = .!cache.active .| (cache.obs_count .< est.min_obs)
     if any(not_ready)
         mu[not_ready] .= NaN
@@ -312,14 +354,19 @@ end
 
 Compute the exponentially weighted expected returns of each asset.
 
-Iterates over the observation dimension of `X`, updating an online mean cache at each step, then applies the cold-start bias correction and blanks every asset that is not ready.
+[`ExpWeightedExpectedReturns`](@ref) states the mathematics.
+
+# Algorithm
+
+ 1. Fold every observation of `X` into a cold state with [`exp_weighted_pass!`](@ref).
+ 2. Read the mean out of the last state with [`exp_weighted_moment`](@ref).
 
 # Arguments
 
   - `me`: Exponentially weighted expected returns estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `active_mask`: Optional boolean matrix with the same size as `X`. An asset whose entry is `false` is inactive at that observation: its state is reset and its answer is `NaN` while it stays inactive. With `nothing` every asset is active, so a non-finite return reads as a holiday and the mean freezes.
+  - `active_mask`: Optional boolean matrix with the same size as `X`. An asset whose entry is `false` is inactive at that observation. Its state is reset, and its answer is `NaN` while it stays inactive. With `nothing` every asset is active, so a return that is not finite is a holiday and the mean does not change.
   - $(arg_dict[:ignkwargs])
 
 # Validation
@@ -329,7 +376,7 @@ Iterates over the observation dimension of `X`, updating an online mean cache at
 
 # Returns
 
-  - `mu::Vector{<:Number}`: Per-asset expected returns vector of length `assets`. An asset with fewer than `me.min_obs` valid observations is `NaN`.
+  - `mu::Vector{<:Number}`: Per-asset expected returns vector of length `assets`. An asset with fewer than `me.min_obs` valid observations is `NaN`, and so is an asset that is inactive at the last observation.
 
 # Examples
 
@@ -364,7 +411,7 @@ end
 
 Compute the exponentially weighted expected returns from a window of an Asset Panel.
 
-This estimator is mask-aware, so it overrides the reduce-and-expand root of the verb and reads the panel's active mask itself. The answer therefore lives on the whole universe rather than on the Coverage Universe: a young asset that lists inside the window is answered from the observations it has, and it is `NaN` only while it stays below `me.min_obs`.
+The estimator reads the active mask of the panel itself. So this method replaces the generic method, which reduces the sample to the Coverage Universe and expands the answer back. The answer covers every asset of the panel. A young asset that lists inside the window gets an answer from the observations it has, and it is `NaN` only while it has fewer than `me.min_obs` valid observations.
 
 # Arguments
 
@@ -376,7 +423,7 @@ This estimator is mask-aware, so it overrides the reduce-and-expand root of the 
 
 # Returns
 
-  - `mu::Vector{<:Number}`: Per-asset expected returns vector of length `assets`.
+  - `mu::Vector{<:Number}`: Per-asset expected returns vector of length `assets`. An asset with fewer than `me.min_obs` valid observations is `NaN`, and so is an asset that is inactive at the last observation.
 
 # Related
 
@@ -400,7 +447,7 @@ end
 
 Fold a block of observations into the estimator's own online mean state.
 
-The estimator carries the state in its `cache` field, so a second call continues the recursion rather than restarting it. A partial-fit state is the one Result an estimator may hold, and this is that exception.
+The estimator keeps the state in its `cache` field, so a second call continues the recursion and does not start it again. A partial-fit state is the one Result that an estimator can hold.
 
 # Arguments
 
@@ -445,7 +492,7 @@ end
 
 Fold one observation into the estimator's own online mean state.
 
-The entries of `x` are the assets of a single observation, which is the row the matrix method folds one at a time. This is the shape a caller has when the observations arrive one by one.
+The entries of `x` are the returns of the assets at one observation. The method folds `x` as one row of the matrix method, for a caller that gets the observations one at a time.
 
 # Arguments
 
@@ -501,6 +548,8 @@ end
 
 Read the exponentially weighted expected returns out of a state the caller holds.
 
+The method calls [`exp_weighted_moment`](@ref), and [`ExpWeightedExpectedReturns`](@ref) states the mathematics.
+
 # Arguments
 
   - `me`: Exponentially weighted expected returns estimator.
@@ -509,7 +558,7 @@ Read the exponentially weighted expected returns out of a state the caller holds
 
 # Returns
 
-  - `mu::Vector{<:Number}`: Per-asset expected returns vector.
+  - `mu::Vector{<:Number}`: Per-asset expected returns vector. An asset that is inactive, or that has fewer than `me.min_obs` valid observations, is `NaN`.
 
 # Related
 
@@ -526,7 +575,7 @@ end
 
 Read the exponentially weighted expected returns out of the estimator's own state.
 
-The one-argument form is what an incremental fit answers: [`partial_fit!`](@ref) leaves the state in the `cache` field, and this verb turns it into the ordinary answer. An estimator that has been given no observation carries no state, so the call is refused rather than answered with a zero.
+[`partial_fit!`](@ref) leaves the state in the `cache` field, and this method reads the expected returns out of it. An estimator that has had no observation holds no state, so the method refuses the call and does not answer with a zero.
 
 # Arguments
 
@@ -539,7 +588,7 @@ The one-argument form is what an incremental fit answers: [`partial_fit!`](@ref)
 
 # Returns
 
-  - `mu::Vector{<:Number}`: Per-asset expected returns vector of length `assets`.
+  - `mu::Vector{<:Number}`: Per-asset expected returns vector of length `assets`. An asset that is inactive, or that has fewer than `me.min_obs` valid observations, is `NaN`.
 
 # Examples
 
@@ -573,7 +622,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses to merge two [`ExpWeightedExpectedReturnsState`](@ref).
 
-An exponentially weighted state folds forward exactly, `S = λ^{n_b} S_a + S_b`, but only while no asset resets inside the second block. The state records the count that a reset zeroed and not the reset itself, so the two cases are indistinguishable after the fact and a merge would silently keep a history the reset discarded. Fold the second block into the first with `partial_fit!` instead.
+The state of two consecutive blocks is ``S = \\lambda^{n_b} S_a + S_b``, where ``S_a`` is the state of the first block, ``S_b`` the state of the second block from a cold start, and ``n_b`` the count of valid observations of the asset in the second block. That holds only when no asset resets inside the second block. The state records the count after a reset and not the reset itself, so the two cases cannot be told apart, and a merge would keep a history that the reset removed. Fold the second block into the first with [`partial_fit!`](@ref) instead.
 
 # Arguments
 
@@ -600,15 +649,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies an [`ExpWeightedExpectedReturnsState`](@ref), so the copy shares no array with the original.
 
-The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. Every field is an array, and every one is copied.
+This is the `copy` method of the [`AbstractPartialFitState`](@ref) interface. [`partial_fit`](@ref) calls it before it folds, so the state of the caller does not change. The method copies each of the three arrays.
 
 # Arguments
 
-  - `x`: The cache to copy.
+  - `x`: The state to copy.
 
 # Returns
 
-  - `state::ExpWeightedExpectedReturnsState`: A fresh cache, equal to `x`, whose arrays are fresh.
+  - `state::ExpWeightedExpectedReturnsState`: A new state, equal to `x`, with new arrays.
 
 # Related
 

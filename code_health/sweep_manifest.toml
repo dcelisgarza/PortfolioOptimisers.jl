@@ -163,7 +163,7 @@
 "src/05_Moments/26_Windowed/05_WindowedCokurtosis.jl" = { map = 3, units = 0, algorithm = 0, swept = true, bindings = [] }
 "src/05_Moments/27_MedianExpectedReturns.jl" = { map = 3, units = 3, algorithm = 1, swept = true, bindings = ["MedianExpectedReturns", "mean", "mean"] }
 "src/05_Moments/28_CustomValueExpectedReturns.jl" = { map = 3, units = 8, algorithm = 2, swept = true, bindings = ["CER_Func_Num_VecNum", "CustomExpectedReturnsValueAlgorithm", "CustomValueExpectedReturns", "assert_custom_expected_returns_val", "mean", "mean", "mean", "port_opt_view"] }
-"src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { map = 3, units = 14, swept = false }
+"src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { map = 3, units = 14, algorithm = 4, swept = true, bindings = ["ExpWeightedExpectedReturns", "ExpWeightedExpectedReturnsState", "copy", "exp_weighted_moment", "exp_weighted_pass!", "exp_weighted_pass!", "mean", "mean", "mean", "mean", "merge_states", "partial_fit!", "partial_fit!", "process_observation!"] }
 "src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { map = 3, units = 21, swept = false }
 "src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { map = 3, units = 23, swept = false }
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { map = 3, units = 29, swept = false }
