@@ -96,7 +96,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :fdape => "`ape`: Asset Panel producer, or `nothing` to read the panel the data carrier holds. A producer is configuration: it builds a static panel at the point of use, from the prior result and the returns of the subproblem that runs it, so a view passes it through and a fold refits it.",#
                  :fdsel => "`sel`: Feature Selector naming the Panel Fields the Feature Matrix stacks, or `nothing` to stack every field's values. An entry is a field name, a field paired with the levels or labels it keeps, a field paired with one level or label, or a field paired with `:observed`. The vector order is the column order.",#
                  :fdstrict => "`strict`: Whether a `sel` entry naming a field, a level or a label the Asset Panel does not hold throws instead of warning and being dropped.",#
-                 :fdrows => "`rows`: The observation rows a time-varying Asset Panel stacks, `Colon()` for every row. A static panel has no observation axis and refuses any other value.",#
+                 :fdrows => "`rows`: The observation rows a time-varying Asset Panel stacks, as positions or as a `Bool` mask, and `Colon()` for every row. A static panel has no observation axis and refuses any other value.",#
                  # Stats.
                  :sigma => "`sigma`: Covariance matrix `assets × assets`.",#
                  :mu => "`mu`: Expected returns vector `assets × 1`.",#

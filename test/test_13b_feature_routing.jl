@@ -446,6 +446,13 @@ const PO = PortfolioOptimisers
             # The rows must lie on the observation axis, and a static panel has none.
             @test_throws ArgumentError feature_matrix(tpnl, sel; rows = [0, 2])
             @test_throws ArgumentError feature_matrix(tpnl, sel; rows = 1:(Tt + 1))
+            # A `Bool` mask is an `AbstractVector{<:Integer}`, and it names the rows it holds
+            # `true` at, as `selectdim` reads it. Its length is the observation count and
+            # not the stack's, which threw a DimensionMismatch before #845.
+            bmsk = [false, true, false, false, true, false, false]
+            @test feature_matrix(tpnl, sel; rows = bmsk) == Zt[[2, 5], :, :]
+            @test PortfolioOptimisers.stacked_axes((Tt, Nt), bmsk) == (2, Nt)
+            @test_throws ArgumentError feature_matrix(tpnl, sel; rows = [true, false])
             @test_throws ArgumentError feature_matrix(gpnl; rows = 1:1)
             @test feature_matrix(gpnl; rows = Colon()) == feature_matrix(gpnl)
             @test PortfolioOptimisers.stacked_axes((Tt, Nt), Colon()) == (Tt, Nt)
