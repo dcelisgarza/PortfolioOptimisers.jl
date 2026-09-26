@@ -2,7 +2,7 @@
 Description = "The Pipeline's online step, public API of PortfolioOptimisers.jl: partial_fit!, fit, cross_val_predict."
 ```
 
-# The Pipeline's online step
+# [The Pipeline's online step](@id api-the-pipelines-online-step)
 
 A [`Pipeline`](@ref) updates incrementally. [`partial_fit!`](@ref) passes each block of observations through the steps in order, up to the step that stores the rows: the prior step, or the optimiser step when the pipeline has no prior. `fit(pipe)` with no data returns the fitted [`PipelineResult`](@ref). It rebuilds the returns from the rows that the step stored, and refits over them every step that chooses assets. It then restricts the state of the step that stores the rows to the assets that remain, and runs the steps after it as a batch fit.
 

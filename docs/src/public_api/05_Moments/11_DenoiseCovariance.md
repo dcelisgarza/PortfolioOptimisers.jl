@@ -2,7 +2,7 @@
 Description = "Denoise covariance, public API of PortfolioOptimisers.jl: DenoiseCovariance."
 ```
 
-# Denoise covariance
+# [Denoise covariance](@id api-denoise-covariance)
 
 ```@docs
 DenoiseCovariance

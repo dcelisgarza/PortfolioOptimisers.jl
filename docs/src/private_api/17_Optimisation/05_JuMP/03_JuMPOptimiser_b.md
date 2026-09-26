@@ -2,7 +2,7 @@
 Description = "JuMP Optimiser (b), private API of PortfolioOptimisers.jl: assert_universe_axis_order, processed_jump_optimiser_attributes, processed_jump_optimiser, …"
 ```
 
-# JuMP Optimiser (b): private API
+# [JuMP Optimiser (b): private API](@id private-api-jump-optimiser-b)
 
 ```@docs
 assert_universe_axis_order

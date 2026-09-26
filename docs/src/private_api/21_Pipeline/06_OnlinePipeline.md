@@ -2,7 +2,7 @@
 Description = "The Pipeline's online step, private API of PortfolioOptimisers.jl: PipelineResume, PipelineBufferState, fold_pipeline, fold_pipeline_owner, …"
 ```
 
-# The Pipeline's online step: private API
+# [The Pipeline's online step: private API](@id private-api-the-pipelines-online-step)
 
 ```@docs
 PortfolioOptimisers.PipelineResume

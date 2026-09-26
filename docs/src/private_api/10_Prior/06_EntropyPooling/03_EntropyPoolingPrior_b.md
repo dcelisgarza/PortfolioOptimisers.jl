@@ -2,7 +2,7 @@
 Description = "Entropy Pooling (b), private API of PortfolioOptimisers.jl: ep_view_terms, ep_normalise_view_term, ep_view_formulations, ep_sbar, ep_assert_reachable_view, …"
 ```
 
-# Entropy Pooling (b): private API
+# [Entropy Pooling (b): private API](@id private-api-entropy-pooling-b)
 
 ```@docs
 ep_view_terms

@@ -6,7 +6,7 @@ Description = "Base Pipeline, private API of PortfolioOptimisers.jl: AbstractPip
 
 This page has the abstract pipeline types, the [`PipelineContext`](@ref) that keeps the output of each step in a named slot, the tables that name the slots and the targets of a constraint, and the functions that state which slots a step reads and writes.
 
-The abstract types of the preprocessing estimators and of their results, the price-level result [`PricesResult`](@ref), and the functions that fit and apply preprocessing are on the [preprocessing](../03_InputData/04_Preprocessing.md) page. They work without a pipeline, so this page does not document them.
+The abstract types of the preprocessing estimators and of their results, the price-level result [`PricesResult`](@ref), and the functions that fit and apply preprocessing are on the [preprocessing](@ref private-api-preprocessing) page. They work without a pipeline, so this page does not document them.
 
 ```@docs
 AbstractPipelineEstimator

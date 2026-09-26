@@ -4,4 +4,4 @@ Description = "Validation and return descriptions has no public API in Portfolio
 
 # Validation and return descriptions
 
-This file defines no name. The [private page](../../../private_api/01_Base/01_DocstringDictionaries/08_ValidationsAndReturns.md) says which table it fills.
+This file defines no name. The [private page](@ref private-api-validation-and-return-descriptions) says which table it fills.

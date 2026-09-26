@@ -92,6 +92,16 @@ function mirror_pages(repo::AbstractString, side::Symbol)
     return pages
 end
 
+#=
+Every link from a page to another page by a relative `.md` path, as `(target)` in
+`[text](target)`. A path breaks when either page moves, and the file split 0ed224263c broke
+one so (#1353). The target's H1 carries a label, `# [Title](@id label)`, and the link reads
+`[text](@ref label)`, which survives a move. A colon excludes a URL.
+=#
+function relative_md_links(text::AbstractString)
+    return [m.captures[1] for m in eachmatch(r"\]\(([^():\s]*\.md(?:#[^)]*)?)\)", text)]
+end
+
 @testset "Docs page metadata census" begin
     @testset "The derivation" begin
         # A page title is the H1's text, with an `@id` wrapper unwrapped.
@@ -305,5 +315,28 @@ end
             end
             @test wrong == String[]
         end
+    end
+
+    @testset "a hand-written page links a page by its label, never by a relative path" begin
+        @test relative_md_links("[a](../b/C.md) [d](E.md#f) [g](./H.md)") ==
+              ["../b/C.md", "E.md#f", "./H.md"]
+        @test isempty(relative_md_links("[a](@ref label) [`B`](@ref)"))
+        @test isempty(relative_md_links("[c](https://x.org/README.md)"))
+        hand_written = Dict(p => s for (p, s) in sources if endswith(s, ".md"))
+        for side in (:public, :private)
+            merge!(hand_written, mirror_pages(REPO_ROOT, side))
+        end
+        @test haskey(hand_written, "index.md")
+        @test count(p -> startswith(p, "private_api"), keys(hand_written)) >= 100
+        linked = String[]
+        for (page, path) in sort(collect(hand_written); by = first)
+            for target in relative_md_links(read(path, String))
+                push!(linked, "$page -> $target")
+            end
+        end
+        if !isempty(linked)
+            @warn "Pages that link a page by a relative `.md` path. Give the target's H1 an `(@id label)` and link `(@ref label)`:\n  $(join(linked, "\n  "))"
+        end
+        @test linked == String[]
     end
 end

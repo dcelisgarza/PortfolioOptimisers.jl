@@ -4,4 +4,4 @@ Description = "Kurtosis Constraints has no public API in PortfolioOptimisers.jl;
 
 # Kurtosis Constraints
 
-Every name of this topic is private. The [private page](../../../../private_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/04_KurtosisConstraints.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-kurtosis-constraints) documents them.

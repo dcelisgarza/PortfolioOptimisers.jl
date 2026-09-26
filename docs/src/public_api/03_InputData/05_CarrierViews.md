@@ -4,4 +4,4 @@ Description = "Carrier views has no public API in PortfolioOptimisers.jl; its na
 
 # Carrier views
 
-Every name of this topic is private. The [private page](../../private_api/03_InputData/05_CarrierViews.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-carrier-views) documents them.

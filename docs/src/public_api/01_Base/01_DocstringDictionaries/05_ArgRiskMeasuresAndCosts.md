@@ -4,4 +4,4 @@ Description = "Risk measure and cost arguments has no public API in PortfolioOpt
 
 # Risk measure and cost arguments
 
-This file defines no name. The [private page](../../../private_api/01_Base/01_DocstringDictionaries/05_ArgRiskMeasuresAndCosts.md) says which table it fills.
+This file defines no name. The [private page](@ref private-api-risk-measure-and-cost-arguments) says which table it fills.

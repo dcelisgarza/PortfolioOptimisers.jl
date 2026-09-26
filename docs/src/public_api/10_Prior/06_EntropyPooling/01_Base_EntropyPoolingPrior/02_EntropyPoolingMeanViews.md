@@ -4,4 +4,4 @@ Description = "Entropy pooling mean views has no public API in PortfolioOptimise
 
 # Entropy pooling mean views
 
-Every name of this topic is private. The [private page](../../../../private_api/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/02_EntropyPoolingMeanViews.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-entropy-pooling-mean-views) documents them.

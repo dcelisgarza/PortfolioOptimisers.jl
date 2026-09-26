@@ -2,7 +2,7 @@
 Description = "KFold, public API of PortfolioOptimisers.jl: KFold, KFoldResult, Base.split."
 ```
 
-# KFold
+# [KFold](@id api-kfold)
 
 ```@docs
 KFold

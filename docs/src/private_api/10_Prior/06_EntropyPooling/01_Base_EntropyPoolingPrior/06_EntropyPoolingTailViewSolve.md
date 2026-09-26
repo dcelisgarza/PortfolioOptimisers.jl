@@ -2,7 +2,7 @@
 Description = "Entropy pooling tail view solve, private API of PortfolioOptimisers.jl: AbstractEntropyPoolingTailView, VecEPTV, ep_jump_entropy_pooling, ep_refine_iters, …"
 ```
 
-# Entropy pooling tail view solve: private API
+# [Entropy pooling tail view solve: private API](@id private-api-entropy-pooling-tail-view-solve)
 
 ```@docs
 AbstractEntropyPoolingTailView

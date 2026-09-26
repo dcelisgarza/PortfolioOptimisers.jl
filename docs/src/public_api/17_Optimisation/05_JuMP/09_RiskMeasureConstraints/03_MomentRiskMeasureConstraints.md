@@ -4,4 +4,4 @@ Description = "Moment Risk Constraints has no public API in PortfolioOptimisers.
 
 # Moment Risk Constraints
 
-Every name of this topic is private. The [private page](../../../../private_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-moment-risk-constraints) documents them.

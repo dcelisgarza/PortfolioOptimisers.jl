@@ -2,7 +2,7 @@
 Description = "Windowed Coskewness, public API of PortfolioOptimisers.jl: WindowedCoskewness, coskewness."
 ```
 
-# Windowed Coskewness
+# [Windowed Coskewness](@id api-windowed-coskewness)
 
 ```@docs
 WindowedCoskewness

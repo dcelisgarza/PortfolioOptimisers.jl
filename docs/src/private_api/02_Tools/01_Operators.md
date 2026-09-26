@@ -2,7 +2,7 @@
 Description = "Operators, private API of PortfolioOptimisers.jl: :⊗, :⊙, :⊘, :⊕, :⊖, dot_scalar."
 ```
 
-# Operators: private API
+# [Operators: private API](@id private-api-operators)
 
 ## Mathematical functions
 

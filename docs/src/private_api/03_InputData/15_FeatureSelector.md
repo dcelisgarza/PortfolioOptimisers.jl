@@ -2,7 +2,7 @@
 Description = "Feature selector, private API of PortfolioOptimisers.jl: panel_field_keys, panel_value_columns!, panel_key_column!, panel_column_label, …"
 ```
 
-# Feature selector: private API
+# [Feature selector: private API](@id private-api-feature-selector)
 
 ```@docs
 PortfolioOptimisers.panel_field_keys

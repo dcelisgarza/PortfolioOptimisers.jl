@@ -4,4 +4,4 @@ Description = "Variance Skew Kurtosis Constraints has no public API in Portfolio
 
 # Variance Skew Kurtosis Constraints
 
-Every name of this topic is private. The [private page](../../../../private_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/17_VarianceSkewKurtosisConstraints.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-variance-skew-kurtosis-constraints) documents them.

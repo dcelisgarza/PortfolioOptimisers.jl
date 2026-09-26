@@ -4,4 +4,4 @@ Description = "Base asset selection has no private API in PortfolioOptimisers.jl
 
 # Base asset selection: private API
 
-Every name of this topic is public. The [public page](../../public_api/03_InputData/13_Base_AssetSelection.md) documents them.
+Every name of this topic is public. The [public page](@ref api-base-asset-selection) documents them.

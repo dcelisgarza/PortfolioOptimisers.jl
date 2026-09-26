@@ -2,7 +2,7 @@
 Description = "Base asset selection, public API of PortfolioOptimisers.jl: AbstractAssetSelector, AssetSelectorResult, select_assets."
 ```
 
-# Base asset selection
+# [Base asset selection](@id api-base-asset-selection)
 
 ## What every asset selector shares
 

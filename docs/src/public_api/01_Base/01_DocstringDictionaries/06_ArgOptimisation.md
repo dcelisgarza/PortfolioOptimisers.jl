@@ -4,4 +4,4 @@ Description = "Optimisation arguments has no public API in PortfolioOptimisers.j
 
 # Optimisation arguments
 
-This file defines no name. The [private page](../../../private_api/01_Base/01_DocstringDictionaries/06_ArgOptimisation.md) says which table it fills.
+This file defines no name. The [private page](@ref private-api-optimisation-arguments) says which table it fills.

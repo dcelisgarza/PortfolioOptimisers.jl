@@ -2,7 +2,7 @@
 Description = "Messages, private API of PortfolioOptimisers.jl: did_you_mean, suggest_declared_key, unknown_variable_msg, misaligned_axis_msg, strict_diagnostic, …"
 ```
 
-# Messages: private API
+# [Messages: private API](@id private-api-messages)
 
 ```@docs
 did_you_mean

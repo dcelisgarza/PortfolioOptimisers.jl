@@ -4,4 +4,4 @@ Description = "Cross-Sectional Factor Prior internals has no public API in Portf
 
 # Cross-Sectional Factor Prior internals
 
-Every name of this topic is private. The [private page](../../private_api/10_Prior/10_Base_CrossSectionalFactorPrior.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-cross-sectional-factor-prior-internals) documents them.

@@ -6,7 +6,7 @@ Description = "Step execution, private API of PortfolioOptimisers.jl: run_step, 
 
 A `run_step` method is the only code that connects an estimator family to a pipeline. It reads the slots of the [`PipelineContext`](@ref) that its estimator needs, and calls the function that the family uses outside a pipeline: [`prior`](@ref) for a prior estimator, [`clusterise`](@ref) for a clustering estimator, [`optimise`](@ref) for an optimiser, and [`fit_preprocessing`](@ref) and [`apply_preprocessing`](@ref) for a preprocessing estimator. It then writes the slot that the family produces.
 
-The estimators do not depend on the pipeline code, and their docstrings are with their own families. The preprocessing estimators, for example, are on the [preprocessing](../03_InputData/04_Preprocessing.md) page.
+The estimators do not depend on the pipeline code, and their docstrings are with their own families. The preprocessing estimators, for example, are on the [preprocessing](@ref private-api-preprocessing) page.
 
 ```@docs
 run_step

@@ -4,4 +4,4 @@ Description = "Preferences has no public API in PortfolioOptimisers.jl; its name
 
 # Preferences
 
-Every name of this topic is private. The [private page](../../private_api/01_Base/05_Preferences.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-preferences) documents them.

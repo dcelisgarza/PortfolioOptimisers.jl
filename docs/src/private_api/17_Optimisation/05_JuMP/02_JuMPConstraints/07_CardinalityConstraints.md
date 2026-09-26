@@ -2,7 +2,7 @@
 Description = "Cardinality Constraints, private API of PortfolioOptimisers.jl: set_card_constraints!, set_gcard_constraints!, subgroup_entry, set_all_smip_constraints!, …"
 ```
 
-# Cardinality Constraints: private API
+# [Cardinality Constraints: private API](@id private-api-cardinality-constraints)
 
 ```@docs
 set_card_constraints!

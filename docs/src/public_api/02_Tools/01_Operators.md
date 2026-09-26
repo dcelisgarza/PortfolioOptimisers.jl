@@ -4,4 +4,4 @@ Description = "Operators has no public API in PortfolioOptimisers.jl; its names 
 
 # Operators
 
-Every name of this topic is private. The [private page](../../private_api/02_Tools/01_Operators.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-operators) documents them.

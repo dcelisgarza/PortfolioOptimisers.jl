@@ -2,7 +2,7 @@
 Description = "Frontier sweep, private API of PortfolioOptimisers.jl: frontier_point_count, frontier_sweep_points, assert_frontier_sweep_cap, frontier_axis, …"
 ```
 
-# Frontier sweep: private API
+# [Frontier sweep: private API](@id private-api-frontier-sweep)
 
 ```@docs
 frontier_point_count

@@ -4,4 +4,4 @@ Description = "Median expected returns has no private API in PortfolioOptimisers
 
 # Median expected returns: private API
 
-Every name of this topic is public. The [public page](../../public_api/05_Moments/27_MedianExpectedReturns.md) documents them.
+Every name of this topic is public. The [public page](@ref api-median-expected-returns) documents them.

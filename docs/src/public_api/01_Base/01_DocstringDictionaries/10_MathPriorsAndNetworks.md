@@ -4,4 +4,4 @@ Description = "Prior and network notation has no public API in PortfolioOptimise
 
 # Prior and network notation
 
-This file defines no name. The [private page](../../../private_api/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.md) says which table it fills.
+This file defines no name. The [private page](@ref private-api-prior-and-network-notation) says which table it fills.

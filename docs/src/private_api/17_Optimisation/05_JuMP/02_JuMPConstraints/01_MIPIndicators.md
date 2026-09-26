@@ -2,7 +2,7 @@
 Description = "MIP Constraints, private API of PortfolioOptimisers.jl: AbstractMIPSpace, AbstractMIPIndicators, AssetMIPSpace, SubsetMIPSpace, HeldIndicators, …"
 ```
 
-# MIP Constraints: private API
+# [MIP Constraints: private API](@id private-api-mip-constraints)
 
 ```@docs
 AbstractMIPSpace

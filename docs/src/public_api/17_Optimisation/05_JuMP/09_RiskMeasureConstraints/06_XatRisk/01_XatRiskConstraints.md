@@ -4,4 +4,4 @@ Description = "XatRisk Constraints has no public API in PortfolioOptimisers.jl; 
 
 # XatRisk Constraints
 
-Every name of this topic is private. The [private page](../../../../../private_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/01_XatRiskConstraints.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-xatrisk-constraints) documents them.

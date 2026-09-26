@@ -4,4 +4,4 @@ Description = "Validation has no private API in PortfolioOptimisers.jl; its name
 
 # Validation: private API
 
-Every name of this topic is public. The [public page](../../../public_api/17_Optimisation/02_CrossValidation/06_Validation.md) documents them.
+Every name of this topic is public. The [public page](@ref api-validation) documents them.

@@ -4,4 +4,4 @@ Description = "Feature selector has no public API in PortfolioOptimisers.jl; its
 
 # Feature selector
 
-Every name of this topic is private. The [private page](../../private_api/03_InputData/15_FeatureSelector.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-feature-selector) documents them.

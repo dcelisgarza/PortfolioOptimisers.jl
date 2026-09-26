@@ -4,4 +4,4 @@ Description = "Online selection notation has no public API in PortfolioOptimiser
 
 # Online selection notation
 
-This file defines no name. The [private page](../../../private_api/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.md) says which table it fills.
+This file defines no name. The [private page](@ref private-api-online-selection-notation) says which table it fills.

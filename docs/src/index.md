@@ -245,4 +245,4 @@ The drawdown plot shows the compounded drawdowns. Pass `compound = false` for th
 plot_drawdowns(mip_res.w, rd.X; slv = slv, ts = rd.ts, compound = true)
 ```
 
-The [Plotting](public_api/22_Plotting.md) page lists the other plots.
+The [Plotting](@ref api-plotting) page lists the other plots.

@@ -2,7 +2,7 @@
 Description = "Kappa logarithm, private API of PortfolioOptimisers.jl: kappa_log."
 ```
 
-# Kappa logarithm: private API
+# [Kappa logarithm: private API](@id private-api-kappa-logarithm)
 
 ```@docs
 kappa_log

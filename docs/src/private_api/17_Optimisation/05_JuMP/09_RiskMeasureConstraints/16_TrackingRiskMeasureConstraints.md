@@ -2,7 +2,7 @@
 Description = "Tracking Risk Measure Constraints, private API of PortfolioOptimisers.jl: set_risk_constraints!, set_tracking_risk!, set_risk_tr_constraints!, …"
 ```
 
-# Tracking Risk Measure Constraints: private API
+# [Tracking Risk Measure Constraints: private API](@id private-api-tracking-risk-measure-constraints)
 
 ```@docs
 set_risk_constraints!(model::JuMP.Model, i::Any, r::TrackingRiskMeasure{<:Any, <:Any, <:L1Norm}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)

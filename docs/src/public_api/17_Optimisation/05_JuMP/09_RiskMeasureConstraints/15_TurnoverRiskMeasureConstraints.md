@@ -4,4 +4,4 @@ Description = "Turnover Risk Measure Constraints has no public API in PortfolioO
 
 # Turnover Risk Measure Constraints
 
-Every name of this topic is private. The [private page](../../../../private_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/15_TurnoverRiskMeasureConstraints.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-turnover-risk-measure-constraints) documents them.

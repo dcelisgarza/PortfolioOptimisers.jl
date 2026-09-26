@@ -4,4 +4,4 @@ Description = "Turnover Constraints has no public API in PortfolioOptimisers.jl;
 
 # Turnover Constraints
 
-Every name of this topic is private. The [private page](../../../../private_api/17_Optimisation/05_JuMP/02_JuMPConstraints/09_TurnoverConstraints.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-turnover-constraints) documents them.

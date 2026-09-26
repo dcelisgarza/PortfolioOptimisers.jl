@@ -4,4 +4,4 @@ Description = "Realised factor attribution has no public API in PortfolioOptimis
 
 # Realised factor attribution
 
-Every name of this topic is private. The [private page](../../private_api/19_FactorAttribution/02_FactorAttributionRealised.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-realised-factor-attribution) documents them.

@@ -11,7 +11,7 @@ Description = "The code-health loop of PortfolioOptimisers.jl: what each gate me
 
 !!! note "Developer documentation"
 
-    If you haven't, please read the [Developer documentation](2-developer.md) first. This page
+    If you haven't, please read the [Developer documentation](@ref dev_docs) first. This page
     assumes you can already build, test and format the package.
 
 Four tools measure this repository continuously. **JET** looks for inference and correctness
@@ -61,7 +61,7 @@ gets closed. It files each file once, so the queue is also finite. See
 
     That is the other direction, and it is covered by
     the section "When a code-health gate turns red" on the
-    [Developer documentation](2-developer.md) page. Come back here when you want to lower a
+    [Developer documentation](@ref dev_docs) page. Come back here when you want to lower a
     number rather than clear one.
 
 ## The priority order

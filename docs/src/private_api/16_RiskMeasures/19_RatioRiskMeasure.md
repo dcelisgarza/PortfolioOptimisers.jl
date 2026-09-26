@@ -4,4 +4,4 @@ Description = "Ratio Risk Measure has no private API in PortfolioOptimisers.jl; 
 
 # Ratio Risk Measure: private API
 
-Every name of this topic is public. The [public page](../../public_api/16_RiskMeasures/19_RatioRiskMeasure.md) documents them.
+Every name of this topic is public. The [public page](@ref api-ratio-risk-measure) documents them.

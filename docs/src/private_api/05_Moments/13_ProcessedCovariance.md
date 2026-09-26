@@ -4,4 +4,4 @@ Description = "Processed covariance has no private API in PortfolioOptimisers.jl
 
 # Processed covariance: private API
 
-Every name of this topic is public. The [public page](../../public_api/05_Moments/13_ProcessedCovariance.md) documents them.
+Every name of this topic is public. The [public page](@ref api-processed-covariance) documents them.

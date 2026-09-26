@@ -2,7 +2,7 @@
 Description = "Detone, public API of PortfolioOptimisers.jl: AbstractDetoneEstimator, Detone, detone, detone!."
 ```
 
-# Detone
+# [Detone](@id api-detone)
 
 Most assets move with the market, and that common movement dominates their correlations. Detoning removes the `n` largest eigenvalues, which carry the market movement, so the correlations that remain show how the assets relate to each other apart from the market [mlp1](@cite).
 

@@ -4,4 +4,4 @@ Description = "Entropy Pooling (b) has no public API in PortfolioOptimisers.jl; 
 
 # Entropy Pooling (b)
 
-Every name of this topic is private. The [private page](../../../private_api/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_b.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-entropy-pooling-b) documents them.

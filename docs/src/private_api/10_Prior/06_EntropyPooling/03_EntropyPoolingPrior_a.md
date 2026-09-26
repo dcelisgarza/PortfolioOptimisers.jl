@@ -2,7 +2,7 @@
 Description = "Entropy Pooling (a), private API of PortfolioOptimisers.jl: AbstractSequentialTailViewConstraint, LinearConditionalValueatRiskViewConstraint, …"
 ```
 
-# Entropy Pooling (a): private API
+# [Entropy Pooling (a): private API](@id private-api-entropy-pooling-a)
 
 ```@docs
 AbstractSequentialTailViewConstraint

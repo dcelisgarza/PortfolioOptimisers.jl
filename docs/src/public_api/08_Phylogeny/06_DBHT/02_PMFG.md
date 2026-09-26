@@ -4,4 +4,4 @@ Description = "Planar Maximally Filtered Graph has no public API in PortfolioOpt
 
 # Planar Maximally Filtered Graph
 
-Every name of this topic is private. The [private page](../../../private_api/08_Phylogeny/06_DBHT/02_PMFG.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-planar-maximally-filtered-graph) documents them.

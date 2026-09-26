@@ -92,3 +92,29 @@ and Consequences, and the rejection of a CI-committed alternative are unchanged.
 Verification is re-run against the new path: `git ls-files docs/src/user_guide
 docs/src/examples docs/src/capability_catalogue.md docs/src/TypeHierarchy.md` lists nothing,
 and `git check-ignore` answers all four.
+
+## Amendment (2026-09-26)
+
+**A hand-written page links another page by the `@id` label of its H1, never by a relative
+`.md` path.** The hand-written pages are `docs/src/*.md`, `docs/src/contribute/` and the two
+mirror trees. They stay in the checkout, so lychee reads them, and the Docs build resolves their
+links too. A relative path breaks when either page moves. The file split `0ed224263c` moved
+`public_api/17_Optimisation/01_Base_Optimisation/01_OptimisationTypes.md` one directory deeper,
+its link to the aliases page broke, and the Link checker was red on `dev` until `ee854441e3`.
+At that commit the hand-written pages held 117 such links in 116 files (#1353).
+
+1. The target page's H1 is `# [Title](@id label)`. A public mirror page takes
+   `api-<title>`, and a private mirror page takes `private-api-<title>` with the `: private API`
+   suffix dropped. The title is lower case, and a run of other characters is one hyphen. A page
+   that already carries a label keeps it. `page_h1` in `docs/page_metadata.jl` unwraps the
+   label, so the derived `Description` of a mirror page does not change.
+2. The link is `[text](@ref label)`. `.lychee.toml` excludes `@ref`, and the Docs build fails on
+   a label that does not resolve.
+3. The label is explicit. A bare `[Title](@ref)` needs the heading text to be unique across the
+   site, and "Threshold Constraints: private API" is the H1 of two pages. A backticked
+   `` [`Title`](@ref) `` is a docstring reference and fails the Docs build.
+4. `test/test_64_docs_page_metadata_census.jl` refuses a relative `.md` link on a hand-written
+   page. A link whose target holds a colon is a URL, and the census does not read it.
+
+The Literate sources under `user_guide/` and `examples/` are generated pages. This amendment does
+not govern them, and the Docs build stays the gate on their links as the Decision states.

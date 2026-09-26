@@ -4,4 +4,4 @@ Description = "Positive definite matrix projection has no private API in Portfol
 
 # Positive definite matrix projection: private API
 
-Every name of this topic is public. The [public page](../../public_api/04_MatrixProcessing/01_PosdefMatrix.md) documents them.
+Every name of this topic is public. The [public page](@ref api-positive-definite-matrix-projection) documents them.

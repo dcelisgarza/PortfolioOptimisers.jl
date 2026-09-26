@@ -2,7 +2,7 @@
 Description = "Return constraints, private API of PortfolioOptimisers.jl: set_return_bounds!, set_return_expression!, scalarise_return_expression!, …"
 ```
 
-# Return constraints: private API
+# [Return constraints: private API](@id private-api-return-constraints)
 
 ```@docs
 set_return_bounds!

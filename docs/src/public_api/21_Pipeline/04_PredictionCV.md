@@ -17,7 +17,7 @@ needs_previous_weights(p::Pipeline)
 
 `cross_val_predict` over a `Pipeline` fits every step of the pipeline on each training window, and predicts on each test window. It also resolves the [`TimeDependent`](@ref) schedules of the pipeline. Before `fit` runs on a fold, it replaces each schedule with its value for that fold. `fit` and [`run_step`](@ref) never see a schedule, and never need to know the fold.
 
-An online walk-forward, such as one that `OnlineIndexWalkForward` builds, fits the pipeline once on the first training window. It then adds the rows of each later fold with [`partial_fit!`](@ref), and reads the result with `fit(pipe)`. A pipeline wrapped as `Online(pipe)`, which refits on the rows it stores, runs through the same calls. See [the online updates of a pipeline](06_OnlinePipeline.md).
+An online walk-forward, such as one that `OnlineIndexWalkForward` builds, fits the pipeline once on the first training window. It then adds the rows of each later fold with [`partial_fit!`](@ref), and reads the result with `fit(pipe)`. A pipeline wrapped as `Online(pipe)`, which refits on the rows it stores, runs through the same calls. See [the online updates of a pipeline](@ref api-the-pipelines-online-step).
 
 ```@docs
 cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)

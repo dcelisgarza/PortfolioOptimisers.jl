@@ -2,7 +2,7 @@
 Description = "OWA Risk Measure Constraints, private API of PortfolioOptimisers.jl: set_owa_constraints!, set_risk_constraints!."
 ```
 
-# OWA Risk Measure Constraints: private API
+# [OWA Risk Measure Constraints: private API](@id private-api-owa-risk-measure-constraints)
 
 ```@docs
 set_owa_constraints!

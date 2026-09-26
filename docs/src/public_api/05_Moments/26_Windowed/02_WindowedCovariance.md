@@ -2,7 +2,7 @@
 Description = "Windowed covariance, public API of PortfolioOptimisers.jl: WindowedCovariance, cov, cor."
 ```
 
-# Windowed covariance
+# [Windowed covariance](@id api-windowed-covariance)
 
 ```@docs
 WindowedCovariance

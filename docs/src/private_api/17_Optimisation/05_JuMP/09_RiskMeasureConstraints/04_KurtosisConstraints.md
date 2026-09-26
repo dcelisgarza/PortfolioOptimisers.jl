@@ -2,7 +2,7 @@
 Description = "Kurtosis Constraints, private API of PortfolioOptimisers.jl: get_chol_or_Gkt_pm, get_kt_Akt_pm, set_kurtosis_risk!, set_risk_constraints!."
 ```
 
-# Kurtosis Constraints: private API
+# [Kurtosis Constraints: private API](@id private-api-kurtosis-constraints)
 
 ```@docs
 get_chol_or_Gkt_pm

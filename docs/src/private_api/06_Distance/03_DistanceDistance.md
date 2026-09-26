@@ -4,4 +4,4 @@ Description = "Distances of Distances has no private API in PortfolioOptimisers.
 
 # Distances of Distances: private API
 
-Every name of this topic is public. The [public page](../../public_api/06_Distance/03_DistanceDistance.md) documents them.
+Every name of this topic is public. The [public page](@ref api-distances-of-distances) documents them.

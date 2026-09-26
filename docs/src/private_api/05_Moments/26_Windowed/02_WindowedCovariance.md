@@ -4,4 +4,4 @@ Description = "Windowed covariance has no private API in PortfolioOptimisers.jl;
 
 # Windowed covariance: private API
 
-Every name of this topic is public. The [public page](../../../public_api/05_Moments/26_Windowed/02_WindowedCovariance.md) documents them.
+Every name of this topic is public. The [public page](@ref api-windowed-covariance) documents them.

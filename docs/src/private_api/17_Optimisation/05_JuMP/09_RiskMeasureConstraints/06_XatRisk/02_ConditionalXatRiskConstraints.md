@@ -2,7 +2,7 @@
 Description = "Conditional XatRisk Constraints, private API of PortfolioOptimisers.jl: set_risk_constraints!, set_conditional_risk_constraints!, …"
 ```
 
-# Conditional XatRisk Constraints: private API
+# [Conditional XatRisk Constraints: private API](@id private-api-conditional-xatrisk-constraints)
 
 ```@docs
 set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRisk, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)

@@ -2,7 +2,7 @@
 Description = "JuMP model setup, private API of PortfolioOptimisers.jl: process_model, optimise_JuMP_model!, set_initial_w!, set_w!, set_portfolio_returns!, …"
 ```
 
-# JuMP model setup: private API
+# [JuMP model setup: private API](@id private-api-jump-model-setup)
 
 ```@docs
 process_model

@@ -4,4 +4,4 @@ Description = "Detone has no private API in PortfolioOptimisers.jl; its names ar
 
 # Detone: private API
 
-Every name of this topic is public. The [public page](../../public_api/04_MatrixProcessing/03_Detone.md) documents them.
+Every name of this topic is public. The [public page](@ref api-detone) documents them.

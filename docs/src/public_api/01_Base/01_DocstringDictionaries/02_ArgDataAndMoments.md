@@ -4,4 +4,4 @@ Description = "Data and moment arguments has no public API in PortfolioOptimiser
 
 # Data and moment arguments
 
-This file defines no name. The [private page](../../../private_api/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.md) says which table it fills.
+This file defines no name. The [private page](@ref private-api-data-and-moment-arguments) says which table it fills.

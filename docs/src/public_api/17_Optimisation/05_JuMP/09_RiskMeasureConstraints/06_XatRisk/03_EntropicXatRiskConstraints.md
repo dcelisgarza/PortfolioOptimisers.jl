@@ -4,4 +4,4 @@ Description = "Entropic XatRisk Constraints has no public API in PortfolioOptimi
 
 # Entropic XatRisk Constraints
 
-Every name of this topic is private. The [private page](../../../../../private_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/03_EntropicXatRiskConstraints.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-entropic-xatrisk-constraints) documents them.

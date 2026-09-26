@@ -4,4 +4,4 @@ Description = "Fees Constraints has no public API in PortfolioOptimisers.jl; its
 
 # Fees Constraints
 
-Every name of this topic is private. The [private page](../../../../private_api/17_Optimisation/05_JuMP/02_JuMPConstraints/10_FeesConstraints.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-fees-constraints) documents them.

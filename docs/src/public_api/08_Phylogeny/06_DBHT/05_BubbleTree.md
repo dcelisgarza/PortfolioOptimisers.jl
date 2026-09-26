@@ -4,4 +4,4 @@ Description = "Bubble Tree has no public API in PortfolioOptimisers.jl; its name
 
 # Bubble Tree
 
-Every name of this topic is private. The [private page](../../../private_api/08_Phylogeny/06_DBHT/05_BubbleTree.md) documents them.
+Every name of this topic is private. The [private page](@ref private-api-bubble-tree) documents them.

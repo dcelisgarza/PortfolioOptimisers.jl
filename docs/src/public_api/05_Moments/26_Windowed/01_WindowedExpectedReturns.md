@@ -2,7 +2,7 @@
 Description = "Windowed expected returns, public API of PortfolioOptimisers.jl: WindowedExpectedReturns, factory, mean."
 ```
 
-# Windowed expected returns
+# [Windowed expected returns](@id api-windowed-expected-returns)
 
 ```@docs
 WindowedExpectedReturns

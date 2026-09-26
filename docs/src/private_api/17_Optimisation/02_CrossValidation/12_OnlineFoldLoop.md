@@ -2,7 +2,7 @@
 Description = "The online arm of the fold loop, private API of PortfolioOptimisers.jl: fit_fold_result, thread_online_folds!, online_folds, online_step_fold, …"
 ```
 
-# The online arm of the fold loop: private API
+# [The online arm of the fold loop: private API](@id private-api-the-online-arm-of-the-fold-loop)
 
 A scheme built by [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref) or [`OnlineHindsightSplit`](@ref) is an online scheme. With an online scheme, [`PortfolioOptimisers.fold_loop`](@ref) does not refit the estimator on each training window. It fits one estimator on the first training window. At each later fold it adds to that estimator only the rows that the training window gained, by default with [`partial_fit!`](@ref).
 

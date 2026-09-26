@@ -2,7 +2,7 @@
 Description = "Moment Risk Constraints, private API of PortfolioOptimisers.jl: calc_risk_constraint_target, set_risk_constraints!, set_second_moment_risk!, …"
 ```
 
-# Moment Risk Constraints: private API
+# [Moment Risk Constraints: private API](@id private-api-moment-risk-constraints)
 
 ```@docs
 calc_risk_constraint_target
