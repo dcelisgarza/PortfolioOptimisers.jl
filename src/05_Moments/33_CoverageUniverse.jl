@@ -327,15 +327,22 @@ Allocate the `NaN` frame that a moment expands into.
 
 The frame takes its element type from the block through `similar`, and not from `eltype(A)`. [`MatNum`](@ref) admits a `JuMP` scalar as well as a number, so `eltype` of one splits into two branches at inference and the numeric half is the only one a moment ever takes. Reading the type off the block instead keeps the frame in the block's own element type and leaves no unreachable branch behind.
 
+The element type of the block must hold `NaN`. An `Integer` and a `Rational` have no `NaN`, and a moment of a `Rational` sample stays `Rational`, so the function refuses both before it writes the frame. The function does not widen the type, because a sentinel is not an arithmetic operation, and the data sets the type. A caller with a `Rational` sample and a gap converts the sample to a floating-point type, or fills the gap so that every asset is in the Coverage Universe.
+
 # Algorithm
 
  1. Allocate an array of `sz`, of the same kind and element type as `A`.
- 2. Fill it with `NaN`, and return it.
+ 2. Refuse the frame when its element type is an `Integer` or a `Rational`.
+ 3. Fill it with `NaN`, and return it.
 
 # Arguments
 
   - `A`: The block that will be written into the frame.
   - `sz`: Size of the frame.
+
+# Validation
+
+  - $(val_dict[:nan_frame])
 
 # Returns
 
@@ -347,6 +354,8 @@ The frame takes its element type from the block through `similar`, and not from 
 """
 function coverage_nan_frame(A::AbstractArray, sz::Dims)
     frame = similar(A, sz)
+    @argcheck(!(eltype(frame) <: Union{Integer, Rational}),
+              ArgumentError("a moment on the full asset universe carries NaN outside the Coverage Universe, and its element type $(eltype(frame)) cannot hold NaN. Convert the sample to a floating-point type, or fill its gaps so that every asset is in the Coverage Universe."))
     fill!(frame, NaN)
     return frame
 end
@@ -644,6 +653,10 @@ The method that Julia selects is the algorithm.
   - `dims`: The dimension that the marginal was computed along.
   - `::Val{:kt}`: The marker that names a cokurtosis matrix, which a covariance matrix cannot be told from by type.
 
+# Validation
+
+  - $(val_dict[:nan_frame])
+
 # Returns
 
   - The moment on the full asset universe, carrying `NaN` outside the Coverage Universe.
@@ -792,6 +805,7 @@ The cost of the rule is [`coverage_mask`](@ref)'s: one non-finite return, or one
 
   - $(val_dict[:dims])
   - At least one asset must be in the Coverage Universe.
+  - $(val_dict[:nan_frame])
 
 # Returns
 
@@ -935,6 +949,7 @@ A **mask-aware** estimator overrides this method and takes the whole window, as 
 # Validation
 
   - $(val_dict[:dims])
+  - $(val_dict[:nan_frame]) The series writes its frame before its first row, so it needs this type for every sample, with or without a gap.
 
 # Returns
 

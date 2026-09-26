@@ -417,6 +417,40 @@ end
                                      active_mask = pnl_full.amsk))
 end
 
+@testset "A NaN frame refuses a type without NaN, issue #1347" begin
+    # A moment of a `Rational` sample stays exact, and `Rational` has no `NaN`. The expansion
+    # refuses the block with a named error before it writes the frame, and does not widen it.
+    Xr = Rational{Int}.(rand(StableRNG(9), -5:5, T, N))
+    # A sample with no gap needs no frame, so the moment stays exact.
+    @test eltype(Statistics.cov(Covariance(), Xr, nothing)) <: Rational
+    Xrg = copy(Xr)
+    Xrg[2, 3] = 1 // 0
+    for f in (Statistics.cov, Statistics.cor)
+        @test_throws ArgumentError f(Covariance(), Xrg, nothing)
+        @test_throws ArgumentError f(Covariance(), Xr, pnl_inactive)
+    end
+    @test_throws ArgumentError Statistics.mean(SimpleExpectedReturns(), Xrg, nothing)
+    @test_throws ArgumentError Statistics.var(SimpleVariance(), Xrg, nothing)
+    @test_throws ArgumentError prior(EmpiricalPrior(), Xrg, nothing, pnl_full)
+    # The series writes its frame before its first row, so it refuses a sample with no gap.
+    @test_throws ArgumentError PO.variance_series(SimpleVariance(), Xr, nothing)
+    # The message names the type and the way out.
+    err = try
+        Statistics.cov(Covariance(), Xrg, nothing)
+    catch e
+        e
+    end
+    @test occursin("Rational{Int64} cannot hold NaN", err.msg)
+    @test occursin("floating-point type", err.msg)
+    @test_throws ArgumentError PO.coverage_nan_frame([1 2; 3 4], (2, 2))
+    # A type that holds `NaN` keeps its own type in the frame.
+    @test eltype(PO.coverage_nan_frame(Float32[1 2], (2, 2))) === Float32
+    # The float sample of the same data expands as before.
+    sig = Statistics.cov(Covariance(), Float64.(Xrg), nothing)
+    @test all(isnan, sig[3, :]) && all(isnan, sig[:, 3])
+    @test all(isfinite, sig[[1, 2, 4], [1, 2, 4]])
+end
+
 @testset "The mask-aware family answers the series and the marginals, issue #896" begin
     # A mask-aware estimator overrides every panel verb it answers, so the panel call and the
     # masked keyword call name the same answer. Where the override is missing the call lands on
