@@ -43,9 +43,9 @@ and the reported variance divides out the weights the cold start never accumulat
 
 Where:
 
-  - ``\\lambda``: `decay`.
+  - $(math_dict[:lambda_ew])
   - ``e_{i, t}``: the return of asset ``i`` at the valid observation ``t``, less the running location where `centred` is `false`, and the return itself where it is `true`.
-  - ``n_i``: the count of valid observations of asset ``i``.
+  - $(math_dict[:n_i_ew])
 
 # Examples
 
@@ -89,7 +89,7 @@ julia> ce.min_obs
     cache
     function ExpWeightedVariance(decay::Number, min_obs::Integer, centred::Bool,
                                  cache::Option{<:AbstractPartialFitState})
-        assert_nonempty_gt0_finite_val(decay, :decay)
+        assert_unit_interval(decay, :decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         return new{typeof(decay), typeof(min_obs), typeof(centred), typeof(cache)}(decay,
                                                                                    min_obs,
@@ -832,7 +832,7 @@ Where:
 
   - ``n_{i}^{\\mathrm{eff}}``: Effective count of the observations of asset ``i``, and the divisor of its variance.
   - ``n_{i}``: Number of finite rows of column ``i``.
-  - ``\\lambda``: `decay`.
+  - $(math_dict[:lambda_ew])
 
 The count tends to ``(1 + \\lambda) / (1 - \\lambda)`` as ``n_{i}`` grows, which is about ``115`` at the default half-life of ``40`` observations.
 

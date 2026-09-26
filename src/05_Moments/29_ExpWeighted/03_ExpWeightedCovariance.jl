@@ -91,7 +91,7 @@ julia> ce.min_obs
     cache
     function ExpWeightedCovariance(decay::Number, min_obs::Integer, centred::Bool,
                                    cache::Option{<:AbstractPartialFitState})
-        assert_nonempty_gt0_finite_val(decay, :decay)
+        assert_unit_interval(decay, :decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         return new{typeof(decay), typeof(min_obs), typeof(centred), typeof(cache)}(decay,
                                                                                    min_obs,

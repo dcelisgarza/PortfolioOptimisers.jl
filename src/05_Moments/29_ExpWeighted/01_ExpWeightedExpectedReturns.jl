@@ -85,7 +85,7 @@ julia> me.min_obs
     cache
     function ExpWeightedExpectedReturns(decay::Number, min_obs::Integer,
                                         cache::Option{<:AbstractPartialFitState})
-        assert_nonempty_gt0_finite_val(decay, :decay)
+        assert_unit_interval(decay, :decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         return new{typeof(decay), typeof(min_obs), typeof(cache)}(decay, min_obs, cache)
     end

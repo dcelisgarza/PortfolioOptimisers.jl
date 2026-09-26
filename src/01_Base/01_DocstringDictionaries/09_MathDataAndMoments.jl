@@ -119,6 +119,10 @@ unique_key_dict!(math_dict, :math_dict,
                  :y_t_dev => "``\\boldsymbol{y}_t``: ``N \\times 1`` deviation vector of observation ``t``, the ``t``-th row of ``\\mathbf{Y}``. Its ``i``-th entry is ``y_{t,\\,i}``.",#
                  :Z_pairprod => "``\\mathbf{Z}``: ``T \\times N^{2}`` pairwise expansion of ``\\mathbf{Y}``, whose ``t``-th row is ``\\mathbf{Z}_{t,\\cdot}`` and whose entry ``\\mathbf{Z}_{t,\\,(i-1)N+j}`` is the product ``y_{t,\\,i} \\, y_{t,\\,j}``.",#
                  :w_obs_vec => "``\\boldsymbol{w}``: ``T \\times 1`` observation weights vector.",#
+                 # The exponentially weighted moments of `29_ExpWeighted/`. Each symbol is
+                 # stated by two or more Units of those files.
+                 :lambda_ew => "``\\lambda``: `decay`, the decay factor of the exponentially weighted recursion.",#
+                 :n_i_ew => "``n_i``: Valid-history length of asset ``i``, the count of its valid observations since its last reset.",#
                  # The ambiguity radius rules of `06_CalibrationRules.jl`, and the
                  # effective sample size the significance rules share with them. Each
                  # rule returns one radius off one record, so the radius, its scale

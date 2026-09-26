@@ -359,7 +359,7 @@ true
                                                                                   <:Number}},
                                                  min_val::Number, centred::Bool,
                                                  cache::Option{<:AbstractPartialFitState})
-        assert_nonempty_gt0_finite_val(decay, :decay)
+        assert_unit_interval(decay, :decay)
         if !isnothing(cor_decay)
             assert_nonempty_gt0_finite_val(cor_decay, :cor_decay)
         end

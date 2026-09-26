@@ -479,7 +479,7 @@ julia> ce.min_obs
                                                                                 <:Number}},
                                                min_val::Number, centred::Bool,
                                                cache::Option{<:AbstractPartialFitState})
-        assert_nonempty_gt0_finite_val(decay, :decay)
+        assert_unit_interval(decay, :decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         assert_nonempty_gt0_finite_val(regime_min_obs, :regime_min_obs)
         if !isnothing(regime_lohi_mult)

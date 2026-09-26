@@ -51,7 +51,7 @@ unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempt
                  :B => "`!isempty(B)`.",#
                  :A_B => "`size(A, 1) == length(B)`, one row of `A` per entry of `B`.",#
                  :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.",
-                 :decay => "`decay > 0`.",#
+                 :decay => "`0 < decay < 1`.",#
                  :rf => "`isfinite(rf)`.",#
                  :q_scorer => "`0 <= q <= 1`.",#
                  :unit => "`unit > 0`.",#

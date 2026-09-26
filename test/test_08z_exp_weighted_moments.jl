@@ -309,6 +309,19 @@ end
     @test_throws DomainError ExpWeightedVariance(; min_obs = 0)
     @test_throws DomainError ExpWeightedCovariance(; decay = -1.0)
 
+    # A decay of one or more is refused too. At one the weight `1 - decay` of a new
+    # observation is zero and the default warm-up is `round(Int, Inf)`; above one the weight
+    # is negative, so a variance goes negative. The regime-adjusted pair derives
+    # `regime_min_obs` from `decay` too, so the test states it.
+    for decay in (1.0, 1.5)
+        for E in (ExpWeightedExpectedReturns, ExpWeightedVariance, ExpWeightedCovariance)
+            @test_throws DomainError E(; decay = decay, min_obs = 1)
+        end
+        for E in (RegimeAdjustedExpWeightedVariance, RegimeAdjustedExpWeightedCovariance)
+            @test_throws DomainError E(; decay = decay, min_obs = 1, regime_min_obs = 1)
+        end
+    end
+
     # A state does not merge, because it does not record whether an asset reset.
     a = partial_fit!(ExpWeightedVariance(; decay = EW_DECAY), view(Xg, 1:20, :)).cache
     b = partial_fit!(ExpWeightedVariance(; decay = EW_DECAY), view(Xg, 21:40, :)).cache
