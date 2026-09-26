@@ -1084,7 +1084,7 @@ The verb reads the weights and the factor model block, and returns one [`FactorA
   - `ret` is finite throughout, else an `IsNonFiniteError` naming the observations is raised.
   - The block carries the fields the chosen decomposition reads, else an `IsNothingError` names the field.
   - The portfolio variance is positive on the predicted side, and the portfolio volatility is positive on the realised side, else a `DomainError` is raised.
-  - `1 <= window <= T`, else a `DomainError` is raised.
+  - `2 <= window <= T`, else a `DomainError` is raised. A window of one observation has no sample volatility.
   - `step >= 1`, else a `DomainError` is raised.
   - `se = true` needs the regression weight history and the idiosyncratic variance history, else an `IsNothingError` names the field.
 

@@ -209,4 +209,23 @@ unique_key_dict!(math_dict, :math_dict,
                  :B_tik_cs => "``B_{tik}``: Exposure of asset ``i`` to factor ``k`` at observation ``t``.",#
                  :u_t_cs => "``\\boldsymbol{u}_{t}``: Cross-sectional weights of observation ``t``.",#
                  :rho_rank_cs => "``\\rho^{\\mathrm{S}}``: The correlation of the ranks of two cross-sections, over the assets at which both values are finite, with a tie ranked by `fe.ties`.",#
-                 :rho_w_cs => "``\\rho``: The weighted correlation of two cross-sections, over the assets at which both values are finite and the weight is finite and positive.")
+                 :rho_w_cs => "``\\rho``: The weighted correlation of two cross-sections, over the assets at which both values are finite and the weight is finite and positive.",#
+                 # The realised factor attribution of `19_FactorAttribution/`, and the
+                 # annualisation it shares with the Return Forecast portfolios. Each symbol
+                 # is stated by two or more Units.
+                 :p_ppy => "``p``: Periods per year.",#
+                 :B_t_att => "``\\mathbf{B}_{t}``: Exposure slice of observation ``t``, ``N \\times K``, the exposures the factor returns of ``t`` are read against.",#
+                 :w_t_att => "``\\boldsymbol{w}_{t}``: Portfolio weights held over observation ``t``, ``N \\times 1``, with entry ``w_{ti}`` for asset ``i``. A constant weight vector is the same at every ``t``.",#
+                 :g_t_att => "``\\boldsymbol{g}_{t} = \\mathbf{B}_{t}^{\\intercal} \\boldsymbol{w}_{t}``: Portfolio factor exposure of observation ``t``, ``K \\times 1``, with entry ``g_{tk}`` for factor ``k``.",#
+                 :f_t_att => "``\\boldsymbol{f}_{t}``: Factor returns of observation ``t``, ``K \\times 1``, with entry ``f_{tk}`` for factor ``k``.",#
+                 :eps_t_att => "``\\boldsymbol{\\varepsilon}_{t}``: Idiosyncratic returns of observation ``t``, ``N \\times 1``.",#
+                 :s_e_t_att => "``s_{t} = \\boldsymbol{g}_{t}^{\\intercal} \\boldsymbol{f}_{t}``, ``e_{t} = \\boldsymbol{w}_{t}^{\\intercal} \\boldsymbol{\\varepsilon}_{t}``: Systematic and idiosyncratic return of the portfolio at observation ``t``.",#
+                 :s_ti_att => "``s_{ti} = (\\mathbf{B}_{t} \\boldsymbol{f}_{t})_{i}``: Systematic return of asset ``i`` at observation ``t``.",#
+                 :r_t_att => "``r_{t}``: Realised portfolio return of observation ``t``, net of fees.",#
+                 :sigma_P_att => "``\\sigma_{P} = \\operatorname{sd}(r)``: Realised portfolio volatility, the sample standard deviation of the portfolio returns.",#
+                 :cov_sd_att => "``\\operatorname{cov}(x, y)``, ``\\operatorname{sd}(x)``: Sample covariance of two series and sample standard deviation of one, over the ``T`` observations and with the denominator ``T - 1``.",#
+                 :VC_att => "``\\mathrm{VC}(c)``, ``\\mathrm{PV}(c)``, ``\\mathrm{MC}(c)``, ``\\rho(c)``: Volatility contribution, variance share, mean return contribution and correlation with the portfolio of a return series ``c``, as [`attribution_series_component`](@ref) states them.",#
+                 :F_fam_att => "``\\mathcal{F}``: Raw factors of one family.",#
+                 :Q_t_att => "``\\mathbf{Q}_{t}``: Regression weight matrix of observation ``t``, diagonal, holding the cross-sectional weight of each asset.",#
+                 :Omega_t_att => "``\\boldsymbol{\\Omega}_{t}``: Idiosyncratic variance matrix of observation ``t``, diagonal, holding the idiosyncratic variance of each asset.",#
+                 :V_t_att => "``\\mathbf{V}_{t}``: Sandwich covariance of the factor returns the cross-sectional fit estimates at observation ``t``, ``K \\times K``.")

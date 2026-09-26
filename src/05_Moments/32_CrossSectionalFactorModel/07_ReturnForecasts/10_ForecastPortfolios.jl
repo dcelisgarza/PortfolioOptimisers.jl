@@ -66,7 +66,7 @@ Each figure reads the finite entries of the series, so a date that the evaluatio
 Where:
 
   - ``\\overline{x}`` and ``\\sigma_{x}``: Mean and standard deviation of the finite entries of ``x``, the second with one degree of freedom removed.
-  - ``p``: Periods per year.
+  - $(math_dict[:p_ppy])
 
 # Algorithm
 

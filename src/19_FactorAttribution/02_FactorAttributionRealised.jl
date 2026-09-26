@@ -17,7 +17,7 @@ const ATTRIBUTION_CURRENCY_FAMILY = "currency"
 
 Return the exposure slice of one observation.
 
-A block whose exposures do not move carries one matrix and answers it at every observation, and a block that keeps a history answers the slice. The shape is the dispatch, so the arithmetic above reads one name.
+A block whose exposures do not move holds one matrix, and that matrix is the slice of every observation. A block that keeps a history returns the slice of `t`. The shape of `B` selects the method, so a caller uses one function for both.
 
 # Arguments
 
@@ -45,7 +45,7 @@ end
 
 Return the portfolio weights of one observation.
 
-A constant weight answers the same vector at every observation, and a weight history answers the row. The shape is the dispatch, so the arithmetic above reads one name.
+A constant weight vector is the weights of every observation. A weight history returns the row of `t`. The shape of the weights selects the method, so a caller uses one function for both.
 
 # Arguments
 
@@ -72,7 +72,24 @@ end
 
 Return the covariance of a series with a pre-centred series.
 
-The portfolio series is centred once and reused by every covariance a realised attribution takes, which is what makes the components additive: the covariances of the parts with the whole sum to the variance of the whole.
+A realised attribution centres the portfolio series once and takes every covariance against it. The covariances of the parts with the whole then sum to the variance of the whole, so the components add up.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\operatorname{cov}(x, y) &= \\frac{1}{T - 1} \\sum_{t=1}^{T} (x_{t} - \\bar{x})\\, y_{t}\\,, \\\\
+0 &= \\sum_{t=1}^{T} y_{t}\\,.
+\\end{align}
+```
+
+A centred ``y`` makes the sum equal to the sample covariance, because ``\\bar{x} \\sum_{t} y_{t}`` vanishes.
+
+Where:
+
+  - ``x_{t}``, ``y_{t}``: Entry ``t`` of the series and of the centred series.
+  - ``\\bar{x}``: Mean of the series.
+  - $(math_dict[:T])
 
 # Arguments
 
@@ -98,7 +115,17 @@ Return the lag-aligned history a realised factor attribution reads off a factor 
 
 The fit of observation `t` regresses the returns of `t` on the exposures of `t - lag`, so the exposures are trimmed at the tail and every return-like history at the head. A block whose exposures do not move keeps its one matrix, because a static slice needs no alignment.
 
-A fit that warmed up on the first observations keeps fewer than the caller's series carries, so the two axes are lined up at their **tail**: the aligned history describes the last observations of the caller's series, and `rows` names them.
+A fit that warmed up on the first observations keeps fewer than the caller's series carries, so the two axes are lined up at their tail. The aligned history describes the last observations of the caller's series, and `rows` names them.
+
+# Algorithm
+
+ 1. Read the exposure lag `lag`, the factor returns `f` and the idiosyncratic returns `eps` off the block, and the number of block observations `Tb`.
+ 2. Check that the caller's series is at least as long as the block, and that the block is longer than the lag.
+ 3. Take the block rows `brows = lag + 1:Tb`, whose returns an exposure explains, and the caller's rows `rows`, the last `Tb - lag` of its `T`. Aligned observation `j` therefore reads the exposures of block row `j`, the returns of block row `j + lag`, and the caller's row `T - Tb + lag + j`.
+ 4. Trim the exposure history by `lag` at its tail, giving `B`. A static loadings matrix is kept as it is.
+ 5. Take the rows `brows` of `f`, of `eps`, of the regression weights `rw` and of the idiosyncratic variances `vs`.
+ 6. Replace every non-finite entry of `B`, `f`, `eps`, `rw` and `vs` with zero.
+ 7. Slice the family re-basis to its first `Tb - lag` observations, giving `fcb`.
 
 # Arguments
 
@@ -235,7 +262,7 @@ end
 
 Return an optional per-observation history with every non-finite entry replaced by zero.
 
-The pairing of [`attribution_finite`](@ref) with the absent case, so the regression weights and the idiosyncratic variances take the same treatment as the histories beside them without a test at the call site.
+It pairs [`attribution_finite`](@ref) with the absent case, so the regression weights and the idiosyncratic variances take the same treatment as the histories beside them without a test at the call site.
 
 # Arguments
 
@@ -371,6 +398,22 @@ Return the mean weight of each asset and the spread of its history.
 
 A constant weight has no spread, so the spread is `nothing` and a reader dispatches on it rather than reading a vector of zeros.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{w}_{i} &= \\frac{1}{T} \\sum_{t=1}^{T} w_{ti}\\,, \\\\
+s_{i} &= \\operatorname{sd}(w_{\\cdot i})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\bar{w}_{i}``, ``s_{i}``: Mean weight and weight spread of asset ``i``.
+  - $(math_dict[:w_t_att])
+  - $(math_dict[:cov_sd_att])
+  - $(math_dict[:T])
+
 # Arguments
 
   - `w`: The constant weights, or the weight history.
@@ -399,7 +442,53 @@ end
 
 Decompose one realised return series over the factors of an aligned factor model history.
 
-The core of every realised method of [`factor_attribution`](@ref) and of every window of every rolling method. It assumes the alignment is done, so it reads the exposures, the factor returns and the idiosyncratic returns as they stand.
+Every realised method of [`factor_attribution`](@ref), and every window of every rolling method, calls this function. It assumes the alignment is done, so it reads the exposures, the factor returns and the idiosyncratic returns as they stand.
+
+# Mathematical definition
+
+The portfolio return splits into three series:
+
+```math
+\\begin{align}
+s_{t} &= \\boldsymbol{g}_{t}^{\\intercal} \\boldsymbol{f}_{t} = \\sum_{k=1}^{K} g_{tk} f_{tk}\\,, \\\\
+e_{t} &= \\boldsymbol{w}_{t}^{\\intercal} \\boldsymbol{\\varepsilon}_{t}\\,, \\\\
+u_{t} &= r_{t} - s_{t} - e_{t}\\,.
+\\end{align}
+```
+
+The systematic, the idiosyncratic and the unattributed components are ``s``, ``e`` and ``u``, and each component is the five numbers of its series. The total is ``r`` itself, so its volatility contribution is ``\\sqrt{p}\\, \\sigma_{P}``, its variance share is ``1`` and its correlation is ``1``. The three series sum to ``r``, and the covariance is linear, so the three volatility contributions sum to the total and the three variance shares sum to ``1``.
+
+Row ``k`` of the factor axis takes its numbers from the series ``g_{\\cdot k} f_{\\cdot k}``. These series sum to ``s`` over ``k``, so the rows sum to the systematic component.
+
+```math
+\\begin{align}
+\\bar{g}_{k} &= \\frac{1}{T} \\sum_{t=1}^{T} g_{tk}\\,, \\\\
+\\mathrm{VC}_{k} &= \\mathrm{VC}(g_{\\cdot k} f_{\\cdot k})\\,, \\\\
+\\mathrm{PV}_{k} &= \\mathrm{PV}(g_{\\cdot k} f_{\\cdot k})\\,, \\\\
+\\mathrm{MC}_{k} &= \\mathrm{MC}(g_{\\cdot k} f_{\\cdot k})\\,, \\\\
+\\rho_{k} &= \\frac{\\operatorname{cov}(f_{\\cdot k}, r)}{\\operatorname{sd}(f_{\\cdot k})\\, \\sigma_{P}}\\,.
+\\end{align}
+```
+
+The row also carries the exposure spread ``\\operatorname{sd}(g_{\\cdot k})``, the factor volatility ``\\sqrt{p}\\, \\operatorname{sd}(f_{\\cdot k})`` and the factor mean return ``p\\, \\bar{f}_{k}``. The correlation ``\\rho_{k}`` is of the factor return and not of its contribution, and it is `NaN` when ``\\operatorname{sd}(f_{\\cdot k})`` is zero.
+
+Where:
+
+  - ``u_{t}``: Unattributed return of the portfolio at observation ``t``.
+  - $(math_dict[:s_e_t_att])
+  - ``\\bar{g}_{k}``, ``\\bar{f}_{k}``: Mean portfolio exposure to factor ``k``, and mean return of factor ``k``.
+  - ``\\mathrm{VC}_{k}``, ``\\mathrm{PV}_{k}``, ``\\mathrm{MC}_{k}``, ``\\rho_{k}``: Volatility contribution, variance share, mean return contribution and correlation with the portfolio of factor ``k``.
+  - $(math_dict[:g_t_att])
+  - $(math_dict[:f_t_att])
+  - $(math_dict[:w_t_att])
+  - $(math_dict[:eps_t_att])
+  - $(math_dict[:r_t_att])
+  - $(math_dict[:sigma_P_att])
+  - $(math_dict[:VC_att])
+  - $(math_dict[:cov_sd_att])
+  - $(math_dict[:p_ppy])
+  - $(math_dict[:K])
+  - $(math_dict[:T])
 
 # Algorithm
 
@@ -448,7 +537,8 @@ function realised_attribution(W::VecNum_MatNum, ret::VecNum, al::NamedTuple,
               DomainError(total_vol,
                           "the portfolio return series must have a positive volatility for an attribution to divide by it"))
     retc = ret .- total_mu
-    Tf = promote_type(real(eltype(f)), real(eltype(ret)))
+    Tf = promote_type(real(eltype(f)), real(eltype(ret)), real(eltype(W)),
+                      real(eltype(al.B)))
     g = Matrix{Tf}(undef, T, K)
     sysr = Matrix{Tf}(undef, T, N)
     for t in 1:T
@@ -488,6 +578,31 @@ Return one component of a realised attribution from its own return series.
 
 The systematic, the idiosyncratic and the unattributed series are decomposed alike, so one verb builds all three. The volatility contribution is the covariance with the portfolio over the portfolio volatility, which is what makes the three sum to the portfolio volatility exactly.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{vol}(c) &= \\sqrt{p}\\, \\operatorname{sd}(c)\\,, \\\\
+\\mathrm{VC}(c) &= \\sqrt{p}\\, \\frac{\\operatorname{cov}(c, r)}{\\sigma_{P}}\\,, \\\\
+\\mathrm{PV}(c) &= \\frac{\\operatorname{cov}(c, r)}{\\sigma_{P}^{2}}\\,, \\\\
+\\mathrm{MC}(c) &= \\frac{p}{T} \\sum_{t=1}^{T} c_{t}\\,, \\\\
+\\rho(c) &= \\frac{\\operatorname{cov}(c, r)}{\\operatorname{sd}(c)\\, \\sigma_{P}}\\,.
+\\end{align}
+```
+
+``\\rho(c)`` is `NaN` when ``\\operatorname{sd}(c)`` is zero. For series that sum to ``r``, the covariances sum to ``\\sigma_{P}^{2}``, so the volatility contributions sum to ``\\sqrt{p}\\, \\sigma_{P}`` and the variance shares sum to ``1``.
+
+Where:
+
+  - ``c_{t}``: Return of the series at observation ``t``.
+  - ``\\mathrm{vol}(c)``: Standalone volatility of the series.
+  - $(math_dict[:VC_att])
+  - $(math_dict[:r_t_att])
+  - $(math_dict[:sigma_P_att])
+  - $(math_dict[:cov_sd_att])
+  - $(math_dict[:p_ppy])
+  - $(math_dict[:T])
+
 # Arguments
 
   - `pnl`: The component's own return series.
@@ -520,6 +635,21 @@ end
 Return the spread of each family's portfolio exposure over the observations.
 
 A family's exposure is the sum of the exposures of its factors, so its spread is the spread of that sum and not the sum of the spreads.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+s_{\\mathcal{F}} &= \\operatorname{sd}\\left(\\sum_{k \\in \\mathcal{F}} g_{\\cdot k}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``s_{\\mathcal{F}}``: Exposure spread of the family.
+  - $(math_dict[:F_fam_att])
+  - $(math_dict[:g_t_att])
+  - $(math_dict[:cov_sd_att])
 
 # Arguments
 
@@ -573,25 +703,27 @@ The cross-sectional fit estimates the factor returns of every observation, and t
 
 Under a family re-basis the raw Gram matrix is singular by construction, so the sandwich is taken in the reduced full-rank basis and mapped back onto the raw axis for the per-factor and per-family answers. The systematic answer is invariant under the change of basis, so it is read in the reduced basis directly.
 
-The systematic and the idiosyncratic errors are equal: the portfolio return is observed, so the two estimation errors sum to zero.
+The systematic and the idiosyncratic errors are equal. The portfolio return is observed, so the two estimation errors sum to zero.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\operatorname{Var}(\\hat{\\boldsymbol{f}}_{t}) &= \\mathbf{G}_{t}^{-1} \\mathbf{B}_{t}^{\\intercal} \\mathbf{W}_{t} \\boldsymbol{\\Omega}_{t} \\mathbf{W}_{t} \\mathbf{B}_{t} \\mathbf{G}_{t}^{-1}\\,, \\\\
-\\mathbf{G}_{t} &= \\mathbf{B}_{t}^{\\intercal} \\mathbf{W}_{t} \\mathbf{B}_{t}\\,, \\\\
-\\mathrm{SE} &= \\frac{a}{T} \\sqrt{\\sum_{t=1}^{T} \\boldsymbol{g}_{t}^{\\intercal} \\operatorname{Var}(\\hat{\\boldsymbol{f}}_{t}) \\boldsymbol{g}_{t}}\\,.
+\\mathrm{SE} &= \\frac{p}{T} \\sqrt{\\sum_{t=1}^{T} \\boldsymbol{g}_{t}^{\\intercal} \\mathbf{V}_{t} \\boldsymbol{g}_{t}}\\,, \\\\
+\\mathrm{SE}_{k} &= \\frac{p}{T} \\sqrt{\\sum_{t=1}^{T} g_{tk}^{2}\\, V_{t,kk}}\\,.
 \\end{align}
 ```
 
+[`attribution_sandwich`](@ref) states ``\\mathbf{V}_{t}``. The systematic error ``\\mathrm{SE}`` is the error of the mean of ``s_{t} = \\boldsymbol{g}_{t}^{\\intercal} \\hat{\\boldsymbol{f}}_{t}``, with the estimation errors of two observations taken as independent. A factor of the currency family is not estimated, so its row and its column of ``\\mathbf{V}_{t}`` are zero, and ``\\mathrm{SE}_{k}`` of such a factor is `NaN`.
+
 Where:
 
-  - ``\\mathbf{B}_{t}``: Exposure slice of observation ``t``.
-  - ``\\mathbf{W}_{t}``: Diagonal matrix of the regression weights of observation ``t``.
-  - ``\\boldsymbol{\\Omega}_{t}``: Diagonal matrix of the idiosyncratic variances of observation ``t``.
-  - ``\\boldsymbol{g}_{t}``: Portfolio exposure of observation ``t``.
-  - ``a``: Periods per year the numbers are scaled to.
+  - ``\\mathrm{SE}``, ``\\mathrm{SE}_{k}``: Standard error of the systematic mean return contribution, and of the mean return contribution of factor ``k``.
+  - ``\\hat{\\boldsymbol{f}}_{t}``: Factor returns the cross-sectional fit estimates at observation ``t``.
+  - ``V_{t,kk}``: Diagonal entry ``k`` of ``\\mathbf{V}_{t}``.
+  - $(math_dict[:g_t_att])
+  - $(math_dict[:V_t_att])
+  - $(math_dict[:p_ppy])
   - $(math_dict[:T])
 
 # Arguments
@@ -626,21 +758,18 @@ function attribution_standard_errors(g::MatNum, al::NamedTuple, fam::Option{<:Ve
     cur = attribution_currency_mask(fam, K)
     red = attribution_reduce_for_errors(al.fcb, al.B, g, fam, T)
     keep = findall(!, red.currency)
-    scale = s1 / T
+    se(v) = s1 * sqrt(max(zero(v), v)) / T
     V = [attribution_sandwich(view(red.B, t, :, :), view(rw, t, :), view(vs, t, :), keep)
          for t in 1:T]
-    sys = scale * sqrt(max(zero(scale),
-                           sum(LinearAlgebra.dot(view(red.g, t, keep), V[t], view(red.g, t, keep))
-                               for t in 1:T)))
+    sys = se(sum(LinearAlgebra.dot(view(red.g, t, keep), V[t], view(red.g, t, keep))
+                 for t in 1:T))
     Vf = [attribution_expand_errors(al.fcb, V[t], keep, red.nr, t) for t in 1:T]
-    factor = [if k in cur
-                  convert(typeof(scale), NaN)
-              else
-                  scale * sqrt(max(zero(scale), sum(g[t, k]^2 * Vf[t][k, k] for t in 1:T)))
-              end
-              for k in 1:K]
+    factor = [se(sum(g[t, k]^2 * Vf[t][k, k] for t in 1:T)) for k in 1:K]
+    for k in cur
+        factor[k] = oftype(factor[k], NaN)
+    end
     return (; sys = sys, factor = factor,
-            family = attribution_family_errors(fam, g, Vf, scale, T))
+            family = attribution_family_errors(fam, g, Vf, s1, T))
 end
 """
     attribution_currency_mask(fam::Nothing, K::Integer)
@@ -674,7 +803,7 @@ end
 
 Return the exposures and the portfolio exposure the sandwich covariance is taken in.
 
-A block that constrains no family is regressed on its raw axis, and the two answers pass through. A block that constrains a family has a singular raw Gram matrix, so the sandwich is taken in the reduced full-rank basis.
+A block that constrains no family is regressed on its raw axis, and the function returns the two inputs unchanged. A block that constrains a family has a singular raw Gram matrix, so the sandwich is taken in the reduced full-rank basis.
 
 # Arguments
 
@@ -802,6 +931,26 @@ Return the sandwich covariance of the factor returns of one observation.
 
 The fit of one observation is a weighted least squares across the assets, so the covariance of its coefficients is the sandwich of the Gram matrix around the weighted idiosyncratic variances. A rank-deficient Gram matrix falls back to the pseudo-inverse, which is the policy [`PseudoInverseFallback`](@ref) states and the rank test [`cross_sectional_rank`](@ref) applies, so the standard errors of a collinear cross-section are the minimum-norm answer rather than an arbitrarily large one.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{G}_{t} &= \\mathbf{B}_{t}^{\\intercal} \\mathbf{Q}_{t} \\mathbf{B}_{t}\\,, \\\\
+\\mathbf{V}_{t} &= \\mathbf{G}_{t}^{+} \\mathbf{B}_{t}^{\\intercal} \\mathbf{Q}_{t} \\boldsymbol{\\Omega}_{t} \\mathbf{Q}_{t} \\mathbf{B}_{t} \\mathbf{G}_{t}^{+}\\,.
+\\end{align}
+```
+
+``\\mathbf{B}_{t}`` here holds the columns of the estimated factors alone. ``\\mathbf{G}_{t}^{+}`` is ``\\mathbf{G}_{t}^{-1}`` when ``\\mathbf{G}_{t}`` has full rank, and the Moore-Penrose pseudo-inverse when it does not.
+
+Where:
+
+  - ``\\mathbf{G}_{t}``: Gram matrix of the weighted cross-sectional fit of observation ``t``.
+  - ``\\mathbf{G}_{t}^{+}``: Pseudo-inverse of ``\\mathbf{G}_{t}``.
+  - $(math_dict[:B_t_att])
+  - $(math_dict[:Q_t_att])
+  - $(math_dict[:Omega_t_att])
+  - $(math_dict[:V_t_att])
+
 # Arguments
 
   - `Bt`: The exposures of the observation, `assets × factors`.
@@ -893,20 +1042,38 @@ function attribution_scatter(V::MatNum, keep, nr::Integer)
 end
 """
     attribution_family_errors(fam::Nothing, g::MatNum, Vf::AbstractVector{<:MatNum},
-                              scale::Number, T::Integer)
+                              s1::Number, T::Integer)
     attribution_family_errors(fam::VecStr, g::MatNum, Vf::AbstractVector{<:MatNum},
-                              scale::Number, T::Integer)
+                              s1::Number, T::Integer)
 
 Return the standard error of each family's mean return contribution.
 
 A family's contribution sums the contributions of its factors, so its error reads the full covariance block of the family rather than the diagonal alone. The currency family reports `NaN`, because its rows carry no regression-estimation uncertainty.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{SE}_{\\mathcal{F}} &= \\frac{p}{T} \\sqrt{\\sum_{t=1}^{T} \\boldsymbol{g}_{t,\\mathcal{F}}^{\\intercal} \\mathbf{V}_{t,\\mathcal{F}\\mathcal{F}}\\, \\boldsymbol{g}_{t,\\mathcal{F}}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{SE}_{\\mathcal{F}}``: Standard error of the mean return contribution of the family.
+  - ``\\boldsymbol{g}_{t,\\mathcal{F}}``, ``\\mathbf{V}_{t,\\mathcal{F}\\mathcal{F}}``: The entries of ``\\boldsymbol{g}_{t}``, and the block of ``\\mathbf{V}_{t}``, that the factors of the family index.
+  - $(math_dict[:F_fam_att])
+  - $(math_dict[:g_t_att])
+  - $(math_dict[:V_t_att])
+  - $(math_dict[:p_ppy])
+  - $(math_dict[:T])
 
 # Arguments
 
   - `fam`: The family label of each raw factor, or `nothing`.
   - `g`: The per-observation portfolio exposure on the raw axis.
   - `Vf`: The sandwich covariance of each observation, on the raw axis.
-  - `scale`: The annualisation factor over the number of observations.
+  - `s1`: The factor a mean takes under the annualisation.
   - `T`: The number of aligned observations.
 
 # Returns
@@ -923,21 +1090,15 @@ function attribution_family_errors(::Nothing, ::MatNum, ::AbstractVector{<:MatNu
     return nothing
 end
 function attribution_family_errors(fam::VecStr, g::MatNum, Vf::AbstractVector{<:MatNum},
-                                   scale::Number, T::Integer)
+                                   s1::Number, T::Integer)
     fi = attribution_family_index(fam)
-    Tf = typeof(scale)
-    out = Vector{Tf}(undef, length(fi.labels))
-    for j in eachindex(fi.labels)
+    se(v) = s1 * sqrt(max(zero(v), v)) / T
+    out = [se(sum(LinearAlgebra.dot(view(g, t, i), view(Vf[t], i, i), view(g, t, i))
+                  for t in 1:T)) for i in fi.idx]
+    for j in eachindex(out)
         if fi.labels[j] == ATTRIBUTION_CURRENCY_FAMILY
-            out[j] = Tf(NaN)
-            continue
+            out[j] = oftype(out[j], NaN)
         end
-        i = fi.idx[j]
-        v = zero(Tf)
-        for t in 1:T
-            v += Tf(LinearAlgebra.dot(view(g, t, i), view(Vf[t], i, i), view(g, t, i)))
-        end
-        out[j] = Tf(scale) * sqrt(max(zero(Tf), v))
     end
     return out
 end
@@ -948,7 +1109,44 @@ end
 
 Return the asset axis and the asset-by-factor matrices of a realised attribution.
 
-Each asset's systematic and idiosyncratic contributions are the covariances of its own weighted series with the portfolio, so the rows sum to their components exactly. The axis decomposes the **model**, so `vol_contrib` is the two parts together and the rows sum to the systematic and idiosyncratic components together, not to the total: the remainder is a property of the portfolio and has no per-asset split. The asset-by-factor matrices split the systematic row of each asset over the factors.
+Each asset's systematic and idiosyncratic contributions are the covariances of its own weighted series with the portfolio, so the rows sum to their components exactly. The axis decomposes the model, so `vol_contrib` is the two parts together, and the rows sum to the systematic and idiosyncratic components together and not to the total. The remainder belongs to the portfolio and has no split over the assets. The asset-by-factor matrices split the systematic row of each asset over the factors.
+
+# Mathematical definition
+
+The model return of asset ``i`` is the sum of its systematic and idiosyncratic returns.
+
+```math
+\\begin{align}
+a_{ti} &= s_{ti} + \\varepsilon_{ti}\\,.
+\\end{align}
+```
+
+The systematic row of asset ``i`` is ``\\mathrm{VC}`` and ``\\mathrm{MC}`` of ``w_{\\cdot i} s_{\\cdot i}``, and the idiosyncratic row is the same two numbers of ``w_{\\cdot i} \\varepsilon_{\\cdot i}``. The total row is ``\\mathrm{VC}``, ``\\mathrm{PV}`` and ``\\mathrm{MC}`` of ``w_{\\cdot i} a_{\\cdot i}``. The weighted series of all the assets sum to ``s_{t}`` and ``e_{t}``, so the rows sum to the two components. The standalone numbers are those of the model return, which holds no per-observation intercept.
+
+```math
+\\begin{align}
+\\mathrm{vol}_{i} &= \\sqrt{p}\\, \\operatorname{sd}(a_{\\cdot i})\\,, \\\\
+\\mu_{i} &= \\frac{p}{T} \\sum_{t=1}^{T} a_{ti}\\,, \\\\
+\\rho_{i} &= \\frac{\\operatorname{cov}(a_{\\cdot i}, r)}{\\operatorname{sd}(a_{\\cdot i})\\, \\sigma_{P}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\varepsilon_{ti}``, ``a_{ti}``: Idiosyncratic and model return of asset ``i`` at observation ``t``.
+  - $(math_dict[:s_ti_att])
+  - $(math_dict[:s_e_t_att])
+  - ``\\mathrm{vol}_{i}``, ``\\mu_{i}``, ``\\rho_{i}``: Standalone volatility, mean return and correlation with the portfolio of asset ``i``.
+  - $(math_dict[:B_t_att])
+  - $(math_dict[:f_t_att])
+  - $(math_dict[:eps_t_att])
+  - $(math_dict[:w_t_att])
+  - $(math_dict[:r_t_att])
+  - $(math_dict[:sigma_P_att])
+  - $(math_dict[:VC_att])
+  - $(math_dict[:cov_sd_att])
+  - $(math_dict[:p_ppy])
+  - $(math_dict[:T])
 
 # Arguments
 
@@ -981,7 +1179,7 @@ function realised_attribution_assets(assets::Bool, W::VecNum_MatNum, al::NamedTu
     T, N = size(eps)
     K = size(f, 2)
     ar = sysr .+ eps
-    Tf = eltype(retc)
+    Tf = promote_type(eltype(W), eltype(sysr), eltype(eps))
     syspnl = Matrix{Tf}(undef, T, N)
     idiopnl = Matrix{Tf}(undef, T, N)
     for t in 1:T
@@ -1012,7 +1210,31 @@ end
 
 Return the asset-by-factor contributions of a realised attribution.
 
-The series of the pair `(i, k)` is `w_{t,i} B_{t,i,k} f_{t,k}`, so its mean is the pair's mean return contribution and its covariance with the portfolio over the portfolio volatility is the pair's volatility contribution.
+Each pair of an asset and a factor is one term of the systematic return, so a row of the matrices sums to the asset's systematic row and a column sums to the factor's row.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+c^{(ik)}_{t} &= w_{ti}\\, B_{t,ik}\\, f_{tk}\\,, \\\\
+\\mathrm{VC}_{ik} &= \\mathrm{VC}(c^{(ik)})\\,, \\\\
+\\mathrm{MC}_{ik} &= \\mathrm{MC}(c^{(ik)})\\,.
+\\end{align}
+```
+
+``\\sum_{k} c^{(ik)}_{t} = w_{ti} s_{ti}`` and ``\\sum_{i} c^{(ik)}_{t} = g_{tk} f_{tk}``, and both numbers are linear in the series.
+
+Where:
+
+  - ``c^{(ik)}_{t}``: Return of the pair of asset ``i`` and factor ``k`` at observation ``t``.
+  - ``B_{t,ik}``: Entry ``(i, k)`` of ``\\mathbf{B}_{t}``.
+  - $(math_dict[:s_ti_att])
+  - ``\\mathrm{VC}_{ik}``, ``\\mathrm{MC}_{ik}``: Volatility contribution and mean return contribution of the pair.
+  - $(math_dict[:B_t_att])
+  - $(math_dict[:w_t_att])
+  - $(math_dict[:g_t_att])
+  - $(math_dict[:f_t_att])
+  - $(math_dict[:VC_att])
 
 # Arguments
 
@@ -1038,7 +1260,7 @@ function realised_attribution_asset_factor(W::VecNum_MatNum, al::NamedTuple, ret
                                            total_vol::Number, sc::NamedTuple, T::Integer,
                                            N::Integer, K::Integer)
     f = al.f
-    Tf = eltype(retc)
+    Tf = promote_type(eltype(W), eltype(al.B), eltype(f), eltype(retc))
     vc = Matrix{Tf}(undef, N, K)
     mc = Matrix{Tf}(undef, N, K)
     pnl = Vector{Tf}(undef, T)
@@ -1060,7 +1282,25 @@ end
 
 Roll a realised attribution over the windows of an aligned history.
 
-The alignment runs once over the whole history, and each window is a slice of the aligned axis, so a window carries `window` effective observations and spends the exposure lag once rather than once per window. The windows end at `window:step:T`.
+The alignment runs once over the whole history, and each window is a slice of the aligned axis, so a window carries `window` effective observations and spends the exposure lag once rather than once per window.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{W}_{j} &= \\{\\tau_{j} - m + 1, \\ldots, \\tau_{j}\\}\\,, \\\\
+\\tau_{j} &= m + (j - 1)\\, h\\,, \\quad j = 1, \\ldots, \\left\\lfloor \\frac{T - m}{h} \\right\\rfloor + 1\\,.
+\\end{align}
+```
+
+Attribution ``j`` is the realised attribution over the observations of ``\\mathcal{W}_{j}``. Two windows that share observations are not independent.
+
+Where:
+
+  - ``\\mathcal{W}_{j}``, ``\\tau_{j}``: Observations of window ``j``, and its last observation.
+  - ``m``: Size of the window, `window`.
+  - ``h``: Stride between two consecutive windows, `step`.
+  - $(math_dict[:T])
 
 # Arguments
 
@@ -1076,7 +1316,7 @@ The alignment runs once over the whole history, and each window is a slice of th
 
 # Validation
 
-  - `1 <= window <= T`, else a `DomainError` is raised.
+  - `2 <= window <= T`, else a `DomainError` is raised. A window of one observation has no sample volatility.
   - `step >= 1`, else a `DomainError` is raised.
 
 # Returns
@@ -1093,9 +1333,9 @@ function attribution_rolling(W::VecNum_MatNum, ret::VecNum, al::NamedTuple,
                              fam::Option{<:VecStr}, assets::Bool, se::Bool, ppy::Number,
                              window::Integer, step::Integer)
     T = length(ret)
-    @argcheck(1 <= window <= T,
+    @argcheck(2 <= window <= T,
               DomainError(window,
-                          "window must be in 1:$(T), the number of aligned observations; got window => $window"))
+                          "window must be in 2:$(T), where $(T) is the number of aligned observations; a window of one observation has no sample volatility to attribute. Got window => $window"))
     @argcheck(step >= one(step), DomainError(step, "step must be >= 1"))
     return [realised_attribution(attribution_window_weights(W, (t - window + 1):t),
                                  view(ret, (t - window + 1):t),
@@ -1107,7 +1347,7 @@ end
 
 Refuse a portfolio return series that carries a non-finite value, naming the observations.
 
-The methods that form the series themselves route a non-finite return through [`attribution_net_returns`](@ref), so a `NaN` that reaches here came in the caller's own series or in a fold's. It is refused before the alignment, so the observations named are the caller's and not the aligned window's, and the refusal names the cause rather than the volatility it would poison.
+The methods that form the series themselves route a non-finite return through [`attribution_net_returns`](@ref), so a `NaN` that reaches here came in the caller's own series or in a fold's. It is refused before the alignment, so the observations named are the caller's and not the aligned window's, and the refusal names the cause rather than the undefined volatility that the value would give.
 
 # Arguments
 
@@ -1141,7 +1381,15 @@ end
 
 Align a factor model block against a realised return series and decompose it.
 
-Every realised method of [`factor_attribution`](@ref) that is not rolling arrives here, having formed its net return series and its weights.
+Every realised method of [`factor_attribution`](@ref) that is not rolling forms its net return series and its weights, then calls this function.
+
+# Algorithm
+
+ 1. Read the factor model block `rr` off `pr`.
+ 2. Report a holding in a non-investable asset through [`attribution_investable_diagnostic`](@ref), which warns, or raises under `strict`.
+ 3. Refuse a non-finite entry of `ret` through [`attribution_finite_series`](@ref).
+ 4. Align the block against the `length(ret)` observations of the caller, giving `al`.
+ 5. Decompose the rows `al.rows` of `ret`, and of `W` when it is a history, with [`realised_attribution`](@ref).
 
 # Arguments
 
@@ -1152,6 +1400,13 @@ Every realised method of [`factor_attribution`](@ref) that is not rolling arrive
   - `se`: Whether to fill the standard errors of the mean return contributions.
   - `ppy`: Periods per year the numbers are scaled to.
   - `strict`: Whether a holding in a non-investable asset raises rather than warns.
+
+# Validation
+
+  - Every weight at a non-investable asset is zero, else a warning names the assets, or an `ArgumentError` names them under `strict`.
+  - `ret` is finite throughout, else an `IsNonFiniteError` naming the observations is raised.
+  - `ret` carries at least as many observations as the block, and the block more than its exposure lag, else a `DimensionMismatch` is raised.
+  - The portfolio volatility is positive, and `ppy > 0`, else a `DomainError` is raised.
 
 # Returns
 
@@ -1182,7 +1437,15 @@ end
 
 Align a factor model block against a realised return series and roll the decomposition.
 
-Every rolling method of [`factor_attribution`](@ref) arrives here, having formed its net return series and its weights.
+Every rolling method of [`factor_attribution`](@ref) forms its net return series and its weights, then calls this function.
+
+# Algorithm
+
+ 1. Read the factor model block `rr` off `pr`.
+ 2. Report a holding in a non-investable asset through [`attribution_investable_diagnostic`](@ref), which warns, or raises under `strict`.
+ 3. Refuse a non-finite entry of `ret` through [`attribution_finite_series`](@ref).
+ 4. Align the block against the `length(ret)` observations of the caller, giving `al`.
+ 5. Roll the decomposition over the windows of the rows `al.rows` with [`attribution_rolling`](@ref), which checks `window` and `step` against the aligned length.
 
 # Arguments
 
@@ -1195,6 +1458,15 @@ Every rolling method of [`factor_attribution`](@ref) arrives here, having formed
   - `se`: Whether to fill the standard errors of the mean return contributions.
   - `ppy`: Periods per year the numbers are scaled to.
   - `strict`: Whether a holding in a non-investable asset raises rather than warns.
+
+# Validation
+
+  - Every weight at a non-investable asset is zero, else a warning names the assets, or an `ArgumentError` names them under `strict`.
+  - `ret` is finite throughout, else an `IsNonFiniteError` naming the observations is raised.
+  - `ret` carries at least as many observations as the block, and the block more than its exposure lag, else a `DimensionMismatch` is raised.
+  - The portfolio volatility is positive, and `ppy > 0`, else a `DomainError` is raised.
+  - `2 <= window <= T` over the aligned observations, else a `DomainError` is raised.
+  - `step >= 1`, else a `DomainError` is raised.
 
 # Returns
 
@@ -1221,9 +1493,24 @@ end
 
 Return the net portfolio return series over the finite entries of the asset returns.
 
-A point-in-time panel carries a `NaN` at every `(observation, asset)` pair where the asset is inactive: before it lists, after it delists, and at a non-investable asset's whole column. `0 * NaN` is `NaN`, so a zero weight does not save the product `X * w`, and the series is formed over the finite entries instead.
+A point-in-time panel carries a `NaN` at every `(observation, asset)` pair where the asset is inactive: before it lists, after it delists, and at a non-investable asset's whole column. `0 * NaN` is `NaN`, so a zero weight does not remove a `NaN` from the product `X * w`. The series is therefore formed over the finite entries.
 
-A pair with a **zero** weight contributes nothing whatever it holds, and is never reported. A pair with a **non-zero** weight and a non-finite return is a holding with no return to earn, and it takes the library's strictness policy through [`strict_diagnostic`](@ref): a warning names the observations and the assets and the pair contributes zero, or an `ArgumentError` names them under `strict`. Under a walk-forward the held pairs after a delisting carry a zero weight already, so the default is silent there.
+A pair with a zero weight contributes nothing whatever it holds, and no message names it. A pair with a non-zero weight and a non-finite return is a holding with no return to earn, and it takes the library's strictness policy through [`strict_diagnostic`](@ref). By default a warning names the observations and the assets, and the pair contributes zero. Under `strict`, an `ArgumentError` names them instead. Under a walk-forward the held pairs after a delisting carry a zero weight already, so the default is silent there.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{x}_{ti} &= \\begin{cases} x_{ti} & x_{ti} \\text{ finite}\\,, \\\\ 0 & \\text{otherwise}\\,. \\end{cases}
+\\end{align}
+```
+
+The series is the net series [`calc_net_returns`](@ref) forms from ``\\tilde{\\mathbf{X}}`` and ``\\boldsymbol{w}``. A panel with no non-finite entry gives ``\\tilde{\\mathbf{X}} = \\mathbf{X}``.
+
+Where:
+
+  - ``x_{ti}``, ``\\tilde{x}_{ti}``: Return of asset ``i`` at observation ``t``, and its finite part, the entries of ``\\mathbf{X}`` and ``\\tilde{\\mathbf{X}}``.
+  - $(math_dict[:w_port])
 
 # Arguments
 
@@ -1352,7 +1639,7 @@ end
 
 Return the weight history one fold of a cross-validation held.
 
-A fold that recorded a Held Weights result answers its drifted path, and a fold that recorded none held its target weights over every observation of the fold.
+A fold that recorded a Held Weights result returns its drifted path, and a fold that recorded none held its target weights over every observation of the fold.
 
 # Arguments
 
