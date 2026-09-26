@@ -716,6 +716,133 @@ end
     end
 end
 
+@testset "The exponentially weighted member agrees with its closed form" begin
+    PO = PortfolioOptimisers
+    # Observation 2 carries no entering asset, so it advances nothing. The state must not
+    # decay over it: a weight of `lambda^(t_n - t)` on the calendar index states different
+    # coefficients. Observation 3 carries three of the four assets.
+    a = [1.0 2.0 3.0 0.5; 2.0 1.0 4.0 1.5; 3.0 2.0 1.0 2.5; 1.0 4.0 2.0 3.0;
+         2.0 2.0 3.0 1.0]
+    b = [4.0 1.0 2.0 3.0; 1.0 3.0 2.0 2.0; 2.0 1.0 3.0 1.0; 3.0 2.0 1.0 4.0;
+         1.0 1.0 2.0 2.0]
+    er = [0.01 -0.02 0.03 0.00; -0.01 0.02 0.01 0.02; 0.02 0.01 -0.03 0.01;
+          0.00 0.03 0.02 -0.01; 0.01 0.00 -0.01 0.02]
+    vs = [0.04 0.09 0.01 0.02; 0.02 0.05 0.03 0.04; 0.06 0.01 0.02 0.03;
+          0.03 0.04 0.05 0.02; 0.02 0.03 0.04 0.05]
+    emsk = trues(5, 4)
+    emsk[2, :] .= false
+    emsk[3, 4] = false
+    rd, csfm, ds = forecast_fit_panel(a, b, er, vs; emsk = emsk)
+    lambda = 0.5
+    rho = 1e-3
+    gamma = 1.5
+
+    # The closed form, written out: the sums over the observations t_1 < ... < t_n that
+    # advance the state, the advance k weighted by lambda^(m - k), then the ridge with its
+    # floor, then the forecast at t from the coefficients after m(t - 1) advances.
+    function closed_form(sharpe::Bool, normalise::Bool, calendar::Bool)
+        g = sharpe ? sqrt.(vs) : ones(size(vs))
+        fwd = er[2:5, :]
+        ts = [t for t in 1:4 if any(emsk[t, :])]
+        beta = Vector{Vector{Float64}}(undef, length(ts))
+        for m in eachindex(ts)
+            A = zeros(2, 2)
+            c = zeros(2)
+            for k in 1:m
+                t = ts[k]
+                idx = findall(emsk[t, :])
+                w = [g[t, i]^2 / vs[t, i] for i in idx]
+                if normalise
+                    w ./= sum(w) / length(w)
+                end
+                S = [a[t, idx] b[t, idx]]
+                W = LinearAlgebra.Diagonal(w)
+                p = calendar ? ts[m] - t : m - k
+                A += (1 - lambda) * lambda^p * transpose(S) * W * S
+                c += (1 - lambda) *
+                     lambda^p *
+                     transpose(S) *
+                     W *
+                     [fwd[t, i] / g[t, i] for i in idx]
+            end
+            r = rho * max(sum(abs, LinearAlgebra.diag(A)) / 2, eps(Float64))
+            beta[m] = (A + r * LinearAlgebra.I) \ c
+        end
+        H = fill(NaN, 5, 4)
+        for t in 2:5, i in 1:4
+            m = count(<=(t - 1), ts)
+            if m >= 1
+                H[t, i] = gamma * g[t, i] * (a[t, i] * beta[m][1] + b[t, i] * beta[m][2])
+            end
+        end
+        return H, beta[end]
+    end
+
+    for (unit, sharpe) in
+        ((IdiosyncraticReturnUnit(), false), (IdiosyncraticSharpeUnit(), true)),
+        normalise in (true, false)
+
+        rf = return_forecast(ExpWeightedReturnForecast(; scores = ds, decay = lambda,
+                                                       min_obs = 1, ridge = rho,
+                                                       scale = gamma, normalise = normalise,
+                                                       unit = unit), rd, csfm)
+        H, beta = closed_form(sharpe, normalise, false)
+        _, calendar = closed_form(sharpe, normalise, true)
+        m = isfinite.(H)
+        @test isequal(isnan.(rf.hist), isnan.(H))
+        @test rf.hist[m] ≈ H[m] rtol = 1e-12
+        @test rf.coef ≈ beta rtol = 1e-12
+        @test rf.n == 3
+        @test !isapprox(rf.coef, calendar; rtol = 1e-2)
+    end
+
+    @testset "min_obs counts the observations that advance the state" begin
+        # Row 3 reads the state after observation 2, which one advance holds. A count of
+        # the calendar observations would publish it.
+        rf = return_forecast(ExpWeightedReturnForecast(; scores = ds, decay = lambda,
+                                                       min_obs = 2, ridge = rho), rd, csfm)
+        @test all(isnan, rf.hist[1:3, :])
+        @test all(isfinite, rf.hist[4:5, :])
+    end
+
+    @testset "The ridge of an empty normal matrix takes the floor" begin
+        @test PO.ew_forecast_solve(zeros(2, 2), [1.0, 1.0], 1.0, 1) ≈
+              fill(1 / eps(Float64), 2)
+        @test PO.ew_forecast_solve(zeros(2, 2), [1.0, 1.0], 0.0, 1) == [0.0, 0.0]
+    end
+
+    @testset "The state takes the type of the data and of the hyperparameters" begin
+        T, N = size(a)
+        inp = [NumericPanelInput(; name = "a", vals = Float32.(a),
+                                 alg = ForwardPanelFill()),
+               NumericPanelInput(; name = "b", vals = Float32.(b),
+                                 alg = ForwardPanelFill())]
+        pnl = asset_panel(inp; amsk = trues(T, N), emsk = emsk)
+        rd32 = ReturnsResult(; nx = ["A$i" for i in 1:N], X = zeros(Float32, T, N),
+                             pnl = pnl)
+        csr = CrossSectionalRegression(; f = zeros(Float32, T, 1), eps = Float32.(er),
+                                       n = fill(N, T))
+        csfm32 = CrossSectionalFactorModel(; M = reshape(fill(1.0f0, N), N, 1),
+                                           b = zeros(Float32, N), csr = csr,
+                                           vs = Float32.(vs))
+        H, _ = closed_form(false, true, false)
+        rf = return_forecast(ExpWeightedReturnForecast(; scores = ds, decay = 0.5f0,
+                                                       min_obs = 1, ridge = 1.0f-3,
+                                                       scale = 1.5f0), rd32, csfm32)
+        for x in (rf.A, rf.c, rf.coef, rf.hist, rf.mu)
+            @test eltype(x) == Float32
+        end
+        @test rf.hist[isfinite.(H)] ≈ H[isfinite.(H)] rtol = 1e-5
+        # A wider hyperparameter widens the state, and is not truncated to the data.
+        rf = return_forecast(ExpWeightedReturnForecast(; scores = ds, decay = big"0.5",
+                                                       min_obs = 1, ridge = big"1e-3"), rd,
+                             csfm)
+        for x in (rf.A, rf.c, rf.coef, rf.hist)
+            @test eltype(x) == BigFloat
+        end
+    end
+end
+
 @testset "The target member fits a regression over every observation and asset" begin
     PO = PortfolioOptimisers
     a = [1.0 2.0 3.0; 2.0 1.0 4.0; 3.0 2.0 1.0; 1.0 4.0 2.0]
