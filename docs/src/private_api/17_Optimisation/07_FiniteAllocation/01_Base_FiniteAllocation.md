@@ -9,7 +9,6 @@ FiniteAllocationOptimisationEstimator
 FiniteAllocationOptimisationResult
 FOptE_FOpt
 FOptE_FOpt_FbChain
-AbstractCollateralAlgorithm
 allocation_horizon
 setup_alloc_optim
 allocation_turnover_money

@@ -317,19 +317,20 @@ end
         # At an interior minimiser of D_Ψ(w, q) + λ‖w‖ on the simplex,
         # ∇Ψ(w) − ∇Ψ(q) + λ w / ‖w‖ is the same in every entry. The Tsallis arm wrote
         # (1 − α) D_Ψ, which gave the penalty 1 / (1 − α) times its weight: at α = 1/2 the
-        # spread below was 0.046.
+        # spread below was 0.046. On one CI host type, Clarabel stops at a spread of 2.5e-6
+        # in one case, so every geometry takes the tolerance 1e-5.
         qp = [0.35, 0.25, 0.4]
         A = [2.0 0.3 0.1; 0.3 1.0 0.2; 0.1 0.2 1.5]
-        cases = ((EuclideanProjection(), w -> w, 0.2, 1e-6),
-                 (EntropicProjection(), w -> log.(w), 0.2, 1e-6),
-                 (TsallisProjection(; alpha = 0.5), w -> w .^ -0.5 ./ -0.5, 0.2, 1e-6),
-                 (TsallisProjection(; alpha = 0.3), w -> w .^ -0.7 ./ -0.7, 0.1, 1e-6),
+        cases = ((EuclideanProjection(), w -> w, 0.2, 1e-5),
+                 (EntropicProjection(), w -> log.(w), 0.2, 1e-5),
+                 (TsallisProjection(; alpha = 0.5), w -> w .^ -0.5 ./ -0.5, 0.2, 1e-5),
+                 (TsallisProjection(; alpha = 0.3), w -> w .^ -0.7 ./ -0.7, 0.1, 1e-5),
                  (LogBarrierProjection(), w -> -1 ./ w, 0.2, 1e-5),
-                 (GramProjection(; slv = slv, A = A), w -> A * w, 0.2, 1e-6),
+                 (GramProjection(; slv = slv, A = A), w -> A * w, 0.2, 1e-5),
                  # The diagonal arm set its own objective and dropped the penalty: it
                  # returned q, and the spread was 0.051 (#1198).
                  (po.DiagonalProjection([1.5, 0.7, 2.0]), w -> [1.5, 0.7, 2.0] .* w, 0.2,
-                  1e-6))
+                  1e-5))
         for (proj, grad, lam, tol) in cases
             set = resolve(ProgrammeAllocationSet(; slv = slv,
                                                  l2 = L2Regularisation(; val = lam)), 3)
@@ -1468,7 +1469,8 @@ end
                      TsallisProjection(; alpha = 0.3))
             wr = po.project(proj, bC, qC, wh)
             @test wr[2] == 0.2 && all(0.2 .< wr[[1, 3]] .< 0.5)
-            @test isapprox(wr, po.project(proj, pC, qC, wh); atol = 1e-6)
+            # On one CI host type, Clarabel stops 1.2e-6 from the root at alpha = 0.5.
+            @test isapprox(wr, po.project(proj, pC, qC, wh); atol = 1e-5)
         end
         # The Tsallis projection tends to the entropic one as alpha tends to one, and to the
         # log-barrier one as alpha tends to zero.

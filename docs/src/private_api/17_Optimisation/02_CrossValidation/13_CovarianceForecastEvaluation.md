@@ -1,5 +1,5 @@
 ```@meta
-Description = "The covariance forecast evaluation, private API of PortfolioOptimisers.jl: forecast_location, forecast_state_location, forecast_coverage_policy, …"
+Description = "The covariance forecast evaluation, private API of PortfolioOptimisers.jl: forecast_location, forecast_state_location, prior_forecast_location, …"
 ```
 
 # The covariance forecast evaluation: private API

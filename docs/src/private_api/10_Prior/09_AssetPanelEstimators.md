@@ -1,11 +1,10 @@
 ```@meta
-Description = "Asset Panel Estimators, private API of PortfolioOptimisers.jl: AbstractPhylogenyFeatureAlgorithm, _proximity_features, panel_axis_labels, …"
+Description = "Asset Panel Estimators, private API of PortfolioOptimisers.jl: _proximity_features, panel_axis_labels, carrier_asset_names, regression_factor_names, …"
 ```
 
 # Asset Panel Estimators: private API
 
 ```@docs
-AbstractPhylogenyFeatureAlgorithm
 PortfolioOptimisers._proximity_features
 PortfolioOptimisers.panel_axis_labels
 PortfolioOptimisers.carrier_asset_names

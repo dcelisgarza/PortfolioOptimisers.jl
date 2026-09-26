@@ -256,7 +256,10 @@ end
         x = X[1, :]
         st, w1 = step(alg, w0, x)
         g = x ./ dot(w0, x)
-        @test w1 == w0 .* (1 - 0.3 .+ 0.3 .* g)
+        # The step sums to one up to rounding, and the Euclidean projection renormalises
+        # such a step (#1308), so the pin divides by the sum.
+        q = w0 .* (1 - 0.3 .+ 0.3 .* g)
+        @test w1 == q ./ sum(q)
         @test isapprox(sum(w1), 1; atol = 1e-15)
         @test st.n == 1 && st.w1 == w0
         # The convex combination of holding and Cover's posterior.

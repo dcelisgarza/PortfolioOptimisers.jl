@@ -740,3 +740,4 @@ function assert_producer_prior(ape::AbstractAssetPanelEstimator, ::Any)::Nothing
 end
 
 export Proximity, phylogeny_features, RegressionPanel, PhylogenyPanel
+public AbstractPhylogenyFeatureAlgorithm

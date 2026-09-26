@@ -1403,3 +1403,4 @@ end
 export SchurComplementHierarchicalRiskParityResult, SchurComplementParams,
        SchurComplementHierarchicalRiskParity, NonMonotonicSchurComplement,
        MonotonicSchurComplement
+public SchurComplementAlgorithm, schur_complement_weights

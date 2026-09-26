@@ -330,3 +330,4 @@ function port_opt_view(pr::AbstractPricesResult, args...; kwargs...)
     return throw(ArgumentError("port_opt_view has no method for a $(nameof(typeof(pr))) with the index argument type(s) ($(join(typeof.(args), ", ")))$(kwmsg). A price-level carrier takes port_opt_view(pr, observations) or port_opt_view(pr, observations, assets), with no keyword argument. The observations are integer indices, a range, a Colon or a vector of timestamps, and the assets are integer indices, a range or a Colon. A subtype of AbstractPricesResult implements these two shapes."))
 end
 export PricesResult
+public AbstractPricesResult

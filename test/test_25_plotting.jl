@@ -1337,9 +1337,10 @@
         z_sw(p) = Matrix(p[3].series_list[1][:z].surf)
         @test z_sw(plot_clusters(cle_sw, Matrix(X_sw'), nx_sw; dims = 2)) ≈
               z_sw(plot_clusters(cle_sw, X_sw, nx_sw))
-        # A prior holds its observations along the first dimension, so `dims = 2` reaches
-        # the clustering, clusters the observations, and no longer fits the asset names.
-        @test_throws BoundsError plot_clusters(cle_sw, rd_sw; dims = 2)
+        # A carrier holds its observations along the rows. Its bridge passes `dims = 1`
+        # after the caller's keywords, so `dims = 2` has no effect (#1348).
+        @test z_sw(plot_clusters(cle_sw, rd_sw; dims = 2)) ==
+              z_sw(plot_clusters(cle_sw, rd_sw))
         pr_sw = prior(EmpiricalPrior(), rd_sw)
         Xn_sw = collect(pr_sw.X)
         Xn_sw[:, 3] .= NaN

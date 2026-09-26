@@ -1,5 +1,5 @@
 ```@meta
-Description = "Simple variance and standard deviation, private API of PortfolioOptimisers.jl: show_fields, simple_variance_kernel, SimpleVarianceState, …"
+Description = "Simple variance and standard deviation, private API of PortfolioOptimisers.jl: show_fields, simple_variance_kernel, simple_variance_count, …"
 ```
 
 # Simple variance and standard deviation: private API

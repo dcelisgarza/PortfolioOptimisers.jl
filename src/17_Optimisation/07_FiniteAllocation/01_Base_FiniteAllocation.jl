@@ -455,6 +455,7 @@ function FiniteAllocationInput(res::NonFiniteAllocationOptimisationResult; price
                                  isnothing(imsk) ? result_investable_mask(res) : imsk, ca)
 end
 export FiniteAllocationInput
+public AbstractCollateralAlgorithm
 """
     allocation_horizon(res::NonFiniteAllocationOptimisationResult,
                        horizon::Option{<:Number} = nothing)

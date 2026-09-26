@@ -1,5 +1,5 @@
 ```@meta
-Description = "Cross-Sectional Exposure Diagnostics, private API of PortfolioOptimisers.jl: exposure_weights, cs_weighted_correlation, cs_correlation_enters, …"
+Description = "Cross-Sectional Exposure Diagnostics, private API of PortfolioOptimisers.jl: exposure_weights, cs_weighted_correlation, cs_correlation_enters, cs_ranks, …"
 ```
 
 # Cross-Sectional Exposure Diagnostics: private API

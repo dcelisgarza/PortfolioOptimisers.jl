@@ -217,7 +217,7 @@ Add the positive semidefinite (PSD) cone that lifts the decision vector of a [`F
 
 It is [`set_sdp_constraints!`](@ref) on the decision vector ``\\boldsymbol{z}``. That vector is the factor weights ``\\boldsymbol{w}_1`` when `flag = false`, and the factor weights followed by the off-factor weights ``\\boldsymbol{w}_2`` when `flag = true`. A second call returns the first call's matrix and adds nothing.
 
-The lift covers the whole decision vector because the asset weights are ``\\mathbf{P} \\boldsymbol{z}``, with ``\\mathbf{P}`` the basis of [`set_factor_risk_contribution_constraints!`](@ref). So ``\\mathrm{tr}(\\mathbf{P}^\\intercal \\mathbf{\\Sigma} \\mathbf{P} \\mathbf{W}_z)`` is the variance of the asset weights at rank one. A lift of ``\\boldsymbol{w}_1`` alone gives the variance of ``\\mathbf{B}_1 \\boldsymbol{w}_1`` only, and omits the off-factor weights (#1350). The leading ``N_f \\times N_f`` block of ``\\mathbf{W}_z`` is a lift of ``\\boldsymbol{w}_1`` by itself, because a principal submatrix of a PSD matrix is PSD. The factor phylogeny reads that block.
+The lift covers the whole decision vector because the asset weights are ``\\mathbf{P} \\boldsymbol{z}``, with ``\\mathbf{P}`` the basis of [`set_factor_risk_contribution_constraints!`](@ref). So ``\\mathrm{tr}(\\mathbf{P}^\\intercal \\mathbf{\\Sigma} \\mathbf{P} \\mathbf{W}_z)`` is the variance of the asset weights at rank one. A lift of ``\\boldsymbol{w}_1`` alone gives the variance of ``\\mathbf{B}_1 \\boldsymbol{w}_1`` only, and omits the off-factor weights. The leading ``N_f \\times N_f`` block of ``\\mathbf{W}_z`` is a lift of ``\\boldsymbol{w}_1`` by itself, because a principal submatrix of a PSD matrix is PSD. The factor phylogeny reads that block.
 
 # Mathematical definition
 

@@ -169,8 +169,8 @@ end
     Xi = rand(StableRNG(5), -20:20, 60, 6)
     nxi = ["a$i" for i in 1:6]
     wint = optimise(HierarchicalRiskParity(), ReturnsResult(; nx = nxi, X = Xi)).w
-    @test wint == optimise(HierarchicalRiskParity(),
-                           ReturnsResult(; nx = nxi, X = Float64.(Xi))).w
+    @test wint ==
+          optimise(HierarchicalRiskParity(), ReturnsResult(; nx = nxi, X = Float64.(Xi))).w
     # Validation.
     @test_throws IsEmptyError HierarchicalRiskParity(; r = PO.OptimisationRiskMeasure[])
     @test_throws ArgumentError HierarchicalRiskParity(; r = NoRisk())

@@ -2,7 +2,7 @@
 Description = "Aliases, public API of PortfolioOptimisers.jl: SD, UcVariance, WR, VaR, CVaR, DRCVaR, EVaR, RLVaR, PNVaR, RG, VaR_RG, CVaR_RG, DRCVaR_RG, EVaR_RG, RLVaR_RG, …"
 ```
 
-# Aliases
+# [Aliases](@id aliases)
 
 This page lists short names for long type names, and for a few functions.
 

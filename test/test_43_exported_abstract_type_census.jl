@@ -56,6 +56,9 @@
     (issue #1161). The nine types whose `# Interfaces` sections the sweeps of #1040, #1042,
     #1044 and #1052 wrote — the six preprocessing types, `AbstractReturnsResult`,
     `AbstractAssetSelector` and `SubPortfolioUniverse` — joined on 2026-09-25 (issue #1301).
+    `AbstractPricesResult`, `AbstractPhylogenyFeatureAlgorithm`, `AbstractCollateralAlgorithm`
+    and `SchurComplementAlgorithm` joined on 2026-09-26 (PR #1204), after #1012, #848, #1337
+    and #881 wrote their `# Interfaces` sections.
     They are held to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
@@ -128,7 +131,9 @@
                           :AbstractReturnsPreprocessingEstimator,
                           :AbstractPreprocessingResult, :AbstractPricesPreprocessingResult,
                           :AbstractReturnsPreprocessingResult, :AbstractReturnsResult,
-                          :AbstractAssetSelector, :SubPortfolioUniverse])
+                          :AbstractAssetSelector, :SubPortfolioUniverse,
+                          :AbstractPricesResult, :AbstractPhylogenyFeatureAlgorithm,
+                          :AbstractCollateralAlgorithm, :SchurComplementAlgorithm])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&
@@ -162,7 +167,7 @@
     @test length(exported) < length(defined) / 10
 
     #=
-    The four names stay reachable through the module prefix, which is what an extension
+    The three names stay reachable through the module prefix, which is what an extension
     needs to subtype them, and each keeps its docstring and its private mirror-page entry.
     Unexported is not undocumented. They are pinned by name so the regression cannot come
     back quietly. `AbstractConstraintSpace` left this list on 2026-09-17: its docstring
@@ -174,9 +179,11 @@
     anticipate ADR 0154 -- the root's own `# Interfaces` section already states "subtype one
     of the two children, not this root", so promoting the root to `public` alongside its
     children restates that rule as the public contract rather than contradicting it.
+    `AbstractPhylogenyFeatureAlgorithm` left the same way on 2026-09-26: the sweep of #848 wrote
+    its `# Interfaces` section, and it now sits on `allowed_public` above.
     =#
-    for n in (:AbstractAssetPanelEstimator, :AbstractPhylogenyFeatureAlgorithm,
-              :AbstractSimilarityMatrixAlgorithm, :AbstractNonNegativeSimilarityMatrixAlgorithm)
+    for n in (:AbstractAssetPanelEstimator, :AbstractSimilarityMatrixAlgorithm,
+              :AbstractNonNegativeSimilarityMatrixAlgorithm)
         @test is_abstract(n)
         @test !Base.isexported(PortfolioOptimisers, n)
         @test n ∉ names(PortfolioOptimisers)

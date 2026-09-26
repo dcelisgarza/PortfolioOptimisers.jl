@@ -326,18 +326,25 @@ end
                     (mk("amsk"), (; layout = :wide)), (mk("emsk"), (; layout = :wide)),
                     (mk("x"), (; nx = ["observation", "B"], fields = "x")),
                     (mk("x"), (; nx = ["A", "A"], layout = :wide)),
-                    (AssetPanel(; pf = [NumericPanelField(; name = "asset", vals = [1.0, 2.0])]), (;)),
-                    (AssetPanel(;
-                                pf = [NumericPanelField(; name = "x", vals = [1.0, 2.0],
-                                                        omsk = [true, false]),
-                                      NumericPanelField(; name = "x::observed", vals = [5.0, 6.0])]),
-                     (;)),
-                    (AssetPanel(;
-                                pf = [NumericPanelField(; name = "beta=size", vals = [1.0, 2.0]),
-                                      TensorPanelField(; name = "beta", axis = "f", labels = ["size"],
-                                                       vals = reshape([7.0, 8.0], 2, 1))]), (;)))
+                    (AssetPanel(; pf = [NumericPanelField(; name = "asset", vals = [1.0, 2.0])]), (;)))
         @test_throws ArgumentError panel_dataframe(p; kw...)
     end
+    # The AssetPanel constructor refuses two Panel Fields that derive one column name
+    # (#1335), so these two panels never reach panel_dataframe.
+    @test_throws ArgumentError AssetPanel(;
+                                          pf = [NumericPanelField(; name = "x",
+                                                                  vals = [1.0, 2.0],
+                                                                  omsk = [true, false]),
+                                                NumericPanelField(; name = "x::observed",
+                                                                  vals = [5.0, 6.0])])
+    @test_throws ArgumentError AssetPanel(;
+                                          pf = [NumericPanelField(; name = "beta=size",
+                                                                  vals = [1.0, 2.0]),
+                                                TensorPanelField(; name = "beta",
+                                                                 axis = "f",
+                                                                 labels = ["size"],
+                                                                 vals = reshape([7.0, 8.0],
+                                                                                2, 1))])
     msg = try
         panel_dataframe(mk("asset"))
     catch e

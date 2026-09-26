@@ -1,5 +1,5 @@
 ```@meta
-Description = "The optimiser on the partial-fit seam, private API of PortfolioOptimisers.jl: step_active_mask, fold_prior, fold_context, fold_returns, …"
+Description = "The optimiser on the partial-fit seam, private API of PortfolioOptimisers.jl: step_active_mask, fold_prior, fold_context, fold_returns, online_state_seed, …"
 ```
 
 # The optimiser on the partial-fit seam: private API
