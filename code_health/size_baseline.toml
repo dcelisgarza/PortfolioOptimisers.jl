@@ -226,7 +226,7 @@ commit = "0ecb3ce47c"
 "src/10_Prior/08_HighOrderFactorPriorEstimator.jl" = { code = 190, doc = 299, comment = 54, blank = 93, total = 636 }
 "src/10_Prior/09_AssetPanelEstimators.jl" = { code = 116, doc = 422, comment = 14, blank = 190, total = 742 }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { code = 395, doc = 559, comment = 0, blank = 290, total = 1244 }
-"src/10_Prior/11_CrossSectionalFactorPrior.jl" = { code = 189, doc = 233, comment = 27, blank = 68, total = 517 }
+"src/10_Prior/11_CrossSectionalFactorPrior.jl" = { code = 193, doc = 287, comment = 27, blank = 80, total = 587 }
 "src/10_Prior/12_PriorPartialFit.jl" = { code = 232, doc = 567, comment = 20, blank = 278, total = 1097 }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { code = 37, doc = 77, comment = 1, blank = 28, total = 143 }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { code = 90, doc = 163, comment = 13, blank = 48, total = 314 }

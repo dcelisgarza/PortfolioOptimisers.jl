@@ -205,6 +205,7 @@ fit_rows(rd, pr) = (size(rd.X, 1) - size(pr.X, 1) + 1):size(rd.X, 1)
         @test_throws DomainError CrossSectionalFactorPrior(; factors = f, lambda = 1.5)
         @test_throws DomainError CrossSectionalFactorPrior(; factors = f, c = -0.1)
         @test_throws PO.IsEmptyError CrossSectionalFactorPrior(; factors = f, mcap = "")
+        @test_throws PO.IsEmptyError CrossSectionalFactorPrior(; factors = f, bw = "")
     end
     @testset "A matrix with no panel is refused by name" begin
         rd = csfp_panel(; n_assets = 10, n_observations = 20, n_industries = 2).rd
@@ -1074,4 +1075,127 @@ end
     # `mp` still owns the asset block alone: it is the estimator the idiosyncratic
     # covariance and the lifted asset covariance are processed under.
     @test isa(base.mp, MatrixProcessing)
+end
+
+#=
+Issue #829. The closed form that the `# Mathematical definition` of the returns-matrix `prior`
+method states, computed from first principles and compared with the fit.
+
+The oracle reads the Factor Exposures and the idiosyncratic covariance off the library, because
+they are the INPUT of the definition: the Exposure Estimators and the variance estimator state
+their own. Everything the definition itself states is rebuilt here: the eligibility of each pair,
+the weight `m^p` at the lagged market capitalisation, the weighted least squares of every
+observation through a pseudo-inverse, the sample mean and covariance of the factor returns, the
+weighted least squares of the forecast on the latest exposures, the blend, the investable set and
+the two lifted moments.
+
+The three factors are independent, so every weighted design has full column rank. Under the
+default four the factor covariance is singular in one direction, and whether its repair moves it
+depends on the LAPACK build, as the testset above records.
+=#
+function csfp_oracle(pe, rd; alpha = nothing)
+    PO = PortfolioOptimisers
+    X = rd.X
+    Tn, N = size(X)
+    amsk, emsk = PO.cross_sectional_panel_masks(rd.pnl)
+    mcap = PO.panel_field_values(rd, pe.mcap)
+    bmsk = isfinite.(X) .& emsk .& isfinite.(mcap)
+    BW = PO.cross_sectional_cap_weights(pe.bp, mcap, bmsk)
+    Z = PO.cross_sectional_exposure_history(pe.factors,
+                                            PO.cross_sectional_benchmark_carrier(rd, pe.bw,
+                                                                                 BW)).Ms
+    ell = pe.lag
+    ts = (PO.cross_sectional_warmup(X, Z, emsk) + ell + 1):Tn
+    K = size(Z, 3)
+    F = zeros(length(ts), K)
+    Q = zeros(length(ts), N)
+    for (u, t) in enumerate(ts)
+        for i in 1:N
+            if emsk[t, i] &&
+               isfinite(X[t, i]) &&
+               all(isfinite, view(Z, t - ell, i, :)) &&
+               isfinite(mcap[t - ell, i])
+                Q[u, i] = mcap[t - ell, i]^pe.wa.p
+            end
+        end
+        e = findall(>(0), view(Q, u, :))
+        s = sqrt.(Q[u, e])
+        F[u, :] = LinearAlgebra.pinv(s .* Z[t - ell, e, :]) * (s .* X[t, e])
+    end
+    muf = vec(Statistics.mean(F; dims = 1))
+    Sf = Statistics.cov(F; dims = 1)
+    ZT = Z[Tn, :, :]
+    g = zeros(K)
+    b = zeros(N)
+    if !isnothing(alpha)
+        qT = [isfinite(alpha[i]) && all(isfinite, view(ZT, i, :)) ? Q[end, i] : 0.0
+              for i in 1:N]
+        e = findall(>(0), qT)
+        s = sqrt.(qT[e])
+        g = LinearAlgebra.pinv(s .* ZT[e, :]) * (s .* alpha[e])
+        b = pe.c * (alpha - ZT * g)
+    end
+    mut = pe.lambda * muf + (1 - pe.lambda) * g
+    return (; F, Q, muf, Sf, mut, ZT, b, amsk)
+end
+
+@testset "The prior against its mathematical definition, from first principles" begin
+    PO = PortfolioOptimisers
+    rd = csfp_panel().rd
+    factors = ["market" => ConstantExposure(),
+               "size" =>
+                   CompositeExposure(; descriptors = [LogMarketCap()], family = "style"),
+               "value" =>
+                   CompositeExposure(; descriptors = [BookToPrice()], family = "style")]
+    alpha = 0.01 * randn(StableRNG(829), size(rd.X, 2))
+    alpha[3] = NaN
+    cases = (("the defaults", CrossSectionalFactorPrior(; factors = factors), nothing),
+             ("a lag of three", CrossSectionalFactorPrior(; factors = factors, lag = 3),
+              nothing),
+             ("a shrunk factor mean",
+              CrossSectionalFactorPrior(; factors = factors, lambda = 0.4), nothing),
+             ("a Return Forecast, lambda = 0.3 and c = 0.7",
+              CrossSectionalFactorPrior(; factors = factors, lambda = 0.3, c = 0.7,
+                                        rfe = CustomValueReturnForecast(; mu = alpha)),
+              alpha))
+    for (name, pe, a) in cases
+        @testset "$name" begin
+            pr = prior(pe, rd)
+            o = csfp_oracle(pe, rd; alpha = a)
+            rr = pr.rr
+            D = rr.esigma
+            @test o.Q == rr.rw
+            @test isapprox(o.F, rr.csr.f; rtol = 1e-10, atol = 1e-15)
+            @test isapprox(o.mut, pr.fpr.mu; rtol = 1e-10)
+            @test isapprox(o.Sf, pr.fpr.sigma; rtol = 1e-10)
+            I = findall(i -> o.amsk[end, i] &&
+                             isfinite(D[i]) &&
+                             all(isfinite, view(o.ZT, i, :)), eachindex(D))
+            J = setdiff(eachindex(D), I)
+            @test !isempty(J)
+            mu = o.ZT[I, :] * o.mut + o.b[I]
+            S = o.ZT[I, :] * o.Sf * transpose(o.ZT[I, :]) + LinearAlgebra.Diagonal(D[I])
+            @test isapprox(mu, pr.mu[I]; rtol = 1e-10, nans = true)
+            @test isapprox(S, pr.sigma[I, I]; rtol = 1e-10)
+            @test all(isnan, pr.mu[J])
+            @test all(isnan, pr.sigma[J, :])
+            @test all(isnan, pr.sigma[:, J])
+        end
+    end
+    @testset "At lambda = 0 and c = 1 the expected return is the forecast" begin
+        pe = CrossSectionalFactorPrior(; factors = factors, lambda = 0.0, c = 1.0,
+                                       rfe = CustomValueReturnForecast(; mu = alpha))
+        pr = prior(pe, rd)
+        i = findall(PO.investable_mask(pr))
+        @test !(3 in i)
+        @test isapprox(pr.mu[i], alpha[i]; rtol = 1e-12)
+    end
+    @testset "A regression that fits an intercept is refused" begin
+        # With a market factor in the design, the intercept takes a share of the common
+        # return, and the moments, which read the factor returns alone, would drop it.
+        pe = CrossSectionalFactorPrior(; factors = factors,
+                                       cre = CrossSectionalLinearRegression(;
+                                                                            intercept = true))
+        @test_throws ArgumentError prior(pe, rd)
+    end
 end
