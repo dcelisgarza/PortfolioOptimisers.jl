@@ -54,11 +54,16 @@ the clock of its common observations. Pairwise deletion is not positive semidefi
    and the step is `λ S + (1 - λ) e e'`, the old recursion. A diagonal entry, the location, the
    count, the reset on an inactive period and the read-out are unchanged. The parity constants of
    `test/test_08z_exp_weighted_moments.jl` have no holiday, and they pass unchanged.
-4. **`RegimeAdjustedExpWeightedCovariance` takes the same step on its path with one decay.** Its
-   path with a separate `cor_decay` updates the correlation state on the valid pairs alone and
-   divides each pair by its own pair count at read-out, so a holiday can still make it
-   indefinite. The fix removes a field of its state, so #1346 records it for the sweep of that
-   file.
+4. **`RegimeAdjustedExpWeightedCovariance` takes the same step on both of its paths.** The path
+   with one decay takes it on the covariance state (#1343). The path with a separate `cor_decay`
+   takes it on the correlation state, with `sqrt(cor_decay)` in `D` (#1346). That path used to
+   update the correlation state on the valid pairs alone, and to divide each pair by its own
+   count of common observations at read-out. Neither operation is a congruence, and 200 random
+   panels with holidays gave a smallest eigenvalue of `-0.1075` times the largest entry. The
+   correction for the zero seed is now the congruence
+   `sqrt((1 - cor_decay^n_i)(1 - cor_decay^n_j))`, and it cancels in the normalisation to a unit
+   diagonal, so the read-out normalises the state directly. The pair count then has no reader,
+   and the state `RegimeAdjustedCovarianceState` drops its field `pair_obs_count`.
 
 ## Considered options
 
@@ -84,3 +89,7 @@ the clock of its common observations. Pairwise deletion is not positive semidefi
 - `cor` reads a ratio that lies in `[-1, 1]`, so its clamp removes round-off only.
 - The value of a pair whose two assets have different holidays changes. The value of every other
   entry is the same as before.
+- The estimate of `RegimeAdjustedExpWeightedCovariance` is positive semidefinite on a holiday on
+  both paths, where `hac_lags` is `nothing`. On its separate path, a sample with a holiday gives
+  a new answer, and a sample without one gives the old answer, because a common count then
+  corrects every pair by the same scalar.

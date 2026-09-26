@@ -226,7 +226,9 @@ Q_{ij,t} &= \\lambda_c Q_{ij,t-1} + (1-\\lambda_c) \\frac{u_{i,t} u_{j,t}}{\\sqr
 Where:
 
   - ``v_{i,t}``: Raw exponentially weighted variance of asset ``i``.
-  - ``Q_{ij,t}``: Raw exponentially weighted correlation state.
+  - ``Q_{ij,t}``: Raw exponentially weighted correlation state. On a holiday of asset ``i``,
+    ``Q_{ii}`` holds and ``Q_{ij}`` decays by ``\\sqrt{\\lambda_c}``, so each correlation
+    ``\\rho_{ij}`` holds and ``Q`` stays positive semidefinite.
   - ``\\rho_{ij,t}``: Correlation, normalised from ``Q``.
 
 A zero seed damps the state, so the read-out removes the damping before it reports:
@@ -240,7 +242,8 @@ A zero seed damps the state, so the read-out removes the damping before it repor
 Where:
 
   - $(math_dict[:Sigma_hat])
-  - ``n_i``: Count of valid observations of asset ``i``. A pairwise count corrects ``Q``.
+  - ``n_i``: Count of valid observations of asset ``i``. The same correction of ``Q`` at
+    ``\\lambda_c`` cancels in the normalisation to ``\\rho``, so ``Q`` needs none.
   - ``\\mathrm{mult}(s_T)``: Regime multiplier of the smoothed regime state ``s_T``, clamped to
     `regime_lohi_mult` where that field is not `nothing`.
 
@@ -419,7 +422,7 @@ Internal mutable cache for the online covariance update in [`RegimeAdjustedExpWe
 
 This type is an implementation detail and is not intended for direct use.
 
-The three fields that carry the separate correlation recursion are `nothing` where `cor_decay`
+The two fields that carry the separate correlation recursion are `nothing` where `cor_decay`
 is `nothing`, because one decay then carries the whole matrix and no correlation state exists.
 
 # Fields
@@ -448,10 +451,6 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:ra_cor_state])
     """
     cor_state
-    """
-    $(field_dict[:ra_pair_obs_count])
-    """
-    pair_obs_count
     """
     $(field_dict[:ra_XXt])
     """
@@ -978,7 +977,10 @@ reads.
  1. Advance the variance with the diagonal of the outer product, floored at zero.
  2. Standardise the outer product by the running volatilities. An asset whose variance is not
     above `min_val` contributes zero.
- 3. Advance the correlation state where both assets of the pair are valid, and count the pair.
+ 3. Advance the correlation state by the step ``Q \\leftarrow D Q D + (1 - \\lambda_c) \\Delta``,
+    where ``D`` holds ``\\sqrt{\\lambda_c}`` for a valid asset and one for any other asset, and
+    ``\\Delta`` is the standardised outer product on the pairs of valid assets. A holiday thus
+    holds the correlation of each pair that contains its asset.
  4. Normalise the correlation state of the active block to a unit diagonal, symmetrise it, and
     rescale it by the running volatilities into `cache.covariance`.
 
@@ -1010,11 +1012,12 @@ function update_var_cor!(cache::RegimeAdjustedCovarianceState,
     inv_sigma = ifelse.(positive, inv.(sqrt.(ifelse.(positive, cache.variance, one(T)))),
                         zero(T))
     outer_std = cache.XXt .* (inv_sigma .* transpose(inv_sigma))
-    cache.cor_state .= ifelse.(pair_valid,
-                               ce.cor_decay * cache.cor_state +
-                               (one(ce.cor_decay) - ce.cor_decay) * outer_std,
-                               cache.cor_state)
-    cache.pair_obs_count[pair_valid] .+= 1
+    # A holiday holds the correlation of each pair that contains its asset (ADR 0181).
+    sqrt_cor_decay = sqrt(ce.cor_decay)
+    d = ifelse.(valid, sqrt_cor_decay, one(sqrt_cor_decay))
+    cache.cor_state .= d .* cache.cor_state .* transpose(d) .+
+                       ifelse.(pair_valid, (one(ce.cor_decay) - ce.cor_decay) .* outer_std,
+                               zero(T))
 
     active = cache.active .& (cache.variance .> zero(T))
     if !any(active)
@@ -1044,10 +1047,9 @@ read-out reports.
 The recursion is seeded at zero, and it damps the state by ``1 - \\lambda^{n}`` after `n`
 observations. The correction is a congruence transform, so it restores the scale without moving a
 correlation, and it keeps a positive semidefinite state positive semidefinite. Where `cor_decay`
-opens the separate path, the variance and the correlation are corrected at their own decays, and
-the correlation reads a pairwise count so that an asynchronous listing is corrected pair by pair.
-That pairwise count is not a congruence, so a holiday can make the separate path indefinite
-(#1346).
+opens the separate path, the variance is corrected at `decay`. The correction of the correlation
+state at `cor_decay` is a congruence transform too, so it cancels in the normalisation to a unit
+diagonal, and the read-out normalises the state directly.
 
 # Arguments
 
@@ -1094,9 +1096,7 @@ function bias_corrected_covariance(cache::RegimeAdjustedCovarianceState,
              inv.(max.(one(ce.decay) .- ce.decay .^ view(cache.obs_count, idx),
                        eps(ce.decay)))
     vol = sqrt.(max.(var_bc, ce.min_val))
-    cor_raw = cache.cor_state[idx, idx] .*
-              inv.(max.(one(ce.cor_decay) .- ce.cor_decay .^ cache.pair_obs_count[idx, idx],
-                        eps(ce.cor_decay)))
+    cor_raw = cache.cor_state[idx, idx]
     inv_d = inv.(sqrt.(clamp.(LinearAlgebra.diag(cor_raw), ce.min_val, T(Inf))))
     rho = clamp.(cor_raw .* (inv_d .* transpose(inv_d)), -one(T), one(T))
     rho .= (rho + transpose(rho)) / 2
@@ -1113,8 +1113,8 @@ statistic.
 
 This block calibrates the smoother and is never reported, so it applies the per-asset variance
 correction alone. Where the separate path runs, the correlation already sits inside
-`cache.covariance` normalised, and its pairwise correction cancels in that normalisation for a
-synchronous sample. [`bias_corrected_covariance`](@ref) is the exact read-out.
+`cache.covariance` normalised, and its correction for the zero seed cancels in that
+normalisation. [`bias_corrected_covariance`](@ref) is the exact read-out.
 
 # Arguments
 
@@ -1219,8 +1219,10 @@ then advances the covariance itself. On the path with one decay, the covariance 
 ``S \\leftarrow D S D + (1 - \\lambda) \\Delta``, where ``D`` holds ``\\sqrt{\\lambda}`` for a
 valid asset and one for any other asset, and ``\\Delta`` is the outer product on the pairs of valid
 assets. A holiday thus holds the correlation of each pair that contains its asset, as in
-[`ExpWeightedCovariance`](@ref). An asset that turns inactive at this observation has its
-row and column zeroed and its counts reset, so a later listing starts from a cold state.
+[`ExpWeightedCovariance`](@ref). The path with a separate `cor_decay` takes the same step on its
+correlation state, with ``\\sqrt{\\lambda_c}``, in [`update_var_cor!`](@ref). An asset that
+turns inactive at this observation has its row and column zeroed and its count reset, so a
+later listing starts from a cold state.
 
 # Arguments
 
@@ -1297,8 +1299,6 @@ function process_observation!(cache::RegimeAdjustedCovarianceState,
             cache.variance[newly_inactive] .= zero(T)
             cache.cor_state[newly_inactive, :] .= zero(T)
             cache.cor_state[:, newly_inactive] .= zero(T)
-            cache.pair_obs_count[newly_inactive, :] .= 0
-            cache.pair_obs_count[:, newly_inactive] .= 0
         end
         if !ce.centred
             cache.location[newly_inactive] .= T(NaN)
@@ -1446,7 +1446,6 @@ function regime_adjusted_covariance_pass!(f, ce::RegimeAdjustedExpWeightedCovari
                                       end, zeros(eltype(X), N, N),
                                       separate ? zeros(eltype(X), N) : nothing,
                                       separate ? zeros(eltype(X), N, N) : nothing,
-                                      separate ? zeros(Int, N, N) : nothing,
                                       zeros(eltype(X), N, N), zeros(eltype(X), N),
                                       zeros(eltype(X), N), location, zeros(Int, N),
                                       trues(N), nothing, 0)

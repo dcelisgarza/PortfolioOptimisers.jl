@@ -541,7 +541,7 @@ Copies a [`RegimeAdjustedCovarianceState`](@ref), so the copy shares no array wi
 The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref)
 calls before it folds. Every array field is copied, and the two scalar fields pass through. The
 circular buffer of recent centred returns is rebuilt at the same capacity, and each observation
-it holds is copied into it, so a fold on the copy pushes into a buffer of its own. The three
+it holds is copied into it, so a fold on the copy pushes into a buffer of its own. The two
 fields of the separate correlation recursion pass through as `nothing` where they are `nothing`.
 
 # Arguments
@@ -571,10 +571,9 @@ function Base.copy(x::RegimeAdjustedCovarianceState)
 
     variance = isnothing(x.variance) ? nothing : copy(x.variance)
     cor_state = isnothing(x.cor_state) ? nothing : copy(x.cor_state)
-    pair_obs_count = isnothing(x.pair_obs_count) ? nothing : copy(x.pair_obs_count)
 
     return RegimeAdjustedCovarianceState(ret_buffer, copy(x.covariance), variance,
-                                         cor_state, pair_obs_count, copy(x.XXt), copy(x.Xi),
+                                         cor_state, copy(x.XXt), copy(x.Xi),
                                          copy(x.X_old_i), copy(x.location),
                                          copy(x.obs_count), copy(x.active), x.regime_state,
                                          x.n_regime_obs)
