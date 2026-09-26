@@ -206,16 +206,20 @@ The API pages follow the new source layout, and each source file has a public pa
 
 ## From v0.31 to v0.32
 
-v0.32 adds the online portfolio selection family. It also removes `OnlineStep`, the `ff` keyword, the `ddof` keyword of `LInfNorm` and three unexported functions. It gives the naive optimisers a `fees` field and adds fields to four results. Five calls that ran in v0.31 now raise an error, four calls that raised now answer, and the results in [Results that move](@ref migration-0-32-numbers) change.
+v0.32 adds the online portfolio selection family. It also removes `OnlineStep`, the `ff` keyword, the `ddof` keyword of `LInfNorm`, the `dims` keyword of every call on a `ReturnsResult` or a prior result, and some unexported functions. It gives the naive optimisers a `fees` field and adds fields to some results. The rank statistics give a tie its mean rank. Some calls that ran in v0.31 now raise an error, some calls that raised now answer, and the results in [Results that move](@ref migration-0-32-numbers) change.
 
 ### [Names that were removed](@id migration-0-32-removed)
 
 | Removed | Write instead |
 | --- | --- |
 | `OnlineStep`, and the `ff` keyword of `IndexWalkForward` and `DateWalkForward` | The online step is a scheme wrapped in `Online`, and each scheme has its own constructor. `OnlineIndexWalkForward(train_size, test_size; …)` and `OnlineDateWalkForward(train_size, test_size; …)` take every keyword of the plain scheme except `expand_train`, which an online run sets. `IndexWalkForward(60, 1; ff = OnlineStep())` becomes `OnlineIndexWalkForward(60, 1)`. An `Online(cv)` that you write by hand on a scheme raises an error that names the three constructors. |
-| The derived `expand_train` (`nothing` on the two walk-forwards) | `expand_train` is a plain `Bool` keyword again, `false` by default, as in v0.30. |
+| The derived `expand_train`, which was `nothing` on the two walk-forwards | `expand_train` is a plain `Bool` keyword again, `false` by default, as in v0.30. |
 | `fold_fit`, `cv_online_info`, `cv_resume_info` (unexported) | Nothing replaces them. The fold loop reads the type of the scheme to decide whether it steps online. |
 | The `ddof` keyword and field of `LInfNorm` | `LInfNorm()`. The largest single-period difference carries no degrees of freedom, so the norm is not scaled. `LInfNorm(; ddof = 1)` raises a `MethodError`. |
+| The `dims` keyword of `optimise` on every optimiser, of `prior`, `ucs`, `mu_ucs` and `sigma_ucs` on a `ReturnsResult`, and of `clusterise`, `phylogeny_matrix`, `phylogeny_constraints`, `centrality_vector`, `average_centrality`, `asset_phylogeny`, `centrality_constraints`, `plot_dendrogram` and `plot_clusters` on a prior result | Nothing. A `ReturnsResult` and a prior result hold the observations along the rows, so `dims = 1` is the one correct value. These calls ignore a `dims` that you pass. A method that takes a matrix keeps `dims`. |
+| `find_complete_indices` (unexported) | `CompleteAssetSelector` keeps the assets with no gap, and `MissingDataFilter` drops rows and columns. The function counted a column with an `Inf` as complete. |
+| `assert_returns_result_dims` (unexported) | Nothing replaces it, because no call takes `dims` on a `ReturnsResult`. |
+| `has_X`, `get_X`, `has_Xap1`, `get_Xap1`, `has_ddap1`, `get_ddap1`, `has_dd`, `get_dd` and `set_asset_neg_returns_plus_one!` (unexported) | Keep the value that the builder of the entry returns. For the negated returns, pass `-X` to `set_asset_returns_plus_one!` under a prefix of your own. No code in the library called these functions. |
 
 ### [Renamed keywords and changed defaults](@id migration-0-32-renames)
 
@@ -229,10 +233,14 @@ v0.32 adds the online portfolio selection family. It also removes `OnlineStep`, 
 - **`plot_histogram(…; reference = true)`** draws the pdf of the Normal fitted to the returns, and `reference = false` draws no curve. v0.31 drew a kernel density under the label "Normal" for `true`, and the Normal for `false`.
 - **`plot_factor_risk_contribution`** names its last bar "Off-factor", where v0.31 named it "Constant". The factor names apply only when they count the columns of the loadings. Otherwise the bars are numbered.
 - **`plot_performance_summary`** draws four more bars: the excess return, the tracking error, the information ratio and the turnover.
+- **The rank statistics give a tie its mean rank.** `forecast_evaluation`, `exposure_ic`, `exposure_ic_summary`, `idio_vol_ic` and `idio_vol_residual_dependence` take `ties = :average` by default, and `forecast_ic`, `forecast_factor_correlation` and the `:rank` book of `forecast_portfolio` read the `ties` of the evaluation. v0.31 ranked a tie by the order of the assets, so a constant forecast scored a Spearman coefficient of `1` or `-1`. State `ties = :ordinal` to keep the v0.31 numbers.
+- **`covariance_forecast_compare`** caps its default `lags` at the number of steps less one. So a run with fewer steps than the horizon no longer refuses its own default.
+- **A finite allocation below a unit budget** splits the cash by the new collateral algorithm, `ProceedsCollateral` by default. See [Results that move](@ref migration-0-32-numbers).
+- **The keyword `N` of the plots that keep the largest assets** counts the effective number of assets from the shares of the magnitudes. So the count no longer changes when you scale the weights.
 
 ### [Calls that now raise](@id migration-0-32-raises)
 
-In v0.31 each of these calls returned a value that did not follow the configuration. In v0.32 each call raises an error that names the cause and the fix.
+In v0.31 each of these calls returned a value that did not follow the configuration, or raised an error that did not name the cause. In v0.32 each call raises an error that names the cause.
 
 | Call | v0.31 | v0.32 |
 | --- | --- | --- |
@@ -241,15 +249,55 @@ In v0.31 each of these calls returned a value that did not follow the configurat
 | A `TimeDependent` schedule whose entries or `default` hold a prior result, in the fold loop | Accepted, and every fold read the full-sample prior | `ArgumentError`. A callable schedule still runs. |
 | A walk-forward on a `Frontier` sweep with a term that reads the previous weights, such as `Turnover(; w)` | Ran, and charged every fold against the stated `w`, because no one portfolio of the sweep is the previous one | `ArgumentError`. A `fixed = true` turnover still runs. |
 | `GridEntropicValueatRiskView(; M)` or `GridRelativisticValueatRiskView(; M)` with `M < 1` | Accepted | `DomainError` |
+| `ExpWeightedExpectedReturns`, `ExpWeightedVariance`, `ExpWeightedCovariance`, `RegimeAdjustedExpWeightedVariance` or `RegimeAdjustedExpWeightedCovariance` with `decay > 1` and a stated `min_obs` | Accepted, and the estimate could be negative. On one example, `decay = 1.5` gave the variances `-1.5e12` and `-1.24e12`. | `DomainError`. `decay` must lie in `(0, 1)`. At `decay = 1` the default `min_obs` still raises an `InexactError`, as in v0.31. |
+| `Fees` with a `tn`, `lq` or `flq` whose `val` is not finite | Accepted. `Inf` gave a model with an infinite coefficient and `NaN` weights. | `DomainError` that names the field |
+| `GridSearchCrossValidation` or `RandomisedSearchCrossValidation` with an empty vector of values, such as `"opt.l1" => Float64[]` | The search fitted nothing, and it raised an error that said that every candidate failed | `IsEmptyError` that names the key, before the search builds the grid |
+| `AssetPanel` whose fields derive one column name of the feature matrix twice, such as `"beta=size"` beside a tensor field `beta` with the label `size` | `panel_feature_matrix` gave the name twice | `ArgumentError` that names the column and both fields |
+| `ReturnsResult(; X, nb)` with no `B` | Accepted | `IsNothingError` that names `nb` and `B` |
+| `UncertaintySetVariance` with a `sigma` that is not square | Accepted, and a box set ran | `DimensionMismatch`, as `Variance` gives |
+| `DistributionallyRobustConditionalValueatRisk(; w)` with a negative or non-finite weight | Accepted | `DomainError` |
+| `prior(CrossSectionalFactorPrior(…), rd)` whose regression fits an intercept | Accepted. `mu`, `sigma` and the scenarios dropped the share of the intercept. | `ArgumentError` that names the remedy |
+| `cross_sectional_factor_sets` with a factor label that starts with a key prefix of the universe, or that equals its `nikey` | A label such as `"ni"` became an axis. Other labels gave an unrelated `DimensionMismatch` or `KeyError`. | `ArgumentError` that names the label |
+| `IntegerPhylogeny` in the `frc_ple` of `FactorRiskContribution` when the asset bounds are `nothing` or not finite | The phylogeny had no effect | `ArgumentError`. With finite bounds the phylogeny now binds the factor weights, and it needs a MIP solver. |
+| `ResidualInflation` with no `dof` on a hand-built `Regression` that records no `edof` | The radius took a count of degrees of freedom from the type of the block | `IsNothingError` |
+| `MissingDataFilter` applied to a window that lacks a fitted asset | The filter dropped the asset with no error | `ArgumentError` |
+| `merge_states` of two returns buffers with different caps | Merged to the smaller cap | `ArgumentError` |
+| `PriceIngestion(; join_method)` with `:right` or a misspelt symbol | Accepted. `:right` let a covariate set the clock. | `ArgumentError` |
+| `panel_dataframe` on a panel whose field name or asset name equals a column that the table writes, such as `"asset"` or `"observation"` | The table replaced the column with no error | `ArgumentError` that names the column |
+| A `Pipeline` with a capped `Online` prior two levels down, such as `opt.pe.pe`, after a `PriceGapFill` step | Ran, although the same prior one level down raised an error | `ArgumentError` |
+| `partial_fit!` on a `Pipeline` whose `Online` step no warm-up resolved | The step dropped the wrapper and its cap. `Online(EmpiricalPrior(); max_history = 30)` folded 80 rows. | `ArgumentError` |
+| `plot_rolling_drawdowns` with a window longer than the series | Drew an empty plot | `DomainError` |
 
 ### [Calls that now answer](@id migration-0-32-answers)
 
 | Call | v0.31 | v0.32 |
 | --- | --- | --- |
-| A library estimator that holds a bare `StatsBase` covariance estimator, such as `Covariance(; ce = SimpleCovariance())`, inside a prior or an optimiser | `MethodError`: the bare estimator refused the library's keywords and the asset panel | Runs. A working path keeps its numbers. |
-| A mask-aware moment estimator (`ExpWeightedExpectedReturns`, `ExpWeightedVariance`, `ExpWeightedCovariance` and the two regime-adjusted forms) on a transposed sample with an asset panel, `dims = 2` | `DimensionMismatch` | The same answer as `dims = 1` |
+| A library estimator that holds a bare `StatsBase` covariance estimator, such as `Covariance(; ce = SimpleCovariance())`, inside a prior or an optimiser | `MethodError`, because the bare estimator refused the library's keywords and the asset panel | Runs. A working path keeps its numbers. |
+| `ExpWeightedExpectedReturns`, `ExpWeightedVariance`, `ExpWeightedCovariance` or one of the two regime-adjusted forms on a transposed sample with an asset panel, `dims = 2` | `DimensionMismatch` | The same answer as `dims = 1` |
 | An upper bound over several assets on an EVaR or RLVaR view, with `alg = nothing` | `ArgumentError` | The sequential formulation meets the view. |
 | An upper-bound grid EVaR view at half the prior value | On a 100-row example, a `DomainError` on the posterior weights | The posterior meets the bound to `1e-10`. |
+| `optimise(opt, rd; dims = 2)` on `EqualWeighted`, `RandomWeighted` or a hierarchical optimiser, and `plot_dendrogram` or `plot_clusters` on a prior result with `dims = 2` | `ConflictingArgumentError`, `DimensionMismatch` or `BoundsError` | The call ignores `dims`, and it gives the answer of `dims = 1`. |
+| Integer returns in `HierarchicalRiskParity`, `HierarchicalEqualRiskContribution`, `SchurComplementHierarchicalRiskParity`, `InverseVolatility`, `EqualWeighted`, `RandomWeighted`, `PreviousWeights`, the three exponentially weighted moment estimators, `phylogeny_features`, `factor_model_summary`, the exposure, regression and idiosyncratic diagnostics, `CrossSectionalFactorPrior` and `OrthogonalUncertaintySet` | `InexactError`, or `MethodError` for `eps(::Type{Int64})` | The answer of the `Float64` copy of the data. `Float32` data stays `Float32`. |
+| An optimiser whose fallback `fb` is a precomputed result, such as `fb = optimise(EqualWeighted(), rd)`, when the first solve fails | `MethodError` | The fallback returns that result. A failed precomputed result ends the chain. |
+| `MonotonicSchurComplement` on a bracket narrower than about `0.18 * tol` | The search did not iterate. It warned that it did not converge, or it raised under `strict = true`. | The search stops when the bracket is at most `tol` wide. |
+| `feature_matrix(…, rows)` with a `Bool` mask | `DimensionMismatch` | The stack holds the rows where the mask is `true`. |
+| The compact covariance uncertainty set on a singular covariance | `PosDefException` | Runs, as `Variance` does |
+| `mean(StandardDeviationExpectedReturns(SimpleCovariance()), X)`, the same for `VarianceExpectedReturns`, and either one inside `EmpiricalPrior(; me = …)` | `MethodError` | Runs |
+| `covariance_forecast_evaluation` of a `PortfolioOptimisersCovariance` or `CorrelationCovariance` that holds a `StatsBase` estimator | `MethodError` | Runs |
+| `covariance_forecast_summary` on a one-step evaluation, or on a step with a `NaN` standardised return | `ArgumentError` about quantiles in the presence of `NaN` | The bias columns are `NaN`. |
+| `FactorRiskContribution` with an estimator in `frc_ple`, when `optimise` receives a keyword that the optimiser does not read | `MethodError` | Runs |
+| `FactorRiskContribution` with a vector `frc_ple` | The model solved, then a `TypeError` stopped the result | Runs, and `frc_plr` holds the vector |
+| An `sgcarde` whose column count equals the row count of `sgmtx` when the row count does not, or on an optimiser where an asset is not investable | `DimensionMismatch` | Runs. An asset that departed removes a column of `sgmtx`, not a sub-group. |
+| A vector `sglt` or `sgst` with no `card` or `gcard` | `MethodError` | Runs |
+| `NearestQuantilePrediction`, `sort_by_measure`, `quantile_by_measure`, `expected_risk(r, ppred)` or `rolling_window_measure(r, ppred, window)` on a `PopulationPredictionResult` of single-fold `PredictionResult`s | `FieldError` or `MethodError` | Runs. Each member takes its own method. |
+| `train_test_split` or `TrainTestSplit` with a `Rational` fraction, such as `train_size = 1 // 5` | `MethodError` | Runs |
+| `MissingDataFilter` with a vector `ivpa` and no `iv`, when the filter drops a column | `DimensionMismatch` | Runs |
+| `merge_states` of the empty sample buffer that an `Online` wrapper seeds with a folded buffer, and `port_opt_view` of an empty buffer | `DimensionMismatch` or `BoundsError` | A copy of the folded buffer, and a view |
+| `price_ingestion` on a table of `Union{Missing, Rational{Int}}` that holds no `missing` | `DomainError` | Runs |
+| A `price_ingestion` collapse whose timestamp function makes new timestamps, on a time-varying panel | `ArgumentError` | Runs |
+| `linear_constraints` with a group that sheds every member while the other side is not empty | `BoundsError` | Runs |
+| `plot_factor_mu`, `plot_factor_sigma`, `plot_factor_forecast_correlation` and `plot_factor_forecast_volatilities` on a `HighOrderPrior` over a `FactorPrior` | `FieldError` | Runs |
+| `plot_composition` of a prediction with a masked fold, `plot_dendrogram` and `plot_clusters` on a prior with gaps, `plot_measures` on a `PredictionResult`, and `plot_asset_cumulative_returns(…; N = 0.5)` | An error. A masked fold gave a `BoundsError`, a prior with gaps an `IsNonFiniteError`, and a fractional `N` a `TypeError`. | Runs |
 
 ### [Results that move](@id migration-0-32-numbers)
 
@@ -262,18 +310,77 @@ These results were wrong in v0.31:
 - `IntegerConditionalValueatRiskView` did not reach the posterior of least divergence. On a 60-row example, the divergence falls from `0.0189` to `0.0175` for an upper bound, and from `0.0858` to `0.0415` for an equality. The view now warns when its window of `sbar` losses binds.
 - An `IterativeWeightFinaliser` that stalled or diverged reported success with weights that broke the bounds. It now returns the Euclidean projection of its input. A bound set that cannot hold the budget now fails, so the fallback chain runs.
 - A walk-forward that charged a turnover fee on a naive optimiser priced the fee against the reference weights `w` of its `Turnover` on every fold, never against the weights that the fold held. Buy-and-hold paid the most, and a constant rebalanced portfolio paid nothing. The fee is now charged against the previous weights that the fold loop passes on. The first fold's fee is the trade from those reference weights.
+- `optimise(opt, rd; dims = 2)` on `MeanRisk`, `InverseVolatility` or another optimiser that fits a prior fitted the prior on the transpose, and gave one weight per observation. `prior(pe, rd; dims = 2)` and the clustering calls on a prior result also read the transpose. Now `dims` has no effect.
+- Under `MaximumRatio`, the squared L2 penalty of `RSOCRiskExpr`, `SquaredSOCRiskExpr` and `QuadRiskExpr` scaled as `k^2 ‖w‖^2`, so its strength moved with `ohf`. The weights moved by `0.25` between `ohf` and `10 ohf`. The penalty is now `k ‖w‖^2`, of degree one, as every other penalty is.
+- With a fee, a moment risk measure whose target is per asset centred the net returns on the gross mean, so each deviation carried the mean fee. A target is per asset when you state a `mu` vector, or when `factory` fills the prior mean. The target now subtracts the mean fee of each period, in the model and in the functor. This covers the low- and high-order moments, `Kurtosis`, `MedianAbsoluteDeviation`, the third central moment and the skewness.
+- `LowOrderMoment(; w, alg = SecondMoment())`, `HighOrderMoment` with a standardised algorithm and `Skewness(; w)` did not pass `w` to their variance estimator. So the functor ignored the weights in the variance. On one example it gave `2.7574`, and the optimiser gave `2.9726`.
+- `expected_risk` of a `RiskTrackingRiskMeasure` with `IndependentVariableTracking` and a fee charged the fee of `w - wb`, which is zero at `wb`, while the model charged the fee of `w`. With `Fees(; l = 0.002)` and a CVaR at `w = wb`, the functor gave about `0` and the model `0.002`. The functor now reads the series of the model. The weights do not move.
+- A `SemiDefinitePhylogeny` dropped its penalty `p tr(W)` when any variance was in the model. It now drops the penalty only when the objective minimises that variance: `MinimumRisk`, `MaximumUtility` with `l > 0`, and the return form of `MaximumRatio`. A variance ceiling, `MaximumReturn`, `MaximumUtility` with `l = 0` and the risk form of `MaximumRatio` keep the penalty, so their weights move. The same rule now holds for a `SemiDefinitePhylogeny` in the `frc_ple` of `FactorRiskContribution`, which v0.31 always penalised.
+- A `RiskTrackingRiskMeasure` with `DependentVariableTracking` of a semidefinite `Variance`, and a dependent `RiskTrackingError`, built the tracking variance on a second lifted matrix, which the rows of a `SemiDefinitePhylogeny` did not bind. The tracking variance now reads the lifted matrix of the optimiser.
+- An `IntegerPhylogeny` in the `frc_ple` of `FactorRiskContribution` had no effect. It now binds the factor weights.
+- Under `FactorRiskContribution(; flag = true)`, the variance read the factor part `b1 * w1` alone and omitted the off-factor weights. On one example the model value was 43 % below the variance of the returned weights. The variance now covers the whole decision vector.
+- Under `RelaxedRiskBudgeting` with `FactorRiskBudgeting(; flag = true)`, the relaxed risk priced `b1 * w1` alone. On one example `psi` was `0.219`, and the standard deviation of the weights was `1.88`. The marginal risks now read the asset weights.
+- `RelaxedRiskBudgeting` with a `RiskBudget` whose values do not sum to one did not meet the budget. `RiskBudget(; val = 20:-1:1)` gave contribution ratios from `0.19` to `1.64` against a target of `20`. The cones now read `val / sum(val)`.
+- Under `MaximumRatio`, an upper bound on the compact covariance uncertainty set bounded the worst-case variance by `ub / k`, so a bound that `MaximumReturn` meets made the model infeasible. The set now bounds the square root by `sqrt(ub)`.
+- When `smtx` and `sgmtx` were the same matrix, the model ignored `sglt` and `sgst`. It now keeps them unless they are the same objects as `slt` and `sst`.
+- `risk_contribution` of a vector of risk measures under `MaxScalariser` or `MinScalariser` took the wrong measure when the measures had different degrees. The chain-rule weights now come from the scaled risks, and the log-sum-exp contributions move too. `SumScalariser` does not move.
+- The Laplace z-score of a parametric `ValueatRiskRange` was wrong. At `beta = 0.05` it was `-0.454` where the quantile of the unit-variance Laplace is `-1.628`, so the range was about `2.08` standard deviations in place of `3.26`. The lower tail at `alpha > 1/2` was also wrong.
+- The empirical `ValueatRisk`, `ValueatRiskRange`, `DrawdownatRisk` and `RelativeDrawdownatRisk` took the order statistic `ceil(alpha T)`. When `alpha T` rounds above an integer, as `0.07 × 100` does, the functor returned the 8th smallest return and the MIP model the 7th. The functor now takes the order statistic of the model.
+- `HierarchicalEqualRiskContribution` chose the nodes above the cut by their height. When two heights tied at the cut, every weight was `NaN`, and the result was a failure. It now takes the nodes that `cutree` leaves. Under `LogSumExpScalariser` the shares inside a cluster did not sum to one, and at `gamma = 1e-3` the weights moved by up to `5.6e-3`.
+- DBHT clustering turned `Inf * 0` into `NaN` where two vertices have no path, and then chose the `NaN`. The bubble assignment and the tree move on such a network.
+- `ExpWeightedCovariance`, and `RegimeAdjustedExpWeightedCovariance` with one decay, let the variance of an asset decay on a holiday of another asset while their covariance stayed. So the estimate was not positive semidefinite. Two equal series, one of them with five holidays, gave an implied correlation of `2.37` under `ExpWeightedCovariance` and `2.44` under the regime-adjusted form. Each asset now ages its observations on its own clock, and a holiday holds the correlation of each pair that contains its asset. A sample with no holiday keeps its numbers.
+- `RegimeAdjustedExpWeightedCovariance` with a separate `cor_decay` divided each pair by its own count of common observations. With holidays, the smallest eigenvalue reached `-0.1075` times the largest entry. A holiday now holds the correlation of each pair that contains its asset. A sample with no holiday keeps its numbers.
+- `IdiosyncraticVarianceScaling` read only the diagonal of a full idiosyncratic covariance, which a `CrossSectionalFactorPrior` with `th != 0` writes. On a six-asset example with a correlated `esigma`, the scaling missed the full covariance by `0.0032`. It now reads the whole matrix.
+- A `PreviousWeights` fallback kept its whole `w` under an asset subset. So a cluster of `NestedClustered`, or the asset subset of `MultipleRandomised` or `SubsetResampling`, whose solve failed gave weights of the wrong length. A view now slices `w`, `fees` and `fb`, and it does not rescale the slice.
+- `DiscreteAllocation` had three defects. It multiplied the weights of a side by the cash of the side, which already held the budget of the side. So when a side budget `b` is not `1`, the targets summed to `b^2` times the cash. The two relative formulations bounded `x C / (w p) - 1`, where `x` is the count of shares, `p` the price, `w` the weight and `C` the cash. The correct relative error is `x p / (w C) - 1`. The relative objective added a unitless error to the cash. On `w = [0.4, 0.4]`, `p = [10, 100]` and `cash = 1250`, it bought `[40, 4]` where the exact book is `[50, 5]`.
+- Below a unit budget, the long side of a finite allocation took the cash that the short side did not use. So a book could spend more than its cash. On `[1.2, -0.5]` a book spent `170` of a cash of `100`, and a market-neutral book became all long. When the short side paid a fee, the long side also received an excess of twice that fee. The default `ProceedsCollateral` now bounds the net money, and `CashCollateral` bounds the gross money.
+- `GreedyAllocation` bought an asset with a zero target weight when its first pass bought nothing, and a side whose targets are all zero gave `NaN` shares and cash.
+- A fixed fee on a MIP optimiser charged the binary variable, which does not scale with `k`, so under `MaximumRatio` the weights depended on `ohf`. The fee now charges the binary times `k`. A fee with fixed terms alone did not reach the net returns, so a risk measure on the net returns did not see it.
+- `prices_to_returns` let the gap-return algorithm of the caller overwrite the `-1`, `-Inf` and `Inf` returns next to an observed zero price. Those cells read two observed prices, and the algorithm no longer writes them. `CatchUpGapReturn` writes the same values as before.
+- `prices_to_returns(…; padding = true)` on a view of a `ListingSpan` made the first return row active for an asset listed before the window, with a `NaN` return. The row is now inactive.
+- `PriceGapFill` with `CarriedPrice` carried a price across an absence in the span of the caller, and across an absence at the end of the training window. So the return after the gap was an active move across the absence. An absence now clears the carry.
+- A `price_ingestion` collapse such as `(Dates.week, first, last)` took the prices of each period from its last row, but the values of the panel fields from its first row. Each period now takes the values of its last row.
+- `MissingDataFilter` dropped a row whose share of missing assets equals `row_thr`, and a `Float32` `col_thr` dropped a column at its threshold. The apply step kept the column order of the window, not the fitted order.
+- `train_test_split` and `TrainTestSplit` with a fraction lost a row to round-off. For example, `train_size = 0.29` on 100 rows gave 28 rows. The count is now the largest `n` with `n / N <= s`.
+- `merge_states` of two capped returns buffers trimmed `X` to `max_history`, but not `ts` or `B`.
+- `panel_dataframe` shared memory with the panel in the static long layout, so a write to the table changed the panel. It now copies.
+- Under `ResetCoverage`, the semi-covariance, the coskewness and the cokurtosis gave the answer of `DecayCoverage`. They now drop the history before the last delisting.
+- The online answer of a `HighOrderPriorEstimator` refitted a co-moment that does not fold over the capped or zero-filled `pr.X`. Under a cap of 25 scenarios on 80 rows, the coskewness missed the batch fit by 24 %. It now refits over the rows that the embedded prior folded.
+- `linear_constraints` read only the first two factors of a product: `"2*3*x <= 1"` lost `x`, and `"2*x*3 <= 1"` gave `2x`. `UniformValues` under `datatype = Rational{Int}` gave `6004799503160661//18014398509481984` for `1//3`.
+- `covariance_forecast_evaluation` of a prior centred the test rows on the `mu` that the prior publishes. For an `EmpiricalPrior` whose `me` shrinks the mean, this read a bias that the forecast did not have. The centre is now the centre of the `sigma` of the prior. The default pair does not move.
+- `covariance_forecast_evaluation` of a `PortfolioOptimisersCovariance` that holds a mask-aware estimator dropped an asset that listed after the start of the sample. Under an online cross-validation scheme with `store_forecasts = true`, every stored location was the vector of the last fold, so `covariance_forecast_portfolio` of such a run was off by up to `0.76`.
+- `performance_summary` of a constant return series gave a `sharpe` of about `2e16`, and a constant excess series gave an `information_ratio` of `2e16`. Each is now `NaN`, as the docstring states.
+- `forecast_portfolio` under `:zscore` turned a flat cross-section into a short book of 200 % gross. The row now stays zero. The series summary gave a constant series an information ratio of about `2e16`, which is now `NaN`.
+- `forecast_coverage` and its summary counted an asset with an infinite weight, which the Pearson column drops. They now admit `0 < u < Inf`.
+- `factor_model_summary` of a constant factor series gave a Sharpe ratio up to `1.3e17` and an autocorrelation of `±1`. The exposure diagnostics counted a zero weight toward a pair, and one `NaN` weight made an observation `NaN`. A constant cross-section gave an exposure correlation of `0.0` and a `cs_regression_r2` up to `8.1e31`. Each of these is now `NaN`.
+- `idio_skewness` and `idio_kurtosis` of a constant cross-section gave a finite value up to `2.45`, where the docstring states `NaN`. `idio_tail_rate` counted an infinite entry in the numerator and not in the denominator, so `[Inf 0.5 4 NaN -5]` gave `1.0` where the rate is `2/3`.
 
 These results were approximate in v0.31:
 
 - A tracking error on `LpNorm()`, whose default `ddof` moved from `0` to `1`.
 - The t-statistic of every information-coefficient summary treated the forward windows as independent rows. The windows overlap in three cases: `forecast_holding_period` from its second row on, `forecast_evaluation_summary` at any `step < horizon`, and `exposure_ic_summary` on a block at any `horizon > 1`. In these cases the statistic now uses a Newey-West variance at the known overlap order, so it is smaller. `ic_ir` does not move.
+- `MIPValueatRisk`, `DrawdownatRisk` and `ValueatRiskRange` with `b = nothing` used a big-M constant of `1000`. A solver integrality tolerance of `1e-6` then loosened a row by about `1e-3`, so the model risk and the measure disagreed. The builder now derives the smallest exact constant from the weight bounds and the spread of the losses. It keeps `1000` for a free weight scale, a tracking shift, fees or a `NaN` in `X`. On one example, a `NestedClustered` VaR portfolio falls from `0.013824` to `0.013200`.
+- The `ResidualInflation` radius took one count of degrees of freedom from the type of the block, so its level fell to `0.904` at `T = 30`, `K = 3` and to `0.769` at `K = 8`, against `0.95`. The fit now records the count of each asset, and the level is `0.942` and `0.946`.
+- The three exponentially weighted estimators divided the cold-start correction by `max(1 - decay^n, eps)`. The floor is gone. It changed an answer only where `1 - decay < eps`.
+- A bin edge of `forecast_calibration` that falls on an order statistic could land one ulp above it, and move a pair to the bin below.
+- Under Optim 2.3 and later, the entropy-pooling solve takes `Fminbox(; mu0 = 1e-5)`, as it does under Optim 2.0.1 to 2.2. v0.31 took the default `mu0` of Optim there, which can give a `NaN`.
 
 This result keeps its numbers, but its meaning changed:
 
 - `PopulationPredictionResult` gives each member whose `id` is `nothing` its position, so a scorer that selects a path names it.
+
+These results keep their numbers, but their number type changed:
+
+- `EqualWeighted` on `Float32` returns gives `Float32` weights. v0.31 gave `Float64`.
+- `factor_attribution` and the realised attribution family take the number type of the data. v0.31 gave `Float64` volatilities and errors for `Float32` data.
+- `forecast_evaluation_summary(fe; quantiles = 0.2)` stores `quantiles` as a vector of one. v0.31 stored a 0-dimensional array.
 
 ### [If you extend the library](@id migration-0-32-extending)
 
 - **A risk-measure builder** `set_risk_constraints!(model, i, r, opt, pr, …)` receives `opt::RiskConstraintOwner`. A method bound to `RiskJuMPOptimisationEstimator` alone is not called for a `ProgrammeAllocationSet`.
 - **`SchurComplementHierarchicalRiskParityResult`** has a `fees` field after `clr`, so its positional constructor takes one more argument. The keyword constructor needs `fees` too. Pass `fees = nothing` for a result with no fee.
 - **`L1Norm`** has a field, `ddof`, and **`LInfNorm`** has none. Code that constructs either by position must follow.
+- **`ForecastEvaluationResult`** has a `ties` field after `min_count`, so its positional constructor takes one more argument.
+- **`Regression`** and **`CrossSectionalFactorModel`** have the fields `edof` and `ediv`, so their positional constructors take two more arguments.
+- **`FactorRiskBudgeting`** has a `hedge` field, `false` by default, so its positional constructor takes one more argument.
+- **`FiniteAllocationInput`** has a field `ca`, the collateral algorithm, so its positional constructor takes one more argument.
