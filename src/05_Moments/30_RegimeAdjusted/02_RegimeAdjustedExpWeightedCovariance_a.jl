@@ -256,11 +256,11 @@ $(DocStringExtensions.FIELDS)
     RegimeAdjustedExpWeightedCovariance(;
         decay::Number                                         = exp2(-inv(40.0)),
         cor_decay::Option{<:Number}                           = nothing,
-        min_obs::Integer                                      = round(Int, max(1, inv(log2(inv(decay))), isnothing(cor_decay) ? 1 : inv(log2(inv(cor_decay))))),
+        min_obs::Integer                                      = round(Int, max(1, decay_half_life(decay), isnothing(cor_decay) ? 1 : decay_half_life(cor_decay, :cor_decay))),
         hac_lags::Option{<:Integer}                           = nothing,
         regime_method::Option{<:RegimeAdjustedMethod}         = FirstMomentRegimeAdjusted(),
-        regime_decay::Number                                  = exp2(-2 * log2(inv(decay))),
-        regime_min_obs::Integer                               = round(Int, max(1, inv(log2(inv(decay))) / 2)),
+        regime_decay::Number                                  = exp2(-2 / decay_half_life(decay)),
+        regime_min_obs::Integer                               = round(Int, max(1, decay_half_life(decay) / 2)),
         regime_target::RegimeAdjustedTarget                   = PortfolioTarget(),
         regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = nothing,
         min_val::Number                                       = sqrt(eps()),
@@ -274,7 +274,7 @@ Keywords correspond to the struct's fields. Where `cor_decay` is not `nothing`, 
 ## Validation
 
   - $(val_dict[:decay])
-  - If `cor_decay` is not `nothing`, `cor_decay > 0`, finite, and non-empty.
+  - If `cor_decay` is not `nothing`, `0 < cor_decay < 1`.
   - `min_obs > 0` and `regime_min_obs > 0`.
   - $(val_dict[:hac_lags])
   - If `regime_lohi_mult` is not `nothing`, `0 < regime_lohi_mult[1] < regime_lohi_mult[2]`.
@@ -364,7 +364,7 @@ true
                                                  cache::Option{<:AbstractPartialFitState})
         assert_unit_interval(decay, :decay)
         if !isnothing(cor_decay)
-            assert_nonempty_gt0_finite_val(cor_decay, :cor_decay)
+            assert_unit_interval(cor_decay, :cor_decay)
         end
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         assert_nonempty_gt0_finite_val(regime_min_obs, :regime_min_obs)
@@ -390,19 +390,20 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                              cor_decay::Option{<:Number} = nothing,
                                              min_obs::Integer = round(Int,
                                                                       max(1,
-                                                                          inv(log2(inv(decay))),
+                                                                          decay_half_life(decay),
                                                                           if isnothing(cor_decay)
                                                                               1
                                                                           else
-                                                                              inv(log2(inv(cor_decay)))
+                                                                              decay_half_life(cor_decay,
+                                                                                              :cor_decay)
                                                                           end)),
                                              hac_lags::Option{<:Integer} = nothing,
                                              regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
-                                             regime_decay::Number = exp2(-2 *
-                                                                         log2(inv(decay))),
+                                             regime_decay::Number = exp2(-2 /
+                                                                         decay_half_life(decay)),
                                              regime_min_obs::Integer = round(Int,
                                                                              max(1,
-                                                                                 inv(log2(inv(decay))) /
+                                                                                 decay_half_life(decay) /
                                                                                  2)),
                                              regime_target::RegimeAdjustedTarget = PortfolioTarget(),
                                              regime_lohi_mult::Option{<:Tuple{<:Number,

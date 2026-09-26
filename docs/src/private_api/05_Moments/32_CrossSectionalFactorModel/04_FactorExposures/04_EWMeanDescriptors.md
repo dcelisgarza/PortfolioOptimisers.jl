@@ -1,5 +1,5 @@
 ```@meta
-Description = "Exponentially Weighted Mean Descriptors, private API of PortfolioOptimisers.jl: half_life_decay, half_life_min_obs, decay_half_life, assert_ew_decay, …"
+Description = "Exponentially Weighted Mean Descriptors, private API of PortfolioOptimisers.jl: half_life_decay, half_life_min_obs, assert_ew_decay, assert_ew_ratio_side, …"
 ```
 
 # Exponentially Weighted Mean Descriptors: private API
@@ -9,7 +9,6 @@ Description = "Exponentially Weighted Mean Descriptors, private API of Portfolio
 ```@docs
 half_life_decay
 half_life_min_obs
-decay_half_life
 assert_ew_decay
 assert_ew_ratio_side
 ew_ratio_values

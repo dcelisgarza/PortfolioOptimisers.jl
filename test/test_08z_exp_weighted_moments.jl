@@ -328,6 +328,50 @@ end
         end
     end
 
+    # #1355: the keyword defaults read `decay` before the inner constructor checks it, so
+    # each reads it through `decay_half_life`, which checks it first. The refusal must be
+    # the check's own `DomainError`: at one the old default raised `InexactError`, and below
+    # zero `log2` raised a `DomainError` that did not name `decay`.
+    refuses(f, sym) =
+        try
+            f()
+            false
+        catch e
+            e isa DomainError && occursin("0 < $sym < 1 must hold", e.msg)
+        end
+    for decay in (1.0, 1.5, 0.0, -0.5)
+        for E in (ExpWeightedExpectedReturns, ExpWeightedVariance, ExpWeightedCovariance,
+                  RegimeAdjustedExpWeightedVariance, RegimeAdjustedExpWeightedCovariance)
+            @test refuses(() -> E(; decay = decay), :decay)
+        end
+        # `regime_decay` and `regime_min_obs` read `decay` too, where `min_obs` is given.
+        for E in (RegimeAdjustedExpWeightedVariance, RegimeAdjustedExpWeightedCovariance)
+            @test refuses(() -> E(; decay = decay, min_obs = 1), :decay)
+        end
+        @test refuses(() -> PortfolioOptimisers.decay_half_life(decay), :decay)
+        @test refuses(() -> PortfolioOptimisers.decay_half_life(decay, :cor_decay),
+                      :cor_decay)
+    end
+    # `cor_decay` is a decay factor too. At one its weight `1 - cor_decay` is zero, and above
+    # one it is negative, so the constructor refuses both, and so does the default `min_obs`.
+    for cor_decay in (1.0, 1.5, 0.0)
+        @test refuses(() -> RegimeAdjustedExpWeightedCovariance(; decay = 0.9,
+                                                                cor_decay = cor_decay),
+                      :cor_decay)
+        @test refuses(() -> RegimeAdjustedExpWeightedCovariance(; decay = 0.9,
+                                                                cor_decay = cor_decay,
+                                                                min_obs = 1), :cor_decay)
+    end
+    # The defaults the half-life states are the ones the constructors held before #1355.
+    @test ExpWeightedCovariance().min_obs == 40
+    @test RegimeAdjustedExpWeightedVariance().regime_min_obs == 20
+    @test RegimeAdjustedExpWeightedCovariance().regime_decay == exp2(-inv(40.0))^2
+    @test RegimeAdjustedExpWeightedCovariance(; decay = 0.9, cor_decay = 0.99).min_obs ==
+          round(Int, PortfolioOptimisers.decay_half_life(0.99))
+    @test PortfolioOptimisers.decay_half_life(0.5) == 1
+    @test all(h -> round(Int, PortfolioOptimisers.decay_half_life(exp2(-inv(h)))) == h,
+              1:500)
+
     # A state does not merge, because it does not record whether an asset reset.
     a = partial_fit!(ExpWeightedVariance(; decay = EW_DECAY), view(Xg, 1:20, :)).cache
     b = partial_fit!(ExpWeightedVariance(; decay = EW_DECAY), view(Xg, 21:40, :)).cache

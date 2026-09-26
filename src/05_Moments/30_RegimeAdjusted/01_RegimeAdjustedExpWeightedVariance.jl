@@ -385,11 +385,11 @@ $(DocStringExtensions.FIELDS)
 
     RegimeAdjustedExpWeightedVariance(;
         decay::Number             = exp2(-inv(40.0)),
-        min_obs::Integer          = round(Int, max(1, inv(log2(inv(decay))))),
+        min_obs::Integer          = round(Int, max(1, decay_half_life(decay))),
         hac_lags::Option{<:Integer} = nothing,
         regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
-        regime_decay::Number      = exp2(-2 / inv(log2(inv(decay)))),
-        regime_min_obs::Integer   = round(Int, max(1, inv(log2(inv(decay))) / 2)),
+        regime_decay::Number      = exp2(-2 / decay_half_life(decay)),
+        regime_min_obs::Integer   = round(Int, max(1, decay_half_life(decay) / 2)),
         regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = nothing,
         min_val::Number           = sqrt(eps()),
         centred::Bool             = false,
@@ -503,14 +503,14 @@ end
 function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                            min_obs::Integer = round(Int,
                                                                     max(1,
-                                                                        inv(log2(inv(decay))))),
+                                                                        decay_half_life(decay))),
                                            hac_lags::Option{<:Integer} = nothing,
                                            regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
                                            regime_decay::Number = exp2(-2 /
-                                                                       inv(log2(inv(decay)))),
+                                                                       decay_half_life(decay)),
                                            regime_min_obs::Integer = round(Int,
                                                                            max(1,
-                                                                               inv(log2(inv(decay))) /
+                                                                               decay_half_life(decay) /
                                                                                2)),
                                            regime_lohi_mult::Option{<:Tuple{<:Number,
                                                                             <:Number}} = nothing,

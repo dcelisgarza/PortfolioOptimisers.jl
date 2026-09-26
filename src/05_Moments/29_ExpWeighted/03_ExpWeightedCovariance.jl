@@ -17,7 +17,7 @@ $(DocStringExtensions.FIELDS)
 
     ExpWeightedCovariance(;
         decay::Number = exp2(-inv(40.0)),
-        min_obs::Integer = round(Int, max(1, inv(log2(inv(decay))))),
+        min_obs::Integer = round(Int, max(1, decay_half_life(decay))),
         centred::Bool = false,
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> ExpWeightedCovariance
@@ -112,7 +112,8 @@ julia> ce.min_obs
     end
 end
 function ExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
-                               min_obs::Integer = round(Int, max(1, inv(log2(inv(decay))))),
+                               min_obs::Integer = round(Int,
+                                                        max(1, decay_half_life(decay))),
                                centred::Bool = false,
                                cache::Option{<:AbstractPartialFitState} = nothing)::ExpWeightedCovariance
     return ExpWeightedCovariance(decay, min_obs, centred, cache)

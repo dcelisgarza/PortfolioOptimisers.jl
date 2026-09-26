@@ -53,13 +53,13 @@ $(DocStringExtensions.FIELDS)
 
     ExpWeightedExpectedReturns(;
         decay::Number = exp2(-inv(40.0)),
-        min_obs::Integer = round(Int, max(1, inv(log2(inv(decay))))),
+        min_obs::Integer = round(Int, max(1, decay_half_life(decay))),
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> ExpWeightedExpectedReturns
 
 Keywords correspond to the struct's fields.
 
-The default `min_obs` is the half-life ``h = 1 / \\log_2(1 / \\lambda)`` rounded to the nearest integer, and at least one. The half-life is the count of observations over which a weight falls to one half, so after ``h`` valid observations the weight ``\\lambda^{n_i}`` that the cold start removes is one half. The default `decay` is ``2^{-1/40}``, a half-life of 40. The rule rounds, and does not truncate, because ``1 / \\log_2(1 / \\lambda)`` of ``\\lambda = 2^{-1/h}`` often comes back a small amount below the integer ``h``.
+The default `min_obs` is the half-life ``h = -1 / \\log_2 \\lambda`` of [`decay_half_life`](@ref) rounded to the nearest integer, and at least one. The half-life is the count of observations over which a weight falls to one half, so after ``h`` valid observations the weight ``\\lambda^{n_i}`` that the cold start removes is one half. The default `decay` is ``2^{-1/40}``, a half-life of 40. The rule rounds, and does not truncate, because ``-1 / \\log_2 \\lambda`` of ``\\lambda = 2^{-1/h}`` often comes back a small amount below the integer ``h``.
 
 ## Validation
 
@@ -110,9 +110,64 @@ julia> me.min_obs
 end
 function ExpWeightedExpectedReturns(; decay::Number = exp2(-inv(40.0)),
                                     min_obs::Integer = round(Int,
-                                                             max(1, inv(log2(inv(decay))))),
+                                                             max(1, decay_half_life(decay))),
                                     cache::Option{<:AbstractPartialFitState} = nothing)::ExpWeightedExpectedReturns
     return ExpWeightedExpectedReturns(decay, min_obs, cache)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Convert an exponential decay factor into its half-life, the count of observations over which a weight falls to one half.
+
+The function checks `decay` before it takes the logarithm. Every keyword default of an exponentially weighted estimator that reads `decay` reads it through this function. A `decay` outside the open unit interval therefore raises a `DomainError` that names it. No default reaches the logarithm or the conversion to an integer first. [`EWBeta`](@ref) reads its effective sample size, twice the half-life, through the same function. The function is the inverse of [`half_life_decay`](@ref).
+
+# Mathematical definition
+
+```math
+\\begin{align}
+h &= -\\frac{1}{\\log_2 \\lambda}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:lambda_ew])
+  - ``h``: Half-life, the count of observations for which ``\\lambda^{h} = 1/2``.
+
+# Arguments
+
+  - `decay::Number`: Decay factor.
+  - `sym::Sym_Str`: Name that the `DomainError` gives the decay factor.
+
+# Validation
+
+  - `0 < decay < 1`, for the decay factor that `sym` names.
+
+# Returns
+
+  - `h::Number`: Half-life, in observations.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.decay_half_life(0.5)
+1.0
+
+julia> PortfolioOptimisers.decay_half_life(PortfolioOptimisers.half_life_decay(60.0))
+60.00000000000008
+```
+
+# Related
+
+  - [`half_life_decay`](@ref)
+  - [`ExpWeightedExpectedReturns`](@ref)
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`EWBeta`](@ref)
+  - [`ew_beta_shrink`](@ref)
+"""
+function decay_half_life(decay::Number, sym::Sym_Str = :decay)::Number
+    assert_unit_interval(decay, sym)
+    return -inv(log2(decay))
 end
 """
 $(DocStringExtensions.TYPEDEF)
