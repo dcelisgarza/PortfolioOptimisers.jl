@@ -189,6 +189,8 @@ unique_key_dict!(math_dict, :math_dict,
                  # `32_CrossSectionalFactorModel/07_ReturnForecasts/`. Each symbol is
                  # stated by two or more Units of those files.
                  :alpha_ti_fc => "``\\alpha_{ti}``: Return Forecast of asset ``i`` at observation ``t``.",#
+                 :g_ti_unit => "``g_{ti}``: Unit factor of asset ``i`` at observation ``t``. It is ``1`` in [`IdiosyncraticReturnUnit`](@ref) and ``\\sqrt{v_{ti}}`` in [`IdiosyncraticSharpeUnit`](@ref).",#
+                 :gamma_rf_scale => "``\\gamma``: Forecast scale, the field `scale`.",#
                  :y_ti_fwd => "``y_{ti}``: Forward target of asset ``i`` at observation ``t``.",#
                  :m_ti_univ => "``m_{ti}``: Universe mask of asset ``i`` at observation ``t``, `true` where the asset is in the estimation universe.",#
                  :u_ti_cs => "``u_{ti}``: Cross-sectional weight of asset ``i`` at observation ``t``.",#

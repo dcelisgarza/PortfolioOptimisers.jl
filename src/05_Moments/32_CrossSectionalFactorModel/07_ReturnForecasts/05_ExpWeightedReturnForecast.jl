@@ -255,7 +255,7 @@ Where:
   - $(math_dict[:eps_ti_idio])
   - ``\\bar{\\varepsilon}_{ti}``: Forward mean idiosyncratic return of asset ``i`` at observation ``t``, the mean of the finite ``\\varepsilon_{si}`` over ``s`` from ``t + \\ell`` to ``t + \\ell + h - 1``, with ``\\ell`` the lag and ``h`` the horizon.
   - $(math_dict[:v_ti_idio])
-  - ``g_{ti}``: Unit factor of asset ``i`` at observation ``t``. It is ``1`` in [`IdiosyncraticReturnUnit`](@ref) and ``\\sqrt{v_{ti}}`` in [`IdiosyncraticSharpeUnit`](@ref).
+  - $(math_dict[:g_ti_unit])
   - ``y_{ti}``: Target of the fit for asset ``i`` at observation ``t``.
   - $(math_dict[:u_ti_cs])
   - ``w_{ti}``: Regression weight of asset ``i`` at observation ``t``. It is ``u_{ti} / v_{ti}`` in the return unit and ``u_{ti}`` in the Sharpe unit.
@@ -271,7 +271,7 @@ Where:
   - ``\\boldsymbol{\\beta}_{k}``: Descriptor coefficients after ``k`` advances. A singular ``\\mathbf{A}_{k} + \\rho_{k} \\mathbf{I}`` gives the minimum-norm solution.
   - ``d``: ``\\ell + h - 1``, the number of observations a target takes to mature.
   - ``m(t)``: The count of the observations ``t_{k} \\leq t``. The forecast at ``t`` is `NaN` when ``t \\leq d`` or when ``m(t - d)`` is below `min_obs`.
-  - ``\\gamma``: `scale`.
+  - $(math_dict[:gamma_rf_scale])
   - $(math_dict[:alpha_ti_fc]) The member publishes the row of the latest observation ``T``.
   - $(math_dict[:T])
 

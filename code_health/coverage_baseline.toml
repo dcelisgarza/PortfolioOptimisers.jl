@@ -136,6 +136,7 @@ commit = "8610300"
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/11_OneHotExposure.jl" = { lines = 52, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/12_ConstantExposure.jl" = { lines = 10, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/03_CustomValueReturnForecast.jl" = { lines = 14, misses = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { lines = 58, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/05_ExpWeightedReturnForecast.jl" = { lines = 106, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/06_TargetReturnForecast.jl" = { lines = 156, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/07_ForecastEvaluation.jl" = { lines = 54, misses = 0 }

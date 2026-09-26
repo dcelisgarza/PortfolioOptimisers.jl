@@ -398,6 +398,112 @@ end
     end
 end
 
+@testset "The fixed weighted member agrees with its closed form" begin
+    PO = PortfolioOptimisers
+    # Three Descriptors on a 5 x 4 panel. Cell (1, 4) carries only `c`, whose share of the
+    # absolute weight is 1/7, below the threshold. Cell (2, 3) carries only `a`, whose share
+    # is 4/7. Cell (4, 2) carries no Descriptor at all.
+    a = [0.3 -1.2 0.8 NaN; 1.1 0.4 -0.9 -0.5; -0.7 0.2 1.5 0.6; 0.9 NaN -0.3 1.3;
+         -0.4 0.7 0.1 -1.1]
+    b = [1.4 0.5 -0.6 NaN; -0.2 NaN NaN 0.8; 0.3 -1.0 NaN 0.4; 1.2 NaN 0.7 -0.8;
+         0.6 -0.3 1.1 0.2]
+    c = [-0.5 0.9 0.2 0.7; 0.8 -0.4 NaN 1.0; NaN 0.6 -1.3 -0.2; -0.9 NaN 0.4 0.5;
+         1.5 -0.7 -0.1 0.3]
+    rd = forecast_hand_panel(["a" => a, "b" => b, "c" => c])
+    T, N = size(a)
+    vs = [0.01 + 0.002 * (t + i) for t in 1:T, i in 1:N]
+    csfm = forecast_hand_block(N; vs = vs)
+    descriptors = [Passthrough(; field = "a"), Passthrough(; field = "b"),
+                   Passthrough(; field = "c")]
+    omega = [2.0, -1.0, 0.5]
+    gamma = 0.04
+    mc = 0.3
+
+    # The closed form of the docstring, one cell at a time.
+    function closed_form(S, omega, mc)
+        w = omega ./ sum(abs, omega)
+        Z = fill(NaN, size(S, 1), size(S, 2))
+        for t in axes(S, 1), i in axes(S, 2)
+            V = [k for k in axes(S, 3) if isfinite(S[t, i, k])]
+            W = sum(k -> abs(w[k]), V; init = 0.0)
+            if W > 0 && W >= mc
+                Z[t, i] = sum(k -> w[k] * S[t, i, k], V) / W
+            end
+        end
+        return Z
+    end
+
+    @testset "Without a scoring transform the composite is the raw closed form" begin
+        ds = DescriptorScores(; descriptors = descriptors, outlier = nothing,
+                              scoring = nothing)
+        Z = closed_form(cat(a, b, c; dims = 3), omega, mc)
+        @test isnan(Z[1, 4]) && isnan(Z[4, 2])
+        @test Z[2, 3] ≈ a[2, 3]
+        for (unit, g) in ((IdiosyncraticReturnUnit(), ones(T, N)),
+                          (IdiosyncraticSharpeUnit(), sqrt.(vs)))
+            rf = return_forecast(FixedWeightedReturnForecast(; scores = ds, scale = gamma,
+                                                             weights = omega,
+                                                             min_coverage = mc,
+                                                             unit = unit), rd, csfm)
+            E = gamma .* g .* Z
+            @test isequal(isnan.(rf.hist), isnan.(E))
+            @test rf.hist[isfinite.(E)] ≈ E[isfinite.(E)] rtol = 1e-12
+            @test isequal(rf.mu, rf.hist[end, :])
+            @test rf.weights ≈ [4, -2, 1] ./ 7
+        end
+    end
+
+    @testset "With more than one Descriptor the scoring transform rescores the composite" begin
+        ct = CrossSectionalStandardiser(; min_group_size = 2)
+        ds = DescriptorScores(; descriptors = descriptors, outlier = nothing, scoring = ct)
+        S = descriptor_scores(ds, rd, csfm).S
+        Zt = PO.cross_sectional_transform(ct, closed_form(S, omega, mc);
+                                          w = PO.return_forecast_weights(rd),
+                                          groups = nothing)
+        rf = return_forecast(FixedWeightedReturnForecast(; scores = ds, scale = gamma,
+                                                         weights = omega, min_coverage = mc,
+                                                         unit = IdiosyncraticSharpeUnit()),
+                             rd, csfm)
+        E = gamma .* sqrt.(vs) .* Zt
+        @test isequal(isnan.(rf.hist), isnan.(E))
+        @test rf.hist[isfinite.(E)] ≈ E[isfinite.(E)] rtol = 1e-12
+        # The rescored composite differs from the composite of the scores.
+        Z = gamma .* sqrt.(vs) .* closed_form(S, omega, mc)
+        @test !(rf.hist[isfinite.(E)] ≈ Z[isfinite.(E)])
+    end
+
+    @testset "One Descriptor under a negative weight is its score with the sign turned" begin
+        ct = CrossSectionalStandardiser(; min_group_size = 2)
+        ds = DescriptorScores(; descriptors = descriptors[1:1], outlier = nothing,
+                              scoring = ct)
+        S = descriptor_scores(ds, rd, csfm).S
+        rf = return_forecast(FixedWeightedReturnForecast(; scores = ds, scale = gamma,
+                                                         weights = [-2.0]), rd, csfm)
+        @test rf.weights == [-1.0]
+        @test isequal(rf.hist, -gamma .* S[:, :, 1])
+    end
+
+    @testset "The number type comes from the scores, the weights and the scale" begin
+        ds = DescriptorScores(; descriptors = descriptors, outlier = nothing,
+                              scoring = nothing)
+        rf = return_forecast(FixedWeightedReturnForecast(; scores = ds, scale = gamma,
+                                                         weights = omega,
+                                                         min_coverage = mc), rd, csfm)
+        rq = return_forecast(FixedWeightedReturnForecast(; scores = ds, scale = gamma,
+                                                         weights = [2 // 1, -1 // 1,
+                                                                    1 // 2],
+                                                         min_coverage = mc), rd, csfm)
+        @test rq.weights == [4 // 7, -2 // 7, 1 // 7]
+        @test isequal(isnan.(rq.hist), isnan.(rf.hist))
+        @test rq.hist[isfinite.(rf.hist)] ≈ rf.hist[isfinite.(rf.hist)] rtol = 1e-14
+        rb = return_forecast(FixedWeightedReturnForecast(; scores = ds, scale = big"0.04",
+                                                         weights = omega,
+                                                         min_coverage = mc), rd, csfm)
+        @test eltype(rb.hist) === BigFloat
+        @test rb.hist[isfinite.(rf.hist)] ≈ rf.hist[isfinite.(rf.hist)] rtol = 1e-12
+    end
+end
+
 @testset "The member reproduces the reference implementation" begin
     sp = synthetic_asset_panel(; n_assets = 20, n_observations = 60, n_industries = 4,
                                late_listing_proba = 0.3, delisting_proba = 0.3,
