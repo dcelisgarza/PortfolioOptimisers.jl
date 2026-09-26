@@ -14,6 +14,13 @@ function PortfolioOptimisers.gap_return(::RogueGapReturn, ::AbstractVector,
                                         r::AbstractVector, ::Symbol)
     return fill(-99.0, length(r))
 end
+# A Gap Return algorithm that drops the last cell, used to reach the length check of
+# `apply_gap_return`.
+struct ShortGapReturn <: PortfolioOptimisers.AbstractGapReturnAlgorithm end
+function PortfolioOptimisers.gap_return(::ShortGapReturn, ::AbstractVector,
+                                        r::AbstractVector, ::Symbol)
+    return r[1:(end - 1)]
+end
 include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 @testset "Tools tests" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, Dates, Random, StableRNGs, CSV,
@@ -1060,6 +1067,59 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                           prices_to_returns(Zg; gap_return_alg = CatchUpGapReturn()).X)
             @test fit_preprocessing(ptr, pg) === ptr
         end
+
+        @testset "a zero price is not a gap, so its returns keep their values" begin
+            # #894. A zero price gives -1 (simple) or -Inf (log) on its own observation and
+            # Inf on the next. Both returns read two observed prices, so no algorithm can
+            # write them. The writable set once admitted every non-finite cell in the span,
+            # and `RogueGapReturn` overwrote the Inf with -99.
+            zts = Date(2020, 1, 1):Day(1):Date(2020, 1, 4)
+            pz = [10.0, 0.0, 12.0, 13.0]
+            Zz = TimeArray(zts, hcat(pz, [1.0, 2, 3, 4]), ["A", "B"])
+            base = prices_to_returns(Zz)
+            @test base.X[1:2, 1] == [-1.0, Inf]
+            @test prices_to_returns(Zz; ret_method = :log).X[1:2, 1] == [-Inf, Inf]
+            @test !any(PortfolioOptimisers.gap_return_writable(pz, base.X[:, 1]))
+            rogue = @test_logs (:info,) match_mode=:any prices_to_returns(Zz;
+                                                                          gap_return_alg = RogueGapReturn())
+            @test isequal(rogue.X, base.X)
+
+            # A zero price beside a gap. Only the two returns that read the gapped price
+            # are writable, and the -1 onto the zero price keeps its value.
+            pzg = [10.0, 0.0, NaN, 12.0]
+            Zzg = TimeArray(zts, hcat(pzg, [1.0, 2, 3, 4]), ["A", "B"])
+            rzg = prices_to_returns(Zzg).X[:, 1]
+            @test findall(PortfolioOptimisers.gap_return_writable(pzg, rzg)) == [2, 3]
+            @test isequal(prices_to_returns(Zzg; gap_return_alg = RogueGapReturn()).X[:, 1],
+                          [-1.0, -99.0, -99.0])
+        end
+
+        @testset "the catch-up value keeps the element type of the prices" begin
+            p32 = Float32[100, NaN, NaN, 110, 121, 133.1]
+            Z32 = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 6),
+                            hcat(p32, Float32[1, 2, 3, 4, 5, 6]), ["A", "B"])
+            r32 = prices_to_returns(Z32; gap_return_alg = CatchUpGapReturn())
+            @test eltype(r32.X) == Float32
+            @test findall(!isfinite, view(r32.X, :, 1)) == [1, 2]
+            @test r32.X[3, 1] ===
+                  PortfolioOptimisers.gap_return_value(:simple, 110.0f0, 100.0f0)
+            @test r32.X[3, 1] ≈ 110.0f0 / 100.0f0 - 1
+        end
+
+        @testset "an algorithm that returns the wrong length is refused" begin
+            @test_throws DimensionMismatch prices_to_returns(Zg;
+                                                             gap_return_alg = ShortGapReturn())
+        end
+    end
+    @testset "prices_to_returns validation" begin
+        vts = Date(2020, 1, 1):Day(1):Date(2020, 1, 4)
+        Xv = TimeArray(vts, [10.0 1.0; 11.0 2.0; 12.0 3.0; 13.0 4.0], ["A", "B"])
+        @test_throws ArgumentError prices_to_returns(Xv; ret_method = :foo)
+        @test_throws ArgumentError PricesToReturns(; ret_method = :foo)
+        # The implied volatilities must cover the returns clock.
+        ivv = TimeArray(Date(2021, 1, 1):Day(1):Date(2021, 1, 4), fill(0.2, 4, 2),
+                        ["A", "B"])
+        @test_throws ArgumentError prices_to_returns(PricesResult(; X = Xv, iv = ivv))
     end
     @testset "the conversion takes a carrier, and a bare table runs the layer" begin
         # Map #955, ADR 0133. A keyword survives on the conversion if and only if it changes

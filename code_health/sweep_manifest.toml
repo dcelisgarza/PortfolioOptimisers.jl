@@ -115,7 +115,7 @@
 "src/03_InputData/08_PriceGapFill.jl" = { map = 2, units = 8, algorithm = 6, swept = true, bindings = ["CarriedPrice", "PriceGapFill", "PriceGapFillResult", "carrier_listing_span", "gap_fill_column!", "gap_fill_open", "gap_fill_seed", "gap_fill_span"] }
 "src/03_InputData/09_PriceFilters.jl" = { map = 2, units = 3, algorithm = 1, swept = true, bindings = ["MissingDataFilter", "MissingDataFilterResult", "share_at_most"] }
 "src/03_InputData/10_ReturnsResult.jl" = { map = 2, units = 8, algorithm = 4, swept = true, bindings = ["AbstractReturnsResult", "Prices_RR", "ReturnsResult", "assert_asset_panel_supplied", "asset_panel", "check_names_and_returns_matrix", "port_opt_view", "returns_result_picker"] }
-"src/03_InputData/11_PricesToReturns.jl" = { map = 2, units = 9, algorithm = 5, swept = false }
+"src/03_InputData/11_PricesToReturns.jl" = { map = 2, units = 9, algorithm = 6, swept = true, bindings = ["AbstractGapReturnAlgorithm", "CatchUpGapReturn", "PricesToReturns", "append_carrier_block!", "apply_gap_return", "gap_return", "gap_return_value", "gap_return_writable", "prices_to_returns"] }
 "src/03_InputData/12_TrainTestSplit.jl" = { map = 2, units = 7, algorithm = 5, swept = true, bindings = ["TrainTestSplit", "TrainTestSplitResult", "fit_preprocessing", "safe_index", "split_count", "train_test_split", "train_test_split"] }
 "src/03_InputData/13_Base_AssetSelection.jl" = { map = 2, units = 5, algorithm = 2, swept = true, bindings = ["AbstractAssetSelector", "AssetSelectorResult", "apply_preprocessing", "fit_preprocessing", "select_assets"] }
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { map = 2, units = 30, swept = false }
