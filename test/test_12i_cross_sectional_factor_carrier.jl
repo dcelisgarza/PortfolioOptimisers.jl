@@ -200,22 +200,26 @@ end
 
         # 3. `set_factor_risk_contribution_constraints!`, at
         #    `17_Optimisation/05_JuMP/05_FactorRiskContribution.jl`.
-        b1_c, rr_c = PO.set_factor_risk_contribution_constraints!(PO.JuMP.Model(),
-                                                                  StepwiseRegression(), rd,
-                                                                  pr_csfm_reb, true,
-                                                                  nothing)
-        b1_r, rr_r = PO.set_factor_risk_contribution_constraints!(PO.JuMP.Model(),
-                                                                  StepwiseRegression(), rd,
-                                                                  pr_reg_reb, true, nothing)
+        b1_c, _, rr_c = PO.set_factor_risk_contribution_constraints!(PO.JuMP.Model(),
+                                                                     StepwiseRegression(),
+                                                                     rd, pr_csfm_reb, true,
+                                                                     nothing)
+        b1_r, _, rr_r = PO.set_factor_risk_contribution_constraints!(PO.JuMP.Model(),
+                                                                     StepwiseRegression(),
+                                                                     rd, pr_reg_reb, true,
+                                                                     nothing)
         @test b1_c == b1_r
         @test rr_c === csfm_reb
         @test rr_r === reg_reb
 
-        # 4. The expression `set_relaxed_risk_budgeting_constraints!` forms from that `rr`,
-        #    at `17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl`. It is built here on the `rr`
-        #    step 3 returned, so it is the same read on the same object.
+        # 4. The expressions `set_relaxed_risk_budgeting_constraints!` forms from that `rr`,
+        #    at `17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl`: the factor covariance
+        #    under `flag = false`, and the factor marginal risks under `flag = true`. They are
+        #    built here on the `rr` step 3 returned, so they are the same reads on the same
+        #    object.
         @test Matrix(LinearAlgebra.Symmetric(rr_c.L \ pr_csfm_reb.sigma * b1_c)) ==
               Matrix(LinearAlgebra.Symmetric(rr_r.L \ pr_reg_reb.sigma * b1_r))
+        @test transpose(b1_c) * pr_csfm_reb.sigma == transpose(b1_r) * pr_reg_reb.sigma
 
         # 5. The factor budget axis, at `17_Optimisation/05_JuMP/07_RiskBudgeting.jl`. The caller
         #    passes `size(rr.L, 2)`, so the reduced basis is what the names must match.

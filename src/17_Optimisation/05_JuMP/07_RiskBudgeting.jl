@@ -363,7 +363,8 @@ $(DocStringExtensions.FIELDS)
         re::RegE_Reg = StepwiseRegression(),
         rkb::Option{<:RkbE_Rkb} = nothing,
         sets::Option{<:UniverseSets} = nothing,
-        flag::Bool = true
+        flag::Bool = true,
+        hedge::Bool = false
     ) -> FactorRiskBudgeting
 
 Keywords correspond to the struct's fields.
@@ -409,20 +410,28 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
     $(field_dict[:flag])
     """
     flag
+    """
+    $(field_dict[:hedge_frb])
+    """
+    hedge
     function FactorRiskBudgeting(re::RegE_Reg, rkb::Option{<:RkbE_Rkb},
-                                 sets::Option{<:UniverseSets}, flag::Bool)
+                                 sets::Option{<:UniverseSets}, flag::Bool, hedge::Bool)
         if isa(rkb, RiskBudgetEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when rkb is a RiskBudgetEstimator: the budget is written in factor names and is resolved against the factor axis `re` names, `sets.dict[sets.tfkey]` or `sets.dict[sets.cfkey]`"))
         end
-        return new{typeof(re), typeof(rkb), typeof(sets), typeof(flag)}(re, rkb, sets, flag)
+        return new{typeof(re), typeof(rkb), typeof(sets), typeof(flag), typeof(hedge)}(re,
+                                                                                       rkb,
+                                                                                       sets,
+                                                                                       flag,
+                                                                                       hedge)
     end
 end
 function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
                              rkb::Option{<:RkbE_Rkb} = nothing,
-                             sets::Option{<:UniverseSets} = nothing,
-                             flag::Bool = true)::FactorRiskBudgeting
-    return FactorRiskBudgeting(re, rkb, sets, flag)
+                             sets::Option{<:UniverseSets} = nothing, flag::Bool = true,
+                             hedge::Bool = false)::FactorRiskBudgeting
+    return FactorRiskBudgeting(re, rkb, sets, flag, hedge)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -801,7 +810,8 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          pr::AbstractPriorResult, wb::WeightBounds,
                                          rd::ReturnsResult)
     b1, _, rr = set_factor_risk_contribution_constraints!(model, rb.rba.re, rd, pr,
-                                                          rb.rba.flag, rb.wi)
+                                                          rb.rba.flag, rb.wi;
+                                                          hedge = rb.rba.hedge)
     rkb = _set_risk_budgeting_constraints!(model, rb, shared_get(model, :w1);
                                            strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt)

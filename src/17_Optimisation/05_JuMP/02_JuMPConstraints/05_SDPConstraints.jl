@@ -235,7 +235,7 @@ Where:
   - ``\\mathbf{W}_z``: The symmetric ``N_z \\times N_z`` lifted matrix of the decision vector.
   - ``\\boldsymbol{z}``: The decision vector, of length ``N_z``. ``N_z = N_f`` when `flag = false`, and ``N_z = N`` when `flag = true`.
   - $(math_dict[:w_1_factor])
-  - ``\\boldsymbol{w}_2``: Off-factor weights, one entry for each of the ``N - N_f`` directions the loadings do not span.
+  - $(math_dict[:w_2_off_factor])
   - $(math_dict[:k_budget])
 
 # JuMP formulation

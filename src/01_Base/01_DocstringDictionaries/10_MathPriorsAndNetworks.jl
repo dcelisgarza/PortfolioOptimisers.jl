@@ -23,6 +23,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :i_plg => "``i``: Position of the entry in `plgs`, or `1` for a single entry.",#
                  :B_loadings => "``\\mathbf{B}``: Loading matrix, of size ``N \\times N_{f}``.",#
                  :w_1_factor => "``\\boldsymbol{w}_1``: Factor weights of [`FactorRiskContribution`](@ref), one entry for each of the ``N_f`` factors. The asset weights are ``\\mathbf{B}_1 \\boldsymbol{w}_1``, with ``\\mathbf{B}_1`` the pseudoinverse of ``\\mathbf{B}^\\intercal``, plus an off-factor block when `flag = true`.",#
+                 :w_2_off_factor => "``\\boldsymbol{w}_2``: Off-factor weights, one entry for each of the ``N - N_f`` directions the loadings do not span.",#
                  :lu_factor => "``\\boldsymbol{\\ell}_{f}``, ``\\boldsymbol{u}_{f}``: Factor weight bounds, the lower and the upper, one entry for each factor. [`factor_weight_bounds`](@ref) derives them from the asset weight bounds.",#
                  # Separation decay. The four members of
                  # `AbstractSeparationDecayAlgorithm` each state a closed form over the

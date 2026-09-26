@@ -138,13 +138,14 @@
                             wb = WeightBounds(; lb = nothing, ub = nothing))
         rr = regression(StepwiseRegression(), rd)
         for (i, alg) in enumerate(algs)
-            rb = RelaxedRiskBudgeting(; opt = opt, rba = FactorRiskBudgeting(; re = rr))
+            rb = RelaxedRiskBudgeting(; opt = opt, alg = alg,
+                                      rba = FactorRiskBudgeting(; re = rr))
             res = optimise(rb, rd)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
                                            re = res.prb.rr)
             v1 = minimum(rkc[1:5])
             v2 = maximum(rkc[1:5])
-            rtol = 0.25
+            rtol = i == 4 ? 0.25 : 1e-5
             success = isapprox(v2 / v1, 1; rtol = rtol)
             if !success
                 println("Extrema $i fails")
@@ -163,7 +164,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedFactorRiskBudgeting2.csv.gz"),
                       DataFrame)
         for (i, alg) in enumerate(algs)
-            rb = RelaxedRiskBudgeting(; opt = opt,
+            rb = RelaxedRiskBudgeting(; opt = opt, alg = alg,
                                       rba = FactorRiskBudgeting(; re = rr,
                                                                 rkb = RiskBudget(;
                                                                                  val = 1:5)))
@@ -172,7 +173,7 @@
                                            re = res.prb.rr)
             v1 = minimum(rkc[1:5])
             v2 = maximum(rkc[1:5])
-            rtol = 1.1
+            rtol = i ∈ (2, 4) ? 0.6 : 1e-5
             success = isapprox(v2 / v1, 5; rtol = rtol)
             if !success
                 println("Extrema $i fails")
@@ -188,5 +189,38 @@
             end
             @test success
         end
+    end
+    @testset "Factor Risk Budgeting prices the off-factor weights (#1351)" begin
+        # Under `flag = true` the asset weights are `b1 * w1 + b2 * w2`. The risk cone read
+        # `b1 * w1` alone, so `psi` sat 3 % below the standard deviation of the returned
+        # weights under the default long-only bounds.
+        res = optimise(RelaxedRiskBudgeting(; opt = JuMPOptimiser(; pe = pr, slv = slv),
+                                            rba = FactorRiskBudgeting()), rd)
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(PortfolioOptimisers.JuMP.value(res.model[:psi]),
+                       sqrt(dot(res.w, pr.sigma, res.w)); rtol = 1e-6)
+
+        # With `hedge = true` the off-factor weights are the minimum-variance hedge of the
+        # factor exposures. With no weight bound, the log-barrier optimum under the variance
+        # meets those rows already, and the relaxation reaches it.
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            sbgt = BudgetRange(; lb = 0, ub = nothing), bgt = 1,
+                            wb = WeightBounds(; lb = nothing, ub = nothing))
+        rr = regression(StepwiseRegression(), rd)
+        rb = optimise(RiskBudgeting(; opt = opt, r = Variance(),
+                                    rba = FactorRiskBudgeting(; re = rr)), rd)
+        rbh = optimise(RiskBudgeting(; opt = opt, r = Variance(),
+                                     rba = FactorRiskBudgeting(; re = rr, hedge = true)),
+                       rd)
+        rrbh = optimise(RelaxedRiskBudgeting(; opt = opt,
+                                             rba = FactorRiskBudgeting(; re = rr,
+                                                                       hedge = true)), rd)
+        @test isa(rrbh.retcode, OptimisationSuccess)
+        @test isapprox(rbh.w, rb.w; rtol = 1e-4)
+        @test isapprox(rrbh.w, rb.w; rtol = 1e-4)
+        rkc = factor_risk_contribution(factory(Variance(), pr, slv), rrbh.w, pr.X;
+                                       re = rrbh.prb.rr)
+        @test isapprox(rkc[1:5] / sum(rkc), fill(0.2, 5); rtol = 1e-5)
+        @test isapprox(rkc[6] / sum(rkc), 0; atol = 1e-8)
     end
 end

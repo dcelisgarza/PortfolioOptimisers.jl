@@ -339,11 +339,13 @@ function port_opt_view(frc::FactorRiskContribution, i, X::MatNum,
                                   flag = frc.flag, fb = view_child(frc.fb, i, X))
 end
 """
-    set_factor_risk_contribution_constraints!(model, re, rd, pr, flag, wi)
+    set_factor_risk_contribution_constraints!(model, re, rd, pr, flag, wi; hedge = false)
 
 Add factor risk contribution constraints to the JuMP model.
 
 Re-bases the weight variable onto the factor axis, `w = b1 * w1` (or `w = b1 * w1 + b2 * w2` when `flag` is `true`), using the factor loadings to specify the basis.
+
+When `flag` and `hedge` are both `true`, the rows `b2' Σ w = 0` fix the off-factor weights at the minimum-variance hedge of the factor exposures `w1`. They are the first-order condition of `w' Σ w` in `w2`, so the off-factor weights take no risk contribution under the variance, and `w' Σ w = w1' (B' Σ⁻¹ B)⁻¹ w1`. The weights then lie in a subspace of dimension `N_f`, so a bound that the free off-factor weights meet can be infeasible.
 
 The loadings come from [`resolve_factor_regression`](@ref), which is the same precedence the value-level [`factor_risk_contribution`](@ref) uses: a precomputed [`Regression`](@ref) in `re` wins, then the prior's own `rr`, then a refit from `rd`. The prior outranks the refit so that the decision basis is the one the moments were projected through.
 
@@ -359,6 +361,7 @@ The loadings come from [`resolve_factor_regression`](@ref), which is the same pr
   - `pr`: Prior result, read for its factor block.
   - `flag`: Whether to add the off-factor weight block.
   - `wi`: Optional initial factor weights.
+  - `hedge`: Whether to add the hedge rows. Read only when `flag` is `true`, and then `pr` must carry `sigma`.
 
 # Returns
 
@@ -373,7 +376,8 @@ The loadings come from [`resolve_factor_regression`](@ref), which is the same pr
 function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_Reg,
                                                    rd::ReturnsResult,
                                                    pr::Option{<:AbstractPriorResult},
-                                                   flag::Bool, wi::Option{<:VecNum})
+                                                   flag::Bool, wi::Option{<:VecNum};
+                                                   hedge::Bool = false)
     rr = resolve_factor_regression(re, rd, pr)
     Bt = transpose(rr.L)
     b1 = LinearAlgebra.pinv(Bt)
@@ -386,6 +390,10 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_R
                             w2[1:(N - Nf)]
                         end)
         JuMP.@expression(model, w, b1 * w1 + b2 * w2)
+        if hedge
+            sc = get_constraint_scale(model)
+            JuMP.@constraint(model, cfrb_hedge, sc * (transpose(b2) * pr.sigma * w) == 0)
+        end
     else
         b2 = nothing
         JuMP.@variable(model, w1[1:Nf])

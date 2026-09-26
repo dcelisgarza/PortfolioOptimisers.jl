@@ -695,6 +695,7 @@ The dendrogram's leaf permutation. It never changes the merge tree or the cluste
 - **RiskBudgeting (RB)**: targets prescribed risk *contributions* per asset or factor rather than a return/risk trade-off.
 - **RelaxedRiskBudgeting (RRB)**: a convex relaxation of Risk Budgeting.
 - **FactorRiskContribution (FRC)**: optimises or targets risk contributions attributed to factors.
+- **Off-factor weights**: under `flag = true` of a factor optimiser, the weights `w2` on the directions the loadings do not span, so the asset weights are `b1 w1 + b2 w2`. Their Euler contribution takes no factor budget. `FactorRiskBudgeting(; hedge = true)` fixes them at the minimum-variance hedge of the factor exposures, `b2' Σ w = 0`, so their contribution to the variance is zero.
 - **NearOptimalCentering (NOC)**: finds a robust interior point near the efficient frontier.
 
 **JuMP Returns Estimator**
