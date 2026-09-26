@@ -347,9 +347,11 @@ function descriptor_scores(ds::DescriptorScores, rd::ReturnsResult,
     groups = exposure_group_labels(rd, ds.group)
     rows = return_forecast_rows(rd, csfm)
     # `stack` promotes the number types of the scores. Under a Neutralisation the residual is
-    # fitted on the exposure history, so `S` also takes the number type of that history.
-    S = stack(composite_score(de, rd, ds.outlier, ds.scoring, w, groups)
-              for de in ds.descriptors)
+    # fitted on the exposure history, so `S` also takes the number type of that history. The
+    # bound on `S` keeps the `Nothing` method of `return_forecast_cut` out of every caller's
+    # inference, where a `stack` over an abstract Descriptor vector reads as `Any`.
+    S::Arr3Num = stack(composite_score(de, rd, ds.outlier, ds.scoring, w, groups)
+                       for de in ds.descriptors)
     if !isnothing(ds.neutralise)
         Tf = promote_type(eltype(S), eltype(first(descriptor_scores_axis(csfm))))
         S = convert(Array{Tf, 3}, S)
