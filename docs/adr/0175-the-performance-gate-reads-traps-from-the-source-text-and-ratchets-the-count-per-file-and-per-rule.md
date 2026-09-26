@@ -60,7 +60,7 @@ docstring names the shapes it flags, the near shapes it leaves alone, and why.
 | `reduce_temporary` | a reduction over a broadcast or an array comprehension | `sum(f, x)`, a generator, `dot` |
 | `unfused_broadcast` | a plain `+` or `-` with a broadcast operand | `.+` or `.-` |
 | `search_temporary` | `length(findall(m))`, `sort(x)[1]`, `sortperm(x)[1:k]`, `for i in collect(r)` | `count`, `minimum`, `partialsortperm`, the range |
-| `linalg_temporary` | `inv(A) * b`, `diagm(v) * A`, `tr(A * B)`, `diag(A * B)`, `x' * A * y`, `(A * B) * x` | `A \ b`, `Diagonal`, `dot`, `dot(x, A, y)`, `A * B * x` |
+| `linalg_temporary` | `inv(A) * b`, `diagm(v) * A`, `tr(A * B)`, `diag(A * B)`, `x' * A * y` with or without parentheses, `(A * B) * x` | `A \ b`, `Diagonal`, `dot`, `dot(x, A, y)`, `A * B * x` |
 | `repeated_call` | one scalar reduction or factorisation made twice in one definition, on inputs it never mutates, where both calls can run | a local name |
 | `loop_allocation` | an allocating call or an array comprehension inside a `for` or `while` body, that the loop does not keep | one buffer before the loop, the array hoisted, or `push!`/`append!` for growth |
 

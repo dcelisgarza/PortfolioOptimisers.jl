@@ -42,7 +42,7 @@ number is part of the provenance, and a baseline written under another version i
 than compared. Raise it in the commit that changes a rule, and refresh the baseline in the same
 commit.
 """
-const RULES_VERSION = 1
+const RULES_VERSION = 2
 
 """
 The rules, in the order a baseline row prints them. The value is the one-line statement `scan`
@@ -400,6 +400,21 @@ function isinverse(a)
     return iscall(a, :inv) && length(positional(a)) == 1 && ismatrix_like(positional(a)[1])
 end
 
+"""
+    isquadratic_form(xt, A, y) -> Bool
+
+Whether `xt * A * y` reads as the quadratic form `x' * A * y` over two vectors: `xt` is the
+transpose of a lowercase name, `y` is a lowercase name, and `A` differs from both, because
+`d' * d * l` is a scalar times a vector.
+"""
+function isquadratic_form(xt, A, y)
+    return isadjoint(xt) &&
+           islowercase_name(adjoint_operand(xt)) &&
+           islowercase_name(y) &&
+           A != adjoint_operand(xt) &&
+           A != y
+end
+
 function rule_linalg_temporary(e)
     if e.head === :call && iscall(e, :*)
         args = positional(e)
@@ -409,6 +424,20 @@ function rule_linalg_temporary(e)
         if any(a -> iscall(a, :diagm), args)
             return "`Diagonal(v)` multiplies in O(n²) and builds no dense matrix"
         end
+        # `x' * A * y` parses as one n-ary call, and `(x' * A) * y` and `x' * (A * y)` as two
+        # nested products. All three build the vector `x' * A` or `A * y` to read one scalar.
+        quad = if length(args) == 3
+            isquadratic_form(args...)
+        elseif length(args) == 2 && iscall(args[1], :*) && length(positional(args[1])) == 2
+            isquadratic_form(positional(args[1])..., args[2])
+        elseif length(args) == 2 && iscall(args[2], :*) && length(positional(args[2])) == 2
+            isquadratic_form(args[1], positional(args[2])...)
+        else
+            false
+        end
+        if quad
+            return "`dot(x, A, y)` reads the quadratic form without the vector `A * y`, when `x` and `y` are vectors"
+        end
         # `(A * B) * x` parses as a nested product, and the parentheses force the matrix-matrix
         # product first. `A * B * x` parses as one n-ary call, and Julia picks the cheaper order.
         if length(args) == 2 &&
@@ -416,16 +445,6 @@ function rule_linalg_temporary(e)
            all(ismatrix_like, positional(args[1])) &&
            islowercase_name(args[2])
             return "`A * B * x`, without the parentheses, multiplies right to left and builds no matrix"
-        end
-        # `d' * d * l` is a scalar times a vector, not a quadratic form, so the middle operand must
-        # differ from both ends.
-        if length(args) == 3 &&
-           isadjoint(args[1]) &&
-           islowercase_name(adjoint_operand(args[1])) &&
-           islowercase_name(args[3]) &&
-           args[2] != adjoint_operand(args[1]) &&
-           args[2] != args[3]
-            return "`dot(x, A, y)` reads the quadratic form without the vector `A * y`, when `x` and `y` are vectors"
         end
     elseif e.head === :call && length(positional(e)) == 1
         a = positional(e)[1]

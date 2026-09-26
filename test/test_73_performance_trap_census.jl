@@ -95,11 +95,18 @@ using Test, TOML
         @test rules("f(A, B) = tr(A * B)") == ["linalg_temporary"]
         @test rules("f(A, B) = diag(A * B)") == ["linalg_temporary"]
         @test rules("f(w, sigma) = w' * sigma * w") == ["linalg_temporary"]
+        # Parentheses fix the order and build the same vector, so the nested forms are the
+        # same trap.
+        @test rules("f(w, sigma) = (transpose(w) * sigma) * w") == ["linalg_temporary"]
+        @test rules("f(w, sigma) = w' * (sigma * w)") == ["linalg_temporary"]
+        @test flagged("f(w, Sigma) = (w' * Sigma) * w") ==
+              [("linalg_temporary", "(w' * Sigma) * w")]
         @test rules("f(A, B, x) = (A * B) * x") == ["linalg_temporary"]
         # `inv(alpha)` is a scalar.
         @test isempty(rules("f(alpha, b) = inv(alpha) * b"))
         # `d' * d * l` is a scalar times a vector, not a quadratic form.
         @test isempty(rules("f(d, l) = transpose(d) * d * l"))
+        @test isempty(rules("f(d, l) = (transpose(d) * d) * l"))
         @test isempty(rules("f(A, B, x) = A * B * x"))
     end
 

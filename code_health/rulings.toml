@@ -231,6 +231,19 @@ A function that only builds the text of a failure message is the same path in a 
 own, and runs once, on the solve that failed. Its loop sorts the keys of each trial's dictionary, \
 whose key type differs between trials, so a shared buffer would need an `Any` element type."""
 
+[rationale.a-matrix-chain-the-code-keeps]
+text = """
+`linalg_temporary` reads `x' * A * y` over two lowercase names as a quadratic form over two \
+vectors, whose scalar `dot(x, A, y)` reads without the vector `A * y`. The rule reads text and \
+cannot see a type. When the left end is a matrix, the chain is not a scalar. With two matrix ends \
+it is the congruence `B' * A * B`, and with a vector at the right it is the vector `B' * A * y`. \
+The code keeps that matrix or vector whole, and `dot(B, A, y)` is a single scalar, a different \
+quantity. The three-argument `*` already takes the cheaper order. Found at two sites of the \
+factor risk contribution: `set_risk_constraints!` under `Variance`, which reads rows of \
+`transpose(b) * sigma * b` and its inner product with `W` (#1350), and \
+`set_factor_risk_contribution_constraints!`, whose hedge constraint holds one row per entry of \
+`transpose(b2) * pr.sigma * w` (#1351). Approved by the maintainer on 2026-09-26 (#845)."""
+
 # --- exemptions ------------------------------------------------------------
 #
 # Keyed (path, definition, metric), dropped before the file's maximum is taken. An Exemption binds
@@ -847,3 +860,17 @@ file = "src/01_Base/06_Messages.jl"
 rule = "loop_allocation"
 definition = "failed_solve_msg"
 rationale = "a-failure-message-is-a-cold-path"
+
+[[perf_dismissal]]
+file = "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl"
+rule = "linalg_temporary"
+definition = "set_risk_constraints!"
+code = "transpose(b) * sigma * b"
+rationale = "a-matrix-chain-the-code-keeps"
+
+[[perf_dismissal]]
+file = "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl"
+rule = "linalg_temporary"
+definition = "set_factor_risk_contribution_constraints!"
+code = "transpose(b2) * pr.sigma * w"
+rationale = "a-matrix-chain-the-code-keeps"
