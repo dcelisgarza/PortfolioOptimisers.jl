@@ -493,7 +493,14 @@ end
     p32 = LowOrderPrior(; X = X, mu = rr.M * fpr.mu .+ rr.b,
                         sigma = rr.M * fpr.sigma * transpose(rr.M) + Diagonal(rr.esigma),
                         rr = rr, fpr = fpr)
-    f32 = factor_attribution(Float32[0.5, 0.3, 0.2], p32, X; se = true)
+    f32 = factor_attribution(Float32[0.5, 0.3, 0.2], p32, X; se = true, assets = true)
+    # The volatilities scale by the square root of `ppy`, which is taken in the type of the
+    # data, so the default integer `ppy` does not widen them.
+    for v in ([f32.total.vol, f32.sys.vol, f32.sys.vol_contrib, f32.unattr.vol_contrib],
+              f32.fbd.vol, f32.fbd.vol_contrib, f32.abd.vol, f32.abd.vol_contrib,
+              f32.afc.vol_contrib)
+        @test eltype(v) == Float32
+    end
     @test typeof(f32.sys.mu_se) == Float32
     @test eltype(f32.fbd.mu_se) == Float32
     @test eltype(f32.fmbd.mu_se) == Float32

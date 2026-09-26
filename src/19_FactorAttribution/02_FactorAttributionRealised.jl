@@ -527,7 +527,6 @@ Where:
 function realised_attribution(W::VecNum_MatNum, ret::VecNum, al::NamedTuple,
                               fam::Option{<:VecStr}, assets::Bool, se::Bool,
                               ppy::Number)::FactorAttributionResult
-    sc = attribution_scale(ppy)
     f, eps = al.f, al.eps
     T, K = size(f)
     N = size(eps, 2)
@@ -539,6 +538,7 @@ function realised_attribution(W::VecNum_MatNum, ret::VecNum, al::NamedTuple,
     retc = ret .- total_mu
     Tf = promote_type(real(eltype(f)), real(eltype(ret)), real(eltype(W)),
                       real(eltype(al.B)))
+    sc = attribution_scale(ppy, zero(Tf))
     g = Matrix{Tf}(undef, T, K)
     sysr = Matrix{Tf}(undef, T, N)
     for t in 1:T
