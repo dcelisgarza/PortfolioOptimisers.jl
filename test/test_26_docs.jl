@@ -966,7 +966,7 @@ in the sense of `STANDARDS.md`.
     edit and not a silent one.
     =#
     @testset "# Details is abolished" begin
-        DETAILS_TOTAL = 27
+        DETAILS_TOTAL = 26
 
         @testset "a swept file carries no # Details section" begin
             offenders = Tuple{String, Int}[]

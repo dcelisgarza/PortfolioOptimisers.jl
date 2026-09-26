@@ -293,7 +293,7 @@
 "src/14_NetReturnsDrawdowns.jl" = { map = 8, units = 48, algorithm = 11, swept = false }
 "src/15_Tracking.jl" = { map = 8, units = 14, algorithm = 4, swept = true, bindings = ["AbstractTracking", "AbstractTrackingAlgorithm", "DependentVariableTracking", "IndependentVariableTracking", "ReturnsTracking", "Tr_VecTr", "TrackingError", "VariableTracking", "VecTr", "WeightsTracking", "factory", "needs_previous_weights", "tracking_benchmark", "tracking_benchmark"] }
 "src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 91, swept = false }
-"src/16_RiskMeasures/02_Variance.jl" = { map = 9, units = 24, swept = false }
+"src/16_RiskMeasures/02_Variance.jl" = { map = 9, units = 24, algorithm = 3, swept = true, bindings = ["NSkeQuadFormulations", "QuadRiskExpr", "QuadSecondMomentFormulations", "RSOCRiskExpr", "SOCRiskExpr", "SecondMomentFormulation", "SquaredSOCRiskExpr", "StandardDeviation", "UncertaintySetVariance", "UncertaintySetVariance", "Variance", "VarianceFormulation", "_no_bounds_no_risk_expr_risk_measure", "_no_bounds_risk_measure", "factory", "factory", "factory", "factory", "factory", "resolve_deferred_quantities", "resolve_deferred_quantities", "resolve_deferred_quantities", "ucs_risk_measure", "ucs_variance"] }
 "src/16_RiskMeasures/03_MomentRiskMeasures.jl" = { map = 9, units = 32, swept = false }
 "src/16_RiskMeasures/04_Kurtosis.jl" = { map = 9, units = 9, swept = false }
 "src/16_RiskMeasures/05_NegativeSkewness.jl" = { map = 9, units = 5, swept = false }

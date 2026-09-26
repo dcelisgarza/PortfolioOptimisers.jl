@@ -245,7 +245,7 @@ commit = "0ecb3ce47c"
 "src/14_NetReturnsDrawdowns.jl" = { code = 493, doc = 1326, comment = 15, blank = 598, total = 2432 }
 "src/15_Tracking.jl" = { code = 71, doc = 451, comment = 0, blank = 178, total = 700 }
 "src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { code = 427, doc = 1346, comment = 18, blank = 645, total = 2436 }
-"src/16_RiskMeasures/02_Variance.jl" = { code = 250, doc = 694, comment = 20, blank = 255, total = 1219 }
+"src/16_RiskMeasures/02_Variance.jl" = { code = 254, doc = 636, comment = 20, blank = 231, total = 1141 }
 "src/16_RiskMeasures/03_MomentRiskMeasures.jl" = { code = 295, doc = 916, comment = 5, blank = 353, total = 1569 }
 "src/16_RiskMeasures/04_Kurtosis.jl" = { code = 160, doc = 219, comment = 3, blank = 78, total = 460 }
 "src/16_RiskMeasures/05_NegativeSkewness.jl" = { code = 89, doc = 135, comment = 5, blank = 48, total = 277 }
