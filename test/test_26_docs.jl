@@ -409,6 +409,16 @@ nothing raises `@error "File exists but no references were collected"` in
             else
                 Union{}
             end
+            # A bare name renders the docstring of the generic function alone when the
+            # binding has one, because `Documenter` first compares the signature `Union{}`
+            # with `==`. Joining every method's docstring here would read a citation that
+            # the page never renders.
+            if !iscall
+                md = get(Base.Docs.meta(PO), Base.Docs.Binding(PO, sym), nothing)
+                if !isnothing(md) && haskey(md.docs, Union{})
+                    return string(Base.Docs.parsedoc(md.docs[Union{}]))
+                end
+            end
             return try
                 string(Base.Docs.doc(Base.Docs.Binding(PO, sym), sig))
             catch
