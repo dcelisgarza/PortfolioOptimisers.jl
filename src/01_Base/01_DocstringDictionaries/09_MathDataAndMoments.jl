@@ -144,6 +144,14 @@ unique_key_dict!(math_dict, :math_dict,
                  :a_t_series => "``a_{t}``: Diagnostic series value at observation ``t``.",#
                  :A_series_fin => "``\\mathcal{A}``: Finite observations of a diagnostic series, those at which ``a_{t}`` is finite.",#
                  :rho_S_cs => "``\\rho_{S}``: Cross-sectional rank correlation, over the assets at which both cross-sections are finite. Under the default `ties = :average`, equal values share the mean of their ranks. Under `ties = :ordinal`, they take consecutive ranks, in the order of the asset axis.",#
+                 # The factor model summary of `32_CrossSectionalFactorModel/`. Each symbol
+                 # is stated by two or more Units of `10_FactorModelSummary.jl`.
+                 :f_tk_summary => "``f_{tk}``: Factor return of factor ``k`` at observation ``t``, an entry of the factor return history.",#
+                 :a_tk_summary => "``a_{tk}``: Diagnostic series entry at observation ``t`` for factor ``k``.",#
+                 :T_k_summary => "``\\mathcal{T}_{k}``: Present observations of column ``k`` of a series, those at which its entry is not `NaN`. An infinite entry is present.",#
+                 :pi_k_summary => "``\\pi_{k}``: Reduced position of raw factor ``k``, its position on the reduced factor axis, and ``0`` when the family re-basis dropped it.",#
+                 :s2_tk_summary => "``s^{2}_{tk}``: Uncorrected cross-sectional variance of the exposure to factor ``k`` at observation ``t``, over the assets at which that exposure is not `NaN`.",#
+                 :c_k_summary => "``c_{k}``: Constant-exposure flag of factor ``k``, true when the largest ``s^{2}_{tk}`` over the observations is under ``10^{-12}``.",#
                  # The coverage policy of `01_Base/16_CoveragePolicy.jl`. Each symbol is
                  # stated by two or more Units of that file.
                  :s_i_cvg => "``s_{i}``: Coverage share of asset ``i``, its own observation count over the number of observations folded.",#

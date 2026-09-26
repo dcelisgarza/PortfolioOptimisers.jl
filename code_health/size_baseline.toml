@@ -30,7 +30,7 @@ commit = "0ecb3ce47c"
 "src/01_Base/01_DocstringDictionaries/06_ArgOptimisation.jl" = { code = 238, doc = 0, comment = 24, blank = 0, total = 262 }
 "src/01_Base/01_DocstringDictionaries/07_FieldDict.jl" = { code = 3, doc = 0, comment = 2, blank = 0, total = 5 }
 "src/01_Base/01_DocstringDictionaries/08_ValidationsAndReturns.jl" = { code = 85, doc = 0, comment = 4, blank = 0, total = 89 }
-"src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { code = 112, doc = 0, comment = 30, blank = 0, total = 142 }
+"src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { code = 163, doc = 0, comment = 48, blank = 0, total = 211 }
 "src/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.jl" = { code = 40, doc = 0, comment = 31, blank = 0, total = 71 }
 "src/01_Base/01_DocstringDictionaries/11_MathRiskAndOptimisation.jl" = { code = 77, doc = 0, comment = 36, blank = 0, total = 113 }
 "src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { code = 86, doc = 0, comment = 16, blank = 0, total = 102 }
@@ -156,7 +156,7 @@ commit = "0ecb3ce47c"
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { code = 242, doc = 382, comment = 7, blank = 133, total = 764 }
 "src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { code = 463, doc = 752, comment = 1, blank = 352, total = 1568 }
 "src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { code = 425, doc = 547, comment = 0, blank = 267, total = 1239 }
-"src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { code = 225, doc = 318, comment = 2, blank = 150, total = 695 }
+"src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { code = 235, doc = 471, comment = 8, blank = 203, total = 917 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 236, doc = 477, comment = 0, blank = 215, total = 928 }
 "src/05_Moments/33_CoverageUniverse.jl" = { code = 411, doc = 767, comment = 0, blank = 351, total = 1529 }
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { code = 373, doc = 787, comment = 6, blank = 339, total = 1505 }
