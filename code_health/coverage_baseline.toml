@@ -288,7 +288,7 @@ commit = "8610300"
 "src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl" = { lines = 19, misses = 0 }
 "src/17_Optimisation/03_NaiveOptimisation.jl" = { lines = 99, misses = 0 }
 "src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl" = { lines = 56, misses = 0 }
-"src/17_Optimisation/04_Hierarchical/02_HierarchicalRiskParity.jl" = { lines = 101, misses = 2 }
+"src/17_Optimisation/04_Hierarchical/02_HierarchicalRiskParity.jl" = { lines = 101, misses = 0 }
 "src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl" = { lines = 187, misses = 0 }
 "src/17_Optimisation/04_Hierarchical/04_HierarchicalEqualRiskContribution.jl" = { lines = 244, misses = 4 }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/01_JuMPOptimisationTypes.jl" = { lines = 54, misses = 0 }
