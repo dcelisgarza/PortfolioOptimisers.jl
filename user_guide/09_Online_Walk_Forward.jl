@@ -1,29 +1,28 @@
 #=
 ```@meta
-Description = "The online walk-forward in PortfolioOptimisers.jl: warm one estimator on the first window and step it fold by fold instead of refitting."
+Description = "Fit one estimator on the first training window and update it with each later fold, instead of refitting every fold of a walk-forward."
 ```
 
-# The online walk-forward
+# [The online walk-forward](@id user-guide-the-online-walk-forward)
 
-A walk-forward refits every fold from its training window, so on an expanding window each
-fold re-reads every row the fold before it read. The online step does the reading once. A
-walk-forward that declares the **Fold Fit** [`OnlineStep`](@ref) warms one estimator up on
-the first training window, folds each later fold's *new* rows into it, and reads it out where
-a refit would have run. The folds are the same folds; only the fit of each one changes, and
-the run reaches the weights of the batch expanding-window walk-forward fold for fold.
+A walk-forward refits each fold from its training window, so on an expanding window each fold
+uses again every row that the fold before it used. The online walk-forward adds each row to the
+moments once. It fits one estimator on the first training window, adds the new rows of each later
+fold to it, and computes the weights where a refit would have run. On this page the online run
+gives exactly the weights of the batch expanding-window walk-forward, fold by fold.
 
-The rule is one keyword:
+You ask for it with one constructor. Write `OnlineIndexWalkForward(w, t)` where you would have
+written `IndexWalkForward(w, t)`.
 
-> `IndexWalkForward(w, t; ff = OnlineStep())`
-
-Every layer above the moments takes the step. A prior folds its moments and carries its rows;
-an optimiser forwards the rows to its prior and, at read-out, rebuilds the carrier and runs the
-ordinary batch path, so every constraint, clustering and uncertainty set is identical to batch
-by construction; a search scores every candidate through the one loop; a [`Pipeline`](@ref)
-is a host of the step; and a Result resumes a run. A member with no exact recursion is
-wrapped — `Online(est; max_history)` — and refits from the rows its buffer keeps, and that cap
-is the rolling window. This page shows the call, the identity, the wrapper, the gain measured
-honestly, and the resume.
+Adding rows to a fitted estimator is an update, and [`partial_fit!`](@ref) makes it. A prior
+updates its moments and keeps its rows. An optimiser passes the new rows to its prior. When it
+needs weights, it rebuilds the training data and runs the ordinary batch fit, so every
+constraint, clustering and uncertainty set is the one the batch run builds. A search scores every
+candidate through the same loop. A [`Pipeline`](@ref) passes the update to its steps, and the
+result of an online run lets you resume the run. A prior with no update formula goes in
+[`Online`](@ref)`(pe; max_history)`, which refits it from the rows its buffer keeps, and the cap
+on the buffer gives a rolling window. This page shows the call, the weights the two runs share,
+the wrapper, where the update is faster and where it is not, and the resume.
 =#
 
 using PortfolioOptimisers, StableRNGs, Statistics, Dates, Clarabel
@@ -31,10 +30,10 @@ using PortfolioOptimisers, StableRNGs, Statistics, Dates, Clarabel
 #=
 ## 1. A universe that moves, and the one call
 
-The fixture is a seeded factor panel of eight assets over three hundred observations, with a
-listing calendar written out as a fact about the instruments: three assets list after the
-first row and three delist before the last. The returns are `NaN` where an asset is not
-listed, and the [`AssetPanel`](@ref) carries the calendar as its active mask.
+The data is a seeded factor panel of eight assets over three hundred observations. Its listing
+calendar is a fact about the instruments. Five assets list after the first row, and three delist
+before the last. The returns are `NaN` where an asset is not listed, and the
+[`AssetPanel`](@ref) takes the calendar as its active mask.
 =#
 
 function synthetic_panel(; T = 300, N = 8, K = 2, seed = 20260912)
@@ -56,10 +55,12 @@ rd = synthetic_panel()
 N = size(rd.X, 2)
 
 #=
-The prior carries a [`CoveragePolicy`](@ref) on both moments, so each cell is fitted on the
-observations it has and an asset enters the universe when it lists. Its moments fold exactly
-under the policy. The two schemes below cut identical windows: an online run is expanding by
-construction — a fold cannot un-fold a row — so `OnlineStep()` derives `expand_train = true`.
+The prior has a [`CoveragePolicy`](@ref) on both moments. Each asset's mean uses the rows where
+that asset has a return, each covariance entry uses the rows where both assets have one, and an
+asset enters the universe when it lists. Under that policy the online update gives the batch
+estimate exactly. The two schemes below cut the same windows. An update of the moments adds rows
+and never removes them, so `OnlineIndexWalkForward` sets `expand_train = true`, and a rolling window goes
+on the estimator, as section 2 shows.
 =#
 
 cvg = CoveragePolicy()
@@ -68,7 +69,7 @@ pe = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg),
 hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe))
 
 batch = IndexWalkForward(100, 40; purged_size = 3, expand_train = true)
-online = IndexWalkForward(100, 40; purged_size = 3, ff = OnlineStep())
+online = OnlineIndexWalkForward(100, 40; purged_size = 3)
 
 b = cross_val_predict(hrp, rd, batch)
 o = cross_val_predict(hrp, rd, online)
@@ -80,14 +81,17 @@ count_in(m) = isnothing(m) ? N : count(m)
 (weights(o) == weights(b), masks(o) == masks(b), count_in.(masks(o)))
 
 #=
-The weights agree to the bit, and both routes watch the universe move: seven investable
-assets, then eight once the seventh lists inside the third window, then seven once the
-fourth delists inside the fifth. Through a JuMP head the same identity holds to the solver's
-tolerance, because the read-out solves the batch problem from the batch carrier.
+Every weight of the online run equals the weight of the batch run, and both runs follow the
+universe as it moves. Seven assets are investable, then eight once the seventh asset lists inside
+the third window, then seven once the fourth delists inside the fifth. The
+[online walk-forward example](@ref example-the-online-walk-forward-one-estimator-updated-fold-by-fold) runs the
+same comparison through [`MeanRisk`](@ref) and prints the largest weight difference per fold.
 
-The loop is two verbs, and writing them out reaches its own weights: [`partial_fit!`](@ref)
-folds the rows of a carrier into the optimiser and solves nothing, and `optimise(opt)` with
-no data reads the state out and solves once.
+The loop calls two functions, and you can call them yourself. [`partial_fit!`](@ref) adds the rows
+of a `ReturnsResult` to the optimiser and solves nothing. `optimise(opt)` with no data computes
+the weights from the rows added so far, and solves once. We update the estimator with the first
+training window and then with the new rows of the second fold, and we compare `optimise(est)`
+with the weights of the second fold above.
 =#
 
 function cut(i)
@@ -97,34 +101,41 @@ function cut(i)
 end
 (; train_idx) = split(online, rd)
 
-est = partial_fit!(hrp, cut(train_idx[1]))                     # warm-up: fold 1's window
-est = partial_fit!(est, cut((last(train_idx[1]) + 1):last(train_idx[2])))   # fold 2's new rows
+est = partial_fit!(hrp, cut(train_idx[1]))
+est = partial_fit!(est, cut((last(train_idx[1]) + 1):last(train_idx[2])))
 
 optimise(est).w == weights(o)[2]
 
 #=
-The loop starts cold. An estimator that already carries a state is refused at the door, and
-so is a [`TimeDependent`](@ref) schedule on the prior or on the optimiser itself, because a
-schedule replaces the value a state is threaded through; a schedule on any other field
-composes with no rule.
+The loop starts from an estimator with no state. An estimator that already holds a state throws
+an error at the first fit, and so does a [`TimeDependent`](@ref) schedule on the prior or on the
+optimiser itself, because such a schedule would replace the estimator that holds the state. A
+schedule on any other field works as it does in batch. A schedule that the update itself uses,
+such as the allocation set of an [`OnlinePortfolioSelection`](@ref), is swapped in before the
+rows of the fold are added.
 
-The step folds the panel's **active mask** with the rows and nothing else. A panel whose
-estimation mask is narrower than its active mask, or one that carries time-varying Panel
-Fields, is refused at warm-up by name — the batch loop takes both.
+The update takes the active mask of the panel with the rows, and no other part of the panel. A
+panel whose estimation mask differs from its active mask throws at the first fit, and so does one
+that has time-varying panel fields. The batch walk-forward accepts either kind of panel, because
+each fold refits over its whole window.
 
-## 2. A member with no exact recursion, and the rolling window
+## 2. A prior with no update formula, and the rolling window
 
-A [`FactorPrior`](@ref) is a regression, and a regression has no incremental fold the library
-ships. Wrap it in [`Online`](@ref): the wrapper seeds a Sample Buffer in the prior's `cache`,
-the fold appends the rows, and the read-out runs the batch verb over them. The buffer holds
-exactly the rows the batch fold reads, so the two match to the bit. The same wrapper's
-`max_history` is how a **rolling** window is declared online: the loop is expanding, so the
-window is the estimator's. A rolling batch scheme of window `w + p` with purge `p` trains over
-`w` rows, and a buffer capped at `w` reads out over exactly those rows.
+A [`FactorPrior`](@ref) is a regression, and the library has no update formula for one. Wrap it
+in [`Online`](@ref). The wrapper puts a buffer of rows in the `cache` of the prior, each fold
+appends its new rows to the buffer, and the prior is fitted over the buffer in the ordinary way.
+The buffer holds the rows the batch fold uses, so the two runs return the same weights. The
+wrapper also takes a prior that has an update formula, and the cell below wraps the
+`EmpiricalPrior` of section 1.
+
+`max_history` caps that buffer, and the cap is how you ask for a rolling window online. The loop
+only expands the training window. You set a rolling window on the estimator, not on the scheme. A
+batch scheme with window `w + p` and purge `p` trains over `w` rows, and a buffer capped at `w`
+fits over those same `w` rows.
 =#
 
 rolling = IndexWalkForward(103, 40; purged_size = 3)
-stepped = IndexWalkForward(103, 40; purged_size = 3, ff = OnlineStep())
+stepped = OnlineIndexWalkForward(103, 40; purged_size = 3)
 hrp_cap = HierarchicalRiskParity(;
                                  opt = HierarchicalOptimiser(;
                                                              pe = Online(pe;
@@ -134,22 +145,23 @@ weights(cross_val_predict(hrp_cap, rd, stepped)) ==
 weights(cross_val_predict(hrp, rd, rolling))
 
 #=
-An estimator you would write in batch is the estimator you write online: a host folds every
-member that folds and refits every member that does not from its own rows.
+The cell prints `true`. The buffer capped at 100 rows gives every weight of the rolling batch
+walk-forward. You write the same estimator online that you write in batch. An estimator updates
+each part that has an update formula, and refits each other part from the rows it keeps.
 
-## 3. The gain, measured honestly
+## 3. Where the online update is faster, and where it is not
 
-The seam's **advertised** benefit is speed, and through the loop that benefit is where the
-batch fit is itself a recursion over the rows. The plain family's batch covariance is one BLAS
-product, and its online step is no faster at any width the library has measured — the ratio
-sits at or above one. The `CoveragePolicy` family's batch arm folds row by row, so there the
-loop does the arithmetic once instead of once per fold; through a hierarchical head, whose
-read-out is a clustering, the gain shows, and it grows with the panel (the library's own
-measurements put it near half of batch at this size and a fifth at sixty assets over three
-thousand observations). Through a JuMP head the read-out is a solve, which the step does not
-touch, so the ratio sits near one until the moment fit grows into the solve. The numbers below
-are wall-clock on the build machine, the minimum of three runs after a warm one, and are a
-direction rather than a benchmark.
+The update is faster where the batch fit itself runs row by row. With the default covariance of
+[`EmpiricalPrior`](@ref), the batch fit is one BLAS product, and the online run is no faster.
+With a `CoveragePolicy` on both moments, the batch fit runs the same update row by row, so there
+the loop does that arithmetic once instead of once per fold. When the optimiser is
+`HierarchicalRiskParity`, which ends in a clustering, the online run is then faster. When the
+optimiser solves a JuMP problem, such as `MeanRisk`, the run ends in a solve, which the update
+does not change.
+
+We print the ratio of online time to batch time through `HierarchicalRiskParity`, without and
+with the policy. The numbers are wall-clock on the build machine, the minimum of three runs after
+a warm one. Read them as a direction and not as a benchmark.
 =#
 
 function ratio(opt)
@@ -164,11 +176,12 @@ hrp_plain = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = Empirica
 (; plain = ratio(hrp_plain), policy = ratio(hrp))
 
 #=
-The seam's **real** benefit is accuracy. The fold is a Welford recursion, not the textbook
-one-pass formula `(Σ xxᵀ − n μμᵀ) / (n − 1)`, and the difference shows the moment a caller
-folds a level rather than a change — prices, mean a thousand and unit spread. The textbook
-formula subtracts two large numbers and loses its digits; the recursion updates around the
-running mean and reaches the batch estimator, which centres first and is exact.
+A ratio below one means the online run took less time than the batch run. The update has a second
+gain, accuracy. The update is a Welford recursion, and not the textbook one-pass formula
+`(Σ xxᵀ − n μμᵀ) / (n − 1)`. The difference shows as soon as you update with a level
+instead of a change, such as a series with a mean near one thousand and a spread near one. The
+textbook formula subtracts two large numbers and loses digits. The recursion updates around the
+running mean, and the batch estimator centres the rows before it multiplies them.
 =#
 
 Z = randn(StableRNG(987654321), 50, 4) .+ 1000.0
@@ -182,39 +195,47 @@ folded = foldl(partial_fit!, eachrow(Z); init = Covariance())
 (maximum(abs, cov(folded) - exact), maximum(abs, textbook(Z) - exact))
 
 #=
-Reach for the step on a plain prior for that property and for the resume below, not for the
-clock; reach for it on a policy prior through a cheap head for the clock as well.
+The first number is the largest difference between the recursion and the batch covariance, and
+the second is the largest difference between the textbook formula and the batch covariance.
 
-## 4. A run resumes from its Result
+With the default covariance of `EmpiricalPrior`, reach for the update for that accuracy and for
+the resume below, and not for the speed. With a `CoveragePolicy` and an optimiser that computes
+its weights cheaply, such as `HierarchicalRiskParity`, reach for it for the speed as well.
 
-An online run's [`MultiPeriodPredictionResult`](@ref) carries the estimator the loop
-threaded, folded through the last training end. When more rows arrive, [`Resume`](@ref) hands
-that Result back over the **full history extended** and the same scheme: the loop skips the
-folds the Result holds, folds the ordinary delta into a copy of the state, and continues from
-the next fold. The resumed Result holds the new folds only, `vcat` stacks the two, and the
-stack equals the one-shot run. Timestamps are required, because the fold to resume from is
-located by the state's last held timestamp.
+## 4. A run resumes from its result
+
+The [`MultiPeriodPredictionResult`](@ref) of an online run holds the estimator as it stood at the
+end of the last training window. When more rows arrive, hand that result to [`Resume`](@ref) with
+the extended history and the same scheme. The loop skips the folds the result already holds,
+adds the new rows to a copy of the state, and continues from the next fold. The resumed result
+holds the new folds alone. `vcat` stacks the two results, and we compare the stack with the run
+over the whole history at once. The first run sees the first 260 rows, and the resume sees all 300
+rows. The data needs timestamps, because the loop finds the fold to resume from by the last
+timestamp the state holds.
 =#
 
-res_1 = cross_val_predict(hrp, cut(1:260), online)              # the history at the first run
-res_2 = cross_val_predict(Resume(res_1), rd, online)            # the full history
+res_1 = cross_val_predict(hrp, cut(1:260), online)
+res_2 = cross_val_predict(Resume(res_1), rd, online)
 
 (length(res_1.pred), length(res_2.pred), weights(vcat(res_1, res_2)) == weights(o))
 
 #=
-`res_1` is never written — `Resume` copies every state at entry — so one Result resumes any
-number of times.
+`Resume` works on a copy of every state. `res_1` does not change, and you can resume it any number
+of times.
 
 ## Where to go next
 
-  - [The online walk-forward example](../examples/5_validation_tuning/09_Online_Walk_Forward.md)
-    — every identity above through a JuMP head as well, the search, the refusals, and the
-    gain measured by prior family and by head.
-  - [Validation and tuning](05_Validation_and_Tuning.md) — the walk-forward and the search
+  - [The online walk-forward example](@ref example-the-online-walk-forward-one-estimator-updated-fold-by-fold)
+    runs every comparison above through `MeanRisk` as well, with the search, the errors, and the
+    speed with and without a `CoveragePolicy` through each optimiser.
+  - [Online portfolio selection](@ref user-guide-online-portfolio-selection) covers the optimisers whose
+    weights come from a recursion of their own rather than a batch fit, run through the online
+    walk-forward of this page.
+  - [Validation and tuning](@ref user-guide-validation-and-tuning) covers the walk-forward and the search
     this page runs.
-  - [The point-in-time universe](08_Point_in_Time_Universe.md) — the panel whose active mask
-    the step folds.
-  - [Data and priors](01_Data_and_Priors.md) — the prior that does the folding here.
+  - [The point-in-time universe](@ref user-guide-the-point-in-time-universe) covers the panel whose active mask
+    the update takes.
+  - [Data and priors](@ref user-guide-data-and-priors) covers the prior that updates here.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

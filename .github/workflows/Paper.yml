@@ -35,15 +35,12 @@ jobs:
         uses: julia-actions/cache@v3
       # The paper's hidden cell activates `docs/` by relative path, so the listing runs against
       # whatever that environment resolves. `docs/Manifest.toml` is not tracked, so the manifest
-      # that points PortfolioOptimisers at this checkout has to be built here, exactly as the
-      # documentation job builds it. Without this the cell would resolve the registered release,
-      # which is older than the API the listing uses.
+      # has to be built here, exactly as the documentation job builds it. The `[sources]` entry
+      # of `docs/Project.toml` points PortfolioOptimisers at this checkout, so the cell runs the
+      # development version and not the registered release, which is older than the API the
+      # listing uses.
       - name: Instantiate environment with development version of the package
-        run: |
-          julia --color=yes --project=docs -e '
-            using Pkg
-            Pkg.develop(PackageSpec(path=pwd()))
-            Pkg.instantiate()'
+        run: julia --color=yes --project=docs -e 'using Pkg; Pkg.instantiate()'
       - name: Install TypstJlyfish
         run: julia --color=yes --project=@jlyfishdoc -e 'using Pkg; Pkg.add("TypstJlyfish")'
       # `recompute: false` keys a cell on its own text, and `main-jlyfish.json` is committed, so a

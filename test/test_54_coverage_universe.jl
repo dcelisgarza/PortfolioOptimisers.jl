@@ -417,6 +417,40 @@ end
                                      active_mask = pnl_full.amsk))
 end
 
+@testset "A NaN frame refuses a type without NaN, issue #1347" begin
+    # A moment of a `Rational` sample stays exact, and `Rational` has no `NaN`. The expansion
+    # refuses the block with a named error before it writes the frame, and does not widen it.
+    Xr = Rational{Int}.(rand(StableRNG(9), -5:5, T, N))
+    # A sample with no gap needs no frame, so the moment stays exact.
+    @test eltype(Statistics.cov(Covariance(), Xr, nothing)) <: Rational
+    Xrg = copy(Xr)
+    Xrg[2, 3] = 1 // 0
+    for f in (Statistics.cov, Statistics.cor)
+        @test_throws ArgumentError f(Covariance(), Xrg, nothing)
+        @test_throws ArgumentError f(Covariance(), Xr, pnl_inactive)
+    end
+    @test_throws ArgumentError Statistics.mean(SimpleExpectedReturns(), Xrg, nothing)
+    @test_throws ArgumentError Statistics.var(SimpleVariance(), Xrg, nothing)
+    @test_throws ArgumentError prior(EmpiricalPrior(), Xrg, nothing, pnl_full)
+    # The series writes its frame before its first row, so it refuses a sample with no gap.
+    @test_throws ArgumentError PO.variance_series(SimpleVariance(), Xr, nothing)
+    # The message names the type and the way out.
+    err = try
+        Statistics.cov(Covariance(), Xrg, nothing)
+    catch e
+        e
+    end
+    @test occursin("Rational{Int64} cannot hold NaN", err.msg)
+    @test occursin("floating-point type", err.msg)
+    @test_throws ArgumentError PO.coverage_nan_frame([1 2; 3 4], (2, 2))
+    # A type that holds `NaN` keeps its own type in the frame.
+    @test eltype(PO.coverage_nan_frame(Float32[1 2], (2, 2))) === Float32
+    # The float sample of the same data expands as before.
+    sig = Statistics.cov(Covariance(), Float64.(Xrg), nothing)
+    @test all(isnan, sig[3, :]) && all(isnan, sig[:, 3])
+    @test all(isfinite, sig[[1, 2, 4], [1, 2, 4]])
+end
+
 @testset "The mask-aware family answers the series and the marginals, issue #896" begin
     # A mask-aware estimator overrides every panel verb it answers, so the panel call and the
     # masked keyword call name the same answer. Where the override is missing the call lands on
@@ -464,6 +498,24 @@ end
                                      active_mask = permutedims(pnl_full.amsk)),
                   permutedims(PO.variance_series(ewv, X0, pnl_full)))
 
+    # The panel arm turns the mask where the caller turns the sample, so the same panel
+    # names the same statistic through the transposed orientation. An arm that handed the
+    # panel's mask through unturned met a `T × N` mask with an `N × T` sample and threw a
+    # `DimensionMismatch` at `dims = 2` alone, for every verb of every member (issue #1249).
+    Xt = permutedims(Xhol)
+    for pnl in (pnl_full, pnl_inactive),
+        (ce, verbs) in
+        ((rac, (Statistics.cov, Statistics.cor, Statistics.var, Statistics.std)),
+         (ewv, (Statistics.var, Statistics.std)),
+         (ewc, (Statistics.cov, Statistics.cor, Statistics.var, Statistics.std)))
+
+        for verb in verbs
+            @test isequal(vec(verb(ce, Xt, pnl; dims = 2)), vec(verb(ce, Xhol, pnl)))
+        end
+        @test isequal(PO.variance_series(ce, Xt, pnl; dims = 2),
+                      permutedims(PO.variance_series(ce, Xhol, pnl)))
+    end
+
     # No panel, and a static panel, both take the estimator's unmasked path.
     @test isequal(PO.variance_series(ewv, X0, nothing), PO.variance_series(ewv, X0))
     @test isequal(Statistics.var(ewc, X0, nothing), Statistics.var(ewc, X0))
@@ -502,4 +554,115 @@ end
     # A mask of the wrong size is refused by the pass.
     @test_throws DimensionMismatch PO.variance_series(ewv, X0;
                                                       active_mask = trues(T, N + 1))
+end
+
+@testset "The docstrings of 33_CoverageUniverse.jl against numbers" begin
+    # `coverage_mask` against its set definition: finite at every row of `X`, and `true` at
+    # every row of the active mask, whose row count may differ from the row count of `X`.
+    rng = StableRNG(11)
+    for _ in 1:200
+        Tx, Ta, n = rand(rng, 1:12), rand(rng, 1:12), rand(rng, 1:6)
+        X = randn(rng, Tx, n)
+        for _ in 1:rand(rng, 0:3)
+            X[rand(rng, 1:Tx), rand(rng, 1:n)] = rand(rng, (NaN, Inf, -Inf))
+        end
+        amsk = rand(rng, Ta, n) .> 0.08
+        pnl = AssetPanel(; pf = [NumericPanelField(; name = "m", vals = ones(Ta, n))],
+                         amsk = amsk, emsk = amsk)
+        want = [all(isfinite, X[:, i]) && all(amsk[:, i]) for i in 1:n]
+        for (Xd, dims) in ((X, 1), (permutedims(X), 2))
+            if !any(want)
+                @test_throws IsEmptyError PO.coverage_mask(Xd, pnl; dims = dims)
+            elseif all(want)
+                @test isnothing(PO.coverage_mask(Xd, pnl; dims = dims))
+            else
+                @test PO.coverage_mask(Xd, pnl; dims = dims) == want
+            end
+        end
+    end
+
+    # The four frames of `expand_moment`, entry by entry: position `k(i)` of asset `i` in the
+    # Coverage Universe, `NaN` at every other entry.
+    for cmsk in (BitVector([1, 0, 1, 1]), BitVector([0, 1, 0, 1, 1]), BitVector([0, 0, 1]))
+        C = findall(cmsk)
+        n, M = length(C), length(cmsk)
+        k = Dict(C[j] => j for j in 1:n)
+        m, B = randn(rng, n), randn(rng, n, n)
+        S, K = randn(rng, n, n^2), randn(rng, n^2, n^2)
+        want_S = fill(NaN, M, M^2)
+        want_K = fill(NaN, M^2, M^2)
+        for i in C, a in C, b in C
+            want_S[i, (a - 1) * M + b] = S[k[i], (k[a] - 1) * n + k[b]]
+        end
+        for a in C, b in C, c in C, d in C
+            want_K[(a - 1) * M + b, (c - 1) * M + d] = K[(k[a] - 1) * n + k[b],
+                                                         (k[c] - 1) * n + k[d]]
+        end
+        mt = PO.expand_moment(m, cmsk, 1)
+        @test mt[C] == m
+        @test all(isnan, mt[.!cmsk])
+        Bt = PO.expand_moment(B, cmsk)
+        @test Bt[C, C] == B
+        @test count(isnan, Bt) == M^2 - n^2
+        St, Vt = PO.expand_moment((S, B), cmsk)
+        @test isequal(St, want_S)
+        @test isequal(Vt, Bt)
+        @test isequal(PO.expand_moment(K, cmsk, Val(:kt)), want_K)
+        @test PO.coverage_pair_index(cmsk) == [(a - 1) * M + b for a in C for b in C]
+    end
+    # The pair index reads the column rule of `kron(o, Y) .* kron(Y, o)`.
+    Y = randn(rng, 7, 4)
+    o = ones(1, 4)
+    KY = kron(o, Y) .* kron(Y, o)
+    @test all(KY[:, (a - 1) * 4 + b] == Y[:, b] .* Y[:, a] for a in 1:4, b in 1:4)
+
+    # The implied volatility surface describes the assets of `X`, so its asset axis must match.
+    # A narrower surface read two of three columns and answered "every asset covered".
+    @test_throws DimensionMismatch PO.coverage_mask(X0, fill(0.2, T, N - 1), nothing)
+    @test_throws DimensionMismatch PO.coverage_mask(X0, fill(0.2, T, N + 1), pnl_full)
+    @test_throws DimensionMismatch PO.coverage_mask(permutedims(X0), fill(0.2, N - 1, T),
+                                                    nothing; dims = 2)
+    iv = fill(0.2, T, N)
+    iv[3, 2] = NaN
+    @test PO.coverage_mask(Xlist, iv, pnl_inactive) == BitVector([0, 0, 1, 0])
+
+    # The series pairs the active mask with `X` row by row, so the two must be the same size.
+    # A shorter mask threw a `BoundsError`, and a wider one an unnamed `DimensionMismatch`.
+    short = AssetPanel(; pf = [NumericPanelField(; name = "m", vals = ones(T - 5, N))],
+                       amsk = trues(T - 5, N), emsk = trues(T - 5, N))
+    wide = AssetPanel(; pf = [NumericPanelField(; name = "m", vals = ones(T, N + 1))],
+                      amsk = trues(T, N + 1), emsk = trues(T, N + 1))
+    ve = SimpleVariance()
+    vc = SimpleVariance(; cvg = CoveragePolicy())
+    for pnl in (short, wide), est in (ve, vc, GerberCovariance())
+        @test_throws DimensionMismatch PO.variance_series(est, Xhol, pnl)
+    end
+    @test_throws DomainError PO.variance_series(ve, Xhol, pnl_full; dims = 3)
+    @test_throws DomainError PO.variance_series(vc, Xhol, pnl_full; dims = 3)
+
+    # The series against its definition, entry by entry.
+    got = PO.variance_series(ve, Xlist, pnl_inactive)
+    want = fill(NaN, T, N)
+    for t in 1:T
+        C = [i for i in 1:N if all(isfinite, Xlist[1:t, i]) && all(inactive_amsk[1:t, i])]
+        isempty(C) && continue
+        want[t, C] = vec(Statistics.var(ve, Xlist[1:t, C]; dims = 1))
+    end
+    @test isequal(got, want)
+    # Every window starts at the first row, so the asset that lists at observation 31 is `NaN`
+    # throughout. The available-case seam gives it a number from its second observation on.
+    @test all(isnan, view(got, :, 4))
+    @test findall(isfinite, view(PO.variance_series(vc, Xlist, pnl_full), :, 4)) == 32:T
+
+    # A variance divides, so an integer sample gives the series of the same sample in Float64,
+    # bit for bit, and a Float32 sample stays Float32. The frame took `eltype(X)` and an integer
+    # sample threw `InexactError: Int64(NaN)`.
+    Xi = rand(StableRNG(33), -5:5, T, N)
+    for est in (ve, vc)
+        vi = PO.variance_series(est, Xi, pnl_inactive)
+        @test eltype(vi) == Float64
+        @test isequal(vi, PO.variance_series(est, Float64.(Xi), pnl_inactive))
+    end
+    @test eltype(PO.variance_series(ve, Float32.(Xhol), pnl_full)) == Float32
+    @test eltype(PO.variance_series(vc, Float32.(Xhol), nothing)) == Float32
 end

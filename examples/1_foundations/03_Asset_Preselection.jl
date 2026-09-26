@@ -1,40 +1,41 @@
 #=
 ```@meta
-Description = "Asset pre-selection in PortfolioOptimisers.jl: drop constant, dominated and redundant assets before optimising, and why it helps."
+Description = "Asset pre-selection in PortfolioOptimisers.jl: drop constant, low-ranked and redundant assets before optimising, and why it helps."
 ```
 
 # Asset pre-selection
 
-Not every asset in a universe earns its place. Some carry no information at all — a constant
-column, a name that never traded. Some are dominated: you asked for the twenty lowest-risk
-names and got two hundred. And some are redundant, moving so closely with another asset that
-keeping both tells the optimiser the same thing twice, inflating its confidence in a
-correlation structure that is really one factor wearing two hats.
+Some assets in a universe add nothing to the optimisation. A constant column, such as a name that
+never traded, carries no information. Some assets rank too low, for example when you want the twenty
+names with the lowest risk and the universe has two hundred. Some are redundant, because they move
+so closely with another asset that keeping both gives the optimiser the same information twice. The
+optimiser then treats one common factor as two separate sources of risk.
 
-**Asset selectors** narrow the universe from the data, as ordinary preprocessing estimators.
-They know nothing about pipelines; a [`Pipeline`](@ref) drives them through
-[`fit_preprocessing`](@ref) and [`apply_preprocessing`](@ref) exactly as it drives a prior
-estimator through [`prior`](@ref). Three families:
+An asset selector removes such assets from the universe, based on the returns. It is an ordinary
+preprocessing estimator and needs no pipeline. A [`Pipeline`](@ref) runs it through
+[`fit_preprocessing`](@ref) and [`apply_preprocessing`](@ref), as it runs a prior estimator through
+[`prior`](@ref). The library has three kinds:
 
-  - [`CompleteAssetSelector`](@ref) — drop any asset column holding a `missing` or `NaN`.
-  - [`ScoreSelector`](@ref) — score every asset with a risk measure, keep what a rule admits.
-    [`ZeroVarianceFilter`](@ref) is the named special case.
-  - [`RedundancySelector`](@ref) — discard assets that duplicate information others carry.
+  - [`CompleteAssetSelector`](@ref) drops every asset with a non-finite return at any observation
+    of the window.
+  - [`ScoreSelector`](@ref) scores every asset with a risk measure and keeps the assets a rule
+    admits. [`ZeroVarianceFilter`](@ref) is a named case of it.
+  - [`RedundancySelector`](@ref) drops assets whose returns repeat the information of other
+    assets.
 
-The idea that makes all of this safe is that **the universe a selector chooses on the
-training window is its fitted state**. Applying the fitted result to an unseen window
-*replays* that universe rather than re-deciding it. Without that, selection would be the
-purest form of look-ahead bias: choosing your assets using the returns you are about to be
-scored on.
+A selector chooses its universe on the training window, and that universe is the result of the fit.
+Applying the fitted result to a later window keeps the same universe and does not choose again. A
+selector that chose again on each window would pick its assets with the returns it is about to be
+scored on, which is look-ahead bias.
 
 !!! tip "When to reach for this"
-    Reach for a selector whenever the universe itself is a modelling decision rather than a
-    given. Degenerate columns (`ZeroVarianceFilter`, `CompleteAssetSelector`) are hygiene —
-    run them always. Score-based selection (`ScoreSelector`) is a *hypothesis*: that
-    pre-screening on a risk measure improves out-of-sample outcomes. Redundancy pruning
-    (`RedundancySelector`) is a *conditioning* fix, for when a near-singular correlation
-    matrix is destabilising the optimiser. Screening and pruning are hyperparameters — tune
-    them inside cross-validation (§7), never on the full sample.
+    Reach for a selector when the choice of universe is part of your model and not given to you.
+    Run the selectors for degenerate columns, `ZeroVarianceFilter` and `CompleteAssetSelector`,
+    on every universe. Selection by score, `ScoreSelector`, tests the hypothesis that a screen on
+    a risk measure improves the results out of sample. Pruning redundant assets,
+    `RedundancySelector`, helps when a correlation matrix close to singular makes the optimiser
+    unstable. The screen and the pruning have parameters, and you tune them inside
+    cross-validation, as section 7 shows, never on the full sample.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames, Statistics, StatsAPI
@@ -50,8 +51,8 @@ end;
 #=
 ## 1. The data
 
-Twenty S&P 500 names, the last 1000 trading days. Real data, so the correlations are real
-too — that matters for §5, where two algorithms that sound equivalent give different answers.
+We take twenty S&P 500 names over the last 1000 trading days. Section 5 needs the correlations of
+real data, because on them the two redundancy algorithms keep different assets.
 =#
 
 using CSV, TimeSeries
@@ -61,16 +62,16 @@ rd = prices_to_returns(X[(end - 1000):end])
 size(rd.X), rd.nx
 
 #=
-## 2. Scoring an asset with a risk measure
+## 2. Score an asset with a risk measure
 
-`ScoreSelector` scores asset `i` by evaluating a risk measure on **that asset's own return
-series**: `score(view(X, :, i))`. There is no separate score taxonomy to learn, because the
-risk-measure family already spans everything you would want to rank on — variance and
-semi-variance, VaR and CVaR, the drawdown measures, and [`MeanReturn`](@ref).
+`ScoreSelector` scores asset `i` with a risk measure evaluated on the returns of that asset alone,
+`score(view(X, :, i))`. The library has no separate family of scores, because the risk measures
+already cover what you would rank assets on: variance and semi-variance, VaR and CVaR, the drawdown
+measures, and [`MeanReturn`](@ref).
 
-Two traits do the work. [`supports_precomputed_returns`](@ref) says whether a measure's
-functor can consume a bare return series at all, and [`bigger_is_better`](@ref) says which end
-of the resulting ordering is "best".
+Two traits decide how a measure scores. [`supports_precomputed_returns`](@ref) says whether a
+measure can take a single return series, and [`bigger_is_better`](@ref) says which end of the
+ranking is the best. We print both traits for five measures.
 =#
 
 measures = ["SCM()" => SCM(), "ConditionalValueatRisk()" => ConditionalValueatRisk(),
@@ -84,8 +85,9 @@ pretty_table(DataFrame(; measure = first.(measures),
                                            for (_, r) in measures]))
 
 #=
-So `ConditionalValueatRisk` is minimised and `MeanReturn` is maximised, and a rule that says
-`best` means the right thing for each without you having to remember which.
+A smaller `ConditionalValueatRisk` is better and a bigger `MeanReturn` is better. A rule that asks
+for the `best` assets takes the right end for each measure, and you do not state which end it is.
+We score every asset with both measures.
 =#
 
 cvar = PortfolioOptimisers.asset_scores(ConditionalValueatRisk(), rd.X)
@@ -96,11 +98,10 @@ pretty_table(sort(DataFrame(; asset = rd.nx, cvar = cvar, mean_return = mu), :cv
 #=
 ### 2.1 `Variance` cannot score a single asset
 
-This is the one sharp edge in reusing the risk-measure family, and it is worth meeting
-head-on. [`Variance`](@ref) is a [`WeightsInput`](@ref) measure: its functor consumes
-portfolio *weights* and a covariance matrix, not a return series. It has no meaning applied to
-one asset in isolation, so `ScoreSelector` rejects it at construction rather than silently
-computing something else.
+One measure of the family does not work as a score. [`Variance`](@ref) is a
+[`WeightsInput`](@ref) measure. It takes the weights of a portfolio and a covariance matrix, not a
+return series. It has no meaning for one asset alone, so `ScoreSelector` throws an error when you
+construct it with `Variance`.
 =#
 
 try
@@ -110,9 +111,10 @@ catch e
 end
 
 #=
-The remedy is in the error: `SCM()` — the second central moment, an alias for
-[`LowOrderMoment`](@ref) with [`SecondMoment`](@ref) and [`FullMoment`](@ref) — computes the
-same quantity from a return series, and is scoreable.
+The error names the replacement, `SCM()`. It is the second central moment, an alias for
+[`LowOrderMoment`](@ref) with [`SecondMoment`](@ref) and [`FullMoment`](@ref). It computes the
+same quantity from a return series, and it can score an asset. We print its scores for three
+assets beside the variances that `var` computes.
 =#
 
 PortfolioOptimisers.asset_scores(SCM(), rd.X)[1:3],
@@ -121,18 +123,19 @@ var(rd.X[:, 1:3]; dims = 1, corrected = false)
 #=
 ## 3. Rules: what to do with the scores
 
-A [selection rule](@ref PortfolioOptimisers.AbstractSelectionRule) turns per-asset scores into
-a keep-mask. Rules come in two kinds, and the distinction is not cosmetic.
+A [selection rule](@ref PortfolioOptimisers.AbstractSelectionRule) turns the scores into a mask of
+the assets to keep. There are two kinds of rule, and they treat the scores differently.
 
-**Literal.** [`ThresholdRule`](@ref) compares raw scores against absolute bounds `(lo, hi)`,
-both optional and both exclusive. It **ignores** `bigger_is_better`. That is deliberate: a
-zero-variance filter must drop the *low*-variance assets, so a trait-aware "keep the better
-ones" would invert its whole purpose.
+A literal rule compares the scores with fixed values. [`ThresholdRule`](@ref) compares each score
+with the bounds `(lo, hi)`, both optional and both exclusive, and ignores `bigger_is_better`. A
+filter for zero variance must drop the assets of low variance, and a rule that kept the better
+assets by the trait would keep those assets instead.
 
-**Ordinal.** [`RankRule`](@ref) and [`QuantileRule`](@ref) sort the assets best-to-worst,
-consulting `bigger_is_better`, and take **counts (or fractions) from each end**. Not
-positions — counts. That is what makes "drop the worst 5" expressible without knowing how many
-assets there are, and what lets you take both tails at once.
+An ordinal rule compares the scores with each other. [`RankRule`](@ref) and
+[`QuantileRule`](@ref) sort the assets from best to worst by `bigger_is_better`, and take a count or
+a fraction of assets from each end. A rule takes counts, not positions, and it can take the two
+ends at once. `action = :drop` inverts the selection, so the rule drops the assets it names and
+keeps the rest. With it you can drop the worst five without knowing how many assets there are.
 =#
 
 rules = ["RankRule(best = 5)" => RankRule(; best = 5),
@@ -149,10 +152,9 @@ end
 pretty_table(DataFrame(rows))
 
 #=
-Note the orientation flip. `ConditionalValueatRisk` is minimised, so `best = 5` returns the
-five *defensive* names. Swap the score for `MeanReturn`, which is maximised, and `best = 5`
-returns the five *growth* names — the same rule, the opposite end of the table, and no flag to
-remember.
+The direction of the ranking changes with the measure. `ConditionalValueatRisk` is better when
+smaller, so `best = 5` returns the five defensive names. `MeanReturn` is better when bigger, so
+the same rule returns the five growth names.
 =#
 
 DataFrame(; rule = ["best = 5", "worst = 5"],
@@ -174,44 +176,42 @@ DataFrame(; rule = ["best = 5", "worst = 5"],
                                                    rd).nx, ", ")])
 
 #=
-### 3.1 Hygiene: degenerate columns
+### 3.1 Degenerate columns
 
 [`ZeroVarianceFilter`](@ref) is `ScoreSelector(; score = SCM(), rule = ThresholdRule(; lo = tol))`
-under a friendlier name. A constant column has zero variance, contributes nothing, and makes a
-covariance matrix singular.
+under its own name. A constant column has zero variance, adds nothing to a portfolio, and makes a
+covariance matrix singular. We set the returns of one asset to zero, and the filter drops it.
 
-[`CompleteAssetSelector`](@ref) is its counterpart for missingness at the returns level —
-useful when a pipeline is fed a `ReturnsResult` directly and the price-level
-[`MissingDataFilter`](@ref) never runs.
+[`CompleteAssetSelector`](@ref) drops the assets with a non-finite return. Use it when a
+pipeline receives a `ReturnsResult` directly, so the [`MissingDataFilter`](@ref) that works on
+prices never runs.
 =#
 
 Xz = copy(rd.X)
-Xz[:, 4] .= 0.0                                  # BBY stops trading
+Xz[:, 4] .= 0.0
 rd_z = ReturnsResult(; nx = rd.nx, X = Xz)
 setdiff(rd.nx, fit_preprocessing(ZeroVarianceFilter(), rd_z).nx)
 
 #=
-`tol` defaults to `1e-12` rather than `0` because a column that moves by 1e-18 is constant for
-every purpose that matters, and the bound is exclusive so `tol = 0` still drops an exactly
-constant asset.
+`tol` defaults to `1e-12` and not `0`, because a column that moves by `1e-18` is constant for any
+use. The bound is exclusive, so `tol = 0` still drops a column that is exactly constant.
 
-## 4. Ties: if we cannot tell them apart, keep neither
+## 4. Ties: if the scores cannot tell two assets apart, the rule keeps neither
 
-This is the library's one genuinely surprising rule, so it is worth understanding rather than
-discovering.
+When two assets have the same score, a rule keeps neither of them. A block of tied assets that
+spans a cut of the ranking is dropped whole and never split. To split it, the rule would have to
+break the tie by column index, and your portfolio would then depend on the order of the columns in
+your CSV file, which is not a property of the data.
 
-When two assets are **indistinguishable under the criterion being applied**, neither is kept.
-A tied block straddling a rank cut is dropped whole rather than split arbitrarily. The
-alternative — breaking the tie by column index — would make your portfolio depend on the order
-of the columns in your CSV, which is not a property of the data.
-
-The consequence to internalise: **`RankRule(; best = k)` may return fewer than `k` assets.**
+So `RankRule(; best = k)` can return fewer than `k` assets. To show it, we copy the column of the
+asset with the second lowest variance over the column of the third, so that the two tie, and ask
+for the best one, two and three assets.
 =#
 
 v = PortfolioOptimisers.asset_scores(SCM(), rd.X)
-ord = sortperm(v)                                # ascending variance; lower is better
+ord = sortperm(v)
 Xs = copy(rd.X)
-Xs[:, ord[3]] = Xs[:, ord[2]]                    # make ranks 2 and 3 tie exactly
+Xs[:, ord[3]] = Xs[:, ord[2]]
 rd_tie = ReturnsResult(; nx = rd.nx, X = Xs)
 
 tie_rows = map([1, 2, 3]) do k
@@ -222,14 +222,14 @@ end
 pretty_table(DataFrame(tie_rows))
 
 #=
-`best = 2` returns one asset: ranks 2 and 3 tie, the block straddles the cut, so it is
-excluded. `best = 3` returns three: the same block now fits entirely inside the cut, so it is
-kept whole. And a window whose scores are *all* equal selects nothing — which
-[`fit_preprocessing`](@ref) reports as an error rather than handing an empty universe
-downstream.
+`best = 2` returns one asset, because ranks 2 and 3 tie and the cut falls between them, so the rule
+drops the pair. `best = 3` returns three, because the pair now sits inside the cut and the rule
+keeps it whole. A window whose scores are all equal selects nothing, and
+[`fit_preprocessing`](@ref) throws an error rather than return an empty universe.
 
-The same stance governs redundancy. Two identical columns are perfectly correlated and score
-identically, so neither survives.
+The redundancy selector treats ties in the same way. Two identical columns have a correlation of
+one and the same score, so it keeps neither. We add a copy of AAPL and check whether either
+stays.
 =#
 
 rd_dup = ReturnsResult(; nx = [rd.nx; "AAPL_copy"], X = hcat(rd.X, rd.X[:, 1]))
@@ -238,25 +238,25 @@ dup_kept = fit_preprocessing(RedundancySelector(; alg = PairwiseCorrelation(; t 
 ("AAPL" in dup_kept, "AAPL_copy" in dup_kept, length(dup_kept))
 
 #=
-## 5. Redundancy: two algorithms, two different answers
+## 5. Redundancy: pairwise pruning and connected components
 
-[`RedundancySelector`](@ref) has two parts. `alg` decides *which* assets are redundant;
-`score` decides *which member of a redundant group survives*. Leave `score` as `nothing` and
-the correlation algorithms fall back on their own rule — the asset with the lowest summary
-correlation to the rest of the universe survives, i.e. the least redundant one.
+[`RedundancySelector`](@ref) has two parts. `alg` decides which assets are redundant, and `score`
+decides which member of a redundant group stays. If you leave `score` as `nothing`, the
+correlation algorithms keep the asset with the lowest summary correlation to the rest of the
+universe, the least redundant one.
 
-The two correlation algorithms sound interchangeable. They are not.
+[`PairwiseCorrelation`](@ref) is greedy and is the default. It visits the pairs of assets from the
+most correlated to the least, and drops the worse asset of each pair, until no pair that remains
+has a correlation above `t`.
 
-[`PairwiseCorrelation`](@ref) is **greedy**. It visits correlated pairs from most to least
-correlated and drops the worse asset of each, until no surviving pair exceeds `t`. That is
-the literal promise the threshold makes, and it is the default.
+[`CorrelationComponents`](@ref) follows the correlations from one asset to the next. The assets
+are the nodes of a graph, and each correlation above the threshold is an edge. Each connected
+component of the graph keeps one asset. At `t = 0.7`, if `ρ(A,B) = 0.80` and `ρ(B,C) = 0.81` but
+`ρ(A,C) = 0.32`, the three assets form one component, and the algorithm drops two of them, although
+`A` and `C` are weakly correlated. We call such a sequence of edges a chain.
 
-[`CorrelationComponents`](@ref) reads the same correlations **transitively**. Assets are nodes,
-over-threshold correlations are edges, and each connected component keeps one representative.
-If `ρ(A,B) = 0.97` and `ρ(B,C) = 0.97` but `ρ(A,C) = 0.10`, all three are one component and two
-are discarded — even though `A` and `C` are uncorrelated.
-
-Chaining is not hypothetical. On real data, at the same threshold:
+Chains form on real data too. We run both algorithms at the same threshold and print the largest
+correlation between two assets the greedy algorithm keeps.
 =#
 
 greedy = RedundancySelector(; alg = PairwiseCorrelation(; t = 0.65, absolute = true),
@@ -267,7 +267,6 @@ comps = RedundancySelector(; alg = CorrelationComponents(; t = 0.65, absolute = 
 kept_g = fit_preprocessing(greedy, rd).nx
 kept_c = fit_preprocessing(comps, rd).nx
 
-## the greedy guarantee, verified: no surviving pair exceeds t
 gi = [findfirst(==(n), rd.nx) for n in kept_g]
 sub = abs.(cor(rd.X[:, gi]))
 max_surviving = maximum(sub[i, j] for j in axes(sub, 2) for i in (j + 1):size(sub, 1))
@@ -275,21 +274,23 @@ max_surviving = maximum(sub[i, j] for j in axes(sub, 2) for i in (j + 1):size(su
 DataFrame(; algorithm = ["PairwiseCorrelation", "CorrelationComponents"],
           kept = [length(kept_g), length(kept_c)],
           max_surviving_abs_cor = [round(max_surviving; digits = 3), missing],
-          extra_drops = ["—", join(setdiff(kept_g, kept_c), ", ")])
+          extra_drops = ["", join(setdiff(kept_g, kept_c), ", ")])
 
 #=
-`absolute = true` treats a correlation of `-0.9` as redundant too, which is usually what you
-want: two assets moving in lockstep carry the same information whichever sign it comes with.
+`absolute = true` counts a correlation of `-0.9` as redundant too. That is usually what you want,
+because two assets that move together carry the same information whatever the sign of their
+correlation.
 
-Neither answer is wrong. Greedy honours the promise a threshold makes and keeps more assets;
-components makes the stronger claim that a correlated blob deserves one representative, and
-reduces harder. Choose knowingly.
+The largest correlation the greedy algorithm keeps is below the threshold, and the last column names
+the assets that the components algorithm drops in addition. Choose the one whose rule you want.
 
 ### 5.1 Clustering as the grouping rule
 
-[`ClusterGroups`](@ref) partitions with [`clusterise`](@ref), so the entire clustering family —
-hierarchical linkage, DBHT, the optimal-number-of-clusters estimators — becomes a way to define
-"redundant". It has no fallback survivor rule, so it *requires* a `score`.
+[`ClusterGroups`](@ref) forms the groups with [`clusterise`](@ref), so any clustering method of
+the library can define which assets are redundant: hierarchical linkage, the Direct Bubble
+Hierarchical Tree ([`DBHT`](@ref)), and the estimators of the optimal number of clusters. It has no
+default rule for which asset stays, so it needs a `score`, and the second cell prints the error you
+get without one.
 =#
 
 clustered = RedundancySelector(; alg = ClusterGroups(), score = SCM())
@@ -297,17 +298,18 @@ kept_cl = fit_preprocessing(clustered, rd).nx
 length(kept_cl), join(kept_cl, ", ")
 
 try
-    RedundancySelector(; alg = ClusterGroups())            # no score
+    RedundancySelector(; alg = ClusterGroups())
 catch e
     println(e.msg)
 end
 
 #=
-## 6. The universe is fitted state
+## 6. The universe is the result of the fit
 
-Everything above ran `fit_preprocessing` on one window. In a pipeline, that window is the
-*training* window, and the selected universe is carried in the fitted result. Predicting on an
-unseen window **replays** it.
+Every selection above was fitted on one window, the whole sample. In a pipeline that window is the
+training window, and the fitted result holds the selected universe. A prediction on a later window
+keeps that universe. We fit a selector on the first 700 observations, apply it to the rest, and
+compare the result with the universe the selector would choose on the rest alone.
 =#
 
 selector = ScoreSelector(; score = ConditionalValueatRisk(), rule = RankRule(; best = 10))
@@ -317,23 +319,25 @@ test = ReturnsResult(; nx = rd.nx, X = rd.X[701:end, :])
 fitted = fit_preprocessing(selector, train)
 replayed = apply_preprocessing(fitted, test)
 
-## the *test* window's own ten lowest-CVaR names would have been different
 would_have_chosen = fit_preprocessing(selector, test).nx
 
-DataFrame(; universe = ["fitted on train", "replayed on test", "test window's own choice"],
+DataFrame(;
+          universe = ["fitted on the training window", "applied to the test window",
+                      "chosen on the test window"],
           assets = [join(fitted.nx, ", "), join(replayed.nx, ", "),
                     join(would_have_chosen, ", ")])
 
 #=
-The replayed universe is the training one, not the test window's own. That difference is the
-look-ahead bias a fit/apply contract exists to prevent.
+The second row, the universe applied to the test window, is the one fitted on the training window.
+The last row is the choice the test window would make from the returns it is scored on, and using
+it would be look-ahead bias.
 
-### 6.1 Step order is checked, not assumed
+### 6.1 The pipeline checks the order of its steps
 
-A selector shrinks `:returns`. Any slot already derived from `:returns` — a prior, a phylogeny,
-an uncertainty set, generated constraints — is then computed on an asset universe that no
-longer exists. `Pipeline` rejects that ordering at construction rather than letting a stale,
-asset-misdimensioned prior reach the optimiser.
+A selector changes the assets of `:returns`. A step computed from `:returns` before the selector,
+such as a prior, a phylogeny, an uncertainty set or a set of constraints, then describes assets
+that are no longer in the universe. `Pipeline` throws an error for that order when you construct
+it, and the prior with the wrong number of assets never reaches the optimiser.
 =#
 
 try
@@ -343,7 +347,7 @@ catch e
 end
 
 #=
-Put the selector first, and it composes with everything else without comment.
+With the selector first, the pipeline accepts the other steps with no change to them.
 =#
 
 using Clarabel
@@ -360,21 +364,24 @@ res = StatsAPI.fit(pipe, rd)
 pretty_table(DataFrame(; asset = res.ctx.returns.nx, weight = res.w); formatters = [resfmt])
 
 #=
-Ten assets in, ten weights out. `predict` on any window replays the fitted ten.
+The pipeline takes twenty assets and returns ten weights. `predict` on any window keeps the ten
+assets of the fit. We predict on the whole sample and print the CVaR of the portfolio of ten
+assets.
 =#
 
 pred = StatsAPI.predict(res, rd)
 expected_risk(ConditionalValueatRisk(), pred)
 
 #=
-## 7. Selection is a hyperparameter
+## 7. Selection is a parameter to tune
 
-How many assets should you keep? That is not a question to answer by looking at the answer.
-[`search_cross_validation`](@ref) fits the *entire* pipeline — selection included — on each
-training window and scores it on the held-out one, so no candidate ever sees the test window
-while choosing its universe.
+The number of assets to keep is a choice you cannot make by looking at the returns you will be
+scored on. [`search_cross_validation`](@ref) fits the whole pipeline, the selector with it, on each
+training window and scores it on the window held out, so no candidate sees the test window when it
+chooses its universe.
 
-Lens keys reach into the selector by name: `"select.rule"` swaps the whole rule.
+A key of the grid names a step and one of its fields. `"select.rule"` replaces the whole rule of
+the step named `"select"`.
 =#
 
 p = ["select.rule" => [RankRule(; best = 5), RankRule(; best = 10), RankRule(; best = 15)]]
@@ -386,20 +393,22 @@ pretty_table(DataFrame(; k = [v[1].best for v in tuned.val_grid],
                        mean_score = vec(mean(tuned.test_scores; dims = 1))))
 
 #=
-`tuned.opt` is the winning *pipeline*, selector and all, ready to fit on the full sample.
+`tuned.opt` is the pipeline with the best score, selector included, and you can fit it on the full
+sample. Its selector keeps this many assets:
 =#
 
 tuned.opt.steps[1].rule.best
 
 #=
-Two things make this honest. Counts **saturate** at the number of assets, so a grid point of
-`best = 50` on a 20-asset universe keeps 20 rather than throwing — a sweep is never killed by
-its largest point. And every *other* degenerate case fails closed: an unscoreable measure, a
-rule that selects nothing, a non-finite score, a fitted asset missing from a test window.
+A count larger than the number of assets keeps every asset, so `best = 50` on a universe of 20
+assets keeps 20 and throws no error, and the largest value of a grid never stops a search. Every
+other degenerate case throws an error: a measure that cannot score an asset, a rule that selects
+nothing, a score that is not finite, and a fitted asset that is missing from a test window.
 
-## 8. Visualising the two decisions
+## 8. Plot the two decisions
 
-The score-and-rule decision is one dimension: sort the assets, cut somewhere.
+A score and a rule sort the assets along one axis and cut them at one place. The bar chart shows
+the CVaR of each asset, and the blue bars are the ten assets that `RankRule(; best = 10)` keeps.
 =#
 
 using StatsPlots
@@ -411,11 +420,12 @@ colours = [n in kept10 ? :steelblue : :lightgray for n in rd.nx[perm]]
 
 bar(1:length(perm), cvar[perm]; color = colours, legend = false,
     xticks = (1:length(perm), rd.nx[perm]), xrotation = 60, ylabel = "CVaR",
-    title = "Per-asset CVaR — RankRule(best = 10) keeps the blue names")
+    title = "CVaR per asset, with the ten that RankRule(best = 10) keeps in blue")
 
 #=
-The redundancy decision is a threshold sweep, and it shows the chaining gap opening up. The two
-algorithms agree only once the graph has no chains left to traverse.
+The redundancy decision depends on the threshold. We count the assets each algorithm keeps over a
+range of thresholds. The gap between the two lines is the assets the components
+algorithm drops through chains, and it closes at the thresholds where the graph has no chains.
 =#
 
 thrs = 0.5:0.025:0.85
@@ -434,29 +444,30 @@ plot(thrs, n_greedy; label = "PairwiseCorrelation (greedy)", marker = :circle, l
 plot!(thrs, n_comps; label = "CorrelationComponents (transitive)", marker = :square, lw = 2)
 hline!([length(rd.nx)]; label = "full universe", ls = :dash, color = :gray)
 plot!(; xlabel = "|correlation| threshold", ylabel = "assets kept",
-      title = "Chaining costs assets", legend = :bottomright)
+      title = "Assets kept at each correlation threshold", legend = :bottomright)
 
 #=
 ## Summary
 
-  - Asset selectors are returns-level preprocessing estimators. The universe chosen on the
-    training window is **fitted state**, replayed on unseen windows — that is what keeps
-    selection out of the look-ahead-bias family.
+  - An asset selector is a preprocessing estimator that works on returns. It chooses the universe
+    on the training window, and applies that universe to later windows, so the selection uses no
+    returns from the window it is scored on.
   - [`ScoreSelector`](@ref) scores each asset with any risk measure whose
-    [`supports_precomputed_returns`](@ref) is `true`, and [`bigger_is_better`](@ref) orients
-    `best`/`worst` so you never pass a direction flag. [`Variance`](@ref) is not scoreable;
-    use `SCM()`.
-  - [`ThresholdRule`](@ref) is literal and ignores orientation; [`RankRule`](@ref) and
-    [`QuantileRule`](@ref) are ordinal and take counts (or fractions) **from each end**, so
-    "drop the worst 5" needs no knowledge of `n`.
-  - Ties are excluded, never split. `RankRule(; best = k)` may return fewer than `k` assets,
-    and two identical columns leave no survivor.
-  - [`PairwiseCorrelation`](@ref) guarantees no surviving pair exceeds the threshold;
-    [`CorrelationComponents`](@ref) reads correlation transitively and reduces harder. They
-    give different answers on the same input, by design.
-  - A step that rewrites `:returns` after a prior, phylogeny, uncertainty, or constraint step
-    is rejected at construction — the stale-universe bug is unrepresentable.
-  - Selection thresholds and counts are hyperparameters. Tune them with
+    [`supports_precomputed_returns`](@ref) is `true`. [`bigger_is_better`](@ref) sets the direction
+    of `best` and `worst`, so you pass no flag for it. [`Variance`](@ref) cannot score an asset,
+    and `SCM()` replaces it.
+  - [`ThresholdRule`](@ref) compares each score with fixed bounds and ignores the direction.
+    [`RankRule`](@ref) and [`QuantileRule`](@ref) rank the assets and take counts or fractions
+    from each end, so you can drop the worst five without knowing how many assets there are.
+  - A rule keeps neither of two tied assets and never splits a tied block. `RankRule(; best = k)`
+    can return fewer than `k` assets, and two identical columns both leave the universe.
+  - [`PairwiseCorrelation`](@ref) keeps no pair above the threshold.
+    [`CorrelationComponents`](@ref) follows chains of correlations and drops more assets. On the
+    same returns the two keep different assets.
+  - A pipeline throws an error at construction if a step changes `:returns` after a prior, a
+    phylogeny, an uncertainty set or a constraint step, so a step never computes on a universe
+    that no longer exists.
+  - The thresholds and counts of a selection are parameters. Tune them with
     [`search_cross_validation`](@ref), never on the full sample.
 =#
 

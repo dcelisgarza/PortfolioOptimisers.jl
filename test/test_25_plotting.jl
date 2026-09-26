@@ -96,6 +96,23 @@
     @testset "plot_factor_risk_contribution" begin
         # rd supplies both asset returns (rd.X) and factor data for regression
         @test is_plot(plot_factor_risk_contribution(r_cvr, w_rd, rd.X; rd = rd))
+        # The last bar is the off-factor contribution, not an intercept, and the factor names
+        # apply only when they count the columns of the loadings (#1290). A large `N` keeps
+        # every bar, so no bar folds into "Others".
+        p_sw = plot_factor_risk_contribution(r_cvr, w_rd, rd.X; rd = rd, N = 100)
+        @test p_sw[1][:xaxis][:ticks][2] == [rd.nf; "Off-factor"]
+        nf_ab = string.('a':'z')[1:length(rd.nf)]
+        p_nf = plot_factor_risk_contribution(r_cvr, w_rd, rd.X; rd = rd, nf = nf_ab,
+                                             N = 100)
+        @test p_nf[1][:xaxis][:ticks][2] == [nf_ab; "Off-factor"]
+        # A dimension-reduction regression fits fewer columns than there are factors, so the
+        # factor names would put a factor's name on the off-factor bar.
+        re_dr = DimensionReductionRegression()
+        k_dr = length(factor_risk_contribution(r_cvr, w_rd, rd.X; rd = rd, re = re_dr)) - 1
+        @test k_dr < length(rd.nf)
+        p_dr = plot_factor_risk_contribution(r_cvr, w_rd, rd.X; rd = rd, re = re_dr,
+                                             N = 100)
+        @test p_dr[1][:xaxis][:ticks][2] == [string.(1:k_dr); "Off-factor"]
     end
 
     @testset "plot_dendrogram" begin
@@ -133,6 +150,20 @@
         @test is_plot(plot_histogram(w, X))
         @test is_plot(plot_histogram(w, X; reference = false))
         @test is_plot(plot_histogram(w_rd, rd))
+
+        # #1284: `reference = true` overlays the pdf of the Normal fitted to the returns, not
+        # a kernel density, and `reference = false` overlays no curve.
+        ret = X * w
+        mu_n, sigma_n = mean(ret), std(ret; corrected = false)
+        p_ref = plot_histogram(w, X)
+        s_ref = p_ref.series_list[end]
+        @test startswith(s_ref[:label], "Normal")
+        @test s_ref[:x] ≈ range(extrema(ret)...; length = ceil(Int, 4 * sqrt(T)))
+        @test s_ref[:y] ≈
+              exp.(-(s_ref[:x] .- mu_n) .^ 2 ./ (2 * sigma_n^2)) ./ (sigma_n * sqrt(2 * pi))
+        p_noref = plot_histogram(w, X; reference = false)
+        @test length(p_noref.series_list) == length(p_ref.series_list) - 1
+        @test !any(s -> startswith(s[:label], "Normal"), p_noref.series_list)
     end
 
     @testset "plot_network" begin
@@ -343,6 +374,16 @@
         @test is_plot(plot_performance_summary(res_p, rd))
         mpred_p = cross_val_predict(mr_p, rd, IndexWalkForward(80, 40))
         @test is_plot(plot_performance_summary(mpred_p))
+        # The four bars of #1184: a benchmark fills three of them, the held path the fourth,
+        # and the empty `NaN` bars of a bare series still draw.
+        bench = fill(0.001, length(mpred_p.mrd.X))
+        @test is_plot(plot_performance_summary(mpred_p; benchmark = bench))
+        @test is_plot(plot_performance_summary(w, X; benchmark = fill(0.001, size(X, 1))))
+        ps_b = performance_summary(mpred_p; benchmark = bench)
+        @test all(isfinite,
+                  (ps_b.excess_ret, ps_b.tracking_error, ps_b.information_ratio,
+                   ps_b.turnover))
+        @test is_plot(plot_performance_summary(ps_b))
     end
 
     @testset "plot_rolling_drawdowns" begin
@@ -986,12 +1027,15 @@
                      plot_cokurtosis(hprn_pv, nx_pv; heatmap = true))
             @test is_plot(p_pv)
         end
-        # The frame is the full universe: the axis carries every asset, gapped or not. The
-        # bar itself is missing, which is what the backend draws at a `NaN`, so the gapped
-        # figure holds fewer polygon vertices than the complete one.
-        @test plot_mu(prn_pv, nx_pv)[1][:xaxis][:ticks][2] == nx_pv
+        # A count that does not truncate keeps the frame: the axis carries every asset,
+        # gapped or not. The bar itself is missing, which is what the backend draws at a
+        # `NaN`, so the gapped figure holds fewer polygon vertices than the complete one.
+        # `plot_mu` takes the count explicitly, because its default is the effective
+        # number of the magnitudes, which truncates this universe.
+        @test plot_mu(prn_pv, nx_pv; N = N_pv)[1][:xaxis][:ticks][2] == nx_pv
         @test plot_sigma(prn_pv, nx_pv)[1][:xaxis][:ticks][2] == nx_pv
-        @test length(sy_pv(plot_mu(prn_pv, nx_pv))) < length(sy_pv(plot_mu(pr_pv, nx_pv)))
+        @test length(sy_pv(plot_mu(prn_pv, nx_pv; N = N_pv))) <
+              length(sy_pv(plot_mu(pr_pv, nx_pv; N = N_pv)))
         @test length(sy_pv(plot_sigma(prn_pv, nx_pv))) <
               length(sy_pv(plot_sigma(pr_pv, nx_pv)))
         # A blank never takes a top slot, so a truncated frame holds live assets alone.
@@ -1116,11 +1160,14 @@
 
         # The mislabelling arities label each bar with its own asset: the caller's names
         # viewed at the mask, or the asset's own index when the caller gives none.
-        @test ticks_ru(plot_mu(res_ru, rd_ru)) == nx_ru[keep_ru]
+        # `plot_mu` takes the count explicitly: its default is the effective number of the
+        # magnitudes, which truncates this universe.
+        Nk_ru = length(keep_ru)
+        @test ticks_ru(plot_mu(res_ru, rd_ru; N = Nk_ru)) == nx_ru[keep_ru]
         @test ticks_ru(plot_sigma(res_ru, rd_ru)) == nx_ru[keep_ru]
         @test ticks_ru(plot_risk_contribution(r_cvr, res_ru, rd_ru)) == nx_ru[keep_ru]
         @test ticks_ru(plot_risk_contribution(r_cvr, res_ru, prn_ru)) == keep_ru
-        @test ticks_ru(plot_mu(res_ru)) == string.(keep_ru)
+        @test ticks_ru(plot_mu(res_ru; N = Nk_ru)) == string.(keep_ru)
         # The bars are the reduced prior's own, under the reduced names.
         @test isequal(ys_ru(plot_mu(res_ru, rd_ru)),
                       ys_ru(plot_mu(pr_ru.mu[keep_ru], nx_ru[keep_ru])))
@@ -1128,7 +1175,240 @@
         @test size(plot_correlation(res_ru, rd_ru).series_list[1][:z]) ==
               (length(keep_ru), length(keep_ru))
         pred_ru = predict(res_ru, rd_ru, collect(130:T_ru))
-        @test ticks_ru(plot_mu(pred_ru, rd_ru)) == nx_ru[keep_ru]
+        @test ticks_ru(plot_mu(pred_ru, rd_ru; N = Nk_ru)) == nx_ru[keep_ru]
         @test is_plot(plot_sigma(pred_ru))
+        # A fold carries its weights on the caller's universe and its names on the investable
+        # one, so the composition views the weights at the mask. It raised a `BoundsError`.
+        @test ticks_ru(plot_composition(pred_ru; N = Nk_ru)) == nx_ru[keep_ru]
+        @test isequal(ys_ru(plot_composition(pred_ru; N = Nk_ru)),
+                      ys_ru(plot_composition(res_ru.w[keep_ru], nx_ru[keep_ru]; N = Nk_ru)))
+    end
+
+    @testset "The sweep of src/22_Plotting.jl (#1075, #1325)" begin
+        # Each claim the docstrings of `src/22_Plotting.jl` state, checked with numbers. A bar
+        # is a polygon of six vertices, so the height of bar `i` is entry `6(i - 1) + 1` of the
+        # series' `:y`, and a `NaN` bar draws no polygon. A horizontal line keeps its level in
+        # `:y`, and a horizontal bar keeps its length in `:x`.
+        import Distributions
+        bars_sw(p, i = 1) = p.series_list[i][:y][1:6:end]
+        level_sw(p) = p.series_list[end][:y][1]
+        PO_sw = PortfolioOptimisers
+        EXT_sw = Base.get_extension(PortfolioOptimisers, :PortfolioOptimisersPlotsExt)
+        rng_sw = StableRNG(1075)
+        T_sw, N_sw = 80, 5
+        X_sw = randn(rng_sw, T_sw, N_sw) ./ 100 .+ 0.0003
+        w_sw = [0.35, 0.25, 0.2, 0.15, 0.05]
+        nx_sw = string.('a':'e')
+        ret_sw = X_sw * w_sw
+        rd_sw = ReturnsResult(; X = X_sw, nx = nx_sw)
+
+        # ── relevant_assets: the count reads shares, so it does not move with the scale ──
+        mu_sw = [5e-4, 4e-4, 3e-4, 2e-4, 1e-4, 1e-4, 5e-5, 5e-5]
+        @test PO_sw.relevant_assets(mu_sw, 8)[1] == 6
+        @test PO_sw.relevant_assets(252 .* mu_sw, 8)[1] == 6
+        deg_sw = [5.0, 4, 3, 3, 2, 1, 1, 1]
+        @test PO_sw.relevant_assets(deg_sw, 8)[1] == 7
+        @test PO_sw.relevant_assets(100 .* deg_sw, 8)[1] == 7
+        # A long-short book of gross two fell into the share branch and drew one asset.
+        @test PO_sw.relevant_assets([0.9, -0.5, 0.4, 0.2], 4)[1] == 4
+        # With nothing to rank, every entry is drawn. Both raised an `InexactError`.
+        @test PO_sw.relevant_assets(zeros(4), 4) == (4, [1, 2, 3, 4])
+        @test PO_sw.relevant_assets(fill(NaN, 3), 3)[1] == 3
+        @test PO_sw.relevant_assets(zeros(3), 3, 0.5)[1] == 3
+        # A share keeps strictly more than `1 - n` of the magnitude.
+        @test PO_sw.relevant_assets([0.5, 0.3, 0.2], 3, 0.25)[1] == 2
+        @test PO_sw.relevant_assets([0.5, 0.5], 2, 0.5)[1] == 2
+        @test PO_sw.relevant_assets(w_sw, 5, 0.5)[1] == 2
+        # A count is clamped to `[1, M]`.
+        @test PO_sw.relevant_assets([0.5, 0.3, 0.2], 3, 2)[1] == 2
+        @test PO_sw.relevant_assets([0.5, 0.3, 0.2], 3, 7.2)[1] == 3
+        # A non-finite entry ranks as a zero, among the zeros by position.
+        @test PO_sw.relevant_assets([NaN, 0.0, 1.0], 3, 3)[2] == [3, 1, 2]
+        # The asset figure takes a share too; its `N` was typed `Integer`.
+        p_sw = plot_asset_cumulative_returns(w_sw, X_sw; nx = nx_sw, N = 0.5)
+        @test [s[:label] for s in p_sw.series_list] == ["a", "b", "Others"]
+
+        # ── the finite helpers ────────────────────────────────────────────────────────
+        @test PO_sw.finite_magnitudes([NaN, -2.0, Inf]) == [0.0, 2.0, 0.0]
+        @test PO_sw.finite_symmetric_clim([NaN NaN; NaN NaN]) == (0.0, 0.0)
+        @test_throws ArgumentError PO_sw.finite_symmetric_clim(zeros(0, 0))
+        @test PO_sw.finite_columns([1.0 NaN 3.0; 4.0 5.0 6.0], [3, 2, 1]) == [3, 1]
+
+        # ── composition and risk contribution ────────────────────────────────────────
+        p_sw = plot_composition(w_sw, nx_sw; N = 2)
+        @test bars_sw(p_sw) ≈ [0.35, 0.25, 0.4]
+        @test p_sw[1][:xaxis][:ticks][2] == ["a", "b", "Others"]
+        r_sw = ConditionalValueatRisk()
+        rc_sw = risk_contribution(r_sw, w_sw, X_sw)
+        p_sw = plot_risk_contribution(r_sw, w_sw, X_sw; N = N_sw)
+        @test bars_sw(p_sw) ≈ rc_sw ./ sum(rc_sw)
+        @test level_sw(p_sw) ≈ 1 / N_sw
+        p_sw = plot_risk_contribution(r_sw, w_sw, X_sw; N = N_sw, percentage = false)
+        @test bars_sw(p_sw) ≈ rc_sw
+        @test level_sw(p_sw) ≈ mean(rc_sw)
+        # Each stacked figure names one segment per asset, not per portfolio.
+        ws_sw = [w_sw, reverse(w_sw), fill(0.2, N_sw)]
+        @test unique([s[:label] for s in plot_stacked_bar_composition(ws_sw).series_list]) ==
+              string.(1:N_sw)
+        @test [s[:label] for s in plot_stacked_area_composition(ws_sw).series_list] ==
+              string.(1:N_sw)
+
+        # ── the return figures ────────────────────────────────────────────────────────
+        p_sw = plot_histogram(w_sw, X_sw)
+        xs_sw = p_sw.series_list[end][:x]
+        @test length(xs_sw) == ceil(Int, 4 * sqrt(T_sw))
+        @test extrema(xs_sw) == extrema(ret_sw)
+        # The Normal fit is the maximum likelihood one, divisor `T`.
+        m_sw = mean(ret_sw)
+        s_sw = sqrt(sum(abs2, ret_sw .- m_sw) / T_sw)
+        @test p_sw.series_list[end][:y] ≈
+              exp.(-((xs_sw .- m_sw) ./ s_sw) .^ 2 ./ 2) ./ (s_sw * sqrt(2 * pi))
+        @test length(plot_histogram(w_sw, X_sw; points = 7).series_list[end][:x]) == 7
+        W_sw = ceil(Int, sqrt(T_sw))
+        p_sw = plot_rolling_measure(r_sw, w_sw, X_sw)
+        @test p_sw.series_list[1][:y] ≈ PO_sw.rolling_window_measure(r_sw, ret_sw, W_sw)
+        @test p_sw.series_list[1][:x][1] == W_sw
+        p_sw = plot_rolling_drawdowns(w_sw, X_sw; rolling = 10)
+        dd_sw = [100 * minimum(drawdowns(ret_sw[(t - 9):t], false)) for t in 10:T_sw]
+        @test p_sw.series_list[1][:y] ≈ dd_sw
+        @test maximum(dd_sw) <= 0
+        # A window longer than the series draws nothing, so it raises.
+        @test_throws DomainError plot_rolling_drawdowns(w_sw, X_sw; rolling = T_sw + 1)
+        ps_sw = performance_summary(w_sw, X_sw)
+        v_sw = [ps_sw.ann_return * 100, ps_sw.ann_volatility * 100, ps_sw.sharpe,
+                ps_sw.sortino, ps_sw.calmar, ps_sw.max_drawdown * 100, ps_sw.cvar * 100,
+                ps_sw.excess_ret * 100, ps_sw.tracking_error * 100, ps_sw.information_ratio,
+                ps_sw.turnover * 100]
+        p_sw = plot_performance_summary(ps_sw)
+        @test length(p_sw[1][:xaxis][:ticks][2]) == 11
+        @test all(isnan, v_sw[8:11])
+        @test bars_sw(p_sw) ≈ filter(!isnan, v_sw)
+        p_sw = plot_turnover(ws_sw)
+        @test p_sw.series_list[1][:y] ≈ [sum(abs, ws_sw[k] - ws_sw[k - 1]) for k in 2:3]
+        @test p_sw.series_list[1][:x] == 2:3
+
+        # ── the moment figures ────────────────────────────────────────────────────────
+        S_sw = cov(X_sw)
+        q_sw = N_sw / T_sw
+        s2_sw = tr(S_sw) / N_sw
+        p_sw = plot_eigenspectrum(S_sw; N_obs = T_sw)
+        @test bars_sw(p_sw) ≈ sort(eigvals(Symmetric(S_sw)); rev = true)
+        @test p_sw.series_list[3][:y][1] ≈ s2_sw * (1 + sqrt(q_sw))^2
+        @test p_sw.series_list[4][:y][1] ≈ s2_sw * (1 - sqrt(q_sw))^2
+        # With more assets than observations the lower edge is not drawn.
+        @test length(plot_eigenspectrum(S_sw; N_obs = 3).series_list) == 3
+        hpr_sw = prior(HighOrderPriorEstimator(), rd_sw)
+        kt_sw = hpr_sw.kt
+        @test level_sw(plot_cokurtosis(kt_sw)) ≈ tr(kt_sw) / size(kt_sw, 1)
+        C_sw = StatsBase.cov2cor(S_sw, sqrt.(diag(S_sw)))
+        p_sw = plot_correlation(S_sw)
+        @test Matrix(p_sw.series_list[1][:z].surf) ≈ C_sw
+        @test p_sw[1][:clims] == (-1.0, 1.0)
+        @test plot_correlation(C_sw)[1][:clims] == extrema(C_sw)
+        # `plot_sigma` reads `N` as a count and draws every asset without one.
+        @test length(bars_sw(plot_sigma(S_sw))) == N_sw
+        @test length(bars_sw(plot_sigma(S_sw; N = 0.5))) == 1
+        # The coskewness guard runs before the default names, so it raises its own error.
+        hpr_nosk = HighOrderPrior(; pr = prior(EmpiricalPrior(), rd_sw), kt = kt_sw,
+                                  L2 = hpr_sw.L2, S2 = hpr_sw.S2)
+        @test_throws ArgumentError plot_coskewness(hpr_nosk)
+        cte_sw = CentralityEstimator()
+        sc_sw = centrality_vector(cte_sw, X_sw).X
+        p_sw = plot_centrality(cte_sw, X_sw, nx_sw; N = 2)
+        @test bars_sw(p_sw) ≈ sort(sc_sw ./ sum(sc_sw); rev = true)[1:2]
+        @test sum(bars_sw(p_sw)) < 1
+
+        # ── a high order prior over a factor prior keeps its factor block in `pr.pr` ──
+        F_sw = randn(rng_sw, T_sw, 2) ./ 100
+        rdF_sw = ReturnsResult(; X = X_sw, nx = nx_sw, F = F_sw, nf = ["f1", "f2"])
+        fpr_sw = prior(FactorPrior(), rdF_sw)
+        hof_sw = prior(HighOrderPriorEstimator(; pe = FactorPrior()), rdF_sw)
+        @test isnothing(hof_sw.fpr)
+        @test PO_sw.factor_plot_prior(hof_sw) === hof_sw.pr.fpr
+        # The four factor figures raised a `FieldError` on this carrier.
+        @test bars_sw(plot_factor_mu(hof_sw; N = 2)) ≈ fpr_sw.fpr.mu
+        @test is_plot(plot_factor_sigma(hof_sw))
+        @test plot_factor_forecast_correlation(hof_sw)[1][:clims] == (-1.0, 1.0)
+        p_sw = plot_factor_forecast_volatilities(hof_sw; ppy = 252)
+        @test p_sw.series_list[1][:x][1:6:end] ≈ sort(sqrt.(diag(fpr_sw.fpr.sigma) .* 252))
+
+        # ── the clustering figures pass `dims` and reduce a gapped prior ──────────────
+        cle_sw = ClustersEstimator()
+        z_sw(p) = Matrix(p[3].series_list[1][:z].surf)
+        @test z_sw(plot_clusters(cle_sw, Matrix(X_sw'), nx_sw; dims = 2)) ≈
+              z_sw(plot_clusters(cle_sw, X_sw, nx_sw))
+        # A carrier holds its observations along the rows. Its bridge passes `dims = 1`
+        # after the caller's keywords, so `dims = 2` has no effect (#1348).
+        @test z_sw(plot_clusters(cle_sw, rd_sw; dims = 2)) ==
+              z_sw(plot_clusters(cle_sw, rd_sw))
+        pr_sw = prior(EmpiricalPrior(), rd_sw)
+        Xn_sw = collect(pr_sw.X)
+        Xn_sw[:, 3] .= NaN
+        mun_sw = collect(pr_sw.mu)
+        mun_sw[3] = NaN
+        sn_sw = collect(pr_sw.sigma)
+        sn_sw[3, :] .= NaN
+        sn_sw[:, 3] .= NaN
+        prn_sw = LowOrderPrior(; X = Xn_sw, mu = mun_sw, sigma = sn_sw)
+        keep_sw = [1, 2, 4, 5]
+        # Both raised an `IsNonFiniteError`; both now draw the investable universe.
+        @test plot_dendrogram(cle_sw, prn_sw, nx_sw)[1][:xaxis][:ticks][2] ==
+              plot_dendrogram(cle_sw, X_sw[:, keep_sw], nx_sw[keep_sw])[1][:xaxis][:ticks][2]
+        @test size(z_sw(plot_clusters(cle_sw, prn_sw, nx_sw))) ==
+              (length(keep_sw), length(keep_sw))
+
+        # ── the attribution rows rank by finite magnitude ────────────────────────────
+        @test EXT_sw.attribution_plot_rows([NaN, 1.0, 0.5], 1) == [2]
+        @test EXT_sw.attribution_plot_rows([0.1, NaN, -2.0, 0.5], 2) == [3, 4]
+
+        # ── the cross-validation figures ─────────────────────────────────────────────
+        mpred_sw = cross_val_predict(MeanRisk(; opt = JuMPOptimiser(; slv = slv)), rd_sw,
+                                     IndexWalkForward(40, 20))
+        rs_sw = [ConditionalValueatRisk(), MaximumDrawdown()]
+        max_sw = [expected_risk(rs_sw, p; sca = MaxScalariser()) for p in mpred_sw.pred]
+        sum_sw = [expected_risk(rs_sw, p) for p in mpred_sw.pred]
+        # `sca` reached the bar attributes and never the scores.
+        @test bars_sw(plot_cv_scores(rs_sw, mpred_sw; sca = MaxScalariser())) ≈ max_sw
+        @test bars_sw(plot_cv_scores(rs_sw, mpred_sw)) ≈ sum_sw
+        @test !(max_sw ≈ sum_sw)
+        # A path scores to one number, which the scatter raised on. `plt` is drawn into.
+        base_sw = plot(; title = "base")
+        @test plot_measures(mpred_sw; plt = base_sw) === base_sw
+        @test base_sw.series_list[1][:x] ≈
+              [expected_risk(ConditionalValueatRisk(), mpred_sw)]
+        @test length(plot_measures(mpred_sw.pred[1]).series_list[1][:x]) == 1
+
+        # ── the cross-sectional and forecast reference lines ─────────────────────────
+        Ms_sw = randn(rng_sw, 10, 8, 3)
+        csr_sw = CrossSectionalRegression(; f = 0.02 * randn(rng_sw, 10, 3),
+                                          eps = 0.01 * randn(rng_sw, 10, 8),
+                                          n = fill(8, 10))
+        csfm_sw = CrossSectionalFactorModel(; M = Ms_sw[10, :, :], b = zeros(8),
+                                            csr = csr_sw, Ms = Ms_sw,
+                                            rw = abs.(randn(rng_sw, 10, 8)) .+ 0.1,
+                                            nf = ["value", "size", "momentum"], lag = 1)
+        # The line was fixed at 0.05 whatever the threshold.
+        for c_sw in (2, 3)
+            p_sw = plot_cs_regression_t_stat_exceedance_rate(csfm_sw; threshold = c_sw)
+            @test level_sw(p_sw) ≈ 2 * Distributions.ccdf(Distributions.Normal(), c_sw)
+        end
+        @test level_sw(plot_exposure_vif(csfm_sw)) == 1.0
+        eps_sw = randn(rng_sw, 24, 6) ./ 100
+        y_sw = PO_sw.forward_mean_returns(eps_sw, 1, 1)
+        alpha_sw() = [t < 24 ? eps_sw[t + 1, i] + randn(rng_sw) / 400 : randn(rng_sw) / 100
+                      for t in 1:24, i in 1:6]
+        fes_sw = [forecast_evaluation(alpha_sw(), y_sw; ppy = 252),
+                  forecast_evaluation(alpha_sw(), y_sw; ppy = 252)]
+        # A compounded book starts near one, so its break-even line is one.
+        @test level_sw(plot_forecast_cumulative_returns(fes_sw)) == 0.0
+        @test level_sw(plot_forecast_cumulative_returns(fes_sw; compound = true)) == 1.0
+        ic_sw = forecast_ic(fes_sw[1])
+        @test plot_forecast_cumulative_ic(fes_sw[1]).series_list[1][:y] ≈
+              cumsum([isfinite(x) ? x : zero(x) for x in view(ic_sw, :, 1)])
+        roll_sw = [t < 3 ? NaN : let v = filter(isfinite, ic_sw[(t - 2):t, 1])
+                       isempty(v) ? NaN : mean(v)
+                   end for t in axes(ic_sw, 1)]
+        @test isapprox(plot_forecast_rolling_ic(fes_sw[1]; rolling = 3).series_list[1][:y],
+                       roll_sw; nans = true)
     end
 end

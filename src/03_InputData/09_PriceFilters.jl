@@ -1,30 +1,29 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Preprocessing estimator dropping assets and observations with excessive missing data from price-level data.
+Preprocessing estimator that drops the assets and the observations of a price window whose share of missing prices exceeds a threshold.
 
-The *asset universe is fitted state*: the training window decides which assets survive (per-column missing fraction at most `col_thr`), and applying the fitted result to an unseen window subsets it to that same universe — so train weights and test returns always refer to the same assets. Observation (row) filtering is window-local: rows whose missing fraction across the surviving assets exceeds `row_thr` are dropped from whichever window is being transformed.
+The fit decides the asset universe. An asset survives when its share of missing observations over the training window does not exceed `col_thr`. The apply step replays that universe by name on a later window, in the fitted order, and refuses a window that lacks a fitted asset. The train weights and the test returns therefore name the same assets in the same order. The row filter reads each window alone. The apply step drops an observation when its share of missing assets, over the fitted universe, exceeds `row_thr`.
 
-This estimator is the library's **only** missing-data filter: [`prices_to_returns`](@ref) removes no observation and no asset, because deleting either is a **Universe Policy** and a policy is fitted on a training window and replayed by name, which a stateless conversion cannot do. Only the asset series `X` decides what survives; the implied volatility columns and the Asset Panel follow the assets, and every series the carrier holds is read at the observations that survive, because the carrier states one clock.
+This estimator is the only missing-data filter of the library. [`prices_to_returns`](@ref) removes no observation and no asset, because a deletion is a **Universe Policy**. A policy needs a fit on a training window and a replay by name on later windows, and a stateless conversion has no fit to replay. Only the asset series `X` decides what survives. The factor, benchmark and implied volatility series, and the Asset Panel, follow the surviving assets and observations, because the carrier states one clock.
+
+A share is the count of missing entries divided by the count of entries, computed in the type of the threshold. `29 / 100` is `0.29` in `Float64` and `29f0 / 100f0` is `0.29f0` in `Float32`, so a threshold written as a decimal keeps an asset or an observation whose share equals it. A `Rational` threshold compares the exact share.
 
 # Algorithm
 
 ## Fit
 
- 1. Count the missing observations of each asset column with [`is_missing_value`](@ref), and divide each count by the observation total, giving `frac`.
- 2. Keep the assets whose fraction does not exceed `col_thr`, and check that one asset at least survives.
- 3. Return a [`MissingDataFilterResult`](@ref) holding the surviving asset names and `row_thr`.
+ 1. Count the missing observations of each asset column with [`is_missing_value`](@ref).
+ 2. Keep the assets whose share of missing observations does not exceed `col_thr`. Raise an `IsEmptyError` when no asset survives.
+ 3. Return a [`MissingDataFilterResult`](@ref) that holds the names of the surviving assets, in the column order of the training window, and `row_thr`.
 
 ## Apply
 
- 1. Find the columns of the window whose names are in the fitted universe, and check that one at least is present.
- 2. Count the missing assets of each row over those columns alone, and keep the rows whose count does not exceed `row_thr` of the column total.
- 3. Rebuild `X` from the kept rows and the kept columns.
- 4. Read the factor, benchmark and implied volatility series at the kept timestamps, as [`port_opt_view`](@ref) reads them. A dropped row leaves the carrier's clock, and the conversion refuses a covariate stating a clock the assets no longer do. Subselect the implied volatilities on the kept columns too, and `ivpa` with them when it is a vector; a benchmark with one column per asset follows the kept columns, and a single shared column does not.
- 5. View the Asset Panel with [`panel_carrier_view`](@ref) at the kept rows and the kept columns, handing it the asset names so that a tensor Panel Field whose labels *are* the asset names ([`features_are_assets`](@ref)) is cut on its label axis too.
- 6. Rebuild the [`PricesResult`](@ref).
+ 1. Find the column of each fitted asset in the window, in the fitted order. Raise an `ArgumentError` that names the first absent asset.
+ 2. Count the missing assets of each observation over those columns. Keep the observations whose share of missing assets does not exceed `row_thr`. Raise an `IsEmptyError` when no observation survives.
+ 3. Return [`port_opt_view`](@ref) of the carrier at the kept timestamps and the fitted columns. It reads the factor, benchmark and implied volatility series at the kept timestamps, subsets a per-asset benchmark, the implied volatilities and a vector `ivpa` to the fitted columns, and views the Asset Panel and the Listing Span at the kept rows and columns.
 
-The two thresholds count opposite axes: `col_thr` counts the missing rows of a column and drops columns, and `row_thr` counts the missing columns of a row and drops rows.
+The two thresholds count opposite axes. `col_thr` counts the missing observations of an asset and drops assets. `row_thr` counts the missing assets of an observation and drops observations.
 
 # Fields
 
@@ -38,18 +37,16 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:AbstractPartialFitState} = nothing,
     ) -> MissingDataFilter
 
-Keywords correspond to the struct's fields.
-
-# Online form
-
-The column filter is universe-only, so a stepped filter counts the gaps of every block in `cache` through [`partial_fit_transform`](@ref), passes the rows through, and reads the [`MissingDataFilterResult`](@ref) of the whole history out through [`fit_preprocessing`](@ref) with no data; a [`Pipeline`](@ref) applies that universe as a view at its read-out. The row filter is row-local only at `row_thr = 1`, where it drops nothing: a lower threshold drops a row kept earlier when a column leaves the universe, so [`supports_partial_fit`](@ref) answers `false` for it and a Pipeline refuses it at warm-up by name.
-
-Both thresholds admit zero, which is the tightest policy the estimator can state: `col_thr = 0` keeps the assets with no gap at all, and `row_thr = 0` keeps the observations with no gap at all.
+Keywords correspond to the struct's fields. Both thresholds admit zero. `col_thr = 0` keeps the assets with no missing observation, and `row_thr = 0` keeps the observations with no missing asset. Both thresholds admit one, which drops nothing on its axis.
 
 ## Validation
 
-  - `0 <= col_thr <= 1`.
-  - `0 <= row_thr <= 1`.
+  - `0 <= col_thr <= 1`, else `DomainError`.
+  - `0 <= row_thr <= 1`, else `DomainError`.
+
+# Online form
+
+The column filter changes only the universe. A stepped filter counts the missing observations of every block in `cache` through [`partial_fit_transform`](@ref) and passes the rows through. [`fit_preprocessing`](@ref) with no data reads the [`MissingDataFilterResult`](@ref) of the whole history out of that count, and a [`Pipeline`](@ref) applies that universe as a view at its read-out. The row filter has an online form only at `row_thr = 1`, where it drops nothing. At a lower threshold, the filter can drop a row at a later step that it kept at an earlier step, when an asset leaves the universe. [`supports_partial_fit`](@ref) answers `false` for it, and a Pipeline refuses it by name at warm-up.
 
 # Examples
 
@@ -75,11 +72,11 @@ julia> res.nx
 """
 @concrete struct MissingDataFilter <: AbstractPricesPreprocessingEstimator
     """
-    Maximum allowed fraction `[0, 1]` of missing observations per asset column; assets above it are dropped from the universe at fit time. `0` tolerates no gap at all, and keeps the assets priced at every observation of the training window.
+    Largest share `[0, 1]` of missing observations that an asset can have over the training window and stay in the universe. `0` keeps the assets with a price at every observation of the training window.
     """
     col_thr
     """
-    Maximum allowed fraction `[0, 1]` of missing assets per observation row; rows above it are dropped from the window being transformed. `0` tolerates no gap at all, and keeps the observations at which every surviving asset is priced.
+    Largest share `[0, 1]` of missing assets that an observation can have and stay in the window. `0` keeps the observations at which every asset of the fitted universe has a price.
     """
     row_thr
     """
@@ -102,7 +99,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fitted result of a [`MissingDataFilter`](@ref).
 
-Carries the asset universe selected on the training window plus the row threshold needed to transform further windows. Produced by [`fit_preprocessing`](@ref), consumed by [`apply_preprocessing`](@ref).
+It holds the asset universe that the training window selected and the row threshold that the apply step reads on a later window. [`fit_preprocessing`](@ref) returns it and [`apply_preprocessing`](@ref) reads it.
 
 # Fields
 
@@ -115,58 +112,64 @@ $(DocStringExtensions.FIELDS)
 """
 @concrete struct MissingDataFilterResult <: AbstractPricesPreprocessingResult
     """
-    Names of the assets that survived the training window (the fitted universe).
+    Names of the assets that survived the training window, in its column order. This is the fitted universe.
     """
     nx
     """
-    Maximum allowed fraction `[0, 1]` of missing assets per observation row.
+    Largest share `[0, 1]` of missing assets that an observation can have and stay in the window.
     """
     row_thr
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` when `k` missing entries out of `n` are a share that does not exceed `thr`.
+
+The share is `k / n` computed in the type of `thr`, so a decimal threshold keeps the count that it names. `29 / 100` is `0.29` in `Float64`, but `100 * 0.29` is `28.999999999999996`, so a test of `k <= n * thr` drops 29 missing entries of 100 at `thr = 0.29`. A `Float32` threshold divides in `Float32`, and a `Rational` threshold divides exactly.
+
+# Arguments
+
+  - `k`: Count of missing entries.
+  - `n`: Count of entries, positive.
+  - `thr`: Largest share that passes.
+
+# Returns
+
+  - `flag::Bool`: `true` when the share does not exceed `thr`.
+
+# Related
+
+  - [`MissingDataFilter`](@ref)
+  - [`is_missing_value`](@ref)
+"""
+function share_at_most(k::Integer, n::Integer, thr::Real)::Bool
+    return k * one(thr) / n <= thr
 end
 function fit_preprocessing(mdf::MissingDataFilter,
                            pr::PricesResult)::MissingDataFilterResult
     vals = values(pr.X)
-    frac = vec(count(is_missing_value, vals; dims = 1)) / size(vals, 1)
-    keep = frac .<= mdf.col_thr
+    miss = vec(count(is_missing_value, vals; dims = 1))
+    keep = share_at_most.(miss, size(vals, 1), mdf.col_thr)
     @argcheck(any(keep),
               IsEmptyError("MissingDataFilter with col_thr = $(mdf.col_thr) drops every asset in the training window"))
     return MissingDataFilterResult(TimeSeries.colnames(pr.X)[keep], mdf.row_thr)
 end
 function apply_preprocessing(res::MissingDataFilterResult, pr::PricesResult)::PricesResult
-    cols = findall(in(res.nx), TimeSeries.colnames(pr.X))
-    @argcheck(!isempty(cols),
-              IsEmptyError("none of the fitted universe assets $(res.nx) are present in the data window"))
-    vals = values(pr.X)[:, cols]
-    rows = findall(vec(count(is_missing_value, vals; dims = 2)) .<=
-                   length(cols) * res.row_thr)
-    ts = TimeSeries.timestamp(pr.X)[rows]
-    X = TimeSeries.TimeArray(ts, vals[rows, :], TimeSeries.colnames(pr.X)[cols])
-    #! The carrier states one clock, and a dropped row leaves it: the factor, benchmark and
-    #! implied-volatility series are read at the surviving timestamps, as `port_opt_view`
-    #! reads them, or the conversion refuses a covariate stating a clock the assets no
-    #! longer do.
-    F = isnothing(pr.F) ? nothing : pr.F[ts]
-    #! A per-asset benchmark follows the assets that survived; a single shared column has
-    #! nothing to follow. The test is B's own width, as in `port_opt_view`.
-    B = if isnothing(pr.B)
-        nothing
-    elseif length(TimeSeries.colnames(pr.B)) == size(values(pr.X), 2)
-        pr.B[ts][TimeSeries.colnames(pr.B)[cols]]
-    else
-        pr.B[ts]
+    names = TimeSeries.colnames(pr.X)
+    cols = Vector{Int}(undef, length(res.nx))
+    for (k, name) in pairs(res.nx)
+        j = findfirst(==(name), names)
+        @argcheck(!isnothing(j),
+                  ArgumentError(unknown_variable_msg(name, string.(names), :nx;
+                                                     consequence = "the window must contain the whole fitted universe")))
+        cols[k] = j
     end
-    iv, ivpa = if isnothing(pr.iv)
-        nothing, pr.ivpa
-    else
-        ivt = pr.iv[ts]
-        ivm = TimeSeries.TimeArray(TimeSeries.timestamp(ivt), values(ivt)[:, cols],
-                                   TimeSeries.colnames(pr.iv)[cols])
-        ivm, isa(pr.ivpa, VecNum) ? pr.ivpa[cols] : pr.ivpa
-    end
-    pnl = panel_carrier_view(pr.pnl, rows, cols, string.(TimeSeries.colnames(pr.X)))
-    #! The span is a fact about the instruments, so the surviving window's span is the
-    #! carrier's viewed at the rows and columns that survived, never one re-derived.
-    span = span_carrier_view(pr.span, ts, TimeSeries.timestamp(pr.X), cols)
-    return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = ivpa, pnl = pnl, span = span)
+    miss = vec(count(is_missing_value, view(values(pr.X), :, cols); dims = 2))
+    rows = findall(share_at_most.(miss, length(cols), res.row_thr))
+    @argcheck(!isempty(rows),
+              IsEmptyError("MissingDataFilter with row_thr = $(res.row_thr) drops every observation of the window"))
+    #! The carrier states one clock, so every series it holds is read at the surviving
+    #! timestamps and the fitted columns, by the view that owns that rule.
+    return port_opt_view(pr, TimeSeries.timestamp(pr.X)[rows], cols)
 end
 export MissingDataFilter, MissingDataFilterResult

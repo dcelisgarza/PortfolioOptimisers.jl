@@ -622,7 +622,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses an incremental fit of a [`Coskewness`](@ref) estimator under [`SemiMoment`](@ref).
 
-[`SemiMoment`](@ref) clips every positive deviation to zero before the moment, and the centre it clips against is a statistic of the whole sample. A new observation moves that centre, so every past clip moves with it and a past observation's membership of the clipped set flips. No state written before that observation is still valid, which is the second clause of the membership rule of issue #308.
+[`SemiMoment`](@ref) clips every positive deviation to zero before the moment, and the centre it clips against is a statistic of the whole sample. A new observation moves that centre, so every past clip moves with it and a past observation's membership of the clipped set flips. No state written before that observation is still valid.
 
 # Arguments
 

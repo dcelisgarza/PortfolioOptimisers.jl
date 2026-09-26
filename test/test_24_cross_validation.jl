@@ -590,6 +590,77 @@
                   count(k -> 1 + k * b <= a, 0:a) - 1
         end
     end
+    @testset "n_splits and split agree on short data" begin
+        # `n_splits` had no guard, so a `train_size` of `T` or more returned a count of zero
+        # or less where `split` refused the same schedule. Both now check the one rule the
+        # data owns, `train_size < T`. The purge stays out of the rule: it comes out of the
+        # training window, so it moves neither the test schedule nor the count, and
+        # `train_size + purged_size == T` is a legal schedule with `purged_size` test rows.
+        short = Dict(T => ReturnsResult(; nx = string.('A':'C'),
+                                        X = randn(StableRNG(335), T, 3) ./ 100)
+                     for T in 2:30)
+        for T in (2, 3, 4), reduce_test in (false, true), purged_size in (0, 1)
+            cv = IndexWalkForward(4, 1; purged_size = purged_size,
+                                  reduce_test = reduce_test)
+            @test_throws DomainError n_splits(cv, short[T])
+            @test_throws DomainError split(cv, short[T])
+            # The two refusals name the same value and carry the same message.
+            e1 = try
+                n_splits(cv, short[T])
+            catch e
+                e
+            end
+            e2 = try
+                split(cv, short[T])
+            catch e
+                e
+            end
+            @test e1.val == e2.val == 4
+            @test e1.msg == e2.msg
+        end
+        # One observation past the training window is one test row, under either
+        # `reduce_test`, because `test_size = 1` fits it. A purge of one takes that row off
+        # the training window, not off the test.
+        for reduce_test in (false, true), purged_size in (0, 1)
+            cv = IndexWalkForward(4, 1; purged_size = purged_size,
+                                  reduce_test = reduce_test)
+            res = split(cv, short[5])
+            @test n_splits(cv, short[5]) == length(res.train_idx) == 1
+            @test res.train_idx == [1:(4 - purged_size)]
+            @test res.test_idx == [5:5]
+        end
+        # A `test_size` wider than the rows that remain gives one partial fold under
+        # `reduce_test`, and no fold without it. `n_splits` says `0` there, and `split`
+        # refuses the empty fold list through `WalkForwardResult`.
+        cv = IndexWalkForward(4, 3; reduce_test = true)
+        res = split(cv, short[5])
+        @test n_splits(cv, short[5]) == length(res.train_idx) == 1
+        @test res.test_idx == [5:5]
+        cv = IndexWalkForward(4, 3; reduce_test = false)
+        @test n_splits(cv, short[5]) == 0
+        @test_throws IsEmptyError split(cv, short[5])
+        # Over every short schedule, the count is never negative, and it is the length of
+        # the split wherever the split exists.
+        for T in 2:30, train_size in 1:10, test_size in 1:5, reduce_test in (false, true),
+            purged_size in 0:min(2, train_size - 1)
+
+            cv = IndexWalkForward(train_size, test_size; purged_size = purged_size,
+                                  reduce_test = reduce_test)
+            if train_size >= T
+                @test_throws DomainError n_splits(cv, short[T])
+                @test_throws DomainError split(cv, short[T])
+            else
+                n = n_splits(cv, short[T])
+                @test n >= 0
+                if n == 0
+                    @test !reduce_test
+                    @test_throws IsEmptyError split(cv, short[T])
+                else
+                    @test n == length(split(cv, short[T]).train_idx)
+                end
+            end
+        end
+    end
     @testset "A zero test_size is refused" begin
         # A `test_size` of zero advances the walk-forward window by nothing, so each of the
         # three `while true` split loops runs forever and allocates forever. `n_splits`
@@ -859,6 +930,208 @@
         # the quantile is taken over the finite members, so it does not throw
         @test PortfolioOptimisers.quantile_by_measure(ppred, MaximumDrawdown(), 0.5) isa
               MultiPeriodPredictionResult
+
+        #=
+        Issue #1250: a population built by hand from `cross_val_predict` streams numbers its
+        members, so the path a scorer selects names its place instead of `nothing`.
+        =#
+        @test isnothing(quiet.id)
+        @test [p.id for p in ppred.pred] == [1, 2, 3]
+        sel = NearestQuantilePrediction(; r = MaximumDrawdown())(ppred)
+        @test sel.id isa Integer
+        @test ppred.pred[sel.id] === sel
+        # the rebuilt member keeps its folds
+        @test ppred.pred[1].pred === quiet.pred
+        @test ppred.pred[1].mrd.X == quiet.mrd.X
+        # a member that carries an id keeps it, and a lone stream is member 1
+        named = MultiPeriodPredictionResult(; pred = loud.pred, id = 7)
+        @test [p.id for p in PopulationPredictionResult(; pred = [quiet, named]).pred] ==
+              [1, 7]
+        @test NearestQuantilePrediction(; r = MaximumDrawdown())(PopulationPredictionResult(;
+                                                                                            pred = [quiet])).id ==
+              1
+        # a population with every id is not copied, and a lone fold needs no id
+        @test PopulationPredictionResult(; pred = ppred.pred).pred === ppred.pred
+        fold = quiet.pred[1]
+        @test PopulationPredictionResult(; pred = [fold]).pred[1] === fold
+    end
+    @testset "NearestQuantilePrediction selects the path nearest the quantile (#1251)" begin
+        quantile = PortfolioOptimisers.Statistics.quantile
+        resok = NaiveOptimisationResult(; pr = nothing, wb = nothing,
+                                        retcode = OptimisationSuccess(), w = [0.5, 0.5],
+                                        fb = nothing)
+        resbad = NaiveOptimisationResult(; pr = nothing, wb = nothing,
+                                         retcode = OptimisationFailure(; res = nothing),
+                                         w = [0.5, 0.5], fb = nothing)
+        function fold(X; res = resok)
+            return PredictionResult(; res = res,
+                                    rd = PredictionReturnsResult(; nx = ["A", "B"], X = X,
+                                                                 ts = nothing))
+        end
+        member(X; kwargs...) = MultiPeriodPredictionResult(; pred = [fold(X; kwargs...)])
+        rng = StableRNG(42)
+        Xs = [0.02 .* randn(rng, 30) for _ in 1:9]
+        ppred = PopulationPredictionResult(; pred = member.(Xs))
+        r = ConditionalValueatRisk()
+        rks = [expected_risk(r, p) for p in ppred.pred]
+
+        # the selected path is the first argmin of the distance to the quantile
+        for q in 0:0.05:1
+            sel = NearestQuantilePrediction(; r = r, q = q)(ppred)
+            @test findfirst(p -> p === sel, ppred.pred) ==
+                  argmin(abs.(rks .- quantile(rks, q)))
+        end
+        # q = 0 and q = 1 select the least and the greatest risk, whatever the definition
+        for (a, b) in ((1.0, 1.0), (0.0, 0.0), (0.0, 1.0), (1.0, 0.0), (0.5, 0.5))
+            nqp(q) = NearestQuantilePrediction(; r = r, q = q,
+                                               q_kwargs = (alpha = a, beta = b))(ppred)
+            @test nqp(0.0) === ppred.pred[argmin(rks)]
+            @test nqp(1.0) === ppred.pred[argmax(rks)]
+        end
+        # sign = -1 at q selects the path of sign = 1 at 1 - q when alpha equals beta
+        for (a, b) in ((1.0, 1.0), (0.0, 0.0), (0.5, 0.5)), q in 0:0.05:1
+            s(q) = NearestQuantilePrediction(; r = r, q = q,
+                                             q_kwargs = (alpha = a, beta = b))
+            @test s(q)(ppred, -1) === s(1 - q)(ppred, 1)
+        end
+        # and not always when alpha differs from beta
+        asym = NearestQuantilePrediction(; r = r, q = 0.3,
+                                         q_kwargs = (alpha = 0.0, beta = 1.0))
+        asym_flip = NearestQuantilePrediction(; r = r, q = 0.7,
+                                              q_kwargs = (alpha = 0.0, beta = 1.0))
+        @test asym(ppred, -1) !== asym_flip(ppred, 1)
+        # a tie goes to the first member in population order
+        tie = PopulationPredictionResult(;
+                                         pred = [member(Xs[1]), member(Xs[1]),
+                                                 member(Xs[2])])
+        @test expected_risk(r, tie.pred[1]) == expected_risk(r, tie.pred[2])
+        @test NearestQuantilePrediction(; r = r, q = 0.0)(tie).id ==
+              argmin([expected_risk(r, p) for p in tie.pred])
+        @test NearestQuantilePrediction(; r = r, q = 1.0)(tie).id == 1
+        # a vector of measures is scalarised through r_kwargs, and sums by default
+        rv = [ConditionalValueatRisk(), MaximumDrawdown()]
+        vmax = [max(expected_risk(rv[1], p), expected_risk(rv[2], p)) for p in ppred.pred]
+        vsum = [expected_risk(rv[1], p) + expected_risk(rv[2], p) for p in ppred.pred]
+        @test NearestQuantilePrediction(; r = rv, r_kwargs = (sca = MaxScalariser(),))(ppred) ===
+              ppred.pred[argmin(abs.(vmax .- quantile(vmax, 0.5)))]
+        @test NearestQuantilePrediction(; r = rv)(ppred) ===
+              ppred.pred[argmin(abs.(vsum .- quantile(vsum, 0.5)))]
+        # a mixed-polarity vector is admitted here and refused by sort_by_measure
+        mixed = [MeanReturn(), MaximumDrawdown()]
+        @test NearestQuantilePrediction(; r = mixed)(ppred) isa MultiPeriodPredictionResult
+        @test_throws ArgumentError sort_by_measure(ppred, mixed)
+        # a failed fold takes its path out, and no solved path leaves nothing to rank
+        bad = member(Xs[1]; res = resbad)
+        @test !PortfolioOptimisers.member_solved(bad)
+        @test !PortfolioOptimisers.member_solved(bad.pred[1])
+        @test PortfolioOptimisers.member_solved(ppred.pred[1])
+        p2 = PopulationPredictionResult(; pred = [bad; ppred.pred[2:end]])
+        @test length(PortfolioOptimisers.successful_members(p2)) == 8
+        @test all(q -> NearestQuantilePrediction(; r = r, q = q)(p2) !== p2.pred[1],
+                  0:0.1:1)
+        @test_throws ArgumentError NearestQuantilePrediction()(PopulationPredictionResult(;
+                                                                                          pred = [bad]))
+        @test_throws ArgumentError NearestQuantilePrediction()(PopulationPredictionResult())
+        @test_throws DomainError NearestQuantilePrediction(; q = NaN)
+        @test_throws DomainError NearestQuantilePrediction(; q = 1.1)
+
+        #=
+        A population of single folds is admitted, and every consumer reads it. Each of the
+        three below threw on it before, because it read the member as a multi-period result.
+        =#
+        fpop = PopulationPredictionResult(; pred = fold.(Xs))
+        @test length(PortfolioOptimisers.successful_members(fpop)) == 9
+        fpop2 = PopulationPredictionResult(;
+                                           pred = [fold(Xs[1]; res = resbad);
+                                                   fpop.pred[2:end]])
+        @test length(PortfolioOptimisers.successful_members(fpop2)) == 8
+        @test expected_risk(r, fpop) == rks
+        @test rolling_window_measure(r, fpop, 10) ==
+              [rolling_window_measure(r, p, 10) for p in fpop.pred]
+        @test rolling_window_measure(r, ppred, 10) ==
+              [rolling_window_measure(r, p, 10) for p in ppred.pred]
+        sel = NearestQuantilePrediction(; r = r)(fpop)
+        @test sel isa PredictionResult
+        @test findfirst(p -> p === sel, fpop.pred) ==
+              argmin(abs.(rks .- quantile(rks, 0.5)))
+        @test expected_risk(r, sort_by_measure(fpop, r)[1]) == minimum(rks)
+    end
+    @testset "A clustering optimiser in the fold loop refuses a precomputed prior (#1277)" begin
+        # A precomputed prior is the full sample's, so every fold would read its test rows.
+        hopt = HierarchicalOptimiser(; pe = prior(EmpiricalPrior(), rd))
+        for opt in (HierarchicalRiskParity(; opt = hopt),
+                    HierarchicalEqualRiskContribution(; opt = hopt),
+                    SchurComplementHierarchicalRiskParity(; opt = hopt))
+            err = try
+                cross_val_predict(opt, rd, KFold())
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, ArgumentError) && occursin("opt.opt.pe", err.msg)
+        end
+        # The outer solve of a nested optimiser refuses it too, and the inner one views it.
+        pinned = HierarchicalRiskParity(; opt = hopt)
+        @test_throws ArgumentError NestedClustered(; opti = HierarchicalRiskParity(),
+                                                   opto = pinned)
+        @test isa(NestedClustered(; opti = pinned, opto = HierarchicalRiskParity()),
+                  NestedClustered)
+        # The estimator refits on each fold's training rows, so the folds differ.
+        pred = cross_val_predict(HierarchicalRiskParity(), rd, KFold())
+        @test !all(p -> p.res.w == pred.pred[1].res.w, pred.pred[2:end])
+    end
+    @testset "A search and a schedule refuse a precomputed prior (#1281)" begin
+        pr = prior(EmpiricalPrior(), rd)
+        function refusal_msg(f)
+            return try
+                f()
+                ""
+            catch e
+                isa(e, ArgumentError) ? e.msg : sprint(showerror, e)
+            end
+        end
+        refused(f, name) = startswith(refusal_msg(f), "$name cannot be a precomputed")
+        # A search scores each candidate through the fold loop, so it refuses what
+        # cross_val_predict refuses, for every scheme and for the randomised form.
+        pinned = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pr))
+        p = concrete_typed_array([["opt.wb" => [WeightBounds(; lb = 0.0, ub = 1.0),
+                                                WeightBounds(; lb = 0.0, ub = 0.5)]]])
+        for cv in (KFold(), CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2))
+            @test refused(() -> search_cross_validation(pinned,
+                                                        GridSearchCrossValidation(p;
+                                                                                  cv = cv),
+                                                        rd), "opt.opt.pe")
+        end
+        @test refused(() -> search_cross_validation(pinned,
+                                                    RandomisedSearchCrossValidation(p;
+                                                                                    n_iter = 2,
+                                                                                    rng = StableRNG(1)),
+                                                    rd), "opt.opt.pe")
+        # A lens that writes a precomputed prior is refused, and one that replaces it in every
+        # candidate is not.
+        writes = concrete_typed_array([["opt.pe" => [EmpiricalPrior(), pr]]])
+        @test refused(() -> search_cross_validation(HierarchicalRiskParity(),
+                                                    GridSearchCrossValidation(writes), rd),
+                      "opt.opt.pe")
+        replaces = concrete_typed_array([["opt.pe" => [EmpiricalPrior(),
+                                                       EmpiricalPrior(; horizon = 2)]]])
+        res = search_cross_validation(pinned, GridSearchCrossValidation(replaces), rd)
+        @test isa(res.opt.opt.pe, EmpiricalPrior)
+        # A schedule is refused when an entry or its default is a precomputed prior, and a
+        # schedule of estimators is not.
+        n = 5
+        for pe in (TimeDependent(fill(pr, n); default = EmpiricalPrior()),
+                   TimeDependent([EmpiricalPrior() for _ in 1:n]; default = pr))
+            @test refused(() -> cross_val_predict(InverseVolatility(; pe = pe), rd,
+                                                  KFold(; n = n)), "opt.pe")
+            @test refused(() -> cross_val_predict(HierarchicalRiskParity(;
+                                                                         opt = HierarchicalOptimiser(;
+                                                                                                     pe = pe)),
+                                                  rd, KFold(; n = n)), "opt.opt.pe")
+        end
+        estimated = TimeDependent([EmpiricalPrior() for _ in 1:n])
+        pred = cross_val_predict(InverseVolatility(; pe = estimated), rd, KFold(; n = n))
+        @test length(pred.pred) == n
     end
     @testset "Cross val predict" begin
         w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))
@@ -978,6 +1251,27 @@
                         0.045277821913963394, 0.049019700143647246, 0.05252956796830584,
                         0.05670666006046363, 0.06106323762304805, 0.06731010011882382],
                        rtol = 1e-6)
+
+        # #1004: a frontier fold gives one portfolio per sweep point, and a term that reads
+        # the previous weights needs one portfolio. The loop charged such a term against its
+        # first stated `w` on every fold, so it now refuses the pair by name, on either
+        # Previous-Weights Source. A fixed turnover reads no previous weights, so it runs.
+        nx = size(rd.X, 2)
+        front_tn(tn) = MeanRisk(;
+                                opt = JuMPOptimiser(; slv = slv, tn = tn,
+                                                    ret = ArithmeticReturn(;
+                                                                           settings = JuMPReturnsSettings(;
+                                                                                                          lb = Frontier(;
+                                                                                                                        N = 5)))))
+        mr_tn = front_tn(Turnover(; val = 0.003, w = fill(inv(nx), nx)))
+        @test_throws "population of 5 portfolios" cross_val_predict(mr_tn, rd, cv)
+        @test_throws "population of 5 portfolios" cross_val_predict(mr_tn, rd,
+                                                                    IndexWalkForward(127,
+                                                                                     171;
+                                                                                     wd = SelfFinancingDrift(),
+                                                                                     pws = DriftedWeights()))
+        mr_fx = front_tn(Turnover(; val = 0.003, w = fill(inv(nx), nx), fixed = true))
+        @test length(cross_val_predict(mr_fx, rd, cv).pred) == n_splits(cv, rd)
 
         n_folds, n_test_folds = optimal_number_folds(1008, 247, 7; train_size_w = 19,
                                                      n_test_paths_w = 11)

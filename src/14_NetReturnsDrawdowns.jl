@@ -78,7 +78,7 @@ end
 
 Subtract a fee from a portfolio return series, on the clock the fee states.
 
-`l`, `s` and `tn` are rates per period, so they charge on every observation. `fl` and `fs` are currency amounts charged one time for the whole holding period, so the clock decides where in the series they land, and `fees.fa` names that clock. The length of the holding period is the length of the series, which this verb hands to [`calc_fees`](@ref).
+`l`, `s` and `tn` are rates per period, so they charge on every observation. `fl` and `fs` charge each non-zero position one time for the whole holding period, as a fraction of capital on a return series, so the clock decides where in the series they land, and `fees.fa` names that clock. The length of the holding period is the length of the series, which this verb hands to [`calc_fees`](@ref).
 
 # Algorithm
 
@@ -87,7 +87,7 @@ Subtract a fee from a portfolio return series, on the clock the fee states.
  3. Subtract `amortised` from every observation.
  4. Subtract `one_time` from the first observation alone. Under an [`AmortisedFees`](@ref) it is zero, because step 2 spread that whole cost into `amortised`, and `iszero` gates the pass away.
 
-Both clocks charge the same total when the horizon is the length of `r`. They give a different drawdown, because the first charges the whole cost on one observation and the second charges a fraction of it on each.
+Both clocks charge the same total when the horizon is the length of `r`. They differ in where the one-off charge lands: the first charges it whole on the first observation, and the second charges a share of it on each. So the net return of each observation differs, and so does the path of the cumulative return.
 
 # Arguments
 
@@ -157,7 +157,7 @@ A reduced [`Fees`](@ref) lives on **two** axes: the five per asset fields were s
 
  1. A `nothing` `fees` returns `R` unchanged. It charges no fee rather than a zero fee.
  2. Read the pair of pairs `((am_i, am_l), (ot_i, ot_l))` of [`calc_asset_fees`](@ref), over the row count of `R`. The weights it is handed are the investable ones, because that is the axis the five per asset fields were sliced to; the carriers read `w` for its element type alone.
- 3. On a `nothing` `imsk`, charge the investable axis over the whole matrix, and refuse a `fees` that carries a liquidation: no mask says where the exits are, so the charge has nowhere to land, and dropping it would understate the return.
+ 3. On a `nothing` `imsk`, charge the investable axis over the whole matrix, and refuse a `fees` that carries a liquidation: no mask says where the exits are, so the charge has nowhere to land, and dropping it would overstate the net return.
  4. On a `BitVector` `imsk`, charge the investable axis in the `imsk` columns and the liquidation axis in the complement's, each by the same two steps: the per period vector on every observation, and the one-off vector on the first alone. Under an [`AmortisedFees`](@ref) the one-off vector is zero, because step 2 spread that cost into the per period one.
 
 # Arguments
@@ -302,7 +302,7 @@ An optimiser reduces once at its entry, so no optimiser meets a gap. A caller wh
 
 Every block of the prior is reduced together by the [`port_opt_view`](@ref) method the prior's owner already writes, so a new block cannot be forgotten, and the reduced `pr.X` carries no dead column. The fees travel with the weights, because a [`Fees`](@ref) whose rates are one number per asset is indexed by the same axis and would otherwise meet a shorter weight vector.
 
-The fee takes the same door the fit sites take, [`investable_fees_view`](@ref), under every carrier. A caller states the two liquidation carriers of a [`Fees`](@ref) over the full universe, so on a prior with no mask nothing left and the carriers are dropped; a result's fee is marked with the mask it was reduced on, so it passes the door untouched and the exit it carries is charged. Without the door, an all-investable prior charged a caller's full-universe carrier as a forced exit of the whole book on every period, which is the defect of #1067.
+The fee takes the same door the fit sites take, [`investable_fees_view`](@ref), under every carrier. A caller states the two liquidation carriers of a [`Fees`](@ref) over the full universe, so on a prior with no mask nothing left and the carriers are dropped; a result's fee is marked with the mask it was reduced on, so it passes the door untouched and the exit it carries is charged. Without the door, an all-investable prior charged a caller's full-universe carrier as a forced exit of the whole book on every period.
 
 A held non-investable asset is a holding the prior cannot value. It takes the library's strictness policy through [`strict_diagnostic`](@ref): a warning names the assets and their weights are dropped, or an `ArgumentError` names them under `strict`.
 

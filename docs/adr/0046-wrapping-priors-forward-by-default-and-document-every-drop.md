@@ -9,7 +9,7 @@ status: accepted
 Most prior estimators wrap another one. [`BlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl)
 takes a `pe`, fits it, and returns a carrier built from the result; so do
 [`BayesianBlackLittermanPrior`](../../src/10_Prior/05_BlackLitterman/03_BayesianBlackLittermanPrior.jl),
-[`EntropyPoolingPrior`](../../src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior.jl),
+[`EntropyPoolingPrior`](../../src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_c.jl),
 [`OpinionPoolingPrior`](../../src/10_Prior/07_OpinionPoolingPrior.jl) and
 [`FeaturePrior`](../../src/13_Prior/15_FeaturePrior.jl). Each one decides, field by field, which of
 the wrapped carrier's thirteen fields to carry across — and each one decided independently, by

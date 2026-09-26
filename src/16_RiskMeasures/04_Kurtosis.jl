@@ -323,7 +323,7 @@ See [`calc_deviations_vec`](@ref) for details.
 function calc_deviations_vec(r::Kurtosis, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
-    tgt = calc_moment_target(r, w, x)
+    tgt = calc_moment_target(r, w, x) - moment_target_fees(r.mu, w, fees, length(x))
     return x .- tgt
 end
 """

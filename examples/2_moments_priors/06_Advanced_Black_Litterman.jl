@@ -3,39 +3,39 @@
 Description = "Advanced Black-Litterman variants in PortfolioOptimisers.jl: factor views, asset and factor views at once, and the Bayesian form."
 ```
 
-# Advanced Black–Litterman variants
+# [Advanced Black-Litterman variants](@id example-advanced-black-litterman-variants)
 
-The base [`BlackLittermanPrior`](@ref) ([previous page](05_Black_Litterman.md)) works entirely
-in **asset space**: views are statements about individual assets or asset groups. But views
-are often more naturally expressed about **factors** — "momentum will earn a premium",
-"quality minus low-volatility will be negative" — and sometimes you hold asset *and* factor
-views at once. `PortfolioOptimisers` ships three variants of the model for exactly these cases:
+The base [`BlackLittermanPrior`](@ref) of the [previous page](@ref example-black-litterman) works on
+the assets alone, and each view is about one asset or a group of assets. But a view is often
+easier to state about a factor, such as "momentum will earn a premium" or "quality minus low
+volatility will be negative". Sometimes you also hold views on assets and on factors at once.
+The library has three variants of the model for these cases.
 
-  - [`BayesianBlackLittermanPrior`](@ref) — the Bayesian formulation that sits on top of a
-    [`FactorPrior`](@ref). Views are expressed on the factors, and the factor structure
-    propagates the posterior back to the assets.
-  - [`FactorBlackLittermanPrior`](@ref) — expresses views directly on **factor premia** and
-    pushes them to the assets through a factor regression. The `rsd` flag controls whether
-    idiosyncratic residual variance is retained, and `l` is the risk-aversion of the implied
-    factor equilibrium.
-  - [`AugmentedBlackLittermanPrior`](@ref) — carries **both** asset views (`a_views`) and
-    factor views (`f_views`) simultaneously, each with its own asset set and confidence.
+  - [`BayesianBlackLittermanPrior`](@ref) is the Bayesian form of the model, and it builds on
+    a [`FactorPrior`](@ref). You state the views on the factors, and the factor model carries
+    the posterior back to the assets.
+  - [`FactorBlackLittermanPrior`](@ref) takes views on the factor premia and passes them to the
+    assets through a factor regression. The `rsd` flag sets whether the posterior keeps the
+    residual variance of each asset. `l` is the risk aversion of an implied factor equilibrium,
+    and it is off by default.
+  - [`AugmentedBlackLittermanPrior`](@ref) takes views on assets in `a_views` and views on
+    factors in `f_views` in one model, each with its own confidence.
 
-All three return an asset-space posterior `(mu, sigma)` you can feed to any optimiser, exactly
-like the base model.
+Each variant returns a posterior mean and covariance over the assets, `mu` and `sigma`, and you
+give it to an optimiser as you give the base model.
 
 !!! tip "When to reach for this"
-    Reach for these when your conviction is about factors rather than (or in addition to)
-    individual names: a macro view on momentum or value, a quality-vs-low-vol spread, or a
-    desk that wants to combine a stock-level call with a factor-level call in one coherent
-    posterior. If all your views are plain asset statements, the base
-    [`BlackLittermanPrior`](@ref) is simpler and enough.
+    Reach for these when your views are about factors, alone or next to views on single
+    assets. Examples are a macro view on momentum or value, a spread between quality and low
+    volatility, or a view on a stock that you want to combine with a view on a factor in one
+    posterior. If every view is about assets, the base [`BlackLittermanPrior`](@ref) is
+    simpler, and it is enough.
 
 !!! note "Factor data required"
-    These variants need factor returns, so the [`ReturnsResult`](@ref) must be built with a
-    factor block, which the ingestion layer assembles:
+    These variants need factor returns, so you must build the [`ReturnsResult`](@ref) with
+    the factor data, which the price ingestion step adds:
     `prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))`. Factor views and
-    factor sets refer to the factor names in `rd.nf`.
+    factor sets use the factor names in `rd.nf`.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames
@@ -56,15 +56,19 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. Data, sets, and the equilibrium baseline
+## 1. Data, sets and the equilibrium prior
 
-We load the S&P 500 slice **with** its factor block, then declare **one** `UniverseSets` that all
-three variants read. It names both axes — assets under `xkey`, factors under `tfkey`, each in the
-column order of `rd.X` and `rd.F` — plus a couple of asset groups for the augmented asset views.
-Every factor-view estimator here resolves its names on the *declared* factor axis, so one object
-covers a factor-only mandate, an asset-only mandate, and the augmented model that writes both.
-The [`EquilibriumExpectedReturns`](@ref) prior is the neutral anchor every Black–Litterman
-posterior tilts away from.
+We load one year of daily prices of 20 assets and of five factor funds, and convert both to
+returns. Then we declare one `UniverseSets` that all three variants read. It lists the assets
+under `"nx"` and the factors under `"nf"`, each in the column order of `rd.X` and `rd.F`. These
+are the default keys under which every estimator looks for the assets and the factors. The
+`xkey` and `tfkey` fields of `UniverseSets` hold the two keys. The object also holds two groups
+of assets for the asset views of the augmented model. One object therefore serves a model with
+factor views only, a model with asset views only, and the augmented model that has both.
+
+We also compute the [`EquilibriumExpectedReturns`](@ref) prior as a reference to compare the
+posteriors with. The Bayesian, the factor and the augmented posteriors of the comparison table
+do not start from it. Each starts from the sample mean of the quantities its views update.
 =#
 
 using CSV, TimeSeries
@@ -82,21 +86,22 @@ tau = 1 / size(rd.X, 1)
 pr_eq = prior(EmpiricalPrior(; me = EquilibriumExpectedReturns()), rd)
 
 #=
-The factors available in this dataset:
+`rd.nf` holds the names of the factors in this data set.
 =#
 
 pretty_table(DataFrame(; factor = rd.nf); title = "Factor names (rd.nf)")
 
 #=
-## 2. Bayesian Black–Litterman: factor views on a factor prior
+## 2. Bayesian Black-Litterman with factor views
 
-[`BayesianBlackLittermanPrior`](@ref) takes a [`FactorPrior`](@ref) as its base estimator and
-accepts views written in **factor space**, resolved against the declared factor axis
-`sets.dict[sets.tfkey]`. It is the Bayesian formulation: the factor prior supplies the structure,
-the views update the factor means, and the result is mapped back to an asset-space posterior.
+[`BayesianBlackLittermanPrior`](@ref) takes a [`FactorPrior`](@ref) as its base estimator, and
+views on the factors, whose names must be in `sets.dict[sets.tfkey]`. In this Bayesian form the
+factor prior gives the structure, and the views update the mean and the covariance of the
+factors. The model then maps the result back to a posterior over the assets through the factor
+loadings.
 
-Our factor views: momentum earns 5 bps/day, and quality underperforms low-volatility by 3
-bps/day.
+We state two factor views. Momentum earns 5 bps a day, and quality returns 3 bps a day less than
+low volatility.
 =#
 
 factor_views = LinearConstraintEstimator(;
@@ -107,21 +112,21 @@ pr_bayes = prior(BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = Empirical
                                              views = factor_views), rd)
 
 #=
-## 3. Factor Black–Litterman: views on factor premia
+## 3. Factor Black-Litterman with views on factor premia
 
-[`FactorBlackLittermanPrior`](@ref) also takes factor views, but propagates them to the assets
-through the factor regression rather than a factor prior. Its views resolve against the
-**declared time-series factor axis**, `sets.dict[sets.tfkey]`: the names must be looked up on the axis they
-were written in, and the asset axis is what a view over a subset of assets slices. Two knobs
-matter:
+[`FactorBlackLittermanPrior`](@ref) also takes factor views. It runs the ordinary
+Black-Litterman update on a prior fit to the factors alone, and carries the result to the assets
+through the regression loadings. Its views name factors from the same list,
+`sets.dict[sets.tfkey]`. Two parameters change the posterior.
 
-  - `rsd` — keep the idiosyncratic **residual** variance (`true`) or drop it (`false`), i.e.
-    whether the posterior covariance is the full asset covariance or only its factor-explained
-    part.
-  - `l` — the risk-aversion of the implied factor equilibrium.
+  - `rsd = true` adds the residual variance of each asset on the diagonal of the posterior
+    covariance, and `rsd = false` keeps only the part the factors explain.
+  - `l` is off by default, `nothing`. Set it, and the model replaces the factor prior's own mean
+    with the equilibrium mean that this risk aversion implies for the equal-weight portfolio.
 
-We build both `rsd` settings and a higher-risk-aversion variant to show each knob moves the
-posterior.
+We build one prior with each `rsd` setting, and a third that sets `l = 5`. The table compares
+Apple's posterior mean and variance under the two `rsd` settings. The page prints nothing for
+the third prior, and you can compare `pr_fbl_l.mu` with `pr_fbl_rsd.mu` to see what `l` changes.
 =#
 
 pr_fbl_rsd = prior(FactorBlackLittermanPrior(; pe = EmpiricalPrior(), rsd = true,
@@ -139,22 +144,24 @@ pretty_table(DataFrame(; quantity = ["AAPL posterior mean", "AAPL posterior vari
                        rsd_true = [pr_fbl_rsd.mu[i_aapl], pr_fbl_rsd.sigma[i_aapl, i_aapl]],
                        rsd_false = [pr_fbl_nors.mu[i_aapl],
                                     pr_fbl_nors.sigma[i_aapl, i_aapl]]);
-             formatters = [mmtfmt], title = "Factor BL: residual variance on vs off")
+             formatters = [mmtfmt],
+             title = "AAPL posterior mean and variance of FactorBlackLittermanPrior with and without the residual variance")
 
 #=
-Dropping the residual variance (`rsd = false`) leaves only the factor-explained part of the
-covariance, so the posterior variance is smaller — the model trusts the factor structure to
-explain all risk.
+With `rsd = false` the covariance keeps only the part the factors explain, so the posterior
+variance is smaller. The model then assumes that the factors explain all of the risk.
 
-## 4. Augmented Black–Litterman: asset and factor views together
+## 4. Augmented Black-Litterman with asset and factor views
 
-[`AugmentedBlackLittermanPrior`](@ref) is the most general: it takes asset views (`a_views`)
-**and** factor views (`f_views`) in the same posterior. Use it when you have a stock-specific
-call and a factor call you do not want to choose between.
+[`AugmentedBlackLittermanPrior`](@ref) is the most general variant. It takes views on assets in
+`a_views` and views on factors in `f_views`, in the same posterior. Use it when you hold a view
+on a stock and a view on a factor, and do not want to choose between them.
 
-It is the one estimator that reads **both** declared axes, and it reads them out of the same
-`universe_sets` every variant above used: `a_views` resolve against `sets.dict[sets.xkey]` — so
-the `tech` group is in scope — and `f_views` against `sets.dict[sets.tfkey]`.
+It is the only estimator of the three that reads both declared lists, and it reads them from the
+same `universe_sets` as the variants above. It resolves the names of `a_views` against the
+assets, `sets.dict[sets.xkey]`, and the names of `f_views` against the factors,
+`sets.dict[sets.tfkey]`. A group name such as `tech` is read from its own entry in `sets.dict`,
+and in Black-Litterman it stands for the average of its members.
 =#
 
 asset_views = LinearConstraintEstimator(; val = ["AAPL == 0.0008", "tech == 0.0006"])
@@ -166,9 +173,9 @@ pr_aug = prior(AugmentedBlackLittermanPrior(; sets = universe_sets, tau = tau,
 #=
 ## 5. Comparing the posteriors
 
-Each variant produces a different asset-space posterior mean. Below we line them up against the
-equilibrium anchor for the first few assets — the factor views move the whole cross-section,
-and the augmented model additionally tilts the assets named in its asset views.
+Each variant gives a different posterior mean. The table lines them up with the equilibrium
+prior for the first few assets. The factor views move every asset, and the augmented model
+also moves the assets that its asset views name.
 =#
 
 cmp = DataFrame(; Assets = rd.nx, Equilibrium = pr_eq.mu, Bayesian = pr_bayes.mu,
@@ -176,15 +183,15 @@ cmp = DataFrame(; Assets = rd.nx, Equilibrium = pr_eq.mu, Bayesian = pr_bayes.mu
 pretty_table(first(cmp, 8); formatters = [mmtfmt],
              title = "Posterior expected returns (first 8 assets)")
 
+# The posterior expected returns of the augmented model, for every asset.
 using StatsPlots, GraphRecipes
 plot_mu(pr_aug, rd.nx)
 
 #=
 ## 6. From views to portfolios
 
-The payoff is the same as for the base model: each posterior reshapes the optimal portfolio.
-We solve a maximum-ratio portfolio under the equilibrium prior and under each variant, then
-compare the compositions.
+As with the base model, each posterior changes the optimal portfolio. We solve a maximum-ratio
+portfolio under the equilibrium prior and under each variant, then compare the compositions.
 =#
 
 using Clarabel
@@ -208,16 +215,14 @@ plot_stacked_bar_composition(res, rd; xticks = (1:length(priors), first.(priors)
 #=
 ## Summary
 
-The Black–Litterman family extends well past asset-space views:
+The three variants take views that the base model cannot.
 
-  - [`BayesianBlackLittermanPrior`](@ref) places factor views on a [`FactorPrior`](@ref).
-  - [`FactorBlackLittermanPrior`](@ref) propagates factor-premia views through a regression,
-    with `rsd` controlling residual variance and `l` the implied equilibrium risk-aversion.
-  - [`AugmentedBlackLittermanPrior`](@ref) blends asset views and factor views in one
+  - [`BayesianBlackLittermanPrior`](@ref) puts factor views on a [`FactorPrior`](@ref).
+  - [`FactorBlackLittermanPrior`](@ref) passes views on the factor premia through a regression.
+    `rsd` sets whether it keeps the residual variance, and `l`, off by default, is the risk
+    aversion of an implied equilibrium.
+  - [`AugmentedBlackLittermanPrior`](@ref) combines asset views and factor views in one
     posterior.
-
-All three return a standard asset-space posterior, so they drop into any optimiser exactly
-like the base model — the difference is only in *where* the views live.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

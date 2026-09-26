@@ -1,23 +1,18 @@
 ```@meta
-Description = "Meta optimisation, private API of PortfolioOptimisers.jl: SubPortfolioUniverse, FullUniverse, ClusterUniverse, sub_portfolio_count, sub_portfolio_predict, …"
+Description = "Meta optimisation, private API of PortfolioOptimisers.jl: FullUniverse, ClusterUniverse, sub_portfolio_cv, outer_optimisation_finaliser, …"
 ```
 
 # Meta optimisation: private API
 
 ```@docs
-SubPortfolioUniverse
 FullUniverse
 ClusterUniverse
-sub_portfolio_count
-sub_portfolio_predict
-sub_portfolio_view
 sub_portfolio_cv
 outer_optimisation_finaliser
 combination_weights
 prepare_outer_rd
 assert_fold_alignment
 fold_row_indices
-fold_weight_matrix
 fold_asset_panel
 fold_feature_anchors
 panel_field_stack(fs::AbstractVector{<:NumericPanelField})

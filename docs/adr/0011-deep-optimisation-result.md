@@ -249,3 +249,17 @@ finite fallback estimator could never be written either; they are bound to
 `Option{<:FOptE_FOpt_FbChain}` instead. A result's `fb` is therefore `nothing` when the
 estimator it was asked of answered, and the chain when a fallback did; `fb[1][1]` is the
 estimator that was asked first.
+
+## Amendment (2026-09-23)
+
+`SchurComplementHierarchicalRiskParityResult` gains a `fees` field, after `clr`
+([#1296](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1296)). Its estimator took a
+fee through its `HierarchicalOptimiser` and dropped it without an error, so `calc_net_returns` on
+the result gave the gross returns. The fit now resolves the fee as `HierarchicalRiskParity` does,
+on the caller's universe before the investable reduction, and the result carries it. The
+allocation still reads no fee: its measure is a variance or a standard deviation, which a fee does
+not move.
+
+The result stays flat and a member by supertype only. With the fee, its field set still differs
+from `HierarchicalResult` by `r` and `gamma`. The keyword constructor takes `fees` with no
+default, as `HierarchicalResult` does, so a caller who builds the result by hand passes it.

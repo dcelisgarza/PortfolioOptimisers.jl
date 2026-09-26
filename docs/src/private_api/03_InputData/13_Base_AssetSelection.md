@@ -1,17 +1,7 @@
 ```@meta
-Description = "Base asset selection, private API of PortfolioOptimisers.jl: AbstractAssetSelector, find_complete_indices."
+Description = "Base asset selection has no private API in PortfolioOptimisers.jl; its names are in the public API."
 ```
 
 # Base asset selection: private API
 
-## Types
-
-```@docs
-AbstractAssetSelector
-```
-
-## Functions
-
-```@docs
-find_complete_indices
-```
+Every name of this topic is public. The [public page](@ref api-base-asset-selection) documents them.

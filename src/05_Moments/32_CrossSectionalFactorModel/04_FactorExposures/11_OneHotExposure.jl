@@ -277,7 +277,7 @@ julia> factor_exposure(OneHotExposure(; field = \"sector\", family = \"sector\")
 function factor_exposure(xe::OneHotExposure, rd::ReturnsResult)::Array{<:Real, 3}
     f = one_hot_field(rd, xe.field)
     codes = f.codes
-    Tf = real(eltype(rd.X))
+    Tf = float_if_integer(real(eltype(rd.X)))
     B = zeros(Tf, size(codes, 1), size(codes, 2), length(f.levels))
     for i in CartesianIndices(codes)
         B[i, codes[i]] = one(Tf)

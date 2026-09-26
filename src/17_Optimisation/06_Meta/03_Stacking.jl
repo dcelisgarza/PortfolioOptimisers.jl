@@ -258,12 +258,12 @@ c_k &= \\frac{s_k v_k}{\\sum_{j=1}^{K} s_j v_j} \\sum_{j=1}^{K} v_j\\,,\\\\
 Where:
 
   - ``\\boldsymbol{w}^*``: Final stacked portfolio weights.
-  - ``K``: Number of inner optimisers.
+  - $(math_dict[:K_sub]) Here it is the number of inner optimisers.
   - ``\\boldsymbol{X}``: Asset returns matrix.
   - ``\\boldsymbol{R}``: Returns proxy matrix, one column per synthetic asset.
-  - ``\\boldsymbol{v}``: Outer optimiser weights over the synthetic universe.
-  - ``s_k``: Combination Weight of inner optimiser ``k``. Absent, or uniform, ``\\boldsymbol{c} = \\boldsymbol{v}``.
-  - ``c_k``: Coefficient inner optimiser ``k`` carries in the combination.
+  - $(math_dict[:v_outer])
+  - $(math_dict[:s_k_comb]) Absent, or uniform, ``\\boldsymbol{c} = \\boldsymbol{v}``.
+  - $(math_dict[:c_k_comb])
   - ``\\mathrm{opto}``: Outer optimiser applied to the synthetic universe.
 
 The outer problem is built from ``\\boldsymbol{w}_k``, never from ``s_k \\boldsymbol{w}_k``: the weight acts at the combination alone, so a cross-validated run and a fold-less one agree on it (see [`combination_weights`](@ref)).
@@ -465,8 +465,7 @@ function assert_special_nco_requirements(opt::Stacking)::Nothing
 end
 function assert_external_optimiser(opt::Stacking)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.pe, AbstractPriorResult),
-              ArgumentError("opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    assert_estimated_prior(opt.pe, "opt.pe")
     assert_external_optimiser(opt.opto)
     if !isnothing(opt.cv)
         assert_external_optimiser(opt.opti)
@@ -563,18 +562,17 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
     opto = port_opt_view(st.opto, i, X)
     return Stacking(; pe = pe, wb = wb, fees = fees, sets = sets, scale = st.scale,
                     opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex,
-                    fb = st.fb, brt = st.brt, strict = st.strict,
+                    fb = view_child(st.fb, i, X), brt = st.brt, strict = st.strict,
                     cache = port_opt_view(st.cache, i))
 end
 function non_investable_universe(st::Stacking, ni::VecStr)::Stacking
     return rebuild_estimator(st, (; sets = non_investable_sets(st.sets, ni)))
 end
-function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
-                   branchorder::Symbol = :optimal, str_names::Bool = false,
-                   save::Bool = true, kwargs...)
+function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optimal,
+                   str_names::Bool = false, save::Bool = true, kwargs...)
     st = reset_time_dependent_estimator(st)
     rd = returns_result_picker(rd, st.brt)
-    pr = prior(st.pe, rd; dims = dims)
+    pr = prior(st.pe, rd)
     # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
@@ -602,8 +600,8 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     wi = zeros(eltype(X), size(X, 2), Ni)
     resi = Vector{NonFiniteAllocationOptimisationResult}(undef, Ni)
     FLoops.@floop st.ex for (i, opt) in pairs(opti)
-        res = optimise(opt, rdr; dims = dims, branchorder = branchorder,
-                       str_names = str_names, save = save, kwargs...)
+        res = optimise(opt, rdr; branchorder = branchorder, str_names = str_names,
+                       save = save, kwargs...)
         #! Support efficient frontier?
         @argcheck(!isa(res.retcode, AbstractVector),
                   ArgumentError("res.retcode cannot be an AbstractVector; efficient frontier results are not supported here"))
@@ -611,8 +609,8 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
         resi[i] = res
     end
     rdo = predict_outer_returns(st.cv, st, FullUniverse(), rdr, pr, cfees, wi, resi)
-    reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
-                    str_names = str_names, save = save, kwargs...)
+    reso = optimise(st.opto, rdo; branchorder = branchorder, str_names = str_names,
+                    save = save, kwargs...)
     wb = weight_bounds_constraints(st.wb, st.sets; N = size(X, 2), strict = st.strict,
                                    datatype = eltype(X))
     retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode,
@@ -624,7 +622,7 @@ end
     optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                      <:Any, <:Any, Nothing
                  }, rd::ReturnsResult;
-             dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+             branchorder::Symbol = :optimal, str_names::Bool = false,
              save::Bool = true, kwargs...) -> StackingResult
 
 Run the Stacking portfolio optimisation.
@@ -633,7 +631,6 @@ Run the Stacking portfolio optimisation.
 
   - `st`: The stacking optimiser to use.
   - $(arg_dict[:rd])
-  - `dims`: The dimension along which observations advance in time.
   - `branchorder`: Passed to the inner and outer optimisers. The branch order to use for the clusterisation.
   - `str_names`: Passed to the inner and outer optimisers. Whether to use string names for the assets in the optimisation.
   - `save`: Passed to the inner and outer optimisers. Whether to save the JuMP model in the optimisation result.
@@ -654,12 +651,12 @@ Run the Stacking portfolio optimisation.
   - [`combination_weights`](@ref)
 """
 function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                               <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1,
+                               <:Any, <:Any, Nothing}, rd::ReturnsResult;
                   branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)
     assert_batch_entry(st, "`optimise`")
-    return _optimise(st, rd; dims = dims, branchorder = branchorder, str_names = str_names,
-                     save = save, kwargs...)
+    return _optimise(st, rd; branchorder = branchorder, str_names = str_names, save = save,
+                     kwargs...)
 end
 
 export StackingResult, Stacking

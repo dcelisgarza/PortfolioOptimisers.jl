@@ -362,6 +362,152 @@ end
     end
 end
 
+# The identities above hold for any set of values that is wrong but consistent, so this testset
+# computes every field of a realised Result from its definition. The alignment is written out from
+# the block's own fields rather than read from `attribution_align`, and the weights move over the
+# history, so the weight spread, the exposure spread and the per-observation exposure all differ
+# from their constant-weight values.
+@testset "The realised decomposition matches a direct computation" begin
+    PO = PortfolioOptimisers
+    pr, rd = fa_prior()
+    rr = pr.rr
+    N, K = length(pr.mu), length(rr.nf)
+    w0 = fa_weights(pr)
+    fin(x) = isfinite(x) ? x : zero(x)
+    X0 = fin.(rd.X)
+    Tx = size(X0, 1)
+    Wh = [w0[i] * (1 + 0.3 * sin(0.7 * t + i)) for t in 1:Tx, i in 1:N]
+    Wh ./= sum(Wh; dims = 2)
+    ret = [dot(view(Wh, t, :), view(X0, t, :)) for t in 1:Tx]
+    ppy = 12
+    fa = factor_attribution(Wh, pr, ret; assets = true, ppy = ppy)
+    # The j-th aligned observation reads the exposures of block row j, the factor and
+    # idiosyncratic returns of block row j + lag, and the caller's row Tx - Tb + lag + j.
+    lag, Tb = rr.lag, size(rr.csr.f, 1)
+    n = Tb - lag
+    rows = [Tx - Tb + lag + j for j in 1:n]
+    B = [fin.(rr.Ms[j, :, :]) for j in 1:n]
+    F = fin.(rr.csr.f[(1:n) .+ lag, :])
+    E = fin.(rr.csr.eps[(1:n) .+ lag, :])
+    W = Wh[rows, :]
+    r = ret[rows]
+    sig = std(r)
+    cv(x) = dot(x .- mean(x), r .- mean(r)) / (n - 1)
+    G = reduce(vcat, [transpose(transpose(B[j]) * W[j, :]) for j in 1:n])
+    S = reduce(vcat, [transpose(B[j] * F[j, :]) for j in 1:n])
+    s = vec(sum(G .* F; dims = 2))
+    e = vec(sum(W .* E; dims = 2))
+    @testset "The alignment leaves the intercept of each observation" begin
+        # Over the pairs the fit covered, the caller's return less the model is one number per
+        # observation. A pair with no exposure left the fit, so its return is in the remainder.
+        for j in 1:n
+            cov_i = [i
+                     for i in 1:N
+                     if all(isfinite, rr.Ms[j, i, :]) && isfinite(rr.csr.eps[j + lag, i])]
+            res = [X0[rows[j], i] - S[j, i] - E[j, i] for i in cov_i]
+            @test maximum(res) - minimum(res) < 1e-10
+        end
+    end
+    @testset "Each component is its series against the portfolio" begin
+        for (c, got) in ((s, fa.sys), (e, fa.idio), (r .- s .- e, fa.unattr))
+            @test got.vol ≈ std(c) * sqrt(ppy)
+            @test got.vol_contrib ≈ cv(c) / sig * sqrt(ppy)
+            @test got.pct_var ≈ cv(c) / sig^2
+            @test got.mu_contrib ≈ mean(c) * ppy
+            @test got.corr ≈ cv(c) / (std(c) * sig)
+        end
+        @test fa.total.vol ≈ sig * sqrt(ppy)
+        @test fa.total.mu_contrib ≈ mean(r) * ppy
+    end
+    @testset "Each factor row reads its exposure and its return series" begin
+        @test fa.fbd.exposure ≈ vec(mean(G; dims = 1))
+        @test fa.fbd.exposure_std ≈ vec(std(G; dims = 1))
+        @test fa.fbd.vol ≈ vec(std(F; dims = 1)) .* sqrt(ppy)
+        @test fa.fbd.corr ≈ [cv(F[:, k]) / (std(F[:, k]) * sig) for k in 1:K]
+        @test fa.fbd.vol_contrib ≈ [cv(G[:, k] .* F[:, k]) / sig for k in 1:K] .* sqrt(ppy)
+        @test fa.fbd.pct_var ≈ [cv(G[:, k] .* F[:, k]) / sig^2 for k in 1:K]
+        @test fa.fbd.mu ≈ vec(mean(F; dims = 1)) .* ppy
+        @test fa.fbd.mu_contrib ≈ vec(mean(G .* F; dims = 1)) .* ppy
+        fi = PO.attribution_family_index(rr.fam)
+        @test fa.fmbd.exposure_std ≈ [std(vec(sum(G[:, i]; dims = 2))) for i in fi.idx]
+    end
+    @testset "Each asset row reads the model return of the asset" begin
+        A = S .+ E
+        @test fa.abd.weight ≈ vec(mean(W; dims = 1))
+        @test fa.abd.weight_std ≈ vec(std(W; dims = 1))
+        @test fa.abd.sys_vol_contrib ≈
+              [cv(W[:, i] .* S[:, i]) / sig for i in 1:N] .* sqrt(ppy)
+        @test fa.abd.sys_mu_contrib ≈ vec(mean(W .* S; dims = 1)) .* ppy
+        @test fa.abd.idio_vol_contrib ≈
+              [cv(W[:, i] .* E[:, i]) / sig for i in 1:N] .* sqrt(ppy)
+        @test fa.abd.idio_mu_contrib ≈ vec(mean(W .* E; dims = 1)) .* ppy
+        @test fa.abd.vol ≈ vec(std(A; dims = 1)) .* sqrt(ppy)
+        # An asset the prior could not estimate has a model return of zero, so no correlation.
+        @test isapprox(fa.abd.corr,
+                       [std(A[:, i]) > 0 ? cv(A[:, i]) / (std(A[:, i]) * sig) : NaN
+                        for i in 1:N]; nans = true)
+        @test fa.abd.vol_contrib ≈ [cv(W[:, i] .* A[:, i]) / sig for i in 1:N] .* sqrt(ppy)
+        @test fa.abd.pct_var ≈ [cv(W[:, i] .* A[:, i]) / sig^2 for i in 1:N]
+        @test fa.abd.mu ≈ vec(mean(A; dims = 1)) .* ppy
+        @test fa.abd.mu_contrib ≈ vec(mean(W .* A; dims = 1)) .* ppy
+    end
+    @testset "Each asset-by-factor entry is one term of the systematic return" begin
+        pnl(i, k) = [W[j, i] * B[j][i, k] * F[j, k] for j in 1:n]
+        @test fa.afc.vol_contrib ≈ [cv(pnl(i, k)) / sig * sqrt(ppy) for i in 1:N, k in 1:K]
+        @test fa.afc.mu_contrib ≈ [mean(pnl(i, k)) * ppy for i in 1:N, k in 1:K]
+    end
+end
+
+# A number type the weights carry reaches every number a realised attribution reports, and so does
+# a narrower one: the types come from the data, never from the annualisation or a division.
+@testset "The number type of the data reaches every field" begin
+    pr, rd = fa_prior()
+    w = fa_weights(pr)
+    ret = fa_net_returns(w, pr, rd)
+    Wb = repeat(transpose(BigFloat.(w)), length(ret))
+    fa = factor_attribution(Wb, pr, ret; assets = true, se = true)
+    for v in (fa.fbd.exposure, fa.fbd.vol_contrib, fa.fbd.mu_se, fa.fmbd.mu_se,
+              fa.abd.sys_vol_contrib, fa.abd.idio_vol_contrib, fa.afc.vol_contrib,
+              fa.afc.mu_contrib, [fa.sys.vol_contrib, fa.idio.vol_contrib, fa.sys.mu_se])
+        @test eltype(v) == BigFloat
+    end
+    # The sandwich fixture below in Float32, with a currency factor: the errors stay Float32,
+    # and the currency row and family carry a Float32 NaN.
+    Ms = Array{Float32, 3}(undef, 2, 3, 2)
+    Ms[1, :, :] = [1 0.5; 1 -0.5; 1 1.5]
+    Ms[2, :, :] = [1 0.4; 1 -0.6; 1 1.2]
+    f = Float32[0.01 0.02; -0.005 0.03]
+    eps = Float32[0.001 -0.002 0.0015; -0.0005 0.001 -0.0008]
+    rw = Float32[0.4 0.35 0.25; 0.3 0.45 0.25]
+    vs = Float32[1.0e-4 2.0e-4 1.5e-4; 1.2e-4 1.8e-4 1.6e-4]
+    csr = CrossSectionalRegression(; f = f, eps = eps, n = [3, 3])
+    rr = CrossSectionalFactorModel(; M = Ms[2, :, :], b = Float32[0.001, 0.0005, 0.0012],
+                                   csr = csr, Ms = Ms, vs = vs,
+                                   esigma = Float32[1.2e-4, 1.8e-4, 1.6e-4], rw = rw,
+                                   bw = rw, nf = ["market", "usd"],
+                                   fam = ["market",
+                                          PortfolioOptimisers.ATTRIBUTION_CURRENCY_FAMILY],
+                                   lag = 0)
+    X = Float32[0.011 0.003 0.02; 0.004 0.012 0.009]
+    fpr = LowOrderPrior(; X = f, mu = vec(mean(f; dims = 1)), sigma = cov(f))
+    p32 = LowOrderPrior(; X = X, mu = rr.M * fpr.mu .+ rr.b,
+                        sigma = rr.M * fpr.sigma * transpose(rr.M) + Diagonal(rr.esigma),
+                        rr = rr, fpr = fpr)
+    f32 = factor_attribution(Float32[0.5, 0.3, 0.2], p32, X; se = true, assets = true)
+    # The volatilities scale by the square root of `ppy`, which is taken in the type of the
+    # data, so the default integer `ppy` does not widen them.
+    for v in ([f32.total.vol, f32.sys.vol, f32.sys.vol_contrib, f32.unattr.vol_contrib],
+              f32.fbd.vol, f32.fbd.vol_contrib, f32.abd.vol, f32.abd.vol_contrib,
+              f32.afc.vol_contrib)
+        @test eltype(v) == Float32
+    end
+    @test typeof(f32.sys.mu_se) == Float32
+    @test eltype(f32.fbd.mu_se) == Float32
+    @test eltype(f32.fmbd.mu_se) == Float32
+    @test isnan(f32.fbd.mu_se[2])
+    @test isnan(f32.fmbd.mu_se[1])
+end
+
 @testset "A collinear cross-section takes the pseudo-inverse" begin
     # The market intercept is the sum of the one-hot industry block, so the Gram matrix of every
     # observation is rank-deficient and the sandwich falls back to the pseudo-inverse. The answer is
@@ -842,6 +988,16 @@ end
         @test_throws DomainError factor_attribution(w, pr; ppy = 0)
         @test_throws DomainError factor_attribution(w, pr; ppy = -1)
         @test_throws DomainError factor_attribution(w, pr, rd.X, 0)
+        # One observation has no sample volatility, so the window names itself rather than
+        # the volatility it would leave undefined.
+        err = try
+            factor_attribution(w, pr, rd.X, 1)
+        catch e
+            e
+        end
+        @test err isa DomainError && err.val == 1
+        @test length(factor_attribution(w, pr, rd.X, 2)) ==
+              size(pr.rr.csr.f, 1) - pr.rr.lag - 1
         @test_throws DomainError factor_attribution(w, pr, rd.X, 10_000)
         @test_throws DomainError factor_attribution(w, pr, rd.X, 30; step = 0)
     end
@@ -901,9 +1057,140 @@ end
         @test sum(fa.fbd.vol_contrib) ≈ fa.sys.vol_contrib
         @test sum(fa.fmbd.vol_contrib) ≈ fa.sys.vol_contrib
     end
+    @testset "The systematic error does not move under the change of basis" begin
+        # The raw Gram matrix is singular under the re-basis, so the sandwich is taken in the
+        # reduced basis. Mapped back onto the raw axis, it gives the same systematic error.
+        fa = factor_attribution(w, pr, rd.X; se = true)
+        ret = fa_net_returns(w, pr, rd)
+        al = PO.attribution_align(rr, pr, length(ret))
+        T = size(al.f, 1)
+        g = reduce(vcat, [transpose(transpose(al.B[t, :, :]) * w) for t in 1:T])
+        red = PO.attribution_reduce_for_errors(al.fcb, al.B, g, rr.fam, T)
+        @test red.nr < size(g, 2)
+        keep = findall(!, red.currency)
+        Vf = [PO.attribution_expand_errors(al.fcb,
+                                           PO.attribution_sandwich(view(red.B, t, :, :),
+                                                                   view(al.rw, t, :),
+                                                                   view(al.vs, t, :), keep),
+                                           keep, red.nr, t) for t in 1:T]
+        @test fa.sys.mu_se ≈ sqrt(sum(dot(g[t, :], Vf[t], g[t, :]) for t in 1:T)) / T
+        @test fa.fbd.mu_se ≈
+              [sqrt(sum(g[t, k]^2 * Vf[t][k, k] for t in 1:T)) / T for k in axes(g, 2)]
+        @test all(isfinite, fa.fmbd.mu_se)
+    end
     @testset "The predicted decomposition answers the same axis" begin
         fa = factor_attribution(w, pr)
         @test length(fa.fbd.vol_contrib) == length(rr.nf)
         @test sum(fa.fbd.vol_contrib) ≈ fa.sys.vol_contrib
+    end
+end
+
+# A prior built by hand, with three assets and two factors, so every number of the predicted side
+# is checked against its closed form in the docstrings of `factor_attribution` and
+# `predicted_attribution_assets`, and not only against the identities it satisfies (#838).
+function fa_hand_prior(; T::Type = Float64, F = [0.04 0.006; 0.006 0.09])
+    B = T[1.0 0.5; 0.8 -0.2; 0.3 1.2]
+    b = T[0.001, -0.002, 0.0005]
+    F = T.(F)
+    muf = T[0.01, 0.02]
+    D = T[0.01, 0.02, 0.015]
+    rng = StableRNG(838)
+    fpr = LowOrderPrior(; X = randn(rng, T, 10, 2), mu = muf, sigma = F)
+    rr = PortfolioOptimisers.Regression(; M = B, b = b, esigma = D)
+    return LowOrderPrior(; X = randn(rng, T, 10, 3), mu = B * muf + b,
+                         sigma = B * F * transpose(B) + Diagonal(D), rr = rr, fpr = fpr)
+end
+
+@testset "The predicted side reproduces its closed forms" begin
+    PO = PortfolioOptimisers
+    pr = fa_hand_prior()
+    B, b, F, muf, D = pr.rr.M, pr.rr.b, pr.fpr.sigma, pr.fpr.mu, Diagonal(pr.rr.esigma)
+    w = [0.5, 0.3, 0.2]
+    p = 12
+    fa = factor_attribution(w, pr; assets = true, ppy = p)
+    g = transpose(B) * w
+    sP = sqrt(dot(w, pr.sigma, w))
+    sS2, sI2 = dot(g, F, g), dot(w, D, w)
+    SM = B * F * transpose(B) + D
+    @testset "The three components and the total" begin
+        @test fa.sys.vol ≈ sqrt(p * sS2)
+        @test fa.sys.vol_contrib ≈ sqrt(p) * sS2 / sP
+        @test fa.sys.pct_var ≈ sS2 / sP^2
+        @test fa.sys.mu_contrib ≈ p * dot(g, muf)
+        @test fa.sys.corr ≈ sqrt(sS2) / sP
+        @test fa.idio.vol ≈ sqrt(p * sI2)
+        @test fa.idio.vol_contrib ≈ sqrt(p) * sI2 / sP
+        @test fa.idio.mu_contrib ≈ p * dot(w, b)
+        @test fa.idio.corr ≈ sqrt(sI2) / sP
+        # The prior's covariance is the model's, so the gap is at rounding level.
+        @test abs(fa.unattr.vol_contrib) < 1e-15
+        @test abs(fa.unattr.mu_contrib) < 1e-15
+        @test fa.total.vol ≈ sqrt(p) * sP
+        @test fa.total.mu_contrib ≈ p * dot(w, pr.mu)
+    end
+    @testset "The factor axis" begin
+        Fg = F * g
+        @test fa.fbd.exposure ≈ g
+        @test fa.fbd.vol ≈ sqrt.(p .* diag(F))
+        @test fa.fbd.corr ≈ Fg ./ (sqrt.(diag(F)) .* sP)
+        @test fa.fbd.vol_contrib ≈ sqrt(p) .* g .* Fg ./ sP
+        @test fa.fbd.pct_var ≈ g .* Fg ./ sP^2
+        @test fa.fbd.mu_contrib ≈ p .* g .* muf
+    end
+    @testset "The asset axis and the asset-by-factor matrices" begin
+        vol = sqrt.(diag(SM))
+        @test fa.abd.vol ≈ sqrt(p) .* vol
+        @test fa.abd.corr ≈ (SM * w) ./ (vol .* sP)
+        @test fa.abd.vol_contrib ≈ sqrt(p) .* w .* (SM * w) ./ sP
+        @test fa.abd.sys_vol_contrib ≈ sqrt(p) .* w .* (B * F * g) ./ sP
+        @test fa.abd.idio_vol_contrib ≈ sqrt(p) .* w .* (D * w) ./ sP
+        @test fa.abd.pct_var ≈ w .* (SM * w) ./ sP^2
+        @test fa.abd.mu ≈ p .* (B * muf + b)
+        @test fa.abd.sys_mu_contrib ≈ p .* w .* (B * muf)
+        @test fa.abd.idio_mu_contrib ≈ p .* w .* b
+        @test fa.afc.vol_contrib ≈
+              [sqrt(p) * w[i] * B[i, k] * (F * g)[k] / sP for i in 1:3, k in 1:2]
+        @test fa.afc.mu_contrib ≈ [p * w[i] * B[i, k] * muf[k] for i in 1:3, k in 1:2]
+    end
+    @testset "The correlations are those of the model, measured on a simulated history" begin
+        rng = StableRNG(838_001)
+        T = 200_000
+        fs = cholesky(F).L * randn(rng, 2, T) .+ muf
+        es = sqrt.(pr.rr.esigma) .* randn(rng, 3, T)
+        R = B * fs .+ b .+ es
+        rp = vec(transpose(w) * R)
+        # The sampling error of a correlation is about 1 / sqrt(T), which is 0.0022.
+        @test isapprox(cor(vec(transpose(g) * fs), rp), fa.sys.corr; atol = 5e-3)
+        @test isapprox(cor(vec(transpose(w) * es), rp), fa.idio.corr; atol = 5e-3)
+        @test isapprox([cor(fs[k, :], rp) for k in 1:2], fa.fbd.corr; atol = 5e-3)
+        @test isapprox([cor(R[i, :], rp) for i in 1:3], fa.abd.corr; atol = 5e-3)
+    end
+    @testset "A factor with no volatility has no correlation" begin
+        fz = factor_attribution(w, fa_hand_prior(; F = [0.04 0.0; 0.0 0.0]))
+        @test isnan(fz.fbd.corr[2])
+        @test iszero(fz.fbd.vol[2])
+        @test isfinite(fz.fbd.corr[1])
+        @test isnan(PO.attribution_safe_corr(0.1, 0.0, 0.2))
+        @test isnan(PO.attribution_safe_corr(0.1, NaN, 0.2))
+    end
+    @testset "Integer weights and an integer ppy keep the float type of the data" begin
+        fi = factor_attribution([1, 0, 0], pr)
+        @test fi.total.vol ≈ sqrt(pr.sigma[1, 1])
+        @test fi.sys.mu_contrib ≈ dot(B[1, :], muf)
+        f32 = factor_attribution(Float32[0.5, 0.3, 0.2], fa_hand_prior(; T = Float32);
+                                 assets = true)
+        # The default `ppy = 1` is an `Int`, and its bare square root is a `Float64`. The scale
+        # takes the data's type, so no volatility is widened past the correlations beside it.
+        for x in (f32.total.vol, f32.sys.vol, f32.sys.vol_contrib, f32.unattr.vol_contrib,
+                  f32.sys.corr, f32.unattr.vol, f32.total.mu_contrib)
+            @test isa(x, Float32)
+        end
+        for v in (f32.fbd.vol, f32.fbd.vol_contrib, f32.abd.vol, f32.abd.vol_contrib,
+                  f32.afc.vol_contrib)
+            @test eltype(v) == Float32
+        end
+        @test PO.attribution_scale(252, 1.0f0).s2 === sqrt(252.0f0)
+        @test PO.attribution_scale(252).s2 === sqrt(252)
+        @test PO.attribution_scale(12.0, 1.0f0).s2 === sqrt(12.0)
     end
 end

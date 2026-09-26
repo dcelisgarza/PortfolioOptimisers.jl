@@ -73,14 +73,11 @@ function DBHTs(D::MatNum, S::MatNum; branchorder::Symbol = :optimal,
 
     Mb = Mb[1:size(CliqList, 1), :]
 
-    sRpm = size(Rpm, 1)
-    Mv = SparseArrays.spzeros(Int, sRpm, 0)
-
+    sRpm = size(Rpm, 1)::Int
     nMb = size(Mb, 2)
+    Mv = SparseArrays.spzeros(Int, sRpm, nMb)
     for n in axes(Mb, 2)
-        vc = SparseArrays.spzeros(Int, sRpm)
-        vc[sort!(unique(CliqList[Mb[:, n] .!= 0, :]))] .= 1
-        Mv = hcat(Mv, vc)
+        Mv[sort!(unique(CliqList[@view(Mb[:, n]) .!= 0, :])), n] .= 1
     end
 
     Adjv, T8 = BubbleCluster8s(Rpm, Dpm, Hb, Mb, Mv, CliqList)
@@ -90,8 +87,8 @@ function DBHTs(D::MatNum, S::MatNum; branchorder::Symbol = :optimal,
 
     n = size(Z, 1)
     hmer = Clustering.HclustMerges{eltype(D)}(n + 1)
-    resize!(hmer.mleft, n) .= Int.(Z[:, 1])
-    resize!(hmer.mright, n) .= Int.(Z[:, 2])
+    resize!(hmer.mleft, n) .= Int.(@view(Z[:, 1]))
+    resize!(hmer.mright, n) .= Int.(@view(Z[:, 2]))
     resize!(hmer.heights, n) .= Z[:, 3]
 
     if branchorder == :barjoseph || branchorder == :optimal

@@ -326,4 +326,65 @@ using Statistics
                                                                        [2, 0, 1]),
                              [6.0, NaN, 5.0])
     end
+
+    @testset "the kernels against their definitions" begin
+        # The autocorrelation is the Pearson correlation of the two halves, each centred on
+        # its own mean, so `Statistics.cor` of the halves is an independent oracle.
+        ac = PortfolioOptimisers.factor_summary_autocorrelation(fA)
+        for k in (1, 3)
+            @test isapprox(ac[k], Statistics.cor(fA[1:(end - 1), k], fA[2:end, k]))
+        end
+        # The cross-sectional variance is uncorrected, over the exposures that are not NaN.
+        for t in 1:TA, k in 1:KA
+            b = filter(!isnan, MsA[t, :, k])
+            @test isapprox(PortfolioOptimisers.factor_summary_exposure_variance(MsA, t, k),
+                           Statistics.var(b; corrected = false))
+        end
+        # An infinite entry is present: it stays, and the mean of its column is infinite.
+        A = [1.0 0.0; Inf 0.0; NaN 0.0]
+        @test PortfolioOptimisers.factor_summary_finite_column(A, 1) == [1.0, Inf]
+        @test PortfolioOptimisers.factor_summary_column_mean(A, 1) == Inf
+    end
+
+    @testset "a constant series and a constant cross-section" begin
+        # The rounded mean of equal values can differ from their common value, which left a
+        # volatility of about 1e-17 and a Sharpe ratio of about 1e17, an autocorrelation of
+        # +-1, and a variance of about 1e-34. Lengths 3 to 7 and values that do not divide
+        # exactly are the cases that exposed it.
+        for T in 2:9, c in (0.1, 0.01, 0.3, -0.07, 1e-3, 0.123456789, 2.5)
+            r, v, s = PortfolioOptimisers.factor_summary_return_stats(fill(c, T, 1), 252)
+            @test iszero(v[1])
+            @test isnan(s[1])
+            @test isnan(PortfolioOptimisers.factor_summary_autocorrelation(fill(c, T, 1))[1])
+        end
+        for N in 3:7, c in (0.1, 0.3, 1e8, 0.123456789)
+            @test iszero(PortfolioOptimisers.factor_summary_exposure_variance(fill(c, 1, N,
+                                                                                   1), 1,
+                                                                              1))
+        end
+        # A constant half alone leaves the coefficient without a value.
+        @test isnan(PortfolioOptimisers.factor_summary_autocorrelation(reshape([0.3, 0.3,
+                                                                                0.3, 0.5],
+                                                                               4, 1))[1])
+    end
+
+    @testset "an integer history" begin
+        # An integer series holds neither a mean nor a NaN, so it computes in floating point
+        # and gives the answers of the same series in Float64.
+        fi = [1 2; 3 5; 4 1; 2 2]
+        ri, vi, si = PortfolioOptimisers.factor_summary_return_stats(fi, 12)
+        rf, vf, sf = PortfolioOptimisers.factor_summary_return_stats(Float64.(fi), 12)
+        @test ri == rf && vi == vf && si == sf
+        @test eltype(ri) == Float64
+        @test PortfolioOptimisers.factor_summary_autocorrelation(fi) ==
+              PortfolioOptimisers.factor_summary_autocorrelation(Float64.(fi))
+        Mi = reshape([1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1], 2, 3, 2)
+        @test PortfolioOptimisers.factor_summary_exposure_variance(Mi, 1, 1) ≈ 2 / 9
+        @test PortfolioOptimisers.factor_summary_mapped([1, 2], [2, 0]) isa Vector{Float64}
+        # A Float32 history stays in Float32.
+        r32, v32, s32 = PortfolioOptimisers.factor_summary_return_stats(Float32.(fi), 12)
+        @test eltype(r32) == eltype(v32) == eltype(s32) == Float32
+        @test eltype(PortfolioOptimisers.factor_summary_autocorrelation(Float32.(fi))) ==
+              Float32
+    end
 end

@@ -413,10 +413,11 @@ function factory(tn::Turnover, w::VecNum)::Turnover
 end
 """
     turnover_constraints(tn::Option{<:Turnover}, args...; kwargs...)
+    turnover_constraints(tns::AbstractVector{<:Turnover}, ::Nothing, args...; kwargs...)
 
 Propagate or pass through turnover portfolio constraints.
 
-`turnover_constraints` returns the input [`Turnover`](@ref) object unchanged or `nothing`. This method is used to propagate already constructed turnover constraints, enabling composability and uniform interface handling in constraint generation workflows.
+`turnover_constraints` returns the input [`Turnover`](@ref) object unchanged or `nothing`. This method is used to propagate already constructed turnover constraints, enabling composability and uniform interface handling in constraint generation workflows. A vector of them with no universe is returned as it is, as a vector of [`LinearConstraint`](@ref) is; a vector that holds a [`TurnoverEstimator`](@ref) is refused by its owner's constructor before it reaches here.
 
 # Algorithm
 
@@ -453,6 +454,10 @@ Turnover
 function turnover_constraints(tn::Option{<:Turnover}, args...;
                               kwargs...)::Option{<:Turnover}
     return tn
+end
+function turnover_constraints(tns::AbstractVector{<:Turnover}, ::Nothing, args...;
+                              kwargs...)::AbstractVector{<:Turnover}
+    return tns
 end
 """
     const TnE_Tn = Union{<:Turnover, <:TurnoverEstimator}
@@ -725,7 +730,7 @@ function needs_previous_weights(tn::TnE_Tn)::Bool
     return !tn.fixed
 end
 function needs_previous_weights(tn::VecTnE_Tn)::Bool
-    return any(needs_previous_weights.(tn))
+    return any(needs_previous_weights, tn)
 end
 
 export TurnoverEstimator, Turnover, turnover_constraints

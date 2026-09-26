@@ -4,9 +4,17 @@
 
 Return the factor-model block truncated to its first `tb` observations.
 
-A member that computes no history is scored by refitting it at each evaluation date, and a refit at an observation may read nothing after it. This verb states what "before an observation" means for a block: every history the Return Forecast family reads is cut to the rows `1:tb`, and the loadings `M` follow the exposure history, whose last slice they are.
+[`forecast_history_refit`](@ref) refits a member that computes no history at each row of a grid, and the fit at a row must read nothing after that row. This function gives the block that such a fit reads. It cuts every history of the block to the rows `1:tb`, and it sets the loadings `M` to the last slice of the cut exposure history.
 
-The per-asset summaries `b` and `esigma` are carried unchanged, because they describe the assets rather than the observations and no Return Forecast Estimator reads either. The family re-basis `L` and its basis `fcb` are dropped, because a re-basis of the truncated block is not derivable from the block and an unset `L` reads back as `M`, which is the truthful statement that the prefix carries none. The prior's own fitted forecast `rf` is dropped for the same reason: its history would state the untruncated rows.
+The function keeps the per-asset summaries `b`, `esigma`, `edof` and `ediv` unchanged. They describe the assets and not the observations, and no Return Forecast Estimator reads either of them. The function drops the family re-basis `L`, its basis `fcb` and the fitted forecast `rf` of the prior. A re-basis of the truncated block does not follow from the block, and an unset `L` reads back as `M`. The history of `rf` covers the rows after `tb`.
+
+# Algorithm
+
+ 1. Cut the exposure history `Ms` to the rows `1:tb`, into `Mb`, when the block carries one.
+ 2. Take the last slice of `Mb` as the loadings `M`, or keep the loadings of the block when it carries no exposure history.
+ 3. Cut the factor returns `f`, the residuals `eps`, the counts `n` and the intercepts `b` of the cross-sectional fit `csr` to the rows `1:tb`.
+ 4. Cut the variance history `vs`, the regression weight history `rw` and the benchmark weight history `bw` to the rows `1:tb`.
+ 5. Build the block from these histories, with `b`, `esigma`, `edof`, `ediv`, `nf`, `fam` and `lag` unchanged, and with no `L`, `fcb` or `rf`.
 
 # Arguments
 
@@ -47,7 +55,8 @@ function forecast_history_block(csfm::CrossSectionalFactorModel,
                                                                   end)
                                      end, Ms = Mb,
                                      vs = isnothing(vs) ? nothing : vs[1:tb, :],
-                                     esigma = csfm.esigma,
+                                     esigma = csfm.esigma, edof = csfm.edof,
+                                     ediv = csfm.ediv,
                                      rw = isnothing(rw) ? nothing : rw[1:tb, :],
                                      bw = isnothing(bw) ? nothing : bw[1:tb, :],
                                      nf = csfm.nf, fam = csfm.fam, lag = csfm.lag)
@@ -59,9 +68,37 @@ end
 
 Build the history of a Return Forecast that computes none, by refitting it along the evaluation grid.
 
-A member that publishes only the latest cross-section states one row of the history per fit, so the path is the sequence of those rows. The grid is anchored at the block's first observation and strides by `step`, which is the grid [`forecast_evaluation_dates`](@ref) then scores on: its own stride is the same `step` and its first date is the first row of this grid that carries a finite pair, so every evaluation date is a row that was fitted. A row off the grid carries `NaN`.
+A member that publishes only the latest cross-section gives one row of the history per fit, so the history is the sequence of those rows. The grid starts at the first observation of the block and has a stride of `step`. A row off the grid carries `NaN`.
 
-The fit at observation `tb` sees the carrier through the row the block's observation `tb` sits on, and the block through its own row `tb`, so it reads nothing after the observation it answers for. The last observation of the block is the whole sample, and `mu` is already that fit, so the loop reuses it rather than repeating it.
+[`forecast_evaluation_dates`](@ref) scores on the same grid when the evaluation has the same `step`. A row off the grid carries no finite forecast, so the first evaluation date is a row of the grid, and each later date is a stride of `step` after it. So every evaluation date is a row at which the function fitted the member.
+
+The fit at row `t` of the block reads the carrier through the carrier row of that observation, and the block through its row `t`. It reads nothing after the observation that it forecasts. At the last row of the block the fit reads the whole sample, and `mu` is that fit. The function writes `mu` into the last row when the last row is on the grid, and does not fit the member again. When the last row is off the grid, it carries `NaN` as every other row off the grid does.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{\\alpha}_{t} &= \\begin{cases} \\hat{\\boldsymbol{\\mu}}^{(t)} & \\text{if } (t - 1) \\bmod s = 0\\,, \\\\ \\mathrm{NaN} & \\text{otherwise}\\,, \\end{cases} \\\\
+r_{t} &= T_{c} - T_{b} + t\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:alpha_t_fc])
+  - ``\\hat{\\boldsymbol{\\mu}}^{(t)}``: Forecast of the member fitted on the carrier rows ``1`` to ``r_{t}`` and on the block rows ``1`` to ``t``.
+  - ``r_{t}``: Carrier row of block row ``t``. The block is a suffix of the carrier, so ``r_{T_{b}} = T_{c}``, and ``\\hat{\\boldsymbol{\\mu}}^{(T_{b})}`` is the fit on the whole sample.
+  - ``s``: Number of observations between two refits.
+  - ``T_{c}``: Number of observations of the carrier.
+  - ``T_{b}``: Number of observations of the block, ``1 \\le t \\le T_{b}``.
+
+# Algorithm
+
+ 1. Find the carrier rows of the block with [`return_forecast_rows`](@ref), into `rows`, and their number, into `Tb`.
+ 2. Fill the history `hist`, `Tb × assets`, with `NaN` in the element type of `mu`.
+ 3. At each row `tb` of the grid `1:step:Tb`, cut the carrier to the rows `1:rows[tb]` with [`port_opt_view`](@ref).
+ 4. Cut the block to its rows `1:tb` with [`forecast_history_block`](@ref).
+ 5. Fit the member on the cut carrier and the cut block with [`return_forecast`](@ref), and write its forecast into row `tb` of `hist`. At `tb == Tb`, write `mu` and fit nothing.
 
 # Arguments
 
@@ -73,7 +110,7 @@ The fit at observation `tb` sees the carrier through the row the block's observa
 
 # Returns
 
-  - `hist::MatNum`: Return Forecast history, `observations × assets`, on the block's rows, `NaN` off the grid.
+  - `hist::MatNum`: Return Forecast history, `observations × assets`, on the rows of the block, in the element type of `mu`. A row off the grid carries `NaN`.
 
 # Related
 
@@ -108,30 +145,37 @@ end
 
 Return the history of a Return Forecast Estimator, refitting the member if it computes none.
 
-An evaluation scores a forecast at every date it holds, so it needs the whole path and not only the latest cross-section. Two of the four shipped members publish one: [`FixedWeightedReturnForecast`](@ref) composes its Descriptor scores observation by observation and [`ExpWeightedReturnForecast`](@ref) advances a recursion, so both carry `hist` and this verb hands it back. [`TargetReturnForecast`](@ref) fits one cross-section over the whole sample and publishes one row, so the path is built by refitting it along the evaluation grid through [`forecast_history_refit`](@ref).
+An evaluation scores a forecast at every date it holds, so it needs the forecast at each observation and not only the latest cross-section. Two of the four shipped members compute that history. [`FixedWeightedReturnForecast`](@ref) composes its Descriptor scores observation by observation, and [`ExpWeightedReturnForecast`](@ref) advances a recursion. Both carry `hist`, and this function returns it. [`TargetReturnForecast`](@ref) fits one cross-section over the whole sample and publishes one row, so [`forecast_history_refit`](@ref) builds its history by refitting it along the evaluation grid.
 
-The member is fitted once whatever it is, and its own Result says which of the two happens: a fitted Result that carries a history publishes the path already, and one that carries none is refitted. So a member added later needs no method here, and a member that publishes a history is never refitted behind the caller's back.
+The function fits the member once on the whole sample. When the Result carries a history, the function returns it and fits nothing more. When the Result carries none, the function starts the refit. So a member added later needs no method of this function, and a member that computes a history is fitted once.
 
 # The refit is the expensive path
 
-A member that carries no history costs one fit per evaluation date rather than one fit. A `TargetReturnForecast` that carries a [`CrossValidationEstimator`](@ref) in `cv` runs its whole cross-validation at each of them. `step` is what a caller trades against that cost, and passing it the evaluation's own `step` is what keeps the two grids aligned.
+A member that carries no history costs the first fit and one refit at each row of the grid, except the last row of the block. The grid holds every evaluation date. A `TargetReturnForecast` that carries a [`CrossValidationEstimator`](@ref) in `cv` runs its whole cross-validation at each of those fits. A larger `step` makes fewer fits. Pass the `step` of the evaluation, so that each evaluation date is a row of the grid.
+
+# Algorithm
+
+ 1. Check that `step` is at least one.
+ 2. Fit the member on the whole sample with [`return_forecast`](@ref), into `rf`.
+ 3. Return `rf.hist` when the Result carries a history.
+ 4. Otherwise build the history with [`forecast_history_refit`](@ref) from the forecast `rf.mu`, at the stride `step`.
 
 # Arguments
 
   - `rfe`: Return Forecast Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
   - `csfm`: The fitted factor-model block.
-  - `step`: Number of observations between two refits. A member that publishes its own history ignores it, because the history it publishes states every observation.
+  - `step`: Number of observations between two refits. A member that computes its own history ignores it, because that history gives every observation.
 
 # Validation
 
   - `step >= 1`. Raises a `DomainError`.
-  - [`CustomValueReturnForecast`](@ref) states its forecast rather than fitting one, so no refit can give it a path at any observation but the one it states. Raises a [`ConflictingArgumentError`](@ref).
+  - [`CustomValueReturnForecast`](@ref) states its forecast and fits nothing, so a refit gives the same values at every observation and no history of it exists. Raises a [`ConflictingArgumentError`](@ref), whatever `step` is.
   - The rules of [`return_forecast`](@ref) for the member.
 
 # Returns
 
-  - `hist::MatNum`: Return Forecast history, `observations × assets`, on the block's rows, in return units.
+  - `hist::MatNum`: Return Forecast history, `observations × assets`, on the rows of the block, in return units.
 
 # Related
 

@@ -4,14 +4,16 @@ Description = "Returns buffer state, public API of PortfolioOptimisers.jl: parti
 
 # Returns buffer state
 
-## The fold context of the online step
+## What an optimiser stores between updates
 
-An optimiser's online step forwards each observation to its prior and records the rest of the
-carrier in a [`PortfolioOptimisers.ReturnsBufferState`](@ref): the factor, benchmark and
-timestamp columns as buffers of their own, and the names and the static Asset Panel pinned by
-the first step. The returns are owned once, by the prior, and this state holds them only where
-no prior sits beneath the optimiser. [`PortfolioOptimisers.returns_result`](@ref) rebuilds the
-[`ReturnsResult`](@ref) a batch fit over the same observations would have read.
+When you update an optimiser with `partial_fit!`, it passes the asset returns to its prior. It
+stores the rest of the [`ReturnsResult`](@ref) in a [`PortfolioOptimisers.ReturnsBufferState`](@ref).
+The benchmark returns and the timestamps each go in a buffer of their own. The factor returns go in
+a buffer here only when the prior does not read them, or when the optimiser has no prior. The state
+also stores the asset names and the static asset panel of the first update. The prior holds
+the asset returns, and this state stores them only when the optimiser has no prior.
+[`PortfolioOptimisers.returns_result`](@ref) rebuilds the `ReturnsResult` that a batch fit over the
+same observations would read.
 
 ```@docs
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.ReturnsBufferState, rd::ReturnsResult; own_returns::Bool = false)

@@ -3,6 +3,9 @@
 # which is the mistake the stubs exist to name.
 struct UnimplementedPreprocessing <: PortfolioOptimisers.AbstractPreprocessingEstimator end
 struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreprocessingResult end
+# A price-level carrier that implements no `port_opt_view`, used to reach the fallback of
+# the family.
+struct BarePricesResult <: PortfolioOptimisers.AbstractPricesResult end
 # A Gap Return algorithm that ignores the invariant entirely and answers the whole column with
 # one sentinel. `apply_gap_return` reads back only the writable cells, so the invariant is the
 # driver's and not the algorithm's, and this is what proves it.
@@ -10,6 +13,13 @@ struct RogueGapReturn <: PortfolioOptimisers.AbstractGapReturnAlgorithm end
 function PortfolioOptimisers.gap_return(::RogueGapReturn, ::AbstractVector,
                                         r::AbstractVector, ::Symbol)
     return fill(-99.0, length(r))
+end
+# A Gap Return algorithm that drops the last cell, used to reach the length check of
+# `apply_gap_return`.
+struct ShortGapReturn <: PortfolioOptimisers.AbstractGapReturnAlgorithm end
+function PortfolioOptimisers.gap_return(::ShortGapReturn, ::AbstractVector,
+                                        r::AbstractVector, ::Symbol)
+    return r[1:(end - 1)]
 end
 include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 @testset "Tools tests" begin
@@ -287,8 +297,8 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                   size(panel_feature_matrix(rr3.pnl)[2], 1) ==
                   size(rr3.X, 1)
 
-            # Under collapse_args the aggregated period takes the features of the row at its
-            # representative timestamp -- last-observation semantics. The collapse is the
+            # Under collapse_args the aggregated period takes the features of the last row of
+            # its group -- last-observation semantics. The collapse is the
             # step that renumbers the observation, so `price_ingestion` is what projects the
             # panel onto the clock it emits; the conversion moves no clock and cuts only the
             # observation `padding` costs.
@@ -491,6 +501,87 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                                                                            nothing, ts)
     end
 
+    @testset "PricesResult and its views agree with their docstrings" begin
+        port_opt_view = PortfolioOptimisers.port_opt_view
+        ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 5))
+        Xv = [100.0 200 300; 101 201 301; 102 202 302; 103 203 303; 104 204 304]
+        X = TimeArray(ts, Xv, [:A, :B, :C])
+        iv = TimeArray(ts, repeat([0.1 0.2 0.3], 5), [:A, :B, :C])
+        B = TimeArray(ts, 10 .* Xv, [:bA, :bB, :bC])
+        span = trues(5, 3)
+        span[1, 3] = false
+        ivpa = [1.0, 2.0, 3.0]
+        pr = PricesResult(; X = X, iv = iv, B = B, ivpa = ivpa, span = span)
+
+        # The TimeArray fields are copies, the other fields can share memory with the
+        # parent, and two Colons return the parent itself.
+        v = port_opt_view(pr, 1:2, 1:2)
+        @test values(v.X) == Xv[1:2, 1:2]
+        v.ivpa[1] = 9.0
+        @test pr.ivpa[1] == 9.0
+        pr.ivpa[1] = 1.0
+        @test port_opt_view(pr, :, :) === pr
+
+        # Rows come back in clock order whatever the order of `i`, and a timestamp that
+        # `X` does not hold selects no row.
+        @test timestamp(port_opt_view(pr, [3, 1]).X) == ts[[1, 3]]
+        va = port_opt_view(pr, [ts[2], Date(2021, 1, 1)])
+        @test timestamp(va.X) == ts[[2]]
+        @test size(va.span) == (1, 3)
+        @test_throws PortfolioOptimisers.IsEmptyError port_opt_view(pr, [Date(2021, 1, 1)])
+
+        # `j` keeps the order it gives, on every field with an asset axis.
+        vr = port_opt_view(pr, :, [3, 1])
+        @test values(vr.X)[1, :] == [300.0, 100.0]
+        @test values(vr.iv)[1, :] == [0.3, 0.1]
+        @test string.(TimeSeries.colnames(vr.B)) == ["bC", "bA"]
+        @test vr.ivpa == [3.0, 1.0]
+        @test vr.span[1, :] == [false, true]
+
+        # A call shape that no method takes names itself, not a leaf helper.
+        msg(f) =
+            try
+                f()
+                ""
+            catch e
+                e isa ArgumentError ? sprint(showerror, e) : string(typeof(e))
+            end
+        m1 = msg(() -> port_opt_view(pr, 2))
+        @test occursin("PricesResult with the index argument type(s) (Int64)", m1)
+        @test occursin("port_opt_view(pr, observations, assets)", m1)
+        @test occursin("(UnitRange{Int64}, UnitRange{Int64}, Colon)",
+                       msg(() -> port_opt_view(pr, 1:2, 1:2, :)))
+        @test occursin("keyword argument(s) foo",
+                       msg(() -> port_opt_view(pr, 1:2; foo = 1)))
+        @test occursin("BarePricesResult",
+                       msg(() -> port_opt_view(BarePricesResult(), 1:2)))
+        # The fallback takes no call that a method of PricesResult takes.
+        @test !any(p -> p[1].name === :port_opt_view,
+                   Test.detect_ambiguities(PortfolioOptimisers))
+
+        # The constructor accepts an absent implied volatility, NaN or missing, and refuses
+        # a present value that is negative or infinite.
+        ivn = TimeArray(ts, [fill(NaN, 5) fill(0.2, 5) fill(0.3, 5)], [:A, :B, :C])
+        @test PricesResult(; X = X, iv = ivn) isa PricesResult
+        ivmv = Matrix{Union{Missing, Float64}}(fill(0.1, 5, 3))
+        ivmv[1, 1] = missing
+        ivm = TimeArray(ts, ivmv, [:A, :B, :C])
+        @test PricesResult(; X = X, iv = ivm) isa PricesResult
+        for bad in (Inf, -0.1)
+            ivb = TimeArray(ts, [fill(bad, 5) fill(0.2, 5) fill(0.3, 5)], [:A, :B, :C])
+            @test_throws DomainError PricesResult(; X = X, iv = ivb)
+        end
+        @test PortfolioOptimisers.assert_nonneg_where_present([0.0, -0.0, NaN, 1], :iv) ===
+              nothing
+        # The other raises of the Validation list.
+        @test_throws PortfolioOptimisers.IsEmptyError PricesResult(; X = X,
+                                                                   ivpa = Float64[])
+        @test_throws DomainError PricesResult(; X = X, ivpa = [1.0, -1.0, 1.0])
+        @test_throws DimensionMismatch PricesResult(; X = X, ivpa = [1.0, 1.0])
+        @test_throws DimensionMismatch PricesResult(; X = X, B = B[:bA, :bB])
+        @test_throws DimensionMismatch PricesResult(; X = X, span = trues(5, 2))
+    end
+
     @testset "the preprocessing interface refuses a half-implemented estimator" begin
         pr = PricesResult(;
                           X = TimeArray(collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 3)),
@@ -546,7 +637,6 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
     end
 
     @testset "the missing-data path on both axes" begin
-        find_complete_indices = PortfolioOptimisers.find_complete_indices
         is_missing_value = PortfolioOptimisers.is_missing_value
 
         # `missing` and `NaN` are the two conventions for an absent price, and one predicate
@@ -555,14 +645,6 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test is_missing_value(NaN)
         @test !is_missing_value(1.0)
         @test !is_missing_value("a")
-
-        # `dims = 1` reports the complete columns, `dims = 2` the complete rows. One entry
-        # is enough to remove the whole column or row.
-        Xm = [1.0 2.0 NaN; 4.0 missing 6.0]
-        @test find_complete_indices(Xm) == [1]
-        @test find_complete_indices(Xm; dims = 2) == Int[]
-        @test find_complete_indices([1.0 2.0; 3.0 4.0]) == [1, 2]
-        @test find_complete_indices([1.0 2.0; 3.0 4.0]; dims = 2) == [1, 2]
 
         # `MissingDataFilter` splits the two axes across the fit/apply seam: `col_thr`
         # selects the universe at fit time and `row_thr` drops rows at apply time.
@@ -644,9 +726,94 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test_throws PortfolioOptimisers.IsEmptyError fit_preprocessing(MissingDataFilter(;
                                                                                           col_thr = 0.5),
                                                                         allmissing)
-        # A window that carries none of the fitted universe is refused the same way.
+        # A window that carries none of the fitted universe is refused, and the message names
+        # the first fitted asset it lacks.
         other = PricesResult(; X = TimeArray(ts, Float64.(reshape(1:5, 5, 1)), [:zz]))
-        @test_throws PortfolioOptimisers.IsEmptyError apply_preprocessing(fitted, other)
+        @test_throws ArgumentError apply_preprocessing(fitted, other)
+    end
+
+    @testset "MissingDataFilter agrees with its docstrings" begin
+        share_at_most = PortfolioOptimisers.share_at_most
+        # A share is k / n in the type of the threshold. `100 * 0.29` is 28.999999999999996,
+        # so a test of k <= n * thr dropped 29 missing entries of 100 at 0.29.
+        @test all(k -> share_at_most(k, 100, k / 100), 0:100)
+        @test all(k -> share_at_most(k, 100, Float32(k / 100)), 0:100)
+        @test all(k -> !share_at_most(k + 1, 100, k / 100), 0:99)
+        @test share_at_most(1, 3, 1 // 3) && !share_at_most(2, 3, 1 // 3)
+        @test share_at_most(0, 7, 0) && !share_at_most(1, 7, 0) && share_at_most(7, 7, 1)
+
+        ts100 = collect(Date(2020, 1, 1):Day(1):(Date(2020, 1, 1) + Day(99)))
+        # A row with 29 of 100 assets missing has the share 0.29, so row_thr = 0.29 keeps it
+        # and row_thr = 0.28 drops it.
+        v = fill(1.0, 100, 100)
+        v[1, 1:29] .= NaN
+        pr = PricesResult(; X = TimeArray(ts100, v, Symbol.("a", 1:100)))
+        keep29 = apply_preprocessing(fit_preprocessing(MissingDataFilter(; row_thr = 0.29),
+                                                       pr), pr)
+        @test size(values(keep29.X), 1) == 100
+        drop28 = apply_preprocessing(fit_preprocessing(MissingDataFilter(; row_thr = 0.28),
+                                                       pr), pr)
+        @test TimeSeries.timestamp(drop28.X) == ts100[2:end]
+
+        # A column with 29 of 100 observations missing survives col_thr = 0.29 in Float64,
+        # Float32 and Rational, in the batch fit and in the online read-out alike.
+        w = fill(1.0, 100, 2)
+        w[1:29, 1] .= NaN
+        pc = PricesResult(; X = TimeArray(ts100, w, [:a, :b]))
+        for thr in (0.29, 0.29f0, 29 // 100)
+            mdf = MissingDataFilter(; col_thr = thr)
+            @test fit_preprocessing(mdf, pc).nx == [:a, :b]
+            stepped, _ = PortfolioOptimisers.partial_fit_transform(mdf, pc)
+            @test fit_preprocessing(stepped).nx == [:a, :b]
+        end
+        for thr in (0.28, 0.28f0, 28 // 100)
+            @test fit_preprocessing(MissingDataFilter(; col_thr = thr), pc).nx == [:b]
+        end
+
+        # The apply step replays the fitted universe by name, in the fitted order, and
+        # refuses a window that lacks a fitted asset.
+        t5 = ts100[1:5]
+        p3 = PricesResult(;
+                          X = TimeArray(t5,
+                                        [1.0 2.0 3.0; 1.1 2.1 3.1; 1.2 2.2 3.2;
+                                         1.3 2.3 3.3; 1.4 2.4 3.4], [:a, :b, :c]))
+        r3 = fit_preprocessing(MissingDataFilter(), p3)
+        swapped = PricesResult(; X = p3.X[[:c, :a, :b]])
+        out = apply_preprocessing(r3, swapped)
+        @test TimeSeries.colnames(out.X) == [:a, :b, :c]
+        @test values(out.X) == values(p3.X)
+        partial = PricesResult(; X = p3.X[[:a, :c]])
+        e = try
+            apply_preprocessing(r3, partial)
+        catch err
+            err
+        end
+        @test e isa ArgumentError
+        @test occursin("variable `b` not in asset universe", e.msg)
+
+        # A vector ivpa follows the kept columns when the carrier holds no iv series.
+        x = [NaN 1.0; NaN 2.0; NaN 3.0; 1.0 4.0; 2.0 5.0]
+        pv = PricesResult(; X = TimeArray(t5, x, [:a, :b]), ivpa = [1.0, 2.0])
+        av = apply_preprocessing(fit_preprocessing(MissingDataFilter(; col_thr = 0.5), pv),
+                                 pv)
+        @test TimeSeries.colnames(av.X) == [:b]
+        @test av.ivpa == [2.0]
+        @test size(prices_to_returns(av).X) == (4, 1)
+
+        # A window whose every observation the row filter drops is refused by name.
+        allgap = PricesResult(; X = TimeArray(t5, fill(NaN, 5, 2), [:a, :b]))
+        e = try
+            apply_preprocessing(fit_preprocessing(MissingDataFilter(; row_thr = 0.0), pv),
+                                allgap)
+        catch err
+            err
+        end
+        @test e isa PortfolioOptimisers.IsEmptyError
+        @test occursin("row_thr = 0.0 drops every observation", e.msg)
+
+        # Both thresholds are shares in [0, 1].
+        @test_throws DomainError MissingDataFilter(; col_thr = -0.1)
+        @test_throws DomainError MissingDataFilter(; row_thr = 1.1)
     end
 
     @testset "prices_to_returns filters neither axis" begin
@@ -900,6 +1067,59 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                           prices_to_returns(Zg; gap_return_alg = CatchUpGapReturn()).X)
             @test fit_preprocessing(ptr, pg) === ptr
         end
+
+        @testset "a zero price is not a gap, so its returns keep their values" begin
+            # #894. A zero price gives -1 (simple) or -Inf (log) on its own observation and
+            # Inf on the next. Both returns read two observed prices, so no algorithm can
+            # write them. The writable set once admitted every non-finite cell in the span,
+            # and `RogueGapReturn` overwrote the Inf with -99.
+            zts = Date(2020, 1, 1):Day(1):Date(2020, 1, 4)
+            pz = [10.0, 0.0, 12.0, 13.0]
+            Zz = TimeArray(zts, hcat(pz, [1.0, 2, 3, 4]), ["A", "B"])
+            base = prices_to_returns(Zz)
+            @test base.X[1:2, 1] == [-1.0, Inf]
+            @test prices_to_returns(Zz; ret_method = :log).X[1:2, 1] == [-Inf, Inf]
+            @test !any(PortfolioOptimisers.gap_return_writable(pz, base.X[:, 1]))
+            rogue = @test_logs (:info,) match_mode=:any prices_to_returns(Zz;
+                                                                          gap_return_alg = RogueGapReturn())
+            @test isequal(rogue.X, base.X)
+
+            # A zero price beside a gap. Only the two returns that read the gapped price
+            # are writable, and the -1 onto the zero price keeps its value.
+            pzg = [10.0, 0.0, NaN, 12.0]
+            Zzg = TimeArray(zts, hcat(pzg, [1.0, 2, 3, 4]), ["A", "B"])
+            rzg = prices_to_returns(Zzg).X[:, 1]
+            @test findall(PortfolioOptimisers.gap_return_writable(pzg, rzg)) == [2, 3]
+            @test isequal(prices_to_returns(Zzg; gap_return_alg = RogueGapReturn()).X[:, 1],
+                          [-1.0, -99.0, -99.0])
+        end
+
+        @testset "the catch-up value keeps the element type of the prices" begin
+            p32 = Float32[100, NaN, NaN, 110, 121, 133.1]
+            Z32 = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 6),
+                            hcat(p32, Float32[1, 2, 3, 4, 5, 6]), ["A", "B"])
+            r32 = prices_to_returns(Z32; gap_return_alg = CatchUpGapReturn())
+            @test eltype(r32.X) == Float32
+            @test findall(!isfinite, view(r32.X, :, 1)) == [1, 2]
+            @test r32.X[3, 1] ===
+                  PortfolioOptimisers.gap_return_value(:simple, 110.0f0, 100.0f0)
+            @test r32.X[3, 1] ≈ 110.0f0 / 100.0f0 - 1
+        end
+
+        @testset "an algorithm that returns the wrong length is refused" begin
+            @test_throws DimensionMismatch prices_to_returns(Zg;
+                                                             gap_return_alg = ShortGapReturn())
+        end
+    end
+    @testset "prices_to_returns validation" begin
+        vts = Date(2020, 1, 1):Day(1):Date(2020, 1, 4)
+        Xv = TimeArray(vts, [10.0 1.0; 11.0 2.0; 12.0 3.0; 13.0 4.0], ["A", "B"])
+        @test_throws ArgumentError prices_to_returns(Xv; ret_method = :foo)
+        @test_throws ArgumentError PricesToReturns(; ret_method = :foo)
+        # The implied volatilities must cover the returns clock.
+        ivv = TimeArray(Date(2021, 1, 1):Day(1):Date(2021, 1, 4), fill(0.2, 4, 2),
+                        ["A", "B"])
+        @test_throws ArgumentError prices_to_returns(PricesResult(; X = Xv, iv = ivv))
     end
     @testset "the conversion takes a carrier, and a bare table runs the layer" begin
         # Map #955, ADR 0133. A keyword survives on the conversion if and only if it changes
@@ -949,5 +1169,135 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                                                                              F = Fc[tsc[1:4]]))
         @test_throws ConflictingArgumentError prices_to_returns(PricesResult(; X = Xc,
                                                                              B = Fc[tsc[1:4]]))
+    end
+    @testset "the carrier views recover rows by timestamp and name the derived columns" begin
+        ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 6))
+        # The rows come back in the order of the selection, not sorted, as a Vector{Int}.
+        rows = PortfolioOptimisers.matched_row_indices(ts[[5, 2, 4]], ts)
+        @test rows == [5, 2, 4]
+        @test rows isa Vector{Int}
+        @test PortfolioOptimisers.matched_row_indices(Date[], ts) == Int[]
+        # A timestamp that appears twice in the clock matches its first position.
+        @test PortfolioOptimisers.matched_row_indices([ts[2]], ts[[1, 2, 2, 3]]) == [2]
+        # Both messages name the carriers that hold an axis on a clock, not the feature axis.
+        err = try
+            PortfolioOptimisers.matched_row_indices([Date(2019, 1, 1)], ts)
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("Asset Panel or Listing Span", err.msg)
+        @test occursin("2019-01-01", err.msg)
+        err = try
+            PortfolioOptimisers.matched_row_indices(nothing, ts)
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("Asset Panel or Listing Span", err.msg)
+
+        # A panel with its two masks and no Panel Field has an observation axis.
+        pm = AssetPanel(; pf = PortfolioOptimisers.AbstractPanelField[], amsk = trues(6, 3),
+                        emsk = trues(6, 3))
+        @test !PortfolioOptimisers.panel_is_static(pm)
+        @test PortfolioOptimisers.feature_row_indices(pm, ts[[6, 1]], ts) == [6, 1]
+        @test PortfolioOptimisers.panel_feature_names(pm) == String[]
+
+        # The names follow the column order of the derived Feature Matrix, observed masks
+        # after the values of their own field.
+        pnl = AssetPanel(;
+                         pf = [NumericPanelField(; name = "mcap", vals = [1.0, 2.0],
+                                                 omsk = [true, false]),
+                               TensorPanelField(; name = "beta", axis = "f",
+                                                labels = ["a", "b"],
+                                                vals = [1.0 2.0; 3.0 4.0],
+                                                omsk = trues(2, 2))])
+        @test PortfolioOptimisers.panel_feature_names(pnl) ==
+              ["mcap", "mcap::observed", "beta=a", "beta=b", "beta=a::observed",
+               "beta=b::observed"]
+        @test PortfolioOptimisers.panel_feature_names(pnl) == panel_feature_matrix(pnl)[1]
+
+        # The view cuts the label axis of a square tensor field only when it has the names.
+        @test isnothing(PortfolioOptimisers.panel_carrier_view(nothing, 1:2, 1:2, nothing))
+        sq = AssetPanel(;
+                        pf = [TensorPanelField(; name = "prox", axis = "asset",
+                                               labels = ["A", "B", "C"],
+                                               vals = [1.0 2.0 3.0; 4.0 5.0 6.0;
+                                                       7.0 8.0 9.0])])
+        @test panel_feature_matrix(PortfolioOptimisers.panel_carrier_view(sq, :, [2, 3],
+                                                                          ["A", "B", "C"])) ==
+              (["prox=B", "prox=C"], [5.0 6.0; 8.0 9.0])
+        @test panel_feature_matrix(PortfolioOptimisers.panel_carrier_view(sq, :, [2, 3],
+                                                                          nothing)) ==
+              (["prox=A", "prox=B", "prox=C"], [4.0 5.0 6.0; 7.0 8.0 9.0])
+        # A time-varying panel is cut on both axes, and a static one ignores the rows.
+        Z3 = reshape(Float64.(1:36), 6, 3, 2)
+        tv = PortfolioOptimisers.panel_carrier_view(matrix_panel(["f1", "f2"], Z3), [2, 5],
+                                                    [1, 3], nothing)
+        @test panel_feature_matrix(tv)[2] == Z3[[2, 5], [1, 3], :]
+        st = PortfolioOptimisers.panel_carrier_view(matrix_panel(["f1", "f2"], Z3[1, :, :]),
+                                                    [2, 5], [1, 3], nothing)
+        @test panel_feature_matrix(st)[2] == Z3[1, [1, 3], :]
+    end
+    @testset "the preprocessing family: its levels, its missing values and its stubs" begin
+        PO = PortfolioOptimisers
+        # `missing` and a `NaN` of any number type are missing. An infinity, a zero, a
+        # rational infinity and a value that is not a number are not, and the answer is a Bool.
+        for v in (missing, NaN, NaN32, big(NaN), complex(NaN, 0.0))
+            @test PO.is_missing_value(v) === true
+        end
+        for v in (Inf, -Inf, 0.0, 1, 1 // 0, nothing, "a", Date(2020, 1, 1), :x)
+            @test PO.is_missing_value(v) === false
+        end
+
+        # An estimator that reads and writes one level subtypes that level. The two that
+        # change the level or work at both subtype the root alone.
+        @test PriceGapFill <: PO.AbstractPricesPreprocessingEstimator
+        @test MissingDataFilter <: PO.AbstractPricesPreprocessingEstimator
+        @test PO.AbstractAssetSelector <: PO.AbstractReturnsPreprocessingEstimator
+        for T in (PricesToReturns, TrainTestSplit)
+            @test T <: PO.AbstractPreprocessingEstimator
+            @test !(T <: PO.AbstractPricesPreprocessingEstimator)
+            @test !(T <: PO.AbstractReturnsPreprocessingEstimator)
+        end
+        @test PriceGapFillResult <: PO.AbstractPricesPreprocessingResult
+        @test MissingDataFilterResult <: PO.AbstractPricesPreprocessingResult
+        @test AssetSelectorResult <: PO.AbstractReturnsPreprocessingResult
+        # A holdout applies to no other window, so its result is not a preprocessing result.
+        @test !(TrainTestSplitResult <: PO.AbstractPreprocessingResult)
+
+        pr = PricesResult(;
+                          X = TimeArray(collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 4)),
+                                        [1.0 2.0; 1.1 2.2; 1.2 2.1; 1.3 2.3], [:a, :b]))
+        # A stateless estimator is its own fitted object, and the conversion changes the level.
+        ptr = PricesToReturns()
+        @test fit_preprocessing(ptr, pr) === ptr
+        rd = apply_preprocessing(ptr, pr)
+        @test rd isa ReturnsResult
+        @test fit_preprocessing(TrainTestSplit(), pr) isa TrainTestSplitResult
+
+        # A pipeline runs a price-level estimator on the prices slot alone, and a fitted
+        # result of one level passes a window of the other level through with no change.
+        ctx = PO.PipelineContext(; prices = pr)
+        res, ctx′ = PO.run_step(MissingDataFilter(; col_thr = 0.0), ctx)
+        @test res isa MissingDataFilterResult
+        @test ctx′.prices isa PricesResult
+        @test isnothing(ctx′.returns)
+        @test PO.apply_fitted_step(res, rd) === rd
+        @test PO.apply_fitted_step(AssetSelectorResult([:a]), pr) === pr
+        # A direct subtype of the root with no step method of its own is refused.
+        @test_throws "is not steppable" PO.run_step(UnimplementedPreprocessing(), ctx)
+
+        # Both stubs name the type that does not implement the method.
+        msg(f) =
+            try
+                f()
+            catch e
+                e isa ArgumentError ? e.msg : rethrow()
+            end
+        @test occursin("UnimplementedPreprocessing subtypes AbstractPreprocessingEstimator",
+                       msg(() -> fit_preprocessing(UnimplementedPreprocessing(), pr)))
+        @test occursin("UnimplementedPreprocessingResult subtypes AbstractPreprocessingEstimator or AbstractPreprocessingResult",
+                       msg(() -> apply_preprocessing(UnimplementedPreprocessingResult(), pr)))
     end
 end

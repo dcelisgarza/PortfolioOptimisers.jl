@@ -763,3 +763,94 @@ end
               Matrix{Float64}(phylogeny_matrix(pl, rd.X).X) + I
     end
 end
+
+@testset "The docstrings of 09_AssetPanelEstimators.jl against numbers" begin
+    PO = PortfolioOptimisers
+    G = PO.Graphs
+    decays = (LinearDecay(), ExponentialDecay(; rate = 0.7), ReciprocalDecay(; power = 1.5),
+              NoDecay())
+    fdecay(::LinearDecay, d, B) = B + 1 - d
+    fdecay(::ExponentialDecay, d, B) = exp(-0.7 * d)
+    fdecay(::ReciprocalDecay, d, B) = (1 + d)^(-1.5)
+    fdecay(::NoDecay, d, B) = 1.0
+
+    # Integer returns hold a fractional score. Every decay under both separations threw
+    # `InexactError` on the element type `eltype(X)` except the two whose scores are
+    # integers under a hop count; each now gives the matrix of the Float64 copy.
+    Xi = round.(Int, rd.X .* 1000)
+    Xf = Float64.(Xi)
+    for dk in decays, sep in (HopCount(; n = 2), PathLength())
+        pl = NetworkEstimator(; sep = sep)
+        Zi = phylogeny_features(Proximity(; decay = dk), pl, Xi)
+        @test isa(Zi, Matrix{Float64})
+        @test Zi == phylogeny_features(Proximity(; decay = dk), pl, Xf)
+    end
+    Zi = phylogeny_features(Proximity(), CLE, Xi)
+    @test isa(Zi, Matrix{Float64})
+    @test Zi == phylogeny_features(Proximity(), CLE, Xf)
+    @test isa(proxmat(PhylogenyPanel(), nothing, Xi), Matrix{Float64})
+    # Every other type is kept.
+    @test isa(phylogeny_features(Proximity(; decay = ExponentialDecay()), NTE,
+                                 Float32.(rd.X)), Matrix{Float32})
+    @test isa(phylogeny_features(Proximity(), CLE, Float32.(rd.X)), Matrix{Float32})
+
+    # The graph form of `Proximity`, under a path length, against a Floyd-Warshall
+    # separation matrix of the same structure and each decay written out.
+    for dk in decays, dmx in (nothing, 0.5, 2.0)
+        sep = PathLength(; dmax = dmx)
+        pl = NetworkEstimator(; sep = sep)
+        g = PO.separation_graph(sep, pl, rd.X; dims = 1)
+        D = G.floyd_warshall_shortest_paths(g, G.weights(g)).dists
+        B = isnothing(dmx) ? maximum(D) : min(dmx, maximum(D))
+        ref = [D[i, k] <= B ? fdecay(dk, D[i, k], B) : 0.0 for i in 1:NA, k in 1:NA]
+        Z = phylogeny_features(Proximity(; decay = dk), pl, rd.X)
+        @test isapprox(Z, ref; rtol = 1e-14)
+        @test all(==(fdecay(dk, 0.0, B)), diag(Z))
+    end
+
+    # The partition form: one where two assets share a cluster, zero otherwise, whatever
+    # the algorithm.
+    cl = clusterise(CLE, rd.X)
+    asg = Clustering.cutree(cl.res; k = cl.k)
+    ref = [Float64(asg[i] == asg[k]) for i in 1:NA, k in 1:NA]
+    @test phylogeny_features(Proximity(), CLE, rd.X) == ref
+    @test phylogeny_features(Proximity(; decay = ExponentialDecay()), CLE, rd.X) == ref
+
+    # `PhylogenyPanel`'s table and the linear figures under the default one-hop budget,
+    # graded by the kernel on the path 1 - 2 - 3.
+    de = FeatureDistance()
+    d3 = Float64[0 1 2; 1 0 1; 2 1 0]
+    Z1 = PO._proximity_features(Proximity(), HopCount(), d3, 1, Float64)
+    @test Z1 == Float64[2 1 0; 1 2 1; 0 1 2]
+    D1 = distance(de, Z1)
+    @test round(D1[1, 3]; digits = 3) == 0.436
+    @test round(D1[1, 2]; digits = 3) == 0.239
+    Zn = PO._proximity_features(Proximity(; decay = NoDecay()), HopCount(), d3, 1, Float64)
+    @test Zn == Float64[0 1 0; 1 0 1; 0 1 0] + I
+    Dn = distance(de, Zn)
+    @test round(Dn[1, 3]; digits = 3) == 0.333
+    @test round(Dn[1, 2]; digits = 3) == 0.196
+    @test distance(de, Zn - I)[1, 3] == 0.0
+
+    # `expand_investable_loadings`: the rows on the mask are `L`, the rows off it are zero,
+    # and the observed mask is the mask, row for row.
+    rng = StableRNG(848)
+    for _ in 1:50
+        msk = BitVector(rand(rng, Bool, 9))
+        any(msk) || (msk[1] = true)
+        L = randn(rng, count(msk), 4)
+        vals, omsk = PO.expand_investable_loadings(L, msk)
+        if all(msk)
+            @test vals === L && isnothing(omsk)
+            continue
+        end
+        @test size(vals) == size(omsk) == (9, 4)
+        @test vals[msk, :] == L
+        @test all(iszero, vals[.!msk, :])
+        @test omsk == repeat(msk, 1, 4)
+    end
+    # A mask that holds every asset, and no mask at all, both give back `L` unexpanded.
+    L = randn(rng, 9, 4)
+    @test PO.expand_investable_loadings(L, trues(9)) === (L, nothing)
+    @test PO.expand_investable_loadings(L, nothing) === (L, nothing)
+end

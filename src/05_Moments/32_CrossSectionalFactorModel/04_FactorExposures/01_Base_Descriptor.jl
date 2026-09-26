@@ -137,7 +137,7 @@ function panel_field_values(rd::ReturnsResult, name::AbstractString)::Matrix{<:R
               ArgumentError("a Descriptor reads one number per observation and asset, so the Panel Field \"$name\" must be a NumericPanelField, got a $(nameof(typeof(f)))"))
     @argcheck(ndims(f.vals) == 2,
               DimensionMismatch("a Descriptor reads one number per observation and asset, so the Panel Field \"$name\" must be time-varying; this Asset Panel is static"))
-    Tf = typeof(one(eltype(f.vals)) / one(eltype(f.vals)))
+    Tf = float_if_integer(eltype(f.vals))
     V = Matrix{Tf}(f.vals)
     omsk = f.omsk
     if !isnothing(omsk)

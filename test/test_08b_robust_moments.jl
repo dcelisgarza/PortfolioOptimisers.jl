@@ -3,7 +3,7 @@ Regression tests for `robust_cov`/`robust_cor` keyword dispatch: unsupported key
 arguments are dropped via `hasmethod` dispatch rather than error-swallowing, so genuine
 errors thrown by the estimator propagate to the caller.
 =#
-using Test, PortfolioOptimisers, Statistics, StatsBase, LinearAlgebra, StableRNGs
+using Test, PortfolioOptimisers, Statistics, StatsBase, LinearAlgebra, StableRNGs, Clarabel
 
 struct KwargsCov <: StatsBase.CovarianceEstimator end
 function Statistics.cov(::KwargsCov, X::AbstractMatrix; dims::Int = 1, mean = nothing,
@@ -86,4 +86,58 @@ so the `MethodError` retry could not see it. The weighted seam densifies instead
           Statistics.cov(ce, X; dims = 1)
     pe = EntropyPoolingPrior(; alg = H1_EntropyPooling())
     @test prior(pe, permutedims(X); dims = 2).sigma ≈ prior(pe, X).sigma
+end
+
+# #1262: a field bound to `StatsBase.CovarianceEstimator` admits a bare estimator that the
+# library does not own. The library calls a nested estimator with its own keywords and with
+# an Asset Panel argument, which a `StatsBase` method refuses. Every bare spelling must
+# answer what its `GeneralCovariance` spelling answers.
+@testset "a bare StatsBase estimator nested in a library estimator (#1262)" begin
+    rng = StableRNG(1262)
+    X = 0.02 .* randn(rng, 30, 4)
+    sc = StatsBase.SimpleCovariance()
+    gc = GeneralCovariance(; ce = sc)
+    kw = (; iv = nothing, ivpa = nothing)
+    @test PortfolioOptimisers.library_covariance_estimator(gc) === gc
+    @test PortfolioOptimisers.library_covariance_estimator(sc) isa GeneralCovariance
+    pairs = ((Covariance(; ce = sc), Covariance(; ce = gc)),
+             (Covariance(; ce = sc, alg = SemiMoment()),
+              Covariance(; ce = gc, alg = SemiMoment())),
+             (CorrelationCovariance(; ce = sc), CorrelationCovariance(; ce = gc)),
+             (PortfolioOptimisersCovariance(; ce = sc),
+              PortfolioOptimisersCovariance(; ce = gc)),
+             (DenoiseCovariance(; ce = sc), DenoiseCovariance(; ce = gc)))
+    for (bare, wrapped) in pairs, f in (Statistics.cov, Statistics.cor)
+        @test f(bare, X; kw...) == f(wrapped, X; kw...)
+        @test f(bare, X, nothing; kw...) == f(wrapped, X, nothing; kw...)
+    end
+    # `ce.w` weights a library estimator and passes a bare one through unchanged, so the
+    # weighted bare spelling is its own estimator. The keywords must not move its answer.
+    bw = Covariance(; ce = sc, w = eweights(30, 0.1))
+    for f in (Statistics.cov, Statistics.cor)
+        @test f(bw, X; kw...) == f(bw, X)
+    end
+    @test prior(EmpiricalPrior(; ce = sc), X; kw...).sigma ==
+          prior(EmpiricalPrior(; ce = gc), X; kw...).sigma
+    for me in (ShrunkExpectedReturns, EquilibriumExpectedReturns,
+               StandardDeviationExpectedReturns, VarianceExpectedReturns)
+        @test mean(me(; ce = sc), X; kw...) == mean(me(; ce = gc), X; kw...)
+        @test mean(me(; ce = sc), X, nothing; kw...) ==
+              mean(me(; ce = gc), X, nothing; kw...)
+    end
+    # #1263: the two diagonal estimators called `std` and `var` on the bare estimator, which
+    # `StatsBase` does not define for a `CovarianceEstimator`.
+    d = LinearAlgebra.diag(Statistics.cov(sc, X))
+    @test vec(mean(VarianceExpectedReturns(; ce = sc), X)) ≈ d
+    @test vec(mean(StandardDeviationExpectedReturns(; ce = sc), X)) ≈ sqrt.(d)
+    @test prior(EmpiricalPrior(; me = StandardDeviationExpectedReturns(; ce = sc)), X).mu ≈
+          sqrt.(d)
+    rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false))
+    w = map((Covariance(; ce = sc), Covariance(; ce = gc))) do ce
+        pe = EmpiricalPrior(; ce = PortfolioOptimisersCovariance(; ce = ce))
+        return optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pe, slv = slv)), rd).w
+    end
+    @test w[1] == w[2]
 end

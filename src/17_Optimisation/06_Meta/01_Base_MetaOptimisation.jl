@@ -1,30 +1,109 @@
 """
-    abstract type SubPortfolioUniverse end
+$(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for a meta-optimiser's *sub-portfolio enumeration*: what a sub-portfolio is, and what it sees.
+Abstract supertype for the sub-portfolio enumeration of a meta-optimiser, which states what a sub-portfolio is and which assets it sees.
 
-A meta-optimiser solves one inner problem per sub-portfolio, predicts each sub-portfolio's returns, and hands the outer optimiser a synthetic universe with one asset per sub-portfolio. That is one module, and the two shipped meta-optimisers differ in exactly one respect, which this type names:
+A meta-optimiser solves one inner problem for each sub-portfolio, predicts the returns of each sub-portfolio, and gives the outer optimiser a synthetic universe with one asset for each sub-portfolio. One module does this for every meta-optimiser that owns an outer optimiser. The two meta-optimisers of the library differ in one respect only, and this type names it.
 
-  - [`NestedClustered`](@ref) enumerates **cluster index sets**. One inner optimiser is viewed onto each cluster, and every full-universe quantity — the Prior Result, the Fees — is viewed onto it too.
-  - [`Stacking`](@ref) enumerates **inner optimisers**. Each one sees the whole universe, so nothing is viewed.
+  - [`NestedClustered`](@ref) enumerates cluster index sets. It views its one inner optimiser onto each cluster, and it views every full-universe quantity, the Prior Result and the Fees, onto that cluster too.
+  - [`Stacking`](@ref) enumerates inner optimisers. Each one sees the whole universe, so the module views nothing.
 
-[`FullUniverse`](@ref) and [`ClusterUniverse`](@ref) declare the two. The module reads them back through [`sub_portfolio_predict`](@ref), [`sub_portfolio_view`](@ref) and [`fold_weight_matrix`](@ref), and a third meta-optimiser is a third declaration rather than a third copy of the module.
+[`FullUniverse`](@ref) and [`ClusterUniverse`](@ref) declare the two. The module reads them through the four methods below, so a third meta-optimiser needs a third subtype and no copy of the module.
+
+# Interfaces
+
+To implement a new sub-portfolio enumeration, subtype `SubPortfolioUniverse` and implement the following methods:
+
+  - `sub_portfolio_count(u::SubPortfolioUniverse, opti) -> Integer`: The number of sub-portfolios. `opti` is the inner optimiser field of the meta-optimiser.
+  - `sub_portfolio_predict(u::SubPortfolioUniverse, opti, i::Integer, rd::ReturnsResult, cv, ex) -> MultiPeriodPredictionResult`: The cross-validation prediction of sub-portfolio `i`, one [`cross_val_predict`](@ref) call. On the combinatorial path the call returns a [`PopulationPredictionResult`](@ref) instead.
+  - `sub_portfolio_view(u::SubPortfolioUniverse, x, i::Integer)`: The full-universe quantity `x`, a Prior Result or Fees or `nothing`, viewed onto sub-portfolio `i`.
+  - `fold_weight_matrix(predictions::VecMPredRes, u::SubPortfolioUniverse, f::Integer, na::Integer) -> Matrix`: The weights of every sub-portfolio in fold `f`, as an `assets × sub-portfolios` matrix over all `na` assets.
+
+## Arguments
+
+  - `u`: The sub-portfolio enumeration.
+  - `opti`: The inner optimiser field of the meta-optimiser.
+  - `i`: The index of the sub-portfolio.
+  - `rd`: The returns data of the meta-optimiser.
+  - `cv`: The cross-validation scheme, a copy that belongs to sub-portfolio `i`.
+  - `ex`: The FLoops executor.
+  - `x`: A Prior Result, Fees, or `nothing`.
+  - `predictions`: One prediction result for each sub-portfolio.
+  - `f`: The index of the fold.
+  - `na`: The number of real assets.
+
+## Returns
+
+  - `sub_portfolio_count`: The number of sub-portfolios.
+  - `sub_portfolio_predict`: The prediction result of sub-portfolio `i`.
+  - `sub_portfolio_view`: `x` viewed onto sub-portfolio `i`.
+  - `fold_weight_matrix`: The `assets × sub-portfolios` weight matrix of fold `f`.
+
+# Examples
+
+An enumeration that splits the assets into two halves. The fold-less prediction then returns the net return of each half's equal-weight portfolio.
+
+```jldoctest
+julia> struct Halves <: PortfolioOptimisers.SubPortfolioUniverse
+           n::Int
+       end
+
+julia> halves(u::Halves) = [1:(u.n ÷ 2), (u.n ÷ 2 + 1):(u.n)];
+
+julia> PortfolioOptimisers.sub_portfolio_count(::Halves, opti) = 2
+
+julia> function PortfolioOptimisers.sub_portfolio_view(u::Halves, x, i::Integer)
+           return PortfolioOptimisers.port_opt_view(x, halves(u)[i])
+       end
+
+julia> function PortfolioOptimisers.sub_portfolio_predict(u::Halves, opti, i::Integer,
+                                                          rd::ReturnsResult, cv, ex)
+           return cross_val_predict(opti, rd, cv; cols = halves(u)[i], ex = ex)
+       end
+
+julia> function PortfolioOptimisers.fold_weight_matrix(predictions, u::Halves, f::Integer,
+                                                       na::Integer)
+           W = zeros(na, 2)
+           for (i, cl) in enumerate(halves(u))
+               W[cl, i] = predictions[i].pred[f].res.w
+           end
+           return W
+       end
+
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\", \"C\", \"D\"],
+                          X = [0.5 0.25 -0.25 0.125; -0.5 0.75 0.25 0.375]);
+
+julia> res = [optimise(EqualWeighted(), PortfolioOptimisers.port_opt_view(rd, cl))
+              for cl in halves(Halves(4))];
+
+julia> W = [0.5 0.0; 0.5 0.0; 0.0 0.5; 0.0 0.5];
+
+julia> pr = prior(EmpiricalPrior(), rd);
+
+julia> PortfolioOptimisers.predict_outer_returns(nothing, nothing, Halves(4), rd, pr, nothing, W,
+                                                 res).X
+2×2 Matrix{Float64}:
+ 0.375  -0.0625
+ 0.125   0.3125
+```
 
 # Related
 
   - [`FullUniverse`](@ref)
   - [`ClusterUniverse`](@ref)
+  - [`sub_portfolio_count`](@ref)
   - [`sub_portfolio_predict`](@ref)
   - [`sub_portfolio_view`](@ref)
+  - [`fold_weight_matrix`](@ref)
   - [`predict_outer_returns`](@ref)
 """
 abstract type SubPortfolioUniverse end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Sub-portfolios are the inner optimisers, and each sees the whole universe. [`Stacking`](@ref)'s enumeration.
+Makes each inner optimiser a sub-portfolio that sees the whole universe.
 
-Nothing is viewed onto a sub-portfolio, and an inner weight vector is already full length — which is why the outer collapse pads nothing (see [`fold_weight_matrix`](@ref)).
+This is the enumeration of [`Stacking`](@ref). The module views nothing onto a sub-portfolio, and an inner weight vector already covers every asset, so [`fold_weight_matrix`](@ref) adds no zeros.
 
 # Related
 
@@ -36,9 +115,9 @@ struct FullUniverse <: SubPortfolioUniverse end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Sub-portfolios are cluster index sets, and each sees its own cluster. [`NestedClustered`](@ref)'s enumeration.
+Makes each cluster a sub-portfolio that sees only its own assets.
 
-One inner optimiser serves every sub-portfolio, viewed onto that sub-portfolio's assets, and an inner weight vector is as long as its cluster — which is why the outer collapse zero-pads it onto the full asset axis (see [`fold_weight_matrix`](@ref)).
+This is the enumeration of [`NestedClustered`](@ref). One inner optimiser serves every sub-portfolio, viewed onto the assets of that sub-portfolio, so an inner weight vector is as long as its cluster. [`fold_weight_matrix`](@ref) puts zeros at the other assets.
 
 # Fields
 
@@ -52,7 +131,7 @@ $(DocStringExtensions.FIELDS)
 """
 struct ClusterUniverse{T <: VecVecInt} <: SubPortfolioUniverse
     """
-    Asset indices of each sub-portfolio. They partition the universe, so a zero-padded column is the sub-portfolio's real weight on the full asset axis.
+    Asset indices of each sub-portfolio. They partition the universe, so a column with zeros at the other assets is the real weight of the sub-portfolio over the whole asset axis.
     """
     cls::T
 end
@@ -62,12 +141,12 @@ end
 
 Count the sub-portfolios.
 
-A [`FullUniverse`](@ref) enumerates the inner optimisers, so it has as many sub-portfolios as `opti` holds. A [`ClusterUniverse`](@ref) enumerates the clusters, and one inner optimiser serves them all.
+A [`FullUniverse`](@ref) enumerates the inner optimisers, so it has one sub-portfolio for each optimiser in `opti`. A [`ClusterUniverse`](@ref) enumerates the clusters, and one inner optimiser serves all of them.
 
 # Arguments
 
   - `u`: Sub-portfolio enumeration.
-  - `opti`: The meta-optimiser's inner optimiser field — a vector of optimisers for [`FullUniverse`](@ref), one optimiser for [`ClusterUniverse`](@ref).
+  - `opti`: The inner optimiser field of the meta-optimiser. It is a vector of optimisers for a [`FullUniverse`](@ref), and one optimiser for a [`ClusterUniverse`](@ref), which does not read it.
 
 # Returns
 
@@ -90,20 +169,20 @@ end
 
 Cross-validate sub-portfolio `i`.
 
-One [`cross_val_predict`](@ref) call, and the enumeration says which optimiser it runs and on which assets. A [`FullUniverse`](@ref) runs `opti[i]` and passes **no** `cols`: the sub-portfolio is the whole universe, and the arity that takes a precomputed [`OptimisationResult`](@ref) has no `cols` keyword at all, so a colon would be a `MethodError` rather than a no-op. A [`ClusterUniverse`](@ref) runs the one inner optimiser on `u.cls[i]`.
+The method makes one [`cross_val_predict`](@ref) call, and the enumeration selects the optimiser and the assets. A [`FullUniverse`](@ref) runs `opti[i]` and passes no `cols`. The sub-portfolio is the whole universe, and the method of `cross_val_predict` for a precomputed [`OptimisationResult`](@ref) has no `cols` keyword, so a colon there raises a `MethodError`. A [`ClusterUniverse`](@ref) runs the one inner optimiser on `u.cls[i]`.
 
 # Arguments
 
   - `u`: Sub-portfolio enumeration.
-  - `opti`: The meta-optimiser's inner optimiser field.
+  - `opti`: The inner optimiser field of the meta-optimiser.
   - `i`: Sub-portfolio index.
   - `rd`: Returns data.
-  - `cv`: Cross-validation scheme, already copied for this sub-portfolio.
-  - `ex`: FLoops executor controlling parallelism.
+  - `cv`: Cross-validation scheme, the copy that belongs to this sub-portfolio.
+  - `ex`: FLoops executor that controls parallelism.
 
 # Returns
 
-  - Sub-portfolio `i`'s cross-validation prediction result.
+  - The cross-validation prediction result of sub-portfolio `i`.
 
 # Related
 
@@ -126,7 +205,7 @@ end
 
 View a full-universe quantity onto sub-portfolio `i`.
 
-The quantities are the ones a sub-portfolio's predicted returns are computed from: the Prior Result and the Fees. A [`FullUniverse`](@ref) sub-portfolio holds the whole universe, so `x` is returned unchanged; a [`ClusterUniverse`](@ref) one restricts it through [`port_opt_view`](@ref).
+The quantities are the two that the predicted returns of a sub-portfolio read: the Prior Result and the Fees. A [`FullUniverse`](@ref) sub-portfolio holds the whole universe, so the method returns `x` unchanged. A [`ClusterUniverse`](@ref) sub-portfolio restricts `x` to its cluster through [`port_opt_view`](@ref).
 
 # Arguments
 
@@ -155,7 +234,9 @@ end
 
 Give one sub-portfolio its own copy of the cross-validation scheme.
 
-The sub-portfolios are cross-validated in parallel, so a scheme that draws its splits from a random number generator must not be shared: the generator is mutable state, and two sub-portfolios advancing it at once would neither reproduce nor agree on their folds. A scheme with no `rng` field carries no such state and is passed through.
+The module cross-validates the sub-portfolios in parallel. A scheme that draws its splits from a random number generator holds mutable state, and two sub-portfolios that advance one generator at the same time get different folds on each run. So the method copies a scheme that has an `rng` field, and each copy starts from the same state. It returns a scheme with no `rng` field unchanged.
+
+No scheme that [`OptimisationCrossValidation`](@ref) accepts has an `rng` field, so every scheme a meta-optimiser runs today takes the second branch. A scheme with an `rng` field must implement `Base.copy`.
 
 # Arguments
 
@@ -163,46 +244,74 @@ The sub-portfolios are cross-validated in parallel, so a scheme that draws its s
 
 # Returns
 
-  - `cv`, copied when it holds an `rng`.
+  - A copy of `cv` when it has an `rng` field, otherwise `cv` itself.
 
 # Related
 
-  - [`predict_outer_returns`](@ref)
+  - [`sub_portfolio_predictions`](@ref)
   - [`cross_val_predict`](@ref)
 """
 function sub_portfolio_cv(cv)
     return !hasfield(typeof(cv), :rng) ? cv : copy(cv)
 end
 """
-    outer_optimisation_finaliser(wb, wf, w_inner, w_outer)
+    outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
+                                 rco::OptimisationReturnCode, w::VecNum, wi::MatNum)
+    outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
+                                 rcos::VecOptRetCode, ws::VecVecNum, wi::MatNum)
 
-Finalise outer optimisation weights for the NCO algorithm.
+Combine the inner and outer weights of a meta-optimiser, and finalise them under its weight bounds.
 
-Combines inner cluster weights `w_inner` with outer portfolio weights `w_outer`, applying weight bounds `wb` and finalisation algorithm `wf`.
+The return code reports a failure at any of the three stages: an inner solve, the outer solve, and the finalisation of the combined weights.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{w} &= \\mathbf{W} \\boldsymbol{v}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: Combined weights over the ``N`` assets, before the finalisation.
+  - $(math_dict[:W_inner])
+  - $(math_dict[:v_outer]) [`Stacking`](@ref) passes the coefficients of [`combination_weights`](@ref) in its place.
+  - $(math_dict[:N])
+
+# Algorithm
+
+ 1. Combine the weights, giving `w = wi * w`.
+ 2. Finalise `w` with `wf` under `wb` through [`finalise_weight_bounds`](@ref), giving `retcode` and the finalised `w`.
+ 3. Read the return code of every inner result, giving `resi_retcodes`.
+ 4. When an inner return code, `rco` or `retcode` is an [`OptimisationFailure`](@ref), replace `retcode` with an `OptimisationFailure` whose `res` is `(; msg, opti, opto, wb)`. `msg` has one line for each stage that failed, in the order inner, outer, finalisation. `opti` is `resi_retcodes`, `opto` is `rco`, and `wb` is the return code of step 2.
+ 5. Return `(retcode, w)`. The method returns the weights of step 2 when a stage fails too.
+
+The method for an efficient frontier runs these steps once for each pair of `rcos` and `ws`.
 
 # Arguments
 
-  - `wb`: Weight bounds (optional).
+  - `wb`: Weight bounds over the ``N`` assets.
   - `wf`: Weight finaliser.
-  - `w_inner`: Inner (within-cluster) weights.
-  - `w_outer`: Outer (across-cluster) weights.
+  - `resi`: The results of the inner optimisations.
+  - `rco`: The return code of the outer optimisation.
+  - `w`: Outer weights, one entry for each sub-portfolio.
+  - `rcos`, `ws`: The return codes and outer weights of the points of an efficient frontier.
+  - `wi`: Inner weights, `assets × sub-portfolios`.
 
 # Returns
 
-  - `(retcode, w)`: Final combined portfolio weights and return code. On failure of any
-    sub-problem, `retcode` is an `OptimisationFailure` whose `res` is a named tuple
-    `(; msg, opti, opto, wb)` carrying the failure summary, the inner optimisation return
-    codes, the outer return code, and the weight-finalisation return code (including
-    their solver trial diagnostics).
+  - `(retcode, w)`: The return code and the finalised weights. The frontier method returns a vector of return codes and a vector of weight vectors.
 
 # Related
 
   - [`NestedClustered`](@ref)
+  - [`Stacking`](@ref)
+  - [`finalise_weight_bounds`](@ref)
   - [`WeightBounds`](@ref)
 """
-function outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFinaliser,
-                                      resi::VecOpt, rco::OptimisationReturnCode, w::VecNum,
-                                      wi::MatNum)
+function outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
+                                      rco::OptimisationReturnCode, w::VecNum, wi::MatNum)
     w = wi * w
     retcode, w = finalise_weight_bounds(wf, wb, w)
     wb_flag = isa(retcode, OptimisationFailure)
@@ -226,9 +335,8 @@ function outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFina
     end
     return retcode, w
 end
-function outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFinaliser,
-                                      resi::VecOpt, rcos::VecOptRetCode, ws::VecVecNum,
-                                      wi::MatNum)
+function outer_optimisation_finaliser(wb::WeightBounds, wf::WeightFinaliser, resi::VecOpt,
+                                      rcos::VecOptRetCode, ws::VecVecNum, wi::MatNum)
     retcode_w = [outer_optimisation_finaliser(wb, wf, resi, rco, w, wi)
                  for (rco, w) in zip(rcos, ws)]
     return map(x -> x[1], retcode_w), map(x -> x[2], retcode_w)
@@ -238,39 +346,54 @@ end
     combination_weights(scale::VecNum, w::VecNum)
     combination_weights(scale::VecNum, w::VecVecNum)
 
-Apply a Combination Weight to a meta-optimiser's outer weights.
+Apply a Combination Weight to the outer weights of a meta-optimiser.
 
-The outer optimiser decides how much of each sub-portfolio to hold. A Combination Weight is a *fixed* belief about the same quantity, so the two multiply: sub-portfolio `k` carries the coefficient `sₖ·vₖ`, and the coefficients are rescaled to the total the outer optimiser chose. Schur Complement Hierarchical Risk Parity blends its parameter bundles the same way; this is that shape, placed where a meta-optimiser that owns an *outer optimiser* can use it.
+The outer optimiser decides how much of each sub-portfolio to hold. A Combination Weight is a fixed belief about the same quantity, so the two multiply, and the method rescales the products to the total that the outer optimiser chose. Schur Complement Hierarchical Risk Parity blends its parameter bundles in the same way.
 
-## What the rescale buys
+The rescale makes only the ratios between the entries of a Combination Weight matter. A common factor cancels, so the weight needs no normalised form. Three cases give back `w` unchanged:
 
-Only the ratios between the entries of a Combination Weight carry meaning, and the rescale is what makes that true here — a common factor cancels, so the weight needs no normalised form of its own. Three cases are then exactly inert:
+  - a uniform weight, whatever its sum;
+  - a lone sub-portfolio, because one element is not a combination;
+  - an outer total other than one keeps its total, so the method does not overrule a `bgt` of `0.9`.
 
-  - A **uniform** weight gives back `w`, whatever it sums to.
-  - A **lone** sub-portfolio gives back `w`. One element is not a combination.
-  - An outer optimiser that chose a total other than one keeps it. Rescaling to one instead would silently overrule a `bgt` of `0.9`.
+The outer problem never sees the weight. A common factor on every synthetic return column moves the trade-off between return and risk of [`MaximumUtility`](@ref), so a uniform weight in the outer problem is not neutral. A weight in the outer problem also needs every [`predict_outer_returns`](@ref) method to apply it, and a method that drops it makes a cross-validated run disagree with a fold-less run.
 
-## Why the outer problem never sees the weight
+# Mathematical definition
 
-Scaling the synthetic return columns instead would break the weight on two counts:
+```math
+\\begin{align}
+c_k &= \\begin{cases}
+\\dfrac{s_k v_k}{\\sum_{j=1}^{K} s_j v_j} \\sum_{j=1}^{K} v_j & \\text{if } \\sum_{j=1}^{K} s_j v_j \\neq 0 \\text{ and } \\sum_{j=1}^{K} v_j \\neq 0\\,,\\\\
+s_k v_k & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
 
-  - A uniform weight would stop being neutral. A common rescale of every column moves [`MaximumUtility`](@ref)'s trade-off between return and risk, so the neutral setting would not be neutral.
-  - Every [`predict_outer_returns`](@ref) overload would have to re-apply it. A custom one would drop it silently, and the two cross-validation methods already did — so a cross-validated run would disagree with a fold-less one on what the weight means. `cv` is execution control and stays that way.
+Where:
 
-## Degenerate combinations
+  - $(math_dict[:c_k_comb])
+  - $(math_dict[:s_k_comb])
+  - $(math_dict[:v_outer])
+  - $(math_dict[:K_sub])
 
-The rescale factor is `sum(w) / sum(scale .* w)`, and it does not always exist. A zero denominator — a tilt that cancels a long-short outer allocation — makes it infinite or `NaN`; a zero numerator — a dollar-neutral outer allocation — makes it zero, which would collapse the portfolio. One test covers all three, and the tilted coefficients then stand unrescaled: finite, with their ratios intact. No scalar rescale can hold a zero total while tilting, so there is nothing better to return.
+The first case keeps the total, ``\\sum_k c_k = \\sum_k v_k``, and the ratios, ``c_k / c_j = s_k v_k / (s_j v_j)``. In the second case no scalar rescale can keep a zero total and apply the tilt at the same time, so the tilted products stand. They are finite and keep their ratios. A denominator near zero is not a degenerate case. The large factor is the correct rescale of a combination that nearly cancels.
 
-A denominator that is merely *near* zero is not degenerate. The large factor is the answer: the tilt genuinely rebalances a combination that nearly cancels. Should it overflow, [`finalise_weight_bounds`](@ref) reports an [`OptimisationFailure`](@ref) rather than a plausible-looking portfolio.
+# Algorithm
+
+ 1. Multiply the weight into the outer weights, giving `c = scale .* w`.
+ 2. Divide the two totals, giving the factor `f = sum(w) / sum(c)`.
+ 3. Return `c` when `f` is zero or not finite, otherwise `c * f`. A factor that overflows is not finite, so it takes the second case too.
+
+A `scale` of `nothing` returns `w`, and a frontier applies the steps to each point.
 
 # Arguments
 
-  - `scale`: Combination Weight, one entry per sub-portfolio, or `nothing`.
-  - `w`: Outer optimiser weights, one entry per sub-portfolio; a vector of them on an efficient frontier.
+  - `scale`: Combination Weight, one entry for each sub-portfolio, or `nothing`.
+  - `w`: Outer weights, one entry for each sub-portfolio, or a vector of them on an efficient frontier.
 
 # Returns
 
-  - `w` unchanged when `scale` is `nothing`, otherwise the rescaled coefficients.
+  - `w` when `scale` is `nothing`, otherwise the coefficients ``\\boldsymbol{c}``.
 
 # Related
 
@@ -294,32 +417,59 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Prepares the ReturnsResult for outer optimisation, applying the inner cluster weights `wi` to the returns matrix `rd.B`, and adjusting the independent variable matrices `rd.iv` and `rd.ivpa`, and the Feature Matrix derived from `rd.pnl`, accordingly.
+Prepare the returns data of the outer problem from the inner weights `wi`.
 
-!!! warning
+The method collapses every per-asset quantity of `rd` onto the synthetic assets, and it allocates the buffer that the caller fills with the synthetic returns. Benchmark returns are extensive and collapse as a weighted sum. The implied volatilities and the Asset Panel are intensive and collapse as convex combinations, so the gross exposure of a sub-portfolio does not scale them.
 
-    This function returns `pnl` in addition to the four values it returned before the Asset Panel was collapsed onto the synthetic universe, and it returns it **before** the returns buffer `X`. A custom [`predict_outer_returns`](@ref) overload written against the old tuple therefore breaks loudly — it binds `pnl` where it expects `X` and fails on the first write — rather than silently continuing to build an outer [`ReturnsResult`](@ref) with no panel and never learning that it should have one. Appending the value would not have done this: Julia's destructuring discards trailing values without complaint.
+Destructure all six returned values. Julia discards trailing values without an error, so a caller that names five binds `pnl` to the name it means for the buffer `X`, and its first write into that name fails.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{B}^{o} &= \\mathbf{B} \\mathbf{W}\\,,\\\\
+\\mathbf{V}^{o} &= \\mathbf{V} \\tilde{\\mathbf{W}}\\,,\\\\
+\\boldsymbol{a}^{o} &= \\tilde{\\mathbf{W}}^\\intercal \\boldsymbol{a}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{B}``, ``\\mathbf{B}^{o}``: Benchmark returns, `observations × assets` and `observations × sub-portfolios`. A benchmark that is not a matrix is kept as it is.
+  - ``\\mathbf{V}``, ``\\mathbf{V}^{o}``: Implied volatilities, `observations × assets` and `observations × sub-portfolios`.
+  - ``\\boldsymbol{a}``, ``\\boldsymbol{a}^{o}``: Implied volatility risk premium adjustment, one entry for each asset and one for each sub-portfolio. A scalar adjustment is kept as it is.
+  - $(math_dict[:W_inner])
+  - $(math_dict[:W_tilde_syn])
+
+A column of zeros in ``\\mathbf{W}`` gives a column of zeros in ``\\mathbf{V}^{o}`` and a zero entry in ``\\boldsymbol{a}^{o}``.
+
+# Algorithm
+
+ 1. When `rd.B` is a matrix, collapse it, giving `B = rd.B * wi`, and name its columns `nb = ["_b1", …]`. Otherwise keep `rd.B` and `rd.nb`.
+ 2. When `rd.iv` is present or `rd.ivpa` is a vector, normalise `wi` with [`synthetic_asset_weights`](@ref), giving `wn`. Collapse `iv = rd.iv * wn` when it is present, and `ivpa = transpose(wn) * rd.ivpa` when it is a vector.
+ 3. Collapse the Asset Panel with [`collapse_asset_panel`](@ref), giving `pnl`.
+ 4. Allocate the buffer `X`, `observations × sub-portfolios`, with the element type of `rd.X`.
 
 # Arguments
 
-  - `rd`: ReturnsResult containing the returns data.
-  - `wi`: Inner weights matrix.
+  - `rd`: The returns data of the meta-optimiser.
+  - `wi`: Inner weights, `assets × sub-portfolios`.
 
 # Returns
 
-  - `nb`: New names for the benchmark returns columns after applying inner weights (if `rd.B` is a matrix).
-  - `B`: Adjusted benchmarkreturns matrix after applying inner weights (if `rd.B` is a matrix).
-  - `iv`: Adjusted independent variable matrix (if present).
-  - `ivpa`: Adjusted independent variable per asset matrix (if present).
-  - `pnl`: Asset Panel collapsed onto the synthetic assets (if present), see [`collapse_asset_panel`](@ref).
-  - `X`: Buffer for the outer returns matrix.
+  - `nb`: Names of the benchmark columns.
+  - `B`: Benchmark returns.
+  - `iv`: Implied volatilities, or `nothing`.
+  - `ivpa`: Implied volatility risk premium adjustment, or `nothing`.
+  - `pnl`: Asset Panel over the synthetic assets, or `nothing`.
+  - `X`: Uninitialised buffer for the outer returns matrix.
 
 # Related
 
   - [`ReturnsResult`](@ref)
-  - [`NestedClustered`](@ref)
-  - [`Stacking`](@ref)
+  - [`predict_outer_returns`](@ref)
   - [`collapse_asset_panel`](@ref)
+  - [`synthetic_asset_weights`](@ref)
   - [`features_are_assets`](@ref)
 """
 function prepare_outer_rd(rd::ReturnsResult, wi::MatNum)
@@ -356,19 +506,30 @@ end
 """
     assert_fold_alignment(predictions) -> VecPredRes
 
-Assert that every sub-portfolio's fold `f` covers the same test period, and return the first sub-portfolio's folds.
+Check that fold `f` of every sub-portfolio covers the same observations, and return the folds of the first sub-portfolio.
 
-A meta-optimiser runs the *same* cross-validation scheme over the *same* returns result for every sub-portfolio, so fold `f` covers the same observations whichever sub-portfolio produced it. [`rebuild_returns_result`](@ref) has relied on that silently since long before it was stated — `reshape(X, :, N)` is only meaningful if the `N` stacked return vectors line up row for row — and the per-fold weight matrix it now assembles is only well defined if it holds. This makes the invariant explicit, and it matters most on the combinatorial path, where each sub-portfolio's `scorer` selects a path independently.
+A meta-optimiser runs the same cross-validation scheme over the same returns data for every sub-portfolio, so fold `f` covers the same observations for each of them. [`rebuild_returns_result`](@ref) needs this. Its `reshape(X, :, N)` lines up the `N` stacked return vectors row by row, and the weight matrix of a fold exists only when they agree. The check matters most on the combinatorial path, where the `scorer` of each sub-portfolio selects its path on its own.
 
-Folds are compared on their timestamps where the returns result has a clock, and on their observation counts where it does not — which is the strongest statement available in each case, and exactly the statement `reshape` needs.
+# Algorithm
+
+ 1. Read the folds of the first sub-portfolio, giving `pred1`, and their number `nf`.
+ 2. For each sub-portfolio, check that it has `nf` folds.
+ 3. For each fold, compare the timestamps with those of `pred1` when the returns data has a clock, and the number of return entries when it has none.
+
+The number of entries is the strongest check available without a clock, and it is the one `reshape` needs.
 
 # Arguments
 
-  - `predictions`: Vector of [`MultiPeriodPredictionResult`](@ref) objects, one per sub-portfolio.
+  - `predictions`: One [`MultiPeriodPredictionResult`](@ref) for each sub-portfolio.
+
+# Validation
+
+  - Every sub-portfolio has the same number of folds as the first, else `DimensionMismatch`.
+  - Fold `f` of every sub-portfolio has the timestamps of fold `f` of the first, or the same number of return entries when there are no timestamps, else `DimensionMismatch`.
 
 # Returns
 
-  - The first sub-portfolio's per-fold [`PredictionResult`](@ref) objects, which every other sub-portfolio now agrees with.
+  - The per-fold [`PredictionResult`](@ref) objects of the first sub-portfolio.
 
 # Related
 
@@ -398,55 +559,76 @@ end
 """
     fold_row_indices(rd, pred) -> VecVecInt
 
-Recover the rows of the original returns result each cross-validation fold covers.
+Find the rows of the original returns data that each cross-validation fold covers.
 
-The folds do not store their row indices, and they do not need to: [`port_opt_view`](@ref) slices `ts` with the very `test_idx` the fold was built from, so a fold's `rd.ts` *is* its slice of the original clock and [`feature_row_indices`](@ref) matches it straight back. Recovering rather than storing is what keeps this correct on the combinatorial path, where [`sort_predictions!`](@ref) assembles a path's folds in split order rather than chronologically: the timestamps carry whatever order actually happened, while a re-derived split would have to reproduce it.
+The folds do not store their row indices. [`port_opt_view`](@ref) slices `ts` with the `test_idx` of the fold, so the `rd.ts` of a fold is its slice of the original clock, and [`feature_row_indices`](@ref) finds the rows from it. This works on the combinatorial path too, where [`sort_predictions!`](@ref) puts the folds of a path in split order and not in time order. The timestamps carry the order that the folds have.
 
-Only a **time-varying** feature matrix needs this — a static one has no observation axis to slice — which is why the clock is required exactly there and nowhere else.
+Only a time-varying Asset Panel needs the rows. A static panel has no observation axis, so only the time-varying shape needs the clock.
 
 # Arguments
 
-  - `rd`: Original [`ReturnsResult`](@ref), whose `ts` is the clock a time-varying `rd.pnl`'s observation axis is parallel to.
-  - `pred`: Per-fold [`PredictionResult`](@ref) objects from one sub-portfolio.
+  - `rd`: The original [`ReturnsResult`](@ref). The observation axis of a time-varying `rd.pnl` is parallel to its `ts`.
+  - `pred`: The per-fold [`PredictionResult`](@ref) objects of one sub-portfolio.
+
+# Validation
+
+  - `rd.ts` is not `nothing`, else `IsNothingError`.
 
 # Returns
 
-  - One row-index vector per fold.
+  - One vector of row indices for each fold.
 
 # Related
 
   - [`feature_row_indices`](@ref)
-  - [`rebuild_asset_panel`](@ref)
+  - [`fold_feature_anchors`](@ref)
   - [`assert_fold_alignment`](@ref)
 """
 function fold_row_indices(rd::ReturnsResult, pred::VecPredRes)
     @argcheck(!isnothing(rd.ts),
-              IsNothingError("a time-varying feature matrix (Z) has its observation axis parallel to the returns result's timestamps, so collapsing it onto a meta-optimiser's synthetic assets fold by fold needs `ts` to say which observation of Z each fold's observations are. Got ts => nothing. Supply timestamps, or pass a static assets × features Z, which has no observation axis to align."))
+              IsNothingError("a time-varying Asset Panel holds its observation axis parallel to the returns result's timestamps, so collapsing it onto a meta-optimiser's synthetic assets fold by fold needs `ts` to find the rows of the panel that each fold covers. Got ts => nothing. Supply timestamps, or pass a static Asset Panel, which has no observation axis to align."))
     return [feature_row_indices(rd.pnl, p.rd.ts, rd.ts) for p in pred]
 end
 """
     fold_weight_matrix(predictions, u::FullUniverse, f, na)
     fold_weight_matrix(predictions, u::ClusterUniverse, f, na)
 
-Lay fold `f`'s sub-portfolio weights out as the `assets × sub-portfolios` matrix the outer collapse contracts against.
+Write the sub-portfolio weights of fold `f` as the `assets × sub-portfolios` matrix that the collapse of the Asset Panel reads.
 
-The sub-portfolio enumeration says which. A [`FullUniverse`](@ref)'s inner optimisers see the whole universe, so their weight vectors are already full length. A [`ClusterUniverse`](@ref)'s see one cluster each, so sub-portfolio `i`'s weights are zero-padded onto `u.cls[i]`. The padding invents nothing: the clusters partition the universe, so a padded column *is* the sub-portfolio's real weight on the full asset axis.
+# Mathematical definition
+
+```math
+\\begin{align}
+W_{ik} &= \\begin{cases}
+w^{(f)}_{k,i} & \\text{if } i \\in \\mathcal{C}_k\\,,\\\\
+0 & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``W_{ik}``: Entry of the weight matrix of fold ``f``, the weight of sub-portfolio ``k`` on asset ``i``.
+  - ``w^{(f)}_{k,i}``: Weight of sub-portfolio ``k`` on asset ``i`` in fold ``f``.
+  - ``\\mathcal{C}_k``: Assets of sub-portfolio ``k``. It is every asset for a [`FullUniverse`](@ref), and cluster ``k`` for a [`ClusterUniverse`](@ref).
+
+The clusters of a [`ClusterUniverse`](@ref) partition the assets, so a column is the real weight of its sub-portfolio over every asset.
 
 # Arguments
 
-  - `predictions`: Vector of [`MultiPeriodPredictionResult`](@ref) objects, one per sub-portfolio.
+  - `predictions`: One [`MultiPeriodPredictionResult`](@ref) for each sub-portfolio.
   - `u`: Sub-portfolio enumeration, a [`SubPortfolioUniverse`](@ref).
   - `f`: Fold index.
   - `na`: Number of real assets.
 
 # Returns
 
-  - An `assets × sub-portfolios` weight matrix.
+  - The `assets × sub-portfolios` weight matrix of fold `f`.
 
 # Related
 
   - [`SubPortfolioUniverse`](@ref)
-  - [`rebuild_returns_result`](@ref)
+  - [`rebuild_asset_panel`](@ref)
   - [`collapse_asset_panel`](@ref)
 """
 function fold_weight_matrix(predictions::VecMPredRes, ::FullUniverse, f::Integer,
@@ -468,44 +650,41 @@ function fold_weight_matrix(predictions::VecMPredRes, u::ClusterUniverse, f::Int
     return W
 end
 """
-    fold_asset_panel(pnl::Nothing, nx, wi, anchor) -> nothing
     fold_asset_panel(pnl::AssetPanel, nx, wi, anchor) -> AssetPanel
 
-Collapse the original [`AssetPanel`](@ref) onto a fold's synthetic universe, with an observation axis.
+Collapse the original [`AssetPanel`](@ref) onto the synthetic assets of one fold, with an observation axis.
 
-The collapse itself is [`collapse_asset_panel`](@ref), applied to the *original*, unsliced panel and the fold's weights. What the fold supplies differs by shape, and the anchor says which:
+The collapse is [`collapse_asset_panel`](@ref) of the original panel with the weights of the fold. The anchor of the fold depends on the shape of the panel:
 
-  - A **static** panel has no observation axis, so its anchor is the fold's observation count. Its one collapsed panel is lifted across them, because the collapse is a function of *this fold's* weights and is therefore constant within the fold and different in the next one — which is how a static source becomes genuinely time-varying at the outer problem.
-  - A **time-varying** panel is first cut to the fold's `rows` in the original clock, and comes back with an observation axis already. This is the only place a fold's absolute rows are needed, and [`fold_row_indices`](@ref) recovers them from the fold's timestamps.
+  - A static panel has no observation axis, so its anchor is the number of observations of the fold. The method repeats its one collapsed panel over them. The collapse depends on the weights of the fold, so it is constant in one fold and changes in the next, and the outer problem sees a time-varying panel.
+  - For a time-varying panel, the method first cuts the panel to the rows of the fold in the original clock, and the collapse keeps that observation axis. The anchor is those rows, and [`fold_row_indices`](@ref) finds them from the timestamps of the fold.
 
 # Algorithm
 
- 1. Return `nothing` when the carrier holds no panel.
- 2. For a static panel, collapse it and lift every field to the fold's observation count with [`panel_field_lift`](@ref), taking all-`true` universe masks.
- 3. For a time-varying panel, view the fold's rows with [`port_opt_view`](@ref) and collapse that view.
+ 1. For a static panel, collapse it, giving `c`, and lift every field of `c` to the `anchor` observations of the fold with [`panel_field_lift`](@ref). Both universe masks are all `true`.
+ 2. For a time-varying panel, view the rows `anchor` with [`port_opt_view`](@ref) and collapse that view.
+
+[`rebuild_asset_panel`](@ref) returns before this method when the returns data has no panel.
 
 # Arguments
 
-  - `pnl`: The original Asset Panel, unsliced, or `nothing`.
-  - `nx`: The carrier's asset names, or `nothing`. Read for the square case alone.
-  - `wi`: The fold's weights, assets × synthetic assets.
-  - `anchor`: The fold's observation count for a static panel, its absolute rows for a time-varying one.
+  - `pnl`: The original Asset Panel, not sliced.
+  - `nx`: The asset names of the returns data, or `nothing`. Only the square case reads them.
+  - `wi`: The weights of the fold, `assets × sub-portfolios`.
+  - `anchor`: The number of observations of the fold for a static panel, its rows for a time-varying one.
 
 # Returns
 
-  - `nothing`, or a time-varying Asset Panel over the fold's observations.
+  - A time-varying Asset Panel over the observations of the fold.
 
 # Related
 
   - [`collapse_asset_panel`](@ref)
   - [`fold_weight_matrix`](@ref)
-  - [`fold_row_indices`](@ref)
+  - [`fold_feature_anchors`](@ref)
   - [`rebuild_asset_panel`](@ref)
   - [`panel_field_lift`](@ref)
 """
-function fold_asset_panel(::Nothing, ::Any, ::MatNum, ::Any)
-    return nothing
-end
 function fold_asset_panel(pnl::AssetPanel, nx::Option{<:VecStr}, wi::MatNum, anchor)
     if panel_is_static(pnl)
         c = collapse_asset_panel(pnl, wi, nx)
@@ -517,21 +696,22 @@ function fold_asset_panel(pnl::AssetPanel, nx::Option{<:VecStr}, wi::MatNum, anc
     return collapse_asset_panel(port_opt_view(pnl, anchor, :, nx), wi, nx)
 end
 """
-    panel_field_stack(fs::AbstractVector) -> AbstractPanelField
+    panel_field_stack(fs::AbstractVector{<:NumericPanelField}) -> NumericPanelField
+    panel_field_stack(fs::AbstractVector{<:TensorPanelField}) -> TensorPanelField
 
-Stack one Panel Field's fold-by-fold collapses along the observation axis.
+Stack the collapses of one Panel Field over the folds, along the observation axis.
 
-Every fold collapses the same source field onto the same synthetic universe, so the fold results agree on every axis but the observations, and the stack is a concatenation there. The observed masks stack with the values.
+Every fold collapses the same source field onto the same synthetic assets, so the fold results agree on every axis except the observations, and the stack concatenates them there. The observed masks stack with the values. [`collapse_panel_field`](@ref) turns a categorical field into a tensor field, so a fold result is never categorical.
 
 # Algorithm
 
  1. Concatenate the values of every fold along the observation axis.
- 2. Concatenate the observed masks the same way, or keep `nothing` when the field carries none.
- 3. Rebuild the field with its own keyword constructor, which re-runs every guard.
+ 2. Concatenate the observed masks in the same way, or keep `nothing` when the field carries none.
+ 3. Build the field again with its keyword constructor, which runs every check again.
 
 # Arguments
 
-  - `fs`: One collapsed Panel Field per fold, in fold order.
+  - `fs`: One collapsed Panel Field for each fold, in fold order.
 
 # Returns
 
@@ -551,15 +731,6 @@ function panel_field_stack(fs::AbstractVector{<:NumericPanelField})
                                  vcat((f.omsk for f in fs)...)
                              end)
 end
-function panel_field_stack(fs::AbstractVector{<:CategoricalPanelField})
-    return CategoricalPanelField(; name = fs[1].name, levels = fs[1].levels,
-                                 codes = vcat((f.codes for f in fs)...),
-                                 omsk = if isnothing(fs[1].omsk)
-                                     nothing
-                                 else
-                                     vcat((f.omsk for f in fs)...)
-                                 end)
-end
 function panel_field_stack(fs::AbstractVector{<:TensorPanelField})
     return TensorPanelField(; name = fs[1].name, axis = fs[1].axis, labels = fs[1].labels,
                             groups = fs[1].groups,
@@ -573,18 +744,18 @@ end
 """
     fold_feature_anchors(rd, pred)
 
-Give each fold whatever [`fold_asset_panel`](@ref) needs from it: an observation count for a static panel, absolute rows for a time-varying one.
+Give each fold the anchor that [`fold_asset_panel`](@ref) needs: the number of observations for a static panel, and the rows for a time-varying one.
 
-Scoping the row recovery to the shape that needs it is what keeps the clock requirement narrow. A static panel has no observation axis to align, so it runs on fold sizes alone and never asks the returns result for timestamps.
+Only a time-varying panel needs rows, so only that shape asks the returns data for timestamps. A static panel runs on the fold sizes alone.
 
 # Arguments
 
-  - `rd`: Original [`ReturnsResult`](@ref).
-  - `pred`: Per-fold [`PredictionResult`](@ref) objects from one sub-portfolio.
+  - `rd`: The original [`ReturnsResult`](@ref).
+  - `pred`: The per-fold [`PredictionResult`](@ref) objects of one sub-portfolio.
 
 # Returns
 
-  - One anchor per fold: an `Integer` for a static panel, a row-index vector for a time-varying one.
+  - One anchor for each fold: an `Integer` for a static panel or no panel, a vector of row indices for a time-varying one.
 
 # Related
 
@@ -601,22 +772,29 @@ end
 """
     rebuild_asset_panel(rd, predictions, u, pred1)
 
-Recompute the outer problem's [`AssetPanel`](@ref) at the cross-validation assembly seam.
+Compute the [`AssetPanel`](@ref) of the outer problem on the cross-validated path.
 
-Per fold, this makes the *same* [`collapse_asset_panel`](@ref) call [`prepare_outer_rd`](@ref) makes on the non-cross-validated path — same asset names, same weight-matrix arity, same original panel — and stacks the results down the observation axis. That shared call is the whole point: `cv` is execution control, so toggling it must not change what the outer optimiser measures.
+For each fold, the method makes the same [`collapse_asset_panel`](@ref) call that [`prepare_outer_rd`](@ref) makes on the fold-less path, with the same asset names and the same original panel, and the weights of that fold. Thus `cv`, which controls execution only, does not change what the outer optimiser measures.
 
-The stacked panel is time-varying by construction, and takes all-`true` universe masks: the fold panels describe disjoint observation windows of one synthetic universe, and a synthetic asset exists in every one of them.
+The stacked panel is time-varying, and both of its universe masks are all `true`. The fold panels cover disjoint windows of one synthetic universe, and each synthetic asset exists in every window.
+
+# Algorithm
+
+ 1. Return `nothing` when `rd` carries no panel.
+ 2. For each fold, build its weight matrix with [`fold_weight_matrix`](@ref) and collapse the original panel with [`fold_asset_panel`](@ref) at the anchor from [`fold_feature_anchors`](@ref), giving `ps`.
+ 3. Stack each Panel Field over the folds with [`panel_field_stack`](@ref), giving `pf`.
+ 4. Count the observations of all folds, giving `nobs`, and build the panel with all-`true` masks of size `nobs × sub-portfolios`.
 
 # Arguments
 
-  - `rd`: Original [`ReturnsResult`](@ref), whose panel is collapsed unsliced.
-  - `predictions`: Vector of [`MultiPeriodPredictionResult`](@ref) objects, one per sub-portfolio.
+  - `rd`: The original [`ReturnsResult`](@ref). The method collapses its panel without slicing it first.
+  - `predictions`: One [`MultiPeriodPredictionResult`](@ref) for each sub-portfolio.
   - `u`: Sub-portfolio enumeration, a [`SubPortfolioUniverse`](@ref).
-  - `pred1`: The first sub-portfolio's folds, from [`assert_fold_alignment`](@ref) — every sub-portfolio agrees with them, so they define the fold boundaries.
+  - `pred1`: The folds of the first sub-portfolio, from [`assert_fold_alignment`](@ref). Every sub-portfolio agrees with them, so they set the fold boundaries.
 
 # Returns
 
-  - `pnl::Option{AssetPanel}`: The Asset Panel on the synthetic universe, or `nothing` when `rd` carries none.
+  - `pnl::Option{AssetPanel}`: The Asset Panel over the synthetic assets, or `nothing` when `rd` carries none.
 
 # Related
 
@@ -629,12 +807,13 @@ The stacked panel is time-varying by construction, and takes all-`true` universe
 """
 function rebuild_asset_panel(rd::ReturnsResult, predictions::VecMPredRes,
                              u::SubPortfolioUniverse, pred1::VecPredRes)
-    if isnothing(rd.pnl)
+    # A local, so the check below narrows it; a second read of the field would not be.
+    pnl = rd.pnl
+    if isnothing(pnl)
         return nothing
     end
     na = size(rd.X, 2)
-    ps = [fold_asset_panel(rd.pnl, rd.nx, fold_weight_matrix(predictions, u, f, na),
-                           anchor)
+    ps = [fold_asset_panel(pnl, rd.nx, fold_weight_matrix(predictions, u, f, na), anchor)
           for (f, anchor) in enumerate(fold_feature_anchors(rd, pred1))]
     #! A panel with no Panel Field is the ingestion layer's shape, and an untyped
     #! comprehension over no field answers a `Vector{Any}` the panel's constructor refuses,
@@ -649,29 +828,41 @@ end
 """
     rebuild_returns_result(rd, predictions, u)
 
-Reconstruct a returns result from cross-validation predictions.
+Build the returns data of the outer problem from the cross-validation predictions of the sub-portfolios.
 
-Combines individual fold predictions from `predictions` into a new `ReturnsResult` corresponding to the original data layout. `u` is the sub-portfolio enumeration — a [`ClusterUniverse`](@ref) for [`NestedClustered`](@ref), a [`FullUniverse`](@ref) for [`Stacking`](@ref) — and it is what says whether a fold's weight vectors need padding onto the full asset axis.
+Column `k` of the result is the out-of-sample prediction of sub-portfolio `k`, and its rows are the rows of the folds, in fold order. `u` is the sub-portfolio enumeration: a [`ClusterUniverse`](@ref) for [`NestedClustered`](@ref) and a [`FullUniverse`](@ref) for [`Stacking`](@ref). It states where the weights of a fold sit on the asset axis.
 
-!!! warning
+`u` is positional and has no default. With a full-universe default, a two-argument call still runs. That is correct for [`Stacking`](@ref), but for [`NestedClustered`](@ref) it writes the weights of every cluster to the wrong rows and gives a wrong Asset Panel with no error.
 
-    `u` is **positional and required**, not a keyword with a full-universe default. A default would let a stale two-argument call keep working: correct for [`Stacking`](@ref), and for [`NestedClustered`](@ref) silently writing every cluster's weights to the wrong rows — which yields not an error but a plausible-looking feature matrix. The one configuration that most needs the argument is the one a default would mis-serve, so the break is arranged to be loud.
+The folds carry no Asset Panel. The method collapses the original `rd.pnl` again for each fold, with the same [`collapse_asset_panel`](@ref) call as [`prepare_outer_rd`](@ref) makes on the fold-less path, and stacks the fold results along the observation axis (see [`rebuild_asset_panel`](@ref)). The stack has the `observations × assets × features` shape of a time-varying panel, and a [`FeatureDistance`](@ref) with its default [`LastObservation`](@ref) reads the collapse of the last fold. The inner solves still see the panel of their own cluster. The collapse of the original panel also serves a square panel under [`NestedClustered`](@ref). Its folds see the returns of one cluster each, so their own panels have different feature axes and do not stack.
 
-## The feature matrix
+# Algorithm
 
-The folds carry none. Instead, the collapse onto the synthetic universe is **recomputed here** from the Feature Matrix derived from the original, unsliced `rd.pnl`, using the same [`collapse_asset_panel`](@ref) call [`prepare_outer_rd`](@ref) makes on the non-cross-validated path — with `sq` from [`features_are_assets`](@ref) flowing through unchanged, and the per-fold `assets × sub-portfolios` weight matrix assembled from `pred[f].res.w` (see [`rebuild_asset_panel`](@ref)). The fold results stack down the observation axis, giving the `observations × assets × features` shape the time-varying carrier takes, and the outer optimiser's default [`LastObservation`](@ref) reduces them to the most recent fold's collapse.
+ 1. Copy the returns `X`, and `B` and `iv` when present, of the first prediction. Wrap its `ivpa` in a vector when present. Each prediction keeps the `ivpa` of its last fold as one number.
+ 2. Check the folds with [`assert_fold_alignment`](@ref), giving `pred1`.
+ 3. Append the returns, `iv` and `B` of every other prediction, and push its `ivpa`.
+ 4. Reshape the returns to `observations × sub-portfolios`, giving `X`.
+ 5. Check that the folds cover `size(X, 1)` observations, `nobs`.
+ 6. Build the Asset Panel with [`rebuild_asset_panel`](@ref), giving `pnl`.
+ 7. Reshape `B` and `iv` to `observations × sub-portfolios`, and name the benchmark columns `_b1`, `_b2`, ….
+ 8. Build the [`ReturnsResult`](@ref), with the asset names `_1`, `_2`, … and the factors and timestamps of the first prediction.
 
-The inner solves are untouched: each still sees its own cluster-sliced feature matrix. What the recompute buys is that `cv`, which is execution control, no longer changes what the outer problem measures — and it closes the one intersection where the matrix used to be dropped altogether, a square feature matrix under [`NestedClustered`](@ref), whose folds see cluster-sliced returns and so could never agree on a feature axis to stack.
+The method reads `predictions` and does not change them, so two calls on one vector give the same result.
 
 # Arguments
 
-  - `rd`: Original [`ReturnsResult`](@ref).
-  - `predictions`: Vector of [`MultiPeriodPredictionResult`](@ref) objects from cross-validation, one per sub-portfolio.
+  - `rd`: The original [`ReturnsResult`](@ref).
+  - `predictions`: One [`MultiPeriodPredictionResult`](@ref) for each sub-portfolio.
   - `u`: Sub-portfolio enumeration, a [`SubPortfolioUniverse`](@ref).
+
+# Validation
+
+  - The checks of [`assert_fold_alignment`](@ref).
+  - The folds of the first sub-portfolio cover as many observations as the stacked returns have rows, else `DimensionMismatch`.
 
 # Returns
 
-  - Rebuilt [`ReturnsResult`](@ref).
+  - The returns data of the outer problem, one synthetic asset for each sub-portfolio.
 
 # Related
 
@@ -734,22 +925,27 @@ end
 """
     sub_portfolio_predictions(::Type{T}, opti, u, rd, cv, ex) where {T}
 
-Cross-validate every sub-portfolio, in parallel, over the same returns result.
+Cross-validate every sub-portfolio in parallel, over the same returns data.
 
-One [`sub_portfolio_predict`](@ref) call per sub-portfolio, each on its own copy of the scheme (see [`sub_portfolio_cv`](@ref)). Every sub-portfolio therefore runs the *same* cross-validation over the *same* returns result, which is the invariant [`assert_fold_alignment`](@ref) states one level down.
+Every sub-portfolio runs the same cross-validation over the same returns data, which is the condition that [`assert_fold_alignment`](@ref) checks.
+
+# Algorithm
+
+ 1. Allocate one slot of type `T` for each of the [`sub_portfolio_count`](@ref) sub-portfolios, giving `predictions`.
+ 2. For each sub-portfolio `i`, in parallel under `ex`, give it its own scheme with [`sub_portfolio_cv`](@ref) and write the result of [`sub_portfolio_predict`](@ref) to `predictions[i]`.
 
 # Arguments
 
-  - `T`: Element type of the prediction vector — a [`MultiPeriodPredictionResult`](@ref) per sub-portfolio on the non-combinatorial path, a [`PopulationPredictionResult`](@ref) on the combinatorial one.
-  - `opti`: The meta-optimiser's inner optimiser field.
+  - `T`: Element type of the prediction vector. It is [`MultiPeriodPredictionResult`](@ref) on the non-combinatorial path and [`PopulationPredictionResult`](@ref) on the combinatorial one.
+  - `opti`: The inner optimiser field of the meta-optimiser.
   - `u`: Sub-portfolio enumeration, a [`SubPortfolioUniverse`](@ref).
   - `rd`: Returns data.
   - `cv`: Cross-validation scheme.
-  - `ex`: FLoops executor controlling parallelism.
+  - `ex`: FLoops executor that controls parallelism.
 
 # Returns
 
-  - One prediction result per sub-portfolio.
+  - One prediction result for each sub-portfolio.
 
 # Related
 
@@ -780,36 +976,64 @@ end
                           pr::AbstractPriorResult, fees::Option{<:Fees}, wi::MatNum,
                           resi::VecOpt)
 
-Predict a meta-optimiser's sub-portfolio returns as the outer problem's [`ReturnsResult`](@ref).
+Predict the returns of the sub-portfolios of a meta-optimiser as the [`ReturnsResult`](@ref) of the outer problem.
 
-One module serves every meta-optimiser that owns an outer optimiser. What varies between them is the sub-portfolio enumeration, which arrives as a [`SubPortfolioUniverse`](@ref) — [`NestedClustered`](@ref) passes a [`ClusterUniverse`](@ref), [`Stacking`](@ref) a [`FullUniverse`](@ref) — and nothing else here reads the meta-optimiser's own type.
+One module serves every meta-optimiser that owns an outer optimiser. The sub-portfolio enumeration is the only part that changes between them, and it arrives as `u`. [`NestedClustered`](@ref) passes a [`ClusterUniverse`](@ref) and [`Stacking`](@ref) a [`FullUniverse`](@ref). No method reads the type of the meta-optimiser.
 
-**Dispatch is on `cv`**, which is what chooses the prediction, and a custom cross-validation scheme is therefore an overload on that first argument:
+The methods dispatch on `cv`, which selects the prediction, so a custom cross-validation scheme is a method on the first argument:
 
-  - Fold-less. The sub-portfolios' own solves are already in `resi`, so each column of the synthetic universe is that solve's net returns, on the Prior Result and Fees viewed onto the sub-portfolio ([`sub_portfolio_view`](@ref)).
-  - Non-combinatorial cross-validation. Each sub-portfolio is cross-validated and the folds are stacked ([`rebuild_returns_result`](@ref)), so the outer problem is measured out of sample.
-  - Combinatorial cross-validation. As above, then each sub-portfolio's `scorer` selects one path from its population. The default is [`NearestQuantilePrediction`](@ref).
+  - Without folds, the column of each sub-portfolio is the net return of its own solve in `resi`, on the Prior Result and the Fees viewed onto it with [`sub_portfolio_view`](@ref).
+  - Non-combinatorial cross-validation predicts each sub-portfolio out of sample and stacks the folds with [`rebuild_returns_result`](@ref).
+  - Combinatorial cross-validation does the same, and first the `scorer` of the scheme selects one path from the population of each sub-portfolio. The default scorer is [`NearestQuantilePrediction`](@ref).
 
-`wi` holds the inner optimisers' own weights, and a Combination Weight is **not** applied to them and must not be applied here: it acts at the combination, after the outer solve, so that an overload cannot drop it and a cross-validated run cannot disagree with a fold-less one on what it means (see [`combination_weights`](@ref)).
+`wi` holds the weights of the inner optimisers alone. A Combination Weight acts at the combination after the outer solve, so no method applies it here (see [`combination_weights`](@ref)).
 
-!!! warning
+# Mathematical definition
 
-    A meta-optimiser calls this with its `cv` **first** and its sub-portfolio enumeration **third**. The two verbs this replaces — `predict_outer_nco_estimator_returns` and `predict_outer_st_estimator_returns` — were the same module written twice, and an overload of either is now a method of nothing. Rewrite it as a method of this verb, dispatching on the scheme rather than on the meta-optimiser's type parameters.
+Without folds:
+
+```math
+\\begin{align}
+R_{tk} &= \\boldsymbol{x}_t^\\intercal \\mathbf{W}_{\\cdot k}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``R_{tk}``: Return of synthetic asset ``k`` at observation ``t``, before Fees.
+  - $(math_dict[:x_t_obs])
+  - $(math_dict[:W_inner])
+
+With Fees, [`calc_net_returns`](@ref) subtracts the fee of sub-portfolio ``k`` from its column.
+
+# Algorithm
+
+Without folds:
+
+ 1. Prepare the returns data of the outer problem with [`prepare_outer_rd`](@ref), giving `nb`, `B`, `iv`, `ivpa`, `pnl` and the buffer `X`.
+ 2. For each inner result `res` in `resi`, write its net returns with [`calc_net_returns`](@ref) to column `i` of `X`, on the Prior Result and Fees viewed onto sub-portfolio `i`.
+ 3. Build the [`ReturnsResult`](@ref), with the asset names `_1`, `_2`, … and the factors and timestamps of `rd`.
+
+With cross-validation:
+
+ 1. Cross-validate every sub-portfolio with [`sub_portfolio_predictions`](@ref) under the scheme `cv.cv`, giving `predictions`.
+ 2. On the combinatorial path, select one path of each population with `cv.scorer`, or with [`NearestQuantilePrediction`](@ref) when it is `nothing`.
+ 3. Stack the predictions with [`rebuild_returns_result`](@ref).
 
 # Arguments
 
-  - `cv`: The meta-optimiser's cross-validation scheme.
-  - `opt`: The meta-optimiser. Read for its inner optimisers and its executor.
+  - `cv`: The cross-validation scheme of the meta-optimiser.
+  - `opt`: The meta-optimiser. The cross-validated methods read its `opti` and `ex` fields.
   - `u`: Sub-portfolio enumeration.
   - `rd`: Returns data.
   - `pr`: Prior Result over the whole universe.
   - `fees`: Fees over the whole universe.
-  - `wi`: Inner weights, assets × sub-portfolios.
-  - `resi`: The sub-portfolios' own optimisation results.
+  - `wi`: Inner weights, `assets × sub-portfolios`.
+  - `resi`: The results of the inner optimisations.
 
 # Returns
 
-  - The outer problem's [`ReturnsResult`](@ref), one synthetic asset per sub-portfolio.
+  - The [`ReturnsResult`](@ref) of the outer problem, one synthetic asset for each sub-portfolio.
 
 # Related
 
@@ -847,3 +1071,5 @@ function predict_outer_returns(cv::OptimisationCrossValidation{<:CombinatorialCr
     scorer = isnothing(cv.scorer) ? NearestQuantilePrediction() : cv.scorer
     return rebuild_returns_result(rd, [scorer(prediction) for prediction in predictions], u)
 end
+public SubPortfolioUniverse, sub_portfolio_count, sub_portfolio_predict, sub_portfolio_view,
+       fold_weight_matrix

@@ -417,8 +417,9 @@ function ew_beta_shrink(b::AbstractVector{<:Real}, bev::AbstractVector{<:Real},
     end
     gm, gpv = ew_beta_group_prior(b, bev, w, vld)
     lo, hi = bounds
+    msk = similar(vld)
     for g in unique(L[i] for i in eachindex(L) if vld[i])
-        msk = [vld[i] && L[i] == g for i in eachindex(L)]
+        msk .= vld .& (L .== g)
         m, pv = if count(msk) < min_group_size
             (gm, gpv)
         else

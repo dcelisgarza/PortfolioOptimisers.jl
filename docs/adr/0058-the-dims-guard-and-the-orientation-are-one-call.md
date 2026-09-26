@@ -135,6 +135,33 @@ admits exactly the leaves the hand-written skip admitted.
 The second Note stands. `cov`/`cor` on the two `AbstractVarianceEstimator` leaves still
 recurse, and giving that family a covariance reading is a separate decision.
 
+## Amendment (2026-09-26)
+
+Only a method that takes a matrix takes `dims`. A method that takes a carrier does not.
+
+A `ReturnsResult` and a prior result always hold their observations along the rows, so on a
+carrier the only valid `dims` is `1`. Before
+[issue #1348](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1348), the heads of
+`optimise` still took `dims` and handed it to `prior`. `MeanRisk` with `dims = 2` fitted the
+prior on the transpose and gave one weight per observation, and `HierarchicalRiskParity` threw a
+`DimensionMismatch` several frames down. #885 refused `dims = 2` in the naive heads with
+`assert_returns_result_dims`, one head at a time, and missed the others.
+
+The rule is now structural:
+
+- No `optimise` or `_optimise` head, and no other function that takes a `ReturnsResult`, has a
+    `dims` keyword. `assert_returns_result_dims` is deleted.
+- Each bridge from a carrier to a matrix method passes `dims = 1` after the caller's keywords.
+    The bridges are `prior`, `ucs`, `mu_ucs` and `sigma_ucs` on a `ReturnsResult`,
+    `prior_forecast_location` on a `ReturnsResult`, `coverage_reduction` on a carrier, the
+    clustering, phylogeny and centrality forwarders on `Pr_RR`, and the `Pr_RR` arities of
+    `plot_dendrogram` and `plot_clusters`. A `dims` in `kwargs` has no effect, because the
+    rightmost keyword wins.
+- The matrix methods keep `dims`, and this ADR's guard, unchanged.
+
+A caller's stray `dims` is ignored, not refused. A refusal needs one check at each head, and the
+defect of issue #1348 showed that a check at each head is the rule that heads forget.
+
 ## Related
 
 - [0037](0037-model-state-accessor-interface.md) — the closed-rule polarity the locks copy: a

@@ -6,7 +6,7 @@ status: accepted
 
 ## Context
 
-Three optimisers — [`JuMPOptimiser`](../../src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl),
+Three optimisers — [`JuMPOptimiser`](../../src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl),
 [`HierarchicalOptimiser`](../../src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl) and
 [`NestedClustered`](../../src/17_Optimisation/06_Meta/02_NestedClustered.jl) — carried a field
 `cle_pr::Bool = true`, forwarded as a keyword argument into the prior-layer bridge in

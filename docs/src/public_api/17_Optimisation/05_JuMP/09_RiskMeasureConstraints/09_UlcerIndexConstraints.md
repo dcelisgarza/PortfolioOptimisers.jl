@@ -4,4 +4,4 @@ Description = "Ulcer Index Constraints has no public API in PortfolioOptimisers.
 
 # Ulcer Index Constraints
 
-Ulcer Index Constraints has no public API in PortfolioOptimisers.jl; see [Ulcer Index Constraints: private API](../../../../private_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/09_UlcerIndexConstraints.md) for its private API.
+Every name of this topic is private. The [private page](@ref private-api-ulcer-index-constraints) documents them.

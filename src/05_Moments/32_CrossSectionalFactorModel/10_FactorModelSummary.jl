@@ -1,9 +1,23 @@
 """
     factor_summary_finite_column(A::MatNum, k::Integer)
 
-Return the finite entries of one column of a diagnostic series.
+Return the present entries of one column of a diagnostic series.
 
-Every column of the summary aggregates a series over the observations, and an observation whose answer is absent contributes nothing rather than poisoning the aggregate. The absent entries are dropped once, here, so each aggregate reads a dense vector and carries no test of its own.
+Every column of the summary aggregates a series over the observations. An observation whose answer is absent holds `NaN`, and it takes no part in the aggregate. This function drops the absent entries once, so each aggregate reads a dense vector and carries no test of its own. An infinite entry is a value and not an absence, so it stays, and the aggregate of its column is infinite too.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{v} &= \\left(a_{tk}\\right)_{t \\in \\mathcal{T}_{k}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{v}``: Present entries of column ``k``, in the order of the observations.
+  - $(math_dict[:a_tk_summary])
+  - $(math_dict[:T_k_summary])
 
 # Arguments
 
@@ -12,7 +26,7 @@ Every column of the summary aggregates a series over the observations, and an ob
 
 # Returns
 
-  - `v::Vector{<:Real}`: The entries of column `k` that are not `NaN`, in the order of the observations.
+  - `v::Vector{<:Real}`: The entries of column `k` that are not `NaN`, in the order of the observations. An integer series gives a floating-point vector.
 
 # Related
 
@@ -21,7 +35,7 @@ Every column of the summary aggregates a series over the observations, and an ob
   - [`factor_model_summary`](@ref)
 """
 function factor_summary_finite_column(A::MatNum, k::Integer)
-    Tf = real(eltype(A))
+    Tf = float_if_integer(real(eltype(A)))
     v = Vector{Tf}(undef, 0)
     for t in axes(A, 1)
         a = A[t, k]
@@ -34,7 +48,23 @@ end
 """
     factor_summary_column_mean(A::MatNum, k::Integer)
 
-Return the mean of the finite entries of one column of a diagnostic series.
+Return the mean of the present entries of one column of a diagnostic series.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{a}_{k} &= \\frac{1}{|\\mathcal{T}_{k}|} \\sum_{t \\in \\mathcal{T}_{k}} a_{tk}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\bar{a}_{k}``: Mean of the present entries of column ``k``.
+  - $(math_dict[:a_tk_summary])
+  - $(math_dict[:T_k_summary])
+
+The mean is not defined for an empty ``\\mathcal{T}_{k}``.
 
 # Arguments
 
@@ -43,7 +73,7 @@ Return the mean of the finite entries of one column of a diagnostic series.
 
 # Returns
 
-  - `m::Real`: The mean, and `NaN` when the column carries no finite entry.
+  - `m::Real`: The mean, and `NaN` when the column has no present entry.
 
 # Related
 
@@ -57,7 +87,23 @@ end
 """
     factor_summary_column_median(A::MatNum, k::Integer)
 
-Return the median of the finite entries of one column of a diagnostic series.
+Return the median of the present entries of one column of a diagnostic series.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{a}_{k} &= \\operatorname{median} \\left\\{ a_{tk} : t \\in \\mathcal{T}_{k} \\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{a}_{k}``: Median of the present entries of column ``k``. For an even count it is the mean of the two middle entries.
+  - $(math_dict[:a_tk_summary])
+  - $(math_dict[:T_k_summary])
+
+The median is not defined for an empty ``\\mathcal{T}_{k}``.
 
 # Arguments
 
@@ -66,7 +112,7 @@ Return the median of the finite entries of one column of a diagnostic series.
 
 # Returns
 
-  - `m::Real`: The median, and `NaN` when the column carries no finite entry.
+  - `m::Real`: The median, and `NaN` when the column has no present entry.
 
 # Related
 
@@ -80,9 +126,26 @@ end
 """
     factor_summary_ratio(m::Real, v::Real)
 
-Return a ratio of two summary statistics, answering `NaN` wherever the ratio is not defined.
+Return a ratio of two summary statistics, and `NaN` where the ratio has no value.
 
-A ratio of a summary is a Sharpe ratio, so its denominator is a volatility. A zero volatility, an absent volatility and a division that overflows all say the same thing — the ratio has no value — and this is the one place that says it.
+The summary takes one ratio, the Sharpe ratio, whose denominator is a volatility. A zero volatility, an absent volatility and a division that overflows each leave the ratio without a value, and this function answers `NaN` for all three.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+r &= \\begin{cases}
+m / v & \\text{when } m / v \\text{ is finite}\\,,\\\\
+\\mathrm{NaN} & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``r``: The ratio.
+  - ``m``: Numerator.
+  - ``v``: Denominator. A zero or `NaN` value of ``v`` leaves ``m / v`` not finite.
 
 # Arguments
 
@@ -98,8 +161,7 @@ A ratio of a summary is a Sharpe ratio, so its denominator is a volatility. A ze
   - [`factor_summary_return_stats`](@ref)
 """
 function factor_summary_ratio(m::Real, v::Real)
-    q = m / v
-    r = (isnan(v) || iszero(v)) ? oftype(q, NaN) : q
+    r = m / v
     return isfinite(r) ? r : oftype(r, NaN)
 end
 """
@@ -107,19 +169,39 @@ end
 
 Return the annualised mean, the annualised volatility and the Sharpe ratio of every factor return series.
 
-An observation whose factor return is absent is dropped from the mean and from the volatility, so a series with a gap is still summarised. The volatility is the corrected sample standard deviation, which needs two observations, and a series with fewer reads `NaN`.
+An absent factor return takes no part in the mean or the volatility, so a series with a gap still has a summary. The volatility is the corrected sample standard deviation, which needs two observations, and a series with fewer reads `NaN`. A constant series has a zero volatility, so its Sharpe ratio reads `NaN`.
 
 # Mathematical definition
 
-Let ``\\boldsymbol{f}_{k}`` be the finite entries of the factor return series of factor ``k``, let ``T_{k}`` be their count, and let ``p`` be `ppy`.
-
 ```math
 \\begin{align}
-\\mathrm{ann\\_return}_{k} &= p \\, \\dfrac{1}{T_{k}} \\sum_{t} f_{tk}\\\\
-\\mathrm{ann\\_volatility}_{k} &= \\sqrt{\\dfrac{p}{T_{k} - 1} \\sum_{t} \\left(f_{tk} - \\dfrac{1}{T_{k}} \\sum_{s} f_{sk}\\right)^{2}}\\\\
-\\mathrm{sharpe}_{k} &= \\dfrac{\\mathrm{ann\\_return}_{k}}{\\mathrm{ann\\_volatility}_{k}}\\,.
+\\hat{\\mu}_{k} &= \\frac{1}{T_{k}} \\sum_{t \\in \\mathcal{T}_{k}} f_{tk}\\,,\\\\
+\\mathrm{ann\\_return}_{k} &= p \\, \\hat{\\mu}_{k}\\,,\\\\
+\\mathrm{ann\\_volatility}_{k} &= \\sqrt{\\frac{p}{T_{k} - 1} \\sum_{t \\in \\mathcal{T}_{k}} \\left(f_{tk} - \\hat{\\mu}_{k}\\right)^{2}}\\,,\\\\
+\\mathrm{sharpe}_{k} &= \\frac{\\mathrm{ann\\_return}_{k}}{\\mathrm{ann\\_volatility}_{k}}\\,.
 \\end{align}
 ```
+
+Where:
+
+  - ``\\hat{\\mu}_{k}``: Per-period mean of the present returns of factor ``k``.
+  - ``\\mathrm{ann\\_return}_{k}``, ``\\mathrm{ann\\_volatility}_{k}``, ``\\mathrm{sharpe}_{k}``: The three returned entries of factor ``k``.
+  - $(math_dict[:f_tk_summary])
+  - $(math_dict[:T_k_summary])
+  - ``T_{k} = |\\mathcal{T}_{k}|``: Count of the present returns of factor ``k``.
+  - ``p``: Periods per year, `ppy`.
+
+The mean is not defined for ``T_{k} = 0``, the volatility is not defined for ``T_{k} < 2``, and the Sharpe ratio is not defined where the volatility is zero.
+
+# Algorithm
+
+For each factor `k`:
+
+ 1. Drop the absent returns of column `k` with [`factor_summary_finite_column`](@ref), giving `v`.
+ 2. Take the mean of `v` and clamp it to the least and the greatest entry of `v`, giving `m`. The clamp changes nothing in exact arithmetic. The rounded mean of a constant `v` can differ from its common value, and the clamp makes `m` equal to that value, so every deviation in step 4 is exactly zero.
+ 3. Multiply `m` by `ppy`, giving `ann_return[k]`. An empty `v` gives `NaN`.
+ 4. Take the corrected sample standard deviation of `v` about `m` and multiply it by the square root of `ppy`, giving `ann_volatility[k]`. A `v` with fewer than two entries gives `NaN`.
+ 5. Divide the two with [`factor_summary_ratio`](@ref), giving `sharpe[k]`.
 
 # Arguments
 
@@ -139,15 +221,19 @@ Let ``\\boldsymbol{f}_{k}`` be the finite entries of the factor return series of
 """
 function factor_summary_return_stats(f::MatNum, ppy::Number)
     K = size(f, 2)
-    Tf = promote_type(real(eltype(f)), real(typeof(ppy)))
-    ann_return = Vector{Tf}(undef, K)
-    ann_volatility = Vector{Tf}(undef, K)
-    sharpe = Vector{Tf}(undef, K)
-    s = sqrt(Tf(ppy))
+    Tr = promote_type(float_if_integer(real(eltype(f))), real(typeof(ppy)))
+    Tv = typeof(sqrt(one(Tr)))
+    ann_return = Vector{Tr}(undef, K)
+    ann_volatility = Vector{Tv}(undef, K)
+    sharpe = Vector{promote_type(Tr, Tv)}(undef, K)
+    s = sqrt(Tr(ppy))
     for k in 1:K
         v = factor_summary_finite_column(f, k)
-        ann_return[k] = isempty(v) ? Tf(NaN) : Tf(mean(v)) * Tf(ppy)
-        ann_volatility[k] = length(v) < 2 ? Tf(NaN) : Tf(std(v)) * s
+        # The clamp moves nothing in exact arithmetic. On a constant series it makes the mean
+        # the common value, so the volatility is exactly zero and the Sharpe ratio is `NaN`.
+        m = isempty(v) ? Tr(NaN) : Tr(clamp(mean(v), extrema(v)...))
+        ann_return[k] = m * Tr(ppy)
+        ann_volatility[k] = length(v) < 2 ? Tv(NaN) : Tv(std(v; mean = m)) * s
         sharpe[k] = factor_summary_ratio(ann_return[k], ann_volatility[k])
     end
     return ann_return, ann_volatility, sharpe
@@ -157,17 +243,35 @@ end
 
 Return the lag-one autocorrelation of every factor return series.
 
-The answer is the Pearson correlation of the pair `(f[1:end - 1, k], f[2:end, k])`, each half centred on **its own** mean. It is not `StatsBase.autocor`, which centres both halves on the mean of the whole series and divides by the sum of squares of the whole series. The two agree in the limit and differ on a short series, so a caller who wants the other definition calls `StatsBase.autocor` on the factor return history itself.
-
-A series with an absent entry reads `NaN`, because the mean of the half that holds it is absent.
+The answer is the Pearson correlation of the pair `(f[1:end - 1, k], f[2:end, k])`, with each half centred on its own mean. `StatsBase.autocor` is a different estimator. It centres both halves on the mean of the whole series and divides by the sum of squares of the whole series. The two agree in the limit and differ on a short series, so a caller who wants the other definition calls `StatsBase.autocor` on the factor return history itself.
 
 # Mathematical definition
 
-Let ``a_{t} = f_{tk}`` for ``t = 1 \\ldots T - 1``, let ``b_{t} = f_{(t + 1)k}``, and let ``\\bar{a}`` and ``\\bar{b}`` be their means.
-
 ```math
-\\mathrm{autocorr}_{k} = \\dfrac{\\sum_{t} (a_{t} - \\bar{a})(b_{t} - \\bar{b})}{\\sqrt{\\sum_{t} (a_{t} - \\bar{a})^{2} \\sum_{t} (b_{t} - \\bar{b})^{2}}}\\,.
+\\begin{align}
+\\bar{a}_{k} &= \\frac{1}{T - 1} \\sum_{t = 1}^{T - 1} f_{tk}\\,,\\\\
+\\bar{b}_{k} &= \\frac{1}{T - 1} \\sum_{t = 2}^{T} f_{tk}\\,,\\\\
+\\rho_{k} &= \\frac{\\sum_{t = 1}^{T - 1} \\left(f_{tk} - \\bar{a}_{k}\\right)\\left(f_{(t + 1)k} - \\bar{b}_{k}\\right)}{\\sqrt{\\sum_{t = 1}^{T - 1} \\left(f_{tk} - \\bar{a}_{k}\\right)^{2} \\sum_{t = 1}^{T - 1} \\left(f_{(t + 1)k} - \\bar{b}_{k}\\right)^{2}}}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\rho_{k}``: Lag-one autocorrelation of factor ``k``.
+  - ``\\bar{a}_{k}``: Mean of the leading half, the first ``T - 1`` returns of factor ``k``.
+  - ``\\bar{b}_{k}``: Mean of the trailing half, the last ``T - 1`` returns of factor ``k``.
+  - $(math_dict[:f_tk_summary])
+  - $(math_dict[:T])
+
+The coefficient is not defined for ``T < 2``, nor for a series with a constant half, whose denominator is zero. An absent return makes the mean of its half absent, so the coefficient of that series is absent too.
+
+# Algorithm
+
+ 1. Return `NaN` for every factor when `T < 2`.
+ 2. For each factor `k`, sum each half and track the least and the greatest entry of each half.
+ 3. Divide each sum by `T - 1` and clamp it to the least and the greatest entry of its half, giving `ma` and `mb`. The clamp changes nothing in exact arithmetic. It makes the mean of a constant half equal to its common value, so the deviations of that half are exactly zero and the coefficient is `NaN`.
+ 4. Accumulate the cross product `cab` and the two sums of squares `caa` and `cbb` of the deviations.
+ 5. Divide `cab` by the square root of `caa * cbb`, giving `ac[k]`.
 
 # Arguments
 
@@ -175,7 +279,7 @@ Let ``a_{t} = f_{tk}`` for ``t = 1 \\ldots T - 1``, let ``b_{t} = f_{(t + 1)k}``
 
 # Returns
 
-  - `autocorr::Vector{<:Real}`: One entry per factor, and `NaN` for a series of one observation.
+  - `autocorr::Vector{<:Real}`: One entry per factor, and `NaN` for a series of one observation, a series with a constant half and a series with an absent return.
 
 # Related
 
@@ -183,7 +287,7 @@ Let ``a_{t} = f_{tk}`` for ``t = 1 \\ldots T - 1``, let ``b_{t} = f_{(t + 1)k}``
 """
 function factor_summary_autocorrelation(f::MatNum)
     T, K = size(f)
-    Tf = real(eltype(f))
+    Tf = typeof(sqrt(one(float_if_integer(real(eltype(f))))))
     ac = fill(Tf(NaN), K)
     if T < 2
         return ac
@@ -191,12 +295,20 @@ function factor_summary_autocorrelation(f::MatNum)
     for k in 1:K
         sa = zero(Tf)
         sb = zero(Tf)
+        la = ha = Tf(f[1, k])
+        lb = hb = Tf(f[2, k])
         for t in 1:(T - 1)
-            sa += Tf(f[t, k])
-            sb += Tf(f[t + 1, k])
+            a = Tf(f[t, k])
+            b = Tf(f[t + 1, k])
+            sa += a
+            sb += b
+            la, ha = min(la, a), max(ha, a)
+            lb, hb = min(lb, b), max(hb, b)
         end
-        ma = sa / (T - 1)
-        mb = sb / (T - 1)
+        # The clamp moves nothing in exact arithmetic. On a constant half it makes the mean
+        # the common value, so the deviations of that half are exactly zero.
+        ma = clamp(sa / (T - 1), la, ha)
+        mb = clamp(sb / (T - 1), lb, hb)
         cab = zero(Tf)
         caa = zero(Tf)
         cbb = zero(Tf)
@@ -216,9 +328,9 @@ end
     factor_summary_returns(csr::Nothing)
     factor_summary_returns(csr::CrossSectionalRegression)
 
-Return the factor return history a summary reads off a factor model block.
+Return the factor return history that a summary reads off a factor model block.
 
-The history is on the **raw** factor axis, because it is what the fit produced before any family re-basis. The absent case is the dispatch rather than a branch, and its message names the field the caller must populate.
+The history is on the raw factor axis, because the fit produced it before any family re-basis. A separate method handles a block with no fit, and its message names the field the caller must populate.
 
 # Arguments
 
@@ -227,7 +339,7 @@ The history is on the **raw** factor axis, because it is what the fit produced b
 
 # Validation
 
-  - `csfm.csr` is not `nothing`, else an `IsNothingError` naming `csr` is raised.
+  - `csfm.csr` is not `nothing`, else the function raises an `IsNothingError` that names `csr`.
 
 # Returns
 
@@ -254,11 +366,29 @@ end
     factor_summary_positions(fcb::AbstractFactorFamilyBasis, nf::Nothing, K::Integer)
     factor_summary_positions(fcb::FactorFamilyBasis, nf::VecStr, K::Integer)
 
-Return the position each raw factor takes on the reduced factor axis.
+Return the position of each raw factor on the reduced factor axis.
 
-The regression group answers on the reduced axis and the summary answers on the raw one, so the two are joined **by name**. A raw factor the re-basis dropped takes the position `0`, which is what makes its Gram columns read `NaN`.
+The regression group answers on the reduced axis and the summary answers on the raw one, so the summary joins the two by name. A raw factor that the re-basis dropped takes the position `0`, and its Gram columns read `NaN` for that reason. A block with no re-basis needs no join, because its two axes are the same axis.
 
-A block that carries no re-basis needs no join, and the two axes are then the same axis.
+# Mathematical definition
+
+```math
+\\begin{align}
+\\pi_{k} &= \\begin{cases}
+j & \\text{when } n_{k} = r_{j}\\,,\\\\
+0 & \\text{when } n_{k} \\notin \\left\\{r_{1}, \\ldots, r_{K_{r}}\\right\\}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:pi_k_summary])
+  - ``n_{k}``: Name of raw factor ``k``.
+  - ``r_{j}``: Name of reduced factor ``j``.
+  - ``K_{r}``: Number of reduced factors.
+
+A block with no re-basis has ``\\pi_{k} = k``.
 
 # Arguments
 
@@ -269,7 +399,7 @@ A block that carries no re-basis needs no join, and the two axes are then the sa
 
 # Validation
 
-  - `csfm.nf` is not `nothing` when `csfm.fcb` is present, else an `IsNothingError` naming `nf` is raised: a re-based block cannot be joined without the names.
+  - `csfm.nf` is not `nothing` when `csfm.fcb` is present, else the function raises an `IsNothingError` that names `nf`. The summary cannot join a re-based block to the raw axis without the names.
 
 # Returns
 
@@ -305,6 +435,23 @@ end
 
 Return a statistic of the reduced factor axis, written onto the raw factor axis.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+m_{k} &= \\begin{cases}
+v_{\\pi_{k}} & \\text{when } \\pi_{k} > 0\\,,\\\\
+\\mathrm{NaN} & \\text{when } \\pi_{k} = 0\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``m_{k}``: The statistic of raw factor ``k``.
+  - ``v_{j}``: The statistic of reduced factor ``j``.
+  - $(math_dict[:pi_k_summary])
+
 # Arguments
 
   - `v`: A statistic, one entry per reduced factor.
@@ -320,7 +467,7 @@ Return a statistic of the reduced factor axis, written onto the raw factor axis.
   - [`factor_model_summary`](@ref)
 """
 function factor_summary_mapped(v::VecNum, pos::AbstractVector{Int})
-    Tf = real(eltype(v))
+    Tf = float_if_integer(real(eltype(v)))
     m = fill(Tf(NaN), length(pos))
     for k in eachindex(pos)
         j = pos[k]
@@ -337,15 +484,23 @@ end
 
 Return the three regression columns of a factor model summary, on the raw factor axis.
 
-The columns are the mean absolute t-statistic, the rate at which the absolute t-statistic passes `threshold`, and the mean variance inflation factor. Each is the time average of a level-2 series of the regression group, joined back onto the raw factor axis by name.
+The columns are the mean absolute t-statistic, the rate at which the absolute t-statistic passes `threshold`, and the mean variance inflation factor. Each one is the time average of a series of the regression group, joined back onto the raw factor axis by name.
 
-A block that carries no exposure history carries no regression design either, so the three columns are absent as a whole. The absent case is the dispatch rather than a branch.
+A block with no exposure history has no regression design either, so all three columns are absent, and a separate method handles that case.
+
+# Algorithm
+
+ 1. Take the position of each raw factor on the reduced axis with [`factor_summary_positions`](@ref), giving `pos`.
+ 2. Take the t-statistic history with [`cs_regression_t_stats`](@ref), giving `t`, and the variance inflation factor history with [`exposure_vif`](@ref), giving `vif`.
+ 3. Take the exceedance rate at `threshold` with [`cs_regression_t_stat_exceedance_rate`](@ref), giving `rate`.
+ 4. For each reduced factor, take the mean of the present entries of `abs.(t)` and of `vif` with [`factor_summary_column_mean`](@ref), giving `abs_t` and `mvif`.
+ 5. Write `abs_t`, `rate` and `mvif` onto the raw axis with [`factor_summary_mapped`](@ref).
 
 # Arguments
 
   - `csfm`: A cross-sectional factor model block.
   - `Ms`: The `Ms` field of the block, or `nothing`.
-  - `threshold`: Absolute t-statistic the exceedance rate counts against.
+  - `threshold`: Absolute t-statistic that the exceedance rate counts against.
 
 # Returns
 
@@ -388,7 +543,32 @@ end
 
 Return the cross-sectional variance of one factor exposure at one observation.
 
-The variance is taken over the finite exposures of the observation and it is not corrected.
+The variance is uncorrected, and it reads the exposures that are not `NaN`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{b}_{tk} &= \\frac{1}{|\\mathcal{N}_{tk}|} \\sum_{i \\in \\mathcal{N}_{tk}} b_{tik}\\,,\\\\
+s^{2}_{tk} &= \\frac{1}{|\\mathcal{N}_{tk}|} \\sum_{i \\in \\mathcal{N}_{tk}} \\left(b_{tik} - \\bar{b}_{tk}\\right)^{2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:s2_tk_summary])
+  - ``\\bar{b}_{tk}``: Cross-sectional mean of the exposure to factor ``k`` at observation ``t``.
+  - ``b_{tik}``: Exposure of asset ``i`` to factor ``k`` at observation ``t``.
+  - ``\\mathcal{N}_{tk}``: Assets at which ``b_{tik}`` is not `NaN`.
+
+The variance is not defined for an empty ``\\mathcal{N}_{tk}``. An infinite exposure makes the deviations undefined, so the variance reads `NaN`.
+
+# Algorithm
+
+ 1. Sum the exposures of the cross-section that are not `NaN`, count them, and track their least and greatest value.
+ 2. Return `NaN` when the count is zero.
+ 3. Divide the sum by the count and clamp it to the least and the greatest value, giving `m`. The clamp changes nothing in exact arithmetic. It makes the mean of a constant cross-section equal to its common value, so the variance of that cross-section is exactly zero.
+ 4. Average the squared deviations from `m`, giving the variance.
 
 # Arguments
 
@@ -398,27 +578,32 @@ The variance is taken over the finite exposures of the observation and it is not
 
 # Returns
 
-  - `v::Real`: The variance, and `NaN` when the cross-section carries no finite exposure.
+  - `v::Real`: The variance, and `NaN` when the cross-section has no exposure that is not `NaN`.
 
 # Related
 
   - [`factor_summary_constant_exposures`](@ref)
 """
 function factor_summary_exposure_variance(Ms::Arr3Num, t::Integer, k::Integer)
-    Tf = real(eltype(Ms))
+    Tf = float_if_integer(real(eltype(Ms)))
     n = 0
     s = zero(Tf)
+    lo = Tf(Inf)
+    hi = -Tf(Inf)
     for i in axes(Ms, 2)
         a = Ms[t, i, k]
         if !isnan(a)
             n += 1
             s += Tf(a)
+            lo, hi = min(lo, Tf(a)), max(hi, Tf(a))
         end
     end
     if n == 0
         return Tf(NaN)
     end
-    m = s / n
+    # The clamp moves nothing in exact arithmetic. On a constant cross-section it makes the
+    # mean the common value, so every deviation is exactly zero.
+    m = clamp(s / n, lo, hi)
     q = zero(Tf)
     for i in axes(Ms, 2)
         a = Ms[t, i, k]
@@ -433,7 +618,26 @@ end
 
 Return which factor exposures never vary across the cross-section.
 
-A constant exposure is the global intercept and the constant column of a one-hot family. Its cross-section has no spread, so its stability coefficient is not defined and the summary writes `1` in its place: an exposure that never moves is perfectly stable. The patch lives in the summary rather than in [`exposure_stability`](@ref), which answers the `NaN` the correlation earns.
+The global intercept and the constant column of a one-hot family are constant exposures. The cross-section of a constant exposure has no spread, so its stability coefficient is not defined, and the summary writes `1` in its place. An exposure that never moves is perfectly stable. The summary applies that patch, and [`exposure_stability`](@ref) keeps the `NaN` that the correlation gives.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+c_{k} &= \\begin{cases}
+\\max_{t \\in \\mathcal{V}_{k}} s^{2}_{tk} < 10^{-12} & \\text{when } \\mathcal{V}_{k} \\neq \\emptyset\\,,\\\\
+\\mathrm{false} & \\text{when } \\mathcal{V}_{k} = \\emptyset\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:c_k_summary])
+  - $(math_dict[:s2_tk_summary])
+  - ``\\mathcal{V}_{k}``: Observations at which ``s^{2}_{tk}`` is not `NaN`.
+
+A factor with no exposure anywhere is not constant.
 
 # Arguments
 
@@ -441,7 +645,7 @@ A constant exposure is the global intercept and the constant column of a one-hot
 
 # Returns
 
-  - `c::BitVector`: One entry per factor, `true` when the largest cross-sectional variance the factor reaches is under `1e-12`.
+  - `c::BitVector`: One entry per factor, `true` when the largest cross-sectional variance of the factor is under `1e-12`.
 
 # Related
 
@@ -461,8 +665,8 @@ function factor_summary_constant_exposures(Ms::Arr3Num)
                 m = v
             end
         end
-        # A factor with no finite cross-section anywhere leaves `m` at `-Inf`, and it is
-        # not constant.
+        # A factor whose every cross-sectional variance is `NaN` leaves `m` at `-Inf`, and it
+        # is not constant.
         c[k] = m > -Inf && m < 1e-12
     end
     return c
@@ -473,13 +677,33 @@ end
 
 Return the stability column of a factor model summary, on the raw factor axis.
 
-The column is the median over the observations of [`exposure_stability`](@ref), with a constant exposure patched to `1`. A history with no more observations than `step` has no stability series at all, and then every factor reads `NaN` but for the constant ones, which still read `1`.
+The column is the median over the observations of [`exposure_stability`](@ref), and a constant exposure reads `1`. A history with no more observations than `step` has no stability series, so every factor reads `NaN` except the constant ones, which still read `1`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{stability}_{k} &= \\begin{cases}
+1 & \\text{when } c_{k}\\,,\\\\
+\\operatorname{median} \\left\\{ a_{tk} : t \\in \\mathcal{T}_{k} \\right\\} & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{stability}_{k}``: The returned entry of factor ``k``.
+  - $(math_dict[:c_k_summary])
+  - $(math_dict[:a_tk_summary]) Here the series is the stability coefficient that [`exposure_stability`](@ref) returns.
+  - $(math_dict[:T_k_summary])
+
+The median is not defined for an empty ``\\mathcal{T}_{k}``, and that is the case for every factor when the history has no more observations than `step`.
 
 # Arguments
 
   - `Ms`: Exposure history `observations × assets × factors`, unlagged.
   - `csfm`: A cross-sectional factor model block.
-  - `step`: Number of observations between the two cross-sections the coefficient reads.
+  - `step`: Number of observations between the two cross-sections that the coefficient reads.
   - `weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose weight history the coefficient reads.
 
 # Returns
@@ -496,7 +720,7 @@ function factor_summary_stability(Ms::Arr3Num, csfm::CrossSectionalFactorModel;
                                   step::Integer = 21, weighting = BenchmarkWeightMetric())
     con = factor_summary_constant_exposures(Ms)
     K = size(Ms, 3)
-    Tf = real(eltype(Ms))
+    Tf = float_if_integer(real(eltype(Ms)))
     if size(Ms, 1) <= step
         return Tf[con[k] ? one(Tf) : Tf(NaN) for k in 1:K]
     end
@@ -512,17 +736,17 @@ end
 
 Return the two exposure columns of a factor model summary, on the raw factor axis.
 
-The columns are the median exposure stability and the average coverage. Both read the unlagged exposure history, as the whole exposure group does. A block that carries no exposure history has neither, and the absent case is the dispatch rather than a branch.
+The columns are the median exposure stability and the average coverage. Both read the unlagged exposure history, as the whole exposure group does. A block with no exposure history has neither column, and a separate method handles that case.
 
-The two columns read **different** weight histories: the stability reads the history `weighting` names, and the coverage reads the one `coverage_weighting` names.
+The two columns read different weight histories. The stability reads the history that `weighting` names, and the coverage reads the history that `coverage_weighting` names.
 
 # Arguments
 
   - `csfm`: A cross-sectional factor model block.
   - `Ms`: The `Ms` field of the block, or `nothing`.
-  - `step`: Number of observations between the two cross-sections the stability reads.
-  - `weighting`: The [`AbstractOrthogonalityMetric`](@ref) the stability reads.
-  - `coverage_weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose positive weights are the coverage's universe.
+  - `step`: Number of observations between the two cross-sections that the stability reads.
+  - `weighting`: The [`AbstractOrthogonalityMetric`](@ref) that the stability reads.
+  - `coverage_weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose positive weights are the universe of the coverage.
 
 # Returns
 
@@ -556,15 +780,15 @@ $(DocStringExtensions.TYPEDEF)
 
 The headline statistics of every factor of a cross-sectional factor model.
 
-`FactorSummaryResult` is what [`factor_model_summary`](@ref) returns. It carries the nine columns [`plot_factor_model_summary`](@ref) draws, one entry per **raw** factor, and the annualisation factor that produced the first three, so a summary can be tabulated, compared across fits, asserted on in a test, or read without a plotting package installed.
+[`factor_model_summary`](@ref) returns a `FactorSummaryResult`. It holds the nine columns that [`plot_factor_model_summary`](@ref) draws, one entry per raw factor, and the annualisation factor of the first three. A caller can tabulate a summary, compare it across fits, test it, or read it with no plotting package installed.
 
 # The five columns that can be absent
 
-`mean_abs_t`, `t_rate` and `mean_vif` read the regression design, and `stability` and `coverage` read the exposure history. A block that carries no exposure history has none of them, and all five read back as `nothing`. A consumer reads that by dispatch rather than by a test of its own.
+`mean_abs_t`, `t_rate` and `mean_vif` read the regression design, and `stability` and `coverage` read the exposure history. A block with no exposure history has none of them, and all five are `nothing`. A consumer handles that case by dispatch on `nothing`.
 
 # The raw factor axis
 
-The three Gram columns are computed on the reduced factor axis of the family re-basis, and are written back onto the raw axis by name. A raw factor the re-basis dropped carries `NaN` in those three columns and a value in the others.
+The summary computes the three Gram columns on the reduced factor axis of the family re-basis, and writes them back onto the raw axis by name. A raw factor that the re-basis dropped has `NaN` in those three columns and a value in the others.
 
 # Fields
 
@@ -577,9 +801,7 @@ $(DocStringExtensions.FIELDS)
         mean_abs_t, t_rate, mean_vif, stability, coverage, ppy
     ) -> FactorSummaryResult
 
-Arguments correspond to the struct's fields, in the order they are declared. The type is a
-Result, so [`factor_model_summary`](@ref) builds it and a caller reads it; there is no
-keyword constructor, and the type validates nothing of its own.
+The arguments are the fields, in the order of their declaration. The type is a Result, so [`factor_model_summary`](@ref) builds it and a caller reads it. It has no keyword constructor, and it checks none of its values.
 
 # Related
 
@@ -605,23 +827,23 @@ keyword constructor, and the type validates nothing of its own.
     """
     autocorr
     """
-    Mean absolute cross-sectional t-statistic, one entry per raw factor, or `nothing` when the block carries no exposure history.
+    Mean absolute cross-sectional t-statistic, one entry per raw factor, or `nothing` when the block has no exposure history.
     """
     mean_abs_t
     """
-    Fraction of the observations at which the absolute t-statistic passes the threshold, one entry per raw factor, or `nothing` when the block carries no exposure history.
+    Fraction of the observations at which the absolute t-statistic passes the threshold, one entry per raw factor, or `nothing` when the block has no exposure history.
     """
     t_rate
     """
-    Mean variance inflation factor, one entry per raw factor, or `nothing` when the block carries no exposure history.
+    Mean variance inflation factor, one entry per raw factor, or `nothing` when the block has no exposure history.
     """
     mean_vif
     """
-    Median exposure stability coefficient, one entry per raw factor, or `nothing` when the block carries no exposure history.
+    Median exposure stability coefficient, one entry per raw factor, or `nothing` when the block has no exposure history.
     """
     stability
     """
-    Average fraction of the universe at which the factor exposure is finite, one entry per raw factor, or `nothing` when the block carries no exposure history.
+    Average fraction of the universe at which the factor exposure is finite, one entry per raw factor, or `nothing` when the block has no exposure history.
     """
     coverage
     """
@@ -637,33 +859,33 @@ end
 
 Summarise every factor of a cross-sectional factor model as a [`FactorSummaryResult`](@ref).
 
-The summary is the top of the diagnostic hierarchy. It calls one level-2 verb of the regression group and one of the exposure group per column, and it aggregates each series over the observations. It computes no statistic of its own but the factor return statistics and two aggregates: the median of the stability, and the patch that reads a constant exposure as perfectly stable.
+For each column, the summary calls one function of the regression group or of the exposure group, and it aggregates the series that function returns over the observations. The only statistics it computes itself are the factor return statistics and two aggregates: the median of the stability, and the patch that reads a constant exposure as perfectly stable.
 
 The answer is on the **raw** factor axis. The regression group answers on the reduced axis of the family re-basis, and the summary joins the two by name.
 
 # Algorithm
 
- 1. Read the factor return history off `csr`, refusing a block that carries none.
- 2. Take the annualised mean, the annualised volatility and the Sharpe ratio of each series with [`factor_summary_return_stats`](@ref), dropping the absent observations.
+ 1. Read the factor return history off `csr`, and refuse a block that has none.
+ 2. Take the annualised mean, the annualised volatility and the Sharpe ratio of each series with [`factor_summary_return_stats`](@ref). An absent return takes no part.
  3. Take the lag-one autocorrelation of each series with [`factor_summary_autocorrelation`](@ref).
- 4. Take the mean absolute t-statistic, the exceedance rate and the mean variance inflation factor, and join them onto the raw factor axis. A block with no exposure history gives `nothing` for all three.
- 5. Take the median stability and the coverage. A block with no exposure history gives `nothing` for both.
+ 4. Take the mean absolute t-statistic, the exceedance rate and the mean variance inflation factor with [`factor_summary_gram`](@ref), on the raw factor axis. A block with no exposure history gives `nothing` for all three.
+ 5. Take the median stability and the coverage with [`factor_summary_exposure`](@ref). A block with no exposure history gives `nothing` for both.
  6. Collect the nine columns and `ppy` into a [`FactorSummaryResult`](@ref).
 
 # Arguments
 
   - `csfm`: A cross-sectional factor model block. A caller who holds a Prior Result writes `pr.rr`.
   - `ppy`: Periods per year. `252` annualises a daily fit, and the default of `1` reports the statistics per period.
-  - `threshold`: Absolute t-statistic the exceedance rate counts against.
-  - `step`: Number of observations between the two cross-sections the stability reads.
+  - `threshold`: Absolute t-statistic that the exceedance rate counts against.
+  - `step`: Number of observations between the two cross-sections that the stability reads.
   - `weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose weight history the stability reads.
   - `coverage_weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose positive weights are the universe of the coverage. Its default of [`RegressionWeightMetric`](@ref) is the estimation universe of the fit.
 
 # Validation
 
-  - `ppy > 0`.
-  - `csfm.csr` is not `nothing`.
-  - `csfm.nf` is not `nothing` when `csfm.fcb` is present.
+  - `ppy > 0`, else the function raises a `DomainError`.
+  - `csfm.csr` is not `nothing`, else the function raises an `IsNothingError`.
+  - `csfm.nf` is not `nothing` when `csfm.fcb` is present, else the function raises an `IsNothingError`.
 
 # Returns
 

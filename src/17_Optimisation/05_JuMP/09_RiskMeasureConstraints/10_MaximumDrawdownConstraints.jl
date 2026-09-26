@@ -40,8 +40,8 @@ where ``dd_t`` is the portfolio drawdown at time ``t``.
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::MaximumDrawdown,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     return state_build!(model, prefix, :mdd_risk) do
         sc = get_constraint_scale(model)
         dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)

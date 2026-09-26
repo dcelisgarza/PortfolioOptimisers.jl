@@ -2,7 +2,7 @@
 Description = "Preferences, private API of PortfolioOptimisers.jl: PREFERENCE_KEYS, PREFERENCE_DISTANCES, apply_preferences!, apply_show_preferences!, __init__, …"
 ```
 
-# Preferences: private API
+# [Preferences: private API](@id private-api-preferences)
 
 ```@docs
 PREFERENCE_KEYS

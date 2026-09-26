@@ -39,28 +39,6 @@ Abstract supertype for estimators that specify transaction cost budgets.
 """
 abstract type BudgetCostEstimator <: BudgetConstraintEstimator end
 """
-    set_budget_costs!(args...)
-
-Set transaction cost budget constraints in the JuMP model.
-
-No-op fallback when no cost budget is specified.
-
-# Arguments
-
-  - `args...`: Arguments (ignored).
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`set_long_short_budget_constraints!`](@ref)
-"""
-function set_budget_costs!(args...)
-    return nothing
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Bounds the sum of the portfolio weights inside a closed interval, rather than pinning it to one value.
@@ -835,7 +813,6 @@ vectors.
 
 # Related
 
-  - [`set_budget_costs!`](@ref)
   - [`set_budget_constraints!`](@ref)
   - [`BudgetCosts`](@ref)
   - [`BudgetMarketImpact`](@ref)

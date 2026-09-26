@@ -212,6 +212,64 @@
         @test length(pred_future.rd.X) == 29
     end
 
+    @testset "the split agrees with its docstrings" begin
+        split_count = PortfolioOptimisers.split_count
+
+        # a fraction rounds down to whole rows in exact arithmetic: 0.29 * 100 is
+        # 28.999999999999996, and a floor of that product lost the 29th row
+        @test all(k -> split_count(k / 100, 100, :train_size) == k, 1:99)
+        @test all(k -> split_count(Float32(k / 100), 100, :train_size) == k, 1:99)
+        @test all(k -> split_count(k / 7, 7, :train_size) == k, 1:6)
+        @test split_count(0.295, 100, :train_size) == 29
+        @test split_count(0.305, 100, :train_size) == 30
+        @test safe_index(0.29, nothing, 100) == (1:29, 30:100)
+
+        # a fraction is any Real in (0, 1), so an exact Rational resolves exactly
+        @test split_count(29 // 100, 100, :train_size) == 29
+        @test split_count(1 // 3, 10, :train_size) == 3
+        @test_throws DomainError split_count(3 // 2, 10, :train_size)
+        rd10 = ReturnsResult(; nx = ["A"], X = reshape(collect(0.1:0.1:1.0), 10, 1))
+        tr, te = train_test_split(rd10; test_size = 1 // 5)
+        @test (size(tr.X, 1), size(te.X, 1)) == (8, 2)
+
+        # with no size the training window takes floor(0.75 N) rows, and one row
+        # leaves no test window
+        @test safe_index(nothing, nothing, 4) == (1:3, 4:4)
+        @test safe_index(nothing, nothing, 2) == (1:1, 2:2)
+        @test_throws ArgumentError safe_index(nothing, nothing, 1)
+
+        # the overlap message states both lengths and the row count
+        e = try
+            safe_index(8, 3, 10)
+        catch err
+            err
+        end
+        @test occursin("8 training and 3 test observations exceed the 10 available", e.msg)
+
+        # at the returns level every time-axis array is a view of the input, sliced by row
+        rng = StableRNG(1)
+        ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 10))
+        rd = ReturnsResult(; nx = ["A", "B"], X = randn(rng, 10, 2), nf = ["f"],
+                           F = randn(rng, 10, 1), ts = ts)
+        tr, te = train_test_split(rd; test_size = 3)
+        @test tr.X isa SubArray && tr.F isa SubArray && tr.ts isa SubArray
+        @test parent(te.X) === rd.X
+        @test tr.ts == ts[1:7]
+        @test te.ts == ts[8:10]
+        @test te.F == rd.F[8:10, :]
+
+        # at the price level the windows are copies, so a write to one leaves the input
+        pr = PricesResult(;
+                          X = TimeArray(ts, 100 .+ cumsum(rand(rng, 10, 2); dims = 1),
+                                        ["A", "B"]))
+        p81 = values(pr.X)[8, 1]
+        trp, tep = train_test_split(pr; test_size = 3)
+        @test timestamp(trp.X) == ts[1:7]
+        @test timestamp(tep.X) == ts[8:10]
+        values(tep.X)[1, 1] = -1.0
+        @test values(pr.X)[8, 1] == p81
+    end
+
     @testset "one evaluation protocol per call" begin
         pr = make_prices()
         pipe = Pipeline(;
@@ -226,5 +284,6 @@
                                                    PricesToReturns(; ret_method = :log)]);
                                          cv = KFold(; n = 2), r = Variance())
         @test_throws ArgumentError search_cross_validation(pipe, gscv, pr)
+        @test_throws ArgumentError cross_val_predict(pipe, pr, KFold(; n = 2))
     end
 end

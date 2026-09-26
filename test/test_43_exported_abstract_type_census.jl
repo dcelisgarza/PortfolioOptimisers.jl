@@ -50,14 +50,23 @@
     `src/17_Optimisation/` types below joined the same day again (issue #1138), the two
     `src/20_AssetSelection.jl` types below joined the same day once more (issue #1139), and
     the four `src/10_Prior/` family types below — `AbstractPriorEstimator`'s own section
-    tells an author to subtype one of them — joined on 2026-09-17 too (issue #1146). They
-    are held to their own list for the same reason — public is API too.
+    tells an author to subtype one of them — joined on 2026-09-17 too (issue #1146), and
+    the five online-selection types below — the rule, the geometry, the set, the slack and
+    the price-level statistic — joined on 2026-09-18 with their `# Interfaces` sections
+    (issue #1161). The nine types whose `# Interfaces` sections the sweeps of #1040, #1042,
+    #1044 and #1052 wrote — the six preprocessing types, `AbstractReturnsResult`,
+    `AbstractAssetSelector` and `SubPortfolioUniverse` — joined on 2026-09-25 (issue #1301).
+    `AbstractPricesResult`, `AbstractPhylogenyFeatureAlgorithm`, `AbstractCollateralAlgorithm`
+    and `SchurComplementAlgorithm` joined on 2026-09-26 (PR #1204), after #1012, #848, #1337
+    and #881 wrote their `# Interfaces` sections.
+    They are held to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
                           :AbstractAmbiguityTailWeightCalibrationAlgorithm, :AbstractBins,
-                          :AbstractCompactRadiusAlgorithm, :AbstractConstraintEstimator,
-                          :AbstractConstraintResult, :AbstractConstraintSpace,
-                          :AbstractCovarianceEstimator, :AbstractCoverageAlgorithm,
+                          :AbstractCompactRadiusAlgorithm, :AbstractConfidenceUpdate,
+                          :AbstractConstraintEstimator, :AbstractConstraintResult,
+                          :AbstractConstraintSpace, :AbstractCovarianceEstimator,
+                          :AbstractCovarianceShrinkageTarget, :AbstractCoverageAlgorithm,
                           :AbstractCrossSectionalRegressionEstimator,
                           :AbstractCrossSectionalTransform,
                           :AbstractCrossSectionalWeightsAlgorithm,
@@ -67,25 +76,31 @@
                           :AbstractEstimatorValueAlgorithm,
                           :AbstractExpectedReturnsEstimator, :AbstractExposureEstimator,
                           :AbstractForecastTarget, :AbstractGapReturnAlgorithm,
-                          :AbstractHighOrderPriorEstimator_F,
+                          :AbstractGradientPredictor, :AbstractGradientTransform,
+                          :AbstractLearningRateSchedule, :AbstractHighOrderPriorEstimator_F,
                           :AbstractLowOrderPriorEstimator_A,
                           :AbstractLowOrderPriorEstimator_AF,
                           :AbstractLowOrderPriorEstimator_F,
                           :AbstractMatrixProcessingAlgorithm,
                           :AbstractMatrixProcessingEstimator,
                           :AbstractNormCeilingCalibrationAlgorithm,
-                          :AbstractOptimisationEstimator,
+                          :AbstractOptimisationEstimator, :AbstractAllocationSet,
+                          :AbstractProgrammeAllocationSet, :AbstractOnlineObjective,
+                          :AbstractOnlinePortfolioSelectionAlgorithm,
                           :AbstractOrderedWeightsArrayFunction, :AbstractOrthogonalScaling,
                           :AbstractOrthogonalityMetric, :AbstractPanelField,
                           :AbstractPanelFieldInput, :AbstractPanelFillAlgorithm,
-                          :AbstractPartialFitState, :AbstractPosdefEstimator,
+                          :AbstractPartialFitState, :AbstractPassiveAggressiveSlack,
+                          :AbstractPatternMatchSelector, :AbstractPosdefEstimator,
                           :AbstractPreorderBy, :AbstractPreviousWeightsSource,
-                          :AbstractPriorEstimator, :AbstractPriorResult,
+                          :AbstractPriceLevelStatistic, :AbstractPriorEstimator,
+                          :AbstractPriorResult, :AbstractProjectionGeometry,
                           :AbstractPriorUncertaintySetEstimator, :AbstractRealisedTarget,
                           :AbstractRedundancyAlgorithm, :AbstractReturnForecastEstimator,
-                          :AbstractRiskMeasureSettings,
+                          :AbstractRiskMeasureSettings, :AbstractSampleSelector,
+                          :AbstractSparsePortfolioAlgorithm,
                           :AbstractSearchCrossValidationResult, :AbstractSelectionRule,
-                          :AbstractSignificanceCalibrationAlgorithm,
+                          :AbstractTrendTest, :AbstractSignificanceCalibrationAlgorithm,
                           :AbstractTimeSeriesRegressionEstimator,
                           :AbstractTrackingAlgorithm, :AbstractUncertaintyKAlgorithm,
                           :AbstractUncertaintySetAlgorithm, :AbstractUncertaintySetClass,
@@ -111,7 +126,14 @@
                           :TimeDependentCallable, :TimeDependentConstraintCallable,
                           :TimeDependentOptimiserCallable, :VecJuMPConstr, :VecJuMPObj,
                           :VectorAbstractEstimatorValueAlgorithm, :VectorToScalarMeasure,
-                          :WeightFinaliser])
+                          :WeightFinaliser, :AbstractPreprocessingEstimator,
+                          :AbstractPricesPreprocessingEstimator,
+                          :AbstractReturnsPreprocessingEstimator,
+                          :AbstractPreprocessingResult, :AbstractPricesPreprocessingResult,
+                          :AbstractReturnsPreprocessingResult, :AbstractReturnsResult,
+                          :AbstractAssetSelector, :SubPortfolioUniverse,
+                          :AbstractPricesResult, :AbstractPhylogenyFeatureAlgorithm,
+                          :AbstractCollateralAlgorithm, :SchurComplementAlgorithm])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&
@@ -145,7 +167,7 @@
     @test length(exported) < length(defined) / 10
 
     #=
-    The four names stay reachable through the module prefix, which is what an extension
+    The three names stay reachable through the module prefix, which is what an extension
     needs to subtype them, and each keeps its docstring and its private mirror-page entry.
     Unexported is not undocumented. They are pinned by name so the regression cannot come
     back quietly. `AbstractConstraintSpace` left this list on 2026-09-17: its docstring
@@ -157,9 +179,11 @@
     anticipate ADR 0154 -- the root's own `# Interfaces` section already states "subtype one
     of the two children, not this root", so promoting the root to `public` alongside its
     children restates that rule as the public contract rather than contradicting it.
+    `AbstractPhylogenyFeatureAlgorithm` left the same way on 2026-09-26: the sweep of #848 wrote
+    its `# Interfaces` section, and it now sits on `allowed_public` above.
     =#
-    for n in (:AbstractAssetPanelEstimator, :AbstractPhylogenyFeatureAlgorithm,
-              :AbstractSimilarityMatrixAlgorithm, :AbstractNonNegativeSimilarityMatrixAlgorithm)
+    for n in (:AbstractAssetPanelEstimator, :AbstractSimilarityMatrixAlgorithm,
+              :AbstractNonNegativeSimilarityMatrixAlgorithm)
         @test is_abstract(n)
         @test !Base.isexported(PortfolioOptimisers, n)
         @test n ∉ names(PortfolioOptimisers)

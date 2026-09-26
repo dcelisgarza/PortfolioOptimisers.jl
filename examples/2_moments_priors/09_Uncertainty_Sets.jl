@@ -1,35 +1,34 @@
 #=
 ```@meta
-Description = "Uncertainty sets in PortfolioOptimisers.jl: robust optimisation against the worst case within box and ellipsoidal sets around the moments."
+Description = "Uncertainty sets in PortfolioOptimisers.jl: optimise against the worst case over a box or an ellipsoid around the estimated moments."
 ```
 
-# Uncertainty sets
+# [Uncertainty sets](@id example-uncertainty-sets)
 
-The view priors so far ([Black–Litterman](05_Black_Litterman.md),
-[Entropy Pooling](07_Entropy_Pooling.md), [Opinion Pooling](08_Opinion_Pooling.md)) change
-*what* the moments are. **Robust optimisation** takes the opposite stance: it accepts that the
-estimated moments are *wrong by some amount* and optimises against the worst case within an
-**uncertainty set** around them. Rather than trusting a single point estimate of the
-covariance (or mean), you bound a region the true value plausibly lies in and minimise the
-worst-case risk (or maximise the worst-case return) over that region. The result is an
-allocation that is stable to estimation error by construction.
+The view priors of the earlier pages, [Black-Litterman](@ref example-black-litterman),
+[entropy pooling](@ref example-entropy-pooling) and [opinion pooling](@ref example-opinion-pooling), change
+the moments themselves. Robust optimisation keeps the estimated moments and assumes that they
+are wrong by some amount. You choose a region around the estimate that the true covariance or
+mean is likely to lie in, the uncertainty set. The optimiser then minimises the worst-case risk,
+or maximises the worst-case return, over that region. The risk it reports is an upper bound for
+every covariance inside the set, the estimate included.
 
-`PortfolioOptimisers` builds uncertainty sets with an estimator such as
-[`NormalUncertaintySet`](@ref) and an algorithm — [`BoxUncertaintySetAlgorithm`](@ref) (a
-per-entry interval box) or [`EllipsoidalUncertaintySetAlgorithm`](@ref) (a joint ellipsoid).
-The helper [`sigma_ucs`](@ref) produces a covariance set and [`mu_ucs`](@ref) a mean set; the
-covariance set parametrises a robust risk measure like [`UncertaintySetVariance`](@ref), while
-the mean set plugs into [`ArithmeticReturn`](@ref) to give a worst-case expected return. This
-page is a deep dive across both: covariance robustness, the confidence level that sizes the
-set, and worst-case-mean robust returns.
+An uncertainty set comes from an estimator, such as [`NormalUncertaintySet`](@ref), and an
+algorithm. [`BoxUncertaintySetAlgorithm`](@ref) gives an interval for each entry of the moment,
+and [`EllipsoidalUncertaintySetAlgorithm`](@ref) gives one ellipsoid over all the entries.
+[`sigma_ucs`](@ref) builds a covariance set and [`mu_ucs`](@ref) builds a mean set. A robust
+risk measure such as [`UncertaintySetVariance`](@ref) takes the covariance set, and
+[`ArithmeticReturn`](@ref) takes the mean set to give a worst-case expected return. This page
+covers both sets, and the confidence level that sets their size.
 
 !!! tip "When to reach for this"
-    Reach for uncertainty sets when you care less about a forecast and more about *robustness*
-    to the noise in the moments — short windows, unstable covariances, regime risk. A box set
-    is simple and conservative (it bounds each entry independently); an ellipsoidal set captures
-    the joint geometry. Which one diversifies depends on *what* you make robust: see sections 4
-    and 5 below. If you have actual views about where the moments are headed, reach for the view
-    priors instead — or combine both, since a robust risk measure composes with any prior.
+    Reach for uncertainty sets when the estimated moments are noisy, for example over a short
+    window, and you want weights that allow for that noise more than you want to act on a
+    forecast. A box set bounds each entry on its own. An ellipsoidal set bounds all the entries
+    together. On this page the ellipsoidal set gives the less concentrated weights, for the
+    covariance in section 4 and for the mean in section 5. If you hold views about where the
+    moments are going, reach for a view prior instead. You can also use both, because a robust
+    risk measure works with any prior.
 =#
 
 using PortfolioOptimisers, PrettyTables, StableRNGs
@@ -43,7 +42,7 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. The returns data
 
 We use the same S&P 500 slice as the other examples.
 =#
@@ -57,8 +56,10 @@ pr = prior(EmpiricalPrior(), rd)
 #=
 ## 2. Building covariance uncertainty sets
 
-We construct two covariance uncertainty sets from a [`NormalUncertaintySet`](@ref) — one box,
-one ellipsoidal. The set is estimated by resampling, so we fix an RNG for reproducibility.
+We build two covariance uncertainty sets with a [`NormalUncertaintySet`](@ref), a box and an
+ellipsoid. The box draws random covariance matrices from the Wishart law that normal returns
+imply, so we fix the random number generator to make the run repeatable. At its default the
+ellipsoid takes its radius from a chi-square quantile and draws nothing.
 =#
 
 ucs_box = sigma_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(), rng = StableRNG(1),
@@ -69,12 +70,11 @@ ucs_ell = sigma_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(), rng = StableRN
 #=
 ## 3. The confidence level `q` sizes the set
 
-`NormalUncertaintySet` takes a confidence level `q` (default `0.05`). It controls *how big* the
-uncertainty set is: a **smaller `q` is more demanding** and yields a **larger, more
-conservative** set, because you are insuring against a more extreme worst case. For a box set
-this widens every per-entry interval; for an ellipsoidal set it inflates the radius. We sweep
-`q` and measure the total width of the box (the sum of interval lengths) to watch the set grow
-as `q` shrinks.
+`NormalUncertaintySet` takes a confidence level `q`, whose default is `0.05`, and `q` sets the
+size of the set. A smaller `q` covers a more extreme worst case, so it gives a larger set. For a
+box set every interval widens, and for an ellipsoidal set the radius grows. We build a box set
+at four values of `q` and print the total width of each box, which is the sum of the lengths of
+its intervals.
 =#
 
 qs = [0.01, 0.05, 0.10, 0.20]
@@ -86,14 +86,15 @@ box_widths = [let u = sigma_ucs(NormalUncertaintySet(; rng = StableRNG(1), q = q
               for q in qs]
 
 pretty_table(DataFrame(; q = qs, Symbol("box total width") => box_widths);
-             title = "Smaller q → wider (more conservative) uncertainty set")
+             title = "Total width of the box set at each q")
 
 #=
-## 4. Robust vs nominal minimum-variance
+## 4. Robust and nominal minimum variance
 
-[`UncertaintySetVariance`](@ref) is the robust counterpart of [`Variance`](@ref): it minimises
-the worst-case variance over the uncertainty set rather than the point estimate. We compare a
-nominal minimum-variance portfolio against the box- and ellipsoid-robust versions.
+[`UncertaintySetVariance`](@ref) is the robust form of [`Variance`](@ref). It minimises the
+worst-case variance over the uncertainty set instead of the variance at the point estimate. We
+solve the nominal minimum-variance portfolio, then the robust one with the box set and with the
+ellipsoidal set.
 =#
 
 using Clarabel
@@ -110,33 +111,31 @@ res_ell = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs_ell),
                             obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pr, slv = slv)))
 
 #=
-The robust portfolios hedge against covariance estimation error. For *covariance* robustness the
-ellipsoidal set — which captures the joint geometry of the estimation error rather than bounding
-each entry on its own — typically produces the more diversified, less concentrated allocation.
+The table puts the weights of the three portfolios side by side. On this data the ellipsoidal
+set gives the less concentrated weights.
 =#
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Nominal" => res_nom.w,
                         "Box-robust" => res_box.w, "Ellipsoid-robust" => res_ell.w]);
-             formatters = [resfmt], title = "Minimum-variance weights: nominal vs robust")
+             formatters = [resfmt], title = "Minimum-variance weights, nominal and robust")
 
-# Nominal vs box- vs ellipsoid-robust minimum variance.
+# The composition of the nominal, box-robust and ellipsoid-robust portfolios.
 using StatsPlots, GraphRecipes
 plot_stacked_bar_composition([res_nom, res_box, res_ell], rd;
                              xticks = (1:3, ["Nominal", "Box", "Ellipsoid"]))
 
 #=
-## 5. Worst-case mean: robust expected returns
+## 5. Robust expected returns with a worst-case mean
 
-Robustness is not only about the covariance. A mean uncertainty set, built with [`mu_ucs`](@ref),
-plugs into [`ArithmeticReturn`](@ref) via its `ucs` keyword and makes the optimiser maximise the
-**worst-case** expected return over the set instead of the point estimate. This guards a
-return-seeking objective against the fact that sample means are extremely noisy over a single
-year.
+You can make the mean robust too. Build a mean uncertainty set with [`mu_ucs`](@ref) and pass it
+to [`ArithmeticReturn`](@ref) through its `ucs` keyword. The optimiser then maximises the
+worst-case expected return over the set instead of the return at the point estimate. A sample
+mean over one year of daily returns carries a large error, and an objective that seeks return
+acts on that error unless the mean is robust.
 
-A wiring note worth knowing: pass `ArithmeticReturn` a **pre-built** mean set (the result of
-`mu_ucs`), exactly as `UncertaintySetVariance` takes a pre-built `sigma_ucs` result. (Handing it
-the *estimator* instead defers construction to solve time and requires the returns data to be
-threaded through the optimiser.)
+Pass `ArithmeticReturn` the mean set that `mu_ucs` returns, as `UncertaintySetVariance` takes
+the set that `sigma_ucs` returns. If you pass the estimator instead, the optimiser builds the set
+when it solves, and it then needs the returns data as well.
 =#
 
 rf = 4.2 / 100 / 252
@@ -156,39 +155,59 @@ ret_ell = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                                 ret = ArithmeticReturn(; ucs = mu_ell))))
 
 #=
-The geometry flips relative to the covariance case. With a **box** mean set every asset's mean is
-pushed to its own lower bound independently, so the worst-case maximum-ratio portfolio piles into
-whichever single name still has the best worst-case Sharpe — it *concentrates*. The **ellipsoidal**
-mean set couples the assets through the joint estimation geometry, so no single name can be cheap
-in isolation and the worst-case allocation spreads out toward a near-equal-weight portfolio. The
-lesson: "box vs ellipsoid" does not map to "concentrated vs diversified" in the abstract — it
-depends on whether you are making the *mean* or the *covariance* robust.
+With a box mean set, the mean of each asset falls to the lower bound of its own interval. The
+worst-case portfolio then puts almost all its weight in the asset with the highest worst-case
+return. The ellipsoidal mean set bounds the means together, and its worst-case
+penalty grows as the weights concentrate. The worst-case portfolio spreads its weight over
+most of the assets.
 
-!!! note "Both worst-case-mean books here sit on the ratio's scale floor"
-    At these radii no portfolio's worst-case return beats `rf`, so the ratio is non-positive
-    everywhere and there is no tangency portfolio to find. [`MaximumRatio`](@ref) answers at its
-    scale floor `kmin` rather than on the degenerate ray, which is why the weights above respect
-    their constraints; read them as "the best worst-case return at that scale", not as a
-    worst-case tangency portfolio. The nominal book above is unaffected — it has a real one.
+!!! note "Neither worst-case mean portfolio is a tangency portfolio"
+    The last cell of this section prints the largest worst-case return that a long-only
+    portfolio can reach over each set, next to `rf`. When that return is below `rf`, the ratio
+    is negative for every portfolio, and no tangency portfolio exists. [`MaximumRatio`](@ref) solves the ratio with a scale variable `k`, and here it returns the
+    portfolio at the floor `kmin` of that variable, so the weights still meet their constraints.
+    Read them as the best worst-case return at that scale, not as a worst-case tangency
+    portfolio. The nominal problem has a tangency portfolio, so this note does not apply to
+    the nominal column.
 =#
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Nominal" => ret_nom.w,
                         "Box worst-case mean" => ret_box.w,
                         "Ellipsoid worst-case mean" => ret_ell.w]); formatters = [resfmt],
-             title = "Maximum-ratio weights: nominal vs worst-case mean")
+             title = "Maximum-ratio weights with the nominal mean and the two worst-case means")
 
 plot_stacked_bar_composition([ret_nom, ret_box, ret_ell], rd;
                              xticks = (1:3, ["Nominal", "Box μ", "Ellipsoid μ"]))
 
 #=
+We find the long-only portfolio with the largest worst-case return over each set with
+[`MaximumReturn`](@ref) and [`NoRisk`](@ref). Over a box, the worst-case return of the weights
+`w` is `μᵀw - dᵀ|w|`, where `d` is the vector of the half-widths of the intervals. Over an
+ellipsoid it is `μᵀw - k‖Gw‖₂`, where `k` is the radius of the set and `G` is the upper
+Cholesky factor of its covariance. We print both returns next to `rf`.
+=#
+
+using LinearAlgebra
+
+wc_box(w) = dot(pr.mu, w) - dot((mu_box.ub .- mu_box.lb) ./ 2, abs.(w))
+wc_ell(w) = dot(pr.mu, w) - mu_ell.k * norm(cholesky(mu_ell.sigma).U * w)
+function best_wc(ucs)
+    return optimise(MeanRisk(; r = NoRisk(), obj = MaximumReturn(),
+                             opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                 ret = ArithmeticReturn(; ucs = ucs)))).w
+end
+(rf = rf, box = wc_box(best_wc(mu_box)), ellipsoid = wc_ell(best_wc(mu_ell)))
+
+#=
 ## 6. Other set estimators: Delta and the ARCH bootstrap
 
-[`NormalUncertaintySet`](@ref) resamples under a Gaussian assumption, but it is not the only
-estimator. The simplest alternative is [`DeltaUncertaintySet`](@ref): a fixed *fractional
-perturbation* box around the point estimate, with no resampling at all. It is deterministic and
-essentially free to build — the set size is a modelling choice rather than something learned
-from the data. We build a covariance box with it and compare its total width against the Normal
-box from section 2.
+[`NormalUncertaintySet`](@ref) builds its sets from the sampling laws that normal returns imply,
+and other estimators exist. Two of them are [`DeltaUncertaintySet`](@ref) and
+[`ARCHUncertaintySet`](@ref). `DeltaUncertaintySet` is the simpler, a box whose intervals are a
+fixed fraction of the point estimate on each side, with no sampling. It gives the same set on
+every run and costs almost nothing to build. You choose the fraction, and the data does not
+change it. We build a covariance box with it and print its total width next to that of the
+Normal box of section 2.
 =#
 
 ucs_delta = sigma_ucs(DeltaUncertaintySet(), rd.X)
@@ -197,13 +216,12 @@ set_width(u) = sum(abs, u.ub .- u.lb)
 pretty_table(DataFrame(; estimator = ["Delta (fixed)", "Normal (q=0.05)"],
                        Symbol("box total width") =>
                            [set_width(ucs_delta), set_width(ucs_box)]);
-             title = "Delta is a tight, deterministic box")
+             title = "Total width of the Delta box and the Normal box")
 
 #=
-The Delta set is tighter than the Normal one here — a small fixed perturbation rather than a
-resampled interval. It plugs into [`UncertaintySetVariance`](@ref) exactly like the Normal set,
-so we solve a robust minimum-variance portfolio with it and compare against the Normal-box
-version from section 4.
+On this data the Delta box is narrower than the Normal box. [`UncertaintySetVariance`](@ref)
+takes it as it takes the Normal set, so we solve a robust minimum-variance portfolio with it and
+print its weights next to those of the Normal box of section 4.
 =#
 
 res_delta = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs_delta),
@@ -212,26 +230,29 @@ res_delta = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs_delta),
 
 pretty_table(DataFrame(["Assets" => rd.nx, "Delta-robust" => res_delta.w,
                         "Normal-box-robust" => res_box.w]); formatters = [resfmt],
-             title = "Minimum-variance weights: Delta vs Normal box")
+             title = "Robust minimum-variance weights with the Delta box and the Normal box")
 
 plot_stacked_bar_composition([res_nom, res_delta, res_box], rd;
                              xticks = (1:3, ["Nominal", "Delta", "Normal box"]))
 
 #=
-!!! note "Data-driven sets: the ARCH bootstrap"
-    For a set that reflects the data's *own* tail thickness and serial dependence rather than a
-    Gaussian or a fixed delta, use [`ARCHUncertaintySet`](@ref). It resamples the returns with a
-    block bootstrap — [`StationaryBootstrap`](@ref), [`MovingBootstrap`](@ref), or
-    [`CircularBootstrap`](@ref) — and is built the same way:
-    ```julia
-    ucs_arch = sigma_ucs(ARCHUncertaintySet(; alg = BoxUncertaintySetAlgorithm(),
-                                            bootstrap = StationaryBootstrap(), n_sim = 100,
-                                            seed = 1), rd.X)
-    ```
-    The resulting set is wider than the Gaussian one (it captures fat tails and autocorrelation
-    that the Normal estimator misses) and drops into `UncertaintySetVariance` identically. It is
-    the most data-driven of the three estimators and also the most expensive — it runs `n_sim`
-    bootstrap resamples — so it is described here rather than executed in this page.
+[`ARCHUncertaintySet`](@ref) builds a set from the tails and the serial dependence of the
+returns themselves, not from a Gaussian or a fixed fraction. It resamples the returns in blocks,
+with [`StationaryBootstrap`](@ref), [`MovingBootstrap`](@ref) or [`CircularBootstrap`](@ref),
+and fits the moments again on each of the `n_sim` resamples. We build a covariance box with it
+and print its total width next to that of the Normal box.
+=#
+
+ucs_arch = sigma_ucs(ARCHUncertaintySet(; alg = BoxUncertaintySetAlgorithm(),
+                                        bootstrap = StationaryBootstrap(), n_sim = 100,
+                                        seed = 1), rd.X)
+(arch = set_width(ucs_arch), normal = set_width(ucs_box))
+
+#=
+On this data the ARCH box is a little wider than the Normal box. The block bootstrap draws from
+the observed returns, so their fat tails and autocorrelation enter the set, and the Normal
+estimator ignores both. You pass this set to `UncertaintySetVariance` in the same way as the
+other two sets.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
@@ -244,6 +265,10 @@ plot_stacked_bar_composition([res_nom, res_delta, res_box], rd;
 #src   worst-case mean ≈ 9.8% max (near-equal-weight, 20 nz). Covariance case is the opposite
 #src   (ellipsoid diversifies). Documented this box/ellipsoid ≠ concentrated/diversified nuance
 #src   in section 5 because it is genuinely surprising.
+#src - CORRECTED 2026-09-23 (#1228 hand-back from #1235): rerun at 3183a91e79. The ellipsoid
+#src   spreads the weights in BOTH sections, so the "opposite" above was wrong. Covariance: box
+#src   max 0.41 / 7 names, ellipsoid 0.19 / 16. Mean: box max 0.9995 / 2 names, ellipsoid 0.21 /
+#src   15. Best long-only worst-case return: box 1.21e-4, ellipsoid -6.69e-4, rf 1.67e-4.
 #src - q sweep verified monotone: box total width 0.0577 (q=0.01) > 0.0370 (q=0.10). Smaller q =
 #src   wider/more conservative. The `q` field docstring only said "Quantile parameter" — added a
 #src   set-size note there (→ #126).
@@ -260,3 +285,6 @@ plot_stacked_bar_composition([res_nom, res_delta, res_box], rd;
 #src   (width 0.0474 with StationaryBootstrap, n_sim=100). But n_sim=100 took ~50s on this slice, so
 #src   per the build-cost trade-off it is DESCRIBED with a non-executed snippet rather than run in
 #src   the rendered page. If the bootstrap is sped up or cached, promote it to executed code.
+#src - PROMOTED 2026-09-23 (#1228 hand-back from #1235): at 3183a91e79 the ARCH build took 1.8 s
+#src   with compilation and 0.9 s warm, so it now runs. Width 0.0464 against 0.0440 for the
+#src   Normal box.

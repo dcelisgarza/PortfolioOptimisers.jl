@@ -457,12 +457,14 @@ const StatsAPI = PortfolioOptimisers.StatsAPI
         @test isnothing(PO.port_opt_view(PO.Regression(; M = M), i).esigma)
     end
 
-    @testset "set_idiosyncratic_covariance rewrites one field and keeps an unset L unset" begin
+    @testset "set_idiosyncratic_covariance rewrites three fields and keeps an unset L unset" begin
         M = [1.0 2.0; 3.0 4.0; 5.0 6.0]
         re = PO.Regression(; M = M, b = [0.1, 0.2, 0.3])
         @test isnothing(getfield(re, :L))
-        re2 = PO.set_idiosyncratic_covariance(re, [1.0, 2.0, 3.0])
+        re2 = PO.set_idiosyncratic_covariance(re, [1.0, 2.0, 3.0], [7, 8, 9], [9, 9, 9])
         @test re2.esigma == [1.0, 2.0, 3.0]
+        @test re2.edof == [7, 8, 9]
+        @test re2.ediv == [9, 9, 9]
         # The `swap(L, M)` rule makes `re.L` answer `M`, so a property-based rewrite would
         # materialise `L` as a copy of `M`. This one reads `getfield`, so the field stays
         # unset and `M` and `b` come through untouched.
@@ -471,9 +473,16 @@ const StatsAPI = PortfolioOptimisers.StatsAPI
         @test re2.b == [0.1, 0.2, 0.3]
         # A set `L` survives, and `nothing` clears the field.
         reL = PO.Regression(; M = M, L = 2 * M)
-        @test PO.set_idiosyncratic_covariance(reL, [1.0, 2.0, 3.0]).L == 2 * M
-        @test isnothing(PO.set_idiosyncratic_covariance(re2, nothing).esigma)
+        @test PO.set_idiosyncratic_covariance(reL, [1.0, 2.0, 3.0], nothing, nothing).L ==
+              2 * M
+        re3 = PO.set_idiosyncratic_covariance(re2, nothing, nothing, nothing)
+        @test isnothing(re3.esigma)
+        @test isnothing(re3.edof)
+        @test isnothing(re3.ediv)
         # The guards of the constructor run again.
-        @test_throws DimensionMismatch PO.set_idiosyncratic_covariance(re, [1.0, 2.0])
+        @test_throws DimensionMismatch PO.set_idiosyncratic_covariance(re, [1.0, 2.0],
+                                                                       nothing, nothing)
+        @test_throws DimensionMismatch PO.set_idiosyncratic_covariance(re, [1.0, 2.0, 3.0],
+                                                                       [1, 2], nothing)
     end
 end

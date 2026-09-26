@@ -6,7 +6,7 @@ status: accepted
 
 ## Context
 
-Three prior estimators reweight observations: [`EntropyPoolingPrior`](../../src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior.jl),
+Three prior estimators reweight observations: [`EntropyPoolingPrior`](../../src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_c.jl),
 [`MeucciEntropyPoolingPrior`](../../src/10_Prior/06_EntropyPooling/02_MeucciEntropyPoolingPrior.jl) and
 [`OpinionPoolingPrior`](../../src/10_Prior/07_OpinionPoolingPrior.jl). Each one fits a nested prior
 and pools a probability vector over the scenarios that fit produced.
@@ -20,7 +20,7 @@ its exposure lag consumes. Its scenarios are the window the fit is defined on, a
 design.
 
 So `ep_prior` sized `w0` at `size(X, 1)` and pushed it down the whole estimator tree with
-[`factory`](../../src/02_Tools.jl) **before** it fitted the nested prior. The nested prior then fitted
+[`factory`](../../src/02_Tools/04_Factory.jl) **before** it fitted the nested prior. The nested prior then fitted
 on fewer rows than the weights it carried, and the call raised a bare
 `DimensionMismatch: Inconsistent array dimension.` out of `StatsBase`, one call below any check that
 could name it. Issue [#849](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/849) holds
@@ -71,7 +71,7 @@ if !isnothing(pe.w)
 end
 ```
 
-`ep_prior_probabilities`, in [`10_Base_EntropyPoolingPrior.jl`](../../src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior.jl),
+`ep_prior_probabilities`, in [`10_Base_EntropyPoolingPrior.jl`](../../src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/),
 holds the one rule for all four `ep_prior` bodies. It reads three sources in order:
 
 1. **`pe.w`**, the caller's own tilt, which no fit can state. Its length must equal

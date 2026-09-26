@@ -3,41 +3,38 @@
 Description = "Ordered weighted average (OWA) risk measures in PortfolioOptimisers.jl: weight sorted returns to build tail and dispersion measures."
 ```
 
-# OWA risk measures
+# [OWA risk measures](@id example-owa-risk-measures)
 
-Ordered Weighted Average (OWA) risk measures describe portfolio risk as a linear
-combination of **sorted portfolio returns**. The combination weights — the *OWA weights
-vector* — determine which quantile of the distribution is emphasised: a vector that loads
-heavily on the worst few observations gives a CVaR-like tail measure, while one that spreads
-weight across the whole distribution is more like a dispersion measure.
+An ordered weighted average (OWA) risk measure is a weighted sum of the portfolio returns sorted
+from worst to best. The weights of that sum, the OWA weights, decide which part of the
+distribution counts most. Weights on the few worst returns give a tail measure like CVaR, and
+weights spread over the whole distribution give a measure of dispersion.
 
-Three things make OWA measures attractive:
+This page covers three points about OWA measures.
 
-  1. **Generalisation.** CVaR, Gini Mean Difference, Tail Gini, Worst Realisation, and
-     Range are all special cases with closed-form weight vectors. You can define your own by
-     passing any valid `w` vector to [`OrderedWeightsArray`](@ref).
-  2. **L-moment perspective.** A particular family of OWA weights captures the *L-moments*
-     of the return distribution, giving a distribution-free risk summary that bridges
-     tail quantiles and distributional spread.
-  3. **Linear programming.** Every OWA measure leads to a linear programme in the portfolio
-     weights, so it composes cleanly with `MeanRisk`, `RiskBudgeting`, and the rest of the
-     framework without requiring a covariance matrix.
+  1. CVaR, the Gini mean difference, the tail Gini, the worst realisation and the range each
+     have a closed-form weight vector. You can also pass your own `w` to
+     [`OrderedWeightsArray`](@ref).
+  2. One family of OWA weights gives the *L-moments* of the return distribution. They describe
+     the spread and the tails of the distribution without a model of its shape.
+  3. The exact formulation of an OWA measure is a linear programme in the portfolio weights,
+     and no OWA measure needs a covariance matrix. `MeanRisk`, `RiskBudgeting` and the other
+     optimisers that take a risk measure accept an OWA measure.
 
 !!! tip "When to reach for this"
-    Reach for OWA risk measures when you want a tail or dispersion measure that does not
-    require a covariance matrix and that generalises beyond CVaR — especially when the
-    return distribution is non-normal and you want the measure to respond to the full shape
-    of the distribution rather than only to variance or a single quantile.
+    Reach for an OWA risk measure when you want a tail or dispersion measure that needs no
+    covariance matrix and covers more cases than CVaR. It suits returns that are far from
+    normal, where the variance or one quantile misses part of the distribution and you want
+    the measure to depend on its whole shape.
 
-!!! note "Exact vs approximate formulation"
-    [`OrderedWeightsArray`](@ref) supports two internal formulations: **exact**
-    (`ExactOrderedWeightsArray`), which solves a small LP per portfolio evaluation and is
-    fast for a small number of assets/observations but does not scale to large problems;
-    and **approximate** (`ApproxOrderedWeightsArray`, the default), which approximates the
-    OWA objective with a set of p-norms and solves as a second-order cone problem, scaling
-    to the normal S&P 500 slice used throughout the examples. All optimisations in this
-    example use the **approximate** formulation, which is the default and is appropriate
-    for the ~252 observations and ~20 assets used here.
+!!! note "Exact and approximate formulations"
+    [`OrderedWeightsArray`](@ref) has two formulations. The exact one,
+    `ExactOrderedWeightsArray`, is a linear programme that adds `T × T` constraints for `T`
+    observations, so it grows fast with the length of the sample. The approximate one,
+    `ApproxOrderedWeightsArray`, is the default. It replaces those constraints with one
+    p-norm constraint for each entry of `p`, and it gives an upper bound on the exact risk
+    that is close when the weights change almost linearly with rank. Every optimisation on
+    this page uses the approximate formulation.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames
@@ -86,20 +83,20 @@ opt = JuMPOptimiser(; pe = pr, slv = slv)
 #=
 ## 2. Closed-form OWA weight vectors
 
-The library ships functions that return the OWA weights for the classical special cases.
-Each function takes `T` (the number of observations) and returns a length-`T` vector. Those
-vectors are passed as `w` to [`OrderedWeightsArray`](@ref) to build a risk measure.
+The library has one function for the OWA weights of each classical case. Each function takes
+`T`, the number of observations, and returns a vector of length `T`. We pass each vector as `w`
+to [`OrderedWeightsArray`](@ref) to build a risk measure.
 
-| Function | Measure | Intuition |
-| -------- | ------- | --------- |
-| `owa_gmd(T)` | Gini Mean Difference | Average absolute spread across all pairs; a dispersion measure |
-| `owa_cvar(T)` | CVaR | Recovers the standard 5 % CVaR via the OWA framework |
-| `owa_tg(T)` | Tail Gini | Gini spread over the worst tail; more sensitive to tail shape than CVaR |
-| `owa_tgrg(T)` | Tail Gini Range | Tail Gini of losses minus tail Gini of gains; two-sided tail |
-| `owa_wr(T)` | Worst Realisation | Equivalent to min-return; entirely determined by the single worst day |
-| `owa_rg(T)` | Range | Max return minus min return; full return span |
-| `owa_cvarrg(T)` | CVaR Range | CVaR of losses minus CVaR of gains |
-| `owa_l_moment_crm(T)` | L-moment CRM | Higher-order L-moment convex risk measure |
+| Function | Measure | What it measures |
+| -------- | ------- | ---------------- |
+| `owa_gmd(T)` | Gini mean difference | The mean absolute difference over all pairs of returns, a dispersion measure |
+| `owa_cvar(T)` | CVaR | The CVaR at 5 %, written as an OWA measure |
+| `owa_tg(T)` | Tail Gini | The Gini spread within the worst tail, which depends on the shape of the tail as well as its level |
+| `owa_tgrg(T)` | Tail Gini range | The tail Gini of the worst returns and of the best returns together, a measure of both tails |
+| `owa_wr(T)` | Worst realisation | The negative of the worst return, so only the worst day counts |
+| `owa_rg(T)` | Range | The best return minus the worst return |
+| `owa_cvarrg(T)` | CVaR range | The mean of the best 5 % of returns minus the mean of the worst 5 % |
+| `owa_l_moment_crm(T)` | L-moment CRM | A convex risk measure built from the L-moments of order 2 to `k`, with `k = 2` by default |
 =#
 
 r_gmd = OrderedWeightsArray(; w = owa_gmd(T))
@@ -109,14 +106,14 @@ r_tgrg = OrderedWeightsArray(; w = owa_tgrg(T))
 r_wr = OrderedWeightsArray(; w = owa_wr(T))
 r_rg = OrderedWeightsArray(; w = owa_rg(T))
 r_cvarrg = OrderedWeightsArray(; w = owa_cvarrg(T))
-r_lcrm = OrderedWeightsArray(; w = owa_l_moment_crm(T))
+r_lcrm = OrderedWeightsArray(; w = owa_l_moment_crm(T; k = 5))
 
 #=
 ## 3. Minimising each OWA risk measure
 
-We build a minimum-risk `MeanRisk` portfolio for each OWA measure and collect the weights.
-Because all these measures are approximated with p-norms via the default
-`ApproxOrderedWeightsArray`, they all solve as second-order cone problems with Clarabel.
+We build a minimum-risk `MeanRisk` portfolio for each OWA measure and print the weights. Every
+measure uses the default `ApproxOrderedWeightsArray`, so Clarabel solves each one as a conic
+problem.
 =#
 
 rs = [r_gmd, r_cvar, r_tg, r_tgrg, r_wr, r_rg, r_cvarrg, r_lcrm]
@@ -129,17 +126,19 @@ pretty_table(DataFrame(hcat(rd.nx, [r.w for r in results]...),
                        [:assets; Symbol.(names_r)...]); formatters = [resfmt])
 
 #=
-Even though all portfolios minimise risk, the allocations differ substantially because each
-measure emphasises a different aspect of the distribution:
+Every portfolio minimises a risk, but each measure counts a different part of the distribution,
+so the portfolios differ.
 
-  - **GMD** penalises pairwise spread — it concentrates into correlated low-volatility names.
-  - **CVaR** focuses on the worst 5 % of days and ignores moderate losses.
-  - **TailGini** also looks at the tail but responds to its *shape* (Gini spread within the
-    tail), not only its level.
-  - **WorstRealisation** and **Range** are extreme: the solver pushes all weight into
-    whatever reduces a single day or the full span.
-  - **L-moment CRM** distributes attention over many higher-order distributional moments at
-    once.
+  - `GMD` weights every pair of days, so every day counts.
+  - `CVaR` uses only the worst 5 % of days and ignores smaller losses.
+  - `TailGini` also uses the worst days, and it responds to the Gini spread within the tail
+    as well as to its level.
+  - `WorstReal` depends on one day and `Range` on two days, so the solver chooses the weights that
+    improve those days alone.
+  - `L-moment` uses the L-moments of order 2 to 5, `k = 5`. The second L-moment alone has half
+    the GMD weights, and the higher orders add weight on the tails. On this sample the
+    portfolio holds the same assets as `GMD`, with different weights. Section 7 changes
+    the mix of the orders.
 =#
 
 using StatsPlots, GraphRecipes
@@ -148,63 +147,72 @@ plot_stacked_bar_composition(results, rd)
 #=
 ## 4. Default approximate formulation
 
-[`OrderedWeightsArray`](@ref) with no `w` and no explicit `alg` defaults to
-`ApproxOrderedWeightsArray`, which approximates the OWA sort with a set of p-norms
-(`p = [2, 3, 4, 10, 50]`). The resulting optimisation is a second-order cone programme.
+[`OrderedWeightsArray`](@ref) with no arguments uses the Gini mean difference weights,
+`owa_gmd`, and the formulation `ApproxOrderedWeightsArray` with `p = [2, 3, 4, 10, 50]`. This is
+the GMD measure of section 3. We print the largest absolute difference between its weights and
+the weights of the `GMD` column. A difference of zero means that the two portfolios are the
+same.
 
-This is the recommended path when you do not need an exact closed-form weight vector and
-want the solver to use the most tractable formulation.
+Use the approximate formulation for a long sample. Use `ExactOrderedWeightsArray` when the weights
+are far from linear in rank, where the approximation is less close.
 =#
 
 r_approx = OrderedWeightsArray()
 res_approx = optimise(MeanRisk(; r = r_approx, opt = opt))
-println("Approx OWA, max weight: $(round(maximum(res_approx.w)*100; digits=2)) %")
+println("Largest weight difference from the GMD column: ",
+        maximum(abs, res_approx.w .- results[1].w))
 
 #=
-## 5. OWA risk measure range — two-sided tail control
+## 5. OWA range measures for both tails
 
-[`OrderedWeightsArrayRange`](@ref) defines a *range* measure as the difference of two OWA
-weight vectors — one for losses, one for gains. This is the OWA generalisation of a
-two-sided risk measure.
+[`OrderedWeightsArrayRange`](@ref) builds a *range* measure from two OWA weight vectors, `w1`
+for the worst returns and `w2` for the best returns. You write `w2` in the same orientation as
+`w1`, and the constructor reverses it. The measure then weights the sorted returns by
+`w1 - w2`, which covers the worst returns through `w1` and the best through `w2`. Pass `rev = true` if
+your `w2` is already reversed. This is the OWA form of a risk measure for both tails.
 
-The default range is `owa_tg` (lower tail) minus the reversed `owa_tg` (upper tail), which
-is equivalent to `owa_tgrg`. Passing custom `w1` and `w2` gives full control over what
-"bad" and "good" outcomes each side of the range tracks.
+The default range takes `owa_tg` for both tails, which gives the same weights as `owa_tgrg`.
+Its portfolio still differs from the `TailGiniRange` column of section 3. The approximate
+formulation of a range approximates each tail on its own and adds the two, and the
+`TailGiniRange` measure of section 3 approximates the combined weights in one block. You can
+pass your own `w1` and `w2` to choose what each side measures. We also build a range
+from `owa_cvar` and `owa_wr`, the CVaR of the losses plus the largest return.
 =#
 
-## Default range: tail Gini losses vs tail Gini gains.
 r_range_default = OrderedWeightsArrayRange()
 
-## Custom range: CVaR losses vs worst realisation gains.
 T_obs = T
-r_range_custom = OrderedWeightsArrayRange(; w1 = owa_cvar(T_obs),
-                                          w2 = reverse(owa_wr(T_obs)))
+r_range_custom = OrderedWeightsArrayRange(; w1 = owa_cvar(T_obs), w2 = owa_wr(T_obs))
 
 res_range_d = optimise(MeanRisk(; r = r_range_default, opt = opt))
 res_range_c = optimise(MeanRisk(; r = r_range_custom, opt = opt))
 
 pretty_table(DataFrame(; :assets => rd.nx, :TailGiniRange => res_range_d.w,
-                       :CVaR_vs_WorstGain => res_range_c.w); formatters = [resfmt])
+                       :CVaR_plus_MaxReturn => res_range_c.w); formatters = [resfmt])
 
 #=
-## 6. Maximum Sharpe ratio with an OWA measure
+## 6. Maximum risk-adjusted ratio with an OWA measure
 
-OWA risk measures work as the denominator in a risk-adjusted ratio objective too, which lets
-you find the portfolio that maximises return per unit of tail dispersion rather than return
-per unit of variance.
+An OWA measure can also be the risk in the ratio objective. We maximise the return, net of the
+risk-free rate, per unit of Gini mean difference.
 =#
 
 rf = 4.2 / 100 / 252
 res_ratio = optimise(MeanRisk(; r = r_gmd, obj = MaximumRatio(; rf = rf), opt = opt))
-println("GMD Sharpe portfolio, max weight: $(round(maximum(res_ratio.w)*100; digits=2)) %")
+println("GMD ratio portfolio, max weight: $(round(maximum(res_ratio.w)*100; digits=2)) %")
 pretty_table(DataFrame(; :assets => rd.nx, :weight => res_ratio.w); formatters = [resfmt])
 
 #=
-## 7. L-moment CRM: controlling risk aversion with `g`
+## 7. The risk aversion `g` of the L-moment CRM
 
-The [`NormalisedConstantRelativeRiskAversion`](@ref) estimator generates L-moment CRM
-weights parameterised by `g ∈ (0, 1)`. As `g → 0` the weights concentrate on the worst
-observations; as `g → 1` they spread more evenly across the distribution.
+[`NormalisedConstantRelativeRiskAversion`](@ref) builds the weights of the L-moment CRM from a
+risk aversion `g`, with `0 < g < 1`. We use the L-moments of order 2 to 5, `k = 5`. A larger
+`g` gives the higher-order L-moments more weight, and the OWA weights then put more of their
+mass on the worst returns. A smaller `g` brings the measure closer to the second L-moment,
+which is half the Gini mean difference.
+
+We minimise the measure for `g` equal to 0.25, 0.5 and 0.75. The default is `g = 0.5`, which
+is the `L-moment` measure of section 3, so the `g=0.5` column repeats that column.
 =#
 
 gs = [0.25, 0.5, 0.75]
@@ -218,26 +226,23 @@ pretty_table(DataFrame(hcat(rd.nx, [r.w for r in lcrm_results]...),
                        [:assets, Symbol.("g=" .* string.(gs))...]); formatters = [resfmt])
 
 #=
-Lower `g` concentrates into defensive names (the worst-day sensitivity dominates); higher
-`g` spreads across more assets as the estimator starts to care about moderate returns too.
+As `g` rises, the portfolio moves weight from PEP to JNJ, and every other weight changes by
+less than one percentage point. The bars run from the smallest `g` on the left to the largest
+on the right.
 =#
 
-## The risk-aversion sweep, side by side: lower `g` (left) loads the defensive names harder.
 plot_stacked_bar_composition(lcrm_results, rd)
 
 #=
 ## Summary
 
-OWA risk measures offer a linear-programme-compatible family that spans the full
-spectrum from worst-realisation to distributional dispersion:
-
-  - **Closed-form vectors** (`owa_gmd`, `owa_tg`, `owa_cvar`, …) plug directly into
-    [`OrderedWeightsArray`](@ref) with no solver required for weight construction.
-  - **Default approximate formulation** (`ApproxOrderedWeightsArray`) scales to realistic
-    universes without any code changes.
-  - **L-moment CRM** with `NormalisedConstantRelativeRiskAversion` and `g` gives a
-    continuously tunable risk-aversion dial.
-  - **Range variants** (`OrderedWeightsArrayRange`) track two-sided tail exposure.
+  - The closed-form functions, such as `owa_gmd`, `owa_tg` and `owa_cvar`, return a weight
+    vector that you pass to [`OrderedWeightsArray`](@ref). Building the weights needs no
+    solver.
+  - `owa_l_moment_crm` with `NormalisedConstantRelativeRiskAversion` sets the weight on the
+    worst returns through `g`. With its default `k = 2` it gives the Gini mean difference
+    portfolio.
+  - `OrderedWeightsArrayRange` measures both tails at once.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

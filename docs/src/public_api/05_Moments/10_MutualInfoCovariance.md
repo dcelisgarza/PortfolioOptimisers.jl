@@ -2,7 +2,7 @@
 Description = "Mutual Information Covariance, public API of PortfolioOptimisers.jl: MutualInfoCovariance, cor."
 ```
 
-# Mutual Information Covariance
+# [Mutual Information Covariance](@id api-mutual-information-covariance)
 
 ```@docs
 MutualInfoCovariance

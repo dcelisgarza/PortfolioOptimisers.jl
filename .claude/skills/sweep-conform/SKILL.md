@@ -1,6 +1,6 @@
 ---
 name: sweep-conform
-description: Make an addition under src/ or ext/ conform to the sweep of #404 before the commit — the manifest row, the unit count, the child map, the coverage entry, the include line, and the two tracker steps no Julia test can reach. Use after adding or changing any file under src/ or ext/, and before committing.
+description: "Make an addition under src/ or ext/ conform to the sweep of #404 before the commit — the manifest row, the unit count, the child map, the coverage entry, the include line, and the two tracker steps no Julia test can reach. Use after adding or changing any file under src/ or ext/, and before committing."
 ---
 
 # Conforming to the sweep
@@ -50,20 +50,27 @@ Steps 3 and 4 write to the tracker. The `sweep-file-issues` skill does them.
 ## What each failure means
 
 **`no row in code_health/sweep_manifest.toml`.** Paste the line the check printed, and choose `map` yourself.
-**`map` is not derivable from a path.** Each of the nine subdirectories of `src/` and `ext/` uses
-exactly one child map, and there the check names it outright. The top level of `src/` holds files
-across five maps, and the numeric prefix does not rescue the lookup: the blocks are not contiguous.
-The check prints the candidates and you choose by subject.
+**`map` is not always derivable from a path.** When the file's directory uses one child map, the
+check names it outright. When the directory uses several, as the top level of `src/` and
+`src/17_Optimisation/` do, the numeric prefix does not rescue the lookup: the blocks are not
+contiguous. The check prints the candidates and you choose by subject.
 
 **`the unit count moved`.** A documented unit joined the file. This is the case the rule is really
 aimed at — a type or a function added to an *existing* file, which already has a row — so record
-the new count *and* take steps 3 and 4 for that file. A unit is a docstring that attaches to a
+the new count. On an unswept row, take steps 3 and 4 for that file too. On a swept row, sweep the
+new unit in the same commit instead, as the next paragraph says. A unit is a docstring that attaches to a
 binding. A field docstring inside a struct body is not one.
 
 **`the unit set moved under a swept row`.** The count held and the names did not: a unit was
 replaced one for one, which is the case of ADR 0148. The sweep passed a text the file no longer
-holds, so paste the printed line — it carries the new `bindings` list and keeps `swept = true` —
-and take steps 3 and 4 for the rewritten units, as you would for an addition.
+holds, so paste the printed line — it carries the new `bindings` list and keeps `swept = true`.
+
+**A swept row owes no step 3 or 4** (ADR 0148 § Amendment, issue #1310). The commit that adds or
+rewrites a unit in a swept file sweeps that unit itself: the swept standard below, the three
+conditions of the manifest header, and a claim check of each new sentence against its source. A
+sub-issue would record nothing that the commit does not, and `code_health/sweep_triage.jl --file`
+refuses a swept row. A commit that cannot meet the standard sets `swept = false` and drops
+`algorithm` and `bindings`. The row is then an ordinary addition, and steps 3 and 4 apply.
 
 **`src/PortfolioOptimisers.jl` holds 0 `include` line(s) for it.** Add the `include` in the load
 order the file needs. `test/test_47_alias_and_module_census.jl` demands exactly one.
@@ -77,8 +84,10 @@ order the file needs. `test/test_47_alias_and_module_census.jl` demands exactly 
 
 **A file whose row reads `swept = true` is held to the swept standard now.** Its addition owes a
 `# Algorithm` section where the docstring standard demands one, no `# Details` section, a `Where:`
-bullet that interpolates `math_dict` rather than copying it, and `# Related` on a dispatch alias.
-`test/test_26_docs.jl` holds all four, and it holds the row's `algorithm` count as a floor. Raise
+bullet that interpolates `math_dict` rather than copying it, `# Related` on a dispatch alias, and
+prose that passes `/unslop`.
+`test/test_26_docs.jl` holds the first four and no gate holds the pass, which holds by review. The
+test also holds the row's `algorithm` count as a floor. Raise
 that count in the same commit when the new unit carries the section.
 
 **A new file has no coverage row yet.** The gate ratchets `misses` per file, so a file with no row

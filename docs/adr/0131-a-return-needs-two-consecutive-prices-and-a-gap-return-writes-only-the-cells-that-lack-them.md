@@ -174,3 +174,20 @@ columns before the drift compounds.
 A spread of a gap's move across its observations is expressible under the invariant and is not
 shipped. It is a convention no one has asked for, and the family is open precisely so that it costs
 one type when someone does.
+
+## Amendment (2026-09-26): the writable set is the cells that read a gapped price
+
+The section *A Gap Return writes only the cells the default rule left non-finite* gave the
+writable set as a non-finite cell inside the Listing Span with an earlier observed price. That set
+held more than the invariant it was written for. A zero price is an observed price, and
+`TimeSeries.percentchange` gives `-1` (simple) or `-Inf` (log) on its observation and `Inf` on the
+next. Each of these cells reads two observed prices. The `Inf` and the `-Inf` are non-finite and
+lay inside the span, so a caller's own algorithm could overwrite them. The sweep of
+`11_PricesToReturns.jl` (#894) found it.
+
+The writable set is now a cell whose later price lies in `[first + 1, last]` of the Listing Span
+and whose pair of prices holds a gap. A cell that reads a gapped price is always non-finite under
+the default rule, so every cell the old rule admitted for a gap is still admitted, and
+`CatchUpGapReturn` writes the same values as before, in the batch conversion and in the online step.
+Only the cells of a zero price leave the set. The invariant this ADR states, that a cell computed
+from two observed prices is never altered, now holds without an exception.

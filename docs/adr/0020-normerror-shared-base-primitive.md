@@ -60,3 +60,38 @@ rename the `Lx*` types from `*Tracking` to `*Norm`.**
   there is more than one view to reconcile).
 - New shared surface: extension authors adding a norm write one `NormError` subtype +
   `norm_error` method and it is immediately usable in tracking, risk targets and priors.
+
+## Amendment (2026-09-23)
+
+Issue #1271 found that the family had no rule for the factor that divides each norm, and that
+`LInfNorm` broke the pattern the others follow. The family now has one rule: **the norm of order
+`p` divides by `(T - d)^(1/p)`**, where `T` is the number of observations and `d` is `ddof`.
+`L1Norm` and `L2Norm` are the templates.
+
+| Norm            | Factor          | Default `ddof` |
+| :-------------- | :-------------- | :------------- |
+| `L1Norm`        | `T - d`         | `0`            |
+| `L2Norm`        | `sqrt(T - d)`   | `1`            |
+| `SquaredL2Norm` | `T - d`         | `1`            |
+| `LpNorm`        | `(T - d)^(1/p)` | `1`            |
+| `LInfNorm`      | `1`             | no field       |
+
+- **`LInfNorm` divides by `1`**, the limit of `(T - d)^(1/p)` as `p` grows. Its old factor was
+  `T - d`, which no source gave. With 252 daily returns, `err = 0.01` then allowed a worst day of
+  2.52, so the constraint almost never bound. `err` is now the worst single-period difference.
+  The `ddof` field had no effect after that change, so it was removed: `LInfNorm()` takes no
+  arguments. This is breaking for a caller that passed `ddof`.
+- **`L1Norm` gains `ddof`**, default `0`. The default keeps the denominator `T` of the source
+  (Cajas 2025, Eq. 9.17), so no present `L1Norm` number moves.
+- **`LpNorm` defaults to `ddof = 1`**, so `LpNorm(; p = 2)` equals `L2Norm()`. This is breaking for
+  a caller that relied on the old default `0`. `L1Norm` keeps `0`, so `LpNorm(; p = 1)` and
+  `L1Norm()` differ by `T / (T - 1)`. We kept that difference on purpose: the `T - 1` correction
+  gives the sample standard deviation, and it has no such reason for a mean absolute deviation.
+- **`SquaredL2Norm`** is the square of the `L2Norm` error, so its factor is the square of the
+  `L2Norm` factor. It is the one member that does not follow the rule in `p`.
+- **`norm_factor` is the one source of the factor.** `norm_error` read it before. Now the JuMP
+  models of `TrackingError` and `TrackingRiskMeasure` read it too, at every norm, where each had
+  written the factor by hand. The drift that #1271 found lived in those copies. The second-order
+  cone of `SquaredL2Norm` reads the square root of its factor.
+- Entropy pooling reads the same `norm_factor`, so an `LpNorm` or `LInfNorm` passed as its `err`
+  takes the new factor.

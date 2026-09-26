@@ -6,7 +6,7 @@
     #     optimise(o::Opt{<:Any, …, Nothing}, args…; kwargs…) = _optimise(o, args…; kwargs…)
     #
     # which skips the fallback chain in the generic `optimise`
-    # (`01_Base_Optimisation.jl`) when the estimator has no fallback. The `Nothing` is
+    # (`01_Base_Optimisation/05_InvestableUniverse.jl`) when the estimator has no fallback. The `Nothing` is
     # positional, so each site re-encodes "`fb` is type parameter k" by hand, and the
     # count is invisible to the reader.
     #
@@ -76,5 +76,5 @@
     with_fb = which(PortfolioOptimisers.optimise,
                     Tuple{da_type(GreedyAllocation), FiniteAllocationInput})
     @test basename(string(no_fb.file)) == "02_DiscreteFiniteAllocation.jl"
-    @test basename(string(with_fb.file)) == "01_Base_Optimisation.jl"
+    @test basename(string(with_fb.file)) == "05_InvestableUniverse.jl"
 end

@@ -3,28 +3,26 @@
 Description = "Expected returns estimation in PortfolioOptimisers.jl: shrinkage estimators that pull the noisy sample mean toward a structured target."
 ```
 
-# Expected returns estimation
+# [Expected returns estimation](@id example-expected-returns-estimation)
 
-The sample mean is the noisiest ingredient in portfolio optimisation. With only a year of
-daily data the per-asset average return is estimated very imprecisely, and any optimiser that
-*chases* return — maximum return, maximum risk-adjusted ratio, high-risk-aversion utility —
-amplifies that noise into extreme, unstable weights. **Shrinkage** estimators pull the raw
-sample mean toward a structured target, trading a little bias for a large reduction in
-variance.
+The sample mean is the noisiest input of a portfolio optimisation. One year of daily data gives
+a poor estimate of the average return of each asset. An optimiser that seeks return, such as
+maximum return, the maximum risk-adjusted ratio or maximum utility, turns that noise into
+extreme weights. A shrinkage estimator pulls the sample mean toward a structured target. It
+accepts a little bias for a large fall in variance.
 
-`PortfolioOptimisers` exposes the expected-returns estimator as the `me` field of a prior.
-The default is the plain sample mean ([`SimpleExpectedReturns`](@ref)); the shrinkage
-estimator [`ShrunkExpectedReturns`](@ref) wraps it with an algorithm —
-[`BayesStein`](@ref), [`BodnarOkhrinParolya`](@ref) or [`JamesStein`](@ref) — each of which
-shrinks toward one of three targets: [`GrandMean`](@ref), [`VolatilityWeighted`](@ref) or
-[`MeanSquaredError`](@ref).
+A prior takes its expected returns estimator in the `me` field. The default is
+[`SimpleExpectedReturns`](@ref), the plain sample mean. [`ShrunkExpectedReturns`](@ref) wraps
+it with one of three algorithms, [`BayesStein`](@ref), [`BodnarOkhrinParolya`](@ref) or
+[`JamesStein`](@ref). Each algorithm shrinks toward one of three targets,
+[`GrandMean`](@ref), [`VolatilityWeighted`](@ref) or [`MeanSquaredError`](@ref).
 
 !!! tip "When to reach for this"
-    Reach for a shrunk expected-returns estimator whenever your objective depends on the mean
-    — [`MaximumReturn`](@ref), [`MaximumRatio`](@ref), or a risk-averse
-    [`MaximumUtility`](@ref) — and especially when the estimation window is short relative to
-    the number of assets. If you only ever run [`MinimumRisk`](@ref) or risk-budgeting (which
-    ignore the mean), the estimator hardly matters and the default is fine.
+    Reach for a shrunk expected returns estimator when your objective reads the mean, as
+    [`MaximumReturn`](@ref), [`MaximumRatio`](@ref) and [`MaximumUtility`](@ref) do, and
+    above all when the window is short next to the number of assets. [`MinimumRisk`](@ref)
+    and risk budgeting ignore the mean, so if you only run those, the default estimator is
+    enough.
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -45,9 +43,9 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. The data
 
-We use the same S&P 500 slice as the other examples.
+We load one year of daily prices of 20 assets and convert them to 252 daily returns.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -58,10 +56,10 @@ rd = prices_to_returns(X)
 #=
 ## 2. Expected-returns estimators
 
-We build one prior per estimator, varying **only** the `me` field so the covariance is
-identical across them — any difference in the optimisation later is due purely to the expected
-returns. We compare the plain sample mean against Bayes–Stein, Bodnar–Okhrin–Parolya and
-James–Stein shrinkage toward different targets.
+We build one prior per estimator and change only the `me` field, so every prior carries the
+same covariance. Any difference in the optimisation later comes from the expected returns
+alone. We compare the sample mean with Bayes-Stein, Bodnar-Okhrin-Parolya and James-Stein
+shrinkage toward different targets.
 =#
 
 mes = ["Vanilla" => SimpleExpectedReturns(),
@@ -74,9 +72,9 @@ mes = ["Vanilla" => SimpleExpectedReturns(),
 prs = [k => prior(EmpiricalPrior(; me = me), rd) for (k, me) in mes]
 
 #=
-The expected-returns vectors side by side. Note that shrinkage toward the grand mean
-(`BS(GM)`, `JS(GM)`) preserves the cross-sectional average while pulling the spread in, whereas
-volatility-weighted and MSE targets shift the level too.
+Shrinkage toward the grand mean, in `BS(GM)` and `JS(GM)`, keeps the average over the assets
+and narrows the spread around it. The volatility-weighted target and the mean squared error
+target move the average as well.
 =#
 
 pretty_table(DataFrame(["Assets" => rd.nx; [k => p.mu for (k, p) in prs]]);
@@ -85,22 +83,22 @@ pretty_table(DataFrame(["Assets" => rd.nx; [k => p.mu for (k, p) in prs]]);
 #=
 ## 3. Visualising the shrinkage
 
-[`plot_mu`](@ref) makes the pull-toward-target visible: compared with the raw sample mean, the
-shrunk estimator compresses the dispersion of the per-asset expected returns.
+[`plot_mu`](@ref) draws the expected return of each asset as a bar. The bars of the shrunk
+estimator spread less than the bars of the sample mean.
 =#
 
-# Vanilla sample-mean expected returns.
 using StatsPlots, GraphRecipes
-# Bayes–Stein (volatility-weighted target) expected returns.
+# The sample mean.
 plot_mu(prs[1].second, rd.nx)
+# Bayes-Stein shrinkage toward the volatility-weighted target.
 plot_mu(prs[3].second, rd.nx)
 
 #=
-## 4. Why it matters: a return-seeking optimisation
+## 4. Expected returns in a maximum-ratio portfolio
 
-Expected returns only bite when the objective uses them. We maximise the risk-adjusted ratio
-with each prior in turn (same covariance, different mean) and compare the resulting weights.
-The noisy sample mean concentrates; shrinkage spreads the allocation out and stabilises it.
+The expected returns change a portfolio only when the objective reads them. We maximise the
+risk-adjusted ratio with each prior in turn, and compare the weights. The covariance is the same
+in every prior, so only the mean differs. Compare how many assets get a weight in each column.
 =#
 
 using Clarabel
@@ -117,8 +115,7 @@ pretty_table(DataFrame(["Assets" => rd.nx; [k => r.w for (k, r) in ress]]);
              formatters = [resfmt], title = "Maximum-ratio weights by mu estimator")
 
 #=
-The composition plot drives the point home: swapping the expected-returns estimator alone
-reshapes the maximum-ratio portfolio.
+The composition plot draws the same weights as one bar per estimator.
 =#
 
 plot_stacked_bar_composition([r for (_, r) in ress], rd;

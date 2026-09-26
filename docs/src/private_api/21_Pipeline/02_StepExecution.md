@@ -4,9 +4,9 @@ Description = "Step execution, private API of PortfolioOptimisers.jl: run_step, 
 
 # Step execution: private API
 
-The step execution contract is the only pipeline-aware layer over the estimator families. Each `run_step` method reads the [`PipelineContext`](@ref) slots its estimator needs, dispatches to that family's **native verb** — [`prior`](@ref) for prior estimators, [`clusterise`](@ref) for clustering, [`optimise`](@ref) for optimisers, [`fit_preprocessing`](@ref)/[`apply_preprocessing`](@ref) for preprocessing estimators — and writes the slot the family produces.
+A `run_step` method is the only code that connects an estimator family to a pipeline. It reads the slots of the [`PipelineContext`](@ref) that its estimator needs, and calls the function that the family uses outside a pipeline: [`prior`](@ref) for a prior estimator, [`clusterise`](@ref) for a clustering estimator, [`optimise`](@ref) for an optimiser, and [`fit_preprocessing`](@ref) and [`apply_preprocessing`](@ref) for a preprocessing estimator. It then writes the slot that the family produces.
 
-The estimators themselves live with their own families and know nothing about pipelines; the preprocessing estimators, for instance, are documented under [Preprocessing](../03_InputData/04_Preprocessing.md).
+The estimators do not depend on the pipeline code, and their docstrings are with their own families. The preprocessing estimators, for example, are on the [preprocessing](@ref private-api-preprocessing) page.
 
 ```@docs
 run_step
@@ -20,4 +20,4 @@ pipeline_asset_sets
 add_constraint_result
 ```
 
-A [`TrainTestSplit`](@ref) is the one step whose written slot is not a property of its type: it narrows whichever data slot the pipeline input filled, and declares the sentinel `:split` (see [`pipe_writes`](@ref)) so that the generic constructor machinery treats it as writing nothing. Its `run_step` method and slot declarations are documented with `run_step`, [`pipe_reads`](@ref), and [`pipe_writes`](@ref).
+A [`TrainTestSplit`](@ref) is the one step whose written slot does not follow from its type. It narrows whichever data slot the pipeline input filled, the prices or the returns. [`pipe_writes`](@ref) returns `:split` for it, which is not a slot, so the pipeline treats the step as one that writes nothing. The docstrings of `run_step`, [`pipe_reads`](@ref) and [`pipe_writes`](@ref) cover the `run_step` method of the split and its slot declarations.

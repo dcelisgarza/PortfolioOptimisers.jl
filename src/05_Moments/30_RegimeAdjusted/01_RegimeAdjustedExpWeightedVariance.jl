@@ -479,7 +479,7 @@ julia> ce.min_obs
                                                                                 <:Number}},
                                                min_val::Number, centred::Bool,
                                                cache::Option{<:AbstractPartialFitState})
-        assert_nonempty_gt0_finite_val(decay, :decay)
+        assert_unit_interval(decay, :decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         assert_nonempty_gt0_finite_val(regime_min_obs, :regime_min_obs)
         if !isnothing(regime_lohi_mult)
@@ -628,7 +628,7 @@ squared innovations.
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
 function get_regime_state(method::FirstMomentRegimeAdjusted, z2_valid::VecNum, ::Any)
-    return Statistics.mean(sqrt.(max.(z2_valid, zero(eltype(z2_valid))))) / method.x
+    return Statistics.mean(z -> sqrt(max(z, zero(eltype(z2_valid)))), z2_valid) / method.x
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1054,7 +1054,7 @@ function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::
                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = regime_adjusted_variance_pass!(ce, X, dims, estimation_mask, active_mask)
-    if !ce.centred && any(.!cache.active)
+    if !ce.centred && any(!, cache.active)
         cache.location[.!cache.active] .= NaN
     end
 
@@ -1646,19 +1646,19 @@ The panel travels as the third positional argument, and this method unpacks it o
 """
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    amsk, emsk = panel_moment_masks(pnl)
+    amsk, emsk = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.var(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
                           kwargs...)
 end
 function Statistics.std(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    amsk, emsk = panel_moment_masks(pnl)
+    amsk, emsk = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.std(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
                           kwargs...)
 end
 function variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
                          pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    amsk, emsk = panel_moment_masks(pnl)
+    amsk, emsk = dims_oriented(dims, panel_moment_masks(pnl)...)
     return variance_series(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
                            kwargs...)
 end
@@ -1666,6 +1666,9 @@ end
 # Folds in every configuration; only its merge refuses (see [`supports_partial_fit`](@ref)).
 function supports_partial_fit(::RegimeAdjustedExpWeightedVariance)
     return true
+end
+function variance_count(ve::RegimeAdjustedExpWeightedVariance, X::MatNum)
+    return exp_weighted_variance_count(ve.decay, X)
 end
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
        RegimeAdjustedExpWeightedVariance

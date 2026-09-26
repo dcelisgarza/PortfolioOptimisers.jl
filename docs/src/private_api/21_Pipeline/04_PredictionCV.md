@@ -6,9 +6,9 @@ Description = "Pipeline cross-validation, private API of PortfolioOptimisers.jl:
 
 ## The pipeline fold loop
 
-`cross_val_predict` over a `Pipeline` fits the whole workflow per fold and predicts on each test window. It is also the fold loop that consumes [`TimeDependent`](@ref) schedules in a pipeline (ADR 0030, "swap, then inject"): schedules are swapped for their per-fold values *before* `fit` runs, so injection never sees a schedule and `fit`/[`run_step`](@ref) never learn about folds.
+`cross_val_predict` over a `Pipeline` fits the whole pipeline on each training window and predicts on each test window. It also replaces each [`TimeDependent`](@ref) schedule of the pipeline with its value for the fold, before `fit` runs. So no value that the pipeline passes to the optimiser is a schedule, and neither `fit` nor [`run_step`](@ref) reads the fold.
 
-A scheme that declares a Fold Fit sends the loop down its online arm, where the pipeline is warmed up once, folded fold by fold through [`partial_fit!`](@ref), and read out through `fit(pipe)`; `Online(pipe)` takes the same doors as the declared refit. See [the Pipeline's online step](06_OnlinePipeline.md).
+A scheme built by [`OnlineIndexWalkForward`](@ref) or [`OnlineDateWalkForward`](@ref) is an online scheme. With one, the loop fits the pipeline once on the first training window, adds the rows of each later fold with [`partial_fit!`](@ref), and gets the fitted result from `fit(pipe)` with no data. `Online(pipe)` goes through the same `cross_val_predict` methods, and refits the whole pipeline at each fold on a buffer of the rows so far. The [online pipeline](@ref private-api-the-pipelines-online-step) page documents both.
 
 ```@docs
 PortfolioOptimisers.Pipeline_OnlPipe
@@ -17,15 +17,15 @@ PortfolioOptimisers.pipeline_cross_val_predict
 
 ## Combinatorial and asset-resampling over a returns-level pipeline
 
-A returns-level pipeline runs the multi-path schemes like the plain-optimiser loops: combinatorial fits each split on its (possibly non-contiguous) training rows and predicts its test groups; multiple-randomised runs each path's inner walk-forward over an asset-subset view of the input, so the pipeline fits fresh on the sub-universe and never sub-selects fitted state.
+A pipeline over returns runs the schemes with many paths in the same way as a plain optimiser. [`CombinatorialCrossValidation`](@ref) fits each split on its training rows, which need not be contiguous, and predicts its test groups. [`MultipleRandomised`](@ref) runs the inner walk-forward of each path on a view of the input that holds a subset of the assets. The pipeline fits again on that subset, and never takes a subset of a state it already fitted.
 
 ```@docs
 PortfolioOptimisers.pipeline_path_fit_and_predict
 ```
 
-## Time-dependent traits and the swap over steps
+## Schedules in the steps of a pipeline
 
-The per-step legs of the time-dependent machinery: the traits recurse over a pipeline's steps, the swap maps over them (unwrapping [`PipelineStep`](@ref)-wrapped schedules), the fold-less reset resolves schedule steps to their explicit `default`, and the previous-weights factory delivers `w_prev` to the optimisation steps after the swap.
+The functions below apply the schedule logic to each step of a pipeline. The check for a schedule looks through every step. So does the replacement of each schedule by its value for the fold, which also unwraps a schedule inside a [`PipelineStep`](@ref). A run with no folds sets each schedule step to its `default`. After the replacement, `pipeline_step_factory` gives the weights of the previous fold, `w_prev`, to the optimisation steps.
 
 ```@docs
 PortfolioOptimisers.pipeline_step_is_time_dependent

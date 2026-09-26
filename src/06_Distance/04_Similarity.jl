@@ -91,9 +91,9 @@ S_{i,\\,j} &= \\left\\lceil\\max(\\mathbf{D})^2\\right\\rceil - D_{i,\\,j}^2\\,,
 
 Where:
 
-  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
+  - $(math_dict[:S_ij_sim])
   - $(math_dict[:D_mat_dist])
-  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
+  - $(math_dict[:D_ij_dist])
 
 !!! warning
 
@@ -140,9 +140,9 @@ S_{i,\\,j} &= e^{-D_{i,\\,j}}\\,,
 
 Where:
 
-  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
+  - $(math_dict[:S_ij_sim])
   - $(math_dict[:D_mat_dist])
-  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
+  - $(math_dict[:D_ij_dist])
 
 # Algorithm
 
@@ -179,9 +179,9 @@ S_{i,\\,j} &= e^{-c \\cdot D_{i,\\,j}^p}\\,,
 
 Where:
 
-  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
+  - $(math_dict[:S_ij_sim])
   - $(math_dict[:D_mat_dist])
-  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
+  - $(math_dict[:D_ij_dist])
   - ``c``: Scale factor.
   - ``p``: Exponent.
 
@@ -268,9 +268,9 @@ S_{i,\\,j} &= 1 - D_{i,\\,j}\\,,
 
 Where:
 
-  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
+  - $(math_dict[:S_ij_sim])
   - $(math_dict[:D_mat_dist])
-  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
+  - $(math_dict[:D_ij_dist])
 
 This recovers the named similarity counterpart of every distance that is itself one minus a similarity. `Distances.CosineDist` returns the cosine similarity, `Distances.Jaccard` the Ruzicka similarity, `Distances.BrayCurtis` the Sørensen–Dice similarity, and `Distances.CorrDist` the Pearson correlation.
 
@@ -278,7 +278,7 @@ This recovers the named similarity counterpart of every distance that is itself 
 
     The result is only correlation-like when ``\\mathbf{D} \\in [0,\\,1]``. Above `1` the similarity is negative.
 
-    What happens next depends on the path. On the [`FeatureDistance`](@ref) path the value is **kept**, lands outside the ``[-1,\\,1]`` range that [`plot_clusters`](@ref) assumes, and is silently clipped there rather than flagged. On the PMFG path the same input is **refused** by [`assert_similarity_domain`](@ref), because [`PMFG_T2s`](@ref)'s consumers cannot take a negative weight. Symmetry and the unit diagonal survive either way.
+    What happens next depends on the path. On the [`FeatureDistance`](@ref) path the value is **kept**, and [`plot_clusters`](@ref) colours it on the signed scale ``[-1,\\,1]``. A distance above `2` gives a similarity below `-1`, which that scale clips silently rather than flags. On the PMFG path the same input is **refused** by [`assert_similarity_domain`](@ref), because [`PMFG_T2s`](@ref)'s consumers cannot take a negative weight. Symmetry and the unit diagonal survive either way.
 
     The rule is `D <= 1`, **not** "the metric is unbounded". `Distances.CosineDist` and `Distances.CorrDist` are bounded — by `2`, not by `1` — and are refused whenever they exceed `1`, which `CorrDist` does at every negative correlation. In-library sources that exceed `1`: [`LogDistance`](@ref), [`DistanceDistance`](@ref) — whose `Distances.Euclidean` **default** puts most of its entries above `1` — and [`VariationInfoDistance`](@ref) with `normalise = false`. Use [`ExponentialSimilarity`](@ref) or [`GeneralExponentialSimilarity`](@ref) for a member with no domain at all.
 
@@ -325,9 +325,9 @@ S_{i,\\,j} &= \\cos\\left(\\pi D_{i,\\,j}\\right)\\,,
 
 Where:
 
-  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
+  - $(math_dict[:S_ij_sim])
   - $(math_dict[:D_mat_dist])
-  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
+  - $(math_dict[:D_ij_dist])
 
 For an angular distance ``D_{i,\\,j} = \\arccos(\\rho_{i,\\,j}) / \\pi`` this recovers ``\\rho_{i,\\,j}`` exactly, without reference to the data the distance was computed from. Against [`AngularDist`](@ref) the recovered cosine matches the one computed from the features to floating-point precision. It maps ``[0,\\,1] \\to [1,\\,-1]``, so the similarity is bounded and the diagonal is unity whenever the distance matrix has a zero diagonal.
 

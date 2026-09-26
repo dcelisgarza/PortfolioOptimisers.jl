@@ -12,9 +12,11 @@
 #   [[unmeasured_path]] a path the gate never measures. It has no row and nothing to ratchet.
 #   [[exemption]]       a real number that may stand. It binds issue candidacy alone.
 #   [[dismissal]]       a JET report class that is not a defect. It binds the reviewed count.
+#   [[perf_dismissal]]  a performance Finding that is not a trap. It binds the rule's count.
 #   [[coverage_exemption]]  a line that no test can reach. It binds the terminal condition.
 #
-# An Exemption, a Dismissal and a Coverage Exemption all cite a Rationale by name. Citing an
+# An Exemption, a Dismissal, a performance Dismissal and a Coverage Exemption all cite a Rationale
+# by name. Citing an
 # approved Rationale is bookkeeping and any contributor may do it. Adding a `[rationale.…]` block
 # is a claim that some code is correct, and it needs the maintainer.
 
@@ -34,6 +36,9 @@ cyclomatic = 10
 cognitive = 15
 argcount = 10
 jet_reviewed = 1
+# ADR 0175. An added file enters `code_health/perf_baseline.toml` with no performance Finding that
+# a Dismissal does not cover, which is the entry rule `jet_reviewed` sets for JET.
+perf_reviewed = 1
 
 # --- the size ratchet ------------------------------------------------------
 #
@@ -141,6 +146,17 @@ constructors show the two shapes it is not: `PartialLinearConstraint`, whose sig
 line, carries 215 there, and `UniverseSets`, whose signature is three, carries 67. A row here is \
 therefore keyed to the one definition that shows it, never to multi-line signatures as a class."""
 
+[rationale.a-signature-line-counter-on-a-method-whose-body-is-reached]
+text = """
+A method whose body runs can still read zero on its `function` line. Julia allocates that counter \
+to a method of some signatures and not to its siblings, and the call that reaches the body does not \
+increment it. Measured by the sweep of issue #1075 over `test_25_plotting.jl` alone: the \
+`BitVector` method of `investable_plot_view` carries 12 on its `return` line and 0 on its \
+`function` line, the `Nothing` method beside it has no counter on its `function` line at all, and \
+Codecov records the same single miss on that line for `dev`. The body is reached by every test that \
+draws a computed figure of a gapped prior, so no test can pay the line. A row here is keyed to the \
+one definition that shows it."""
+
 [rationale.a-return-after-an-unconditional-throw]
 text = """
 A fallback method that exists only to reject a term has one unconditional `throw` for a body, and \
@@ -187,6 +203,47 @@ drives its own file's maximum. Neither body changed. Lowering either number is s
 the definition itself: the macro carries the whole pretty-show rendering, and `apply_preferences!` \
 carries one branch per key of `PREFERENCE_KEYS`."""
 
+[rationale.an-allocation-the-loop-keeps]
+text = """
+ADR 0175 reads an allocation inside a `for` or `while` body as a temporary unless a keeper call \
+such as `push!` or `setindex!` takes it on the same line. The parser cannot see an allocation \
+bound with a plain `=` that the loop keeps: one stored into a Result or a dictionary on a later \
+line, one returned by the iteration's own branch, or one rebound as the state the next iteration \
+reads. Each such array is a distinct output of its iteration, and it has its own length, so one \
+buffer before the loop would alias every stored copy to the last one. The ADR names this case and \
+says that it takes a Dismissal. Found by issue #1312 at twelve sites: the bisection frontier of \
+the hierarchical optimisers, the test-index lists of the combinatorial split, the family lists of \
+the cross-sectional factor axis, the NaN weight matrices of `rebuild_weight_path`, the copies that \
+`replace_prior_views` returns, and the index lists `replace_coprior_views` records per row."""
+
+[rationale.a-slice-the-result-keeps]
+text = """
+A slice passed to a callee that returns it, or stores it in the Result it builds, becomes a field \
+of that Result. A view would make the field a `SubArray` that aliases a local matrix, which \
+changes the field's type and keeps the whole matrix alive. Found by issue #1312 at \
+`cross_sectional_idiosyncratic_covariance`, which returns the variance row it is given when its \
+threshold is zero."""
+
+[rationale.a-failure-message-is-a-cold-path]
+text = """
+ADR 0175 leaves a cold path unread: an interpolation, a `throw`, an `error`, or a logging macro. \
+A function that only builds the text of a failure message is the same path in a definition of its \
+own, and runs once, on the solve that failed. Its loop sorts the keys of each trial's dictionary, \
+whose key type differs between trials, so a shared buffer would need an `Any` element type."""
+
+[rationale.a-matrix-chain-the-code-keeps]
+text = """
+`linalg_temporary` reads `x' * A * y` over two lowercase names as a quadratic form over two \
+vectors, whose scalar `dot(x, A, y)` reads without the vector `A * y`. The rule reads text and \
+cannot see a type. When the left end is a matrix, the chain is not a scalar. With two matrix ends \
+it is the congruence `B' * A * B`, and with a vector at the right it is the vector `B' * A * y`. \
+The code keeps that matrix or vector whole, and `dot(B, A, y)` is a single scalar, a different \
+quantity. The three-argument `*` already takes the cheaper order. Found at two sites of the \
+factor risk contribution: `set_risk_constraints!` under `Variance`, which reads rows of \
+`transpose(b) * sigma * b` and its inner product with `W` (#1350), and \
+`set_factor_risk_contribution_constraints!`, whose hedge constraint holds one row per entry of \
+`transpose(b2) * pr.sigma * w` (#1351). Approved by the maintainer on 2026-09-26 (#845)."""
+
 # --- exemptions ------------------------------------------------------------
 #
 # Keyed (path, definition, metric), dropped before the file's maximum is taken. An Exemption binds
@@ -194,12 +251,18 @@ carries one branch per key of `PREFERENCE_KEYS`."""
 #
 # The seventeen below are issue #356's, written before the scheduled job first runs. They name
 # every constructor standing above the argument-count threshold of 10, not only the one that drives
-# its file, because `src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl` holds a second at 19. Nineteen
+# its file, because `src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl` holds a second at 19. Nineteen
 # definitions sit over seventeen keys, because the key holds no line.
 
 [[exemption]]
 path = "src/03_InputData/10_ReturnsResult.jl"
 definition = "ReturnsResult"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl"
+definition = "ProgrammeAllocationSet"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
@@ -238,13 +301,13 @@ metric = "arg"
 rationale = "a-definition-a-file-split-moved-unchanged"
 
 [[exemption]]
-path = "src/05_Moments/05_Gerber/03_GerberIQCovariance.jl"
+path = "src/05_Moments/05_Gerber/03_GerberIQCovariance_a.jl"
 definition = "FullGerberIQ"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/05_Moments/05_Gerber/03_GerberIQCovariance.jl"
+path = "src/05_Moments/05_Gerber/03_GerberIQCovariance_a.jl"
 definition = "PartialGerberIQ"
 metric = "arg"
 rationale = "keyword-constructor-arity"
@@ -280,7 +343,7 @@ metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior.jl"
+path = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_c.jl"
 definition = "EntropyPoolingPrior"
 metric = "arg"
 rationale = "keyword-constructor-arity"
@@ -298,25 +361,25 @@ metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl"
+path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl"
 definition = "JuMPOptimiser"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl"
+path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl"
 definition = "ProcessedJuMPOptimiserAttributes"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl"
+path = "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl"
 definition = "NearOptimalCentering"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
-path = "src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl"
+path = "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl"
 definition = "NearOptimalSetup"
 metric = "arg"
 rationale = "keyword-constructor-arity"
@@ -382,6 +445,297 @@ definition = "apply_preferences!"
 metric = "cog"
 rationale = "a-definition-a-file-split-moved-unchanged"
 
+# The letter splits of ADR 0178 cut eight files near the size threshold. Each definition
+# below stood inside its old file's row, and now drives the maximum of the part that holds it.
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl"
+definition = "ep_evar_anchor"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl"
+definition = "ep_evar_grid"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl"
+definition = "ep_rlvar_anchor"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl"
+definition = "ep_rlvar_grid"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_b.jl"
+definition = "ep_add_evar_view!"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_b.jl"
+definition = "ep_add_rlvar_view!"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_c.jl"
+definition = "EntropyPoolingPrior"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_c.jl"
+definition = "ep_prior"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_c.jl"
+definition = "ep_prior"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl"
+definition = "JuMPOptimiser"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl"
+definition = "JuMPOptimiser"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl"
+definition = "PredictionReturnsResult"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl"
+definition = "PredictionReturnsResult"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl"
+definition = "fit_and_predict"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl"
+definition = "fold_loop"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl"
+definition = "regime_adjusted_covariance_pass!"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl"
+definition = "regime_adjusted_covariance_pass!"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl"
+definition = "RegimeAdjustedExpWeightedCovariance"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl"
+definition = "NearOptimalCentering"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl"
+definition = "near_optimal_centering_setup"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl"
+definition = "solve_noc!"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_b.jl"
+definition = "get_overall_retcode"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_b.jl"
+definition = "solve_noc!"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/05_Moments/05_Gerber/03_GerberIQCovariance_a.jl"
+definition = "gerber_iq_weight"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/05_Moments/05_Gerber/03_GerberIQCovariance_a.jl"
+definition = "gerber_iq_weight"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/05_Moments/05_Gerber/03_GerberIQCovariance_a.jl"
+definition = "iq_add_diagonal"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl"
+definition = "UniverseSets"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl"
+definition = "collect_terms!"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl"
+definition = "collect_terms!"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl"
+definition = "eval_numeric_functions"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl"
+definition = "get_linear_constraints"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl"
+definition = "replace_group_by_assets"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl"
+definition = "get_linear_constraints"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl"
+definition = "replace_group_by_assets"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+# The splits by subject of ADR 0179 moved each definition below unchanged into a file of its
+# subject, where it now drives the file's maximum.
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/04_EntropyPoolingSolvers.jl"
+definition = "entropy_pooling"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/04_EntropyPoolingSolvers.jl"
+definition = "ep_var_views!"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/04_EntropyPoolingSolvers.jl"
+definition = "entropy_pooling"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/04_EntropyPoolingSolvers.jl"
+definition = "ep_var_views!"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/05_EntropyPoolingMomentViews.jl"
+definition = "replace_coprior_views"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/05_EntropyPoolingMomentViews.jl"
+definition = "replace_coprior_views"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/02_Tools/05_Propagatable.jl"
+definition = "propagatable_parse_body"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/02_Tools/06_ForwardProperties.jl"
+definition = "@forward_properties"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/02_Tools/06_ForwardProperties.jl"
+definition = "@forward_properties"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+# The split by subject of the Plots extension (ADR 0179) moved each definition below unchanged
+# into a file of its subject, where it now drives the file's maximum.
+
+[[exemption]]
+path = "ext/PortfolioOptimisersPlotsExt/04_CompositionPlots.jl"
+definition = "PortfolioOptimisers.plot_factor_risk_contribution"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "ext/PortfolioOptimisersPlotsExt/04_CompositionPlots.jl"
+definition = "PortfolioOptimisers.plot_risk_contribution"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl"
+definition = "PortfolioOptimisers.plot_efficient_frontier"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl"
+definition = "PortfolioOptimisers.plot_portfolio_dashboard"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
 # --- coverage exemptions ---------------------------------------------------
 #
 # ADR 0082. One row per definition that holds an uncovered line no test can reach, keyed
@@ -422,7 +776,7 @@ misses = 1
 rationale = "a-cut-into-one-cluster-is-always-valid"
 
 [[coverage_exemption]]
-path = "src/09_ConstraintGeneration/02_LinearConstraintGeneration.jl"
+path = "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl"
 definition = "LinearConstraint"
 misses = 1
 rationale = "a-signature-line-counter-the-test-job-cannot-reach"
@@ -440,3 +794,83 @@ path = "src/05_Moments/20_Base_Regression.jl"
 definition = "MaxValStepwiseRegressionCriterion"
 misses = 1
 rationale = "a-closure-inside-a-top-level-const"
+
+[[coverage_exemption]]
+path = "src/22_Plotting.jl"
+definition = "investable_plot_view"
+misses = 1
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
+
+# --- performance dismissals ------------------------------------------------
+#
+# ADR 0175. A row with `code` covers the one Finding whose printed code matches; a row without it
+# covers every Finding of the rule in the definition. Issue #1312 wrote the first rows.
+
+[[perf_dismissal]]
+file = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/02_EntropyPoolingMeanViews.jl"
+rule = "loop_allocation"
+definition = "replace_prior_views"
+rationale = "an-allocation-the-loop-keeps"
+
+[[perf_dismissal]]
+file = "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/05_EntropyPoolingMomentViews.jl"
+rule = "loop_allocation"
+definition = "replace_coprior_views"
+rationale = "an-allocation-the-loop-keeps"
+
+[[perf_dismissal]]
+file = "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl"
+rule = "loop_allocation"
+definition = "cross_sectional_factor_sets"
+rationale = "an-allocation-the-loop-keeps"
+
+[[perf_dismissal]]
+file = "src/14_NetReturnsDrawdowns.jl"
+rule = "loop_allocation"
+definition = "rebuild_weight_path"
+rationale = "an-allocation-the-loop-keeps"
+
+[[perf_dismissal]]
+file = "src/17_Optimisation/02_CrossValidation/03_Combinatorial.jl"
+rule = "loop_allocation"
+definition = "split"
+rationale = "an-allocation-the-loop-keeps"
+
+[[perf_dismissal]]
+file = "src/17_Optimisation/04_Hierarchical/02_HierarchicalRiskParity.jl"
+rule = "loop_allocation"
+definition = "_optimise"
+rationale = "an-allocation-the-loop-keeps"
+
+[[perf_dismissal]]
+file = "src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl"
+rule = "loop_allocation"
+definition = "schur_complement_weights"
+rationale = "an-allocation-the-loop-keeps"
+
+[[perf_dismissal]]
+file = "src/10_Prior/11_CrossSectionalFactorPrior.jl"
+rule = "slice_copy"
+definition = "prior"
+code = "vs[end, :]"
+rationale = "a-slice-the-result-keeps"
+
+[[perf_dismissal]]
+file = "src/01_Base/06_Messages.jl"
+rule = "loop_allocation"
+definition = "failed_solve_msg"
+rationale = "a-failure-message-is-a-cold-path"
+
+[[perf_dismissal]]
+file = "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl"
+rule = "linalg_temporary"
+definition = "set_risk_constraints!"
+code = "transpose(b) * sigma * b"
+rationale = "a-matrix-chain-the-code-keeps"
+
+[[perf_dismissal]]
+file = "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl"
+rule = "linalg_temporary"
+definition = "set_factor_risk_contribution_constraints!"
+code = "transpose(b2) * pr.sigma * w"
+rationale = "a-matrix-chain-the-code-keeps"

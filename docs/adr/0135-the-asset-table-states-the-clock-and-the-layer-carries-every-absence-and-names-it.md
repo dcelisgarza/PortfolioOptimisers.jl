@@ -237,3 +237,15 @@ steps, which is also the only place the layer's pieces are visible.
   closed to `Float32` and to every number type the library has not seen, which is the rule
   `.github/instructions/julia-source-code.instructions.md` § *Numeric types come from the data*
   states.
+
+## Amendment (2026-09-26)
+
+The target is now `float_if_integer(T)` of the promoted type, and no longer
+`typeof(oneunit(T) / one(T))`. The maintainer ruled that a site takes the type of its data and
+repairs an integer type only, through the one guard `float_if_integer` in
+`src/02_Tools/03_TypeUtilities.jl`. The type of a division decides for every type, because a
+number type is free to define its division in a different type, and
+`test/test_55_numeric_coercion_census.jl` now refuses that spelling. The answers this record
+states do not change: `Float32` answers itself, `Int` answers `Float64`, `BigInt` answers
+`BigFloat`, and a `Rational` answers itself. A number type the library has not seen now answers
+itself, and `absent_value` refuses it by name when it cannot hold an absence.

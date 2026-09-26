@@ -41,9 +41,9 @@ where ``\\mathrm{WR} = -\\min_t \\hat{r}_t`` and ``\\mathrm{BR} = -\\max_t \\hat
   - [`set_wr_risk_expression!`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
 """
-function set_risk_constraints!(model::JuMP.Model, ::Any, r::Range,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+function set_risk_constraints!(model::JuMP.Model, ::Any, r::Range, opt::RiskConstraintOwner,
+                               pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     return state_build!(model, prefix, :range_risk) do
         sc = get_constraint_scale(model)
         wr_risk = set_wr_risk_expression!(model, pr.X; prefix = prefix)

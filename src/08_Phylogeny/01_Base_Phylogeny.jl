@@ -607,7 +607,7 @@ f(d) &= d_{\\mathrm{max}} + 1 - d\\,,
 Where:
 
   - $(math_dict[:d_sep])
-  - ``d_{\\mathrm{max}}``: Separation budget in scope.
+  - $(math_dict[:dmax_sep])
 
 The default, and the only member that reads the budget. It is the fall-off the graded neighbourhood hardcoded before the family existed, so it reproduces those values exactly: a direct neighbour scores ``d_{\\mathrm{max}}``, the asset itself ``d_{\\mathrm{max}} + 1``.
 

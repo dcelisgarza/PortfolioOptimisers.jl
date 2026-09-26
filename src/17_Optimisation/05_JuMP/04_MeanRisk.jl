@@ -359,7 +359,7 @@ function port_opt_view(mr::MeanRisk, i, X::MatNum, args...)::MeanRisk
     opt = port_opt_view(mr.opt, i, X)
     r = port_opt_view(mr.r, i, X)
     wi = nothing_scalar_array_view(mr.wi, i)
-    return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = wi, fb = mr.fb)
+    return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = wi, fb = view_child(mr.fb, i, X))
 end
 """
     solve_mean_risk!(model, mr, pr, ::Val{false}, ::Val{false}, fees, attrs)
@@ -755,10 +755,10 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResu
     return frontier_sweep!(model, mr, eltype(pr.X),
                            frontier_sweep_axes(ret_axis, risk_axis))
 end
-function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult();
                    str_names::Bool = false, save::Bool = true, kwargs...)
     mr = reset_time_dependent_estimator(mr)
-    attrs = processed_jump_optimiser_attributes(mr.opt, rd; dims = dims, kwargs...)
+    attrs = processed_jump_optimiser_attributes(mr.opt, rd; kwargs...)
     # The bundle reduced what it carries. The head carries the rest — an initial weight
     # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
@@ -784,8 +784,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
 end
 """
     optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult; dims::Int = 1,
-             str_names::Bool = false, save::Bool = true, kwargs...) -> MeanRiskResult
+             rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...) -> MeanRiskResult
 
 Run the Mean-Risk portfolio optimisation.
 
@@ -793,7 +792,6 @@ Run the Mean-Risk portfolio optimisation.
 
   - `mr`: The mean risk optimiser to use.
   - $(arg_dict[:rd]) If `isa(mr.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
-  - `dims`: The dimension along which observations advance in time.
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
@@ -808,9 +806,9 @@ Run the Mean-Risk portfolio optimisation.
   - [`MeanRiskResult`](@ref)
 """
 function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+                  str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(mr, "`optimise`")
-    return _optimise(mr, rd; dims = dims, str_names = str_names, save = save, kwargs...)
+    return _optimise(mr, rd; str_names = str_names, save = save, kwargs...)
 end
 
 @pipe_delegates MeanRisk opt

@@ -66,7 +66,7 @@ Alias for an abstract vector of [`AbstractBaseRiskMeasure`](@ref) elements.
 """
 const VecBaseRM = AbstractVector{<:AbstractBaseRiskMeasure}
 function needs_previous_weights(r::VecBaseRM)::Bool
-    return any(needs_previous_weights.(r))
+    return any(needs_previous_weights, r)
 end
 """
     const BaseRM_VecBaseRM = Union{<:AbstractBaseRiskMeasure, <:VecBaseRM}
@@ -392,6 +392,34 @@ Return `false`: the target type requires portfolio weights (e.g. a per-asset `mu
 """
 weight_independent_target(::Any) = false
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the fee that a moment target `mu` subtracts, so that a per-asset target centres a net series on its net mean.
+
+A per-asset target states a gross expected return, ``\\boldsymbol{w}^\\intercal \\boldsymbol{\\mu}``. The series a moment measure centres is net of the fee, so the target is the net mean ``\\boldsymbol{w}^\\intercal \\boldsymbol{\\mu} - \\bar{F}(\\boldsymbol{w})``, where ``\\bar{F}`` is the mean fee per period that [`term_fees`](@ref) charges. A per period fee then cancels from every deviation, and the value of the measure agrees with its `JuMP` model. A target that [`weight_independent_target`](@ref) calls weight-independent (the mean or the median of the net series, or a scalar threshold) is already stated on the net series, so it subtracts nothing.
+
+# Arguments
+
+  - `mu`: The target slot of the measure.
+  - `w`: The weights of the target, ``\\boldsymbol{w}`` in ``\\boldsymbol{w}^\\intercal \\boldsymbol{\\mu}``.
+  - `fees`: Fee of the portfolio whose series is centred, or `nothing`.
+  - `T`: Observation count of the series, over which the one-off terms are spread.
+
+# Returns
+
+  - `f::Number`: ``\\bar{F}(\\boldsymbol{w})`` for a per-asset target, and a zero of the element type of `w` otherwise.
+
+# Related
+
+  - [`weight_independent_target`](@ref)
+  - [`term_fees`](@ref)
+  - [`calc_moment_target`](@ref)
+  - [`calc_deviations_vec`](@ref)
+"""
+function moment_target_fees(mu, w::VecNum, fees::Option{<:Fees}, T::Integer)
+    return weight_independent_target(mu) ? zero(eltype(w)) : term_fees(w, fees, T, true)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for risk measures that are not intended for use in portfolio optimisation routines.
@@ -479,7 +507,7 @@ A [`WeightsReturnsFeesInput`](@ref) measure also declares [`supports_precomputed
 
 ## The model builder
 
-A `JuMP` optimiser builds the measure into its model through [`set_risk_constraints!`](@ref), as `set_risk_constraints!(model::JuMP.Model, i, r::MyRiskMeasure, opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...; kwargs...)`, which has no fallback. The method builds the risk expression from the model's weights, then registers it with [`set_risk_bounds_and_expression!`](@ref), which reads the bound and the contribution to the aggregate risk expression off `r.settings`. Scale every constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), so the bound is compared against unrescaled weights under a ratio objective (ADR 0008).
+A `JuMP` optimiser, or a programme Allocation Set, builds the measure into its model through [`set_risk_constraints!`](@ref), as `set_risk_constraints!(model::JuMP.Model, i, r::MyRiskMeasure, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)`, which has no fallback. The method builds the risk expression from the model's weights, then registers it with [`set_risk_bounds_and_expression!`](@ref), which reads the bound and the contribution to the aggregate risk expression off `r.settings`. Scale every constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), so the bound is compared against unrescaled weights under a ratio objective.
 
 ## Optional methods
 
@@ -2159,7 +2187,7 @@ Refuse a **Deferred Quantity**, or an empty slot the functor reads, that reached
 
 [`expected_risk`](@ref) takes either a prior result or a plain returns matrix. Given the prior it resolves the measure through [`factory`](@ref) first. Given the matrix it cannot: that call has no `pr.w` to thread and no factor returns to reach, so resolving there would use a different rule than the settled one. So it refuses instead, naming the slot and the Estimator standing in it — without the refusal the failure lands several frames down, inside a kernel that expected a matrix.
 
-The same door refuses a slot that holds `nothing` when the functor reads it as it stands. `Variance()` is built with `sigma` at `nothing`, and the prior route fills it through [`factory`](@ref); the matrix route has nothing to fill it from, and `dot(w, nothing, w)` raised a bare `MethodError` inside `LinearAlgebra` that named neither the measure nor the slot (#1079). Which slots those are is declared by [`functor_slots`](@ref), so a slot whose `nothing` **has** a value-level reading — a moment measure's `mu`, which then means the sample mean — is never refused. Resolving the slot from the matrix instead would pick an estimator the caller never named, and would make the matrix route and the prior route disagree whenever the prior is not empirical, so the door refuses by name and states the two ways out.
+The same door refuses a slot that holds `nothing` when the functor reads it as it stands. `Variance()` is built with `sigma` at `nothing`, and the prior route fills it through [`factory`](@ref); the matrix route has nothing to fill it from, and `dot(w, nothing, w)` raised a bare `MethodError` inside `LinearAlgebra` that named neither the measure nor the slot. Which slots those are is declared by [`functor_slots`](@ref), so a slot whose `nothing` **has** a value-level reading — a moment measure's `mu`, which then means the sample mean — is never refused. Resolving the slot from the matrix instead would pick an estimator the caller never named, and would make the matrix route and the prior route disagree whenever the prior is not empirical, so the door refuses by name and states the two ways out.
 
 This is the shape [`HopCount`](@ref) and [`PathLength`](@ref) already use: the consumer resolves, the kernel refuses.
 

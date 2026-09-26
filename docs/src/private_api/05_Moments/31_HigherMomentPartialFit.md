@@ -4,7 +4,7 @@ Description = "Higher-Moment Partial Fit, private API of PortfolioOptimisers.jl:
 
 # Higher-Moment Partial Fit: private API
 
-The incremental fit of the third and fourth co-moments. [`partial_fit!`](@ref) folds a block of observations into the state an estimator carries, and [`coskewness`](@ref) and [`cokurtosis`](@ref) read the answer out of it. Only the `FullMoment` arm of each estimator takes part, because `SemiMoment` clips against a centre that a new observation moves.
+The coskewness and cokurtosis estimators can take the observations one block at a time. [`partial_fit!`](@ref) adds a block to the state that the estimator holds, and [`coskewness`](@ref) and [`cokurtosis`](@ref) compute the estimate from that state. Only the `FullMoment` form of the two estimators supports this, because `SemiMoment` clips the deviations at a centre that moves with every new observation.
 
 ## Types
 

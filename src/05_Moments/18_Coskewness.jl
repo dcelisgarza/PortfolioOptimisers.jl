@@ -305,8 +305,8 @@ function negative_spectral_part(vals::AbstractVector{<:Real}, vecs::MatNum, Tf::
     return vecs * LinearAlgebra.Diagonal(v) * transpose(vecs)
 end
 function negative_spectral_part(vals::AbstractVector{<:Complex}, vecs::MatNum, Tf::Type)
-    v = clamp.(real.(vals), typemin(Tf), zero(Tf)) +
-        clamp.(imag.(vals), typemin(Tf), zero(Tf))im
+    v = clamp.(real.(vals), typemin(Tf), zero(Tf)) .+
+        clamp.(imag.(vals), typemin(Tf), zero(Tf)) .* im
     return real(vecs * LinearAlgebra.Diagonal(v) * transpose(vecs))
 end
 """

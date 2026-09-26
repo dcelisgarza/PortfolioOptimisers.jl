@@ -420,7 +420,7 @@ struct StringDistanceConfig
     min_score::Float64
     function StringDistanceConfig(dist::StringDistances.StringDistance, min_score::Real)
         @argcheck(min_score > 0,
-                  ArgumentError("min_score must be positive; got $(min_score). A value above 1 legitimately disables suggestions, but a zero or negative threshold admits every candidate with any nonzero similarity, making `did_you_mean` echo a real asset name for near-miss probes and defeating the info-leak-safe boundary (ADR 0026)."))
+                  ArgumentError("min_score must be positive; got $(min_score). A value above 1 legitimately disables suggestions, but a zero or negative threshold admits every candidate with any nonzero similarity, making `did_you_mean` echo a real asset name for near-miss probes. A suggestion must never reveal which asset names exist to a caller who guesses."))
         return new(dist, min_score)
     end
 end
@@ -522,7 +522,7 @@ Global resource caps for equation parsing, guarding the string→AST trust bound
 
 Constraint, Black-Litterman view and entropy-pooling view strings are untrusted input (config files, spreadsheets, UI). They funnel through [`parse_equation`](@ref), which calls `Meta.parse` and then walks the resulting expression tree recursively ([`eval_numeric_functions`](@ref), `collect_terms!`, `has_invalid_plus`). Without a bound, a deeply nested string (e.g. tens of thousands of parentheses) produces an AST deep enough to exhaust the stack and take down the host process. These caps fail closed with a typed `Meta.ParseError` well before that point.
 
-The values are conservative static defaults (portable across build and deployment machines, unlike a value auto-detected during precompilation). Immutable; held in the [`EQUATION_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_equation_limits!`](@ref), override per scope via [`with_equation_limits`](@ref). See `docs/adr/0027-cap-equation-parser-recursion.md`.
+The values are conservative static defaults (portable across build and deployment machines, unlike a value auto-detected during precompilation). Immutable; held in the [`EQUATION_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_equation_limits!`](@ref), override per scope via [`with_equation_limits`](@ref).
 
 # Fields
 

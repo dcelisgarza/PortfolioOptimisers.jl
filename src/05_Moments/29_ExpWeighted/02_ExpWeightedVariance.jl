@@ -3,9 +3,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Estimates per-asset variance by an exponentially weighted recursion that freezes on a holiday and resets on an inactive period.
 
-The recursion is seeded at zero, so a newly listed asset starts from a cold state and the output divides out the damping that the cold start costs. An asset below `min_obs` valid observations is `NaN`, and so is an asset that the active mask leaves inactive at the last observation.
+The recursion starts at zero, so a newly listed asset starts from a cold state, and the output divides out the weight that the cold start lacks. An asset with fewer than `min_obs` valid observations since its last reset is `NaN`, and so is an asset that the active mask leaves inactive at the last observation.
 
-Keeping a young asset investable has a cost the prior pays for it. A prior fitted with this estimator zero-fills the rows the asset was missing through [`scenario_fill`](@ref), because every consumer of a Prior Result reads its returns matrix; a scenario-based measure then reads a zero return where the asset had none and understates that asset's risk over those rows, while the variance stays the estimate this recursion made from the rows it saw. The fill is silent at or below the fitting prior's own `fill_limit` field, a share of that asset's own observations, warns above it, and refuses any fill under `strict`; `fill_limit` defaults to `nothing`, and this family carries no `CoveragePolicy` to derive a limit from, so every fill is named.
+A young asset stays investable, and the returns matrix of the prior carries the cost. A prior fitted with this estimator fills the rows that the asset was missing with zero through [`scenario_fill`](@ref), because every consumer of a Prior Result reads its returns matrix. A scenario-based measure then reads a zero return where the asset had none, so it understates the risk of that asset over those rows. The variance stays the estimate that this recursion made from the rows it saw. The fill is silent up to the `fill_limit` field of the fitting prior, a share of the asset's own observations. Above that share it warns, and `strict` refuses any fill. `fill_limit` defaults to `nothing`, and this family carries no `CoveragePolicy` to derive a limit from, so every fill warns.
 
 # Fields
 
@@ -29,23 +29,44 @@ Keywords correspond to the struct's fields.
 
 # Mathematical definition
 
-The internal state of asset ``i`` after ``n_i`` valid observations is
+Let ``x_{i, k}`` be the ``k``-th valid return of asset ``i`` since its last reset, ``k = 1, \\ldots, n_i``. The running location starts at zero and follows the same recursion as the variance,
 
 ```math
-S_i = (1 - \\lambda) \\sum_{k=0}^{n_i - 1} \\lambda^{k} e_{i, n_i - k}^{2},
+\\begin{align}
+m_{i, 0} &= 0\\,, \\\\
+m_{i, k} &= \\lambda\\, m_{i, k - 1} + (1 - \\lambda)\\, x_{i, k}\\,.
+\\end{align}
 ```
 
-and the reported variance divides out the weights the cold start never accumulated,
+The deviation of observation ``k`` is taken from the location that stands before it,
 
 ```math
-\\hat{\\sigma}^{2}_i = \\frac{S_i}{1 - \\lambda^{n_i}}.
+e_{i, k} = \\begin{cases}
+x_{i, k} - m_{i, k - 1} & \\text{if } \\texttt{centred} = \\texttt{false}\\,, \\\\
+x_{i, k} & \\text{if } \\texttt{centred} = \\texttt{true}\\,.
+\\end{cases}
 ```
+
+The internal state of asset ``i`` is the exponentially weighted sum of the squared deviations, and the reported variance divides out the weights that the cold start never accumulated,
+
+```math
+\\begin{align}
+S_i &= (1 - \\lambda) \\sum_{k = 1}^{n_i} \\lambda^{n_i - k} e_{i, k}^{2}\\,, \\\\
+\\hat{\\sigma}^{2}_i &= \\frac{S_i}{1 - \\lambda^{n_i}}\\,.
+\\end{align}
+```
+
+The location is not divided by ``1 - \\lambda^{k}``. During the cold start it is pulled toward zero, so an early deviation is taken from a location smaller than the mean of the returns seen. [`ExpWeightedExpectedReturns`](@ref) divides its mean out, so the two locations agree only once ``\\lambda^{k}`` is negligible.
 
 Where:
 
-  - ``\\lambda``: `decay`.
-  - ``e_{i, t}``: the return of asset ``i`` at the valid observation ``t``, less the running location where `centred` is `false`, and the return itself where it is `true`.
-  - ``n_i``: the count of valid observations of asset ``i``.
+  - $(math_dict[:lambda_ew])
+  - $(math_dict[:n_i_ew])
+  - ``x_{i, k}``: The ``k``-th valid return of asset ``i`` since its last reset.
+  - ``m_{i, k}``: The running location of asset ``i`` after ``k`` valid returns.
+  - ``e_{i, k}``: The deviation of the ``k``-th valid return of asset ``i``.
+  - ``S_i``: The internal state of asset ``i``, the `variance` field of [`ExpWeightedVarianceState`](@ref).
+  - ``\\hat{\\sigma}^{2}_i``: The reported variance of asset ``i``.
 
 # Examples
 
@@ -89,7 +110,7 @@ julia> ce.min_obs
     cache
     function ExpWeightedVariance(decay::Number, min_obs::Integer, centred::Bool,
                                  cache::Option{<:AbstractPartialFitState})
-        assert_nonempty_gt0_finite_val(decay, :decay)
+        assert_unit_interval(decay, :decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         return new{typeof(decay), typeof(min_obs), typeof(centred), typeof(cache)}(decay,
                                                                                    min_obs,
@@ -139,20 +160,32 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Processes a single observation row (or column) to update the online variance cache.
+Folds one observation into the online variance cache.
 
-An asset is valid when its return is finite and the active mask admits it. A valid asset takes the ordinary recursion, an active asset with a non-finite return freezes, and an asset that has just become inactive is reset to the cold state so that the bias correction restarts if it lists again. Where `centred` is `false` the deviation is taken from the location that stands before the observation, and the location is advanced afterwards.
+An asset is valid when its return is finite and the active mask admits it. A valid asset takes one step of the recursion, and an active asset with a non-finite return freezes. An asset that has just become inactive goes back to the cold state, so the bias correction starts again if it lists again.
+
+# Algorithm
+
+ 1. Mark each asset whose return is finite and that `active_mask` admits, giving `valid`. With `nothing`, `valid` is the finite mask alone.
+ 2. Where `active_mask` is not `nothing`, mark each asset that was active before this observation and is inactive now, giving `newly_inactive`, and set its `variance`, `location` and `obs_count` to zero.
+ 3. Store `active_mask` in `active`. With `nothing`, set every entry of `active` to `true`.
+ 4. If no entry of `valid` is `true`, return the cache unchanged.
+ 5. Take the deviation `Xi`. Where `centred` is `true` it is `X`. Where it is `false` it is `X` less the `location` that stands before the observation, and the `location` of each valid asset then takes one step of the recursion of ``m_{i, k}`` in [`ExpWeightedVariance`](@ref).
+ 6. Give the `variance` of each valid asset one step of the recursion of ``S_i``, and add one to its `obs_count`.
+ 7. Return the cache.
+
+An active asset whose return is not finite is not in `valid`, so steps 5 and 6 leave its state as it was: the state freezes over the holiday.
 
 # Arguments
 
-  - `cache::ExpWeightedVarianceState`: Online variance computation cache (mutated).
+  - `cache::ExpWeightedVarianceState`: The online variance cache, which this call mutates.
   - `ce::ExpWeightedVariance`: Variance estimator configuration.
   - `X::VecNum`: Returns vector for the current observation.
   - `active_mask::Option{<:AbstractVector{<:Bool}}`: Optional mask of currently active assets. An asset that becomes inactive has its variance, its location and its count reset. With `nothing` every asset is active, so a non-finite return reads as a holiday.
 
 # Returns
 
-  - `cache::ExpWeightedVarianceState`: The cache to read on and to pass to the next observation. Every field is an array that is mutated in place.
+  - `cache::ExpWeightedVarianceState`: The cache to read, and to pass to the next observation. Every field is an array that this call mutates in place.
 
 # Related
 
@@ -168,10 +201,8 @@ function process_observation!(cache::ExpWeightedVarianceState, ce::ExpWeightedVa
         newly_inactive = .!active_mask .& cache.active
         if any(newly_inactive)
             cache.variance[newly_inactive] .= zero(eltype(cache.variance))
+            cache.location[newly_inactive] .= zero(eltype(cache.location))
             cache.obs_count[newly_inactive] .= 0
-            if !ce.centred
-                cache.location[newly_inactive] .= NaN
-            end
         end
         cache.active .= active_mask
     else
@@ -185,10 +216,10 @@ function process_observation!(cache::ExpWeightedVarianceState, ce::ExpWeightedVa
     Xi = if ce.centred
         X
     else
-        loc = replace(cache.location, NaN => zero(eltype(cache.location)))
-        cache.location[valid] = ce.decay * view(loc, valid) +
+        dev = X - cache.location
+        cache.location[valid] = ce.decay * view(cache.location, valid) +
                                 (one(ce.decay) - ce.decay) * view(X, valid)
-        X - loc
+        dev
     end
 
     cache.variance[valid] .= ce.decay * view(cache.variance, valid) +
@@ -200,7 +231,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Variance method of [`exp_weighted_pass!`](@ref). Runs one forward pass of the online variance update over the observations of `X`, and calls `f` after each observation.
+Variance method of [`exp_weighted_pass!`](@ref). Runs one forward pass of the online variance update over the observations of `X`, and calls `f` after each observation. The pass continues from `state` when the caller gives one, and starts from the cold state otherwise.
 
 # Related
 
@@ -221,12 +252,11 @@ function exp_weighted_pass!(f, est::ExpWeightedVariance, X::MatNum, dims::Int,
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
 
-    # An uncentred estimator seeds its location from the first observation it sees, so the
-    # location starts as `NaN`, in the type of `X` so that a `Float32` panel keeps a
-    # `Float32` state.
-    location = est.centred ? zeros(eltype(X), N) : fill(convert(eltype(X), NaN), N)
+    # The state takes the type of `X`, widened to a float only when it is an integer, so an
+    # integer panel gets a floating-point state and a `Float32` panel keeps a `Float32` one.
+    T = float_if_integer(eltype(X))
     cache = if isnothing(state)
-        ExpWeightedVarianceState(zeros(eltype(X), N), location, zeros(Int, N), trues(N))
+        ExpWeightedVarianceState(zeros(T, N), zeros(T, N), zeros(Int, N), trues(N))
     else
         @argcheck(length(state.variance) == N,
                   DimensionMismatch("the state holds $(length(state.variance)) assets, and `X` holds $N"))
@@ -261,7 +291,18 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Variance method of [`exp_weighted_moment`](@ref). Reads the exponentially weighted variance out of a cache, as it stands.
 
-Applies the cold-start bias correction and blanks every asset that is not ready. The cache is read, never written, so the same cache answers this call after every observation of a forward pass.
+Applies the cold-start bias correction and sets every asset that is not ready to `NaN`. This method reads the cache and never writes it, so the same cache answers this call after every observation of a forward pass.
+
+# Algorithm
+
+ 1. Copy `cache.variance` into `variance`.
+ 2. Mark each asset with a positive `obs_count`, giving `counted`.
+ 3. Give each counted asset the cold-start `correction` ``1 / (1 - \\lambda^{n_i})``. Every other asset keeps a `correction` of one.
+ 4. Multiply `variance` by `correction`.
+ 5. Mark each asset that is inactive, or whose `obs_count` is below `est.min_obs`, giving `not_ready`, and set its entry of `variance` to `NaN`.
+ 6. Return `variance`.
+
+Because ``0 < \\lambda < 1``, ``1 - \\lambda^{n_i} \\geq 1 - \\lambda > 0`` for every ``n_i \\geq 1``, so the division needs no floor.
 
 # Returns
 
@@ -277,9 +318,8 @@ function exp_weighted_moment(cache::ExpWeightedVarianceState, est::ExpWeightedVa
     variance = copy(cache.variance)
     counted = cache.obs_count .> zero(eltype(cache.obs_count))
     correction = ones(eltype(variance), length(variance))
-    correction[counted] .= inv.(max.(one(est.decay) .-
-                                     est.decay .^ view(cache.obs_count, counted),
-                                     eps(eltype(variance))))
+    correction[counted] .= inv.(one(est.decay) .-
+                                est.decay .^ view(cache.obs_count, counted))
     variance .*= correction
     not_ready = .!cache.active .| (cache.obs_count .< est.min_obs)
     if any(not_ready)
@@ -299,14 +339,14 @@ end
 
 Compute the exponentially weighted variance of each asset.
 
-Iterates over the observation dimension of `X`, updating an online variance cache at each step, then applies the cold-start bias correction and blanks every asset that is not ready.
+Runs the recursion over the observations of `X` in one forward pass. Then it applies the cold-start bias correction and sets every asset that is not ready to `NaN`.
 
 # Arguments
 
   - `ce`: Exponentially weighted variance estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `active_mask`: Optional boolean matrix with the same size as `X`. An asset whose entry is `false` is inactive at that observation: its state is reset and its answer is `NaN` while it stays inactive. With `nothing` every asset is active, so a non-finite return reads as a holiday and the variance freezes.
+  - `active_mask`: Optional boolean matrix with the same size as `X`. An asset whose entry is `false` is inactive at that observation. The estimator resets its state, and answers `NaN` for it while it stays inactive. With `nothing` every asset is active, so a non-finite return reads as a holiday and the variance freezes.
   - $(arg_dict[:ignkwargs])
 
 # Validation
@@ -316,7 +356,7 @@ Iterates over the observation dimension of `X`, updating an online variance cach
 
 # Returns
 
-  - `var::Vector{<:Number}`: Per-asset variance vector of length `assets`. An asset with fewer than `ce.min_obs` valid observations is `NaN`.
+  - `var::Vector{<:Number}`: Per-asset variance vector of length `assets`. An asset with fewer than `ce.min_obs` valid observations since its last reset is `NaN`, and so is an asset that is inactive at the last observation.
 
 # Examples
 
@@ -338,10 +378,6 @@ julia> length(var(ce, X))
 function Statistics.var(ce::ExpWeightedVariance, X::MatNum; dims::Int = 1,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = exp_weighted_pass!(ce, X, dims, active_mask)
-    if !ce.centred && any(.!cache.active)
-        cache.location[.!cache.active] .= NaN
-    end
-
     return exp_weighted_moment(cache, ce)
 end
 """
@@ -389,7 +425,7 @@ end
 
 Compute the point-in-time exponentially weighted variance series.
 
-Row `t` holds what `var` returns for the first `t` observations of `X`, so no row reads an observation after its own. The update is a recursion over one observation, so this method overrides the expanding-window fallback with a **single forward pass**: it reads the cache after each observation instead of refitting.
+Row `t` holds what `var` returns for the first `t` observations of `X`, so no row reads an observation after its own. The update is a recursion over one observation, so this method replaces the expanding-window fallback with one forward pass. It reads the cache after each observation instead of a refit.
 
 The fallback cannot answer this estimator. It slices `X` once per row and passes every keyword unsliced, so a mask of the whole window meets a window of `t` observations and the size check refuses the call.
 
@@ -420,7 +456,9 @@ The fallback cannot answer this estimator. It slices `X` once per row and passes
 function variance_series(ce::ExpWeightedVariance, X::MatNum; dims::Int = 1,
                          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     assert_dims(dims)
-    val = Matrix{eltype(X)}(undef, size(X, dims), size(X, setdiff((1, 2), (dims,))[1]))
+    T = float_if_integer(eltype(X))
+    N = size(X, setdiff((1, 2), (dims,))[1])
+    val = Matrix{T}(undef, size(X, dims), N)
     exp_weighted_pass!(ce, X, dims, active_mask) do i, cache
         val[i, :] = exp_weighted_moment(cache, ce)
         return nothing
@@ -439,7 +477,7 @@ end
 
 Compute the exponentially weighted variance from a window of an Asset Panel.
 
-This estimator is mask-aware, so it overrides the reduce-and-expand root of the verb and reads the panel's active mask itself. The answer therefore lives on the whole universe rather than on the Coverage Universe: a young asset that lists inside the window is answered from the observations it has, and it is `NaN` only while it stays below `ce.min_obs`.
+This estimator reads the active mask of the panel itself, so it overrides the reduce-and-expand root of the verb. Its answer covers the whole universe, not only the Coverage Universe. A young asset that lists inside the window gets an answer from the observations it has, and it is `NaN` only while it has fewer than `ce.min_obs`.
 
 # Arguments
 
@@ -461,7 +499,7 @@ This estimator is mask-aware, so it overrides the reduce-and-expand root of the 
 """
 function Statistics.var(ce::ExpWeightedVariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.var(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
@@ -496,7 +534,7 @@ This is the square root of the variance of the same call, and it reads the panel
 """
 function Statistics.std(ce::ExpWeightedVariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.std(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
@@ -510,7 +548,7 @@ end
 
 Compute the point-in-time exponentially weighted variance series from a window of an Asset Panel.
 
-This is the variance of the same call, read after each observation, and it reads the panel's active mask through the same override. A Descriptor that holds this estimator therefore keeps a number for a young asset, where the reduce-and-expand root would reduce every window and answer `NaN`.
+This is the variance of the same call, read after each observation, and it reads the panel's active mask through the same override. A Descriptor that holds this estimator keeps a number for a young asset, where the reduce-and-expand root would reduce every window and answer `NaN`.
 
 # Arguments
 
@@ -533,7 +571,7 @@ This is the variance of the same call, read after each observation, and it reads
 """
 function variance_series(ce::ExpWeightedVariance, X::MatNum, pnl::Option{<:AssetPanel};
                          dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return variance_series(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
@@ -666,7 +704,7 @@ end
 
 Read the exponentially weighted variance out of the estimator's own state.
 
-The one-argument form is what an incremental fit answers: [`partial_fit!`](@ref) leaves the state in the `cache` field, and this verb turns it into the ordinary answer. An estimator that has been given no observation carries no state, so the call is refused rather than answered with a zero.
+The one-argument form is what an incremental fit answers: [`partial_fit!`](@ref) leaves the state in the `cache` field, and this verb turns it into the ordinary answer. An estimator that has seen no observation carries no state, so this method refuses the call instead of answering zero.
 
 # Arguments
 
@@ -675,7 +713,7 @@ The one-argument form is what an incremental fit answers: [`partial_fit!`](@ref)
 
 # Validation
 
-  - `ce.cache` is not `nothing`. An `ArgumentError` is thrown otherwise.
+  - `ce.cache` is not `nothing`. Otherwise the method throws an `ArgumentError`.
 
 # Returns
 
@@ -742,7 +780,7 @@ Read the exponentially weighted volatility out of the estimator's own state.
 
 # Validation
 
-  - `ce.cache` is not `nothing`. An `ArgumentError` is thrown otherwise.
+  - `ce.cache` is not `nothing`. Otherwise the method throws an `ArgumentError`.
 
 # Returns
 
@@ -761,7 +799,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses to merge two [`ExpWeightedVarianceState`](@ref).
 
-An exponentially weighted state folds forward exactly, `S = λ^{n_b} S_a + S_b`, but only while no asset resets inside the second block. The state records the count that a reset zeroed and not the reset itself, so the two cases are indistinguishable after the fact and a merge would silently keep a history the reset discarded. Fold the second block into the first with `partial_fit!` instead.
+A centred state folds forward exactly, `S = λ^{n_b} S_a + S_b` with `n_b` the valid observations of the second block, but only while no asset resets inside that block. The state records the count that a reset zeroed and not the reset itself, so a merge cannot tell the two cases apart, and it would keep a history that the reset discarded. An uncentred state does not fold at all, because each deviation of the second block reads a location that carries the first block. Fold the second block into the first with `partial_fit!` instead.
 
 # Arguments
 
@@ -770,7 +808,7 @@ An exponentially weighted state folds forward exactly, `S = λ^{n_b} S_a + S_b`,
 
 # Validation
 
-  - The pair is refused with an `ArgumentError`.
+  - The method throws an `ArgumentError` for every pair.
 
 # Related
 
@@ -787,7 +825,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies an [`ExpWeightedVarianceState`](@ref), so the copy shares no array with the original.
 
-The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. Every field is an array, and every one is copied.
+It is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. Every field is an array, and this method copies each one.
 
 # Arguments
 
@@ -812,5 +850,54 @@ end
 # [`supports_partial_fit`](@ref)).
 function supports_partial_fit(::ExpWeightedVariance)
     return true
+end
+"""
+    exp_weighted_variance_count(decay::Number, X::MatNum)
+
+Effective count and divisor of an exponentially weighted variance, for each column of `X`.
+
+Each column enters the recursion on its finite rows alone, and the recursion divides out the weights that the cold start never accumulated. So the weights of a column of ``n`` finite rows are proportional to ``\\lambda^{k}``, ``k = 0, \\ldots, n - 1``, and they sum to one. The count reads no active mask, so it does not start again at a reset. Their Kish count is the effective count, and because they sum to one it is also the divisor. [`ExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedVariance`](@ref) share this count.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+n_{i}^{\\mathrm{eff}} &= \\dfrac{\\left(\\sum_{k=0}^{n_{i}-1} \\lambda^{k}\\right)^{2}}{\\sum_{k=0}^{n_{i}-1} \\lambda^{2k}} = \\dfrac{\\left(1 - \\lambda^{n_{i}}\\right)\\left(1 + \\lambda\\right)}{\\left(1 - \\lambda\\right)\\left(1 + \\lambda^{n_{i}}\\right)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``n_{i}^{\\mathrm{eff}}``: Effective count of the observations of asset ``i``, and the divisor of its variance.
+  - ``n_{i}``: Number of finite rows of column ``i``.
+  - $(math_dict[:lambda_ew])
+
+The count tends to ``(1 + \\lambda) / (1 - \\lambda)`` as ``n_{i}`` grows, which is about ``115`` at the default half-life of ``40`` observations.
+
+# Arguments
+
+  - `decay`: Decay of the recursion.
+  - `X`: Data matrix `observations × assets`.
+
+# Returns
+
+  - `(; n, m)::NamedTuple`: The effective count `n` and the divisor `m`, one entry per column of `X`. The two vectors are equal.
+
+# Related
+
+  - [`variance_count`](@ref)
+  - [`ExpWeightedVariance`](@ref)
+  - [`RegimeAdjustedExpWeightedVariance`](@ref)
+"""
+function exp_weighted_variance_count(decay::Number, X::MatNum)
+    n = map(axes(X, 2)) do i
+        lk = decay^count(isfinite, view(X, :, i))
+        return (one(lk) - lk) * (one(decay) + decay) /
+               ((one(decay) - decay) * (one(lk) + lk))
+    end
+    return (; n = n, m = n)
+end
+function variance_count(ve::ExpWeightedVariance, X::MatNum)
+    return exp_weighted_variance_count(ve.decay, X)
 end
 export ExpWeightedVariance

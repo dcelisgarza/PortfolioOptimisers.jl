@@ -446,6 +446,13 @@ const PO = PortfolioOptimisers
             # The rows must lie on the observation axis, and a static panel has none.
             @test_throws ArgumentError feature_matrix(tpnl, sel; rows = [0, 2])
             @test_throws ArgumentError feature_matrix(tpnl, sel; rows = 1:(Tt + 1))
+            # A `Bool` mask is an `AbstractVector{<:Integer}`, and it names the rows it holds
+            # `true` at, as `selectdim` reads it. Its length is the observation count and
+            # not the stack's, which threw a DimensionMismatch before #845.
+            bmsk = [false, true, false, false, true, false, false]
+            @test feature_matrix(tpnl, sel; rows = bmsk) == Zt[[2, 5], :, :]
+            @test PortfolioOptimisers.stacked_axes((Tt, Nt), bmsk) == (2, Nt)
+            @test_throws ArgumentError feature_matrix(tpnl, sel; rows = [true, false])
             @test_throws ArgumentError feature_matrix(gpnl; rows = 1:1)
             @test feature_matrix(gpnl; rows = Colon()) == feature_matrix(gpnl)
             @test PortfolioOptimisers.stacked_axes((Tt, Nt), Colon()) == (Tt, Nt)
@@ -592,5 +599,74 @@ const PO = PortfolioOptimisers
             @test occursin(":observed", err.value.msg)
             @test !occursin("0 label", err.value.msg)
         end
+    end
+end
+@testset "The routed FeatureDistance units against their docstrings" begin
+    # Each assertion pins one number or one raise that a docstring of
+    # `src/06_Distance/05_FeatureDistance.jl` states, measured under #1066.
+    Dst = PortfolioOptimisers.Distances
+    @testset "the similarity leaves [-1, 1] above a distance of 2, not 1" begin
+        # CosineDist is bounded by 2: a negative cosine crosses 1, and the similarity
+        # `1 - D` stays inside [-1, 1] on a signed scale.
+        Zs = [1.0 -1.0; -1.0 1.0; 0.5 0.5]
+        S, D = cor_and_dist(FeatureDistance(; metric = Dst.CosineDist()), Zs)
+        @test maximum(D) > 1
+        @test maximum(D) <= 2
+        @test minimum(S) < 0
+        @test minimum(S) >= -1
+        # Euclidean has no bound, so large features cross 2 and leave [-1, 1].
+        Se, De = cor_and_dist(FeatureDistance(; metric = Dst.Euclidean()),
+                              [10.0 0.0; 0.0 10.0; 1.0 1.0])
+        @test maximum(De) > 2
+        @test minimum(Se) < -1
+    end
+    @testset "CorrDist leaves NaN against a constant vector that is not zero" begin
+        Zk = [1.0 1.0 1.0; 0.0 0.0 0.0; 1.0 2.0 3.0; 3.0 1.0 2.0]
+        Dk = distance(FeatureDistance(; metric = Dst.CorrDist()), Zk)
+        # Row 1 is constant and not zero, so its pairs with rows 3 and 4 stay NaN.
+        @test isnan(Dk[1, 3]) && isnan(Dk[1, 4])
+        # Row 2 is the zero vector, so the zero-feature-vector convention patches it.
+        @test Dk[1, 2] == 1 && Dk[2, 3] == 1 && Dk[2, 4] == 1
+        # One feature makes every feature vector constant.
+        D1 = distance(FeatureDistance(; metric = Dst.CorrDist()),
+                      reshape([1.0, 2.0, 3.0], 3, 1))
+        @test all(isnan, (D1[i, j] for i in 1:3, j in 1:3 if i != j))
+    end
+    @testset "AggregateDistances runs the kernel's two steps once per observation" begin
+        rng = StableRNG(1066)
+        Z3 = randn(rng, 5, 4, 3)
+        w = aweights(rand(rng, 5))
+        de = FeatureDistance(; alg = AggregateDistances(; w = w))
+        Dref = sum(w[t] * PortfolioOptimisers.feature_distance(de.metric, Z3[t, :, :], 1)
+                   for t in 1:5) / sum(w)
+        @test isapprox(distance(de, Z3), Dref; rtol = 1e-14)
+    end
+    @testset "the three-argument methods raise what their Validation states" begin
+        rng = StableRNG(7)
+        X = randn(rng, 60, 5) / 100
+        nx = ["A$i" for i in 1:5]
+        Zp = abs.(randn(rng, 5, 3))
+        rd = ReturnsResult(; nx = nx, X = X, pnl = matrix_panel(["f1", "f2", "f3"], Zp))
+        rds = ReturnsResult(; nx = nx, X = X,
+                            pnl = matrix_panel(["f1", "f2", "f3"], Zp .- 1))
+        strict = FeatureDistance(; sel = ["nope"], strict = true)
+        @test_throws ArgumentError feature_matrix(strict, nothing, rd, rd.X)
+        @test_throws ArgumentError feature_labels(strict, nothing, rd, rd.X)
+        @test_throws ArgumentError cor_and_dist(strict, nothing, rd.X; rd = rd)
+        # The stacked matrix meets `assert_feature_matrix`: Jaccard refuses signed input.
+        jac = FeatureDistance(; metric = Dst.Jaccard())
+        @test_throws DomainError distance(jac, nothing, rds.X; rd = rds)
+        @test_throws DomainError cor_and_dist(jac, nothing, rds.X; rd = rds)
+        @test_throws PortfolioOptimisers.IsNothingError cor_and_dist(FeatureDistance(),
+                                                                     nothing, X)
+        # The call that `feature_labels` recommends, on a real optimisation result.
+        fde = FeatureDistance(; sel = ["f3", "f1"])
+        res = optimise(HierarchicalRiskParity(;
+                                              opt = HierarchicalOptimiser(;
+                                                                          cle = ClustersEstimator(;
+                                                                                                  de = fde))),
+                       rd)
+        @test feature_labels(fde, res.pr, rd, rd.X) == ["f3", "f1"]
+        @test feature_matrix(fde, res.pr, rd, rd.X) == Zp[:, [3, 1]]
     end
 end

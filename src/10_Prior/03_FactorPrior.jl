@@ -267,7 +267,7 @@ The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\ma
  3. Project the factor covariance through the loadings, giving `posterior_sigma`, the systematic block.
  4. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `mp` and `posterior_X`.
  5. Carry the lower Cholesky factor of `f_sigma` through the loadings, giving `posterior_csigma`. This reads the `f_sigma` the caller passed, which step 4 does not touch.
- 6. When `rsd` is `true`, take the reconstruction error `err = X - posterior_X`, and read `esigma`, the column variances of `err` under `ve`. Size the residual block as `err_sigma`, the diagonal matrix of those variances. When `rsd` is `false`, `esigma` is `nothing`.
+ 6. When `rsd` is `true`, take the reconstruction error `err = X - posterior_X`, and read `esigma`, the column variances of `err` under `ve`. Read the counts of those variances with [`variance_count`](@ref), and restate them with [`residual_variance_counts`](@ref) against the `edof` of `rr`, giving `edof` and `ediv`. Size the residual block as `err_sigma`, the diagonal matrix of the variances. When `rsd` is `false`, `esigma` and `ediv` are `nothing`, and `edof` is the `edof` of `rr`.
  7. Still under `rsd`, add `err_sigma` to `posterior_sigma` and re-condition the sum with [`posdef!`](@ref), under `mp.pdm`. This is the body's only explicit [`posdef!`](@ref) call. `mp.pdm` also reaches `posterior_sigma` inside step 4, whenever `:pdm` is a member of `mp.order`.
  8. Still under `rsd`, widen `posterior_csigma` with `sqrt.(err_sigma)`, so the block that step 7 added to the covariance enters the factor as well.
  9. Reshape `posterior_csigma` to `length(posterior_mu)` columns, transpose it into `chol`, and return the four quantities.
@@ -286,7 +286,7 @@ The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\ma
 
 # Returns
 
-  - `(; mu, sigma, chol, esigma)::NamedTuple`: Asset expected returns, asset covariance, the Cholesky-like factor whose trailing block is the residual standard deviations when `rsd` is `true`, and the residual variances themselves. `esigma` is `nothing` when `rsd` is `false`, because no residual block was added. A caller writes it onto the `esigma` field of the loadings result it returns, so that a consumer that needs the idiosyncratic variances reads them off the block instead of recomputing them from the reconstruction error.
+  - `(; mu, sigma, chol, esigma, edof, ediv)::NamedTuple`: Asset expected returns, asset covariance, the Cholesky-like factor whose trailing block is the residual standard deviations when `rsd` is `true`, the residual variances themselves, and their degrees of freedom and divisors. `esigma` and `ediv` are `nothing` when `rsd` is `false`, because no residual block was added. A caller writes the last three onto the loadings result it returns, so that a consumer that needs the idiosyncratic variances, or their sampling law, reads them off the block instead of recomputing them from the reconstruction error.
 
 # Related
 
@@ -306,9 +306,13 @@ function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVariance
     matrix_processing!(mp, posterior_sigma, posterior_X; kwargs...)
     posterior_csigma = M * LinearAlgebra.cholesky(f_sigma).L
     esigma = nothing
+    edof = rr.edof
+    ediv = nothing
     if rsd
         err = X - posterior_X
         esigma = vec(Statistics.var(ve, err; dims = 1))
+        (; edof, ediv) = residual_variance_counts(variance_count(ve, err), rr.edof,
+                                                  size(err, 1))
         err_sigma = LinearAlgebra.diagm(esigma)
         posterior_sigma .+= err_sigma
         posdef!(mp.pdm, posterior_sigma)
@@ -316,7 +320,58 @@ function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVariance
     end
     return (; mu = posterior_mu, sigma = posterior_sigma,
             chol = transpose(reshape(posterior_csigma, length(posterior_mu), :)),
-            esigma = esigma)
+            esigma = esigma, edof = edof, ediv = ediv)
+end
+"""
+    residual_variance_counts(cnt::Nothing, edof, T::Integer)
+    residual_variance_counts(cnt::NamedTuple, edof::Nothing, T::Integer)
+    residual_variance_counts(cnt::NamedTuple, edof::VecNum, T::Integer)
+
+Degrees of freedom and divisor of each residual variance that a lift measures.
+
+The regression and the variance estimator each know half of the sampling law of a residual variance. The regression knows the parameters it spent on each asset, and records them as `edof`, the count of equally weighted observations that it left. The variance estimator knows the effective count of the observations it reads and its divisor, which [`variance_count`](@ref) states as `cnt`. This function combines them. Each case is a method, so no caller writes an `isnothing` test.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\nu_{i} &= n_{i} - \\left(T - \\nu_{i}^{\\mathrm{fit}}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\nu_{i}``: Degrees of freedom of the residual variance of asset ``i``.
+  - ``n_{i}``: Effective count of the observations that the variance estimator reads, `cnt.n`.
+  - $(math_dict[:T])
+  - ``\\nu_{i}^{\\mathrm{fit}}``: Degrees of freedom that the regression left, `edof`. ``T - \\nu_{i}^{\\mathrm{fit}}`` is the number of parameters it spent on the asset.
+
+With equal weights ``n_{i} = T``, and the count of the regression passes through. Under unequal weights the spend is subtracted from the effective count, which approximates the law of a weighted sum of squared residuals.
+
+# Arguments
+
+  - `cnt`: The count and divisor of the variance estimator, or `nothing` when it states none.
+  - `edof`: The `edof` of the loadings block, or `nothing` when the regression recorded none.
+  - `T`: Number of observations of the residuals.
+
+# Returns
+
+  - `(; edof, ediv)::NamedTuple`: The degrees of freedom and the divisor of each variance. Both are `nothing` when the variance estimator states no count, because neither fact is then known. `edof` alone is `nothing` when the regression recorded no count.
+
+# Related
+
+  - [`factor_lift`](@ref)
+  - [`variance_count`](@ref)
+  - [`Regression`](@ref)
+"""
+function residual_variance_counts(::Nothing, ::Any, ::Integer)
+    return (; edof = nothing, ediv = nothing)
+end
+function residual_variance_counts(cnt::NamedTuple, ::Nothing, ::Integer)
+    return (; edof = nothing, ediv = cnt.m)
+end
+function residual_variance_counts(cnt::NamedTuple, edof::VecNum, T::Integer)
+    return (; edof = cnt.n .- (T .- edof), ediv = cnt.m)
 end
 """
     factor_residual_config(pe::AbstractPriorEstimator) -> Option{<:NamedTuple}
@@ -418,8 +473,8 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
  2. Fit the wrapped prior `pe.pe` on `F`, giving `f_prior`, the factor-axis prior result. `strict` reaches it, because `pe.pe` admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
  3. Fit the loadings and rebuild the asset returns with [`factor_reconstruction`](@ref), giving `rr` and `posterior_X`.
- 4. Project `f_prior.mu` and `f_prior.sigma` through `rr` with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol` and `esigma`.
- 5. Write `esigma` onto the `esigma` field of `rr`. Under `pe.rsd = true` the field holds the residual variances the lift measured, and under `pe.rsd = false` it holds `nothing`, because the lift added no residual block.
+ 4. Project `f_prior.mu` and `f_prior.sigma` through `rr` with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`.
+ 5. Write `esigma`, `edof` and `ediv` onto `rr` with [`set_idiosyncratic_covariance`](@ref). Under `pe.rsd = true` the fields hold the residual variances the lift measured and their counts, and under `pe.rsd = false` `esigma` and `ediv` hold `nothing`, because the lift added no residual block.
  6. Assemble a [`LowOrderPrior`](@ref) over `posterior_X`, with the oriented `X` under `o_X`, the three lifted moments, the factor prior's `w`, `ens`, `kld` and `ow`, the regression result under `rr`, and `f_prior` itself under `fpr`. No `Z` is carried; the composition note of [`FactorPrior`](@ref) says why.
 
 # Arguments
@@ -462,13 +517,15 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
     # `EntropyPoolingPrior`, both of which resolve view names against a universe and honour it.
     f_prior = prior(pe.pe, F; strict = strict)
     rr, posterior_X = factor_reconstruction(pe.re, Xc, F)
-    (; mu, sigma, chol, esigma) = factor_lift(pe.mp, pe.ve, pe.rsd, rr, f_prior.mu,
-                                              f_prior.sigma, Xc, posterior_X; kwargs...)
+    (; mu, sigma, chol, esigma, edof, ediv) = factor_lift(pe.mp, pe.ve, pe.rsd, rr,
+                                                          f_prior.mu, f_prior.sigma, Xc,
+                                                          posterior_X; kwargs...)
     # The lift already measured the residual variances, so the block carries them instead of
     # making every consumer recompute them from the reconstruction error. Under `rsd = false`
     # the lift added no residual block and `esigma` is `nothing`, which is what the field then
-    # holds.
-    rr = set_idiosyncratic_covariance(rr, esigma)
+    # holds. The counts of the variances travel beside them, for a consumer that prices their
+    # sampling error.
+    rr = set_idiosyncratic_covariance(rr, esigma, edof, ediv)
     # No panel travels on a prior result at all: a Feature Matrix is derived from the Asset
     # Panel on the data carrier, or built by a producer on the distance that reads the
     # loadings back off this result.

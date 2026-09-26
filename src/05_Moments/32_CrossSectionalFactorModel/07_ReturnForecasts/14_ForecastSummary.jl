@@ -5,7 +5,7 @@
 
 Return the names axis of a forecast summary, one name per evaluation.
 
-A summary is read as a table, and a row of it is worth little without a name: a caller who is told the second row scored better than the first still has to remember which member produced it. The names are supplied by the caller, because an evaluation carries the pairing and its parameters and no member ever carried a name of its own. The absent case is dispatched rather than branched, and it numbers the rows in the order they were handed over.
+A reader reads a summary as a table, and a row without a name tells the reader little. An evaluation carries the pairing and its parameters but no name, so the caller supplies the names. The method for `nothing` numbers the rows in the order of the evaluations.
 
 # Arguments
 
@@ -18,7 +18,7 @@ A summary is read as a table, and a row of it is worth little without a name: a 
 
 # Returns
 
-  - `names::Vector{String}`: One name per evaluation, in the order the evaluations were given.
+  - `names::Vector{String}`: One name per evaluation, in the order of the evaluations.
 
 # Related
 
@@ -37,11 +37,11 @@ end
     forecast_summary_same_target(a::AbstractForecastTarget,
                                  b::AbstractForecastTarget) -> Bool
 
-Return whether two evaluations were scored against the same forward target.
+Return whether two evaluations scored against the same forward target.
 
-Two members are comparable only where they answer for the same quantity, and the quantity is the [`AbstractForecastTarget`](@ref) the pairing was taken over. The test is the member and its fields, not the member alone: [`PanelFieldTarget`](@ref) names a field of the panel, so two of them are the same target where they name the same field and different targets where they do not.
+Two evaluations are comparable only when they answer for the same quantity, and that quantity is the [`AbstractForecastTarget`](@ref) of the pairing. The test reads the member and its fields. [`PanelFieldTarget`](@ref) names a field of the panel, so two of them are the same target when they name the same field, and different targets when they do not.
 
-The fields are walked in declaration order rather than compared by an equality this library does not define, which is what [`assert_mergeable_states`](@ref) does for the same reason.
+The library defines no equality on a target, so the test compares the fields one by one, in declaration order, with `isequal`.
 
 # Arguments
 
@@ -50,11 +50,11 @@ The fields are walked in declaration order rather than compared by an equality t
 
 # Returns
 
-  - `same::Bool`: `true` where the two are the same member carrying the same fields.
+  - `same::Bool`: `true` when the two targets are of one type and every pair of their fields is equal under `isequal`.
 
 # Related
 
-  - [`forecast_summary_assert_comparable`](@ref)
+  - [`forecast_summary_assert_same_question`](@ref)
   - [`AbstractForecastTarget`](@ref)
   - [`PanelFieldTarget`](@ref)
 """
@@ -72,13 +72,22 @@ end
 """
     forecast_summary_assert_same_question(fes::AbstractVector{<:ForecastEvaluationResult})
 
-Refuse a set of evaluations that do not answer one question, naming the field that differs.
+Refuse a set of evaluations that do not answer one question, and name the field that differs.
 
-A summary puts one row per forecast beside the others and invites the reader to compare them, so the rows must be answers to one question. Six of the fields a [`ForecastEvaluationResult`](@ref) carries change what the question is: the forward target changes the quantity scored, `horizon` and `lag` change the window it is scored over, `step` changes the stride of the sample, `min_count` changes which cross-sections enter it, and `ppy` changes the units the annualised columns are reported in. A difference in any of them is refused here rather than reported as a difference in skill.
+A summary puts one row per forecast beside the others, so the rows must answer one question. Seven fields of a [`ForecastEvaluationResult`](@ref) define the question:
 
-The universe is checked with them, because two forecasts over different universes are two different questions however their parameters agree: the asset axis must agree, and so must `umsk`, which is the denominator every coverage column of the summary is read against. `alpha` and `y` are not compared: a summary of two members of one panel is exactly the case where the forecasts differ, and that is what the summary is for.
+  - the forward target sets the quantity that the evaluation scores,
+  - `horizon` and `lag` set the window of that quantity,
+  - `step` sets the stride of the sample,
+  - `min_count` sets which cross-sections enter the sample,
+  - `ties` sets how the rank statistics rank a tie,
+  - `ppy` sets the units of the annualised columns.
 
-The evaluation `dates` are not checked here either. Two evaluations that answer one question on two grids are still one question, and [`forecast_evaluation_align`](@ref) is what puts them on one grid; the summary asks for the grid as well, through [`forecast_summary_assert_comparable`](@ref).
+The check refuses a difference in any of them, because the summary would otherwise report that difference as a difference in skill.
+
+The universe is part of the question too. Two forecasts over two universes answer two questions, even when their parameters agree. So the asset axis must agree, and so must `umsk`, which is the denominator of every coverage column of the summary. The check compares neither `alpha` nor `y`. The forecasts differ by design, because the summary exists to compare them.
+
+The check does not compare the evaluation `dates` either. Two evaluations that answer one question on two grids still answer one question. [`forecast_evaluation_align`](@ref) puts them on one grid, and [`forecast_summary_assert_comparable`](@ref) asks for one grid as well.
 
 # Arguments
 
@@ -87,7 +96,7 @@ The evaluation `dates` are not checked here either. Two evaluations that answer 
 # Validation
 
   - `!isempty(fes)`. Raises an [`IsEmptyError`](@ref).
-  - Every evaluation agrees with the first on `target`, `horizon`, `lag`, `step`, `min_count`, `ppy`, the number of assets and `umsk`. Raises a [`ConflictingArgumentError`](@ref) naming the field.
+  - Every evaluation agrees with the first on `target`, `horizon`, `lag`, `step`, `min_count`, `ties`, `ppy`, the number of assets and `umsk`. Raises a [`ConflictingArgumentError`](@ref) that names the field.
 
 # Returns
 
@@ -115,6 +124,8 @@ function forecast_summary_assert_same_question(fes::AbstractVector{<:ForecastEva
                   ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `step`: $(b.step) against $(a.step)"))
         @argcheck(a.min_count == b.min_count,
                   ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `min_count`: $(b.min_count) against $(a.min_count)"))
+        @argcheck(a.ties === b.ties,
+                  ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `ties`: :$(b.ties) against :$(a.ties)"))
         @argcheck(a.ppy == b.ppy,
                   ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `ppy`: $(b.ppy) against $(a.ppy)"))
         @argcheck(size(a.alpha, 2) == size(b.alpha, 2),
@@ -127,9 +138,9 @@ end
 """
     forecast_summary_assert_comparable(fes::AbstractVector{<:ForecastEvaluationResult})
 
-Refuse a set of evaluations whose rows would not mean the same thing, naming the field that differs.
+Refuse a set of evaluations whose rows do not mean the same thing, and name the field that differs.
 
-Two evaluations are comparable where they answer one question, which [`forecast_summary_assert_same_question`](@ref) checks, and where they answer it on one sample: two rows taken over different dates compare nothing, so the evaluation `dates` must agree as well. A set that answers one question on two grids is refused here, and [`forecast_evaluation_align`](@ref) is what puts it on one.
+Two evaluations are comparable when they answer one question, which [`forecast_summary_assert_same_question`](@ref) checks, and when they answer it on one sample. Two rows over different dates compare nothing, so the evaluation `dates` must agree as well. This check refuses a set that answers one question on two grids, and [`forecast_evaluation_align`](@ref) puts such a set on one grid.
 
 # Arguments
 
@@ -138,7 +149,7 @@ Two evaluations are comparable where they answer one question, which [`forecast_
 # Validation
 
   - The rules of [`forecast_summary_assert_same_question`](@ref).
-  - Every evaluation agrees with the first on `dates`. Raises a [`ConflictingArgumentError`](@ref) naming the field.
+  - Every evaluation agrees with the first on `dates`. Raises a [`ConflictingArgumentError`](@ref) that names the field.
 
 # Returns
 
@@ -166,15 +177,35 @@ end
 
 Put a set of Return Forecast evaluations on the evaluation grid they share.
 
-Two members of the Return Forecast family rarely share a grid. A member that publishes its history is scorable from the block's first row, and a member that is refit along the grid warms up first, so the two start at different observations and [`forecast_evaluation_summary`](@ref) refuses them on `dates`. Before this verb, a caller who wanted the comparison read `alpha` and `y` off the two Results, blanked the rows before the later warm-up and drove the bare method of [`forecast_evaluation`](@ref) again for each, which was the one place the library made a caller drop from the Estimator layer to the bare one to do an ordinary thing.
+Two members of the Return Forecast family rarely share a grid. A member that publishes its history is scorable from the first row of the block, and a member that the library refits along the grid scores only after its warm-up. The two grids start at different observations, and [`forecast_evaluation_summary`](@ref) refuses them on `dates`.
 
-The verb does what that blank did, in one call, and without touching the pair. Every evaluation's dates are `lo:step:hi` on the block's observation axis, so under one `step` the grid they share is `max(lo):step:min(hi)`: it starts where the last member becomes scorable and ends where the first one stops. The grid is anchored at that later start, so a member whose own grid started earlier and off its phase is re-anchored onto it. Its dates move; its `alpha`, `y` and `umsk` do not, so no statistic of the aligned Result is taken over a value the caller did not hand in. A date of the common grid that some member cannot score is kept, as [`forecast_evaluation_dates`](@ref) keeps one, and that member's statistics are `NaN` there.
+This verb changes the dates of each evaluation and nothing else. The dates of every evaluation are a run of stride `step` on the observation axis of the block, so under one `step` the shared grid starts at the latest first date and stops at or before the earliest last date. The grid starts at that latest first date, so a member whose own grid started earlier on another phase moves onto it. The verb keeps `alpha`, `y` and `umsk` as they are, so no statistic of an aligned Result reads a value that the caller did not hand in. The verb keeps a date of the common grid at which a member scores no asset, as [`forecast_evaluation_dates`](@ref) keeps one, and the statistics of that member are `NaN` there.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\underline{t} &= \\max_{k} t^{(k)}_{1}\\,, \\\\
+\\overline{t} &= \\min_{k} t^{(k)}_{J_{k}}\\,, \\\\
+\\mathcal{D} &= \\left\\{ \\underline{t} + q s : q \\in \\mathbb{Z}_{\\geq 0},\\ \\underline{t} + q s \\leq \\overline{t} \\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``t^{(k)}_{j}``: The ``j``-th evaluation date of evaluation ``k``.
+  - ``J_{k}``: Number of evaluation dates of evaluation ``k``.
+  - ``\\underline{t}``: Latest first date over the set.
+  - ``\\overline{t}``: Earliest last date over the set.
+  - ``\\mathcal{D}``: Common evaluation grid, which every aligned evaluation carries.
+  - $(math_dict[:s_eval_stride])
 
 # Algorithm
 
  1. Refuse a set that does not answer one question, with [`forecast_summary_assert_same_question`](@ref).
- 2. Take the latest first date and the earliest last date over the set, and refuse a set whose grids do not overlap.
- 3. Rebuild each [`ForecastEvaluationResult`](@ref) on `max(lo):step:min(hi)`, carrying its own pair, universe and parameters.
+ 2. Take the latest first date `lo` and the earliest last date `hi` over the set, and refuse a set with `lo > hi`.
+ 3. Build the common grid `dates` from `lo` to `hi` at stride `step`.
+ 4. Rebuild each [`ForecastEvaluationResult`](@ref) on `dates`, with its own pair, universe and parameters.
 
 # Arguments
 
@@ -183,11 +214,11 @@ The verb does what that blank did, in one call, and without touching the pair. E
 # Validation
 
   - The rules of [`forecast_summary_assert_same_question`](@ref).
-  - The grids overlap: the latest first date is no later than the earliest last date. Raises an [`IsEmptyError`](@ref).
+  - The latest first date is no later than the earliest last date. Raises an [`IsEmptyError`](@ref).
 
 # Returns
 
-  - `afes::Vector{ForecastEvaluationResult}`: One evaluation per input, in the order they were given, every one carrying the same `dates`.
+  - `afes::Vector{ForecastEvaluationResult}`: One evaluation per input, in the order of the inputs, and every one carries the same `dates`.
 
 # Examples
 
@@ -229,16 +260,34 @@ function forecast_evaluation_align(fes::AbstractVector{<:ForecastEvaluationResul
               IsEmptyError("the evaluations share no date: the latest first date is $(lo) and the earliest last date is $(hi)"))
     dates = collect(lo:(first(fes).step):hi)
     return [ForecastEvaluationResult(fe.alpha, fe.y, fe.umsk, dates, fe.target, fe.horizon,
-                                     fe.lag, fe.step, fe.min_count, fe.ppy) for fe in fes]
+                                     fe.lag, fe.step, fe.min_count, fe.ties, fe.ppy)
+            for fe in fes]
 end
 """
     forecast_summary_scored(fe::ForecastEvaluationResult, u::MatNum) -> Vector{<:Real}
 
 Return the number of assets an evaluation scored, one entry per evaluation date.
 
-This is the numerator [`forecast_coverage`](@ref) divides by the universe, and a summary reports it beside the share because the two say different things: a coverage of one half over forty assets is a cross-section a statistic can be believed on, and the same share over six assets is not.
+This count is the numerator of [`forecast_coverage`](@ref). A summary reports it beside the share, because the two answer different questions. A coverage of one half over forty assets gives a cross-section large enough to trust a statistic, and the same share over six assets does not. On a point-in-time panel the count moves with the listings while the share stays at `1`.
 
-An asset is counted where it is in the universe the evaluation carries in `umsk`, carries a positive weight, a finite forecast and a finite target, which is the rule the coverage applies. On a point-in-time panel this count moves with the listings while the share stays at `1`, which is why the two are reported side by side.
+# Mathematical definition
+
+```math
+\\begin{align}
+n_{j} &= \\left| \\left\\{ i \\in \\mathcal{U}_{t_{j}} : \\alpha_{t_{j} i} \\text{ and } y_{t_{j} i} \\text{ are finite} \\right\\} \\right|\\,, \\\\
+\\mathcal{U}_{t} &= \\left\\{ i : m_{ti} \\text{ and } 0 < u_{ti} < \\infty \\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:n_j_scored])
+  - $(math_dict[:U_t_univ])
+  - $(math_dict[:alpha_ti_fc])
+  - $(math_dict[:y_ti_fwd])
+  - $(math_dict[:m_ti_univ])
+  - $(math_dict[:u_ti_cs])
+  - $(math_dict[:t_j_eval])
 
 # Arguments
 
@@ -265,7 +314,10 @@ function forecast_summary_scored(fe::ForecastEvaluationResult, u::MatNum)
     for (j, t) in enumerate(dates)
         s = 0
         for i in axes(alpha, 2)
-            s += umsk[t, i] && u[t, i] > 0 && isfinite(alpha[t, i]) && isfinite(y[t, i])
+            s += umsk[t, i] &&
+                 0 < u[t, i] < Inf &&
+                 isfinite(alpha[t, i]) &&
+                 isfinite(y[t, i])
         end
         n[j] = Tf(s)
     end
@@ -275,9 +327,31 @@ end
     forecast_summary_coverage(fe::ForecastEvaluationResult,
                               w::Option{<:MatNum}) -> NamedTuple
 
-Return the four coverage figures a summary carries for one evaluation.
+Return the four coverage figures of one evaluation in a summary.
 
-The share and the count are each reported at their mean and at their minimum. The mean says what the evaluation ran on, and the minimum says the worst cross-section any statistic of it was taken over, which is the figure that says whether a coefficient is a measurement or an accident.
+The summary reports the share and the count, each at its mean and at its minimum. The mean states the sample that the evaluation ran on. The minimum states the smallest cross-section that any statistic of the evaluation read, and that figure tells whether a coefficient is a measurement or an accident. A date whose universe is empty has no coverage, so it enters neither share figure, but it enters both count figures with a count of zero.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{c} &= \\frac{1}{\\left| \\mathcal{J}_{c} \\right|} \\sum_{j \\in \\mathcal{J}_{c}} c_{j}\\,, \\\\
+c_{\\min} &= \\min_{j \\in \\mathcal{J}_{c}} c_{j}\\,, \\\\
+\\bar{n} &= \\frac{1}{J} \\sum_{j=1}^{J} n_{j}\\,, \\\\
+n_{\\min} &= \\min_{1 \\leq j \\leq J} n_{j}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\bar{c}``: Mean coverage over the dates that carry a finite coverage.
+  - ``c_{\\min}``: Least coverage over the same dates.
+  - ``\\bar{n}``: Mean scored count over the evaluation dates.
+  - ``n_{\\min}``: Least scored count over the evaluation dates.
+  - ``\\mathcal{J}_{c}``: Evaluation dates at which ``c_{j}`` is finite, which are the dates whose universe is not empty.
+  - ``J``: Number of evaluation dates.
+  - $(math_dict[:c_j_cov])
+  - $(math_dict[:n_j_scored])
 
 # Arguments
 
@@ -286,7 +360,7 @@ The share and the count are each reported at their mean and at their minimum. Th
 
 # Returns
 
-  - `cov::NamedTuple`: `(; mean_coverage, min_coverage, mean_n_scored, min_n_scored)`. Every figure is `NaN` where the evaluation scored no date.
+  - `cov::NamedTuple`: `(; mean_coverage, min_coverage, mean_n_scored, min_n_scored)`, which are ``\\bar{c}``, ``c_{\\min}``, ``\\bar{n}`` and ``n_{\\min}``. The two shares are `NaN` when the universe of every date is empty, and the two counts are `NaN` when the evaluation carries no date.
 
 # Related
 
@@ -309,13 +383,21 @@ end
     forecast_summary_row(fe::ForecastEvaluationResult, w::Option{<:MatNum},
                          bins::Integer) -> NamedTuple
 
-Return the thirty figures one evaluation contributes to a summary.
+Return the thirty figures of one evaluation in a summary.
 
-The row computes no statistic of its own. It reads [`forecast_ic_summary`](@ref) for the ten information-coefficient figures, [`forecast_portfolio`](@ref) for each of the two books, [`forecast_calibration`](@ref) for the scale of the forecast, and [`forecast_summary_coverage`](@ref) for the sample every one of them was taken over.
+The row computes no statistic of its own. It reads the ten information-coefficient figures from [`forecast_ic_summary`](@ref), five figures of each of the two books from [`forecast_portfolio`](@ref), six calibration figures from [`forecast_calibration`](@ref), and the four figures of the sample from [`forecast_summary_coverage`](@ref).
 
-The two books report the first three figures of the [`PerformanceSummaryResult`](@ref) they carry, and their hit rate and mean turnover beside them. The drawdown family — `sortino`, `calmar`, `max_drawdown`, `cvar` and `sharpe_stderr` — is deliberately left out and read from `forecast_portfolio(fe; kind = …).summary` instead: [`forecast_portfolio`](@ref) states that its summary is of the **compressed** path, so those five figures join the date before a gap to the date after it, and two forecasts whose gaps fall on different dates would be set beside each other over two different paths. The three that are reported are two means and a ratio of them, which the compression does not move.
+Each book reports `ann_return`, `ann_volatility` and `sharpe` from the [`PerformanceSummaryResult`](@ref) it carries, with its hit rate and its mean turnover beside them. None of the three reads the order of the returns. The row leaves out the other figures of that summary, and a caller reads them from `forecast_portfolio(fe; kind = …).summary`. Two of them, `max_drawdown` and `calmar`, read the path, and [`forecast_portfolio`](@ref) summarises the compressed path, which joins the date before a gap to the date after it. When the gaps of two forecasts fall on different dates, their drawdowns are of two different paths.
 
-The threshold is the evaluation's own. It is not a keyword here, because [`forecast_portfolio`](@ref) and [`forecast_quantile_spread`](@ref) read `fe.min_count` off the Result, and one that reached only the coefficients would print a row taken under two thresholds.
+The threshold is the one that the evaluation carries, and the row takes no keyword for it. [`forecast_portfolio`](@ref) and [`forecast_quantile_spread`](@ref) read `fe.min_count` from the Result, so a keyword that reached only the coefficients gives a row under two thresholds.
+
+# Algorithm
+
+ 1. Summarise the coefficients of [`forecast_ic`](@ref) with [`forecast_ic_summary`](@ref), at the lag that [`forecast_ic_lags`](@ref) derives, giving `ic`.
+ 2. Score the rank book and the z-score book with [`forecast_portfolio`](@ref), giving `rk` and `zs`.
+ 3. Read the calibration at `bins` bins with [`forecast_calibration`](@ref), giving `cb`.
+ 4. Read the four coverage figures with [`forecast_summary_coverage`](@ref), giving `cv`.
+ 5. Collect the thirty figures into one named tuple.
 
 # Arguments
 
@@ -325,11 +407,11 @@ The threshold is the evaluation's own. It is not a keyword here, because [`forec
 
 # Validation
 
-  - The rules of [`forecast_ic`](@ref), [`forecast_portfolio`](@ref), [`forecast_calibration`](@ref) and [`forecast_coverage`](@ref). A sample no date can score is refused by [`forecast_portfolio`](@ref) rather than by a guard this verb adds.
+  - The rules of [`forecast_ic`](@ref), [`forecast_portfolio`](@ref), [`forecast_calibration`](@ref) and [`forecast_coverage`](@ref). [`forecast_portfolio`](@ref) refuses a sample in which no date reaches `fe.min_count`, and the row adds no check of its own.
 
 # Returns
 
-  - `row::NamedTuple`: The thirty columns [`ForecastSummaryResult`](@ref) documents, as scalars.
+  - `row::NamedTuple`: The thirty columns that [`ForecastSummaryResult`](@ref) documents, as scalars.
 
 # Related
 
@@ -342,7 +424,7 @@ The threshold is the evaluation's own. It is not a keyword here, because [`forec
 """
 function forecast_summary_row(fe::ForecastEvaluationResult, w::Option{<:MatNum},
                               bins::Integer)
-    ic = forecast_ic_summary(forecast_ic(fe, w))
+    ic = forecast_ic_summary(forecast_ic(fe, w); lags = forecast_ic_lags(fe))
     rk = forecast_portfolio(fe; kind = :rank)
     zs = forecast_portfolio(fe; kind = :zscore)
     cb = forecast_calibration(fe, w; bins = bins)
@@ -371,14 +453,20 @@ end
     forecast_summary_spreads(fes::AbstractVector{<:ForecastEvaluationResult},
                              quantiles) -> Tuple
 
-Return the quantile-spread block of a summary, or five `nothing`s where none was asked for.
+Return the quantile-spread block of a summary, or five `nothing`s when the caller asks for no quantile.
 
-Every other column of a summary is one number per forecast, and this block is one number per forecast **and quantile**, so it carries a second axis the rest of the Result does not. A caller who asks for no quantile pays for none and reads the five entries back as `nothing` by dispatch, which is the idiom [`FactorSummaryResult`](@ref) already holds for its absent columns.
+Every other column of a summary holds one number per forecast. This block holds one number per forecast and per quantile, so it has a second axis. A caller who asks for no quantile computes none, and the method for `nothing` returns the five entries as `nothing`. [`FactorSummaryResult`](@ref) marks its absent columns in the same way.
+
+# Algorithm
+
+ 1. Collect the tail fractions into the vector `q`. A single fraction becomes a vector of one.
+ 2. For each evaluation, cut the spread at every fraction of `q` with [`forecast_quantile_spread`](@ref), giving `s`.
+ 3. Write the annualised mean, the annualised volatility, their ratio and the hit rate of `s` into the row of the evaluation in `sm`, `sv`, `si` and `sh`.
 
 # Arguments
 
   - `fes`: The evaluations to summarise.
-  - `quantiles`: Tail fractions, each in `(0, 0.5]`, or `nothing`.
+  - `quantiles`: Tail fractions, each in `(0, 0.5]`, as a collection or as one number, or `nothing`.
 
 # Validation
 
@@ -386,7 +474,7 @@ Every other column of a summary is one number per forecast, and this block is on
 
 # Returns
 
-  - `block::Tuple`: `(quantiles, spread_ann_return, spread_ann_volatility, spread_sharpe, spread_hit_rate)`. The four matrices are `forecasts × quantiles`, or all five entries are `nothing`.
+  - `block::Tuple`: `(quantiles, spread_ann_return, spread_ann_volatility, spread_sharpe, spread_hit_rate)`. `quantiles` is a vector, and the four matrices are `forecasts × quantiles`. All five entries are `nothing` when `quantiles` is `nothing`.
 
 # Related
 
@@ -399,7 +487,7 @@ function forecast_summary_spreads(::AbstractVector{<:ForecastEvaluationResult}, 
 end
 function forecast_summary_spreads(fes::AbstractVector{<:ForecastEvaluationResult},
                                   quantiles)
-    q = collect(quantiles)
+    q = vec(collect(quantiles))
     n = length(fes)
     m = length(q)
     alpha::MatNum = first(fes).alpha
@@ -415,7 +503,7 @@ function forecast_summary_spreads(fes::AbstractVector{<:ForecastEvaluationResult
     # that generator is what its analysis reports.
     for (i, k) in enumerate(eachindex(fes))
         fe::ForecastEvaluationResult = fes[k]
-        s = forecast_quantile_spread(fe; quantiles = quantiles)
+        s = forecast_quantile_spread(fe; quantiles = q)
         am::VecNum = s.ann_mean
         av::VecNum = s.ann_vol
         ai::VecNum = s.ann_ir
@@ -434,27 +522,27 @@ $(DocStringExtensions.TYPEDEF)
 
 The headline statistics of one or more Return Forecast evaluations, one entry per forecast.
 
-`ForecastSummaryResult` is what [`forecast_evaluation_summary`](@ref) returns. It is the top of the evaluation hierarchy: it carries thirty columns read off the level-2 verbs, on an axis whose entries are the forecasts that were evaluated, so a summary can be tabulated, plotted, asserted on in a test, or read without a plotting package installed.
+`ForecastSummaryResult` is what [`forecast_evaluation_summary`](@ref) returns. It is the top of the evaluation hierarchy. It carries thirty columns that it reads from the verbs below it, on an axis whose entries are the forecasts, so a caller can tabulate it, plot it, test it, or read it without a plotting package.
 
 # One class, and no comparison class beside it
 
-A single evaluation is the **length-1** case of this Result and a comparison is the length-2 case, so no second class ships: a comparison only sets the columns of several evaluations side by side, which a columnar Result already does.
+A single evaluation is the length-1 case of this Result, and a comparison of two is the length-2 case. A comparison only sets the columns of several evaluations side by side, and a columnar Result already does that, so the library has no second class.
 
 # One hit-rate denominator
 
-The five hit rates this Result carries are taken against the dates that **scored**, and none against every evaluation date. `spearman_hit_rate` and `pearson_hit_rate` come from [`exposure_ic_factor_summary`](@ref), and `rank_hit_rate`, `zscore_hit_rate` and the optional `spread_hit_rate` from [`forecast_hit_rate`](@ref); both read a date that carries no figure as a date at which nothing was measured, so every hit rate sits over the same sample as the mean printed beside it. A date whose cross-section fell under `min_count` carries no coefficient, and how often that happened is the coverage's question, which `mean_coverage`, `min_coverage`, `mean_n_scored` and `min_n_scored` answer; folding it into the hit rate as well would count the same silence twice.
+The five hit rates of this Result count the dates that **scored**, and none counts every evaluation date. `spearman_hit_rate` and `pearson_hit_rate` come from [`exposure_ic_factor_summary`](@ref), and `rank_hit_rate`, `zscore_hit_rate` and the optional `spread_hit_rate` come from [`forecast_hit_rate`](@ref). Both read a date without a figure as a date at which the evaluation measured nothing, so each hit rate uses the same sample as the mean beside it. A date whose cross-section fell under `min_count` has no coefficient. The coverage columns `mean_coverage`, `min_coverage`, `mean_n_scored` and `min_n_scored` report how often that happened, and a hit rate that counted such a date as a miss would count the same gap twice.
 
 # The five columns that can be absent
 
-`quantiles`, `spread_ann_return`, `spread_ann_volatility`, `spread_sharpe` and `spread_hit_rate` carry a second axis — the tail fraction — that no other column has. They are computed only where a caller asks for a quantile, and read back as `nothing` otherwise. A consumer reads that by dispatch rather than by a test of its own.
+`quantiles`, `spread_ann_return`, `spread_ann_volatility`, `spread_sharpe` and `spread_hit_rate` have a second axis, the tail fraction, that no other column has. The summary computes them only when a caller asks for a quantile, and they are `nothing` otherwise. A consumer reads their absence by dispatch.
 
-# What is read one call down instead
+# What a caller reads one call down
 
-Three parts of an evaluation are not columns here, because their axis is not the forecast.
+Three parts of an evaluation are not columns here.
 
-  - The **drawdown family** of each book, which is of the compressed path; `forecast_portfolio(fe; kind = …).summary` carries it.
-  - The **holding-period and decay tables**, whose axis is the forward window; [`forecast_holding_period`](@ref) and [`forecast_decay`](@ref) answer them.
-  - The **factor correlations**, whose axis is the factor; [`forecast_factor_correlation`](@ref) answers them and [`exposure_ic_summary`](@ref) summarises them per factor.
+  - The other figures of the performance summary of each book. `forecast_portfolio(fe; kind = …).summary` carries them, and two of them, `max_drawdown` and `calmar`, read the compressed path of the book.
+  - The holding-period and decay tables, whose axis is the forward window. [`forecast_holding_period`](@ref) and [`forecast_decay`](@ref) return them.
+  - The factor correlations, whose axis is the factor. [`forecast_factor_correlation`](@ref) returns them, and [`exposure_ic_summary`](@ref) summarises them per factor.
 
 # Fields
 
@@ -477,8 +565,8 @@ $(DocStringExtensions.FIELDS)
     ) -> ForecastSummaryResult
 
 Arguments correspond to the struct's fields, in the order they are declared. The type is a
-Result, so [`forecast_evaluation_summary`](@ref) builds it and a caller reads it; there is no
-keyword constructor, and the type validates nothing of its own.
+Result, so [`forecast_evaluation_summary`](@ref) builds it and a caller reads it. It has no
+keyword constructor, and it validates nothing of its own.
 
 # Related
 
@@ -505,11 +593,11 @@ keyword constructor, and the type validates nothing of its own.
     """
     spearman_ic_ir
     """
-    Date-level t-statistic of the mean Spearman information coefficient, one entry per forecast.
+    Date-level t-statistic of the mean Spearman information coefficient, one entry per forecast. Its standard error reads the overlap of the forward windows, so it is the familiar ratio only under a stride of the horizon.
     """
     spearman_t_stat
     """
-    Share of **every** evaluation date at which the Spearman information coefficient is positive, one entry per forecast.
+    Share of the **scored** dates at which the Spearman information coefficient is positive, one entry per forecast.
     """
     spearman_hit_rate
     """
@@ -525,11 +613,11 @@ keyword constructor, and the type validates nothing of its own.
     """
     pearson_ic_ir
     """
-    Date-level t-statistic of the mean weighted Pearson information coefficient, one entry per forecast.
+    Date-level t-statistic of the mean weighted Pearson information coefficient, one entry per forecast. Its standard error reads the overlap of the forward windows, so it is the familiar ratio only under a stride of the horizon.
     """
     pearson_t_stat
     """
-    Share of **every** evaluation date at which the weighted Pearson information coefficient is positive, one entry per forecast.
+    Share of the **scored** dates at which the weighted Pearson information coefficient is positive, one entry per forecast.
     """
     pearson_hit_rate
     """
@@ -597,15 +685,15 @@ keyword constructor, and the type validates nothing of its own.
     """
     n_bins
     """
-    Mean share of the universe the evaluation scored, one entry per forecast. The universe is the estimation mask the evaluation carries in `umsk`, so a late lister lowers the count and not the share.
+    Mean share of the universe the evaluation scored, over the dates whose universe is not empty, one entry per forecast. The universe is the estimation mask the evaluation carries in `umsk`, so a late lister lowers the count and not the share.
     """
     mean_coverage
     """
-    Least share of the universe the evaluation scored at any of its dates, one entry per forecast.
+    Least share of the universe the evaluation scored at any date whose universe is not empty, one entry per forecast.
     """
     min_coverage
     """
-    Mean number of assets the evaluation scored, one entry per forecast.
+    Mean number of assets the evaluation scored per evaluation date, one entry per forecast.
     """
     mean_n_scored
     """
@@ -613,27 +701,27 @@ keyword constructor, and the type validates nothing of its own.
     """
     min_n_scored
     """
-    Tail fractions the quantile spreads were cut at, or `nothing` when none was asked for.
+    Tail fractions the quantile spreads were cut at, or `nothing` when the caller asked for none.
     """
     quantiles
     """
-    Annualised mean of the top-minus-bottom spread, `forecasts × quantiles`, or `nothing` when no quantile was asked for.
+    Annualised mean of the top-minus-bottom spread, `forecasts × quantiles`, or `nothing` when the caller asked for no quantile.
     """
     spread_ann_return
     """
-    Annualised volatility of the top-minus-bottom spread, `forecasts × quantiles`, or `nothing` when no quantile was asked for.
+    Annualised volatility of the top-minus-bottom spread, `forecasts × quantiles`, or `nothing` when the caller asked for no quantile.
     """
     spread_ann_volatility
     """
-    Ratio of the annualised mean of the top-minus-bottom spread to its annualised volatility, `forecasts × quantiles`, or `nothing` when no quantile was asked for.
+    Ratio of the annualised mean of the top-minus-bottom spread to its annualised volatility, `forecasts × quantiles`, or `nothing` when the caller asked for no quantile.
     """
     spread_sharpe
     """
-    Share of the **scored** dates at which the top-minus-bottom spread is positive, `forecasts × quantiles`, or `nothing` when no quantile was asked for.
+    Share of the **scored** dates at which the top-minus-bottom spread is positive, `forecasts × quantiles`, or `nothing` when the caller asked for no quantile.
     """
     spread_hit_rate
     """
-    $(field_dict[:ps_ppy]) It defaults to `1`, which reports the statistics per period.
+    $(field_dict[:ps_ppy]) It is the `ppy` that every evaluation of the summary carries.
     """
     ppy
 end
@@ -655,11 +743,11 @@ end
 
 Summarise one or more Return Forecast evaluations as a [`ForecastSummaryResult`](@ref).
 
-This is the top of the evaluation hierarchy, and it is also the comparison. It calls one level-2 verb per block and computes no statistic of its own beyond collecting each block onto the forecast axis, which is how [`factor_model_summary`](@ref) is built. A single evaluation is the length-1 case and has the same type and the same columns as a comparison of four, so a caller who starts with one member and later wants a table of four changes the argument and nothing else.
+This verb is the top of the evaluation hierarchy, and it is also the comparison. It calls one verb per block, computes no statistic of its own, and collects each block onto the forecast axis, as [`factor_model_summary`](@ref) does. A single evaluation is the length-1 case, with the same type and the same columns as a comparison of four. A caller who starts with one member and later wants a table of four changes the argument and nothing else.
 
-The vector method **refuses evaluations that are not comparable**, naming the field that differs, because a table invites a comparison its rows would not support. Two members that answer one question on two grids — the ordinary case, because a member that is refit warms up and a member that publishes its history does not — are refused on `dates` unless `align = true`, which puts them on the grid they share through [`forecast_evaluation_align`](@ref) before anything is read.
+The vector method **refuses evaluations that are not comparable**, and names the field that differs, because a table invites a comparison that its rows must support. Two members that answer one question on two grids are the ordinary case, because a refit member warms up and a member that publishes its history does not. The verb refuses them on `dates` unless `align = true`, which first puts them on their shared grid through [`forecast_evaluation_align`](@ref).
 
-A weighting reaches the summary the way it reaches every other block-aware statistic of this map: as a bare weight history positionally, or as the cross-sectional factor model whose [`AbstractOrthogonalityMetric`](@ref) resolves one. The Result carries no block, so the metric cannot be read off it.
+A weighting reaches the summary in one of two forms, as it reaches every other block-aware statistic of the evaluation. The caller passes a bare weight history in the second position, or the cross-sectional factor model, whose [`AbstractOrthogonalityMetric`](@ref) resolves one. The Result carries no block, so the verb cannot read the metric from it.
 
 # Algorithm
 
@@ -667,19 +755,19 @@ A weighting reaches the summary the way it reaches every other block-aware stati
  2. Refuse a set of evaluations that are not comparable, with [`forecast_summary_assert_comparable`](@ref).
  3. Resolve the names axis with [`forecast_summary_names`](@ref).
  4. Read the thirty core figures of each evaluation with [`forecast_summary_row`](@ref).
- 5. Read the quantile-spread block with [`forecast_summary_spreads`](@ref), which answers `nothing` where no quantile was asked for.
- 6. Collect the rows into columns and build a [`ForecastSummaryResult`](@ref), carrying the `ppy` the evaluations agree on.
+ 5. Read the quantile-spread block with [`forecast_summary_spreads`](@ref), which returns `nothing` when the caller asks for no quantile.
+ 6. Collect the rows into columns and build a [`ForecastSummaryResult`](@ref), with the `ppy` that the evaluations agree on.
 
 # Arguments
 
   - `fes`: The evaluations to summarise, at least one, from [`forecast_evaluation`](@ref).
-  - `fe`: One evaluation. It is summarised as the length-1 case.
+  - `fe`: One evaluation. The verb summarises it as the length-1 case.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecasts, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
-  - `align`: Whether to put the evaluations on the grid they share before the summary reads them. Under `false` a set whose `dates` differ is refused.
+  - `align`: Whether to put the evaluations on the grid they share before the summary reads them. Under `false` the verb refuses a set whose `dates` differ.
   - `names`: One name per evaluation, or `nothing` to number them.
   - `bins`: Number of quantile bins the calibration curve cuts.
-  - `quantiles`: Tail fractions the quantile spreads are cut at, each in `(0, 0.5]`, or `nothing` for none.
+  - `quantiles`: Tail fractions the quantile spreads are cut at, each in `(0, 0.5]`, as a collection or as one number, or `nothing` for none.
   - `weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose weight history the weighted statistics read.
 
 # Validation

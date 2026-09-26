@@ -41,8 +41,8 @@ where ``\\boldsymbol{w}_b`` is the benchmark weight vector and ``k`` is the budg
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::TurnoverRiskMeasure,
-                               opt::RiskJuMPOptimisationEstimator, ::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, ::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     k = get_k(model)

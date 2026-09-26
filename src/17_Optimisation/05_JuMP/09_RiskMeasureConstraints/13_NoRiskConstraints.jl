@@ -1,6 +1,6 @@
 """
     set_risk_constraints!(model::JuMP.Model, ::Any, r::NoRisk,
-                          opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
+                          opt::RiskConstraintOwner, pr::AbstractPriorResult,
                           args...; loss::Bool = true, prefix::Symbol = Symbol(""),
                           kwargs...)
 
@@ -25,9 +25,8 @@ Registers a zero affine expression, so the risk contributes nothing to the objec
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::NoRisk,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
-                               kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     key = ifelse(loss, :nr_risk, :nr_risk_gain)
     return state_build!(model, prefix, key) do
         nr_risk = JuMP.@expression(model, zero(JuMP.AffExpr))

@@ -3,7 +3,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the `JuMP` encodings of a second moment.
 
-A second-moment risk measure hands the formulation a deviation vector and a correction factor, and the formulation decides which quadratic object or cone carries the sum of squares. The four encodings differ in the cone they need and in the units they report: [`SOCRiskExpr`](@ref) reports the square root of the second moment, and the other three report the second moment itself. A bound in `settings.ub` is stated in the units that the chosen formulation reports. The cone encodings bound the sum of squares from above, so they are tight where the risk is minimised or bounded above, which is how a risk expression enters the model.
+A second-moment risk measure gives the encoding a deviation vector and a correction factor, and the encoding selects the quadratic form or the cone that holds the sum of squares. [`SOCRiskExpr`](@ref) reports the square root of the second moment, and the other three encodings report the second moment itself. The functor of the measure reports the units of its model, and the measure reads a bound in `settings.ub` in the same units.
+
+The encoding sets the risk expression alone. Every consumer also adds a second-order cone variable that bounds the square root of the second moment. The bound in `settings.ub` and the [`MaximumRatio`](@ref) objective act on that variable, because each needs an expression of degree one in the weights. The cone encodings bound the sum of squares from above, so they are tight when the objective minimises the risk or when a bound holds it.
 
 All concrete types implementing a second-moment `JuMP` encoding should subtype `SecondMomentFormulation`.
 
@@ -21,7 +23,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the second-moment encodings that state the risk as an explicit square.
 
-[`Variance`](@ref) accepts these two and no others. Both report the variance itself, one as a quadratic form in the weights and the other as the square of a second-order cone variable.
+[`Variance`](@ref) accepts these two and no others. Both report the variance itself. [`QuadRiskExpr`](@ref) states it as a quadratic form in the weights, and [`SquaredSOCRiskExpr`](@ref) states it as the square of a second-order cone variable.
 
 # Related
 
@@ -34,9 +36,9 @@ abstract type VarianceFormulation <: SecondMomentFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Encodes the second moment as an explicit quadratic form, without an auxiliary variable or a cone.
+Encodes the second moment as an explicit quadratic form in the risk expression.
 
-The encoding takes two shapes. A risk measure that holds a co-moment matrix uses the first, and a risk measure that builds a deviation vector uses the second.
+The risk expression reads no auxiliary variable. It takes two shapes. A risk measure that holds a co-moment matrix uses the first, and a risk measure that builds a deviation vector uses the second.
 
 # Mathematical definition
 
@@ -70,7 +72,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Encodes the second moment as the square of a second-order cone variable.
 
-The cone bounds the norm of the deviation vector, and the risk expression squares that variable, so the reported units are those of the second moment.
+The cone bounds the norm of the deviation vector, and the risk expression squares that variable, so the encoding reports the second moment itself.
 
 # Mathematical definition
 
@@ -87,7 +89,7 @@ Where:
   - $(math_dict[:d_secmom])
   - $(math_dict[:c_secmom])
   - $(math_dict[:t_secmom])
-  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm. The model states it with a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
 # Related
 
@@ -104,7 +106,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Encodes the second moment as a variable that a rotated second-order cone bounds.
 
-The cone carries the square, so the risk expression stays linear in the auxiliary variable. The library builds it as `[t; 1/2; d] in JuMP.RotatedSecondOrderCone()`. That cone reads ``2 t u \\geq \\lVert \\boldsymbol{d} \\rVert_{2}^{2}``, and the second entry pins ``u = 1/2``, so it states ``t \\geq \\lVert \\boldsymbol{d} \\rVert_{2}^{2}``. The reported units are those of the second moment.
+The cone holds the square, so the risk expression is linear in the auxiliary variable. The row is `[t; 1/2; d] in JuMP.RotatedSecondOrderCone()`. That cone states ``2 t u \\geq \\lVert \\boldsymbol{d} \\rVert_{2}^{2}``, and the second entry fixes ``u = 1/2``, so the row states ``t \\geq \\lVert \\boldsymbol{d} \\rVert_{2}^{2}``. The encoding reports the second moment itself.
 
 # Mathematical definition
 
@@ -121,7 +123,7 @@ Where:
   - $(math_dict[:d_secmom])
   - $(math_dict[:c_secmom])
   - $(math_dict[:t_secmom])
-  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, whose square is modelled as a [JuMP.RotatedSecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Rotated-Second-Order-Cone).
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm. The model states its square with a [JuMP.RotatedSecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Rotated-Second-Order-Cone).
 
 # Related
 
@@ -137,7 +139,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Encodes the square root of the second moment as a second-order cone variable.
 
-This is the only one of the four encodings that reports a root. A risk measure that takes it reports a standard deviation where the other three report a variance, both in the model and in the functor, and a bound in `settings.ub` is read in the same units.
+This is the only one of the four encodings that reports a root. A risk measure that takes it reports a standard deviation where the other three report a variance, in the model and in the functor alike. The measure reads a bound in `settings.ub` in the same units.
 
 # Mathematical definition
 
@@ -154,7 +156,7 @@ Where:
   - $(math_dict[:d_secmom])
   - $(math_dict[:c_secmom])
   - $(math_dict[:t_secmom])
-  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm. The model states it with a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
 # Related
 
@@ -166,11 +168,11 @@ Where:
 """
 struct SOCRiskExpr <: SecondMomentFormulation end
 """
-    const NSkeQuadFormulations
+    const NSkeQuadFormulations = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}
 
-Union of the second-moment formulations that state the risk of the Negative Skewness risk measure as an explicit square.
+Groups the two encodings under which [`NegativeSkewness`](@ref) reports the quadratic form of its skewness matrix rather than its square root.
 
-Specifically: `Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}`.
+The functor of [`NegativeSkewness`](@ref) dispatches on the group. It returns ``\\boldsymbol{w}^\\intercal \\mathbf{V} \\boldsymbol{w}``, with ``\\mathbf{V}`` the field `V` of the measure, under these two encodings, and the square root under [`SOCRiskExpr`](@ref), so the functor reports the units of the model.
 
 # Related
 
@@ -182,33 +184,52 @@ const NSkeQuadFormulations = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}
 """
     const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
 
-Union of the second-moment formulations that report the second moment itself rather than its square root.
+Groups the three encodings that report the second moment itself rather than its square root.
+
+The value level of [`SecondMoment`](@ref) dispatches on the group. It returns the variance of the deviations under these three encodings, and the standard deviation under [`SOCRiskExpr`](@ref), so the functor reports the units of the model.
 
 # Related
 
   - [`NSkeQuadFormulations`](@ref)
   - [`RSOCRiskExpr`](@ref)
   - [`SOCRiskExpr`](@ref)
-  - [`Variance`](@ref)
+  - [`SecondMoment`](@ref)
 """
 const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the portfolio variance using a covariance matrix.
+Measures the portfolio variance, the quadratic form of the weights in a covariance matrix.
+
+`alg` selects the risk expression that the model builds, and each [`VarianceFormulation`](@ref) reports the variance itself. [`QuadRiskExpr`](@ref) states the quadratic form ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``, and [`SquaredSOCRiskExpr`](@ref) states ``\\sigma^{2}``, the square of a second-order cone variable with ``\\sigma \\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}`` and ``\\mathbf{G}^\\intercal \\mathbf{G} = \\mathbf{\\Sigma}``. The model adds ``\\sigma`` under both encodings, because the bound in `settings.ub` and the [`MaximumRatio`](@ref) objective need an expression of degree one in the weights. The bound acts on ``\\sigma`` at the square root of `settings.ub`, so a caller states it in the units of a variance. [`set_risk_constraints!`](@ref) states the model.
+
+When `rc` holds rows, the model uses the semidefinite formulation of [sdprp](@cite) whatever `alg` says. A [`SemiDefinitePhylogeny`](@ref) in the constraints also moves the variance to this formulation. The formulation lifts the weights into a symmetric matrix ``\\mathbf{W}``, and the variance becomes the trace ``\\mathrm{Tr}(\\mathbf{\\Sigma} \\mathbf{W})``, which has degree one in ``(\\boldsymbol{w}, k)``. So under [`MaximumRatio`](@ref) this formulation maximises the excess return per unit of variance, not the Sharpe ratio. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule, and [`rc_variance_constraints!`](@ref) states the rows.
+
+!!! warning
+
+    The semidefinite formulation is a relaxation. The model states ``\\mathbf{W} \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k`` and not equality, so the rows bind the returned weights only when the solution has ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``. No term of the model forces a matrix of rank one. A solver can add a positive semidefinite part to ``\\mathbf{W}`` that moves the shares the rows constrain, and the solve still reports success. The rows then hold on ``\\mathbf{W}`` while the shares of the returned weights miss them, under a [`MinimumRisk`](@ref) objective as well as a [`MaximumUtility`](@ref) one. To check a result, compute [`risk_contribution`](@ref) of the returned weights, or [`factor_risk_contribution`](@ref) under [`FactorRiskContribution`](@ref), divide it by its sum, and compare the shares with the rows.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{Variance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
+\\mathrm{Variance}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} = \\sum_{i=1}^{N} \\mathrm{RC}_{i}(\\boldsymbol{w})\\,,\\\\
+\\mathrm{RC}_{i}(\\boldsymbol{w}) &= w_{i} (\\mathbf{\\Sigma} \\boldsymbol{w})_{i}\\,,\\\\
+\\mathbf{A} \\, \\mathbf{RC}(\\boldsymbol{w}) &\\leq \\boldsymbol{b} \\, \\mathrm{Variance}(\\boldsymbol{w})\\,,\\\\
+\\mathbf{C} \\, \\mathbf{RC}(\\boldsymbol{w}) &= \\boldsymbol{d} \\, \\mathrm{Variance}(\\boldsymbol{w})\\,.
 \\end{align}
 ```
 
 Where:
 
   - $(math_dict[:w_port])
-  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
+  - $(math_dict[:Sigma_rm])
+  - ``\\mathrm{RC}_{i}(\\boldsymbol{w})``: Risk contribution of asset ``i``. The contributions sum to the variance.
+  - ``\\mathbf{RC}(\\boldsymbol{w})``: Vector of the ``N`` risk contributions.
+  - ``\\mathbf{A}``, ``\\boldsymbol{b}``: The inequality rows of `rc` and their bounds.
+  - ``\\mathbf{C}``, ``\\boldsymbol{d}``: The equality rows of `rc` and their targets.
+
+The last two lines state the rows of `rc`. Each row bounds a share of the variance, and the lines hold only when `rc` holds rows. Under [`FactorRiskContribution`](@ref) the rows read the contribution of each factor in place of ``\\mathrm{RC}_{i}``, the value that [`factor_risk_contribution`](@ref) reports, as a share of the whole variance.
 
 # Fields
 
@@ -228,74 +249,28 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `sigma` is not `nothing`, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
+  - If `sigma` is a matrix, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
+  - If `chol` is a matrix, `!isempty(chol)`.
+  - `chol` is `nothing` when `sigma` is `nothing` or a **Deferred Quantity**.
 
 !!! warning
 
-    `sigma` and `chol` are a pair, and a stated `chol` factorises the `sigma` beside it. A caller who wants one consistent pair names `sigma` alone — a matrix leaves the factorisation to the kernel, a **Deferred Quantity** fits both from one prior. A caller who states both by hand must make sure that they agree. A stated matrix is also pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, while a **Deferred Quantity** crosses unresolved and refits on the subset.
+    `sigma` and `chol` are a pair, and a stated `chol` factorises the `sigma` beside it. A caller who wants one consistent pair names `sigma` alone. A matrix leaves the factorisation to the model, and a **Deferred Quantity** fits both from one prior. A caller who states both by hand must make sure that they agree. A stated matrix is also fixed. It crosses a Cross-Validation fold or a subset view as the answer for the whole universe, while a **Deferred Quantity** crosses unresolved and refits on the subset.
 
 ## View parameters
 
 `Variance` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
-  - `sigma` is sliced to the selected assets. A stated matrix is sliced on **both** axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
-  - `chol` is sliced on its **columns** alone. Its rows index the factorisation, which the asset selection does not address.
+  - The method slices a stated `sigma` to the selected assets on both axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
+  - The method slices `chol` on its columns alone. Its rows index the factorisation, which the asset selection does not address.
   - The method refuses an `rc` that is a [`LinearConstraint`](@ref). A group constraint cannot be restricted to a part of its own group, and the restriction would break factor risk contribution.
-  - `settings`, `rc` and `alg` are carried through unchanged.
-
-# `JuMP` Formulations
-
-!!! info
-
-    Regardless of the formulation used, an auxiliary variable representing the standard deviation is needed in order to constrain the risk or maximise the risk-adjusted return ratio. This is because quadratic constraints are not strictly convex, and the transformation needed to maximise the risk-adjusted return ratio requires affine variables in the numerator and denominator.
-
-Depending on the `alg` field, the variance risk measure is formulated using `JuMP` as follows:
-
-## `QuadRiskExpr`
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} \\quad & \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
-
-## `SquaredSOCRiskExpr`
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} \\quad & \\sigma^2\\nonumber\\\\
-\\text{s.t.} \\quad & \\left\\lVert \\mathbf{G} \\boldsymbol{w} \\right\\rVert_{2} \\leq \\sigma\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\sigma``: Variable representing the optimised portfolio's standard deviation.
-  - ``\\mathbf{G}``: Suitable factorisation of the `N × N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
-  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
+  - `settings`, `rc` and `alg` pass through unchanged.
 
 # Functor
 
     (r::Variance)(w::VecNum)
 
-Computes the variance risk of a portfolio with weights `w` using the covariance matrix `r.sigma`.
-
-```math
-\\begin{align}
-\\mathrm{Variance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
+Computes ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}`` with the matrix `r.sigma`, the value of the risk expression under both encodings. The functor reads `sigma` as it stands, so a measure whose `sigma` is `nothing` or a **Deferred Quantity** needs [`factory`](@ref) with a prior result first.
 
 ## Arguments
 
@@ -340,10 +315,13 @@ julia> r(w)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
   - [`expected_risk`](@ref)
+  - [`risk_contribution`](@ref)
+  - [`rc_variance_constraints!`](@ref): registers the rows of `rc` on the lifted matrix.
 
 # References
 
   - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:sdprp]) Formulations 9 and 10.
 """
 @propagatable @concrete struct Variance <: RiskMeasure
     """
@@ -396,9 +374,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve a **Deferred Quantity** in [`Variance`](@ref)'s `sigma` slot against prior result `pr`.
+Resolve a **Deferred Quantity** in the `sigma` slot of a [`Variance`](@ref) against prior result `pr`.
 
-`sigma` and `chol` travel together, so both come from the same fit. A stated `chol` never reaches here: [`assert_derived_slot_has_source`](@ref) refuses it beside a deferred `sigma` at construction. A covariance estimator produces no factorisation, so `chol` becomes `nothing` and the consumer derives it from the resolved `sigma`. A prior estimator produces both, which is how a factor prior's sparse factorisation reaches the slot intact.
+`sigma` and `chol` are one pair, so both come from the same fit. The method never meets a stated `chol`, because [`assert_derived_slot_has_source`](@ref) refuses one beside a deferred `sigma` at construction. A covariance estimator gives no factorisation, so `chol` becomes `nothing` and the model derives it from the resolved `sigma`. A prior estimator gives both, so the sparse factorisation of a factor prior reaches the slot unchanged. A measure whose `sigma` is not a **Deferred Quantity** returns unchanged.
 
 # Related
 
@@ -423,9 +401,15 @@ functor_slots(r::Variance) = (; sigma = r.sigma)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`Variance`](@ref) by resolving a **Deferred Quantity** in `sigma`, then falling back to the prior result for the covariance matrix and its factorisation.
+Create an instance of [`Variance`](@ref) that holds a covariance matrix, taken from the measure or from the prior result `pr`.
 
-The two are selected **as a pair** ([`sigma_chol_selector`](@ref)), not field by field: a stated `sigma` with no factor must not be paired with the prior's, which factorises a different matrix.
+The method selects `sigma` and `chol` as one pair, not field by field. A stated `sigma` with no factorisation keeps `chol = nothing`, because the factorisation of the prior belongs to a different matrix.
+
+# Algorithm
+
+ 1. Resolve a **Deferred Quantity** in `sigma` with [`resolve_deferred_quantities`](@ref), giving `r`.
+ 2. Select the pair `sigma`, `chol` with [`sigma_chol_selector`](@ref). A measure that states neither takes `pr.sigma` and `pr.chol`, and every other measure keeps its own pair.
+ 3. Build a new `Variance` from the pair and from the `settings`, `rc` and `alg` of `r`.
 
 # Related
 
@@ -450,20 +434,22 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the portfolio standard deviation using a covariance matrix. It is the square root of the variance.
+Measures the portfolio standard deviation, the square root of the variance.
+
+The model states it as a second-order cone variable ``\\sigma \\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}``, which is tight when the objective minimises the risk or when a bound holds it. The variable has degree one in the weights, so the bound in `settings.ub` acts on it directly and a caller states the bound in the units of a standard deviation. [`set_risk_constraints!`](@ref) states the model. Under [`MaximumRatio`](@ref) the objective is the Sharpe ratio.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{StandardDeviation}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\sqrt{\\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}}\\,.
+\\mathrm{StandardDeviation}(\\boldsymbol{w}) &= \\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}\\,.
 \\end{align}
 ```
 
 Where:
 
   - $(math_dict[:w_port])
-  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
+  - $(math_dict[:Sigma_rm])
 
 # Fields
 
@@ -481,52 +467,27 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `sigma` is not `nothing`, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
+  - If `sigma` is a matrix, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
+  - If `chol` is a matrix, `!isempty(chol)`.
+  - `chol` is `nothing` when `sigma` is `nothing` or a **Deferred Quantity**.
 
 !!! warning
 
-    `sigma` and `chol` are a pair, and a stated `chol` factorises the `sigma` beside it. A caller who wants one consistent pair names `sigma` alone — a matrix leaves the factorisation to the kernel, a **Deferred Quantity** fits both from one prior. A caller who states both by hand must make sure that they agree. A stated matrix is also pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, while a **Deferred Quantity** crosses unresolved and refits on the subset.
+    `sigma` and `chol` are a pair, as in [`Variance`](@ref). A caller who wants one consistent pair names `sigma` alone, and a caller who states both by hand must make sure that they agree. A stated matrix is fixed across a Cross-Validation fold or a subset view, while a **Deferred Quantity** refits on the subset.
 
 ## View parameters
 
 `StandardDeviation` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
-  - `sigma` is sliced to the selected assets. A stated matrix is sliced on **both** axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
-  - `chol` is sliced on its **columns** alone. Its rows index the factorisation, which the asset selection does not address.
-  - `settings` is carried through unchanged.
-
-## `JuMP` Formulation
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} \\quad & \\sigma\\nonumber\\\\
-\\text{s.t.} \\quad & \\left\\lVert \\mathbf{G} \\boldsymbol{w} \\right\\rVert_{2} \\leq \\sigma\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\sigma``: Variable representing the optimised portfolio's standard deviation.
-  - ``\\mathbf{G}``: Suitable factorisation of the `N × N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
-  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
+  - The method slices a stated `sigma` to the selected assets on both axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
+  - The method slices `chol` on its columns alone. Its rows index the factorisation, which the asset selection does not address.
+  - `settings` passes through unchanged.
 
 # Functor
 
     (r::StandardDeviation)(w::VecNum)
 
-Computes the standard deviation risk of a portfolio with weights `w` using the covariance matrix `r.sigma`.
-
-```math
-\\begin{align}
-\\mathrm{StandardDeviation}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\sqrt{\\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
+Computes ``\\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}`` with the matrix `r.sigma`. The functor reads `sigma` as it stands, so a measure whose `sigma` is `nothing` or a **Deferred Quantity** needs [`factory`](@ref) with a prior result first.
 
 ## Arguments
 
@@ -604,7 +565,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve a **Deferred Quantity** in [`StandardDeviation`](@ref)'s `sigma` slot against prior result `pr`. `sigma` and `chol` come from the same fit — see [`resolve_deferred_quantities(r::Variance, pr::AbstractPriorResult)`](@ref).
+Resolve a **Deferred Quantity** in the `sigma` slot of a [`StandardDeviation`](@ref) against prior result `pr`.
+
+`sigma` and `chol` come from the same fit, by the rule that [`resolve_deferred_quantities(r::Variance, pr::AbstractPriorResult)`](@ref) states. A measure whose `sigma` is not a **Deferred Quantity** returns unchanged.
 
 # Related
 
@@ -629,7 +592,15 @@ functor_slots(r::StandardDeviation) = (; sigma = r.sigma)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`StandardDeviation`](@ref) by resolving a **Deferred Quantity** in `sigma`, then falling back to the prior result for the covariance matrix and its factorisation as a pair. See [`factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)`](@ref).
+Create an instance of [`StandardDeviation`](@ref) that holds a covariance matrix, taken from the measure or from the prior result `pr`.
+
+The method selects `sigma` and `chol` as one pair, as [`factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)`](@ref) does.
+
+# Algorithm
+
+ 1. Resolve a **Deferred Quantity** in `sigma` with [`resolve_deferred_quantities`](@ref), giving `r`.
+ 2. Select the pair `sigma`, `chol` with [`sigma_chol_selector`](@ref). A measure that states neither takes `pr.sigma` and `pr.chol`, and every other measure keeps its own pair.
+ 3. Build a new `StandardDeviation` from the pair and from the `settings` of `r`.
 
 # Related
 
@@ -650,7 +621,37 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the variance risk measure under uncertainty sets. Works the same way as the [`Variance`](@ref) risk measure but allows specifying uncertainty set estimators or results. These are only used in `JuMP`-based optimisations because they dictate how the variance is formulated as an optimisation problem. By encapsulating the uncertainty set estimator or result, enables the use of multiple uncertainty set variances in the same optimisation model.
+Measures the worst-case portfolio variance over an uncertainty set of covariance matrices.
+
+`ucs` holds the set, as a fitted [`AbstractUncertaintySetResult`](@ref) or as an estimator that the optimisation fits from its returns data or its prior. Each measure holds its own set, so one model can hold more than one worst-case variance. The model states the worst case of the box, the ellipsoid and the norm ball as a dual problem over the lifted weight matrix ``\\mathbf{W}``, and the worst case of the compact set as a second-order cone problem in the weights. [`set_ucs_variance_risk!`](@ref) states the rows and the relaxation. A bound in `settings.ub` is in the units of a variance.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{UncertaintySetVariance}(\\boldsymbol{w}) &= \\underset{\\mathbf{\\Sigma} \\in U_{\\mathbf{\\Sigma}}}{\\max} \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,,\\\\
+R_{\\mathrm{box}}(\\boldsymbol{w}) &= \\langle \\mathbf{\\Sigma}_u, (\\boldsymbol{w} \\boldsymbol{w}^\\intercal)_{+} \\rangle - \\langle \\mathbf{\\Sigma}_l, (-\\boldsymbol{w} \\boldsymbol{w}^\\intercal)_{+} \\rangle\\,,\\\\
+R_{\\mathrm{ell}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + k_{e} \\lVert \\mathbf{G}_{\\Omega} \\, \\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal) \\rVert_{2}\\,,\\\\
+R_{\\mathrm{nb}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + \\kappa_{b} \\lVert \\mathbf{L}^\\intercal \\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal) \\rVert_{p^{*}}\\,,\\\\
+R_{\\mathrm{cpt}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + \\kappa \\lVert (\\mathbf{I} - \\mathbf{Q} \\mathbf{Q}^{+}) \\mathbf{C} \\boldsymbol{w} \\rVert_{2}^{2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``U_{\\mathbf{\\Sigma}}``: Uncertainty set of the covariance matrix.
+  - ``R_{\\mathrm{box}}``, ``R_{\\mathrm{ell}}``, ``R_{\\mathrm{nb}}``, ``R_{\\mathrm{cpt}}``: Value of the first line for the box, for the ellipsoid and the norm ball without the condition ``\\mathbf{\\Sigma} \\succeq 0``, and for the compact set.
+  - ``\\mathbf{\\Sigma}_l``, ``\\mathbf{\\Sigma}_u``: Lower and upper bounds of the box, `lb` and `ub`.
+  - ``(\\cdot)_{+}``: Positive part, entry by entry.
+  - ``\\hat{\\mathbf{\\Sigma}}``: Centre of the set, the `val` of the set when it states one and the `sigma` of the measure otherwise.
+  - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the upper Cholesky factor of its matrix ``\\mathbf{\\Omega}``, `sigma`.
+  - ``\\kappa_{b}``, ``\\mathbf{L}``, ``p^{*}``: Radius of the norm ball, its map, and the dual order of its norm.
+  - ``\\mathbf{C}``, ``\\mathbf{Q}``: Diagonal metric of the compact set and its basis. ``\\mathbf{Q}^{+}`` is the pseudo-inverse, so ``\\mathbf{Q} \\mathbf{Q}^{+}`` projects onto the span of ``\\mathbf{Q}``.
+  - $(math_dict[:kappa_cpt])
+  - ``\\langle \\mathbf{X}, \\mathbf{Y} \\rangle = \\mathrm{Tr}(\\mathbf{X}^\\intercal \\mathbf{Y})``: Inner product of two matrices.
+
+The box value and the compact value are the worst case of the first line. The ellipsoid and the norm ball also require ``\\mathbf{\\Sigma} \\succeq 0``, and their values above omit that condition, so each lies at or above the worst case of its set. The model keeps the condition through the dual matrix ``\\mathbf{E} \\succeq 0``, so its optimum lies at or below these values.
 
 # Fields
 
@@ -668,124 +669,28 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `sigma` is not `nothing`, `!isempty(sigma)`.
+  - If `sigma` is a matrix, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
 
 !!! warning
 
-    A stated `sigma` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on, and nothing makes it agree with the uncertainty set beside it. A caller who wants it to follow the fit names a **Deferred Quantity** in `sigma`, or leaves the slot `nothing` and lets the prior supply it.
+    A stated `sigma` is fixed. It crosses a Cross-Validation fold or a subset view as the answer for the whole universe, so it does not follow the refit that the optimisation runs, and nothing makes it agree with the set beside it. A caller who wants it to follow the fit names a **Deferred Quantity** in `sigma`, or leaves the slot `nothing` so that the prior supplies it.
 
-# `JuMP` Formulations
+## View parameters
 
-When using an uncertainty set on the variance, the optimisation problem becomes:
+`UncertaintySetVariance` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} \\quad & \\underset{\\mathbf{\\Sigma} \\in U_{\\mathbf{\\Sigma}}}{\\max} \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
-  - ``U_{\\mathbf{\\Sigma}}``: Uncertainty set for the covariance matrix.
-
-This problem can be reformulated depending on the type of uncertainty set used.
-
-## Box uncertainty set
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} & \\quad \\mathrm{Tr}\\left(\\mathbf{A}_u \\mathbf{\\Sigma}_u\\right) - \\mathrm{Tr}\\left(\\mathbf{A}_l \\mathbf{\\Sigma}_l\\right)\\\\
-\\text{s.t.} & \\quad \\mathbf{A}_u \\geq 0\\\\
-               & \\quad \\mathbf{A}_l \\geq 0\\\\
-               & \\quad \\begin{bmatrix}
-                            \\mathbf{W} & \\boldsymbol{w}\\\\
-                            \\boldsymbol{w}^\\intercal & k
-                        \\end{bmatrix} \\succeq 0 \\\\
-               & \\quad \\mathbf{A}_u - \\mathbf{A}_l = \\mathbf{W}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-
-  - ``\\mathbf{A}_u``, ``\\mathbf{A}_l``, ``\\mathbf{W}``: `N × N` auxiliary symmetric matrices.
-
-  - ``\\mathbf{\\Sigma}_l``: `N × N` lower bound of the covariance matrix.
-
-  - ``\\mathbf{\\Sigma}_u``: `N × N` upper bound of the covariance matrix.
-
-  - ``k``: Scalar variable/constant.
-
-      + If the objective risk-adjusted return, it is a non-negative variable.
-      + Else it is equal to 1.
-
-  - ``\\mathrm{Tr}(\\cdot)``: Trace operator.
-
-## Ellipsoidal uncertainty set
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} & \\quad \\mathrm{Tr}\\left( \\mathbf{\\Sigma} \\left( \\mathbf{W} + \\mathbf{E} \\right) \\right) + k_{\\mathbf{\\Sigma}} \\sigma \\\\
-\\text{s.t.} & \\quad \\begin{bmatrix}
-                            \\mathbf{W} & \\boldsymbol{w}\\\\
-                            \\boldsymbol{w}^\\intercal & k
-                        \\end{bmatrix} \\succeq 0 \\\\
-               & \\quad \\mathbf{E} \\succeq 0 \\\\
-               & \\quad \\lVert \\mathbf{G} \\mathrm{vec}\\left( \\mathbf{W} + \\mathbf{E} \\right) \\rVert_{2} \\leq \\sigma \\\\
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-
-  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
-
-  - ``\\mathbf{W}``, ``\\mathbf{E}``: `N × N` auxiliary symmetric matrices.
-
-  - ``k_{\\mathbf{\\Sigma}}``: Scalar constant defining the size of the uncertainty set.
-
-  - ``\\sigma``: Variable representing the portfolio's variance of the variance.
-
-  - ``\\mathbf{G}``: Suitable factorisation of the `N^2 × N^2` covariance of the covariance matrix of the uncertainty set, such as the square root matrix, or the Cholesky factorisation.
-
-  - ``k``: Scalar variable/constant.
-
-      + If the objective risk-adjusted return, it is a non-negative variable.
-      + Else it is equal to 1.
-
-  - ``\\mathrm{Tr}(\\cdot)``: Trace operator.
-
-  - ``\\mathrm{vec}(\\cdot)``: Vectorisation operator, which unrolls a matrix as a column vector in column-major order.
-
-  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
+  - `ucs` recurses through [`port_opt_view`](@ref) with the asset index alone. A set on the covariance axis maps the index to the entries of the vectorised matrix before it slices.
+  - The method slices a stated `sigma` to the selected assets on both axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
+  - `settings` passes through unchanged.
 
 # Functor
 
     (r::UncertaintySetVariance)(w::VecNum)
 
-Computes the variance risk of a portfolio with weights `w`. The value depends on what `ucs` holds, because the measure is a worst case over a set and an unfitted estimator defines no set.
+Computes the variance of the weights `w`. The value depends on what `ucs` holds, because an estimator that is not fitted defines no set.
 
-  - `ucs` holds an [`AbstractUncertaintySetResult`](@ref): the worst-case variance over the fitted set, computed by [`ucs_variance`](@ref). This is the scalar twin of the risk expression the `JuMP` formulations above build.
-  - `ucs` holds an estimator or `nothing`: the nominal variance ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``.
-
-```math
-\\begin{align}
-\\mathrm{UncertaintySetVariance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\begin{cases}
-  \\underset{\\mathbf{\\Sigma} \\in U_{\\mathbf{\\Sigma}}}{\\max} \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w} & \\text{(fitted uncertainty set)} \\\\
-  \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w} & \\text{(estimator or nothing)}
-\\end{cases}\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:w_port])
-  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
-  - ``U_{\\mathbf{\\Sigma}}``: Uncertainty set for the covariance matrix.
+  - `ucs` holds an [`AbstractUncertaintySetResult`](@ref): the value of the definition above for that set, computed by [`ucs_variance`](@ref).
+  - `ucs` holds an estimator or `nothing`: the nominal variance ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``, with ``\\mathbf{\\Sigma}`` the `sigma` of the measure.
 
 ## Arguments
 
@@ -851,7 +756,9 @@ julia> r(w)
   - [`AbstractUncertaintySetResult`](@ref)
   - [`AbstractUncertaintySetEstimator`](@ref)
   - [`ucs_variance`](@ref)
-  - [`factory(r::UncertaintySetVariance, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
+  - [`set_ucs_variance_risk!`](@ref): The model of the worst case, with its rows and its relaxation.
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
   - [`expected_risk`](@ref)
 
 # References
@@ -877,6 +784,7 @@ julia> r(w)
                                     sigma::Option{<:SigmaSlot})
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
+            assert_matrix_issquare(sigma, :sigma)
         end
         return new{typeof(settings), typeof(ucs), typeof(sigma)}(settings, ucs, sigma)
     end
@@ -889,7 +797,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve a **Deferred Quantity** in [`UncertaintySetVariance`](@ref)'s `sigma` slot against prior result `pr`. The measure carries one prior-derived slot, so the slot itself admits the estimator and there is no fan-out to make.
+Resolve a **Deferred Quantity** in the `sigma` slot of an [`UncertaintySetVariance`](@ref) against prior result `pr`.
+
+The measure has one slot that the prior supplies, and no derived slot, so [`resolve_slot`](@ref) fills `sigma` alone. A measure whose `sigma` is not a **Deferred Quantity** returns unchanged.
 
 # Related
 
@@ -912,12 +822,9 @@ functor_slots(r::UncertaintySetVariance) = (; sigma = r.sigma)
 """
     (r::UncertaintySetVariance)(w::VecNum)
 
-Compute the risk of weights `w` under an [`UncertaintySetVariance`](@ref) measure.
+Compute the variance of the weights `w` under an [`UncertaintySetVariance`](@ref).
 
-When `r.ucs` is a fitted [`AbstractUncertaintySetResult`](@ref), returns the worst-case
-variance over the uncertainty set via [`ucs_variance`](@ref) — consistent with the risk
-expression built by [`set_ucs_variance_risk!`](@ref). With an unfitted estimator (or
-`nothing`), falls back to the nominal variance `w' * sigma * w`.
+A fitted [`AbstractUncertaintySetResult`](@ref) in `r.ucs` gives [`ucs_variance`](@ref), the value that the `# Mathematical definition` of [`UncertaintySetVariance`](@ref) states. An estimator or `nothing` in `r.ucs` gives the nominal variance ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``, with ``\\mathbf{\\Sigma}`` the field `sigma`.
 
 # Related
 
@@ -933,31 +840,41 @@ end
 """
     ucs_variance(ucs::AbstractUncertaintySetResult, sigma::MatNum, w::VecNum)
 
-Compute the worst-case portfolio variance of weights `w` over a fitted uncertainty set.
+Compute the worst-case portfolio variance of the weights `w` over a fitted uncertainty set.
 
-This is the scalar twin of the JuMP expression built by [`set_ucs_variance_risk!`](@ref):
-for a [`BoxUncertaintySet`](@ref) it evaluates `tr(Au * ub) - tr(Al * lb)` at the optimal
-`Au = max.(W, 0)`, `Al = max.(-W, 0)` with `W = w * w'`; for an
-[`EllipsoidalUncertaintySet`](@ref) it evaluates `tr(sigma * W) + k * norm(G * vec(W))`
-with `G` the upper Cholesky factor of the set's shape matrix (the `E = 0` evaluation of
-the model expression, an upper bound on its optimum); for a
-[`CompactCovarianceUncertaintySet`](@ref) it evaluates `w' * sigma * w` plus `kappa` times
-the squared norm of the least-squares residual of `C .* w` against the set's basis. The
-compact evaluation solves the same inner problem the model variable `z_cucs` solves, so it
-is that expression's optimum and not a bound on it. For a covariance
-[`NormBallUncertaintySet`](@ref) it evaluates `tr(sigma * W) + kappa * norm(L' * vec(W), q)`
-with `q` the dual norm order of the set (again the `E = 0` evaluation, an upper bound on the
-model expression's optimum), and a map with no column pays nothing.
+It is the value level of the risk expression that [`set_ucs_variance_risk!`](@ref) builds, at ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal``. The functor of [`UncertaintySetVariance`](@ref) calls it when `ucs` holds a fitted set. The box and the compact values equal the optimum of the model expression. The ellipsoid and the norm-ball values take the dual matrix ``\\mathbf{E} = 0``, so each lies at or above the optimum of its model expression.
 
-The [`UncertaintySetVariance`](@ref) functor dispatches here when its `ucs` field is a
-fitted result, keeping scalar risk evaluation consistent with the risk expression the
-optimiser sees.
+# Mathematical definition
+
+```math
+\\begin{align}
+R_{\\mathrm{box}}(\\boldsymbol{w}) &= \\langle \\mathbf{\\Sigma}_u, (\\boldsymbol{w} \\boldsymbol{w}^\\intercal)_{+} \\rangle - \\langle \\mathbf{\\Sigma}_l, (-\\boldsymbol{w} \\boldsymbol{w}^\\intercal)_{+} \\rangle\\,,\\\\
+R_{\\mathrm{ell}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + k_{e} \\lVert \\mathbf{G}_{\\Omega} \\, \\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal) \\rVert_{2}\\,,\\\\
+R_{\\mathrm{nb}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + \\kappa_{b} \\lVert \\mathbf{L}^\\intercal \\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal) \\rVert_{p^{*}}\\,,\\\\
+R_{\\mathrm{cpt}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + \\kappa \\underset{\\boldsymbol{z}}{\\min} \\lVert \\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z} \\rVert_{2}^{2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``R_{\\mathrm{box}}``, ``R_{\\mathrm{ell}}``, ``R_{\\mathrm{nb}}``, ``R_{\\mathrm{cpt}}``: Value for a [`BoxUncertaintySet`](@ref), an [`EllipsoidalUncertaintySet`](@ref), a covariance [`NormBallUncertaintySet`](@ref) and a [`CompactCovarianceUncertaintySet`](@ref).
+  - ``\\mathbf{\\Sigma}_l``, ``\\mathbf{\\Sigma}_u``: Lower and upper bounds of the box, `lb` and `ub`.
+  - ``(\\cdot)_{+}``: Positive part, entry by entry.
+  - ``\\hat{\\mathbf{\\Sigma}}``: Centre of the set, the `val` of the set when it states one and `sigma` otherwise.
+  - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the upper Cholesky factor of its matrix ``\\mathbf{\\Omega}``, `sigma`.
+  - ``\\kappa_{b}``, ``\\mathbf{L}``, ``p^{*}``: Radius of the norm ball, its map, and the dual order of its norm. A map with no column adds nothing.
+  - ``\\mathbf{C}``, ``\\mathbf{Q}``, ``\\boldsymbol{z}``: Diagonal metric of the compact set, its basis, and the free coefficients of the basis. A basis with no column leaves ``\\lVert \\mathbf{C} \\boldsymbol{w} \\rVert_{2}^{2}``.
+  - $(math_dict[:kappa_cpt])
+  - ``\\langle \\mathbf{X}, \\mathbf{Y} \\rangle = \\mathrm{Tr}(\\mathbf{X}^\\intercal \\mathbf{Y})``: Inner product of two matrices.
+
+The least-squares problem of the compact line projects onto the span of ``\\mathbf{Q}`` whether or not the columns of ``\\mathbf{Q}`` are orthonormal.
 
 # Arguments
 
-  - `ucs`: Fitted uncertainty set result.
-  - `sigma::MatNum`: Fallback covariance matrix. The set's own `val` field wins over it.
-  - `w::VecNum`: Vector of portfolio weights.
+  - `ucs`: Fitted uncertainty set.
+  - `sigma::MatNum`: Fallback centre of the set. The `val` of the set wins over it, and the box reads neither.
+  - `w::VecNum`: Asset weights.
 
 # Returns
 
@@ -968,19 +885,22 @@ optimiser sees.
   - [`UncertaintySetVariance`](@ref)
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
   - [`CompactCovarianceUncertaintySet`](@ref)
+  - [`set_ucs_variance_risk!`](@ref): The model expression, whose optimum is at or below this value.
 """
 function ucs_variance(ucs::BoxUncertaintySet, ::Any, w::VecNum)
     W = w * transpose(w)
     z = zero(eltype(W))
-    return sum(ucs.ub .* max.(W, z)) - sum(ucs.lb .* max.(-W, z))
+    return sum(ucs.ub[i] * max(W[i], z) for i in eachindex(ucs.ub, W)) -
+           sum(ucs.lb[i] * max(-W[i], z) for i in eachindex(ucs.lb, W))
 end
 function ucs_variance(ucs::EllipsoidalUncertaintySet, sigma::MatNum, w::VecNum)
     W = w * transpose(w)
     # The set names its own centre; `sigma` is the fallback (ADR 0050).
     sigma = something(ucs.val, sigma)
     G = LinearAlgebra.cholesky(ucs.sigma).U
-    return LinearAlgebra.tr(sigma * W) + ucs.k * LinearAlgebra.norm(G * vec(W))
+    return LinearAlgebra.dot(w, sigma, w) + ucs.k * LinearAlgebra.norm(G * vec(W))
 end
 function ucs_variance(ucs::CompactCovarianceUncertaintySet, sigma::MatNum, w::VecNum)
     # The set names its own centre; `sigma` is the fallback (ADR 0050).
@@ -1001,28 +921,31 @@ function ucs_variance(ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
     # `norm` of an empty vector is zero under every order, so a map with no column pays
     # nothing without a branch.
     penalty = LinearAlgebra.norm(transpose(ucs.L) * vec(W), dual_norm_order(ucs.p))
-    return LinearAlgebra.tr(sigma * W) + ucs.kappa * penalty
+    return LinearAlgebra.dot(w, sigma, w) + ucs.kappa * penalty
 end
 """
     _no_bounds_risk_measure(r, flag)
 
-Return a version of the risk measure stripped of bounds for unbounded optimisation sub-problems.
+Return a copy of an [`UncertaintySetVariance`](@ref) without the bound in `settings.ub`, for the sub-problems of [`NearOptimalCentering`](@ref) that solve without bounds.
 
-Internal helper used in frontier construction sub-problems where bounds are temporarily removed.
+`flag` is the `ucs_flag` of [`NearOptimalCentering`](@ref), and it selects whether the copy keeps the uncertainty set. Both copies keep `settings.rke` and `settings.scale`.
 
 # Arguments
 
-  - `r`: Risk measure.
-  - `flag`: Flag controlling which bounds to remove.
+  - `r`: The measure.
+  - `flag`:
+      + `::Val{true}` or `nothing`: Keep the uncertainty set, and return an [`UncertaintySetVariance`](@ref).
+      + `::Val{false}`: Drop the uncertainty set, and return a [`Variance`](@ref) of the nominal matrix `sigma`.
 
 # Returns
 
-  - Risk measure without bounds.
+  - `r_new`: The measure without its bound.
 
 # Related
 
-  - [`UncertaintySetVariance`](@ref)
+  - [`no_bounds_risk_measure`](@ref)
   - [`_no_bounds_no_risk_expr_risk_measure`](@ref)
+  - [`UncertaintySetVariance`](@ref)
 """
 function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Union{Val{true}, Nothing})
     return UncertaintySetVariance(;
@@ -1043,21 +966,24 @@ end
 """
     _no_bounds_no_risk_expr_risk_measure(r, flag)
 
-Return a version of the risk measure with neither bounds nor risk expressions for unbounded sub-problems.
+Return a copy of an [`UncertaintySetVariance`](@ref) without the bound in `settings.ub` and outside the risk of the objective.
 
-Internal helper used in frontier sub-problems that require removing all risk expression constraints.
+A measure that only measures a distance, such as the tracked measure of a [`RiskTrackingRiskMeasure`](@ref), takes this copy. The copy sets `rke = false` and a unit `scale`, as the method for every other measure does. `flag` selects whether the copy keeps the uncertainty set.
 
 # Arguments
 
-  - `r`: Risk measure.
-  - `flag`: Flag controlling configuration.
+  - `r`: The measure.
+  - `flag`:
+      + `::Val{true}` or `nothing`: Keep the uncertainty set, and return an [`UncertaintySetVariance`](@ref).
+      + `::Val{false}`: Drop the uncertainty set, and return a [`Variance`](@ref) of the nominal matrix `sigma`.
 
 # Returns
 
-  - Simplified risk measure.
+  - `r_new`: The measure without its bound and outside the risk of the objective.
 
 # Related
 
+  - [`no_bounds_no_risk_expr_risk_measure`](@ref)
   - [`_no_bounds_risk_measure`](@ref)
   - [`UncertaintySetVariance`](@ref)
 """
@@ -1065,12 +991,13 @@ function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
                                               ::Union{Val{true}, Nothing})
     return UncertaintySetVariance(;
                                   settings = RiskMeasureSettings(; rke = false,
-                                                                 scale = r.settings.scale),
+                                                                 scale = one(r.settings.scale)),
                                   r.ucs, sigma = r.sigma)
 end
 function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, ::Val{false})
     return Variance(;
-                    settings = RiskMeasureSettings(; rke = false, scale = r.settings.scale),
+                    settings = RiskMeasureSettings(; rke = false,
+                                                   scale = one(r.settings.scale)),
                     rc = nothing, sigma = r.sigma)
 end
 function no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
@@ -1082,26 +1009,28 @@ end
             ucs::Option{<:UcSE_UcS} = nothing, args...;
             kwargs...)
 
-Create an instance of [`UncertaintySetVariance`](@ref) by selecting the uncertainty set and covariance matrix from the risk-measure instance or falling back to the prior result.
+Create an instance of [`UncertaintySetVariance`](@ref) whose empty slots take the uncertainty set `ucs` and the covariance matrix of the prior result `pr`.
+
+A slot that the measure states keeps its value. So `ucs` fills `r.ucs` only when `r.ucs` is `nothing`, and it does not replace a set that the measure holds.
+
+# Algorithm
+
+ 1. Resolve a **Deferred Quantity** in `sigma` with [`resolve_deferred_quantities`](@ref), giving `r`.
+ 2. Select the set with [`ucs_selector`](@ref), giving `r.ucs` when it is not `nothing` and `ucs` otherwise.
+ 3. Select the matrix with [`nothing_scalar_array_selector`](@ref), giving `r.sigma` when it is not `nothing` and `pr.sigma` otherwise.
+ 4. Build a new `UncertaintySetVariance` from the set, the matrix and the `settings` of `r`.
 
 # Arguments
 
-  - `r`: Prototype risk measure whose `settings` and `sigma` fields are reused for the new instance.
-  - `prior`: Prior result providing `pr.sigma` to use when `r.sigma === nothing`.
-  - `::Any`: Placeholder positional argument for API compatibility.
-  - `ucs`: Optional uncertainty set estimator or result to override `r.ucs`.
-  - `args...`: Extra positional arguments are accepted for API compatibility but are ignored by this constructor.
-  - `kwargs...`: Keyword arguments are accepted for API compatibility but are ignored by this constructor.
+  - `r::UncertaintySetVariance`: The measure.
+  - `pr::AbstractPriorResult`: The prior result, which supplies `pr.sigma`.
+  - `::Any`: A positional argument that the method ignores, such as a solver.
+  - `ucs`: The uncertainty set for a measure whose `ucs` is `nothing`.
+  - `args...`, `kwargs...`: Ignored.
 
 # Returns
 
-  - `r_new::UncertaintySetVariance`: A new `UncertaintySetVariance` instance.
-
-# Details
-
-  - Selects `ucs` using [`ucs_selector`](@ref).
-  - Selects `sigma` using [`nothing_scalar_array_selector`](@ref).
-  - Other fields are taken from `r`.
+  - `r_new::UncertaintySetVariance`: The new measure.
 
 # Related
 
@@ -1121,7 +1050,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`UncertaintySetVariance`](@ref) without a placeholder positional argument (see [`factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any, ucs, args...; kwargs...)`](@ref)).
+Create an instance of [`UncertaintySetVariance`](@ref) from the prior result `pr` and the uncertainty set `ucs`, with no positional argument between them.
+
+It takes the steps of [`factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any, ucs, args...; kwargs...)`](@ref). So `ucs` fills `r.ucs` only when `r.ucs` is `nothing`.
 
 # Related
 
@@ -1140,7 +1071,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`UncertaintySetVariance`](@ref) with the uncertainty set as the first override argument.
+Create an instance of [`UncertaintySetVariance`](@ref) from the uncertainty set `ucs` and an optional prior result `pr`.
+
+`ucs` fills `r.ucs` only when `r.ucs` is `nothing`. Without `pr` the method keeps `r.sigma` as it stands, and with `pr` it resolves a **Deferred Quantity** in `sigma` and fills an empty `sigma` with `pr.sigma`.
 
 # Related
 
@@ -1162,23 +1095,11 @@ end
 """
     ucs_risk_measure(r, rd::ReturnsResult)
 
-Resolve the uncertainty set of an [`UncertaintySetVariance`](@ref) risk measure to a
-fitted [`AbstractUncertaintySetResult`](@ref) using the returns data. Other risk measures
-are returned unchanged; vectors of risk measures are resolved element-wise.
+Fit the uncertainty set of an [`UncertaintySetVariance`](@ref) on the returns data `rd`, so that the set becomes an [`AbstractUncertaintySetResult`](@ref).
 
-A risk measure whose slot holds an estimator that reads a prior result — one for which
-[`reads_prior_result`](@ref) answers `true`: an [`AbstractPriorUncertaintySetEstimator`](@ref),
-or a returns-data estimator with `pe = nothing` — is returned unchanged too. Such
-an estimator is calibrated on the optimisation's own prior result, and this pre-fit runs before
-any prior exists, so the estimator travels to the builder and each corner solve fits it there
-against the prior that solve was handed.
+[`near_optimal_centering_setup`](@ref) calls it once, so that the risk targets of the barrier, the sub-problem solves and the model of [`NearOptimalCentering`](@ref) read one fitted set. The functor of a measure with a fitted set gives [`ucs_variance`](@ref), so the targets agree with the risk expression of the model.
 
-Used by [`near_optimal_centering_setup`](@ref) so that the barrier risk targets, the
-sub-problem solves, and the NOC model all share the same fitted uncertainty set (fitted
-results pass through [`sigma_ucs`](@ref) unchanged). With a fitted set the
-[`UncertaintySetVariance`](@ref) functor evaluates the worst-case variance via
-[`ucs_variance`](@ref), keeping the barrier targets consistent with the model risk
-expression.
+Three inputs return unchanged. A measure of another type returns unchanged. A set that is already a result passes through [`sigma_ucs`](@ref) unchanged. An estimator that reads a prior result, one for which [`reads_prior_result`](@ref) is `true`, returns unchanged too. Such an estimator is an [`AbstractPriorUncertaintySetEstimator`](@ref), or an estimator of returns data with `pe = nothing`. It is fitted on the prior of the optimisation, and no prior exists when this method runs, so each solve fits it later from its own prior. A vector of measures is fitted element by element.
 
 # Related
 
@@ -1195,7 +1116,8 @@ function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult)
     return if reads_prior_result(r.ucs)
         r
     else
-        Accessors.@set r.ucs = sigma_ucs(r.ucs, rd)
+        UncertaintySetVariance(; settings = r.settings, ucs = sigma_ucs(r.ucs, rd),
+                               sigma = r.sigma)
     end
 end
 function ucs_risk_measure(r::Any, ::ReturnsResult)

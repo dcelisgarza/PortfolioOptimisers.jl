@@ -47,13 +47,13 @@ typo is obvious while a legitimately-absent asset stays quiet.**
   builders never interpolate the full universe (only `length(nx)` and the key) nor the input
   value dictionary / parsed struct, so the info-leak-safe shape and the suggestion behaviour cannot
   drift between call sites. The known boundaries are `get_linear_constraints`
-  ([02_LinearConstraintGeneration.jl](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration.jl)),
+  ([02_LinearConstraintGeneration.jl](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl)),
   `group_to_val!` / `estimator_to_val` (same file — the value-mapping path behind
   `WeightBoundsEstimator`, `Fees`, `Turnover`, threshold and risk-budget estimators), the
   Black-Litterman view generator
   ([05_BlackLittermanViewsGeneration.jl](../../src/10_Prior/05_BlackLitterman/01_BlackLittermanViewsGeneration.jl)), and
   the entropy-pooling view generator
-  ([10_Base_EntropyPoolingPrior.jl](../../src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior.jl)).
+  ([10_Base_EntropyPoolingPrior.jl](../../src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/)).
 - `unknown_variable_msg` takes an optional `candidates` pool (default: the asset universe `nx`) that
   is searched for the typo suggestion, while the *reported* universe size stays `length(nx)`.
   `group_to_val!` passes `[nx; keys(sdict)]` so a mistyped **group** name — valid only in the group

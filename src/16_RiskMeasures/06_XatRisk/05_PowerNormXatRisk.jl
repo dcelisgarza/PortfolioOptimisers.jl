@@ -4,7 +4,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the Power-Norm Risk Measure (PRM) for a vector of portfolio returns.
 
-Solves a convex optimisation problem to compute the PRM at confidence level `alpha` with Lp-norm parameter `p`, using the specified solver(s).
+Solves a convex optimisation problem to compute the PRM at confidence level `alpha` with Lp-norm parameter `p`, using the specified solver(s). The value equals the largest loss of `x` under the condition that [`PowerNormValueatRisk`](@ref) states in its mathematical definition.
 
 # Arguments
 
@@ -69,7 +69,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Power Norm Value-at-Risk (PNVaR) risk measure.
 
-`PowerNormValueatRisk` is a coherent risk measure that generalises EVaR by replacing the exponential moment-generating function with a power-norm. It is parametrised by a power ``p \\geq 1`` and a significance level ``\\alpha``, and is solved via a conic programme.
+`PowerNormValueatRisk` is a coherent risk measure that generalises EVaR by replacing the exponential moment-generating function with a power-norm. It is parametrised by a power ``p \\geq 1`` and a significance level ``\\alpha``, and is solved via a conic programme. On a short sample it equals [`WorstRealisation`](@ref). At the defaults `alpha = 0.05` and `p = 2`, this holds on every series of at most 400 equally weighted observations.
 
 # Mathematical definition
 
@@ -92,6 +92,24 @@ Where:
   - ``\\mathcal{K}_{\\mathrm{pow}}(p') = \\{(a,b,c) : a^{p'} b^{1-p'} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.
 
 The conic variable ``\\boldsymbol{w}`` is unrelated to the `w` field, which carries the observation weights. Write those weights ``\\boldsymbol{q}``. When they are present, the normalisation ``T^{1/p}`` becomes ``\\left(\\sum_{t=1}^{T} q_t\\right)^{1/p}`` and the budget constraint becomes ``\\sum_{i=1}^{T} q_i v_i \\leq t``.
+
+The minimisation over ``t``, ``\\boldsymbol{w}`` and ``\\boldsymbol{v}`` reduces the definition to one variable:
+
+```math
+\\begin{align}
+\\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{x}) &= \\underset{\\eta}{\\min} \\left\\{ \\eta + \\frac{1}{\\alpha} \\left( \\frac{1}{T} \\sum_{i=1}^{T} \\max(-x_i - \\eta,\\, 0)^{p} \\right)^{1/p} \\right\\}\\,.
+\\end{align}
+```
+
+Let ``\\ell = \\max_i (-x_i)`` be the largest loss, and let ``\\pi_\\ell`` be the probability of the observations at ``\\ell``. For ``m`` equally weighted observations at ``\\ell``, ``\\pi_\\ell = m / T``. With observation weights, ``\\pi_\\ell`` is the share of ``\\sum_{t=1}^{T} q_t`` that those observations carry. The objective is convex in ``\\eta``, and its slope just below ``\\eta = \\ell`` is ``1 - \\pi_\\ell^{1/p} / \\alpha``. So the minimum is at ``\\eta = \\ell`` exactly when that slope is not positive:
+
+```math
+\\begin{align}
+\\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{x}) = \\ell &\\iff \\alpha\\, \\pi_\\ell^{-1/p} \\leq 1\\,.
+\\end{align}
+```
+
+With equal weights and no tie, the condition is ``\\alpha T^{1/p} \\leq 1``, that is ``T \\leq \\alpha^{-p}``. At ``\\alpha = 0.05`` and ``p = 2``, this is ``T \\leq 400``. A portfolio that minimises the measure can tie ``m`` of its losses at ``\\ell``. This raises ``\\pi_\\ell`` to ``m / T``, so at such a portfolio the measure can equal the largest loss for ``T`` up to ``m\\, \\alpha^{-p}``.
 
 # Fields
 
@@ -120,7 +138,7 @@ Keywords correspond to the struct's fields.
 
     (r::PowerNormValueatRisk)(x::VecNum)
 
-Computes the PNVaR of a portfolio returns vector `x`.
+Computes the PNVaR of a portfolio returns vector `x`. The value equals the largest loss of `x` under the condition in the mathematical definition.
 
 ## Arguments
 
@@ -149,6 +167,7 @@ PowerNormValueatRisk
   - [`RelativisticValueatRisk`](@ref)
   - [`PowerNormValueatRiskRange`](@ref)
   - [`PowerNormDrawdownatRisk`](@ref)
+  - [`WorstRealisation`](@ref): the value of the measure when the largest loss carries a probability of at least ``\\alpha^{p}``.
 
 # References
 
@@ -207,7 +226,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Power Norm Value-at-Risk Range (PNVaRRange) risk measure.
 
-`PowerNormValueatRiskRange` computes the sum of the lower-tail PNVaR (at level `alpha` with power `pa`) and the upper-tail PNVaR (at level `beta` with power `pb`).
+`PowerNormValueatRiskRange` computes the sum of the lower-tail PNVaR (at level `alpha` with power `pa`) and the upper-tail PNVaR (at level `beta` with power `pb`). Each tail equals its largest loss under the condition that [`PowerNormValueatRisk`](@ref) states.
 
 # Mathematical definition
 
@@ -362,7 +381,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Power Norm Drawdown-at-Risk (PNDaR) risk measure.
 
-`PowerNormDrawdownatRisk` applies the Power Norm Value-at-Risk framework to the absolute drawdown series of portfolio returns.
+`PowerNormDrawdownatRisk` applies the Power Norm Value-at-Risk framework to the absolute drawdown series of portfolio returns. It equals the largest drawdown under the condition that [`PowerNormValueatRisk`](@ref) states, with the drawdowns in place of the losses.
 
 # Mathematical definition
 
@@ -512,7 +531,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Relative Power Norm Drawdown-at-Risk (Relative PNDaR) risk measure for hierarchical optimisation.
 
-`RelativePowerNormDrawdownatRisk` applies the Power Norm Value-at-Risk framework to the relative (compounded) drawdown series of portfolio returns.
+`RelativePowerNormDrawdownatRisk` applies the Power Norm Value-at-Risk framework to the relative (compounded) drawdown series of portfolio returns. It equals the largest relative drawdown under the condition that [`PowerNormValueatRisk`](@ref) states, with the drawdowns in place of the losses.
 
 # Mathematical definition
 

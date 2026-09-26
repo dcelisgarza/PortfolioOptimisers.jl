@@ -65,10 +65,12 @@ function distance_wei(L::MatNum)
     D = fill(typemax(eltype(L)), N, N)
     D[LinearAlgebra.diagind(D)] .= 0  # Distance matrix
     B = zeros(Int, N, N)     # Number of edges matrix
+    S = fill(true, N)   # Distance permanence (true is temporary)
+    L1 = copy(L)
 
     for u in axes(L, 1)
-        S = fill(true, N)   # Distance permanence (true is temporary)
-        L1 = copy(L)
+        fill!(S, true)
+        copyto!(L1, L)
         V = [u]
         while true
             S[V] .= false   # Distance u -> V is now permanent
@@ -76,18 +78,13 @@ function distance_wei(L::MatNum)
             SparseArrays.dropzeros!(L1)
             for v in V
                 T = SparseArrays.findnz(L1[v, :])[1] # neighbours of shortest nodes
-                d, wi = findmin(vcat(vcat(transpose(D[u, T]),
-                                          transpose(D[u, v] .+ L1[v, T]))); dims = 1)
-                # `findmin(...; dims = 1)` returns one `CartesianIndex` per column, so
-                # component 1 is the row that won and component 2 is the column, which
-                # is the position in `T`. The winner is what decides the edge count, so
-                # read component 1. Row 2 is the path through `v`, one edge longer than
-                # the path to `v`. Reading component 2 and comparing it with `3` left
-                # `B` unrelated to any path. Issue #470.
-                wi = vec(getindex.(wi, 1))
-                D[u, T] = vec(d)   # Smallest of old/new path lengths
-                ind = T[wi .== 2]   # Indices of lengthened paths
-                B[u, ind] .= B[u, v] + 1    # Increment number of edges in lengthened paths
+                # The path through `v` wins only when it is strictly shorter, so a tie keeps
+                # the old path and its edge count, and the path that won is one edge longer
+                # than the path to `v`. Issue #470.
+                dT = D[u, v] .+ L1[v, T]
+                won = dT .< view(D, u, T)
+                D[u, T[won]] = dT[won]
+                B[u, T[won]] .= B[u, v] + 1
             end
 
             dus = D[u, S]
@@ -99,7 +96,7 @@ function distance_wei(L::MatNum)
                 break
             end
 
-            V = findall(D[u, :] .== minD)
+            V = findall(==(minD), view(D, u, :))
         end
     end
 
@@ -127,7 +124,7 @@ This function performs a breadth-first search (BFS) on a binary (directed or und
 
 !!! warning
 
-    `distance[source]` does not stay `0`. Step 4 fires on the source itself the first time one of the source's own neighbours is expanded, so on an undirected graph without a self-loop the entry ends at `2`, and at `1` where the graph carries a self-loop on the source. This is the behaviour of the MATLAB original. All three callers reset the entry after the call: [`FindDisjoint`](@ref), [`DirectHb`](@ref) and [`BubbleCluster8s`](@ref) each write a `0` into it. Measured in issue #470 on a five-vertex path with a leaf, where the source reads `2.0`.
+    `distance[source]` does not stay `0`. Step 4 fires on the source itself the first time one of the source's own neighbours is expanded, so on an undirected graph without a self-loop the entry ends at `2`, and at `1` where the graph carries a self-loop on the source. This is the behaviour of the MATLAB original. All three callers reset the entry after the call: [`FindDisjoint`](@ref), [`DirectHb`](@ref) and [`BubbleCluster8s`](@ref) each write a `0` into it. On a five-vertex path with a leaf, the source reads `2.0`.
 
 # Arguments
 
@@ -152,11 +149,10 @@ function breadth(CIJ::MatNum, source::Integer)
     black = 2
     # Initialise colours
     color = zeros(Int, N)
-    # Initialise distances. A distance must hold `Inf` for a vertex no path reaches, so
-    # it lands in the type a division of the connection entries lands in: a `Bool` or an
-    # integer matrix takes the floating-point type that represents it, and a `Float32`
-    # one stays `Float32`.
-    Td = typeof(one(eltype(CIJ)) / one(eltype(CIJ)))
+    # Initialise distances. A distance must hold `Inf` for a vertex no path reaches, so a
+    # `Bool` or an integer matrix takes the floating-point type that represents it, and a
+    # `Float32` one stays `Float32`.
+    Td = float_if_integer(eltype(CIJ))
     distance = fill(convert(Td, Inf), N)
     # Initialise branches
     branch = zeros(Int, N)
@@ -178,10 +174,10 @@ function breadth(CIJ::MatNum, source::Integer)
                 color[v] = gray
                 distance[v] = distance[u] + 1
                 branch[v] = u
-                Q = vcat(Q, v)
+                push!(Q, v)
             end
         end
-        Q = Q[2:length(Q)]
+        popfirst!(Q)
         color[u] = black
     end
 

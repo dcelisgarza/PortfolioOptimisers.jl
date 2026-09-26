@@ -4,4 +4,4 @@ Description = "Graph Traversal has no public API in PortfolioOptimisers.jl; its 
 
 # Graph Traversal
 
-Graph Traversal has no public API in PortfolioOptimisers.jl; see [Graph Traversal: private API](../../../private_api/08_Phylogeny/06_DBHT/03_GraphTraversal.md) for its private API.
+Every name of this topic is private. The [private page](@ref private-api-graph-traversal) documents them.

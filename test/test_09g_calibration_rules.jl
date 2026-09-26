@@ -1493,7 +1493,6 @@ end
         actx = CalibrationContext(; alpha = 0.05)
         @test EntropyBudget(; target = -10.0)(:kappa, pc, nothing, nothing, actx) ==
               EntropyBudget(; target = -10.0)(:kappa, pu, nothing, nothing, actx)
-        @test PO.compact_radius_sample_size(pc) == 1250
         # The normal set's `T` reads `ens`, so its box over the capped prior is the box
         # over the uncapped one: the ellipsoid is not `√5 ≈ 2.24` times too wide.
         ue = NormalUncertaintySet(; pe = nothing)
@@ -1518,7 +1517,6 @@ end
         @test ScenarioCount(; n = 25)(:alpha, pw, pw.w, nothing, ctx) == 25 / kish
         @test RateSignificance()(:alpha, pw, pw.w, nothing, ctx) ==
               RateSignificance()(:alpha, pu, nothing, nothing, ctx) * sqrt(1250 / 120)
-        @test PO.compact_radius_sample_size(pw) == kish
         # The normal set reads `pr.ens` as it always did.
         @test PO.choose_scaling_parameter(NormalUncertaintySet(; pe = nothing), pw) ==
               pw.ens

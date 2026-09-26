@@ -275,6 +275,74 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
                        transpose(G) * Diagonal(D) * G)
     end
 
+    @testset "Issue 831: the sweep of the file" begin
+        @testset "The idiosyncratic scaling reads a stored covariance whole" begin
+            # A cross-sectional prior with a correlation threshold writes a full
+            # idiosyncratic covariance. The scaling is `G' * E * G` over all of it, as the
+            # reference implementation reads it, and not over its diagonal alone.
+            rho = [1.0 0.3 0.0 0.0 0.2 0.0;
+                   0.3 1.0 0.1 0.0 0.0 0.0;
+                   0.0 0.1 1.0 0.4 0.0 0.0;
+                   0.0 0.0 0.4 1.0 0.0 0.1;
+                   0.2 0.0 0.0 0.0 1.0 0.0;
+                   0.0 0.0 0.0 0.1 0.0 1.0]
+            E = sqrt.(D) .* rho .* transpose(sqrt.(D))
+            prE = prior777(B, D; rw = RW, bw = BW, esigma = E)
+            ue = OrthogonalUncertaintySet(; scaling = IdiosyncraticVarianceScaling(),
+                                          metric = IdentityMetric())
+            mu_set, sigma_set = ucs(ue, prE)
+            # Under the identity metric `G * G'` is the projector `I - Q * Q'`, so the shape
+            # matrix `L * L'` is the covariance projected onto the subspace from both sides.
+            P = I - sigma_set.Q * transpose(sigma_set.Q)
+            @test isapprox(mu_set.L * transpose(mu_set.L), P * E * P; atol = 1e-14)
+            @test !isapprox(mu_set.L * transpose(mu_set.L), P * Diagonal(D) * P;
+                            atol = 1e-6)
+            # A variance vector with the same diagonal reads as its diagonal matrix.
+            @test isapprox(mu_ucs(ue, pr777).L * transpose(mu_ucs(ue, pr777).L),
+                           P * Diagonal(D) * P; atol = 1e-14)
+        end
+        @testset "An integer loadings block fits as its floating-point copy does" begin
+            Bi = [1 0; 0 1; 1 1; 2 1; 0 3; 1 2]
+            for metric in (IdentityMetric(), InverseIdiosyncraticVarianceMetric())
+                ue = OrthogonalUncertaintySet(; metric = metric)
+                mi, si = ucs(ue, prior777(Bi, D; rw = RW, bw = BW))
+                mf, sf = ucs(ue, prior777(float.(Bi), D; rw = RW, bw = BW))
+                @test isapprox(mi.L * transpose(mi.L), mf.L * transpose(mf.L); atol = 1e-14)
+                @test isapprox(si.Q * transpose(si.Q), sf.Q * transpose(sf.Q); atol = 1e-14)
+                @test mi.kappa == mf.kappa
+            end
+        end
+        @testset "The rank tolerance reads the larger dimension of the loadings" begin
+            # A second singular value of 8e-16 sits between the tolerance of the smaller
+            # dimension, 2 * eps, and that of the larger one, 6 * eps. `LinearAlgebra.rank`
+            # keeps it, and the fit drops it.
+            Bt = [1.0 0.0; 0.0 8e-16; 0.0 0.0; 0.0 0.0; 0.0 0.0; 0.0 0.0]
+            @test LinearAlgebra.rank(Bt) == 2
+            mu_set, sigma_set = ucs(OrthogonalUncertaintySet(; metric = IdentityMetric()),
+                                    prior777(Bt, D; rw = RW, bw = BW))
+            @test size(sigma_set.Q, 2) == 1
+            @test size(mu_set.L, 2) == N777 - 1
+        end
+        @testset "The spared portfolios are the column space of W B, not of B" begin
+            # Under a metric other than the identity, a portfolio along a loading column pays
+            # on both axes, and the same column scaled by the metric pays on neither.
+            ue = OrthogonalUncertaintySet(; metric = RegressionWeightMetric())
+            mu_set, sigma_set = ucs(ue, pr777)
+            function pays(wp)
+                wp = wp / norm(wp)
+                exposure = collect(sigma_set.C) .* wp
+                residual = exposure - sigma_set.Q * (transpose(sigma_set.Q) * exposure)
+                return norm(transpose(mu_set.L) * wp), norm(residual)
+            end
+            pm, pc = pays(B[:, 1])
+            @test pm > 0.1
+            @test pc > 0.1
+            pm, pc = pays(Diagonal(RW) * B[:, 1])
+            @test pm < 1e-12
+            @test pc < 1e-12
+        end
+    end
+
     @testset "A full-rank factor model leaves no orthogonal direction" begin
         rng = StableRNG(777001)
         Bf = randn(rng, 3, 3)
@@ -515,19 +583,20 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
     prior result and the span already carry, so a literal would only restate the arithmetic.
     =#
     @testset "Issue 928: the covariance radius is sized by a rule" begin
-        using PortfolioOptimisers: k_compact, compact_radius_dof,
-                                   compact_radius_sample_size, compact_reference_weights,
-                                   parse_lens
+        using PortfolioOptimisers: k_compact, compact_reference_weights, parse_lens
         using Accessors
-        # A time-series block, so `compact_radius_dof` takes its `Regression` reading. The
-        # cross-sectional block of `prior777` takes the other one, and both are probed below.
+        # A time-series block built by hand. It records the degrees of freedom of an OLS
+        # residual over `K` factors and an intercept, and no divisor, so the rule reads the
+        # divisor as the degrees of freedom: the variance is the residual sum of squares
+        # over `T - K - 1`. Issue 1334 moved this count from the rule onto the block.
         rng928 = StableRNG(928928928)
         T928, N928, K928 = 260, 7, 3
         F928 = randn(rng928, T928, K928) * 0.01
         B928 = randn(rng928, N928, K928)
         X928 = F928 * transpose(B928) + randn(rng928, T928, N928) * 0.02
         d928 = vec(var(X928 - F928 * transpose(B928); dims = 1))
-        rr928 = Regression(; M = B928, b = zeros(N928), esigma = d928)
+        rr928 = Regression(; M = B928, b = zeros(N928), esigma = d928,
+                           edof = fill(T928 - K928 - 1, N928))
         fpr928 = LowOrderPrior(; X = F928, mu = vec(mean(F928; dims = 1)),
                                sigma = cov(F928))
         pr928 = LowOrderPrior(; X = X928, mu = vec(mean(X928; dims = 1)), sigma = cov(X928),
@@ -556,9 +625,17 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
             ue = OrthogonalUncertaintySet(; kappa = ResidualInflation(), q = 0.05)
             k = sigma_ucs(ue, pr928).kappa
             @test isapprox(k, rho928(0.05, T928 - K928 - 1); rtol = 1e-12)
-            # `pr.rr` is a `Regression`, so the derived count is `T - K - 1`.
-            @test compact_radius_dof(rr928, T928, N928, K928) == T928 - K928 - 1
-            @test compact_radius_sample_size(pr928) == T928
+            # A recorded divisor enters the numerator in place of the degrees of freedom:
+            # a variance over `T - 1` needs a larger inflation than one over `T - K - 1`.
+            rrm = Regression(; M = B928, b = zeros(N928), esigma = d928,
+                             edof = fill(T928 - K928 - 1, N928),
+                             ediv = fill(T928 - 1, N928))
+            prm = LowOrderPrior(; X = X928, mu = vec(mean(X928; dims = 1)),
+                                sigma = cov(X928), rr = rrm, fpr = fpr928)
+            km = sigma_ucs(ue, prm).kappa
+            nu = T928 - K928 - 1
+            @test isapprox(km, (T928 - 1) / quantile(Chisq(nu), 0.05) - 1; rtol = 1e-12)
+            @test km > k
         end
 
         @testset "ResidualInflation carries variance units where the metric needs them" begin
@@ -599,20 +676,27 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
                            rtol = 1e-12)
         end
 
-        @testset "A stated dof overrides the derivation, and the block types derive apart" begin
+        @testset "A stated dof overrides the block, and a block with no count refuses" begin
             k = sigma_ucs(OrthogonalUncertaintySet(;
                                                    kappa = ResidualInflation(; dof = 120)),
                           pr928).kappa
             @test isapprox(k, rho928(0.05, 120); rtol = 1e-12)
-            # A cross-sectional fit spends `K` of the `N` assets each period rather than `K`
-            # of the `T` observations once, so its count is the larger of the two here.
-            csfm = prior777(B, D).rr
-            @test compact_radius_dof(csfm, T777, N777, 2) == T777 * (N777 - 2) / N777
-            @test compact_radius_dof(csfm, T777, N777, 2) !=
-                  compact_radius_dof(rr928, T777, N777, 2)
-            kcs = sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation()),
+            # The cross-sectional block of `prior777` is built by hand and records no count,
+            # so the rule refuses it by name rather than guess at the fit behind it.
+            err = try
+                sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation()),
+                          prior777(B, D))
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, PortfolioOptimisers.IsNothingError)
+            @test occursin("dof", sprint(showerror, err))
+            # A stated count serves it, and one on the block serves it the same way.
+            kcs = sigma_ucs(OrthogonalUncertaintySet(;
+                                                     kappa = ResidualInflation(; dof = 9.5)),
                             prior777(B, D)).kappa
-            @test isapprox(kcs, rho928(0.05, T777 * (N777 - 2) / N777); rtol = 1e-10)
+            @test isapprox(kcs, rho928(0.05, 9.5); rtol = 1e-10)
         end
 
         @testset "ResidualInflation refuses a block with no idiosyncratic variances" begin
@@ -628,22 +712,27 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
                                                                       prbare)
         end
 
-        @testset "A fit that left no degrees of freedom refuses, naming the counts" begin
-            # Fewer observations than regressors leaves `T - K - 1 <= 0`, and no chi-squared
-            # bound is defined there. The message carries `T`, `N` and `K` so the caller can
-            # see which of the three is the problem.
-            fshort = LowOrderPrior(; X = F928[1:3, :], mu = vec(mean(F928; dims = 1)),
-                                   sigma = cov(F928))
-            short = LowOrderPrior(; X = X928[1:3, :], mu = vec(mean(X928; dims = 1)),
-                                  sigma = cov(X928), rr = rr928, fpr = fshort)
-            err = try
-                sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation()), short)
-                nothing
-            catch e
-                e
+        @testset "A fit that left no degrees of freedom refuses, naming the asset" begin
+            # Fewer observations than regressors leaves a count `<= 0` on the block, and no
+            # chi-squared bound is defined there. A `NaN` count is refused the same way. The
+            # message names the asset so the caller can find the short fit.
+            for bad in (-1.0, 0.0, NaN)
+                edof = fill(float(T928 - K928 - 1), N928)
+                edof[3] = bad
+                rrs = Regression(; M = B928, b = zeros(N928), esigma = d928, edof = edof)
+                short = LowOrderPrior(; X = X928, mu = vec(mean(X928; dims = 1)),
+                                      sigma = cov(X928), rr = rrs, fpr = fpr928)
+                err = try
+                    sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation()),
+                              short)
+                    nothing
+                catch e
+                    e
+                end
+                @test isa(err, DomainError)
+                @test occursin("degrees of freedom", sprint(showerror, err))
+                @test occursin("i => 3", sprint(showerror, err))
             end
-            @test isa(err, DomainError)
-            @test occursin("degrees of freedom", sprint(showerror, err))
         end
 
         @testset "VarianceFraction puts the penalty at exactly f of the nominal variance" begin
@@ -714,7 +803,8 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
             mean axis already returns a zero radius for the same span.
             =#
             Bfull = Matrix(1.0I, N928, N928)
-            rrfull = Regression(; M = Bfull, b = zeros(N928), esigma = d928)
+            rrfull = Regression(; M = Bfull, b = zeros(N928), esigma = d928,
+                                edof = fill(T928 - K928 - 1, N928))
             fprfull = LowOrderPrior(; X = randn(StableRNG(7), T928, N928), mu = zeros(N928),
                                     sigma = Matrix(0.01I, N928, N928))
             prfull = LowOrderPrior(; X = X928, mu = vec(mean(X928; dims = 1)),
@@ -808,6 +898,269 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
             v = PortfolioOptimisers.port_opt_view(s, [1, 2, 3, 4])
             @test v.kappa === s.kappa
             @test length(v.C) == 4
+        end
+
+        @testset "ResidualInflation is the smallest radius that covers the inflation" begin
+            #=
+            With `v = P C w`, the penalty is `kappa |v|^2` and the inflation it covers is
+            `|R^{1/2} D^{1/2} W^{1/2} v|^2`, with `R` the diagonal of the inflations. In weight
+            space that is `kappa C P C >= Pi R D Pi'` with `Pi = C P C^{-1}`: the radius
+            satisfies it, and a radius one part in a million smaller does not. The second
+            block records a different count and divisor per asset, as a stepwise fit does.
+            =#
+            rrh946 = Regression(; M = B928, b = zeros(N928), esigma = d928,
+                                edof = collect(range(200.0, 250.0; length = N928)),
+                                ediv = collect(range(203.0, 259.0; length = N928)))
+            prh946 = LowOrderPrior(; X = X928, mu = vec(mean(X928; dims = 1)),
+                                   sigma = cov(X928), rr = rrh946, fpr = fpr928)
+            rhoh946 = rrh946.ediv ./ quantile.(Chisq.(rrh946.edof), 0.05) .- 1
+            for (pr946, rho946) in
+                ((pr928, fill(rho928(0.05, T928 - K928 - 1), N928)), (prh946, rhoh946)),
+                metric946 in (PortfolioOptimisers.InverseIdiosyncraticVarianceMetric(),
+                              IdentityMetric())
+
+                ue946 = OrthogonalUncertaintySet(; kappa = ResidualInflation(), q = 0.05,
+                                                 metric = metric946)
+                s946 = sigma_ucs(ue946, pr946)
+                C946 = collect(s946.C)
+                P946 = I - s946.Q * transpose(s946.Q)
+                Pi946 = Diagonal(C946) * P946 * Diagonal(inv.(C946))
+                M946(k946) = Symmetric(k946 * Diagonal(C946) * P946 * Diagonal(C946) -
+                                       Pi946 * Diagonal(rho946 .* d928) * transpose(Pi946))
+                scale946 = s946.kappa * opnorm(Diagonal(C946) * P946 * Diagonal(C946))
+                @test eigmin(M946(s946.kappa)) >= -1e-10 * scale946
+                @test eigmin(M946(s946.kappa * (1 - 1e-6))) < -1e-8 * scale946
+            end
+            # Under the default metric one inflation per asset is at most the largest.
+            kh946 = sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation()),
+                              prh946).kappa
+            @test minimum(rhoh946) <= kh946 <= maximum(rhoh946) * (1 + 1e-12)
+        end
+
+        @testset "ResidualInflation's level is 1 - q when the block records the divisor" begin
+            #=
+            Issue 1334. The bound `d <= (1 + rho) dhat` holds with probability `1 - q` when
+            `m dhat / d` follows the chi-squared law at the recorded degrees of freedom, and
+            `rho` reads the divisor `m` of the variance. `var` divides by `T - 1`, and an OLS
+            fit over `K` factors and an intercept leaves `nu = T - K - 1`. A block that
+            records both holds the level. A block that records no divisor makes the rule read
+            `m = nu`, and the level falls to `1 - F_nu((T - 1) quantile(Chisq(nu), q) / nu)`,
+            which is what every default fit gave before the fix. Both levels are measured
+            over 400 fits of 50 Gaussian assets, 20000 draws, whose standard error is about
+            0.002.
+            =#
+            rngl946 = StableRNG(946)
+            Tl946, Nl946, Kl946, q946 = 30, 50, 3, 0.05
+            nu946 = Tl946 - Kl946 - 1
+            dtrue946 = 0.0004 .* (1 .+ rand(rngl946, Nl946))
+            hits_div946 = 0
+            hits_nodiv946 = 0
+            for _ in 1:400
+                F946 = randn(rngl946, Tl946, Kl946) * 0.01
+                Bl946 = randn(rngl946, Nl946, Kl946)
+                Xl946 = F946 * transpose(Bl946) .+
+                        randn(rngl946, Tl946, Nl946) .* transpose(sqrt.(dtrue946))
+                Z946 = hcat(ones(Tl946), F946)
+                E946 = Xl946 - Z946 * (Z946 \ Xl946)
+                dhat946 = vec(var(E946; dims = 1))
+                fprl946 = LowOrderPrior(; X = F946, mu = vec(mean(F946; dims = 1)),
+                                        sigma = cov(F946))
+                for ediv946 in (fill(Tl946 - 1, Nl946), nothing)
+                    rrl946 = Regression(; M = Bl946, b = zeros(Nl946), esigma = dhat946,
+                                        edof = fill(nu946, Nl946), ediv = ediv946)
+                    prl946 = LowOrderPrior(; X = Xl946, mu = vec(mean(Xl946; dims = 1)),
+                                           sigma = cov(Xl946), rr = rrl946, fpr = fprl946)
+                    k946 = sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation(),
+                                                              q = q946), prl946).kappa
+                    h946 = count(dtrue946 .<= dhat946 .* (1 + k946))
+                    if isnothing(ediv946)
+                        hits_nodiv946 += h946
+                    else
+                        hits_div946 += h946
+                    end
+                end
+            end
+            @test isapprox(hits_div946 / (400 * Nl946), 1 - q946; atol = 0.01)
+            level946 = 1 -
+                       cdf(Chisq(nu946), (Tl946 - 1) * quantile(Chisq(nu946), q946) / nu946)
+            @test isapprox(hits_nodiv946 / (400 * Nl946), level946; atol = 0.01)
+            @test level946 < 1 - q946 - 0.03
+        end
+    end
+
+    #=
+    Issue 1334. `ResidualInflation` reads the sampling law of each idiosyncratic variance off
+    the loadings block, so every fit that writes `esigma` records the degrees of freedom and
+    the divisor beside it. These probes pin each source of the count: the variance
+    estimators, the two regression estimators, the lift of a time-series prior, the
+    cross-sectional prior, and the view, expansion and constructor that carry a block.
+    =#
+    @testset "Issue 1334: a fit records the sampling law of its idiosyncratic variances" begin
+        PO = PortfolioOptimisers
+        rng1334 = StableRNG(1334)
+        T1334, N1334, K1334 = 60, 5, 3
+        X1334 = randn(rng1334, T1334, N1334)
+
+        @testset "variance_count states the count and the divisor of each estimator" begin
+            c = PO.variance_count(SimpleVariance(), X1334)
+            @test c.n == fill(T1334, N1334)
+            @test c.m == fill(T1334 - 1, N1334)
+            @test PO.variance_count(SimpleVariance(; corrected = false), X1334).m ==
+                  fill(T1334, N1334)
+            # The divisor is what the estimator divides the weighted sum of squares by, once
+            # that sum is rescaled to the effective count: `m var = n SS_w / sum(w)`.
+            for w in (aweights(rand(rng1334, T1334)), pweights(rand(rng1334, T1334)),
+                      fweights(rand(rng1334, 1:4, T1334)))
+                ve = SimpleVariance(; w = w)
+                c = PO.variance_count(ve, X1334)
+                mu = sum(w .* X1334; dims = 1) / sum(w)
+                ss = vec(sum(w .* (X1334 .- mu) .^ 2; dims = 1)) / sum(w)
+                @test c.m .* vec(var(ve, X1334; dims = 1)) ≈ c.n .* ss
+                @test c.n ≈
+                      fill(isa(w, FrequencyWeights) ? sum(w) : sum(w)^2 / sum(abs2, w),
+                           N1334)
+            end
+            # A column reads its finite rows alone.
+            Xg = copy(X1334)
+            Xg[1:5, 2] .= NaN
+            @test PO.variance_count(SimpleVariance(), Xg).n == [60, 55, 60, 60, 60]
+            wg = aweights(rand(rng1334, T1334))
+            @test PO.variance_count(SimpleVariance(; w = wg), Xg).n[2] ≈
+                  sum(wg[6:end])^2 / sum(abs2, wg[6:end])
+            # The exponential weights sum to one, so the count is also the divisor.
+            for ve in (ExpWeightedVariance(), RegimeAdjustedExpWeightedVariance())
+                lam = ve.decay
+                a = lam .^ (0:(T1334 - 1))
+                c = PO.variance_count(ve, X1334)
+                @test c.n ≈ fill(sum(a)^2 / sum(abs2, a), N1334)
+                @test c.m == c.n
+            end
+            c = PO.variance_count(WindowedVariance(; window = 20), X1334)
+            @test c.n == fill(20, N1334)
+            @test c.m == fill(19, N1334)
+            # The root method states no count, which is not a count of its own.
+            @test isnothing(invoke(PO.variance_count,
+                                   Tuple{PO.AbstractVarianceEstimator, PO.MatNum},
+                                   SimpleVariance(), X1334))
+        end
+
+        F1334 = randn(rng1334, T1334, K1334) * 0.01
+        Y1334 = F1334 * randn(rng1334, K1334, N1334) .+ 0.01 .* randn(rng1334, T1334, N1334)
+        rd1334 = ReturnsResult(; nx = string.(1:N1334), X = Y1334, nf = string.(1:K1334),
+                               F = F1334)
+
+        @testset "The regression estimators record the parameters each asset spent" begin
+            rr = regression(StepwiseRegression(), Y1334, F1334)
+            kept = vec(count(!iszero, rr.M; dims = 2))
+            @test rr.edof == T1334 .- kept .- 1
+            @test isnothing(rr.ediv)
+            rrd = regression(DimensionReductionRegression(), Y1334, F1334)
+            @test rrd.edof == fill(T1334 - size(rrd.L, 2) - 1, N1334)
+        end
+
+        @testset "The lift restates the count in the count of its variance estimator" begin
+            pr = prior(FactorPrior(; rsd = true), rd1334)
+            kept = vec(count(!iszero, pr.rr.M; dims = 2))
+            @test pr.rr.edof == T1334 .- kept .- 1
+            @test pr.rr.ediv == fill(T1334 - 1, N1334)
+            # Under weights the spend comes off Kish's count, and the divisor follows.
+            w = aweights(range(0.5, 1.5; length = T1334))
+            prw = prior(FactorPrior(; rsd = true, ve = SimpleVariance(; w = w)), rd1334)
+            keptw = vec(count(!iszero, prw.rr.M; dims = 2))
+            n = sum(w)^2 / sum(abs2, w)
+            @test prw.rr.edof ≈ n .- keptw .- 1
+            @test prw.rr.ediv ≈ fill(n - 1, N1334)
+            # With no residual block there is no variance to count, and the regression's
+            # own count stays on the block.
+            pr0 = prior(FactorPrior(; rsd = false), rd1334)
+            @test isnothing(pr0.rr.esigma)
+            @test isnothing(pr0.rr.ediv)
+            @test pr0.rr.edof == T1334 .- vec(count(!iszero, pr0.rr.M; dims = 2)) .- 1
+            # The rule reads one inflation per asset. Under the default metric the radius
+            # is the norm of the projector scaled by the square roots of the inflations.
+            ue = OrthogonalUncertaintySet(; kappa = ResidualInflation())
+            s = sigma_ucs(ue, pr)
+            rho = pr.rr.ediv ./ quantile.(Chisq.(pr.rr.edof), 0.05) .- 1
+            P = I - s.Q * transpose(s.Q)
+            @test isapprox(s.kappa, opnorm(sqrt.(rho) .* P)^2; rtol = 1e-10)
+        end
+
+        @testset "The counts combine by case" begin
+            cnt = (; n = [4.0, 4.0], m = [3.0, 3.0])
+            @test PO.residual_variance_counts(nothing, [1, 2], 5) ==
+                  (; edof = nothing, ediv = nothing)
+            @test PO.residual_variance_counts(cnt, nothing, 5) ==
+                  (; edof = nothing, ediv = [3.0, 3.0])
+            @test PO.residual_variance_counts(cnt, [3, 2], 5) ==
+                  (; edof = [2.0, 1.0], ediv = [3.0, 3.0])
+        end
+
+        @testset "The default fit holds the level through the real prior" begin
+            #=
+            The issue measured `0.933` through `prior(FactorPrior(; rsd = true), rd)` at
+            `T = 30`, `K = 3`. With the counts on the block the per-asset bound holds at
+            about `1 - q`. The stepwise search spends more than the factors it keeps, and
+            the count charges the kept factors alone, so the level sits a little below.
+            =#
+            rngc = StableRNG(2)
+            Tc, Nc, Kc, qc = 30, 50, 8, 0.05
+            dc = 0.0004 .* (1 .+ rand(rngc, Nc))
+            h = 0
+            for _ in 1:100
+                Fc = randn(rngc, Tc, Kc) * 0.01
+                Xc = Fc * transpose(randn(rngc, Nc, Kc)) .+
+                     randn(rngc, Tc, Nc) .* transpose(sqrt.(dc))
+                rdc = ReturnsResult(; nx = string.(1:Nc), X = Xc, nf = string.(1:Kc),
+                                    F = Fc)
+                prc = prior(FactorPrior(; rsd = true), rdc)
+                rho = prc.rr.ediv ./ quantile.(Chisq.(prc.rr.edof), qc) .- 1
+                h += count(dc .<= prc.rr.esigma .* (1 .+ rho))
+            end
+            @test isapprox(h / (100 * Nc), 1 - qc; atol = 0.015)
+        end
+
+        @testset "A cross-sectional fit charges each asset its share of the spend" begin
+            rdp = synthetic_asset_panel(; n_assets = 40, n_observations = 200,
+                                        n_industries = 3, rng = StableRNG(725_001)).rd
+            pe = CrossSectionalFactorPrior(;
+                                           factors = ["market" => ConstantExposure(),
+                                                      "industry" => OneHotExposure(;
+                                                                                   field = "industry",
+                                                                                   family = "industry"),
+                                                      "size" => CompositeExposure(;
+                                                                                  descriptors = [LogMarketCap()],
+                                                                                  family = "style")])
+            prp = prior(pe, rdp)
+            csr = prp.rr.csr
+            cnt = PO.variance_count(pe.ve, csr.eps)
+            p = size(csr.f, 2) + !isnothing(csr.b)
+            phi = sum(csr.n .- p) / sum(csr.n)
+            @test prp.rr.edof ≈ phi * cnt.n
+            @test prp.rr.ediv == cnt.m
+            @test 0 < phi < 1
+            k = sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation()), prp).kappa
+            @test isfinite(k) && k > 0
+        end
+
+        @testset "A view, an expansion and the constructors carry the counts" begin
+            rr = Regression(; M = ones(3, 2), esigma = [0.1, 0.2, 0.3], edof = [10, 11, 12],
+                            ediv = [13, 14, 15])
+            v = PO.port_opt_view(rr, [1, 3])
+            @test v.edof == [10, 12]
+            @test v.ediv == [13, 15]
+            e = PO.expand_regression(rr, BitVector([true, false, true, true]))
+            @test e.edof == [10, 0, 11, 12]
+            @test e.ediv == [13, 0, 14, 15]
+            @test_throws DimensionMismatch Regression(; M = ones(3, 2), edof = [1, 2])
+            @test_throws PO.IsEmptyError Regression(; M = ones(3, 2), ediv = Int[])
+            csfm = CrossSectionalFactorModel(; M = ones(3, 2), b = zeros(3),
+                                             edof = [10.0, 11.0, 12.0], ediv = [1, 2, 3])
+            cv = PO.port_opt_view(csfm, [2, 3])
+            @test cv.edof == [11.0, 12.0]
+            @test cv.ediv == [2, 3]
+            @test_throws DimensionMismatch CrossSectionalFactorModel(; M = ones(3, 2),
+                                                                     b = zeros(3),
+                                                                     ediv = [1, 2])
         end
     end
 

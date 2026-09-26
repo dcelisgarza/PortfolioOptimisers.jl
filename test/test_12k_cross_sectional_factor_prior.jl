@@ -205,6 +205,7 @@ fit_rows(rd, pr) = (size(rd.X, 1) - size(pr.X, 1) + 1):size(rd.X, 1)
         @test_throws DomainError CrossSectionalFactorPrior(; factors = f, lambda = 1.5)
         @test_throws DomainError CrossSectionalFactorPrior(; factors = f, c = -0.1)
         @test_throws PO.IsEmptyError CrossSectionalFactorPrior(; factors = f, mcap = "")
+        @test_throws PO.IsEmptyError CrossSectionalFactorPrior(; factors = f, bw = "")
     end
     @testset "A matrix with no panel is refused by name" begin
         rd = csfp_panel(; n_assets = 10, n_observations = 20, n_industries = 2).rd
@@ -1074,4 +1075,300 @@ end
     # `mp` still owns the asset block alone: it is the estimator the idiosyncratic
     # covariance and the lifted asset covariance are processed under.
     @test isa(base.mp, MatrixProcessing)
+end
+
+#=
+Issue #829. The closed form that the `# Mathematical definition` of the returns-matrix `prior`
+method states, computed from first principles and compared with the fit.
+
+The oracle reads the Factor Exposures and the idiosyncratic covariance off the library, because
+they are the INPUT of the definition: the Exposure Estimators and the variance estimator state
+their own. Everything the definition itself states is rebuilt here: the eligibility of each pair,
+the weight `m^p` at the lagged market capitalisation, the weighted least squares of every
+observation through a pseudo-inverse, the sample mean and covariance of the factor returns, the
+weighted least squares of the forecast on the latest exposures, the blend, the investable set and
+the two lifted moments.
+
+The three factors are independent, so every weighted design has full column rank. Under the
+default four the factor covariance is singular in one direction, and whether its repair moves it
+depends on the LAPACK build, as the testset above records.
+=#
+function csfp_oracle(pe, rd; alpha = nothing)
+    PO = PortfolioOptimisers
+    X = rd.X
+    Tn, N = size(X)
+    amsk, emsk = PO.cross_sectional_panel_masks(rd.pnl)
+    mcap = PO.panel_field_values(rd, pe.mcap)
+    bmsk = isfinite.(X) .& emsk .& isfinite.(mcap)
+    BW = PO.cross_sectional_cap_weights(pe.bp, mcap, bmsk)
+    Z = PO.cross_sectional_exposure_history(pe.factors,
+                                            PO.cross_sectional_benchmark_carrier(rd, pe.bw,
+                                                                                 BW)).Ms
+    ell = pe.lag
+    ts = (PO.cross_sectional_warmup(X, Z, emsk) + ell + 1):Tn
+    K = size(Z, 3)
+    F = zeros(length(ts), K)
+    Q = zeros(length(ts), N)
+    for (u, t) in enumerate(ts)
+        for i in 1:N
+            if emsk[t, i] &&
+               isfinite(X[t, i]) &&
+               all(isfinite, view(Z, t - ell, i, :)) &&
+               isfinite(mcap[t - ell, i])
+                Q[u, i] = mcap[t - ell, i]^pe.wa.p
+            end
+        end
+        e = findall(>(0), view(Q, u, :))
+        s = sqrt.(Q[u, e])
+        F[u, :] = LinearAlgebra.pinv(s .* Z[t - ell, e, :]) * (s .* X[t, e])
+    end
+    muf = vec(Statistics.mean(F; dims = 1))
+    Sf = Statistics.cov(F; dims = 1)
+    ZT = Z[Tn, :, :]
+    g = zeros(K)
+    b = zeros(N)
+    if !isnothing(alpha)
+        qT = [isfinite(alpha[i]) && all(isfinite, view(ZT, i, :)) ? Q[end, i] : 0.0
+              for i in 1:N]
+        e = findall(>(0), qT)
+        s = sqrt.(qT[e])
+        g = LinearAlgebra.pinv(s .* ZT[e, :]) * (s .* alpha[e])
+        b = pe.c * (alpha - ZT * g)
+    end
+    mut = pe.lambda * muf + (1 - pe.lambda) * g
+    return (; F, Q, muf, Sf, mut, ZT, b, amsk)
+end
+
+@testset "The prior against its mathematical definition, from first principles" begin
+    PO = PortfolioOptimisers
+    rd = csfp_panel().rd
+    factors = ["market" => ConstantExposure(),
+               "size" =>
+                   CompositeExposure(; descriptors = [LogMarketCap()], family = "style"),
+               "value" =>
+                   CompositeExposure(; descriptors = [BookToPrice()], family = "style")]
+    alpha = 0.01 * randn(StableRNG(829), size(rd.X, 2))
+    alpha[3] = NaN
+    cases = (("the defaults", CrossSectionalFactorPrior(; factors = factors), nothing),
+             ("a lag of three", CrossSectionalFactorPrior(; factors = factors, lag = 3),
+              nothing),
+             ("a shrunk factor mean",
+              CrossSectionalFactorPrior(; factors = factors, lambda = 0.4), nothing),
+             ("a Return Forecast, lambda = 0.3 and c = 0.7",
+              CrossSectionalFactorPrior(; factors = factors, lambda = 0.3, c = 0.7,
+                                        rfe = CustomValueReturnForecast(; mu = alpha)),
+              alpha))
+    for (name, pe, a) in cases
+        @testset "$name" begin
+            pr = prior(pe, rd)
+            o = csfp_oracle(pe, rd; alpha = a)
+            rr = pr.rr
+            D = rr.esigma
+            @test o.Q == rr.rw
+            @test isapprox(o.F, rr.csr.f; rtol = 1e-10, atol = 1e-15)
+            @test isapprox(o.mut, pr.fpr.mu; rtol = 1e-10)
+            @test isapprox(o.Sf, pr.fpr.sigma; rtol = 1e-10)
+            I = findall(i -> o.amsk[end, i] &&
+                             isfinite(D[i]) &&
+                             all(isfinite, view(o.ZT, i, :)), eachindex(D))
+            J = setdiff(eachindex(D), I)
+            @test !isempty(J)
+            mu = o.ZT[I, :] * o.mut + o.b[I]
+            S = o.ZT[I, :] * o.Sf * transpose(o.ZT[I, :]) + LinearAlgebra.Diagonal(D[I])
+            @test isapprox(mu, pr.mu[I]; rtol = 1e-10, nans = true)
+            @test isapprox(S, pr.sigma[I, I]; rtol = 1e-10)
+            @test all(isnan, pr.mu[J])
+            @test all(isnan, pr.sigma[J, :])
+            @test all(isnan, pr.sigma[:, J])
+        end
+    end
+    @testset "At lambda = 0 and c = 1 the expected return is the forecast" begin
+        pe = CrossSectionalFactorPrior(; factors = factors, lambda = 0.0, c = 1.0,
+                                       rfe = CustomValueReturnForecast(; mu = alpha))
+        pr = prior(pe, rd)
+        i = findall(PO.investable_mask(pr))
+        @test !(3 in i)
+        @test isapprox(pr.mu[i], alpha[i]; rtol = 1e-12)
+    end
+    @testset "A regression that fits an intercept is refused" begin
+        # With a market factor in the design, the intercept takes a share of the common
+        # return, and the moments, which read the factor returns alone, would drop it.
+        pe = CrossSectionalFactorPrior(; factors = factors,
+                                       cre = CrossSectionalLinearRegression(;
+                                                                            intercept = true))
+        @test_throws ArgumentError prior(pe, rd)
+    end
+end
+
+#=
+Issue #828 swept `10_Base_CrossSectionalFactorPrior.jl`. Each testset below checks one closed form
+that a docstring of that file states, against a loop that writes the form out. The fixtures are
+small random arrays, so each check reads one helper alone.
+
+The integer testset fails on the code before the sweep. `cross_sectional_exposure_history`
+allocated the exposure history in the element type of the returns, so integer returns threw
+`InexactError` at the first fractional exposure.
+=#
+@testset "The docstrings of 10_Base_CrossSectionalFactorPrior.jl against numbers" begin
+    PO = PortfolioOptimisers
+    @testset "The eligibility mask, the warm-up and the investable set are their definitions" begin
+        rng = StableRNG(828_101)
+        nT, nN, nK = 12, 7, 3
+        X = randn(rng, nT, nN)
+        X[rand(rng, nT, nN) .< 0.15] .= NaN
+        Ms = randn(rng, nT, nN, nK)
+        Ms[rand(rng, nT, nN, nK) .< 0.1] .= NaN
+        Ms[1:3, :, 1] .= NaN
+        emsk = rand(rng, nT, nN) .< 0.8
+        m = [emsk[t, i] && isfinite(X[t, i]) && all(isfinite, Ms[t, i, :])
+             for t in 1:nT, i in 1:nN]
+        @test PO.cross_sectional_eligible(X, Ms, emsk) == m
+        @test PO.cross_sectional_warmup(X, Ms, emsk) ==
+              findfirst(t -> any(m[t, :]), 1:nT) - 1
+        @test PO.cross_sectional_warmup(X, Ms, emsk) == 3
+        amsk = rand(rng, nN) .< 0.7
+        L = randn(rng, nN, nK)
+        L[2, 3] = NaN
+        ev = rand(rng, nN)
+        ev[5] = NaN
+        @test PO.cross_sectional_investable(amsk, L, ev) ==
+              [i for i in 1:nN if amsk[i] && isfinite(ev[i]) && all(isfinite, L[i, :])]
+    end
+    @testset "The standardised residuals take the mean of their own observation at a gap" begin
+        rng = StableRNG(828_102)
+        nT, nN = 12, 7
+        eps = randn(rng, nT, nN)
+        eps[rand(rng, nT, nN) .< 0.2] .= NaN
+        vs = rand(rng, nT, nN) .+ 0.1
+        # A zero variance standardises to 0 / 0, and a row of NaN variances leaves no finite
+        # entry, so the mean of that row is zero.
+        vs[4, 2] = 0.0
+        eps[4, 2] = 0.0
+        vs[6, :] .= NaN
+        amsk = rand(rng, nT, nN) .< 0.85
+        z = [amsk[t, i] ? eps[t, i] / sqrt(vs[t, i]) : NaN for t in 1:nT, i in 1:nN]
+        zbar = [sum(filter(isfinite, z[t, :]); init = 0.0) /
+                max(count(isfinite, z[t, :]), 1) for t in 1:nT]
+        S = [amsk[t, i] ? (isfinite(z[t, i]) ? z[t, i] : zbar[t]) : NaN
+             for t in 1:nT, i in 1:nN]
+        @test isequal(PO.cross_sectional_standardised_residuals(eps, vs, amsk), S)
+        @test all(iszero, S[6, amsk[6, :]])
+        @test [PO.cross_sectional_finite_mean(z, t) for t in 1:nT] ≈ zbar
+    end
+    @testset "The degrees of freedom charge each asset the fraction the fit leaves" begin
+        rng = StableRNG(828_103)
+        nT, nN, nK = 12, 7, 3
+        n = rand(rng, 5:7, nT)
+        cnt = (; n = 10 .* rand(rng, nN), m = rand(rng, nN))
+        csr = PO.CrossSectionalRegression(; f = randn(rng, nT, nK),
+                                          eps = randn(rng, nT, nN), n = n)
+        c = PO.cross_sectional_variance_counts(cnt, csr)
+        @test c.edof ≈ (sum(n .- nK) / sum(n)) .* cnt.n
+        @test c.ediv == cnt.m
+        # An intercept is one more parameter of each period.
+        csrb = PO.CrossSectionalRegression(; f = csr.f, eps = csr.eps, n = n, b = zeros(nT))
+        @test PO.cross_sectional_variance_counts(cnt, csrb).edof ≈
+              (sum(n .- nK .- 1) / sum(n)) .* cnt.n
+        @test PO.cross_sectional_variance_counts(nothing, csr) ==
+              (; edof = nothing, ediv = nothing)
+    end
+    @testset "The scenarios pair the last rows of the two histories" begin
+        rng = StableRNG(828_104)
+        nN, nK = 9, 3
+        Fs = randn(rng, 20, nK)
+        S = randn(rng, 14, nN)
+        L = randn(rng, nN, nK)
+        ev = rand(rng, nN)
+        @test PO.cross_sectional_scenarios(Fs, L, S, ev) ≈
+              [dot(L[i, :], Fs[6 + s, :]) + sqrt(ev[i]) * S[s, i] for s in 1:14, i in 1:nN]
+        @test PO.cross_sectional_scenarios(Fs[1:10, :], L, S, ev) ≈
+              [dot(L[i, :], Fs[s, :]) + sqrt(ev[i]) * S[4 + s, i] for s in 1:10, i in 1:nN]
+    end
+    @testset "The split solves the weighted normal equations, and the intercept stays in ap" begin
+        rng = StableRNG(828_105)
+        nN, nK = 9, 3
+        mu = randn(rng, nN)
+        mu[2] = NaN
+        L = randn(rng, nN, nK)
+        L[4, 1] = NaN
+        w = rand(rng, nN)
+        w[7] = 0.0
+        V = [i for i in 1:nN if isfinite(mu[i]) && all(isfinite, L[i, :]) && w[i] > 0]
+        W = Diagonal(w[V])
+        sp = PO.cross_sectional_alpha_split(CrossSectionalLinearRegression(), mu, L, w)
+        @test sp.g ≈ (L[V, :]' * W * L[V, :]) \ (L[V, :]' * W * mu[V])
+        @test sp.ap[V] ≈ mu[V] - L[V, :] * sp.g
+        @test maximum(abs, L[V, :]' * W * sp.ap[V]) < 1e-14
+        @test findall(isnan, sp.ap) == [2, 4]
+        A = hcat(ones(length(V)), L[V, :])
+        gb = (A' * W * A) \ (A' * W * mu[V])
+        spi = PO.cross_sectional_alpha_split(CrossSectionalLinearRegression(;
+                                                                            intercept = true),
+                                             mu, L, w)
+        @test spi.g ≈ gb[2:end]
+        # `ap` is `mu - L * g`, not the residual of the fit, so its weighted mean is the
+        # intercept.
+        @test sum(w[V] .* spi.ap[V]) / sum(w[V]) ≈ gb[1]
+        @test PO.cross_sectional_forecast_mu(0.3, [1.0, 2.0], nothing) ≈ [0.3, 0.6]
+        @test PO.cross_sectional_forecast_mu(0.3, [1.0, 2.0], [10.0, -10.0]) ≈
+              0.3 .* [1.0, 2.0] .+ 0.7 .* [10.0, -10.0]
+    end
+    @testset "The lift is the factor model on the investable block, and NaN off it" begin
+        rng = StableRNG(828_106)
+        nN, nK = 8, 3
+        L = randn(rng, nN, nK)
+        L[3, 2] = NaN
+        A = randn(rng, nK, nK)
+        Sf = A * A' + I
+        muf = randn(rng, nK)
+        ev = rand(rng, nN) .+ 0.1
+        B = randn(rng, nN, nN)
+        D = B * B' + I
+        idx = [1, 2, 4, 5, 7, 8]
+        off = setdiff(1:nN, idx)
+        Xs = randn(rng, 30, nN)
+        mp = CrossSectionalFactorPrior(; factors = csfp_factors()).mp
+        Li = L[idx, :]
+        for (es, Di) in ((ev, Diagonal(ev[idx])), (D, D[idx, idx]))
+            lf = PO.cross_sectional_lift(mp, L, muf, Sf, es, idx, Xs)
+            @test lf.mu[idx] ≈ Li * muf
+            @test lf.sigma[idx, idx] ≈ Li * Sf * Li' + Di
+            @test lf.chol[:, idx]' * lf.chol[:, idx] ≈ lf.sigma[idx, idx]
+            @test size(lf.chol) == (nK + length(idx), nN)
+            @test all(isnan, lf.mu[off])
+            @test all(isnan, lf.sigma[off, :]) && all(isnan, lf.sigma[:, off])
+            @test all(isnan, lf.chol[:, off])
+            rb = PO.cross_sectional_residual_block(es, idx)
+            @test rb.D ≈ Di
+            @test rb.R * rb.R' ≈ Di
+            @test istril(rb.R)
+        end
+        # `chol` factorises the factor model before `mp` processes it, so a detoning `mp`
+        # moves `sigma` and leaves `chol` where it was.
+        lf = PO.cross_sectional_lift(MatrixProcessing(; dt = Detone()), L, muf, Sf, ev, idx,
+                                     Xs)
+        @test lf.chol[:, idx]' * lf.chol[:, idx] ≈ Li * Sf * Li' + Diagonal(ev[idx])
+        @test !isapprox(lf.chol[:, idx]' * lf.chol[:, idx], lf.sigma[idx, idx])
+    end
+    @testset "Integer returns fit, and equal the fit of their float copy" begin
+        rd = csfp_panel(; n_assets = 40, n_observations = 80, n_industries = 3,
+                        seed = 828_002).rd
+        rdi = ReturnsResult(; nx = rd.nx,
+                            X = map(x -> isfinite(x) ? round(Int, 100 * x) : 0, rd.X),
+                            pnl = rd.pnl)
+        rdf = ReturnsResult(; nx = rd.nx, X = Float64.(rdi.X), pnl = rd.pnl)
+        pe = CrossSectionalFactorPrior(; factors = csfp_factors(), minra = 5)
+        pint = prior(pe, rdi)
+        pflt = prior(pe, rdf)
+        @test eltype(pint.rr.Ms) == Float64
+        @test isequal(pint.mu, pflt.mu)
+        @test isequal(pint.sigma, pflt.sigma)
+        @test isequal(pint.X, pflt.X)
+        @test isequal(pint.rr.Ms, pflt.rr.Ms)
+        # A non-investable asset carries NaN in every scenario, as it does in mu and on the
+        # diagonal of sigma: its latest exposures are NaN, so its systematic part is NaN.
+        j = setdiff(eachindex(pflt.mu), csfp_investable(pflt))
+        @test !isempty(j)
+        @test all(isnan, pflt.X[:, j])
+    end
 end

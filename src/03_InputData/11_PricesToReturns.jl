@@ -1,11 +1,11 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Supertype of the policies that write a return into the cells a price gap left non-finite.
+Supertype of the policies that write a return into the cells that a price gap left non-finite.
 
-A return is the change between two consecutive observations, so a run of `k` gapped prices leaves `k + 1` non-finite returns and the move across the gap is recorded nowhere. That is the default, and it is what `nothing` means on [`prices_to_returns`](@ref). A caller who wants the move booked states one of these instead.
+A return is the change between two consecutive observations. So a run of `k` gapped prices inside the series leaves `k + 1` non-finite returns, and a run at either end leaves `k`. Under the default rule no return records the move across the gap, and `nothing` on [`prices_to_returns`](@ref) selects that rule. A caller who wants the move booked gives one of these algorithms instead.
 
-An algorithm may write **only** a non-finite cell inside the asset's Listing Span that has an earlier observed price in its column; [`gap_return_writable`](@ref) derives that set and [`apply_gap_return`](@ref) restores every other cell. So a cell computed from two observed prices is frozen whatever the algorithm returns, a gap can never spread beyond the cells that read one of its prices, and no return is invented before an asset's first price.
+An algorithm writes **only** a cell that reads a gapped price, inside the asset's Listing Span, after the first observed price of its column. [`gap_return_writable`](@ref) finds that set, and [`apply_gap_return`](@ref) restores every other cell. So a return computed from two observed prices keeps its value whatever the algorithm returns. A gap changes no cell that reads none of its prices, and no return appears before an asset's first price.
 
 # Interfaces
 
@@ -20,11 +20,11 @@ In order to implement a new concrete type that works seamlessly with the library
   - `alg`: The concrete subtype instance.
   - `p`: One column's prices along the observation axis, gaps included.
   - `r`: The returns `TimeSeries.percentchange` computed from `p`, so `length(p) - length(r)` is `0` under `padding` and `1` otherwise.
-  - `ret_method`: `:simple` or `:log`. Compute a value with [`gap_return_value`](@ref) rather than re-spelling the two branches.
+  - `ret_method`: `:simple` or `:log`. Compute a value with [`gap_return_value`](@ref), which holds the two branches.
 
 ### Returns
 
-  - `out::Vector`: The same length as `r`. Only the cells [`gap_return_writable`](@ref) admits are read back, so a method may return the frozen cells unchanged and need not defend the invariant itself.
+  - `out::Vector`: The same length as `r`. [`apply_gap_return`](@ref) reads back only the cells that [`gap_return_writable`](@ref) admits. So a method can return every other cell unchanged, and it does not need to check the rule itself.
 
 # Related
 
@@ -38,11 +38,11 @@ abstract type AbstractGapReturnAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Books a Held Gap's whole move on the observation that ends it, shortening the gap to `k`.
+Books the whole move across a Held Gap on the observation that ends it, so the gap holds `k` non-finite returns.
 
-A suspension of `k` observations leaves `k + 1` non-finite returns by default. This puts ``P_{t+k} / P_{t-1} - 1`` on the observation the asset resumes trading and leaves the `k` observations inside the gap non-finite, so wealth is conserved across the gap and the Held Gap is exactly the run of unpriced observations. An asset's inception is untouched: it has no earlier observed price to anchor on.
+A suspension of `k` observations leaves `k + 1` non-finite returns under the default rule. This algorithm writes ``p_{t+k,\\,i} / p_{t-1,\\,i} - 1`` on the observation where the asset trades again, and it leaves the `k` observations inside the gap non-finite. The compounded return across the gap then equals the price ratio, and the Held Gap is the run of unpriced observations. The algorithm writes nothing at an asset's inception, because no earlier observed price exists there.
 
-The estimation mask reads the values it was given and is unaware of which algorithm produced them, so the re-pricing cell is estimable and a `(k + 1)`-period return enters a one-period moment as one draw, at roughly ``\\sqrt{k + 1}`` the scale.
+The estimation mask reads the values and not the algorithm that wrote them. So the mask marks the cell where the asset trades again as estimable, and a moment estimator reads a `(k + 1)`-period return as one draw of a one-period return. Under independent increments, the scale of that draw is about ``\\sqrt{k + 1}`` times the scale of a one-period return.
 
 # Constructors
 
@@ -65,9 +65,9 @@ struct CatchUpGapReturn <: AbstractGapReturnAlgorithm end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute one return from a pair of prices that need not be consecutive.
+Compute one return from two prices that need not be consecutive.
 
-The one place the `ret_method` branches are spelled for the Gap Return family, so a new algorithm states which pair of prices it reads and never which formula turns them into a return. It mirrors `TimeSeries.percentchange`, which computes both branches through logarithms, so a value written here sits on the same arithmetic as the cells around it.
+This function holds the two `ret_method` branches for the Gap Return family. A new algorithm chooses the two prices, and this function turns them into a return. It uses the arithmetic of `TimeSeries.percentchange`, which computes both branches through logarithms. So a value that an algorithm writes uses the same formula as the cells around it.
 
 # Arguments
 
@@ -77,7 +77,7 @@ The one place the `ret_method` branches are spelled for the Gap Return family, s
 
 # Returns
 
-  - `r::Number`: ``\\ln P_t - \\ln P_0`` under `:log`, and `expm1` of it otherwise.
+  - `r::Number`: ``\\ln p_{t} - \\ln p_{0}`` under `:log`, and `expm1` of it otherwise.
 
 # Related
 
@@ -91,17 +91,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Derive the cells of one column a Gap Return algorithm is allowed to write.
+Find the cells of one column that a Gap Return algorithm can write.
 
-This is the family's invariant, held once rather than re-argued per algorithm. [`apply_gap_return`](@ref) restores every cell outside the returned set, so no algorithm can rewrite a return computed from two observed prices, manufacture one before an asset's first price, or resurrect a delisting.
+Every algorithm of the family obeys this one rule, and no algorithm states it again. [`apply_gap_return`](@ref) restores every cell outside the returned set. So no algorithm can change a return computed from two observed prices, write a return before an asset's first price, or write one after its last price.
 
-The bounds are the Span Rule and its projection, the same ones [`listing_span`](@ref) and [`PortfolioOptimisers.project_span`](@ref) state for a whole panel. They are read here off the one price column the conversion is holding, because the writable set is per column and the table reaching [`prices_to_returns`](@ref)'s conversion step is the filtered one rather than the caller's.
+The bounds are the Span Rule and its projection, which [`listing_span`](@ref) and [`PortfolioOptimisers.project_span`](@ref) state for a whole panel. This function reads them off one price column, for two reasons. The writable set is per column. And the table that reaches the conversion step of [`prices_to_returns`](@ref) can be a filtered table, and not the caller's table.
 
 # Algorithm
 
- 1. Read the offset between the two clocks as `length(p) - length(r)`, which is `0` when `padding` kept the first observation and `1` when it did not. Return cell `j` is then the change onto price row `j + off`.
- 2. Locate the column's Listing Span on the price clock: the first observed price and the last. A column with no observed price admits nothing.
- 3. Admit return cell `j` when its price row lies in `[first + 1, last]` — the span projected onto the returns clock, since a return consumes the earlier price of its pair — and the default rule left the cell non-finite.
+ 1. Read the offset between the two clocks as `length(p) - length(r)`, which is `0` when `padding` kept the first observation and `1` when it did not. Return cell `j` is then the change onto price row `t = j + off`, and it reads the prices at rows `t - 1` and `t`.
+ 2. Find the column's Listing Span on the price clock, from the first observed price to the last. A column with no observed price admits no cell.
+ 3. Admit return cell `j` when `t` lies in `[first + 1, last]` and one of the prices at rows `t - 1` and `t` is gapped. The interval is the span projected onto the returns clock, because a return reads the earlier price of its pair. A cell that reads a gapped price is always non-finite under the default rule. The function does not admit a cell that reads two observed prices, even a non-finite one. A zero price gives a return of `-1` or `-Inf` on its own observation and `Inf` on the next, and those cells keep the values of the default rule.
 
 # Arguments
 
@@ -110,7 +110,7 @@ The bounds are the Span Rule and its projection, the same ones [`listing_span`](
 
 # Returns
 
-  - `w::BitVector`: The same length as `r`, true on the cells an algorithm may write.
+  - `w::BitVector`: The same length as `r`, true on the cells that an algorithm can write.
 
 # Related
 
@@ -131,7 +131,7 @@ function gap_return_writable(p::AbstractVector, r::AbstractVector)::BitVector
     off = length(p) - length(r)
     for j in eachindex(r)
         t = j + off
-        w[j] = i1 < t <= i2 && !isfinite(r[j])
+        w[j] = i1 < t <= i2 && (is_missing_value(p[t - 1]) || is_missing_value(p[t]))
     end
     return w
 end
@@ -140,17 +140,18 @@ end
 
 Resolve the writable cells of one column's returns.
 
-The method Julia selects is the algorithm. Only [`CatchUpGapReturn`](@ref) ships, and it is the reason the family is an algorithm rather than a flag: a caller who wants a suspension's move spread across its observations is asking a question of the same kind, and it costs one type.
+Dispatch on `alg` selects the algorithm. The library ships [`CatchUpGapReturn`](@ref) alone. The family is a type and not a flag, so another rule costs one type and one method. A rule that spreads the move of a suspension across its observations is an example.
 
 # Algorithm
 
-[`CatchUpGapReturn`](@ref) walks the observation axis carrying the row of the last observed price.
+[`CatchUpGapReturn`](@ref) reads the observations in order, and keeps the row of the last observed price as the anchor.
 
- 1. On a gapped price, carry nothing forward and write nothing: the observation is inside the Held Gap and stays non-finite.
- 2. On an observed price whose immediate predecessor was observed too, write nothing: `TimeSeries.percentchange` already computed that cell from two consecutive prices, and [`gap_return_writable`](@ref) freezes it in any case.
- 3. On an observed price whose immediate predecessor was not, write [`gap_return_value`](@ref) of it against the carried price. This is the observation that ends the gap, and the whole move across the gap lands on it.
+ 1. On a gapped price, write nothing and keep the anchor. The observation is inside the Held Gap, and its return stays non-finite.
+ 2. On an observed price whose predecessor is also observed, write nothing. `TimeSeries.percentchange` computed that cell from two consecutive prices, and [`gap_return_writable`](@ref) does not admit it.
+ 3. On an observed price whose predecessor is gapped, write [`gap_return_value`](@ref) of this price against the anchor price. This observation ends the gap, and it carries the whole move across the gap.
+ 4. After step 2 or step 3, move the anchor to the row of this price.
 
-A column's first observed price carries nothing, so nothing is written on it, which is what makes an inception and an interior gap one case.
+The first observed price of a column has no anchor, so the algorithm writes nothing on it. That is why an inception needs no case of its own.
 
 # Arguments
 
@@ -202,25 +203,29 @@ end
     apply_gap_return(alg::Nothing, R::DataFrames.DataFrame, P::DataFrames.DataFrame, ret_method::Symbol) -> DataFrames.DataFrame
     apply_gap_return(alg::AbstractGapReturnAlgorithm, R::DataFrames.DataFrame, P::DataFrames.DataFrame, ret_method::Symbol) -> DataFrames.DataFrame
 
-Apply the `gap_return_alg` given to [`prices_to_returns`](@ref) to the converted table.
+Apply the `gap_return_alg` of [`prices_to_returns`](@ref) to the converted table.
 
-The seam that keeps the family optional and holds its invariant. `nothing` is the default path, and its method returns the table untouched, so the arithmetic `TimeSeries.percentchange` produced is bit-identical to what it was before the family existed.
+The method for `nothing` is the default rule. It returns the table unchanged, so the returns are bit for bit the ones that `TimeSeries.percentchange` computed. The method for an algorithm writes only the cells that [`gap_return_writable`](@ref) admits.
 
-The rule is per-column arithmetic on consecutive observations and reads no asset axis, so it applies to every series of the converted table alike — asset, factor and benchmark.
+A Gap Return reads one column and no asset axis. So this function applies it to every series of the converted table, which holds the assets, the factors and the benchmarks.
 
 # Algorithm
 
- 1. Walk the series columns of `R`, taking each column's prices from `P` by name.
- 2. Derive the writable cells with [`gap_return_writable`](@ref).
- 3. Call [`gap_return`](@ref) on the column and copy back **only** the writable cells, so every other cell is frozen whatever the algorithm returned.
- 4. Report an `@info` when no column admitted a single cell. A table that holds no gap admits none, which is the ordinary case rather than a mistake, so this is neither a refusal, which would reject a configuration that computes a correct answer, nor a warning, which could not tell that case from one where the caller expected a gap.
+ 1. For each series column of `R`, read the prices of the same name from `P`.
+ 2. Find the writable cells with [`gap_return_writable`](@ref). Go to the next column when no cell is writable.
+ 3. Call [`gap_return`](@ref) on the column, and copy back **only** the writable cells. Every other cell keeps its value, whatever the algorithm returned.
+ 4. Log an `@info` when no column admits a cell. A table with no gap admits none, and so does a table whose gaps are all at the ends of the Listing Spans. The returns are then correct, so the function does not throw. It does not warn either, because it cannot tell this table from one where the caller expected a gap.
 
 # Arguments
 
   - `alg`: The Gap Return algorithm, or `nothing` for the default rule.
   - `R`: The converted table, `:timestamp` first and one column per series.
-  - `P`: The price table reaching the conversion, with the same series columns.
+  - `P`: The price table that reaches the conversion, with the same series columns.
   - `ret_method`: `:simple` or `:log`.
+
+# Validation
+
+  - [`gap_return`](@ref) returns one value for each cell of the column. The function throws a `DimensionMismatch` otherwise.
 
 # Returns
 
@@ -254,7 +259,7 @@ function apply_gap_return(alg::AbstractGapReturnAlgorithm, R::DataFrames.DataFra
         r[w] .= out[w]
     end
     if !wrote
-        @info("`gap_return_alg` is a $(typeof(alg)) and no cell is writable, so the returns are the ones the default rule computed. A Gap Return writes only a non-finite return inside an asset's Listing Span that has an earlier observed price in its column, and the table reaching the conversion holds no such cell.")
+        @info("`gap_return_alg` is a $(typeof(alg)) and no cell is writable, so the returns are the ones the default rule computed. A Gap Return writes only a return that reads a gapped price, inside an asset's Listing Span, after the first observed price of its column. The table that reaches the conversion holds no such return.")
     end
     return R
 end
@@ -262,16 +267,16 @@ end
     append_carrier_block!(P::DataFrames.DataFrame, A::Nothing, ts, sym::Symbol) -> Vector{String}
     append_carrier_block!(P::DataFrames.DataFrame, A::TimeSeries.TimeArray, ts, sym::Symbol) -> Vector{String}
 
-Lay one of the carrier's price blocks beside the asset block, on the asset clock.
+Write one price block of the carrier beside the asset block, on the asset clock.
 
-The carrier states one clock, so a factor or benchmark series is read at the asset timestamps rather than joined onto them: a join adds or drops observations, which is a clock move, and every clock move belongs to [`price_ingestion`](@ref). Laying the columns out one by one also frees [`prices_to_returns`](@ref) of `TimeSeries.merge`'s one-value-type requirement, so a `Float32` factor table beside a `Float64` asset table converts instead of raising a `MethodError`.
+The carrier states one clock. So this function reads a factor or benchmark series at the asset timestamps, and does not join it onto them. A join adds or drops observations, and [`price_ingestion`](@ref) owns every change of the clock. The function writes the columns one at a time, so the blocks do not need the one value type that `TimeSeries.merge` needs. A `Float32` factor table beside a `Float64` asset table converts, and the conversion promotes the two types.
 
 # Algorithm
 
- 1. A block that is `nothing` contributes no column and no name.
- 2. Otherwise check that the block states the asset clock, and refuse by name if it does not.
- 3. Spell every absent price `NaN` with [`unify_gaps`](@ref), the verb the ingestion door runs. It is idempotent on a carrier the layer built, and it is what makes a hand-built carrier holding `missing` convert like one holding `NaN`.
- 4. Write each of the block's columns into `P` under its own name, and return the names in order.
+ 1. A block that is `nothing` adds no column and no name.
+ 2. Otherwise, check that the block states the asset clock. Throw an error that names the block if it does not.
+ 3. Write every absent price as `NaN` with [`unify_gaps`](@ref), which [`price_ingestion`](@ref) also runs. It changes nothing on a carrier that the ingestion layer built. On a carrier built by hand, it makes a `missing` convert as a `NaN` does.
+ 4. Write each column of the block into `P` under its own name, and return the names in order.
 
 # Arguments
 
@@ -282,11 +287,11 @@ The carrier states one clock, so a factor or benchmark series is read at the ass
 
 # Validation
 
-  - `TimeSeries.timestamp(A) == ts`. Raises a [`ConflictingArgumentError`](@ref) naming [`price_ingestion`](@ref), which is what puts two series on one clock.
+  - `TimeSeries.timestamp(A) == ts`. The function throws a [`ConflictingArgumentError`](@ref) otherwise. The message names [`price_ingestion`](@ref), which puts two series on one clock.
 
 # Returns
 
-  - `n::Vector{String}`: The block's column names, empty when the block is `nothing`.
+  - `n::Vector{String}`: The column names of the block, empty when the block is `nothing`.
 
 # Related
 
@@ -321,71 +326,73 @@ end
         kwargs...
     ) -> ReturnsResult
 
-Compute returns from the price carrier, and nothing else.
+Compute returns from the price carrier.
 
-A keyword survives here if and only if it changes the arithmetic of a return, which is the rule and the reason there are three. Every datum the conversion reads — the asset prices, the factors, the benchmark, the implied volatilities, the **Listing Span** and the [`AssetPanel`](@ref) — is already a field of the [`PricesResult`](@ref), so naming one as a keyword would be a second way to say what the carrier says.
+A keyword belongs to this function only when it changes the arithmetic of a return, and three keywords do. Every datum that the conversion reads is a field of the [`PricesResult`](@ref). These are the asset prices, the factors, the benchmark, the implied volatilities, the **Listing Span** and the [`AssetPanel`](@ref). A keyword for one of them would state again what the carrier states.
 
-The second method is the friendliest call in the library, and it is the layer's own path rather than a way around it: it runs [`price_ingestion`](@ref) with a default [`PriceIngestion`](@ref) and converts what that emits. A caller wanting a different join, a collapse, a declared span, or factor, benchmark and implied-volatility series writes the two steps.
+The second method takes a bare price table. It runs [`price_ingestion`](@ref) with a default [`PriceIngestion`](@ref), and converts the carrier that it returns. For a different join, a collapse, a declared span, or factor, benchmark and implied-volatility series, call the two steps.
 
-An absent price has one spelling, `NaN`, and the conversion carries it into the returns rather than deleting the observation or the asset that holds one. Filling a gap is [`PriceGapFill`](@ref)'s and deleting one is [`MissingDataFilter`](@ref)'s, both of them fitted steps.
+An absent price is a `NaN`. The conversion carries it into the returns, and it does not delete the observation or the asset. [`PriceGapFill`](@ref) fills a gap and [`MissingDataFilter`](@ref) deletes one. Both are fitted steps.
 
 # Mathematical definition
 
-Returns are computed from prices ``P_{t,i}`` as:
+The conversion computes the returns from the prices as:
 
 ```math
 \\begin{align}
-r_{t,i} &= \\begin{cases}
-(P_{t,i} - P_{t-1,i}) / P_{t-1,i} & \\text{simple} \\\\
-\\ln(P_{t,i} / P_{t-1,i}) & \\text{log}
+x_{t,\\,i} &= \\begin{cases}
+(p_{t,\\,i} - p_{t-1,\\,i}) / p_{t-1,\\,i} & \\text{simple} \\\\
+\\ln(p_{t,\\,i} / p_{t-1,\\,i}) & \\text{log}
 \\end{cases}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``r_{t,i}``: Return of asset ``i`` at time ``t``.
-  - ``P_{t,i}``: Price of asset ``i`` at time ``t``.
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:p_ti_price])
 
-Both branches need a **positive** price, and a zero price gives ``\\pm\\infty``.
+Both branches take the logarithm of each price, so a price must be non-negative. A zero price ``p_{t,\\,i} = 0`` gives ``x_{t,\\,i} = -1`` on the simple branch and ``x_{t,\\,i} = -\\infty`` on the log branch. On both branches it gives ``x_{t+1,\\,i} = \\infty``.
 
-A benchmark ``B`` is converted by the same rule and **carried alongside** the asset returns, never subtracted from them. The subtraction that forms the excess return ``\\tilde{r}_{t,i} = r_{t,i} - b_{t,i}`` is a separate operation, and it is applied only when the optimisation tracks the benchmark.
+The conversion applies the same rule to a benchmark ``B``, and carries the benchmark returns ``b_{t,\\,i}`` **beside** the asset returns. It does not subtract them. [`returns_result_picker`](@ref) forms the excess return ``\\tilde{x}_{t,\\,i} = x_{t,\\,i} - b_{t,\\,i}``, and only when the optimisation tracks the benchmark.
 
 # Algorithm
 
- 1. Check that the asset, factor and benchmark series can still be named side by side with [`assert_distinct_series_names`](@ref). Read the asset names and the asset timestamps from `pr.X`, and check `pr.pnl` against them with [`check_asset_panel`](@ref) and `pr.span` with [`assert_span_shape`](@ref).
- 2. Lay the three price blocks side by side on the carrier's clock with [`append_carrier_block!`](@ref), spelling every absent price `NaN` with [`unify_gaps`](@ref). The carrier states one clock, so a factor or benchmark series is read at the asset timestamps rather than joined onto them, and one stating a different clock is refused by name: a join adds or drops observations, and [`price_ingestion`](@ref) owns every clock move. A benchmark is one shared column, or one column per asset.
- 3. Convert the prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. It computes both branches through logarithms — the log return is ``\\ln P_{t,i} - \\ln P_{t-1,i}``, and the simple return is `expm1` of it — so the two agree with the closed forms above to floating point rather than to the last bit. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock. **A gap carried here does not spread.** The formula reads two prices, so a run of `k` gapped prices makes exactly the `k + 1` returns that read one of them non-finite, and every later return of that column is computed from two observed prices and is finite. A gap is confined to its own column for the same reason: no asset's return reads another's price.
- 4. Resolve the cells the conversion left non-finite with [`apply_gap_return`](@ref), under `gap_return_alg`. `nothing` is the default rule, and its method returns the table untouched, so the arithmetic step 3 produced is bit-identical. An algorithm may write only a non-finite cell inside a column's Listing Span that has an earlier observed price, which is what freezes every return computed from two observed prices, and it reports an `@info` when it finds no such cell.
- 5. Name the three blocks. Step 1 refused every name two of the tables shared and the clock's own name `timestamp`, so the asset names `nx`, the factor names `nf` and the benchmark names `nb` are the lists read off the three tables, and `ts` is the `timestamp` column the `DataFrames.DataFrame` conversion wrote. Each is the typed vector its table held, rather than whatever is left once the other groups have taken what they recognise.
- 6. Spell the implied volatilities' absences with [`unify_gaps`](@ref) and index `pr.iv` by `ts`, then check them and `pr.ivpa` against the asset count. The returns clock is the price clock less the observation `padding` costs, so a carrier the layer built covers it, and an absent implied volatility is carried as `NaN` for the estimator that reads it to exclude.
- 7. Subselect the [`AssetPanel`](@ref). Recover the surviving rows with [`feature_row_indices`](@ref) and view the panel with [`port_opt_view`](@ref), handing it the asset names so that a square tensor Panel Field is cut on its label axis too. The conversion removes no column, so the asset axis reaches the panel whole and the subselection that bites is the observation one: a time-varying panel is cut to the surviving observations and matched back into the price timestamps.
- 8. State the universe. Cut `pr.span` to the asset axis with [`span_carrier_view`](@ref), and hand it and the converted returns to [`returns_universe_masks`](@ref), which projects it onto the returns clock and intersects it with finiteness. A carrier that states no span states no universe, and the conversion emits no panel. [`attach_universe_masks`](@ref) puts the pair onto the Asset Panel, keeping whatever Panel Fields it already carried, and mints one with no field when the carrier held none.
- 9. Build the asset, factor and benchmark matrices from the columns of each group. The asset group is always present, because the conversion removes no column; a factor or benchmark group given no column is `nothing`.
-10. Return the [`ReturnsResult`](@ref).
+ 1. Check with [`assert_distinct_series_names`](@ref) that the asset, factor and benchmark series have distinct names. Read the asset names and the asset timestamps from `pr.X`. Check `pr.pnl` against them with [`check_asset_panel`](@ref), and `pr.span` with [`assert_span_shape`](@ref).
+ 2. Write the three price blocks side by side on the clock of the carrier with [`append_carrier_block!`](@ref), which writes every absent price as `NaN` with [`unify_gaps`](@ref). The carrier states one clock. So the function reads a factor or benchmark series at the asset timestamps, and does not join it onto them. It refuses a series on a different clock and names the series, because a join adds or drops observations and [`price_ingestion`](@ref) owns every change of the clock. A benchmark is one shared column, or one column per asset.
+ 3. Convert the prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This step applies the formula above. It computes both branches through logarithms. The log return is ``\\ln p_{t,\\,i} - \\ln p_{t-1,\\,i}``, and the simple return is `expm1` of it. So the two agree with the closed forms above to floating point, and not always to the last bit. When `padding` is `true`, the step keeps the first observation with a `NaN` return, so the returns keep the length of the price clock.
+ 4. **A gap carried here does not spread.** The formula reads two prices, so a run of `k` gapped prices makes non-finite only the returns that read one of them. That is `k + 1` returns for a run inside the series, and `k` for a run at either end, because no return reads a price before the first row or after the last. Every later return of that column reads two observed prices. A gap also stays in its own column, because the return of an asset reads no price of another asset.
+ 5. Resolve the returns that a gap left non-finite with [`apply_gap_return`](@ref), under `gap_return_alg`. The method for `nothing` is the default rule. It returns the table unchanged, so the returns of step 3 stay bit for bit the same. An algorithm writes only a return that reads a gapped price, inside the Listing Span of its column, after the first observed price. So every return computed from two observed prices keeps its value. The function logs an `@info` when it finds no writable return.
+ 6. Name the three blocks. Step 1 refused a name that two tables share and the name `timestamp`. So the asset names `nx`, the factor names `nf` and the benchmark names `nb` are the column names of the three tables, and `ts` is the `timestamp` column of the converted table.
+ 7. Write each absent implied volatility as `NaN` with [`unify_gaps`](@ref), and index `pr.iv` by `ts`. Then check the implied volatilities and `pr.ivpa` against the asset count. The returns clock is the price clock, less the first observation when `padding` is `false`. So the implied volatilities of a carrier that the ingestion layer built cover it. The conversion carries an absent implied volatility as `NaN`, and the estimator that reads it excludes it.
+ 8. View the [`AssetPanel`](@ref) on the returns clock. Find the panel rows of the returns timestamps with [`feature_row_indices`](@ref), and view the panel with [`port_opt_view`](@ref). Give it the asset names, so that it also cuts a square tensor Panel Field on its label axis. The conversion removes no column, so the view keeps every asset. A time-varying panel loses only the observations that the returns clock does not hold.
+ 9. State the universe. Cut `pr.span` to the asset axis with [`span_carrier_view`](@ref). Give it and the asset returns to [`returns_universe_masks`](@ref), which projects the span onto the returns clock and intersects it with finiteness. [`attach_universe_masks`](@ref) puts the two masks on the Asset Panel and keeps its Panel Fields. When the carrier holds no panel, it makes a panel with no Panel Field. A carrier with no span states no universe, so the function attaches no masks, and the panel is the one of step 8, or `nothing`.
+10. Build the factor and benchmark matrices from the columns of each block. A block with no column gives `nothing`, and a benchmark block with one column gives a vector. The asset matrix is always present, because the conversion removes no column.
+11. Return the [`ReturnsResult`](@ref).
 
-**The conversion removes no observation and no asset.** Deleting either is a **Universe Policy**, and a policy is fitted on a training window and replayed by name, which a stateless conversion cannot do; [`MissingDataFilter`](@ref) owns it, with `col_thr` deleting an asset and `row_thr` an observation. A keyword survives here if and only if it changes the arithmetic of a return.
+**The conversion removes no observation and no asset.** A deletion is a **Universe Policy**. A policy is fit on a training window and applied again by name, and a stateless conversion cannot do that. [`MissingDataFilter`](@ref) owns the deletion. Its `col_thr` deletes an asset and its `row_thr` deletes an observation.
 
 # Arguments
 
-  - `pr`: The price carrier, as [`price_ingestion`](@ref) emits it or a caller builds it.
+  - `pr`: The price carrier, as [`price_ingestion`](@ref) returns it or a caller builds it.
   - `X`: Asset price data (observations × assets), converted through a default [`PriceIngestion`](@ref).
-  - `ret_method`: Return calculation method (`:simple` or `:log`).
-  - `padding`: Whether to pad missing values in returns calculation.
-  - `gap_return_alg`: What the observations a price gap left non-finite carry. `nothing` is the arithmetic — a return is the change between two consecutive observations, so a run of `k` gapped prices leaves `k + 1` non-finite returns and the move across the gap is recorded nowhere — and [`CatchUpGapReturn`](@ref) books that move on the observation the asset resumes trading instead, shortening the Held Gap to `k`. Any algorithm may write only a non-finite cell inside an asset's Listing Span that has an earlier observed price in its column, so a return computed from two observed prices is frozen whichever one is stated. It has no cell to write over a gap-free table, and reports an `@info` there.
+  - `ret_method`: The return formula, `:simple` or `:log`.
+  - `padding`: When `true`, keep the first observation with a `NaN` return, so the returns keep the length of the price clock. When `false`, drop it.
+  - `gap_return_alg`: The rule for the returns that a price gap leaves non-finite. `nothing` is the default rule, under which no return records the move across the gap. A run of `k` gapped prices inside the series then leaves `k + 1` non-finite returns, and a run at either end leaves `k`. [`CatchUpGapReturn`](@ref) books the move on the observation where the asset trades again, so the Held Gap holds `k` non-finite returns. An algorithm writes only a return that reads a gapped price, inside the Listing Span of its column, after the first observed price. So a return computed from two observed prices keeps its value under every algorithm. When no return is writable, the function logs an `@info`.
 
 # Validation
 
-  - Every price reaching step 3 is positive. `TimeSeries.percentchange` takes a logarithm on both branches, so a negative price raises a `DomainError` from inside it, on the simple branch as well.
-  - The asset, factor and benchmark column names are pairwise disjoint, and none of them is `timestamp`. Raises a [`ConflictingArgumentError`](@ref) naming the offending columns.
-  - If `pr.F` or `pr.B` is not `nothing`, its timestamps equal the asset timestamps. Raises a [`ConflictingArgumentError`](@ref) naming [`price_ingestion`](@ref), which is what puts two series on one clock.
-  - If `pr.iv` is not `nothing`, the returns timestamps are a subset of `TimeSeries.timestamp(pr.iv)`, then `iv = values(unify_gaps(iv)[ts])`, `!isempty(iv)`, `size(iv) == size(X)`, and every value is finite and non-negative where it is present (an absent one is `NaN`; see [`assert_nonneg_where_present`](@ref)).
-  - If `pr.span` is not `nothing`, `size(pr.span) == size(values(pr.X))`. Raises a `DimensionMismatch`.
-  - `pr.ivpa` is validated in that same branch, so it is checked only when `pr.iv` is given: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`, and, if a vector, `length(ivpa) == size(iv, 2)`. The bound is strict — a zero adjustment is rejected.
+  - `ret_method` is `:simple` or `:log`. `TimeSeries.percentchange` throws an `ArgumentError` otherwise.
+  - Every price that reaches step 3 is non-negative. `TimeSeries.percentchange` takes a logarithm on both branches, so a negative price throws a `DomainError` from inside it, on the simple branch too. A zero price gives the returns that the mathematical definition states.
+  - The asset, factor and benchmark column names are pairwise disjoint, and none of them is `timestamp`. The function throws a [`ConflictingArgumentError`](@ref) that names the columns otherwise.
+  - If `pr.F` or `pr.B` is not `nothing`, its timestamps equal the asset timestamps. The function throws a [`ConflictingArgumentError`](@ref) otherwise. The message names [`price_ingestion`](@ref), which puts two series on one clock.
+  - If `pr.span` is not `nothing`, `size(pr.span) == size(values(pr.X))`. The function throws a `DimensionMismatch` otherwise.
+  - If `pr.iv` is not `nothing`, the returns timestamps are a subset of `TimeSeries.timestamp(pr.iv)`. The function throws an `ArgumentError` otherwise. Then, with `iv = values(unify_gaps(pr.iv)[ts])`, `!isempty(iv)` holds, `size(iv) == size(X)` holds, and every present value is finite and non-negative. An absent value is `NaN`, and [`assert_nonneg_where_present`](@ref) skips it.
+  - The function checks `pr.ivpa` in the same branch, so only when `pr.iv` is given. `all(x -> x > 0, ivpa)` and `all(x -> isfinite(x), ivpa)` hold, and a vector `ivpa` has `length(ivpa) == size(iv, 2)`. The bound is strict, so the function refuses a zero adjustment.
 
 # Returns
 
-  - `rr::ReturnsResult`: Struct containing asset/factor returns, names, time series, and optional implied volatility data. A converted benchmark is carried in its `B` field.
+  - `rr::ReturnsResult`: The asset, factor and benchmark returns, their names, the returns timestamps, the implied volatilities and the Asset Panel.
 
 # Examples
 
@@ -493,8 +500,9 @@ function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
     #! The span is on the price clock and the masks are on the returns clock, and
     #! `universe_masks` does the crossing. Both padding conventions reach it, and it reads
     #! which from the two row counts.
+    RX = Matrix(X[!, nx])
     amsk, emsk = returns_universe_masks(span_carrier_view(pr.span, asset_ts, asset_ts,
-                                                          acols), Matrix(X[!, nx]))
+                                                          acols), RX)
     pnl = attach_universe_masks(pnl, amsk, emsk)
     F = isempty(nf) ? nothing : Matrix(X[!, nf])
     B = if isempty(nb)
@@ -502,8 +510,7 @@ function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
     else
         length(nb) == 1 ? X[!, nb[1]] : Matrix(X[!, nb])
     end
-    return ReturnsResult(; ts = ts, nx = nx, X = Matrix(X[!, nx]),
-                         nf = isempty(nf) ? nothing : nf, F = F,
+    return ReturnsResult(; ts = ts, nx = nx, X = RX, nf = isempty(nf) ? nothing : nf, F = F,
                          nb = isempty(nb) ? nothing : nb, B = B, iv = iv, ivpa = ivpa,
                          pnl = pnl)
 end
@@ -513,26 +520,26 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Preprocessing estimator converting price-level data into returns-level data.
+Preprocessing estimator that converts price-level data into returns-level data.
 
-`PricesToReturns` is the estimator form of [`prices_to_returns`](@ref): it consumes a [`PricesResult`](@ref) and produces a [`ReturnsResult`](@ref). It is stateless — applying it to any window simply runs the conversion — so its fitted object is the estimator itself.
+`PricesToReturns` is the estimator form of [`prices_to_returns`](@ref). It reads a [`PricesResult`](@ref) and returns a [`ReturnsResult`](@ref). It has no fitted state, so its application to a window runs the conversion, and its fitted object is the estimator itself.
 
-Its three fields are the three keywords that survive the rule that a keyword belongs to the conversion if and only if it changes the arithmetic of a return. Joining and collapsing move the observation clock and are [`PriceIngestion`](@ref)'s; filling is [`PriceGapFill`](@ref)'s and deleting is [`MissingDataFilter`](@ref)'s, both fitted steps; and every datum the conversion reads is a field of the [`PricesResult`](@ref) it consumes.
+Its first three fields are the three keywords of [`prices_to_returns`](@ref), which are the keywords that change the arithmetic of a return. A join and a collapse change the observation clock, and [`PriceIngestion`](@ref) owns them. [`PriceGapFill`](@ref) fills a gap and [`MissingDataFilter`](@ref) deletes one, and both are fitted steps. Every datum that the conversion reads is a field of the [`PricesResult`](@ref).
 
-The step is stateless, and it does not need to be stateful to fix an asset universe: the carrier states one. A [`PricesResult`](@ref) that [`price_ingestion`](@ref) built carries a **Listing Span**, and this step projects it onto the returns clock and hands the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) whose two masks say which assets are in the universe and which of them can be estimated at each observation. The asset axis is fixed before the split, so every window of every fold carries every asset and a window can no longer silently lose a column.
+The step needs no state to fix an asset universe, because the carrier states one. A [`PricesResult`](@ref) that [`price_ingestion`](@ref) built carries a **Listing Span**. This step projects the span onto the returns clock, and gives the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) with two masks. At each observation, the masks state which assets are in the universe, and which of them are estimable. The asset axis is fixed before the split, so every window of every fold carries every asset, and no window loses a column.
 
 !!! warning
 
-    A carrier the ingestion layer did not build states no universe, and the conversion does not guess one from the window: a window-local span reads a delisting straddling the window end as an asset that was never listed. Its gaps are still carried and still handled — with no panel the Coverage Universe reads finiteness alone — but the fold is left to infer the universe it would otherwise have been told. Build the carrier with [`price_ingestion`](@ref), or declare a listing calendar as its `span`.
+    A carrier that the ingestion layer did not build states no universe, and the conversion does not infer one from the window. A span computed from the window alone reads a delisting that crosses the end of the window as an asset that was never listed. The conversion still carries the gaps of such a carrier. With no panel, the Coverage Universe reads finiteness alone, and the fold infers the universe that a span would state. Build the carrier with [`price_ingestion`](@ref), or give a listing calendar as its `span`.
 
 # Algorithm
 
-The estimator is stateless, so both verbs are thin.
+The estimator has no fitted state, so both verbs are short.
 
  1. [`fit_preprocessing`](@ref) returns the estimator itself. There is no state to fit.
- 2. [`apply_preprocessing`](@ref) calls [`prices_to_returns`](@ref) with the three fields as keywords, handing it the [`PricesResult`](@ref) whole. It returns the [`ReturnsResult`](@ref).
+ 2. [`apply_preprocessing`](@ref) calls [`prices_to_returns`](@ref) with the whole [`PricesResult`](@ref) and the three fields as keywords, and returns the [`ReturnsResult`](@ref).
 
-Every row and every column of the window reaches the conversion, because the conversion has no way to drop one. `gap_return_alg` is a field, because it decides what the observations a gap left non-finite carry, which is the arithmetic of a return rather than a policy about the universe.
+Every row and every column of the window reaches the conversion, because the conversion cannot drop one. `gap_return_alg` is a field because it sets the returns that a gap leaves non-finite. That is the arithmetic of a return, and not a policy about the universe.
 
 # Fields
 
@@ -549,13 +556,13 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-# Online form
-
-The conversion is stateless to a reader and row-local to a fold: a return reads two consecutive prices, so [`partial_fit_transform`](@ref) converts a block of prices exactly as the whole history would by keeping the last price row in `cache`, and under a [`CatchUpGapReturn`](@ref) the last observed price of every series column. [`fit_preprocessing`](@ref) with no data reads the estimator itself out, as the batch fit does. A caller's own Gap Return algorithm has no online form, and [`supports_partial_fit`](@ref) answers `false` for it.
-
 ## Validation
 
-  - `ret_method in (:simple, :log)`.
+  - `ret_method in (:simple, :log)`. The constructor throws an `ArgumentError` otherwise.
+
+# Online form
+
+A return reads two consecutive prices. So [`partial_fit_transform`](@ref) converts a block of prices as the whole history does, because it keeps the last price row in `cache`. Under a [`CatchUpGapReturn`](@ref), it also keeps the last observed price of every series column. [`fit_preprocessing`](@ref) with no data returns the estimator with an empty `cache`. A caller's own Gap Return algorithm has no online form, and [`supports_partial_fit`](@ref) returns `false` for it.
 
 # Examples
 
@@ -588,15 +595,15 @@ julia> rr.nx
 """
 @concrete struct PricesToReturns <: AbstractPreprocessingEstimator
     """
-    Return calculation method (`:simple` or `:log`).
+    The return formula, `:simple` or `:log`.
     """
     ret_method
     """
-    Whether to pad missing values in the returns calculation.
+    When `true`, keep the first observation with a `NaN` return, so the returns keep the length of the price clock. When `false`, drop it.
     """
     padding
     """
-    What the observations a price gap left non-finite carry. `nothing` is the arithmetic, and [`CatchUpGapReturn`](@ref) books the move across the gap on the observation that ends it. See [`AbstractGapReturnAlgorithm`](@ref).
+    The rule for the returns that a price gap leaves non-finite. `nothing` is the default rule, and [`CatchUpGapReturn`](@ref) books the move across the gap on the observation that ends it. See [`AbstractGapReturnAlgorithm`](@ref).
     """
     gap_return_alg
     """

@@ -1,0 +1,30 @@
+```@meta
+Description = "The programme of a programme Allocation Set, private API of PortfolioOptimisers.jl: calibrated, resolve_allocation_set_rows, …"
+```
+
+# The programme of a programme Allocation Set: private API
+
+```@docs
+PortfolioOptimisers.calibrated
+PortfolioOptimisers.resolve_allocation_set_rows
+PortfolioOptimisers.add_allocation_set_constraints!
+PortfolioOptimisers.assemble_allocation_set!
+PortfolioOptimisers.prefix_tracking_benchmark
+PortfolioOptimisers.set_allocation_turnover!
+PortfolioOptimisers.set_allocation_return_floor!
+PortfolioOptimisers.add_allocation_set_bounds!
+PortfolioOptimisers.anonymous_budget_rows!
+PortfolioOptimisers.free_state_index
+PortfolioOptimisers.set_allocation_set_bounds!
+PortfolioOptimisers.set_projection_objective!
+PortfolioOptimisers.set_distance_cone!
+PortfolioOptimisers.set_divergence_objective!
+PortfolioOptimisers.barrier_objective_entries
+PortfolioOptimisers.projection_solver
+PortfolioOptimisers.allocation_set_ready
+PortfolioOptimisers.projection_programme
+PortfolioOptimisers.programme_investable_reduction
+PortfolioOptimisers.projection_scale
+PortfolioOptimisers.allocation_set_cobj
+PortfolioOptimisers.blend_projection
+```

@@ -5,7 +5,7 @@
 
 Return the namespace a Feature Selector entry pairs with a Panel Field's name.
 
-A numeric Panel Field contributes one column and has no second namespace, so it answers with an empty vector: every key paired with it is absent, and `strict` decides what that means. A categorical Panel Field answers with its levels and a tensor Panel Field with its labels, and in both the position of a key is the position of the column it selects.
+A numeric Panel Field contributes one column and has no second namespace, so it answers with an empty vector. Every key paired with it is then absent, and `strict` decides what that means. A categorical Panel Field answers with its levels and a tensor Panel Field with its labels, and in both the position of a key is the position of the column it selects.
 
 # Algorithm
 
@@ -42,7 +42,7 @@ end
 
 Push every value column of one Panel Field onto a resolved Feature Selector, in column order.
 
-This is what a bare field name expands to, and what an absent selector expands to for every Panel Field of the panel. The mask is not among them: a bare name is the values alone.
+This is what a bare field name expands to, and what an absent selector expands to for every Panel Field of the panel. The mask is not among them, because a bare name selects the values alone.
 
 # Algorithm
 
@@ -88,9 +88,9 @@ end
     panel_selector_msg(f::NumericPanelField, key, keys::VecStr) -> String
     panel_selector_msg(f::AbstractPanelField, key, keys::VecStr) -> String
 
-Build the diagnostic a Feature Selector entry that resolves against nothing carries.
+Build the diagnostic for a Feature Selector entry that resolves against nothing.
 
-The messages name the two namespaces an entry resolves in. The first is the panel's Panel Field names, the second one Panel Field's levels or labels. Each hands its own suggestion pool to [`did_you_mean`](@ref), so a misspelling is answered against the names it could have meant and not against every column of the panel. A numeric Panel Field has no second namespace, so a key paired with it is answered by naming the two entry forms the field does take rather than by an empty pool.
+The messages name the two namespaces an entry resolves in. The first is the Panel Field names of the panel, and the second is the levels or the labels of one Panel Field. Each method hands its own suggestion pool to [`did_you_mean`](@ref), so the suggestion for a misspelling comes from the names the entry could have meant and not from every column of the panel. A numeric Panel Field has no second namespace. For a key paired with it, the message names the two entry forms that the field takes, and it offers no suggestion.
 
 # Algorithm
 
@@ -175,15 +175,15 @@ end
 
 Check that one Feature Selector entry takes one of the four forms the grammar admits.
 
-The four forms are a Panel Field name, a name paired with the levels or labels it keeps, a name paired with one level or label, and a name paired with `:observed`. No entry is a column position: after the Asset Panel became the one carrier every field, level and label carries a name, so an integer has nothing to index.
+The four forms are a Panel Field name, a name paired with the levels or labels it keeps, a name paired with one level or label, and a name paired with `:observed`. No entry is a column position. Every field, level and label of an Asset Panel carries a name, so an integer has nothing to index.
 
-A name is refused when it is empty, and a paired vector is refused when it is empty, holds an empty key, or repeats a key. Each of those resolves to no column or to a doubled column, which is the failure the selector exists to remove.
+The check refuses an empty name, and a paired vector that is empty, holds an empty key or repeats a key. Each of those resolves to no column or to a doubled column, and the selector exists to prevent both.
 
 # Algorithm
 
  1. A string: check that it is not empty.
  2. A pair whose first element is a non-empty string: check its second element. A `Symbol` is `:observed`, a string is non-empty, and a vector of strings is non-empty, holds no empty key and repeats none.
- 3. Anything else is refused.
+ 3. Refuse anything else.
 
 # Arguments
 
@@ -227,9 +227,9 @@ end
     assert_feature_selector(sel::Nothing) -> nothing
     assert_feature_selector(sel::AbstractVector) -> nothing
 
-Validate a Feature Selector: a non-empty vector of distinct entries, each of the four admitted forms.
+Check that a Feature Selector is a non-empty vector of distinct entries, each in one of the four admitted forms.
 
-An empty `sel` is refused rather than read as "every Panel Field": `nothing` already says that, and a selection that silently widens to the whole panel is the failure this selector exists to remove. A repeated entry is refused because it doubles that column's contribution to every distance.
+The check refuses an empty `sel` and does not read it as every Panel Field. `nothing` already says that, and a selection that widens to the whole panel without a message is the failure this selector exists to prevent. The check refuses a repeated entry because it doubles the contribution of its column to every distance.
 
 # Algorithm
 
@@ -333,7 +333,7 @@ end
 
 Resolve a Feature Selector against an [`AssetPanel`](@ref), and return the columns it names.
 
-This is the one resolution. [`feature_matrix`](@ref) and [`feature_labels`](@ref) both read it, so the matrix and its labels cannot disagree about what was selected. It is unexported: a caller reads the labels, not the positions.
+[`feature_matrix`](@ref) and [`feature_labels`](@ref) both call this one resolution, so the matrix and its labels always name the same columns. It is unexported, because a caller reads the labels and not the positions.
 
 A resolved column is the triple `(k, l, part)`. `k` is the Panel Field's position in the panel. `part` is `:vals` or `:observed`. `l` is the position of the level or the label within the Panel Field, and `0` where the Panel Field contributes one column of that part: a numeric Panel Field's value column, and every Panel Field's observed-mask column.
 
@@ -341,8 +341,8 @@ The order of `sel` is the column order, so a caller decides it. A `nothing` sele
 
 # Algorithm
 
- 1. Check that the panel holds a Panel Field. A panel with none carries no feature data at all, so it is refused here, where the cause is still known, rather than downstream where only the empty matrix is visible.
- 2. Validate `sel` with [`assert_feature_selector`](@ref).
+ 1. Check that the panel holds a Panel Field. A panel with none carries no feature data. The check refuses it here, where the cause is still known, and not later, where only the empty matrix shows.
+ 2. Check `sel` with [`assert_feature_selector`](@ref).
  3. `sel` is `nothing`: push every Panel Field's value columns in panel order, and return.
  4. Otherwise resolve each entry with [`select_fields_push!`](@ref), in the order `sel` writes them.
  5. Check that no two entries resolved to one column.
@@ -399,7 +399,7 @@ end
 
 Return the Feature Selector entry that selects exactly one resolved column.
 
-A label is a selector entry, not a rendered string. So the labels of a Feature Matrix are themselves a Feature Selector, and stacking the panel against them rebuilds the same matrix column for column.
+A label is a selector entry and not a rendered string. The labels of a Feature Matrix are therefore a Feature Selector, and a stack of the panel against them rebuilds the same matrix column for column.
 
 # Algorithm
 
@@ -441,7 +441,7 @@ end
 
 Write one Panel Field's value column into a Feature Matrix under construction.
 
-The column is cut to `rows` along its leading axis before it is written, so a stack of one observation reads one row of the Panel Field, and a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), is read once rather than once per observation. The cut is a `selectdim` along the leading axis, so `Colon()` is the whole field. A static panel's leading axis is its asset axis, so a static panel is only ever cut by `Colon()`: [`stacked_axes`](@ref) refuses every other value before a column is written.
+The method cuts the Panel Field to `rows` along its leading axis before it writes the column. A stack of one observation therefore reads one row of the Panel Field, and it reads a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), once and not once per observation. The cut is a `selectdim` along the leading axis, so `Colon()` is the whole field. The leading axis of a static panel is its asset axis, so the only cut of a static panel is `Colon()`. [`stacked_axes`](@ref) refuses every other value before this method runs.
 
 # Algorithm
 
@@ -488,9 +488,9 @@ end
 
 Write one Panel Field's observed mask into a Feature Matrix under construction, as a `0`/`1` column.
 
-A Panel Field contributes **one** mask column, whatever its kind and however many value columns it contributes. The column says whether the cell that Panel Field describes was observed for that asset, so a tensor Panel Field, whose mask carries a label axis of its own, holds where every label of that asset was observed.
+A Panel Field contributes **one** mask column, whatever its kind and however many value columns it contributes. The column shows whether the cell of that Panel Field was observed for that asset. The mask of a tensor Panel Field carries a label axis of its own, so its column holds where every label of that asset was observed.
 
-A Panel Field that carries no mask gives a column of ones: `omsk === nothing` means that the Panel Field cannot blank, so every cell was observed. A mask is cut to `rows` along its leading axis before it is written, as [`panel_field_value_column!`](@ref) cuts a value column; a column of ones is the same whatever `rows` holds.
+A Panel Field that carries no mask gives a column of ones, because `omsk === nothing` means that the Panel Field cannot blank. The method cuts a mask to `rows` along its leading axis before it writes it, as [`panel_field_value_column!`](@ref) cuts a value column. A column of ones is the same whatever `rows` holds.
 
 # Algorithm
 
@@ -542,14 +542,14 @@ end
 
 Cut the observation axis of an Asset Panel's axes to the rows a Feature Matrix stacks.
 
-A time-varying panel is stated on `(observations, assets)`, and its Feature Matrix stacks the observation rows `rows` names, so the matrix is stated on `(length(rows), assets)`. `Colon()` is every row, and answers the axes unchanged, on a static panel too. A static panel is stated on `(assets,)` alone: it has no observation axis to cut, so any other `rows` is refused rather than cutting the asset axis by mistake.
+A time-varying panel has the axes `(observations, assets)`. Its Feature Matrix stacks the observation rows that `rows` names, so the matrix has one row for each of them. `rows` names a row by its position or by a `true` in a `Bool` mask, because both are the indices that the column writers cut with. `Colon()` is every row, and gives the axes unchanged, on a static panel too. A static panel has the axes `(assets,)` alone. It has no observation axis to cut, so it refuses any other `rows`. Without that check, `rows` would cut the asset axis.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `Colon()`: answer `ax` unchanged.
- 2. A vector of row positions: check that `ax` carries an observation axis and that every position lies on it, and answer `(length(rows), ax[2])`.
+ 1. `Colon()`: give `ax` unchanged.
+ 2. A vector: check that `ax` carries an observation axis and that `rows` indexes it. Count the rows it names, which is its length for positions and its count of `true` for a mask, and give `(count, ax[2])`.
 
 # Arguments
 
@@ -559,11 +559,11 @@ The method that Julia selects is the algorithm.
 # Validation
 
   - `length(ax) == 2` when `rows` is not `Colon()`. Raises an `ArgumentError`.
-  - Every entry of `rows` lies in `1:ax[1]`. Raises an `ArgumentError`.
+  - Every position in `rows` lies in `1:ax[1]`, and a `Bool` mask has length `ax[1]`. Raises an `ArgumentError`.
 
 # Returns
 
-  - `ax::Tuple`: `(assets,)` for a static panel, and `(length(rows), assets)` for a time-varying one.
+  - `ax::Tuple`: `(assets,)` for a static panel, and `(rows named, assets)` for a time-varying one.
 
 # Related
 
@@ -578,25 +578,57 @@ function stacked_axes(ax::Tuple, rows::AbstractVector{<:Integer})::Tuple
     @argcheck(length(ax) == 2,
               ArgumentError("rows cuts the observation axis, and a static Asset Panel has none. Pass rows = Colon() on a static panel."))
     @argcheck(checkbounds(Bool, 1:ax[1], rows),
-              ArgumentError("every entry of rows must lie on the observation axis 1:$(ax[1]). Got\nrows => $(rows)."))
-    return (length(rows), ax[2])
+              ArgumentError("rows must index the observation axis 1:$(ax[1]): every position lies on it, and a Bool mask has one entry per observation. Got\nrows => $(rows)."))
+    return (length(only(to_indices(1:ax[1], (rows,)))), ax[2])
 end
 """
     feature_matrix(pnl::AssetPanel, sel = nothing; strict::Bool = false, rows = Colon()) -> Array
 
 Stack the Panel Fields a Feature Selector names into the Feature Matrix a distance measures.
 
-Nothing stores the result. The Asset Panel is the data, and the Feature Matrix is one view of it, so it is built where it is measured and thrown away after.
+No object keeps the result. The Asset Panel is the data and the Feature Matrix is one view of it, so the caller that measures a distance builds the matrix and drops it after.
 
 A static panel gives an `assets × features` matrix, and a time-varying one an `observations × assets × features` array. A numeric Panel Field gives one column, a categorical Panel Field one `0`/`1` column per level, a tensor Panel Field one column per label, and an observed mask one `0`/`1` column. The order of `sel` is the column order.
 
-A time-varying panel stacks every observation unless `rows` names the rows to stack, and then it stacks those alone, `length(rows) × assets × features`. That is how a consumer that reads one row stacks one row: a [`FeatureDistance`](@ref) under [`LastObservation`](@ref) passes the last row through [`collapse_rows`](@ref), so a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), is read once rather than copied once per observation. The stack keeps its observation axis whatever `rows` holds, so a one-row stack is a window of one observation, on which every collapse algorithm agrees. A static panel has no observation axis, so it takes `Colon()` alone.
+A time-varying panel stacks every observation unless `rows` names the rows to stack. Then it stacks those rows alone, one row of the stack for each row that `rows` names. A consumer that reads one row stacks one row this way. A [`FeatureDistance`](@ref) under [`LastObservation`](@ref) passes the last row through [`collapse_rows`](@ref), so it reads a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), once and does not copy it once per observation. The stack keeps its observation axis whatever `rows` holds. A one-row stack is therefore a window of one observation, and every collapse algorithm agrees on it. A static panel has no observation axis, so it takes `Colon()` alone.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+Z_{s,\\,i,\\,c} &= \\begin{cases}
+v^{(k)}_{r_{s},\\,i} & c \\text{ is the value column of a numeric Panel Field} \\\\
+\\mathbf{1}\\left[g^{(k)}_{r_{s},\\,i} = l\\right] & c \\text{ is level } l \\text{ of a categorical Panel Field} \\\\
+V^{(k)}_{r_{s},\\,i,\\,l} & c \\text{ is label } l \\text{ of a tensor Panel Field} \\\\
+m^{(k)}_{r_{s},\\,i} & c \\text{ is the observed mask of a numeric or a categorical Panel Field} \\\\
+\\prod_{j} m^{(k)}_{r_{s},\\,i,\\,j} & c \\text{ is the observed mask of a tensor Panel Field}
+\\end{cases}\\,, \\\\
+& s = 1, \\ldots, R\\,, \\quad i = 1, \\ldots, N\\,, \\quad c = 1, \\ldots, C\\,.
+\\end{align}
+```
+
+A static panel has no observation index, so ``s`` and ``r_{s}`` drop out and ``\\mathbf{Z}`` is ``N \\times C``. A Panel Field that cannot blank has ``m^{(k)} = 1`` in every cell. Each code lies on the levels of its Panel Field, so the level columns of one categorical Panel Field sum to one in every row.
+
+Where:
+
+  - ``Z_{s,\\,i,\\,c}``: Entry of the Feature Matrix ``\\mathbf{Z}`` at stacked row ``s``, asset ``i`` and column ``c``.
+  - ``r_{s}``: The observation that stacked row ``s`` reads.
+  - ``R``: Number of observations the stack reads.
+  - ``k``: The Panel Field that column ``c`` reads.
+  - ``l``: Position of the level or the label that column ``c`` reads.
+  - ``v^{(k)}_{t,\\,i}``: Value of a numeric Panel Field at observation ``t`` and asset ``i``.
+  - ``g^{(k)}_{t,\\,i}``: Level position of a categorical Panel Field at observation ``t`` and asset ``i``.
+  - ``V^{(k)}_{t,\\,i,\\,l}``: Value of a tensor Panel Field at observation ``t``, asset ``i`` and label ``l``.
+  - ``m^{(k)}_{t,\\,i}``, ``m^{(k)}_{t,\\,i,\\,j}``: Observed mask of a Panel Field, ``1`` where the cell was observed. A tensor Panel Field's mask carries the label index ``j``.
+  - ``\\mathbf{1}[\\cdot]``: Indicator function, ``1`` when its condition holds and ``0`` otherwise.
+  - ``C``: Number of columns the Feature Selector resolves to.
+  - $(math_dict[:N])
 
 # Algorithm
 
  1. Resolve `sel` against the panel with [`select_fields`](@ref).
- 2. Derive the element type, as the promotion over the Panel Fields whose **value** columns were resolved. An observed-mask column is a `0`/`1` column that every type carries, so it contributes nothing, and neither does an indicator. A selection of mask and indicator columns alone stacks in the panel's own type, the promotion over every Panel Field's values, so a `Float32` panel's one-hot block is `Float32`; a panel with no numeric or tensor Panel Field at all stacks in `Float64`. See [`panel_value_eltype`](@ref).
- 3. Allocate the matrix as zeros, over the observation rows `rows` names, the panel's asset axis and the resolved column count. See [`stacked_axes`](@ref).
+ 2. Derive the element type as the promotion over the Panel Fields whose **value** columns `sel` resolves to. An observed-mask column is a `0`/`1` column that every type holds, so it contributes nothing, and an indicator contributes nothing either. A selection of mask and indicator columns alone stacks in the panel's own type, the promotion over the values of every Panel Field. So the one-hot block of a `Float32` panel is `Float32`. A panel with no numeric or tensor Panel Field stacks in `Float64`. See [`panel_value_eltype`](@ref).
+ 3. Allocate the matrix as zeros, over the observation rows that `rows` names, the asset axis of the panel and the resolved column count. See [`stacked_axes`](@ref).
  4. Write each column, cut to `rows`, with [`panel_field_value_column!`](@ref) or [`panel_field_observed_column!`](@ref).
 
 # Arguments
@@ -649,9 +681,9 @@ end
 
 Name the columns [`feature_matrix`](@ref) stacks, one Feature Selector entry per column.
 
-A label is the entry that selects exactly its column, so the returned vector is itself a Feature Selector and stacking the panel against it rebuilds the same matrix. That is what lets a caller ask what a distance measured without the matrix being stored anywhere.
+A label is the entry that selects its own column and no other. The returned vector is therefore a Feature Selector, and a stack of the panel against it rebuilds the same matrix. So a caller can ask what a distance measured, and no object has to keep the matrix.
 
-The kernel never calls this: it reads the matrix alone, so no label is allocated on a path that does not read one.
+The distance kernel never calls this function. It reads the matrix alone, so a path that reads no label allocates none.
 
 # Algorithm
 

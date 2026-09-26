@@ -316,6 +316,168 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
               0.05)
 end
 
+@testset "Cardinality rows: names, sub-group shapes, thresholds and the investable mask" begin
+    hslv = Solver(; name = :highs, solver = HiGHS.Optimizer,
+                  settings = "log_to_console" => false,
+                  check_sol = (; allow_local = true, allow_almost = true))
+    nxc = ["a", "b", "c", "d", "e", "f"]
+    Xc = 0.01 .* randn(StableRNG(42), 80, 6) .+ 0.001
+    rdc = ReturnsResult(; nx = nxc, X = Xc)
+    setsc = UniverseSets(;
+                         dict = Dict("nx" => nxc,
+                                     "nx_grp" => ["g1", "g1", "g2", "g2", "g3", "g3"],
+                                     "ux_grp" => ["g1", "g2", "g3"]))
+    S3 = [1.0 1 0 0 0 0; 0 0 1 1 0 0; 0 0 0 0 1 1]
+    S2 = [1.0 0 1 0 1 0; 0 1 0 1 0 1]
+    function solve_c(rdx = rdc; kwargs...)
+        opt = JuMPOptimiser(; slv = hslv, sets = setsc, kwargs...)
+        return optimise(MeanRisk(; r = ConditionalValueatRisk(), opt = opt), rdx)
+    end
+    function card_rows(res)
+        ks = collect(keys(JuMP.object_dictionary(res.model)))
+        return sort!(filter(k -> occursin("card", String(k)), ks))
+    end
+    held(v) = count(abs.(v) .> 1e-8)
+    lc_ineq(A, B) = LinearConstraint(; ineq = PartialLinearConstraint(; A = A, B = B))
+    lc_eq(A, B) = LinearConstraint(; eq = PartialLinearConstraint(; A = A, B = B))
+
+    # The asset space names its rows without a prefix, and the counts hold.
+    gce = LinearConstraintEstimator(; val = [:(a + b + c <= 1), :(d + e == 1)])
+    res = solve_c(; card = 3, gcarde = gce)
+    @test card_rows(res) == [:card, :gcard_eq, :gcard_ineq]
+    @test held(res.w) <= 3 && held(res.w[1:3]) <= 1 && held(res.w[4:5]) == 1
+
+    # A sub-grouped constraint is written over the sub-groups: one column for each row of
+    # `sgmtx`, and any number of rows. With no limit the portfolio holds all three.
+    one_of_three = lc_ineq([1.0 1.0 1.0], [1.0])
+    @test held(S3 * solve_c().w) == 3
+    res = solve_c(; sgcarde = one_of_three, sgmtx = S3)
+    @test card_rows(res) == [:sggcard_ineq_1_]
+    @test held(S3 * res.w) == 1
+    @test_throws DimensionMismatch JuMPOptimiser(; slv = hslv,
+                                                 sgcarde = lc_ineq(ones(2, 6), [1.0, 1.0]),
+                                                 sgmtx = S2)
+    @test_throws DimensionMismatch JuMPOptimiser(; slv = hslv,
+                                                 sgcarde = lc_eq([1.0 1.0], [1.0]),
+                                                 sgmtx = S3)
+    @test_throws DimensionMismatch JuMPOptimiser(; slv = hslv,
+                                                 sgcarde = [one_of_three, one_of_three],
+                                                 sgmtx = [S3, S2])
+
+    # One matrix and one threshold shared by both kinds of row take one builder, and its
+    # vector method gives each matrix its own entries.
+    mv = [S3, S2]
+    res = solve_c(; scard = [2, 1], smtx = mv, sgmtx = mv,
+                  sgcarde = [one_of_three, lc_eq([1.0 1.0], [1.0])])
+    @test card_rows(res) == [:scard_1_, :scard_2_, :sgcard_eq_2_, :sgcard_ineq_1_]
+    @test held(S3 * res.w) == 1 && held(S2 * res.w) == 1
+
+    # A sub-grouped threshold that is not the object of the sub-group threshold gets its own
+    # builder, so the model reads it on a shared matrix as it does on a copy.
+    two_of_three = lc_ineq([1.0 1.0 1.0], [2.0])
+    for sgm in (S3, copy(S3))
+        res = solve_c(; sgcarde = two_of_three, smtx = S3, sgmtx = sgm,
+                      slt = Threshold(0.05), sglt = Threshold(0.6))
+        @test card_rows(res) == [:sggcard_ineq_1_]
+        @test held(S3 * res.w) == 1
+    end
+
+    # A vector of thresholds with no cardinality reaches the vector methods.
+    over(x, t) = all(v -> abs(v) < 1e-8 || abs(v) >= t - 1e-8, x)
+    res = solve_c(; slt = [Threshold(0.3), Threshold(0.3)], smtx = mv)
+    @test over(S3 * res.w, 0.3) && over(S2 * res.w, 0.3)
+    res = solve_c(; sglt = [Threshold(0.3), Threshold(0.3)], sgmtx = mv)
+    @test over(S3 * res.w, 0.3) && over(S2 * res.w, 0.3)
+
+    # An asset that leaves the investable universe removes a column of `sgmtx` and no
+    # sub-group, so a sub-grouped constraint, estimated or precomputed, still solves.
+    Xn = copy(Xc)
+    Xn[5, 6] = NaN
+    rdn = ReturnsResult(; nx = nxc, X = Xn)
+    lce1 = LinearConstraintEstimator(; key = "ux_grp", val = [:(ux_grp <= 1)])
+    for (sgc, sgm) in
+        ((lce1, AssetSetsMatrixEstimator(; val = "nx_grp")), (one_of_three, S3))
+        res = solve_c(rdn; sgcarde = sgc, sgmtx = sgm)
+        @test iszero(res.w[6]) && held(S3 * res.w) == 1
+    end
+
+    # Each sub-group method with nothing to add returns before it reads the model.
+    m = JuMP.Model()
+    wbc = WeightBounds(; lb = 0.0, ub = 1.0)
+    for f in (PortfolioOptimisers.set_scardmip_constraints!,
+              PortfolioOptimisers.set_sgcardmip_constraints!)
+        @test isnothing(f(m, wbc, nothing, nothing, nothing, nothing, nothing))
+        @test isnothing(f(m, wbc, nothing, mv, nothing, nothing, nothing))
+    end
+    @test isnothing(PortfolioOptimisers.set_all_smip_constraints!(m, wbc, nothing, nothing,
+                                                                  nothing, nothing, nothing,
+                                                                  nothing))
+    @test isnothing(PortfolioOptimisers.set_all_smip_constraints!(m, wbc, nothing, nothing,
+                                                                  mv, nothing, nothing,
+                                                                  nothing))
+    @test isempty(JuMP.object_dictionary(m))
+
+    # The two validators, branch by branch.
+    af = PortfolioOptimisers.assert_subgroup_mip_fields
+    agf = PortfolioOptimisers.assert_subgrouped_mip_fields
+    thr = Threshold(0.1)
+    td = TimeDependent([1, 2])
+    @test isnothing(af(td, nothing, nothing, nothing))
+    @test isnothing(af(1, S3, thr, nothing))
+    @test_throws DomainError af(0, S3, nothing, nothing)
+    @test_throws ArgumentError af(1, [S3], nothing, nothing)
+    @test_throws ArgumentError af(1, S3, [thr], nothing)
+    @test_throws ArgumentError af(1, S3, nothing, [thr])
+    @test isnothing(af([1, 2], mv, [thr, nothing], [nothing, thr]))
+    @test_throws ArgumentError af([1], S3, nothing, nothing)
+    @test_throws DimensionMismatch af([1, 2], [S3], nothing, nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError af([1], [S3], Threshold[], nothing)
+    @test_throws DimensionMismatch af([1], [S3], [thr, thr], nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError af([1], [S3], nothing, Threshold[])
+    @test_throws DimensionMismatch af([1], [S3], nothing, [thr, thr])
+    @test isnothing(af(nothing, S3, thr, nothing))
+    @test_throws ArgumentError af(nothing, [S3], nothing, thr)
+    @test isnothing(af(nothing, mv, [thr, thr], [thr, nothing]))
+    @test_throws ArgumentError af(nothing, S3, [thr], nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError af(nothing, Matrix{Float64}[], [thr],
+                                                     nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError af(nothing, [S3], Threshold[], nothing)
+    @test_throws DimensionMismatch af(nothing, [S3], [thr, thr], nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError af(nothing, [S3], nothing, Threshold[])
+    @test_throws DimensionMismatch af(nothing, [S3], nothing, [thr, thr])
+
+    @test isnothing(agf(td, nothing, nothing, nothing))
+    @test isnothing(agf(one_of_three, S3, thr, nothing))
+    @test_throws DimensionMismatch agf(one_of_three, S2, nothing, nothing)
+    @test_throws ArgumentError agf(one_of_three, [S3], nothing, nothing)
+    @test_throws ArgumentError agf(one_of_three, S3, [thr], nothing)
+    @test_throws ArgumentError agf(one_of_three, S3, nothing, [thr])
+    @test isnothing(agf([one_of_three], [S3], [thr], [thr]))
+    @test_throws PortfolioOptimisers.IsEmptyError agf(LinearConstraint[], [S3], nothing,
+                                                      nothing)
+    @test_throws ArgumentError agf([one_of_three], S3, nothing, nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError agf([one_of_three], Matrix{Float64}[],
+                                                      nothing, nothing)
+    @test_throws DimensionMismatch agf([one_of_three], mv, nothing, nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError agf([one_of_three], [S3], Threshold[],
+                                                      nothing)
+    @test_throws DimensionMismatch agf([one_of_three], [S3], [thr, thr], nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError agf([one_of_three], [S3], nothing,
+                                                      Threshold[])
+    @test_throws DimensionMismatch agf([one_of_three], [S3], nothing, [thr, thr])
+    @test_throws DimensionMismatch agf([one_of_three], [S2], nothing, nothing)
+    @test isnothing(agf(nothing, S3, thr, nothing))
+    @test_throws ArgumentError agf(nothing, [S3], nothing, thr)
+    @test isnothing(agf(nothing, mv, [thr, thr], [thr, nothing]))
+    @test_throws ArgumentError agf(nothing, S3, [thr], nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError agf(nothing, Matrix{Float64}[], [thr],
+                                                      nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError agf(nothing, [S3], Threshold[], nothing)
+    @test_throws DimensionMismatch agf(nothing, [S3], [thr, thr], nothing)
+    @test_throws PortfolioOptimisers.IsEmptyError agf(nothing, [S3], nothing, Threshold[])
+    @test_throws DimensionMismatch agf(nothing, [S3], nothing, [thr, thr])
+end
+
 @testset "Phylogeny" begin
     plc = IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = 1)
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
@@ -325,23 +487,26 @@ end
     @test all(JuMP.value.(res.plr.A * res.model[:ib]) .<= res.plr.B)
     idx = [BitVector(res.plr.A[:, i]) for i in axes(res.plr.A, 2)]
     @test all([(count(abs.(getindex(res.w, i)) .> 1e-10) <= 1) for i in idx])
-    @test (isapprox(res.w,
-                    [-5.83349251195602e-14, -0.7549102373927532, -0.24489685036355585,
-                     2.5425310153855233e-16, 1.177641184405827e-13, -1.1761565067160182e-14,
-                     -3.8671847486726096e-14, 1.2944646679137976e-14,
-                     -1.9475087209248426e-14, 0.26951016407394074, 8.367112463199218e-14,
-                     0.7303004971078252, -6.194837681595708e-14, 2.309812136692163e-14,
-                     -2.5460214715889667e-14, -8.58412864279287e-15, 1.1757019029014802e-13,
-                     2.1546906367143115e-14, 5.7299916350654655e-15, 0.9999964265744166];
-                    rtol = 1e-6) || isapprox(res.w,
-                                             [-4.400162786139801e-14, -0.7068647775696704, -0.20178701626483694,
-                                              -1.0233912058364145e-15, 8.336251924927799e-14,
-                                              -1.0638713372805883e-14, -0.09129358185248605, 4.326412562038434e-15,
-                                              -1.626576456755123e-14, 0.2751905375771391, 5.428666085696465e-14,
-                                              0.7247587488302388, -4.6429454132911124e-14, 1.1792066087999556e-14,
-                                              -2.2237835848208057e-14, -1.100539171494297e-14, 8.51166817026479e-14,
-                                              1.0879558335436499e-14, 8.09956925306327e-16, 0.9999960892795525];
-                                             rtol = 1e-6))
+    #=
+    Pajarito's outer approximation does not reach the same integer vertex on every host, so
+    the weights are not a comparable number. Each of the eight solvers in `mip_slv`, run on
+    its own, succeeds, and they stop at four vertices:
+
+      mip1, mip5        assets 2, 3, 7, 12, 18, 20       Sharpe -1.09% vs the reference
+      mip2, mip3, mip4  assets 2, 3, 10, 12, 20          Sharpe -1.02%
+      mip6, mip7        assets 2, 3, 7, 10, 12, 20       Sharpe +0.002% (the reference)
+      mip8              19 assets, tol_feas = 1e-4       Sharpe +2.97%
+
+    The model accepts each of the first three supports: with the binaries fixed and the
+    rest solved by Clarabel, the objective is 2.7435e-4, 2.7301e-4 and 2.7227e-4. The
+    reference is the best of them, and the others are where the solver stopped.
+
+    So compare the ratio `MaximumRatio` maximises. `rtol = 0.02` is about twice the widest
+    spread of the solvers that satisfy the constraint, and it refuses the mip8 answer, whose
+    small weights break the phylogeny constraint the check above also reads. See #1276.
+    =#
+    sharpe = (dot(pr.mu, res.w) - rf) / sqrt(dot(res.w, pr.sigma, res.w))
+    @test isapprox(sharpe, 0.1822224153260592; rtol = 0.02)
 
     plc = IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = fill(2, size(pr.X, 2)))
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
@@ -463,6 +628,57 @@ end
                     1.7964324466334559e-9, 9.69410371286415e-8], rtol = 1e-6)
 end
 
+@testset "Integer phylogeny rows: positions, vector bounds and widths" begin
+    hslv = Solver(; name = :highs, solver = HiGHS.Optimizer,
+                  settings = "log_to_console" => false,
+                  check_sol = (; allow_local = true, allow_almost = true))
+    Xp = 0.01 .* randn(StableRNG(42), 80, 6) .+ 0.001
+    rdp = ReturnsResult(; nx = string.('a':'f'), X = Xp)
+    function solve_p(slv = hslv; kwargs...)
+        opt = JuMPOptimiser(; slv = slv, wb = WeightBounds(; lb = 0, ub = 0.4), kwargs...)
+        res = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumReturn(),
+                                opt = opt), rdp)
+        @test isa(res.retcode, OptimisationSuccess)
+        return res
+    end
+    held_bits(res) = round.(Int, JuMP.value.(res.model[:ib]))
+
+    # Without the rows, assets 1 and 6 are both held.
+    w = solve_p().w
+    @test w[1] > 1e-3 && w[6] > 1e-3
+    # The first entry links assets 1 and 6, and 2 and 4, under a vector bound. The second
+    # links 1 and 3. Each entry writes its rows under its own position.
+    A1 = zeros(Int, 6, 6)
+    A1[1, 6] = A1[6, 1] = 1
+    A1[2, 4] = A1[4, 2] = 1
+    A2 = zeros(Int, 6, 6)
+    A2[1, 3] = A2[3, 1] = 1
+    pl1 = IntegerPhylogeny(; A = A1, B = [1, 1, 1, 1])
+    pl2 = IntegerPhylogeny(; A = A2, B = 1)
+    res = solve_p(; ple = [pl1, pl2])
+    ib = held_bits(res)
+    @test all(pl1.A * ib .<= pl1.B) && all(pl2.A * ib .<= pl2.B)
+    @test min(abs(res.w[1]), abs(res.w[6])) < 1e-8
+    @test all(abs.(res.w[ib .== 0]) .< 1e-8)
+    @test haskey(res.model, :card_plg_1) && haskey(res.model, :card_plg_2)
+
+    # An entry of another kind adds no row here, and the integer entry keeps its position.
+    # The semidefinite entry needs a conic MIP solver.
+    res = optimise(MeanRisk(;
+                            opt = JuMPOptimiser(; slv = mip_slv,
+                                                wb = WeightBounds(; lb = 0, ub = 0.4),
+                                                ple = [SemiDefinitePhylogeny(; A = A1,
+                                                                             p = 0.05),
+                                                       pl1])), rdp)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test haskey(res.model, :sdp_plg_1) && haskey(res.model, :card_plg_2)
+    @test !haskey(res.model, :card_plg_1)
+    @test all(pl1.A * held_bits(res) .<= pl1.B)
+
+    # An entry with one column too few is refused before the solve.
+    @test_throws DimensionMismatch solve_p(; ple = IntegerPhylogeny(; A = zeros(Int, 5, 5)))
+end
+
 @testset "Tracking" begin
     rdb = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
                                                         "./assets/SP500_idx.csv.gz"));
@@ -515,7 +731,7 @@ end
     and an `L2Norm` bound of `3e-3` are the SAME bound. `tracking_error_soc_factor` writes
     one cone bound for both, and the two models must therefore return the same weights.
     Read the deviation from the weights, not from a model key: `TrackingError` registers
-    `:t_te_`, `:te_`, `:cte_soc_` and `:cte_`, and never `:sq_tracking_risk_`, which
+    `:t_tr_`, `:tr_`, `:ctr_soc_` and `:ctr_`, and never `:sq_tracking_risk_`, which
     belongs to `TrackingRiskMeasure`.
     =#
     optsq = JuMPOptimiser(; pe = pr, slv = slv,
@@ -538,12 +754,12 @@ end
     @test dl2 <= 3e-3 * (1 + 1e-6)
     @test dsq / 9e-6 > 0.999
     @test dl2 / 3e-3 > 0.999
-    # the model registers the tracking rows under `te`, not under `tracking_risk`
+    # the model registers the tracking rows under `tr`, not under `tracking_risk`
     ks = keys(JuMP.object_dictionary(ressq.model))
-    @test :t_te_1 in ks
-    @test :te_1 in ks
-    @test :cte_soc_1 in ks
-    @test :cte_1 in ks
+    @test :t_tr_1 in ks
+    @test :tr_1 in ks
+    @test :ctr_soc_1 in ks
+    @test :ctr_1 in ks
     @test !(:sq_tracking_risk_1 in ks)
     @test !(:tracking_risk_1 in ks)
     # `ddof` moves the cone bound, so it moves the realised deviation
@@ -562,14 +778,15 @@ end
                                            alg = LpNorm()))
     mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
     res = optimise(mre)
-    @test LinearAlgebra.norm(rd.X * res.w - wr, 3) / cbrt(size(rd.X, 1)) <= 4.5e-3
+    @test LinearAlgebra.norm(rd.X * res.w - wr, 3) / cbrt(size(rd.X, 1) - 1) <= 4.5e-3
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
-                        tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 8e-5,
+                        tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 2e-2,
                                            alg = LInfNorm()))
     mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
     res = optimise(mre)
-    @test LinearAlgebra.norm(rd.X * res.w - wr, Inf) / size(rd.X, 1) <= 8e-5
+    @test isa(res.retcode, PortfolioOptimisers.OptimisationSuccess)
+    @test LinearAlgebra.norm(rd.X * res.w - wr, Inf) <= 2e-2 * (1 + 1e-6)
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         tr = [TrackingError(; tr = WeightsTracking(; w = w0), err = 2e-3,
@@ -855,6 +1072,10 @@ end
     @test PortfolioOptimisers.universe_axis(fsets, "nx") == "asset"
     @test PortfolioOptimisers.universe_axis(fsets, "nf") == "factor"
     @test PortfolioOptimisers.universe_axis(fsets, "nf_style") == "factor"
+    # The cross-sectional factor axis is a factor axis too, and `"ncf"` does not start with
+    # `"nf"`, so the key's own prefix is what names it. Issue #1273.
+    @test PortfolioOptimisers.universe_axis(fsets, "ncf") == "factor"
+    @test PortfolioOptimisers.universe_axis(fsets, "ncf_style") == "factor"
 
     # `factor_universe` raises at the point of need, naming the axis it reads and the matrix
     # it reconciles it against. It takes the key positionally, because `UniverseSets`

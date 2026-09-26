@@ -12,6 +12,7 @@ reset_time_dependent_estimator(opt::NestedClustered)
 assert_rc_pl(::Any)
 stated_constraint_space_basis
 assert_external_lcse
+assert_estimated_prior
 assert_external_optimiser(opt::ClusteringOptimisationEstimator)
 assert_rc_variance
 _update_asset_sets

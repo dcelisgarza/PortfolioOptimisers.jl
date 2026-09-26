@@ -66,61 +66,31 @@ function WalkForwardResult(; train_idx::VecVecInt, test_idx::VecVecInt)::WalkFor
     return WalkForwardResult(train_idx, test_idx)
 end
 """
-    const WFCVER = Union{<:WalkForwardEstimator, <:WalkForwardResult}
+    const WalkForward_Onl = Union{<:WalkForwardEstimator, <:Online{<:WalkForwardEstimator}}
 
-Alias for a walk-forward cross-validation estimator or result.
+Alias for a walk-forward scheme, plain or an Online Scheme.
 
-Matches either a [`WalkForwardEstimator`](@ref) or a [`WalkForwardResult`](@ref).
+An Online Scheme is an [`Online`](@ref) around a walk-forward, built by the scheme's function constructor — [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref), [`OnlineHindsightSplit`](@ref). It is not a [`WalkForwardEstimator`](@ref) by supertype, because a struct has one, so every bound that admits a walk-forward is written on this alias and the wrapped form reaches the same doors as the plain one. `split`, `n_splits` and [`fold_evaluation`](@ref) forward to the wrapped scheme; [`folds_are_stepped`](@ref) is where the two differ.
 
 # Related
 
   - [`WalkForwardEstimator`](@ref)
+  - [`Online`](@ref)
+  - [`CVE_Onl`](@ref)
+  - [`WFCVER`](@ref)
+"""
+const WalkForward_Onl = Union{<:WalkForwardEstimator, <:Online{<:WalkForwardEstimator}}
+"""
+    const WFCVER = Union{<:WalkForward_Onl, <:WalkForwardResult}
+
+Alias for a walk-forward cross-validation scheme, plain or online, or its result.
+
+# Related
+
+  - [`WalkForward_Onl`](@ref)
   - [`WalkForwardResult`](@ref)
 """
-const WFCVER = Union{<:WalkForwardEstimator, <:WalkForwardResult}
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype of the Fold Fit selectors: how the fold loop fits each fold of a walk-forward.
-
-A walk-forward carries one in its `ff` field, read by [`fold_fit`](@ref), beside its other execution switches. `nothing` refits every fold from its training window, which is the released behaviour; a member selects another fit. The family is a selector-tag family like [`AbstractWeightDrift`](@ref): a member carries no data, and a caller's own subtype extends the loop through a method of its own.
-
-# Related
-
-  - [`OnlineStep`](@ref)
-  - [`fold_fit`](@ref)
-  - [`IndexWalkForward`](@ref)
-  - [`DateWalkForward`](@ref)
-  - [`fold_loop`](@ref)
-  - [`AbstractAlgorithm`](@ref)
-"""
-abstract type AbstractFoldFit <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Fit each fold of a walk-forward by the online step: warm up once, then fold the new observations in and read the estimator out.
-
-Under this Fold Fit the loop takes its online arm, [`online_folds`](@ref). It resolves every [`Online`](@ref) wrapper through [`update_online_estimator`](@ref), folds the first training window into the estimator with [`partial_fit!`](@ref), and then, per fold, folds only the rows the training window has gained since the last fold and reads the estimator out through `optimise(opt)`. The estimator is threaded from fold to fold, so fold `i` never re-reads the rows fold `i - 1` read, and the run reaches the weights of the batch expanding-window walk-forward fold for fold. An online run is expanding by construction — a fold cannot un-fold an observation — so the scheme derives `expand_train = true` from this selector, and a rolling window computed online is the estimator's to declare, through `Online(pe; max_history = train_size - purged_size)`.
-
-The loop starts cold: an estimator carrying a partial-fit state at entry is refused by name, and a [`TimeDependent`](@ref) schedule on a field that carries a state — the prior, or the optimiser itself — is refused at warm-up, because a schedule replaces the value a state is threaded through. A schedule on any other field composes with no rule.
-
-# Examples
-
-```jldoctest
-julia> OnlineStep()
-OnlineStep()
-```
-
-# Related
-
-  - [`AbstractFoldFit`](@ref)
-  - [`fold_fit`](@ref)
-  - [`online_folds`](@ref)
-  - [`IndexWalkForward`](@ref)
-  - [`DateWalkForward`](@ref)
-  - [`Online`](@ref)
-"""
-struct OnlineStep <: AbstractFoldFit end
+const WFCVER = Union{<:WalkForward_Onl, <:WalkForwardResult}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -138,21 +108,20 @@ $(DocStringExtensions.FIELDS)
         train_size::Integer,
         test_size::Integer;
         purged_size::Integer = 0,
-        expand_train::Option{Bool} = nothing,
+        expand_train::Bool = false,
         reduce_test::Bool = false,
         wd::Option{<:AbstractWeightDrift} = nothing,
         pws::Option{<:AbstractPreviousWeightsSource} = nothing,
         fa::Option{<:AbstractFeeAmortisation} = nothing,
         store_weight_path::Bool = false,
         strict::Bool = false,
-        ff::Option{<:AbstractFoldFit} = nothing,
     ) -> IndexWalkForward
 
 Positional and keyword arguments correspond to the struct's fields.
 
-## Fold Fit
+## Online form
 
-`ff` is the Fold Fit of the scheme, the switch that says how the fold loop fits each fold. `nothing` refits every fold from its training window, which is the library's original behaviour. An [`OnlineStep`](@ref) makes the loop warm up once on the first training window and then fold each fold's new observations into one estimator threaded from fold to fold, reading it out where a refit would have run; the run reaches the weights of the expanding batch scheme fold for fold. `expand_train` derives from it: `nothing`, the default, resolves to `true` under an `OnlineStep` and to `false` otherwise, because an online run is expanding by construction. An explicit `expand_train = false` beside an `OnlineStep` is refused; a rolling window computed online is the estimator's to declare, through `Online(pe; max_history = train_size - purged_size)`.
+The scheme refits every fold from its training window. Its online form, under which the fold loop warms one estimator up on the first training window and then folds each fold's new observations into it, is the Online Scheme [`OnlineIndexWalkForward`](@ref) builds: the same keywords minus `expand_train`, which it sets `true`, because a fold cannot un-fold an observation.
 
 ## Weight drift and previous weights
 
@@ -171,7 +140,6 @@ The two switches are independent, and each one is `nothing` by default, which is
   - `train_size` and `purged_size` must be non-empty, non-negative, and finite.
   - `test_size` must be non-empty, greater than zero, and finite.
   - `purged_size < train_size`, because the purge is taken out of the training window.
-  - `expand_train` is `true` when `ff` is set, because a Fold Fit cannot un-fold an observation.
 
 The rule `train_size < T`, where `T` is the number of observations, belongs to the data rather
 than to the estimator, so [`Base.split`](@ref) checks it.
@@ -190,8 +158,7 @@ IndexWalkForward
                 pws ┼ nothing
                  fa ┼ nothing
   store_weight_path ┼ Bool: false
-             strict ┼ Bool: false
-                 ff ┴ nothing
+             strict ┴ Bool: false
 ```
 
 # Related
@@ -200,8 +167,7 @@ IndexWalkForward
   - [`search_cross_validation`](@ref)
   - [`WalkForwardEstimator`](@ref)
   - [`WalkForwardResult`](@ref)
-  - [`OnlineStep`](@ref)
-  - [`fold_fit`](@ref)
+  - [`OnlineIndexWalkForward`](@ref)
   - [`n_splits`](@ref)
 
 # References
@@ -250,49 +216,98 @@ IndexWalkForward
     $(field_dict[:cv_strict])
     """
     strict
-    """
-    $(field_dict[:ff])
-    """
-    ff
     function IndexWalkForward(train_size::Integer, test_size::Integer, purged_size::Integer,
                               expand_train::Bool, reduce_test::Bool,
                               wd::Option{<:AbstractWeightDrift},
                               pws::Option{<:AbstractPreviousWeightsSource},
                               fa::Option{<:AbstractFeeAmortisation},
-                              store_weight_path::Bool, strict::Bool,
-                              ff::Option{<:AbstractFoldFit})
+                              store_weight_path::Bool, strict::Bool)
         assert_nonempty_gt0_finite_val(test_size, :test_size)
         assert_nonempty_nonneg_finite_val(train_size, :train_size)
         assert_nonempty_nonneg_finite_val(purged_size, :purged_size)
         @argcheck(purged_size < train_size,
                   DomainError(purged_size,
                               "purged_size ($purged_size) must be less than train_size ($train_size), because the purge is taken out of the training window"))
-        assert_fold_fit_expands(expand_train, ff, train_size - purged_size)
         return new{typeof(train_size), typeof(test_size), typeof(purged_size),
                    typeof(expand_train), typeof(reduce_test), typeof(wd), typeof(pws),
-                   typeof(fa), typeof(store_weight_path), typeof(strict), typeof(ff)}(train_size,
-                                                                                      test_size,
-                                                                                      purged_size,
-                                                                                      expand_train,
-                                                                                      reduce_test,
-                                                                                      wd,
-                                                                                      pws,
-                                                                                      fa,
-                                                                                      store_weight_path,
-                                                                                      strict,
-                                                                                      ff)
+                   typeof(fa), typeof(store_weight_path), typeof(strict)}(train_size,
+                                                                          test_size,
+                                                                          purged_size,
+                                                                          expand_train,
+                                                                          reduce_test, wd,
+                                                                          pws, fa,
+                                                                          store_weight_path,
+                                                                          strict)
     end
 end
 function IndexWalkForward(train_size::Integer, test_size::Integer; purged_size::Integer = 0,
-                          expand_train::Option{Bool} = nothing, reduce_test::Bool = false,
+                          expand_train::Bool = false, reduce_test::Bool = false,
                           wd::Option{<:AbstractWeightDrift} = nothing,
                           pws::Option{<:AbstractPreviousWeightsSource} = nothing,
                           fa::Option{<:AbstractFeeAmortisation} = nothing,
-                          store_weight_path::Bool = false, strict::Bool = false,
-                          ff::Option{<:AbstractFoldFit} = nothing)
-    return IndexWalkForward(train_size, test_size, purged_size,
-                            resolve_expand_train(expand_train, ff), reduce_test, wd, pws,
-                            fa, store_weight_path, strict, ff)
+                          store_weight_path::Bool = false, strict::Bool = false)
+    return IndexWalkForward(train_size, test_size, purged_size, expand_train, reduce_test,
+                            wd, pws, fa, store_weight_path, strict)
+end
+"""
+    OnlineIndexWalkForward(
+        train_size::Integer,
+        test_size::Integer;
+        purged_size::Integer = 0,
+        reduce_test::Bool = false,
+        wd::Option{<:AbstractWeightDrift} = nothing,
+        pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+        fa::Option{<:AbstractFeeAmortisation} = nothing,
+        store_weight_path::Bool = false,
+        strict::Bool = false,
+    ) -> Online{<:IndexWalkForward}
+
+Build the Online Scheme of an [`IndexWalkForward`](@ref): the scheme wrapped in [`Online`](@ref), under which the fold loop fits each fold by the online step instead of a refit.
+
+The keywords are the scheme's, minus `expand_train`, which is set `true`: a fold cannot un-fold an observation, so an online run is expanding by construction, and the mismatch a rolling window would be cannot be written. A rolling window computed online is the estimator's to declare, through `Online(pe; max_history = train_size - purged_size)` on the prior. This constructor is the only way to build the wrapped scheme; `Online(cv)` by hand is refused by name.
+
+Under the Online Scheme the loop takes its online arm, [`online_folds`](@ref). It resolves every [`Online`](@ref) wrapper in the estimator through [`update_online_estimator`](@ref), folds the first training window in with [`partial_fit!`](@ref), and then, per fold, folds only the rows the training window has gained since the last fold and reads the estimator out through `optimise(opt)`. The estimator is threaded from fold to fold, so fold `i` never re-reads the rows fold `i - 1` read, and the run reaches the weights of the batch expanding-window scheme, `IndexWalkForward(train_size, test_size; purged_size, expand_train = true)`, fold for fold.
+
+The loop starts cold: an estimator carrying a partial-fit state at entry is refused by name, and a [`TimeDependent`](@ref) schedule on a field that carries a state — the prior, or the optimiser itself — is refused at warm-up, because a schedule replaces the value a state is threaded through. A schedule on any other field composes with no rule.
+
+# Examples
+
+```jldoctest
+julia> OnlineIndexWalkForward(100, 20; purged_size = 5)
+Online
+          est ┼ IndexWalkForward
+              │          train_size ┼ Int64: 100
+              │           test_size ┼ Int64: 20
+              │         purged_size ┼ Int64: 5
+              │        expand_train ┼ Bool: true
+              │         reduce_test ┼ Bool: false
+              │                  wd ┼ nothing
+              │                 pws ┼ nothing
+              │                  fa ┼ nothing
+              │   store_weight_path ┼ Bool: false
+              │              strict ┴ Bool: false
+  max_history ┴ nothing
+```
+
+# Related
+
+  - [`IndexWalkForward`](@ref)
+  - [`Online`](@ref)
+  - [`OnlineDateWalkForward`](@ref)
+  - [`OnlineHindsightSplit`](@ref)
+  - [`online_folds`](@ref)
+  - [`folds_are_stepped`](@ref)
+  - [`Resume`](@ref)
+"""
+function OnlineIndexWalkForward(train_size::Integer, test_size::Integer;
+                                purged_size::Integer = 0, reduce_test::Bool = false,
+                                wd::Option{<:AbstractWeightDrift} = nothing,
+                                pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+                                fa::Option{<:AbstractFeeAmortisation} = nothing,
+                                store_weight_path::Bool = false, strict::Bool = false)
+    cv = IndexWalkForward(train_size, test_size, purged_size, true, reduce_test, wd, pws,
+                          fa, store_weight_path, strict)
+    return Online{typeof(cv), Nothing}(cv, nothing)
 end
 """
     Base.split(iwf::IndexWalkForward, rd::Prices_RR) -> WalkForwardResult
@@ -360,6 +375,10 @@ Return the number of cross-validation splits (folds) that would be produced by `
   - `cv`: A cross-validation estimator or result (e.g. [`KFold`](@ref), [`IndexWalkForward`](@ref), [`DateWalkForward`](@ref), [`CombinatorialCrossValidation`](@ref), [`MultipleRandomised`](@ref), or their corresponding result types).
   - `rd`: Returns-level or price-level data used to determine the number of splits ([`Prices_RR`](@ref)).
 
+# Validation
+
+  - For an [`IndexWalkForward`](@ref), `train_size < T`, where `T` is the number of observations in `rd`. This is the rule [`Base.split`](@ref) checks, so the count and the split agree on data too short to test.
+
 # Returns
 
   - `Integer`: The number of folds.
@@ -375,6 +394,10 @@ Return the number of cross-validation splits (folds) that would be produced by `
 function n_splits(iwf::IndexWalkForward, rd::Prices_RR)
     (; train_size, test_size, reduce_test) = iwf
     T = cv_nobs(rd)
+    # The same rule `split` checks, so the two never disagree on short data: without it a
+    # `train_size` of `T` or more gives a count of zero or less where `split` refuses.
+    @argcheck(train_size < T,
+              DomainError(train_size, "train_size ($train_size) must be less than T ($T)"))
     N = T - train_size
     val = div(N, test_size)
     if reduce_test && N % test_size != 0
@@ -458,21 +481,20 @@ $(DocStringExtensions.FIELDS)
         purged_size::Integer = 0,
         adjuster::DateAdjType = identity,
         previous::Bool = false,
-        expand_train::Option{Bool} = nothing,
+        expand_train::Bool = false,
         reduce_test::Bool = false,
         wd::Option{<:AbstractWeightDrift} = nothing,
         pws::Option{<:AbstractPreviousWeightsSource} = nothing,
         fa::Option{<:AbstractFeeAmortisation} = nothing,
         store_weight_path::Bool = false,
         strict::Bool = false,
-        ff::Option{<:AbstractFoldFit} = nothing,
     ) -> DateWalkForward
 
 Positional and keyword arguments correspond to the struct's fields.
 
-## Fold Fit
+## Online form
 
-`ff` is the Fold Fit of the scheme, the switch that says how the fold loop fits each fold. `nothing` refits every fold from its training window, which is the library's original behaviour. An [`OnlineStep`](@ref) makes the loop warm up once on the first training window and then fold each fold's new observations into one estimator threaded from fold to fold, reading it out where a refit would have run; the run reaches the weights of the expanding batch scheme fold for fold. `expand_train` derives from it: `nothing`, the default, resolves to `true` under an `OnlineStep` and to `false` otherwise, because an online run is expanding by construction. An explicit `expand_train = false` beside an `OnlineStep` is refused; a rolling window computed online is the estimator's to declare, through `Online(pe; max_history = …)` with the cap the window's rows count to.
+The scheme refits every fold from its training window. Its online form, under which the fold loop warms one estimator up on the first training window and then folds each fold's new observations into it, is the Online Scheme [`OnlineDateWalkForward`](@ref) builds: the same keywords minus `expand_train`, which it sets `true`, because a fold cannot un-fold an observation.
 
 ## Weight drift and previous weights
 
@@ -491,7 +513,6 @@ The two switches are independent, and each one is `nothing` by default, which is
   - `test_size` must be non-empty, greater than zero, and finite.
   - `purged_size` must be non-empty, non-negative, and finite.
   - If `train_size` is an integer, it must be non-empty, non-negative, and finite.
-  - `expand_train` is `true` when `ff` is set, because a Fold Fit cannot un-fold an observation.
 
 # Examples
 
@@ -511,8 +532,7 @@ DateWalkForward
                 pws ┼ nothing
                  fa ┼ nothing
   store_weight_path ┼ Bool: false
-             strict ┼ Bool: false
-                 ff ┴ nothing
+             strict ┴ Bool: false
 ```
 
 # Related
@@ -521,8 +541,7 @@ DateWalkForward
   - [`search_cross_validation`](@ref)
   - [`WalkForwardEstimator`](@ref)
   - [`WalkForwardResult`](@ref)
-  - [`OnlineStep`](@ref)
-  - [`fold_fit`](@ref)
+  - [`OnlineDateWalkForward`](@ref)
   - [`n_splits`](@ref)
 
 # References
@@ -587,10 +606,6 @@ DateWalkForward
     $(field_dict[:cv_strict])
     """
     strict
-    """
-    $(field_dict[:ff])
-    """
-    ff
     function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer,
                              period::DatesUnionPeriod,
                              period_offset::Option{<:DatesUnionPeriod},
@@ -599,36 +614,111 @@ DateWalkForward
                              wd::Option{<:AbstractWeightDrift},
                              pws::Option{<:AbstractPreviousWeightsSource},
                              fa::Option{<:AbstractFeeAmortisation}, store_weight_path::Bool,
-                             strict::Bool, ff::Option{<:AbstractFoldFit})
+                             strict::Bool)
         assert_nonempty_gt0_finite_val(test_size, :test_size)
         if isa(train_size, Integer)
             assert_nonempty_nonneg_finite_val(train_size, :train_size)
         end
         assert_nonempty_nonneg_finite_val(purged_size, :purged_size)
-        assert_fold_fit_expands(expand_train, ff, nothing)
         return new{typeof(train_size), typeof(test_size), typeof(period),
                    typeof(period_offset), typeof(purged_size), typeof(adjuster),
                    typeof(previous), typeof(expand_train), typeof(reduce_test), typeof(wd),
-                   typeof(pws), typeof(fa), typeof(store_weight_path), typeof(strict),
-                   typeof(ff)}(train_size, test_size, period, period_offset, purged_size,
-                               adjuster, previous, expand_train, reduce_test, wd, pws, fa,
-                               store_weight_path, strict, ff)
+                   typeof(pws), typeof(fa), typeof(store_weight_path), typeof(strict)}(train_size,
+                                                                                       test_size,
+                                                                                       period,
+                                                                                       period_offset,
+                                                                                       purged_size,
+                                                                                       adjuster,
+                                                                                       previous,
+                                                                                       expand_train,
+                                                                                       reduce_test,
+                                                                                       wd,
+                                                                                       pws,
+                                                                                       fa,
+                                                                                       store_weight_path,
+                                                                                       strict)
     end
 end
 function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer;
                          period::DatesUnionPeriod = Dates.Day(1),
                          period_offset::Option{<:DatesUnionPeriod} = nothing,
                          purged_size::Integer = 0, adjuster::DateAdjType = identity,
-                         previous::Bool = false, expand_train::Option{Bool} = nothing,
+                         previous::Bool = false, expand_train::Bool = false,
                          reduce_test::Bool = false,
                          wd::Option{<:AbstractWeightDrift} = nothing,
                          pws::Option{<:AbstractPreviousWeightsSource} = nothing,
                          fa::Option{<:AbstractFeeAmortisation} = nothing,
-                         store_weight_path::Bool = false, strict::Bool = false,
-                         ff::Option{<:AbstractFoldFit} = nothing)
+                         store_weight_path::Bool = false, strict::Bool = false)
     return DateWalkForward(train_size, test_size, period, period_offset, purged_size,
-                           adjuster, previous, resolve_expand_train(expand_train, ff),
-                           reduce_test, wd, pws, fa, store_weight_path, strict, ff)
+                           adjuster, previous, expand_train, reduce_test, wd, pws, fa,
+                           store_weight_path, strict)
+end
+"""
+    OnlineDateWalkForward(
+        train_size::IntPeriodDateRange,
+        test_size::Integer;
+        period::DatesUnionPeriod = Dates.Day(1),
+        period_offset::Option{<:DatesUnionPeriod} = nothing,
+        purged_size::Integer = 0,
+        adjuster::DateAdjType = identity,
+        previous::Bool = false,
+        reduce_test::Bool = false,
+        wd::Option{<:AbstractWeightDrift} = nothing,
+        pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+        fa::Option{<:AbstractFeeAmortisation} = nothing,
+        store_weight_path::Bool = false,
+        strict::Bool = false,
+    ) -> Online{<:DateWalkForward}
+
+Build the Online Scheme of a [`DateWalkForward`](@ref): the scheme wrapped in [`Online`](@ref), under which the fold loop fits each fold by the online step instead of a refit.
+
+The keywords are the scheme's, minus `expand_train`, which is set `true`: a fold cannot un-fold an observation, so an online run is expanding by construction, and the mismatch a rolling window would be cannot be written. A rolling window computed online is the estimator's to declare, through `Online(pe; max_history = …)` on the prior, with the cap the window's rows count to. This constructor is the only way to build the wrapped scheme; `Online(cv)` by hand is refused by name. What the loop does under it is what [`OnlineIndexWalkForward`](@ref) describes, over the folds the date scheme cuts.
+
+# Examples
+
+```jldoctest
+julia> OnlineDateWalkForward(252, 21; purged_size = 5)
+Online
+          est ┼ DateWalkForward
+              │          train_size ┼ Int64: 252
+              │           test_size ┼ Int64: 21
+              │              period ┼ Dates.Day: Dates.Day(1)
+              │       period_offset ┼ nothing
+              │         purged_size ┼ Int64: 5
+              │            adjuster ┼ typeof(identity): identity
+              │            previous ┼ Bool: false
+              │        expand_train ┼ Bool: true
+              │         reduce_test ┼ Bool: false
+              │                  wd ┼ nothing
+              │                 pws ┼ nothing
+              │                  fa ┼ nothing
+              │   store_weight_path ┼ Bool: false
+              │              strict ┴ Bool: false
+  max_history ┴ nothing
+```
+
+# Related
+
+  - [`DateWalkForward`](@ref)
+  - [`Online`](@ref)
+  - [`OnlineIndexWalkForward`](@ref)
+  - [`OnlineHindsightSplit`](@ref)
+  - [`online_folds`](@ref)
+  - [`folds_are_stepped`](@ref)
+"""
+function OnlineDateWalkForward(train_size::IntPeriodDateRange, test_size::Integer;
+                               period::DatesUnionPeriod = Dates.Day(1),
+                               period_offset::Option{<:DatesUnionPeriod} = nothing,
+                               purged_size::Integer = 0, adjuster::DateAdjType = identity,
+                               previous::Bool = false, reduce_test::Bool = false,
+                               wd::Option{<:AbstractWeightDrift} = nothing,
+                               pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+                               fa::Option{<:AbstractFeeAmortisation} = nothing,
+                               store_weight_path::Bool = false, strict::Bool = false)
+    cv = DateWalkForward(train_size, test_size, period, period_offset, purged_size,
+                         adjuster, previous, true, reduce_test, wd, pws, fa,
+                         store_weight_path, strict)
+    return Online{typeof(cv), Nothing}(cv, nothing)
 end
 """
     walk_forward_date_range(ts::AbstractVector, period::DatesUnionPeriod,
@@ -940,6 +1030,228 @@ function n_splits(dwf::DateWalkForward{<:Any}, rd::Prices_RR)
     end
     return special_div(last_allowed_start - M + 1, test_size) + 1
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+A cross-validator whose training set contains its test row by design: fold `t` trains on the rows through `t`, or on row `t` alone, and tests on row `t`.
+
+`HindsightSplit` is the Hindsight Comparator rule of [`log_wealth_regret`](@ref) taken per row. An estimator run through it with [`cross_val_predict`](@ref) reads the row it is scored on before it is scored on it, which no causal scheme may do and which this scheme does by declaration, so that the run yields the per-row comparators dynamic regret is stated against. Under `prefix = true` fold `t` trains on rows `1:t`: [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref), or [`BestConstantRebalancedPortfolio`](@ref), is then **be-the-leader**, the best constant rebalanced portfolio over the rows through `t` played on row `t`. Under `prefix = false` fold `t` trains on row `t` alone: the top-1 [`ScoreSelector`](@ref) under [`RankRule`](@ref)`(; best = 1)` and [`MeanReturn`](@ref)`(; flag = true)` composed with [`EqualWeighted`](@ref) in a [`Pipeline`](@ref) is then the **per-period minimiser**, one-hot on the row's best asset, whose terminal wealth is ``\\prod_t \\max_i x_{t,i}`` over the price relatives ``x``. A ``K``-switch comparator is any piecewise-constant path the caller builds. The test window is one row, and every row from `start` to the last is a fold, so the scheme's rows are those of an [`IndexWalkForward`](@ref)`(start - 1, 1)` over the same data, and the two prediction results share the timestamps the regret verb demands.
+
+The scheme is a walk-forward in every other respect: its folds are a timeline, it carries the Weight Drift, the Previous-Weights Source, the Fee Clock and the two flags of [`IndexWalkForward`](@ref), and [`fold_evaluation`](@ref) reads them. Its online form is [`OnlineHindsightSplit`](@ref), the prefix split under which the training windows are nested and the loop steps; the row-alone split has none.
+
+A fold can train on one row: every fold of the row-alone split does, and so does the first fold of the prefix split at `start = 1`. The corrected covariance of one row is `NaN`, so a JuMP estimator under the default [`EmpiricalPrior`](@ref) throws there, in the `Posdef` step of its [`MatrixProcessing`](@ref). A comparator whose programme reads no covariance, such as [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref), fits one row under a prior that takes the uncorrected covariance and skips that step, `EmpiricalPrior(; ce = PortfolioOptimisersCovariance(; ce = Covariance(; ce = GeneralCovariance(; ce = StatsBase.SimpleCovariance())), mp = MatrixProcessing(; pdm = nothing)))`. The covariance of one row is then the zero matrix, and the log-optimal programme does not read it. [`BestConstantRebalancedPortfolio`](@ref) fits no prior and needs none of this.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    HindsightSplit(;
+        prefix::Bool = true,
+        start::Integer = 1,
+        wd::Option{<:AbstractWeightDrift} = nothing,
+        pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+        fa::Option{<:AbstractFeeAmortisation} = nothing,
+        store_weight_path::Bool = false,
+        strict::Bool = false,
+    ) -> HindsightSplit
+
+Keyword arguments correspond to the struct's fields.
+
+## Validation
+
+  - `start >= 1`.
+
+The rule `start <= T`, where `T` is the number of observations, belongs to the data rather
+than to the estimator, so [`Base.split`](@ref) checks it.
+
+# Examples
+
+```jldoctest
+julia> HindsightSplit(; prefix = false, start = 21)
+HindsightSplit
+             prefix ┼ Bool: false
+              start ┼ Int64: 21
+                 wd ┼ nothing
+                pws ┼ nothing
+                 fa ┼ nothing
+  store_weight_path ┼ Bool: false
+             strict ┴ Bool: false
+```
+
+# Related
+
+  - [`log_wealth_regret`](@ref)
+  - [`LogWealthRegretResult`](@ref)
+  - [`cross_val_predict`](@ref)
+  - [`IndexWalkForward`](@ref)
+  - [`WalkForwardEstimator`](@ref)
+  - [`WalkForwardResult`](@ref)
+  - [`BestConstantRebalancedPortfolio`](@ref)
+  - [`OnlineHindsightSplit`](@ref)
+  - [`n_splits`](@ref)
+"""
+@concrete struct HindsightSplit <: WalkForwardEstimator
+    """
+    `prefix`: If `true`, fold `t` trains on rows `1:t`, the prefix through its test row; if `false`, on row `t` alone.
+    """
+    prefix
+    """
+    `start`: First row scored. Every row from it to the last is a fold, so a scheme over the rows of an [`IndexWalkForward`](@ref)`(train_size, 1)` sets `start = train_size + 1`.
+    """
+    start
+    """
+    $(field_dict[:wd])
+    """
+    wd
+    """
+    $(field_dict[:pws])
+    """
+    pws
+    """
+    $(field_dict[:fa_cv])
+    """
+    fa
+    """
+    $(field_dict[:store_weight_path])
+    """
+    store_weight_path
+    """
+    $(field_dict[:cv_strict])
+    """
+    strict
+    function HindsightSplit(prefix::Bool, start::Integer, wd::Option{<:AbstractWeightDrift},
+                            pws::Option{<:AbstractPreviousWeightsSource},
+                            fa::Option{<:AbstractFeeAmortisation}, store_weight_path::Bool,
+                            strict::Bool)
+        assert_nonempty_gt0_finite_val(start, :start)
+        return new{typeof(prefix), typeof(start), typeof(wd), typeof(pws), typeof(fa),
+                   typeof(store_weight_path), typeof(strict)}(prefix, start, wd, pws, fa,
+                                                              store_weight_path, strict)
+    end
+end
+function HindsightSplit(; prefix::Bool = true, start::Integer = 1,
+                        wd::Option{<:AbstractWeightDrift} = nothing,
+                        pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+                        fa::Option{<:AbstractFeeAmortisation} = nothing,
+                        store_weight_path::Bool = false, strict::Bool = false)
+    return HindsightSplit(prefix, start, wd, pws, fa, store_weight_path, strict)
+end
+"""
+    OnlineHindsightSplit(;
+        start::Integer = 1,
+        wd::Option{<:AbstractWeightDrift} = nothing,
+        pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+        fa::Option{<:AbstractFeeAmortisation} = nothing,
+        store_weight_path::Bool = false,
+        strict::Bool = false,
+    ) -> Online{<:HindsightSplit}
+
+Build the Online Scheme of a [`HindsightSplit`](@ref): the prefix split wrapped in [`Online`](@ref), under which the fold loop fits each fold by the online step instead of a refit.
+
+The keywords are the scheme's, minus `prefix`, which is set `true`: fold `t` then trains on rows `1:t` and tests on row `t`, and those training windows are nested prefixes, so the loop warms up on `1:start`, folds row `t`, reads out, and scores row `t`, exactly as it does under [`OnlineIndexWalkForward`](@ref). The row-alone split, `prefix = false`, is a window of one row that a fold cannot un-fold, so it has no online form and cannot be written here. The read-out after rows `1:t` equals the batch fit over `1:t`, so the comparators this scheme yields are the batch ones fold for fold; the step is faster than the refit only where the estimator's batch fit is itself a row recursion, and a comparator whose step is a solve, or a fixed point over every row it holds, runs no faster.
+
+# Examples
+
+```jldoctest
+julia> OnlineHindsightSplit(; start = 21)
+Online
+          est ┼ HindsightSplit
+              │              prefix ┼ Bool: true
+              │               start ┼ Int64: 21
+              │                  wd ┼ nothing
+              │                 pws ┼ nothing
+              │                  fa ┼ nothing
+              │   store_weight_path ┼ Bool: false
+              │              strict ┴ Bool: false
+  max_history ┴ nothing
+```
+
+# Related
+
+  - [`HindsightSplit`](@ref)
+  - [`Online`](@ref)
+  - [`OnlineIndexWalkForward`](@ref)
+  - [`OnlineDateWalkForward`](@ref)
+  - [`log_wealth_regret`](@ref)
+  - [`folds_are_stepped`](@ref)
+"""
+function OnlineHindsightSplit(; start::Integer = 1,
+                              wd::Option{<:AbstractWeightDrift} = nothing,
+                              pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+                              fa::Option{<:AbstractFeeAmortisation} = nothing,
+                              store_weight_path::Bool = false, strict::Bool = false)
+    cv = HindsightSplit(true, start, wd, pws, fa, store_weight_path, strict)
+    return Online{typeof(cv), Nothing}(cv, nothing)
+end
+"""
+    Base.split(hs::HindsightSplit, rd::Prices_RR) -> WalkForwardResult
+
+Split the returns data `rd` into one fold per row from `start` to the last: fold `t` tests on
+row `t` and trains on rows `1:t` under `prefix = true`, on row `t` alone otherwise.
+
+# Arguments
+
+  - `hs::HindsightSplit`: Hindsight splitter.
+  - `rd`: Returns-level or price-level data to split ([`Prices_RR`](@ref)).
+
+# Validation
+
+  - `start <= T`, where `T` is the number of observations in `rd`.
+
+# Returns
+
+  - `WalkForwardResult`: Result containing train and test index ranges for each fold.
+
+# Related
+
+  - [`HindsightSplit`](@ref)
+  - [`WalkForwardResult`](@ref)
+  - [`n_splits`](@ref)
+"""
+function Base.split(hs::HindsightSplit, rd::Prices_RR)
+    (; prefix, start) = hs
+    T = cv_nobs(rd)
+    @argcheck(start <= T, DomainError(start, "start ($start) must not exceed T ($T)"))
+    idx = 1:T
+    train_idx = [prefix ? idx[1:t] : idx[t:t] for t in start:T]
+    test_idx = [idx[t:t] for t in start:T]
+    return WalkForwardResult(; train_idx = train_idx, test_idx = test_idx)
+end
+function n_splits(hs::HindsightSplit, rd::Prices_RR)
+    return cv_nobs(rd) - hs.start + 1
+end
+"""
+    Base.split(o::Online{<:WalkForwardEstimator}, rd::Prices_RR) -> WalkForwardResult
+    n_splits(o::Online{<:WalkForwardEstimator}, rd::Prices_RR) -> Integer
+    fold_evaluation(o::Online{<:WalkForwardEstimator})
+    folds_are_stepped(o::Online{<:WalkForwardEstimator}) -> Bool
+
+The scheme verbs of an Online Scheme.
+
+The fold enumeration is the wrapped walk-forward's and does not change, and neither do its evaluation switches, so `split`, `n_splits` and [`fold_evaluation`](@ref) forward to `o.est`. What changes is how each fold is fitted, and [`folds_are_stepped`](@ref) is where the wrapped form answers `true`: the fold loop reads it off the type and takes its online arm.
+
+# Related
+
+  - [`WalkForward_Onl`](@ref)
+  - [`OnlineIndexWalkForward`](@ref)
+  - [`OnlineDateWalkForward`](@ref)
+  - [`OnlineHindsightSplit`](@ref)
+  - [`fold_loop`](@ref)
+"""
+function Base.split(o::Online{<:WalkForwardEstimator}, rd::Prices_RR)
+    return split(o.est, rd)
+end
+function n_splits(o::Online{<:WalkForwardEstimator}, rd::Prices_RR)
+    return n_splits(o.est, rd)
+end
+function fold_evaluation(o::Online{<:WalkForwardEstimator})
+    return fold_evaluation(o.est)
+end
+function folds_are_stepped(::Online{<:WalkForwardEstimator})
+    return true
+end
 function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::WFCVER; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
@@ -1017,65 +1329,26 @@ function fold_evaluation(cv::DateWalkForward)
             store_weight_path = cv.store_weight_path, strict = cv.strict)
 end
 """
-    fold_fit(cv::IndexWalkForward)
-    fold_fit(cv::DateWalkForward)
+    fold_evaluation(cv::HindsightSplit)
 
-Read the Fold Fit of a walk-forward: its `ff` field.
+Read the evaluation switches of a [`HindsightSplit`](@ref).
 
-The two walk-forwards are the schemes that carry the switch, because only a timeline has a previous fold to thread an estimator from, and each states it here beside [`fold_evaluation`](@ref).
+The folds of this scheme are a timeline, so it carries both weight switches and states both of them here, beside the Fee Clock of its realised series.
 
 # Returns
 
-  - `ff::Option{<:AbstractFoldFit}`: The Fold Fit, or `nothing` for a refit every fold.
+  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
 
 # Related
 
-  - [`fold_fit`](@ref)
-  - [`AbstractFoldFit`](@ref)
-  - [`OnlineStep`](@ref)
-  - [`IndexWalkForward`](@ref)
-  - [`DateWalkForward`](@ref)
+  - [`fold_evaluation`](@ref)
+  - [`HindsightSplit`](@ref)
+  - [`held_weights_drift`](@ref)
+  - [`override_fee_amortisation`](@ref)
 """
-function fold_fit(cv::IndexWalkForward)
-    return cv.ff
+function fold_evaluation(cv::HindsightSplit)
+    return (; wd = cv.wd, pws = cv.pws, fa = cv.fa,
+            store_weight_path = cv.store_weight_path, strict = cv.strict)
 end
-function fold_fit(cv::DateWalkForward)
-    return cv.ff
-end
-"""
-    resolve_expand_train(expand_train::Option{Bool}, ff::Option{<:AbstractFoldFit})
-
-Derive a walk-forward's `expand_train` from its Fold Fit when the keyword is left unset.
-
-`nothing` resolves to `true` under a Fold Fit and to `false` without one, because a Fold Fit steps rows into one estimator and cannot un-fold an observation, so an online run is expanding by construction; a bare call therefore resolves to the released `false`. An explicit value is returned as it is, and the inner constructor refuses the one that contradicts the switch through [`assert_fold_fit_expands`](@ref).
-
-# Related
-
-  - [`assert_fold_fit_expands`](@ref)
-  - [`IndexWalkForward`](@ref)
-  - [`DateWalkForward`](@ref)
-"""
-function resolve_expand_train(expand_train::Option{Bool}, ff::Option{<:AbstractFoldFit})
-    return isnothing(expand_train) ? !isnothing(ff) : expand_train
-end
-"""
-    assert_fold_fit_expands(expand_train::Bool, ff::Option{<:AbstractFoldFit}, window::Option{<:Integer})
-
-Refuse `expand_train = false` beside a Fold Fit, by name.
-
-A Fold Fit cannot un-fold an observation, so the loop's window only ever grows and a rolling window is not the loop's to give. The message points at the composition that gives one: `Online(pe; max_history = window)` caps the prior's buffer, and the read-out is a batch fit over the window. `window` is `train_size - purged_size` for an index scheme, which names the cap outright, and `nothing` for a date scheme, whose window is counted in periods rather than rows.
-
-# Related
-
-  - [`resolve_expand_train`](@ref)
-  - [`Online`](@ref)
-  - [`OnlineStep`](@ref)
-"""
-function assert_fold_fit_expands(expand_train::Bool, ff::Option{<:AbstractFoldFit},
-                                 window::Option{<:Integer})
-    cap = isnothing(window) ? "the rows the window counts to" : string(window)
-    @argcheck(expand_train || isnothing(ff),
-              ArgumentError("`expand_train = false` beside `ff = $(nameof(typeof(ff)))()`: a Fold Fit folds each fold's new observations into one threaded estimator and cannot un-fold one, so an online run is expanding by construction and the loop has no rolling window to give. Leave `expand_train` unset, and for a rolling window computed online cap the prior's buffer instead: `Online(pe; max_history = $(cap))`, whose read-out is a batch fit over the last `max_history` rows."))
-    return nothing
-end
-export WalkForwardResult, IndexWalkForward, DateWalkForward, OnlineStep, n_splits
+export WalkForwardResult, IndexWalkForward, DateWalkForward, HindsightSplit,
+       OnlineIndexWalkForward, OnlineDateWalkForward, OnlineHindsightSplit, n_splits

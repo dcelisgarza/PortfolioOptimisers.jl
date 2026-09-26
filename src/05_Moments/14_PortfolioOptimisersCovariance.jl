@@ -41,12 +41,6 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
   - `ce`: Recursively viewed via [`port_opt_view`](@ref).
   - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
-## Observation view parameters
-
-When [`obs_weights_view`](@ref) is called on this type:
-
-  - `cache`: Dropped via [`obs_weights_view`](@ref), because no slice of a state exists on the observation axis.
-
 # Examples
 
 ```jldoctest
@@ -140,7 +134,7 @@ The composite is transparent to a gap: it forwards `X` and `active_mask` to `ce.
 
  1. Check `dims`, and orient `X` and `active_mask` to `observations × assets`, transposing them when `dims == 2`.
  2. Refuse a gapped sample with [`assert_finite_sample`](@ref) when [`gap_fill_value`](@ref) on `ce` is finite, because `ce.ce` is then a plain estimator that has no answer for one.
- 3. Compute `sigma` with `Statistics.cov(ce.ce, X; kwargs...)`, adding `active_mask` when one is given.
+ 3. Compute `sigma` with `Statistics.cov(library_covariance_estimator(ce.ce), X; kwargs...)`, adding `active_mask` when one is given.
  4. When `sigma` is immutable, copy it into a `Matrix`, because step 5 writes in place.
  5. Apply [`matrix_processing!`](@ref) with `ce.mp` to `sigma`, in place, or [`matrix_processing_block!`](@ref) when `ce.ce` is gap-aware, so an asset outside the Coverage Universe keeps its `NaN` row and column.
  6. Return `sigma`.
@@ -179,9 +173,10 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,
         assert_finite_sample(X)
     end
     sigma = if isnothing(amsk)
-        Statistics.cov(ce.ce, X; kwargs...)
+        Statistics.cov(library_covariance_estimator(ce.ce), X; kwargs...)
     else
-        Statistics.cov(ce.ce, X; active_mask = amsk, kwargs...)
+        Statistics.cov(library_covariance_estimator(ce.ce), X; active_mask = amsk,
+                       kwargs...)
     end
     if !ismutable(sigma)
         sigma = Matrix(sigma)
@@ -259,7 +254,7 @@ This is the composite's override of the reduce-and-expand root. The inner estima
 function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims = 1, kwargs...)
     X = dims_oriented(dims, X)
-    sigma = Statistics.cov(ce.ce, X, pnl; dims = 1, kwargs...)
+    sigma = Statistics.cov(library_covariance_estimator(ce.ce), X, pnl; dims = 1, kwargs...)
     if !ismutable(sigma)
         sigma = Matrix(sigma)
     end
@@ -269,7 +264,7 @@ end
 function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims = 1, kwargs...)
     X = dims_oriented(dims, X)
-    rho = Statistics.cor(ce.ce, X, pnl; dims = 1, kwargs...)
+    rho = Statistics.cor(library_covariance_estimator(ce.ce), X, pnl; dims = 1, kwargs...)
     if !ismutable(rho)
         rho = Matrix(rho)
     end
@@ -287,7 +282,7 @@ This method computes the correlation matrix for the input data matrix `X` using 
 # Algorithm
 
  1. Check `dims` and orient `X` to `observations × assets`, transposing it when `dims == 2`.
- 2. Compute `rho` with `Statistics.cor(ce.ce, X; kwargs...)`.
+ 2. Compute `rho` with `Statistics.cor(library_covariance_estimator(ce.ce), X; kwargs...)`.
  3. When `rho` is immutable, copy it into a `Matrix`, because step 4 writes in place.
  4. Apply [`matrix_processing!`](@ref) with `ce.mp` to `rho`, in place.
  5. Return `rho`.
@@ -326,9 +321,10 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,
         assert_finite_sample(X)
     end
     rho = if isnothing(amsk)
-        Statistics.cor(ce.ce, X; kwargs...)
+        Statistics.cor(library_covariance_estimator(ce.ce), X; kwargs...)
     else
-        Statistics.cor(ce.ce, X; active_mask = amsk, kwargs...)
+        Statistics.cor(library_covariance_estimator(ce.ce), X; active_mask = amsk,
+                       kwargs...)
     end
     if !ismutable(rho)
         rho = Matrix(rho)

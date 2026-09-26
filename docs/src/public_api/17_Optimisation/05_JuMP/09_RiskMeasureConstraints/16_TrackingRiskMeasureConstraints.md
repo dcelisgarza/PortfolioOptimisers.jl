@@ -4,4 +4,4 @@ Description = "Tracking Risk Measure Constraints has no public API in PortfolioO
 
 # Tracking Risk Measure Constraints
 
-Tracking Risk Measure Constraints has no public API in PortfolioOptimisers.jl; see [Tracking Risk Measure Constraints: private API](../../../../private_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/16_TrackingRiskMeasureConstraints.md) for its private API.
+Every name of this topic is private. The [private page](@ref private-api-tracking-risk-measure-constraints) documents them.

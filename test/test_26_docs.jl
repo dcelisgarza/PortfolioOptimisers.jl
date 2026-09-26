@@ -250,7 +250,7 @@ nothing raises `@error "File exists but no references were collected"` in
     source_files = vcat(files_under(SRC, ".jl"), files_under(EXT, ".jl"))
     # `ref_dict` itself names every key it defines, so it is not evidence that anything
     # cites the work. Exclude the file that holds the table when looking for users.
-    dict_file = joinpath(SRC, "01_Base", "01_DocstringDictionaries.jl")
+    dict_file = joinpath(SRC, "01_Base", "01_DocstringDictionaries", "13_References.jl")
 
     bib_keys = Set(m.captures[1]
                    for m in eachmatch(r"^@\w+\{([A-Za-z0-9_]+),"m, read(BIB, String)))
@@ -285,6 +285,31 @@ nothing raises `@error "File exists but no references were collected"` in
         end
         for key in keys(PO.ref_dict)
             @test key in users
+        end
+    end
+
+    # A conflict resolved by hand inside `References.bib` can drop the tail of an entry,
+    # and three entries lost theirs that way: the key still matched by text above, the
+    # Docs build failed on the parse, and nothing here saw it. An entry is the text from
+    # one `@type{key,` to the next; it is well formed when its braces balance, its last
+    # non-blank line is the closing `}`, and it carries a `title`, a `year` and an `author`
+    # or `editor`. That is read as text, so no bibliography parser joins the test
+    # environment, and it catches the truncation the build would otherwise report.
+    @testset "every References.bib entry is well formed" begin
+        bib_text = read(BIB, String)
+        starts = [m.offset for m in eachmatch(r"^@\w+\{"m, bib_text)]
+        push!(starts, lastindex(bib_text) + 1)
+        for (a, b) in zip(starts[1:(end - 1)], starts[2:end])
+            entry = bib_text[a:prevind(bib_text, b)]
+            key = match(r"^@\w+\{([A-Za-z0-9_]+),", entry)
+            @test !isnothing(key)
+            label = isnothing(key) ? entry[1:min(end, 40)] : key.captures[1]
+            depth = count(==('{'), entry) - count(==('}'), entry)
+            @test depth == 0 || label
+            @test endswith(strip(entry), "}") || label
+            @test occursin(r"^\s*title\s*="m, entry) || label
+            @test occursin(r"^\s*year\s*="m, entry) || label
+            @test occursin(r"^\s*(author|editor)\s*="m, entry) || label
         end
     end
 
@@ -482,7 +507,7 @@ An extension is a module of its own, so `Base.undocumented_names` -- the instrum
 first testset in this file already uses -- answers for it directly. It also answers the
 right question rather than a widened one, and what the one file holds is why:
 
-  - `ext/PortfolioOptimisersPlotsExt.jl` defines 171 methods of 34 functions, and every one
+  - `ext/PortfolioOptimisersPlotsExt/` defines 171 methods of 34 functions, and every one
     of the 34 is declared as a bare `function ... end` stub in `src/22_Plotting.jl`, which
     carries its docstring. Beyond those methods it declares four module-local `const`s
     holding error-message text, and nothing else.
@@ -752,7 +777,7 @@ in the sense of `STANDARDS.md`.
     a caller reads the entry back by that name. THAT IS NOT A PROPERTY OF A ROW.
     `model[:sc]`, `model[:w]`, `model[:ret]` and `model[:risk]` are each a variable or an
     expression, `src/` reads a model key back by name in 51 places over 16 distinct keys, and
-    `01_Base_JuMPOptimisation.jl` wraps nine of those keys in an accessor that raises a named
+    `01_Base_JuMPOptimisation/02_JuMPModelAccessors.jl` wraps nine of those keys in an accessor that raises a named
     `ArgumentError` when its builder has not run. A row name is public, and so is every one
     of those.
 
@@ -941,7 +966,7 @@ in the sense of `STANDARDS.md`.
     edit and not a silent one.
     =#
     @testset "# Details is abolished" begin
-        DETAILS_TOTAL = 56
+        DETAILS_TOTAL = 26
 
         @testset "a swept file carries no # Details section" begin
             offenders = Tuple{String, Int}[]
@@ -1015,7 +1040,7 @@ in the sense of `STANDARDS.md`.
 
     The kind is read from the parse, not from a name. An acronym and a factory are scoped to
     `src/23_Aliases.jl`, which is where both live and is itself part of the rule. Without
-    that scope `const PROP_TAG_MACRO_NAMES = ...` in `src/02_Tools.jl` reads as an acronym
+    that scope `const PROP_TAG_MACRO_NAMES = ...` in `src/02_Tools/05_Propagatable.jl` reads as an acronym
     alias, and it is a computed constant.
 
     Three checks, and the split between them is the one ADR 0081 drew and ADR 0085 reused. A
@@ -1029,7 +1054,7 @@ in the sense of `STANDARDS.md`.
         # The count of dispatch aliases carrying no `# Related`. Each file's own #404 prose
         # ticket pays its share. Lower the number in the commit that pays it, and retire the
         # ratchet at zero.
-        NO_RELATED_TOTAL = 20
+        NO_RELATED_TOTAL = 17
 
         # A `const` bound to a bare name is an acronym; to a type expression, a dispatch
         # alias. `Expr(:curly, ...)` is a type expression and `Expr(:call, ...)` is a value,
@@ -1143,16 +1168,26 @@ in the sense of `STANDARDS.md`.
 
     #=
     `math_dict` is read from source with the same instrument the rest of this file uses, so
-    the checks below load no package either. The table is built by a bare `Dict` call, so
-    each of its entries parses to `Expr(:call, :(=>), QuoteNode(key), value)`.
+    the checks below load no package either. The `*_Math*.jl` files of
+    `src/01_Base/01_DocstringDictionaries/` fill the table, each with one
+    `unique_key_dict!(math_dict, :math_dict, pairs...)` call, so each of its entries parses
+    to `Expr(:call, :(=>), QuoteNode(key), value)`.
     =#
-    function math_dict_pairs(path)
+    function math_dict_pairs(dir)
         acc = Tuple{Symbol, String}[]
+        for file in sort(readdir(dir; join = true))
+            endswith(file, ".jl") || continue
+            math_dict_pairs!(acc, file)
+        end
+        return acc
+    end
+    function math_dict_pairs!(acc, path)
         CH.walk_ast(CH.parse_file(path)) do node
-            if Meta.isexpr(node, :(=)) &&
-               node.args[1] === :math_dict &&
-               node.args[2] isa Expr
-                for p in node.args[2].args
+            if Meta.isexpr(node, :call) &&
+               node.args[1] === :unique_key_dict! &&
+               length(node.args) >= 3 &&
+               node.args[2] === :math_dict
+                for p in node.args[4:end]
                     if Meta.isexpr(p, :call) &&
                        length(p.args) == 3 &&
                        p.args[1] === :(=>) &&
@@ -1161,7 +1196,7 @@ in the sense of `STANDARDS.md`.
                         push!(acc, (p.args[2].value, strip(p.args[3])))
                     end
                 end
-                # The table is read, so nothing below it can add to `acc`.
+                # The call is read, so nothing below it can add to `acc`.
                 return CH.PRUNE
             end
             return nothing
@@ -1170,7 +1205,9 @@ in the sense of `STANDARDS.md`.
     end
 
     math_pairs = math_dict_pairs(joinpath(ROOT, "src", "01_Base",
-                                          "01_DocstringDictionaries.jl"))
+                                          "01_DocstringDictionaries"))
+    # A read that finds no call would make every check below vacuous.
+    @test !isempty(math_pairs)
 
     #=
     The notation contract (issue #481, under the standards-hardening map #478).
@@ -1178,7 +1215,7 @@ in the sense of `STANDARDS.md`.
     ADR 0085 records the decision and
     `.github/instructions/julia-docstrings.instructions.md` is the Authority, in its section
     "Notation is fixed by symbol and by family". A symbol that appears in the docstrings of
-    two or more units gets a `math_dict` key in `src/01_Base/01_DocstringDictionaries.jl`, and every site
+    two or more units gets a `math_dict` key in `src/01_Base/01_DocstringDictionaries/`, and every site
     interpolates it. A new description takes a NEW key, because editing a value already in
     the table moves every docstring that interpolates it.
 
@@ -1193,10 +1230,10 @@ in the sense of `STANDARDS.md`.
 
     A glyph is not owned by a key. `\boldsymbol{w}` is `math_dict[:w_port]`, the portfolio
     weights vector, inside a risk measure; it is the observation weights in
-    `src/02_Tools.jl` and the OWA weight vector in
-    `src/16_RiskMeasures/07_OWARiskMeasures.jl`. Matching on the symbol alone reported 149
+    `src/02_Tools/07_VectorToScalarMeasures.jl` and the OWA weight vector in
+    `src/16_RiskMeasures/07_OWARiskMeasures_a.jl`. Matching on the symbol alone reported 149
     sites, and the great majority of them define a different quantity that the key would
-    state wrongly -- `src/02_Tools.jl` among them, the one such site inside a swept file.
+    state wrongly -- `src/02_Tools/07_VectorToScalarMeasures.jl` among them, the one such site inside a swept file.
     Matching the whole bullet against the whole value reports only a COPY of the dictionary
     text. That copy is the drift the rule exists to stop, and the match cannot fire on a
     glyph that two families share.
@@ -1227,7 +1264,7 @@ in the sense of `STANDARDS.md`.
     library-wide pass.
     =#
     @testset "a math_dict value is interpolated, never copied" begin
-        MATH_COPY_TOTAL = 7
+        MATH_COPY_TOTAL = 2
 
         mvals = Dict{String, Symbol}(v => k for (k, v) in math_pairs)
         @test !isempty(mvals)
@@ -1335,13 +1372,24 @@ in the sense of `STANDARDS.md`.
                     # One quantity under two glyphs, ``s_{c1}`` and ``s_c``. A merge
                     # candidate: the entropy pooling optimiser states its own scale.
                     "constraint scale" => [:ep_sc1, :sc_scale],
-                    # Seven counts of seven different things.
-                    "number" => [:K, :N, :T, :k_tail_count, :n_network, :sigma_st_i_paths,
-                                 :sigma_st_paths],
+                    # A panel entry ``u_{ti}``, against the entry ``q_{k}`` of the pooled
+                    # vector that the calibration verbs read. Those verbs take vectors, not
+                    # the panel, so the pooled glyph cannot be the panel one.
+                    "cross-sectional weight" => [:q_k_pair, :u_ti_cs],
+                    # As `cross-sectional weight`, for ``y_{ti}`` and ``b_{k}``.
+                    "forward target" => [:b_k_pair, :y_ti_fwd],
+                    # Eight counts of eight different things.
+                    "number" =>
+                        [:K, :N, :T, :k_tail_count, :n_network, :n_pool, :sigma_st_i_paths,
+                         :sigma_st_paths],
                     # As `constraint scale`, and the same merge candidate.
                     "objective scale" => [:ep_so, :so_scale],
                     # The weights an optimisation produced, against the weights themselves.
                     "portfolio weights vector ``n \\times 1``" => [:w_0_finaliser, :w_port],
+                    # One cone under two glyphs, ``\mathcal{K}_{\mathrm{pow}}(p)`` and
+                    # ``\mathcal{P}_{\alpha}``. The relativistic measures cannot read the
+                    # second, because their ``\alpha`` is the significance level.
+                    "power cone" => [:K_pow, :P_alpha_power],
                     # One quantity under two glyphs, ``r_{tj}`` and ``x_{t,\,i}``. A merge
                     # candidate, and the wider of the two.
                     "return" => [:r_tj, :x_ti_ret],

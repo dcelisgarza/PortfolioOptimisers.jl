@@ -53,9 +53,8 @@ For observation-weighted samples the weight vector is normalised to ``\\boldsymb
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRisk,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
-                               kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     series, T = risk_series(model, NetReturnsRiskSeries(), pr; loss = loss, prefix = prefix)
     return set_relativistic_risk_constraints!(model, i, r, opt, pr, series, T,
                                               (; t = :t_rlvar_, z = :z_rlvar_,
@@ -104,7 +103,7 @@ series and this function writes the cones once.
   - [`kappa_log`](@ref)
 """
 function set_relativistic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
-                                            opt::RiskJuMPOptimisationEstimator,
+                                            opt::RiskConstraintOwner,
                                             pr::AbstractPriorResult, series, T::Int,
                                             keys::NamedTuple; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
@@ -192,8 +191,8 @@ cones, shaped by *its own* deformation parameter.
   - [`set_range_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRiskRange,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     return set_range_risk_constraints!(model, i, r, :rlvar_range_risk_, opt, pr, args...;
                                        prefix = prefix, kwargs...)
 end
@@ -224,8 +223,8 @@ drawdown-at-risk parameterised by `kappa` at confidence level `r.alpha`.
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdownatRisk,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     series, T = risk_series(model, DrawdownRiskSeries(), pr; prefix = prefix)
     return set_relativistic_risk_constraints!(model, i, r, opt, pr, series, T,
                                               (; t = :t_rldar_, z = :z_rldar_,

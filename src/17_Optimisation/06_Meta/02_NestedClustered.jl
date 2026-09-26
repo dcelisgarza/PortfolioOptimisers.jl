@@ -281,6 +281,7 @@ Checks that the outer optimiser does not use pre-computed prior results, regress
   - [`NestedClustered`](@ref)
 """
 function assert_external_optimiser(opt::ClusteringOptimisationEstimator)::Nothing
+    assert_estimated_prior(opt.opt.pe, "opt.opt.pe")
     assert_internal_optimiser(opt)
     return nothing
 end
@@ -331,10 +332,41 @@ function assert_external_lcse(opt)::Nothing
               ArgumentError("a constraint space in opt.opt.lcse cannot hold a precomputed AbstractLoadingsRegressionResult in re; use an estimator instead. The outer problem replaces the asset universe with cluster names, so stated loadings cannot be sliced to follow it, and a row re-based through them would name assets that no longer exist"))
     return nothing
 end
+"""
+    assert_estimated_prior(pe, name::AbstractString) -> Nothing
+
+Assert that a `pe` slot holds a prior estimator, and no precomputed prior, directly or through a [`TimeDependent`](@ref) schedule.
+
+A prior result was fitted once, over the rows it saw. A fold loop that reads one gives every fold the same moments, so the test rows of each fold enter its fit, and the outer solve of a nested optimiser cannot refit it over the cluster universe. A schedule is read through [`time_dependent_entries`](@ref): each vector entry and the `default` are checked. A callable schedule passes, because its values exist only when it runs.
+
+# Arguments
+
+  - `pe`: The value of the `pe` slot.
+  - `name`: The path of the slot, as the error message names it.
+
+# Validation
+
+  - Neither `pe`, nor a vector entry of a schedule in `pe`, nor the `default` of that schedule, is an `AbstractPriorResult`. An `ArgumentError` that names `name` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_external_optimiser`](@ref)
+  - [`time_dependent_entries`](@ref)
+  - [`AbstractPriorResult`](@ref)
+"""
+function assert_estimated_prior(pe, name::AbstractString)::Nothing
+    entries = isa(pe, TimeDependent) ? time_dependent_entries(pe) : (pe,)
+    @argcheck(!any(x -> isa(x, AbstractPriorResult), entries),
+              ArgumentError("$name cannot be a precomputed AbstractPriorResult, or a TimeDependent schedule whose entries or default hold one; use an estimator instead"))
+    return nothing
+end
 function assert_external_optimiser(opt::JuMPOptimisationEstimator)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
-              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    assert_estimated_prior(opt.opt.pe, "opt.opt.pe")
     assert_external_lcse(opt)
     assert_internal_optimiser(opt)
     return nothing
@@ -354,8 +386,7 @@ Matches either [`RiskBudgeting`](@ref) or [`RelaxedRiskBudgeting`](@ref). Used f
 const RiskBudgetingOptimiser = Union{<:RiskBudgeting, <:RelaxedRiskBudgeting}
 function assert_external_optimiser(opt::RiskBudgetingOptimiser)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
-              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    assert_estimated_prior(opt.opt.pe, "opt.opt.pe")
     if isa(opt.rba, FactorRiskBudgeting)
         @argcheck(!isa(opt.rba.re, AbstractLoadingsRegressionResult),
                   ArgumentError("opt.rba.re cannot be a precomputed AbstractLoadingsRegressionResult; use an estimator instead"))
@@ -366,8 +397,7 @@ function assert_external_optimiser(opt::RiskBudgetingOptimiser)::Nothing
 end
 function assert_external_optimiser(opt::FactorRiskContribution)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
-              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    assert_estimated_prior(opt.opt.pe, "opt.opt.pe")
     @argcheck(!isa(opt.re, AbstractLoadingsRegressionResult),
               ArgumentError("opt.re cannot be a precomputed AbstractLoadingsRegressionResult; use an estimator instead"))
     assert_external_lcse(opt)
@@ -626,8 +656,7 @@ function assert_internal_optimiser(opt::NestedClustered)::Nothing
 end
 function assert_external_optimiser(opt::NestedClustered)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.pe, AbstractPriorResult),
-              ArgumentError("opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    assert_estimated_prior(opt.pe, "opt.pe")
     @argcheck(!isa(opt.cle, AbstractClusteringResult),
               ArgumentError("opt.cle cannot be a precomputed AbstractClusteringResult; use an estimator instead"))
     assert_external_optimiser(opt.opto)
@@ -714,7 +743,7 @@ function port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
     opto = port_opt_view(nco.opto, i, X)
     return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, fees = fees, sets = sets,
                            opti = opti, opto = opto, cv = nco.cv, wf = nco.wf, ex = nco.ex,
-                           fb = nco.fb, brt = nco.brt, x_src = nco.x_src,
+                           fb = view_child(nco.fb, i, X), brt = nco.brt, x_src = nco.x_src,
                            strict = nco.strict, cache = port_opt_view(nco.cache, i))
 end
 function non_investable_universe(nco::NestedClustered, ni::VecStr)::NestedClustered
@@ -765,12 +794,11 @@ function _update_asset_sets(nco::NestedClustered, rdo::ReturnsResult)
         nco
     end
 end
-function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
-                   branchorder::Symbol = :optimal, str_names::Bool = false,
-                   save::Bool = true, kwargs...)
+function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol = :optimal,
+                   str_names::Bool = false, save::Bool = true, kwargs...)
     nco = reset_time_dependent_estimator(nco)
     rd = returns_result_picker(rd, nco.brt)
-    pr = prior(nco.pe, rd; dims = dims)
+    pr = prior(nco.pe, rd)
     # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
@@ -793,7 +821,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     # FLoops reports as a correctness and performance problem on every call.
     _, pr, nco, rdr = investable_reduction(imsk, pr, nco, rd)
     X = pr.X
-    clr = clusterise(nco.cle, pr; rd = rdr, iv = rdr.iv, ivpa = rdr.ivpa, dims = dims,
+    clr = clusterise(nco.cle, pr; rd = rdr, iv = rdr.iv, ivpa = rdr.ivpa,
                      branchorder = branchorder, x_src = nco.x_src)
     assert_clustering_universe(clr, size(X, 2))
     idx = assignments(clr)
@@ -804,8 +832,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     FLoops.@floop nco.ex for (i, cl) in pairs(cls)
         optic = port_opt_view(opti, cl, X)
         rdc = port_opt_view(rdr, cl)
-        res = optimise(optic, rdc; dims = dims, branchorder = branchorder,
-                       str_names = str_names, save = save, kwargs...)
+        res = optimise(optic, rdc; branchorder = branchorder, str_names = str_names,
+                       save = save, kwargs...)
         #! Support efficient frontier?
         @argcheck(!isa(res.retcode, AbstractVector),
                   ArgumentError("res.retcode cannot be an AbstractVector; efficient frontier results are not supported in NCO"))
@@ -814,8 +842,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     end
     rdo = predict_outer_returns(nco.cv, nco, ClusterUniverse(cls), rdr, pr, cfees, wi, resi)
     nco = _update_asset_sets(nco, rdo)
-    reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
-                    str_names = str_names, save = save, kwargs...)
+    reso = optimise(nco.opto, rdo; branchorder = branchorder, str_names = str_names,
+                    save = save, kwargs...)
     wb = weight_bounds_constraints(nco.wb, nco.sets; N = size(X, 2), strict = nco.strict,
                                    datatype = eltype(X))
     retcode, w = outer_optimisation_finaliser(wb, nco.wf, resi, reso.retcode, reso.w, wi)
@@ -827,7 +855,7 @@ end
     optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                       <:Any, <:Any, <:Any, Nothing
                   }, rd::ReturnsResult;
-             dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+             branchorder::Symbol = :optimal, str_names::Bool = false,
              save::Bool = true, kwargs...) -> NestedClusteredResult
 
 Run the Nested Clustered Optimisation portfolio optimisation.
@@ -836,7 +864,6 @@ Run the Nested Clustered Optimisation portfolio optimisation.
 
   - `nco`: The nested clustered optimiser to use.
   - $(arg_dict[:rd])
-  - `dims`: The dimension along which observations advance in time.
   - `branchorder`: Passed to the inner and outer optimisers. If this optimiser uses hierarchical clustering, this applies to the clusterisation. The branch order to use for the clusterisation.
   - `str_names`: Passed to the inner and outer optimisers. Whether to use string names for the assets in the optimisation.
   - `save`: Passed to the inner and outer optimisers. Whether to save the JuMP model in the optimisation result.
@@ -857,11 +884,11 @@ Run the Nested Clustered Optimisation portfolio optimisation.
 """
 function optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+                  branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)
     assert_batch_entry(nco, "`optimise`")
-    return _optimise(nco, rd; dims = dims, branchorder = branchorder, str_names = str_names,
-                     save = save, kwargs...)
+    return _optimise(nco, rd; branchorder = branchorder, str_names = str_names, save = save,
+                     kwargs...)
 end
 
 export NestedClusteredResult, NestedClustered

@@ -232,6 +232,122 @@ end
     end
 end
 
+@testset "The Descriptor Scores agree with their closed form" begin
+    PO = PortfolioOptimisers
+    # Asset 5 leaves the estimation universe at observation 3, the score `a` of asset 2 is
+    # missing at observation 4, and asset 4 has no `size` exposure at the first row of the
+    # block. The block is rows 2 to 4 of the carrier, so row 1 has no exposure.
+    a = [1.0 2.0 4.0 0.5 3.0; 3.0 4.0 1.0 2.0 5.0; 2.0 5.0 3.0 1.0 4.0;
+         4.0 NaN 2.0 3.0 1.0]
+    b = [5.0 6.0 1.0 2.0 4.0; 7.0 8.0 2.0 1.0 3.0; 1.0 3.0 9.0 2.0 5.0;
+         2.0 4.0 6.0 8.0 1.0]
+    emsk = trues(4, 5)
+    emsk[3, 5] = false
+    rd = forecast_hand_panel(["a" => a, "b" => b]; emsk = emsk)
+    Ms = zeros(3, 5, 2)
+    Ms[:, :, 1] = [1.0 2.0 3.0 NaN 5.0; 2.0 1.0 4.0 3.0 1.0; 3.0 3.0 1.0 2.0 4.0]
+    Ms[:, :, 2] = [0.5 -1.0 2.0 1.0 0.0; 1.5 0.5 -0.5 2.0 1.0; -1.0 2.0 0.5 1.0 3.0]
+    blk = CrossSectionalFactorModel(; M = ones(5, 2), b = zeros(5), Ms = Ms,
+                                    nf = ["size", "value"], fam = ["style", "style"])
+
+    # The standardiser, written out: the mean and the sample deviation over the assets of the
+    # estimation universe with a finite value, applied to every asset.
+    function zscore(x::AbstractVector, e::AbstractVector{Bool})
+        E = findall(e .& isfinite.(x))
+        return (x .- mean(x[E])) ./ std(x[E])
+    end
+    # The recipe, written out: score, fit the finite estimation assets on the exposures,
+    # take the residual of every asset, and score the residual once more.
+    function closed_form(D::AbstractMatrix, k::AbstractVector{<:Integer}, intercept::Bool)
+        S = fill(NaN, size(D))
+        for t in 2:4
+            d = zscore(D[t, :], emsk[t, :])
+            B = Ms[t - 1, :, k]
+            X = intercept ? [ones(5) B] : B
+            fit = emsk[t, :] .& isfinite.(d) .& vec(all(isfinite, B; dims = 2))
+            coef = X[fit, :] \ d[fit]
+            S[t, :] = zscore(d - X * coef, emsk[t, :])
+        end
+        return S
+    end
+    function agrees(S::AbstractMatrix, R::AbstractMatrix)
+        f = .!isnan.(R)
+        return isequal(isnan.(S), isnan.(R)) && isapprox(S[f], R[f]; rtol = 1e-12)
+    end
+
+    @testset "A factor name neutralises against that factor alone" begin
+        for intercept in (false, true)
+            ds = DescriptorScores(;
+                                  descriptors = [Passthrough(; field = "a"),
+                                                 Passthrough(; field = "b")],
+                                  neutralise = "value",
+                                  cre = CrossSectionalLinearRegression(;
+                                                                       intercept = intercept),
+                                  outlier = nothing)
+            res = descriptor_scores(ds, rd, blk)
+            @test res.rows == 2:4
+            @test agrees(res.S[:, :, 1], closed_form(a, [2], intercept))
+            @test agrees(res.S[:, :, 2], closed_form(b, [2], intercept))
+        end
+    end
+
+    @testset "A Factor Family neutralises against each of its factors" begin
+        ds = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
+                              neutralise = "style",
+                              cre = CrossSectionalLinearRegression(; intercept = true),
+                              outlier = nothing)
+        R = closed_form(a, [1, 2], true)
+        @test agrees(descriptor_scores(ds, rd, blk).S[:, :, 1], R)
+        # The asset without a `size` exposure has no residual, and the others fit without it.
+        @test isnan(R[2, 4]) && count(isfinite, R[2, :]) == 4
+    end
+
+    @testset "Without a Neutralisation every row carries the transformed Descriptor" begin
+        ds = DescriptorScores(; descriptors = [Passthrough(; field = "b")],
+                              outlier = nothing)
+        S = descriptor_scores(ds, rd, blk).S
+        @test all(isapprox(S[t, :, 1], zscore(b[t, :], emsk[t, :]); rtol = 1e-12)
+                  for t in 1:4)
+    end
+
+    @testset "The number type of the scores is the promotion of every input" begin
+        a3 = [1.0 2.0 4.0; 3.0 4.0 1.0; 2.0 5.0 3.0]
+        b3 = [5.0 6.0 1.0; 7.0 8.0 2.0; 1.0 3.0 9.0] ./ 3
+        panel(inp) = ReturnsResult(; nx = ["A", "B", "C"], X = zeros(Float32, 3, 3),
+                                   pnl = asset_panel(inp; amsk = trues(3, 3),
+                                                     emsk = trues(3, 3)))
+        blk3 = forecast_hand_block(3)
+        # A wider second Descriptor widens the stack, and its score keeps its precision.
+        rdm = panel([NumericPanelInput(; name = "a", vals = Float32.(a3)),
+                     NumericPanelInput(; name = "b", vals = big.(b3))])
+        dsm = DescriptorScores(;
+                               descriptors = [Passthrough(; field = "a"),
+                                              Passthrough(; field = "b")],
+                               outlier = nothing, scoring = nothing)
+        Sm = descriptor_scores(dsm, rdm, blk3).S
+        @test eltype(Sm) === BigFloat
+        @test Sm[:, :, 2] == big.(b3)
+        # A wider exposure history widens the residual under a Neutralisation.
+        rdn = panel([NumericPanelInput(; name = "a", vals = a3)])
+        x = big.(b3)
+        blkn = forecast_hand_block(3; Ms = reshape(x, 3, 3, 1), nf = ["s"], fam = ["s"])
+        dsn = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
+                               neutralise = "s", outlier = nothing, scoring = nothing)
+        Sn = descriptor_scores(dsn, rdn, blkn).S
+        @test eltype(Sn) === BigFloat
+        for t in 1:3
+            y = big.(a3[t, :])
+            @test Sn[t, :, 1] ≈ y - x[t, :] * (dot(x[t, :], y) / dot(x[t, :], x[t, :])) rtol = 1e-60
+        end
+        # A score type without `NaN` cannot mark the rows before a block that starts late.
+        ar = Rational{Int}.(round.(Int, a3))
+        rdr = panel([NumericPanelInput(; name = "a", vals = ar)])
+        blkr = forecast_hand_block(3; Ms = reshape(ar[2:3, :], 2, 3, 1), nf = ["s"],
+                                   fam = ["s"])
+        @test_throws ArgumentError descriptor_scores(dsn, rdr, blkr)
+    end
+end
+
 @testset "The stated member carries the caller's forecast" begin
     PO = PortfolioOptimisers
     rd = forecast_hand_panel(["a" => [1.0 2.0; 3.0 4.0]])
@@ -250,6 +366,36 @@ end
         @test_throws DimensionMismatch return_forecast(CustomValueReturnForecast(;
                                                                                  mu = [0.01]),
                                                        rd, csfm)
+    end
+
+    @testset "The forecast agrees with its closed form, alpha_Ti = m_i" begin
+        m = [0.03, -0.02]
+        rfe = CustomValueReturnForecast(; mu = m)
+        rf = return_forecast(rfe, rd, csfm)
+        for i in eachindex(m)
+            @test rf.mu[i] == m[i]
+        end
+        # The Result holds the vector of the estimator, not a copy.
+        @test rf.mu === rfe.mu
+        # The member reads no Panel Field, so another carrier gives the same forecast.
+        rd2 = forecast_hand_panel(["b" => [9.0 -1.0; 0.5 7.0]])
+        @test return_forecast(rfe, rd2, csfm).mu == m
+    end
+
+    @testset "The number type of the stated vector is kept" begin
+        for m in (Float32[0.01, NaN32], [1 // 100, -1 // 50], big.([0.01, 0.02]))
+            rf = return_forecast(CustomValueReturnForecast(; mu = m), rd, csfm)
+            @test eltype(rf.mu) === eltype(m)
+            @test isequal(rf.mu, m)
+        end
+    end
+
+    @testset "A view cuts the forecast to the selected assets" begin
+        rf = CustomValueReturnForecastResult(; mu = [0.01, NaN, -0.03])
+        v = PO.port_opt_view(rf, [1, 3])
+        @test isa(v, CustomValueReturnForecastResult)
+        @test v.mu == [0.01, -0.03]
+        @test isnothing(v.hist)
     end
 end
 
@@ -365,6 +511,112 @@ end
         PO.signed_composite_accumulate!(num, den, reshape([1.0, NaN], 1, 2, 1), [-0.5])
         @test num == [-0.5 0.0]
         @test den == [0.5 0.0]
+    end
+end
+
+@testset "The fixed weighted member agrees with its closed form" begin
+    PO = PortfolioOptimisers
+    # Three Descriptors on a 5 x 4 panel. Cell (1, 4) carries only `c`, whose share of the
+    # absolute weight is 1/7, below the threshold. Cell (2, 3) carries only `a`, whose share
+    # is 4/7. Cell (4, 2) carries no Descriptor at all.
+    a = [0.3 -1.2 0.8 NaN; 1.1 0.4 -0.9 -0.5; -0.7 0.2 1.5 0.6; 0.9 NaN -0.3 1.3;
+         -0.4 0.7 0.1 -1.1]
+    b = [1.4 0.5 -0.6 NaN; -0.2 NaN NaN 0.8; 0.3 -1.0 NaN 0.4; 1.2 NaN 0.7 -0.8;
+         0.6 -0.3 1.1 0.2]
+    c = [-0.5 0.9 0.2 0.7; 0.8 -0.4 NaN 1.0; NaN 0.6 -1.3 -0.2; -0.9 NaN 0.4 0.5;
+         1.5 -0.7 -0.1 0.3]
+    rd = forecast_hand_panel(["a" => a, "b" => b, "c" => c])
+    T, N = size(a)
+    vs = [0.01 + 0.002 * (t + i) for t in 1:T, i in 1:N]
+    csfm = forecast_hand_block(N; vs = vs)
+    descriptors = [Passthrough(; field = "a"), Passthrough(; field = "b"),
+                   Passthrough(; field = "c")]
+    omega = [2.0, -1.0, 0.5]
+    gamma = 0.04
+    mc = 0.3
+
+    # The closed form of the docstring, one cell at a time.
+    function closed_form(S, omega, mc)
+        w = omega ./ sum(abs, omega)
+        Z = fill(NaN, size(S, 1), size(S, 2))
+        for t in axes(S, 1), i in axes(S, 2)
+            V = [k for k in axes(S, 3) if isfinite(S[t, i, k])]
+            W = sum(k -> abs(w[k]), V; init = 0.0)
+            if W > 0 && W >= mc
+                Z[t, i] = sum(k -> w[k] * S[t, i, k], V) / W
+            end
+        end
+        return Z
+    end
+
+    @testset "Without a scoring transform the composite is the raw closed form" begin
+        ds = DescriptorScores(; descriptors = descriptors, outlier = nothing,
+                              scoring = nothing)
+        Z = closed_form(cat(a, b, c; dims = 3), omega, mc)
+        @test isnan(Z[1, 4]) && isnan(Z[4, 2])
+        @test Z[2, 3] ≈ a[2, 3]
+        for (unit, g) in ((IdiosyncraticReturnUnit(), ones(T, N)),
+                          (IdiosyncraticSharpeUnit(), sqrt.(vs)))
+            rf = return_forecast(FixedWeightedReturnForecast(; scores = ds, scale = gamma,
+                                                             weights = omega,
+                                                             min_coverage = mc,
+                                                             unit = unit), rd, csfm)
+            E = gamma .* g .* Z
+            @test isequal(isnan.(rf.hist), isnan.(E))
+            @test rf.hist[isfinite.(E)] ≈ E[isfinite.(E)] rtol = 1e-12
+            @test isequal(rf.mu, rf.hist[end, :])
+            @test rf.weights ≈ [4, -2, 1] ./ 7
+        end
+    end
+
+    @testset "With more than one Descriptor the scoring transform rescores the composite" begin
+        ct = CrossSectionalStandardiser(; min_group_size = 2)
+        ds = DescriptorScores(; descriptors = descriptors, outlier = nothing, scoring = ct)
+        S = descriptor_scores(ds, rd, csfm).S
+        Zt = PO.cross_sectional_transform(ct, closed_form(S, omega, mc);
+                                          w = PO.return_forecast_weights(rd),
+                                          groups = nothing)
+        rf = return_forecast(FixedWeightedReturnForecast(; scores = ds, scale = gamma,
+                                                         weights = omega, min_coverage = mc,
+                                                         unit = IdiosyncraticSharpeUnit()),
+                             rd, csfm)
+        E = gamma .* sqrt.(vs) .* Zt
+        @test isequal(isnan.(rf.hist), isnan.(E))
+        @test rf.hist[isfinite.(E)] ≈ E[isfinite.(E)] rtol = 1e-12
+        # The rescored composite differs from the composite of the scores.
+        Z = gamma .* sqrt.(vs) .* closed_form(S, omega, mc)
+        @test !(rf.hist[isfinite.(E)] ≈ Z[isfinite.(E)])
+    end
+
+    @testset "One Descriptor under a negative weight is its score with the sign turned" begin
+        ct = CrossSectionalStandardiser(; min_group_size = 2)
+        ds = DescriptorScores(; descriptors = descriptors[1:1], outlier = nothing,
+                              scoring = ct)
+        S = descriptor_scores(ds, rd, csfm).S
+        rf = return_forecast(FixedWeightedReturnForecast(; scores = ds, scale = gamma,
+                                                         weights = [-2.0]), rd, csfm)
+        @test rf.weights == [-1.0]
+        @test isequal(rf.hist, -gamma .* S[:, :, 1])
+    end
+
+    @testset "The number type comes from the scores, the weights and the scale" begin
+        ds = DescriptorScores(; descriptors = descriptors, outlier = nothing,
+                              scoring = nothing)
+        rf = return_forecast(FixedWeightedReturnForecast(; scores = ds, scale = gamma,
+                                                         weights = omega,
+                                                         min_coverage = mc), rd, csfm)
+        rq = return_forecast(FixedWeightedReturnForecast(; scores = ds, scale = gamma,
+                                                         weights = [2 // 1, -1 // 1,
+                                                                    1 // 2],
+                                                         min_coverage = mc), rd, csfm)
+        @test rq.weights == [4 // 7, -2 // 7, 1 // 7]
+        @test isequal(isnan.(rq.hist), isnan.(rf.hist))
+        @test rq.hist[isfinite.(rf.hist)] ≈ rf.hist[isfinite.(rf.hist)] rtol = 1e-14
+        rb = return_forecast(FixedWeightedReturnForecast(; scores = ds, scale = big"0.04",
+                                                         weights = omega,
+                                                         min_coverage = mc), rd, csfm)
+        @test eltype(rb.hist) === BigFloat
+        @test rb.hist[isfinite.(rf.hist)] ≈ rf.hist[isfinite.(rf.hist)] rtol = 1e-12
     end
 end
 
@@ -506,6 +758,95 @@ end
         blk3 = CrossSectionalFactorModel(; M = reshape([1.0, 1.0], 2, 1), b = zeros(2),
                                          csr = csr, vs = [0.1 0.2; 0.3 NaN])
         @test isequal(PO.forecast_idiosyncratic_variances(blk3), [0.1 0.2; 0.3 NaN])
+    end
+end
+
+@testset "The shared helpers of the Return Forecast family agree with their closed form" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(824)
+    X = randn(rng, 12, 4)
+    X[3, 1] = NaN
+    X[7, 2] = Inf
+    X[5:8, 3] .= NaN
+    # The forward mean written out from its docstring: the finite returns of the window
+    # s ∈ {t + ℓ, …, t + ℓ + h - 1}, and NaN when the window leaves the history or is empty.
+    function fwd_oracle(X, h, l)
+        T = size(X, 1)
+        Y = fill(NaN, size(X))
+        for i in axes(X, 2), t in 1:T
+            t + l + h - 1 <= T || continue
+            v = filter(isfinite, X[(t + l):(t + l + h - 1), i])
+            isempty(v) || (Y[t, i] = sum(v) / length(v))
+        end
+        return Y
+    end
+
+    @testset "The forward mean is the mean of the finite window" begin
+        for (h, l) in ((1, 0), (1, 1), (3, 1), (2, 3), (4, 0))
+            Y = PO.forward_mean_returns(X, h, l)
+            E = fwd_oracle(X, h, l)
+            @test isequal(isnan.(Y), isnan.(E))
+            @test Y[isfinite.(E)] ≈ E[isfinite.(E)] rtol = 1e-12
+            @test all(isnan, Y[(end - (l + h - 1) + 1):end, :])
+        end
+    end
+
+    @testset "The forward mean floats integer returns, keeps a float type, and refuses a Rational" begin
+        Xi = [1 2; 3 4; 5 7; 6 1]
+        Yi = PO.forward_mean_returns(Xi, 2, 1)
+        @test eltype(Yi) === Float64
+        @test isequal(Yi, [4.0 5.5; 5.5 4.0; NaN NaN; NaN NaN])
+        @test eltype(PO.forward_mean_returns(Float32.(X), 3, 1)) === Float32
+        Yb = PO.forward_mean_returns(big.(X), 3, 1)
+        @test eltype(Yb) === BigFloat
+        @test isequal(isnan.(Yb), isnan.(fwd_oracle(X, 3, 1)))
+        @test_throws ArgumentError PO.forward_mean_returns(Rational{Int}.(Xi), 1, 0)
+    end
+
+    @testset "The unit conversions are the unit factor and its inverse" begin
+        F = randn(rng, 5, 3)
+        vs = rand(rng, 5, 3) .+ 0.01
+        g = sqrt.(vs)
+        @test PO.forecast_return_units(IdiosyncraticSharpeUnit(), F, vs) ≈ g .* F rtol = 1e-12
+        @test PO.forecast_unit_target(IdiosyncraticSharpeUnit(), F, vs) ≈ F ./ g rtol = 1e-12
+        @test PO.forecast_return_units(IdiosyncraticSharpeUnit(),
+                                       PO.forecast_unit_target(IdiosyncraticSharpeUnit(), F,
+                                                               vs), vs) ≈ F rtol = 1e-12
+        @test PO.forecast_unit_target(IdiosyncraticSharpeUnit(), [1.0 2.0], [0.0 4.0]) ==
+              [Inf 1.0]
+        # A variance history of one row broadcast over the whole target before it was checked.
+        @test_throws DimensionMismatch PO.forecast_unit_target(IdiosyncraticSharpeUnit(), F,
+                                                               vs[1:1, :])
+    end
+
+    @testset "The block lives on the last rows of the carrier" begin
+        rd = forecast_hand_panel(["a" => rand(rng, 6, 2)])
+        @test PO.return_forecast_rows(rd, forecast_hand_block(2; vs = fill(0.1, 4, 2))) ==
+              3:6
+        @test PO.return_forecast_rows(rd, forecast_hand_block(2; vs = fill(0.1, 6, 2))) ==
+              1:6
+        @test PO.return_forecast_rows(rd, forecast_hand_block(2)) == 1:6
+        exposed = forecast_hand_block(2; Ms = rand(rng, 5, 2, 1))
+        @test PO.return_forecast_block_observations(exposed) == 5
+        long = forecast_hand_block(2; vs = fill(0.1, 7, 2))
+        @test_throws DimensionMismatch PO.return_forecast_rows(rd, long)
+    end
+
+    @testset "A cut takes the block rows, and a pad puts NaN before them" begin
+        A = rand(rng, 6, 2)
+        A3 = rand(rng, 6, 2, 3)
+        @test PO.return_forecast_cut(A, 3:6) == A[3:6, :]
+        @test PO.return_forecast_cut(A3, 3:6) == A3[3:6, :, :]
+        @test isnothing(PO.return_forecast_cut(nothing, 3:6))
+        B = PO.return_forecast_pad(A[3:6, :], 3:6, 6)
+        @test all(isnan, B[1:2, :])
+        @test B[3:6, :] == A[3:6, :]
+        @test isnothing(PO.return_forecast_pad(nothing, 3:6, 6))
+        Bi = PO.return_forecast_pad([1 2; 3 4], 2:3, 3)
+        @test eltype(Bi) === Float64
+        @test isequal(Bi, [NaN NaN; 1.0 2.0; 3.0 4.0])
+        @test eltype(PO.return_forecast_pad(Float32[1 2; 3 4], 2:3, 3)) === Float32
+        @test_throws ArgumentError PO.return_forecast_pad(Rational{Int}[1 2; 3 4], 2:3, 3)
     end
 end
 
@@ -713,6 +1054,133 @@ end
                                                                  coef = [1.0],
                                                                  A = fill(1.0, 1, 1),
                                                                  c = [1.0], n = -1)
+    end
+end
+
+@testset "The exponentially weighted member agrees with its closed form" begin
+    PO = PortfolioOptimisers
+    # Observation 2 carries no entering asset, so it advances nothing. The state must not
+    # decay over it: a weight of `lambda^(t_n - t)` on the calendar index states different
+    # coefficients. Observation 3 carries three of the four assets.
+    a = [1.0 2.0 3.0 0.5; 2.0 1.0 4.0 1.5; 3.0 2.0 1.0 2.5; 1.0 4.0 2.0 3.0;
+         2.0 2.0 3.0 1.0]
+    b = [4.0 1.0 2.0 3.0; 1.0 3.0 2.0 2.0; 2.0 1.0 3.0 1.0; 3.0 2.0 1.0 4.0;
+         1.0 1.0 2.0 2.0]
+    er = [0.01 -0.02 0.03 0.00; -0.01 0.02 0.01 0.02; 0.02 0.01 -0.03 0.01;
+          0.00 0.03 0.02 -0.01; 0.01 0.00 -0.01 0.02]
+    vs = [0.04 0.09 0.01 0.02; 0.02 0.05 0.03 0.04; 0.06 0.01 0.02 0.03;
+          0.03 0.04 0.05 0.02; 0.02 0.03 0.04 0.05]
+    emsk = trues(5, 4)
+    emsk[2, :] .= false
+    emsk[3, 4] = false
+    rd, csfm, ds = forecast_fit_panel(a, b, er, vs; emsk = emsk)
+    lambda = 0.5
+    rho = 1e-3
+    gamma = 1.5
+
+    # The closed form, written out: the sums over the observations t_1 < ... < t_n that
+    # advance the state, the advance k weighted by lambda^(m - k), then the ridge with its
+    # floor, then the forecast at t from the coefficients after m(t - 1) advances.
+    function closed_form(sharpe::Bool, normalise::Bool, calendar::Bool)
+        g = sharpe ? sqrt.(vs) : ones(size(vs))
+        fwd = er[2:5, :]
+        ts = [t for t in 1:4 if any(emsk[t, :])]
+        beta = Vector{Vector{Float64}}(undef, length(ts))
+        for m in eachindex(ts)
+            A = zeros(2, 2)
+            c = zeros(2)
+            for k in 1:m
+                t = ts[k]
+                idx = findall(emsk[t, :])
+                w = [g[t, i]^2 / vs[t, i] for i in idx]
+                if normalise
+                    w ./= sum(w) / length(w)
+                end
+                S = [a[t, idx] b[t, idx]]
+                W = LinearAlgebra.Diagonal(w)
+                p = calendar ? ts[m] - t : m - k
+                A += (1 - lambda) * lambda^p * transpose(S) * W * S
+                c += (1 - lambda) *
+                     lambda^p *
+                     transpose(S) *
+                     W *
+                     [fwd[t, i] / g[t, i] for i in idx]
+            end
+            r = rho * max(sum(abs, LinearAlgebra.diag(A)) / 2, eps(Float64))
+            beta[m] = (A + r * LinearAlgebra.I) \ c
+        end
+        H = fill(NaN, 5, 4)
+        for t in 2:5, i in 1:4
+            m = count(<=(t - 1), ts)
+            if m >= 1
+                H[t, i] = gamma * g[t, i] * (a[t, i] * beta[m][1] + b[t, i] * beta[m][2])
+            end
+        end
+        return H, beta[end]
+    end
+
+    for (unit, sharpe) in
+        ((IdiosyncraticReturnUnit(), false), (IdiosyncraticSharpeUnit(), true)),
+        normalise in (true, false)
+
+        rf = return_forecast(ExpWeightedReturnForecast(; scores = ds, decay = lambda,
+                                                       min_obs = 1, ridge = rho,
+                                                       scale = gamma, normalise = normalise,
+                                                       unit = unit), rd, csfm)
+        H, beta = closed_form(sharpe, normalise, false)
+        _, calendar = closed_form(sharpe, normalise, true)
+        m = isfinite.(H)
+        @test isequal(isnan.(rf.hist), isnan.(H))
+        @test rf.hist[m] ≈ H[m] rtol = 1e-12
+        @test rf.coef ≈ beta rtol = 1e-12
+        @test rf.n == 3
+        @test !isapprox(rf.coef, calendar; rtol = 1e-2)
+    end
+
+    @testset "min_obs counts the observations that advance the state" begin
+        # Row 3 reads the state after observation 2, which one advance holds. A count of
+        # the calendar observations would publish it.
+        rf = return_forecast(ExpWeightedReturnForecast(; scores = ds, decay = lambda,
+                                                       min_obs = 2, ridge = rho), rd, csfm)
+        @test all(isnan, rf.hist[1:3, :])
+        @test all(isfinite, rf.hist[4:5, :])
+    end
+
+    @testset "The ridge of an empty normal matrix takes the floor" begin
+        @test PO.ew_forecast_solve(zeros(2, 2), [1.0, 1.0], 1.0, 1) ≈
+              fill(1 / eps(Float64), 2)
+        @test PO.ew_forecast_solve(zeros(2, 2), [1.0, 1.0], 0.0, 1) == [0.0, 0.0]
+    end
+
+    @testset "The state takes the type of the data and of the hyperparameters" begin
+        T, N = size(a)
+        inp = [NumericPanelInput(; name = "a", vals = Float32.(a),
+                                 alg = ForwardPanelFill()),
+               NumericPanelInput(; name = "b", vals = Float32.(b),
+                                 alg = ForwardPanelFill())]
+        pnl = asset_panel(inp; amsk = trues(T, N), emsk = emsk)
+        rd32 = ReturnsResult(; nx = ["A$i" for i in 1:N], X = zeros(Float32, T, N),
+                             pnl = pnl)
+        csr = CrossSectionalRegression(; f = zeros(Float32, T, 1), eps = Float32.(er),
+                                       n = fill(N, T))
+        csfm32 = CrossSectionalFactorModel(; M = reshape(fill(1.0f0, N), N, 1),
+                                           b = zeros(Float32, N), csr = csr,
+                                           vs = Float32.(vs))
+        H, _ = closed_form(false, true, false)
+        rf = return_forecast(ExpWeightedReturnForecast(; scores = ds, decay = 0.5f0,
+                                                       min_obs = 1, ridge = 1.0f-3,
+                                                       scale = 1.5f0), rd32, csfm32)
+        for x in (rf.A, rf.c, rf.coef, rf.hist, rf.mu)
+            @test eltype(x) == Float32
+        end
+        @test rf.hist[isfinite.(H)] ≈ H[isfinite.(H)] rtol = 1e-5
+        # A wider hyperparameter widens the state, and is not truncated to the data.
+        rf = return_forecast(ExpWeightedReturnForecast(; scores = ds, decay = big"0.5",
+                                                       min_obs = 1, ridge = big"1e-3"), rd,
+                             csfm)
+        for x in (rf.A, rf.c, rf.coef, rf.hist)
+            @test eltype(x) == BigFloat
+        end
     end
 end
 
@@ -939,6 +1407,78 @@ end
     end
 end
 
+@testset "The target member agrees with its closed form" begin
+    PO = PortfolioOptimisers
+    # Observation 2 carries one entering asset, so it states no slope. The accumulators must
+    # not decay over it: a weight of `lambda^(-t)` on the calendar index states a different
+    # coefficient.
+    a = [1.0 2.0 3.0 0.5; 2.0 1.0 4.0 1.5; 3.0 2.0 1.0 2.5; 1.0 4.0 2.0 3.0;
+         2.0 2.0 3.0 1.0]
+    b = [4.0 1.0 2.0 3.0; 1.0 3.0 2.0 2.0; 2.0 1.0 3.0 1.0; 3.0 2.0 1.0 4.0;
+         1.0 1.0 2.0 2.0]
+    eps = [0.01 -0.02 0.03 0.00; -0.01 0.02 0.01 0.02; 0.02 0.01 -0.03 0.01;
+           0.00 0.03 0.02 -0.01; 0.01 0.00 -0.01 0.02]
+    vs = [0.04 0.09 0.01 0.02; 0.02 0.05 0.03 0.04; 0.06 0.01 0.02 0.03;
+          0.03 0.04 0.05 0.02; 0.02 0.03 0.04 0.05]
+    emsk = trues(5, 4)
+    emsk[2, 2:4] .= false
+    rd, csfm, ds = forecast_fit_panel(a, b, eps, vs; emsk = emsk)
+    lambda = 0.5
+
+    # The closed form, written out: an ordinary least squares on every valid pair, then the
+    # recursion over the observations that advance the calibration, then the ridge.
+    function closed_form(sharpe::Bool)
+        g = sharpe ? sqrt.(vs) : ones(size(vs))
+        fwd = eps[2:5, :]
+        pairs = [(t, i) for t in 1:4 for i in 1:4 if emsk[t, i]]
+        X = [[a[t, i] for (t, i) in pairs] [b[t, i] for (t, i) in pairs]]
+        beta = X \ [fwd[t, i] / g[t, i] for (t, i) in pairs]
+        p(t, i) = g[t, i] * (a[t, i] * beta[1] + b[t, i] * beta[2])
+        A = 0.0
+        C = 0.0
+        num = 0.0
+        den = 0.0
+        for t in 1:4
+            idx = [i for i in 1:4 if emsk[t, i]]
+            if length(idx) < 2
+                continue
+            end
+            om = [1 / vs[t, i] for i in idx]
+            om ./= sum(om) / length(om)
+            at = sum(om[k] * p(t, idx[k])^2 for k in eachindex(idx))
+            ct = sum(om[k] * p(t, idx[k]) * fwd[t, idx[k]] for k in eachindex(idx))
+            A = lambda * A + (1 - lambda) * at
+            C = lambda * C + (1 - lambda) * ct
+            num += lambda^(-t) * ct
+            den += lambda^(-t) * at
+        end
+        kappa = C / ((1 + 1e-6) * A)
+        return kappa, num / den, [kappa * p(5, i) for i in 1:4]
+    end
+
+    for (unit, sharpe) in
+        ((IdiosyncraticReturnUnit(), false), (IdiosyncraticSharpeUnit(), true))
+        rf = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
+                                                  decay = lambda, min_obs = 1, unit = unit),
+                             rd, csfm)
+        kappa, calendar, alpha = closed_form(sharpe)
+        @test rf.calib ≈ kappa rtol = 1e-12
+        @test rf.mu ≈ alpha rtol = 1e-12
+        @test !isapprox(rf.calib, calendar; rtol = 1e-3)
+    end
+
+    @testset "The early coefficient takes the type of its inputs" begin
+        rfe = TargetReturnForecast(; scores = ds, calibrate = false)
+        c = PO.target_forecast_coefficient(rfe, nothing, zeros(Float32, 2, 2),
+                                           zeros(Float32, 2), trues(2),
+                                           zeros(Float32, 2, 2), nothing,
+                                           ones(Float32, 2, 2), 1)
+        @test isa(c, Float32)
+        @test isnan(c)
+        @test isa(PO.target_forecast_multiplier(false, c), Float32)
+    end
+end
+
 #=
 Issue #835 finishes the file: the estimator scores the WHOLE carrier and answers on the
 BLOCK's rows. ADR 0112.
@@ -1099,5 +1639,21 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
         # The reference implementation's own coefficient, which the padded rows never enter.
         @test rf.calib ≈ -0.7730488894268933
         @test rf.mu[isfinite.(E)] ≈ E[isfinite.(E)]
+    end
+
+    @testset "In the Sharpe unit a row before the block trains nothing" begin
+        # The Sharpe target divides by the idiosyncratic volatility at the signal row, and a
+        # row before the block carries none, so the two windows fit one model.
+        for cal in (false, true)
+            kw = (; scores = ds, horizon = 2, lag = 1, calibrate = cal, half_life = 10.0,
+                  min_obs = 1, unit = IdiosyncraticSharpeUnit())
+            rw = return_forecast(TargetReturnForecast(; kw..., whole_history = true), rd,
+                                 csfm)
+            rc = return_forecast(TargetReturnForecast(; kw..., whole_history = false), rd,
+                                 csfm)
+            @test any(isfinite, rw.mu)
+            @test isequal(rw.mu, rc.mu)
+            @test isequal(rw.calib, rc.calib)
+        end
     end
 end

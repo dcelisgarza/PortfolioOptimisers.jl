@@ -1,11 +1,13 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimates a covariance matrix by an exponentially weighted recursion that freezes on a holiday and resets on an inactive period.
+Estimates a covariance matrix by an exponentially weighted recursion that holds a correlation on a holiday and resets on an inactive period.
 
-Each observation updates the sub-block of the assets that are valid at it, so a gap never reaches an entry it did not touch. The recursion is seeded at zero, and the output divides out the damping that the cold start costs through a congruence transform, which keeps the state positive semidefinite and leaves every correlation unchanged.
+Each asset ages its observations on its own clock, which counts only the observations where that asset is valid. An entry for a pair of assets weights an observation by the geometric mean of the two weights. A gap in one asset thus leaves its variance unchanged, and each of its covariances decays by the square root of the decay at an observation where the other asset is valid. The state starts at zero. The estimate divides out the weight that the zero start lacks, and it divides the rows and the columns by the same factor, so every correlation stays unchanged.
 
-Keeping a young asset investable has a cost the prior pays for it. A prior fitted with this estimator zero-fills the rows the asset was missing through [`scenario_fill`](@ref), because every consumer of a Prior Result reads its returns matrix; a scenario-based measure then reads a zero return where the asset had none and understates that asset's risk over those rows, while the covariance stays the estimate this recursion made from the rows it saw. The fill is silent at or below the fitting prior's own `fill_limit` field, a share of that asset's own observations, warns above it, and refuses any fill under `strict`; `fill_limit` defaults to `nothing`, and this family carries no `CoveragePolicy` to derive a limit from, so every fill is named.
+The estimate is positive semidefinite, with or without a holiday. A holiday gives no information about the co-movement of its asset, so the step holds the correlation of each pair that contains it and moves the variance of the other asset. Of the rules that keep the estimate positive semidefinite, this is the one that moves no correlation without data. It is where the port departs from the reference, which freezes the covariance and can return an indefinite matrix. Without a holiday the two rules agree.
+
+A young asset that stays investable has a cost for the prior. A prior fitted with this estimator fills the rows that the asset lacks with zeros through [`scenario_fill`](@ref), because every consumer of a Prior Result reads its returns matrix. A scenario-based measure then reads a zero return where the asset had none, and it understates the risk of that asset over those rows. The covariance stays the estimate that this recursion made from the rows it saw. The fill is silent at or below the `fill_limit` field of the fitting prior, which is a share of the observations of that asset. Above the limit it warns, and under `strict` it refuses every fill. `fill_limit` defaults to `nothing`, and this family has no `CoveragePolicy` to derive a limit from, so the prior names every fill.
 
 # Fields
 
@@ -20,34 +22,44 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> ExpWeightedCovariance
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. The default `min_obs` is the half-life of `decay`, the count of observations after which a weight halves.
 
 ## Validation
 
   - $(val_dict[:decay])
-  - `min_obs > 0`.
+  - $(val_dict[:min_obs])
 
 # Mathematical definition
 
-The internal state after the valid observations of each asset is
-
 ```math
-S = (1 - \\lambda) \\sum_{k} \\lambda^{k} e_{k} e_{k}^{\\top},
-```
-
-taken on the sub-block of the assets that are valid at each observation, and the reported covariance is the congruence transform
-
-```math
-\\hat{\\Sigma} = D S D, \\qquad D = \\operatorname{diag}\\left(\\frac{1}{\\sqrt{1 - \\lambda^{n_i}}}\\right).
+\\begin{align}
+m_{t,\\,i} &= (1 - \\lambda) \\sum_{u \\in \\mathcal{V}_i,\\, u < t} \\lambda^{c_i(u,\\, t)} x_{u,\\,i}\\,, \\\\
+e_{t,\\,i} &= x_{t,\\,i} - m_{t,\\,i}\\,, \\\\
+S_{ij} &= (1 - \\lambda) \\sum_{t \\in \\mathcal{V}_i \\cap \\mathcal{V}_j} \\lambda^{(c_i(t) + c_j(t)) / 2} e_{t,\\,i} e_{t,\\,j}\\,, \\\\
+\\hat{\\Sigma}_{ij} &= \\frac{S_{ij}}{\\sqrt{(1 - \\lambda^{n_i})(1 - \\lambda^{n_j})}}\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``\\lambda``: `decay`.
-  - ``e_{k}``: the returns of the valid assets at the observation ``k``, less the running location where `centred` is `false`.
-  - ``n_i``: the count of valid observations of asset ``i``.
+  - $(math_dict[:lambda_ew])
+  - $(math_dict[:x_ti_ret])
+  - ``\\mathcal{V}_i``: Valid observations of asset ``i``. They are the observations after the last one at which the active mask excludes the asset, where the return of the asset is finite.
+  - $(math_dict[:n_i_ew])
+  - ``c_i(u,\\, t)``: Count of the observations of ``\\mathcal{V}_i`` that lie strictly between ``u`` and ``t``.
+  - ``c_i(t)``: Count of the observations of ``\\mathcal{V}_i`` that lie after ``t``.
+  - ``m_{t,\\,i}``: Running location of asset ``i`` before the observation ``t``. It is zero where `centred` is `true`.
+  - ``e_{t,\\,i}``: Deviation of asset ``i`` at the observation ``t``.
+  - ``S_{ij}``: Entry of the internal state.
+  - ``\\hat{\\Sigma}_{ij}``: Entry of the estimate. It is `NaN` where asset ``i`` or asset ``j`` has fewer than `min_obs` valid observations, or where the active mask excludes it at the last observation.
 
-A congruence transform preserves positive semidefiniteness, so ``\\hat{\\Sigma}`` inherits the property from ``S``, and it cancels in a correlation, so the correction moves no correlation. The correction is the **square root** of ``1 - \\lambda^{n_i}``, where a first-moment estimator uses the first power.
+The weights of ``S_{ii}`` sum to ``1 - \\lambda^{n_i}``, so ``\\hat{\\Sigma}_{ii}`` is a weighted mean of squared deviations whose weights sum to one. In matrix form ``\\hat{\\Sigma} = D S D`` with ``D = \\operatorname{diag}(1 / \\sqrt{1 - \\lambda^{n_i}})``. This congruence transform cancels in a correlation, and ``\\hat{\\Sigma}`` is positive semidefinite exactly when ``S`` is. ``S`` is positive semidefinite for every pattern of holidays. With ``w_{t,\\,i} = \\lambda^{c_i(t) / 2}`` on ``\\mathcal{V}_i`` and zero elsewhere, ``S = (1 - \\lambda) \\sum_t (w_t \\circ e_t)(w_t \\circ e_t)^\\intercal`` is a sum of positive semidefinite outer products. At each observation the recursion is the congruence ``S \\leftarrow D_t S D_t`` plus one such product, where ``D_t`` holds ``\\sqrt{\\lambda}`` for a valid asset and one for any other asset. Without a holiday ``D_t = \\sqrt{\\lambda} I``, and the recursion is ``S \\leftarrow \\lambda S`` plus the product. The correction is the square root of ``1 - \\lambda^{n_i}``, where a first-moment estimator divides by the first power.
+
+A holiday of asset ``j`` scales ``S_{ij}`` by ``\\sqrt{\\lambda}`` and ``S_{ii}`` by ``\\lambda`` before the new product, and it leaves ``S_{jj}`` unchanged, so the correlation of the pair holds. A recursion that updates only the pairs whose two assets are valid scales ``S_{ii}`` by ``\\lambda`` and leaves ``S_{ij}`` unchanged. After ``k`` such steps with a zero deviation of asset ``i``, the implied correlation grows by ``\\lambda^{-k/2}``, without bound, in exact arithmetic.
+
+By the Cauchy-Schwarz inequality, the weights of ``S_{ij}`` sum to at most the denominator, with equality when the two assets have the same valid observations. An entry for two assets with different histories is therefore smaller in magnitude than the weighted mean over their common observations.
+
+The location starts at zero and takes no correction. The first deviation of an asset is thus its return, and the next deviations read a location that the zero start damps.
 
 # Examples
 
@@ -91,7 +103,7 @@ julia> ce.min_obs
     cache
     function ExpWeightedCovariance(decay::Number, min_obs::Integer, centred::Bool,
                                    cache::Option{<:AbstractPartialFitState})
-        assert_nonempty_gt0_finite_val(decay, :decay)
+        assert_unit_interval(decay, :decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         return new{typeof(decay), typeof(min_obs), typeof(centred), typeof(cache)}(decay,
                                                                                    min_obs,
@@ -108,9 +120,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Internal mutable cache for the online covariance update in [`ExpWeightedCovariance`](@ref).
+Holds the running state of an incremental exponentially weighted covariance fit.
 
-This type is an implementation detail and is not intended for direct use.
+The struct is immutable, and each of its four fields is an array that the recursion writes in place. [`partial_fit!`](@ref) stores the state in the `cache` field of [`ExpWeightedCovariance`](@ref), and `cov(ce, state)` reads the estimate out of it.
 
 # Fields
 
@@ -141,20 +153,30 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Processes a single observation row (or column) to update the online covariance cache.
+Folds one observation into the state of an exponentially weighted covariance fit.
 
-An asset is valid when its return is finite and the active mask admits it, and the update touches the sub-block of the valid assets alone. An active asset with a non-finite return freezes every entry that touches it, and an asset that has just become inactive has its whole row and column reset to the cold state so that the bias correction restarts if it lists again.
+An asset is valid when its return is finite and the active mask admits it. An active asset with a non-finite return is on a holiday. Its variance keeps its value, and its covariance with each valid asset decays by the square root of the decay, so their correlation holds. An asset that leaves the active mask returns to the zero state, so its correction starts again if it lists again.
+
+# Algorithm
+
+ 1. Mark as `valid` each asset whose return in `X` is finite and that `active_mask` admits.
+ 2. When `active_mask` is not `nothing`, take `newly_inactive` as the assets that the mask excludes and that `cache.active` admits. Set their rows and columns of `cache.covariance` and their counts in `cache.obs_count` to zero. Where `ce.centred` is `false`, set their entries of `cache.location` to `NaN`.
+ 3. Copy the mask into `cache.active`, or set every entry to `true` when the mask is `nothing`.
+ 4. Return `cache` when no asset is valid.
+ 5. Where `ce.centred` is `true`, take `Xi` as `X`. Otherwise read `cache.location` with `NaN` as zero into `loc`, move the valid entries of `cache.location` to `ce.decay * loc + (1 - ce.decay) * X`, and take `Xi` as `X - loc`.
+ 6. Take `d` as `sqrt(ce.decay)` for each valid asset and as one for each other asset, and scale `cache.covariance` to `d .* cache.covariance .* d'`. Take `e` as the entries of `Xi` of the valid assets, and add `(1 - ce.decay) * e * e'` to their block.
+ 7. Add one to the count of each valid asset in `cache.obs_count`.
 
 # Arguments
 
-  - `cache::ExpWeightedCovarianceState`: Online covariance computation cache (mutated).
-  - `ce::ExpWeightedCovariance`: Covariance estimator configuration.
-  - `X::VecNum`: Returns vector for the current observation.
-  - `active_mask::Option{<:AbstractVector{<:Bool}}`: Optional mask of currently active assets. With `nothing` every asset is active, so a non-finite return reads as a holiday.
+  - `cache::ExpWeightedCovarianceState`: State of the fit. The method writes it in place.
+  - `ce::ExpWeightedCovariance`: Exponentially weighted covariance estimator.
+  - `X::VecNum`: Returns of one observation, one entry per asset.
+  - `active_mask::Option{<:AbstractVector{<:Bool}}`: Mask of the active assets at this observation. With `nothing` every asset is active, so a non-finite return is a holiday.
 
 # Returns
 
-  - `cache::ExpWeightedCovarianceState`: The cache to read on and to pass to the next observation. Every field is an array that is mutated in place.
+  - `cache::ExpWeightedCovarianceState`: The state after the observation. It is the same object as the argument.
 
 # Related
 
@@ -194,10 +216,13 @@ function process_observation!(cache::ExpWeightedCovarianceState, ce::ExpWeighted
         X - loc
     end
 
+    sqrt_decay = sqrt(ce.decay)
+    d = ifelse.(valid, sqrt_decay, one(sqrt_decay))
+    cache.covariance .*= d .* transpose(d)
     idx = findall(valid)
     e = view(Xi, idx)
     block = view(cache.covariance, idx, idx)
-    block .= ce.decay * block + (one(ce.decay) - ce.decay) * (e * transpose(e))
+    block .+= (one(ce.decay) - ce.decay) * (e * transpose(e))
     cache.obs_count[idx] .+= 1
 
     return cache
@@ -205,7 +230,34 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Covariance method of [`exp_weighted_pass!`](@ref). Runs one forward pass of the online covariance update over the observations of `X`, and calls `f` after each observation.
+Covariance method of [`exp_weighted_pass!`](@ref). Runs one forward pass of the covariance recursion over the observations of `X`, and calls `f` after each observation.
+
+# Algorithm
+
+ 1. Check `dims`, and check that `active_mask` has the size of `X` when it is not `nothing`.
+ 2. Take `N` as the number of assets.
+ 3. When `state` is `nothing`, make a zero state of `N` assets in the type `T` of a quotient of two entries of `X`. Its `covariance` and `obs_count` are zero, its `active` entries are `true`, and its `location` is zero where `est.centred` is `true` and `NaN` otherwise. When `state` is given, check that it holds `N` assets and take it as it is.
+ 4. For each observation `i`, fold the observation and its row of `active_mask` into the state with [`process_observation!`](@ref), then call `f(i, cache)`.
+ 5. Return the state.
+
+# Arguments
+
+  - `f`: Function called as `f(i, cache)` after the observation `i`. Its return value is discarded.
+  - `est::ExpWeightedCovariance`: Exponentially weighted covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `active_mask::Option{<:AbstractMatrix{<:Bool}}`: Mask of the active assets, with the size of `X`. With `nothing` every asset is active.
+  - `state::Option{<:ExpWeightedCovarianceState}`: State to continue. With `nothing` the pass starts from the zero state.
+
+# Validation
+
+  - $(val_dict[:dims])
+  - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`. A `DimensionMismatch` is thrown otherwise.
+  - If `state` is not `nothing`, it holds as many assets as `X`. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `cache::ExpWeightedCovarianceState`: The state after the last observation. A given `state` is the same object, written in place.
 
 # Related
 
@@ -226,13 +278,15 @@ function exp_weighted_pass!(f, est::ExpWeightedCovariance, X::MatNum, dims::Int,
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
 
-    # An uncentred estimator seeds its location from the first observation it sees, so the
-    # location starts as `NaN`, in the type of `X` so that a `Float32` panel keeps a
-    # `Float32` state.
-    location = est.centred ? zeros(eltype(X), N) : fill(convert(eltype(X), NaN), N)
+    # The state takes the type of the returns, widened to a float only when it is an
+    # integer, so an integer panel gets a floating-point state and a `Float32` panel keeps a
+    # `Float32` state. An uncentred location
+    # starts as `NaN`, which marks an asset with no valid observation, and the recursion reads
+    # it as zero.
+    T = float_if_integer(eltype(X))
+    location = est.centred ? zeros(T, N) : fill(T(NaN), N)
     cache = if isnothing(state)
-        ExpWeightedCovarianceState(zeros(eltype(X), N, N), location, zeros(Int, N),
-                                   trues(N))
+        ExpWeightedCovarianceState(zeros(T, N, N), location, zeros(Int, N), trues(N))
     else
         @argcheck(size(state.covariance, 1) == N,
                   DimensionMismatch("the state holds $(size(state.covariance, 1)) assets, and `X` holds $N"))
@@ -249,7 +303,25 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Covariance method of [`exp_weighted_pass!`](@ref). Runs one forward pass of the online covariance update over the observations of `X`, and reads no intermediate cache.
+Covariance method of [`exp_weighted_pass!`](@ref). Runs one forward pass of the covariance recursion over the observations of `X`, and reads no intermediate state.
+
+It calls the method that takes a callback, with a callback that does nothing.
+
+# Arguments
+
+  - `est::ExpWeightedCovariance`: Exponentially weighted covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `active_mask::Option{<:AbstractMatrix{<:Bool}}`: Mask of the active assets, with the size of `X`. With `nothing` every asset is active.
+  - `state::Option{<:ExpWeightedCovarianceState}`: State to continue. With `nothing` the pass starts from the zero state.
+
+# Validation
+
+  - The checks of the method that takes a callback.
+
+# Returns
+
+  - `cache::ExpWeightedCovarianceState`: The state after the last observation.
 
 # Related
 
@@ -265,13 +337,26 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Covariance method of [`exp_weighted_moment`](@ref). Reads the exponentially weighted covariance out of a cache, as it stands.
+Covariance method of [`exp_weighted_moment`](@ref). Reads the exponentially weighted covariance out of a state.
 
-Applies the congruence correction, blanks the whole row and column of every asset that is not ready, and re-symmetrises the block that is left, so no transpose can pull a `NaN` into it. The cache is read, never written, so the same cache answers this call after every observation of a forward pass.
+The method reads the state and does not write it, so a forward pass can call it after every observation. The struct docstring of [`ExpWeightedCovariance`](@ref) states the estimate that it computes.
+
+# Algorithm
+
+ 1. Copy `cache.covariance` into `sigma`.
+ 2. Take `correction` as `1 / sqrt(max(1 - est.decay ^ n, eps(T)))` for each asset with a count `n` above zero, and as one for an asset with no valid observation. The `eps(T)` floor keeps the division finite.
+ 3. Multiply each entry `sigma[i, j]` by `correction[i] * correction[j]`.
+ 4. Take `not_ready` as the assets that `cache.active` excludes or whose count is below `est.min_obs`, and set their rows and columns of `sigma` to `NaN`.
+ 5. Replace the block of the other assets with the mean of the block and its transpose, which removes the round-off asymmetry.
+
+# Arguments
+
+  - `cache::ExpWeightedCovarianceState`: State to read.
+  - `est::ExpWeightedCovariance`: Exponentially weighted covariance estimator.
 
 # Returns
 
-  - `sigma::MatNum`: Covariance matrix. The row and the column of an asset that is inactive, or that carries fewer than `est.min_obs` valid observations, are `NaN`.
+  - `sigma::MatNum`: Covariance matrix. The row and the column of an asset that is inactive, or that has fewer than `est.min_obs` valid observations, are `NaN`.
 
 # Related
 
@@ -313,24 +398,29 @@ end
 
 Compute the exponentially weighted covariance matrix.
 
-Iterates over the observation dimension of `X`, updating an online covariance cache at each step, then applies the congruence correction and blanks every asset that is not ready.
+The struct docstring of [`ExpWeightedCovariance`](@ref) states the estimate.
+
+# Algorithm
+
+ 1. Run one forward pass over the observations of `X` from the zero state with [`exp_weighted_pass!`](@ref), giving the state `cache`.
+ 2. Read `sigma` out of `cache` with [`exp_weighted_moment`](@ref).
 
 # Arguments
 
   - `ce`: Exponentially weighted covariance estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `active_mask`: Optional boolean matrix with the same size as `X`. An asset whose entry is `false` is inactive at that observation: its row and column are reset and its answer is `NaN` while it stays inactive. With `nothing` every asset is active, so a non-finite return reads as a holiday and every entry that touches the asset freezes.
+  - `active_mask`: Optional boolean matrix with the size of `X`. An asset whose entry is `false` is inactive at that observation. Its row and column return to the zero state, and its answer is `NaN` while it stays inactive. With `nothing` every asset is active, so a non-finite return is a holiday, and every entry of that asset keeps its value.
   - $(arg_dict[:ignkwargs])
 
 # Validation
 
   - $(val_dict[:dims])
-  - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`.
+  - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
-  - `sigma::MatNum`: Covariance matrix of size `assets × assets`. The row and the column of an asset with fewer than `ce.min_obs` valid observations are `NaN`.
+  - `sigma::MatNum`: Covariance matrix of size `assets × assets`. The row and the column of an asset are `NaN` when the asset has fewer than `ce.min_obs` valid observations, or when `active_mask` excludes it at the last observation.
 
 # Examples
 
@@ -352,10 +442,6 @@ julia> size(cov(ce, X))
 function Statistics.cov(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = exp_weighted_pass!(ce, X, dims, active_mask)
-    if !ce.centred && any(.!cache.active)
-        cache.location[.!cache.active] .= NaN
-    end
-
     return exp_weighted_moment(cache, ce)
 end
 """
@@ -363,7 +449,7 @@ end
 
 Answer `NaN`, so a gapped sample reaches the recursion with its gaps intact.
 
-The recursion updates only the sub-block of the assets that are valid at each observation, so a gap never reaches an entry it did not touch, and a fill would decay a block the mask freezes. The consumer therefore hands the sample as it stands, together with the active mask that explains the gap.
+The recursion moves only the entries of the assets that are valid at an observation. A finite fill value would make a gapped asset valid, and the recursion would then move entries that a gap keeps. So the consumer passes the sample as it is, together with the active mask that explains each gap.
 
 # Arguments
 
@@ -393,7 +479,23 @@ end
 
 Compute the exponentially weighted correlation matrix.
 
-This is the covariance of the same call, rescaled to a unit diagonal. The congruence correction cancels in the rescale, so the correlation is the correlation of the raw state.
+This is the covariance of the same call, rescaled to a unit diagonal. The correction of the covariance cancels in the rescale, so the correlation is the correlation of the internal state.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\rho_{ij} &= \\max\\left(-1,\\, \\min\\left(1,\\, \\frac{S_{ij}}{\\sqrt{S_{ii} S_{jj}}}\\right)\\right)\\,, \\quad i \\neq j\\,, \\\\
+\\rho_{ii} &= 1\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\rho_{ij}``: Entry of the correlation matrix.
+  - ``S_{ij}``: Entry of the internal state, as the struct docstring of [`ExpWeightedCovariance`](@ref) defines it.
+
+The state is positive semidefinite, so every ratio lies in ``[-1, 1]`` and the clamp removes only round-off. A blanked asset has `NaN` in its row, in its column and on the diagonal.
 
 # Arguments
 
@@ -402,6 +504,10 @@ This is the covariance of the same call, rescaled to a unit diagonal. The congru
   - $(arg_dict[:dims])
   - `active_mask`: Optional boolean matrix with the same size as `X`.
   - $(arg_dict[:ignkwargs])
+
+# Validation
+
+  - The checks of the covariance of the same call.
 
 # Returns
 
@@ -429,9 +535,15 @@ end
 
 Compute the point-in-time exponentially weighted variance series.
 
-Row `t` holds the diagonal of what `cov` returns for the first `t` observations of `X`, so no row reads an observation after its own. The update is a recursion over one observation, so this method overrides the expanding-window fallback with a **single forward pass**: it reads the cache after each observation instead of refitting.
+Row `t` holds the diagonal of what `cov` returns for the first `t` observations of `X`, so no row reads an observation after its own. The recursion folds one observation at a time, so this method replaces the expanding-window fallback with one forward pass that reads the state after each observation.
 
-The fallback cannot answer this estimator. It slices `X` once per row and passes every keyword unsliced, so a mask of the whole window meets a window of `t` observations and the size check refuses the call.
+The fallback cannot serve this estimator. It slices `X` once per row and passes every keyword as it is, so a mask of the whole window meets a window of `t` observations, and the size check refuses the call.
+
+# Algorithm
+
+ 1. Check `dims`, and allocate `val` with one row per observation and one column per asset.
+ 2. Run one forward pass over `X` with [`exp_weighted_pass!`](@ref). After the observation `i`, write the diagonal of [`exp_weighted_moment`](@ref) of the state into row `i` of `val`.
+ 3. Return `val`, transposed when `dims == 2`.
 
 # Arguments
 
@@ -444,12 +556,12 @@ The fallback cannot answer this estimator. It slices `X` once per row and passes
 # Validation
 
   - $(val_dict[:dims])
-  - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`.
+  - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
   - `val::Matrix{<:Number}`: Variance series, shaped as `(T, N)` if `dims == 1` or `(N, T)` if
-    `dims == 2`. An asset with fewer than `ce.min_obs` observations at row `t` is `NaN` there.
+    `dims == 2`. An asset is `NaN` at row `t` when it has fewer than `ce.min_obs` valid observations up to `t`, or when `active_mask` excludes it at `t`.
 
 # Related
 
@@ -479,7 +591,7 @@ end
 
 Compute the exponentially weighted covariance from a window of an Asset Panel.
 
-This estimator is mask-aware, so it overrides the reduce-and-expand root of the verb and reads the panel's active mask itself. The answer therefore lives on the whole universe rather than on the Coverage Universe: a young asset that lists inside the window is answered from the observations it has, and it is `NaN` only while it stays below `ce.min_obs`.
+This estimator reads an active mask, so it replaces the reduce-and-expand root of the verb and reads the active mask of the panel itself. The answer covers the whole universe, not only the Coverage Universe. A young asset that lists inside the window gets an estimate from the observations it has, and it is `NaN` only while its count stays below `ce.min_obs`.
 
 # Arguments
 
@@ -488,6 +600,11 @@ This estimator is mask-aware, so it overrides the reduce-and-expand root of the 
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
   - $(arg_dict[:ignkwargs])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - If `pnl` is not `nothing`, its active mask has the size of `X` after the orientation that `dims` sets. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
@@ -501,7 +618,7 @@ This estimator is mask-aware, so it overrides the reduce-and-expand root of the 
 """
 function Statistics.cov(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.cov(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
@@ -515,7 +632,7 @@ end
 
 Compute the exponentially weighted correlation from a window of an Asset Panel.
 
-This is the covariance of the same call, rescaled to a unit diagonal, and it reads the panel's active mask through the same override.
+This is the covariance of the same call, rescaled to a unit diagonal, and it reads the active mask of the panel in the same way.
 
 # Arguments
 
@@ -524,6 +641,11 @@ This is the covariance of the same call, rescaled to a unit diagonal, and it rea
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
   - $(arg_dict[:ignkwargs])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - If `pnl` is not `nothing`, its active mask has the size of `X` after the orientation that `dims` sets. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
@@ -536,7 +658,7 @@ This is the covariance of the same call, rescaled to a unit diagonal, and it rea
 """
 function Statistics.cor(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.cor(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
@@ -550,7 +672,7 @@ end
 
 Compute the marginal exponentially weighted variance from a window of an Asset Panel.
 
-This is the diagonal of the covariance of the same call, and it reads the panel's active mask through the same override.
+This is the diagonal of the covariance of the same call, and it reads the active mask of the panel in the same way.
 
 # Arguments
 
@@ -559,6 +681,11 @@ This is the diagonal of the covariance of the same call, and it reads the panel'
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
   - $(arg_dict[:ignkwargs])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - If `pnl` is not `nothing`, its active mask has the size of `X` after the orientation that `dims` sets. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
@@ -571,7 +698,7 @@ This is the diagonal of the covariance of the same call, and it reads the panel'
 """
 function Statistics.var(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.var(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
@@ -585,7 +712,7 @@ end
 
 Compute the marginal exponentially weighted volatility from a window of an Asset Panel.
 
-This is the square root of the diagonal of the covariance of the same call, and it reads the panel's active mask through the same override.
+This is the square root of the diagonal of the covariance of the same call, and it reads the active mask of the panel in the same way.
 
 # Arguments
 
@@ -594,6 +721,11 @@ This is the square root of the diagonal of the covariance of the same call, and 
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
   - $(arg_dict[:ignkwargs])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - If `pnl` is not `nothing`, its active mask has the size of `X` after the orientation that `dims` sets. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
@@ -606,7 +738,7 @@ This is the square root of the diagonal of the covariance of the same call, and 
 """
 function Statistics.std(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.std(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
@@ -620,7 +752,7 @@ end
 
 Compute the point-in-time exponentially weighted variance series from a window of an Asset Panel.
 
-This is the diagonal of the covariance of the same call, read after each observation, and it reads the panel's active mask through the same override. A Descriptor that holds this estimator therefore keeps a number for a young asset, where the reduce-and-expand root would reduce every window and answer `NaN`.
+This is the diagonal of the covariance of the same call, read after each observation, and it reads the active mask of the panel in the same way. A Descriptor that holds this estimator thus keeps a number for a young asset. The reduce-and-expand root would reduce every window and answer `NaN` for it.
 
 # Arguments
 
@@ -629,6 +761,11 @@ This is the diagonal of the covariance of the same call, read after each observa
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
   - $(arg_dict[:ignkwargs])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - If `pnl` is not `nothing`, its active mask has the size of `X` after the orientation that `dims` sets. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
@@ -643,7 +780,7 @@ This is the diagonal of the covariance of the same call, read after each observa
 """
 function variance_series(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
                          dims::Int = 1, kwargs...)
-    amsk, _ = panel_moment_masks(pnl)
+    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return variance_series(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
@@ -655,9 +792,14 @@ end
         kwargs...
     ) -> ExpWeightedCovariance
 
-Fold a block of observations into the estimator's own online covariance state.
+Fold a block of observations into the state that the estimator holds.
 
-The estimator carries the state in its `cache` field, so a second call continues the recursion rather than restarting it. A partial-fit state is the one Result an estimator may hold, and this is that exception.
+The estimator keeps the state in its `cache` field, so a second call continues the recursion and does not restart it. A partial-fit state is the one Result that an estimator can hold.
+
+# Algorithm
+
+ 1. Run one forward pass over `X` with [`exp_weighted_pass!`](@ref), from `ce.cache` or from the zero state when `ce.cache` is `nothing`, giving `cache`.
+ 2. Return a copy of `ce` whose `cache` field is `cache`.
 
 # Arguments
 
@@ -670,12 +812,12 @@ The estimator carries the state in its `cache` field, so a second call continues
 # Validation
 
   - $(val_dict[:dims])
-  - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`.
-  - If `ce.cache` is not `nothing`, it holds as many assets as `X`.
+  - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`. A `DimensionMismatch` is thrown otherwise.
+  - If `ce.cache` is not `nothing`, it holds as many assets as `X`. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
-  - `ce::ExpWeightedCovariance`: The estimator, with `cache` holding the state after the block.
+  - `ce::ExpWeightedCovariance`: A new estimator whose `cache` holds the state after the block. When `ce.cache` was a state, the pass wrote that state in place, so the two estimators share it.
 
 # Related
 
@@ -699,9 +841,9 @@ end
         kwargs...
     ) -> ExpWeightedCovariance
 
-Fold one observation into the estimator's own online covariance state.
+Fold one observation into the state that the estimator holds.
 
-The entries of `x` are the assets of a single observation, which is the row the matrix method folds one at a time. This is the shape a caller has when the observations arrive one by one.
+The entries of `x` are the assets of one observation, which is one row of the matrix method. A caller that receives the observations one by one has this shape. The method folds `x` as a matrix of one row.
 
 # Arguments
 
@@ -717,7 +859,7 @@ The entries of `x` are the assets of a single observation, which is the row the 
 
 # Returns
 
-  - `ce::ExpWeightedCovariance`: The estimator, with `cache` holding the state after the observation.
+  - `ce::ExpWeightedCovariance`: A new estimator whose `cache` holds the state after the observation.
 
 # Examples
 
@@ -751,7 +893,7 @@ end
 """
     Statistics.cov(ce::ExpWeightedCovariance, state::ExpWeightedCovarianceState; kwargs...) -> MatNum
 
-Read the exponentially weighted covariance out of a state the caller holds.
+Read the exponentially weighted covariance out of a state that the caller holds.
 
 # Arguments
 
@@ -775,13 +917,13 @@ end
 """
     Statistics.cov(ce::ExpWeightedCovariance; kwargs...) -> MatNum
 
-Read the exponentially weighted covariance out of the estimator's own state.
+Read the exponentially weighted covariance out of the state that the estimator holds.
 
-The one-argument form is what an incremental fit answers: [`partial_fit!`](@ref) leaves the state in the `cache` field, and this verb turns it into the ordinary answer. An estimator that has been given no observation carries no state, so the call is refused rather than answered with a zero.
+The one-argument form reads the result of an incremental fit. [`partial_fit!`](@ref) leaves the state in the `cache` field, and this verb turns the state into the estimate. An estimator that has seen no observation has no state, so the call throws and does not answer zero.
 
 # Arguments
 
-  - `ce`: Exponentially weighted covariance estimator carrying a state.
+  - `ce`: Exponentially weighted covariance estimator that holds a state.
   - $(arg_dict[:ignkwargs])
 
 # Validation
@@ -821,7 +963,7 @@ end
 """
     Statistics.cor(ce::ExpWeightedCovariance, state::ExpWeightedCovarianceState; kwargs...) -> MatNum
 
-Read the exponentially weighted correlation out of a state the caller holds.
+Read the exponentially weighted correlation out of a state that the caller holds.
 
 # Arguments
 
@@ -845,11 +987,11 @@ end
 """
     Statistics.cor(ce::ExpWeightedCovariance; kwargs...) -> MatNum
 
-Read the exponentially weighted correlation out of the estimator's own state.
+Read the exponentially weighted correlation out of the state that the estimator holds.
 
 # Arguments
 
-  - `ce`: Exponentially weighted covariance estimator carrying a state.
+  - `ce`: Exponentially weighted covariance estimator that holds a state.
   - $(arg_dict[:ignkwargs])
 
 # Validation
@@ -873,7 +1015,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses to merge two [`ExpWeightedCovarianceState`](@ref).
 
-An exponentially weighted state folds forward exactly, `S = λ^{n_b} S_a + S_b`, but only while no asset resets inside the second block. The state records the count that a reset zeroed and not the reset itself, so the two cases are indistinguishable after the fact and a merge would silently keep a history the reset discarded. Fold the second block into the first with `partial_fit!` instead.
+The fold ``S = \\lambda^{n_b} S_a + S_b`` is exact only for a centred estimator over a second block in which every asset is valid at every observation. An uncentred block reads the location that the first block carries. A holiday makes the decay of an entry depend on the valid observations of each of its two assets, and a reset discards the first block for its asset. The state records neither the holidays nor the resets, so a merge cannot tell the cases apart. Fold the second block into the first with `partial_fit!`.
 
 # Arguments
 
@@ -882,7 +1024,7 @@ An exponentially weighted state folds forward exactly, `S = λ^{n_b} S_a + S_b`,
 
 # Validation
 
-  - The pair is refused with an `ArgumentError`.
+  - The method throws an `ArgumentError` for every pair.
 
 # Related
 
@@ -899,15 +1041,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies an [`ExpWeightedCovarianceState`](@ref), so the copy shares no array with the original.
 
-The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. Every field is an array, and every one is copied.
+It is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. It copies each of the four arrays.
 
 # Arguments
 
-  - `x`: The cache to copy.
+  - `x`: The state to copy.
 
 # Returns
 
-  - `state::ExpWeightedCovarianceState`: A fresh cache, equal to `x`, whose arrays are fresh.
+  - `state::ExpWeightedCovarianceState`: A new state equal to `x`, with new arrays.
 
 # Related
 

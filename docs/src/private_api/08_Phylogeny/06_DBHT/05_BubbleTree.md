@@ -2,13 +2,13 @@
 Description = "Bubble Tree, private API of PortfolioOptimisers.jl: BubbleHierarchy, DirectHb, BubbleCluster8s, BubbleMember."
 ```
 
-# Bubble Tree: private API
+# [Bubble Tree: private API](@id private-api-bubble-tree)
 
-The bubble tree is the first half of the seam behind [`DBHTs`](@ref): every function on this page
-and on [DBHT Dendrogram](06_DBHTDendrogram.md) reads matrices alone, so each is driven directly
-from a hand-built bubble structure in `test/test_13f_dbht_seam.jl`, and a wrong answer is
-caught at its own step rather than diagnosed backwards from the final clustering. `Hb` is sparse
-throughout, because [`DirectHb`](@ref) cuts an edge out of a copy of it.
+The functions on this page and on the [DBHT dendrogram](@ref private-api-dbht-dendrogram) page are two parts
+of [`DBHTs`](@ref). The functions here build the bubble tree of the planar graph and assign each
+asset to a cluster. The functions on the dendrogram page turn the clusters into a hierarchy. Each
+function takes and returns matrices, so you can call each one on its own. The bubble hierarchy
+`Hb` is a sparse matrix.
 
 ```@docs
 BubbleHierarchy

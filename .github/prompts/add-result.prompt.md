@@ -56,10 +56,7 @@ end
 
 Document it as [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Section Structure for Functions* states.
 
-Common interface methods to implement include:
-
-- `factory(res::MyResult, w::ObsWeights)::MyResult` — returns a copy with observation weights propagated.
-- `port_opt_view(res::MyResult, i)::MyResult` — returns a sliced view.
+A Result that a view or a propagation reaches also needs `port_opt_view` or `factory`. Do not write them by hand when field tags can express the cut. Declare it `@propagatable @concrete struct` and tag its fields, as `Turnover` in [`src/12_Turnover.jl`](../../src/12_Turnover.jl) does: the macro (`src/02_Tools/05_Propagatable.jl`) always makes `factory`, and makes `port_opt_view` when a field is tagged `@vprop`. The docstring then follows [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *`@propagatable` concrete struct types*. Write a method by hand only for a cut the tags cannot express, as `port_opt_view(pr::LowOrderPrior, i, args...)::LowOrderPrior` in [`src/10_Prior/01_Base_Prior.jl`](../../src/10_Prior/01_Base_Prior.jl) does.
 
 ## Step 4 — Update the producing function's return type annotation
 
@@ -67,7 +64,7 @@ Follow [`.github/instructions/julia-return-types.instructions.md`](../instructio
 
 ## Step 5 — Add `*_dict` entries if needed
 
-Add any missing entries to the dictionaries in [`src/01_Base/01_DocstringDictionaries.jl`](../../src/01_Base/01_DocstringDictionaries.jl). [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Documentation Dictionaries* states which text a dictionary owns and when prose is permitted instead.
+Add any missing entries to the dictionaries in [`src/01_Base/01_DocstringDictionaries/`](../../src/01_Base/01_DocstringDictionaries/). [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Documentation Dictionaries* states which text a dictionary owns and when prose is permitted instead.
 
 ## Step 6 — Export
 
@@ -99,6 +96,4 @@ If the addition creates a new file under `src/`, give it a row in [`code_health/
 
 ## Step 10 — Final checks
 
-Run the full pre-commit, test, and doctest suite following [`.github/prompts/pre-commit-and-test.prompt.md`](pre-commit-and-test.prompt.md).
-
-All three steps must pass before committing.
+Run the pre-commit checks, the tests for the area you changed, and the doctests, in the order [`.github/prompts/pre-commit-and-test.prompt.md`](pre-commit-and-test.prompt.md) gives.

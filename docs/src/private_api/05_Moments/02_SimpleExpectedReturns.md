@@ -4,7 +4,7 @@ Description = "Simple expected returns, private API of PortfolioOptimisers.jl: s
 
 # Simple expected returns: private API
 
-The most basic moment is the simple expected return. These types and functions implement it.
+The simplest estimate of the expected return of an asset is its sample mean, which [`SimpleExpectedReturns`](@ref) computes. The entries below support it.
 
 ```@docs
 show_fields(::SimpleExpectedReturns)
@@ -12,7 +12,7 @@ show_fields(::SimpleExpectedReturns)
 
 ## Incremental fit
 
-The sample mean folds one observation at a time, so a long history need not be held or re-read. [`partial_fit!`](@ref) returns a new estimator whose `cache` field carries the state, and `mean` reads the fit off the estimator alone.
+The sample mean can take the observations one at a time, so you do not need to keep a long history or read it again. [`partial_fit!`](@ref) returns a new estimator whose `cache` field holds the running count and mean. `mean(me)` then computes the estimate from that field, with no data.
 
 ```@docs
 SimpleExpectedReturnsState
@@ -22,7 +22,7 @@ Base.copy(x::SimpleExpectedReturnsState)
 
 ## Available-case fit
 
-With a [`CoveragePolicy`](@ref) in its `cvg` field the estimator fits each asset on that asset's own finite and active observations, and [`PortfolioOptimisers.coverage_mean`](@ref) routes between that arm and the Coverage Universe one.
+With a [`CoveragePolicy`](@ref) in its `cvg` field, the estimator computes the mean of each asset from the rows where that asset's return is finite and the asset is active. This is the available-case fit. Without a policy, the estimator computes the ordinary sample mean over the assets that have no gap in the window. [`PortfolioOptimisers.coverage_mean`](@ref) selects one of the two fits from the type of the `cvg` field.
 
 ```@docs
 PortfolioOptimisers.coverage_mean

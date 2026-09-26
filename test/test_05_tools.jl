@@ -544,6 +544,15 @@ end
     already = [1.0, 2.0]
     @test PO.concrete_typed_array_if_abstract(already) === already
     @test eltype(PO.concrete_typed_array_if_abstract(Any[1, 2.0])) == Union{Float64, Int64}
+    # --- float_if_integer: an integer type takes its float type, every other type is kept ---
+    @test PO.float_if_integer(Int) === Float64
+    @test PO.float_if_integer(Int32) === Float64
+    @test PO.float_if_integer(Bool) === Float64
+    @test PO.float_if_integer(BigInt) === BigFloat
+    @test PO.float_if_integer(Float32) === Float32
+    @test PO.float_if_integer(BigFloat) === BigFloat
+    @test PO.float_if_integer(Rational{Int}) === Rational{Int}
+    @test PO.float_if_integer(Complex{Int}) === Complex{Int}
     # --- factory and factory_child over a vector ---
     @test factory([MeanValue(), nothing]) == [MeanValue(), nothing]
     fc = PO.factory_child([MeanValue(), MedianValue()], aw)

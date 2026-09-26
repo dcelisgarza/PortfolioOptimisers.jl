@@ -4,37 +4,37 @@ Description = "Pipeline cross-validation, public API of PortfolioOptimisers.jl: 
 
 # Pipeline cross-validation
 
-## The price-level restriction (the rolling-window rule)
+## Combinatorial cross-validation of a pipeline from prices
 
-Combinatorial and multiple-randomised cross-validation recombine non-contiguous groups / resampled paths. A pipeline that *starts from prices* runs a rolling, order-dependent transform (a `PricesToReturns`, or any windowed preprocessing) that needs contiguous input rows, so those schemes are rejected at the price-level `split`. They are supported for a **returns-level** pipeline (below), which has no such transform.
+Combinatorial cross-validation trains on groups of rows that are not contiguous. A pipeline that starts from prices runs a transform that needs contiguous rows, such as `PricesToReturns`. At each gap between two training groups, that transform computes one false return across the gap, so each training window is approximate. The test groups are contiguous, so no false return enters the test returns. Multiple randomised cross-validation resamples assets and not rows, so it keeps every window contiguous, and a pipeline from prices runs it exactly. A pipeline that starts from returns has no such transform, and it runs combinatorial cross-validation without the approximation.
 
 ```@docs
 port_opt_view(pipe::Pipeline, i, args...; kwargs...)
 needs_previous_weights(p::Pipeline)
 ```
 
-## The pipeline fold loop
+## Cross-validation of a pipeline
 
-`cross_val_predict` over a `Pipeline` fits the whole workflow per fold and predicts on each test window. It is also the fold loop that consumes [`TimeDependent`](@ref) schedules in a pipeline (ADR 0030, "swap, then inject"): schedules are swapped for their per-fold values *before* `fit` runs, so injection never sees a schedule and `fit`/[`run_step`](@ref) never learn about folds.
+`cross_val_predict` over a `Pipeline` fits every step of the pipeline on each training window, and predicts on each test window. It also resolves the [`TimeDependent`](@ref) schedules of the pipeline. Before `fit` runs on a fold, it replaces each schedule with its value for that fold. `fit` and [`run_step`](@ref) never see a schedule, and never need to know the fold.
 
-A scheme that declares a Fold Fit sends the loop down its online arm, where the pipeline is warmed up once, folded fold by fold through [`partial_fit!`](@ref), and read out through `fit(pipe)`; `Online(pipe)` takes the same doors as the declared refit. See [the Pipeline's online step](06_OnlinePipeline.md).
+An online walk-forward, such as one that `OnlineIndexWalkForward` builds, fits the pipeline once on the first training window. It then adds the rows of each later fold with [`partial_fit!`](@ref), and reads the result with `fit(pipe)`. A pipeline wrapped as `Online(pipe)`, which refits on the rows it stores, runs through the same calls. See [the online updates of a pipeline](@ref api-the-pipelines-online-step).
 
 ```@docs
 cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)
 ```
 
-## Combinatorial and asset-resampling over a returns-level pipeline
+## Combinatorial and asset resampling schemes over a pipeline from returns
 
-A returns-level pipeline runs the multi-path schemes like the plain-optimiser loops: combinatorial fits each split on its (possibly non-contiguous) training rows and predicts its test groups; multiple-randomised runs each path's inner walk-forward over an asset-subset view of the input, so the pipeline fits fresh on the sub-universe and never sub-selects fitted state.
+A pipeline that starts from returns runs these schemes as an optimiser does. Combinatorial cross-validation fits each split on its training rows, which need not be contiguous, and predicts its test groups. Multiple randomised cross-validation runs the walk-forward of each path on a subset of the assets. The pipeline then fits again on that subset, and never takes a subset of a fitted state.
 
 ```@docs
 cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::CombinatorialCrossValidation)
 cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::MultipleRandomised)
 ```
 
-## Time-dependent traits and the swap over steps
+## Schedules over the steps of a pipeline
 
-The per-step legs of the time-dependent machinery: the traits recurse over a pipeline's steps, the swap maps over them (unwrapping [`PipelineStep`](@ref)-wrapped schedules), the fold-less reset resolves schedule steps to their explicit `default`, and the previous-weights factory delivers `w_prev` to the optimisation steps after the swap.
+These functions apply schedules to the steps of a pipeline. The functions that detect a schedule search every step. The replacement of each schedule by its value for the fold also works step by step, and it unwraps a schedule held in a [`PipelineStep`](@ref). A fit with no fold replaces each schedule with its `default`. After the replacement, `factory` gives the previous weights `w_prev` to the optimisation steps.
 
 ```@docs
 factory(p::Pipeline, w::VecNum)

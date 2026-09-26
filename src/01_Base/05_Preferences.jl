@@ -1,7 +1,7 @@
 """
     PREFERENCE_DISTANCES
 
-Enumerated allowlist mapping the names accepted by the `"suggestion_distance"` preference to their `StringDistances.StringDistance` objects. Membership and dispatch are one `Dict` — the same single-source-of-truth discipline as the equation parser's function allowlist (`docs/adr/0025-enumerated-parser-allowlist.md`): an unknown name fails closed at load with a typed error carrying a [`did_you_mean`](@ref) suggestion.
+Enumerated allowlist mapping the names accepted by the `"suggestion_distance"` preference to their `StringDistances.StringDistance` objects. Membership and dispatch are one `Dict` — the same single-source-of-truth discipline as the equation parser's function allowlist: an unknown name fails closed at load with a typed error carrying a [`did_you_mean`](@ref) suggestion.
 
 Supported names: `"levenshtein"`, `"damerau_levenshtein"`, `"jaro"`, `"jaro_winkler"`, `"ratcliff_obershelp"`.
 
@@ -52,7 +52,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the warning text for the load-time preferences that widened a guard (see [`apply_preferences!`](@ref)). One line per key: the key, the default it replaced, and the value the project asked for.
 
-A preference file is data. It ships with a cloned project or a template, it is often untracked, and [`__init__`](@ref PortfolioOptimisers.__init__) applies it at `using PortfolioOptimisers`, before any user code runs. A value that *tightens* a guard needs no announcement, so the warning names the widened guards alone: the [`RESOURCE_LIMITS`](@ref) and [`EQUATION_LIMITS`](@ref) caps a file raised, and a [`STRING_DISTANCE`](@ref) suggestion threshold it lowered (a lower threshold admits more candidates, which is the info-leak direction of `docs/adr/0026-lenient-constraint-names-with-suggestions.md`).
+A preference file is data. It ships with a cloned project or a template, it is often untracked, and [`__init__`](@ref PortfolioOptimisers.__init__) applies it at `using PortfolioOptimisers`, before any user code runs. A value that *tightens* a guard needs no announcement, so the warning names the widened guards alone: the [`RESOURCE_LIMITS`](@ref) and [`EQUATION_LIMITS`](@ref) caps a file raised, and a [`STRING_DISTANCE`](@ref) suggestion threshold it lowered (a lower threshold admits more candidates, the info-leak direction).
 
 Never interpolates the whole preference dictionary, so a key the message does not name stays out of the log — the same info-leak-safe message discipline as [`unknown_variable_msg`](@ref).
 
@@ -143,7 +143,7 @@ Apply load-time preference values to the global config defaults ([`EQUATION_LIMI
 
 Fails closed on an *invalid* value: it throws a typed `ArgumentError` naming the key and value, so the package refuses to load rather than silently running with a value the project got wrong. Values are applied through the `set_*!` setters, so they receive the same validation as runtime calls.
 
-A *valid* value is applied whatever its size — the caps exist to turn an OOM kill into a typed error, not to second-guess a sizing choice, and a project on a large machine may legitimately raise one. A value that widens a guard is announced with a `@warn` built by [`relaxed_preferences_msg`](@ref), because the channel needs no code: a `LocalPreferences.toml` is data, it travels with a cloned project, and it applies before any user code runs. Widening means a raised [`RESOURCE_LIMITS`](@ref) or [`EQUATION_LIMITS`](@ref) cap, or a lowered [`STRING_DISTANCE`](@ref) suggestion threshold. A value that tightens a guard, or that equals the default it replaces, is silent. The comparison is against the default *in effect when the preference is applied*, which at load is the shipped default. See the amendment of `docs/adr/0041-one-resource-cap-per-sink.md`.
+A *valid* value is applied whatever its size — the caps exist to turn an OOM kill into a typed error, not to second-guess a sizing choice, and a project on a large machine may legitimately raise one. A value that widens a guard is announced with a `@warn` built by [`relaxed_preferences_msg`](@ref), because the channel needs no code: a `LocalPreferences.toml` is data, it travels with a cloned project, and it applies before any user code runs. Widening means a raised [`RESOURCE_LIMITS`](@ref) or [`EQUATION_LIMITS`](@ref) cap, or a lowered [`STRING_DISTANCE`](@ref) suggestion threshold. A value that tightens a guard, or that equals the default it replaces, is silent. The comparison is against the default *in effect when the preference is applied*, which at load is the shipped default.
 
 To persist a configuration, put the keys in the active project's `LocalPreferences.toml`, e.g.:
 

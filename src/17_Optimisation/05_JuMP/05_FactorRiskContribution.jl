@@ -13,7 +13,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unkn
 
     FactorRiskContributionResult(;
         jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM, rr::AbstractLoadingsRegressionResult,
-        frc_plr::Option{<:AbstractPhylogenyConstraintResult}, fb::Option{<:OptE_Opt_FbChain}
+        frc_plr::Option{<:PlC_VecPlC}, fb::Option{<:OptE_Opt_FbChain}
     ) -> FactorRiskContributionResult
 
 Keywords correspond to the struct's fields.
@@ -38,7 +38,7 @@ Keywords correspond to the struct's fields.
     """
     rr
     """
-    Factor risk contribution placeholder result.
+    Phylogeny constraints on the factor weights, resolved on the factor returns. `nothing` when the estimator holds none.
     """
     frc_plr
     """
@@ -47,7 +47,7 @@ Keywords correspond to the struct's fields.
     fb
     function FactorRiskContributionResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                           rr::AbstractLoadingsRegressionResult,
-                                          frc_plr::Option{<:AbstractPhylogenyConstraintResult},
+                                          frc_plr::Option{<:PlC_VecPlC},
                                           fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(jr), typeof(r), typeof(rr), typeof(frc_plr), typeof(fb)}(jr, r,
                                                                                    rr,
@@ -57,7 +57,7 @@ Keywords correspond to the struct's fields.
 end
 function FactorRiskContributionResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                       rr::AbstractLoadingsRegressionResult,
-                                      frc_plr::Option{<:AbstractPhylogenyConstraintResult},
+                                      frc_plr::Option{<:PlC_VecPlC},
                                       fb::Option{<:OptE_Opt_FbChain})::FactorRiskContributionResult
     return FactorRiskContributionResult(jr, r, rr, frc_plr, fb)
 end
@@ -116,6 +116,10 @@ Solves a mean-risk problem whose decision variable is the vector of factor expos
 
 The asset weights are recovered from the exposures through the factor loadings, so a constraint written on the decision variable is a constraint on a factor. This is the change of basis alone: `FactorRiskContribution` sets **no** risk budget of its own. A target contribution per factor is stated through the risk measure's own `rc` constraints, exactly as it is for assets.
 
+Under [`Variance`](@ref) those rows sit on the semidefinite relaxation of [sdprp](@cite), formulation 16, over the factor weights. With `flag = true` the lift covers the off-factor weights ``\\tilde{\\boldsymbol{y}}_{af}`` too, so the variance is that of the returned weights, and each row states the Euler contribution of a factor as a share of the whole variance, as [`factor_risk_contribution`](@ref) reports it. [`set_risk_constraints!`](@ref) states the formulation. A solve can report success while the factor shares of the returned portfolio miss the rows, so compare [`factor_risk_contribution`](@ref) of the result with them. The `## Risk contribution constraints` subsection of [`Variance`](@ref) states the relaxation and the condition under which the rows bind.
+
+A [`Variance`](@ref) always takes this semidefinite formulation here, with or without rows. Its trace has degree one in the factor weights and ``k``, so under [`MaximumRatio`](@ref) the model maximises the excess return per unit of variance, not the Sharpe ratio. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule.
+
 # Mathematical definition
 
 The factor model of the loadings, fitted by `re` or carried by the prior:
@@ -157,7 +161,7 @@ Where:
 
   - ``\\mathbf{R}``: Asset returns matrix.
   - ``\\mathbf{F}``: Factor returns matrix.
-  - ``\\mathbf{B}``: Loading matrix, of size ``N \\times N_{f}``.
+  - $(math_dict[:B_loadings])
   - ``\\mathbf{E}``: Residual matrix.
   - ``\\boldsymbol{w}``: Portfolio weight vector.
   - ``\\boldsymbol{y}_{f}``: Factor exposure vector, the decision variable.
@@ -186,7 +190,7 @@ $(DocStringExtensions.FIELDS)
         fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> FactorRiskContribution
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the factor model, risk measure, objective, placeholder constraints, asset sets, warm start and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `flag` is execution control and stays static.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the factor model, risk measure, objective, factor phylogeny constraints, asset sets, warm start and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `flag` is execution control and stays static.
 
 ## Validation
 
@@ -229,6 +233,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 # References
 
   - $(ref_dict[:cajas2025]) Section 10.2.1.
+  - $(ref_dict[:sdprp]) Formulation 16.
   - $(ref_dict[:roncalliweisang2012])
   - $(ref_dict[:meucci2007])
 """
@@ -250,7 +255,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     obj
     """
-    Factor risk contribution placeholder constraints.
+    Phylogeny constraints on the factor weights, an estimator or a result, or a vector of them. A semidefinite entry adds rows through [`set_sdp_frc_phylogeny_constraints!`](@ref), and an integer entry through [`set_frc_iplg_constraints!`](@ref), which needs a MIP solver and finite asset weight bounds.
     """
     frc_ple
     """
@@ -331,14 +336,16 @@ function port_opt_view(frc::FactorRiskContribution, i, X::MatNum,
     r = port_opt_view(frc.r, i, X)
     return FactorRiskContribution(; opt = opt, re = re, r = r, obj = frc.obj,
                                   frc_ple = frc.frc_ple, sets = frc.sets, wi = frc.wi,
-                                  flag = frc.flag, fb = frc.fb)
+                                  flag = frc.flag, fb = view_child(frc.fb, i, X))
 end
 """
-    set_factor_risk_contribution_constraints!(model, re, rd, pr, flag, wi)
+    set_factor_risk_contribution_constraints!(model, re, rd, pr, flag, wi; hedge = false)
 
 Add factor risk contribution constraints to the JuMP model.
 
 Re-bases the weight variable onto the factor axis, `w = b1 * w1` (or `w = b1 * w1 + b2 * w2` when `flag` is `true`), using the factor loadings to specify the basis.
+
+When `flag` and `hedge` are both `true`, the rows `b2' Σ w = 0` fix the off-factor weights at the minimum-variance hedge of the factor exposures `w1`. They are the first-order condition of `w' Σ w` in `w2`, so the off-factor weights take no risk contribution under the variance, and `w' Σ w = w1' (B' Σ⁻¹ B)⁻¹ w1`. The weights then lie in a subspace of dimension `N_f`, so a bound that the free off-factor weights meet can be infeasible.
 
 The loadings come from [`resolve_factor_regression`](@ref), which is the same precedence the value-level [`factor_risk_contribution`](@ref) uses: a precomputed [`Regression`](@ref) in `re` wins, then the prior's own `rr`, then a refit from `rd`. The prior outranks the refit so that the decision basis is the one the moments were projected through.
 
@@ -354,10 +361,11 @@ The loadings come from [`resolve_factor_regression`](@ref), which is the same pr
   - `pr`: Prior result, read for its factor block.
   - `flag`: Whether to add the off-factor weight block.
   - `wi`: Optional initial factor weights.
+  - `hedge`: Whether to add the hedge rows. Read only when `flag` is `true`, and then `pr` must carry `sigma`.
 
 # Returns
 
-  - `b1, rr`: The factor basis and the loadings it was built from.
+  - `b1, b2, rr`: The factor basis, the off-factor basis, and the loadings they were built from. `b2` is `nothing` when `flag` is `false`.
 
 # Related
 
@@ -368,7 +376,8 @@ The loadings come from [`resolve_factor_regression`](@ref), which is the same pr
 function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_Reg,
                                                    rd::ReturnsResult,
                                                    pr::Option{<:AbstractPriorResult},
-                                                   flag::Bool, wi::Option{<:VecNum})
+                                                   flag::Bool, wi::Option{<:VecNum};
+                                                   hedge::Bool = false)
     rr = resolve_factor_regression(re, rd, pr)
     Bt = transpose(rr.L)
     b1 = LinearAlgebra.pinv(Bt)
@@ -381,17 +390,22 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_R
                             w2[1:(N - Nf)]
                         end)
         JuMP.@expression(model, w, b1 * w1 + b2 * w2)
+        if hedge
+            sc = get_constraint_scale(model)
+            JuMP.@constraint(model, cfrb_hedge, sc * (transpose(b2) * pr.sigma * w) == 0)
+        end
     else
+        b2 = nothing
         JuMP.@variable(model, w1[1:Nf])
         JuMP.@expression(model, w, b1 * w1)
     end
     set_initial_w!(w1, wi)
-    return b1, rr
+    return b1, b2, rr
 end
 function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
-                   dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+                   str_names::Bool = false, save::Bool = true, kwargs...)
     frc = reset_time_dependent_estimator(frc)
-    attrs = processed_jump_optimiser_attributes(frc.opt, rd; dims = dims, kwargs...)
+    attrs = processed_jump_optimiser_attributes(frc.opt, rd; kwargs...)
     # The bundle reduced what it carries. The head carries the rest — an initial weight
     # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
@@ -402,12 +416,18 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
     set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, frc.obj)
-    b1, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, attrs.pr,
-                                                       frc.flag, frc.wi)
+    b1, b2, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, attrs.pr,
+                                                           frc.flag, frc.wi)
+    # The risk builders read the basis of the whole decision vector, so a variance under
+    # `flag = true` prices the off-factor weights too (#1350).
+    b = isnothing(b2) ? b1 : hcat(b1, b2)
     set_weight_constraints!(model, attrs.wb, frc.opt)
-    frc_plr = phylogeny_constraints(frc.frc_ple, rd.F, kwargs...)
+    assemble_jump_model!(model, frc, frc.opt, attrs, rd, frc.r, frc.obj, b, false)
+    # After the model is assembled, so the factor phylogeny reads the marks that the
+    # variance builders and `mark_risk_minimised!` write, as the asset phylogeny does.
+    frc_plr = phylogeny_constraints(frc.frc_ple, rd.F)
     set_sdp_frc_phylogeny_constraints!(model, frc_plr)
-    assemble_jump_model!(model, frc, frc.opt, attrs, rd, frc.r, frc.obj, b1, false)
+    set_frc_iplg_constraints!(model, frc_plr, attrs.wb, transpose(rr.L), frc.opt.ss)
     set_portfolio_objective_function!(model, frc.obj, frc, attrs)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(attrs.pr.X))
     return FactorRiskContributionResult(;
@@ -424,8 +444,7 @@ end
     optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                       <:Any, <:Any, Nothing
                   },
-             rd::ReturnsResult; dims::Int = 1,
-             str_names::Bool = false, save::Bool = true, kwargs...) -> FactorRiskContributionResult
+             rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...) -> FactorRiskContributionResult
 
 Run the Factor Risk Contribution portfolio optimisation.
 
@@ -433,7 +452,6 @@ Run the Factor Risk Contribution portfolio optimisation.
 
   - `frc`: The factor risk contribution optimiser to use.
   - $(arg_dict[:rd]) If `isa(frc.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
-  - `dims`: The dimension along which observations advance in time.
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
@@ -449,9 +467,9 @@ Run the Factor Risk Contribution portfolio optimisation.
 """
 function optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+                  str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(frc, "`optimise`")
-    return _optimise(frc, rd; dims = dims, str_names = str_names, save = save, kwargs...)
+    return _optimise(frc, rd; str_names = str_names, save = save, kwargs...)
 end
 
 @pipe_delegates FactorRiskContribution opt

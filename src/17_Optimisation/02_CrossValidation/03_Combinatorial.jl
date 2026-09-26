@@ -485,7 +485,8 @@ function Base.split(ccv::CombinatorialCrossValidation, rd::Prices_RR)
     rcp = recombined_paths(ccv)
     train_test_idx = zeros(typeof(T), T, num_splits)
     for i in 1:num_splits
-        train_test_idx[reduce(vcat, [findall(x -> x == j, fold_idx_num) for j in test_set_idx[i]]), i] .= one(num_splits)
+        view(train_test_idx, :, i) .= ifelse.(in.(fold_idx_num, Ref(test_set_idx[i])),
+                                              one(num_splits), zero(num_splits))
     end
     dif = diff(train_test_idx; dims = 1)
     before_idx = findall(x -> x == 1, dif)

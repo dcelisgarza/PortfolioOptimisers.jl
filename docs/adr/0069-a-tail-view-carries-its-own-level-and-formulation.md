@@ -217,3 +217,162 @@ The carriers under `AbstractSequentialTailViewConstraint` hold the two sides and
 `ep_tail_dual_block!` writes one asset's dual block for the dual carrier and the sequential one of
 a measure alike, so each block is written once. `ep_jump_entropy_pooling` is the one solve, and
 `entropy_pooling` is the loop around it, so the three `ep_prior` stages refine within each stage.
+
+## Amendment (2026-09-23)
+
+Issue #1260 found that `IntegerConditionalValueatRiskView` solved a restriction of the view, not the
+view. The formulation of [EPTail](@cite) pins `q_j = w_[j] y_j` with the row
+`q_j >= w_[j] - (1 - y_j)` for every observation of the window, so every marked observation enters
+the tail in full, and the tail must be whole observations of mass exactly `alpha`. The CVaR of a
+discrete law lets its value at risk observation enter in part. The census of #1254 measured the
+integer posterior at 8.4% above the least divergence on an upper bound, and at 107% above it on a
+relative view.
+
+### An observation enters in full only when the one below it is marked
+
+The row now reads the indicator of the observation below:
+
+```julia
+[j = 2:sb], sc1 * (pw[ordi[j]] - (one(alpha) - y[j - 1]) - q[j]) <= 0
+```
+
+The lowest marked observation keeps `0 <= q_j <= w_[j]` alone, and `sum(q) == alpha` fixes it at
+`alpha` less the mass above it. That is the value at risk observation, so the model reads the
+posterior CVaR exactly. The change adds no variable and removes one row per asset. The feasible set
+only grows, so no posterior that was feasible becomes infeasible, and a released posterior can only
+move to a smaller divergence. This departs from the reference on purpose. The ascending order and
+the monotonicity of the section above are unchanged.
+
+### The window stays, and it warns where it binds
+
+`sbar` keeps the rule of thumb of the reference. The window is the one restriction left: the model
+admits the posteriors that put at least `alpha` on the `sbar` largest losses. An upper-bound view
+moves mass down the order and meets that bound first. After the last solve `entropy_pooling` calls
+`ep_check_tail_window`, which warns where the window holds no more than `alpha` plus `alpha` times
+the cube root of the machine epsilon. On the census fixture the binding window held `alpha` to
+`7e-12`, and the five windows that did not bind held `0.011` or more above it. `sbar = T` restricts
+nothing. On that fixture it reached the least divergence of the census to `3e-8` on all four views,
+in 2 to 4 seconds each.
+
+## Amendment (2026-09-23) — from [#1264](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1264)
+
+Issue #1264 found that `GridEntropicValueatRiskView` missed an upper bound by 60%, and that
+nothing reported it. The row of a grid point was divided by its largest coefficient, so the
+coefficients sat in `(0, 1]`, and the bound was `alpha / sc`. At a small dual variable `sc` is of
+the order `1e10`, and the bound fell to `1.5e-11`. The whole row was then inside the feasibility
+tolerance of the conic solver, about `1e-7`. The solver took that row as met by a posterior near
+the prior, and the selector picked the grid point whose row it could ignore. The anchor was not
+at fault: it converged to the dual variable of the posterior of least divergence.
+
+### Every upper-bound row reads against one
+
+The row of grid point `k` reaches the model divided by its bound `b_k`:
+
+```julia
+c = c ./ b
+Mk = M * (maximum(c) - one(b))
+sc1 * (dot(c, pw) - one(b) - Mk * (one(b) - y[k])) <= 0
+```
+
+The solver then meets the row to its tolerance relative to the bound, not relative to the largest
+coefficient. The posterior sums to one, so the left hand side never exceeds `maximum(c)`, and
+`maximum(c) - 1` is the smallest constant that releases the row. The data fix it, row by row.
+
+On the fixture of the census of #1254, an upper bound at half the prior EVaR, the posterior met the
+view to `1.2e-10` at the divergence of a scan over the dual variable of one-row tilts, `0.08822`.
+The solve took 2.6 s. Two floors on the scaled bound were measured and refused. A floor at `1e-7`
+still missed the view by 15%. A floor at `cbrt(eps)` met it, but it dropped the grid point of least
+divergence and raised the divergence by 2.5%. The relativistic grid met its view on that fixture
+before the change, with its smallest bound at `1.1e-7`. It takes the same rows, because its rows are
+scaled the same way.
+
+The largest constant on that fixture is `6.8e10`. Pajarito fixes the binary vector before its last
+conic solve, so the tolerance on integrality does not reach the selected row there. A solver that
+does not fix it can open a slack of the constant times that tolerance on the selected row.
+
+### `M` is a multiplier
+
+`M` stays on `GridEntropicValueatRiskView` and `GridRelativisticValueatRiskView`, and it now
+multiplies the constant of each row. Its default moves from `10` to `1`, and its domain from
+`M > 0` to `M >= 1`, because a multiplier below one cuts off a posterior the view admits. A
+multiplier above one gives the released rows headroom for a posterior that sums to one only to the
+solver's tolerance. It also widens the slack the tolerance on integrality can open on the selected
+row. A caller who passed an `M` below one now meets a `DomainError`.
+
+### An upper-bound grid point needs a positive bound
+
+The upper-bound half keeps a point only when its row is finite and its bound is positive. The
+coefficients are positive and the posterior sums to one, so an upper-bound row with a bound at or
+below zero holds at no posterior. The bound of an entropic row underflows to zero where its
+coefficients overflow, and the bound of a relativistic row is at or below zero where the target
+lies below what the point can reach. The error of an upper-bound half that keeps no point names both
+causes. Before this change the solver reported that case as infeasible, so the error comes earlier
+and names the cause, and it is not a new refusal.
+
+The lower-bound half keeps every finite point. A lower-bound row with a bound at or below zero holds
+at every posterior, so it changes no answer. A filter there would only add a refusal where every
+point is like that, and the grid is centred on the point the posterior attains, so such a grid
+states a view the prior already meets.
+
+### The lower-bound half keeps the norm scale
+
+The rows of the lower-bound half go through `add_ep_constraint!`, which divides a row by its norm.
+They are not divided by their bound, because they do not show the defect. A measurement over 13
+settings covered the fixture of #1254, grids widened to `pct = 0.97` and `K = 41`, and the fixtures of
+`test_12h`, with bounds down to `5.1e-11`. No row with a small bound was violated, and those rows were
+slack at the posterior by factors up to `9.6e7`. Every negative residual sat at the one binding row,
+whose bound was `6e-3` or more, and it was `1.7e-8` of that bound or less. A posterior that meets a
+lower bound moves mass toward the largest loss, where every row takes its largest coefficient, so a
+row that binds has a bound of at least the prior probability of that loss.
+
+Division by the bound gave the same posterior where it solved, and it did harm elsewhere. The dual
+of `OptimEntropyPooling` failed with `Inf` or `NaN` in 7 of the 13 settings, and took 8 to 25 times
+more function evaluations in the others. Clarabel stopped at `SLOW_PROGRESS` where a bound was near
+`1e-10`, which includes the fine grid of the existing test.
+
+A check after the solve, that the posterior statistic meets the target, was considered and refused.
+It would set a tolerance on a residual, which this library does not set (#573).
+
+## Amendment (2026-09-23) — from [#1287](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1287)
+
+Issue #1287 found that an upper bound on a group failed on the EVaR and the RLVaR when `alg` was
+left at `nothing`. A group is a view over several assets whose coefficients all have one sign. The
+selectors sent every upper bound whose coefficients had one sign to the grid, and so every equality
+below the prior value. The grid holds the measure of one asset, and it refused the view with an
+`ArgumentError`.
+
+### The selector reads the number of assets
+
+`ep_evar_formulation` and `ep_rlvar_formulation` take a new argument `single`, which says whether
+the view names one asset. A lower bound, and an equality at or above the prior value, keep the conic
+formulation at any number of assets. The grid keeps the upper bound and the low equality of one
+asset. The same views over several assets take the sequential formulation, which already took every
+relative view:
+
+```julia
+function ep_evar_formulation(::Nothing, mixed::Bool, single::Bool, op::Symbol, rhs::Number,
+                             pv::Number)
+    return if mixed
+        SequentialEntropicValueatRiskView()
+    elseif op == :geq || op == :eq && rhs >= pv
+        ConicEntropicValueatRiskView()
+    elseif single
+        GridEntropicValueatRiskView()
+    else
+        SequentialEntropicValueatRiskView()
+    end
+end
+```
+
+`ep_sequential_sides` negates an upper bound, so every asset of the group goes to the primal side,
+and the view is met with no integer variable. On the three technology assets of the S&P 500 slice
+of the examples, an upper bound at 95% of the prior value and an equality at 97% of it met their
+targets to a relative `8e-9` on both measures.
+
+`ep_cvar_formulation` does not change. It sends the same views to
+`IntegerConditionalValueatRiskView`, which keeps one window per asset and so accepts a group.
+
+The error of the grid named the conic formulation for any positive combination, but the conic
+formulation refuses an upper bound. It now names the conic formulation for a lower bound on a
+positive combination, and the sequential formulation for an upper bound or a relative view. The
+conic errors say that the grid holds a single asset.

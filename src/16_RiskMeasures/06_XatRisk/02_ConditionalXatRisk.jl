@@ -1,42 +1,60 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Conditional Value-at-Risk (CVaR) risk measure, also known as Expected Shortfall (ES).
+Measures the Conditional Value-at-Risk (CVaR), the average loss over the worst `alpha` fraction of the portfolio returns.
 
-`ConditionalValueatRisk` computes the expected loss given that the loss exceeds the Value-at-Risk at level `alpha`. It provides a coherent risk measure for tail risk quantification.
+The measure is also called Expected Shortfall. It is a coherent risk measure, and it is never below the [`ValueatRisk`](@ref) at the same level.
 
 # Mathematical definition
 
-Let ``\\boldsymbol{x} = (x_1, \\ldots, x_T)^\\intercal`` be the portfolio returns vector. The CVaR (also known as Expected Shortfall) at level ``\\alpha`` is the expected loss in the worst ``\\alpha`` fraction of scenarios:
+```math
+\\begin{align}
+\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha W_{T}} \\sum_{t=1}^{T} w_{t} \\max(\\nu - x_t,\\, 0) \\right\\}\\,.
+\\end{align}
+```
+
+The minimum has a closed form on the sorted returns. The tail holds the ``k^{\\star} - 1`` smallest returns in full and the boundary return in part, so that its weight is ``\\alpha W_{T}`` exactly:
 
 ```math
 \\begin{align}
-\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(\\nu - x_t,\\, 0) \\right\\}\\,.
+\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) &= -\\frac{1}{\\alpha W_{T}} \\left( \\sum_{k=1}^{k^{\\star} - 1} w_{(k)} x_{(k)} + \\left(\\alpha W_{T} - W_{k^{\\star} - 1}\\right) x_{(k^{\\star})} \\right)\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x})``: Conditional Value-at-Risk (Expected Shortfall) at level ``\\alpha``.
+  - ``\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x})``: Conditional Value-at-Risk at level ``\\alpha``.
   - $(math_dict[:xret])
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
-  - ``\\nu``: Auxiliary variable (Value-at-Risk threshold).
+  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when no observation weights are set, and then ``W_{T} = T`` and ``k^{\\star} = \\lceil \\alpha T \\rceil``.
+  - $(math_dict[:nu_ru])
+  - $(math_dict[:x_k_sorted])
+  - $(math_dict[:W_k_cum])
+  - $(math_dict[:k_star_tail])
 
-Equivalently, it is the expected loss conditional on exceeding the VaR:
+For a continuous distribution the measure equals ``-\\mathbb{E}[x \\mid x \\leq -\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})]``. On a sample that conditional mean can hold more or less than ``\\alpha W_{T}`` of the weight, and the part taken of the boundary return is what corrects it.
 
-```math
-\\begin{align}
-\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) &= -\\mathbb{E}\\!\\left[x \\mid x \\leq -\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})\\right]\\,.
-\\end{align}
-```
+# Algorithm
 
-Where:
+The functor has one method for each kind of `w`.
 
-  - ``\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x})``: CVaR as the expected loss conditional on exceeding the VaR threshold.
-  - $(math_dict[:xret])
-  - $(math_dict[:alpha_rm])
-  - ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})``: Value-at-Risk at level ``\\alpha``.
+Without observation weights:
+
+ 1. Copy `x`, so that the caller's vector keeps its order.
+ 2. Compute `aT`, which is ``\\alpha T``, and `idx`, which is ``k^{\\star} = \\lceil \\alpha T \\rceil``.
+ 3. Partially sort the copy, so that its `idx` smallest entries come first, in ascending order.
+ 4. Set `var` to minus the entry at `idx`, the Value-at-Risk.
+ 5. Sum `x[i] + var` over the `idx - 1` entries before it, giving `sum_var`.
+ 6. Return `var - sum_var / aT`.
+
+With observation weights:
+
+ 1. Read the weights `w` with [`get_observation_weights`](@ref), and their sum `sw`, which is ``W_{T}``.
+ 2. Sort `x` with `sortperm`, giving `order`, and accumulate the sorted weights, giving `cum_w`.
+ 3. Set `alpha` to `sw * r.alpha`, and find `idx`, the first position at which `cum_w` reaches `alpha`. A rounding error in `cum_w` can put `idx` one past the end, and then `idx` moves back to the last position.
+ 4. If `idx` is one, return minus the smallest return.
+ 5. Otherwise, return minus the weighted sum of the `idx - 1` smallest returns plus the boundary return times `alpha - cum_w[idx - 1]`, divided by `alpha`.
 
 # Fields
 
@@ -55,13 +73,13 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_nonneg])
 
 # Functor
 
     (r::ConditionalValueatRisk)(x::VecNum)
 
-Computes the CVaR of a portfolio returns vector `x`.
+Computes the CVaR of a portfolio returns vector `x`, and leaves `x` unchanged.
 
 ## Arguments
 
@@ -124,46 +142,56 @@ calibration_slots(x::ConditionalValueatRisk) = (; alpha = x.alpha)
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Distributionally Robust Conditional Value-at-Risk (DR-CVaR) risk measure.
+Measures the worst-case mean-CVaR loss of a portfolio over a Wasserstein ball of distributions around the sample.
 
-`DistributionallyRobustConditionalValueatRisk` is a robust variant of CVaR that accounts for distributional uncertainty using Wasserstein ambiguity sets. It provides robustness against model misspecification in the tails of the return distribution. It is the Esfahani-Kuhn [drcvar](@cite) reformulation of a mean-CVaR loss over a Wasserstein ball, and it is a measure of a *portfolio*: it is defined on the weight vector ``\\boldsymbol{w}`` and the scenario matrix, not on a realised return series.
+It is the distributionally robust mean-CVaR problem of Mohajerin Esfahani and Kuhn [drcvar](@cite). It is a measure of a portfolio, defined on the weights and the scenario matrix, so a realised return series does not carry enough to evaluate it.
 
 # Mathematical definition
 
-Let ``\\hat{\\mathbb{P}}`` be the empirical distribution of the ``T`` scenarios ``\\boldsymbol{\\xi}_{t}``, and let ``\\mathcal{B}_{r}(\\hat{\\mathbb{P}})`` be the type-1 Wasserstein ball of radius ``r`` around it, restricted to the support ``\\boldsymbol{\\xi} \\geq -\\boldsymbol{1}``. The measure is the worst-case mean of the mean-CVaR loss ``\\ell_{\\tau}`` over that ball, minimised over the Value-at-Risk level ``\\tau``:
+Let ``\\hat{\\mathbb{P}}`` be the distribution that puts the weight ``w_{t} / W_{T}`` on scenario ``\\boldsymbol{\\xi}_{t}``. Let ``\\mathcal{B}_{r}(\\hat{\\mathbb{P}})`` be the ball of radius ``r`` around it in the type-1 Wasserstein metric, with the 1-norm as the transport cost, over the distributions supported on ``\\boldsymbol{\\xi} \\geq -\\boldsymbol{1}``. That support says that no asset loses more than all of its value. The measure is the worst-case expected mean-CVaR loss over the ball:
 
 ```math
 \\begin{align}
-\\mathrm{DR\\text{-}CVaR}_{\\alpha, l, r}(\\boldsymbol{w}) &= \\min_{\\tau \\in \\mathbb{R}} \\; \\sup_{\\mathbb{Q} \\in \\mathcal{B}_{r}(\\hat{\\mathbb{P}})} \\; \\mathbb{E}_{\\mathbb{Q}}\\left[\\ell_{\\tau}(\\boldsymbol{\\xi})\\right]\\\\
+\\mathrm{DR\\text{-}CVaR}_{\\alpha, l, r}(\\boldsymbol{w}) &= \\underset{\\tau}{\\min} \\; \\sup_{\\mathbb{Q} \\in \\mathcal{B}_{r}(\\hat{\\mathbb{P}})} \\; \\mathbb{E}_{\\mathbb{Q}}\\left[\\ell_{\\tau}(\\boldsymbol{\\xi})\\right]\\,, \\\\
 \\ell_{\\tau}(\\boldsymbol{\\xi}) &= -\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi} + l \\left(\\tau + \\dfrac{1}{\\alpha} \\left(-\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi} - \\tau\\right)_{+}\\right)\\,.
 \\end{align}
 ```
 
-Where:
-
-  - ``\\mathrm{DR\\text{-}CVaR}_{\\alpha, l, r}(\\boldsymbol{w})``: Distributionally Robust CVaR.
-  - ``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.
-  - ``\\boldsymbol{\\xi}``: Asset returns scenario vector ``N \\times 1``.
-  - $(math_dict[:alpha_rm])
-  - ``l``: Weight of the CVaR term in the loss, ``l > 0``.
-  - ``r``: Wasserstein ball radius, ``r > 0``.
-  - ``(\\cdot)_{+} = \\max(\\cdot, 0)``.
-
-The loss ``\\ell_{\\tau}`` is piecewise linear in ``\\boldsymbol{\\xi}`` with the two pieces ``b_{i} \\tau + a_{i} \\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}``, where ``a_{1} = -1``, ``b_{1} = l``, ``a_{2} = -1 - l/\\alpha`` and ``b_{2} = l (1 - 1/\\alpha)``. Taking the dual of the inner supremum gives the conic program that is actually solved:
+The loss is the larger of two affine pieces ``b_{i} \\tau + a_{i} \\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}``, with ``a_{1} = -1``, ``b_{1} = l``, ``a_{2} = -1 - l/\\alpha`` and ``b_{2} = l (1 - 1/\\alpha)``. The dual of the supremum is a finite convex program:
 
 ```math
 \\begin{align}
-\\min_{\\tau,\\, \\lambda,\\, \\boldsymbol{s},\\, \\boldsymbol{u},\\, \\boldsymbol{v}} \\quad & r \\lambda + \\dfrac{1}{T} \\sum_{t=1}^{T} s_{t}\\\\
-\\textrm{s.t.} \\quad & b_{i} \\tau + a_{i} \\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}_{t} + \\boldsymbol{u}_{t}^{(i)\\intercal} \\left(\\boldsymbol{\\xi}_{t} + \\boldsymbol{1}\\right) \\leq s_{t}\\\\
-& \\left\\lVert -\\boldsymbol{u}_{t}^{(i)} - a_{i} \\boldsymbol{w} \\right\\rVert_{\\infty} \\leq \\lambda\\\\
+\\mathrm{DR\\text{-}CVaR}_{\\alpha, l, r}(\\boldsymbol{w}) = \\underset{\\tau,\\, \\lambda,\\, \\boldsymbol{s},\\, \\boldsymbol{u}}{\\min} \\quad & r \\lambda + \\dfrac{1}{W_{T}} \\sum_{t=1}^{T} w_{t} s_{t}\\\\
+\\textrm{s.t.} \\quad & b_{i} \\tau + a_{i} \\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}_{t} + \\boldsymbol{u}_{t}^{(i)\\intercal} \\left(\\boldsymbol{\\xi}_{t} + \\boldsymbol{1}\\right) \\leq s_{t}\\,,\\\\
+& \\left\\lVert -\\boldsymbol{u}_{t}^{(i)} - a_{i} \\boldsymbol{w} \\right\\rVert_{\\infty} \\leq \\lambda\\,,\\\\
 & \\boldsymbol{u}_{t}^{(i)} \\geq \\boldsymbol{0} \\quad \\forall\\, t \\in 1 \\ldots T,\\; i \\in \\{1, 2\\}\\,.
 \\end{align}
 ```
 
-The dual variables ``\\boldsymbol{u}_{t}^{(i)}`` price the support constraint ``\\boldsymbol{\\xi} \\geq -\\boldsymbol{1}``, and ``\\lambda`` bounds the dual-norm Lipschitz modulus of the loss. Two consequences follow, and both contradict a reading of the measure as CVaR plus a constant:
+This is Equation 27 of the paper, which Corollary 5.1 gives for the support ``C \\boldsymbol{\\xi} \\leq \\boldsymbol{d}`` with ``C = -I`` and ``\\boldsymbol{d} = \\boldsymbol{1}``. The infinity norm is the dual of the 1-norm of the transport cost.
 
-  - **The robustness premium ``r \\lambda`` is not a constant.** ``\\lambda`` is a decision variable that depends on ``\\boldsymbol{w}``, so ``r`` cannot be factored out of the optimisation.
-  - **The loss carries a mean term that ``l`` does not scale.** At ``r \\to 0`` the ball collapses to ``\\hat{\\mathbb{P}}`` and the measure reduces to ``-\\mathbb{E}[\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}] + l \\, \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi})``, not to ``\\mathrm{CVaR}_{\\alpha}`` alone.
+Where:
+
+  - ``\\mathrm{DR\\text{-}CVaR}_{\\alpha, l, r}(\\boldsymbol{w})``: Distributionally Robust CVaR.
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{\\xi}_{t}``: Asset returns of scenario ``t``, ``N \\times 1``.
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:l_ek])
+  - $(math_dict[:cal_r_radius]) It is the radius of the Wasserstein ball, ``r > 0``.
+  - $(math_dict[:tau_ek])
+  - $(math_dict[:pos_part])
+  - $(math_dict[:T])
+  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when no observation weights are set.
+  - $(math_dict[:W_T_total])
+  - ``\\lambda``: Bound on the Lipschitz modulus of the loss in the dual norm.
+  - ``s_{t}``: Epigraph variable of the worst-case loss at scenario ``t``.
+  - ``\\boldsymbol{u}_{t}^{(i)}``: Dual variables of the support constraint, for scenario ``t`` and piece ``i``, ``N \\times 1``.
+
+Three consequences follow. The first two contradict a reading of the measure as CVaR plus a constant.
+
+  - The robustness premium ``r \\lambda`` is not a constant. ``\\lambda`` depends on ``\\boldsymbol{w}``, so ``r`` cannot be factored out of the optimisation.
+  - The loss carries a mean term that ``l`` does not scale. As ``r \\to 0`` the ball collapses to ``\\hat{\\mathbb{P}}``, and the measure goes to ``-\\mathbb{E}_{\\hat{\\mathbb{P}}}[\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}] + l \\, \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi})``, not to ``\\mathrm{CVaR}_{\\alpha}`` alone.
+  - As ``r`` grows, the long-only portfolio of minimum measure goes to the equally weighted portfolio. This is Proposition 7.2 of the paper, for this support.
 
 # Fields
 
@@ -186,15 +214,15 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `l` is a number: `l > 0` and finite.
   - If `r` is a number: `r > 0` and finite.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_nonneg])
 
 # Functor
 
     (r::DistributionallyRobustConditionalValueatRisk)(x::VecNum)
 
-Computes the **plain** CVaR of a portfolio returns vector `x`, at level `alpha`. The functor shares its method with [`ConditionalValueatRisk`](@ref) through the `RMCVaR` union, and it ignores `l` and `r`.
+Computes the plain CVaR of a portfolio returns vector `x` at level `alpha`, and ignores `l` and `r`. The functor shares its method with [`ConditionalValueatRisk`](@ref) through the `RMCVaR` union, so the `# Algorithm` of that type is its algorithm.
 
-This is not an omission. The robust term ``r \\lambda`` is a function of the weight vector and the scenario matrix, and a realised return series carries neither, so it cannot be evaluated here. Use the measure inside a JuMP optimisation to get the robust value.
+The robust value needs the weights and the scenario matrix, and a return series carries neither. A JuMP optimisation builds the program of the definition, and the risk it reports is the robust value.
 
 ## Arguments
 
@@ -226,7 +254,7 @@ DistributionallyRobustConditionalValueatRisk
 # References
 
   - $(ref_dict[:cvar])
-  - $(ref_dict[:drcvar])
+  - $(ref_dict[:drcvar]) Section 7.1, Equation 27, Corollary 5.1 and Proposition 7.2.
 """
 @propagatable @concrete struct DistributionallyRobustConditionalValueatRisk <: RiskMeasure
     """
@@ -257,9 +285,7 @@ DistributionallyRobustConditionalValueatRisk
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_gt0_finite_val(l, :l)
         assert_nonempty_gt0_finite_val(r, :r)
-        if !isnothing(w)
-            @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
-        end
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(l), typeof(r), typeof(w)}(settings,
                                                                                      alpha,
                                                                                      l, r,
@@ -277,17 +303,24 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve the significance level `alpha`, the ambiguity radius `r` and the tail weight `l` of a [`DistributionallyRobustConditionalValueatRisk`](@ref) against prior result `pr`.
+Resolve the significance level `alpha`, the tail weight `l` and the ambiguity radius `r` of a [`DistributionallyRobustConditionalValueatRisk`](@ref) against prior result `pr`.
 
-All three slots take a **Calibration Rule** in place of the number, so all three resolve here. The struct is rebuilt through [`rebuild_with_slots`](@ref), and the inner constructor it calls is what re-runs the positivity check on the calibrated number: a rule that returns a value the slot does not admit is refused at fold time, by the same guard a caller's own number meets.
+Each of the three slots takes a Calibration Rule in place of a number. The rebuild calls the inner constructor, so a rule that returns a value the slot does not admit meets the same check as a number the caller writes, at fold time.
 
-`alpha` resolves first, because the tail weight reads it. [`TailTermParity`](@ref) prices a tail term at the measure's own significance level, so `alpha` and `l` are a **travelling pair** and the number reaches the `l` slot in its [`CalibrationContext`](@ref). A stated number, a plain function and a rule that reads no sibling all ignore the field, so the order costs nothing where no rule reads a sibling. The radius reads neither of the two, so its own order is free.
+`alpha` resolves before `l`, because [`TailTermParity`](@ref) prices the tail term at the measure's own significance level. The two form a travelling pair, and the resolved `alpha` reaches the `l` slot in its [`CalibrationContext`](@ref). A number, a plain function and a rule that reads no sibling all ignore that field. The radius reads neither slot.
 
-The effective observation weights are computed locally as `sel(r.w, pr.w)` and threaded to the rule, so a rule that reads a weighted sample size sees the weights the optimisation settled on. The measure carries no solver, so the rule receives none. That holds on both routes: the third argument carries the effective solver for a measure that has a slot for one, and this measure has none.
+Both contexts also carry the series that the measure prices. For this measure it is the returns, which is the default of [`calibration_series`](@ref). The method passes it all the same, because the marker belongs to the measure, and a rule carries no marker of its own.
 
-The series both slots price travels in the same context. It is the returns, which is the default [`calibration_series`](@ref) states, so this site names what the default context already holds. It is written all the same, for the reason every site writes it: the marker belongs to the measure, and no rule carries one of its own to be corrected.
+The measure holds no solver, so the rule receives the `slv` that the caller passes, which is `nothing` by default.
 
-A measure whose two slots both hold numbers is returned unchanged, so the common case allocates nothing.
+# Algorithm
+
+ 1. Compute the effective observation weights `ws`, the measure's own `w` or else the weights of `pr`.
+ 2. Read `s`, the series marker, with [`calibration_series`](@ref).
+ 3. Resolve `alpha` with [`resolve_calibration_slot`](@ref).
+ 4. Resolve `l`, with a context that carries the resolved `alpha` and `s`.
+ 5. Resolve `r`, with a context that carries `s` alone.
+ 6. Rebuild the measure with [`rebuild_with_slots`](@ref). It returns `x` itself when all three slots already held numbers, so the common case allocates nothing.
 
 # Related
 
@@ -317,9 +350,9 @@ end
 """
     const RMCVaR{T} = Union{...}
 
-Parameterised union of [`ConditionalValueatRisk`](@ref) and [`DistributionallyRobustConditionalValueatRisk`](@ref) sharing the same observation-weight type parameter `T`.
+Groups the two measures whose functor computes the plain CVaR of a return series.
 
-Used for unified dispatch on CVaR computation methods.
+The robust measure cannot evaluate its robust term on a return series, so it shares the functor of the plain measure, and this union is the type that functor dispatches on. `T` is the type of the observation weights, so `RMCVaR{Nothing}` selects the unweighted method.
 
 # Related
 
@@ -354,16 +387,18 @@ function (r::RMCVaR{<:ObsWeights})(x::VecNum)
         -sorted_x[1]
     else
         idx = ifelse(idx > length(x), idx - 1, idx)
-        -(LinearAlgebra.dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
-          sorted_x[idx] * (alpha - cum_w[idx - 1])) / alpha
+        k = idx - 1
+        ord = view(order, 1:k)
+        -(LinearAlgebra.dot(view(x, ord), view(w, ord)) +
+          sorted_x[idx] * (alpha - cum_w[k])) / alpha
     end
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Conditional Value-at-Risk Range (CVaR Range) risk measure.
+Measures the spread between the two tails of the portfolio returns, the CVaR of the losses plus the CVaR of the gains.
 
-`ConditionalValueatRiskRange` evaluates the CVaR at level `alpha` on the portfolio returns and the CVaR at level `beta` on the negated portfolio returns, then sums the two to give the total spread between the downside and the upside expected tail.
+The lower tail is the [`ConditionalValueatRisk`](@ref) at level `alpha` of the returns, and the upper tail is the same measure at level `beta` of the negated returns.
 
 # Mathematical definition
 
@@ -375,12 +410,29 @@ Represents the Conditional Value-at-Risk Range (CVaR Range) risk measure.
 
 Where:
 
-  - ``\\mathrm{CVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x})``: CVaR range (tail spread).
+  - ``\\mathrm{CVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x})``: CVaR range, the spread between the two tails.
   - $(math_dict[:xret])
   - ``\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x})``: Lower-tail expected shortfall at level ``\\alpha``.
   - ``\\mathrm{CVaR}_{\\beta}(-\\boldsymbol{x})``: Upper-tail expected surplus at level ``\\beta``.
 
-$(math_dict[:negated_upper_tail])
+$(math_dict[:negated_upper_tail]) Both tails read the same observation weights.
+
+# Algorithm
+
+The functor has one method for each kind of `w`. Each tail follows the steps of the matching method of [`ConditionalValueatRisk`](@ref).
+
+Without observation weights:
+
+ 1. Copy `x`, so that the caller's vector keeps its order.
+ 2. Partially sort the copy ascending, and compute `loss`, the CVaR at level `alpha` of the returns.
+ 3. Negate the copy and partially sort it ascending, which orders the returns descending, and compute `gain`, minus the CVaR at level `beta` of the negated returns.
+ 4. Return `loss - gain`.
+
+With observation weights:
+
+ 1. Sort `x` with `sortperm`, giving `order`, and compute `loss` from the ascending returns.
+ 2. Reverse `order`, and compute `gain` from the descending returns with the same weights. The method reverses the permutation and never a view, because a view writes through into `x` and into the stored weights.
+ 3. Return `loss - gain`.
 
 # Fields
 
@@ -401,13 +453,13 @@ Keywords correspond to the struct's fields.
 
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `beta` is a number: `0 < beta < 1`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_nonneg])
 
 # Functor
 
     (r::ConditionalValueatRiskRange)(x::VecNum)
 
-Computes the CVaR Range of a portfolio returns vector `x`, as the sum of the two tail averages. The functor shares its method with [`DistributionallyRobustConditionalValueatRiskRange`](@ref) through the `RMCVaRRg` union. That method holds the upper tail in the negated convention of [`ConditionalValueatRisk`](@ref), so it writes the sum as `loss - gain`.
+Computes the CVaR Range of a portfolio returns vector `x`, as the sum of the two tail averages, and leaves `x` unchanged. The functor shares its method with [`DistributionallyRobustConditionalValueatRiskRange`](@ref) through the `RMCVaRRg` union. That method holds the upper tail in the negated convention of [`ConditionalValueatRisk`](@ref), so it writes the sum as `loss - gain`.
 
 ## Arguments
 
@@ -484,26 +536,28 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Distributionally Robust Conditional Value-at-Risk Range (DR-CVaR Range) risk measure.
+Measures the spread between the two robust tails of a portfolio, a worst-case mean-CVaR loss on each side.
 
-`DistributionallyRobustConditionalValueatRiskRange` evaluates the DR-CVaR at level `alpha` on the portfolio returns and the DR-CVaR at level `beta` on the negated portfolio returns, then sums the two to give the total spread between the downside and the upside robust tail. Each tail carries its own Wasserstein ambiguity parameters.
+Each tail is the program of [`DistributionallyRobustConditionalValueatRisk`](@ref) with its own significance level, tail weight and radius. The paper that states that program treats one tail only, so this measure is the library's generalisation of it to two tails.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{DR\\text{-}CVaRRange}(\\boldsymbol{x}) &= \\mathrm{DR\\text{-}CVaR}_{\\alpha, l_a, r_a}(\\boldsymbol{x}) + \\mathrm{DR\\text{-}CVaR}_{\\beta, l_b, r_b}(-\\boldsymbol{x})\\,.
+\\mathrm{DR\\text{-}CVaRRange}(\\boldsymbol{w}) &= \\mathrm{DR\\text{-}CVaR}_{\\alpha, l_a, r_a}(\\boldsymbol{w};\\, \\boldsymbol{\\xi}) + \\mathrm{DR\\text{-}CVaR}_{\\beta, l_b, r_b}(\\boldsymbol{w};\\, -\\boldsymbol{\\xi})\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{DR\\text{-}CVaRRange}(\\boldsymbol{x})``: DR-CVaR range.
-  - $(math_dict[:xret])
-  - ``\\mathrm{DR\\text{-}CVaR}_{\\alpha, l_a, r_a}(\\boldsymbol{x})``: Lower-tail DR-CVaR with Wasserstein parameters ``(l_a, r_a)``.
-  - ``\\mathrm{DR\\text{-}CVaR}_{\\beta, l_b, r_b}(-\\boldsymbol{x})``: Upper-tail DR-CVaR with Wasserstein parameters ``(l_b, r_b)``.
+  - ``\\mathrm{DR\\text{-}CVaRRange}(\\boldsymbol{w})``: DR-CVaR range.
+  - $(math_dict[:w_port])
+  - ``\\mathrm{DR\\text{-}CVaR}_{\\alpha, l_a, r_a}(\\boldsymbol{w};\\, \\boldsymbol{\\xi})``: Lower-tail DR-CVaR on the scenarios ``\\boldsymbol{\\xi}_{t}``, with the support ``\\boldsymbol{\\xi} \\geq -\\boldsymbol{1}``.
+  - ``\\mathrm{DR\\text{-}CVaR}_{\\beta, l_b, r_b}(\\boldsymbol{w};\\, -\\boldsymbol{\\xi})``: Upper-tail DR-CVaR on the negated scenarios ``-\\boldsymbol{\\xi}_{t}``. Its support ``-\\boldsymbol{\\xi} \\geq -\\boldsymbol{1}`` says that no asset gains more than all of its value.
 
-$(math_dict[:negated_upper_tail])
+$(math_dict[:negated_upper_tail]) The two tails have separate Wasserstein balls, and both read the same observation weights.
+
+As both radii go to zero, the two mean terms cancel, and the measure goes to ``l_a \\, \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) + l_b \\, \\mathrm{CVaR}_{\\beta}(-\\boldsymbol{x})``, with ``\\boldsymbol{x}`` the portfolio returns of the scenarios.
 
 # Fields
 
@@ -529,17 +583,15 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `beta` is a number: `0 < beta < 1`.
   - Each of `l_a`, `r_a`, `l_b` and `r_b` that is a number: `> 0` and finite.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_nonneg])
 
 # Functor
 
     (r::DistributionallyRobustConditionalValueatRiskRange)(x::VecNum)
 
-Computes the **plain** CVaR Range of a portfolio returns vector `x`, at levels `alpha` and `beta`. The functor shares its method with [`ConditionalValueatRiskRange`](@ref) through the `RMCVaRRg` union, and it ignores `l_a`, `r_a`, `l_b` and `r_b`.
+Computes the plain CVaR Range of a portfolio returns vector `x` at levels `alpha` and `beta`, and ignores `l_a`, `r_a`, `l_b` and `r_b`. The functor shares its method with [`ConditionalValueatRiskRange`](@ref) through the `RMCVaRRg` union, so the `# Algorithm` of that type is its algorithm.
 
-This is not an omission. Each robust term ``r \\lambda`` is a function of the weight vector and the scenario matrix, and a realised return series carries neither, so it cannot be evaluated here. Use the measure inside a JuMP optimisation to get the robust value.
-
-The method returns the sum of the two tail averages. It holds the upper tail in the negated convention of [`ConditionalValueatRisk`](@ref), so it writes the sum as `loss - gain`.
+The robust value needs the weights and the scenario matrix, and a return series carries neither. A JuMP optimisation builds the two programs of the definition, and the risk it reports is the robust value.
 
 ## Arguments
 
@@ -573,7 +625,7 @@ DistributionallyRobustConditionalValueatRiskRange
 # References
 
   - $(ref_dict[:cvar])
-  - $(ref_dict[:drcvar])
+  - $(ref_dict[:drcvar]) Section 7.1, Equation 27.
 """
 @propagatable @concrete struct DistributionallyRobustConditionalValueatRiskRange <:
                                RiskMeasure
@@ -644,15 +696,22 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve the two ambiguity radii and the two tail weights of a [`DistributionallyRobustConditionalValueatRiskRange`](@ref) against prior result `pr`.
+Resolve the two significance levels, the two tail weights and the two ambiguity radii of a [`DistributionallyRobustConditionalValueatRiskRange`](@ref) against prior result `pr`.
 
-Each tail keeps its own pair, so four slots resolve here. It carries the reading of the scalar measure's method unchanged: the rebuild re-runs every positivity check, the effective observation weights are computed locally, and a measure whose four slots all hold numbers is returned unchanged.
+Each tail keeps its own level, weight and radius, so six slots resolve here. The method keeps the rules of the scalar measure. The rebuild re-runs every check of the constructor, and the method returns a measure whose six slots all hold numbers unchanged.
 
-**Each end's tail weight reads that end's own probability.** `alpha` and `beta` resolve first, and each is stated in the context of the tail weight beside it: `l_a` reads `alpha` and `l_b` reads `beta`. A skewed sample therefore resolves the two tail weights to two different numbers, which is the whole point of [`TailTermParity`](@ref) on a Range measure. The two radii read neither probability, so the four remaining slots resolve in one pass.
+Each tail weight reads the level of its own tail. `l_a` reads `alpha` and `l_b` reads `beta`, so on a skewed sample [`TailTermParity`](@ref) gives the two tails two different weights, which is what the rule is for on a range measure. A radius reads neither level, and each radius resolves independently of the other.
 
-A radius names no end of the distribution, so a rule placed in the loss-side pair and the same rule placed in the gain-side pair resolve independently, and neither ambiguity slot defaults from the other.
+Both tails price one series, the returns, so the same marker stands in all three contexts. The series belongs to the measure, and the level belongs to a tail.
 
-Both ends price one series, which is the returns, so the same marker stands in the context of all four slots. The series is a property of the measure and not of an end, where the significance level is a property of the end.
+# Algorithm
+
+ 1. Compute the effective observation weights `ws`, the measure's own `w` or else the weights of `pr`.
+ 2. Read `se`, the series marker, with [`calibration_series`](@ref).
+ 3. Resolve `alpha` and `beta` with [`resolve_calibration_slot`](@ref).
+ 4. Build three contexts: `cs` carries `se` alone, `ca` carries the resolved `alpha` and `se`, and `cb` carries the resolved `beta` and `se`.
+ 5. Resolve `l_a` in `ca`, `r_a` in `cs`, `l_b` in `cb` and `r_b` in `cs`.
+ 6. Rebuild the measure with [`rebuild_with_slots`](@ref), which returns `x` itself when every slot already held a number.
 
 # Related
 
@@ -706,9 +765,9 @@ end
 """
     const RMCVaRRg{T} = Union{...}
 
-Parameterised union of [`ConditionalValueatRiskRange`](@ref) and [`DistributionallyRobustConditionalValueatRiskRange`](@ref) sharing the same observation-weight type parameter `T`.
+Groups the two measures whose functor computes the plain CVaR Range of a return series.
 
-Used for unified dispatch on CVaR-range computation methods.
+The robust range cannot evaluate its robust terms on a return series, so it shares the functor of the plain range, and this union is the type that functor dispatches on. `T` is the type of the observation weights, so `RMCVaRRg{Nothing}` selects the unweighted method.
 
 # Related
 
@@ -736,11 +795,16 @@ function (r::RMCVaRRg{Nothing})(x::VecNum)
     beta = r.beta
     bT = beta * length(x)
     idx2 = ceil(Int, bT)
-    partialsort!(x, 1:idx2; rev = true)
-    var2 = -x[idx2]
+    # Negate the copy and sort it ascending, rather than sort it with `rev = true`. The two
+    # orders give the same values bit for bit, because negation is exact and `var2 - x[i]` is
+    # `var2 + (-x[i])`. The reverse ordering leads JET, over an abstract `x`, into a `StepRange`
+    # of an unknown index type, and from there into `Dates` (issue #1341).
+    x .= .-x
+    partialsort!(x, 1:idx2)
+    var2 = x[idx2]
     sum_var2 = zero(eltype(x))
     for i in 1:(idx2 - 1)
-        sum_var2 += x[i] + var2
+        sum_var2 += var2 - x[i]
     end
     gain = var2 - sum_var2 / bT
     return loss - gain
@@ -758,8 +822,10 @@ function (r::RMCVaRRg{<:ObsWeights})(x::VecNum)
         -sorted_x[1]
     else
         idx = ifelse(idx > length(x), idx - 1, idx)
-        -(LinearAlgebra.dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
-          sorted_x[idx] * (alpha - cum_w[idx - 1])) / (alpha)
+        k = idx - 1
+        ord = view(order, 1:k)
+        -(LinearAlgebra.dot(view(x, ord), view(w, ord)) +
+          sorted_x[idx] * (alpha - cum_w[k])) / (alpha)
     end
 
     # Reverse the **permutation**, never the views. `sorted_x` and `sorted_w` are views, so
@@ -777,50 +843,49 @@ function (r::RMCVaRRg{<:ObsWeights})(x::VecNum)
         -sorted_x[1]
     else
         idx = ifelse(idx > length(x), idx - 1, idx)
-        -(LinearAlgebra.dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
-          sorted_x[idx] * (beta - cum_w[idx - 1])) / (beta)
+        k = idx - 1
+        ord = view(order, 1:k)
+        -(LinearAlgebra.dot(view(x, ord), view(w, ord)) + sorted_x[idx] * (beta - cum_w[k])) /
+        (beta)
     end
     return loss - gain
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Conditional Drawdown-at-Risk (CDaR) risk measure, also known as Expected Maximum Drawdown.
+Measures the Conditional Drawdown-at-Risk (CDaR), the average of the worst `alpha` fraction of the uncompounded drawdowns.
 
-`ConditionalDrawdownatRisk` computes the expected drawdown given that the drawdown exceeds the Drawdown-at-Risk at level `alpha`. It provides a coherent risk measure for drawdown tail risk.
+It is the [`ConditionalValueatRisk`](@ref) of the drawdown series in place of the returns. The size of each drawdown is a convex and positively homogeneous function of the returns, so the measure is too.
 
 # Mathematical definition
 
-Define the absolute drawdown series:
-
 ```math
 \\begin{align}
-c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
-d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\quad c_0 = 0\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s\\,, \\\\
+\\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha W_{T}} \\sum_{t=1}^{T} w_{t} \\max(\\nu - d_t,\\, 0) \\right\\}\\,.
 \\end{align}
 ```
 
 Where:
 
+  - ``\\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x})``: Conditional Drawdown-at-Risk at level ``\\alpha``.
   - $(math_dict[:xret])
   - $(math_dict[:ct])
   - $(math_dict[:dtdd])
-
-The CDaR is the CVaR of the drawdown series ``\\boldsymbol{d} = (d_1, \\ldots, d_T)^\\intercal``:
-
-```math
-\\begin{align}
-\\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(\\nu - d_t,\\, 0) \\right\\}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x})``: Conditional Drawdown-at-Risk (Expected Maximum Drawdown).
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
-  - $(math_dict[:dtdd])
-  - ``\\nu``: Auxiliary variable (DaR threshold).
+  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when no observation weights are set.
+  - $(math_dict[:W_T_total])
+  - $(math_dict[:nu_ru])
+
+The running peak starts at ``c_0 = 0``, so a series that falls from its first period is in drawdown from the start. The minimum has the sorted closed form that [`conditional_drawdown_at_risk`](@ref) states.
+
+# Algorithm
+
+ 1. Compute the drawdown series with [`absolute_drawdown_vec`](@ref).
+ 2. Read the observation weights with [`get_observation_weights`](@ref).
+ 3. Reduce the drawdown series to its tail average with [`conditional_drawdown_at_risk`](@ref).
 
 # Fields
 
@@ -839,13 +904,13 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_nonneg])
 
 # Functor
 
     (r::ConditionalDrawdownatRisk)(x::VecNum)
 
-Computes the CDaR of a portfolio returns vector `x`.
+Computes the CDaR of a portfolio returns vector `x`, and leaves `x` unchanged.
 
 ## Arguments
 
@@ -908,32 +973,42 @@ calibration_slots(x::ConditionalDrawdownatRisk) = (; alpha = x.alpha)
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Distributionally Robust Conditional Drawdown-at-Risk (DR-CDaR) risk measure.
+Measures the worst-case mean-CDaR loss of a portfolio over a Wasserstein ball of drawdown scenarios around the sample.
 
-`DistributionallyRobustConditionalDrawdownatRisk` is a robust variant of CDaR that accounts for distributional uncertainty using Wasserstein ambiguity sets, applied to drawdown sequences. It is the drawdown twin of [`DistributionallyRobustConditionalValueatRisk`](@ref): the same Esfahani-Kuhn [drcvar](@cite) reformulation, with the uncompounded portfolio drawdown path in place of the portfolio return.
+It is the library's generalisation of the program of [`DistributionallyRobustConditionalValueatRisk`](@ref) to drawdowns. The paper that states that program treats returns only.
 
 # Mathematical definition
 
-Let ``d_{t}(\\boldsymbol{w})`` be the uncompounded portfolio drawdown at period ``t``, a non-negative number. The measure is the worst-case mean of the mean-CDaR loss ``\\ell_{\\tau}`` over a type-1 Wasserstein ball of radius ``r`` around the empirical distribution of the drawdown path, minimised over the Drawdown-at-Risk level ``\\tau``:
+Let ``d_{t}(\\boldsymbol{w}) \\geq 0`` be the uncompounded drawdown of the portfolio at period ``t``, and let ``\\mathbf{D}_{t}`` be the vector of the uncompounded drawdowns of the assets at period ``t``, each ``\\leq 0``. The loss is the mean-CDaR loss of the portfolio drawdown:
 
 ```math
 \\begin{align}
-\\mathrm{DR\\text{-}CDaR}_{\\alpha, l, r}(\\boldsymbol{w}) &= \\min_{\\tau \\in \\mathbb{R}} \\; \\sup_{\\mathbb{Q} \\in \\mathcal{B}_{r}(\\hat{\\mathbb{P}})} \\; \\mathbb{E}_{\\mathbb{Q}}\\left[\\ell_{\\tau}(d)\\right]\\\\
 \\ell_{\\tau}(d) &= d + l \\left(\\tau + \\dfrac{1}{\\alpha} \\left(d - \\tau\\right)_{+}\\right)\\,.
 \\end{align}
 ```
 
+The measure ``\\mathrm{DR\\text{-}CDaR}_{\\alpha, l, r}(\\boldsymbol{w})`` is the program of [`DistributionallyRobustConditionalValueatRisk`](@ref) with two substitutions.
+
+  - The rows read the portfolio drawdown, so ``-d_{t}(\\boldsymbol{w})`` takes the place of ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}_{t}``.
+  - The transport cost reads the asset drawdowns, so ``\\mathbf{D}_{t}`` takes the place of ``\\boldsymbol{\\xi}_{t}``, so the support constraint is ``\\mathbf{D} \\geq -\\boldsymbol{1}``.
+
 Where:
 
   - ``\\mathrm{DR\\text{-}CDaR}_{\\alpha, l, r}(\\boldsymbol{w})``: Distributionally Robust CDaR.
-  - ``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.
-  - ``d``: Uncompounded portfolio drawdown, ``d \\geq 0``.
+  - $(math_dict[:w_port])
+  - ``d_{t}(\\boldsymbol{w})``: Uncompounded drawdown of the portfolio at period ``t``, the running peak of the cumulative return minus its current value, with the peak starting at zero.
+  - ``\\mathbf{D}_{t}``: Uncompounded drawdowns of the assets at period ``t``, ``N \\times 1``.
   - $(math_dict[:alpha_rm])
-  - ``l``: Weight of the CDaR term in the loss, ``l > 0``.
-  - ``r``: Wasserstein ball radius, ``r > 0``.
-  - ``(\\cdot)_{+} = \\max(\\cdot, 0)``.
+  - $(math_dict[:l_ek])
+  - $(math_dict[:cal_r_radius]) It is the radius of the Wasserstein ball, ``r > 0``.
+  - $(math_dict[:tau_ek])
+  - $(math_dict[:pos_part])
 
-The two pieces of ``\\ell_{\\tau}`` and the dual conic program are those of [`DistributionallyRobustConditionalValueatRisk`](@ref), with ``-d_{t}`` substituted for ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}_{t}`` and the drawdown support constraint ``d \\geq -1`` priced by the same non-negative dual variables. The same two consequences hold: ``r`` multiplies a decision variable and cannot be factored out, and the mean drawdown term is not scaled by ``l``. At ``r \\to 0`` the measure reduces to ``\\mathbb{E}[d] + l \\, \\mathrm{CDaR}_{\\alpha}(d)``, not to ``\\mathrm{CDaR}_{\\alpha}`` alone.
+Three consequences follow.
+
+  - The radius multiplies a decision variable, so it cannot be factored out, and ``l`` does not scale the mean drawdown term. As ``r \\to 0`` the measure goes to ``\\mathbb{E}[d] + l \\, \\mathrm{CDaR}_{\\alpha}(d)``, not to ``\\mathrm{CDaR}_{\\alpha}`` alone.
+  - The rows read ``d_{t}(\\boldsymbol{w})``, and the robust premium reads the linear function ``-\\boldsymbol{w}^{\\intercal} \\mathbf{D}_{t}``. For long-only weights ``d_{t}(\\boldsymbol{w}) \\leq -\\boldsymbol{w}^{\\intercal} \\mathbf{D}_{t}``, with equality when every asset with a positive weight has its peak in the same period as the portfolio.
+  - The sample lies inside the support when no asset's cumulative return falls more than one below its running peak.
 
 # Fields
 
@@ -956,13 +1031,15 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `l` is a number: `l > 0` and finite.
   - If `r` is a number: `r > 0` and finite.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_nonneg])
 
 # Functor
 
     (r::DistributionallyRobustConditionalDrawdownatRisk)(x::VecNum)
 
-Computes the **plain** CDaR of a portfolio returns vector `x`, at level `alpha`, and ignores `l` and `r`. The robust term ``r \\lambda`` is a function of the weight vector and the scenario matrix, and a realised return series carries neither, so it cannot be evaluated here. Use the measure inside a JuMP optimisation to get the robust value.
+Computes the plain CDaR of a portfolio returns vector `x` at level `alpha`, and ignores `l` and `r`. The functor shares its method with [`ConditionalDrawdownatRisk`](@ref) through the `RMCDaR` union, so the `# Algorithm` of that type is its algorithm.
+
+The robust value needs the weights and the asset drawdowns, and a return series carries neither. A JuMP optimisation builds the program of the definition, and the risk it reports is the robust value.
 
 ## Arguments
 
@@ -995,7 +1072,7 @@ DistributionallyRobustConditionalDrawdownatRisk
 
   - $(ref_dict[:cdar])
   - $(ref_dict[:cvar])
-  - $(ref_dict[:drcvar])
+  - $(ref_dict[:drcvar]) Section 7.1, Equation 27.
 """
 @propagatable @concrete struct DistributionallyRobustConditionalDrawdownatRisk <:
                                RiskMeasure
@@ -1045,11 +1122,20 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve the significance level `alpha`, the ambiguity radius `r` and the tail weight `l` of a [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) against prior result `pr`.
+Resolve the significance level `alpha`, the tail weight `l` and the ambiguity radius `r` of a [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) against prior result `pr`.
 
-It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk measure unchanged, `alpha` first and the tail weight reading it off its own [`CalibrationContext`](@ref). A drawdown series holds one entry per observation, so a rule reads the same sample size here as it does there.
+The steps are those of the method for [`DistributionallyRobustConditionalValueatRisk`](@ref), except for the series. This measure prices drawdowns, so [`calibration_series`](@ref) gives [`AbsoluteDrawdownSeries`](@ref), and the marker reaches both the `l` slot and the `r` slot. [`TailTermParity`](@ref) then prices the mean drawdown of each column against the ``\\mathrm{CDaR}_{\\alpha}`` of that column, and a radius rule reads its scale off the drawdown sample. The keys `:l` and `:r` are the same on the two measures, so the marker is the only thing that tells a rule which quantity it prices.
 
-**The series does not carry over, and the context is what says so.** This measure prices the absolute drawdown series, so [`calibration_series`](@ref) states [`AbsoluteDrawdownSeries`](@ref) and the marker travels beside `alpha` to both ambiguity slots. [`TailTermParity`](@ref) then prices the mean drawdown of each column against the ``\\mathrm{CDaR}_{\\alpha}`` of that column, and the radius rules read the error scale off the drawdown sample. The keys `:l` and `:r` name this measure's slots and the value-at-risk twin's slots alike, so nothing else could have told a rule which quantity it stands in front of.
+A drawdown series holds one entry per observation, so a rule reads the same sample size here as on the returns.
+
+# Algorithm
+
+ 1. Compute the effective observation weights `ws`, the measure's own `w` or else the weights of `pr`.
+ 2. Read `s`, the series marker, which is [`AbsoluteDrawdownSeries`](@ref).
+ 3. Resolve `alpha` with [`resolve_calibration_slot`](@ref).
+ 4. Resolve `l`, with a context that carries the resolved `alpha` and `s`.
+ 5. Resolve `r`, with a context that carries `s` alone.
+ 6. Rebuild the measure with [`rebuild_with_slots`](@ref), which returns `x` itself when all three slots already held numbers.
 
 # Related
 
@@ -1085,9 +1171,9 @@ end
 """
     const RMCDaR{T} = Union{...}
 
-Parameterised union of [`ConditionalDrawdownatRisk`](@ref) and [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) sharing the same observation-weight type parameter `T`.
+Groups the two measures whose functor computes the plain CDaR of a return series.
 
-Used for unified dispatch on CDaR computation methods.
+The robust measure cannot evaluate its robust term on a return series, so it shares the functor of the plain measure, and this union is the type that functor dispatches on. `T` bounds the type of the observation weights. The functor dispatches on the whole union and lets [`conditional_drawdown_at_risk`](@ref) select the weighted or the unweighted method.
 
 # Related
 
@@ -1102,22 +1188,55 @@ const RMCDaR{T} = Union{<:ConditionalDrawdownatRisk{<:Any, <:Any, <:T},
     conditional_drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing) -> Number
     conditional_drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum) -> Number
 
-Aggregate a drawdown series into its Conditional Drawdown-at-Risk at level `alpha`.
+Reduces a drawdown series to its Conditional Drawdown-at-Risk at level `alpha`.
 
-This is the shared aggregation kernel behind [`ConditionalDrawdownatRisk`](@ref), [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) and [`RelativeConditionalDrawdownatRisk`](@ref): the measures differ only in the drawdown series they feed it ([`absolute_drawdown_vec`](@ref) and [`relative_drawdown_vec`](@ref) respectively), so the tail averaging lives here once.
+[`ConditionalDrawdownatRisk`](@ref), [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) and [`RelativeConditionalDrawdownatRisk`](@ref) all call it. They differ only in the drawdown series they pass, from [`absolute_drawdown_vec`](@ref) or [`relative_drawdown_vec`](@ref). The unweighted method reorders `dd` in place, so a caller passes a vector it computed for the call.
 
-`dd` is **consumed in place** — the unweighted method reorders it via `partialsort!`. Callers pass a freshly computed drawdown vector.
+# Mathematical definition
 
-Dispatch on the third argument selects the weighting scheme, so callers resolve observation weights with [`get_observation_weights`](@ref) and let dispatch do the rest.
+```math
+\\begin{align}
+\\mathrm{CDaR}_{\\alpha}(\\boldsymbol{d}) &= -\\frac{1}{\\alpha W_{T}} \\left( \\sum_{k=1}^{k^{\\star} - 1} w_{(k)} d_{(k)} + \\left(\\alpha W_{T} - W_{k^{\\star} - 1}\\right) d_{(k^{\\star})} \\right)\\,.
+\\end{align}
+```
 
-  - `::Nothing`: unweighted, the mean of the drawdowns beyond the `alpha`-quantile by rank.
-  - `w::VecNum`: weighted, the weighted mean of the tail, with the boundary observation contributing only its partial weight.
+Where:
+
+  - ``\\mathrm{CDaR}_{\\alpha}(\\boldsymbol{d})``: Conditional Drawdown-at-Risk of the drawdown series, a non-negative loss.
+  - ``\\boldsymbol{d}``: Drawdown series ``T \\times 1``, each entry ``\\leq 0``.
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when `w` is `nothing`, and then ``W_{T} = T`` and ``k^{\\star} = \\lceil \\alpha T \\rceil``.
+  - $(math_dict[:x_k_sorted]) Here the series is ``\\boldsymbol{d}``, so the entry is ``d_{(k)}``.
+  - $(math_dict[:W_k_cum])
+  - $(math_dict[:k_star_tail])
+
+It is the closed form of the Rockafellar-Uryasev minimum in the definition of [`ConditionalValueatRisk`](@ref), with the drawdowns in place of the returns.
+
+# Algorithm
+
+The third argument selects the method.
+
+`nothing`:
+
+ 1. Compute `aT`, which is ``\\alpha T``, and `idx`, which is ``\\lceil \\alpha T \\rceil``.
+ 2. Partially sort `dd` in place, so that its `idx` smallest entries come first, in ascending order.
+ 3. Set `var` to minus the entry at `idx`.
+ 4. Sum `dd[i] + var` over the `idx - 1` entries before it, giving `sum_var`.
+ 5. Return `var - sum_var / aT`.
+
+A weights vector `w`:
+
+ 1. Sort `dd` with `sortperm`, giving `order`, and accumulate the sorted weights, giving `cum_w`.
+ 2. Set `alpha` to `sum(w) * alpha`, and find `idx`, the first position at which `cum_w` reaches it. A rounding error in `cum_w` can put `idx` one past the end, and then `idx` moves back to the last position.
+ 3. If `idx` is one, return minus the smallest drawdown.
+ 4. Otherwise, return minus the weighted sum of the `idx - 1` smallest drawdowns plus the boundary drawdown times `alpha - cum_w[idx - 1]`, divided by `alpha`.
 
 # Arguments
 
-  - `dd::VecNum`: Drawdown series, all entries ≤ 0. Consumed in place.
+  - `dd::VecNum`: Drawdown series, each entry ``\\leq 0``. The unweighted method reorders it.
   - `alpha::Real`: Significance level, `0 < alpha < 1`.
-  - `w`: Resolved observation weights, or `nothing` for the unweighted aggregation.
+  - `w`: Observation weights from [`get_observation_weights`](@ref), or `nothing` for the unweighted method.
 
 # Returns
 
@@ -1130,7 +1249,7 @@ Dispatch on the third argument selects the weighting scheme, so callers resolve 
   - [`RelativeConditionalDrawdownatRisk`](@ref)
   - [`absolute_drawdown_vec`](@ref)
   - [`relative_drawdown_vec`](@ref)
-  - [`drawdown_at_risk`](@ref)
+  - [`empirical_value_at_risk`](@ref)
 """
 function conditional_drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing)
     aT = alpha * length(dd)
@@ -1155,8 +1274,10 @@ function conditional_drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum)
         -sorted_dd[1]
     else
         idx = ifelse(idx > length(dd), idx - 1, idx)
-        -(LinearAlgebra.dot(sorted_dd[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
-          sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
+        k = idx - 1
+        ord = view(order, 1:k)
+        -(LinearAlgebra.dot(view(dd, ord), view(w, ord)) +
+          sorted_dd[idx] * (alpha - cum_w[k])) / alpha
     end
 end
 function (r::RMCDaR)(x::VecNum)
@@ -1166,42 +1287,39 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Relative Conditional Drawdown-at-Risk risk measure for hierarchical optimisation.
+Measures the Relative Conditional Drawdown-at-Risk, the average of the worst `alpha` fraction of the compounded drawdowns.
 
-`RelativeConditionalDrawdownatRisk` computes the expected relative (compounded) drawdown given that the drawdown exceeds the Relative Drawdown-at-Risk at level `alpha`.
+It is the [`ConditionalValueatRisk`](@ref) of the relative drawdown series. The compounded wealth is a product of linear functions of the weights, so the library states no JuMP formulation of the measure, and it is a [`HierarchicalRiskMeasure`](@ref).
 
 # Mathematical definition
 
-Define the compounded wealth process and relative drawdown series:
-
 ```math
 \\begin{align}
-C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
-rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\quad C_0 = 1\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1\\,, \\\\
+\\mathrm{RCDaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha W_{T}} \\sum_{t=1}^{T} w_{t} \\max(\\nu - rd_t,\\, 0) \\right\\}\\,.
 \\end{align}
 ```
 
 Where:
 
+  - ``\\mathrm{RCDaR}_{\\alpha}(\\boldsymbol{x})``: Relative Conditional Drawdown-at-Risk at level ``\\alpha``.
   - $(math_dict[:xret])
   - $(math_dict[:Ct])
   - $(math_dict[:rdt])
-
-The Relative CDaR is the CVaR of the relative drawdown series ``\\boldsymbol{rd}``:
-
-```math
-\\begin{align}
-\\mathrm{RCDaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(\\nu - rd_t,\\, 0) \\right\\}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{RCDaR}_{\\alpha}(\\boldsymbol{x})``: Relative Conditional Drawdown-at-Risk.
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
-  - $(math_dict[:rdt])
-  - ``\\nu``: Auxiliary variable (RDaR threshold).
+  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when no observation weights are set.
+  - $(math_dict[:W_T_total])
+  - $(math_dict[:nu_ru])
+
+The running peak starts at ``C_0 = 1``, the initial wealth. The minimum has the sorted closed form that [`conditional_drawdown_at_risk`](@ref) states.
+
+# Algorithm
+
+ 1. Compute the relative drawdown series with [`relative_drawdown_vec`](@ref).
+ 2. Read the observation weights with [`get_observation_weights`](@ref).
+ 3. Reduce the series to its tail average with [`conditional_drawdown_at_risk`](@ref).
 
 # Fields
 
@@ -1220,13 +1338,13 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_nonneg])
 
 # Functor
 
     (r::RelativeConditionalDrawdownatRisk)(x::VecNum)
 
-Computes the Relative CDaR of a portfolio returns vector `x`.
+Computes the Relative CDaR of a portfolio returns vector `x`, and leaves `x` unchanged.
 
 ## Arguments
 

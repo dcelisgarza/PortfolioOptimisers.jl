@@ -204,3 +204,104 @@ end
     bad = trues(size(emsk)...)
     @test_throws ArgumentError PortfolioOptimisers.assert_panel_masks(ax, amsk, bad)
 end
+using Dates
+#=
+The docstrings of `03_ListingSpan.jl` against numbers. Each unit states a closed form, and the
+tests below compute it cell by cell and compare it with the unit.
+
+A window of a longer clock gives a `ListingSpan` whose bounds lie outside the window, because
+`span_carrier_view` moves them by the rows the window drops in front. The padded projection moved
+such an opening bound to `first + 1 <= 1`, so the first row of the returns clock was active for an
+asset listed before the window. The same window as a `Matrix{Bool}` leaves that row inactive. The
+projection now clamps the opening bound to the clock first.
+=#
+function span_974_priced(x)
+    return !ismissing(x) && isfinite(x)
+end
+function span_974_oracle(X::AbstractMatrix)
+    T, N = size(X)
+    a = falses(T, N)
+    for i in 1:N
+        ts = findall(t -> span_974_priced(X[t, i]), 1:T)
+        isempty(ts) || (a[ts[1]:ts[end], i] .= true)
+    end
+    return a
+end
+function span_974_project(a::AbstractMatrix{Bool}, m::Integer)
+    n, N = size(a)
+    o = n - m
+    return [t + o - 1 >= 1 && a[t + o - 1, i] && a[t + o, i] for t in 1:m, i in 1:N]
+end
+@testset "The docstrings of 03_ListingSpan.jl against numbers" begin
+    rng = StableRNG(974)
+    @testset "listing_span and project_span equal their closed forms" begin
+        for _ in 1:500
+            T = rand(rng, 1:8)
+            N = rand(rng, 1:5)
+            X = Matrix{Union{Missing, Float64}}(rand(rng, T, N) .+ 1)
+            for k in eachindex(X)
+                r = rand(rng)
+                X[k] = r < 0.15 ? NaN : r < 0.25 ? missing : r < 0.3 ? Inf : X[k]
+            end
+            span = listing_span(X)
+            a = span_974_oracle(X)
+            @test Matrix(span) == a
+            for m in (T, T - 1)
+                @test Matrix(PortfolioOptimisers.project_span(span, m)) ==
+                      PortfolioOptimisers.project_span(a, m) ==
+                      span_974_project(a, m)
+            end
+        end
+    end
+    @testset "A window's bounds outside the clock project as the matrix they hold" begin
+        for _ in 1:500
+            n = rand(rng, 1:8)
+            N = rand(rng, 1:4)
+            f = rand(rng, -4:(n + 3), N)
+            l = rand(rng, -4:(n + 3), N)
+            span = PortfolioOptimisers.ListingSpan(f, l, n)
+            for m in (n, n - 1)
+                o = n - m
+                p = PortfolioOptimisers.project_span(span, m)
+                @test p.first == max.(f, 1) .+ (1 - o)
+                @test p.last == l .- o
+                @test Matrix(p) ==
+                      PortfolioOptimisers.project_span(Matrix(span), m) ==
+                      span_974_project(Matrix(span), m)
+            end
+        end
+    end
+    @testset "A fold window of a derived span leaves the padded first row inactive" begin
+        ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 8))
+        P = [1.0 2.0; 1.1 2.1; 1.2 2.2; 1.3 NaN; 1.4 2.4; 1.5 2.5; 1.6 2.6; 1.7 2.7]
+        X = TimeArray(ts, P, [:A, :B])
+        pr = PricesResult(; X = X, span = listing_span(P))
+        prm = PricesResult(; X = X, span = Matrix(listing_span(P)))
+        pv = PortfolioOptimisers.port_opt_view(pr, 3:8)
+        @test pv.span isa PortfolioOptimisers.ListingSpan
+        @test pv.span.first == [-1, -1]
+        for padding in (true, false)
+            rr = prices_to_returns(pv; padding = padding)
+            rm = prices_to_returns(PortfolioOptimisers.port_opt_view(prm, 3:8);
+                                   padding = padding)
+            @test Matrix(rr.pnl.amsk) == Matrix(rm.pnl.amsk)
+            @test rr.pnl.emsk == rm.pnl.emsk
+        end
+        rr = prices_to_returns(pv; padding = true)
+        @test !any(rr.pnl.amsk[1, :])
+        @test Matrix(rr.pnl.amsk) == Bool[0 0; 1 1; 1 1; 1 1; 1 1; 1 1]
+        @test rr.pnl.emsk == Bool[0 0; 1 0; 1 0; 1 1; 1 1; 1 1]
+    end
+    @testset "An interior gap next to an end of the listing is a Held Gap" begin
+        # Asset 1 has a gap after its first price, and asset 2 a gap before its last one.
+        P = [1.0 NaN; NaN 2.0; 1.2 2.1; 1.3 NaN; 1.4 2.3; 1.5 NaN]
+        amsk, emsk = universe_masks(listing_span(P), span_961_returns(P, true))
+        @test Matrix(amsk) == Bool[0 0; 1 0; 1 1; 1 1; 1 1; 1 0]
+        @test emsk == Bool[0 0; 0 0; 0 1; 1 0; 1 0; 1 0]
+        # The active mask opens on the first return that reads two listed prices, which
+        # is not finite here, so the asset is held with no return.
+        @test amsk[2, 1] && !emsk[2, 1]
+        @test amsk[5, 2] && !emsk[5, 2]
+        @test all(emsk .<= Matrix(amsk))
+    end
+end

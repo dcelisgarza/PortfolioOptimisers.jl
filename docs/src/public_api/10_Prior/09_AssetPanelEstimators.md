@@ -1,12 +1,13 @@
 ```@meta
-Description = "Asset Panel Estimators, public API of PortfolioOptimisers.jl: Proximity, RegressionPanel, PhylogenyPanel, phylogeny_features, asset_panel."
+Description = "Asset Panel Estimators, public API of PortfolioOptimisers.jl: AbstractPhylogenyFeatureAlgorithm, Proximity, RegressionPanel, PhylogenyPanel, …"
 ```
 
 # Asset Panel Estimators
 
-An Asset Panel estimator is a **producer**: [`FeatureDistance`](@ref) holds one in its `ape` slot, and it builds a static [`AssetPanel`](@ref) at the point of use, from the prior result and the returns of the subproblem that runs it.
+An asset panel estimator builds a static [`AssetPanel`](@ref) each time a distance needs one. [`FeatureDistance`](@ref) holds one in its `ape` field. The estimator builds the panel from the prior result and the returns of the optimisation that runs it, which inside a nested optimisation is the inner one. `RegressionPanel` takes the factor loadings that a factor prior fitted. `PhylogenyPanel` takes the closeness of each pair of assets in a network or a clustering of the assets. It reads no prior, so it also works before a prior exists, as in asset selection. A new phylogeny feature rule subtypes `AbstractPhylogenyFeatureAlgorithm` and adds a method of `phylogeny_features`.
 
 ```@docs
+PortfolioOptimisers.AbstractPhylogenyFeatureAlgorithm
 Proximity
 RegressionPanel
 PhylogenyPanel

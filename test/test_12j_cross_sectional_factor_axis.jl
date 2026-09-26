@@ -160,4 +160,94 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @test s1.dict["sector"] == ["a"]
         @test s1.dict[s1.cfkey] == ax.nf
     end
+
+    @testset "The docstrings of 09_CrossSectionalFactorAxis against numbers" begin
+        # `exposure_axis_names`: one name per level for a one-hot member, and the caller's
+        # name for every other member. The one-hot method ignores the caller's name.
+        oh = last(factors[3])
+        lv = PO.one_hot_exposure_names(oh, rd)
+        @test PO.exposure_axis_names("mkt", ConstantExposure(), rd) == (["mkt"], ["market"])
+        @test PO.exposure_axis_names("size", last(factors[2]), rd) == (["size"], ["style"])
+        @test PO.exposure_axis_names("ignored", oh, rd) ==
+              (lv, fill("industry", length(lv)))
+        # `cross_sectional_factor_axis`: one name per member that is not one-hot, and one
+        # per level, so 1 + 1 + 3 names here.
+        ax = PO.cross_sectional_factor_axis(factors, rd)
+        @test length(ax.nf) == 2 + length(lv) == 5
+        # The levels are the ones the Panel Field declares, so a fold over fewer
+        # observations and fewer assets reads the same axis.
+        @test PO.cross_sectional_factor_axis(factors, PO.port_opt_view(rd, 1:10, :)) == ax
+        @test PO.cross_sectional_factor_axis(factors, PO.port_opt_view(rd, 11:30, 1:4)) ==
+              ax
+        # `cross_sectional_factor_sets`: a new sets takes the default key prefixes of
+        # `UniverseSets`, and it equals the widening of the bare default universe.
+        dflt = UniverseSets(; dict = Dict{String, Any}("nx" => rd.nx))
+        ns = PO.cross_sectional_factor_sets(factors, rd)
+        for k in (:xkey, :uxkey, :tfkey, :utfkey, :cfkey, :ucfkey, :nikey)
+            @test getfield(ns, k) == getfield(dflt, k)
+        end
+        @test ns.dict == PO.cross_sectional_factor_sets(factors, rd, dflt).dict
+        @test sort!(collect(keys(ns.dict))) == ["industry", "market", "ncf", "nx", "style"]
+        # A widened universe keeps all seven of its key prefixes.
+        own = UniverseSets(; xkey = "assets", uxkey = "uassets", tfkey = "tsf",
+                           utfkey = "utsf", cfkey = "csf", ucfkey = "ucsf", nikey = "gone",
+                           dict = Dict{String, Any}("assets" => rd.nx))
+        wid = PO.cross_sectional_factor_sets(factors, rd, own)
+        for k in (:xkey, :uxkey, :tfkey, :utfkey, :cfkey, :ucfkey, :nikey)
+            @test getfield(wid, k) == getfield(own, k)
+        end
+        @test wid.dict["csf"] == ax.nf
+        @test !haskey(wid.dict, "ncf")
+        # A Factor Family label that starts with a key prefix of the universe, or equals
+        # its `nikey`, would be read as an axis, so it is refused. Before the guard,
+        # UniverseSets took `"ni"` as the Non-Investable Axis, and a family `"ncfx"` that
+        # held every factor as a partition of the cross-sectional axis.
+        fam_of(lab) = ["market" => ConstantExposure(),
+                       "a" => ConstantExposure(; family = lab)]
+        for lab in ("nxt", "uxx", "nfam", "uf", "ncfx", "ucfam", "ni")
+            @test_throws ArgumentError PO.cross_sectional_factor_sets(fam_of(lab), rd)
+        end
+        @test_throws ArgumentError PO.cross_sectional_factor_sets(["a" =>
+                                                                       ConstantExposure(;
+                                                                                        family = "ncfx"),
+                                                                   "b" =>
+                                                                       ConstantExposure(;
+                                                                                        family = "ncfx")],
+                                                                  rd)
+        msg = try
+            PO.cross_sectional_factor_sets(fam_of("ni"), rd)
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("Factor Family ni", msg)
+        # A label that only starts with `nikey` is a plain group.
+        @test PO.cross_sectional_factor_sets(fam_of("nikkei"), rd).dict["nikkei"] == ["a"]
+        # The prefixes are the universe's own: a label the default refuses is a plain group
+        # of a universe with other prefixes, and a label that starts with one of those is
+        # refused.
+        @test PO.cross_sectional_factor_sets(fam_of("ncfx"), rd, own).dict["ncfx"] == ["a"]
+        @test_throws ArgumentError PO.cross_sectional_factor_sets(fam_of("csfx"), rd, own)
+        @test_throws ArgumentError PO.cross_sectional_factor_sets(fam_of("gone"), rd, own)
+        # `cross_sectional_sets_write!`: a new key and the same list are written, and a
+        # different list is refused with its key named.
+        d = Dict{String, Any}("style" => ["a"])
+        @test isnothing(PO.cross_sectional_sets_write!(d, "style", ["a"]))
+        @test isnothing(PO.cross_sectional_sets_write!(d, "industry", ["b", "c"]))
+        @test d == Dict{String, Any}("style" => ["a"], "industry" => ["b", "c"])
+        msg = try
+            PO.cross_sectional_sets_write!(d, "style", ["b"])
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("under style", msg)
+        @test d["style"] == ["a"]
+        # `cross_sectional_sets_dict`: the method for `nothing` declares the asset axis
+        # alone under `"nx"`, and the method for a universe copies its dictionary.
+        @test PO.cross_sectional_sets_dict(rd, nothing) == Dict{String, Any}("nx" => rd.nx)
+        cpd = PO.cross_sectional_sets_dict(rd, own)
+        @test cpd == own.dict
+        @test cpd !== own.dict
+    end
 end

@@ -193,7 +193,7 @@ Tune a [`Pipeline`](@ref) by grid (or randomised) search cross-validation on pri
 
 The input is split into contiguous observation windows by `gscv.cv` (price-level splits keep stateful preprocessing inside the fold); for each candidate the lens grid is applied to the pipeline (keys resolved by [`pipeline_lens`](@ref), so step names, step positions, and raw property paths all address steps), and the candidate is scored through [`cross_val_predict`](@ref)`(pipe_i, data, gscv.cv; ex = SequentialEx())`, the one fold loop every cross-validation entry point runs. So the candidate runs the scheme it declared: every fold fits the whole workflow on its training window and scores it on its test window, a walk-forward threads the previous fold's weights through the scheme's `pws`, and a [`TimeDependent`](@ref) schedule resolves per fold against the fold's [`TimeDependentContext`](@ref), sized to the scheme's fold count and asserted per candidate, because a grid value may swap a whole schedule in or out. Lenses need no schedule-specific semantics: naming the step swaps the whole schedule as a grid value, and raw property paths address entries. Candidates run in parallel over `gscv.ex`, the folds inside one in sequence. One row per fold, in `split`'s order, through [`write_candidate_scores!`](@ref) and [`score_rows`](@ref); a scheme whose `split` draws at random is fixed once through [`pin_draw`](@ref). The scorer picks the winner among the candidates that finished every fold, through [`finite_candidate_index`](@ref), so a candidate that failed a fold never wins. The randomised form samples the grid and delegates, exactly as for plain optimisers.
 
-A scheme that declares a Fold Fit runs every candidate through the Pipeline's online step: each candidate is warmed up once and folded fold by fold through [`partial_fit!`](@ref), and read out through `fit(pipe)` where a refit would have run, so the search picks the candidate the batch search picks over the same steps. A warm pipeline is refused once, before the grid, through [`assert_search_entry`](@ref); the refit route `Online(pipe)` is not a search root, because the grid's lenses address the pipeline's steps and not a wrapper's.
+An Online Scheme runs every candidate through the Pipeline's online step: each candidate is warmed up once and folded fold by fold through [`partial_fit!`](@ref), and read out through `fit(pipe)` where a refit would have run, so the search picks the candidate the batch search picks over the same steps. A warm pipeline is refused once, before the grid, through [`assert_search_entry`](@ref); the refit route `Online(pipe)` is not a search root, because the grid's lenses address the pipeline's steps and not a wrapper's.
 
 # Arguments
 
@@ -246,8 +246,12 @@ function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation
             # sequence, through the same loop every other entry point runs.
             local predictions = cross_val_predict(pipei, data, scheme;
                                                   ex = FLoops.SequentialEx())
-            write_candidate_scores!(test_scores, train_scores, i, predictions, rows, r, sgn,
-                                    gscv.kwargs)
+            # The window is `nothing` here: a Pipeline's steps transform the data per
+            # fold, so the returns the optimiser was handed are not the returns the split
+            # names. See [`candidate_train_score`](@ref), whose `Nothing` arm scores
+            # through the carrier, which is what every arm did before.
+            write_candidate_scores!(test_scores, train_scores, i, predictions, rows,
+                                    nothing, r, sgn, gscv.kwargs)
         end
     end
     opt_idx = finite_candidate_index(gscv.scorer, test_scores)
@@ -310,7 +314,8 @@ function search_cross_validation(pipe::Pipeline,
         if gscv.train_score
             for (p, path) in enumerate(predictions.pred)
                 for (j, fp) in enumerate(path.pred)
-                    train_scores[p][j, i] = sgn * expected_risk(r, fp.res; gscv.kwargs...)
+                    train_scores[p][j, i] = sgn * candidate_train_score(r, fp.res, nothing,
+                                                                        gscv.kwargs)
                 end
             end
         end

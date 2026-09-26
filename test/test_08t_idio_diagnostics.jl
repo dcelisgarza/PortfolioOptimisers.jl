@@ -68,11 +68,11 @@ using Statistics
         # The reference ranks a cross-section with an unstable sort, so a tie block takes an
         # order the sort chose and not one a rule states. Observation ten carries seven
         # predicted volatilities that are exactly zero, and the reference answers
-        # `0.21428571428571427` there. `cs_ordinal_ranks` breaks a tie by the order of the
-        # asset axis, which is the deterministic reading, and the reference reproduces this
-        # series to the last bit once its own ranks are made stable. The entry below is the
-        # library's answer, and it is the only one of the ninety-eight this file asserts
-        # that parts from the reference as it runs.
+        # `0.21428571428571427` there. Under `ties = :ordinal`, `cs_ranks` breaks a tie by the
+        # order of the asset axis, which is the deterministic reading, and the reference
+        # reproduces this series to the last bit once its own ranks are made stable. The
+        # entry below is the library's answer under that rule, and it is the only one of the
+        # ninety-eight this file asserts that parts from the reference as it runs.
         ref_ic = [-0.09523809523809523, -0.5714285714285714, -0.047619047619047616,
                   -0.3333333333333333, -0.07142857142857142, -0.023809523809523808, NaN,
                   0.2857142857142857, -0.8095238095238095, 0.19047619047619047,
@@ -86,8 +86,22 @@ using Statistics
         @test idio_agrees(idio_tail_rate(eps, vs; threshold = 2), ref_tr2)
         @test idio_agrees(idio_kurtosis(eps, vs), ref_kur)
         @test idio_agrees(idio_skewness(eps, vs), ref_skw)
-        @test idio_agrees(idio_vol_ic(eps, vs), ref_ic)
+        @test idio_agrees(idio_vol_ic(eps, vs; ties = :ordinal), ref_ic)
+        @test idio_agrees(idio_vol_residual_dependence(eps, vs; ties = :ordinal), ref_rd)
+        # Under the default `ties = :average`, the two observations whose predictions tie
+        # move. Observation eleven predicts zero for every asset, so its ranks are constant
+        # and it has no coefficient. Observation ten gives its seven zeros their mean rank,
+        # which `tiedrank` states. No other entry has a tie, so each keeps the reference's
+        # number. The residual dependence divides by the zeros, so it has no tie to move.
+        ica = idio_vol_ic(eps, vs)
+        sig = PortfolioOptimisers.idio_predicted_volatility(vs)
+        @test idio_agrees(ica[1:9], ref_ic[1:9])
+        @test ica[10] ≈ cor(tiedrank(sig[10, :]), tiedrank(abs.(eps[11, :])))
+        @test isnan(ica[11])
         @test idio_agrees(idio_vol_residual_dependence(eps, vs), ref_rd)
+        @test isequal(idio_vol_ic(csfm), ica)
+        @test isequal(idio_vol_ic(csfm; ties = :ordinal),
+                      idio_vol_ic(eps, vs; ties = :ordinal))
 
         # The reference's own summary, under its own key names.
         s = idio_calibration_summary(eps, vs)
@@ -196,6 +210,53 @@ using Statistics
         m = PortfolioOptimisers.idio_row_moments(standardised_idio_returns(eps0, vs0), 1)
         @test m.n == 0
         @test all(isnan, (m.m2, m.m3, m.m4))
+    end
+
+    @testset "a constant cross-section, an infinite entry and an integer input" begin
+        # A cross-section of equal non-zero values has no skewness and no kurtosis. Its mean
+        # carries round-off, so a centred moment computed from it is often a tiny positive
+        # number and not zero: before the exact test, 4195 of 20000 such rows of 3 to 7
+        # assets gave a finite skewness, up to 2.45. The counts avoid 4, whose mean is exact.
+        for nc in (3, 5, 6, 7), x in (0.1, -0.7, 1.3, 2.9)
+            zc = fill(x, 2, nc)
+            @test all(isnan, idio_skewness(zc))
+            @test nc < 4 || all(isnan, idio_kurtosis(zc))
+            @test idio_calibration(zc) == zeros(2)
+            mc = PortfolioOptimisers.idio_row_moments(zc, 1)
+            @test (mc.n, mc.m2, mc.m3, mc.m4) == (nc, 0.0, 0.0, 0.0)
+        end
+        # An infinite entry enters neither the count nor the sum of the tail rate, so the
+        # rate over the finite entries 0.5, 4 and -5 is two in three, never one.
+        @test idio_tail_rate([Inf 0.5 4.0 NaN -5.0]) == [2 / 3]
+        # An integer history answers in floating point rather than raising `InexactError`.
+        e_int = [1 -2 3 0; 3 4 -1 2; 0 1 2 -3]
+        v_int = [1 4 1 0; 1 0 4 1; 1 1 1 1]
+        z_int = standardised_idio_returns(e_int, v_int)
+        @test eltype(z_int) == Float64
+        @test isequal(z_int, [1.0 -1.0 3.0 NaN; 3.0 NaN -0.5 2.0; 0.0 1.0 2.0 -3.0])
+        @test idio_calibration([1 2 3; 4 5 7]) ≈ [1.0, std([4, 5, 7])]
+        # A Float32 history keeps its element type through every series.
+        rng32 = StableRNG(7)
+        e32 = randn(rng32, Float32, 6, 9)
+        v32 = rand(rng32, Float32, 6, 9) .+ 0.5f0
+        for f in
+            (idio_calibration, idio_tail_rate, idio_kurtosis, idio_skewness, idio_vol_ic,
+             idio_vol_residual_dependence)
+            @test eltype(f(e32, v32)) == Float32
+        end
+        @test idio_calibration_summary(e32, v32).mean_cs_std isa Float32
+        # Each series takes its type from its own operation, never from `float`. A square
+        # root is inexact, so a `Rational` history answers in the type `sqrt` lands in. A
+        # rate and the moment ratio of the kurtosis only divide, so an exact `z` stays exact.
+        er = Rational{Int}.(round.(Int, 8 .* e32)) .// 8
+        vr = Rational{Int}.(round.(Int, 8 .* v32)) .// 8
+        @test eltype(standardised_idio_returns(er, vr)) == typeof(sqrt(1 // 1))
+        @test eltype(idio_vol_ic(er, vr)) == typeof(sqrt(1 // 1))
+        zr = [1//2 -3//2 2//1 1//4 -1//1; 3//1 -1//3 1//5 2//1 -2//1]
+        @test idio_tail_rate(zr; threshold = 2) == [0 // 1, 1 // 5]
+        @test eltype(idio_kurtosis(zr)) == Rational{Int}
+        @test eltype(idio_skewness(zr)) == typeof(sqrt(1 // 1))
+        @test PortfolioOptimisers.idio_nan_mean([1 // 2, 1 // 3]) === 5 // 12
     end
 
     @testset "the refusals" begin

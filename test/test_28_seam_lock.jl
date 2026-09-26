@@ -2,9 +2,9 @@
     using Test
 
     # Model State (the `JuMP.Model` object dictionary shared by every constraint and risk
-    # builder) is reached through the typed interface in `01_Base_JuMPOptimisation.jl`:
+    # builder) is reached through the typed interface in `01_Base_JuMPOptimisation/`:
     # `state_key` / `state_set!` / `state_has` / `state_get` / `state_build!` /
-    # `nested_prefix`, plus the named accessors built on them (`get_X`, `get_dd`, …).
+    # `nested_prefix`, plus the named accessors built on them (`get_w`, `get_net_X`, …).
     #
     # Three rules hold the seam shut (ADR 0037, amending ADR 0004 §2 and §6.5):
     #
@@ -44,11 +44,11 @@
     # threshold/fee/xbgt model (ADR 0033/0034).
 
     srcdir = normpath(joinpath(@__DIR__, "..", "src"))
-    interface = "01_Base_JuMPOptimisation.jl"
+    interface = "17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/"
 
     # Files that build a DIFFERENT `JuMP.Model` — not the portfolio model, so the Model
     # State vocabulary does not apply to them at all.
-    other_models = ["16_RiskMeasures/07_OWARiskMeasures.jl",          # OWA weight fitting
+    other_models = ["16_RiskMeasures/07_OWARiskMeasures_a.jl",        # OWA weight fitting
                     "17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl"]  # allocation MIP
 
     # Strip `#` line comments, `\"\"\"` docstrings and `#=` block comments so prose mentions
@@ -108,12 +108,13 @@
     read_violations = String[]
     index_violations = String[]
     for (root, _, files) in walkdir(srcdir), file in files
-        if !endswith(file, ".jl") || file == interface
+        if !endswith(file, ".jl")
             continue
         end
         path = joinpath(root, file)
         rel = replace(relpath(path, srcdir), '\\' => '/')
-        if rel in other_models
+        # The interface is the directory of the JuMP base files (ADR 0179).
+        if startswith(rel, interface) || rel in other_models
             continue
         end
         for (lineno, raw) in code_lines(path)
@@ -164,26 +165,26 @@
     # The three rules police the SPELLING of an access and the NAME of a bare entry. None
     # of them can see that two well-spelled keys COMPOSE the same Symbol: `state_key`
     # concatenates on both axes, so a name that ends in a digit at a low index collides
-    # with a shorter name at a higher index. `:te_dr_11` is how that defect presented (ADR
+    # with a shorter name at a higher index. `:tr_dr_11` is how that defect presented (ADR
     # 0037 amendment §4), and a collision is a WRONG ANSWER — the second write replaced the
     # first, the build carried one entry where it needed two, and a constraint bound the
     # wrong variable. `state_set!` is the runtime rule that closes the class: registration
     # is fresh, so a collision throws where it used to overwrite.
     let m = PortfolioOptimisers.JuMP.Model(), p = Symbol("")
-        @test PortfolioOptimisers.state_key(p, :te_dr_, 11) ==
-              PortfolioOptimisers.state_key(p, :te_dr_1, 1)
-        @test PortfolioOptimisers.state_set!(m, p, :te_dr_, 11, 1) == 1
-        @test_throws ArgumentError PortfolioOptimisers.state_set!(m, p, :te_dr_1, 1, 2)
-        @test m[:te_dr_11] == 1
+        @test PortfolioOptimisers.state_key(p, :tr_dr_, 11) ==
+              PortfolioOptimisers.state_key(p, :tr_dr_1, 1)
+        @test PortfolioOptimisers.state_set!(m, p, :tr_dr_, 11, 1) == 1
+        @test_throws ArgumentError PortfolioOptimisers.state_set!(m, p, :tr_dr_1, 1, 2)
+        @test m[:tr_dr_11] == 1
         # An entry is refused under its own key too, so a second emitter cannot replace an
         # entry the first one owns.
-        @test_throws ArgumentError PortfolioOptimisers.state_set!(m, p, :te_dr_, 11, 2)
-        @test_throws ArgumentError PortfolioOptimisers.state_set!(m, p, :te_dr_11, 3)
+        @test_throws ArgumentError PortfolioOptimisers.state_set!(m, p, :tr_dr_, 11, 2)
+        @test_throws ArgumentError PortfolioOptimisers.state_set!(m, p, :tr_dr_11, 3)
         # A free key still registers, on either arity.
         @test PortfolioOptimisers.state_set!(m, p, :cvar_risk_, 1, 3) == 3
         @test PortfolioOptimisers.state_set!(m, p, :net_X, 4) == 4
         # Reuse is the other two verbs' job, and they stay idempotent.
-        @test PortfolioOptimisers.state_build!(() -> 5, m, p, :te_dr_, 11) == 1
+        @test PortfolioOptimisers.state_build!(() -> 5, m, p, :tr_dr_, 11) == 1
         @test PortfolioOptimisers.state_build!(() -> 5, m, p, :net_X) == 4
         @test PortfolioOptimisers.mark_state!(m, p, :variance_flag) === nothing
         @test PortfolioOptimisers.mark_state!(m, p, :variance_flag) === nothing

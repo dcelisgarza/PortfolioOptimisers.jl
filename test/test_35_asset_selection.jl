@@ -2,6 +2,12 @@ using Test, PortfolioOptimisers, TimeSeries, Dates, StableRNGs
 
 # a selector that never implements select_assets, for the erroring-fallback test
 struct UnimplementedSelector <: PortfolioOptimisers.AbstractAssetSelector end
+# a selector whose mask is one entry short, for the length check of the funnel
+struct ShortMaskSelector <: PortfolioOptimisers.AbstractAssetSelector end
+function PortfolioOptimisers.select_assets(::ShortMaskSelector,
+                                           rd::PortfolioOptimisers.AbstractReturnsResult)
+    return trues(size(rd.X, 2) - 1)
+end
 
 @testset "Asset selection" begin
     PO = PortfolioOptimisers
@@ -272,9 +278,6 @@ struct UnimplementedSelector <: PortfolioOptimisers.AbstractAssetSelector end
         @test_throws TypeError ReturnsResult(; nx = ["A", "B"],
                                              X = Union{Missing, Float64}[0.1 0.2
                                                                          0.3 missing])
-        # the helper itself does read both sentinels
-        @test PO.find_complete_indices(Union{Missing, Float64}[1.0 missing; 2.0 3.0];
-                                       dims = 1) == [1]
     end
 
     #=
@@ -351,6 +354,46 @@ struct UnimplementedSelector <: PortfolioOptimisers.AbstractAssetSelector end
         @test fit_preprocessing(sel, rdte).nx == ["A", "B"]
         # the replay keeps the fitted one, which is what makes the selector safe in CV
         @test collect(apply_preprocessing(res, rdte).nx) == ["B", "C"]
+    end
+
+    @testset "the base of the family agrees with its docstrings" begin
+        # CompleteAssetSelector keeps the Coverage Universe, which drops an Inf column too
+        Xi = [1.0 Inf; 2.0 3.0]
+        @test fit_preprocessing(CompleteAssetSelector(),
+                                ReturnsResult(; nx = ["A", "B"], X = Xi)).nx == ["A"]
+
+        # the fitted names keep the column order of the training window, not a sorted one
+        rd = ReturnsResult(; nx = ["C", "A", "B"],
+                           X = [0.1 0.2 0.0; -0.1 0.3 0.0; 0.2 -0.1 0.0])
+        res = fit_preprocessing(ZeroVarianceFilter(), rd)
+        @test res.nx == ["C", "A"]
+        # and the replay reorders the window's columns into that order
+        w = ReturnsResult(; nx = ["B", "A", "C", "D"],
+                          X = [0.0 0.2 0.1 1.0; 0.0 0.3 -0.1 2.0; 0.0 -0.1 0.2 3.0])
+        aw = apply_preprocessing(res, w)
+        @test collect(aw.nx) == ["C", "A"]
+        @test aw.X == w.X[:, [3, 2]]
+
+        # a mask of the wrong length is refused, and the message states both lengths
+        e = try
+            fit_preprocessing(ShortMaskSelector(), rd)
+        catch err
+            err
+        end
+        @test e isa DimensionMismatch
+        @test occursin("length 2 for the 3 asset columns", e.msg)
+
+        # the unimplemented fallback names the subtype
+        e = try
+            fit_preprocessing(UnimplementedSelector(), rd)
+        catch err
+            err
+        end
+        @test occursin("UnimplementedSelector", e.msg)
+
+        # a carrier with no asset axis matches no method of the reduction
+        prr = PO.PredictionReturnsResult(; nx = ["P"], X = [0.1, -0.2, 0.3])
+        @test_throws MethodError fit_preprocessing(CompleteAssetSelector(), prr)
     end
 
     @testset "pipeline integration" begin

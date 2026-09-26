@@ -156,6 +156,13 @@ Applies the risk measure to each portfolio, then takes the absolute difference o
 
 The risk is the dependent variable of a risk measure, so this formulation compares the two portfolios after the measure is evaluated: it reports ``\\left\\lvert R(\\boldsymbol{w}) - R(\\boldsymbol{w}_{b}) \\right\\rvert``.
 
+The functor reports the exact absolute difference. In an optimisation the model states the difference from one side only, because the absolute difference between a convex risk and the benchmark risk, a constant, is not convex. The model reaches it through the epigraph of the risk measure, an upper bound on ``R(\\boldsymbol{w})`` that the solver can raise at no cost. So the model states ``\\max(0,\\ R(\\boldsymbol{w}) - R(\\boldsymbol{w}_{b}))``: it penalises a portfolio riskier than the benchmark, and it reports zero for one that is less risky. This is true of every measure whose model is an upper bound, among them [`ConditionalValueatRisk`](@ref), [`StandardDeviation`](@ref), [`LowOrderMoment`](@ref) and a [`Variance`](@ref) in the semidefinite form, ``\\mathrm{tr}(\\boldsymbol{\\Sigma}\\mathbf{W}) \\geq \\boldsymbol{w}^\\intercal\\boldsymbol{\\Sigma}\\boldsymbol{w}``:
+
+  - As a bound, a `RiskTrackingRiskMeasure` with `settings.ub` or a [`RiskTrackingError`](@ref), it is the ceiling ``R(\\boldsymbol{w}) \\leq R(\\boldsymbol{w}_{b}) + \\varepsilon``, where ``\\varepsilon`` is the `err` of the tracking error or the `settings.ub` of the measure. The model evaluates ``R(\\boldsymbol{w}_{b})`` on the prior of the optimisation, and a [`WeightsTracking`](@ref) benchmark that is not `fixed` takes the previous weights. So the ceiling moves with the data and with the benchmark, which a fixed `settings.ub` on the measure cannot do.
+  - In the objective, it penalises only the risk in excess of the benchmark risk. The semidefinite [`Variance`](@ref) is the one exception, because its inner build shares the lifted matrix ``\\mathbf{W}`` of the head. The difference is exact when the terms that price the growth of ``\\mathbf{W}`` outweigh the tracking term: ``p + s_v \\Sigma_{ii} \\geq s \\Sigma_{ii}`` for every ``i``. Here ``p`` is the penalty of a [`SemiDefinitePhylogeny`](@ref), ``s`` the tracking scale, and ``s_v`` the scale of a variance that the objective minimises on the same weights, `0` when there is none.
+
+A [`Variance`](@ref) outside the semidefinite form is a quadratic expression, and it does not solve in this mode. The variance takes the semidefinite form under a [`SemiDefinitePhylogeny`](@ref) or risk-contribution rows. The dependent method of `set_risk_constraints!` for a [`RiskTrackingRiskMeasure`](@ref) states the bound in its `## Relaxation`.
+
 # Constructors
 
     DependentVariableTracking() -> DependentVariableTracking
@@ -552,16 +559,16 @@ Where:
 
 The conversion is the square root, it carries no dependence on `T`, and the two norms then write the **same** cone bound. [`tracking_error_soc_factor`](@ref) is where they meet: `(SquaredL2Norm(), err^2)` and `(L2Norm(), err)` give one factor, one weight vector, and realised deviations that satisfy the square. The `ddof` field of `alg` moves that bound.
 
-The keys the model registers are picked by `alg`, and each carries the constraint index appended. Every branch registers `:t_te_` for the cone variable, `:te_` for the deviation expression ``\\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b}k``, and `:cte_` for the row that holds the cone variable below the scaled tolerance. The cone, its row, and the rows a branch adds beyond those three, are:
+The keys the model registers are picked by `alg`, and each carries the constraint index appended. Every branch registers `:t_tr_` for the cone variable, `:tr_` for the deviation expression ``\\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b}k``, and `:ctr_` for the row that holds the cone variable below the scaled tolerance. The cone, its row, and the rows a branch adds beyond those three, are:
 
 | `alg`                                     | Cone                        | Cone row        | Rows the branch adds |
 |:----------------------------------------- |:--------------------------- |:--------------- |:-------------------- |
-| [`L1Norm`](@ref)                          | `JuMP.MOI.NormOneCone`      | `:cte_noc_`     | none                 |
-| [`L2Norm`](@ref), [`SquaredL2Norm`](@ref) | `JuMP.SecondOrderCone`      | `:cte_soc_`     | none                 |
-| [`LpNorm`](@ref)                          | `JuMP.MOI.PowerCone`        | `:cte_pnorm_`   | `:r_te_`, `:cste_`   |
-| [`LInfNorm`](@ref)                        | `JuMP.MOI.NormInfinityCone` | `:cte_infnorm_` | none                 |
+| [`L1Norm`](@ref)                          | `JuMP.MOI.NormOneCone`      | `:ctr_noc_`     | none                 |
+| [`L2Norm`](@ref), [`SquaredL2Norm`](@ref) | `JuMP.SecondOrderCone`      | `:ctr_soc_`     | none                 |
+| [`LpNorm`](@ref)                          | `JuMP.MOI.PowerCone`        | `:ctr_pnorm_`   | `:r_tr_`, `:cstr_`   |
+| [`LInfNorm`](@ref)                        | `JuMP.MOI.NormInfinityCone` | `:ctr_infnorm_` | none                 |
 
-`:cte_soc_` is therefore the key of the default `alg = L2Norm()` and of [`SquaredL2Norm`](@ref) alone. The model registers no `:tracking_risk_` and no `:sq_tracking_risk_`: those two keys belong to [`TrackingRiskMeasure`](@ref), which measures a risk difference rather than a return-series deviation.
+`:ctr_soc_` is therefore the key of the default `alg = L2Norm()` and of [`SquaredL2Norm`](@ref) alone. The model registers no `:tracking_risk_` and no `:sq_tracking_risk_`: those two keys belong to [`TrackingRiskMeasure`](@ref), which measures a risk difference rather than a return-series deviation.
 
 # Fields
 
@@ -692,7 +699,7 @@ function needs_previous_weights(tr::TrackingError)
     return needs_previous_weights(tr.tr)
 end
 function needs_previous_weights(tr::VecTr)
-    return any(needs_previous_weights.(tr))
+    return any(needs_previous_weights, tr)
 end
 
 export IndependentVariableTracking, DependentVariableTracking, WeightsTracking,

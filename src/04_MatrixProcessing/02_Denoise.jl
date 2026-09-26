@@ -545,7 +545,7 @@ function _denoise!(::SpectralDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
 end
 function _denoise!(::FixedDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
-    vals[1:num_factors] .= sum(vals[1:num_factors]) / num_factors
+    vals[1:num_factors] .= sum(view(vals, 1:num_factors)) / num_factors
     X .= StatsBase.cov2cor(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
     return X
 end
@@ -701,7 +701,7 @@ function find_max_eval(vals::VecNum, q::Number,
             pdf[i, 2] = AverageShiftedHistograms.pdf(ash_res, j)
         end
         pdf[.!isfinite.(view(pdf, :, 2)), 2] .= zero(eltype(x))
-        return sum((view(pdf, :, 2) - view(pdf, :, 1)) .^ 2)
+        return sum(i -> (pdf[i, 2] - pdf[i, 1])^2, axes(pdf, 1))
     end
     res = Optim.optimize(x -> f(x), zero(eltype(vals)), one(eltype(vals)), args...;
                          kwargs...)

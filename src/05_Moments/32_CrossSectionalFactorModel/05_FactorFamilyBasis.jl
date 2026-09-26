@@ -502,6 +502,7 @@ function factor_family_basis(families::AbstractVector{<:Pair}, Ms::Arr3Num, bw::
     fi = Vector{Int}[]
     di = Int[]
     blocks = Matrix{Tf}[]
+    ret = Int[]
     for pr in families
         nm = String(first(pr))
         @argcheck(nm ∉ fnm, ArgumentError("family $nm appears more than once in families"))
@@ -511,7 +512,7 @@ function factor_family_basis(families::AbstractVector{<:Pair}, Ms::Arr3Num, bw::
         @argcheck(length(idx) >= 2,
                   ArgumentError("family $nm holds $(length(idx)) factor, and a constrained family needs at least two"))
         d = resolve_dropped_member(last(pr), nm, idx, nf, c)
-        ret = [i for i in idx if i != idx[d]]
+        append!(empty!(ret), (i for i in idx if i != idx[d]))
         push!(fnm, nm)
         push!(fi, idx)
         push!(di, d)
