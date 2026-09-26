@@ -105,7 +105,7 @@ end
 # What a host's `port_opt_view` does with its `cache`, read off the method's lowered body:
 #
 #   - `:slices`  -- some `port_opt_view` call takes the host's `cache` field as an argument.
-#                   `@vprop` emits `port_opt_view(x.cache, i, args...)`, which lowers to an
+#                   `@vprop` emits `view_child(x.cache, i, args...)`, which lowers to an
 #                   `_apply_iterate` over a tuple holding `getproperty(x, :cache)`; a
 #                   hand-written method spells `port_opt_view(opt.cache, i)`, a plain call.
 #   - `:refuses` -- the body throws and never reads the cache.
@@ -121,12 +121,17 @@ function cache_travels(m::Method)
     code = Base.uncompressed_ir(m).code
     stmt(x) = x isa Core.SSAValue ? code[x.id] : x
     is_call(x) = x isa Expr && x.head === :call
-    # `port_opt_view` as a `GlobalRef`, or as `getproperty(PortfolioOptimisers, :port_opt_view)`.
+    # `port_opt_view` or `view_child` as a `GlobalRef`, or as
+    # `getproperty(PortfolioOptimisers, name)`. `@vprop` emits `view_child`, which calls
+    # `port_opt_view` on every value but a precomputed optimisation result, and a cache is
+    # never one.
+    view_names = (:port_opt_view, :view_child)
     function names_view(x)
         x = stmt(x)
-        return (x isa GlobalRef && x.name === :port_opt_view) || (is_call(x) &&
-                                                                  length(x.args) == 3 &&
-                                                                  x.args[3] === QuoteNode(:port_opt_view))
+        return (x isa GlobalRef && x.name in view_names) || (is_call(x) &&
+                                                             length(x.args) == 3 &&
+                                                             x.args[3] isa QuoteNode &&
+                                                             x.args[3].value in view_names)
     end
     # `getproperty(x, :cache)`, or a tuple that holds one.
     function from_cache(x)
