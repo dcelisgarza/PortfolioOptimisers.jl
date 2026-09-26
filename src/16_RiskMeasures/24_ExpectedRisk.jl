@@ -1249,7 +1249,7 @@ Where:
 
   - $(math_dict[:p_k_chain])
   - ``v_k``: Scaled risk ``s_k R_k(\\boldsymbol{w})`` of the ``k``-th risk measure of a vector.
-  - ``\\gamma``: Smoothing parameter of the log-sum-exp scalariser.
+  - $(math_dict[:gamma_lse])
   - $(math_dict[:n_rm_vec])
 
 # Arguments

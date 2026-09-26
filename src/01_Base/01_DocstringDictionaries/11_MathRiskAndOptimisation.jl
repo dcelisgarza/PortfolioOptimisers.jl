@@ -92,6 +92,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :d_homog => "``d``: Degree of homogeneity of the risk measure, the ``d`` for which ``R(c \\boldsymbol{w}) = c^{d} R(\\boldsymbol{w})`` at every ``c > 0``.",#
                  :w_i_asset => "``w_i``: Weight of asset ``i``.",#
                  :n_rm_vec => "``n``: Size of the vector of risk measures.",#
+                 :gamma_lse => "``\\gamma``: Smoothing parameter `gamma` of a [`LogSumExpScalariser`](@ref), positive.",#
                  :W_roll => "``W``: Rolling window size, in observations.",#
                  :R_t_roll => "``R_t``: Rolling risk, the risk of the window that ends at observation ``t``.",#
                  :R_w_rows => "``R(\\boldsymbol{w};\\, \\mathbf{X}_{a:b})``: Window risk, the risk of the portfolio on the rows ``a`` to ``b`` of the returns matrix.",#

@@ -681,7 +681,7 @@ Beside the family, not in it: `BestConstantRebalancedPortfolio` · BCRP · bench
 ### 4.2 Clustering (Non-JuMP)
 
 - **HierarchicalRiskParity (HRP)**: recursive bisection of the cluster tree, allocating by risk.
-- **HierarchicalEqualRiskContribution (HERC)**: equalises risk contribution across clusters, then within them.
+- **HierarchicalEqualRiskContribution (HERC)**: splits weight down the cluster tree between whole clusters in inverse proportion to their risk, then inside each cluster in inverse proportion to each asset's own risk. Despite the name, the clusters do not contribute equally to risk.
 - **SchurComplementHierarchicalRiskParity (SCHRP)**: HRP augmented with a Schur-complement step.
 
 `HierarchicalOptimiser` is the shared configuration for these.

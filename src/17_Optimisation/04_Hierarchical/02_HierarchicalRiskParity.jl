@@ -472,10 +472,10 @@ Where:
   - ``\\rho_k``: Risk measure ``k`` of `rs`.
   - ``\\rho_k(\\{i\\})``: Risk of asset ``i`` held alone under ``\\rho_k``, the entry ``i`` of `rkus[k]`.
   - ``\\tilde{\\boldsymbol{w}}^{(k)}(C)``: Naive risk parity weights of ``\\rho_k`` inside part ``C``, zero outside it.
-  - ``s_k``: The scale `settings.scale` of ``\\rho_k``.
+  - $(math_dict[:s_k_scale])
   - ``\\boldsymbol{p}_k``: The scaled pair of risks of the two halves under ``\\rho_k``.
   - $(math_dict[:C_halves_hier])
-  - ``\\gamma``: The parameter `gamma` of a [`LogSumExpScalariser`](@ref). The logarithm and the exponential act on each entry of the pair.
+  - $(math_dict[:gamma_lse]) The logarithm and the exponential act on each entry of the pair.
 
 The four cases are [`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref) and [`LogSumExpScalariser`](@ref). A maximum or a minimum selects one measure by the total of its pair and returns that measure's own pair. It does not take the maximum or the minimum of each entry.
 
@@ -499,7 +499,7 @@ The four cases are [`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalar
   - [`HierarchicalRiskParity`](@ref)
   - [`scalarise`](@ref)
   - [`unitary_expected_risks`](@ref)
-  - [`herc_scalarised_risk_i!`](@ref)
+  - [`herc_intra_cluster_weights`](@ref)
 """
 function hrp_scalarised_risk(sca::Scalariser, wu::MatNum, rkus::VecVecNum, lc::VecNum,
                              rc::VecNum, rs::VecOptRM, X::MatNum, fees::Option{<:Fees})
