@@ -555,3 +555,114 @@ end
     @test_throws DimensionMismatch PO.variance_series(ewv, X0;
                                                       active_mask = trues(T, N + 1))
 end
+
+@testset "The docstrings of 33_CoverageUniverse.jl against numbers" begin
+    # `coverage_mask` against its set definition: finite at every row of `X`, and `true` at
+    # every row of the active mask, whose row count may differ from the row count of `X`.
+    rng = StableRNG(11)
+    for _ in 1:200
+        Tx, Ta, n = rand(rng, 1:12), rand(rng, 1:12), rand(rng, 1:6)
+        X = randn(rng, Tx, n)
+        for _ in 1:rand(rng, 0:3)
+            X[rand(rng, 1:Tx), rand(rng, 1:n)] = rand(rng, (NaN, Inf, -Inf))
+        end
+        amsk = rand(rng, Ta, n) .> 0.08
+        pnl = AssetPanel(; pf = [NumericPanelField(; name = "m", vals = ones(Ta, n))],
+                         amsk = amsk, emsk = amsk)
+        want = [all(isfinite, X[:, i]) && all(amsk[:, i]) for i in 1:n]
+        for (Xd, dims) in ((X, 1), (permutedims(X), 2))
+            if !any(want)
+                @test_throws IsEmptyError PO.coverage_mask(Xd, pnl; dims = dims)
+            elseif all(want)
+                @test isnothing(PO.coverage_mask(Xd, pnl; dims = dims))
+            else
+                @test PO.coverage_mask(Xd, pnl; dims = dims) == want
+            end
+        end
+    end
+
+    # The four frames of `expand_moment`, entry by entry: position `k(i)` of asset `i` in the
+    # Coverage Universe, `NaN` at every other entry.
+    for cmsk in (BitVector([1, 0, 1, 1]), BitVector([0, 1, 0, 1, 1]), BitVector([0, 0, 1]))
+        C = findall(cmsk)
+        n, M = length(C), length(cmsk)
+        k = Dict(C[j] => j for j in 1:n)
+        m, B = randn(rng, n), randn(rng, n, n)
+        S, K = randn(rng, n, n^2), randn(rng, n^2, n^2)
+        want_S = fill(NaN, M, M^2)
+        want_K = fill(NaN, M^2, M^2)
+        for i in C, a in C, b in C
+            want_S[i, (a - 1) * M + b] = S[k[i], (k[a] - 1) * n + k[b]]
+        end
+        for a in C, b in C, c in C, d in C
+            want_K[(a - 1) * M + b, (c - 1) * M + d] = K[(k[a] - 1) * n + k[b],
+                                                         (k[c] - 1) * n + k[d]]
+        end
+        mt = PO.expand_moment(m, cmsk, 1)
+        @test mt[C] == m
+        @test all(isnan, mt[.!cmsk])
+        Bt = PO.expand_moment(B, cmsk)
+        @test Bt[C, C] == B
+        @test count(isnan, Bt) == M^2 - n^2
+        St, Vt = PO.expand_moment((S, B), cmsk)
+        @test isequal(St, want_S)
+        @test isequal(Vt, Bt)
+        @test isequal(PO.expand_moment(K, cmsk, Val(:kt)), want_K)
+        @test PO.coverage_pair_index(cmsk) == [(a - 1) * M + b for a in C for b in C]
+    end
+    # The pair index reads the column rule of `kron(o, Y) .* kron(Y, o)`.
+    Y = randn(rng, 7, 4)
+    o = ones(1, 4)
+    KY = kron(o, Y) .* kron(Y, o)
+    @test all(KY[:, (a - 1) * 4 + b] == Y[:, b] .* Y[:, a] for a in 1:4, b in 1:4)
+
+    # The implied volatility surface describes the assets of `X`, so its asset axis must match.
+    # A narrower surface read two of three columns and answered "every asset covered".
+    @test_throws DimensionMismatch PO.coverage_mask(X0, fill(0.2, T, N - 1), nothing)
+    @test_throws DimensionMismatch PO.coverage_mask(X0, fill(0.2, T, N + 1), pnl_full)
+    @test_throws DimensionMismatch PO.coverage_mask(permutedims(X0), fill(0.2, N - 1, T),
+                                                    nothing; dims = 2)
+    iv = fill(0.2, T, N)
+    iv[3, 2] = NaN
+    @test PO.coverage_mask(Xlist, iv, pnl_inactive) == BitVector([0, 0, 1, 0])
+
+    # The series pairs the active mask with `X` row by row, so the two must be the same size.
+    # A shorter mask threw a `BoundsError`, and a wider one an unnamed `DimensionMismatch`.
+    short = AssetPanel(; pf = [NumericPanelField(; name = "m", vals = ones(T - 5, N))],
+                       amsk = trues(T - 5, N), emsk = trues(T - 5, N))
+    wide = AssetPanel(; pf = [NumericPanelField(; name = "m", vals = ones(T, N + 1))],
+                      amsk = trues(T, N + 1), emsk = trues(T, N + 1))
+    ve = SimpleVariance()
+    vc = SimpleVariance(; cvg = CoveragePolicy())
+    for pnl in (short, wide), est in (ve, vc, GerberCovariance())
+        @test_throws DimensionMismatch PO.variance_series(est, Xhol, pnl)
+    end
+    @test_throws DomainError PO.variance_series(ve, Xhol, pnl_full; dims = 3)
+    @test_throws DomainError PO.variance_series(vc, Xhol, pnl_full; dims = 3)
+
+    # The series against its definition, entry by entry.
+    got = PO.variance_series(ve, Xlist, pnl_inactive)
+    want = fill(NaN, T, N)
+    for t in 1:T
+        C = [i for i in 1:N if all(isfinite, Xlist[1:t, i]) && all(inactive_amsk[1:t, i])]
+        isempty(C) && continue
+        want[t, C] = vec(Statistics.var(ve, Xlist[1:t, C]; dims = 1))
+    end
+    @test isequal(got, want)
+    # Every window starts at the first row, so the asset that lists at observation 31 is `NaN`
+    # throughout. The available-case seam gives it a number from its second observation on.
+    @test all(isnan, view(got, :, 4))
+    @test findall(isfinite, view(PO.variance_series(vc, Xlist, pnl_full), :, 4)) == 32:T
+
+    # A variance divides, so an integer sample gives the series of the same sample in Float64,
+    # bit for bit, and a Float32 sample stays Float32. The frame took `eltype(X)` and an integer
+    # sample threw `InexactError: Int64(NaN)`.
+    Xi = rand(StableRNG(33), -5:5, T, N)
+    for est in (ve, vc)
+        vi = PO.variance_series(est, Xi, pnl_inactive)
+        @test eltype(vi) == Float64
+        @test isequal(vi, PO.variance_series(est, Float64.(Xi), pnl_inactive))
+    end
+    @test eltype(PO.variance_series(ve, Float32.(Xhol), pnl_full)) == Float32
+    @test eltype(PO.variance_series(vc, Float32.(Xhol), nothing)) == Float32
+end

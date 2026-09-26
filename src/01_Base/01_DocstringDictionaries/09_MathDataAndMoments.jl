@@ -153,6 +153,9 @@ unique_key_dict!(math_dict, :math_dict,
                  :nu_k_cvg => "``\\nu_{k}``: Observation count of cell ``k``, the number of observations at which every asset of the cell is finite and active.",#
                  :v_k_cvg => "``v_{k}``: Entry ``k`` of the answer of an available-case fit.",#
                  :A_adm_cvg => "``\\mathcal{A}``: Admitted assets, those that [`admits`](@ref) lets into the answer. A cell is admitted when every asset of the cell is in ``\\mathcal{A}``.",#
+                 # The Coverage Universe of `05_Moments/33_CoverageUniverse.jl`. The
+                 # symbol is stated by two or more Units of that file.
+                 :C_cvg_univ => "``\\mathcal{C}``: Coverage Universe of the fit, the assets whose returns are finite, and whose active mask entries are ``1``, at every observation of the window.",#
                  # The Listing Span of `03_InputData/03_ListingSpan.jl` and its projection
                  # onto the returns clock. Each symbol is stated by two or more Units of
                  # that file.

@@ -158,7 +158,7 @@ commit = "0ecb3ce47c"
 "src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { code = 425, doc = 547, comment = 0, blank = 267, total = 1239 }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { code = 225, doc = 318, comment = 2, blank = 150, total = 695 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 236, doc = 477, comment = 0, blank = 215, total = 928 }
-"src/05_Moments/33_CoverageUniverse.jl" = { code = 403, doc = 639, comment = 0, blank = 298, total = 1340 }
+"src/05_Moments/33_CoverageUniverse.jl" = { code = 411, doc = 767, comment = 0, blank = 351, total = 1529 }
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { code = 373, doc = 787, comment = 6, blank = 339, total = 1505 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { code = 356, doc = 604, comment = 9, blank = 228, total = 1197 }
 "src/05_Moments/36_RankOneCovariance.jl" = { code = 37, doc = 103, comment = 6, blank = 49, total = 195 }
