@@ -62,6 +62,12 @@ unique_key_dict!(math_dict, :math_dict,
                  # JuMP optimisation variables.
                  :k_budget => "``k``: Budget scaling / homogenisation variable.",#
                  :sc_scale => "``s_c``: Constraint scale. It multiplies both sides of a row, so a positive value leaves the feasible set unchanged.",#
+                 # The second moment in a JuMP model: the matrix, its factor, its lift and the
+                 # epigraph of its square root.
+                 :Sigma_rm => "``\\mathbf{\\Sigma}``: Covariance matrix of the risk measure, ``N \\times N``. It is the measure's own matrix when the measure states one, and the prior's otherwise.",#
+                 :G_cov_factor => "``\\mathbf{G}``: Covariance factor, with ``\\mathbf{G}^\\intercal \\mathbf{G} = \\mathbf{\\Sigma}``. It need not be square, and ``\\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}^{2} = \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``.",#
+                 :W_lift => "``\\mathbf{W}``: Lifted weight matrix, symmetric ``N \\times N``. [`set_sdp_constraints!`](@ref) bounds it by ``\\mathbf{W} \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``.",#
+                 :sigma_epi => "``\\sigma``: Standard-deviation epigraph variable, ``\\sigma \\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}``.",#
                  # The cones of a norm, and the diversification floor a norm ceiling states.
                  :K_q_norm => "``\\mathcal{K}_{q} = \\{(t, \\boldsymbol{x}) : t \\geq \\lVert \\boldsymbol{x} \\rVert_{q}\\}``: Norm cone of order ``q``. ``\\mathcal{K}_{2}`` is the second-order cone.",#
                  :P_alpha_power => "``\\mathcal{P}_{\\alpha} = \\{(x, y, z) : x^{\\alpha} y^{1 - \\alpha} \\geq \\lvert z \\rvert,\\ x \\geq 0,\\ y \\geq 0\\}``: Power cone of exponent ``\\alpha \\in (0, 1)``, in the argument order of `MOI.PowerCone`.",#
