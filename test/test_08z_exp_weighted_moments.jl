@@ -550,3 +550,116 @@ end
     @test mean(ExpWeightedExpectedReturns(; decay = prevfloat(1.0), min_obs = 1),
                [0.01 -0.02]) == [0.01, -0.02]
 end
+
+# The closed form that the docstring of `ExpWeightedCovariance` states, entry by entry and in
+# BigFloat: the valid set of each asset, the running location from zero, and one exponent per
+# pair of assets.
+function ew_cov_closed_form(X, amsk, λ, centred, min_obs)
+    T, N = size(X)
+    λ = big(λ)
+    active = isnothing(amsk) ? trues(T, N) : amsk
+    V = Vector{Vector{Int}}(undef, N)
+    for i in 1:N
+        s = findlast(!, view(active, :, i))
+        s = isnothing(s) ? 1 : s + 1
+        V[i] = [t for t in s:T if isfinite(X[t, i]) && active[t, i]]
+    end
+    e = fill(big(NaN), T, N)
+    for i in 1:N, (k, t) in enumerate(V[i])
+        m = if centred
+            big(0)
+        else
+            (1 - λ) *
+            sum((λ^(k - 1 - q) * big(X[V[i][q], i]) for q in 1:(k - 1)); init = big(0))
+        end
+        e[t, i] = big(X[t, i]) - m
+    end
+    n = length.(V)
+    Σ = fill(big(NaN), N, N)
+    for i in 1:N, j in 1:N
+        J = intersect(V[i], V[j])
+        S = (1 - λ) *
+            sum((λ^(length(J) - k) * e[t, i] * e[t, j] for (k, t) in enumerate(J));
+                init = big(0))
+        Σ[i, j] = S / sqrt((1 - λ^n[i]) * (1 - λ^n[j]))
+    end
+    bad = [n[i] < min_obs || !active[T, i] for i in 1:N]
+    Σ[bad, :] .= NaN
+    Σ[:, bad] .= NaN
+    return Σ
+end
+
+@testset "ExpWeightedCovariance against its closed form" begin
+    # A late listing, a delisting and relisting, a delisting at the end, three holidays of an
+    # active asset and an infinite return.
+    X = oracle_returns()[:, 1:EW_N]
+    X = hcat(X, X[:, 1] .* 0.5 .+ X[:, 3] .* 0.25)
+    amsk = trues(EW_T, EW_N + 1)
+    amsk[1:12, 2] .= false
+    amsk[20:27, 3] .= false
+    amsk[55:EW_T, 5] .= false
+    X[.!amsk] .= NaN
+    X[[5, 17, 33], 1] .= NaN
+    X[40, 4] = Inf
+    for centred in (true, false), mask in (amsk, nothing)
+        ce = ExpWeightedCovariance(; decay = 0.93, min_obs = 3, centred = centred)
+        sigma = cov(ce, X; active_mask = mask)
+        ref = Float64.(ew_cov_closed_form(X, mask, 0.93, centred, 3))
+        @test isequal(isnan.(sigma), isnan.(ref))
+        @test isapprox(filter(isfinite, sigma), filter(isfinite, ref); rtol = 1e-13)
+    end
+
+    # The first deviation of an uncentred asset is its return, because the location starts at
+    # zero: one observation gives the outer product of the returns.
+    x1 = [0.01 -0.02 0.03]
+    @test cov(ExpWeightedCovariance(; decay = 0.9, min_obs = 1), x1) ≈ transpose(x1) * x1
+
+    # The correlation is the correlation of the internal state.
+    ce = ExpWeightedCovariance(; decay = 0.9, min_obs = 1)
+    Xc = oracle_returns()
+    S = partial_fit!(ce, Xc).cache.covariance
+    @test isapprox(cor(ce, Xc), S ./ sqrt.(diag(S) * transpose(diag(S))); atol = 1e-14)
+
+    # A holiday makes the estimate indefinite: the variance of asset 1 decays while its
+    # covariance with asset 2 stays, so the implied correlation leaves [-1, 1] and `cor`
+    # clamps it.
+    r = [0.02, -0.01, 0.015, -0.02, 0.01, 0.03, -0.025, 0.02]
+    Xh = vcat(hcat(r, r), [zeros(5) fill(NaN, 5)])
+    ch = ExpWeightedCovariance(; decay = 0.7, min_obs = 1, centred = true)
+    sh = cov(ch, Xh)
+    @test minimum(eigvals(Symmetric(sh))) < 0
+    @test sh[1, 2] / sqrt(sh[1, 1] * sh[2, 2]) > 1
+    @test cor(ch, Xh)[1, 2] == 1
+    # The wrapper that the docstring names repairs the matrix.
+    @test minimum(eigvals(Symmetric(cov(PortfolioOptimisersCovariance(; ce = ch), Xh)))) >
+          -1e-12
+
+    # The fold S = λ^{n_b} S_a + S_b is exact for a centred estimator over a complete block and
+    # not for an uncentred one, which is why a merge is refused.
+    fold_gap(centred) = begin
+        est = ExpWeightedCovariance(; decay = 0.9, centred = centred)
+        a = partial_fit!(est, view(Xc, 1:12, :)).cache.covariance
+        b = partial_fit!(est, view(Xc, 13:EW_T, :)).cache.covariance
+        full = partial_fit!(est, Xc).cache.covariance
+        maximum(abs, 0.9^(EW_T - 12) * a + b - full) / maximum(abs, full)
+    end
+    @test fold_gap(true) < 1e-14
+    @test fold_gap(false) > 1e-4
+
+    # A second block writes the state of the first estimator in place, so the two share it.
+    c1 = partial_fit!(ExpWeightedCovariance(; decay = 0.9), view(Xc, 1:20, :))
+    c2 = partial_fit!(c1, view(Xc, 21:EW_T, :))
+    @test c1.cache === c2.cache
+
+    # The state takes the type of a quotient of two returns: an integer sample gives a
+    # floating-point estimate, and a `Float32` sample keeps `Float32`.
+    Xi = [1 2 3; 4 -1 2; 0 3 -2; 5 1 1; -3 2 4]
+    ci = ExpWeightedCovariance(; decay = 0.8, min_obs = 1)
+    @test isequal(cov(ci, Xi), cov(ci, float.(Xi)))
+    @test eltype(cov(ExpWeightedCovariance(; decay = 0.8f0, min_obs = 1), Float32.(Xi))) ===
+          Float32
+
+    # A panel whose mask does not have the size of the sample is refused.
+    amskp = trues(EW_T - 5, EW_N)
+    @test_throws DimensionMismatch cov(ExpWeightedCovariance(), Xc, oracle_panel(amskp))
+end

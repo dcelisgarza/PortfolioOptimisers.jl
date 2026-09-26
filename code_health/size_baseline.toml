@@ -117,7 +117,7 @@ commit = "0ecb3ce47c"
 "src/05_Moments/28_CustomValueExpectedReturns.jl" = { code = 50, doc = 161, comment = 0, blank = 75, total = 286 }
 "src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { code = 139, doc = 363, comment = 5, blank = 170, total = 677 }
 "src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { code = 189, doc = 426, comment = 5, blank = 196, total = 816 }
-"src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { code = 217, doc = 485, comment = 5, blank = 221, total = 928 }
+"src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { code = 214, doc = 580, comment = 6, blank = 264, total = 1064 }
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { code = 399, doc = 909, comment = 6, blank = 358, total = 1672 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { code = 492, doc = 776, comment = 3, blank = 321, total = 1592 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { code = 139, doc = 487, comment = 1, blank = 200, total = 827 }
