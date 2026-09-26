@@ -69,4 +69,11 @@ unique_key_dict!(math_dict, :math_dict,
                  # `09_OrthogonalUncertaintySets.jl` builds the set from them.
                  :kappa_cpt => "``\\kappa \\geq 0``: Radius of the compact covariance set, the multiplier of its penalty.",#
                  :C_cpt => "``\\mathbf{C}``: Diagonal metric square root of the covariance set.",#
-                 :Q_cpt => "``\\mathbf{Q}``: Orthonormal basis of the weighted factor span.")
+                 :Q_cpt => "``\\mathbf{Q}``: Orthonormal basis of the weighted factor span.",#
+                 # The mean set of the orthogonal uncertainty sets and its two scalings.
+                 # `09_OrthogonalUncertaintySets.jl` states the estimator, both scaling
+                 # tags and their verb over these symbols.
+                 :G_orth => "``\\mathbf{G}``: Basis of the Orthogonal Subspace, ``N \\times r``, with orthonormal columns.",#
+                 :r_orth => "``r``: Dimension of the Orthogonal Subspace.",#
+                 :Lambda_orth => "``\\mathbf{\\Lambda}``: Scaling of the mean set inside the Orthogonal Subspace, ``r \\times r``, symmetric and positive semi-definite.",#
+                 :D_orth => "``\\mathbf{D}``: Covariance of the idiosyncratic returns that the loadings block carries, ``N \\times N``. It is diagonal when the block stores a variance vector.")

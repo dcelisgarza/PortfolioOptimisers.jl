@@ -275,6 +275,74 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
                        transpose(G) * Diagonal(D) * G)
     end
 
+    @testset "Issue 831: the sweep of the file" begin
+        @testset "The idiosyncratic scaling reads a stored covariance whole" begin
+            # A cross-sectional prior with a correlation threshold writes a full
+            # idiosyncratic covariance. The scaling is `G' * E * G` over all of it, as the
+            # reference implementation reads it, and not over its diagonal alone.
+            rho = [1.0 0.3 0.0 0.0 0.2 0.0;
+                   0.3 1.0 0.1 0.0 0.0 0.0;
+                   0.0 0.1 1.0 0.4 0.0 0.0;
+                   0.0 0.0 0.4 1.0 0.0 0.1;
+                   0.2 0.0 0.0 0.0 1.0 0.0;
+                   0.0 0.0 0.0 0.1 0.0 1.0]
+            E = sqrt.(D) .* rho .* transpose(sqrt.(D))
+            prE = prior777(B, D; rw = RW, bw = BW, esigma = E)
+            ue = OrthogonalUncertaintySet(; scaling = IdiosyncraticVarianceScaling(),
+                                          metric = IdentityMetric())
+            mu_set, sigma_set = ucs(ue, prE)
+            # Under the identity metric `G * G'` is the projector `I - Q * Q'`, so the shape
+            # matrix `L * L'` is the covariance projected onto the subspace from both sides.
+            P = I - sigma_set.Q * transpose(sigma_set.Q)
+            @test isapprox(mu_set.L * transpose(mu_set.L), P * E * P; atol = 1e-14)
+            @test !isapprox(mu_set.L * transpose(mu_set.L), P * Diagonal(D) * P;
+                            atol = 1e-6)
+            # A variance vector with the same diagonal reads as its diagonal matrix.
+            @test isapprox(mu_ucs(ue, pr777).L * transpose(mu_ucs(ue, pr777).L),
+                           P * Diagonal(D) * P; atol = 1e-14)
+        end
+        @testset "An integer loadings block fits as its floating-point copy does" begin
+            Bi = [1 0; 0 1; 1 1; 2 1; 0 3; 1 2]
+            for metric in (IdentityMetric(), InverseIdiosyncraticVarianceMetric())
+                ue = OrthogonalUncertaintySet(; metric = metric)
+                mi, si = ucs(ue, prior777(Bi, D; rw = RW, bw = BW))
+                mf, sf = ucs(ue, prior777(float.(Bi), D; rw = RW, bw = BW))
+                @test isapprox(mi.L * transpose(mi.L), mf.L * transpose(mf.L); atol = 1e-14)
+                @test isapprox(si.Q * transpose(si.Q), sf.Q * transpose(sf.Q); atol = 1e-14)
+                @test mi.kappa == mf.kappa
+            end
+        end
+        @testset "The rank tolerance reads the larger dimension of the loadings" begin
+            # A second singular value of 8e-16 sits between the tolerance of the smaller
+            # dimension, 2 * eps, and that of the larger one, 6 * eps. `LinearAlgebra.rank`
+            # keeps it, and the fit drops it.
+            Bt = [1.0 0.0; 0.0 8e-16; 0.0 0.0; 0.0 0.0; 0.0 0.0; 0.0 0.0]
+            @test LinearAlgebra.rank(Bt) == 2
+            mu_set, sigma_set = ucs(OrthogonalUncertaintySet(; metric = IdentityMetric()),
+                                    prior777(Bt, D; rw = RW, bw = BW))
+            @test size(sigma_set.Q, 2) == 1
+            @test size(mu_set.L, 2) == N777 - 1
+        end
+        @testset "The spared portfolios are the column space of W B, not of B" begin
+            # Under a metric other than the identity, a portfolio along a loading column pays
+            # on both axes, and the same column scaled by the metric pays on neither.
+            ue = OrthogonalUncertaintySet(; metric = RegressionWeightMetric())
+            mu_set, sigma_set = ucs(ue, pr777)
+            function pays(wp)
+                wp = wp / norm(wp)
+                exposure = collect(sigma_set.C) .* wp
+                residual = exposure - sigma_set.Q * (transpose(sigma_set.Q) * exposure)
+                return norm(transpose(mu_set.L) * wp), norm(residual)
+            end
+            pm, pc = pays(B[:, 1])
+            @test pm > 0.1
+            @test pc > 0.1
+            pm, pc = pays(Diagonal(RW) * B[:, 1])
+            @test pm < 1e-12
+            @test pc < 1e-12
+        end
+    end
+
     @testset "A full-rank factor model leaves no orthogonal direction" begin
         rng = StableRNG(777001)
         Bf = randn(rng, 3, 3)

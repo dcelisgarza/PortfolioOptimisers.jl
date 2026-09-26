@@ -31,7 +31,7 @@ commit = "0ecb3ce47c"
 "src/01_Base/01_DocstringDictionaries/07_FieldDict.jl" = { code = 3, doc = 0, comment = 2, blank = 0, total = 5 }
 "src/01_Base/01_DocstringDictionaries/08_ValidationsAndReturns.jl" = { code = 85, doc = 0, comment = 4, blank = 0, total = 89 }
 "src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { code = 163, doc = 0, comment = 48, blank = 0, total = 211 }
-"src/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.jl" = { code = 40, doc = 0, comment = 31, blank = 0, total = 71 }
+"src/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.jl" = { code = 45, doc = 0, comment = 34, blank = 0, total = 79 }
 "src/01_Base/01_DocstringDictionaries/11_MathRiskAndOptimisation.jl" = { code = 77, doc = 0, comment = 36, blank = 0, total = 113 }
 "src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { code = 86, doc = 0, comment = 16, blank = 0, total = 102 }
 "src/01_Base/01_DocstringDictionaries/13_References.jl" = { code = 225, doc = 0, comment = 3, blank = 0, total = 228 }
@@ -238,7 +238,7 @@ commit = "0ecb3ce47c"
 "src/11_UncertaintySets/06_CalibrationRules.jl" = { code = 496, doc = 1491, comment = 31, blank = 671, total = 2689 }
 "src/11_UncertaintySets/07_CompactUncertaintySets.jl" = { code = 63, doc = 142, comment = 0, blank = 59, total = 264 }
 "src/11_UncertaintySets/08_NormBallUncertaintySets.jl" = { code = 134, doc = 351, comment = 5, blank = 154, total = 644 }
-"src/11_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { code = 169, doc = 384, comment = 9, blank = 166, total = 728 }
+"src/11_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { code = 173, doc = 431, comment = 12, blank = 179, total = 795 }
 "src/11_UncertaintySets/10_CompactRadiusRules.jl" = { code = 95, doc = 259, comment = 8, blank = 97, total = 459 }
 "src/12_Turnover.jl" = { code = 86, doc = 460, comment = 5, blank = 185, total = 736 }
 "src/13_Fees.jl" = { code = 439, doc = 1298, comment = 7, blank = 526, total = 2270 }

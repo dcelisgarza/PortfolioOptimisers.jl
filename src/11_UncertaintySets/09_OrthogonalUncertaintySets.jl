@@ -3,13 +3,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype of the scalings that size each direction inside the Orthogonal Subspace.
 
-A member states the ``r \\times r`` matrix ``\\mathbf{\\Lambda}`` of the mean set, whose square root maps the ball's coordinates onto the subspace basis. The scaling changes the shape of the set and not its support: every member confines the set to the same subspace, and the radius reads the same `rank` degrees of freedom.
+A member states the ``r \\times r`` matrix ``\\mathbf{\\Lambda}`` of the mean set, and the square root of that matrix maps the coordinates of the ball onto the basis of the subspace. Every member confines the set to the same subspace, so a scaling changes the shape of the set alone, and the radius reads the same ``r`` degrees of freedom under each member.
 
 # Interfaces
 
 ## `orthogonal_scaling`
 
-  - `orthogonal_scaling(scaling::AbstractOrthogonalScaling, G::MatNum, rr::AbstractLoadingsRegressionResult) -> MatNum`: Returns ``\\mathbf{\\Lambda}``, `rank × rank`, symmetric and positive semi-definite.
+  - `orthogonal_scaling(scaling::AbstractOrthogonalScaling, G::MatNum, rr::AbstractLoadingsRegressionResult) -> MatNum`: Returns ``\\mathbf{\\Lambda}``, ``r \\times r``, symmetric and positive semi-definite.
 
 # Related
 
@@ -24,7 +24,26 @@ $(DocStringExtensions.TYPEDEF)
 
 Gives every direction of the Orthogonal Subspace the same uncertainty, the default.
 
-``\\mathbf{\\Lambda} = \\mathbf{I}_{r}``, so the geometry map is the subspace basis itself and the set is a Euclidean ball inside the subspace.
+The geometry map of the mean set is then the basis of the subspace, and the set is a Euclidean ball inside the subspace.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{\\Lambda} &= \\mathbf{I}_{r}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:Lambda_orth])
+  - $(math_dict[:r_orth])
+
+# Algorithm
+
+The branch of [`orthogonal_scaling`](@ref) that this tag selects runs this step.
+
+ 1. Return the identity of side `size(G, 2)`, the dimension of the subspace, as a dense matrix of the element type of `G`. The caller then takes one kind of square root on both branches.
 
 # Examples
 
@@ -45,7 +64,29 @@ $(DocStringExtensions.TYPEDEF)
 
 Sizes each direction of the Orthogonal Subspace by the idiosyncratic covariance projected onto it.
 
-``\\mathbf{\\Lambda} = \\mathbf{G}^{\\intercal}\\mathbf{D}\\mathbf{G}``, with ``\\mathbf{D}`` the idiosyncratic covariance the loadings block carries. A direction the factors leave noisy is then given more uncertainty than a quiet one, where [`IdentityScaling`](@ref) gives both the same. The block must carry an idiosyncratic covariance, so an unset `esigma` refuses.
+A direction that the factors leave noisy gets more uncertainty than a quiet one, where [`IdentityScaling`](@ref) gives both the same. The loadings block must carry an idiosyncratic covariance, and a block whose `esigma` is unset refuses.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{\\Lambda} &= \\mathbf{G}^{\\intercal}\\mathbf{D}\\mathbf{G}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:Lambda_orth])
+  - $(math_dict[:G_orth])
+  - $(math_dict[:D_orth])
+
+# Algorithm
+
+The branch of [`orthogonal_scaling`](@ref) that this tag selects runs these steps.
+
+ 1. Read `D`, the idiosyncratic covariance of `rr`. A stored matrix is read whole, with its off-diagonal entries. A stored variance vector is read as a `LinearAlgebra.Diagonal`, so the ``N \\times N`` matrix is never materialised. An unset `esigma` refuses through [`idiosyncratic_variances`](@ref).
+ 2. Form `lambda` by the definition above.
+ 3. Return the symmetric part of `lambda`. The product carries a round-off asymmetry, and the caller's square root reads a symmetric matrix.
 
 # Examples
 
@@ -74,9 +115,9 @@ Cross-sectional weight vector the [`AbstractOrthogonalityMetric`](@ref) names, r
 
 # Algorithm
 
- 1. On [`IdentityMetric`](@ref), return `nothing`. The caller reads a `nothing` as a vector of ones and skips both the scaling of the loadings and the division of the projector, so the unweighted route costs no arithmetic.
- 2. On [`InverseIdiosyncraticVarianceMetric`](@ref), take `idiosyncratic_variances(rr)` and return its element-wise inverse.
- 3. On [`BenchmarkWeightMetric`](@ref) and [`RegressionWeightMetric`](@ref) over a [`CrossSectionalFactorModel`](@ref), take the last row of `bw` or of `rw`, the weights of the latest observation.
+ 1. On [`IdentityMetric`](@ref), return `nothing`. The caller reads a `nothing` as a vector of ones, and skips the scaling of the loadings and the division of the projector.
+ 2. On [`InverseIdiosyncraticVarianceMetric`](@ref), read `d`, the idiosyncratic variances, with [`idiosyncratic_variances`](@ref), refuse an entry that is not finite or not `> 0`, and return the element-wise inverse of `d`.
+ 3. On [`BenchmarkWeightMetric`](@ref) and [`RegressionWeightMetric`](@ref) over a [`CrossSectionalFactorModel`](@ref), return the last row of `bw` or of `rw`, the weights of the latest observation, through [`latest_orthogonality_weights`](@ref).
  4. On the same two metrics over any other loadings block, throw. A block fitted per asset over the observations carries no cross-sectional weight history, so the metric has nothing to read.
 
 # Arguments
@@ -134,8 +175,10 @@ Last row of a cross-sectional weight history, checked as a metric.
 
 # Algorithm
 
- 1. On a `nothing` history, throw. The block declares the field and this fit left it unset, which the message says.
- 2. On a history, take its last row, the weights of the latest observation. The uncertainty set is built for the next decision, so it reads the newest cross-section and not an average of the sample.
+ 1. On a `nothing` history, throw. The block declares the field and this fit left it unset, and the message says so.
+ 2. On a history `w`, refuse an empty one.
+ 3. Take `wl`, the last row of `w`, as a view. These are the weights of the latest observation. The uncertainty set serves the next decision, so it reads the newest cross-section and not an average of the sample.
+ 4. Refuse `wl` when an entry is not finite or not `> 0`, and return it otherwise.
 
 # Arguments
 
@@ -146,7 +189,7 @@ Last row of a cross-sectional weight history, checked as a metric.
 # Validation
 
   - `!isempty(w)`, else an `IsEmptyError`.
-  - Every entry of the last row is finite and `> 0`, else a `DomainError`. A weight of zero excluded its asset from the fit, and an excluded asset gives the metric a singular direction. The case is not a point-in-time gap the Investable Mask removes: an asset can be investable, with a finite return and a stated moment, and still sit outside the estimation universe of the latest cross-section, so its weight is zero while its loadings and variance are finite. The two metrics that read no weight history, [`InverseIdiosyncraticVarianceMetric`](@ref) and [`IdentityMetric`](@ref), are the way round it.
+  - Every entry of the last row is finite and `> 0`, else a `DomainError`. A weight of zero excluded its asset from the fit, and an excluded asset gives the metric a singular direction. The Investable Mask does not remove this case. An asset can be investable, with a finite return and a stated moment, and still sit outside the estimation universe of the latest cross-section, so its weight is zero while its loadings and variance are finite. The two metrics that read no weight history, [`InverseIdiosyncraticVarianceMetric`](@ref) and [`IdentityMetric`](@ref), accept such an asset.
 
 # Returns
 
@@ -174,27 +217,12 @@ end
     orthogonal_scaling(::IdentityScaling, G::MatNum, ::AbstractLoadingsRegressionResult)
     orthogonal_scaling(::IdiosyncraticVarianceScaling, G::MatNum, rr::AbstractLoadingsRegressionResult)
 
-Scaling ``\\\\mathbf{\\\\Lambda}`` of the mean set inside the Orthogonal Subspace.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathbf{\\Lambda}_{\\mathrm{id}} &= \\mathbf{I}_{r}\\,, \\\\
-\\mathbf{\\Lambda}_{\\mathrm{idio}} &= \\mathbf{G}^{\\intercal}\\mathbf{D}\\mathbf{G}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathbf{G}``: Orthonormal basis of the Orthogonal Subspace, ``N \\times r``.
-  - ``\\mathbf{D}``: Idiosyncratic covariance the loadings block carries, ``N \\times N``, diagonal when the block stores a variance vector.
-  - ``r``: Dimension of the subspace.
+Scaling ``\\mathbf{\\Lambda}`` of the mean set inside the Orthogonal Subspace.
 
 # Algorithm
 
- 1. On [`IdentityScaling`](@ref), return the ``r \\times r`` identity as a dense matrix, so the caller's square root and the radius read one type on both routes.
- 2. On [`IdiosyncraticVarianceScaling`](@ref), read `rr.esigma`, form ``\\mathbf{G}^{\\intercal}\\mathbf{D}\\mathbf{G}`` and symmetrise it. A stored variance vector is used as a diagonal without materialising the ``N \\times N`` matrix.
+ 1. On [`IdentityScaling`](@ref), run the step that its docstring lists.
+ 2. On [`IdiosyncraticVarianceScaling`](@ref), run the steps that its docstring lists.
 
 # Arguments
 
@@ -208,11 +236,13 @@ Where:
 
 # Returns
 
-  - `lambda::MatNum`: ``r \\times r`` scaling, symmetric and positive semi-definite.
+  - `lambda::MatNum`: ``r \\times r`` scaling, symmetric, and positive semi-definite when the idiosyncratic covariance is.
 
 # Related
 
   - [`AbstractOrthogonalScaling`](@ref)
+  - [`IdentityScaling`](@ref)
+  - [`IdiosyncraticVarianceScaling`](@ref)
   - [`OrthogonalUncertaintySet`](@ref)
   - [`idiosyncratic_variances`](@ref)
 """
@@ -222,16 +252,22 @@ function orthogonal_scaling(::IdentityScaling, G::MatNum,
 end
 function orthogonal_scaling(::IdiosyncraticVarianceScaling, G::MatNum,
                             rr::AbstractLoadingsRegressionResult)
-    D = LinearAlgebra.Diagonal(idiosyncratic_variances(rr))
+    # A stored covariance is read whole, off-diagonal entries included. A variance vector
+    # is read as a diagonal, and an unset field refuses through `idiosyncratic_variances`.
+    D = if isa(rr.esigma, MatNum)
+        rr.esigma
+    else
+        LinearAlgebra.Diagonal(idiosyncratic_variances(rr))
+    end
     lambda = transpose(G) * D * G
     return (lambda + transpose(lambda)) / 2
 end
 """
     k_norm_ball(::NormalKUncertaintyAlgorithm, ::Number, ::Nothing, ::MatNum, ::Integer)
 
-Always throw. The Orthogonal Subspace fit simulates no estimation errors, so the sampled radius has nothing to read.
+Refuses the sampled radius on the Orthogonal Subspace, which simulates no estimation errors for that radius to read.
 
-The method is a refusal rather than a procedure, so it carries no `# Algorithm` section. [`NormalKUncertaintyAlgorithm`](@ref) reads a sample of Mahalanobis distances and takes their quantile, and [`OrthogonalUncertaintySet`](@ref) draws none: it derives its geometry from the fitted loadings alone. The refusal shadows the `MethodError` the missing sample would otherwise raise.
+[`NormalKUncertaintyAlgorithm`](@ref) takes a quantile of a sample of Mahalanobis distances, and [`OrthogonalUncertaintySet`](@ref) draws no sample, because it derives its geometry from the fitted loadings alone. Without this method the absent sample raises a `MethodError`, which names no remedy.
 
 # Arguments
 
@@ -239,7 +275,7 @@ The method is a refusal rather than a procedure, so it carries no `# Algorithm` 
 
 # Validation
 
-  - The method always throws an `ArgumentError`. The message names the two algorithms that read no sample, [`ChiSqKUncertaintyAlgorithm`](@ref) and [`GeneralKUncertaintyAlgorithm`](@ref), and the plain number that states the radius outright.
+  - The method always throws an `ArgumentError`. The message names the two algorithms that read no sample, [`ChiSqKUncertaintyAlgorithm`](@ref) and [`GeneralKUncertaintyAlgorithm`](@ref), and a number, which states the radius itself.
 
 # Returns
 
@@ -260,37 +296,52 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits both uncertainty sets from the factor model of the optimisation's own prior, confined to the directions the factors do not span.
 
-The estimator reads the loadings block `rr` of the Prior Result it is handed, and never fits a prior of its own. It is the one member of [`AbstractPriorUncertaintySetEstimator`](@ref), and the two JuMP builders pass the reduced prior beside the returns so that the sets and the moments they correct are fitted on one object.
+The estimator reads the loadings block `rr` of the Prior Result it receives, and never fits a prior of its own. It is the one member of [`AbstractPriorUncertaintySetEstimator`](@ref). The two JuMP builders pass the reduced prior beside the returns, so the sets and the moments they correct come from one object.
 
-**One estimator answers both axes.** The weighted loadings, their thin singular value decomposition and the numerical rank are computed once, and [`ucs`](@ref) returns the pair. The mean axis gets a [`NormBallUncertaintySet`](@ref) whose geometry map spans the Orthogonal Subspace, and the covariance axis gets a [`CompactCovarianceUncertaintySet`](@ref) whose basis is the weighted factor span itself. The two are complementary: a portfolio inside the span pays nothing on either axis, and one outside it pays on both.
+One fit serves both axes. [`ucs`](@ref) takes the weighted factor span once and returns a [`NormBallUncertaintySet`](@ref) on the mean axis, whose geometry map spans the Orthogonal Subspace, and a [`CompactCovarianceUncertaintySet`](@ref) on the covariance axis, whose basis is the weighted factor span. The two sets spare the same portfolios, and `# Mathematical definition` states which.
 
-**The point estimates are unchanged.** The mean set is centred on `pr.mu` and the covariance set carries `pr.sigma`, so nothing is shrunk in the prior. The correction is a portfolio-dependent worst case that grows with the exposure to the subspace, which is what an optimiser that over-allocates to unspanned directions needs.
+The point estimates stay as the prior states them. The mean set is centred on `pr.mu` and the covariance set carries `pr.sigma`, so the prior is not shrunk. The correction is a worst case that grows with the exposure of the portfolio to the Orthogonal Subspace, and it counters an optimiser that over-allocates to the directions the factors do not span.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathbf{B}_{\\mathbf{W}} &= \\mathbf{W}^{1/2}\\mathbf{B}\\,, \\quad \\mathbf{Q} = \\operatorname{svd}_{r_{\\mathbf{B}}}(\\mathbf{B}_{\\mathbf{W}})\\,, \\\\
-\\mathbf{A} &= \\mathbf{W}^{-1/2}\\left(\\mathbf{I} - \\mathbf{Q}\\mathbf{Q}^{\\intercal}\\right)\\,, \\quad \\mathbf{G} = \\operatorname{qr}(\\mathbf{A}\\mathbf{V}_{+})\\,, \\\\
-\\mathbf{L} &= \\mathbf{G}\\mathbf{\\Lambda}^{1/2}\\,, \\quad \\kappa_{\\boldsymbol{\\mu}} = \\sqrt{\\chi^{2,\\,-1}_{r}(1 - q)}\\,, \\\\
-\\mathbf{C} &= \\mathbf{W}^{-1/2}\\,.
+\\mathbf{Q}\\mathbf{Q}^{\\intercal} &= \\mathbf{W}^{1/2}\\mathbf{B}\\left(\\mathbf{W}^{1/2}\\mathbf{B}\\right)^{+}\\,, \\\\
+\\operatorname{col}(\\mathbf{G}) &= \\left\\{ \\boldsymbol{v} \\in \\mathbb{R}^{N} \\,\\vert\\, \\mathbf{B}^{\\intercal}\\mathbf{W}\\boldsymbol{v} = \\mathbf{0} \\right\\}\\,, \\\\
+r &= N - r_{\\mathbf{B}}\\,, \\\\
+\\mathbf{L} &= \\mathbf{G}\\mathbf{\\Lambda}^{1/2}\\,, \\\\
+\\kappa_{\\boldsymbol{\\mu}} &= \\sqrt{F^{-1}_{\\chi^{2}_{r}}(1 - q)}\\,, \\\\
+\\mathbf{C} &= \\mathbf{W}^{-1/2}\\,, \\\\
+\\underset{\\boldsymbol{\\mu} \\in U_{\\boldsymbol{\\mu}}}{\\min} \\boldsymbol{w}^{\\intercal}\\boldsymbol{\\mu} &= \\boldsymbol{w}^{\\intercal}\\hat{\\boldsymbol{\\mu}} - \\kappa_{\\boldsymbol{\\mu}} \\lVert \\mathbf{L}^{\\intercal}\\boldsymbol{w} \\rVert_{2}\\,, \\\\
+\\underset{\\mathbf{\\Sigma} \\in U_{\\mathbf{\\Sigma}}}{\\max} \\boldsymbol{w}^{\\intercal}\\mathbf{\\Sigma}\\boldsymbol{w} &= \\boldsymbol{w}^{\\intercal}\\hat{\\mathbf{\\Sigma}}\\boldsymbol{w} + \\kappa \\lVert (\\mathbf{I} - \\mathbf{Q}\\mathbf{Q}^{\\intercal})\\mathbf{C}\\boldsymbol{w} \\rVert_{2}^{2}\\,.
 \\end{align}
 ```
 
 Where:
 
   - ``\\mathbf{B}``: Effective loadings, ``N \\times K``, reduced to a full-rank basis when a Factor Family was re-based.
-  - ``\\mathbf{W} = \\operatorname{diag}(\\boldsymbol{w})``: Cross-sectional metric the [`AbstractOrthogonalityMetric`](@ref) names, the identity on [`IdentityMetric`](@ref).
-  - ``\\mathbf{Q}``: Left singular vectors of the weighted loadings kept by the numerical rank ``r_{\\mathbf{B}}``, an orthonormal basis of the weighted factor span.
-  - ``\\mathbf{A}``: Orthogonal projector, mapped back through the metric.
-  - ``\\mathbf{V}_{+}``: Eigenvectors of ``\\mathbf{A}^{\\intercal}\\mathbf{A}`` that carry its ``N - r_{\\mathbf{B}}`` largest eigenvalues, which is the rank of the projector.
-  - ``\\mathbf{G}``: Orthonormal basis of the Orthogonal Subspace, ``N \\times r``.
-  - ``\\mathbf{\\Lambda}``: Scaling the [`AbstractOrthogonalScaling`](@ref) names, ``r \\times r``.
-  - ``\\mathbf{L}``: Geometry map of the mean set.
-  - ``\\kappa_{\\boldsymbol{\\mu}}``: Radius of the mean set, at ``r`` degrees of freedom.
+  - ``\\mathbf{W}``: Diagonal cross-sectional metric that the [`AbstractOrthogonalityMetric`](@ref) names, the identity under [`IdentityMetric`](@ref).
+  - ``(\\cdot)^{+}``: Moore-Penrose pseudo-inverse.
+  - $(math_dict[:Q_cpt])
+  - ``r_{\\mathbf{B}}``: Numerical rank of ``\\mathbf{W}^{1/2}\\mathbf{B}``, the column count of ``\\mathbf{Q}``.
+  - $(math_dict[:G_orth])
+  - $(math_dict[:r_orth])
+  - $(math_dict[:N])
+  - $(math_dict[:Lambda_orth])
+  - ``\\mathbf{L}``: Geometry map of the mean set, ``N \\times r``.
+  - ``\\kappa_{\\boldsymbol{\\mu}}``: Radius of the mean set. The line above is the radius of [`ChiSqKUncertaintyAlgorithm`](@ref), the default. [`GeneralKUncertaintyAlgorithm`](@ref) gives ``\\sqrt{(1 - q)/q}``, and a number is the radius itself.
+  - ``F^{-1}_{\\chi^{2}_{r}}``: Quantile function of the chi-squared distribution with ``r`` degrees of freedom.
+  - ``q``: Significance level of the mean set.
   - $(math_dict[:C_cpt])
+  - ``U_{\\boldsymbol{\\mu}}``, ``U_{\\mathbf{\\Sigma}}``: Mean set and covariance set.
+  - $(math_dict[:w_port])
+  - ``\\hat{\\boldsymbol{\\mu}}``: Mean vector of the prior result, the centre of the mean set.
+  - $(math_dict[:Sigma_hat])
+  - $(math_dict[:kappa_cpt])
 
-The rank of the mean set is the dimension of the Orthogonal Subspace, not the number of assets, because a flat set is a confidence region of its own subspace and not of the ambient space. A model whose loadings span the whole cross-section leaves ``r = 0``, a radius of zero, and no correction at all.
+Both penalties are zero on a portfolio in the column space of ``\\mathbf{W}\\mathbf{B}``, because ``\\mathbf{G}^{\\intercal}\\mathbf{W}\\mathbf{B} = \\mathbf{0}`` and ``\\mathbf{C}\\mathbf{W}\\mathbf{B} = \\mathbf{W}^{1/2}\\mathbf{B}``. Every other portfolio pays on both axes when both radii are positive and ``\\mathbf{\\Lambda}`` is positive definite. Under [`IdentityMetric`](@ref) that column space is the span of the loadings. Under any other metric it is a different space, and a portfolio along a column of ``\\mathbf{B}`` pays on both axes.
+
+The rank of the mean set is ``r``, not ``N``, because a flat set is a confidence region of its own subspace. Loadings that span the whole cross-section leave ``r = 0``, a mean set of radius zero and a covariance basis of ``N`` columns, so neither axis carries a penalty.
 
 # Fields
 
@@ -357,7 +408,7 @@ OrthogonalUncertaintySet
     """
     scaling
     """
-    Radius ``\\kappa \\geq 0`` of the covariance set, the multiplier of its quadratic penalty, and `0` leaves the nominal variance. It is a size the caller states, a rule of [`AbstractCompactRadiusAlgorithm`](@ref) that computes one from the sample and the span, or a value a search picks: `kappa` is a plain field, so `"ucs.kappa"` is a lens path a [`GridSearchCrossValidation`](@ref) or a [`RandomisedSearchCrossValidation`](@ref) grid ranges over, and a grid may hold rules beside numbers.
+    Radius ``\\kappa \\geq 0`` of the covariance set, the multiplier of its quadratic penalty. A radius of `0` leaves the nominal variance. The field holds a number that the caller states, or a rule of [`AbstractCompactRadiusAlgorithm`](@ref) that computes one from the sample and the span. It is a plain field, so `"ucs.kappa"` is a lens path that a [`GridSearchCrossValidation`](@ref) or a [`RandomisedSearchCrossValidation`](@ref) grid ranges over, and a grid may hold rules beside numbers.
     """
     kappa
     """
@@ -393,11 +444,15 @@ Weighted factor span of the prior's loadings block, the geometry both sets are b
 # Algorithm
 
  1. Refuse when `pr.rr` is `nothing`. The set reads the loadings off the prior result, and a prior that fitted no factor model carries none.
- 2. Read the effective loadings `rr.L`, which reads back as `rr.M` when no Factor Family was re-based, so a re-based model is already reduced to a full-rank basis here. Refuse a row that is not finite: a singular value decomposition of such a row is not a span but a LAPACK error. The fit never meets the `NaN` rows a point-in-time Asset Panel writes outside the Investable Mask, because the optimiser's builders hand it the prior reduced to that mask and the standalone verbs reduce to it first through [`investable_ucs_reduction`](@ref). A non-finite row that reaches here therefore sits on an asset the prior calls investable, whose `mu` and variance are finite while its loadings are not, and the message says so.
- 3. Read the cross-sectional weights through [`orthogonality_weights`](@ref) and take their element-wise square root, or leave a `nothing`.
- 4. Scale the rows of the loadings by that square root, take a thin `LinearAlgebra.svd`, and count the singular values above `maximum(size) * eps * s[1]`, the tolerance `LinearAlgebra.rank` applies. Keep that many left singular vectors.
+ 2. Read `B`, the effective loadings `rr.L`. The field reads back as `rr.M` when no Factor Family was re-based, and a re-based model is already reduced to a full-rank basis.
+ 3. Count `nnf`, the rows of `B` that hold an entry that is not finite, and refuse when it is not zero. A singular value decomposition of such a row gives a LAPACK error, not a span. The `NaN` rows that a point-in-time Asset Panel writes outside the Investable Mask never reach this step, because the optimiser's builders pass the prior reduced to that mask, and the standalone verbs reduce to it first through [`investable_ucs_reduction`](@ref). A non-finite row here therefore belongs to an asset that the prior calls investable, whose `mu` and variance are finite and whose loadings are not, and the message says so.
+ 4. Read `w`, the cross-sectional weights, through [`orthogonality_weights`](@ref), and take `w_sqrt`, their element-wise square root, or keep `nothing`.
+ 5. Scale the rows of `B` by `w_sqrt`, giving `Bw`.
+ 6. Take `F`, the thin `LinearAlgebra.svd` of `Bw`, with the singular values `s`.
+ 7. Count `r`, the singular values above `maximum(size(Bw)) * eps * s[1]`. The tolerance reads the larger dimension, so it is wider than the default of `LinearAlgebra.rank`, which reads the smaller one.
+ 8. Return `rr`, `w_sqrt` and the first `r` left singular vectors of `F`.
 
-Step 4 counts the rank after the family re-basis of step 2, because the selected universe can still leave the exposures numerically dependent, and a dependent direction that survives would widen the span the penalty spares.
+Step 7 counts the rank after the re-basis that step 2 reads, because the selected universe can still leave the exposures numerically dependent, and a dependent direction that survives widens the span that the penalty spares.
 
 # Arguments
 
@@ -436,8 +491,9 @@ function orthogonal_factor_span(ue::OrthogonalUncertaintySet, pr::AbstractPriorR
     s = F.S
     # The tolerance reads `s[1]` inside the predicate rather than above the count, so a
     # block with no factor column needs no branch of its own: `count` over an empty vector
-    # never calls the predicate, and answers a rank of zero.
-    r = count(x -> x > maximum(size(Bw)) * eps(real(eltype(Bw))) * s[1], s)
+    # never calls the predicate, and answers a rank of zero. The machine epsilon is read off
+    # the singular values, which are floating point even when the loadings are integers.
+    r = count(x -> x > maximum(size(Bw)) * eps(eltype(s)) * s[1], s)
     return rr, w_sqrt, F.U[:, 1:r]
 end
 """
@@ -447,12 +503,15 @@ Builds the mean [`NormBallUncertaintySet`](@ref) on the Orthogonal Subspace, fro
 
 # Algorithm
 
- 1. Form the orthogonal projector `I - Q * Q'` and divide its rows by the metric square root, giving ``\\mathbf{A}``, the projector read back in the asset coordinates.
- 2. Take the symmetric eigendecomposition of `A' * A` and keep the trailing `N - size(Q, 2)` eigenvectors. The count is exact: `Q` is orthonormal, so `I - Q * Q'` has rank `N - size(Q, 2)`, the metric scaling is an invertible diagonal, and `LinearAlgebra.eigen` on a `Symmetric` orders the eigenvalues from small to large. No tolerance decides the rank here: an eigenvalue tolerance can sit close enough to the eigenvalue it must cut that the rule flips with the reduction order of the machine and states a subspace one dimension too wide. Step 4 of [`orthogonal_factor_span`](@ref) still reads a tolerance, because the rank of the loadings is a property of the data and not of a projector.
- 3. Orthonormalise `A * V₊` with a reduced `LinearAlgebra.qr`, giving `G`, and read the dimension `r` of the Orthogonal Subspace off its columns.
- 4. When `r` is `0`, return the set with a radius of zero and a map of one zero column. The map keeps a column because the type admits a rank-zero map and a consumer that reads a size finds one either way, and the zero radius leaves the nominal mean.
- 5. Otherwise take the scaling ``\\mathbf{\\Lambda}`` through [`orthogonal_scaling`](@ref), form `L = G * sqrt(Λ)` with a symmetric square root, and size the radius with [`k_norm_ball`](@ref) at `r` degrees of freedom.
- 6. Carry `pr.mu` into `val`, so a set fitted on one prior and handed to another optimisation carries the centre its geometry was calibrated on.
+ 1. Form `P`, the orthogonal projector `I - Q * Q'`.
+ 2. Form `A`, the rows of `P` divided by `w_sqrt`, or `P` itself when `w_sqrt` is `nothing`. `A` is the projector read back in the asset coordinates.
+ 3. Take `E`, the symmetric eigendecomposition of `A' * A`.
+ 4. Select `keep`, the indices of the trailing `N - size(Q, 2)` eigenvectors of `E`. The count is exact: `Q` is orthonormal, so `P` has rank `N - size(Q, 2)`, the metric scaling is an invertible diagonal, and `LinearAlgebra.eigen` on a `Symmetric` orders the eigenvalues from small to large. An eigenvalue tolerance can sit so close to the eigenvalue it must cut that the cut changes with the reduction order of the machine and states a subspace one dimension too wide. Step 7 of [`orthogonal_factor_span`](@ref) still reads a tolerance, because the rank of the loadings is a property of the data and not of a projector.
+ 5. Orthonormalise `A` times the selected eigenvectors with a reduced `LinearAlgebra.qr`, giving `G`, and read `r`, the dimension of the Orthogonal Subspace, as its column count. An empty `keep` gives a `G` with no column.
+ 6. When `r` is `0`, return the set with a radius of zero, a map of one zero column, and `pr.mu` as its centre. The zero radius leaves the nominal mean.
+ 7. Take `lambda`, the scaling, through [`orthogonal_scaling`](@ref).
+ 8. Form `L`, the product of `G` and the symmetric square root of `lambda`.
+ 9. Size the radius with [`k_norm_ball`](@ref) at `r` degrees of freedom, and return the set of order `2` with `pr.mu` as its centre. A set fitted on one prior and passed to another optimisation therefore carries the centre that its geometry was calibrated on.
 
 # Arguments
 
@@ -510,11 +569,11 @@ Builds the covariance [`CompactCovarianceUncertaintySet`](@ref) on the Orthogona
 
 # Algorithm
 
- 1. Take the element-wise inverse of the metric square root as the diagonal metric ``\\mathbf{C}``, or a vector of ones on [`IdentityMetric`](@ref).
- 2. Hand the weighted factor span `Q` to the set as the basis it spares. A rank of zero leaves a basis with no column, which the type admits and which leaves the penalty on every direction.
- 3. Settle the radius with [`k_compact`](@ref) and carry `pr.sigma` as the nominal covariance. A stated number passes through unchanged; a rule of [`AbstractCompactRadiusAlgorithm`](@ref) is handed the confidence level, the metric, the prior result, the loadings block, `C` and `Q`, which is everything a radius of this set can be sized from.
+ 1. Form `C`, the diagonal metric square root, as the element-wise inverse of `w_sqrt`, or as a vector of ones when `w_sqrt` is `nothing`.
+ 2. Settle `kappa`, the radius, with [`k_compact`](@ref). A stated number passes through unchanged. A rule of [`AbstractCompactRadiusAlgorithm`](@ref) receives the confidence level, the metric, the prior result, the loadings block, `C`, `Q` and `rd`.
+ 3. Return the set with `Q` as the basis it spares and `pr.sigma` as the nominal covariance. A span of rank zero gives a basis with no column, which the type admits, and the penalty then reaches every direction.
 
-The set spares the span and penalises its complement, which is the same subspace the mean set lives in. The two axes are therefore built from one decomposition, and the estimator computes it once.
+The set penalises the complement of the span, the same subspace that the mean set lives in, so one decomposition serves both axes and the estimator computes it once.
 
 # Arguments
 
@@ -550,10 +609,11 @@ Fits both uncertainty sets of an [`OrthogonalUncertaintySet`](@ref) from the pri
 
 # Algorithm
 
- 1. Reduce the prior result, and the returns data beside it, to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 1. Reduce the prior result, and the returns data beside it, to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives reduced and the step passes it through. Standalone, on a prior fitted on a point-in-time Asset Panel, the step takes the view that the optimiser takes.
  2. Take the weighted factor span once with [`orthogonal_factor_span`](@ref).
- 3. Build the mean set with [`orthogonal_mu_set`](@ref) and the covariance set with [`orthogonal_sigma_set`](@ref), both from that span.
- 4. Write each set back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, with a zero row on every asset outside the mask, and a view of it at the mask recovers the reduced fit.
+ 3. Build the mean set from that span with [`orthogonal_mu_set`](@ref).
+ 4. Build the covariance set from the same span with [`orthogonal_sigma_set`](@ref).
+ 5. Write each set back onto the full universe with [`expand_investable_ucs`](@ref). A set fitted standalone then covers the assets of the prior, with a zero row on every asset outside the mask, and a view of it at the mask recovers the reduced fit.
 
 A caller that needs one axis alone calls [`mu_ucs`](@ref) or [`sigma_ucs`](@ref), which take the same span and build one set.
 
@@ -661,7 +721,14 @@ end
 
 Return the cross-sectional weight history an [`AbstractOrthogonalityMetric`](@ref) names, over the whole observation axis of a factor model block.
 
-[`orthogonality_weights`](@ref) reads the same family off the same block and answers with the weights of the **latest** observation, which is what an uncertainty set needs. A diagnostic scores every observation, so it needs the whole history, and this verb is that reading of the family.
+[`orthogonality_weights`](@ref) reads the same metrics off the same block and returns the weights of the latest observation, which an uncertainty set needs. A diagnostic scores every observation, so it reads the whole history through this function instead.
+
+# Algorithm
+
+ 1. On [`IdentityMetric`](@ref), return `nothing`.
+ 2. On [`BenchmarkWeightMetric`](@ref), return the history `csfm.bw` through [`cs_diagnostic_weight_history`](@ref).
+ 3. On [`RegressionWeightMetric`](@ref), return the history `csfm.rw` through [`cs_diagnostic_weight_history`](@ref).
+ 4. On [`InverseIdiosyncraticVarianceMetric`](@ref), read `vs`, the idiosyncratic variance history `csfm.vs`, through [`cs_diagnostic_weight_history`](@ref), and return its element-wise inverse.
 
 # Arguments
 
@@ -670,7 +737,7 @@ Return the cross-sectional weight history an [`AbstractOrthogonalityMetric`](@re
 
 # Validation
 
-  - The field the metric names is not `nothing`, else an `IsNothingError` naming it is raised.
+  - The field that the metric names is not `nothing`, else an `IsNothingError` that names the field.
 
 # Returns
 
