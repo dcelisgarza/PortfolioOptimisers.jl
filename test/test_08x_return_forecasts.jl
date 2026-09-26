@@ -939,6 +939,78 @@ end
     end
 end
 
+@testset "The target member agrees with its closed form" begin
+    PO = PortfolioOptimisers
+    # Observation 2 carries one entering asset, so it states no slope. The accumulators must
+    # not decay over it: a weight of `lambda^(-t)` on the calendar index states a different
+    # coefficient.
+    a = [1.0 2.0 3.0 0.5; 2.0 1.0 4.0 1.5; 3.0 2.0 1.0 2.5; 1.0 4.0 2.0 3.0;
+         2.0 2.0 3.0 1.0]
+    b = [4.0 1.0 2.0 3.0; 1.0 3.0 2.0 2.0; 2.0 1.0 3.0 1.0; 3.0 2.0 1.0 4.0;
+         1.0 1.0 2.0 2.0]
+    eps = [0.01 -0.02 0.03 0.00; -0.01 0.02 0.01 0.02; 0.02 0.01 -0.03 0.01;
+           0.00 0.03 0.02 -0.01; 0.01 0.00 -0.01 0.02]
+    vs = [0.04 0.09 0.01 0.02; 0.02 0.05 0.03 0.04; 0.06 0.01 0.02 0.03;
+          0.03 0.04 0.05 0.02; 0.02 0.03 0.04 0.05]
+    emsk = trues(5, 4)
+    emsk[2, 2:4] .= false
+    rd, csfm, ds = forecast_fit_panel(a, b, eps, vs; emsk = emsk)
+    lambda = 0.5
+
+    # The closed form, written out: an ordinary least squares on every valid pair, then the
+    # recursion over the observations that advance the calibration, then the ridge.
+    function closed_form(sharpe::Bool)
+        g = sharpe ? sqrt.(vs) : ones(size(vs))
+        fwd = eps[2:5, :]
+        pairs = [(t, i) for t in 1:4 for i in 1:4 if emsk[t, i]]
+        X = [[a[t, i] for (t, i) in pairs] [b[t, i] for (t, i) in pairs]]
+        beta = X \ [fwd[t, i] / g[t, i] for (t, i) in pairs]
+        p(t, i) = g[t, i] * (a[t, i] * beta[1] + b[t, i] * beta[2])
+        A = 0.0
+        C = 0.0
+        num = 0.0
+        den = 0.0
+        for t in 1:4
+            idx = [i for i in 1:4 if emsk[t, i]]
+            if length(idx) < 2
+                continue
+            end
+            om = [1 / vs[t, i] for i in idx]
+            om ./= sum(om) / length(om)
+            at = sum(om[k] * p(t, idx[k])^2 for k in eachindex(idx))
+            ct = sum(om[k] * p(t, idx[k]) * fwd[t, idx[k]] for k in eachindex(idx))
+            A = lambda * A + (1 - lambda) * at
+            C = lambda * C + (1 - lambda) * ct
+            num += lambda^(-t) * ct
+            den += lambda^(-t) * at
+        end
+        kappa = C / ((1 + 1e-6) * A)
+        return kappa, num / den, [kappa * p(5, i) for i in 1:4]
+    end
+
+    for (unit, sharpe) in
+        ((IdiosyncraticReturnUnit(), false), (IdiosyncraticSharpeUnit(), true))
+        rf = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
+                                                  decay = lambda, min_obs = 1, unit = unit),
+                             rd, csfm)
+        kappa, calendar, alpha = closed_form(sharpe)
+        @test rf.calib ≈ kappa rtol = 1e-12
+        @test rf.mu ≈ alpha rtol = 1e-12
+        @test !isapprox(rf.calib, calendar; rtol = 1e-3)
+    end
+
+    @testset "The early coefficient takes the type of its inputs" begin
+        rfe = TargetReturnForecast(; scores = ds, calibrate = false)
+        c = PO.target_forecast_coefficient(rfe, nothing, zeros(Float32, 2, 2),
+                                           zeros(Float32, 2), trues(2),
+                                           zeros(Float32, 2, 2), nothing,
+                                           ones(Float32, 2, 2), 1)
+        @test isa(c, Float32)
+        @test isnan(c)
+        @test isa(PO.target_forecast_multiplier(false, c), Float32)
+    end
+end
+
 #=
 Issue #835 finishes the file: the estimator scores the WHOLE carrier and answers on the
 BLOCK's rows. ADR 0112.
@@ -1099,5 +1171,21 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
         # The reference implementation's own coefficient, which the padded rows never enter.
         @test rf.calib ≈ -0.7730488894268933
         @test rf.mu[isfinite.(E)] ≈ E[isfinite.(E)]
+    end
+
+    @testset "In the Sharpe unit a row before the block trains nothing" begin
+        # The Sharpe target divides by the idiosyncratic volatility at the signal row, and a
+        # row before the block carries none, so the two windows fit one model.
+        for cal in (false, true)
+            kw = (; scores = ds, horizon = 2, lag = 1, calibrate = cal, half_life = 10.0,
+                  min_obs = 1, unit = IdiosyncraticSharpeUnit())
+            rw = return_forecast(TargetReturnForecast(; kw..., whole_history = true), rd,
+                                 csfm)
+            rc = return_forecast(TargetReturnForecast(; kw..., whole_history = false), rd,
+                                 csfm)
+            @test any(isfinite, rw.mu)
+            @test isequal(rw.mu, rc.mu)
+            @test isequal(rw.calib, rc.calib)
+        end
     end
 end

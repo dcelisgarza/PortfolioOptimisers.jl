@@ -3,32 +3,55 @@ $(DocStringExtensions.TYPEDEF)
 
 A Return Forecast fitted by a regression target over every observation and asset at once.
 
-The member turns its Descriptors into scores with the recipe in `scores`, and hands every `(observation, asset)` pair whose forward target has matured to a regression target as one sample. It is the member that admits a nonlinear combination of the Descriptors, because the combination is whatever the target fits, and the library's own [`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref) are two targets that work today.
+The member turns its Descriptors into scores with the recipe in `scores`, and hands every `(observation, asset)` pair whose forward target has matured to a regression target as one sample. The combination of the Descriptors is whatever the target fits, so this member admits a nonlinear one. [`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref) are two targets the library defines.
 
-The target of the fit is transformed cross-sectionally before the fit sees it, which is what keeps one extreme observation from setting the shape of the whole model. That transformation leaves the prediction in no particular unit, so the member calibrates it: one exponentially weighted scalar regression of the forward return on the prediction restores return units, and `cv` decides whether that regression reads in-sample or out-of-fold predictions.
+The member transforms the target of the fit cross-sectionally before the fit reads it, so one extreme observation does not set the shape of the whole model. The transformed target has no unit, and neither has the prediction. One exponentially weighted scalar regression of the forward return on the prediction puts the prediction into return units. `cv` chooses whether that regression reads in-sample or out-of-fold predictions.
 
 The member computes no history. Its in-sample predictions are not a forecast, so `hist` on its Result is `nothing`.
 
-`whole_history` states the window the fit trains over. Under `true` the block's idiosyncratic returns are placed into the rows they were fitted on, and every pair with a finite score, a finite target and a positive weight is one sample, so a signal row before the block whose forward window reaches into the block trains the model too. Under `false` the fit trains on the block's rows alone. The calibration reads the idiosyncratic variance at the signal row either way, so a row before the block enters the fit and not the calibration.
+`whole_history` states the rows the fit trains on. Under `true` the member places the block's idiosyncratic returns into the rows of the carrier they were fitted on. Every pair with a finite score, a finite target and a positive weight is then one sample, so a signal row before the block whose forward window reaches into the block trains the model too. Under `false` the fit trains on the block's rows alone. The calibration reads the idiosyncratic variance at the signal row, and a row before the block has none, so such a row never enters the calibration. In [`IdiosyncraticSharpeUnit`](@ref) the target reads that variance too, so a row before the block trains nothing, and the two values of `whole_history` fit the same model.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\hat{y}_{t,i} &= \\operatorname{predict}\\left(\\mathcal{M}, \\boldsymbol{s}_{t,i}\\right)\\,, &
-\\mathcal{M} &= \\operatorname{fit}\\left(\\texttt{tgt}, \\mathbf{S}, \\boldsymbol{y}\\right)\\,, \\\\
-\\alpha_{i} &= \\kappa \\, \\hat{y}_{T,i}\\,, &
-\\kappa &= \\frac{\\sum_{t} \\lambda^{-t} \\langle \\boldsymbol{u}_{t}, \\hat{\\boldsymbol{y}}_{t} \\odot \\boldsymbol{\\epsilon}_{t} \\rangle}{\\sum_{t} \\lambda^{-t} \\langle \\boldsymbol{u}_{t}, \\hat{\\boldsymbol{y}}_{t} \\odot \\hat{\\boldsymbol{y}}_{t} \\rangle}\\,.
+z_{ti} &= \\mathcal{T}\\left(\\frac{\\bar{\\varepsilon}_{ti}}{g_{ti}}\\right)\\,, \\\\
+\\mathcal{M} &= \\operatorname{fit}\\left(\\texttt{tgt}, \\left\\{\\left(\\boldsymbol{s}_{ti}, z_{ti}\\right) : (t, i) \\in \\mathcal{S}\\right\\}\\right)\\,, \\\\
+p_{ti} &= g_{ti} \\operatorname{predict}\\left(\\mathcal{M}, \\boldsymbol{s}_{ti}\\right)\\,, \\\\
+\\omega_{ti} &= \\frac{u_{ti} / v_{ti}}{\\frac{1}{\\lvert \\mathcal{A}_{t} \\rvert} \\sum_{j \\in \\mathcal{A}_{t}} u_{tj} / v_{tj}}\\,, \\\\
+a_{t} &= \\sum_{i \\in \\mathcal{A}_{t}} \\omega_{ti} \\, p_{ti}^{2}\\,, \\\\
+c_{t} &= \\sum_{i \\in \\mathcal{A}_{t}} \\omega_{ti} \\, p_{ti} \\, \\bar{\\varepsilon}_{ti}\\,, \\\\
+A_{k} &= \\lambda A_{k-1} + (1 - \\lambda) \\, a_{t_{k}}\\,, \\\\
+C_{k} &= \\lambda C_{k-1} + (1 - \\lambda) \\, c_{t_{k}}\\,, \\\\
+\\kappa &= \\frac{C_{n}}{(1 + \\varrho) A_{n}}\\,, \\\\
+\\alpha_{Ti} &= \\gamma \\, \\kappa \\, p_{Ti}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{s}_{t,i}``: Descriptor scores of asset ``i`` at observation ``t``.
-  - ``\\mathcal{M}``: the model the regression target fits on every valid sample.
-  - ``\\boldsymbol{\\epsilon}_{t}``: forward mean idiosyncratic returns of observation ``t``.
-  - ``\\boldsymbol{u}_{t}``: normalised calibration weights of observation ``t``.
-  - ``\\kappa``: the calibration coefficient, written here without its ridge.
+  - $(math_dict[:eps_ti_idio])
+  - ``\\bar{\\varepsilon}_{ti}``: Forward mean idiosyncratic return of asset ``i`` at observation ``t``, the mean of the finite ``\\varepsilon_{si}`` over ``s`` from ``t + \\ell`` to ``t + \\ell + h - 1``, with ``\\ell`` the lag and ``h`` the horizon.
+  - $(math_dict[:v_ti_idio])
+  - ``g_{ti}``: Unit factor of asset ``i`` at observation ``t``. It is ``1`` in [`IdiosyncraticReturnUnit`](@ref) and ``\\sqrt{v_{ti}}`` in [`IdiosyncraticSharpeUnit`](@ref).
+  - ``\\mathcal{T}``: The cross-sectional transform in `target_outlier` followed by the one in `target_scoring`. The member applies it to each observation, and an absent transform leaves the target as it is.
+  - ``z_{ti}``: Target of the fit for asset ``i`` at observation ``t``.
+  - ``\\boldsymbol{s}_{ti}``: Descriptor scores of asset ``i`` at observation ``t``.
+  - $(math_dict[:u_ti_cs])
+  - ``\\mathcal{S}``: The valid samples, the pairs whose target has matured, ``t \\leq T - \\ell - h + 1``, with ``u_{ti} > 0`` and a finite ``z_{ti}`` and ``\\boldsymbol{s}_{ti}``.
+  - ``\\mathcal{M}``: The model the regression target fits on the valid samples.
+  - ``p_{ti}``: Uncalibrated prediction of asset ``i`` at observation ``t``, in return units. Under a cross-validation estimator in `cv`, the calibration reads the prediction of each valid sample from the model fitted on the folds that do not hold that sample.
+  - ``\\mathcal{A}_{t}``: The assets of a matured observation ``t`` that enter the calibration, those with ``u_{ti} > 0`` and a finite ``v_{ti}``, ``p_{ti}`` and ``\\bar{\\varepsilon}_{ti}``.
+  - ``\\omega_{ti}``: Calibration weight of asset ``i`` at observation ``t``. The weights of one observation have a mean of one.
+  - ``a_{t}``, ``c_{t}``: The weighted normal product and cross product of observation ``t``.
+  - ``t_{1} < \\dots < t_{n}``: The observations that advance the calibration, those with at least two assets in ``\\mathcal{A}_{t}``, a finite ``c_{t}`` and a finite ``a_{t}`` above the machine epsilon. An observation that does not advance it leaves ``A`` and ``C`` as they are and does not decay them.
+  - ``A_{k}``, ``C_{k}``: The two exponentially weighted accumulators, with ``A_{0} = C_{0} = 0``.
+  - $(math_dict[:lambda_ew])
+  - ``\\varrho``: The relative ridge, ``10^{-6}``. On a scalar regression it shrinks the coefficient by the factor ``1 / (1 + \\varrho)``.
+  - ``\\kappa``: The calibration coefficient. It is ``1`` when `calibrate` is `false`, and `NaN` when ``n`` is below `min_obs`.
+  - ``\\gamma``: `scale`.
+  - $(math_dict[:alpha_ti_fc]) The member publishes the row of the latest observation ``T``.
+  - $(math_dict[:T])
 
 # Fields
 
@@ -48,11 +71,11 @@ $(DocStringExtensions.TYPEDFIELDS)
                          cv::Option{<:CrossValidationEstimator} = nothing,
                          unit::AbstractForecastUnit = IdiosyncraticReturnUnit()) -> TargetReturnForecast
 
-Every keyword but `half_life` corresponds to a field. `half_life` is not a field: it fixes the defaults of `decay` and `min_obs` of the calibration, and a value passed for either of those is used as it stands. `min_obs = 1` calibrates from the first observation that states a slope.
+Every keyword but `half_life` corresponds to a field. `half_life` is not a field. It fixes the defaults of `decay` and `min_obs` of the calibration, and the constructor keeps a value passed for either of those as it stands. `min_obs = 1` calibrates from the first observation that states a slope.
 
 ## Validation
 
-  - `0 < decay < 1`.
+  - $(val_dict[:decay])
   - `min_obs >= 1`, `horizon >= 1` and `lag >= 1`.
   - `scale > 0` and is finite.
 
@@ -125,15 +148,15 @@ TargetReturnForecast
     """
     whole_history
     """
-    Cross-sectional transform applied to the target of the fit before it is scored, or `nothing` to skip the step.
+    Cross-sectional transform the member applies first to the target of the fit, or `nothing` to skip the step.
     """
     target_outlier
     """
-    Cross-sectional transform applied to the target of the fit after the outlier step, or `nothing` to skip the step. It is `nothing` by default, so the fit predicts the winsorised return itself.
+    Cross-sectional transform the member applies to the target of the fit after `target_outlier`, or `nothing` to skip the step. It is `nothing` by default, so under the default `target_outlier` the fit predicts the winsorised return itself.
     """
     target_scoring
     """
-    Whether the prediction is calibrated back to return units by an exponentially weighted scalar regression of the forward return on it.
+    Whether the member puts its prediction back into return units by an exponentially weighted scalar regression of the forward return on it.
     """
     calibrate
     """
@@ -149,7 +172,7 @@ TargetReturnForecast
     """
     min_obs
     """
-    Cross-validation estimator whose folds give the out of fold predictions the calibration reads, or `nothing` to calibrate on in-sample predictions.
+    Cross-validation estimator whose folds give the out-of-fold predictions the calibration reads, or `nothing` to calibrate on in-sample predictions.
     """
     cv
     """
@@ -197,7 +220,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type produced by [`TargetReturnForecast`](@ref).
 
-Beside the two reads [`AbstractReturnForecastResult`](@ref) states, it carries the fitted model and the calibration coefficient, so a reader inspects the combination the target found and the scale that put it back into return units. `hist` is `nothing`, because the member computes no history.
+Beside the two reads [`AbstractReturnForecastResult`](@ref) states, it carries the fitted model and the calibration coefficient. A reader can inspect the combination the target fitted and the coefficient that puts the prediction into return units. `hist` is `nothing`, because the member computes no history.
 
 # Fields
 
@@ -219,11 +242,11 @@ $(DocStringExtensions.TYPEDFIELDS)
     """
     hist
     """
-    The model the regression target fitted, or `nothing` when no sample was valid.
+    The model the regression target fits on the valid samples, or `nothing` when no sample is valid.
     """
     model
     """
-    The calibration coefficient, or `NaN` when the member did not calibrate or the calibration is in its warm-up.
+    The calibration coefficient. It is `NaN` when the member does not calibrate, when it fits no model, and while the calibration is in its warm-up.
     """
     calib
     function TargetReturnForecastResult(mu::VecNum, model, calib::Number)
@@ -249,8 +272,8 @@ Return the idiosyncratic variance history a [`TargetReturnForecast`](@ref) reads
 
 The method that Julia selects is the algorithm.
 
- 1. [`IdiosyncraticSharpeUnit`](@ref): the variances scale the target and the forecast, so they are read whatever the calibration does.
- 2. [`IdiosyncraticReturnUnit`](@ref): the variances weigh the calibration alone, so they are read when `calibrate` is set and skipped when it is not.
+ 1. [`IdiosyncraticSharpeUnit`](@ref): the variances scale the target and the forecast, so the method reads them whatever `calibrate` says.
+ 2. [`IdiosyncraticReturnUnit`](@ref): the variances weigh the calibration alone, so the method reads them when `calibrate` is set and returns `nothing` when it is not.
 
 # Arguments
 
@@ -260,7 +283,7 @@ The method that Julia selects is the algorithm.
 
 # Validation
 
-  - The rules of [`forecast_idiosyncratic_variances`](@ref), where the history is read.
+  - The rules of [`forecast_idiosyncratic_variances`](@ref), which reads the history.
 
 # Returns
 
@@ -286,7 +309,7 @@ end
 
 Flatten the Descriptor scores and the target of a [`TargetReturnForecast`](@ref) into one sample per `(observation, asset)` pair.
 
-The regression target of this member is not a cross-section: every pair of an observation whose forward target has matured is one sample, and the fit sees them all at once. The pairs are laid out observation by observation, so the flat index of the pair `(t, i)` is `(t - 1) * assets + i`.
+The regression target of this member does not fit one cross-section at a time. Every pair of an observation whose forward target has matured is one sample, and the fit reads all of them at once. The function writes the pairs observation by observation, so the flat index of the pair `(t, i)` is `(t - 1) * assets + i`.
 
 # Arguments
 
@@ -331,11 +354,11 @@ end
 
 Fit the regression target of a [`TargetReturnForecast`](@ref) on the valid samples.
 
-A window that carries no valid sample fits nothing and answers `nothing`, which is the warm-up of this member: it forecasts `NaN` until one observation's target has matured.
+A window with no valid sample fits nothing and returns `nothing`. This is the warm-up of the member, which forecasts `NaN` until the target of one observation has matured.
 
 # Arguments
 
-  - `rfe`: Target Return Forecast Estimator. Its regression target is read as a field rather than passed as an abstract argument, which is what keeps the call site of the third-party fit concrete.
+  - `rfe`: Target Return Forecast Estimator. The function reads the regression target from its field rather than from an abstract argument, so the call of the third-party fit stays concrete.
   - `Sf`: The flattened design.
   - `yf`: The flattened target.
   - `ok`: The mask of the valid samples.
@@ -370,11 +393,11 @@ Predict the uncalibrated forecast of the samples a [`TargetReturnForecast`](@ref
 The method that Julia selects is the algorithm.
 
  1. `nothing`: the fitted model predicts its own training samples, so the calibration runs in sample.
- 2. A cross-validation estimator: the samples are split through [`Base.split`](@ref), a model is fitted on the training folds of each split and predicts its test fold, so the calibration runs out of fold and the slope is not read off predictions the model has already seen. A sample no split tests keeps its `NaN` and states nothing.
+ 2. A cross-validation estimator: [`Base.split`](@ref) splits the valid samples. For each split, the function fits a model on the training folds and predicts the test fold, so the calibration never reads a prediction of a sample the model trained on. A sample that no split tests keeps its `NaN`.
 
 # Arguments
 
-  - `cv`: Cross-validation estimator, or `nothing`. It is `rfe.cv`, passed apart so that the method Julia selects is the algorithm.
+  - `cv`: Cross-validation estimator, or `nothing`. It is `rfe.cv`. The caller passes it as an argument of its own, so that the method Julia selects is the algorithm.
   - `rfe`: Target Return Forecast Estimator.
   - `model`: The model fitted on every valid sample.
   - `Sf`: The flattened design.
@@ -383,7 +406,7 @@ The method that Julia selects is the algorithm.
 
 # Validation
 
-  - Under a cross-validation estimator, the valid samples number at least twice the split count [`n_splits`](@ref) reports, which is the smallest sample that leaves two per fold. Raises an `ArgumentError`.
+  - Under a cross-validation estimator, the count of valid samples is at least twice the split count that [`n_splits`](@ref) reports. Raises an `ArgumentError`.
 
 # Returns
 
@@ -431,7 +454,7 @@ end
 
 Read a flat sample vector of a [`TargetReturnForecast`](@ref) back as an `observations × assets` matrix.
 
-It is the inverse of the layout [`target_forecast_samples`](@ref) writes, so the two functions state the flattening once each and no caller recomputes an index.
+It is the inverse of the layout that [`target_forecast_samples`](@ref) writes, so the two functions hold the flattening, and no caller computes an index.
 
 # Arguments
 
@@ -465,7 +488,7 @@ end
 
 Gather the calibration sample of one observation of a [`TargetReturnForecast`](@ref).
 
-An asset enters when it carries a positive cross-sectional weight, a finite idiosyncratic variance, a finite uncalibrated prediction and a finite forward return. Its weight is the cross-sectional weight divided by its idiosyncratic variance, which is the same generalised least squares weighting the exponentially weighted member uses in the return unit.
+An asset enters when it carries a positive cross-sectional weight, a finite idiosyncratic variance, a finite uncalibrated prediction and a finite forward return. Its weight is the cross-sectional weight divided by its idiosyncratic variance. [`ExpWeightedReturnForecast`](@ref) weighs its regression the same way in the return unit.
 
 # Arguments
 
@@ -505,14 +528,15 @@ end
 
 Fit the scalar calibration coefficient of a [`TargetReturnForecast`](@ref).
 
-The regression target of this member is winsorised, and may be standardised, so its prediction is not in return units. One exponentially weighted scalar regression of the forward return on that prediction restores the units, and its slope is the coefficient the member publishes with.
+The member transforms the target of its fit, so the prediction is not in return units. One exponentially weighted scalar regression of the forward return on that prediction puts the prediction into return units, and the member multiplies its forecast by the slope. [`TargetReturnForecast`](@ref) states the slope as a closed form.
 
 # Algorithm
 
- 1. For each observation in turn, gather its calibration sample through [`target_forecast_calibration_design`](@ref). An observation with fewer than two entering assets states no slope and is skipped.
- 2. Divide the weights by their mean over the entering assets, and take the weighted inner products of the prediction with itself and with the forward return. An observation whose products are not finite, or whose normal product is at or below `eps`, is skipped.
- 3. Advance the two exponentially weighted accumulators by those products, and read the slope off them with a relative ridge of `1e-6` on the normal accumulator.
- 4. Return the slope when `min_obs` observations have advanced the accumulators, and `NaN` before then.
+ 1. For each observation in turn, gather its calibration sample through [`target_forecast_calibration_design`](@ref). An observation with fewer than two entering assets states no slope, and the function skips it.
+ 2. Divide the weights by their mean over the entering assets, giving `u`. Take the weighted inner product of the prediction with itself, giving `on`, and with the forward return, giving `oc`. The function skips an observation whose products are not finite, or whose `on` is at or below `eps`.
+ 3. Advance the two exponentially weighted accumulators `an` and `ac` by `on` and `oc`. A skipped observation does not decay them.
+ 4. Divide `ac` by `an` plus a ridge of `1e-6` times the larger of `abs(an)` and `eps`, giving `calib`.
+ 5. Return `calib` when `min_obs` observations have advanced the accumulators, and `NaN` before then.
 
 # Arguments
 
@@ -569,8 +593,8 @@ Predict the uncalibrated forecast of the latest observation of a [`TargetReturnF
 
 The method that Julia selects is the algorithm.
 
- 1. `nothing`: nothing was fitted, so every asset reads `NaN`.
- 2. A fitted model: the assets whose scores are all finite are predicted together, and the rest read `NaN`.
+ 1. `nothing`: the member fitted no model, so every asset reads `NaN`.
+ 2. A fitted model: the model predicts the assets whose scores are all finite in one call, and the other assets read `NaN`.
 
 # Arguments
 
@@ -616,7 +640,7 @@ end
 
 Return the idiosyncratic variances of the latest observation, as a one-row matrix.
 
-[`forecast_return_units`](@ref) converts a whole history, and this member converts one row of one, so the row is kept a matrix rather than read as a vector.
+[`forecast_return_units`](@ref) converts a history, and the member converts only the last row of one. So the function returns that row as a one-row matrix and not as a vector.
 
 # Arguments
 
@@ -647,8 +671,8 @@ Put the scores of a [`TargetReturnForecast`](@ref) and the histories it fits on 
 
 # Algorithm
 
- 1. `whole_history` is set: the scores, the weights and the group labels stay on the carrier's axis, and the two block histories are placed into the block's rows through [`return_forecast_pad`](@ref). A row before the block carries a `NaN` idiosyncratic return, so it states a target only where its forward window reaches into the block.
- 2. `whole_history` is not set: the scores, the weights and the group labels are cut to the block's rows through [`return_forecast_cut`](@ref), and the two block histories are already on them.
+ 1. `whole_history` is set: the function keeps the scores, the weights and the group labels on the carrier's axis. It places the two block histories into the block's rows through [`return_forecast_pad`](@ref). A row before the block carries a `NaN` idiosyncratic return, so it states a target only where its forward window reaches into the block.
+ 2. `whole_history` is not set: the function cuts the scores, the weights and the group labels to the block's rows through [`return_forecast_cut`](@ref). The two block histories are already on those rows.
 
 # Arguments
 
@@ -691,12 +715,14 @@ Fit a Return Forecast with a regression target over every observation and asset 
 
 # Algorithm
 
- 1. Compute the Descriptor scores over the whole carrier through [`descriptor_scores`](@ref), and read the idiosyncratic returns off the block. The variances are read through [`target_forecast_variances`](@ref), which states when the member needs them.
- 2. Put the scores and the two block histories on one observation axis through [`target_forecast_alignment`](@ref), which `whole_history` chooses.
- 3. Take the forward mean target through [`forward_mean_returns`](@ref), convert it to the Forecast Unit through [`forecast_unit_target`](@ref), and pass it through the outlier slot and then the scoring slot.
- 4. Flatten the observations whose target has matured, which are all but the last `lag + horizon - 1`, into one sample per `(observation, asset)` pair through [`target_forecast_samples`](@ref), and fit the regression target on the valid samples.
- 5. When the member calibrates, predict those samples through [`target_forecast_uncalibrated`](@ref) and fit the calibration coefficient through [`target_forecast_calibration`](@ref). It reads the idiosyncratic variance at the signal row, so a row before the block enters the fit and not the calibration.
- 6. Predict the latest observation through [`target_forecast_latest`](@ref), multiply by the calibration coefficient and by `scale`, and convert the row to return units.
+ 1. Compute the Descriptor scores `S` over the whole carrier through [`descriptor_scores`](@ref), and read the idiosyncratic returns off the block. Read the variances through [`target_forecast_variances`](@ref), which states when the member needs them.
+ 2. Put the scores and the two block histories on one observation axis through [`target_forecast_alignment`](@ref), which reads `whole_history`.
+ 3. Take the forward mean target `fwd` through [`forward_mean_returns`](@ref). Convert it to the Forecast Unit through [`forecast_unit_target`](@ref), and pass it through `target_outlier` and then `target_scoring`, giving `y`.
+ 4. Count the observations whose target has matured, all but the last `lag + horizon - 1`, giving `nt`. Flatten them into one sample per `(observation, asset)` pair through [`target_forecast_samples`](@ref), giving `Sf`, `yf` and `ok`.
+ 5. Fit the regression target on the valid samples through [`target_forecast_fit`](@ref), giving `model`.
+ 6. Compute the calibration coefficient `calib` through [`target_forecast_coefficient`](@ref). A row before the block has no idiosyncratic variance, so it can enter the fit and never enters the calibration.
+ 7. Predict the latest observation through [`target_forecast_latest`](@ref) and convert the row to return units, giving `P`.
+ 8. Multiply `P` by `scale` and by the multiplier of [`target_forecast_multiplier`](@ref), giving `mu`.
 
 # Arguments
 
@@ -757,7 +783,7 @@ end
 
 Return the multiplier a [`TargetReturnForecast`](@ref) applies to its uncalibrated prediction.
 
-A member that does not calibrate publishes the prediction as it stands, so its multiplier is one and the `NaN` its Result carries states that no coefficient was fitted rather than that the forecast is unavailable.
+A member that does not calibrate publishes the prediction as it stands, so its multiplier is one. The `NaN` in its Result then states that the member fitted no coefficient, and not that the forecast is missing.
 
 # Arguments
 
@@ -766,7 +792,7 @@ A member that does not calibrate publishes the prediction as it stands, so its m
 
 # Returns
 
-  - `m::Real`: The multiplier.
+  - `m::Number`: The multiplier, `calib` or one in the type of `calib`.
 
 # Related
 
@@ -783,7 +809,7 @@ end
 
 Return the calibration coefficient of a [`TargetReturnForecast`](@ref), or `NaN`.
 
-This is the one place that states when the calibration runs at all: a member that does not calibrate, and a member that fitted no model, each answer `NaN` without predicting anything.
+This function alone decides whether the calibration runs. A member that does not calibrate, and a member that fits no model, each return `NaN` and predict nothing. The `NaN` takes the type of the flattened design and of the forward returns.
 
 # Arguments
 
@@ -811,7 +837,7 @@ function target_forecast_coefficient(rfe::TargetReturnForecast, model, Sf::MatNu
                                      yf::VecNum, ok::AbstractVector{Bool}, fwd::MatNum,
                                      vs::Option{<:MatNum}, w::MatNum, nt::Integer)::Real
     if !rfe.calibrate || isnothing(model) || isnothing(vs)
-        return NaN
+        return promote_type(real(eltype(Sf)), real(eltype(fwd)))(NaN)
     end
     p = target_forecast_uncalibrated(rfe.cv, rfe, model, Sf, yf, ok)
     P = forecast_return_units(rfe.unit, target_forecast_scatter(p, nt, size(w, 2)),
