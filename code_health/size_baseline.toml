@@ -202,7 +202,7 @@ commit = "0ecb3ce47c"
 "src/09_ConstraintGeneration/06_AssetSetsMatrix.jl" = { code = 111, doc = 297, comment = 5, blank = 154, total = 567 }
 "src/09_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { code = 50, doc = 274, comment = 0, blank = 126, total = 450 }
 "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { code = 108, doc = 335, comment = 0, blank = 169, total = 612 }
-"src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { code = 63, doc = 107, comment = 0, blank = 57, total = 227 }
+"src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { code = 64, doc = 109, comment = 0, blank = 57, total = 230 }
 "src/10_Prior/01_Base_Prior.jl" = { code = 497, doc = 1290, comment = 64, blank = 564, total = 2415 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { code = 84, doc = 271, comment = 14, blank = 108, total = 477 }
 "src/10_Prior/03_FactorPrior.jl" = { code = 81, doc = 285, comment = 26, blank = 100, total = 492 }
