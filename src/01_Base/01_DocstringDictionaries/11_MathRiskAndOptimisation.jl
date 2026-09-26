@@ -157,4 +157,17 @@ unique_key_dict!(math_dict, :math_dict,
                  :R_search => "``\\mathcal{R}``: Expected risk under `r`, as [`expected_risk`](@ref) computes it with the keyword arguments `kwargs`.",#
                  :C_finite_cand => "``\\mathcal{C}``: Finite candidates, the candidates whose every score is finite. A failed fold scores `NaN`, so a candidate that failed one is not in ``\\mathcal{C}``.",#
                  :sigma_scorer => "``\\sigma``: Search scorer `scorer`, a map from a score matrix to the position of its best column. The default [`HighestMeanScore`](@ref) takes the column of greatest mean.",#
-                 :i_star_cand => "``i^{\\star}``: Selected candidate, the position in the grid of the candidate that the search returns.")
+                 :i_star_cand => "``i^{\\star}``: Selected candidate, the position in the grid of the candidate that the search returns.",#
+                 # The recursive bisection that `HierarchicalRiskParity` and
+                 # `SchurComplementHierarchicalRiskParity` share.
+                 :C_halves_hier => "``C_1``, ``C_2``: Halves of a part of the dendrogram's leaf order. ``C_1`` holds the first ``\\lfloor n/2 \\rfloor`` of the part's ``n`` leaves, and ``C_2`` holds the rest.",#
+                 :alpha_split_hier => "``\\alpha``: Split factor, the fraction of the part's weight that goes to ``C_1``. ``C_2`` receives ``1 - \\alpha``.",#
+                 # The Schur complement augmentation of `SchurComplementHierarchicalRiskParity`.
+                 :gamma_sch => "``\\gamma``: Schur complement parameter, in ``[0, 1]``. At ``\\gamma = 0`` every augmented block equals the plain block.",#
+                 :Sigma_blocks_sch => "``\\mathbf{\\Sigma}_{11}``, ``\\mathbf{\\Sigma}_{12}``, ``\\mathbf{\\Sigma}_{21}``, ``\\mathbf{\\Sigma}_{22}``: Blocks of the covariance matrix of a part, with the rows and the columns of ``C_1`` first and those of ``C_2`` second.",#
+                 :M_step_up_sch => "``\\mathbf{M}``: Symmetric step-up matrix of size ``|C_1| \\times |C_2|``, see [`symmetric_step_up_matrix`](@ref).",#
+                 :A_sch => "``\\mathbf{A}``: Scaled Schur complement of ``\\mathbf{\\Sigma}_{22}``. At ``\\gamma = 1`` it is the Schur complement of ``\\mathbf{\\Sigma}_{22}`` in the covariance matrix of the part.",#
+                 :R_sch => "``\\mathbf{R}``: Step-up correction, the matrix that carries the augmentation back to the size of ``C_1``.",#
+                 :Sigma_hat_sch => "``\\hat{\\mathbf{\\Sigma}}_{11}``: Augmented block of ``C_1``, made symmetric. ``\\hat{\\mathbf{\\Sigma}}_{22}`` follows when ``C_1`` and ``C_2`` exchange their roles.",#
+                 :w_naive_sch => "``\\tilde{\\boldsymbol{w}}``: Naive risk parity weights of a block, the inverses of its diagonal entries divided by their sum.",#
+                 :rho_naive_sch => "``\\tilde{\\rho}(C)``: Risk of the naive risk parity sub-portfolio of the augmented block of ``C``. A [`Variance`](@ref) measure takes the quadratic form, and a [`StandardDeviation`](@ref) measure takes its square root.")

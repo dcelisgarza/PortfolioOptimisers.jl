@@ -300,7 +300,7 @@ commit = "0ecb3ce47c"
 "src/17_Optimisation/03_NaiveOptimisation.jl" = { cyc = 3, cog = 3, arg = 10, cyc_sum = 65, cog_sum = 36, arg_sum = 78, macros = ["@propagatable"] }
 "src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl" = { cyc = 3, cog = 2, arg = 11, cyc_sum = 28, cog_sum = 16, arg_sum = 46, macros = ["@forward_properties", "@propagatable"] }
 "src/17_Optimisation/04_Hierarchical/02_HierarchicalRiskParity.jl" = { cyc = 4, cog = 3, arg = 9, cyc_sum = 23, cog_sum = 16, arg_sum = 31, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
-"src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl" = { cyc = 10, cog = 24, arg = 10, cyc_sum = 58, cog_sum = 65, arg_sum = 69, macros = ["@propagatable"] }
+"src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl" = { cyc = 10, cog = 24, arg = 10, cyc_sum = 59, cog_sum = 66, arg_sum = 69, macros = ["@propagatable"] }
 "src/17_Optimisation/04_Hierarchical/04_HierarchicalEqualRiskContribution.jl" = { cyc = 6, cog = 9, arg = 8, cyc_sum = 49, cog_sum = 36, arg_sum = 98, macros = ["@propagatable"] }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/01_JuMPOptimisationTypes.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 27, cog_sum = 14, arg_sum = 48, macros = [] }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/02_JuMPModelAccessors.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 18, cog_sum = 3, arg_sum = 23, macros = [] }

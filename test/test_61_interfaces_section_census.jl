@@ -341,9 +341,9 @@ end
                 :ProcessedRiskBudgetingAttributes, :RankCovarianceEstimator,
                 :RelaxedRiskBudgetingAlgorithm, :RiskBudgetingAlgorithm,
                 :RiskBudgetingFormulation, :RiskInputKind, :RiskJuMPOptimisationEstimator,
-                :RiskJuMPOptimisationResult, :SchurComplementAlgorithm,
-                :SecondMomentFormulation, :SequentialCrossValidationResult,
-                :SmythBrobyCovarianceAlgorithm, :SquaredOrderedWeightsArrayAlgorithm,
+                :RiskJuMPOptimisationResult, :SecondMomentFormulation,
+                :SequentialCrossValidationResult, :SmythBrobyCovarianceAlgorithm,
+                :SquaredOrderedWeightsArrayAlgorithm,
                 :UnstandardisedHighOrderMomentMeasureAlgorithm,
                 :UnstandardisedLowOrderMomentMeasureAlgorithm, :ValueatRiskFormulation,
                 :VariableTracking, :VarianceFormulation, :WalkForwardEstimator])

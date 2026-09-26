@@ -177,7 +177,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :opt_hier => "`opt`: Base hierarchical optimiser configuration.",#
                  :strict_opt => "`strict`: Whether to strictly enforce weight bounds.",#
                  :strict_conv => "`strict`: Whether to raise an error if convergence is not achieved.",#
-                 :schalg => "`alg`: Schur complement algorithm variant.",#
+                 :schalg => "`alg`: Algorithm that chooses the value of `gamma` that the allocation runs at.",#
                  # Partial fit states.
                  :pf_M => "`M`: Running second-moment accumulator of the observations folded into the state, about `mu`.",
                  :pf_max_history => "`max_history`: Optional cap on the number of observations the buffer keeps. `nothing` keeps every observation folded so far. A capped buffer drops its oldest observations as new ones arrive and holds the last `max_history` of them. A read-out over the buffer reads those rows only. The cap is the window of the fit. An estimator wrapped in [`Online`](@ref) returns the batch fit over the last `max_history` observations, also when its statistic has an exact update.",#
