@@ -232,6 +232,122 @@ end
     end
 end
 
+@testset "The Descriptor Scores agree with their closed form" begin
+    PO = PortfolioOptimisers
+    # Asset 5 leaves the estimation universe at observation 3, the score `a` of asset 2 is
+    # missing at observation 4, and asset 4 has no `size` exposure at the first row of the
+    # block. The block is rows 2 to 4 of the carrier, so row 1 has no exposure.
+    a = [1.0 2.0 4.0 0.5 3.0; 3.0 4.0 1.0 2.0 5.0; 2.0 5.0 3.0 1.0 4.0;
+         4.0 NaN 2.0 3.0 1.0]
+    b = [5.0 6.0 1.0 2.0 4.0; 7.0 8.0 2.0 1.0 3.0; 1.0 3.0 9.0 2.0 5.0;
+         2.0 4.0 6.0 8.0 1.0]
+    emsk = trues(4, 5)
+    emsk[3, 5] = false
+    rd = forecast_hand_panel(["a" => a, "b" => b]; emsk = emsk)
+    Ms = zeros(3, 5, 2)
+    Ms[:, :, 1] = [1.0 2.0 3.0 NaN 5.0; 2.0 1.0 4.0 3.0 1.0; 3.0 3.0 1.0 2.0 4.0]
+    Ms[:, :, 2] = [0.5 -1.0 2.0 1.0 0.0; 1.5 0.5 -0.5 2.0 1.0; -1.0 2.0 0.5 1.0 3.0]
+    blk = CrossSectionalFactorModel(; M = ones(5, 2), b = zeros(5), Ms = Ms,
+                                    nf = ["size", "value"], fam = ["style", "style"])
+
+    # The standardiser, written out: the mean and the sample deviation over the assets of the
+    # estimation universe with a finite value, applied to every asset.
+    function zscore(x::AbstractVector, e::AbstractVector{Bool})
+        E = findall(e .& isfinite.(x))
+        return (x .- mean(x[E])) ./ std(x[E])
+    end
+    # The recipe, written out: score, fit the finite estimation assets on the exposures,
+    # take the residual of every asset, and score the residual once more.
+    function closed_form(D::AbstractMatrix, k::AbstractVector{<:Integer}, intercept::Bool)
+        S = fill(NaN, size(D))
+        for t in 2:4
+            d = zscore(D[t, :], emsk[t, :])
+            B = Ms[t - 1, :, k]
+            X = intercept ? [ones(5) B] : B
+            fit = emsk[t, :] .& isfinite.(d) .& vec(all(isfinite, B; dims = 2))
+            coef = X[fit, :] \ d[fit]
+            S[t, :] = zscore(d - X * coef, emsk[t, :])
+        end
+        return S
+    end
+    function agrees(S::AbstractMatrix, R::AbstractMatrix)
+        f = .!isnan.(R)
+        return isequal(isnan.(S), isnan.(R)) && isapprox(S[f], R[f]; rtol = 1e-12)
+    end
+
+    @testset "A factor name neutralises against that factor alone" begin
+        for intercept in (false, true)
+            ds = DescriptorScores(;
+                                  descriptors = [Passthrough(; field = "a"),
+                                                 Passthrough(; field = "b")],
+                                  neutralise = "value",
+                                  cre = CrossSectionalLinearRegression(;
+                                                                       intercept = intercept),
+                                  outlier = nothing)
+            res = descriptor_scores(ds, rd, blk)
+            @test res.rows == 2:4
+            @test agrees(res.S[:, :, 1], closed_form(a, [2], intercept))
+            @test agrees(res.S[:, :, 2], closed_form(b, [2], intercept))
+        end
+    end
+
+    @testset "A Factor Family neutralises against each of its factors" begin
+        ds = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
+                              neutralise = "style",
+                              cre = CrossSectionalLinearRegression(; intercept = true),
+                              outlier = nothing)
+        R = closed_form(a, [1, 2], true)
+        @test agrees(descriptor_scores(ds, rd, blk).S[:, :, 1], R)
+        # The asset without a `size` exposure has no residual, and the others fit without it.
+        @test isnan(R[2, 4]) && count(isfinite, R[2, :]) == 4
+    end
+
+    @testset "Without a Neutralisation every row carries the transformed Descriptor" begin
+        ds = DescriptorScores(; descriptors = [Passthrough(; field = "b")],
+                              outlier = nothing)
+        S = descriptor_scores(ds, rd, blk).S
+        @test all(isapprox(S[t, :, 1], zscore(b[t, :], emsk[t, :]); rtol = 1e-12)
+                  for t in 1:4)
+    end
+
+    @testset "The number type of the scores is the promotion of every input" begin
+        a3 = [1.0 2.0 4.0; 3.0 4.0 1.0; 2.0 5.0 3.0]
+        b3 = [5.0 6.0 1.0; 7.0 8.0 2.0; 1.0 3.0 9.0] ./ 3
+        panel(inp) = ReturnsResult(; nx = ["A", "B", "C"], X = zeros(Float32, 3, 3),
+                                   pnl = asset_panel(inp; amsk = trues(3, 3),
+                                                     emsk = trues(3, 3)))
+        blk3 = forecast_hand_block(3)
+        # A wider second Descriptor widens the stack, and its score keeps its precision.
+        rdm = panel([NumericPanelInput(; name = "a", vals = Float32.(a3)),
+                     NumericPanelInput(; name = "b", vals = big.(b3))])
+        dsm = DescriptorScores(;
+                               descriptors = [Passthrough(; field = "a"),
+                                              Passthrough(; field = "b")],
+                               outlier = nothing, scoring = nothing)
+        Sm = descriptor_scores(dsm, rdm, blk3).S
+        @test eltype(Sm) === BigFloat
+        @test Sm[:, :, 2] == big.(b3)
+        # A wider exposure history widens the residual under a Neutralisation.
+        rdn = panel([NumericPanelInput(; name = "a", vals = a3)])
+        x = big.(b3)
+        blkn = forecast_hand_block(3; Ms = reshape(x, 3, 3, 1), nf = ["s"], fam = ["s"])
+        dsn = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
+                               neutralise = "s", outlier = nothing, scoring = nothing)
+        Sn = descriptor_scores(dsn, rdn, blkn).S
+        @test eltype(Sn) === BigFloat
+        for t in 1:3
+            y = big.(a3[t, :])
+            @test Sn[t, :, 1] ≈ y - x[t, :] * (dot(x[t, :], y) / dot(x[t, :], x[t, :])) rtol = 1e-60
+        end
+        # A score type without `NaN` cannot mark the rows before a block that starts late.
+        ar = Rational{Int}.(round.(Int, a3))
+        rdr = panel([NumericPanelInput(; name = "a", vals = ar)])
+        blkr = forecast_hand_block(3; Ms = reshape(ar[2:3, :], 2, 3, 1), nf = ["s"],
+                                   fam = ["s"])
+        @test_throws ArgumentError descriptor_scores(dsn, rdr, blkr)
+    end
+end
+
 @testset "The stated member carries the caller's forecast" begin
     PO = PortfolioOptimisers
     rd = forecast_hand_panel(["a" => [1.0 2.0; 3.0 4.0]])

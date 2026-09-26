@@ -3,9 +3,36 @@ $(DocStringExtensions.TYPEDEF)
 
 The shared recipe that turns Descriptors into cross-sectional scores.
 
-Every fitted member of the Return Forecast family starts from the same steps: compute each Descriptor, transform it cross-sectionally, stack the results, and, when the caller names Neutralisation targets, residualise every score against the named Factor Exposures and score it once more. The recipe is one struct in a slot rather than five fields repeated on each member, and it answers a verb of its own, [`descriptor_scores`](@ref), so a caller inspects the scores without fitting a forecast.
+Every fitted member of the Return Forecast family starts with the same steps. It computes each Descriptor, transforms it cross-sectionally and stacks the results. When the caller names Neutralisation targets, it also residualises every score against the named Factor Exposures and scores it once more. The recipe is one struct in a slot, so no member repeats its six fields. It has a verb of its own, [`descriptor_scores`](@ref), so a caller can read the scores without the fit of a forecast.
 
-The Descriptors carry no names, because nothing reads them: the weights of a member are positional, and the scores are stacked in the order the Descriptors are written in.
+The Descriptors carry no names, because no code reads a name. The weights of a member are positional, and [`descriptor_scores`](@ref) stacks the scores in the order of the Descriptors.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{d}_{tij} &= \\mathcal{Z}_{t}\\left(\\mathcal{O}_{t}\\left(\\boldsymbol{d}_{t \\cdot j}\\right)\\right)_{i}\\,, \\\\
+\\omega_{tij} &= u_{ti} \\, \\mathbb{1}\\left[u_{ti} > 0,\\ \\tilde{d}_{tij} \\in \\mathbb{R},\\ \\boldsymbol{b}_{ti} \\in \\mathbb{R}^{\\lvert \\mathcal{K} \\rvert}\\right]\\,, \\\\
+\\left(\\hat{a}_{tj}, \\hat{\\boldsymbol{\\gamma}}_{tj}\\right) &= \\underset{a,\\, \\boldsymbol{\\gamma}}{\\arg\\min} \\sum_{i = 1}^{N} \\omega_{tij} \\left(\\tilde{d}_{tij} - a - \\boldsymbol{b}_{ti}^{\\intercal} \\boldsymbol{\\gamma}\\right)^{2}\\,, \\\\
+e_{tij} &= \\tilde{d}_{tij} - \\hat{a}_{tj} - \\boldsymbol{b}_{ti}^{\\intercal} \\hat{\\boldsymbol{\\gamma}}_{tj}\\,, \\\\
+s_{tij} &= \\mathcal{Z}_{t}\\left(\\boldsymbol{e}_{t \\cdot j}\\right)_{i}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``d_{tij}``: Descriptor ``j`` of asset ``i`` at observation ``t``, and ``\\boldsymbol{d}_{t \\cdot j}`` its cross-section.
+  - ``\\mathcal{O}_{t}``, ``\\mathcal{Z}_{t}``: The outlier transform and the scoring transform of one cross-section of observation ``t``. Each reads the weights ``u_{ti}`` and the group labels of `group` as its own docstring states. A slot that holds `nothing` is the identity.
+  - $(math_dict[:u_ti_cs]) It is one where the estimation mask of the Asset Panel is `true`, and zero where it is `false`.
+  - ``\\tilde{d}_{tij}``: Score of Descriptor ``j`` of asset ``i`` at observation ``t`` before the Neutralisation.
+  - ``\\mathcal{K}``: The raw factors that the Neutralisation names. A name resolves to a factor before it resolves to a Factor Family.
+  - $(math_dict[:B_tik_cs])
+  - ``\\boldsymbol{b}_{ti}``: The exposures ``B_{tik}`` of asset ``i`` at observation ``t`` to the factors ``k \\in \\mathcal{K}``.
+  - ``\\omega_{tij}``: Regression weight of asset ``i`` in the Neutralisation of Descriptor ``j`` at observation ``t``. It is zero where the weight, the score or an exposure is not finite.
+  - ``\\hat{a}_{tj}``, ``\\hat{\\boldsymbol{\\gamma}}_{tj}``: Intercept and slopes of the weighted fit. The intercept is ``0`` when `cre.intercept` is `false`, and the solve algorithm of `cre` chooses among the minimisers of a rank deficient fit.
+  - ``e_{tij}``: Residual of asset ``i``. It is defined for every asset, including an asset with ``\\omega_{tij} = 0``.
+  - ``s_{tij}``: Score of Descriptor ``j`` of asset ``i`` at observation ``t``. Without a Neutralisation, ``s_{tij} = \\tilde{d}_{tij}``. With a Neutralisation, ``s_{tij}`` is `NaN` at every observation before the first observation of the factor-model block, because the block states no exposure there.
+  - $(math_dict[:N])
 
 # Fields
 
@@ -31,27 +58,27 @@ $(DocStringExtensions.TYPEDFIELDS)
 """
 @concrete struct DescriptorScores <: AbstractEstimator
     """
-    Descriptor Estimators the scores are built from, in the order a member weights them in.
+    Descriptor Estimators that give the scores, in the order that a member weights them.
     """
     descriptors
     """
-    Names of the factors or the Factor Families every score is neutralised against, or `nothing` to neutralise none.
+    Names of the factors or the Factor Families that the recipe neutralises every score against, or `nothing` to neutralise none.
     """
     neutralise
     """
-    Cross-Sectional Regression Estimator of the Neutralisation. Its `intercept` decides what the residual is orthogonal to: `false` (the default) removes the component along the raw exposure, and `true` removes the component along the exposure's cross-sectional deviation from its mean, which is what makes the residual **uncorrelated** with the exposure rather than merely orthogonal to it.
+    Cross-Sectional Regression Estimator of the Neutralisation. Its `intercept` sets what the residual is orthogonal to. Under `false`, the default, the fit removes the component along the raw exposure. Under `true`, it removes the component along the cross-sectional deviation of the exposure from its mean, so the residual is also uncorrelated with the exposure.
     """
     cre
     """
-    Cross-sectional transform applied to each Descriptor before it is scored, or `nothing` to skip the step.
+    Cross-sectional transform that the recipe applies to each Descriptor before the scoring step, or `nothing` to skip the step.
     """
     outlier
     """
-    Cross-sectional transform applied to each Descriptor after the outlier step, and once more after the Neutralisation, or `nothing` to skip the step.
+    Cross-sectional transform that the recipe applies to each Descriptor after the outlier step, and once more after the Neutralisation, or `nothing` to skip the step.
     """
     scoring
     """
-    Name of the categorical Panel Field the transforms are applied within, or `nothing` to transform each observation as one cross-section.
+    Name of the categorical Panel Field whose group labels the transforms read, or `nothing` to transform each observation as one cross-section.
     """
     group
     function DescriptorScores(descriptors::AbstractVector{<:AbstractDescriptorEstimator},
@@ -87,7 +114,7 @@ end
 
 Check that every Neutralisation name of a [`DescriptorScores`](@ref) names something.
 
-A name is resolved against the factor axis of the block when the scores are computed, and this refuses the two forms that can never resolve: the empty list and the empty string.
+[`descriptor_scores`](@ref) resolves a name against the factor axis of the block. This function refuses the two forms that never resolve, the empty list and the empty string.
 
 # Arguments
 
@@ -127,7 +154,7 @@ end
 
 Return the factor axis and the exposure history a Neutralisation resolves against.
 
-The three reads are optional fields of the block, so this is the one place that states which of them a Neutralisation needs, and it names the missing one in the refusal.
+The three fields are optional on the block. This function is the one place that states which of them a Neutralisation needs, and its refusal names the missing field.
 
 # Arguments
 
@@ -179,28 +206,29 @@ Neutralise the Descriptor scores against the named Factor Exposures, in place.
 
 # Algorithm
 
-The method that Julia selects is the algorithm, and the recipe that names no target does nothing.
+The method that Julia selects is the algorithm. The method for a recipe that names no target does nothing.
 
- 1. Resolve the names to raw factor indices, a factor name beating a Factor Family label, and take those columns of the exposure history as the design.
- 2. For each score in turn, build the regression weights over the block's rows: `w`, with a zero wherever the score or a design exposure of that asset is not finite.
- 3. Regress the score across the assets on the design under those weights with `cre`, and take the residual. `cre.intercept` decides whether the residual is merely orthogonal to the raw design (`false`) or uncorrelated with it (`true`); see [`CrossSectionalLinearRegression`](@ref).
- 4. Score the residual once more under `w`, so that every score leaves the step on one scale.
- 5. Write `NaN` on the rows before the block, where the block states no exposure to neutralise against.
+ 1. Resolve the names to the raw factor indices `tidx`. A name resolves to a factor before it resolves to a Factor Family label. Take those columns of the exposure history as the design `X`.
+ 2. For each score in turn, build the regression weights `W` over the rows of the block. They are `w`, with a zero where the score or a design exposure of the asset is not finite.
+ 3. Regress the score across the assets on the design under those weights with `cre`, and take the residual `csr.eps`. Under `cre.intercept = false` the residual is orthogonal to the raw design. Under `true` it is also uncorrelated with the design, as [`CrossSectionalLinearRegression`](@ref) states.
+ 4. Score the residual once more under `w` and the group labels, so that every score leaves the step on one scale.
+ 5. Write `NaN` on the rows before the block, because the block states no exposure there.
 
 # Arguments
 
-  - `S`: The Descriptor scores, `observations × assets × descriptors`, on the carrier's observation axis. It is changed in place.
+  - `S`: The Descriptor scores, `observations × assets × descriptors`, on the observation axis of the carrier. The function changes it in place.
   - `neutralise`: The Neutralisation names, or `nothing`.
   - `cre`: Cross-Sectional Regression Estimator that fits the residualisation.
   - `csfm`: The fitted factor-model block.
   - `w`: Cross-sectional weights, `observations × assets`.
   - `scoring`: The scoring transform, or `nothing`.
   - `groups`: Group label matrix `observations × assets`, or `nothing`.
-  - `rows`: The rows of the carrier the block lives on.
+  - `rows`: The rows of the carrier that the block covers.
 
 # Validation
 
   - The rules of [`descriptor_scores_axis`](@ref) and of [`neutralisation_targets`](@ref).
+  - When the block starts after the first row of the carrier, the element type of `S` holds `NaN`. An `Integer` or a `Rational` element type raises an `ArgumentError`.
 
 # Returns
 
@@ -235,15 +263,15 @@ function neutralise_scores!(S::AbstractArray{<:Real, 3},
     wb = return_forecast_cut(w, rows)
     gb = return_forecast_cut(groups, rows)
     Tf = eltype(S)
+    @argcheck(first(rows) == 1 || !(Tf <: Union{Integer, Rational}),
+              ArgumentError("a neutralised score is NaN on the $(first(rows) - 1) observations before the factor model block, and the element type $Tf of the scores cannot hold NaN. Convert the Panel Fields to a floating-point type, or hand the carrier the block was fitted on."))
     for k in axes(S, 3)
         y = S[rows, :, k]
         W = neutralisation_weights(y, X, wb)
         csr = cross_sectional_regression(cre, X, y, W)
         S[rows, :, k] = exposure_transform(scoring, csr.eps, wb, gb)
-        for t in 1:(first(rows) - 1), i in axes(S, 2)
-            S[t, i, k] = Tf(NaN)
-        end
     end
+    S[1:(first(rows) - 1), :, :] .= Tf(NaN)
     return nothing
 end
 """
@@ -252,20 +280,20 @@ end
 
 Compute the cross-sectional scores of the Descriptors of a [`DescriptorScores`](@ref).
 
-The Descriptors are computed over the **whole** carrier, so a Descriptor with a warm-up warms up on every observation the panel has rather than a second time inside the block's own window. The verb answers the rows the block lives on beside the scores, and each member cuts to them once.
+The function computes the Descriptors over the whole carrier. A Descriptor with a warm-up therefore warms up on every observation of the panel, and not a second time inside the window of the block. The function also returns the rows of the block, and each member cuts the scores to those rows once.
 
 # Algorithm
 
  1. Read the cross-sectional weights off the estimation mask of the Asset Panel, the group labels off the named categorical Panel Field, and the block's rows with [`return_forecast_rows`](@ref).
  2. Compute each Descriptor over the whole carrier, and apply the outlier slot and then the scoring slot to it.
- 3. Stack the scores on a third axis, in the order the Descriptors are written in.
+ 3. Stack the scores on a third axis of `S`, in the order of the Descriptors. The number type of `S` is the promotion of the number types of the scores and, when the recipe names Neutralisation targets, of the exposure history.
  4. When the recipe names Neutralisation targets, residualise every score of the block's rows against those Factor Exposures, score it once more, and write `NaN` on the rows before the block.
 
 # Arguments
 
   - `ds`: The Descriptor Scores recipe.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
-  - `csfm`: The fitted factor-model block. Its histories state the block's rows, and its exposure history is read only when the recipe names Neutralisation targets.
+  - `csfm`: The fitted factor-model block. Its histories give the rows of the block. The function reads its exposure history only when the recipe names Neutralisation targets.
 
 # Validation
 
@@ -275,7 +303,7 @@ The Descriptors are computed over the **whole** carrier, so a Descriptor with a 
 # Returns
 
   - `S::Array{<:Real, 3}`: The Descriptor scores, `observations × assets × descriptors`, on the carrier's observation axis.
-  - `rows::AbstractUnitRange`: The rows of the carrier the block lives on.
+  - `rows::AbstractUnitRange`: The rows of the carrier that the block covers.
 
 # Examples
 
@@ -318,13 +346,13 @@ function descriptor_scores(ds::DescriptorScores, rd::ReturnsResult,
     w = return_forecast_weights(rd)
     groups = exposure_group_labels(rd, ds.group)
     rows = return_forecast_rows(rd, csfm)
-    des = ds.descriptors
-    S1 = composite_score(des[1], rd, ds.outlier, ds.scoring, w, groups)
-    Tf = eltype(S1)
-    S = Array{Tf, 3}(undef, size(S1, 1), size(S1, 2), length(des))
-    S[:, :, 1] = S1
-    for k in 2:length(des)
-        S[:, :, k] = composite_score(des[k], rd, ds.outlier, ds.scoring, w, groups)
+    # `stack` promotes the number types of the scores. Under a Neutralisation the residual is
+    # fitted on the exposure history, so `S` also takes the number type of that history.
+    S = stack(composite_score(de, rd, ds.outlier, ds.scoring, w, groups)
+              for de in ds.descriptors)
+    if !isnothing(ds.neutralise)
+        Tf = promote_type(eltype(S), eltype(first(descriptor_scores_axis(csfm))))
+        S = convert(Array{Tf, 3}, S)
     end
     neutralise_scores!(S, ds.neutralise, ds.cre, csfm, w, ds.scoring, groups, rows)
     return (; S = S, rows = rows)
