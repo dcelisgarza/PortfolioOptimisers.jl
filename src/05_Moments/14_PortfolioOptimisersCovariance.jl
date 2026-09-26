@@ -41,12 +41,6 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
   - `ce`: Recursively viewed via [`port_opt_view`](@ref).
   - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
-## Observation view parameters
-
-When [`obs_weights_view`](@ref) is called on this type:
-
-  - `cache`: Dropped via [`obs_weights_view`](@ref), because no slice of a state exists on the observation axis.
-
 # Examples
 
 ```jldoctest
