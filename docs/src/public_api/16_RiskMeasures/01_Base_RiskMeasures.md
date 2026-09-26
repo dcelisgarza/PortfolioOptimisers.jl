@@ -4,7 +4,7 @@ Description = "Base Risk Measures, public API of PortfolioOptimisers.jl: RiskMea
 
 # Base Risk Measures
 
-Every risk measure has a full type name, and many also have a short alias, which the [aliases](@aliases) page lists.
+Every risk measure has a full type name, and many also have a short alias, which the [aliases](@ref aliases) page lists.
 
 You can call a concrete risk measure as a function to compute its risk. [`risk_input_kind`](@ref) says what the call takes, such as the portfolio weights or a series of returns. [`expected_risk`](@ref) also computes the risk of a portfolio.
 

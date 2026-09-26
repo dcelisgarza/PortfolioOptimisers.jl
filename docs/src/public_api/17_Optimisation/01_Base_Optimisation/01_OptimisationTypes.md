@@ -4,7 +4,7 @@ Description = "Optimisation types, public API of PortfolioOptimisers.jl: Abstrac
 
 # Optimisation types
 
-Every optimiser has a full type name, and many also have a short alias, which the [aliases](@aliases) page lists.
+Every optimiser has a full type name, and many also have a short alias, which the [aliases](@ref aliases) page lists.
 
 ```@docs
 AbstractOptimisationEstimator
