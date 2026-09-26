@@ -851,7 +851,7 @@ Where:
 """
 function price_levels(X::MatNum)
     T, N = size(X)
-    P = Matrix{typeof(one(eltype(X)) / one(eltype(X)))}(undef, T + 1, N)
+    P = Matrix{float_if_integer(eltype(X))}(undef, T + 1, N)
     P[T + 1, :] .= one(eltype(P))
     for t in T:-1:1
         @views P[t, :] .= P[t + 1, :] ./ (one(eltype(P)) .+ X[t, :])

@@ -1006,8 +1006,8 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
     sigma = ismutable(r.sigma) ? copy(r.sigma) : Matrix(r.sigma)
     gamma = isnothing(gamma) ? params.gamma : gamma
     X = pr.X
-    # A split factor is a quotient of two risks, so the weights take the type of a quotient.
-    w = ones(typeof(one(eltype(X)) / one(eltype(X))), size(X, 2))
+    # A split factor is a quotient of two risks, so an integer sample takes float weights.
+    w = ones(float_if_integer(eltype(X)), size(X, 2))
     pdm = params.pdm
     flag = params.flag
     while length(items) > 0
@@ -1161,7 +1161,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
     max_gamma = params.gamma
     r = factory(params.r, pr)
     # The type of the weights, so a failed allocation scores the largest value of that type.
-    T = typeof(one(eltype(pr.X)) / one(eltype(pr.X)))
+    T = float_if_integer(eltype(pr.X))
     if iszero(max_gamma)
         nm_params = SchurComplementParams(; r = r, gamma = max_gamma, pdm = params.pdm,
                                           alg = NonMonotonicSchurComplement(),
@@ -1258,9 +1258,10 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     # result, where the net returns and a fold's forced exit read it.
     imsk = investable_mask(pr)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
-    # take the type of a quotient of two returns. An integer sample then allocates in
-    # floating point, and a `Float32` sample stays in `Float32`.
-    T = typeof(one(eltype(pr.X)) / one(eltype(pr.X)))
+    # take the type of the returns, widened to a float only when it is an integer. An
+    # integer sample then allocates in floating point, and a `Float32` sample stays in
+    # `Float32`.
+    T = float_if_integer(eltype(pr.X))
     fees = investable_fees_view(fees_constraints(sh.opt.fees, sh.opt.sets;
                                                  strict = sh.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -1328,9 +1329,10 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     # result, where the net returns and a fold's forced exit read it.
     imsk = investable_mask(pr)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
-    # take the type of a quotient of two returns. An integer sample then allocates in
-    # floating point, and a `Float32` sample stays in `Float32`.
-    T = typeof(one(eltype(pr.X)) / one(eltype(pr.X)))
+    # take the type of the returns, widened to a float only when it is an integer. An
+    # integer sample then allocates in floating point, and a `Float32` sample stays in
+    # `Float32`.
+    T = float_if_integer(eltype(pr.X))
     fees = investable_fees_view(fees_constraints(sh.opt.fees, sh.opt.sets;
                                                  strict = sh.opt.strict, datatype = T),
                                 imsk, pr.X)

@@ -149,11 +149,10 @@ function breadth(CIJ::MatNum, source::Integer)
     black = 2
     # Initialise colours
     color = zeros(Int, N)
-    # Initialise distances. A distance must hold `Inf` for a vertex no path reaches, so
-    # it lands in the type a division of the connection entries lands in: a `Bool` or an
-    # integer matrix takes the floating-point type that represents it, and a `Float32`
-    # one stays `Float32`.
-    Td = typeof(one(eltype(CIJ)) / one(eltype(CIJ)))
+    # Initialise distances. A distance must hold `Inf` for a vertex no path reaches, so a
+    # `Bool` or an integer matrix takes the floating-point type that represents it, and a
+    # `Float32` one stays `Float32`.
+    Td = float_if_integer(eltype(CIJ))
     distance = fill(convert(Td, Inf), N)
     # Initialise branches
     branch = zeros(Int, N)

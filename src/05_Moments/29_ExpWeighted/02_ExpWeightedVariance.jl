@@ -252,9 +252,9 @@ function exp_weighted_pass!(f, est::ExpWeightedVariance, X::MatNum, dims::Int,
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
 
-    # The state takes the type of a quotient of two entries of `X`, so an integer panel gets a
-    # floating-point state and a `Float32` panel keeps a `Float32` one.
-    T = typeof(one(eltype(X)) / one(eltype(X)))
+    # The state takes the type of `X`, widened to a float only when it is an integer, so an
+    # integer panel gets a floating-point state and a `Float32` panel keeps a `Float32` one.
+    T = float_if_integer(eltype(X))
     cache = if isnothing(state)
         ExpWeightedVarianceState(zeros(T, N), zeros(T, N), zeros(Int, N), trues(N))
     else
@@ -456,7 +456,7 @@ The fallback cannot answer this estimator. It slices `X` once per row and passes
 function variance_series(ce::ExpWeightedVariance, X::MatNum; dims::Int = 1,
                          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     assert_dims(dims)
-    T = typeof(one(eltype(X)) / one(eltype(X)))
+    T = float_if_integer(eltype(X))
     N = size(X, setdiff((1, 2), (dims,))[1])
     val = Matrix{T}(undef, size(X, dims), N)
     exp_weighted_pass!(ce, X, dims, active_mask) do i, cache

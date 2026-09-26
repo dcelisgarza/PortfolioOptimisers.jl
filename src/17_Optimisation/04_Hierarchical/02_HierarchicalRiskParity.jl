@@ -383,8 +383,9 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
     # complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    # A weight is a quotient of two risks, so an integer sample takes a float weight type.
-    T = typeof(one(eltype(pr.X)) / one(eltype(pr.X)))
+    # A weight is a quotient of two risks, so an integer sample takes a float weight type,
+    # and every other sample keeps its own type.
+    T = float_if_integer(eltype(pr.X))
     imsk = investable_mask(pr)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
@@ -545,8 +546,9 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
     # complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    # A weight is a quotient of two risks, so an integer sample takes a float weight type.
-    T = typeof(one(eltype(pr.X)) / one(eltype(pr.X)))
+    # A weight is a quotient of two risks, so an integer sample takes a float weight type,
+    # and every other sample keeps its own type.
+    T = float_if_integer(eltype(pr.X))
     imsk = investable_mask(pr)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),

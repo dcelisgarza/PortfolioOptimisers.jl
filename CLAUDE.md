@@ -91,7 +91,10 @@ before you merge so you lower the number that is current.
 - **A numeric type is derived, never coerced.** Read it off the arguments with `eltype`, `typeof`,
   `real` and `promote_type`, or off the operation that widens it, and take an index with the
   in-function conversion `ceil(Int, x)` rather than `Int(ceil(x))`. Never wrap a derived type in
-  `float`. The library must stay open to number types it has never seen — an AD dual, a unit-carrying
+  `float`, and never read it off a division such as `typeof(one(T) / one(T))`: both clobber a
+  `Rational` and every type that needed no repair. When integer data must hold a fraction or a
+  `NaN`, pass the type of the data to `float_if_integer`, which floats an `Integer` and keeps every
+  other type. The library must stay open to number types it has never seen — an AD dual, a unit-carrying
   quantity, a `Rational`, a number type another package defines — and every forced type closes it to
   one of them. [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md)
   § *Numeric types come from the data* owns the rule, and

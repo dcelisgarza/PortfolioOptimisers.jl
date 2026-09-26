@@ -39,7 +39,7 @@ end
 
 Derive the type the ingestion layer carries a series of value type `T` in.
 
-The layer spells an absent price `NaN`, so the carried type must be able to hold one. The layer reads that type off the arithmetic and does not name it. A return divides one price by another, so the conversion widens every price to the type of `oneunit(T) / one(T)`, and that type is the widest the layer needs. A floating-point type gives itself, so a `Float32` panel stays `Float32`. An integer type gives the floating-point type its division returns, `Float64` for `Int`. A number type the library does not know gives whatever its own division returns.
+The layer spells an absent price `NaN`, so the carried type must be able to hold one. The layer reads that type off the data and does not name it: the type is [`float_if_integer`](@ref) of `T`. A floating-point type gives itself, so a `Float32` panel stays `Float32`. An integer type gives its floating-point type, `Float64` for `Int` and `BigFloat` for `BigInt`. A `Rational` and a number type the library does not know give themselves.
 
 This function does not decide whether the type can hold an absence, because a series with no gap and no padding never spells one. [`absent_value`](@ref) refuses a type by name when the layer writes an absence in it.
 
@@ -48,7 +48,7 @@ This function does not decide whether the type can hold an absence, because a se
 The method that Julia selects is the algorithm.
 
  1. `T` is `Union{}`: refuse. Every price table holds only `missing`, so no value type exists to derive.
- 2. Otherwise return `typeof(oneunit(T) / one(T))`.
+ 2. Otherwise return [`float_if_integer`](@ref) of `T`.
 
 # Arguments
 
@@ -60,7 +60,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `S::Type`: `typeof(oneunit(T) / one(T))`.
+  - `S::Type`: [`float_if_integer`](@ref) of `T`.
 
 # Related
 
@@ -70,7 +70,7 @@ The method that Julia selects is the algorithm.
   - [`price_ingestion`](@ref)
 """
 function absence_type(::Type{T}) where {T}
-    return typeof(oneunit(T) / one(T))
+    return float_if_integer(T)
 end
 function absence_type(::Type{Union{}})
     return throw(DomainError(Union{},

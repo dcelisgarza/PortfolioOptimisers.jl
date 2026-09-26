@@ -126,22 +126,35 @@ change here. Every forced type closes the library to one of them.
 ```julia
 Tf = eltype(X)                                  # the element type of one argument
 Tf = promote_type(real(eltype(X)), typeof(p))   # the element type of several
-Tf = typeof(one(Ts) / one(Ts))                  # the type one operation lands in
+Tf = float_if_integer(eltype(X))                # the same, when an integer must be repaired
 ```
 
-**Do not wrap a derived type in `float`.** `float(Int)` is `Float64`, so one integer argument
-inside a `promote_type` widens the whole computation to `Float64` and a `Float32` caller silently
-loses its precision. The wrapper also decides for a number type the library has never seen: a
-`Rational` argument becomes inexact, and a number type another package defines is converted to
-whatever `float` says rather than to what the arithmetic says. `nextfloat` and `prevfloat` are
-different verbs. They step a value and coerce nothing, so this rule does not reach them.
+**Repair an integer type with `float_if_integer`, and with nothing else.** An integer element
+type cannot hold a mean, a variance, a weight or a `NaN`, so a site whose data can be an integer
+must widen that one type. Take the type of the data, and pass it to `float_if_integer` in
+[`src/02_Tools/03_TypeUtilities.jl`](../../src/02_Tools/03_TypeUtilities.jl). It returns the
+floating-point type of `T` when `T <: Integer`, and `T` itself for every other type. So an
+integer panel computes in `Float64`, a `Float32` panel stays in `Float32`, and a `Rational`
+panel stays exact. That function holds the one call of `float` in `src/` and `ext/`.
 
-**Derive from the operation when the operation widens.** A mean, a variance, a correlation and a
-regression coefficient all divide, and a division of two integers lands in a float. Take the type
-from the division rather than from the arguments, as `cross_sectional_regression` in
-[`src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl`](../../src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl)
-does. The result is wider than `float`, not narrower: an integer panel still regresses in
-`Float64`, a `Float32` panel stays in `Float32`, and an exact type stays exact.
+**Do not repair an integer type with `float`.** `float(Int)` is `Float64`, so one integer
+argument inside a `promote_type` widens the whole computation to `Float64` and a `Float32` caller
+silently loses its precision. The wrapper also decides for every type that needed no repair: a
+`Rational` argument becomes inexact, and a number type another package defines is converted to
+whatever `float` says. `nextfloat` and `prevfloat` are different verbs. They step a value and
+coerce nothing, so this rule does not reach them.
+
+**Do not repair an integer type with the type of a division.** `typeof(one(T) / one(T))`,
+`typeof(zero(T) / one(Int))` and `typeof(one(T) / 1)` are the same coercion in a different
+spelling. A number type is free to define its division in a different type, so the spelling
+decides for every type, and not for integers alone. Sessions wrote it to repair integer
+returns after the census refused `float(`, and each such repair was reverted.
+
+**Derive from the operation only when the operation leaves every type.** A square root of a
+`Rational` is not a `Rational`, so a site that stores a square root takes
+`typeof(sqrt(one(float_if_integer(T))))`. A site that answers `NaN` for the other branch of a
+real quotient `a / b` takes `oftype(one(a) / one(b), NaN)`, because that value is a quotient.
+Neither is a repair of an integer input.
 
 **A concrete type is admitted only when the code really needs that type**, and then only when no
 method converts internally. An index is the usual case.

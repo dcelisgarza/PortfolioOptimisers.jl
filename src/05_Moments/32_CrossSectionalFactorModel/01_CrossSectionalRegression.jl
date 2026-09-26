@@ -634,14 +634,11 @@ function cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimat
                                     Z::Arr3Num, X::MatNum,
                                     W::MatNum)::CrossSectionalRegression
     act = cross_sectional_design_mask(Z, X, W)
-    # The coefficients answer a weighted least squares, so the working type is the one a
-    # division of the inputs lands in rather than the inputs' own promotion. The division
-    # is what widens an integer panel, and it widens nothing that is already wide enough:
-    # a `Float32` panel regresses in `Float32`. The annotation is what inference reads:
-    # `typeof` alone answers an unbounded `DataType`, and the conversions below then call
-    # an unknown type, which JET reads as a call of every constructor in the world.
+    # The coefficients answer a weighted least squares, so the working type is the inputs'
+    # own promotion, widened to a float only when it is an integer: an integer panel
+    # regresses in `Float64`, a `Float32` panel in `Float32`, and a `Rational` panel exactly.
     Ts = promote_type(real(eltype(Z)), real(eltype(X)), real(eltype(W)))
-    Tf = typeof(one(Ts) / one(Ts))::Type{<:Number}
+    Tf = float_if_integer(Ts)
     K = size(Z, 3)
     f = zeros(Tf, size(X, 1), K)
     b = cre.intercept ? zeros(Tf, size(X, 1)) : nothing
@@ -842,10 +839,10 @@ function cross_sectional_r2(csr::CrossSectionalRegression, Z::Arr3Num, X::MatNum
                             W::MatNum)::VecNum
     act = cross_sectional_design_mask(Z, X, W)
     Xh = StatsAPI.predict(csr, Z)
-    # The ratio lands in the type a division of the inputs lands in, so a `Float32` fit
-    # answers a `Float32` ratio rather than one widened by a `Float64` `NaN`.
+    # The ratio keeps the type of the inputs, so a `Float32` fit answers a `Float32` ratio
+    # rather than one widened by a `Float64` `NaN`.
     Ts = promote_type(real(eltype(Xh)), real(eltype(X)), real(eltype(W)))
-    Tf = typeof(one(Ts) / one(Ts))
+    Tf = float_if_integer(Ts)
     r2 = fill(convert(Tf, NaN), size(X, 1))
     for t in axes(X, 1)
         idx = findall(view(act, t, :))

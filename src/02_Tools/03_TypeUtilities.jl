@@ -147,6 +147,49 @@ julia> PortfolioOptimisers.concrete_typed_array_if_abstract(Any[1, 2.0])
 function concrete_typed_array_if_abstract(A::AbstractArray)
     return isabstracttype(eltype(A)) ? concrete_typed_array(A) : A
 end
+"""
+    float_if_integer(::Type{T}) -> Type
+
+Return the numeric type that a computation over data of element type `T` holds its values in: `T` itself, or the floating-point type that Base `float` gives for `T` when `T` is an `Integer`.
+
+This is the one place where the library turns a derived numeric type into a floating-point type. An integer type cannot hold a mean, a variance, a weight or a `NaN`, so an integer sample must take a floating-point working type, or the first fractional write raises an `InexactError`. Every other type is kept. A `Float32` sample stays in `Float32`, a `Rational` sample stays exact, and an automatic-differentiation dual or a number type from another package is not converted to whatever `float` says. A bare call of `float` on `T` does not make that distinction, and neither does the type of a division such as `one(T) / one(T)`, which a number type is free to define in a different type. So a site that must repair an integer input calls this function on the type of its data, and never calls `float` itself.
+
+A site whose operation leaves every type, for example a square root of a `Rational`, derives its type from that operation on the result of this function.
+
+# Algorithm
+
+ 1. `T` is a subtype of `Integer`, which includes `Bool`: return the floating-point type that Base `float` gives for `T`, for example `Float64` for `Int` and `BigFloat` for `BigInt`.
+ 2. `T` is any other type: return `T`.
+
+The choice is made by dispatch on `Type{T}`, so it costs nothing at run time and inference reads the returned type as a constant.
+
+# Arguments
+
+  - `T`: The element type of the data, usually `eltype` of an argument, or a `promote_type` of the element types of several arguments.
+
+# Returns
+
+  - `Tf::Type`: The floating-point type of `T` if `T <: Integer`, else `T`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.float_if_integer(Int)
+Float64
+
+julia> PortfolioOptimisers.float_if_integer(Float32)
+Float32
+
+julia> PortfolioOptimisers.float_if_integer(Rational{Int})
+Rational{Int64}
+```
+
+# Related
+
+  - [`concrete_typed_array`](@ref)
+"""
+float_if_integer(::Type{T}) where {T <: Integer} = float(T)
+float_if_integer(::Type{T}) where {T} = T
 
 export concrete_typed_array
 public traverse_concrete_subtypes

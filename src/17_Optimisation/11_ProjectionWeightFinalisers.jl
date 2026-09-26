@@ -138,7 +138,7 @@ function euclidean_weight_projection(w::VecNum, wb::WeightBounds)
     s = sum(w)
     # An absent bound is an infinity of the type the root lands in, so it adds no kink. An
     # integer's own `typemin` is finite, and `w .- typemin` overflows.
-    T = typeof(one(eltype(w)) / one(eltype(w)))
+    T = float_if_integer(eltype(w))
     lb = isnothing(wb.lb) ? typemin(T) : wb.lb
     ub = isnothing(wb.ub) ? typemax(T) : wb.ub
     # `Σ clip(w − θ, lb, ub)` is piecewise linear and non-increasing in `θ`, with its kinks
@@ -251,7 +251,7 @@ Projects `w` in relative entropy onto the weights that lie in the bounds `wb` an
 function entropic_weight_projection(w::VecNum, wb::WeightBounds)
     s = sum(w)
     # `zero(w) .+ b` spreads a scalar bound over the assets.
-    T = typeof(one(eltype(w)) / one(eltype(w)))
+    T = float_if_integer(eltype(w))
     lb = isnothing(wb.lb) ? zero(w) : zero(w) .+ wb.lb
     ub = isnothing(wb.ub) ? zero(w) .+ typemax(T) : zero(w) .+ wb.ub
     if !(s > zero(s) &&
@@ -312,8 +312,8 @@ function weights_meet_bounds(wb::WeightBounds, w::VecNum, s::Number)::Bool
     if !all(isfinite, w)
         return false
     end
-    # The type of a division, so an integer vector that no finaliser moved has an `eps`.
-    tol = sqrt(eps(typeof(one(eltype(w)) / one(eltype(w)))))
+    # An integer vector that no finaliser moved takes its float type, which has an `eps`.
+    tol = sqrt(eps(float_if_integer(eltype(w))))
     lb_ok = isnothing(wb.lb) ||
             all(Broadcast.instantiate(Broadcast.broadcasted((x, l) -> x >= l - tol, w,
                                                             wb.lb)))
@@ -332,7 +332,7 @@ function opt_weight_bounds(wf::IterativeWeightFinaliser, wb::WeightBounds, w::Ve
     if !weights_break_bounds(wb, w)
         return w
     end
-    T = typeof(one(eltype(w)) / one(eltype(w)))
+    T = float_if_integer(eltype(w))
     lb = isnothing(wb.lb) ? typemin(T) : wb.lb
     ub = isnothing(wb.ub) ? typemax(T) : wb.ub
     w0 = w

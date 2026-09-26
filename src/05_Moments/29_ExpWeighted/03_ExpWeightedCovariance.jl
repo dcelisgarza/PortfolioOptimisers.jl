@@ -278,11 +278,12 @@ function exp_weighted_pass!(f, est::ExpWeightedCovariance, X::MatNum, dims::Int,
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
 
-    # The state takes the type of a quotient of two returns, so an integer panel gets a
-    # floating-point state and a `Float32` panel keeps a `Float32` state. An uncentred location
+    # The state takes the type of the returns, widened to a float only when it is an
+    # integer, so an integer panel gets a floating-point state and a `Float32` panel keeps a
+    # `Float32` state. An uncentred location
     # starts as `NaN`, which marks an asset with no valid observation, and the recursion reads
     # it as zero.
-    T = typeof(one(eltype(X)) / one(eltype(X)))
+    T = float_if_integer(eltype(X))
     location = est.centred ? zeros(T, N) : fill(T(NaN), N)
     cache = if isnothing(state)
         ExpWeightedCovarianceState(zeros(T, N, N), location, zeros(Int, N), trues(N))

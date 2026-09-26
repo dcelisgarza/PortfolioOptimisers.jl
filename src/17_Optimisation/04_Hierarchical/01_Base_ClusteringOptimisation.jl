@@ -772,9 +772,9 @@ Where:
 function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,
                                 fees::Option{<:Fees} = nothing)
     # A risk is not an entry of `X`: an integer returns matrix has a fractional variance.
-    # The weights take the type of a quotient of returns, and `map` takes the type of the
-    # risks from the values `expected_risk` returns.
-    wk = zeros(typeof(one(eltype(X)) / one(eltype(X))), size(X, 2))
+    # The weights take the type of the returns, widened to a float only when it is an
+    # integer, and `map` takes the type of the risks from the values `expected_risk` returns.
+    wk = zeros(float_if_integer(eltype(X)), size(X, 2))
     return map(eachindex(wk)) do i
         wk[i] = one(eltype(wk))
         rki = expected_risk(r, wk, X, fees)
