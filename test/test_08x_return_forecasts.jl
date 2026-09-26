@@ -251,6 +251,36 @@ end
                                                                                  mu = [0.01]),
                                                        rd, csfm)
     end
+
+    @testset "The forecast agrees with its closed form, alpha_Ti = m_i" begin
+        m = [0.03, -0.02]
+        rfe = CustomValueReturnForecast(; mu = m)
+        rf = return_forecast(rfe, rd, csfm)
+        for i in eachindex(m)
+            @test rf.mu[i] == m[i]
+        end
+        # The Result holds the vector of the estimator, not a copy.
+        @test rf.mu === rfe.mu
+        # The member reads no Panel Field, so another carrier gives the same forecast.
+        rd2 = forecast_hand_panel(["b" => [9.0 -1.0; 0.5 7.0]])
+        @test return_forecast(rfe, rd2, csfm).mu == m
+    end
+
+    @testset "The number type of the stated vector is kept" begin
+        for m in (Float32[0.01, NaN32], [1 // 100, -1 // 50], big.([0.01, 0.02]))
+            rf = return_forecast(CustomValueReturnForecast(; mu = m), rd, csfm)
+            @test eltype(rf.mu) === eltype(m)
+            @test isequal(rf.mu, m)
+        end
+    end
+
+    @testset "A view cuts the forecast to the selected assets" begin
+        rf = CustomValueReturnForecastResult(; mu = [0.01, NaN, -0.03])
+        v = PO.port_opt_view(rf, [1, 3])
+        @test isa(v, CustomValueReturnForecastResult)
+        @test v.mu == [0.01, -0.03]
+        @test isnothing(v.hist)
+    end
 end
 
 @testset "The fixed weighted member combines the scores under signed weights" begin
