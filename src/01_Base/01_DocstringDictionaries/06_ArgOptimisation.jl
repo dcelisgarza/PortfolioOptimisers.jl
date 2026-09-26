@@ -61,7 +61,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Optimiser fields.
                  :opt_jmp => "`opt`: `JuMP` optimiser configuration.",#
                  :r_opt => "`r`: Risk measure or vector of risk measures.",#
-                 :r_res => "`r`: The risk measure the optimisation ran under, or a vector of them, stored **resolved** — a **Deferred Quantity** has already been fitted and an unstated slot has already taken the prior's field. A resolved measure is fitted state, not configuration, so it belongs on the Result. Pass it back as `expected_risk(res.r, res.w, res.pr; sca = res.sca)`.",#
+                 :r_res => "`r`: The risk measure the optimisation ran under, or a vector of them, stored resolved. Every Deferred Quantity in it is fitted, and every unstated slot holds the prior's field. A resolved measure is fitted state, not configuration, so it belongs on the Result. Pass it back as `expected_risk(res.r, res.w, res.pr; sca = res.sca)`.",#
                  :obj => "`obj`: Portfolio objective function.",#
                  :wi => "`wi`: Initial portfolio weights for warm-starting the solver.",#
                  :sca => "`sca`: Scalariser for combining multiple risk measures.",#
@@ -108,7 +108,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :l2reg_alg => "`alg`: Second-moment formulation used to express the L2 penalty.",#
                  :lpreg_p => "`p`: Norm order, `p > 1`.",#
                  :lpreg_val => "`val`: Penalty coefficient when the estimator is used as a regularisation term (the `lp` field of [`JuMPOptimiser`](@ref)), or the upper bound on the p-norm of the weights when it is used as a norm constraint (the `lpc` field). As a regularisation term it is the ambiguity radius of a type-``q`` Wasserstein ground metric with ``1/p + 1/q = 1``. As a norm constraint it is a ceiling, which is a different quantity. One field therefore carries two readings, so the bound is [`Num_AmbRadNormCeilCal`](@ref), which admits both rule families, and each of the two routes refuses the family that has no reading on it. It is the one slot that admits no plain function, because a function names no family and the two routes read the family.",#
-                 :brt => "`brt`: Whether to use bootstrap returns.",#
+                 :brt => "`brt`: Whether to optimise over the returns in excess of the benchmark. When it is `true` and the returns result carries a benchmark `B`, [`returns_result_picker`](@ref) replaces `X` with `X - B` before the prior is fitted. A returns result with no benchmark is used as it is.",#
                  :x_src => "`x_src`: Which returns matrix the clustering, phylogeny and centrality estimators read: `:prior` takes the prior result's `X`, `:data` takes the raw returns result's `X`. Ignored when no returns result is available, in which case the prior result's `X` is used.",#
                  :wf => "`wf`: Weight finaliser.",#
                  :rkb => "`rkb`: Risk budget estimator or result.",#
@@ -184,8 +184,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :unit => "`unit`: Number of shares that one purchase buys, such as a lot size. A fractional `unit` buys fractional shares.",#
                  # Hierarchical and Schur complement optimisers.
                  :ri => "`ri`: Inner risk measure.",#
-                 :ri_res => "`ri`: The intra-cluster risk measure the optimisation ran under, or a vector of them, stored **resolved**.",#
-                 :ro_res => "`ro`: The inter-cluster risk measure the optimisation ran under, or a vector of them, stored **resolved**.",#
+                 :ri_res => "`ri`: The intra-cluster risk measure the optimisation ran under, or a vector of them, stored resolved.",#
+                 :ro_res => "`ro`: The inter-cluster risk measure the optimisation ran under, or a vector of them, stored resolved.",#
+                 :hr_core => "`hr`: The [`HierarchicalResult`](@ref) that holds the fields every hierarchical result shares. Each of its properties reads through this result.",#
                  :ro => "`ro`: Outer risk measure.",#
                  :scai => "`scai`: Inner scalariser.",#
                  :scao => "`scao`: Outer scalariser.",#
