@@ -272,6 +272,8 @@ Fits one weighted least squares per observation across the assets, in closed for
 
 The solve runs on the weighted design ``\\sqrt{w_{t,i}} \\, \\boldsymbol{z}_{t,i}`` rather than on the normal matrix ``\\mathbf{Z}_{t}^{\\intercal} \\mathbf{W}_{t} \\mathbf{Z}_{t}``, which halves the condition number in the exponent, and `alg` decides what happens when that design is rank deficient.
 
+The square root sets the arithmetic of the solve. An integer and a `Rational` weight have a floating-point square root, so the solve of a `Rational` panel runs in floating point. `f` keeps the `Rational` type of the panel, and holds the floating-point answer written as a `Rational`, not the exact least-squares answer. A caller who needs the exact answer solves the weighted normal equations in `Rational` arithmetic.
+
 # Algorithm
 
  1. Check `Z`, `X` and `W`, and take the eligibility mask, per `# Validation` of [`cross_sectional_regression`](@ref).
@@ -535,7 +537,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the factor returns of one observation, through the member's own solve.
 
-[`CrossSectionalLinearRegression`](@ref) scales the design and the target by `sqrt.(w)` and hands them to [`cross_sectional_solve`](@ref). [`CrossSectionalTargetRegression`](@ref) hands the unscaled pair to the target, with `w` as the observation weights, and refuses an empty cross-section.
+[`CrossSectionalLinearRegression`](@ref) scales the design and the target by `sqrt.(w)` and hands them to [`cross_sectional_solve`](@ref). The square root of a `Rational` weight is a float, so that solve runs in floating point for a `Rational` panel. [`CrossSectionalTargetRegression`](@ref) hands the unscaled pair to the target, with `w` as the observation weights, and refuses an empty cross-section.
 
 # Arguments
 
@@ -636,7 +638,10 @@ function cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimat
     act = cross_sectional_design_mask(Z, X, W)
     # The coefficients answer a weighted least squares, so the working type is the inputs'
     # own promotion, widened to a float only when it is an integer: an integer panel
-    # regresses in `Float64`, a `Float32` panel in `Float32`, and a `Rational` panel exactly.
+    # regresses in `Float64`, and a `Float32` panel in `Float32`. A `Rational` panel keeps
+    # its type in `f`, but it is not fitted exactly, issue #1352. The linear member scales
+    # by `sqrt.(w)`, which is a float, and the default target `LinearModel` fits in floating
+    # point too.
     Ts = promote_type(real(eltype(Z)), real(eltype(X)), real(eltype(W)))
     Tf = float_if_integer(Ts)
     K = size(Z, 3)
