@@ -29,6 +29,14 @@ unique_key_dict!(math_dict, :math_dict,
                  # same separation, so `01_Base_Phylogeny.jl` shares this symbol
                  # between four Units.
                  :d_sep => "``d``: Separation between two assets.",#
+                 # The proximity matrix of a separation. `LinearDecay` reads the budget,
+                 # and `Proximity` and `phylogeny_features` in
+                 # `10_Prior/09_AssetPanelEstimators.jl` state the matrix over the four
+                 # symbols below.
+                 :dmax_sep => "``d_{\\mathrm{max}}``: Separation budget in scope.",#
+                 :D_sep => "``\\mathbf{D}``: Separation matrix, of size ``N \\times N``. Entry ``D_{i,\\,k}`` is the separation of assets ``i`` and ``k`` in the structure, ``D_{i,\\,i} = 0``, and ``D_{i,\\,k} = +\\infty`` when no path joins the two assets.",#
+                 :f_sep_decay => "``f``: Separation decay, the score that [`separation_decay`](@ref) gives a separation under the decay algorithm in scope.",#
+                 :Z_prox => "``\\mathbf{Z}``: Proximity matrix, of size ``N \\times N``. Entry ``Z_{i,\\,k}`` scores how close asset ``k`` is to asset ``i``, and a larger entry means a closer pair.",#
                  # Network centrality. The eight members of
                  # `AbstractCentralityAlgorithm` each state a closed form over the
                  # same network, so `01_Centrality.jl` shares these symbols between
