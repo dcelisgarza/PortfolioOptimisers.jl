@@ -14,7 +14,7 @@ $(DocStringExtensions.FIELDS)
     AttributionComponent(vol, vol_contrib, pct_var, mu_contrib, corr, mu_se)
         -> AttributionComponent
 
-Arguments correspond to the struct's fields, in the order they are declared. The type is a part of a Result, so [`factor_attribution`](@ref) builds it and a caller reads it; there is no keyword constructor, and the type validates nothing of its own.
+Arguments correspond to the struct's fields, in the order they are declared. The type is a part of a Result, so [`factor_attribution`](@ref) builds it and a caller reads it. It has no keyword constructor, and it validates nothing of its own.
 
 # Related
 
@@ -43,7 +43,7 @@ Arguments correspond to the struct's fields, in the order they are declared. The
     """
     corr
     """
-    Standard error of `mu_contrib`, or `nothing`. It is filled on the realised side under `se = true`, and it is `nothing` everywhere else.
+    Standard error of `mu_contrib`, or `nothing`. The realised side fills it under `se = true`, and it is `nothing` everywhere else.
     """
     mu_se
 end
@@ -54,7 +54,7 @@ The factor axis or the family axis of a factor attribution, one entry per row of
 
 The factor axis carries no labels, because the factor names are carried input that the caller already holds. The family axis carries its own labels, because they are derived from the family labels of the block and exist nowhere else. Every number is scaled to the `ppy` the Result carries.
 
-A family is a set of factors, so the four additive fields — `exposure`, `vol_contrib`, `pct_var` and `mu_contrib` — carry the sum of the rows of the family, and `vol`, `corr` and `mu` are `nothing`, because no single standalone volatility, correlation or mean return describes a set.
+A family is a set of factors. The four additive fields `exposure`, `vol_contrib`, `pct_var` and `mu_contrib` carry the sum of the rows of the family. `vol`, `corr` and `mu` are `nothing`, because no single standalone volatility, correlation or mean return describes a set.
 
 # Fields
 
@@ -65,7 +65,7 @@ $(DocStringExtensions.FIELDS)
     AttributionBreakdown(labels, exposure, exposure_std, vol, corr, vol_contrib, pct_var,
                          mu, mu_contrib, mu_se) -> AttributionBreakdown
 
-Arguments correspond to the struct's fields, in the order they are declared. The type is a part of a Result, so [`factor_attribution`](@ref) builds it and a caller reads it; there is no keyword constructor, and the type validates nothing of its own.
+Arguments correspond to the struct's fields, in the order they are declared. The type is a part of a Result, so [`factor_attribution`](@ref) builds it and a caller reads it. It has no keyword constructor, and it validates nothing of its own.
 
 # Related
 
@@ -110,7 +110,7 @@ Arguments correspond to the struct's fields, in the order they are declared. The
     """
     mu_contrib
     """
-    Standard error of `mu_contrib`, one entry per row, or `nothing`. It is filled on the realised side under `se = true`, and a row of a currency family reports `NaN`.
+    Standard error of `mu_contrib`, one entry per row, or `nothing`. The realised side fills it under `se = true`, and a row of a currency family reports `NaN`.
     """
     mu_se
 end
@@ -121,7 +121,7 @@ The asset axis of a factor attribution, one entry per asset.
 
 Each asset carries its weight, its standalone moments and its systematic, idiosyncratic and total contributions, so a reader sees which holding drove a factor row. Every number is scaled to the `ppy` the Result carries.
 
-The axis decomposes the factor model, so the systematic rows sum to the systematic component, the idiosyncratic rows to the idiosyncratic component, and `vol_contrib`, which is the two together, to both of them. It does not reach the total: the difference is the unattributed remainder, which is a property of the portfolio and has no per-asset split.
+The axis decomposes the factor model, so the systematic rows sum to the systematic component, the idiosyncratic rows to the idiosyncratic component, and `vol_contrib`, which is the two together, to both of them. It does not reach the total. The difference is the unattributed remainder, which is a property of the portfolio and has no per-asset split.
 
 # Fields
 
@@ -133,7 +133,7 @@ $(DocStringExtensions.FIELDS)
                               idio_vol_contrib, idio_mu_contrib, vol, corr, vol_contrib,
                               pct_var, mu, mu_contrib) -> AssetAttributionBreakdown
 
-Arguments correspond to the struct's fields, in the order they are declared. The type is a part of a Result, so [`factor_attribution`](@ref) builds it and a caller reads it; there is no keyword constructor, and the type validates nothing of its own.
+Arguments correspond to the struct's fields, in the order they are declared. The type is a part of a Result, so [`factor_attribution`](@ref) builds it and a caller reads it. It has no keyword constructor, and it validates nothing of its own.
 
 # Related
 
@@ -146,7 +146,7 @@ Arguments correspond to the struct's fields, in the order they are declared. The
     """
     weight
     """
-    Standard deviation of the weight of each asset, or `nothing`. It is `nothing` wherever the weights are constant, and it is filled from a weight history.
+    Standard deviation of the weight of each asset, or `nothing`. It is `nothing` wherever the weights are constant, and a weight history fills it.
     """
     weight_std
     """
@@ -205,7 +205,7 @@ $(DocStringExtensions.FIELDS)
 
     AssetFactorContribution(vol_contrib, mu_contrib) -> AssetFactorContribution
 
-Arguments correspond to the struct's fields, in the order they are declared. The type is a part of a Result, so [`factor_attribution`](@ref) builds it and a caller reads it; there is no keyword constructor, and the type validates nothing of its own.
+Arguments correspond to the struct's fields, in the order they are declared. The type is a part of a Result, so [`factor_attribution`](@ref) builds it and a caller reads it. It has no keyword constructor, and it validates nothing of its own.
 
 # Related
 
@@ -227,9 +227,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Decomposes a portfolio's volatility and mean return over the factors, the factor families and the assets of a factor model.
 
-`FactorAttributionResult` is what [`factor_attribution`](@ref) returns. It carries the four components, the factor axis, and — when the block names families and when the caller asks for assets — the family axis, the asset axis and the asset-by-factor matrices, so an attribution can be tabulated, plotted, compared across runs or asserted on in a test.
+`FactorAttributionResult` is what [`factor_attribution`](@ref) returns. It carries the four components and the factor axis. It also carries the family axis when the block names families, and the asset axis and the asset-by-factor matrices when the caller asks for assets. A caller can tabulate an attribution, plot it, compare it across runs or assert on it in a test.
 
-Every field that an axis does not have is `nothing`, so a reader dispatches on `::Nothing` rather than branching: `fmbd` is `nothing` when the block names no family, and `abd` and `afc` are `nothing` unless the caller passed `assets = true`.
+Every field that an axis does not have is `nothing`, so a reader dispatches on `::Nothing` rather than branching. `fmbd` is `nothing` when the block names no family, and `abd` and `afc` are `nothing` unless the caller passed `assets = true`.
 
 # Fields
 
@@ -240,7 +240,7 @@ $(DocStringExtensions.FIELDS)
     FactorAttributionResult(sys, idio, unattr, total, fbd, fmbd, abd, afc, realised, ppy)
         -> FactorAttributionResult
 
-Arguments correspond to the struct's fields, in the order they are declared. The type is a Result, so [`factor_attribution`](@ref) builds it and a caller reads it; there is no keyword constructor, and the type validates nothing of its own.
+Arguments correspond to the struct's fields, in the order they are declared. The type is a Result, so [`factor_attribution`](@ref) builds it and a caller reads it. It has no keyword constructor, and it validates nothing of its own.
 
 # Related
 
@@ -299,9 +299,9 @@ end
 
 Return the idiosyncratic covariance a factor attribution adds to the systematic block.
 
-One of the five reads [`factor_attribution`](@ref) takes off a loadings result. The root refuses, so a loadings result that carries no idiosyncratic block is named rather than silently attributed to zero.
+It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. The root refuses, so the verb names a loadings result that carries no idiosyncratic block rather than attributing zero to it.
 
-A [`Regression`](@ref) answers its own `esigma`, which [`FactorPrior`](@ref) fills under `rsd = true`. Under `rsd = false` the field is `nothing` and the read answers a vector of zeros rather than refusing, because the carrier's covariance carries no residual block either: the predicted idiosyncratic component is zero, the systematic component reaches the total on its own, and the remainder stays at rounding level. A realised attribution is unaffected, because it measures the idiosyncratic series from the returns rather than from this field.
+A [`Regression`](@ref) answers its own `esigma`, which [`FactorPrior`](@ref) fills under `rsd = true`. Under `rsd = false` the field is `nothing` and the read answers a vector of zeros rather than refusing, because the carrier's covariance carries no residual block either. The predicted idiosyncratic component is then zero, the systematic component reaches the total on its own, and the remainder stays at rounding level. A realised attribution is unaffected, because it measures the idiosyncratic series from the returns rather than from this field.
 
 # Arguments
 
@@ -347,14 +347,14 @@ end
 
 Return the idiosyncratic return series a realised factor attribution weights by the portfolio.
 
-One of the five reads [`factor_attribution`](@ref) takes off a loadings result. The root refuses, so a loadings result that keeps no residual history is named rather than attributed to zero.
+It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. The root refuses, so the verb names a loadings result that keeps no residual history rather than attributing zero to it.
 
-The read takes the carrier beside the block, because a block that stores no series recovers it from the result it travels on. A [`CrossSectionalFactorModel`](@ref) keeps its own residuals and ignores the carrier. A [`Regression`](@ref) keeps none, so the series is `original_returns(pr) - pr.X`: the difference between the returns the carrier was fitted on and the reconstruction `F * M' .+ b'` it holds. A wrapping prior that replaces `X` moves this series, and the difference lands in the unattributed remainder.
+The read takes the carrier beside the block, because a block that stores no series recovers it from the prior result that carries it. A [`CrossSectionalFactorModel`](@ref) keeps its own residuals and ignores the carrier. A [`Regression`](@ref) keeps none, so the series is `original_returns(pr) - pr.X`, the difference between the returns the prior was fitted on and the reconstruction `F * M' .+ b'` that the carrier holds. A wrapping prior that replaces `X` moves this series, and the difference lands in the unattributed remainder.
 
 # Arguments
 
   - `rr`: A loadings regression result.
-  - `pr`: The prior result the block travels on.
+  - `pr`: The prior result that carries the block.
 
 # Validation
 
@@ -393,19 +393,19 @@ end
 
 Return the factor return series a realised factor attribution multiplies by the exposures.
 
-One of the five reads [`factor_attribution`](@ref) takes off a loadings result. The series is on the **raw** factor axis, which is the axis the loadings name, so a family re-basis does not move it.
+It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. The series is on the raw factor axis, which is the axis the loadings name, so a family re-basis does not move it.
 
-The read takes the carrier beside the block, as [`attribution_idiosyncratic_returns`](@ref) does and for the same reason. A [`CrossSectionalFactorModel`](@ref) fits the factor returns itself and ignores the carrier. A [`Regression`](@ref) regresses on factors the caller supplied, so the series is `pr.fpr.X`, the scenarios of the nested factor-axis prior. That field needs no refusal of its own: [`LowOrderPrior`](@ref) admits `rr` and `fpr` only together, so a carrier that answers a loadings result answers a factor-axis prior beside it.
+The read takes the carrier beside the block, as [`attribution_idiosyncratic_returns`](@ref) does and for the same reason. A [`CrossSectionalFactorModel`](@ref) fits the factor returns itself, and reads them off its own fit when no family is constrained. A constrained Factor Family makes the fit solve in a reduced basis, one column short per constrained family, so a re-based block reads `pr.fpr.X` instead, which holds the same coefficients already expanded onto the raw axis. A [`Regression`](@ref) regresses on factors the caller supplied, so the series is `pr.fpr.X`, the scenarios of the nested factor-axis prior. That field needs no refusal of its own, because [`LowOrderPrior`](@ref) admits `rr` and `fpr` only together, so a carrier that answers a loadings result answers a factor-axis prior beside it.
 
 # Arguments
 
   - `rr`: A loadings regression result.
-  - `pr`: The prior result the block travels on.
+  - `pr`: The prior result that carries the block.
 
 # Validation
 
   - The root method always raises an `ArgumentError` naming the type.
-  - A [`CrossSectionalFactorModel`](@ref) whose `csr` is `nothing` raises an `IsNothingError`.
+  - A [`CrossSectionalFactorModel`](@ref) whose `csr` is `nothing` raises an `IsNothingError`, with or without a family re-basis.
 
 # Returns
 
@@ -441,7 +441,7 @@ end
 
 Return the exposure history a realised factor attribution reads, one slice per observation.
 
-One of the five reads [`factor_attribution`](@ref) takes off a loadings result. A block whose exposures do not move answers its loadings matrix, and the attribution then reads one static slice.
+It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. A block whose exposures do not move answers its loadings matrix, and the attribution then reads one static slice.
 
 A [`Regression`](@ref) fits one loadings matrix over the whole sample, so it always answers that matrix and every observation reads the same slice.
 
@@ -486,7 +486,7 @@ end
 
 Return the number of observations by which the exposures lag the returns.
 
-One of the five reads [`factor_attribution`](@ref) takes off a loadings result. The attribution keeps the exposures of observation `t - lag` with the returns of observation `t`, so a block that states no lag answers zero and the two axes line up as they stand.
+It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. The attribution keeps the exposures of observation `t - lag` with the returns of observation `t`, so a block that states no lag answers zero and the two axes line up as they stand.
 
 A [`Regression`](@ref) fits the returns of an observation on the factor returns of the same observation, so its lag is zero.
 
@@ -552,7 +552,7 @@ end
 
 Return the family re-basis the block's fit was written in, or `nothing`.
 
-The standard errors of a realised attribution are computed in the reduced full-rank basis and mapped back onto the raw axis, because a constrained family makes the raw Gram matrix singular. A block type that constrains no family answers `nothing` through the root, and the sandwich then runs on the raw axis.
+A realised attribution computes its standard errors in the reduced full-rank basis and maps them back onto the raw axis, because a constrained family makes the raw Gram matrix singular. A block type that constrains no family answers `nothing` through the root, and the sandwich then runs on the raw axis.
 
 # Arguments
 
@@ -666,9 +666,9 @@ end
     assert_attribution_carrier(x::Nothing, sym::Symbol)
     assert_attribution_carrier(x, sym::Symbol)
 
-Return an optional field of the prior result a factor model block travels on, or raise naming it.
+Return an optional field of the prior result that carries a factor model block, or raise naming it.
 
-The sibling of [`assert_attribution_field`](@ref), and it names the carrier rather than the block. A block that stores no return series of its own — a [`Regression`](@ref) — reads the two series off the carrier, so a `nothing` there is a missing input of the attribution and not a missing field of the block.
+It is the sibling of [`assert_attribution_field`](@ref), and it names the carrier rather than the block. A [`Regression`](@ref) stores no return series of its own and reads the two series off the carrier, so a `nothing` there is a missing input of the attribution and not a missing field of the block.
 
 # Arguments
 
@@ -700,9 +700,22 @@ end
 
 Return an array with every non-finite entry replaced by zero, or the array itself.
 
-A Prior Estimator fits on the coverage universe and answers on the full one, so an asset it could not estimate carries `NaN` in its row of `mu`, of `sigma` and of the block. A holding in such an asset is reported by [`attribution_investable_diagnostic`](@ref) before the arithmetic starts, and `0 * NaN` is `NaN` and would poison every sum whether the asset is held or not. The entries are replaced once here rather than guarded at each of the sums, so a non-investable asset contributes nothing to any component.
+A Prior Estimator fits on the coverage universe and answers on the full one, so an asset it could not estimate carries `NaN` in its row of `mu`, of `sigma` and of the block. [`attribution_investable_diagnostic`](@ref) reports a holding in such an asset before the arithmetic starts. `0 * NaN` is `NaN`, so the entry would make every sum `NaN` whether the asset is held or not. The verb replaces the entries once rather than guarding each of the sums, so a non-investable asset contributes nothing to any component.
 
-An array that is finite throughout is returned unchanged and is not copied, which is the whole universe's case.
+The verb returns an array that is finite throughout as it is, without a copy. That is the case when every asset is investable.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{a}_{j} &= \\begin{cases} a_{j} & \\text{if } a_{j} \\text{ is finite}\\,, \\\\ 0 & \\text{otherwise}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``a_{j}``: Entry ``j`` of the array, in any order of its indices.
+  - ``\\tilde{a}_{j}``: Entry ``j`` of the returned array.
 
 # Arguments
 
@@ -727,11 +740,17 @@ end
 
 Report a portfolio that holds an asset the prior could not estimate.
 
-A non-investable asset carries `NaN` in `mu` and on the diagonal of `sigma`, so no moment of it exists to attribute. A portfolio that holds none of it is decomposed exactly, with a zero row wherever the asset appears. A portfolio that holds some of it is a **term that cannot contribute a row**, and it takes the library's strictness policy through [`strict_diagnostic`](@ref): a warning names the assets and the decomposition proceeds with their contributions zeroed, or an `ArgumentError` names them under `strict`.
+A non-investable asset carries `NaN` in `mu` and on the diagonal of `sigma`, so no moment of it exists to attribute. The attribution decomposes a portfolio that holds none of it exactly, with a zero row wherever the asset appears. A holding in it is a term that cannot contribute a row, and it takes the library's strictness policy through [`strict_diagnostic`](@ref). A warning names the assets and the decomposition proceeds with their contributions zeroed, or, under `strict`, an `ArgumentError` names them.
 
 The zeroing is the work of [`attribution_finite`](@ref) on every array the decomposition reads, so the held asset contributes nothing to the systematic and idiosyncratic components. On the predicted side the totals read `pr.mu` and `pr.sigma` with the same zeroing, so they describe the portfolio without the holding. On the realised side the net series still carries whatever return the holding earned, and that return lands in the unattributed remainder, which is where the reader looks for what the model does not explain.
 
-A weight history that holds a non-investable asset is the shape a walk-forward produces: a prior fit on the whole history marks every asset that delisted inside it non-investable, and an early fold held it while it was listed. That is why the default is to warn.
+A walk-forward produces a weight history that holds a non-investable asset. A prior fit on the whole history marks every asset that delisted inside it non-investable, and an early fold held that asset while it was listed. That is why the default is to warn.
+
+# Algorithm
+
+ 1. Read the investable mask `imsk` off `pr`. An absent mask means that every asset is investable, and the verb returns.
+ 2. Find the non-investable assets that carry a non-zero weight, in the vector or at any observation of the history, giving `held`.
+ 3. When `held` is not empty, warn naming it, or raise under `strict`, through [`strict_diagnostic`](@ref).
 
 # Arguments
 
@@ -785,9 +804,24 @@ end
 
 Return the loadings or the intercept with the rows of the non-investable assets replaced by zero.
 
-A non-investable asset can carry finite loadings while its idiosyncratic variance is `NaN`: the prior needs three facts to state a moment, and one missing fact is enough. [`attribution_finite`](@ref) replaces only the `NaN`, so the finite loadings of a held non-investable asset would reach the systematic component while the totals, which read `pr.mu` and `pr.sigma`, exclude the asset. The row is zeroed whole, so every component describes the portfolio without the non-investable assets, and the four still sum to the total.
+A non-investable asset can carry finite loadings while its idiosyncratic variance is `NaN`, because the prior needs three facts to state a moment and one missing fact is enough. [`attribution_finite`](@ref) replaces only the `NaN`, so the finite loadings of a held non-investable asset would reach the systematic component while the totals, which read `pr.mu` and `pr.sigma`, exclude the asset. The verb zeroes the whole row, so every component describes the portfolio without the non-investable assets, and the four still sum to the total.
 
-An absent mask means that every asset is investable, and the array is returned unchanged.
+An absent mask means that every asset is investable, and the verb returns the array unchanged.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{A}_{ik} &= m_{i} A_{ik}\\,, \\\\
+\\tilde{a}_{i} &= m_{i} a_{i}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``A_{ik}``, ``\\tilde{A}_{ik}``: Loading of asset ``i`` on factor ``k``, before and after the zeroing.
+  - ``a_{i}``, ``\\tilde{a}_{i}``: Intercept of asset ``i``, before and after the zeroing.
+  - $(math_dict[:m_patt])
 
 # Arguments
 
@@ -821,6 +855,23 @@ Return the idiosyncratic covariance with the rows and the columns of the non-inv
 
 The covariance sibling of [`attribution_investable_rows`](@ref). A diagonal covariance travels as a vector and loses the entries, and a full one loses the rows and the columns, so `w' D w` reads nothing of a held non-investable asset through either.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{E}_{ij} &= m_{i} E_{ij} m_{j}\\,, \\\\
+\\tilde{e}_{i} &= m_{i} e_{i}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``E_{ij}``, ``\\tilde{E}_{ij}``: Idiosyncratic covariance of assets ``i`` and ``j``, before and after the zeroing.
+  - ``e_{i}``, ``\\tilde{e}_{i}``: Idiosyncratic variance of asset ``i``, before and after the zeroing.
+  - $(math_dict[:m_patt])
+
+The vector form is the diagonal of the matrix form, so a diagonal covariance gives the same quadratic form in either shape.
+
 # Arguments
 
   - `E`: The idiosyncratic variances, one entry per asset, or the idiosyncratic covariance, `assets × assets`.
@@ -851,7 +902,7 @@ end
 
 Return the factor model block and the factor distribution a factor attribution decomposes.
 
-A prior result carries the loadings in `rr` and the factor distribution in `fpr`, and its constructor keeps the two together, so one check establishes the whole block. Every wrapping prior forwards both unchanged while it replaces `mu` and `sigma`, which is why the totals anchor on the carrier and the gaps land in the unattributed remainder.
+A prior result carries the loadings in `rr` and the factor distribution in `fpr`, and its constructor keeps the two together, so one check establishes the whole block. Every wrapping prior forwards both unchanged while it replaces `mu` and `sigma`, which is why the totals come from the carrier and the gaps land in the unattributed remainder.
 
 # Arguments
 
@@ -877,15 +928,33 @@ function attribution_prior_block(pr::AbstractPriorResult)
     return (; rr = pr.rr, fpr = pr.fpr)
 end
 """
-    attribution_scale(ppy::Number)
+    attribution_scale(ppy::Number, x::Number = ppy)
 
 Return the two scale factors an annualisation applies.
 
 Means and variances scale by `ppy`, and volatilities by its square root. Shares and correlations are ratios of two quantities that scale alike, so they are not scaled at all.
 
+The square root takes the type of `ppy` promoted with the type of `x`, a value of the data the factors scale. The default `ppy = 1` is an `Int`, and its bare square root is a `Float64`, which would widen every volatility of `Float32` data while the correlations beside them stayed `Float32`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+s_{1} &= p\\,, \\\\
+s_{2} &= \\sqrt{p}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``s_{1}``: Scale factor of a mean or a variance.
+  - ``s_{2}``: Scale factor of a volatility.
+  - $(math_dict[:p_ppy])
+
 # Arguments
 
   - `ppy`: Periods per year the numbers are scaled to.
+  - `x`: A value of the data the factors scale. Only its type is read.
 
 # Validation
 
@@ -893,17 +962,17 @@ Means and variances scale by `ppy`, and volatilities by its square root. Shares 
 
 # Returns
 
-  - `s1::Real`: The factor a mean or a variance takes.
-  - `s2::Real`: The factor a volatility takes.
+  - `s1::Number`: The factor a mean or a variance takes, `ppy` itself.
+  - `s2::Number`: The factor a volatility takes, in the type of `ppy * one(x)` or wider.
 
 # Related
 
   - [`factor_attribution`](@ref)
   - [`FactorAttributionResult`](@ref)
 """
-function attribution_scale(ppy::Number)
+function attribution_scale(ppy::Number, x::Number = ppy)
     @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
-    return (; s1 = ppy, s2 = sqrt(ppy))
+    return (; s1 = ppy, s2 = sqrt(ppy * one(x)))
 end
 """
     attribution_idiosyncratic_matrix(esigma::VecNum)
@@ -911,7 +980,22 @@ end
 
 Return the idiosyncratic covariance as a matrix the quadratic form reads.
 
-The idiosyncratic block takes two shapes, a vector of variances and a full covariance, so the shape is the dispatch and no caller tests it.
+The idiosyncratic block takes two shapes, a vector of variances and a full covariance. The method dispatches on the shape, so no caller tests it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{D} &= \\begin{cases} \\operatorname{diag}(\\boldsymbol{e}) & \\text{for a vector of variances}\\,, \\\\ \\mathbf{E} & \\text{for a covariance}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{e}``: Idiosyncratic variances, ``N \\times 1``.
+  - ``\\mathbf{E}``: Idiosyncratic covariance, ``N \\times N``.
+  - ``\\mathbf{D}``: Returned idiosyncratic covariance, ``N \\times N``.
+  - $(math_dict[:N])
 
 # Arguments
 
@@ -937,7 +1021,23 @@ end
 
 Return a correlation, or `NaN` when the pair of volatilities cannot normalise it.
 
-A factor whose standalone volatility is zero has no correlation with anything, and the quotient would be an infinity or a `NaN` of the arithmetic's own choosing. The verb answers `NaN` so that every such row reads alike.
+A factor whose standalone volatility is zero has no correlation with anything. The plain quotient would give `Inf`, `-Inf` or `NaN` by the sign of the covariance, so the verb answers `NaN` for every such row.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\rho &= \\begin{cases} \\dfrac{c}{\\sigma_{1} \\sigma_{2}} & \\text{if } \\sigma_{1} \\sigma_{2} > 0\\,, \\\\ \\mathrm{NaN} & \\text{otherwise}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``\\rho``: Correlation.
+  - ``c``: Covariance of the two quantities.
+  - ``\\sigma_{1}``, ``\\sigma_{2}``: Volatilities of the two quantities.
+
+A `NaN` product fails the test, so it also gives `NaN`.
 
 # Arguments
 
@@ -964,6 +1064,11 @@ Return the rows of the family axis and the raw factors each of them sums.
 
 The axis is the sorted unique labels, so it is deterministic and independent of the order the factors were built in. Every consumer of the family axis reads the axis from here, so the labels, the sums, the exposure spread and the standard errors are in one order.
 
+# Algorithm
+
+ 1. Convert each label of `fam` to a `String`, remove the duplicates and sort the rest, giving `labels`.
+ 2. For each entry of `labels`, find the positions of `fam` that carry it, giving one entry of `idx`.
+
 # Arguments
 
   - `fam`: The family label of each raw factor.
@@ -989,6 +1094,28 @@ end
 Return the family axis of a factor attribution as a sum of the rows of the factor axis.
 
 A family is a set of factors, so the four additive fields sum over the rows of the family. The axis is the sorted unique labels, which makes it deterministic and independent of the order the factors were built in; a plot that shows the largest families sorts the rows it draws. `vol`, `corr` and `mu` are `nothing`, because no single standalone volatility, correlation or mean return describes a set of factors.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+x_{\\mathcal{F}} &= \\sum_{k \\in \\mathcal{F}} x_{k}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``x_{k}``: Entry of factor ``k`` in one of the four additive fields of the factor axis: the exposure, the volatility contribution, the variance share and the mean return contribution.
+  - ``x_{\\mathcal{F}}``: Entry of the family in the same field of the family axis.
+  - $(math_dict[:F_fam_att])
+
+The families partition the raw factors, so each field of the family axis sums to the same total as that field of the factor axis.
+
+# Algorithm
+
+ 1. Index the families with [`attribution_family_index`](@ref), giving the sorted labels and the raw factors of each.
+ 2. Sum each of the four additive fields of `fbd` over the raw factors of each family.
+ 3. Build the family axis from the labels, the four sums, `exposure_std` and `mu_se`, with `nothing` for `vol`, `corr` and `mu`.
 
 # Arguments
 
@@ -1039,20 +1166,84 @@ end
 
 Decompose a portfolio's volatility and mean return over the factors of a factor model.
 
-The verb reads the weights and the factor model block, and returns one [`FactorAttributionResult`](@ref). The **predicted** methods take no return series and decompose the moments the optimiser saw. The **realised** methods take one, and decompose the history the portfolio actually produced. Each realised method has a **rolling** twin that takes a positional `window` and returns one Result per window.
+The verb reads the weights and the factor model block, and returns one [`FactorAttributionResult`](@ref). The predicted methods take no return series and decompose the moments the optimiser saw. The realised methods take one, and decompose the history the portfolio actually produced. Each realised method has a rolling twin that takes a positional `window` and returns one Result per window.
 
-**The predicted totals anchor on the prior result, not on the model.** `pr.mu` and `pr.sigma` are what the optimiser saw and what [`expected_return`](@ref) and [`expected_risk`](@ref) report, so they are the totals. A wrapping prior replaces them while it forwards the block unchanged, so the model no longer reproduces them, and the two gaps `dot(w, pr.mu - M * fpr.mu - b)` and `dot(w, (pr.sigma - M * F * M' - D) * w) / sigma_P` land in the unattributed remainder. The remainder is therefore present on the predicted side too, and it is at rounding level on a plain fit.
+**The predicted totals come from the prior result, not from the model.** `pr.mu` and `pr.sigma` are what the optimiser saw and what [`expected_return`](@ref) and [`expected_risk`](@ref) report, so they are the totals. A wrapping prior replaces them while it forwards the block unchanged, so the model no longer reproduces them, and the two gaps `dot(w, pr.mu - M * fpr.mu - b)` and `dot(w, (pr.sigma - M * F * M' - D) * w) / sigma_P` land in the unattributed remainder. The remainder is therefore present on the predicted side too, and it is at rounding level on a plain fit.
 
 **Every source of unexplained return lands in the remainder, and no guard reports it.** On the realised side the identity per observation is `portfolio return = systematic + idiosyncratic + unattributed`, and the remainder holds the per-observation intercept share `b_t * sum(w)`, the fees, the cash, the weight drift inside a period and the exposure lag. A large `pct_var` on the remainder means the model does not explain the portfolio, and the reader draws that conclusion.
 
-**A holding the prior could not estimate is warned about and zeroed, and `strict` turns the warning into a refusal.** A non-investable asset carries `NaN` in `mu`, on the diagonal of `sigma` and across its rows of the block, so no moment of it exists to attribute. A portfolio that holds one takes the library's strictness policy through [`attribution_investable_diagnostic`](@ref): under the default `strict = false` a warning names the assets, every `NaN` is replaced by zero, and the decomposition proceeds with nothing attributed to them; under `strict = true` an `ArgumentError` names them. On the realised side a held asset whose return is non-finite at an observation takes the same policy through [`attribution_net_returns`](@ref), which names the observations and the assets, and zeroes those pairs. A weight history from a walk-forward holds exactly this shape whenever an asset delisted inside the history, which is why the default warns rather than refuses.
+**A holding the prior could not estimate gets a warning and a zero contribution, and `strict` turns the warning into a refusal.** A non-investable asset carries `NaN` in `mu`, on the diagonal of `sigma` and across its rows of the block, so no moment of it exists to attribute. A portfolio that holds one takes the library's strictness policy through [`attribution_investable_diagnostic`](@ref). Under the default `strict = false` a warning names the assets, the verb replaces every `NaN` with zero, and the decomposition attributes nothing to them. Under `strict = true` an `ArgumentError` names them. On the realised side a held asset whose return is non-finite at an observation takes the same policy through [`attribution_net_returns`](@ref), which names the observations and the assets, and zeroes those pairs. A weight history from a walk-forward holds exactly this shape whenever an asset delisted inside the history, which is why the default warns rather than refuses.
 
-**The factor shares disagree with [`factor_risk_contribution`](@ref), and the disagreement is one term.** That verb computes `(M' w)_k * (pinv(M) * grad)_k` with `grad` a finite difference of any risk measure, so for the variance and `sigma = M F M' + D` it reads `grad = (M F M' w + D w) / sigma_P` and its factor share is `(M' w)_k * (F M' w + pinv(M) D w)_k / sigma_P`. This decomposition's factor share is the first term alone, `(M' w)_k * (F M' w)_k / sigma_P`, and it holds the second, the **leakage** `(M' w)_k * (pinv(M) D w)_k / sigma_P`, in the idiosyncratic component instead. The two therefore agree exactly when `pinv(M) D w` is zero, and neither is wrong: one is an Euler decomposition through a pseudo-inverse, generic in the risk measure, and this one is the analytic model split, specific to the variance.
+**The factor shares disagree with [`factor_risk_contribution`](@ref), and the disagreement is one term.** That verb computes `(M' w)_k * (pinv(M) * grad)_k` with `grad` a finite difference of any risk measure, so for the variance and `sigma = M F M' + D` it reads `grad = (M F M' w + D w) / sigma_P` and its factor share is `(M' w)_k * (F M' w + pinv(M) D w)_k / sigma_P`. This decomposition's factor share is the first term alone, `(M' w)_k * (F M' w)_k / sigma_P`, and it holds the second, the leakage `(M' w)_k * (pinv(M) D w)_k / sigma_P`, in the idiosyncratic component instead. The two therefore agree exactly when `pinv(M) D w` is zero. Neither is wrong. That verb is an Euler decomposition through a pseudo-inverse and holds for any risk measure, and this one is the analytic split of the model, specific to the variance.
+
+# Mathematical definition
+
+The predicted side splits the portfolio variance and the expected portfolio return into three components, the systematic ``S``, the idiosyncratic ``I`` and the unattributed ``U``:
+
+```math
+\\begin{align}
+\\sigma_{P}^{2} &= \\boldsymbol{w}^{\\intercal} \\mathbf{\\Sigma} \\boldsymbol{w}\\,, \\\\
+\\sigma_{S}^{2} &= \\boldsymbol{g}^{\\intercal} \\mathbf{F} \\boldsymbol{g}\\,, \\\\
+\\sigma_{I}^{2} &= \\boldsymbol{w}^{\\intercal} \\mathbf{D} \\boldsymbol{w}\\,, \\\\
+\\sigma_{U}^{2} &= \\sigma_{P}^{2} - \\sigma_{S}^{2} - \\sigma_{I}^{2}\\,, \\\\
+\\mu_{P} &= \\boldsymbol{w}^{\\intercal} \\boldsymbol{\\mu}\\,, \\\\
+\\mu_{S} &= \\boldsymbol{g}^{\\intercal} \\boldsymbol{\\mu}_{f}\\,, \\\\
+\\mu_{I} &= \\boldsymbol{w}^{\\intercal} \\boldsymbol{b}\\,, \\\\
+\\mu_{U} &= \\mu_{P} - \\mu_{S} - \\mu_{I}\\,.
+\\end{align}
+```
+
+Each component ``C \\in \\{S, I, U\\}`` and the total ``P`` report a volatility contribution, a variance share and a mean return contribution. The systematic and the idiosyncratic component, and the total, also report a volatility and a correlation with the portfolio:
+
+```math
+\\begin{align}
+\\mathrm{VC}_{C} &= \\sqrt{p}\\, \\frac{\\sigma_{C}^{2}}{\\sigma_{P}}\\,, \\\\
+\\mathrm{PV}_{C} &= \\frac{\\sigma_{C}^{2}}{\\sigma_{P}^{2}}\\,, \\\\
+\\mathrm{MC}_{C} &= p\\, \\mu_{C}\\,, \\\\
+\\mathrm{vol}_{C} &= \\sqrt{p}\\, \\sigma_{C}\\,, \\\\
+\\rho_{C} &= \\frac{\\sigma_{C}}{\\sigma_{P}}\\,.
+\\end{align}
+```
+
+The factor axis reports, for each factor ``k``:
+
+```math
+\\begin{align}
+\\mathrm{VC}_{k} &= \\sqrt{p}\\, \\frac{g_{k} (\\mathbf{F} \\boldsymbol{g})_{k}}{\\sigma_{P}}\\,, \\\\
+\\mathrm{PV}_{k} &= \\frac{g_{k} (\\mathbf{F} \\boldsymbol{g})_{k}}{\\sigma_{P}^{2}}\\,, \\\\
+\\mathrm{MC}_{k} &= p\\, g_{k} \\mu_{f,k}\\,, \\\\
+\\mathrm{vol}_{k} &= \\sqrt{p\\, F_{kk}}\\,, \\\\
+\\rho_{k} &= \\frac{(\\mathbf{F} \\boldsymbol{g})_{k}}{\\sqrt{F_{kk}}\\, \\sigma_{P}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{\\Sigma}``: Covariance matrix of the prior result, ``N \\times N``, with every non-finite entry set to zero.
+  - ``\\boldsymbol{\\mu}``: Expected returns of the prior result, ``N \\times 1``, with every non-finite entry set to zero.
+  - ``\\sigma_{C}^{2}``, ``\\mu_{C}``: Variance and expected return of component ``C``. ``\\sigma_{U}^{2}`` is a difference of variances and can be negative.
+  - ``\\mu_{P}``: Expected portfolio return.
+  - ``\\mathrm{VC}``, ``\\mathrm{PV}``, ``\\mathrm{MC}``, ``\\mathrm{vol}``, ``\\rho``: Volatility contribution, variance share, mean return contribution, volatility and correlation with the portfolio.
+  - ``F_{kk}``: Variance of factor ``k``, the diagonal entry of ``\\mathbf{F}``.
+  - ``\\mu_{f,k}``: Expected return of factor ``k``, entry ``k`` of ``\\boldsymbol{\\mu}_{f}``.
+  - $(math_dict[:sigma_P_patt])
+  - $(math_dict[:w_port])
+  - $(math_dict[:g_patt])
+  - $(math_dict[:B_patt])
+  - $(math_dict[:F_patt])
+  - $(math_dict[:mu_f_patt])
+  - $(math_dict[:D_patt])
+  - $(math_dict[:b_patt])
+  - $(math_dict[:p_ppy])
+  - $(math_dict[:N])
+  - $(math_dict[:K])
+
+The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\\, \\sigma_{P}``, ``\\sum_{C} \\mathrm{PV}_{C} = 1`` and ``\\sum_{C} \\mathrm{MC}_{C} = p\\, \\mu_{P}``. The factor rows sum to the systematic component, because ``\\sum_{k} g_{k} (\\mathbf{F} \\boldsymbol{g})_{k} = \\sigma_{S}^{2}``. The correlations are those of the model. Under ``\\mathbf{\\Sigma} = \\mathbf{B} \\mathbf{F} \\mathbf{B}^{\\intercal} + \\mathbf{D}``, with factors uncorrelated with the idiosyncratic returns, the covariance of the systematic return with the portfolio return is ``\\sigma_{S}^{2}``, and that of factor ``k`` is ``(\\mathbf{F} \\boldsymbol{g})_{k}``. The unattributed component carries no volatility and no correlation, because it is a gap between two moments and not a return series.
 
 # Algorithm
 
  1. Read the block and the factor distribution off `pr`, and the five series off the block.
- 2. Anchor the totals: `pr.mu` and `pr.sigma` on the predicted side, the return series on the realised side.
+ 2. Take the totals from `pr.mu` and `pr.sigma` on the predicted side, and from the return series on the realised side.
  3. Decompose the systematic and the idiosyncratic parts, and put every gap into the remainder.
  4. Sum the factor rows by family when the block names families, and over the assets when `assets = true`.
  5. Scale by `ppy`: means and variances by `ppy`, volatilities by its square root.
@@ -1109,7 +1300,6 @@ function factor_attribution(w::VecNum, pr::AbstractPriorResult; assets::Bool = f
     rr, fpr = blk.rr, blk.fpr
     imsk = investable_mask(pr)
     attribution_investable_diagnostic(w, imsk, strict)
-    sc = attribution_scale(ppy)
     M = attribution_investable_rows(attribution_finite(rr.M), imsk)
     F = fpr.sigma
     mu_f = fpr.mu
@@ -1127,6 +1317,7 @@ function factor_attribution(w::VecNum, pr::AbstractPriorResult; assets::Bool = f
               DomainError(total_var,
                           "the portfolio variance w' * pr.sigma * w must be positive for an attribution to divide by its square root"))
     sigma_p = sqrt(total_var)
+    sc = attribution_scale(ppy, sigma_p)
     sys_mu = LinearAlgebra.dot(bexp, mu_f)
     idio_mu = LinearAlgebra.dot(w, bp)
     total_mu = LinearAlgebra.dot(w, mu)
@@ -1167,7 +1358,55 @@ end
 
 Return the asset axis and the asset-by-factor matrices of a predicted attribution.
 
-The asset axis decomposes the **model**, not the anchors: every row reads `M F M' + D` and `M mu_f + b`, so the systematic rows sum to the systematic component, the idiosyncratic rows to the idiosyncratic component, and `vol_contrib` to the two together. It therefore does not reach the total, and the difference is the unattributed remainder, which is a property of the portfolio and has no per-asset split. The realised asset axis satisfies the same identity, so a reader compares the two sides row by row.
+The asset axis decomposes the model, not the totals. Every row reads `M F M' + D` and `M mu_f + b`, so the systematic rows sum to the systematic component, the idiosyncratic rows to the idiosyncratic component, and `vol_contrib` to the two together. It therefore does not reach the total, and the difference is the unattributed remainder, which is a property of the portfolio and has no per-asset split. The realised asset axis satisfies the same identity, so a reader compares the two sides row by row.
+
+# Mathematical definition
+
+For each asset ``i``, with the model covariance ``\\mathbf{\\Sigma}_{M}``:
+
+```math
+\\begin{align}
+\\mathbf{\\Sigma}_{M} &= \\mathbf{B} \\mathbf{F} \\mathbf{B}^{\\intercal} + \\mathbf{D}\\,, \\\\
+\\mathrm{VC}^{S}_{i} &= \\sqrt{p}\\, \\frac{w_{i} (\\mathbf{B} \\mathbf{F} \\boldsymbol{g})_{i}}{\\sigma_{P}}\\,, \\\\
+\\mathrm{VC}^{I}_{i} &= \\sqrt{p}\\, \\frac{w_{i} (\\mathbf{D} \\boldsymbol{w})_{i}}{\\sigma_{P}}\\,, \\\\
+\\mathrm{VC}_{i} &= \\mathrm{VC}^{S}_{i} + \\mathrm{VC}^{I}_{i} = \\sqrt{p}\\, \\frac{w_{i} (\\mathbf{\\Sigma}_{M} \\boldsymbol{w})_{i}}{\\sigma_{P}}\\,, \\\\
+\\mathrm{PV}_{i} &= \\frac{w_{i} (\\mathbf{\\Sigma}_{M} \\boldsymbol{w})_{i}}{\\sigma_{P}^{2}}\\,, \\\\
+\\mathrm{MC}^{S}_{i} &= p\\, w_{i} (\\mathbf{B} \\boldsymbol{\\mu}_{f})_{i}\\,, \\\\
+\\mathrm{MC}^{I}_{i} &= p\\, w_{i} b_{i}\\,, \\\\
+\\mathrm{MC}_{i} &= \\mathrm{MC}^{S}_{i} + \\mathrm{MC}^{I}_{i}\\,, \\\\
+\\mu_{i} &= p \\left( (\\mathbf{B} \\boldsymbol{\\mu}_{f})_{i} + b_{i} \\right)\\,, \\\\
+\\mathrm{vol}_{i} &= \\sqrt{p\\, (\\mathbf{\\Sigma}_{M})_{ii}}\\,, \\\\
+\\rho_{i} &= \\frac{(\\mathbf{\\Sigma}_{M} \\boldsymbol{w})_{i}}{\\sqrt{(\\mathbf{\\Sigma}_{M})_{ii}}\\, \\sigma_{P}}\\,.
+\\end{align}
+```
+
+For each asset ``i`` and factor ``k``:
+
+```math
+\\begin{align}
+\\mathrm{VC}_{ik} &= \\sqrt{p}\\, \\frac{w_{i} B_{ik} (\\mathbf{F} \\boldsymbol{g})_{k}}{\\sigma_{P}}\\,, \\\\
+\\mathrm{MC}_{ik} &= p\\, w_{i} B_{ik} \\mu_{f,k}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{\\Sigma}_{M}``: Model covariance, ``N \\times N``.
+  - ``\\mathrm{VC}``, ``\\mathrm{PV}``, ``\\mathrm{MC}``, ``\\mathrm{vol}``, ``\\rho``: Volatility contribution, variance share, mean return contribution, volatility and correlation with the portfolio. A superscript ``S`` or ``I`` names the systematic or the idiosyncratic part.
+  - ``\\mu_{i}``: Expected return of asset ``i`` under the model, scaled by ``p``.
+  - ``w_{i}``, ``b_{i}``, ``B_{ik}``, ``\\mu_{f,k}``: Entries of ``\\boldsymbol{w}``, ``\\boldsymbol{b}``, ``\\mathbf{B}`` and ``\\boldsymbol{\\mu}_{f}``.
+  - $(math_dict[:sigma_P_patt])
+  - $(math_dict[:w_port])
+  - $(math_dict[:g_patt])
+  - $(math_dict[:B_patt])
+  - $(math_dict[:F_patt])
+  - $(math_dict[:mu_f_patt])
+  - $(math_dict[:D_patt])
+  - $(math_dict[:b_patt])
+  - $(math_dict[:p_ppy])
+  - $(math_dict[:N])
+
+Summed over the assets, ``\\mathrm{VC}^{S}_{i}`` gives ``\\sqrt{p}\\, \\boldsymbol{g}^{\\intercal} \\mathbf{F} \\boldsymbol{g} / \\sigma_{P}``, the systematic volatility contribution, and ``\\mathrm{VC}^{I}_{i}`` gives ``\\sqrt{p}\\, \\boldsymbol{w}^{\\intercal} \\mathbf{D} \\boldsymbol{w} / \\sigma_{P}``, the idiosyncratic one. Summed over the assets, ``\\mathrm{VC}_{ik}`` and ``\\mathrm{MC}_{ik}`` give the row of factor ``k`` of the factor axis. Summed over the factors, they give ``\\mathrm{VC}^{S}_{i}`` and ``\\mathrm{MC}^{S}_{i}``. The volatility and the correlation of an asset read the model covariance, while ``\\sigma_{P}`` reads the covariance of the prior result. So ``\\rho_{i}`` is the correlation of asset ``i`` with the portfolio under the model only when ``\\boldsymbol{w}^{\\intercal} \\mathbf{\\Sigma}_{M} \\boldsymbol{w} = \\sigma_{P}^{2}``, which is when the unattributed variance is zero.
 
 # Arguments
 

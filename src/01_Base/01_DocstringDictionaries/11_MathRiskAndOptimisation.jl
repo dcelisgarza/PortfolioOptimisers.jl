@@ -180,4 +180,14 @@ unique_key_dict!(math_dict, :math_dict,
                  :rho_naive_sch => "``\\tilde{\\rho}(C)``: Risk of the naive risk parity sub-portfolio of the augmented block of ``C``. A [`Variance`](@ref) measure takes the quadratic form, and a [`StandardDeviation`](@ref) measure takes its square root.",#
                  # The Dirichlet distribution that `RandomWeighted` draws from and
                  # `UniversalPortfolio` samples its experts from.
-                 :alpha_dirichlet_conc => "``\\boldsymbol{\\alpha}``: Dirichlet concentration, one entry per asset.")
+                 :alpha_dirichlet_conc => "``\\boldsymbol{\\alpha}``: Dirichlet concentration, one entry per asset.",#
+                 # The predicted factor attribution of `19_FactorAttribution/`. Each symbol
+                 # is stated by two or more Units of `01_FactorAttribution.jl`.
+                 :B_patt => "``\\mathbf{B}``: Loadings the predicted attribution reads, ``N \\times K``, with entry ``B_{ik}`` for asset ``i`` and factor ``k``. Every non-finite entry and every row of a non-investable asset is zero.",#
+                 :F_patt => "``\\mathbf{F}``: Factor covariance, ``K \\times K``, the covariance of the factor distribution that the prior result carries.",#
+                 :mu_f_patt => "``\\boldsymbol{\\mu}_{f}``: Expected factor returns, ``K \\times 1``, the mean of the factor distribution that the prior result carries.",#
+                 :D_patt => "``\\mathbf{D}``: Idiosyncratic covariance the predicted attribution reads, ``N \\times N``. It is diagonal when the block carries variances alone. Every non-finite entry, and every row and column of a non-investable asset, is zero.",#
+                 :b_patt => "``\\boldsymbol{b}``: Intercept the predicted attribution reads, ``N \\times 1``, the expected return of each asset that the factors do not explain. Every non-finite entry and the entry of every non-investable asset is zero.",#
+                 :g_patt => "``\\boldsymbol{g} = \\mathbf{B}^{\\intercal} \\boldsymbol{w}``: Predicted factor exposure of the portfolio, ``K \\times 1``, with entry ``g_{k}`` for factor ``k``. The loadings and the weights do not move, so one exposure holds for every period.",#
+                 :sigma_P_patt => "``\\sigma_{P}``: Predicted portfolio volatility, the square root of the quadratic form of the weights in the covariance of the prior result.",#
+                 :m_patt => "``\\boldsymbol{m} \\in \\{0, 1\\}^{N}``: Investable mask, one entry per asset. An entry is ``1`` when the prior could estimate the asset, and ``0`` otherwise.")

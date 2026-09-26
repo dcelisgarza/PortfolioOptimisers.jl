@@ -1077,3 +1077,113 @@ end
         @test sum(fa.fbd.vol_contrib) ≈ fa.sys.vol_contrib
     end
 end
+
+# A prior built by hand, with three assets and two factors, so every number of the predicted side
+# is checked against its closed form in the docstrings of `factor_attribution` and
+# `predicted_attribution_assets`, and not only against the identities it satisfies (#838).
+function fa_hand_prior(; T::Type = Float64, F = [0.04 0.006; 0.006 0.09])
+    B = T[1.0 0.5; 0.8 -0.2; 0.3 1.2]
+    b = T[0.001, -0.002, 0.0005]
+    F = T.(F)
+    muf = T[0.01, 0.02]
+    D = T[0.01, 0.02, 0.015]
+    rng = StableRNG(838)
+    fpr = LowOrderPrior(; X = randn(rng, T, 10, 2), mu = muf, sigma = F)
+    rr = PortfolioOptimisers.Regression(; M = B, b = b, esigma = D)
+    return LowOrderPrior(; X = randn(rng, T, 10, 3), mu = B * muf + b,
+                         sigma = B * F * transpose(B) + Diagonal(D), rr = rr, fpr = fpr)
+end
+
+@testset "The predicted side reproduces its closed forms" begin
+    PO = PortfolioOptimisers
+    pr = fa_hand_prior()
+    B, b, F, muf, D = pr.rr.M, pr.rr.b, pr.fpr.sigma, pr.fpr.mu, Diagonal(pr.rr.esigma)
+    w = [0.5, 0.3, 0.2]
+    p = 12
+    fa = factor_attribution(w, pr; assets = true, ppy = p)
+    g = transpose(B) * w
+    sP = sqrt(dot(w, pr.sigma, w))
+    sS2, sI2 = dot(g, F, g), dot(w, D, w)
+    SM = B * F * transpose(B) + D
+    @testset "The three components and the total" begin
+        @test fa.sys.vol ≈ sqrt(p * sS2)
+        @test fa.sys.vol_contrib ≈ sqrt(p) * sS2 / sP
+        @test fa.sys.pct_var ≈ sS2 / sP^2
+        @test fa.sys.mu_contrib ≈ p * dot(g, muf)
+        @test fa.sys.corr ≈ sqrt(sS2) / sP
+        @test fa.idio.vol ≈ sqrt(p * sI2)
+        @test fa.idio.vol_contrib ≈ sqrt(p) * sI2 / sP
+        @test fa.idio.mu_contrib ≈ p * dot(w, b)
+        @test fa.idio.corr ≈ sqrt(sI2) / sP
+        # The prior's covariance is the model's, so the gap is at rounding level.
+        @test abs(fa.unattr.vol_contrib) < 1e-15
+        @test abs(fa.unattr.mu_contrib) < 1e-15
+        @test fa.total.vol ≈ sqrt(p) * sP
+        @test fa.total.mu_contrib ≈ p * dot(w, pr.mu)
+    end
+    @testset "The factor axis" begin
+        Fg = F * g
+        @test fa.fbd.exposure ≈ g
+        @test fa.fbd.vol ≈ sqrt.(p .* diag(F))
+        @test fa.fbd.corr ≈ Fg ./ (sqrt.(diag(F)) .* sP)
+        @test fa.fbd.vol_contrib ≈ sqrt(p) .* g .* Fg ./ sP
+        @test fa.fbd.pct_var ≈ g .* Fg ./ sP^2
+        @test fa.fbd.mu_contrib ≈ p .* g .* muf
+    end
+    @testset "The asset axis and the asset-by-factor matrices" begin
+        vol = sqrt.(diag(SM))
+        @test fa.abd.vol ≈ sqrt(p) .* vol
+        @test fa.abd.corr ≈ (SM * w) ./ (vol .* sP)
+        @test fa.abd.vol_contrib ≈ sqrt(p) .* w .* (SM * w) ./ sP
+        @test fa.abd.sys_vol_contrib ≈ sqrt(p) .* w .* (B * F * g) ./ sP
+        @test fa.abd.idio_vol_contrib ≈ sqrt(p) .* w .* (D * w) ./ sP
+        @test fa.abd.pct_var ≈ w .* (SM * w) ./ sP^2
+        @test fa.abd.mu ≈ p .* (B * muf + b)
+        @test fa.abd.sys_mu_contrib ≈ p .* w .* (B * muf)
+        @test fa.abd.idio_mu_contrib ≈ p .* w .* b
+        @test fa.afc.vol_contrib ≈
+              [sqrt(p) * w[i] * B[i, k] * (F * g)[k] / sP for i in 1:3, k in 1:2]
+        @test fa.afc.mu_contrib ≈ [p * w[i] * B[i, k] * muf[k] for i in 1:3, k in 1:2]
+    end
+    @testset "The correlations are those of the model, measured on a simulated history" begin
+        rng = StableRNG(838_001)
+        T = 200_000
+        fs = cholesky(F).L * randn(rng, 2, T) .+ muf
+        es = sqrt.(pr.rr.esigma) .* randn(rng, 3, T)
+        R = B * fs .+ b .+ es
+        rp = vec(transpose(w) * R)
+        # The sampling error of a correlation is about 1 / sqrt(T), which is 0.0022.
+        @test isapprox(cor(vec(transpose(g) * fs), rp), fa.sys.corr; atol = 5e-3)
+        @test isapprox(cor(vec(transpose(w) * es), rp), fa.idio.corr; atol = 5e-3)
+        @test isapprox([cor(fs[k, :], rp) for k in 1:2], fa.fbd.corr; atol = 5e-3)
+        @test isapprox([cor(R[i, :], rp) for i in 1:3], fa.abd.corr; atol = 5e-3)
+    end
+    @testset "A factor with no volatility has no correlation" begin
+        fz = factor_attribution(w, fa_hand_prior(; F = [0.04 0.0; 0.0 0.0]))
+        @test isnan(fz.fbd.corr[2])
+        @test iszero(fz.fbd.vol[2])
+        @test isfinite(fz.fbd.corr[1])
+        @test isnan(PO.attribution_safe_corr(0.1, 0.0, 0.2))
+        @test isnan(PO.attribution_safe_corr(0.1, NaN, 0.2))
+    end
+    @testset "Integer weights and an integer ppy keep the float type of the data" begin
+        fi = factor_attribution([1, 0, 0], pr)
+        @test fi.total.vol ≈ sqrt(pr.sigma[1, 1])
+        @test fi.sys.mu_contrib ≈ dot(B[1, :], muf)
+        f32 = factor_attribution(Float32[0.5, 0.3, 0.2], fa_hand_prior(; T = Float32);
+                                 assets = true)
+        # The default `ppy = 1` is an `Int`, and its bare square root is a `Float64`. The scale
+        # takes the data's type, so no volatility is widened past the correlations beside it.
+        for x in (f32.total.vol, f32.sys.vol, f32.sys.vol_contrib, f32.unattr.vol_contrib,
+                  f32.sys.corr, f32.unattr.vol, f32.total.mu_contrib)
+            @test isa(x, Float32)
+        end
+        for v in (f32.fbd.vol, f32.fbd.vol_contrib, f32.abd.vol, f32.abd.vol_contrib,
+                  f32.afc.vol_contrib)
+            @test eltype(v) == Float32
+        end
+        @test PO.attribution_scale(252, 1.0f0).s2 === sqrt(252.0f0)
+        @test PO.attribution_scale(252).s2 === sqrt(252)
+        @test PO.attribution_scale(12.0, 1.0f0).s2 === sqrt(12.0)
+    end
+end
