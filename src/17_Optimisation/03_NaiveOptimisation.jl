@@ -1,25 +1,27 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for naive (heuristic) portfolio optimisation estimators.
+Abstract supertype for the optimisers that compute portfolio weights without a solver.
 
-Naive optimisers compute portfolio weights directly from statistical properties of asset returns (e.g., volatility or equal weights) without solving an optimisation problem.
+Each subtype gives its weights by a closed form, a random draw, a fixed-point iteration or a copy of the weights it holds, and then imposes its weight bounds with its weight finaliser. [`PreviousWeights`](@ref) is the exception. It holds its weights as it was given them, and imposes no bounds. Every subtype carries a `fees` field and a fallback `fb`, and gives a [`NaiveOptimisationResult`](@ref).
 
 # Related
 
   - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+  - [`NaiveOptimisationResult`](@ref)
   - [`InverseVolatility`](@ref)
   - [`EqualWeighted`](@ref)
   - [`RandomWeighted`](@ref)
+  - [`BestConstantRebalancedPortfolio`](@ref)
   - [`PreviousWeights`](@ref)
 """
 abstract type NaiveOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether the naive optimiser requires previous portfolio weights: through its fees, a per-fold schedule on any field, or its fallback estimator.
+Return whether the naive optimiser needs the previous portfolio weights.
 
-Every naive head carries a `fees` field, and a static [`Fees`](@ref) whose turnover term is not fixed reads the previous weights through [`factory`](@ref) exactly as it does on a [`JuMPOptimiser`](@ref); a [`TimeDependent`](@ref) `fees` is read through the schedule scan instead.
+The answer is `true` when one of three parts needs them. The first is a [`TimeDependent`](@ref) schedule on any field. The second is the `fees`. A static [`Fees`](@ref) whose turnover or liquidation term is not fixed reads the previous weights through [`factory`](@ref), as it does on a [`JuMPOptimiser`](@ref). The third is the fallback `fb`. [`PreviousWeights`](@ref) overrides this method and always answers `true`.
 
 # Related
 
@@ -34,7 +36,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert internal validity for a naive optimisation estimator. No-op default.
+Assert internal validity for a naive optimisation estimator.
+
+The default method checks nothing and returns `nothing`.
 
 # Related
 
@@ -47,7 +51,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert external validity for a naive optimisation estimator. No-op default.
+Assert external validity for a naive optimisation estimator.
+
+The default method checks nothing and returns `nothing`. [`InverseVolatility`](@ref) overrides it, because its prior estimator can hold a result.
 
 # Related
 
@@ -60,7 +66,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if the naive optimiser configuration carries time-dependent constraints.
+Return `true` when a field of the naive optimiser holds a [`TimeDependent`](@ref) schedule, or when its fallback `fb` is time-dependent.
 
 # Related
 
@@ -80,9 +86,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve the time-dependent constraints of a naive optimiser for the fold described by `ctx`.
+Resolve the time-dependent fields of a naive optimiser for the fold that `ctx` describes.
 
-Rebuilds the optimiser through its validated keyword constructor with each [`TimeDependent`](@ref)-valued field replaced by its resolved per-fold value, recursing into the fallback, so the result is an ordinary static optimiser.
+The answer is a static optimiser, built through the keyword constructor, so the constructor checks every resolved value.
+
+# Algorithm
+
+ 1. Return `opt` unchanged when [`is_time_dependent`](@ref) is `false`.
+ 2. Replace each [`TimeDependent`](@ref) field of `opt` with its value for the fold, with `update_time_dependent_fields`, giving `opt`.
+ 3. Resolve the fallback `opt.fb` for the same fold, and rebuild `opt` with it.
 
 # Related
 
@@ -106,9 +118,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the static defaults of the naive-optimiser fields that may hold a [`TimeDependent`](@ref).
+Return the static defaults of the naive-optimiser fields that can hold a [`TimeDependent`](@ref).
 
-Shared by the constructors' test-substitution passes and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted; [`RandomWeighted`](@ref) overrides the trait because its `wb` default is `nothing`, and [`InverseVolatility`](@ref) extends it with its prior estimator.
+The constructors pass these defaults to [`assert_time_dependent_substitution`](@ref), and [`time_dependent_field_defaults`](@ref) returns them, so the value of a field outside a fold is written once. A field whose static default is `nothing` has no entry. [`RandomWeighted`](@ref) overrides the trait, because its `wb` default is `nothing`. [`InverseVolatility`](@ref) adds its prior estimator `pe`.
 
 # Related
 
@@ -122,7 +134,21 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Replace time-dependent constraints with their static defaults, both on the naive optimiser's own fields and by recursing into the fallback.
+Replace every [`TimeDependent`](@ref) field of a naive optimiser with its static default, and do the same to its fallback `fb`.
+
+A fold-less `optimise` calls it first, so the fit runs with each schedule at its static default.
+
+# Algorithm
+
+ 1. Return `opt` unchanged when [`is_time_dependent`](@ref) is `false`.
+ 2. Replace each [`TimeDependent`](@ref) field of `opt` with its entry of [`time_dependent_field_defaults`](@ref), with `reset_time_dependent_fields`, giving `opt`.
+ 3. Reset the fallback `opt.fb` the same way, and rebuild `opt` with it.
+
+# Related
+
+  - [`NaiveOptimisationEstimator`](@ref)
+  - [`update_time_dependent_estimator`](@ref)
+  - [`naive_optimiser_td_defaults`](@ref)
 """
 function reset_time_dependent_estimator(opt::NaiveOptimisationEstimator)
     if !is_time_dependent(opt)
@@ -134,7 +160,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Result type for naive portfolio optimisation estimators.
+Holds the weights, the bounds, the fee and the return code of a naive optimiser's fit.
+
+Every subtype of [`NaiveOptimisationEstimator`](@ref) gives this result. `pr` is the prior result that [`InverseVolatility`](@ref) fits, or the returns data that a prior-free head reads.
 
 # Fields
 
@@ -149,7 +177,7 @@ $(DocStringExtensions.FIELDS)
         imsk::Option{<:BitVector} = nothing, fb::Option{<:OptE_Opt_FbChain}
     ) -> NaiveOptimisationResult
 
-Keywords correspond to the struct's fields. The keyword constructor expands `w` onto the full asset universe through [`expand_investable_weights`](@ref), which is the one door [`_optimise`](@ref) exits through. The positional constructor never expands. `fees` is the fee the head was charged with, on the universe it solved on, so a walk-forward fold charges it through [`extract_fees`](@ref) exactly as it charges a hierarchical head's; it is `nothing` for a head that carries none.
+Keywords correspond to the struct's fields. The keyword constructor expands `w` from the assets of `imsk` onto the full asset universe with [`expand_investable_weights`](@ref), and every [`_optimise`](@ref) of the family builds its result through it. The positional constructor never expands. `fees` is the fee of the head, on the universe that it solved on. A walk-forward fold charges it through [`extract_fees`](@ref), as it charges the fee of a hierarchical head. It is `nothing` for a head that carries no fee.
 
 # Examples
 
@@ -229,7 +257,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Allocates each asset a weight inversely proportional to its volatility, or to its variance when `sq = true`.
 
-The volatilities come from the diagonal of the covariance matrix the prior estimator `pe` returns, so every choice inside `pe` reaches the result. This is the naive risk parity allocation that [`HierarchicalRiskParity`](@ref) applies inside a cluster.
+The variances are the diagonal of the covariance matrix that the prior estimator `pe` gives, so every choice inside `pe` reaches the weights. The inverse-variance weights, `sq = true`, are the naive risk parity allocation. [`HierarchicalRiskParity`](@ref) gives the assets of each half these weights under [`Variance`](@ref), and the inverse-volatility weights under [`StandardDeviation`](@ref), when it measures the risk of the half.
+
+The weight finaliser `wf` then imposes the weight bounds, so the weights of the result equal the closed form below only when no bound binds.
 
 # Mathematical definition
 
@@ -242,12 +272,9 @@ w_i &= \\frac{\\sigma_i^{-2}}{\\sum_{j=1}^N \\sigma_j^{-2}} \\quad \\textrm{when
 
 Where:
 
-  - ``w_i``: Portfolio weight of asset ``i`` before the weight bounds are applied.
-  - ``\\sigma_i^2``: Variance of asset ``i``, the ``i``-th diagonal entry of the prior covariance matrix.
-  - ``\\sigma_i``: Standard deviation of asset ``i``.
-  - ``N``: Number of assets.
-
-The weight finaliser `wf` then imposes the resolved weight bounds on ``\\boldsymbol{w}``, so the returned weights equal the expression above only when no bound binds.
+  - $(math_dict[:w_i_asset])
+  - $(math_dict[:sigma_i_asset]) Its square ``\\sigma_i^2`` is entry ``i`` of the diagonal of the prior covariance matrix.
+  - $(math_dict[:N])
 
 # Fields
 
@@ -268,7 +295,7 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> InverseVolatility
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the prior estimator, weight bounds, fees, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `sq`, `brt` and `strict` are execution control and stay static. `fees` is the fee the result carries and a walk-forward fold charges; a turnover fee reads the previous weights the loop threads through [`factory`](@ref).
+Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) can hold a [`TimeDependent`](@ref) per-fold schedule in place of a static value. The prior estimator, the weight bounds, the fees, the asset sets, the weight finaliser and the fallback define the problem, so a cross-validation fold loop resolves them for each fold. A fold-less `optimise` sets each of them to its static default. `sq`, `brt` and `strict` control the run and stay static. The result carries `fees`, and a walk-forward fold charges it. A turnover fee reads the previous weights that the loop writes through [`factory`](@ref).
 
 ## Validation
 
@@ -440,7 +467,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that [`InverseVolatility`](@ref) is valid for external use.
 
-Requires that `opt.pe` holds no `AbstractPriorResult`, directly or through a [`TimeDependent`](@ref) schedule.
+It throws an `ArgumentError` when `opt.pe` holds an `AbstractPriorResult`, directly or through a [`TimeDependent`](@ref) schedule.
 
 # Related
 
@@ -459,7 +486,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run the inverse volatility portfolio optimisation.
 
-Internal dispatch called by [`optimise`](@ref). Computes covariance via the prior estimator, reduces the prior, the optimiser and the returns data to the Investable Mask with [`investable_reduction`](@ref), assigns weights inversely proportional to volatility (or variance when `iv.sq = true`), then applies weight bounds. [`NaiveOptimisationResult`](@ref) expands the weights back onto the full asset universe.
+[`optimise`](@ref) calls this method. The weights follow the closed form of [`InverseVolatility`](@ref) on the assets of the Investable Mask, and every other asset holds a zero.
+
+# Algorithm
+
+ 1. Refuse a `dims` other than `1` with [`assert_returns_result_dims`](@ref).
+ 2. Set every [`TimeDependent`](@ref) field of `iv` to its static default, with [`reset_time_dependent_estimator`](@ref).
+ 3. Replace `rd` with its returns in excess of the benchmark when `iv.brt` is `true`, with `returns_result_picker`.
+ 4. Fit the prior `pr` with `iv.pe` on `rd`.
+ 5. Resolve the fee on the full universe of `rd`, and view it on the Investable Mask of `pr`, giving `fees`.
+ 6. Reduce `pr`, `iv` and `rd` to the Investable Mask with [`investable_reduction`](@ref), giving the mask `imsk`.
+ 7. Read the variances off the diagonal of `pr.sigma`, and take their inverse square roots, or their inverses when `iv.sq` is `true`, giving `w`.
+ 8. Divide `w` by its sum.
+ 9. Resolve the weight bounds `wb` over the reduced assets.
+10. Impose `wb` on `w` with the weight finaliser `iv.wf`, giving `retcode` and `w`.
+11. Build the [`NaiveOptimisationResult`](@ref), which expands `w` onto the full universe.
 
 # Related
 
@@ -470,16 +511,21 @@ Internal dispatch called by [`optimise`](@ref). Computes covariance via the prio
 """
 function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, kwargs...)
-    assert_dims(dims)
+    # A `ReturnsResult` is observations by assets, so `dims = 2` would fit the prior on the
+    # transpose and give one weight per observation.
+    assert_returns_result_dims(dims)
     iv = reset_time_dependent_estimator(iv)
     rd = returns_result_picker(rd, iv.brt)
     pr = prior(iv.pe, rd; dims = dims)
+    # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
+    # a float type for them, and every other sample keeps its own type.
+    Tf = float_if_integer(eltype(pr.X))
     # Resolve the fee on the caller's own universe, before the door below narrows `sets`,
     # for the reason the hierarchical heads do; `investable_fees_view` then places it on
     # the axes the mask leaves.
     fees = investable_fees_view(fees_constraints(iv.fees, iv.sets; strict = iv.strict,
-                                                 datatype = eltype(pr.X)),
-                                investable_mask(pr), size(pr.X, 2))
+                                                 datatype = Tf), investable_mask(pr),
+                                size(pr.X, 2))
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here: the
     # diagonal below then holds a finite variance at every position, and the bounds are
@@ -490,10 +536,8 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
     w = LinearAlgebra.diag(pr.sigma)
     w = inv.(!iv.sq ? sqrt.(w) : w)
     w /= sum(w)
-    # `pr.X` is always observations by assets, whatever `dims` the caller passed, so the
-    # asset count is `size(X, 2)` unconditionally.
     wb = weight_bounds_constraints(iv.wb, iv.sets; N = size(X, 2), strict = iv.strict,
-                                   datatype = eltype(X))
+                                   datatype = Tf)
     retcode, w = finalise_weight_bounds(iv.wf, wb, w)
     return NaiveOptimisationResult(; pr = pr, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = imsk, fb = nothing)
@@ -507,13 +551,14 @@ Run the inverse volatility portfolio optimisation.
 # Arguments
 
   - `iv`: The inverse volatility optimiser to use.
-  - $(arg_dict[:rd]) If `isa(iv.pe, AbstractPriorResult)`, `rd` is not necessary.
-  - `dims`: The dimension along which observations advance in time.
-  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+  - $(arg_dict[:rd]) When `iv.pe` is a prior result, the fit reads no returns from `rd`, and an empty `ReturnsResult()` is enough.
+  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets.
+  - `kwargs`: Ignored.
 
 # Validation
 
-  - No field in the tree of `iv` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+  - `dims == 1`. [`assert_returns_result_dims`](@ref) throws a `ConflictingArgumentError` for `dims == 2`, and a `DomainError` for any other value.
+  - No field in the tree of `iv` holds an [`Online`](@ref). [`assert_batch_entry`](@ref) throws an `ArgumentError` that names the field otherwise. A plain `optimise` is a batch fit, and only the warm-up of the online arm of the fold loop resolves a wrapper.
 """
 function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult; dims::Int = 1, kwargs...)::NaiveOptimisationResult
@@ -523,11 +568,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Allocates the same weight to every asset in the universe.
+Allocates the same weight to every asset of the Coverage Universe of the window.
 
-The asset count comes from `rd.X`, so this optimiser reads no prior and no covariance matrix.
+The optimiser fits no prior and reads no covariance matrix. It reads the asset count off the returns data.
 
-``N`` is the size of the **Coverage Universe** of the window, not of the full asset universe. An asset is in it when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window, so an asset that is not yet listed, is delisted, or carries a stale finite price during an inactive spell, weights nothing and holds a zero. The result carries that universe as its `imsk`. An all-dead window throws an `IsEmptyError`.
+``N`` is the size of the Coverage Universe of the window, not of the full asset universe. An asset is in it when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window. So an asset that is not yet listed, that is delisted, or that carries a stale finite price during an inactive spell holds a zero. The result carries the Coverage Universe as its `imsk`. A window in which no asset is covered throws an `IsEmptyError`.
+
+The weight finaliser `wf` then imposes the weight bounds, so the weights of the result equal ``1/N`` only when no bound binds.
 
 # Mathematical definition
 
@@ -539,10 +586,8 @@ w_i &= \\frac{1}{N} \\quad \\forall i\\,.
 
 Where:
 
-  - ``w_i``: Portfolio weight of asset ``i`` before the weight bounds are applied.
-  - ``N``: Number of assets.
-
-The weight finaliser `wf` then imposes the resolved weight bounds on ``\\boldsymbol{w}``, so the returned weights equal ``1/N`` only when no bound binds.
+  - $(math_dict[:w_i_asset])
+  - $(math_dict[:N])
 
 # Fields
 
@@ -560,7 +605,7 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> EqualWeighted
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, fees, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `strict` is execution control and stays static. `fees` is the fee the result carries and a walk-forward fold charges; a turnover fee reads the previous weights the loop threads through [`factory`](@ref).
+Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) can hold a [`TimeDependent`](@ref) per-fold schedule in place of a static value. The weight bounds, the fees, the asset sets, the weight finaliser and the fallback define the problem, so a cross-validation fold loop resolves them for each fold. A fold-less `optimise` sets each of them to its static default. `strict` controls the run and stays static. The result carries `fees`, and a walk-forward fold charges it. A turnover fee reads the previous weights that the loop writes through [`factory`](@ref).
 
 ## Validation
 
@@ -675,9 +720,19 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run the equal-weighted portfolio optimisation.
 
-Internal dispatch called by [`optimise`](@ref). Reduces the optimiser and the returns data to the Coverage Universe of the window with [`coverage_reduction`](@ref), assigns equal weights to the assets it keeps, then applies weight bounds. [`NaiveOptimisationResult`](@ref) expands the weights back onto the full asset universe.
+[`optimise`](@ref) calls this method. The head fits no prior, so no Prior Result gives it an Investable Mask. It takes the Coverage Universe of the window as its mask, and the result carries that mask as `imsk`, as the result of a prior-fitting head carries its Investable Mask.
 
-This head fits no prior, so no Prior Result yields an Investable Mask for it. The Coverage Universe is the mask it derives instead: an asset is kept when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window. A stale finite price during an inactive spell weights nothing, and an asset outside the mask holds a zero. The result carries the mask as `imsk`, so a reader of a walk-forward has the same idiom here as in every other family. An all-dead window throws an `IsEmptyError`.
+# Algorithm
+
+ 1. Refuse a missing `rd.X` with an `IsNothingError`, and a `dims` other than `1` with [`assert_returns_result_dims`](@ref).
+ 2. Set every [`TimeDependent`](@ref) field of `ew` to its static default, with [`reset_time_dependent_estimator`](@ref).
+ 3. Resolve the fee on the full universe of `rd`, giving `fees`.
+ 4. Reduce `ew` and `rd` to the Coverage Universe with [`coverage_reduction`](@ref), giving the mask `cmsk`. A window in which no asset is covered throws an `IsEmptyError`.
+ 5. View `fees` on `cmsk`.
+ 6. Fill `w` with ``1/N`` over the ``N`` assets that `rd` keeps.
+ 7. Resolve the weight bounds `wb` over the kept assets.
+ 8. Impose `wb` on `w` with the weight finaliser `ew.wf`, giving `retcode` and `w`.
+ 9. Build the [`NaiveOptimisationResult`](@ref), which expands `w` onto the full universe.
 
 # Related
 
@@ -693,7 +748,10 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
     # The fee is resolved on the caller's own universe before the door below narrows
     # `sets`, and placed on the axes the mask leaves after it.
     Nf = size(rd.X, 2)
-    fees = fees_constraints(ew.fees, ew.sets; strict = ew.strict, datatype = eltype(rd.X))
+    # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
+    # a float type for them, and every other sample keeps its own type.
+    Tf = float_if_integer(eltype(rd.X))
+    fees = fees_constraints(ew.fees, ew.sets; strict = ew.strict, datatype = Tf)
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here: the weight bounds and the sets are stated over the full universe
     # and are viewed by the same index. `NaiveOptimisationResult` expands the weights back.
@@ -702,9 +760,9 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
     # `rd.X` is always observations by assets, whatever `dims` the caller passed, so the
     # asset count is `size(rd.X, 2)` unconditionally.
     N = size(rd.X, 2)
-    w = fill(inv(N), N)
-    wb = weight_bounds_constraints(ew.wb, ew.sets; N = N, strict = ew.strict,
-                                   datatype = eltype(rd.X))
+    # The weight takes the type of the data, not the `Float64` of `inv(N)`.
+    w = fill(one(Tf) / N, N)
+    wb = weight_bounds_constraints(ew.wb, ew.sets; N = N, strict = ew.strict, datatype = Tf)
     retcode, w = finalise_weight_bounds(ew.wf, wb, w)
     return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = cmsk, fb = nothing)
@@ -718,9 +776,14 @@ Run the equal-weighted portfolio optimisation.
 # Arguments
 
   - `ew`: The equal-weighted optimiser to use.
-  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, which is the universe the weights are spread over.
-  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets, so `dims == 2` throws `ConflictingArgumentError`; build one in this layout with `prices_to_returns`.
-  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, and the weights are spread over that universe.
+  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets. [`prices_to_returns`](@ref) builds one in this layout.
+  - `kwargs`: Ignored.
+
+# Validation
+
+  - `rd.X` is not `nothing`. The method throws an `IsNothingError` otherwise.
+  - `dims == 1`. [`assert_returns_result_dims`](@ref) throws a `ConflictingArgumentError` for `dims == 2`, and a `DomainError` for any other value.
 """
 function optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
                   dims::Int = 1, kwargs...)::NaiveOptimisationResult
@@ -729,26 +792,30 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Draws portfolio weights at random from a Dirichlet distribution with concentration parameter `alpha`.
+Draws portfolio weights at random from a Dirichlet distribution with concentration `alpha`.
 
-Use it for simulation, benchmarking, or stress testing. A scalar `alpha` draws from the symmetric Dirichlet distribution over ``N`` assets; a vector `alpha` must be one entry per asset.
+A scalar `alpha` gives every asset the same concentration, so the draw is from the symmetric Dirichlet distribution. A vector `alpha` states one concentration per asset of the full universe. The draw takes the float type of `alpha`, not of the returns data, so the default `alpha = 1` gives `Float64` weights and `alpha = 1.0f0` gives `Float32` weights.
 
-``N`` is the size of the **Coverage Universe** of the window, not of the full asset universe. An asset is in it when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window, so an asset that is not yet listed, is delisted, or carries a stale finite price during an inactive spell, weights nothing and holds a zero. A vector `alpha` is still stated over the full universe, and is sliced to the Coverage Universe. The result carries that universe as its `imsk`. An all-dead window throws an `IsEmptyError`.
+``N`` is the size of the Coverage Universe of the window, not of the full asset universe. An asset is in it when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window. So an asset that is not yet listed, that is delisted, or that carries a stale finite price during an inactive spell holds a zero. A vector `alpha` is sliced to the Coverage Universe. The result carries the Coverage Universe as its `imsk`. A window in which no asset is covered throws an `IsEmptyError`.
+
+The weight finaliser `wf` then imposes the weight bounds. The default `wb` is `nothing`, so by default no bound binds and the weights of the result are the draw.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\boldsymbol{w} &\\sim \\mathrm{Dirichlet}(\\boldsymbol{\\alpha})\\,.
+\\boldsymbol{w} &\\sim \\mathrm{Dirichlet}(\\boldsymbol{\\alpha})\\,, \\\\
+\\mathbb{E}[\\boldsymbol{w}] &= \\frac{\\boldsymbol{\\alpha}}{\\boldsymbol{1}^\\intercal \\boldsymbol{\\alpha}}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}``: Portfolio weight vector before the weight bounds are applied. A Dirichlet draw is non-negative and sums to one.
-  - ``\\boldsymbol{\\alpha}``: Concentration parameter, one entry per asset. A larger value concentrates the distribution near equal weights.
+  - ``\\boldsymbol{w}``: Portfolio weights vector, one entry per asset of the Coverage Universe.
+  - $(math_dict[:alpha_dirichlet_conc])
+  - $(math_dict[:N])
 
-The weight finaliser `wf` then imposes the resolved weight bounds on ``\\boldsymbol{w}``, which by default are absent for this optimiser.
+A Dirichlet draw is non-negative and sums to one. A larger ``\\boldsymbol{1}^\\intercal \\boldsymbol{\\alpha}`` concentrates the draws nearer their mean, which is ``1/N`` for every asset when all the entries of ``\\boldsymbol{\\alpha}`` are equal.
 
 # Fields
 
@@ -769,7 +836,7 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> RandomWeighted
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, fees, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `wb`, `fees`, `sets` and `fb`). `rng`, `seed` and `strict` are execution control and stay static. `fees` is the fee the result carries and a walk-forward fold charges; a turnover fee reads the previous weights the loop threads through [`factory`](@ref).
+Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) can hold a [`TimeDependent`](@ref) per-fold schedule in place of a static value. The weight bounds, the fees, the asset sets, the weight finaliser and the fallback define the problem, so a cross-validation fold loop resolves them for each fold. A fold-less `optimise` sets each of them to its static default, which is `nothing` for `wb`, `fees`, `sets` and `fb`. `alpha` is static. `rng`, `seed` and `strict` control the run and stay static. The result carries `fees`, and a walk-forward fold charges it. A turnover fee reads the previous weights that the loop writes through [`factory`](@ref).
 
 ## Validation
 
@@ -916,11 +983,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run the random-weighted portfolio optimisation.
 
-Internal dispatch called by [`optimise`](@ref). Reduces the optimiser and the returns data to the Coverage Universe of the window with [`coverage_reduction`](@ref), draws weights over the assets it keeps from a Dirichlet distribution parameterised by `rw.alpha`, then applies weight bounds. [`NaiveOptimisationResult`](@ref) expands the weights back onto the full asset universe.
+[`optimise`](@ref) calls this method. The head fits no prior, so no Prior Result gives it an Investable Mask. It takes the Coverage Universe of the window as its mask, and the result carries that mask as `imsk`, as the result of a prior-fitting head carries its Investable Mask. A vector `alpha` states one concentration per asset of the full universe, so the method checks its length against the full width, before the reduction slices it.
 
-This head fits no prior, so no Prior Result yields an Investable Mask for it. The Coverage Universe is the mask it derives instead: an asset is kept when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window. A stale finite price during an inactive spell weights nothing, and an asset outside the mask holds a zero. The result carries the mask as `imsk`, so a reader of a walk-forward has the same idiom here as in every other family. An all-dead window throws an `IsEmptyError`.
+# Algorithm
 
-A vector `alpha` is one concentration per asset of the **full** universe, because that is the universe the caller states it over. Its length is therefore checked against the full width, before the reduction, and [`port_opt_view`](@ref) then slices it to the Coverage Universe with the rest of the estimator.
+ 1. Refuse a missing `rd.X` with an `IsNothingError`, and a `dims` other than `1` with [`assert_returns_result_dims`](@ref).
+ 2. Set every [`TimeDependent`](@ref) field of `rw` to its static default, with [`reset_time_dependent_estimator`](@ref).
+ 3. Refuse a vector `rw.alpha` whose length is not the width `Nf` of `rd.X`, with a `DimensionMismatch`.
+ 4. Resolve the fee on the full universe of `rd`, giving `fees`.
+ 5. Reduce `rw` and `rd` to the Coverage Universe with [`coverage_reduction`](@ref), giving the mask `cmsk`. [`port_opt_view`](@ref) slices a vector `rw.alpha` with the rest of `rw`. A window in which no asset is covered throws an `IsEmptyError`.
+ 6. View `fees` on `cmsk`.
+ 7. Build the Dirichlet distribution `dist` over the ``N`` kept assets, symmetric for a scalar `rw.alpha`.
+ 8. Draw `w` from `dist` with the generator that `resolve_rng` gives for `rw.rng` and `rw.seed`.
+ 9. Resolve the weight bounds `wb` over the kept assets.
+10. Impose `wb` on `w` with the weight finaliser `rw.wf`, giving `retcode` and `w`.
+11. Build the [`NaiveOptimisationResult`](@ref), which expands `w` onto the full universe.
 
 # Related
 
@@ -944,7 +1021,10 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     end
     # The fee is resolved on the caller's own universe before the door below narrows
     # `sets`, and placed on the axes the mask leaves after it.
-    fees = fees_constraints(rw.fees, rw.sets; strict = rw.strict, datatype = eltype(rd.X))
+    # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
+    # a float type for them, and every other sample keeps its own type.
+    Tf = float_if_integer(eltype(rd.X))
+    fees = fees_constraints(rw.fees, rw.sets; strict = rw.strict, datatype = Tf)
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here: the concentrations, the weight bounds and the sets are stated over
     # the full universe and are viewed by the same index. `NaiveOptimisationResult` expands
@@ -959,8 +1039,7 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     end
     rng = resolve_rng(rw.rng, rw.seed)
     w = rand(rng, dist)
-    wb = weight_bounds_constraints(rw.wb, rw.sets; N = N, strict = rw.strict,
-                                   datatype = eltype(rd.X))
+    wb = weight_bounds_constraints(rw.wb, rw.sets; N = N, strict = rw.strict, datatype = Tf)
     retcode, w = finalise_weight_bounds(rw.wf, wb, w)
     return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = cmsk, fb = nothing)
@@ -974,9 +1053,15 @@ Run the random-weighted portfolio optimisation.
 # Arguments
 
   - `rw`: The random-weighted optimiser to use.
-  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, which is the universe the draw is taken over.
-  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets, so `dims == 2` throws `ConflictingArgumentError`; build one in this layout with `prices_to_returns`.
-  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, and the draw is over that universe.
+  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets. [`prices_to_returns`](@ref) builds one in this layout.
+  - `kwargs`: Ignored.
+
+# Validation
+
+  - `rd.X` is not `nothing`. The method throws an `IsNothingError` otherwise.
+  - `dims == 1`. [`assert_returns_result_dims`](@ref) throws a `ConflictingArgumentError` for `dims == 2`, and a `DomainError` for any other value.
+  - A vector `rw.alpha` has one entry per column of `rd.X`. The method throws a `DimensionMismatch` otherwise.
 """
 function optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                      Nothing}, rd::ReturnsResult; dims::Int = 1,
@@ -986,33 +1071,40 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Allocates the constant rebalanced portfolio that maximises the log wealth of the window it is fit on, by Cover's fixed point and no solver.
+Allocates the constant rebalanced portfolio that maximises the log wealth of its window, through Cover's fixed point and without a solver.
 
-The Hindsight Comparator of the online selection family with no solver attached: fit it on the rows a strategy is scored on and predict it in sample over the same rows, and its log wealth is the ceiling every constant portfolio, and every strategy that pays no attention to order, is measured against with [`log_wealth_regret`](@ref). It is also the solver-free optimiser a follow-the-leader rule re-solves on the rows it selects. A caller with a JuMP solver reaches the same portfolio, and a bounded or otherwise constrained one, through [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref); the parity of the two is tested to the solver's tolerance.
+It is the Hindsight Comparator of the online selection family that needs no solver. Fit it on the rows that a strategy is scored on, and predict it in sample over the same rows. Its log wealth is then the largest that a constant rebalanced portfolio reaches on those rows, and [`log_wealth_regret`](@ref) measures a strategy against it. A follow-the-leader rule can also re-solve it on the rows that the rule selects. [`MeanRisk`](@ref)`(; obj = MaximumReturn(), opt = JuMPOptimiser(; slv, ret = LogarithmicReturn()))` gives the same portfolio to the tolerance of its solver, with one exponential cone per row.
+
+The fixed point knows no bound other than the simplex. The weight finaliser `wf` imposes a `wb` that binds after the fixed point, so the weights of the result are then a repair of the unconstrained optimum, and not the constrained optimum. The default bounds are the simplex, and the finaliser leaves the fixed point unchanged under them. For a bounded or constrained Hindsight Comparator, state the bounds on the [`MeanRisk`](@ref) form above.
+
+The head fits no prior. It reduces to the Coverage Universe of its window. An asset is kept when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row. Every other asset holds a zero, and the result carries the Coverage Universe as `imsk`.
+
+The iteration stops when the certificate of the last line below is at most `tol * max(1, |log wealth|)`, or after `iters` steps. So `converged = true` means that the log wealth is within that tolerance of the optimum. The certificate bounds the log wealth, not the weights. The weight of an asset that the optimum does not hold falls by the factor ``g_i(\\boldsymbol{b}^{\\star})`` at each step. When that multiplier is near one, the default budget can stop first with `converged = false`. The `retcode.res` of the result holds `converged`, `iterations` and the certificate `gap`.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\boldsymbol{w}^{\\star} &= \\underset{\\boldsymbol{w} \\in \\Delta^{N}}{\\arg\\max} \\sum_{t=1}^{T} \\log\\left(1 + \\boldsymbol{x}_t^{\\intercal} \\boldsymbol{w}\\right)\\,, \\\\
-w_i^{(k+1)} &= w_i^{(k)} \\, \\frac{1}{T} \\sum_{t=1}^{T} \\frac{1 + x_{t,i}}{1 + \\boldsymbol{x}_t^{\\intercal} \\boldsymbol{w}^{(k)}}\\,.
+\\boldsymbol{b}^{\\star} &= \\underset{\\boldsymbol{b} \\in \\Delta_N}{\\arg\\max} \\log S_T(\\boldsymbol{b}) = \\underset{\\boldsymbol{b} \\in \\Delta_N}{\\arg\\max} \\sum_{t=1}^{T} \\log \\langle \\boldsymbol{b}, \\boldsymbol{x}_t \\rangle\\,, \\\\
+g_i(\\boldsymbol{b}) &= \\frac{1}{T} \\sum_{t=1}^{T} \\frac{x_{t,i}}{\\langle \\boldsymbol{b}, \\boldsymbol{x}_t \\rangle}\\,, \\\\
+b_i^{(k+1)} &= b_i^{(k)} \\, g_i\\left(\\boldsymbol{b}^{(k)}\\right)\\,, \\\\
+\\log S_T(\\boldsymbol{b}^{\\star}) - \\log S_T(\\boldsymbol{b}) &\\leq T \\log \\max_i g_i(\\boldsymbol{b})\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}^{\\star}``: The best constant rebalanced portfolio, on the simplex ``\\Delta^{N}``.
-  - $(math_dict[:x_t_obs]) ``1 + x_{t,i}`` is asset ``i``'s price relative.
+  - ``\\boldsymbol{b}^{\\star}``: Best constant rebalanced portfolio, the weights of the result when no bound binds.
+  - $(math_dict[:b_crp])
+  - $(math_dict[:Delta_N_simplex])
+  - $(math_dict[:S_t_crp])
+  - $(math_dict[:x_t_rel]) Its entry ``x_{t,i}`` is one plus the return of asset ``i``.
   - $(math_dict[:T])
-  - ``w_i^{(k)}``: Weight of asset ``i`` at iteration ``k``, started from ``1/N``.
+  - $(math_dict[:N])
+  - ``g_i(\\boldsymbol{b})``: Multiplier of asset ``i`` at ``\\boldsymbol{b}``, the mean over the periods of the price relative of asset ``i`` divided by the gross return of ``\\boldsymbol{b}``.
+  - ``\\boldsymbol{b}^{(k)}``: Iterate ``k`` of Cover's map.
 
-The objective is concave on the simplex, so its maximum is global. The multiplier of an asset is the average ratio of its price relative to the portfolio's own; an asset that beats the portfolio on average grows, and at a fixed point every held asset has multiplier one, which is the first-order condition. The iteration is a minorise–maximise scheme, so the log wealth is non-decreasing at every step. A weight that starts at zero stays at zero, so the uniform start is what lets every asset compete.
-
-The iteration stops on a certificate, or after `iters` steps. The certificate is ``T \\log \\max_i g_i`` over the multipliers ``g_i`` of the current weights. By concavity and Jensen's inequality it bounds from above the shortfall of the log wealth from the optimum, and it reaches zero at the optimum, a corner included. So `converged = true` means that the log wealth is within `tol * max(1, |log wealth|)` of the optimum. The certificate bounds the log wealth, not the weights. At a leader that holds no weight on an asset, the weight of that asset decays sublinearly, so the default budget can stop first and report `converged = false`. The result's `retcode.res` carries `converged`, `iterations` and the certificate `gap`. The exact form, on a solver, is [`MeanRisk`](@ref)`(; obj = MaximumReturn(), opt = JuMPOptimiser(; slv, ret = LogarithmicReturn()))`: one exponential cone per row, exact to the solver's tolerance, and the only form that honours a bound.
-
-The head is simplex-only. The fixed point knows no bound other than the simplex, so a `wb` that binds is imposed by the weight finaliser `wf` **after** the fixed point: the returned weights are then a repair of the unconstrained optimum, not the constrained one. A bounded or constrained Hindsight Comparator is [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref), with the bounds stated on its optimiser. The default bounds are the simplex, and the finaliser leaves the fixed point untouched.
-
-The head fits no prior and derives the Coverage Universe of its own window: an asset is kept when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row, and every other asset holds a zero. The result carries that universe as `imsk`.
+The objective is concave on the simplex, so its maximum is global. The multipliers satisfy ``\\sum_i b_i g_i(\\boldsymbol{b}) = 1``, so Cover's map keeps an iterate on the simplex. The map is a minorise-maximise step, so ``\\log S_T`` does not fall from one iterate to the next. An entry at zero stays at zero. At ``\\boldsymbol{b}^{\\star}`` every held asset has ``g_i = 1`` and every other asset has ``g_i \\leq 1``, which is the first-order condition. The last line holds at every ``\\boldsymbol{b}`` in the simplex, by concavity and Jensen's inequality, and its right side is zero at ``\\boldsymbol{b}^{\\star}``, a corner included.
 
 # Fields
 
@@ -1032,7 +1124,7 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> BestConstantRebalancedPortfolio
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, fees, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `iters`, `tol` and `strict` are execution control and stay static. `fees` is the fee the result carries and a walk-forward fold charges; a turnover fee reads the previous weights the loop threads through [`factory`](@ref).
+Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) can hold a [`TimeDependent`](@ref) per-fold schedule in place of a static value. The weight bounds, the fees, the asset sets, the weight finaliser and the fallback define the problem, so a cross-validation fold loop resolves them for each fold. A fold-less `optimise` sets each of them to its static default. `iters`, `tol` and `strict` control the run and stay static. The result carries `fees`, and a walk-forward fold charges it. A turnover fee reads the previous weights that the loop writes through [`factory`](@ref).
 
 ## Validation
 
@@ -1082,6 +1174,8 @@ BestConstantRebalancedPortfolio
   - [`NaiveOptimisationResult`](@ref)
   - [`NaiveOptimisationEstimator`](@ref)
   - [`log_wealth_regret`](@ref)
+  - [`cover_fixed_point`](@ref)
+  - [`MeanRisk`](@ref): Reaches the same portfolio with a solver under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref), and takes bounds.
   - [`LogarithmicReturn`](@ref)
   - [`EqualWeighted`](@ref)
   - [`factory`](@ref)
@@ -1176,7 +1270,15 @@ end
 
 Run Cover's fixed-point iteration for the best constant rebalanced portfolio over a matrix of price relatives.
 
-The kernel of [`BestConstantRebalancedPortfolio`](@ref), on a bare matrix so it can be tested against the closed form on a hand example and reused by a rule that re-solves it. Starts from the uniform portfolio and multiplies each weight by the average ratio of its price relative to the portfolio's, renormalising after every step. Before each step it reads the duality-gap certificate ``T \\log \\max_i g_i`` over the multipliers ``g_i``, an upper bound on the shortfall of the log wealth from the optimum, and it stops when the certificate is at most `tol * max(1, |log wealth|)`, or after `iters` steps.
+It is the kernel of [`BestConstantRebalancedPortfolio`](@ref), on a bare matrix, so a rule that re-solves the portfolio can call it directly. The map, the multipliers ``g_i`` and the certificate are the ones that [`BestConstantRebalancedPortfolio`](@ref) states.
+
+# Algorithm
+
+ 1. Start from the uniform portfolio `w`, ``1/N`` for every asset, so that every asset can take weight.
+ 2. Compute the gross returns `p = X * w`, the log wealth `lw`, the multipliers `g` as `X' * inv.(p) / T`, and the certificate `gap`, ``T \\log \\max_i g_i`` clamped at zero.
+ 3. Stop, with `converged = true`, when `gap` is at most `tol * max(1, abs(lw))`.
+ 4. Stop, with `converged = false`, after `iters` steps.
+ 5. Otherwise multiply `w` by `g` entry by entry, divide it by its sum to remove the round-off, add one to `iterations`, and go back to step 2.
 
 # Arguments
 
@@ -1186,7 +1288,13 @@ The kernel of [`BestConstantRebalancedPortfolio`](@ref), on a bare matrix so it 
 
 # Returns
 
-  - `fp::NamedTuple`: `w`, the weights on the simplex; `log_wealth`, ``\\sum_t \\log(\\boldsymbol{x}_t^{\\intercal} \\boldsymbol{w})``; `gap`, the certificate at `w`, which bounds the optimal log wealth minus `log_wealth`; `converged`, whether the certificate met the tolerance; `iterations`, the number of multiplicative steps taken, zero when the uniform start already meets it.
+  - `fp::NamedTuple`: Five entries.
+
+      + `w`: The weights, on the simplex.
+      + `log_wealth`: ``\\sum_t \\log(\\boldsymbol{x}_t^{\\intercal} \\boldsymbol{w})`` at `w`.
+      + `gap`: The certificate at `w`, an upper bound on the optimal log wealth minus `log_wealth`.
+      + `converged`: Whether `gap` met the tolerance.
+      + `iterations`: The number of multiplicative steps, zero when the uniform start already meets the tolerance.
 
 # Related
 
@@ -1203,7 +1311,9 @@ function cover_fixed_point(X::MatNum, iters::Integer, tol::Number)
     # included, where every multiplier is at most one.
     p = X * w
     lw = sum(log, p)
-    g = vec(Statistics.mean(X ./ p; dims = 1))
+    # The mean over observations of `X[t, i] / p[t]` is one matrix-vector product, so no
+    # observations-by-assets temporary is built at each step.
+    g = X' * inv.(p) / T
     gap = max(zero(lw), T * log(maximum(g)))
     converged = gap <= tol * max(one(lw), abs(lw))
     iterations = 0
@@ -1214,7 +1324,7 @@ function cover_fixed_point(X::MatNum, iters::Integer, tol::Number)
         w ./= sum(w)
         p = X * w
         lw = sum(log, p)
-        g = vec(Statistics.mean(X ./ p; dims = 1))
+        g = X' * inv.(p) / T
         gap = max(zero(lw), T * log(maximum(g)))
         converged = gap <= tol * max(one(lw), abs(lw))
         iterations += 1
@@ -1227,7 +1337,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run the best constant rebalanced portfolio optimisation.
 
-Internal dispatch called by [`optimise`](@ref). Reduces the optimiser and the returns data to the Coverage Universe of the window with [`coverage_reduction`](@ref), forms the price relatives `1 .+ rd.X`, runs [`cover_fixed_point`](@ref) from the uniform portfolio, then applies weight bounds through the finaliser. [`NaiveOptimisationResult`](@ref) expands the weights back onto the full asset universe. The return code is the finaliser's; a successful one carries the fixed point's `converged` flag, iteration count and certificate `gap` in its `res`, so a run that stopped at `iters` is read off the result rather than guarded.
+[`optimise`](@ref) calls this method. The return code is the one of the weight finaliser. A successful return code holds the `converged` flag, the iteration count and the certificate `gap` of the fixed point in its `res`, so the caller reads a run that stopped at `iters` off the result, and the method throws nothing for it.
+
+# Algorithm
+
+ 1. Refuse a missing `rd.X` with an `IsNothingError`, and a `dims` other than `1` with [`assert_returns_result_dims`](@ref).
+ 2. Set every [`TimeDependent`](@ref) field of `bcrp` to its static default, with [`reset_time_dependent_estimator`](@ref).
+ 3. Resolve the fee on the full universe of `rd`, giving `fees`.
+ 4. Reduce `bcrp` and `rd` to the Coverage Universe with [`coverage_reduction`](@ref), giving the mask `cmsk`. A window in which no asset is covered throws an `IsEmptyError`.
+ 5. View `fees` on `cmsk`.
+ 6. Form the price relatives `X`, one plus `rd.X`.
+ 7. Run [`cover_fixed_point`](@ref) on `X` with `bcrp.iters` and `bcrp.tol`, giving `fp`.
+ 8. Resolve the weight bounds `wb` over the kept assets.
+ 9. Impose `wb` on `fp.w` with the weight finaliser `bcrp.wf`, giving `retcode` and `w`.
+10. When `retcode` is an [`OptimisationSuccess`](@ref), replace it with one whose `res` holds `fp.converged`, `fp.iterations` and `fp.gap`.
+11. Build the [`NaiveOptimisationResult`](@ref), which expands `w` onto the full universe.
 
 # Related
 
@@ -1245,8 +1369,10 @@ function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; dim
     # The fee is resolved on the caller's own universe before the door below narrows
     # `sets`, and placed on the axes the mask leaves after it.
     Nf = size(rd.X, 2)
-    fees = fees_constraints(bcrp.fees, bcrp.sets; strict = bcrp.strict,
-                            datatype = eltype(rd.X))
+    # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
+    # a float type for them, and every other sample keeps its own type.
+    Tf = float_if_integer(eltype(rd.X))
+    fees = fees_constraints(bcrp.fees, bcrp.sets; strict = bcrp.strict, datatype = Tf)
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here, as `EqualWeighted` does. `NaiveOptimisationResult` expands back.
     cmsk, bcrp, rd = coverage_reduction(bcrp, rd; dims = dims)
@@ -1255,7 +1381,7 @@ function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; dim
     N = size(X, 2)
     fp = cover_fixed_point(X, bcrp.iters, bcrp.tol)
     wb = weight_bounds_constraints(bcrp.wb, bcrp.sets; N = N, strict = bcrp.strict,
-                                   datatype = eltype(X))
+                                   datatype = Tf)
     retcode, w = finalise_weight_bounds(bcrp.wf, wb, fp.w)
     if isa(retcode, OptimisationSuccess)
         retcode = OptimisationSuccess(;
@@ -1271,14 +1397,19 @@ end
 
 Run the best constant rebalanced portfolio optimisation.
 
-A Hindsight Comparator is fit on the rows it is scored on, so `predict(optimise(bcrp, rd_test), rd_test)` is the comparator's prediction result over `rd_test`, and `cross_val_predict(bcrp, rd, cv)` is the causal constant portfolio over the same rows.
+A Hindsight Comparator is fit on the rows that it is scored on. So `predict(optimise(bcrp, rd_test), rd_test)` is the prediction result of the comparator over `rd_test`, and `cross_val_predict(bcrp, rd, cv)` is the causal constant portfolio over the same rows.
 
 # Arguments
 
   - `bcrp`: The best constant rebalanced portfolio optimiser to use.
-  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, which is the universe the fixed point runs over.
-  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets, so `dims == 2` throws `ConflictingArgumentError`; build one in this layout with `prices_to_returns`.
-  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, and the fixed point runs over that universe.
+  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets. [`prices_to_returns`](@ref) builds one in this layout.
+  - `kwargs`: Ignored.
+
+# Validation
+
+  - `rd.X` is not `nothing`. The method throws an `IsNothingError` otherwise.
+  - `dims == 1`. [`assert_returns_result_dims`](@ref) throws a `ConflictingArgumentError` for `dims == 2`, and a `DomainError` for any other value.
 """
 function optimise(bcrp::BestConstantRebalancedPortfolio{<:Any, <:Any, <:Any, <:Any,
                                                         Nothing}, rd::ReturnsResult;
@@ -1291,9 +1422,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the weights it was handed, and solves nothing.
 
-The hold-only head. Its weights are the previous fold's, threaded into `w` by the fold loop through [`factory`](@ref) exactly as they reach a [`TurnoverEstimator`](@ref), and it returns them verbatim on the full asset universe: no prior, no Coverage Universe, no weight bounds, so a hold is never rewritten. Its one use is as the fallback `fb` of an optimiser inside a walk-forward, where a failed solve then holds the book instead of writing `NaN` weights and losing the fold; a weight on an asset that left the panel is still held, and its returns are zeroed as a Held Gap. It is also a primary: `PreviousWeights(; w = w)` is a walk-forward that holds `w` on every fold. A view to an asset subset, such as a cluster of [`NestedClustered`](@ref) or the asset subset of a [`MultipleRandomised`](@ref) fold, slices `w` to the subset, and the head holds that slice verbatim: the slice is not rescaled to the budget of the subset. It refuses nothing at construction and fails at solve time when `w` is `nothing`, which is what fold 1 of a walk-forward, and a fold-less `optimise` with no `w`, hand it.
+The fold loop writes the weights of the previous fold into `w` through [`factory`](@ref), as it writes them into a [`TurnoverEstimator`](@ref). The head returns `w` unchanged, on the full asset universe. It fits no prior, takes no Coverage Universe and imposes no weight bounds, so nothing rewrites a hold.
 
-`needs_previous_weights` is `true`, so an optimiser that carries it as a fallback runs sequentially, and the loop threads the previous weights into it.
+Its main use is as the fallback `fb` of an optimiser inside a walk-forward. A failed solve then holds the book, and the fold keeps finite weights in place of `NaN` weights. The head still holds a weight on an asset that left the panel, and the returns of that asset are zeroed as a Held Gap. It is also a primary optimiser: `PreviousWeights(; w = w)` is a walk-forward that holds `w` on every fold.
+
+A view to an asset subset, such as a cluster of [`NestedClustered`](@ref) or the asset subset of a [`MultipleRandomised`](@ref) fold, slices `w` to the subset. The head holds that slice as it is, and does not rescale it to the budget of the subset.
+
+The constructor refuses a `w` with a non-finite entry. A fit with `w = nothing` gives an [`OptimisationFailure`](@ref). Fold 1 of a walk-forward and a fold-less `optimise` with no `w` meet that case. [`needs_previous_weights`](@ref) is `true`, so an optimiser that carries the head as a fallback runs its folds in sequence, and the loop writes the previous weights into it.
 
 # Fields
 
@@ -1303,11 +1438,11 @@ $(DocStringExtensions.FIELDS)
 
     PreviousWeights(; w::Option{<:VecNum} = nothing, fees::Option{<:Fees} = nothing, fb::TDO_Option{<:OptE_Opt} = nothing) -> PreviousWeights
 
-Keywords correspond to the struct's fields. `fb` may hold a [`TimeDependent`](@ref) per-fold schedule. `fees` is a resolved [`Fees`](@ref), never an estimator, because the head holds no `sets` to resolve one over; it is the fee the result carries and a walk-forward fold charges, and under a Previous-Weights Source its turnover term prices the rebalance from the drifted book back to the held target.
+Keywords correspond to the struct's fields. `fb` can hold a [`TimeDependent`](@ref) per-fold schedule. `fees` is a resolved [`Fees`](@ref), never an estimator, because the head holds no `sets` to resolve an estimator over. The result carries `fees`, and a walk-forward fold charges it. Under a Previous-Weights Source, its turnover term prices the rebalance from the drifted book back to the held target.
 
 ## Validation
 
-  - `w`: `all(isfinite, w)`, else a `DomainError` is raised.
+  - `w`: `all(isfinite, w)` when `w` is not `nothing`. The constructor throws a `DomainError` otherwise.
   - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
@@ -1414,12 +1549,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the held weights as a result, or a failure when there are none.
 
-Internal dispatch called by [`optimise`](@ref). The head reads nothing off `rd` but its width: the weights are returned verbatim, on the universe they were threaded on, with `imsk = nothing` and no weight bounds. A head whose `w` is `nothing` answers an [`OptimisationFailure`](@ref) naming the missing weights, so a fallback chain that reaches it walks on, and its weights are a `NaN` vector of the carrier's width — what every failed solve carries, so a fold reads the failure as it reads any other — or `nothing` when the carrier has no returns to take a width from.
+[`optimise`](@ref) calls this method. It reads only the width of `rd`. The weights of the result are `w` unchanged, on the universe that the loop wrote them on, with `imsk = nothing` and no weight bounds.
+
+A head whose `w` is `nothing` gives an [`OptimisationFailure`](@ref) that names the missing weights, so a fallback chain that reaches it goes on to the next fallback. Its weights are then `NaN` at every column of `rd.X`, as the weights of every failed solve are, so a fold reads this failure as it reads any other. They are `nothing` when `rd.X` is `nothing`.
 
 # Algorithm
 
- 1. With `w` set, give a [`NaiveOptimisationResult`](@ref) carrying `w` and an [`OptimisationSuccess`](@ref).
- 2. With `w` unset, give one carrying an [`OptimisationFailure`](@ref) and `NaN` weights, one per column of `rd.X`, or `nothing` when `rd.X` is `nothing`.
+ 1. Set every [`TimeDependent`](@ref) field of `pw` to its static default, with [`reset_time_dependent_estimator`](@ref).
+ 2. With `w` set, give a [`NaiveOptimisationResult`](@ref) that carries `w` and an [`OptimisationSuccess`](@ref).
+ 3. With `w` unset, give one that carries an [`OptimisationFailure`](@ref) and the weights of [`failed_hold_weights`](@ref).
 
 # Related
 
@@ -1444,7 +1582,9 @@ end
     failed_hold_weights(X::Nothing)
     failed_hold_weights(X::MatNum)
 
-The weights a [`PreviousWeights`](@ref) with nothing to hold answers: `NaN` at every asset of the carrier, or `nothing` when the carrier has no returns to take a width from.
+Return the weights of a [`PreviousWeights`](@ref) that has nothing to hold.
+
+The weights are `NaN` at every column of `X`, or `nothing` when `X` is `nothing`. They take the element type of `X`, or a float type when `X` holds integers, because an integer cannot hold `NaN`.
 
 # Related
 
@@ -1455,7 +1595,9 @@ function failed_hold_weights(::Nothing)
     return nothing
 end
 function failed_hold_weights(X::MatNum)
-    return fill(convert(eltype(X), NaN), size(X, 2))
+    # An integer sample cannot hold `NaN`, so it takes a float type, and every other sample
+    # keeps its own type.
+    return fill(convert(float_if_integer(eltype(X)), NaN), size(X, 2))
 end
 """
     optimise(pw::PreviousWeights{<:Any, <:Any, Nothing}, rd::ReturnsResult = ReturnsResult();
@@ -1466,8 +1608,8 @@ Hold the weights the head carries.
 # Arguments
 
   - `pw`: The hold-only head.
-  - $(arg_dict[:rd]) Read for nothing, and recorded on the result as `pr`.
-  - `kwargs`: Additional keyword arguments, ignored.
+  - $(arg_dict[:rd]) The result records it as `pr`. The head reads only the width of `rd.X`, and only when `pw.w` is `nothing`.
+  - `kwargs`: Ignored.
 """
 function optimise(pw::PreviousWeights{<:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); kwargs...)::NaiveOptimisationResult

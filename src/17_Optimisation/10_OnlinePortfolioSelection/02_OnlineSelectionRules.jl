@@ -1325,7 +1325,7 @@ Where:
   - $(math_dict[:b_crp])
   - $(math_dict[:S_t_crp])
   - ``\\mu``: Dirichlet prior on the simplex.
-  - ``\\boldsymbol{\\alpha}``: Dirichlet concentration, one entry per asset.
+  - $(math_dict[:alpha_dirichlet_conc])
   - ``\\boldsymbol{b}_k``: Target of sampled expert ``k``.
   - $(math_dict[:K_expert])
   - $(math_dict[:x_t_rel])

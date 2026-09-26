@@ -170,4 +170,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :R_sch => "``\\mathbf{R}``: Step-up correction, the matrix that carries the augmentation back to the size of ``C_1``.",#
                  :Sigma_hat_sch => "``\\hat{\\mathbf{\\Sigma}}_{11}``: Augmented block of ``C_1``, made symmetric. ``\\hat{\\mathbf{\\Sigma}}_{22}`` follows when ``C_1`` and ``C_2`` exchange their roles.",#
                  :w_naive_sch => "``\\tilde{\\boldsymbol{w}}``: Naive risk parity weights of a block, the inverses of its diagonal entries divided by their sum.",#
-                 :rho_naive_sch => "``\\tilde{\\rho}(C)``: Risk of the naive risk parity sub-portfolio of the augmented block of ``C``. A [`Variance`](@ref) measure takes the quadratic form, and a [`StandardDeviation`](@ref) measure takes its square root.")
+                 :rho_naive_sch => "``\\tilde{\\rho}(C)``: Risk of the naive risk parity sub-portfolio of the augmented block of ``C``. A [`Variance`](@ref) measure takes the quadratic form, and a [`StandardDeviation`](@ref) measure takes its square root.",#
+                 # The Dirichlet distribution that `RandomWeighted` draws from and
+                 # `UniversalPortfolio` samples its experts from.
+                 :alpha_dirichlet_conc => "``\\boldsymbol{\\alpha}``: Dirichlet concentration, one entry per asset.")

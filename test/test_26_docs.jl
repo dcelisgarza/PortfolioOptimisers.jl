@@ -1264,7 +1264,7 @@ in the sense of `STANDARDS.md`.
     library-wide pass.
     =#
     @testset "a math_dict value is interpolated, never copied" begin
-        MATH_COPY_TOTAL = 5
+        MATH_COPY_TOTAL = 2
 
         mvals = Dict{String, Symbol}(v => k for (k, v) in math_pairs)
         @test !isempty(mvals)
