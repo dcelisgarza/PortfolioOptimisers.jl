@@ -3,21 +3,21 @@
 Description = "An end-to-end profile in PortfolioOptimisers.jl: an institutional mandate under concentration limits, sector caps and a tracking-error budget."
 ```
 
-# Profile: institutional
+# [Profile: institutional](@id example-profile-institutional)
 
 The third profile runs a large benchmarked book under a written mandate. The
-[retail profile](01_Profile_Retail_Daily.md) optimised against cost and the
-[desk profile](02_Profile_Desk_Monthly.md) optimised on a view. This one optimises inside a set of
+[retail profile](@ref example-profile-retail-daily) optimised against cost and the
+[desk profile](@ref example-profile-desk-monthly) optimised on a view. This one optimises inside a set of
 rules: a cap on each name, a cap on the energy sector, and a limit on how far the book may drift from
 its benchmark. The prior is the plain empirical one.
 
-Of the limits in the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md),
+Of the limits in the [strategy decision framework](@ref user-guide-choosing-a-strategy),
 three shape this mandate's choices.
 
   - The mandate's caps are hard limits, not preferences. Each one is a keyword on the
     [`JuMPOptimiser`](@ref).
   - The book is measured against a benchmark, so we bound the tracking error while we minimise
-    risk. [Turnover and Tracking](../4_constraints_costs/05_Turnover_and_Tracking.md) covers that
+    risk. [Turnover and Tracking](@ref example-turnover-and-tracking) covers that
     bound.
   - The mandate invests \$10,000,000, and [`DiscreteAllocation`](@ref) turns it into whole shares
     with a mixed-integer solve.

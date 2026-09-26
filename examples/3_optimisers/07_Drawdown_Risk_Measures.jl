@@ -3,7 +3,7 @@
 Description = "Drawdown risk measures in PortfolioOptimisers.jl: average, maximum and conditional drawdown at risk on the path of cumulative returns."
 ```
 
-# Drawdown risk measures
+# [Drawdown risk measures](@id example-drawdown-risk-measures)
 
 A drawdown is how far the running sum of the portfolio returns is below its previous high at each
 point in time. The variance and the conditional value at risk (CVaR) use the distribution of the

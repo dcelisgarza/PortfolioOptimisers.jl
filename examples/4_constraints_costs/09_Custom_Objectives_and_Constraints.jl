@@ -3,7 +3,7 @@
 Description = "Custom objectives and constraints in PortfolioOptimisers.jl: write your own terms into the JuMP model with CustomJuMPObjective and CustomJuMPConstraint."
 ```
 
-# Custom objectives and constraints
+# [Custom objectives and constraints](@id example-custom-objectives-and-constraints)
 
 Each keyword of the [`JuMPOptimiser`](@ref), such as the bounds, the budgets, turnover, fees and
 cardinality, adds a ready-made part to the problem. When a mandate needs something that no
@@ -21,7 +21,7 @@ is a struct that holds its data, and one method. If you subtype one of the two t
 and write no method, the optimisation throws an error that names the missing method. This page
 builds both kinds of term, shows the two rules that keep a constraint correct, and combines
 several terms in one problem. The [constraints and costs
-guide](../../user_guide/04_Constraints_and_Costs.md) gives a short summary of the same features.
+guide](@ref user-guide-constraints-and-costs) gives a short summary of the same features.
 
 !!! tip "When to reach for this"
     Reach for a custom term when your preference is a number per asset that no group string can

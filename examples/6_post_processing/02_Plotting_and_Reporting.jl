@@ -3,7 +3,7 @@
 Description = "Plotting and reporting in PortfolioOptimisers.jl: inputs, allocation, risk contribution, performance and one-call dashboards from StatsPlots."
 ```
 
-# Plotting and reporting
+# [Plotting and reporting](@id example-plotting-and-reporting)
 
 `PortfolioOptimisers.jl` has plotting functions for each stage of an optimisation. They load when
 you load `StatsPlots` and `GraphRecipes` with the package. They plot the inputs, the allocation,

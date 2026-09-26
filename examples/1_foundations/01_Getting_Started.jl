@@ -123,7 +123,7 @@ plot_drawdowns(res, rd)
 #=
 ## 4. Finite allocation
 
-The weights are fractions of capital, but an investor buys whole shares with a fixed amount of cash. A finite allocation turns the weights, the latest prices and the cash into a number of shares per asset. We use [`DiscreteAllocation`](@ref), which solves a mixed-integer programme for the best whole-share portfolio. The library also has a greedy method that can allocate fractional shares, and [Finite allocation](../6_post_processing/01_Finite_Allocation.md) compares the two.
+The weights are fractions of capital, but an investor buys whole shares with a fixed amount of cash. A finite allocation turns the weights, the latest prices and the cash into a number of shares per asset. We use [`DiscreteAllocation`](@ref), which solves a mixed-integer programme for the best whole-share portfolio. The library also has a greedy method that can allocate fractional shares, and [Finite allocation](@ref example-finite-allocation) compares the two.
 
 A mixed-integer programme needs a solver that supports it, and we use `HiGHS`.
 =#

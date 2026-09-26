@@ -3,9 +3,9 @@
 Description = "The cross-sectional factor model through a Pipeline in PortfolioOptimisers.jl: the same weights as the hand-wired version, with each estimator as a named step."
 ```
 
-# Cross-sectional factor model through a Pipeline
+# [Cross-sectional factor model through a Pipeline](@id example-cross-sectional-factor-model-through-a-pipeline)
 
-The [deep dive](05_Cross_Sectional_Factor_Model.md) built a cross-sectional factor model, fitted two
+The [deep dive](@ref example-cross-sectional-factor-model-end-to-end) built a cross-sectional factor model, fitted two
 orthogonal uncertainty sets from it, and solved a constrained book, by wiring the estimators into
 one [`JuMPOptimiser`](@ref) by hand. This page reaches the same weights through a
 [`Pipeline`](@ref), with the same specification.
@@ -35,7 +35,7 @@ end;
 ## 1. The same panel, and the same specification
 
 We copy the generator and the estimator from the deep dive, with the same seed, so this page solves
-the same book. Sections 1 and 2 of [the deep dive](05_Cross_Sectional_Factor_Model.md) say what each
+the same book. Sections 1 and 2 of [the deep dive](@ref example-cross-sectional-factor-model-end-to-end) say what each
 piece is.
 =#
 
@@ -239,10 +239,10 @@ pretty_table(DataFrame("max |predicted returns difference|" =>
 #=
 ## Where to go next
 
-  - [Cross-sectional factor model, end to end](05_Cross_Sectional_Factor_Model.md) is the long
+  - [Cross-sectional factor model, end to end](@ref example-cross-sectional-factor-model-end-to-end) is the long
     version of every estimator on this page.
-  - [Pipelines](../5_validation_tuning/03_Pipelines.md) covers the slots, the routing and the
+  - [Pipelines](@ref example-pipelines) covers the slots, the routing and the
     hyper-parameter search this page only touches.
-  - [Reading a return forecast before an optimiser sees it](07_Forecast_Evaluation.md) scores the
+  - [Reading a return forecast before an optimiser sees it](@ref example-reading-a-return-forecast-before-an-optimiser-sees-it) scores the
     return forecast that this page's prior uses, before any optimiser acts on it.
 =#

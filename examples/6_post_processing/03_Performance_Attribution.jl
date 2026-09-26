@@ -3,7 +3,7 @@
 Description = "Performance attribution in PortfolioOptimisers.jl: cumulative returns, drawdowns, risk contributions and fees as diagnostics after optimise."
 ```
 
-# Performance attribution and post-optimisation diagnostics
+# [Performance attribution and post-optimisation diagnostics](@id example-performance-attribution-and-post-optimisation-diagnostics)
 
 An optimiser gives you weights. It does not tell you how the portfolio behaves. Before you trust an
 allocation, you measure what it would have done: how wealth would have grown, how deep and how long
@@ -12,7 +12,7 @@ None of these is what the portfolios below optimise. You compute them after `opt
 take any weights: the output of an optimiser, a benchmark, a portfolio you already hold, or equal
 weights.
 
-The [plotting and reporting](02_Plotting_and_Reporting.md) page draws plots. This page uses the
+The [plotting and reporting](@ref example-plotting-and-reporting) page draws plots. This page uses the
 functions that return the numbers and the series behind those plots, so you can put them in a
 table and compare them.
 

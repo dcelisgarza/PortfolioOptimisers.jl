@@ -3,9 +3,9 @@
 Description = "Time-dependent optimisers in PortfolioOptimisers.jl: a TimeDependent schedule of whole optimisers, run fold by fold under cross-validation."
 ```
 
-# Time-dependent optimisers
+# [Time-dependent optimisers](@id example-time-dependent-optimisers)
 
-The page on [time-dependent constraints](04_Time_Dependent_Constraints.md) changed the inputs of
+The page on [time-dependent constraints](@ref example-time-dependent-constraints) changed the inputs of
 one optimiser from fold to fold. This page changes the optimiser. A [`TimeDependent`](@ref) whose
 values are whole optimisers is a schedule of optimisers, and you can put it in two places.
 
@@ -293,7 +293,7 @@ that works this way, because a fallback can be absent.
 ### 7.2 Schedules in a meta-optimiser
 
 The optimiser fields of a meta-optimiser take schedules too. Nested fold loops work as on the
-[time-dependent constraints](04_Time_Dependent_Constraints.md) page, with one more rule for
+[time-dependent constraints](@ref example-time-dependent-constraints) page, with one more rule for
 optimiser fields. `bind = :nearest` is valid in an optimiser field only when an inner fold loop uses
 the value of that field.
 

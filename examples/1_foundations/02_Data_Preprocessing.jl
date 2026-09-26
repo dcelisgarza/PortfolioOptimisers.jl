@@ -3,7 +3,7 @@
 Description = "Cleaning real price data with price_ingestion: leading and trailing gaps, stale quotes, halts and mismatched calendars, before any optimiser sees it."
 ```
 
-# Data preprocessing and the ingestion layer
+# [Data preprocessing and the ingestion layer](@id example-data-preprocessing-and-the-ingestion-layer)
 
 Real price tables have gaps. An asset that lists partway through the window has no prices before
 its listing, which is a leading gap. A delisted asset has none after it, which is a trailing gap. A
@@ -230,7 +230,7 @@ heatmap(1:N, 1:T, Float64.(ismissing.(vals)); xlabel = "Asset", ylabel = "Day",
     step deletes anything. Both are fitted on a training window and applied to later windows, so a
     later window never chooses its own universe.
 
-[The point-in-time universe](../../user_guide/08_Point_in_Time_Universe.md) takes a table with gaps
+[The point-in-time universe](@ref user-guide-the-point-in-time-universe) takes a table with gaps
 through these steps to a walk-forward, and shows where a fitted fill goes in a [`Pipeline`](@ref)
 over the prices.
 =#

@@ -3,14 +3,14 @@
 Description = "Trace the efficient frontier in PortfolioOptimisers.jl: the whole risk-return curve from one MeanRisk estimator, and how to read it."
 ```
 
-# Efficient frontier
+# [Efficient frontier](@id example-efficient-frontier)
 
 A single [`MeanRisk`](@ref) optimisation returns *one* portfolio. The efficient frontier is the
 whole curve of portfolios that earn the most return for each level of risk. They are also the
 portfolios that take the least risk for each level of return. You compute the whole trade-off first,
 and then choose a point on it.
 
-This page adds three things to the [`MeanRisk` objectives](01_MeanRisk_Objectives.md) page. It
+This page adds three things to the [`MeanRisk` objectives](@ref example-meanrisk-objectives) page. It
 computes the frontier from both directions, once by minimising risk above a return floor and once
 by maximising return below a risk ceiling, and plots the two on one chart. It introduces
 [`Frontier`](@ref), which finds the bounds of the frontier for you. It then compares the
@@ -22,7 +22,7 @@ up a little of the objective for a portfolio that holds more assets at each poin
     in advance. You see the whole curve and choose a portfolio on it, or pass its points to a
     rule that selects one. Read the [`MeanRisk`](@ref) objectives page first, since each point
     of a frontier is one of those optimisations. For more than two criteria, see the
-    [Pareto surface](03_Pareto_Surface.md) example.
+    [Pareto surface](@ref example-pareto-surface) example.
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -161,7 +161,7 @@ is the exact optimum of its problem. [`NearOptimalCentering`](@ref),
 NOC for short, computes a centred frontier instead. At each point it returns the portfolio at the
 analytic centre of the set of near-optimal portfolios, not the one at its edge. That portfolio
 gives up a little of the objective, holds more assets, and moves less when the prior changes. The
-[NOC page](15_Near_Optimal_Centering.md) shows how it finds the centre. Here we use it only to
+[NOC page](@ref example-near-optimal-centering) shows how it finds the centre. Here we use it only to
 compute a frontier.
 
 NOC solves a harder problem than `MeanRisk`, so one solver setting can fail to converge. We give it

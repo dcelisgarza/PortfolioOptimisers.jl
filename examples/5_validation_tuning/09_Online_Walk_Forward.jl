@@ -3,7 +3,7 @@
 Description = "The online walk-forward in PortfolioOptimisers.jl worked through, with one estimator fitted on the first training window and updated fold by fold."
 ```
 
-# The online walk-forward: one estimator, updated fold by fold
+# [The online walk-forward: one estimator, updated fold by fold](@id example-the-online-walk-forward-one-estimator-updated-fold-by-fold)
 
 A walk-forward refits every fold from its training window. Fold `i` uses every row that fold
 `i - 1` used and a few more, fits the moments over all of them, and solves. On an expanding

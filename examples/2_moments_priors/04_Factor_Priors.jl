@@ -3,7 +3,7 @@
 Description = "Factor priors in PortfolioOptimisers.jl: asset moments implied by a regression onto common risk factors, to cut estimation error."
 ```
 
-# Factor priors
+# [Factor priors](@id example-factor-priors)
 
 A factor model writes the return of each asset as a function of a few common risk factors. It
 has fewer parameters to estimate than the moments of the assets have, so its estimates carry
@@ -17,8 +17,8 @@ give.
     so it cuts the number of parameters and the estimation error. This helps most when the
     number of assets is large next to the length of the history. If you have no meaningful
     factors, or a long history next to the number of assets, a denoised empirical prior is
-    simpler, and the [covariance](02_Covariance_Estimation.md) and
-    [higher moment](03_Higher_Moment_Estimation.md) pages show it.
+    simpler, and the [covariance](@ref example-covariance-estimation) and
+    [higher moment](@ref example-higher-moment-estimation) pages show it.
 =#
 using PortfolioOptimisers, PrettyTables
 tsfmt = (v, i, j) -> begin
@@ -125,7 +125,7 @@ pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => prs[1].mu,
              source_notes = "prs[1].mu ≈ prs[2].mu ≈ prs[3].mu: $(prs[1].mu ≈ prs[2].mu ≈ prs[3].mu)")
 
 #=
-The note prints `true`, so on this data the three priors give the same expected returns. The [expected returns page](01_Expected_Returns_Estimation.md) shows estimators that reduce the noise of expected returns. The covariances, in the `sigma` field, differ. In a factor model the factors carry the common part of the returns, and the noise of each single asset has less effect on the covariance. Each covariance table carries its condition number under it. A lower condition number means that inverting the matrix amplifies its errors less.
+The note prints `true`, so on this data the three priors give the same expected returns. The [expected returns page](@ref example-expected-returns-estimation) shows estimators that reduce the noise of expected returns. The covariances, in the `sigma` field, differ. In a factor model the factors carry the common part of the returns, and the noise of each single asset has less effect on the covariance. Each covariance table carries its condition number under it. A lower condition number means that inverting the matrix amplifies its errors less.
 
 A factor prior also stores a sparser Cholesky factor, with better numerical properties than the plain one, in the `chol` field of the prior result. When it is present, the optimisers use it in place of the Cholesky factor of `sigma` in the `SecondOrderCone` constraint of the variance and standard deviation formulations.
 =#
@@ -227,7 +227,7 @@ plot_coskewness(prs[4], rd)
 plot_coskewness(prs[7], rd)
 
 #=
-We print the cokurtosis matrix of the same three priors. The [higher moment page](03_Higher_Moment_Estimation.md) shows why the raw cokurtosis is singular. The default processing replaces a matrix that is not positive definite with the nearest correlation matrix, rescaled to the same diagonal, and the condition number under each table shows how close to singular the result is.
+We print the cokurtosis matrix of the same three priors. The [higher moment page](@ref example-higher-moment-estimation) shows why the raw cokurtosis is singular. The default processing replaces a matrix that is not positive definite with the nearest correlation matrix, rescaled to the same diagonal, and the condition number under each table shows how close to singular the result is.
 =#
 pretty_table(DataFrame([nx2 prs[4].kt], ["Assets^2"; nx2]); formatters = [hmmtfmt],
              title = "HighOrderPriorEstimator cokurtosis",
@@ -519,7 +519,7 @@ pretty_table(DataFrame("Assets" => rd.nx, "HighOrderPriorEstimator" => ress[1].w
 plot_stacked_bar_composition(ress, rd)
 
 #=
-The kurtosis portfolios follow section 3.1 and not section 3.2. The factor priors give more diversified portfolios than the empirical prior. The [covariance](02_Covariance_Estimation.md) and [higher moment](03_Higher_Moment_Estimation.md) pages show ways to reduce the estimation error of these moments.
+The kurtosis portfolios follow section 3.1 and not section 3.2. The factor priors give more diversified portfolios than the empirical prior. The [covariance](@ref example-covariance-estimation) and [higher moment](@ref example-higher-moment-estimation) pages show ways to reduce the estimation error of these moments.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

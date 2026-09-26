@@ -3,7 +3,7 @@
 Description = "Cluster on a feature matrix instead of returns with FeatureDistance in PortfolioOptimisers.jl: sectors, loadings or any per-asset quantity."
 ```
 
-# Feature matrices as a distance source
+# [Feature matrices as a distance source](@id example-feature-matrices-as-a-distance-source)
 
 Every clustering optimiser so far builds its hierarchy from the returns. A covariance estimate
 becomes a correlation, a correlation becomes a distance, and the distance becomes a dendrogram.
@@ -421,7 +421,7 @@ plot(1:size(sweep, 1), sweep[!, "ARI vs correlation"]; marker = :circle, legend 
     removes the diversification benefit of every pair from the variance the optimiser minimises.
     It forbids no joint holding, but the minimum-risk portfolio puts all its weight in one asset,
     and the solve reports no failure. Section 2.2 of
-    [Phylogeny and centrality constraints](../4_constraints_costs/04_Phylogeny_Centrality.md)
+    [Phylogeny and centrality constraints](@ref example-phylogeny-and-centrality-constraints)
     warns about that setting, and its section 3.1 shows the one-asset portfolio. The bare default
     also ties the scale of the field to the sample, which section 8.3 measures.
 

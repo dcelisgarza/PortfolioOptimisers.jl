@@ -3,7 +3,7 @@
 Description = "Subset resampling under cross-validation in PortfolioOptimisers.jl: how stable a meta-optimiser's out-of-sample weights and frontier are."
 ```
 
-# Subset resampling and cross-validation
+# [Subset resampling and cross-validation](@id example-subset-resampling-and-cross-validation)
 
 The meta-optimiser page builds the three meta-optimisers. This page asks two further
 questions:
@@ -115,7 +115,7 @@ alone, so the prior is an estimator, the default [`EmpiricalPrior`](@ref), and i
 again on each training fold. Cross-validation needs it that way. A prior computed once was
 fitted on every observation, including the ones each test fold holds, so cross-validation
 refuses it and asks for the estimator. The
-[`MeanRisk` objectives](01_MeanRisk_Objectives.md) page covers that distinction.
+[`MeanRisk` objectives](@ref example-meanrisk-objectives) page covers that distinction.
 =#
 
 kfold = KFold(; n = 5)

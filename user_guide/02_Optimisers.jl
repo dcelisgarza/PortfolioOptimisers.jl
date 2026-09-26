@@ -3,13 +3,13 @@
 Description = "The optimiser families of PortfolioOptimisers.jl with one minimal call each: mean-risk, risk budgeting, hierarchical, near-optimal centering, naive and meta."
 ```
 
-# Optimisers
+# [Optimisers](@id user-guide-optimisers)
 
 This page makes one call from each family of optimisers. Every optimiser takes the same call,
 `optimise(estimator)`, or `optimise(estimator, rd)` for the naive optimisers and the
 meta-optimisers. The result holds the asset weights in its field `w`. For the objectives, the risk
 measures and the variants of each family, follow the links into the
-[optimiser examples](../examples/3_optimisers/01_MeanRisk_Objectives.md).
+[optimiser examples](@ref example-meanrisk-objectives).
 
 We compute one empirical prior and give it to every JuMP, clustering and meta-optimiser. The naive
 optimisers take the returns directly.
@@ -55,7 +55,7 @@ by the reciprocal of its volatility. [`EqualWeighted`](@ref) gives each asset th
 [`RandomWeighted`](@ref) draws the weights from a Dirichlet distribution. They take the
 [`ReturnsResult`](@ref) directly. [`OnlinePortfolioSelection`](@ref) is also a naive optimiser. It
 moves its allocation after each period by a rule of its own, and it has its own page,
-[Online portfolio selection](10_Online_Portfolio_Selection.md).
+[Online portfolio selection](@ref user-guide-online-portfolio-selection).
 =#
 
 res_iv = optimise(InverseVolatility(), rd)
@@ -77,17 +77,17 @@ res_mr = optimise(MeanRisk(; obj = MinimumRisk(),
 #=
 `MeanRisk` also takes the objectives [`MaximumUtility`](@ref), [`MaximumRatio`](@ref) and
 [`MaximumReturn`](@ref), and it computes efficient frontiers. See
-[MeanRisk Objectives](../examples/3_optimisers/01_MeanRisk_Objectives.md) and
-[Efficient Frontier](../examples/3_optimisers/02_Efficient_Frontier.md).
+[MeanRisk Objectives](@ref example-meanrisk-objectives) and
+[Efficient Frontier](@ref example-efficient-frontier).
 
 The risk measure is the `r` field of `MeanRisk` and of the clustering optimisers below, and its
 default is [`Variance`](@ref). The measure sets the kind of risk that the optimiser penalises.
 [`Variance`](@ref) penalises the spread of the returns, [`ConditionalValueatRisk`](@ref) the left
 tail, [`MaximumDrawdown`](@ref) the largest fall from a peak, and [`OrderedWeightsArray`](@ref) a
-weighted sum of the sorted returns. [Risk measures](03_Risk_Measures.md) lists every measure with
+weighted sum of the sorted returns. [Risk measures](@ref user-guide-risk-measures) lists every measure with
 its alias, what it penalises and the optimisers that accept it. You can also put several measures
 in one objective. See
-[Multiple Risk Measures](../examples/3_optimisers/04_Multiple_Risk_Measures.md).
+[Multiple Risk Measures](@ref example-multiple-risk-measures).
 
 The return is the `ret` field of [`JuMPOptimiser`](@ref), an [`ArithmeticReturn`](@ref) by
 default. Like `r`, it takes one term or a vector of terms. The optimiser multiplies each term by
@@ -95,19 +95,19 @@ its scale and adds the terms into one return expression. Each term has its own
 [`JuMPReturnsSettings`](@ref), which set its scale, its lower bound, and whether it enters the
 sum. So a term can bound the portfolio's return and add nothing to the objective. With this you
 can measure how much of one return you give up to keep another above a floor
-([ℓ1 uncertainty sets](../examples/2_moments_priors/11_L1_Uncertainty_Quintile_Portfolios.md)).
+([ℓ1 uncertainty sets](@ref example-l1-uncertainty-sets-the-quintile-and-1-n-portfolios)).
 
 To measure the drawdowns of a portfolio without optimising them, call [`drawdowns`](@ref) on its
 returns after the optimisation. See
-[Performance Attribution](../examples/6_post_processing/03_Performance_Attribution.md).
+[Performance Attribution](@ref example-performance-attribution-and-post-optimisation-diagnostics).
 
 The other JuMP optimisers take the same `opt = JuMPOptimiser(...)` keyword:
 
   - [`RiskBudgeting`](@ref) and [`RelaxedRiskBudgeting`](@ref) give each asset, or each factor, a
-    target share of the risk. See [Risk Budgeting](../examples/3_optimisers/09_Risk_Budgeting.md).
+    target share of the risk. See [Risk Budgeting](@ref example-risk-budgeting).
   - [`NearOptimalCentering`](@ref) returns the centre of the set of portfolios whose return and
     risk are close to those of the optimal portfolio. See
-    [Near Optimal Centering](../examples/3_optimisers/15_Near_Optimal_Centering.md).
+    [Near Optimal Centering](@ref example-near-optimal-centering).
 
 We run risk budgeting with its default budget, which gives every asset the same share of the risk.
 =#
@@ -130,7 +130,7 @@ supported_risk_measures(HierarchicalRiskParity)
 
 The first call returns `true`, and the second returns `OptimisationRiskMeasure`. For a
 meta-optimiser, `NestedClustered`, `Stacking` or `SubsetResampling`, the answer depends on
-the optimisers that it holds. The [risk measures](03_Risk_Measures.md) page shows every measure
+the optimisers that it holds. The [risk measures](@ref user-guide-risk-measures) page shows every measure
 against these classes.
 
 ## 3. Clustering optimisers
@@ -140,7 +140,7 @@ program. It takes a [`HierarchicalOptimiser`](@ref) that holds the prior and a c
 assets. [`HierarchicalRiskParity`](@ref) (HRP) is the best known.
 [`HierarchicalEqualRiskContribution`](@ref) and
 [`SchurComplementHierarchicalRiskParity`](@ref) are in the same family. See
-[Clustering Optimisers](../examples/3_optimisers/11_Clustering_Optimisers.md).
+[Clustering Optimisers](@ref example-clustering-optimisers).
 =#
 
 clr = clusterise(ClustersEstimator(), pr.X)
@@ -202,7 +202,7 @@ from the returns, they give different panels. A panel estimator is also the only
 feature that changes with time on every fold, because it fits the feature on the rows of the fold.
 
 See
-[Feature Matrices as a Distance Source](../examples/3_optimisers/16_Feature_Distance_Clustering.md)
+[Feature Matrices as a Distance Source](@ref example-feature-matrices-as-a-distance-source)
 for the panel estimators, the features that change with time, and a comparison over a walk-forward.
 
 ## 4. Meta-optimisers
@@ -211,7 +211,7 @@ A meta-optimiser combines other optimisers. [`NestedClustered`](@ref) (NCO) runs
 optimiser inside each cluster, and an outer optimiser across the portfolios of the clusters.
 [`Stacking`](@ref) runs several inner optimisers and combines their weights with an outer
 optimiser. [`SubsetResampling`](@ref) runs one optimiser on random subsets of the assets and
-combines the weights. See [Meta Optimisers](../examples/3_optimisers/13_Meta_Optimisers.md).
+combines the weights. See [Meta Optimisers](@ref example-meta-optimisers).
 
 In the call below, the inner optimiser holds the computed prior `pr`, and the outer one must not.
 The outer problem has one asset for each cluster, so the outer optimiser computes its own prior.

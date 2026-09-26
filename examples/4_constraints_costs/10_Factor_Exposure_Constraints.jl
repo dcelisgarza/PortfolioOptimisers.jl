@@ -3,7 +3,7 @@
 Description = "Factor exposure constraints in PortfolioOptimisers.jl: bound the portfolio's factor exposures through a loadings matrix instead of its tickers."
 ```
 
-# Factor exposure constraints
+# [Factor exposure constraints](@id example-factor-exposure-constraints)
 
 An investment mandate often limits factors instead of assets, for example "at most 10%
 momentum", "no net exposure to value" or "no more than 60% in the defensive factors together".

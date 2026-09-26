@@ -3,10 +3,10 @@
 Description = "Windowed moment estimators in PortfolioOptimisers.jl: compute a moment from a chosen window of observations, or weight the recent ones more."
 ```
 
-# Windowed moment estimators
+# [Windowed moment estimators](@id example-windowed-moment-estimators)
 
-The estimators of the [expected returns](01_Expected_Returns_Estimation.md),
-[covariance](02_Covariance_Estimation.md) and [higher moment](03_Higher_Moment_Estimation.md)
+The estimators of the [expected returns](@ref example-expected-returns-estimation),
+[covariance](@ref example-covariance-estimation) and [higher moment](@ref example-higher-moment-estimation)
 pages used the whole return sample, with equal weight on each observation. That is the right
 default when the process that makes the returns does not change. In markets the process
 changes. Volatility comes in clusters and correlations rise in a

@@ -3,7 +3,7 @@
 Description = "Finite allocation in PortfolioOptimisers.jl: turn continuous weights into whole shares under a cash budget with greedy or discrete allocation."
 ```
 
-# Finite allocation
+# [Finite allocation](@id example-finite-allocation)
 
 An optimiser returns continuous weights, which are fractions of capital. To trade them you buy
 whole shares at market prices with a fixed amount of cash. The rounding moves the portfolio you
@@ -141,7 +141,7 @@ pretty_table(DataFrame("Budget" => budgets,
 #=
 [`FiniteAllocationInput`](@ref) also takes a `fees` keyword, a [`Fees`](@ref), which needs a
 `horizon` in periods too. With fees, both allocators choose share counts whose cost and fee fit in
-the cash. [Fees and net returns](../4_constraints_costs/06_Fees_and_Net_Returns.md) covers
+the cash. [Fees and net returns](@ref example-fees-and-net-returns) covers
 the fees.
 
 ## 6. Target and allocated weights

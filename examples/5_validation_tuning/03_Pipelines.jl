@@ -3,7 +3,7 @@
 Description = "Pipelines in PortfolioOptimisers.jl: fit the data cleaning, gap filling and asset filtering inside each cross-validation fold, and tune their parameters."
 ```
 
-# Pipelines
+# [Pipelines](@id example-pipelines)
 
 The earlier examples start from a returns matrix. Several choices come before that matrix:
 which assets have enough data to keep, how to fill the gaps in their prices, and whether the

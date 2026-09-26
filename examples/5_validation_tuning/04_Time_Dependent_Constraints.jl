@@ -3,7 +3,7 @@
 Description = "Time-dependent constraints in PortfolioOptimisers.jl: a TimeDependent schedule or callable in any optimiser field, varied fold by fold."
 ```
 
-# Time-dependent constraints
+# [Time-dependent constraints](@id example-time-dependent-constraints)
 
 The constraints on the earlier pages are static. You set them when you build the optimiser, and
 every optimisation uses the same values. Under cross-validation a fold is a separate optimisation
@@ -547,5 +547,5 @@ the fallbacks. An input that states how the fold is solved stays static: the sol
 number generators and the cross-validation scheme of a meta-optimiser. The type of each constructor
 argument enforces the rule. The optimiser is part of what the fold solves, so a schedule of whole
 optimisers also works, passed to [`cross_val_predict`](@ref) or held in a field that takes an
-optimiser. [Time-dependent optimisers](06_Time_Dependent_Optimisers.md) covers that case.
+optimiser. [Time-dependent optimisers](@ref example-time-dependent-optimisers) covers that case.
 =#

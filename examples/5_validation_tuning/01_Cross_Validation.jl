@@ -3,7 +3,7 @@
 Description = "Cross-validation in PortfolioOptimisers.jl: walk-forward, K-fold and combinatorial schemes, the measures you compute on their predictions, and their plots."
 ```
 
-# Cross validation
+# [Cross validation](@id example-cross-validation)
 
 Cross-validation scores a model on data that the fit did not see. This example shows the
 cross-validation schemes of PortfolioOptimisers.jl, how to run them on a portfolio

@@ -3,7 +3,7 @@
 Description = "How PortfolioOptimisers.jl handles assets that list, delist or stop quoting mid-sample, from a gapped price table to a walk-forward."
 ```
 
-# The point-in-time universe
+# [The point-in-time universe](@id user-guide-the-point-in-time-universe)
 
 Real asset universes move. A company lists halfway through your sample, another is acquired and
 stops quoting, a third is suspended for a month. `PortfolioOptimisers.jl` answers all three cases
@@ -84,7 +84,7 @@ as one you still hold, and not as one that was never listed.
 ingested price table. It unifies the two gap spellings, joins factor and benchmark series onto the
 asset clock, collapses to a lower frequency if you ask for one, and finds the span.
 [`PricesToReturns`](@ref) converts that table to returns. Write the two steps when you need any of
-those options. The [data preprocessing example](../examples/1_foundations/02_Data_Preprocessing.md)
+those options. The [data preprocessing example](@ref example-data-preprocessing-and-the-ingestion-layer)
 walks each one.
 
 ## 3. The prior marks the assets it could not estimate
@@ -252,9 +252,9 @@ test window. Both cases follow from the listing span, which a fill does not chan
 
 ## Where to go next
 
-  - [Data preprocessing and the ingestion layer](../examples/1_foundations/02_Data_Preprocessing.md)
+  - [Data preprocessing and the ingestion layer](@ref example-data-preprocessing-and-the-ingestion-layer)
     covers each step of the layer in turn: unify, join, span, carry, fill, drop.
-  - [Data and priors](01_Data_and_Priors.md) covers the prior that reduces here.
-  - [Optimisers](02_Optimisers.md) covers the families that reduce and expand.
-  - [Validation and tuning](05_Validation_and_Tuning.md) covers the cross-validation this page ran.
+  - [Data and priors](@ref user-guide-data-and-priors) covers the prior that reduces here.
+  - [Optimisers](@ref user-guide-optimisers) covers the families that reduce and expand.
+  - [Validation and tuning](@ref user-guide-validation-and-tuning) covers the cross-validation this page ran.
 =#

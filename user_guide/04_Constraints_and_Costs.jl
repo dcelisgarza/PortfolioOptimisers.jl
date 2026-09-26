@@ -3,14 +3,14 @@
 Description = "Constraints and costs as keywords of JuMPOptimiser, with one minimal call each for weight bounds, groups, factor exposures, turnover and fees."
 ```
 
-# Constraints and costs
+# [Constraints and costs](@id user-guide-constraints-and-costs)
 
 A real mandate has constraints. You cap the weight of one asset, hold a sector inside a band, limit
 how much you trade at each rebalance, and pay fees. In `PortfolioOptimisers.jl` these are keywords
 of the [`JuMPOptimiser`](@ref). The `JuMPOptimiser` holds the constraints and the costs, and the
 optimiser that takes it, such as `MeanRisk`, holds the objective. This page shows the common ones
 with one minimal call each. For the others, see the
-[constraints and costs examples](../examples/4_constraints_costs/01_Budget_Constraints.md).
+[constraints and costs examples](@ref example-budget-constraints).
 
 We compute one empirical prior. Every call but the factor call uses it, and every call but the
 last two minimises the risk. You can then compare the portfolio under each constraint with the
@@ -55,7 +55,7 @@ res_cap = optimise(MeanRisk(; obj = MinimumRisk(),
 The budget, the sum of the weights, is the `bgt` keyword, `1.0` by default. With
 [`BudgetRange`](@ref) and a separate short budget `sbgt`, you can build a long-short portfolio or a
 leveraged portfolio. See
-[Budget Constraints](../examples/4_constraints_costs/01_Budget_Constraints.md).
+[Budget Constraints](@ref example-budget-constraints).
 
 ## 2. Linear and group constraints
 
@@ -74,7 +74,7 @@ res_grp = optimise(MeanRisk(; obj = MinimumRisk(),
 #=
 The same `lcse` takes a bound on one asset, such as `"AAPL <= 0.1"`, and a bound between two
 assets, such as `"MSFT >= AMD"`. For constraints built from the hierarchy of the assets, see
-[Phylogeny and Centrality](../examples/4_constraints_costs/04_Phylogeny_Centrality.md).
+[Phylogeny and Centrality](@ref example-phylogeny-and-centrality-constraints).
 
 ## 3. Factor exposure constraints
 
@@ -97,7 +97,7 @@ loadings come from the prior, so the prior must be a [`FactorPrior`](@ref) and n
 does not drop the row. `FactorSpace(; re = <a fitted Regression>)` fixes the loadings.
 `FactorSpace(; re = StepwiseRegression())` fits them when the prior has none, so the constraint
 works on any prior. The
-[factor exposure example](../examples/4_constraints_costs/10_Factor_Exposure_Constraints.md) gives
+[factor exposure example](@ref example-factor-exposure-constraints) gives
 the order in which these sources apply.
 =#
 
@@ -185,9 +185,9 @@ MRK and XOM, and the fee moves about 21% of the weight from MRK to XOM.
 The `l1` and `l2` keywords add an L1 or an L2 penalty on the weights, which you can use in place
 of a hard limit on the turnover or on the positions. The `l2c` keyword is a hard constraint, a
 ceiling on the 2-norm of the weights, which sets a lower limit on the number of effective assets.
-See [Regularisation](../examples/4_constraints_costs/07_Regularisation.md). The `tr` keyword takes
+See [Regularisation](@ref example-regularisation). The `tr` keyword takes
 a [`TrackingError`](@ref) to a benchmark. See
-[Turnover and Tracking](../examples/4_constraints_costs/05_Turnover_and_Tracking.md).
+[Turnover and Tracking](@ref example-turnover-and-tracking).
 
 ## 6. Custom objectives and constraints
 
@@ -211,7 +211,7 @@ The library adds a custom objective term to the objective penalty, which enters 
 the sign that makes the objective worse, for a minimisation and for a maximisation. You write a
 cost as a positive contribution and a reward as a negative contribution. One definition is correct
 under every objective, [`MaximumRatio`](@ref) included. The
-[custom objectives and constraints example](../examples/4_constraints_costs/09_Custom_Objectives_and_Constraints.md)
+[custom objectives and constraints example](@ref example-custom-objectives-and-constraints)
 builds a momentum tilt and a momentum floor. It also shows the two values of the model that a
 constraint written by hand needs. [`get_constraint_scale`](@ref) returns the scale of the
 constraints, and [`get_k`](@ref) returns the variable `k`, which rescales the weights under a ratio

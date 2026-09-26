@@ -3,7 +3,7 @@
 Description = "Covariance estimation in PortfolioOptimisers.jl: denoising and sparsification of the covariance of a short, noisy return sample."
 ```
 
-# Covariance estimation
+# [Covariance estimation](@id example-covariance-estimation)
 
 Almost every optimiser reads the covariance matrix, and a short window estimates it badly.
 With ``N`` assets and a little more than ``N`` observations, the sample covariance is noisy

@@ -5,7 +5,7 @@ Description = "Clustering on a fundamentals panel in PortfolioOptimisers.jl: bui
 
 # Clustering on a fundamentals panel
 
-[Feature matrices as a distance source](16_Feature_Distance_Clustering.md) builds its panel
+[Feature matrices as a distance source](@ref example-feature-matrices-as-a-distance-source) builds its panel
 from a classification. That panel holds one named quantity per asset for each level of the
 classification, and each named quantity is a field. A fundamentals table is the harder case. It
 holds one row per asset and one column per reported quantity, it arrives with gaps, and its

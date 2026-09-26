@@ -3,7 +3,7 @@
 Description = "Hyperparameter tuning in PortfolioOptimisers.jl: grid and randomised search over any estimator, scored on cross-validation folds."
 ```
 
-# Hyperparameter tuning
+# [Hyperparameter tuning](@id example-hyperparameter-tuning)
 
 Hyperparameter tuning chooses the parameters of an estimator by how they score on the test
 folds of a cross-validation. This example shows the two searches of PortfolioOptimisers.jl, a

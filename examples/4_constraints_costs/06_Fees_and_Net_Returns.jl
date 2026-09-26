@@ -3,7 +3,7 @@
 Description = "Fees and net returns in PortfolioOptimisers.jl: proportional, fixed and turnover fees, optimised net of cost and evaluated with calc_net_returns."
 ```
 
-# Fees and net returns
+# [Fees and net returns](@id example-fees-and-net-returns)
 
 A portfolio with a good return before costs can have a poor return after them. A [`Fees`](@ref)
 contains the costs: proportional and fixed charges on long and short positions, and a charge on
@@ -11,7 +11,7 @@ turnover. You can optimise net of fees, so that the optimiser weighs the expecte
 the cost. You can also compute the returns of a portfolio after costs with
 [`calc_net_returns`](@ref).
 
-[Turnover and tracking](05_Turnover_and_Tracking.md) bounds how far the weights move. This page
+[Turnover and tracking](@ref example-turnover-and-tracking) bounds how far the weights move. This page
 charges for the positions, and section 5 names the charge on trades.
 
 !!! tip "When to reach for this"
@@ -122,9 +122,9 @@ The proportional fees, `l` and `s`, are convex, and Clarabel solves them. The fi
 and `fs`, are a flat charge on each position the portfolio holds. Each one is either zero or the
 whole fee, which is the same structure as a threshold or a cardinality constraint. They need a
 mixed-integer solver, as section 6 of [Linear and group
-constraints](02_Linear_Group_Constraints.md) explains. A `Fees` also has a `tn` field, a charge
+constraints](@ref example-linear-and-group-constraints) explains. A `Fees` also has a `tn` field, a charge
 on the turnover from a reference weight vector, which puts a price on the change that [Turnover
-and tracking](05_Turnover_and_Tracking.md) limits.
+and tracking](@ref example-turnover-and-tracking) limits.
 
 ## 6. Comparing the portfolios
 

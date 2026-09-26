@@ -3,7 +3,7 @@
 Description = "The risk measures of PortfolioOptimisers.jl: variance, semi-moments, MAD, VaR, CVaR, EVaR, RLVaR, drawdowns and OWA, and the aliases that configure them."
 ```
 
-# Risk measures
+# [Risk measures](@id user-guide-risk-measures)
 
 The previous page showed which optimiser to call. This page lists what you can ask it to
 minimise, the risk measure in its `r` field. The library has many risk measures, and a name does
@@ -75,7 +75,7 @@ pretty_table(DataFrame("Measure" => ["StandardDeviation", "MAD (LowOrderMoment)"
     The fields `sigma`, `mu`, `kt` and `sk` each take a value or an estimator that computes it. The
     optimiser computes the estimator on the prior of each run, including each cross-validation
     fold and each resampled subset. The
-    [subset resampling example](../examples/3_optimisers/14_Subset_Resampling_and_Cross_Validation.md)
+    [subset resampling example](@ref example-subset-resampling-and-cross-validation)
     shows it.
 
 ## 2. The three usage classes
@@ -107,7 +107,7 @@ that only a clustering optimiser can use.
 Each table gives the meaning of each measure in one line, its alias and its class. The tables
 group the measures by the part of the returns that they measure. Every name is exported and has a
 docstring. The docstrings are on the
-[public API pages on risk measures](../public_api/16_RiskMeasures/01_Base_RiskMeasures.md). Each
+[public API pages on risk measures](@ref api-base-risk-measures). Each
 docstring gives the signature and the fields of its measure, and most also give references.
 `?ConditionalValueatRisk` in the REPL shows the same docstring.
 =#
@@ -249,7 +249,7 @@ pretty_table(family_table("Composite and structural"))
 
 You cannot put these measures in an `r` field. They score a portfolio after the optimisation,
 and they score the folds of a cross-validation. See
-[validation and tuning](05_Validation_and_Tuning.md).
+[validation and tuning](@ref user-guide-validation-and-tuning).
 =#
 pretty_table(family_table("Non-optimisation (diagnostics and scoring)"))
 
@@ -338,12 +338,12 @@ The choice depends on what you want to penalise:
     the distance from the previous weights. To penalise the distance of the portfolio's returns
     from a benchmark, add [`TrackingRiskMeasure`](@ref).
 
-[Multiple Risk Measures](../examples/3_optimisers/04_Multiple_Risk_Measures.md) shows how an
+[Multiple Risk Measures](@ref example-multiple-risk-measures) shows how an
 optimiser combines several measures in one objective. These pages cover the measures in depth:
-[OWA Risk Measures](../examples/3_optimisers/05_OWA_Risk_Measures.md),
-[Brownian Distance, Skew and Kurtosis](../examples/3_optimisers/06_Brownian_Distance_Variance_and_VarianceSkewKurtosis.md),
-[Drawdown Risk Measures](../examples/3_optimisers/07_Drawdown_Risk_Measures.md), and
-[Exotic Tail Risk Measures](../examples/3_optimisers/08_Exotic_Tail_Risk_Measures.md).
+[OWA Risk Measures](@ref example-owa-risk-measures),
+[Brownian Distance, Skew and Kurtosis](@ref example-browniandistancevariance-and-varianceskewkurtosis),
+[Drawdown Risk Measures](@ref example-drawdown-risk-measures), and
+[Exotic Tail Risk Measures](@ref example-tail-risk-measures-that-weight-the-worst-losses-more-than-cvar).
 
 ## 6. The measures on the distribution of the returns
 

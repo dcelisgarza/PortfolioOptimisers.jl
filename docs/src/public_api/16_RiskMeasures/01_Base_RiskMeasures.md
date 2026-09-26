@@ -2,7 +2,7 @@
 Description = "Base Risk Measures, public API of PortfolioOptimisers.jl: RiskMeasure, HierarchicalRiskMeasure, Frontier, AbstractRiskMeasureSettings, RiskMeasureSettings, …"
 ```
 
-# Base Risk Measures
+# [Base Risk Measures](@id api-base-risk-measures)
 
 Every risk measure has a full type name, and many also have a short alias, which the [aliases](@ref aliases) page lists.
 

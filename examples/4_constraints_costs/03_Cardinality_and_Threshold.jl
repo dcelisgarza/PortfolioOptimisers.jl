@@ -3,7 +3,7 @@
 Description = "Cardinality and threshold constraints in PortfolioOptimisers.jl on assets, on groups of assets, on sets of assets and on groups of sets."
 ```
 
-# Cardinality and threshold
+# [Cardinality and threshold](@id example-cardinality-and-threshold)
 
 This example applies cardinality and threshold constraints at four levels.
 

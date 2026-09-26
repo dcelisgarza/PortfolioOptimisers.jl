@@ -3,9 +3,9 @@
 Description = "Phylogeny and centrality constraints in PortfolioOptimisers.jl: limit joint holdings of linked assets, and tilt toward or away from the network's hubs."
 ```
 
-# Phylogeny and centrality constraints
+# [Phylogeny and centrality constraints](@id example-phylogeny-and-centrality-constraints)
 
-The constraints in [Linear and group constraints](02_Linear_Group_Constraints.md) act on asset
+The constraints in [Linear and group constraints](@ref example-linear-and-group-constraints) act on asset
 names and on groups that you write by hand. Phylogeny and centrality constraints act on the asset
 network instead. The asset network is a graph whose nodes are the assets, and whose edges join
 assets whose returns move together. In place of a cap such as "tech ≤ 30%", you tell the optimiser
@@ -301,7 +301,7 @@ The constraint moves weight between many assets, and section 3.1 prints the size
 a turnover. [`IntegerPhylogenyEstimator`](@ref) sets a hard limit on how many assets you hold from
 each neighbourhood of the network. A neighbourhood is an asset and the assets related to it, or a
 cluster when the source is a clustering estimator. The constraint needs a mixed-integer solver,
-because it uses binary variables. [Cardinality and threshold](03_Cardinality_and_Threshold.md) shows
+because it uses binary variables. [Cardinality and threshold](@ref example-cardinality-and-threshold) shows
 how to set up a mixed-integer solver.
 
 ### 3.1 The separation sets the strength of the constraint
@@ -349,7 +349,7 @@ The table shows two facts to know before you tune `sep`.
 First, a tighter phylogeny constraint concentrates the weights. A wider separation relates more
 pairs, and the optimiser holds fewer assets. The largest weight rises as the
 constraint becomes tighter. To spread the weights as well, use `ple` together with an upper bound
-on the weights or a [regularisation](07_Regularisation.md) term.
+on the weights or a [regularisation](@ref example-regularisation) term.
 
 Second, the bare `PathLength()` row shows the cost of the setting in the warning of section 2.2.
 The constraint relates every reachable pair. The optimiser then gets no diversification benefit

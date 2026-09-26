@@ -3,7 +3,7 @@
 Description = "Near optimal centering in PortfolioOptimisers.jl: give up a little of the objective for the analytic centre of the near-optimal region, which moves less."
 ```
 
-# Near optimal centering
+# [Near optimal centering](@id example-near-optimal-centering)
 
 A plain optimiser returns the one point that maximises or minimises its objective, such as
 the maximum-ratio portfolio or the minimum-variance portfolio. That point often sits in a

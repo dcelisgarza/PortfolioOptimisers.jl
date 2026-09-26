@@ -3,9 +3,9 @@
 Description = "Opinion pooling in PortfolioOptimisers.jl: combine several entropy-pooling posteriors into one consensus prior weighted by trust."
 ```
 
-# Opinion pooling
+# [Opinion pooling](@id example-opinion-pooling)
 
-[Entropy pooling](07_Entropy_Pooling.md) turns one set of views into a reweighted prior. But
+[Entropy pooling](@ref example-entropy-pooling) turns one set of views into a reweighted prior. But
 you often hold several sets of views from different sources, such as a fundamental analyst, a
 quantitative signal and a macro desk, and they can conflict. Opinion pooling combines several
 entropy pooling posteriors into one consensus prior, and weights each opinion by how much you

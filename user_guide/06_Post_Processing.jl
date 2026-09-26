@@ -3,12 +3,12 @@
 Description = "Turn the continuous weights of a PortfolioOptimisers.jl portfolio into whole shares under a cash budget, and plot the weights."
 ```
 
-# Post-processing
+# [Post-processing](@id user-guide-post-processing)
 
 An optimiser returns continuous weights, which are fractions of the capital. To trade them, you
 need whole shares, and to show them to others, you need a report. Post-processing does both. It
 turns the weights into whole numbers of shares under a cash budget, and it plots the result. For
-more, see the [post-processing examples](../examples/6_post_processing/01_Finite_Allocation.md).
+more, see the [post-processing examples](@ref example-finite-allocation).
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -61,7 +61,7 @@ pretty_table(DataFrame("Asset" => rd.nx, "Target weight" => res.w,
 #=
 [`DiscreteAllocation`](@ref) solves a mixed-integer program to find an exact allocation, and it
 needs a [`Solver`](@ref) that handles integer variables. See the
-[finite allocation example](../examples/6_post_processing/01_Finite_Allocation.md).
+[finite allocation example](@ref example-finite-allocation).
 
 ## 2. Reporting
 

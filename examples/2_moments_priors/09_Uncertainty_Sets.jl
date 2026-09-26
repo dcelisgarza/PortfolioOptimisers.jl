@@ -3,10 +3,10 @@
 Description = "Uncertainty sets in PortfolioOptimisers.jl: optimise against the worst case over a box or an ellipsoid around the estimated moments."
 ```
 
-# Uncertainty sets
+# [Uncertainty sets](@id example-uncertainty-sets)
 
-The view priors of the earlier pages, [Black-Litterman](05_Black_Litterman.md),
-[entropy pooling](07_Entropy_Pooling.md) and [opinion pooling](08_Opinion_Pooling.md), change
+The view priors of the earlier pages, [Black-Litterman](@ref example-black-litterman),
+[entropy pooling](@ref example-entropy-pooling) and [opinion pooling](@ref example-opinion-pooling), change
 the moments themselves. Robust optimisation keeps the estimated moments and assumes that they
 are wrong by some amount. You choose a region around the estimate that the true covariance or
 mean is likely to lie in, the uncertainty set. The optimiser then minimises the worst-case risk,

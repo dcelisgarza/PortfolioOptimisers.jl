@@ -3,7 +3,7 @@
 Description = "Meta-optimisers in PortfolioOptimisers.jl: nested clustered, stacking and subset resampling, which split a problem and recombine the pieces."
 ```
 
-# Meta-optimisers
+# [Meta-optimisers](@id example-meta-optimisers)
 
 Every optimiser so far gives weights by solving one problem. A meta-optimiser runs other
 optimisers instead. It splits the problem, solves each piece with the estimator you name, and
@@ -64,7 +64,7 @@ clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
 
 #=
 The inner and the outer optimiser take their statistics from different places, and the cell
-below shows how. The [`MeanRisk` objectives](01_MeanRisk_Objectives.md) page covers the wider
+below shows how. The [`MeanRisk` objectives](@ref example-meanrisk-objectives) page covers the wider
 point, that a keyword takes a computed result or an estimator that computes one.
 
 The inner optimiser gets the prior we computed above, through `pe = pr` on its

@@ -3,7 +3,7 @@
 Description = "Reproduce the quintile and 1/N portfolios as robust optimisations with an l1 uncertainty set in PortfolioOptimisers.jl."
 ```
 
-# ℓ1 uncertainty sets: the quintile and 1/N portfolios
+# [ℓ1 uncertainty sets: the quintile and 1/N portfolios](@id example-l1-uncertainty-sets-the-quintile-and-1-n-portfolios)
 
 Two portfolios that practitioners use a lot have no theory behind them. The 1/N portfolio puts
 a weight of `1/N` in each asset and uses no data. The quintile portfolio sorts the assets on a
@@ -27,7 +27,7 @@ when you do not believe it at all.
 
 Because the quintile portfolio is the solution of a robust problem, the library has no
 quintile optimiser. An ℓ1 ball is an
-[uncertainty set](09_Uncertainty_Sets.md), so the quintile portfolio is a [`MeanRisk`](@ref)
+[uncertainty set](@ref example-uncertainty-sets), so the quintile portfolio is a [`MeanRisk`](@ref)
 problem with an ℓ1 `ucs`, and every constraint of the library applies to it. This page computes
 the sweep over `ε` behind the table above, the models of the paper, a ranking on a
 characteristic other than return, and the portfolios from theory that the paper compares with.
@@ -36,7 +36,7 @@ characteristic other than return, and the portfolios from theory that the paper 
     Reach for an ℓ1 set when you have a ranking that you trust in part. Do not set `ε`
     yourself, because its scale comes from the data, as section 3 shows. Give the number of
     assets you want to hold, and [`ActiveAssetsUncertaintyAlgorithm`](@ref) finds the radius.
-    Reach for a [box or ellipsoidal set](09_Uncertainty_Sets.md) instead when the size of the
+    Reach for a [box or ellipsoidal set](@ref example-uncertainty-sets) instead when the size of the
     estimation error matters to you more than the order of the ranking.
 =#
 
@@ -535,7 +535,7 @@ MSRP put most of their weight in few assets, and both act on 252 days of estimat
 estimates were exact. The quintile portfolio and 1/N spread equal weights over four assets and
 over all of them. The in-sample columns do not measure the risk of a concentrated portfolio.
 Only a test out of sample can show whether the spread pays, and this page does not run one. The
-[cross validation](../5_validation_tuning/01_Cross_Validation.md) examples show how to run such a
+[cross validation](@ref example-cross-validation) examples show how to run such a
 test.
 
 ## 13. What to take away

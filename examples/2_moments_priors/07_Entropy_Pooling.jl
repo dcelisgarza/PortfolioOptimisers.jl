@@ -3,9 +3,9 @@
 Description = "Entropy pooling in PortfolioOptimisers.jl: views as constraints on any moment, imposed by reweighting scenarios without assuming normality."
 ```
 
-# Entropy pooling
+# [Entropy pooling](@id example-entropy-pooling)
 
-[Black-Litterman](05_Black_Litterman.md) adds views to the mean through a Gaussian update.
+[Black-Litterman](@ref example-black-litterman) adds views to the mean through a Gaussian update.
 Entropy pooling is more general in two ways. First, a view can constrain one of several
 statistics, such as the mean, the variance, the CVaR, the skewness or the kurtosis, and even a
 single covariance or correlation. Second, it assumes no normal distribution. It reweights the
@@ -14,8 +14,8 @@ can to the original one, in relative entropy, which is the Kullback-Leibler dive
 result gives every scenario a new weight, so every moment of the prior can change.
 
 This page is the second of three on priors built from views.
-[Black-Litterman](05_Black_Litterman.md) comes before it, and
-[opinion pooling](08_Opinion_Pooling.md) follows and combines several entropy pooling priors
+[Black-Litterman](@ref example-black-litterman) comes before it, and
+[opinion pooling](@ref example-opinion-pooling) follows and combines several entropy pooling priors
 into one.
 
 [`EntropyPoolingPrior`](@ref) takes the views on each quantity in its own field, and the names
@@ -34,7 +34,7 @@ that the four tail risk fields put around it.
     correlation between two assets, one or several at once. It also suits you when you do not
     trust the normal distribution that Black-Litterman assumes, because it reweights the
     empirical scenarios directly. For a view on the mean alone, Black-Litterman is simpler. To
-    combine several entropy pooling priors, see [opinion pooling](08_Opinion_Pooling.md).
+    combine several entropy pooling priors, see [opinion pooling](@ref example-opinion-pooling).
 =#
 
 using PortfolioOptimisers, PrettyTables

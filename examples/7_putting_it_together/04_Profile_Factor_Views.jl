@@ -6,17 +6,17 @@ Description = "An end-to-end profile in PortfolioOptimisers.jl: a desk with fact
 # Profile: factor-views desk
 
 The fourth profile states its views on factors rather than on assets. The
-[desk monthly profile](02_Profile_Desk_Monthly.md) stated a thesis about two sectors, healthcare
+[desk monthly profile](@ref example-profile-desk-monthly) stated a thesis about two sectors, healthcare
 over energy, and entropy pooling turned it into a prior. This desk states what it expects momentum
 and value to earn, and a factor model takes those two numbers to every asset through the
 regression of assets on factors. The posterior then goes into an optimiser with caps on it.
 
-The [advanced Black-Litterman](../2_moments_priors/06_Advanced_Black_Litterman.md) page builds
+The [advanced Black-Litterman](@ref example-advanced-black-litterman-variants) page builds
 this prior one variant at a time. This page puts it to work in a whole book, with a
 [`FactorBlackLittermanPrior`](@ref), sector caps and an exact allocation.
 
 For this desk, three limits of the
-[strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md) bind.
+[strategy decision framework](@ref user-guide-choosing-a-strategy) bind.
 
   - The view is about what a factor earns, so we write it against the factor names and let the
     regression take it to the assets.
@@ -136,7 +136,7 @@ book, name by name.
 
 ## 5. Exact finite allocation
 
-The desk invests \$1,000,000. As in the [institutional profile](03_Profile_Institutional.md),
+The desk invests \$1,000,000. As in the [institutional profile](@ref example-profile-institutional),
 [`DiscreteAllocation`](@ref) rounds the target to whole shares with a mixed-integer solve.
 =#
 

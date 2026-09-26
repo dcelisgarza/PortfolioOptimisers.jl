@@ -3,7 +3,7 @@
 Description = "Risk budgeting in PortfolioOptimisers.jl: match per-asset or per-factor risk contributions to a budget, with equal risk contribution as the special case."
 ```
 
-# Risk budgeting
+# [Risk budgeting](@id example-risk-budgeting)
 
 [`RiskBudgeting`](@ref) takes a different stance from [`MeanRisk`](@ref). It does not trade
 expected return against risk through an objective function. It divides the risk itself, and

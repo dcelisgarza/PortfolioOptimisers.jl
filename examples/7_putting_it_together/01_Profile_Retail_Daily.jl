@@ -3,14 +3,14 @@
 Description = "An end-to-end profile in PortfolioOptimisers.jl: a retail investor rebalancing daily under compute, trading-cost and capital limits."
 ```
 
-# Profile: retail, daily
+# [Profile: retail, daily](@id example-profile-retail-daily)
 
 Each earlier example covers one part of the pipeline. A profile page runs the whole pipeline once,
 for one investor, so you can see how the choices fit together. This first profile rebalances a
 small retail account every day. Compute, trading cost and the size of the account set the limits
 here, and none of them rewards a more elaborate model.
 
-Of the limits in the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md),
+Of the limits in the [strategy decision framework](@ref user-guide-choosing-a-strategy),
 four shape this investor's choices.
 
   - The rebalance is daily, so you pay for the optimisation every trading day. One convex solve is

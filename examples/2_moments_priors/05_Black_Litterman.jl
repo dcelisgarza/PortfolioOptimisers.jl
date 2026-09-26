@@ -3,7 +3,7 @@
 Description = "The Black-Litterman model in PortfolioOptimisers.jl: tilt an equilibrium prior toward your views on assets and asset groups."
 ```
 
-# Black-Litterman
+# [Black-Litterman](@id example-black-litterman)
 
 The estimators on the earlier pages take the data as it is. But you often hold a view, such as
 "Apple will return 8 bps a day", "Microsoft will beat AMD" or "tech as a group will do well",
@@ -14,7 +14,7 @@ each view sets how far it moves the prior. The result is a prior with a posterio
 covariance, and you give it to an optimiser as you give any other prior.
 
 This page is the first of three on priors built from views.
-[Entropy pooling](07_Entropy_Pooling.md) and [opinion pooling](08_Opinion_Pooling.md) follow,
+[Entropy pooling](@ref example-entropy-pooling) and [opinion pooling](@ref example-opinion-pooling) follow,
 and each builds on the page before it. You can also read each page on its own.
 
 [`BlackLittermanPrior`](@ref) takes a base estimator in `pe`, whose default mean is
@@ -29,7 +29,7 @@ scales the uncertainty of the prior for all the views at once.
     relative or about a group, as section 4 shows. It is the simplest of the three view
     priors, because a view enters as a Gaussian update of the mean. If your views are about other quantities, such as the variance, the tail risk or
     the skew, or you want them to hold as constraints on the distribution, see
-    [entropy pooling](07_Entropy_Pooling.md).
+    [entropy pooling](@ref example-entropy-pooling).
 =#
 
 using PortfolioOptimisers, PrettyTables

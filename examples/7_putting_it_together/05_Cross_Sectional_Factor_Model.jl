@@ -3,7 +3,7 @@
 Description = "A cross-sectional factor model in PortfolioOptimisers.jl, end to end: factor returns from lagged asset traits, uncertainty sets and a constrained book."
 ```
 
-# Cross-sectional factor model, end to end
+# [Cross-sectional factor model, end to end](@id example-cross-sectional-factor-model-end-to-end)
 
 Apart from the two pages after this one, every factor example on this site fits a factor model
 through time. It regresses each asset's return series on a set of observed factor series, one
@@ -672,14 +672,14 @@ pretty_table(DataFrame("Family" => rr.fam, "Factor" => rr.nf,
 #=
 ## Where to go next
 
-  - [Cross-sectional factor model through a Pipeline](06_Cross_Sectional_Factor_Pipeline.md)
+  - [Cross-sectional factor model through a Pipeline](@ref example-cross-sectional-factor-model-through-a-pipeline)
     reaches the same weights with the panel passed into the pipeline as data.
-  - [Reading a return forecast before an optimiser sees it](07_Forecast_Evaluation.md) scores the
+  - [Reading a return forecast before an optimiser sees it](@ref example-reading-a-return-forecast-before-an-optimiser-sees-it) scores the
     `rfe` of section 2 out of sample, against what happened next, and compares it with another.
-  - [Factor priors](../2_moments_priors/04_Factor_Priors.md) is the counterpart of section 2
+  - [Factor priors](@ref example-factor-priors) is the counterpart of section 2
     through time.
-  - [Uncertainty sets](../2_moments_priors/09_Uncertainty_Sets.md) covers the box, ellipsoidal and
+  - [Uncertainty sets](@ref example-uncertainty-sets) covers the box, ellipsoidal and
     norm-ball shapes that the orthogonal sets of section 4 specialise.
-  - [Factor exposure constraints](../4_constraints_costs/10_Factor_Exposure_Constraints.md) is the
+  - [Factor exposure constraints](@ref example-factor-exposure-constraints) is the
     full grammar behind the one-line mandate of section 5.
 =#

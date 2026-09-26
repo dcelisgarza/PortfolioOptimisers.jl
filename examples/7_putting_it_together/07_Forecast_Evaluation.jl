@@ -3,7 +3,7 @@
 Description = "Read a return forecast before an optimiser sees it: forecast evaluation for CrossSectionalFactorPrior in PortfolioOptimisers.jl."
 ```
 
-# Reading a return forecast before an optimiser sees it
+# [Reading a return forecast before an optimiser sees it](@id example-reading-a-return-forecast-before-an-optimiser-sees-it)
 
 A [`CrossSectionalFactorPrior`](@ref) takes a return forecast, which is an opinion about which
 assets are about to do better than the factor model says they should, and adds it to the expected
@@ -27,7 +27,7 @@ Ask three questions in order, and stop at the first no.
 Two more questions come after all three answer yes. They ask how long the forecast keeps its
 information and whether it is a factor exposure under another name. Section 6 asks them.
 
-Everything below runs on the synthetic panel of the [deep dive](05_Cross_Sectional_Factor_Model.md).
+Everything below runs on the synthetic panel of the [deep dive](@ref example-cross-sectional-factor-model-end-to-end).
 The alpha that the panel was drawn from is known before the estimator runs, and you can
 check every claim against it.
 
@@ -49,7 +49,7 @@ end;
 ## 1. The panel, and two convictions
 
 We copy the panel generator from the deep dive without a change. Section 1 of
-[the deep dive](05_Cross_Sectional_Factor_Model.md) says what each field of the panel is. One field
+[the deep dive](@ref example-cross-sectional-factor-model-end-to-end) says what each field of the panel is. One field
 matters here, `signal`. It is the assets' true alpha plus a little noise, and no factor exposure is
 built from it. A forecast built on it has a part that the factor model does not span.
 =#
@@ -600,14 +600,14 @@ plot_forecast_rolling_ic(fe_signal, csfm; title = "Signal composite: rolling IC"
 #=
 ## Where to go next
 
-  - [Cross-sectional factor model, end to end](05_Cross_Sectional_Factor_Model.md) builds the panel,
+  - [Cross-sectional factor model, end to end](@ref example-cross-sectional-factor-model-end-to-end) builds the panel,
     the prior and the block this page starts from, and hands the same forecast to an optimiser.
-  - [Cross-sectional factor model through a Pipeline](06_Cross_Sectional_Factor_Pipeline.md)
+  - [Cross-sectional factor model through a Pipeline](@ref example-cross-sectional-factor-model-through-a-pipeline)
     reaches the same weights, with the panel arriving on the returns result rather than in a slot
     of its own.
-  - [Walk-forward and cross-validation](../5_validation_tuning/01_Cross_Validation.md) tests a whole
+  - [Walk-forward and cross-validation](@ref example-cross-validation) tests a whole
     strategy out of sample, where this page scores a single forecast.
-  - [Performance attribution](../6_post_processing/03_Performance_Attribution.md) decomposes what
+  - [Performance attribution](@ref example-performance-attribution-and-post-optimisation-diagnostics) decomposes what
     a book earned, once one has been solved.
 =#
 

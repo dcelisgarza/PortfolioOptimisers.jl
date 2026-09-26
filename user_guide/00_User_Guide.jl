@@ -8,7 +8,7 @@ Description = "A short tour of PortfolioOptimisers.jl that gives one minimal cal
 The user guide is a short tour of `PortfolioOptimisers.jl`. Each page gives you one minimal call
 for a task, so you can build a portfolio without reading the source or the reference. A page
 covers the common path of its topic and stops there. For the variants of a topic and the choices
-between them, follow the links into the [Examples](../examples/00_Examples.md), where each page
+between them, follow the links into the [Examples](@ref example-examples-introduction), where each page
 covers one topic in depth.
 
 ## The pipeline
@@ -22,41 +22,41 @@ data ─▶ moments / prior ─▶ optimiser ─▶ constraints & costs ─▶ v
 
 The first pages of the guide follow the stages, and the later pages cover topics that span them:
 
-  - [Data and priors](01_Data_and_Priors.md) turns prices into returns, and returns into a prior,
+  - [Data and priors](@ref user-guide-data-and-priors) turns prices into returns, and returns into a prior,
     which holds the expected returns and the covariance. The
-    [moments and priors examples](../examples/2_moments_priors/01_Expected_Returns_Estimation.md)
+    [moments and priors examples](@ref example-expected-returns-estimation)
     show more estimators and the priors that take views.
-  - [Optimisers](02_Optimisers.md) makes one call from each family of optimisers: naive, JuMP
+  - [Optimisers](@ref user-guide-optimisers) makes one call from each family of optimisers: naive, JuMP
     (`MeanRisk`, risk budgeting, near-optimal centering), clustering, and the optimisers that
     combine other optimisers. The
-    [optimiser examples](../examples/3_optimisers/01_MeanRisk_Objectives.md) show the objectives
+    [optimiser examples](@ref example-meanrisk-objectives) show the objectives
     and the variants of each family.
-  - [Risk measures](03_Risk_Measures.md) lists every risk measure that you can ask an optimiser to
+  - [Risk measures](@ref user-guide-risk-measures) lists every risk measure that you can ask an optimiser to
     minimise, with its alias, what it penalises, and the optimisers that accept it.
-  - [Constraints and costs](04_Constraints_and_Costs.md) adds weight bounds, group constraints,
+  - [Constraints and costs](@ref user-guide-constraints-and-costs) adds weight bounds, group constraints,
     factor exposures, turnover and fees. The
-    [constraints and costs examples](../examples/4_constraints_costs/01_Budget_Constraints.md)
+    [constraints and costs examples](@ref example-budget-constraints)
     also cover budgets, regularisation and constraints that you write yourself.
-  - [Validation and tuning](05_Validation_and_Tuning.md) runs cross-validation and a search over
-    parameters. The [validation examples](../examples/5_validation_tuning/01_Cross_Validation.md)
+  - [Validation and tuning](@ref user-guide-validation-and-tuning) runs cross-validation and a search over
+    parameters. The [validation examples](@ref example-cross-validation)
     show the other splitters and searches.
-  - [Post-processing](06_Post_Processing.md) turns weights into whole shares and plots the result.
-    The [post-processing examples](../examples/6_post_processing/01_Finite_Allocation.md) also
+  - [Post-processing](@ref user-guide-post-processing) turns weights into whole shares and plots the result.
+    The [post-processing examples](@ref example-finite-allocation) also
     cover the plots in detail and the attribution of the performance.
-  - [Choosing a strategy](07_Choosing_a_Strategy.md) asks four questions about your mandate:
+  - [Choosing a strategy](@ref user-guide-choosing-a-strategy) asks four questions about your mandate:
     compute, rebalance frequency, trust in your estimates, and capital. The
-    [investor profiles](../examples/7_putting_it_together/01_Profile_Retail_Daily.md) apply the
+    [investor profiles](@ref example-profile-retail-daily) apply the
     answers from start to finish.
-  - [The point-in-time universe](08_Point_in_Time_Universe.md) starts from a price table with
+  - [The point-in-time universe](@ref user-guide-the-point-in-time-universe) starts from a price table with
     gaps and ends with a walk-forward. It shows what the library does when an asset lists, delists
     or is suspended inside your sample. Some steps handle the gap, and the others throw an error
     that names the asset.
-  - [The online walk-forward](09_Online_Walk_Forward.md) warms one estimator up on the first
+  - [The online walk-forward](@ref user-guide-the-online-walk-forward) warms one estimator up on the first
     training window and then adds the rows of each later fold to it, where a batch walk-forward
     refits. It shows the constructor that selects this, the weights of the two runs side by side,
     the wrapper for an estimator with no exact update, where the online run is faster, and how to
     resume a run.
-  - [Online portfolio selection](10_Online_Portfolio_Selection.md) runs rules that move the
+  - [Online portfolio selection](@ref user-guide-online-portfolio-selection) runs rules that move the
     allocation after each period, from the ratio of each asset's price to its price one period
     before. It runs the rules that follow the winner and the rules that follow the loser on a
     market that reverts and on a market that trends. It compares every rule with three portfolios
@@ -91,7 +91,7 @@ A stage runs when you call a function on its estimator: `prior(EmpiricalPrior(),
 `optimise(MeanRisk(…))`, `clusterise(…)`. A risk measure is different. You pass it to the `r`
 keyword of an optimiser. To get the risk of a portfolio outside an optimiser, you call
 [`expected_risk`](@ref) with the measure, the weights and the prior.
-[Risk measures](03_Risk_Measures.md) shows both uses.
+[Risk measures](@ref user-guide-risk-measures) shows both uses.
 
 ## The data
 

@@ -3,13 +3,13 @@
 Description = "Turn prices into returns with prices_to_returns, and returns into a prior with prior, which gives the expected returns and covariance most optimisers use."
 ```
 
-# Data and priors
+# [Data and priors](@id user-guide-data-and-priors)
 
 The first stage turns prices into a prior, which holds the expected returns vector and the
 covariance matrix that most optimisers use. Two calls cover the common path,
 [`prices_to_returns`](@ref) and [`prior`](@ref). For the other moment estimators and the priors that
 take views, see the
-[moments and priors examples](../examples/2_moments_priors/01_Expected_Returns_Estimation.md).
+[moments and priors examples](@ref example-expected-returns-estimation).
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, LinearAlgebra,
@@ -38,7 +38,7 @@ The conversion keeps every gap in the returns, and it returns an [`AssetPanel`](
 `rd.pnl` that states which assets have data on each date. To fill a gap inside the listing span,
 use [`PriceGapFill`](@ref). To drop the assets or the dates with too much missing data, use
 [`MissingDataFilter`](@ref). The page
-[Data preprocessing and the ingestion layer](../examples/1_foundations/02_Data_Preprocessing.md)
+[Data preprocessing and the ingestion layer](@ref example-data-preprocessing-and-the-ingestion-layer)
 covers these steps in depth.
 =#
 
@@ -53,7 +53,7 @@ implied volatilities as `iv`. By default it aligns them on the dates of the asse
 [`PriceIngestion`](@ref) estimator also sets how to collapse the prices to a lower frequency. The
 conversion then puts the factor returns in `rd.F` and the benchmark returns in `rd.B`, on the same
 [`ReturnsResult`](@ref) as the asset returns.
-[The point-in-time universe](08_Point_in_Time_Universe.md) runs these two calls on a price table
+[The point-in-time universe](@ref user-guide-the-point-in-time-universe) runs these two calls on a price table
 with gaps.
 
 ## 2. Returns to a prior
@@ -77,20 +77,20 @@ You call every prior estimator with `prior(pe, rd)`, and you change the prior by
 first argument. The common alternatives are these:
 
   - [`FactorPrior`](@ref) computes the moments from a factor model. See
-    [Factor Priors](../examples/2_moments_priors/04_Factor_Priors.md).
+    [Factor Priors](@ref example-factor-priors).
   - [`BlackLittermanPrior`](@ref) combines the moments of a market equilibrium with your views.
-    See [Black-Litterman](../examples/2_moments_priors/05_Black_Litterman.md). Three more priors
+    See [Black-Litterman](@ref example-black-litterman). Three more priors
     of the same family are [`BayesianBlackLittermanPrior`](@ref),
     [`FactorBlackLittermanPrior`](@ref), which takes views on the factors, and
     [`AugmentedBlackLittermanPrior`](@ref), which takes views on the assets and on the factors
     together. See
-    [Advanced Black-Litterman](../examples/2_moments_priors/06_Advanced_Black_Litterman.md).
+    [Advanced Black-Litterman](@ref example-advanced-black-litterman-variants).
   - [`EntropyPoolingPrior`](@ref) changes the probability of each historical scenario until the
     scenarios satisfy your views, and it takes views on any moment. See
-    [Entropy Pooling](../examples/2_moments_priors/07_Entropy_Pooling.md).
+    [Entropy Pooling](@ref example-entropy-pooling).
   - [`OpinionPoolingPrior`](@ref) combines several entropy pooling priors, each with its own
     views, into one probability for each scenario, and computes the moments under those
-    probabilities. See [Opinion Pooling](../examples/2_moments_priors/08_Opinion_Pooling.md).
+    probabilities. See [Opinion Pooling](@ref example-opinion-pooling).
   - [`CrossSectionalFactorPrior`](@ref) computes the moments from a factor model that it fits
     across the assets on each date, not through time. On each date it regresses the returns of
     the assets on their exposures of the date before, by default. It therefore needs no factor
@@ -102,18 +102,18 @@ equity or an industry label, which the returns hold in `rd.pnl`. You give it a l
 pair names a factor and the estimator that computes the exposures of the assets to that factor from
 the panel. An industry label gives one factor for each industry, and one pair then gives many
 factors. The page
-[Cross-sectional factor model, end to end](../examples/7_putting_it_together/05_Cross_Sectional_Factor_Model.md)
+[Cross-sectional factor model, end to end](@ref example-cross-sectional-factor-model-end-to-end)
 fits one, and
-[Cross-sectional factor model through a Pipeline](../examples/7_putting_it_together/06_Cross_Sectional_Factor_Pipeline.md)
+[Cross-sectional factor model through a Pipeline](@ref example-cross-sectional-factor-model-through-a-pipeline)
 gets the same weights through a [`Pipeline`](@ref).
 
 [`EmpiricalPrior`](@ref) holds a covariance estimator in its field `ce`, and you can change it for
 another, such as a denoised covariance or the Gerber covariance. The page
-[Covariance Estimation](../examples/2_moments_priors/02_Covariance_Estimation.md) compares them. A
+[Covariance Estimation](@ref example-covariance-estimation) compares them. A
 moment estimator can also use only the last part of the sample, or weight the recent returns more
 than the old ones. Use this when the recent returns describe the market better than the full
 sample does, as the page
-[Windowed Estimators](../examples/2_moments_priors/10_Windowed_Estimators.md) shows.
+[Windowed Estimators](@ref example-windowed-moment-estimators) shows.
 [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref)
 multiply an exponentially weighted estimate by a factor that measures how far the recent
 standardised returns are from their usual size.

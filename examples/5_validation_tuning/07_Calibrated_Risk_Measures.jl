@@ -3,7 +3,7 @@
 Description = "Calibrated risk measures in PortfolioOptimisers.jl: a rule that computes alpha from the sample it is given instead of a fixed number."
 ```
 
-# Calibrated risk measures: a rule in place of a number
+# [Calibrated risk measures: a rule in place of a number](@id example-calibrated-risk-measures-a-rule-in-place-of-a-number)
 
 `alpha = 0.05` is a statement about the *probability* of the tail. It says nothing about the
 number of observations the tail holds. Over one year of daily data the 5% tail holds about 13
@@ -34,7 +34,7 @@ after it shows one use of a slot.
 
 The regularisation coefficients `l1`, `linf`, [`L2Regularisation`](@ref) and
 [`LpRegularisation`](@ref) are ambiguity radii too, and they take the same rule family. They
-belong to the [regularisation example](../4_constraints_costs/07_Regularisation.md), which covers
+belong to the [regularisation example](@ref example-regularisation), which covers
 those slots. The three norm ceilings `l2c`, `lpc` and `linfc` of [`JuMPOptimiser`](@ref) bound a
 norm rather than price one, so they are a different quantity and take a family of their own,
 [`AbstractNormCeilingCalibrationAlgorithm`](@ref). That example runs both families, and this one
@@ -458,7 +458,7 @@ ball at the rate the number of assets sets rather than at the square-root rate o
 length, which is far slower over a wide universe. [`DualNormRadius`](@ref) uses the slot's own
 key, picks the ground metric that slot names, and returns the sampling error in it, so two
 slots of two different norms get two different numbers. Both fit any radius slot, as the two
-above do, and the [regularisation example](../4_constraints_costs/07_Regularisation.md) runs
+above do, and the [regularisation example](@ref example-regularisation) runs
 them, because the slots that separate them are the four penalty coefficients of
 [`JuMPOptimiser`](@ref).
 
@@ -522,7 +522,7 @@ println("robust out-of-sample variance = $(expected_risk(var_rm, pred_drcvar))")
     family.
   - A slot names its quantity, and its type bound refuses a rule of another family at
     construction.
-  - The [regularisation example](../4_constraints_costs/07_Regularisation.md) runs the other two
+  - The [regularisation example](@ref example-regularisation) runs the other two
     radius rules and the three norm ceilings of `JuMPOptimiser`. `DualNormRadius` gives a
     different radius to penalties of different norms, and the four penalty coefficients of
     `JuMPOptimiser` are where those norms differ.

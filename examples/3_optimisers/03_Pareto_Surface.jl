@@ -3,11 +3,11 @@
 Description = "Sweep a Pareto surface in PortfolioOptimisers.jl: trade off return against two risk measures at once with NearOptimalCentering."
 ```
 
-# Pareto surface
+# [Pareto surface](@id example-pareto-surface)
 
 This page extends the efficient frontier to two risk measures and the return. We compute the
 surface with [`NearOptimalCentering`](@ref), which the
-[efficient-frontier](02_Efficient_Frontier.md) page introduced.
+[efficient-frontier](@ref example-efficient-frontier) page introduced.
 
 !!! tip "When to reach for this"
     Reach for a Pareto surface when one frontier of risk and return is not enough, because you

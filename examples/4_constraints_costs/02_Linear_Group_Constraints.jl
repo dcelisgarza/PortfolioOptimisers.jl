@@ -3,7 +3,7 @@
 Description = "Linear and group constraints in PortfolioOptimisers.jl: weight bounds, sector bands, relative and sum constraints on a JuMPOptimiser."
 ```
 
-# Linear and group constraints
+# [Linear and group constraints](@id example-linear-and-group-constraints)
 
 A mandate can cap the weight of a single name, keep each sector inside a band, keep one group
 larger than another, or forbid very small positions. `PortfolioOptimisers.jl` expresses each of
@@ -14,7 +14,7 @@ mixed-integer solver.
 
 You name the assets and the groups once, in a [`UniverseSets`](@ref), and every constraint
 refers to those names. The views of the [prior
-examples](../2_moments_priors/07_Entropy_Pooling.md) use strings of the same `"name op value"`
+examples](@ref example-entropy-pooling) use strings of the same `"name op value"`
 form.
 
 !!! tip "When to reach for this"
@@ -161,11 +161,11 @@ Two common constraints are not convex, so Clarabel cannot solve them alone.
 Both need a mixed-integer solver, for example Pajarito with Clarabel as the continuous solver
 and HiGHS as the mixed-integer solver. If you give a threshold to a continuous solver, the
 result carries a failed `retcode` and `NaN` weights. [Cardinality and
-threshold](03_Cardinality_and_Threshold.md) sets up such a solver.
+threshold](@ref example-cardinality-and-threshold) sets up such a solver.
 
 Every constraint on this page uses asset names. A mandate in factor names, such as "at most 10%
 momentum" or "no net exposure to value", is the same linear form over the factor exposures.
-[Factor exposure constraints](10_Factor_Exposure_Constraints.md) covers it.
+[Factor exposure constraints](@ref example-factor-exposure-constraints) covers it.
 
 ## 7. Comparing the constraints
 

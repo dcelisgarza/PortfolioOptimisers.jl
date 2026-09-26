@@ -3,7 +3,7 @@
 Description = "Multiple risk measures in one PortfolioOptimisers.jl optimisation: combine them with a scalariser, and report a portfolio's risk under all of them."
 ```
 
-# Multiple risk measures
+# [Multiple risk measures](@id example-multiple-risk-measures)
 
 This page puts several risk measures into one optimisation. It combines them in the objective of
 `MeanRisk` and of a hierarchical optimiser, and it reports the risk of a portfolio under a vector
@@ -16,14 +16,14 @@ of risk measures.
     [`MeanRisk`](@ref) optimisation takes a vector of risk measures, each with its own
     settings, so the objective and the constraints can combine them. If you want to trade
     several criteria against each other over many portfolios instead, see the
-    [Pareto surface](03_Pareto_Surface.md) example.
+    [Pareto surface](@ref example-pareto-surface) example.
 
 !!! note "The return side takes several terms too"
     The `ret` field of `JuMPOptimiser` takes one return term or a vector of them, as the `r`
     field of `MeanRisk` does, each with its own [`JuMPReturnsSettings`](@ref). The optimiser
     combines several risk measures with a scalariser, the rule that turns their values into one
     number, and you choose it. It always adds the return terms as a weighted sum, with no
-    scalariser. See [ℓ1 uncertainty sets](../2_moments_priors/11_L1_Uncertainty_Quintile_Portfolios.md).
+    scalariser. See [ℓ1 uncertainty sets](@ref example-l1-uncertainty-sets-the-quintile-and-1-n-portfolios).
 =#
 using PortfolioOptimisers, PrettyTables
 tsfmt = (v, i, j) -> begin

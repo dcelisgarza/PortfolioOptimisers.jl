@@ -3,13 +3,13 @@
 Description = "Walk-forward and combinatorial cross-validation, and cross-validated hyperparameter search, for any PortfolioOptimisers.jl optimiser."
 ```
 
-# Validation and tuning
+# [Validation and tuning](@id user-guide-validation-and-tuning)
 
 Cross-validation scores a strategy on data that it was not fitted to, and a search chooses the
 parameters of the strategy by that score. `PortfolioOptimisers.jl` has cross-validation splitters,
 and a cross-validated search over parameters, that work with any optimiser. This page shows the
 minimal path. For the other splitters and searches, see the
-[validation and tuning examples](../examples/5_validation_tuning/01_Cross_Validation.md).
+[validation and tuning examples](@ref example-cross-validation).
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
@@ -47,9 +47,9 @@ cv_risk = expected_risk(LowOrderMoment(; alg = SecondMoment()), pred)
 [`CombinatorialCrossValidation`](@ref) takes every combination of a number of test folds out of
 the folds, and joins the test folds into several paths through the dates. You get several
 out-of-sample paths in place of one, for more fits. See
-[Cross Validation](../examples/5_validation_tuning/01_Cross_Validation.md). A walk-forward can also
+[Cross Validation](@ref example-cross-validation). A walk-forward can also
 update one estimator from fold to fold instead of refitting it on each fold, with
-[`OnlineIndexWalkForward`](@ref). See [The online walk-forward](09_Online_Walk_Forward.md).
+[`OnlineIndexWalkForward`](@ref). See [The online walk-forward](@ref user-guide-the-online-walk-forward).
 
 ## 2. Hyperparameter tuning
 
@@ -77,7 +77,7 @@ res_tuned = optimise(gs_res.opt, rd)
 #=
 [`RandomisedSearchCrossValidation`](@ref) draws candidates from the grid, or from distributions,
 instead of trying every one. It costs less on a large grid. See
-[Hyperparameter Tuning](../examples/5_validation_tuning/02_Hyperparameter_Tuning.md).
+[Hyperparameter Tuning](@ref example-hyperparameter-tuning).
 
 ## 3. Time-dependent inputs
 
@@ -125,8 +125,8 @@ A schedule in a field such as `wb` needs no `default`. Outside a fold loop, the 
 the value that the constructor gives it when you do not pass it. For schedules in the fields of
 a meta-optimiser, functions that read the data of the fold, and schedules that hold computed
 results, see
-[Time Dependent Constraints](../examples/5_validation_tuning/04_Time_Dependent_Constraints.md)
-and [Time Dependent Optimisers](../examples/5_validation_tuning/06_Time_Dependent_Optimisers.md).
+[Time Dependent Constraints](@ref example-time-dependent-constraints)
+and [Time Dependent Optimisers](@ref example-time-dependent-optimisers).
 
 ## 4. Cross-validation scores
 

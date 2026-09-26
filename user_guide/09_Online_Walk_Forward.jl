@@ -3,7 +3,7 @@
 Description = "Fit one estimator on the first training window and update it with each later fold, instead of refitting every fold of a walk-forward."
 ```
 
-# The online walk-forward
+# [The online walk-forward](@id user-guide-the-online-walk-forward)
 
 A walk-forward refits each fold from its training window, so on an expanding window each fold
 uses again every row that the fold before it used. The online walk-forward adds each row to the
@@ -84,7 +84,7 @@ count_in(m) = isnothing(m) ? N : count(m)
 Every weight of the online run equals the weight of the batch run, and both runs follow the
 universe as it moves. Seven assets are investable, then eight once the seventh asset lists inside
 the third window, then seven once the fourth delists inside the fifth. The
-[online walk-forward example](../examples/5_validation_tuning/09_Online_Walk_Forward.md) runs the
+[online walk-forward example](@ref example-the-online-walk-forward-one-estimator-updated-fold-by-fold) runs the
 same comparison through [`MeanRisk`](@ref) and prints the largest weight difference per fold.
 
 The loop calls two functions, and you can call them yourself. [`partial_fit!`](@ref) adds the rows
@@ -225,17 +225,17 @@ of times.
 
 ## Where to go next
 
-  - [The online walk-forward example](../examples/5_validation_tuning/09_Online_Walk_Forward.md)
+  - [The online walk-forward example](@ref example-the-online-walk-forward-one-estimator-updated-fold-by-fold)
     runs every comparison above through `MeanRisk` as well, with the search, the errors, and the
     speed with and without a `CoveragePolicy` through each optimiser.
-  - [Online portfolio selection](10_Online_Portfolio_Selection.md) covers the optimisers whose
+  - [Online portfolio selection](@ref user-guide-online-portfolio-selection) covers the optimisers whose
     weights come from a recursion of their own rather than a batch fit, run through the online
     walk-forward of this page.
-  - [Validation and tuning](05_Validation_and_Tuning.md) covers the walk-forward and the search
+  - [Validation and tuning](@ref user-guide-validation-and-tuning) covers the walk-forward and the search
     this page runs.
-  - [The point-in-time universe](08_Point_in_Time_Universe.md) covers the panel whose active mask
+  - [The point-in-time universe](@ref user-guide-the-point-in-time-universe) covers the panel whose active mask
     the update takes.
-  - [Data and priors](01_Data_and_Priors.md) covers the prior that updates here.
+  - [Data and priors](@ref user-guide-data-and-priors) covers the prior that updates here.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

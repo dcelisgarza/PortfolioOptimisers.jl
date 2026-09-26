@@ -95,26 +95,37 @@ and `git check-ignore` answers all four.
 
 ## Amendment (2026-09-26)
 
-**A hand-written page links another page by the `@id` label of its H1, never by a relative
-`.md` path.** The hand-written pages are `docs/src/*.md`, `docs/src/contribute/` and the two
-mirror trees. They stay in the checkout, so lychee reads them, and the Docs build resolves their
-links too. A relative path breaks when either page moves. The file split `0ed224263c` moved
+**A docs page links another page by the `@id` label of its H1, never by a relative `.md` path.**
+The rule governs the hand-written pages, which are `docs/src/*.md`, `docs/src/contribute/` and
+the two mirror trees. It also governs the Literate sources under `user_guide/` and `examples/`.
+A relative path breaks when either page moves. The file split `0ed224263c` moved
 `public_api/17_Optimisation/01_Base_Optimisation/01_OptimisationTypes.md` one directory deeper,
 its link to the aliases page broke, and the Link checker was red on `dev` until `ee854441e3`.
-At that commit the hand-written pages held 117 such links in 116 files (#1353).
+At that commit the hand-written pages held 117 such links in 116 files, and the Literate sources
+held 176 in 49 files (#1353).
 
-1. The target page's H1 is `# [Title](@id label)`. A public mirror page takes
-   `api-<title>`, and a private mirror page takes `private-api-<title>` with the `: private API`
-   suffix dropped. The title is lower case, and a run of other characters is one hyphen. A page
-   that already carries a label keeps it. `page_h1` in `docs/page_metadata.jl` unwraps the
-   label, so the derived `Description` of a mirror page does not change.
+1. The target page's H1 is `# [Title](@id label)`. The title is lower case, and a run of other
+   characters is one hyphen. The prefix names the kind of page:
+
+   | Page | Label |
+   | ---- | ----- |
+   | public mirror page | `api-<title>` |
+   | private mirror page | `private-api-<title>`, with the `: private API` suffix dropped |
+   | user-guide page | `user-guide-<title>` |
+   | example page | `example-<title>` |
+
+   A page that already carries a label keeps it. A Literate source puts the label on the H1 in
+   its first block comment. `page_h1` in `docs/page_metadata.jl` unwraps the label, so the
+   derived `Description` of a mirror page does not change.
 2. The link is `[text](@ref label)`. `.lychee.toml` excludes `@ref`, and the Docs build fails on
-   a label that does not resolve.
+   a label that does not resolve. Literate writes the notebook of a page with
+   `documenter = true`, which renders `[text](@ref label)` and `[Title](@id label)` as plain text.
 3. The label is explicit. A bare `[Title](@ref)` needs the heading text to be unique across the
    site, and "Threshold Constraints: private API" is the H1 of two pages. A backticked
    `` [`Title`](@ref) `` is a docstring reference and fails the Docs build.
-4. `test/test_64_docs_page_metadata_census.jl` refuses a relative `.md` link on a hand-written
-   page. A link whose target holds a colon is a URL, and the census does not read it.
+4. `test/test_64_docs_page_metadata_census.jl` refuses a relative `.md` link on every page that
+   it describes and on both mirror trees. A link whose target holds a colon is a URL, and the
+   census does not read it.
 
-The Literate sources under `user_guide/` and `examples/` are generated pages. This amendment does
-not govern them, and the Docs build stays the gate on their links as the Decision states.
+The Decision is unchanged for the generated pages. They stay untracked, and the Docs build stays
+the gate on the labels that their links name.

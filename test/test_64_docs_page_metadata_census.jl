@@ -96,7 +96,8 @@ end
 Every link from a page to another page by a relative `.md` path, as `(target)` in
 `[text](target)`. A path breaks when either page moves, and the file split 0ed224263c broke
 one so (#1353). The target's H1 carries a label, `# [Title](@id label)`, and the link reads
-`[text](@ref label)`, which survives a move. A colon excludes a URL.
+`[text](@ref label)`, which survives a move. A Literate source puts the label on the H1 of its
+first block comment. A colon excludes a URL.
 =#
 function relative_md_links(text::AbstractString)
     return [m.captures[1] for m in eachmatch(r"\]\(([^():\s]*\.md(?:#[^)]*)?)\)", text)]
@@ -317,21 +318,24 @@ end
         end
     end
 
-    @testset "a hand-written page links a page by its label, never by a relative path" begin
+    @testset "a page links a page by its label, never by a relative path" begin
         @test relative_md_links("[a](../b/C.md) [d](E.md#f) [g](./H.md)") ==
               ["../b/C.md", "E.md#f", "./H.md"]
         @test isempty(relative_md_links("[a](@ref label) [`B`](@ref)"))
         @test isempty(relative_md_links("[c](https://x.org/README.md)"))
-        hand_written = Dict(p => s for (p, s) in sources if endswith(s, ".md"))
+        # Every described page, the Literate sources and the generators with them, and both
+        # mirror trees.
+        pages = copy(sources)
         for side in (:public, :private)
-            merge!(hand_written, mirror_pages(REPO_ROOT, side))
+            merge!(pages, mirror_pages(REPO_ROOT, side))
         end
-        @test haskey(hand_written, "index.md")
-        @test count(p -> startswith(p, "private_api"), keys(hand_written)) >= 100
+        @test haskey(pages, "index.md")
+        @test count(p -> startswith(p, "examples"), keys(pages)) >= 60
+        @test count(p -> startswith(p, "private_api"), keys(pages)) >= 100
         linked = String[]
-        for (page, path) in sort(collect(hand_written); by = first)
+        for (page, path) in sort(collect(pages); by = first)
             for target in relative_md_links(read(path, String))
-                push!(linked, "$page -> $target")
+                push!(linked, "$(relpath(path, REPO_ROOT)) -> $target")
             end
         end
         if !isempty(linked)

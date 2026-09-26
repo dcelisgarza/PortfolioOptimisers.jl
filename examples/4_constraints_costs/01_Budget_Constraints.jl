@@ -3,7 +3,7 @@
 Description = "Budget constraints in PortfolioOptimisers.jl: the budget, the short budget and budget ranges, and why the short positions can sum to less than the short budget."
 ```
 
-# Budget constraints
+# [Budget constraints](@id example-budget-constraints)
 
 The budget is the sum of the portfolio weights. The short budget is the absolute value of the
 sum of the negative weights.

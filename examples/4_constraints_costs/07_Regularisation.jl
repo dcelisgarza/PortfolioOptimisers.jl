@@ -3,7 +3,7 @@
 Description = "Regularisation in PortfolioOptimisers.jl: L1, L2, Lp and L-infinity penalties and ceilings on the weights, as numbers or as calibration rules."
 ```
 
-# Regularisation
+# [Regularisation](@id example-regularisation)
 
 This example shows regularisation, a penalty on a norm of the weights that the optimiser adds to
 the objective.
@@ -255,7 +255,7 @@ gets. `l1` and `linf` take the rule directly, and [`L2Regularisation`](@ref) and
 [`LpRegularisation`](@ref) take it in their `val`. The optimiser computes the coefficient when
 it builds the model. In a cross-validation, each fold therefore gets a coefficient from its own
 training sample, and the rest of the optimiser stays the same. The [calibration
-example](../5_validation_tuning/07_Calibrated_Risk_Measures.md) uses a rule in a risk measure.
+example](@ref example-calibrated-risk-measures-a-rule-in-place-of-a-number) uses a rule in a risk measure.
 This section covers the four penalties and the three norm ceilings.
 
 The four penalty coefficients are ambiguity radii. Take a ball of return distributions around

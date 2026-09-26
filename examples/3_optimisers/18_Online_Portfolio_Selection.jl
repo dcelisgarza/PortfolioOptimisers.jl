@@ -3,9 +3,9 @@
 Description = "Online portfolio selection on real prices in PortfolioOptimisers.jl: the roster under a turnover fee, a schedule, a mixture, a risk loss and a risk ceiling."
 ```
 
-# Online portfolio selection
+# [Online portfolio selection](@id example-online-portfolio-selection)
 
-The [user-guide chapter](../../user_guide/10_Online_Portfolio_Selection.md) compares the
+The [user-guide chapter](@ref user-guide-online-portfolio-selection) compares the
 follow-the-winner and the follow-the-loser rules on two synthetic markets. This page runs the
 same family on real prices, over four years of twenty S&P 500 names. Sections 3 to 10 each add
 one piece.
@@ -492,12 +492,12 @@ pretty_table(DataFrame("Asset" => rd.nx, "Target weight" => capped_pred.pred[end
 #=
 ## Where to go next
 
-  - [Online portfolio selection](../../user_guide/10_Online_Portfolio_Selection.md) covers
+  - [Online portfolio selection](@ref user-guide-online-portfolio-selection) covers
     the test for a trending or a reverting market, the regret table on synthetic markets, and
     the roster group by group.
-  - [The online walk-forward](../5_validation_tuning/09_Online_Walk_Forward.md) covers the
+  - [The online walk-forward](@ref example-the-online-walk-forward-one-estimator-updated-fold-by-fold) covers the
     walk-forward that every run on this page uses.
-  - [Finite allocation](../6_post_processing/01_Finite_Allocation.md) covers the share count
+  - [Finite allocation](@ref example-finite-allocation) covers the share count
     the last section takes.
 =#
 

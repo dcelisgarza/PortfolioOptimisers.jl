@@ -3,7 +3,7 @@
 Description = "Ordered weighted average (OWA) risk measures in PortfolioOptimisers.jl: weight sorted returns to build tail and dispersion measures."
 ```
 
-# OWA risk measures
+# [OWA risk measures](@id example-owa-risk-measures)
 
 An ordered weighted average (OWA) risk measure is a weighted sum of the portfolio returns sorted
 from worst to best. The weights of that sum, the OWA weights, decide which part of the

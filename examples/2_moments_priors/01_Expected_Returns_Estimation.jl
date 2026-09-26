@@ -3,7 +3,7 @@
 Description = "Expected returns estimation in PortfolioOptimisers.jl: shrinkage estimators that pull the noisy sample mean toward a structured target."
 ```
 
-# Expected returns estimation
+# [Expected returns estimation](@id example-expected-returns-estimation)
 
 The sample mean is the noisiest input of a portfolio optimisation. One year of daily data gives
 a poor estimate of the average return of each asset. An optimiser that seeks return, such as

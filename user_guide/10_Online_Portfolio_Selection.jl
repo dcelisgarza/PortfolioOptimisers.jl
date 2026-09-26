@@ -3,7 +3,7 @@
 Description = "Online portfolio selection rules on two synthetic markets, with static and dynamic regret and a forecast read off a prior."
 ```
 
-# Online portfolio selection
+# [Online portfolio selection](@id user-guide-online-portfolio-selection)
 
 Most optimisers met so far fit moments, and those that take a solver, such as `MeanRisk`, then
 solve a programme. Most rules of the online portfolio selection family do neither. A rule of the family is one recursion,
@@ -441,13 +441,13 @@ and with [`performance_summary`](@ref) and a benchmark.
 
 ## Where to go next
 
-  - [The online portfolio selection example](../examples/3_optimisers/18_Online_Portfolio_Selection.md)
+  - [The online portfolio selection example](@ref example-online-portfolio-selection)
     runs the roster on real prices in a walk-forward with a turnover fee, with the search, the
     regret table, the weight path of a rule and its discrete allocation.
-  - [The online walk-forward](09_Online_Walk_Forward.md) covers the online scheme every run on
+  - [The online walk-forward](@ref user-guide-the-online-walk-forward) covers the online scheme every run on
     this page goes through.
-  - [Validation and tuning](05_Validation_and_Tuning.md) covers the walk-forward and the search.
-  - [Optimisers](02_Optimisers.md) covers the naive optimisers, the family `OnlinePortfolioSelection` belongs to.
+  - [Validation and tuning](@ref user-guide-validation-and-tuning) covers the walk-forward and the search.
+  - [Optimisers](@ref user-guide-optimisers) covers the naive optimisers, the family `OnlinePortfolioSelection` belongs to.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

@@ -3,7 +3,7 @@
 Description = "The MeanRisk objectives in PortfolioOptimisers.jl: minimum risk, maximum utility, maximum ratio and maximum return on one prior and risk measure."
 ```
 
-# `MeanRisk` objectives
+# [`MeanRisk` objectives](@id example-meanrisk-objectives)
 
 [`MeanRisk`](@ref) trades expected return against risk, and its objective, the `obj` field,
 picks the point on that trade-off that you get. With one prior and one risk measure, the four
@@ -26,7 +26,7 @@ changes the portfolio, and then prints the risk, return and ratio of each portfo
     return, maximise the risk-adjusted ratio, or maximise a utility that penalises risk. If you
     want to allocate the risk itself instead of trading it against return, see
     [`RiskBudgeting`](@ref). If you want the whole curve of the trade-off instead of one point,
-    see the [efficient-frontier](02_Efficient_Frontier.md) example.
+    see the [efficient-frontier](@ref example-efficient-frontier) example.
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -96,8 +96,8 @@ opt = JuMPOptimiser(; pe = pr, slv = slv)
     - Cross-validation fits the optimiser again on each training fold, so it needs the estimator form. A result fitted on the whole sample has already seen the test data, and the library does not accept one.
     - The meta-optimisers [`Stacking`](@ref) and [`NestedClustered`](@ref) give their *outer* optimiser synthetic returns that they build from the inner solves. The assets of the outer optimiser are the inner portfolios, so a prior computed on the original assets does not apply, and that field takes an estimator.
 
-    The [meta-optimisers](13_Meta_Optimisers.md) and
-    [subset resampling and cross-validation](14_Subset_Resampling_and_Cross_Validation.md)
+    The [meta-optimisers](@ref example-meta-optimisers) and
+    [subset resampling and cross-validation](@ref example-subset-resampling-and-cross-validation)
     examples show each case.
 
 We build one `MeanRisk` per objective. Only the `obj` field differs between them.
@@ -185,7 +185,7 @@ The result of an optimisation stores what the call needs. `res.r` is the risk me
 optimisation and `res.ret` its return measure, both as the optimisation used them. If you gave an
 estimator, the result contains the fitted measure. If you left a field unset, it contains the
 value that the optimiser took from the prior. `res.sca` is the scalariser, the rule that combines
-several risk values into one number. The [multiple risk measures](04_Multiple_Risk_Measures.md)
+several risk values into one number. The [multiple risk measures](@ref example-multiple-risk-measures)
 page uses it. The call takes all its arguments from the result:
 
 ```julia

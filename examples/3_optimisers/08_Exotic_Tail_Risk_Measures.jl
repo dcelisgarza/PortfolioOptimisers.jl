@@ -3,7 +3,7 @@
 Description = "Tail risk measures beyond CVaR in PortfolioOptimisers.jl: EVaR, RLVaR, power-norm VaR and the VaR ranges that weight the extreme tail harder."
 ```
 
-# Tail risk measures that weight the worst losses more than CVaR
+# [Tail risk measures that weight the worst losses more than CVaR](@id example-tail-risk-measures-that-weight-the-worst-losses-more-than-cvar)
 
 [`ConditionalValueatRisk`](@ref), CVaR, is the most common coherent tail measure. It is the
 expected loss over the worst fraction ``\alpha`` of outcomes. Because it averages over the tail,
@@ -37,7 +37,7 @@ takes the tail fraction ``\alpha`` as CVaR does.
 !!! note "A conic solver is enough"
     EVaR needs the exponential cone, and RLVaR and PNVaR need the power cone. Clarabel
     supports both, so the Clarabel solver in `opt` handles both cones, and no other solver
-    is needed. The [previous page](06_Brownian_Distance_Variance_and_VarianceSkewKurtosis.md)
+    is needed. The [previous page](@ref example-browniandistancevariance-and-varianceskewkurtosis)
     solves `VarianceSkewKurtosis` with SCS, because it builds a large semidefinite problem.
     These measures also take an `slv` field. You need it only when you evaluate a measure alone with [`expected_risk`](@ref), as we do below, and not when the
     measure is the objective of a `MeanRisk`.

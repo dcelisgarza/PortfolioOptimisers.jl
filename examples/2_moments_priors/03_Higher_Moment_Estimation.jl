@@ -3,7 +3,7 @@
 Description = "Coskewness and cokurtosis estimation in PortfolioOptimisers.jl, the higher moments that skewness and kurtosis risk measures need."
 ```
 
-# Higher moment estimation
+# [Higher moment estimation](@id example-higher-moment-estimation)
 
 Mean-variance optimisation reads only the first two moments of the returns. Asset returns are
 skewed and have fat tails, and risk measures such as [`NegativeSkewness`](@ref) and
@@ -16,7 +16,7 @@ covariance.
 [`HighOrderPriorEstimator`](@ref) computes the higher moments. It wraps a prior for the mean
 and the covariance, and adds a [`Coskewness`](@ref) estimator in `ske` and a
 [`Cokurtosis`](@ref) estimator in `kte`. Each takes the same [`MatrixProcessing`](@ref), with
-[`Denoise`](@ref) and [`LoGo`](@ref), that the [covariance page](02_Covariance_Estimation.md)
+[`Denoise`](@ref) and [`LoGo`](@ref), that the [covariance page](@ref example-covariance-estimation)
 uses.
 
 !!! tip "When to reach for this"

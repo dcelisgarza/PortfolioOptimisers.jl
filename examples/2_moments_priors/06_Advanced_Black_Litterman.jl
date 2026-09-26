@@ -3,9 +3,9 @@
 Description = "Advanced Black-Litterman variants in PortfolioOptimisers.jl: factor views, asset and factor views at once, and the Bayesian form."
 ```
 
-# Advanced Black-Litterman variants
+# [Advanced Black-Litterman variants](@id example-advanced-black-litterman-variants)
 
-The base [`BlackLittermanPrior`](@ref) of the [previous page](05_Black_Litterman.md) works on
+The base [`BlackLittermanPrior`](@ref) of the [previous page](@ref example-black-litterman) works on
 the assets alone, and each view is about one asset or a group of assets. But a view is often
 easier to state about a factor, such as "momentum will earn a premium" or "quality minus low
 volatility will be negative". Sometimes you also hold views on assets and on factors at once.

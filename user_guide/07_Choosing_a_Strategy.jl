@@ -3,11 +3,11 @@
 Description = "A decision framework for choosing an optimiser, risk measure and prior in PortfolioOptimisers.jl from four questions about your mandate."
 ```
 
-# Choosing a strategy
+# [Choosing a strategy](@id user-guide-choosing-a-strategy)
 
 The previous pages showed how to call each tool. This page helps you choose one. Four questions
 about your situation lead to a choice. The
-[investor profiles](../examples/7_putting_it_together/01_Profile_Retail_Daily.md) work through four
+[investor profiles](@ref example-profile-retail-daily) work through four
 complete cases, and this page gives the questions behind them.
 
 ## The four questions

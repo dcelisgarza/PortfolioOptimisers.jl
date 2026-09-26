@@ -3,7 +3,7 @@
 Description = "Clustering optimisers in PortfolioOptimisers.jl: hierarchical risk parity, HERC and Schur complement allocation from a dendrogram of the assets."
 ```
 
-# Clustering optimisers
+# [Clustering optimisers](@id example-clustering-optimisers)
 
 The optimisers we have met so far, [`MeanRisk`](@ref), [`RiskBudgeting`](@ref) and
 [`NearOptimalCentering`](@ref), solve one problem over every asset at once. A clustering

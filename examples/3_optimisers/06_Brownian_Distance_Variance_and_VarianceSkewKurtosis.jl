@@ -3,7 +3,7 @@
 Description = "BrownianDistanceVariance and VarianceSkewKurtosis in PortfolioOptimisers.jl: a dispersion measure built from distances, and a measure of the higher moments."
 ```
 
-# `BrownianDistanceVariance` and `VarianceSkewKurtosis`
+# [`BrownianDistanceVariance` and `VarianceSkewKurtosis`](@id example-browniandistancevariance-and-varianceskewkurtosis)
 
 Some risk measures respond to parts of the return distribution that the variance and the
 conditional value at risk do not measure. This page shows two of them.
