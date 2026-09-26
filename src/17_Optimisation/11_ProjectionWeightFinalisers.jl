@@ -267,6 +267,45 @@ function entropic_weight_projection(w::VecNum, wb::WeightBounds)
     return clamp.(t .* w, lb, ub)
 end
 """
+    weights_bound_tolerance(::Type{T}) -> T
+
+Return the tolerance to which [`weights_meet_bounds`](@ref) holds the finalised weights of element type `T` to their bounds and to their budget.
+
+A floating-point type rounds, so a finaliser that lands on a bound or on the budget can miss it by a few units in the last place. The tolerance is then ``\\sqrt{\\epsilon}``, with ``\\epsilon`` the machine epsilon of `T`. A `Rational` type does not round, so a finaliser lands on a bound exactly, and the tolerance is zero. `Rational` has no `eps` method, so the choice cannot come from `eps` itself.
+
+The choice is made by dispatch on `Type{T}`. A package that defines another exact number type adds a method for it.
+
+# Algorithm
+
+ 1. `T` is a subtype of `Rational`: return `zero(T)`.
+ 2. `T` is any other type: return `sqrt(eps(T))`. This covers every floating-point type, and every number type that defines `eps`, such as an automatic-differentiation dual.
+
+# Arguments
+
+  - `T`: The element type of the weights. An `Integer` type has no fractional weight to compare, so the caller repairs it with [`float_if_integer`](@ref) first.
+
+# Returns
+
+  - `tol::T`: The tolerance, a non-negative value of type `T`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.weights_bound_tolerance(Float64)
+1.4901161193847656e-8
+
+julia> PortfolioOptimisers.weights_bound_tolerance(Rational{Int})
+0//1
+```
+
+# Related
+
+  - [`weights_meet_bounds`](@ref)
+  - [`float_if_integer`](@ref)
+"""
+weights_bound_tolerance(::Type{T}) where {T} = sqrt(eps(T))
+weights_bound_tolerance(::Type{T}) where {T <: Rational} = zero(T)
+"""
     weights_meet_bounds(wb::WeightBounds, w::VecNum, s::Number) -> Bool
 
 Tests whether the finalised weights `w` are finite, lie in the bounds `wb`, and sum to the budget `s`. The last two conditions hold to a tolerance.
@@ -289,7 +328,7 @@ Where:
   - $(math_dict[:w_port])
   - $(math_dict[:lb_ub_finaliser])
   - ``s``: The budget of the weights before the finaliser moved them.
-  - ``\\tau = \\sqrt{\\epsilon}``: The tolerance, with ``\\epsilon`` the machine epsilon of the type that a division of two weights returns.
+  - ``\\tau``: The tolerance that [`weights_bound_tolerance`](@ref) gives for the element type of ``\\boldsymbol{w}``, which is ``\\sqrt{\\epsilon}`` for a floating-point type and zero for an exact type such as `Rational`.
 
 The tolerance on the bounds is absolute. The tolerance on the budget is relative when ``\\lvert s \\rvert > 1``.
 
@@ -307,13 +346,14 @@ The tolerance on the bounds is absolute. The tolerance on the budget is relative
 
   - [`finalise_weight_bounds`](@ref)
   - [`weights_break_bounds`](@ref)
+  - [`weights_bound_tolerance`](@ref)
 """
 function weights_meet_bounds(wb::WeightBounds, w::VecNum, s::Number)::Bool
     if !all(isfinite, w)
         return false
     end
     # An integer vector that no finaliser moved takes its float type, which has an `eps`.
-    tol = sqrt(eps(float_if_integer(eltype(w))))
+    tol = weights_bound_tolerance(float_if_integer(eltype(w)))
     lb_ok = isnothing(wb.lb) ||
             all(Broadcast.instantiate(Broadcast.broadcasted((x, l) -> x >= l - tol, w,
                                                             wb.lb)))

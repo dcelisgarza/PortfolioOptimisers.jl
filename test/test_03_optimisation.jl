@@ -337,7 +337,7 @@ end
     end
 end
 @testset "Weight finalisation" begin
-    using PortfolioOptimisers, JuMP, Test, Clarabel, LinearAlgebra
+    using PortfolioOptimisers, JuMP, Test, Clarabel, LinearAlgebra, Dates, StableRNGs
     slv = Solver(; name = :Clarabel, solver = Clarabel.Optimizer,
                  settings = Dict("verbose" => false))
     w0 = [0.5, 0.3, 0.15, 0.05]
@@ -525,6 +525,42 @@ end
             ri, wi_ = PortfolioOptimisers.finalise_weight_bounds(wf, wbi, copy(wi))
             @test typeof(ri) == typeof(rf)
             @test isequal(wi_, wf_)
+        end
+    end
+    @testset "A Rational weight vector meets its bounds exactly (#1349)" begin
+        # `weights_meet_bounds` took `sqrt(eps(T))`, and `Rational` has no `eps`, so every
+        # finaliser threw on `Rational` weights, also with no bounds at all.
+        tolf = PortfolioOptimisers.weights_bound_tolerance
+        meet = PortfolioOptimisers.weights_meet_bounds
+        @test tolf(Float64) == sqrt(eps(Float64))
+        @test tolf(Float32) === sqrt(eps(Float32))
+        @test tolf(Rational{Int}) === 0 // 1
+        w = fill(1 // 3, 3)
+        wb = WeightBounds(; lb = 0 // 1, ub = 1 // 2)
+        @test meet(wb, w, 1 // 1)
+        @test meet(WeightBounds(; lb = nothing, ub = nothing), w, 1 // 1)
+        # Exact arithmetic has no round-off, so the smallest miss fails.
+        @test !meet(WeightBounds(; lb = 0 // 1, ub = 1 // 3 - 1 // 10^12), w, 1 // 1)
+        @test !meet(wb, w, 1 // 1 + 1 // 10^12)
+        # A finaliser that moves the weights lands on the bounds and the budget exactly.
+        wr = [1 // 2, 3 // 10, 3 // 20, 1 // 20]
+        wbr = WeightBounds(; lb = 1 // 10, ub = 2 // 5)
+        for (wf, we) in ((IterativeWeightFinaliser(), [2 // 5, 1 // 3, 1 // 6, 1 // 10]),
+                         (EuclideanWeightFinaliser(), [2 // 5, 13 // 40, 7 // 40, 1 // 10]),
+                         (EntropicWeightFinaliser(), [2 // 5, 1 // 3, 1 // 6, 1 // 10]))
+            retcode, wf_ = PortfolioOptimisers.finalise_weight_bounds(wf, wbr, copy(wr))
+            @test isa(retcode, OptimisationSuccess)
+            @test wf_ == we
+            @test eltype(wf_) == Rational{Int}
+        end
+        X = Rational.(rand(StableRNG(1349), -20:20, 50, 3)) .// 1000
+        rd = ReturnsResult(; nx = ["a", "b", "c"], X = X,
+                           ts = Date(2024, 1, 1) .+ Day.(0:49))
+        for opt in (EqualWeighted(), EqualWeighted(; wb = nothing))
+            res = optimise(opt, rd)
+            @test isa(res.retcode, OptimisationSuccess)
+            @test res.w == fill(1 // 3, 3)
+            @test eltype(res.w) == Rational{Int}
         end
     end
     @testset "The relative formulations write eps into a zero weight" begin
