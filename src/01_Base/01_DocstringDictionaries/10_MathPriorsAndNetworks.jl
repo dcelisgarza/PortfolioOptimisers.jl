@@ -64,6 +64,17 @@ unique_key_dict!(math_dict, :math_dict,
                  # read-out as the batch prior of the rows it folded.
                  :P_batch_prior => "``\\mathcal{P}(\\cdot)``: Batch prior, the result that the estimator's batch verb gives on the matrices in the parentheses.",#
                  :P_fold_prior => "``\\mathcal{P}_T``: Folded prior, the result that the estimator's read-out gives after it folds the observations ``\\boldsymbol{x}_1, \\ldots, \\boldsymbol{x}_T`` in order, one at a time or in blocks of any size.",#
+                 # The cross-sectional factor prior. Each symbol below is stated by two or
+                 # more Units of `10_Prior/10_Base_CrossSectionalFactorPrior.jl`.
+                 :a_ti_pnl => "``a_{ti}``: Panel activity of asset ``i`` at observation ``t``, ``1`` when the active mask of the Asset Panel activates the asset and ``0`` when it does not.",#
+                 :e_ti_pnl => "``e_{ti}``: Estimation flag of asset ``i`` at observation ``t``, ``1`` when the estimation mask of the Asset Panel holds the asset and ``0`` when it does not.",#
+                 :ztilde_ti_idio => "``\\tilde{z}_{ti}``: Filled standardised idiosyncratic return of asset ``i`` at observation ``t``. It is ``z_{ti}`` where that is finite, ``\\bar{z}_{t}`` where the asset is active and ``z_{ti}`` is not finite, and `NaN` where the asset is inactive.",#
+                 :R_idio => "``\\mathbf{R}``: Idiosyncratic square root, lower triangular, with ``\\mathbf{R} \\mathbf{R}^{\\intercal} = \\mathbf{D}_{\\mathcal{I}\\mathcal{I}}``.",#
+                 :zbar_t_idio => "``\\bar{z}_{t}``: Mean standardised idiosyncratic return of observation ``t``, the average of ``z_{ti}`` over ``\\mathcal{F}_{t}``, and ``0`` when ``\\mathcal{F}_{t}`` is empty.",#
+                 :B_T_cs => "``\\mathbf{B}_{T}``: Latest Factor Exposures, ``N \\times K``, with entry ``B_{Tik}`` for asset ``i`` and factor ``k``.",#
+                 :I_inv => "``\\mathcal{I}``: Investable set, the assets the prior states a finite moment for.",#
+                 :alpha_perp => "``\\boldsymbol{\\alpha}^{\\perp}``: Orthogonal part of a Return Forecast, one entry per asset, `NaN` at an asset whose forecast or whose latest exposures are not finite.",#
+                 :g_span => "``\\boldsymbol{g}``: Spanned coefficients of a Return Forecast, ``K \\times 1``, the coefficients of its regression on the latest Factor Exposures.",#
                  # The compact covariance set and the rules that size its radius.
                  # `10_CompactRadiusRules.jl` states both rules over these symbols, and
                  # `09_OrthogonalUncertaintySets.jl` builds the set from them.

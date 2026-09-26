@@ -31,7 +31,7 @@ commit = "0ecb3ce47c"
 "src/01_Base/01_DocstringDictionaries/07_FieldDict.jl" = { code = 3, doc = 0, comment = 2, blank = 0, total = 5 }
 "src/01_Base/01_DocstringDictionaries/08_ValidationsAndReturns.jl" = { code = 85, doc = 0, comment = 4, blank = 0, total = 89 }
 "src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { code = 163, doc = 0, comment = 48, blank = 0, total = 211 }
-"src/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.jl" = { code = 45, doc = 0, comment = 34, blank = 0, total = 79 }
+"src/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.jl" = { code = 54, doc = 0, comment = 36, blank = 0, total = 90 }
 "src/01_Base/01_DocstringDictionaries/11_MathRiskAndOptimisation.jl" = { code = 77, doc = 0, comment = 36, blank = 0, total = 113 }
 "src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { code = 86, doc = 0, comment = 16, blank = 0, total = 102 }
 "src/01_Base/01_DocstringDictionaries/13_References.jl" = { code = 225, doc = 0, comment = 3, blank = 0, total = 228 }
@@ -225,7 +225,7 @@ commit = "0ecb3ce47c"
 "src/10_Prior/07_OpinionPoolingPrior.jl" = { code = 102, doc = 341, comment = 21, blank = 129, total = 593 }
 "src/10_Prior/08_HighOrderFactorPriorEstimator.jl" = { code = 190, doc = 299, comment = 54, blank = 93, total = 636 }
 "src/10_Prior/09_AssetPanelEstimators.jl" = { code = 116, doc = 422, comment = 14, blank = 190, total = 742 }
-"src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { code = 395, doc = 559, comment = 0, blank = 290, total = 1244 }
+"src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { code = 404, doc = 779, comment = 0, blank = 356, total = 1539 }
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { code = 193, doc = 287, comment = 27, blank = 80, total = 587 }
 "src/10_Prior/12_PriorPartialFit.jl" = { code = 232, doc = 567, comment = 20, blank = 278, total = 1097 }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { code = 37, doc = 77, comment = 1, blank = 28, total = 143 }
