@@ -221,6 +221,7 @@ Where:
   - The hyperbolic constraint is the substitution that makes the least squares risk parity
     problem disciplined convex, and the same device carries it here.
   - The hyperbolic constraint reads ``\\gamma \\leq \\sqrt{w_{i} \\zeta_{i} / b_{i}}`` for every ``i``, and ``w_{i} \\zeta_{i}`` is the risk contribution of asset ``i`` under the variance. So maximising ``\\gamma`` drives the contributions towards the stated proportions, while minimising ``\\psi`` drives the total risk down. The single objective ``\\psi - \\gamma`` does both.
+  - The cones read the risk budget as shares, ``b_i / \\sum_j b_j``. The chain ``\\gamma^2 \\leq \\sum_i w_i \\zeta_i \\leq \\psi^2`` holds the objective at zero only for a budget that sums to one, and a hand-built [`RiskBudget`](@ref) keeps its own sum, so without the shares a budget of `1:5` and one of `(1:5) / 15` would give different portfolios.
   - The relaxation reads the covariance alone. This head resolves no risk measure, which is why its result carries no `r`.
 
 # Notes
@@ -555,7 +556,9 @@ function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
     rkb = risk_budget_constraints(rrb.rba.rkb, rrb.rba.sets,
                                   risk_budget_universe_key(rrb.rba, N); N = N,
                                   strict = rrb.opt.strict)
-    rb = rkb.val
+    # The chain `gamma^2 <= sum_i x_i zeta_i <= psi^2` needs a budget that sums to one, and a
+    # hand-built `RiskBudget` keeps its own sum, so the cones read its shares.
+    rb = rkb.val / sum(rkb.val)
     @argcheck(length(rb) == N, DimensionMismatch("rb ($(length(rb))) must match N ($N)"))
     sc = get_constraint_scale(model)
     JuMP.@variables(model, begin

@@ -101,8 +101,16 @@
             res = optimise(rb)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = risk_contribution(r, res.w, pr.X)
-            v1, m1 = findmin(rkc)
-            v2, m2 = findmax(rkc)
+            # The budget sums to 210, and the cones read its shares, so the contributions
+            # keep its ratio of 20. The heavy penalty of item 4 trades the budget away.
+            if i != 4
+                success = isapprox(rkc[1] / rkc[end], 20; rtol = 1e-5)
+                if !success
+                    println("Budget ratio $i fails")
+                    find_tol(rkc[1] / rkc[end], 20)
+                end
+                @test success
+            end
             rtol = if Sys.isapple() && i == 9
                 5e-4
             elseif Sys.isapple() && i == 14
@@ -173,7 +181,7 @@
                                            re = res.prb.rr)
             v1 = minimum(rkc[1:5])
             v2 = maximum(rkc[1:5])
-            rtol = i ∈ (2, 4) ? 0.6 : 1e-5
+            rtol = i == 4 ? 0.5 : 5e-5
             success = isapprox(v2 / v1, 5; rtol = rtol)
             if !success
                 println("Extrema $i fails")
