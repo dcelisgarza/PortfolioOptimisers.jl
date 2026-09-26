@@ -452,4 +452,134 @@ using Statistics
         # A block that carries no re-basis has one axis, whatever `reduced` states.
         @test exposure_agrees(exposure_ic(csfm3; reduced = true), exposure_ic(csfm3))
     end
+
+    @testset "an asset enters only on a finite positive weight" begin
+        rng7 = StableRNG(842)
+        Bw = randn(rng7, 1, 4, 2)
+        # Two assets of positive weight are fewer than the three a correlation needs, and a
+        # zero weight does not make up the count.
+        @test isnan(exposure_correlation(Bw, [1.0 1.0 0.0 0.0])[1, 2])
+        # A `NaN` or an infinite weight excludes its own asset and not the observation.
+        for bad in (NaN, Inf)
+            wb = [1.0 1.0 1.0 bad]
+            @test exposure_correlation(Bw, wb) ≈ exposure_correlation(Bw[:, 1:3, :])
+            @test exposure_dispersion(Bw, wb) ≈ exposure_dispersion(Bw[:, 1:3, :])
+        end
+        # The universe of the coverage reads the same rule: the asset of infinite weight
+        # leaves the universe, so the three finite exposures cover all of it.
+        Bc = copy(Bw)
+        Bc[1, 4, :] .= NaN
+        @test exposure_coverage(Bc, [1.0 1.0 1.0 Inf]) == [1.0, 1.0]
+        @test exposure_coverage(Bc) == [0.75, 0.75]
+    end
+
+    @testset "a constant cross-section has no spread at any scale" begin
+        # The mean of equal values rounds. Without the clamp, the correlation below came out
+        # `0.0`, because the round-off of the constant side times a spread of `1e6` cleared
+        # the tolerance.
+        @test isnan(PortfolioOptimisers.cs_weighted_correlation([0.1, 0.1, 0.1],
+                                                                [1e6, 3e6, 2e6], ones(3)))
+        rng8 = StableRNG(2842)
+        for x in (0.1, 0.3, 0.7), n in (3, 5, 7)
+            @test iszero(exposure_dispersion(fill(x, 1, n, 1), rand(rng8, 1, n))[1, 1])
+        end
+        # The intercept of the fixture is constant, so its dispersion is exactly zero, where
+        # the reference reads the round-off `2.2e-16`.
+        @test all(iszero, exposure_dispersion(csfm)[:, 3])
+    end
+
+    @testset "the verbs agree with the textbook estimators" begin
+        rng9 = StableRNG(1842)
+        Tn, Nn, Kn, H = 30, 12, 3, 3
+        Bn = randn(rng9, Tn, Nn, Kn)
+        Bn[rand(rng9, Tn, Nn, Kn) .< 0.1] .= NaN
+        Rn = 0.02 * randn(rng9, Tn, Nn)
+        Rn[rand(rng9, Tn, Nn) .< 0.05] .= NaN
+        wn = rand(rng9, Tn, Nn)
+        wn[rand(rng9, Tn, Nn) .< 0.1] .= 0.0
+        function wcor(x, z, u)
+            m = (u .> 0) .& isfinite.(x) .& isfinite.(z)
+            return count(m) < 3 ? NaN : cor(hcat(x[m], z[m]), Weights(u[m]), 1)[1, 2]
+        end
+        function srank(x, z)
+            m = isfinite.(x) .& isfinite.(z)
+            return count(m) < 3 ? NaN : corspearman(x[m], z[m])
+        end
+        y = PortfolioOptimisers.exposure_forward_mean_return(Rn, H)
+        yref = [mean(filter(isfinite, Rn[(t + 1):(t + H), i]))
+                for t in 1:(Tn - H), i in 1:Nn]
+        @test y ≈ yref
+        Cref = [if k == l
+                    1.0
+                else
+                    mean(filter(isfinite,
+                                [wcor(Bn[t, :, k], Bn[t, :, l], wn[t, :]) for t in 1:Tn]))
+                end
+                for k in 1:Kn, l in 1:Kn]
+        @test exposure_correlation(Bn, wn) ≈ Cref
+        @test exposure_ic(Bn, Rn, wn; horizon = H, rank = false) ≈
+              [wcor(Bn[t, :, k], y[t, :], wn[t, :]) for t in 1:(Tn - H), k in 1:Kn]
+        @test exposure_ic(Bn, Rn, wn; horizon = H) ≈
+              [srank(Bn[t, :, k], y[t, :]) for t in 1:(Tn - H), k in 1:Kn]
+        @test exposure_stability(Bn, wn; step = 4) ≈
+              [wcor(Bn[t, :, k], Bn[t + 4, :, k], wn[t, :]) for t in 1:(Tn - 4), k in 1:Kn]
+        Dref = [(m = isfinite.(Bn[t, :, k]) .& (wn[t, :] .> 0);
+                 std(Bn[t, m, k], Weights(wn[t, m]); corrected = false))
+                for t in 1:Tn, k in 1:Kn]
+        @test exposure_dispersion(Bn, wn) ≈ Dref
+        @test exposure_coverage(Bn, wn) ≈
+              [mean(count(isfinite.(Bn[t, :, k]) .& (wn[t, :] .> 0)) / count(wn[t, :] .> 0)
+                    for t in 1:Tn) for k in 1:Kn]
+        # The t-statistic over two lags, written out from its definition.
+        ic = exposure_ic(Bn, Rn, wn; horizon = H)
+        # The sums below read every row, which holds because no row of this fixture is `NaN`.
+        @test !any(isnan, ic)
+        s2 = exposure_ic_summary(ic; lags = 2)
+        for k in 1:Kn
+            c = ic[:, k]
+            m = mean(c)
+            g = sum((c[t] - m) * (c[t + j] - m) for j in 1:2 for t in 1:(length(c) - j))
+            @test s2.t_stat[k] ≈
+                  m / sqrt((sum(abs2, c .- m) + 2 * g) / (length(c) - 1)) * sqrt(length(c))
+            @test s2.std_ic[k] ≈ std(c)
+            @test s2.hit_rate[k] == mean(c .> 0)
+        end
+    end
+
+    @testset "the verbs derive their types from the data" begin
+        rng10 = StableRNG(3842)
+        Bi = rand(rng10, -3:3, 8, 5, 2)
+        Ri = rand(rng10, -3:3, 8, 5)
+        Bf = float.(Bi)
+        Rf = float.(Ri)
+        # An integer panel answers in `Float64`, with the numbers of the same panel in floats.
+        @test exposure_correlation(Bi) ≈ exposure_correlation(Bf)
+        @test isequal(exposure_ic(Bi, Ri), exposure_ic(Bf, Rf))
+        @test isequal(exposure_ic(Bi, Ri; rank = false), exposure_ic(Bf, Rf; rank = false))
+        @test isequal(exposure_stability(Bi; step = 2), exposure_stability(Bf; step = 2))
+        @test exposure_dispersion(Bi) ≈ exposure_dispersion(Bf)
+        @test exposure_coverage(Bi) == exposure_coverage(Bf)
+        @test PortfolioOptimisers.cs_ranks([3, 1, 1, 2], trues(4), :average) ==
+              [4.0, 1.5, 1.5, 3.0]
+        ici = rand(rng10, -1:1, 6, 2)
+        @test isequal(exposure_ic_summary(ici; lags = 1),
+                      exposure_ic_summary(float.(ici); lags = 1))
+        # A `Rational` panel keeps its means exact, and a square root answers in `Float64`.
+        Rr = Rational{Int}.(Ri)
+        @test PortfolioOptimisers.exposure_forward_mean_return(Rr, 2) isa
+              Matrix{Rational{Int}}
+        @test exposure_coverage(Rational{Int}.(Bi)) isa Vector{Rational{Int}}
+        sr = exposure_ic_summary(Rational{Int}.(ici); lags = 1)
+        @test sr.mean_ic isa Vector{Rational{Int}}
+        @test sr.hit_rate isa Vector{Rational{Int}}
+        @test sr.std_ic ≈ exposure_ic_summary(float.(ici); lags = 1).std_ic
+        @test exposure_correlation(Rational{Int}.(Bi)) ≈ exposure_correlation(Bf)
+        # A `Float32` panel stays in `Float32`.
+        B32 = Float32.(Bf)
+        R32 = Float32.(Rf)
+        @test eltype(exposure_correlation(B32)) == Float32
+        @test eltype(exposure_ic(B32, R32)) == Float32
+        @test eltype(exposure_dispersion(B32)) == Float32
+        @test eltype(exposure_ic_summary(exposure_ic(B32, R32)).t_stat) == Float32
+    end
 end

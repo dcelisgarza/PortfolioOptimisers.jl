@@ -206,6 +206,7 @@ unique_key_dict!(math_dict, :math_dict,
                  # Each symbol is stated by two or more Units of those files.
                  :alpha_t_fc => "``\\boldsymbol{\\alpha}_{t}``: Return Forecast cross-section at observation ``t``.",#
                  :B_tk_cs => "``\\mathbf{B}_{t \\cdot k}``: Exposure cross-section of factor ``k`` at observation ``t``.",#
+                 :B_tik_cs => "``B_{tik}``: Exposure of asset ``i`` to factor ``k`` at observation ``t``.",#
                  :u_t_cs => "``\\boldsymbol{u}_{t}``: Cross-sectional weights of observation ``t``.",#
                  :rho_rank_cs => "``\\rho^{\\mathrm{S}}``: The correlation of the ranks of two cross-sections, over the assets at which both values are finite, with a tie ranked by `fe.ties`.",#
                  :rho_w_cs => "``\\rho``: The weighted correlation of two cross-sections, over the assets at which both values are finite and the weight is finite and positive.")

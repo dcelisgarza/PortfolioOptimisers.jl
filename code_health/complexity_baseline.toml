@@ -154,7 +154,7 @@ commit = "0ecb3ce47c"
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { cyc = 5, cog = 8, arg = 4, cyc_sum = 19, cog_sum = 21, arg_sum = 20, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { cyc = 6, cog = 8, arg = 3, cyc_sum = 33, cog_sum = 29, arg_sum = 20, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { cyc = 7, cog = 14, arg = 5, cyc_sum = 122, cog_sum = 128, arg_sum = 112, macros = [] }
-"src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { cyc = 11, cog = 15, arg = 6, cyc_sum = 118, cog_sum = 137, arg_sum = 114, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { cyc = 11, cog = 15, arg = 6, cyc_sum = 119, cog_sum = 133, arg_sum = 114, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 53, cog_sum = 51, arg_sum = 45, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { cyc = 6, cog = 8, arg = 4, cyc_sum = 59, cog_sum = 62, arg_sum = 54, macros = [] }
 "src/05_Moments/33_CoverageUniverse.jl" = { cyc = 7, cog = 12, arg = 8, cyc_sum = 108, cog_sum = 67, arg_sum = 214, macros = [] }
