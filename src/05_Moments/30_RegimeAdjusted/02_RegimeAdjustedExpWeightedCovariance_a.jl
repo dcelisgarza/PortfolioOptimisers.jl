@@ -1041,11 +1041,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Removes the damping a zero seed leaves in the running state, and returns the covariance that
 read-out reports.
 
-The recursion is seeded at zero, which keeps the state positive semi-definite at every step and
-damps it by ``1 - \\lambda^{n}`` after `n` observations. The correction is a congruence
-transform, so it restores the scale without breaking that property. Where `cor_decay` opens the
-separate path, the variance and the correlation are corrected at their own decays, and the
-correlation reads a pairwise count so that an asynchronous listing is corrected pair by pair.
+The recursion is seeded at zero, and it damps the state by ``1 - \\lambda^{n}`` after `n`
+observations. The correction is a congruence transform, so it restores the scale without moving a
+correlation, and it keeps a positive semidefinite state positive semidefinite. Where `cor_decay`
+opens the separate path, the variance and the correlation are corrected at their own decays, and
+the correlation reads a pairwise count so that an asynchronous listing is corrected pair by pair.
+That pairwise count is not a congruence, so a holiday can make the separate path indefinite
+(#1346).
 
 # Arguments
 
@@ -1213,7 +1215,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Processes a single observation row (or column) to update the online covariance cache.
 
 Updates the running location, advances the regime state one step ahead of the covariance, and
-then advances the covariance itself. An asset that turns inactive at this observation has its
+then advances the covariance itself. On the path with one decay, the covariance takes the step
+``S \\leftarrow D S D + (1 - \\lambda) \\Delta``, where ``D`` holds ``\\sqrt{\\lambda}`` for a
+valid asset and one for any other asset, and ``\\Delta`` is the outer product on the pairs of valid
+assets. A holiday thus holds the correlation of each pair that contains its asset, as in
+[`ExpWeightedCovariance`](@ref). An asset that turns inactive at this observation has its
 row and column zeroed and its counts reset, so a later listing starts from a cold state.
 
 # Arguments
@@ -1262,10 +1268,12 @@ function process_observation!(cache::RegimeAdjustedCovarianceState,
     if has_separate_cor_decay(ce)
         update_var_cor!(cache, ce, valid, pair_valid)
     else
-        cache.covariance .= ifelse.(pair_valid,
-                                    ce.decay * cache.covariance +
-                                    (one(ce.decay) - ce.decay) * cache.XXt,
-                                    cache.covariance)
+        # A holiday holds the correlation of each pair that contains its asset (ADR 0181).
+        sqrt_decay = sqrt(ce.decay)
+        d = ifelse.(valid, sqrt_decay, one(sqrt_decay))
+        cache.covariance .= d .* cache.covariance .* transpose(d) .+
+                            ifelse.(pair_valid, (one(ce.decay) - ce.decay) .* cache.XXt,
+                                    zero(T))
     end
     cache.obs_count[valid] .+= 1
 

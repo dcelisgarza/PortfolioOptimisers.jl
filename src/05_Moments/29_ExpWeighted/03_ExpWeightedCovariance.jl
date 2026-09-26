@@ -1,11 +1,11 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimates a covariance matrix by an exponentially weighted recursion that freezes on a holiday and resets on an inactive period.
+Estimates a covariance matrix by an exponentially weighted recursion that holds a correlation on a holiday and resets on an inactive period.
 
-An entry of the state moves only at an observation where both of its assets are valid, so a gap in one asset leaves every entry of that asset unchanged. The state starts at zero. The estimate divides out the weight that the zero start lacks, and it divides the rows and the columns by the same factor, so every correlation stays unchanged.
+Each asset ages its observations on its own clock, which counts only the observations where that asset is valid. An entry for a pair of assets weights an observation by the geometric mean of the two weights. A gap in one asset thus leaves its variance unchanged, and each of its covariances decays by the square root of the decay at an observation where the other asset is valid. The state starts at zero. The estimate divides out the weight that the zero start lacks, and it divides the rows and the columns by the same factor, so every correlation stays unchanged.
 
-A holiday can make the estimate indefinite. While one asset is on a holiday, the variance of another asset moves and their covariance does not, so the implied correlation can leave ``[-1, 1]``. Without a holiday the estimate is positive semidefinite. Wrap the estimator in an estimator that repairs the matrix, such as [`PortfolioOptimisersCovariance`](@ref), when a consumer needs a positive semidefinite matrix.
+The estimate is positive semidefinite, with or without a holiday. A holiday gives no information about the co-movement of its asset, so the step holds the correlation of each pair that contains it and moves the variance of the other asset. Of the rules that keep the estimate positive semidefinite, this is the one that moves no correlation without data. It is where the port departs from the reference, which freezes the covariance and can return an indefinite matrix. Without a holiday the two rules agree.
 
 A young asset that stays investable has a cost for the prior. A prior fitted with this estimator fills the rows that the asset lacks with zeros through [`scenario_fill`](@ref), because every consumer of a Prior Result reads its returns matrix. A scenario-based measure then reads a zero return where the asset had none, and it understates the risk of that asset over those rows. The covariance stays the estimate that this recursion made from the rows it saw. The fill is silent at or below the `fill_limit` field of the fitting prior, which is a share of the observations of that asset. Above the limit it warns, and under `strict` it refuses every fill. `fill_limit` defaults to `nothing`, and this family has no `CoveragePolicy` to derive a limit from, so the prior names every fill.
 
@@ -35,7 +35,7 @@ Keywords correspond to the struct's fields. The default `min_obs` is the half-li
 \\begin{align}
 m_{t,\\,i} &= (1 - \\lambda) \\sum_{u \\in \\mathcal{V}_i,\\, u < t} \\lambda^{c_i(u,\\, t)} x_{u,\\,i}\\,, \\\\
 e_{t,\\,i} &= x_{t,\\,i} - m_{t,\\,i}\\,, \\\\
-S_{ij} &= (1 - \\lambda) \\sum_{t \\in \\mathcal{V}_i \\cap \\mathcal{V}_j} \\lambda^{c_{ij}(t)} e_{t,\\,i} e_{t,\\,j}\\,, \\\\
+S_{ij} &= (1 - \\lambda) \\sum_{t \\in \\mathcal{V}_i \\cap \\mathcal{V}_j} \\lambda^{(c_i(t) + c_j(t)) / 2} e_{t,\\,i} e_{t,\\,j}\\,, \\\\
 \\hat{\\Sigma}_{ij} &= \\frac{S_{ij}}{\\sqrt{(1 - \\lambda^{n_i})(1 - \\lambda^{n_j})}}\\,.
 \\end{align}
 ```
@@ -47,15 +47,17 @@ Where:
   - ``\\mathcal{V}_i``: Valid observations of asset ``i``. They are the observations after the last one at which the active mask excludes the asset, where the return of the asset is finite.
   - $(math_dict[:n_i_ew])
   - ``c_i(u,\\, t)``: Count of the observations of ``\\mathcal{V}_i`` that lie strictly between ``u`` and ``t``.
-  - ``c_{ij}(t)``: Count of the observations of ``\\mathcal{V}_i \\cap \\mathcal{V}_j`` that lie after ``t``.
+  - ``c_i(t)``: Count of the observations of ``\\mathcal{V}_i`` that lie after ``t``.
   - ``m_{t,\\,i}``: Running location of asset ``i`` before the observation ``t``. It is zero where `centred` is `true`.
   - ``e_{t,\\,i}``: Deviation of asset ``i`` at the observation ``t``.
   - ``S_{ij}``: Entry of the internal state.
   - ``\\hat{\\Sigma}_{ij}``: Entry of the estimate. It is `NaN` where asset ``i`` or asset ``j`` has fewer than `min_obs` valid observations, or where the active mask excludes it at the last observation.
 
-The weights of ``S_{ii}`` sum to ``1 - \\lambda^{n_i}``, so ``\\hat{\\Sigma}_{ii}`` is a weighted mean of squared deviations whose weights sum to one. In matrix form ``\\hat{\\Sigma} = D S D`` with ``D = \\operatorname{diag}(1 / \\sqrt{1 - \\lambda^{n_i}})``. This congruence transform cancels in a correlation, and ``\\hat{\\Sigma}`` is positive semidefinite exactly when ``S`` is. ``S`` is positive semidefinite when each ``\\mathcal{V}_i`` is empty or an unbroken run of observations that ends at the last one, which holds when no asset has a holiday. Then every exponent ``c_{ij}(t)`` is the count of observations after ``t``, and ``S`` is a sum of positive semidefinite outer products. The correction is the square root of ``1 - \\lambda^{n_i}``, where a first-moment estimator divides by the first power.
+The weights of ``S_{ii}`` sum to ``1 - \\lambda^{n_i}``, so ``\\hat{\\Sigma}_{ii}`` is a weighted mean of squared deviations whose weights sum to one. In matrix form ``\\hat{\\Sigma} = D S D`` with ``D = \\operatorname{diag}(1 / \\sqrt{1 - \\lambda^{n_i}})``. This congruence transform cancels in a correlation, and ``\\hat{\\Sigma}`` is positive semidefinite exactly when ``S`` is. ``S`` is positive semidefinite for every pattern of holidays. With ``w_{t,\\,i} = \\lambda^{c_i(t) / 2}`` on ``\\mathcal{V}_i`` and zero elsewhere, ``S = (1 - \\lambda) \\sum_t (w_t \\circ e_t)(w_t \\circ e_t)^\\intercal`` is a sum of positive semidefinite outer products. At each observation the recursion is the congruence ``S \\leftarrow D_t S D_t`` plus one such product, where ``D_t`` holds ``\\sqrt{\\lambda}`` for a valid asset and one for any other asset. Without a holiday ``D_t = \\sqrt{\\lambda} I``, and the recursion is ``S \\leftarrow \\lambda S`` plus the product. The correction is the square root of ``1 - \\lambda^{n_i}``, where a first-moment estimator divides by the first power.
 
-The weights of ``S_{ij}`` sum to ``1 - \\lambda^{|\\mathcal{V}_i \\cap \\mathcal{V}_j|}``, and this is less than the denominator when the two assets have different histories. An entry for two such assets is therefore smaller in magnitude than the weighted mean over their common observations.
+A holiday of asset ``j`` scales ``S_{ij}`` by ``\\sqrt{\\lambda}`` and ``S_{ii}`` by ``\\lambda`` before the new product, and it leaves ``S_{jj}`` unchanged, so the correlation of the pair holds. A recursion that updates only the pairs whose two assets are valid scales ``S_{ii}`` by ``\\lambda`` and leaves ``S_{ij}`` unchanged. After ``k`` such steps with a zero deviation of asset ``i``, the implied correlation grows by ``\\lambda^{-k/2}``, without bound, in exact arithmetic.
+
+By the Cauchy-Schwarz inequality, the weights of ``S_{ij}`` sum to at most the denominator, with equality when the two assets have the same valid observations. An entry for two assets with different histories is therefore smaller in magnitude than the weighted mean over their common observations.
 
 The location starts at zero and takes no correction. The first deviation of an asset is thus its return, and the next deviations read a location that the zero start damps.
 
@@ -153,7 +155,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds one observation into the state of an exponentially weighted covariance fit.
 
-An asset is valid when its return is finite and the active mask admits it. An active asset with a non-finite return is on a holiday, and every entry of that asset keeps its value. An asset that leaves the active mask returns to the zero state, so its correction starts again if it lists again.
+An asset is valid when its return is finite and the active mask admits it. An active asset with a non-finite return is on a holiday. Its variance keeps its value, and its covariance with each valid asset decays by the square root of the decay, so their correlation holds. An asset that leaves the active mask returns to the zero state, so its correction starts again if it lists again.
 
 # Algorithm
 
@@ -162,7 +164,7 @@ An asset is valid when its return is finite and the active mask admits it. An ac
  3. Copy the mask into `cache.active`, or set every entry to `true` when the mask is `nothing`.
  4. Return `cache` when no asset is valid.
  5. Where `ce.centred` is `true`, take `Xi` as `X`. Otherwise read `cache.location` with `NaN` as zero into `loc`, move the valid entries of `cache.location` to `ce.decay * loc + (1 - ce.decay) * X`, and take `Xi` as `X - loc`.
- 6. Take `e` as the entries of `Xi` of the valid assets, and move their block of `cache.covariance` to `ce.decay * block + (1 - ce.decay) * e * e'`.
+ 6. Take `d` as `sqrt(ce.decay)` for each valid asset and as one for each other asset, and scale `cache.covariance` to `d .* cache.covariance .* d'`. Take `e` as the entries of `Xi` of the valid assets, and add `(1 - ce.decay) * e * e'` to their block.
  7. Add one to the count of each valid asset in `cache.obs_count`.
 
 # Arguments
@@ -214,10 +216,13 @@ function process_observation!(cache::ExpWeightedCovarianceState, ce::ExpWeighted
         X - loc
     end
 
+    sqrt_decay = sqrt(ce.decay)
+    d = ifelse.(valid, sqrt_decay, one(sqrt_decay))
+    cache.covariance .*= d .* transpose(d)
     idx = findall(valid)
     e = view(Xi, idx)
     block = view(cache.covariance, idx, idx)
-    block .= ce.decay * block + (one(ce.decay) - ce.decay) * (e * transpose(e))
+    block .+= (one(ce.decay) - ce.decay) * (e * transpose(e))
     cache.obs_count[idx] .+= 1
 
     return cache
@@ -489,7 +494,7 @@ Where:
   - ``\\rho_{ij}``: Entry of the correlation matrix.
   - ``S_{ij}``: Entry of the internal state, as the struct docstring of [`ExpWeightedCovariance`](@ref) defines it.
 
-The clamp changes an entry only when a holiday made the state indefinite. A clamped entry of ``\\pm 1`` is then not a correlation of the data. A blanked asset has `NaN` in its row, in its column and on the diagonal.
+The state is positive semidefinite, so every ratio lies in ``[-1, 1]`` and the clamp removes only round-off. A blanked asset has `NaN` in its row, in its column and on the diagonal.
 
 # Arguments
 
@@ -1009,7 +1014,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses to merge two [`ExpWeightedCovarianceState`](@ref).
 
-The fold ``S = \\lambda^{n_b} S_a + S_b`` is exact only for a centred estimator over a second block in which every asset is valid at every observation. An uncentred block reads the location that the first block carries. A holiday makes the decay of an entry depend on the joint observations of its two assets, and a reset discards the first block for its asset. The state records neither the holidays nor the resets, so a merge cannot tell the cases apart. Fold the second block into the first with `partial_fit!`.
+The fold ``S = \\lambda^{n_b} S_a + S_b`` is exact only for a centred estimator over a second block in which every asset is valid at every observation. An uncentred block reads the location that the first block carries. A holiday makes the decay of an entry depend on the valid observations of each of its two assets, and a reset discards the first block for its asset. The state records neither the holidays nor the resets, so a merge cannot tell the cases apart. Fold the second block into the first with `partial_fit!`.
 
 # Arguments
 

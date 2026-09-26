@@ -3,8 +3,11 @@ The plain exponentially weighted family answers a gapped panel the way the refer
 
 `ExpWeightedExpectedReturns`, `ExpWeightedVariance` and `ExpWeightedCovariance` are ports of the
 reference implementation's three plain exponentially weighted members. Each seeds its recursion at
-zero, freezes on a holiday, resets on an inactive period, and divides out the damping that the cold
-start costs. The oracle is the reference itself: `oracle_returns` is an exactly representable
+zero, freezes a moment of an asset on its holiday, resets on an inactive period, and divides out the
+damping that the cold start costs. The covariance departs from the reference on a holiday alone
+(#1343): it holds the correlation of each pair where the reference holds the covariance, which
+keeps the estimate positive semidefinite. The fixture has no holiday, so the parity
+below is exact. The oracle is the reference itself: `oracle_returns` is an exactly representable
 fixture that both languages build bit for bit, so no file is exchanged, and the literals below were
 measured by fitting the reference on it at `half_life = 10`.
 
@@ -15,11 +18,11 @@ takes a matrix-multiply fast path and the port takes the row recursion.
 Two families of testset sit beside the parity. The first pins the structural identities the census
 of the reference states, and each is checked in plain Julia rather than against a stored number: the
 congruence identity, the invariance of every correlation under the correction, the positive
-semidefiniteness of the raw state, the freeze identity on the raw state, the warm-up mask and the
+semidefiniteness of the raw state, the holiday identity on the raw state, the warm-up mask and the
 equal-history identity. The second pins the seam of ADR 0117: a mask-aware estimator overrides the
 reduce-and-expand root and answers a young asset that the Coverage Universe drops.
 =#
-using Test, PortfolioOptimisers, Statistics, LinearAlgebra
+using Test, PortfolioOptimisers, Statistics, LinearAlgebra, StableRNGs
 
 # The reference's answers on the fixture below, at `half_life = 10`.
 const EW_MU_MIN1 = [0.001292041816555475, 0.002114893063360849, 0.0033233997239623943,
@@ -144,7 +147,7 @@ end
     n = fitted.cache.obs_count
     sigma = cov(cc, Xg; active_mask = amsk)
 
-    # The raw state matches the reference's own, which is what the freeze identity compares.
+    # The raw state matches the reference's own, which is what the holiday identity compares.
     @test isapprox(S, EW_COV_RAW_STATE; rtol = 1e-12)
 
     # 1. The congruence identity: the correction is `D S D`, and nothing else.
@@ -160,9 +163,10 @@ end
     @test minimum(eigvals(Symmetric(S))) > 0
     @test minimum(eigvals(Symmetric(sigma))) > 0
 
-    # 4. The freeze identity, on the raw state. One holiday at the last row of asset 1 leaves
-    #    that asset's raw row exactly where a fit that stops one observation earlier leaves it,
-    #    and its count does not rise. The corrected output moves, because the other assets'
+    # 4. The holiday identity, on the raw state. One holiday at the last row of asset 1 leaves
+    #    its raw variance exactly where a fit that stops one observation earlier leaves it, and
+    #    its count does not rise. Its covariances decay by `sqrt(decay)`, so the correlation
+    #    before the new product holds. The corrected output moves, because the other assets'
     #    counts rise and so the correction changes, which is why this reads the raw state.
     Xh = copy(Xg)
     Xh[end, 1] = NaN
@@ -171,7 +175,9 @@ end
     short = partial_fit!(ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1,
                                                centred = true), view(Xg, 1:(EW_T - 1), :);
                          active_mask = view(amsk, 1:(EW_T - 1), :))
-    @test view(held.cache.covariance, 1, :) == view(short.cache.covariance, 1, :)
+    @test held.cache.covariance[1, 1] == short.cache.covariance[1, 1]
+    @test isapprox(view(held.cache.covariance, 1, 2:EW_N),
+                   sqrt(EW_DECAY) * view(short.cache.covariance, 1, 2:EW_N); rtol = 1e-14)
     @test held.cache.obs_count[1] == EW_T - 1
     @test held.cache.obs_count[2] == EW_T
 
@@ -552,8 +558,8 @@ end
 end
 
 # The closed form that the docstring of `ExpWeightedCovariance` states, entry by entry and in
-# BigFloat: the valid set of each asset, the running location from zero, and one exponent per
-# pair of assets.
+# BigFloat: the valid set of each asset, the running location from zero, and the mean of the two
+# exponents of a pair, each counted on the clock of its own asset.
 function ew_cov_closed_form(X, amsk, λ, centred, min_obs)
     T, N = size(X)
     λ = big(λ)
@@ -577,10 +583,9 @@ function ew_cov_closed_form(X, amsk, λ, centred, min_obs)
     n = length.(V)
     Σ = fill(big(NaN), N, N)
     for i in 1:N, j in 1:N
-        J = intersect(V[i], V[j])
-        S = (1 - λ) *
-            sum((λ^(length(J) - k) * e[t, i] * e[t, j] for (k, t) in enumerate(J));
-                init = big(0))
+        c(k, t) = count(>(t), V[k])
+        S = (1 - λ) * sum((sqrt(λ)^(c(i, t) + c(j, t)) * e[t, i] * e[t, j]
+                           for t in intersect(V[i], V[j])); init = big(0))
         Σ[i, j] = S / sqrt((1 - λ^n[i]) * (1 - λ^n[j]))
     end
     bad = [n[i] < min_obs || !active[T, i] for i in 1:N]
@@ -620,19 +625,37 @@ end
     S = partial_fit!(ce, Xc).cache.covariance
     @test isapprox(cor(ce, Xc), S ./ sqrt.(diag(S) * transpose(diag(S))); atol = 1e-14)
 
-    # A holiday makes the estimate indefinite: the variance of asset 1 decays while its
-    # covariance with asset 2 stays, so the implied correlation leaves [-1, 1] and `cor`
-    # clamps it.
+    # Issue #1343. A holiday holds the correlation. Two equal assets and five holidays of the
+    # second: the variance of asset 1 decays, and its covariance with asset 2 decays by the
+    # square root, so the correlation stays one and the matrix is singular, not indefinite. A
+    # rule that updates only the pairs whose two assets are valid gives the correlation 2.44.
     r = [0.02, -0.01, 0.015, -0.02, 0.01, 0.03, -0.025, 0.02]
     Xh = vcat(hcat(r, r), [zeros(5) fill(NaN, 5)])
     ch = ExpWeightedCovariance(; decay = 0.7, min_obs = 1, centred = true)
     sh = cov(ch, Xh)
-    @test minimum(eigvals(Symmetric(sh))) < 0
-    @test sh[1, 2] / sqrt(sh[1, 1] * sh[2, 2]) > 1
-    @test cor(ch, Xh)[1, 2] == 1
-    # The wrapper that the docstring names repairs the matrix.
-    @test minimum(eigvals(Symmetric(cov(PortfolioOptimisersCovariance(; ce = ch), Xh)))) >
-          -1e-12
+    @test isapprox(sh[1, 2] / sqrt(sh[1, 1] * sh[2, 2]), 1; rtol = 1e-14)
+    @test minimum(eigvals(Symmetric(sh))) > -1e-14 * maximum(abs, sh)
+    @test isapprox(cor(ch, Xh)[1, 2], 1; rtol = 1e-14)
+
+    # The state stays positive semidefinite for every pattern of holidays, resets and listings.
+    # A rule that updates only the valid pairs does not: on 2000 panels of this kind, its
+    # smallest eigenvalue reached -1.15 times the largest entry.
+    rng = StableRNG(1343)
+    worst = Inf
+    for _ in 1:300
+        T, N = rand(rng, 5:40), rand(rng, 2:6)
+        Xr = randn(rng, T, N) / 100
+        Xr[rand(rng, T, N) .< rand(rng) / 2] .= NaN
+        ar = rand(rng, T, N) .> 0.05
+        λr = 0.01 + 0.98 * rand(rng)
+        for centred in (true, false), mask in (ar, nothing)
+            Sr = partial_fit!(ExpWeightedCovariance(; decay = λr, centred = centred), Xr;
+                              active_mask = mask).cache.covariance
+            m = maximum(abs, Sr)
+            iszero(m) || (worst = min(worst, minimum(eigvals(Symmetric(Sr))) / m))
+        end
+    end
+    @test worst > -1e-14
 
     # The fold S = λ^{n_b} S_a + S_b is exact for a centred estimator over a complete block and
     # not for an uncentred one, which is why a merge is refused.

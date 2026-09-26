@@ -478,3 +478,31 @@ end
                       PO.regime_adjusted_covariance(without_f, ce))
     end
 end
+
+@testset "a holiday holds the correlation on the path with one decay" begin
+    # Issue #1343 and ADR 0181. Two equal assets and five holidays of the second: the variance
+    # of asset 1 decays, and its covariance with asset 2 decays by the square root, so the
+    # correlation stays one. A rule that updates only the pairs whose two assets are valid gives
+    # a correlation above one and a negative eigenvalue.
+    r = [0.02, -0.01, 0.015, -0.02, 0.01, 0.03, -0.025, 0.02]
+    Xh = vcat(hcat(r, r), [zeros(5) fill(NaN, 5)])
+    sh = cov(RegimeAdjustedExpWeightedCovariance(; decay = 0.7, min_obs = 1,
+                                                 centred = true), Xh)
+    @test isapprox(sh[1, 2] / sqrt(sh[1, 1] * sh[2, 2]), 1; rtol = 1e-12)
+    @test minimum(eigvals(Symmetric(sh))) > -1e-14 * maximum(abs, sh)
+
+    # The state stays positive semidefinite for every pattern of holidays.
+    rng = StableRNG(1343)
+    worst = Inf
+    for _ in 1:100
+        T, N = rand(rng, 10:40), rand(rng, 2:5)
+        X = randn(rng, T, N) / 100
+        X[rand(rng, T, N) .< 0.3] .= NaN
+        ce = partial_fit!(RegimeAdjustedExpWeightedCovariance(; decay = 0.9, min_obs = 1),
+                          X)
+        S = ce.cache.covariance
+        m = maximum(abs, S)
+        iszero(m) || (worst = min(worst, minimum(eigvals(Symmetric(S))) / m))
+    end
+    @test worst > -1e-14
+end
