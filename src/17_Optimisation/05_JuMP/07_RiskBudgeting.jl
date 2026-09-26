@@ -862,10 +862,10 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     set_weight_constraints!(model, wb, rb.opt)
     return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
 end
-function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult();
                    str_names::Bool = false, save::Bool = true, kwargs...)
     rb = reset_time_dependent_estimator(rb)
-    attrs = processed_jump_optimiser_attributes(rb.opt, rd; dims = dims, kwargs...)
+    attrs = processed_jump_optimiser_attributes(rb.opt, rd; kwargs...)
     # The bundle reduced what it carries. The head carries the rest — an initial weight
     # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
@@ -889,8 +889,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
 end
 """
     optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult; dims::Int = 1,
-             str_names::Bool = false, save::Bool = true, kwargs...) -> RiskBudgetingResult
+             rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...) -> RiskBudgetingResult
 
 Run the Risk Budgeting portfolio optimisation.
 
@@ -898,7 +897,6 @@ Run the Risk Budgeting portfolio optimisation.
 
   - `rb`: The risk budgeting optimiser to use.
   - $(arg_dict[:rd]) If `isa(rb.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
-  - `dims`: The dimension along which observations advance in time.
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
@@ -913,9 +911,9 @@ Run the Risk Budgeting portfolio optimisation.
   - [`RiskBudgetingResult`](@ref)
 """
 function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+                  str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(rb, "`optimise`")
-    return _optimise(rb, rd; dims = dims, str_names = str_names, save = save, kwargs...)
+    return _optimise(rb, rd; str_names = str_names, save = save, kwargs...)
 end
 
 @pipe_delegates RiskBudgeting opt

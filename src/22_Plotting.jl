@@ -449,7 +449,7 @@ function plot_factor_risk_contribution end
         kwargs...
     ) -> Plot
     plot_dendrogram(cle::HClE_HCl, X::MatNum, nx = 1:size(X, 2); dims::Integer = 1, kwargs...) -> Plot
-    plot_dendrogram(cle::HClE_HCl, pr::Pr_RR, nx = 1:size(pr.X, 2); dims::Integer = 1, kwargs...) -> Plot
+    plot_dendrogram(cle::HClE_HCl, pr::Pr_RR, nx = 1:size(pr.X, 2); kwargs...) -> Plot
 
 Plot the dendrogram of a hierarchical clustering, with one shaded region per cluster.
 
@@ -465,7 +465,7 @@ A non-investable asset is **not drawn**. A clustering is fitted by a plain momen
   - `pr`: Prior result or [`ReturnsResult`](@ref). A returns result that carries `nx` replaces the argument with its own.
   - `nx`: Asset names.
   - `dend_theme`: Colour palette of the cluster regions.
-  - `dims`: Dimension of `X` that holds the observations, as [`clusterise`](@ref) reads it. The `X` of a prior or a returns result holds them along the first, so the prior arity needs the default.
+  - `dims`: Dimension of `X` that holds the observations, as [`clusterise`](@ref) reads it. Only the `X` arity takes it. The `X` of a prior or a returns result holds the observations along the rows, so the prior arity passes `dims = 1`.
 
 # Validation
 
@@ -496,7 +496,7 @@ function plot_dendrogram end
         kwargs...
     ) -> Plot
     plot_clusters(cle::HClE_HCl, X::MatNum, nx = 1:size(X, 2); dims::Integer = 1, kwargs...) -> Plot
-    plot_clusters(cle::HClE_HCl, pr::Pr_RR, nx = 1:size(pr.X, 2); dims::Integer = 1, kwargs...) -> Plot
+    plot_clusters(cle::HClE_HCl, pr::Pr_RR, nx = 1:size(pr.X, 2); kwargs...) -> Plot
 
 Plot the similarity matrix of a clustering as a heatmap in the order of the clustering, with a dendrogram on two sides and a box round each cluster.
 
@@ -516,7 +516,7 @@ A non-investable asset is **not drawn**, for the reason [`plot_dendrogram`](@ref
   - `color_func`: Function that maps the correlation matrix to the colour limits `(lo, hi)`. The default gives `(-1, 1)` when an entry is negative, and `(0, 1)` otherwise.
   - `line_color`: Colour of the cluster boxes.
   - `line_width`: Width of the cluster boxes.
-  - `dims`: Dimension of `X` that holds the observations, as [`clusterise`](@ref) reads it. The `X` of a prior or a returns result holds them along the first, so the prior arity needs the default.
+  - `dims`: Dimension of `X` that holds the observations, as [`clusterise`](@ref) reads it. Only the `X` arity takes it. The `X` of a prior or a returns result holds the observations along the rows, so the prior arity passes `dims = 1`.
 
 # Validation
 

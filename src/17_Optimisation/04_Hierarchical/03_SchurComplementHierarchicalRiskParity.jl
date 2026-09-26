@@ -1248,10 +1248,10 @@ Fit a Schur complement allocation with one bundle.
   - [`_optimise`](@ref)
 """
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
-                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); kwargs...)
     sh = reset_time_dependent_estimator(sh)
     rd = returns_result_picker(rd, sh.opt.brt)
-    pr = prior(sh.opt.pe, rd; dims = dims)
+    pr = prior(sh.opt.pe, rd)
     # Resolve the fee on the caller's own universe, before the door below narrows `sets`,
     # as `HierarchicalRiskParity` does. The allocation reads no fee: its measure is a
     # variance or a standard deviation, which a fee does not move. The fee rides on the
@@ -1274,7 +1274,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
                      x_src = sh.opt.x_src)
     assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
@@ -1319,10 +1319,10 @@ The denominator is the sum of the blended weights, because each ``\\boldsymbol{w
   - [`_optimise`](@ref)
 """
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVector},
-                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); kwargs...)
     sh = reset_time_dependent_estimator(sh)
     rd = returns_result_picker(rd, sh.opt.brt)
-    pr = prior(sh.opt.pe, rd; dims = dims)
+    pr = prior(sh.opt.pe, rd)
     # Resolve the fee on the caller's own universe, before the door below narrows `sets`,
     # as `HierarchicalRiskParity` does. The allocation reads no fee: its measure is a
     # variance or a standard deviation, which a fee does not move. The fee rides on the
@@ -1345,7 +1345,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
                      x_src = sh.opt.x_src)
     assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
@@ -1373,7 +1373,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
 end
 """
     optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
-             rd::ReturnsResult; dims::Int = 1, kwargs...) -> SchurComplementHierarchicalRiskParityResult
+             rd::ReturnsResult; kwargs...) -> SchurComplementHierarchicalRiskParityResult
 
 Run the Schur complement hierarchical risk parity optimisation.
 
@@ -1383,7 +1383,6 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
 
   - `sh`: The Schur complement hierarchical risk parity optimiser.
   - $(arg_dict[:rd]) When `sh.opt.pe` is a prior result, the fit itself does not read `rd`, but the clustering and a fallback can read it.
-  - `dims`: The dimension along which observations advance in time.
   - `kwargs`: Absorbed and ignored.
 
 # Validation
@@ -1396,9 +1395,9 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
   - [`SchurComplementHierarchicalRiskParityResult`](@ref)
 """
 function optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
-                  rd::ReturnsResult; dims::Int = 1, kwargs...)
+                  rd::ReturnsResult; kwargs...)
     assert_batch_entry(sh, "`optimise`")
-    return _optimise(sh, rd; dims = dims, kwargs...)
+    return _optimise(sh, rd; kwargs...)
 end
 
 export SchurComplementHierarchicalRiskParityResult, SchurComplementParams,

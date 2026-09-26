@@ -490,17 +490,16 @@ Run the inverse volatility portfolio optimisation.
 
 # Algorithm
 
- 1. Refuse a `dims` other than `1` with [`assert_returns_result_dims`](@ref).
- 2. Set every [`TimeDependent`](@ref) field of `iv` to its static default, with [`reset_time_dependent_estimator`](@ref).
- 3. Replace `rd` with its returns in excess of the benchmark when `iv.brt` is `true`, with `returns_result_picker`.
- 4. Fit the prior `pr` with `iv.pe` on `rd`.
- 5. Resolve the fee on the full universe of `rd`, and view it on the Investable Mask of `pr`, giving `fees`.
- 6. Reduce `pr`, `iv` and `rd` to the Investable Mask with [`investable_reduction`](@ref), giving the mask `imsk`.
- 7. Read the variances off the diagonal of `pr.sigma`, and take their inverse square roots, or their inverses when `iv.sq` is `true`, giving `w`.
- 8. Divide `w` by its sum.
- 9. Resolve the weight bounds `wb` over the reduced assets.
-10. Impose `wb` on `w` with the weight finaliser `iv.wf`, giving `retcode` and `w`.
-11. Build the [`NaiveOptimisationResult`](@ref), which expands `w` onto the full universe.
+ 1. Set every [`TimeDependent`](@ref) field of `iv` to its static default, with [`reset_time_dependent_estimator`](@ref).
+ 2. Replace `rd` with its returns in excess of the benchmark when `iv.brt` is `true`, with `returns_result_picker`.
+ 3. Fit the prior `pr` with `iv.pe` on `rd`.
+ 4. Resolve the fee on the full universe of `rd`, and view it on the Investable Mask of `pr`, giving `fees`.
+ 5. Reduce `pr`, `iv` and `rd` to the Investable Mask with [`investable_reduction`](@ref), giving the mask `imsk`.
+ 6. Read the variances off the diagonal of `pr.sigma`, and take their inverse square roots, or their inverses when `iv.sq` is `true`, giving `w`.
+ 7. Divide `w` by its sum.
+ 8. Resolve the weight bounds `wb` over the reduced assets.
+ 9. Impose `wb` on `w` with the weight finaliser `iv.wf`, giving `retcode` and `w`.
+10. Build the [`NaiveOptimisationResult`](@ref), which expands `w` onto the full universe.
 
 # Related
 
@@ -509,14 +508,10 @@ Run the inverse volatility portfolio optimisation.
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
-function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
-                   dims::Int = 1, kwargs...)
-    # A `ReturnsResult` is observations by assets, so `dims = 2` would fit the prior on the
-    # transpose and give one weight per observation.
-    assert_returns_result_dims(dims)
+function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult(); kwargs...)
     iv = reset_time_dependent_estimator(iv)
     rd = returns_result_picker(rd, iv.brt)
-    pr = prior(iv.pe, rd; dims = dims)
+    pr = prior(iv.pe, rd)
     # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
     # a float type for them, and every other sample keeps its own type.
     Tf = float_if_integer(eltype(pr.X))
@@ -544,7 +539,7 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
 end
 """
     optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
+             rd::ReturnsResult; kwargs...) -> NaiveOptimisationResult
 
 Run the inverse volatility portfolio optimisation.
 
@@ -552,18 +547,16 @@ Run the inverse volatility portfolio optimisation.
 
   - `iv`: The inverse volatility optimiser to use.
   - $(arg_dict[:rd]) When `iv.pe` is a prior result, the fit reads no returns from `rd`, and an empty `ReturnsResult()` is enough.
-  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets.
   - `kwargs`: Ignored.
 
 # Validation
 
-  - `dims == 1`. [`assert_returns_result_dims`](@ref) throws a `ConflictingArgumentError` for `dims == 2`, and a `DomainError` for any other value.
   - No field in the tree of `iv` holds an [`Online`](@ref). [`assert_batch_entry`](@ref) throws an `ArgumentError` that names the field otherwise. A plain `optimise` is a batch fit, and only the warm-up of the online arm of the fold loop resolves a wrapper.
 """
 function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; dims::Int = 1, kwargs...)::NaiveOptimisationResult
+                  rd::ReturnsResult; kwargs...)::NaiveOptimisationResult
     assert_batch_entry(iv, "`optimise`")
-    return _optimise(iv, rd; dims = dims, kwargs...)
+    return _optimise(iv, rd; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -724,7 +717,7 @@ Run the equal-weighted portfolio optimisation.
 
 # Algorithm
 
- 1. Refuse a missing `rd.X` with an `IsNothingError`, and a `dims` other than `1` with [`assert_returns_result_dims`](@ref).
+ 1. Refuse a missing `rd.X` with an `IsNothingError`.
  2. Set every [`TimeDependent`](@ref) field of `ew` to its static default, with [`reset_time_dependent_estimator`](@ref).
  3. Resolve the fee on the full universe of `rd`, giving `fees`.
  4. Reduce `ew` and `rd` to the Coverage Universe with [`coverage_reduction`](@ref), giving the mask `cmsk`. A window in which no asset is covered throws an `IsEmptyError`.
@@ -741,9 +734,8 @@ Run the equal-weighted portfolio optimisation.
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
-function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
+function _optimise(ew::EqualWeighted, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    assert_returns_result_dims(dims)
     ew = reset_time_dependent_estimator(ew)
     # The fee is resolved on the caller's own universe before the door below narrows
     # `sets`, and placed on the axes the mask leaves after it.
@@ -755,10 +747,8 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here: the weight bounds and the sets are stated over the full universe
     # and are viewed by the same index. `NaiveOptimisationResult` expands the weights back.
-    cmsk, ew, rd = coverage_reduction(ew, rd; dims = dims)
+    cmsk, ew, rd = coverage_reduction(ew, rd)
     fees = investable_fees_view(fees, cmsk, Nf)
-    # `rd.X` is always observations by assets, whatever `dims` the caller passed, so the
-    # asset count is `size(rd.X, 2)` unconditionally.
     N = size(rd.X, 2)
     # The weight takes the type of the data, not the `Float64` of `inv(N)`.
     w = fill(one(Tf) / N, N)
@@ -769,7 +759,7 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
 end
 """
     optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
+             rd::ReturnsResult; kwargs...) -> NaiveOptimisationResult
 
 Run the equal-weighted portfolio optimisation.
 
@@ -777,17 +767,15 @@ Run the equal-weighted portfolio optimisation.
 
   - `ew`: The equal-weighted optimiser to use.
   - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, and the weights are spread over that universe.
-  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets. [`prices_to_returns`](@ref) builds one in this layout.
   - `kwargs`: Ignored.
 
 # Validation
 
   - `rd.X` is not `nothing`. The method throws an `IsNothingError` otherwise.
-  - `dims == 1`. [`assert_returns_result_dims`](@ref) throws a `ConflictingArgumentError` for `dims == 2`, and a `DomainError` for any other value.
 """
 function optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  dims::Int = 1, kwargs...)::NaiveOptimisationResult
-    return _optimise(ew, rd; dims = dims, kwargs...)
+                  kwargs...)::NaiveOptimisationResult
+    return _optimise(ew, rd; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -987,7 +975,7 @@ Run the random-weighted portfolio optimisation.
 
 # Algorithm
 
- 1. Refuse a missing `rd.X` with an `IsNothingError`, and a `dims` other than `1` with [`assert_returns_result_dims`](@ref).
+ 1. Refuse a missing `rd.X` with an `IsNothingError`.
  2. Set every [`TimeDependent`](@ref) field of `rw` to its static default, with [`reset_time_dependent_estimator`](@ref).
  3. Refuse a vector `rw.alpha` whose length is not the width `Nf` of `rd.X`, with a `DimensionMismatch`.
  4. Resolve the fee on the full universe of `rd`, giving `fees`.
@@ -1006,12 +994,9 @@ Run the random-weighted portfolio optimisation.
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
-function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
+function _optimise(rw::RandomWeighted, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    assert_returns_result_dims(dims)
     rw = reset_time_dependent_estimator(rw)
-    # `rd.X` is always observations by assets, whatever `dims` the caller passed, so the
-    # asset count is `size(rd.X, 2)` unconditionally.
     Nf = size(rd.X, 2)
     if isa(rw.alpha, VecNum)
         # The caller states one concentration per asset of the full universe, so the check
@@ -1029,7 +1014,7 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     # reduces once, here: the concentrations, the weight bounds and the sets are stated over
     # the full universe and are viewed by the same index. `NaiveOptimisationResult` expands
     # the weights back.
-    cmsk, rw, rd = coverage_reduction(rw, rd; dims = dims)
+    cmsk, rw, rd = coverage_reduction(rw, rd)
     fees = investable_fees_view(fees, cmsk, Nf)
     N = size(rd.X, 2)
     dist = if isa(rw.alpha, Number)
@@ -1046,7 +1031,7 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
 end
 """
     optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
+             rd::ReturnsResult; kwargs...) -> NaiveOptimisationResult
 
 Run the random-weighted portfolio optimisation.
 
@@ -1054,19 +1039,17 @@ Run the random-weighted portfolio optimisation.
 
   - `rw`: The random-weighted optimiser to use.
   - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, and the draw is over that universe.
-  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets. [`prices_to_returns`](@ref) builds one in this layout.
   - `kwargs`: Ignored.
 
 # Validation
 
   - `rd.X` is not `nothing`. The method throws an `IsNothingError` otherwise.
-  - `dims == 1`. [`assert_returns_result_dims`](@ref) throws a `ConflictingArgumentError` for `dims == 2`, and a `DomainError` for any other value.
   - A vector `rw.alpha` has one entry per column of `rd.X`. The method throws a `DimensionMismatch` otherwise.
 """
 function optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                     Nothing}, rd::ReturnsResult; dims::Int = 1,
+                                     Nothing}, rd::ReturnsResult;
                   kwargs...)::NaiveOptimisationResult
-    return _optimise(rw, rd; dims = dims, kwargs...)
+    return _optimise(rw, rd; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1341,7 +1324,7 @@ Run the best constant rebalanced portfolio optimisation.
 
 # Algorithm
 
- 1. Refuse a missing `rd.X` with an `IsNothingError`, and a `dims` other than `1` with [`assert_returns_result_dims`](@ref).
+ 1. Refuse a missing `rd.X` with an `IsNothingError`.
  2. Set every [`TimeDependent`](@ref) field of `bcrp` to its static default, with [`reset_time_dependent_estimator`](@ref).
  3. Resolve the fee on the full universe of `rd`, giving `fees`.
  4. Reduce `bcrp` and `rd` to the Coverage Universe with [`coverage_reduction`](@ref), giving the mask `cmsk`. A window in which no asset is covered throws an `IsEmptyError`.
@@ -1361,10 +1344,8 @@ Run the best constant rebalanced portfolio optimisation.
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
-function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; dims::Int = 1,
-                   kwargs...)
+function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    assert_returns_result_dims(dims)
     bcrp = reset_time_dependent_estimator(bcrp)
     # The fee is resolved on the caller's own universe before the door below narrows
     # `sets`, and placed on the axes the mask leaves after it.
@@ -1375,7 +1356,7 @@ function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; dim
     fees = fees_constraints(bcrp.fees, bcrp.sets; strict = bcrp.strict, datatype = Tf)
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here, as `EqualWeighted` does. `NaiveOptimisationResult` expands back.
-    cmsk, bcrp, rd = coverage_reduction(bcrp, rd; dims = dims)
+    cmsk, bcrp, rd = coverage_reduction(bcrp, rd)
     fees = investable_fees_view(fees, cmsk, Nf)
     X = one(eltype(rd.X)) .+ rd.X
     N = size(X, 2)
@@ -1393,7 +1374,7 @@ function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; dim
 end
 """
     optimise(bcrp::BestConstantRebalancedPortfolio{<:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
+             rd::ReturnsResult; kwargs...) -> NaiveOptimisationResult
 
 Run the best constant rebalanced portfolio optimisation.
 
@@ -1403,18 +1384,16 @@ A Hindsight Comparator is fit on the rows that it is scored on. So `predict(opti
 
   - `bcrp`: The best constant rebalanced portfolio optimiser to use.
   - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, and the fixed point runs over that universe.
-  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets. [`prices_to_returns`](@ref) builds one in this layout.
   - `kwargs`: Ignored.
 
 # Validation
 
   - `rd.X` is not `nothing`. The method throws an `IsNothingError` otherwise.
-  - `dims == 1`. [`assert_returns_result_dims`](@ref) throws a `ConflictingArgumentError` for `dims == 2`, and a `DomainError` for any other value.
 """
 function optimise(bcrp::BestConstantRebalancedPortfolio{<:Any, <:Any, <:Any, <:Any,
                                                         Nothing}, rd::ReturnsResult;
-                  dims::Int = 1, kwargs...)::NaiveOptimisationResult
-    return _optimise(bcrp, rd; dims = dims, kwargs...)
+                  kwargs...)::NaiveOptimisationResult
+    return _optimise(bcrp, rd; kwargs...)
 end
 
 """

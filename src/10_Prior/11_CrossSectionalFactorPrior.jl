@@ -410,7 +410,7 @@ The method unwraps the carrier onto the returns-matrix method above, which holds
 # Algorithm
 
  1. Check that `rd` carries asset returns.
- 2. Call the returns-matrix method with `rd.X`, `rd.F` and `rd.pnl`, forwarding `rd.iv` and `rd.ivpa` as keyword arguments alongside `kwargs`.
+ 2. Call the returns-matrix method with `rd.X`, `rd.F` and `rd.pnl`, forwarding `rd.iv` and `rd.ivpa` as keyword arguments alongside `kwargs`, and `dims = 1` last, because a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
@@ -439,7 +439,7 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...)
               IsNothingError("a Cross-Sectional Factor Prior regresses asset returns on their Factor Exposures, and rd.X is nothing"))
     @argcheck(!isnothing(rd.pnl),
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
-    return prior(pe, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
+    return prior(pe, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

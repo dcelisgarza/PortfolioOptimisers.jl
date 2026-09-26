@@ -701,40 +701,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that `dims` is `1`, because a `ReturnsResult` always holds its observations along the rows.
-
-A [`ReturnsResult`](@ref) is always observations × assets, so its asset axis is always `2`, whatever `dims` a caller passes. This assertion refuses `dims == 2` instead of flipping the axis. Its error message names [`prices_to_returns`](@ref), which builds a `ReturnsResult` in that one layout.
-
-# Arguments
-
-  - $(arg_dict[:dims_chk])
-  - $(arg_dict[:sym_msg])
-
-# Validation
-
-  - `dims in (1, 2)`, by [`assert_dims`](@ref), which raises a `DomainError` naming `sym` and `dims`.
-  - `dims == 1`, which raises a `ConflictingArgumentError` naming `sym`, `dims` and `prices_to_returns`.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`assert_dims`](@ref)
-  - [`ConflictingArgumentError`](@ref)
-  - [`ReturnsResult`](@ref)
-  - [`prices_to_returns`](@ref)
-"""
-function assert_returns_result_dims(dims::Integer, sym::Sym_Str = :dims)::Nothing
-    assert_dims(dims, sym)
-    @argcheck(isone(dims),
-              ConflictingArgumentError("$sym must be 1 for a ReturnsResult. A ReturnsResult holds observations along its rows and assets along its columns, so its asset axis is always 2. Pass $sym = 1, or leave it at its default, and put the observations along the rows of the ReturnsResult, as `prices_to_returns` does. Got\n$sym => $(dims)"))
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Validate `dims` and return the matrices with the observations along the rows.
 
 The guard and the orientation are one call, so a caller cannot orient a matrix without validating `dims`. This is the single decision point: a leaf that spelled the guard and the `transpose` by hand could omit the guard and answer a `dims` of `3` with the raw input.

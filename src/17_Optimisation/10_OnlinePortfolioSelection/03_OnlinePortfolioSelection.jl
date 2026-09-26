@@ -820,10 +820,9 @@ Runs the Causal Pass.
 
 # Algorithm
 
- 1. Refuse `dims != 1` through [`assert_returns_result_dims`](@ref).
- 2. Reset every schedule of the head to its fold-less value through [`reset_time_dependent_estimator`](@ref).
- 3. Fold every row of `rd` from the Start Allocation, with no carried state, through [`fold_online_selection`](@ref), giving `state`.
- 4. Read the Next-Period Allocation out of `state` through [`online_selection_readout`](@ref).
+ 1. Reset every schedule of the head to its fold-less value through [`reset_time_dependent_estimator`](@ref).
+ 2. Fold every row of `rd` from the Start Allocation, with no carried state, through [`fold_online_selection`](@ref), giving `state`.
+ 3. Read the Next-Period Allocation out of `state` through [`online_selection_readout`](@ref).
 
 # Related
 
@@ -833,15 +832,13 @@ Runs the Causal Pass.
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
-function _optimise(opt::OnlinePortfolioSelection, rd::ReturnsResult; dims::Int = 1,
-                   kwargs...)
-    assert_returns_result_dims(dims)
+function _optimise(opt::OnlinePortfolioSelection, rd::ReturnsResult; kwargs...)
     opt = reset_time_dependent_estimator(opt)
     state = fold_online_selection(opt, nothing, rd)
     return online_selection_readout(opt, state)
 end
 """
-    optimise(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
+    optimise(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; kwargs...) -> NaiveOptimisationResult
 
 Runs the Causal Pass over `rd`, and returns the Next-Period Allocation.
 
@@ -849,7 +846,6 @@ Runs the Causal Pass over `rd`, and returns the Next-Period Allocation.
 
   - `opt`: The head.
   - $(arg_dict[:rd]) Every row is one Online Update, in order.
-  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets, so `dims == 2` throws `ConflictingArgumentError`.
   - `kwargs`: Additional keyword arguments, ignored.
 
 # Validation
@@ -867,9 +863,9 @@ Runs the Causal Pass over `rd`, and returns the Next-Period Allocation.
   - [`online_selection_readout`](@ref)
 """
 function optimise(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; dims::Int = 1, kwargs...)::NaiveOptimisationResult
+                  rd::ReturnsResult; kwargs...)::NaiveOptimisationResult
     assert_batch_entry(opt, "`optimise`")
-    return _optimise(opt, rd; dims = dims, kwargs...)
+    return _optimise(opt, rd; kwargs...)
 end
 """
     optimise(opt::OnlinePortfolioSelection; kwargs...) -> OptimisationResult

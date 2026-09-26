@@ -165,7 +165,7 @@ be-the-leader's own path length, which is the gap the issue measured.
                                            ReturnsResult(; nx = ["A", "B"], X = X3,
                                                          ts = ts3 .+ Day(1)))
         @test_throws po.IsNothingError optimise(est, ReturnsResult())
-        @test_throws po.ConflictingArgumentError optimise(est, rd3; dims = 2)
+        @test optimise(est, rd3; dims = 2).w ≈ res.w
         # The estimator views its bounds and sets.
         sets = UniverseSets(; dict = Dict("nx" => ["A", "B"]))
         est_v = po.port_opt_view(BudgetedHindsightPath(; L = 1.0, slv = slv, sets = sets,

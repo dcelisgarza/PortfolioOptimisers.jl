@@ -639,7 +639,7 @@ function NearOptimalSetup(; w_opt::VecNum_VecVecNum, rk_opt::Union{<:Number, <:V
                             opt, attrs, w_min_retcode, w_opt_retcode, w_max_retcode)
 end
 """
-    near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResult; dims::Int = 1)
+    near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResult; kwargs...)
 
 Compute all prerequisite data for Near Optimal Centering.
 
@@ -649,7 +649,7 @@ Solves the minimum-risk, optimal-objective, and maximum-risk sub-problems (unles
 
   - `noc::NearOptimalCentering`: NOC estimator configuration.
   - `rd::ReturnsResult`: Returns data.
-  - `dims::Int`: Observation dimension (default `1`).
+  - `kwargs...`: Keyword arguments passed to [`processed_jump_optimiser_attributes`](@ref).
 
 # Returns
 
@@ -662,7 +662,7 @@ Solves the minimum-risk, optimal-objective, and maximum-risk sub-problems (unles
   - [`near_optimal_centering_risks`](@ref)
 """
 function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResult;
-                                      dims::Int = 1, kwargs...)
+                                      kwargs...)
     w_min = noc.w_min
     w_opt = noc.w_opt
     w_max = noc.w_max
@@ -674,7 +674,7 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     w_max_retcode = OptimisationSuccess()
     unconstrained = isa(noc.alg, UnconstrainedNearOptimalCentering)
     r = ucs_risk_measure(noc.r, rd)
-    attrs = processed_jump_optimiser_attributes(noc.opt, rd; dims = dims, kwargs...)
+    attrs = processed_jump_optimiser_attributes(noc.opt, rd; kwargs...)
     # The corner solves below run the head's own `opt`, `r` and anchor weights against
     # `rd`, so the head is reduced before any of them, and before the optimiser is
     # repackaged from the bundle. `_optimise` takes the same view of its own locals.

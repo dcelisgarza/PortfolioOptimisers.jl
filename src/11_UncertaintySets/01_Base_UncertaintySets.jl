@@ -521,7 +521,7 @@ The method unpacks the container and forwards to the matrix method, so an estima
 
  1. Check that `rd.X` is not `nothing`, and raise otherwise.
  2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
- 3. Forward to `ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)`, giving the pair of fitted sets. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword.
+ 3. Forward to `ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)`, giving the pair of fitted sets. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` comes last, because a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
@@ -548,7 +548,7 @@ The method unpacks the container and forwards to the matrix method, so an estima
 function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
-    return ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
+    return ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)
 end
 """
     mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
@@ -561,7 +561,7 @@ The method unpacks the container and forwards to the matrix method. A caller tha
 
  1. Check that `rd.X` is not `nothing`, and raise otherwise.
  2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
- 3. Forward to `mu_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)`, giving the fitted mean set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword.
+ 3. Forward to `mu_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)`, giving the fitted mean set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` comes last, because a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
@@ -588,7 +588,7 @@ The method unpacks the container and forwards to the matrix method. A caller tha
 function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
-    return mu_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
+    return mu_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)
 end
 """
     sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
@@ -601,7 +601,7 @@ The method unpacks the container and forwards to the matrix method. An estimator
 
  1. Check that `rd.X` is not `nothing`, and raise otherwise.
  2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
- 3. Forward to `sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)`, giving the fitted covariance set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword.
+ 3. Forward to `sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)`, giving the fitted covariance set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` comes last, because a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
@@ -628,7 +628,7 @@ The method unpacks the container and forwards to the matrix method. An estimator
 function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
-    return sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
+    return sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)
 end
 """
     ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)

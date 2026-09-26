@@ -22,5 +22,4 @@ assert_unit_interval
 assert_closed_unit_interval
 assert_all_finite
 assert_source_selector
-assert_returns_result_dims
 ```

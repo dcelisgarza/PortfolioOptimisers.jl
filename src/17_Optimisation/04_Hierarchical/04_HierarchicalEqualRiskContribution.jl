@@ -585,11 +585,11 @@ Run the Hierarchical Equal Risk Contribution optimisation.
   - [`optimise`](@ref)
 """
 function _optimise(hec::HierarchicalEqualRiskContribution,
-                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                   branchorder::Symbol = :optimal, kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); branchorder::Symbol = :optimal,
+                   kwargs...)
     hec = reset_time_dependent_estimator(hec)
     rd = returns_result_picker(rd, hec.opt.brt)
-    pr = prior(hec.opt.pe, rd; dims = dims)
+    pr = prior(hec.opt.pe, rd)
     # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
@@ -614,7 +614,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     _, pr, hec, rd = investable_reduction(imsk, pr, hec, rd)
     X = pr.X
     N = size(X, 2)
-    clr = clusterise(hec.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    clr = clusterise(hec.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
                      branchorder = branchorder, x_src = hec.opt.x_src)
     assert_clustering_universe(clr, N)
     idx = assignments(clr)
@@ -664,8 +664,7 @@ end
     optimise(hec::HierarchicalEqualRiskContribution{
                      <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
                  },
-            rd::ReturnsResult; dims::Int = 1,
-            branchorder::Symbol = :optimal, kwargs...) -> HierarchicalEqualRiskContributionResult
+            rd::ReturnsResult; branchorder::Symbol = :optimal, kwargs...) -> HierarchicalEqualRiskContributionResult
 
 Run the Hierarchical Equal Risk Contribution portfolio optimisation.
 
@@ -673,7 +672,6 @@ Run the Hierarchical Equal Risk Contribution portfolio optimisation.
 
   - `hec`: The hierarchical equal risk contribution optimiser to use.
   - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, a standalone optimisation does not need `rd`, but a fallback or the clustering can need it.
-  - `dims`: The dimension along which observations advance in time.
   - `branchorder`: The branch order of the clustering. The weights do not depend on the order of the leaves, so a faster order that is not optimal gives the same weights. When `opt.cle` holds a clustering result, the order has no effect.
   - `kwargs`: Keyword arguments that the method accepts and does not read.
 
@@ -689,9 +687,9 @@ Run the Hierarchical Equal Risk Contribution portfolio optimisation.
 """
 function optimise(hec::HierarchicalEqualRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any, Nothing}, rd::ReturnsResult;
-                  dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+                  branchorder::Symbol = :optimal, kwargs...)
     assert_batch_entry(hec, "`optimise`")
-    return _optimise(hec, rd; dims = dims, branchorder = branchorder, kwargs...)
+    return _optimise(hec, rd; branchorder = branchorder, kwargs...)
 end
 
 export HierarchicalEqualRiskContribution

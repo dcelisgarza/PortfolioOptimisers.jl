@@ -794,12 +794,11 @@ function _update_asset_sets(nco::NestedClustered, rdo::ReturnsResult)
         nco
     end
 end
-function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
-                   branchorder::Symbol = :optimal, str_names::Bool = false,
-                   save::Bool = true, kwargs...)
+function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol = :optimal,
+                   str_names::Bool = false, save::Bool = true, kwargs...)
     nco = reset_time_dependent_estimator(nco)
     rd = returns_result_picker(rd, nco.brt)
-    pr = prior(nco.pe, rd; dims = dims)
+    pr = prior(nco.pe, rd)
     # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
@@ -822,7 +821,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     # FLoops reports as a correctness and performance problem on every call.
     _, pr, nco, rdr = investable_reduction(imsk, pr, nco, rd)
     X = pr.X
-    clr = clusterise(nco.cle, pr; rd = rdr, iv = rdr.iv, ivpa = rdr.ivpa, dims = dims,
+    clr = clusterise(nco.cle, pr; rd = rdr, iv = rdr.iv, ivpa = rdr.ivpa,
                      branchorder = branchorder, x_src = nco.x_src)
     assert_clustering_universe(clr, size(X, 2))
     idx = assignments(clr)
@@ -833,8 +832,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     FLoops.@floop nco.ex for (i, cl) in pairs(cls)
         optic = port_opt_view(opti, cl, X)
         rdc = port_opt_view(rdr, cl)
-        res = optimise(optic, rdc; dims = dims, branchorder = branchorder,
-                       str_names = str_names, save = save, kwargs...)
+        res = optimise(optic, rdc; branchorder = branchorder, str_names = str_names,
+                       save = save, kwargs...)
         #! Support efficient frontier?
         @argcheck(!isa(res.retcode, AbstractVector),
                   ArgumentError("res.retcode cannot be an AbstractVector; efficient frontier results are not supported in NCO"))
@@ -843,8 +842,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     end
     rdo = predict_outer_returns(nco.cv, nco, ClusterUniverse(cls), rdr, pr, cfees, wi, resi)
     nco = _update_asset_sets(nco, rdo)
-    reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
-                    str_names = str_names, save = save, kwargs...)
+    reso = optimise(nco.opto, rdo; branchorder = branchorder, str_names = str_names,
+                    save = save, kwargs...)
     wb = weight_bounds_constraints(nco.wb, nco.sets; N = size(X, 2), strict = nco.strict,
                                    datatype = eltype(X))
     retcode, w = outer_optimisation_finaliser(wb, nco.wf, resi, reso.retcode, reso.w, wi)
@@ -856,7 +855,7 @@ end
     optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                       <:Any, <:Any, <:Any, Nothing
                   }, rd::ReturnsResult;
-             dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+             branchorder::Symbol = :optimal, str_names::Bool = false,
              save::Bool = true, kwargs...) -> NestedClusteredResult
 
 Run the Nested Clustered Optimisation portfolio optimisation.
@@ -865,7 +864,6 @@ Run the Nested Clustered Optimisation portfolio optimisation.
 
   - `nco`: The nested clustered optimiser to use.
   - $(arg_dict[:rd])
-  - `dims`: The dimension along which observations advance in time.
   - `branchorder`: Passed to the inner and outer optimisers. If this optimiser uses hierarchical clustering, this applies to the clusterisation. The branch order to use for the clusterisation.
   - `str_names`: Passed to the inner and outer optimisers. Whether to use string names for the assets in the optimisation.
   - `save`: Passed to the inner and outer optimisers. Whether to save the JuMP model in the optimisation result.
@@ -886,11 +884,11 @@ Run the Nested Clustered Optimisation portfolio optimisation.
 """
 function optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+                  branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)
     assert_batch_entry(nco, "`optimise`")
-    return _optimise(nco, rd; dims = dims, branchorder = branchorder, str_names = str_names,
-                     save = save, kwargs...)
+    return _optimise(nco, rd; branchorder = branchorder, str_names = str_names, save = save,
+                     kwargs...)
 end
 
 export NestedClusteredResult, NestedClustered

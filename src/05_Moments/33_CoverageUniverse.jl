@@ -266,10 +266,8 @@ function coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1)
     end
 end
 """
-    coverage_reduction(rd::AbstractReturnsResult;
-                       dims::Int = 1) -> Tuple{Option{BitVector}, AbstractReturnsResult}
-    coverage_reduction(X::MatNum, rd::AbstractReturnsResult;
-                       dims::Int = 1) -> Tuple{Option{BitVector}, AbstractReturnsResult}
+    coverage_reduction(rd::AbstractReturnsResult) -> Tuple{Option{BitVector}, AbstractReturnsResult}
+    coverage_reduction(X::MatNum, rd::AbstractReturnsResult) -> Tuple{Option{BitVector}, AbstractReturnsResult}
     coverage_reduction(cmsk::Nothing,
                        rd::AbstractReturnsResult) -> Tuple{Nothing, AbstractReturnsResult}
     coverage_reduction(cmsk::BitVector,
@@ -288,7 +286,7 @@ A window with no covered asset throws an `IsEmptyError` in [`coverage_mask`](@re
 # Algorithm
 
  1. Pass `rd.X` as the first argument of the second method, which refuses a carrier with no asset axis.
- 2. Derive the Coverage Universe of `X` and `rd.pnl` with [`coverage_mask`](@ref).
+ 2. Derive the Coverage Universe of `X` and `rd.pnl` with [`coverage_mask`](@ref), with `dims = 1`, because a carrier holds its observations along the rows.
  3. Return the mask and the carrier unchanged when the mask is `nothing`.
  4. Otherwise return the mask beside a [`port_opt_view`](@ref) of the carrier at `findall(cmsk)`.
 
@@ -297,11 +295,9 @@ A window with no covered asset throws an `IsEmptyError` in [`coverage_mask`](@re
   - $(arg_dict[:rd])
   - $(arg_dict[:X])
   - `cmsk`: The Coverage Universe, or `nothing`.
-  - $(arg_dict[:dims])
 
 # Validation
 
-  - $(val_dict[:dims])
   - The carrier must hold an `observations × assets` returns matrix.
   - At least one asset must be in the Coverage Universe.
 
@@ -316,11 +312,11 @@ A window with no covered asset throws an `IsEmptyError` in [`coverage_mask`](@re
   - [`fit_preprocessing`](@ref)
   - [`port_opt_view`](@ref)
 """
-function coverage_reduction(rd::AbstractReturnsResult; dims::Int = 1)
-    return coverage_reduction(rd.X, rd; dims = dims)
+function coverage_reduction(rd::AbstractReturnsResult)
+    return coverage_reduction(rd.X, rd)
 end
-function coverage_reduction(X::MatNum, rd::AbstractReturnsResult; dims::Int = 1)
-    return coverage_reduction(coverage_mask(X, rd.pnl; dims = dims), rd)
+function coverage_reduction(X::MatNum, rd::AbstractReturnsResult)
+    return coverage_reduction(coverage_mask(X, rd.pnl; dims = 1), rd)
 end
 function coverage_reduction(::Nothing, rd::AbstractReturnsResult)
     return nothing, rd

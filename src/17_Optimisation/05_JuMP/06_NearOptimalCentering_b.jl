@@ -232,9 +232,9 @@ function solve_near_optimal_centering!(::ConstrainedNearOptimalCentering, model:
                       Val(shared_has(model, :risk_frontier)))
 end
 function _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult();
-                   dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+                   str_names::Bool = false, save::Bool = true, kwargs...)
     noc = reset_time_dependent_estimator(noc)
-    setup = near_optimal_centering_setup(noc, rd; dims = dims, kwargs...)
+    setup = near_optimal_centering_setup(noc, rd; kwargs...)
     (; w_opt, r, opt, attrs, w_min_retcode, w_opt_retcode, w_max_retcode) = setup
     # The setup reduced its own locals. These are this method's, and they reach
     # `assemble_near_optimal_centering_model!` directly.
@@ -268,8 +268,7 @@ end
     optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                       <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
                   },
-             rd::ReturnsResult; dims::Int = 1,
-             str_names::Bool = false, save::Bool = true, kwargs...) -> NearOptimalCenteringResult
+             rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...) -> NearOptimalCenteringResult
 
 Run the Near Optimal Centering portfolio optimisation.
 
@@ -277,7 +276,6 @@ Run the Near Optimal Centering portfolio optimisation.
 
   - `noc`: The near optimal centering optimiser to use.
   - $(arg_dict[:rd]) If `isa(noc.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
-  - `dims`: The dimension along which observations advance in time.
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
@@ -293,10 +291,9 @@ Run the Near Optimal Centering portfolio optimisation.
 """
 function optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                             <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; dims::Int = 1, str_names::Bool = false,
-                  save::Bool = true, kwargs...)
+                  rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(noc, "`optimise`")
-    return _optimise(noc, rd; dims = dims, str_names = str_names, save = save, kwargs...)
+    return _optimise(noc, rd; str_names = str_names, save = save, kwargs...)
 end
 
 @pipe_delegates NearOptimalCentering opt

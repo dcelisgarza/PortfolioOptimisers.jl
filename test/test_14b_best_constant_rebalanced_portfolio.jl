@@ -139,8 +139,8 @@ both pick the best single asset and the parity test says nothing about the fixed
                                                                                                   lb = "A" =>
                                                                                                       0.1,
                                                                                                   ub = nothing))
-        @test_throws po.ConflictingArgumentError optimise(BestConstantRebalancedPortfolio(),
-                                                          rd; dims = 2)
+        @test optimise(BestConstantRebalancedPortfolio(), rd; dims = 2).w ≈
+              optimise(BestConstantRebalancedPortfolio(), rd).w
         @test_throws po.IsNothingError optimise(BestConstantRebalancedPortfolio(),
                                                 ReturnsResult())
     end

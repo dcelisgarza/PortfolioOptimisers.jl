@@ -988,7 +988,7 @@ function path_row_masks(rd::ReturnsResult)
 end
 
 """
-    _optimise(est::BudgetedHindsightPath, rd::ReturnsResult; dims::Int = 1, kwargs...) -> BudgetedHindsightPathResult
+    _optimise(est::BudgetedHindsightPath, rd::ReturnsResult; kwargs...) -> BudgetedHindsightPathResult
 
 Solves the budgeted path programme of [`BudgetedHindsightPath`](@ref) over the rows of `rd`.
 
@@ -996,7 +996,7 @@ Solves the budgeted path programme of [`BudgetedHindsightPath`](@ref) over the r
 
 # Algorithm
 
- 1. Check that `rd.X` is not `nothing` and that `dims` is `1`.
+ 1. Check that `rd.X` is not `nothing`.
  2. Add one to the returns, giving the price relatives `X`, of size `T × N`.
  3. Derive the rows' Investable Masks through [`path_row_masks`](@ref), giving `imsk`, and `msk`, which is all `true` when `imsk` is `nothing`.
  4. Resolve the weight bounds through [`weight_bounds_constraints`](@ref), giving `wb`.
@@ -1033,7 +1033,6 @@ Where:
 
   - `est`: The estimator.
   - $(arg_dict[:rd]) Its returns matrix is the panel the path is solved over.
-  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets, so `dims == 2` throws `ConflictingArgumentError`.
   - `kwargs`: Ignored.
 
 # Validation
@@ -1054,9 +1053,8 @@ Where:
   - [`path_budget_constraint!`](@ref)
   - [`optimise_JuMP_model!`](@ref)
 """
-function _optimise(est::BudgetedHindsightPath, rd::ReturnsResult; dims::Int = 1, kwargs...)
+function _optimise(est::BudgetedHindsightPath, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    assert_returns_result_dims(dims)
     X = one(eltype(rd.X)) .+ rd.X
     T, N = size(X)
     imsk = path_row_masks(rd)

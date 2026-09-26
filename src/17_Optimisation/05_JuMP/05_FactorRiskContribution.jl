@@ -395,9 +395,9 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_R
     return b1, b2, rr
 end
 function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
-                   dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+                   str_names::Bool = false, save::Bool = true, kwargs...)
     frc = reset_time_dependent_estimator(frc)
-    attrs = processed_jump_optimiser_attributes(frc.opt, rd; dims = dims, kwargs...)
+    attrs = processed_jump_optimiser_attributes(frc.opt, rd; kwargs...)
     # The bundle reduced what it carries. The head carries the rest — an initial weight
     # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
@@ -436,8 +436,7 @@ end
     optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                       <:Any, <:Any, Nothing
                   },
-             rd::ReturnsResult; dims::Int = 1,
-             str_names::Bool = false, save::Bool = true, kwargs...) -> FactorRiskContributionResult
+             rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...) -> FactorRiskContributionResult
 
 Run the Factor Risk Contribution portfolio optimisation.
 
@@ -445,7 +444,6 @@ Run the Factor Risk Contribution portfolio optimisation.
 
   - `frc`: The factor risk contribution optimiser to use.
   - $(arg_dict[:rd]) If `isa(frc.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
-  - `dims`: The dimension along which observations advance in time.
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
@@ -461,9 +459,9 @@ Run the Factor Risk Contribution portfolio optimisation.
 """
 function optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+                  str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(frc, "`optimise`")
-    return _optimise(frc, rd; dims = dims, str_names = str_names, save = save, kwargs...)
+    return _optimise(frc, rd; str_names = str_names, save = save, kwargs...)
 end
 
 @pipe_delegates FactorRiskContribution opt

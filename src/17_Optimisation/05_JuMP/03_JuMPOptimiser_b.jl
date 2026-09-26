@@ -36,7 +36,7 @@ end
     processed_jump_optimiser_attributes(
         opt::JuMPOptimiser,
         rd::ReturnsResult;
-        dims::Int = 1
+        kwargs...
     ) -> ProcessedJuMPOptimiserAttributes
 
 Compute all constraint and prior results needed for model assembly.
@@ -52,7 +52,7 @@ processing happens exactly once per `optimise` call.
 
   - `opt::JuMPOptimiser`: JuMP optimiser configuration.
   - $(arg_dict[:rd])
-  - `dims::Int = 1`: Observation dimension passed to the prior estimator.
+  - `kwargs...`: Keyword arguments passed to the centrality and phylogeny constraint estimators.
 
 # Returns
 
@@ -66,10 +66,10 @@ processing happens exactly once per `optimise` call.
   - [`processed_jump_optimiser`](@ref)
 """
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
-                                             dims::Int = 1, kwargs...)
+                                             kwargs...)
     rd = returns_result_picker(rd, opt.brt)
     assert_universe_axis_order(opt.sets, rd)
-    pr = prior(opt.pe, rd; dims = dims)
+    pr = prior(opt.pe, rd)
     # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
@@ -242,7 +242,7 @@ end
     processed_jump_optimiser(
         opt::JuMPOptimiser,
         rd::ReturnsResult;
-        dims::Int = 1
+        kwargs...
     ) -> JuMPOptimiser
 
 Build a fully-processed [`JuMPOptimiser`](@ref) from raw configuration and returns data.
@@ -256,7 +256,7 @@ reused directly by [`assemble_jump_model!`](@ref).
 
   - `opt::JuMPOptimiser`: Raw optimiser configuration.
   - $(arg_dict[:rd])
-  - `dims::Int = 1`: Observation dimension passed to the prior estimator.
+  - `kwargs...`: Keyword arguments passed to [`processed_jump_optimiser_attributes`](@ref).
 
 # Returns
 
@@ -269,9 +269,8 @@ reused directly by [`assemble_jump_model!`](@ref).
   - [`processed_jump_optimiser_attributes`](@ref)
   - [`jump_optimiser_from_attributes`](@ref)
 """
-function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1,
-                                  kwargs...)
-    attrs = processed_jump_optimiser_attributes(opt, rd; dims = dims, kwargs...)
+function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; kwargs...)
+    attrs = processed_jump_optimiser_attributes(opt, rd; kwargs...)
     return jump_optimiser_from_attributes(opt, attrs)
 end
 """

@@ -430,7 +430,7 @@ For the default [`EmpiricalPrior`](@ref), the mean estimator is the centring est
 function prior_forecast_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult,
                                  rd::ReturnsResult; kwargs...)
     return prior_forecast_location(pe, pr, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa,
-                                   kwargs...)
+                                   kwargs..., dims = 1)
 end
 function prior_forecast_location(::AbstractPriorEstimator, pr::AbstractPriorResult,
                                  ::MatNum, ::Option{<:MatNum}, ::Option{<:AssetPanel};

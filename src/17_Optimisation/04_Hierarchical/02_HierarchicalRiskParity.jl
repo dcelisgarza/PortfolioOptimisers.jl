@@ -374,10 +374,10 @@ Run the Hierarchical Risk Parity optimisation for a single risk measure.
   - [`_optimise`](@ref)
 """
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
-                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); kwargs...)
     hrp = reset_time_dependent_estimator(hrp)
     rd = returns_result_picker(rd, hrp.opt.brt)
-    pr = prior(hrp.opt.pe, rd; dims = dims)
+    pr = prior(hrp.opt.pe, rd)
     # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
@@ -403,7 +403,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
                      x_src = hrp.opt.x_src)
     assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
@@ -537,10 +537,10 @@ Run the Hierarchical Risk Parity optimisation for a vector of risk measures, sca
   - [`_optimise`](@ref)
 """
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
-                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); kwargs...)
     hrp = reset_time_dependent_estimator(hrp)
     rd = returns_result_picker(rd, hrp.opt.brt)
-    pr = prior(hrp.opt.pe, rd; dims = dims)
+    pr = prior(hrp.opt.pe, rd)
     # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
@@ -566,7 +566,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
                      x_src = hrp.opt.x_src)
     assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
@@ -602,7 +602,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
 end
 """
     optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
-             rd::ReturnsResult; dims::Int = 1, kwargs...) -> HierarchicalRiskParityResult
+             rd::ReturnsResult; kwargs...) -> HierarchicalRiskParityResult
 
 Run the Hierarchical Risk Parity portfolio optimisation.
 
@@ -612,7 +612,6 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
 
   - `hrp`: The hierarchical risk parity optimiser to use.
   - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback or the clusterisation can.
-  - `dims`: The dimension along which observations advance in time.
   - `kwargs`: Passed to [`_optimise`](@ref), which ignores them. A `branchorder` passed here has no effect.
 
 # Validation
@@ -625,9 +624,9 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
   - [`HierarchicalRiskParityResult`](@ref)
 """
 function optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
-                  rd::ReturnsResult; dims::Int = 1, kwargs...)
+                  rd::ReturnsResult; kwargs...)
     assert_batch_entry(hrp, "`optimise`")
-    return _optimise(hrp, rd; dims = dims, kwargs...)
+    return _optimise(hrp, rd; kwargs...)
 end
 
 @pipe_delegates HierarchicalRiskParity opt

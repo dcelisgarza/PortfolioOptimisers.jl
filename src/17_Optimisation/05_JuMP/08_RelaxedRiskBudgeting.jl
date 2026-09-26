@@ -574,9 +574,9 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
     return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
 end
 function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
-                   dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+                   str_names::Bool = false, save::Bool = true, kwargs...)
     rrb = reset_time_dependent_estimator(rrb)
-    attrs = processed_jump_optimiser_attributes(rrb.opt, rd; dims = dims, kwargs...)
+    attrs = processed_jump_optimiser_attributes(rrb.opt, rd; kwargs...)
     # The bundle reduced what it carries. The head carries the rest — an initial weight
     # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
@@ -597,8 +597,7 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
 end
 """
     optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult; dims::Int = 1,
-             str_names::Bool = false, save::Bool = true, kwargs...) -> RelaxedRiskBudgetingResult
+             rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...) -> RelaxedRiskBudgetingResult
 
 Run the Relaxed Risk Budgeting portfolio optimisation.
 
@@ -606,7 +605,6 @@ Run the Relaxed Risk Budgeting portfolio optimisation.
 
   - `rrb`: The relaxed risk budgeting optimiser to use.
   - $(arg_dict[:rd]) If `isa(rrb.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
-  - `dims`: The dimension along which observations advance in time.
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
@@ -621,10 +619,9 @@ Run the Relaxed Risk Budgeting portfolio optimisation.
   - [`RelaxedRiskBudgetingResult`](@ref)
 """
 function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; dims::Int = 1, str_names::Bool = false,
-                  save::Bool = true, kwargs...)
+                  rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(rrb, "`optimise`")
-    return _optimise(rrb, rd; dims = dims, str_names = str_names, save = save, kwargs...)
+    return _optimise(rrb, rd; str_names = str_names, save = save, kwargs...)
 end
 
 @pipe_delegates RelaxedRiskBudgeting opt

@@ -164,7 +164,7 @@ The branch is dispatch rather than a condition, over three methods, as in [`inve
 
 # Algorithm
 
- 1. Derive the Coverage Universe `cmsk` of `rd.X` and `rd.pnl` with [`coverage_mask`](@ref).
+ 1. Derive the Coverage Universe `cmsk` of `rd.X` and `rd.pnl` with [`coverage_mask`](@ref), with `dims = 1`, because a `ReturnsResult` holds its observations along the rows.
  2. Return the mask, the optimiser and the returns data unchanged when the mask is `nothing`.
  3. Otherwise read the departed names `ni` off the *unreduced* `rd.nx` with [`non_investable_names`](@ref), and announce them once with [`announce_non_investable`](@ref).
  4. Take a [`port_opt_view`](@ref) of the optimiser and of the returns data at `findall(cmsk)`.
@@ -174,11 +174,9 @@ The branch is dispatch rather than a condition, over three methods, as in [`inve
 
   - `opt::AbstractOptimisationEstimator`: The optimisation estimator, holding every constraint estimator the caller stated over the full universe.
   - $(arg_dict[:rd])
-  - $(arg_dict[:dims])
 
 # Validation
 
-  - $(val_dict[:dims])
   - At least one asset must be in the Coverage Universe. [`coverage_mask`](@ref) throws an `IsEmptyError` otherwise, so every prior-free head refuses an all-dead window in one place.
 
 # Returns
@@ -192,9 +190,8 @@ The branch is dispatch rather than a condition, over three methods, as in [`inve
   - [`expand_investable_weights`](@ref)
   - [`port_opt_view`](@ref)
 """
-function coverage_reduction(opt::AbstractOptimisationEstimator, rd::ReturnsResult;
-                            dims::Int = 1)
-    return coverage_reduction(coverage_mask(rd.X, rd.pnl; dims = dims), opt, rd)
+function coverage_reduction(opt::AbstractOptimisationEstimator, rd::ReturnsResult)
+    return coverage_reduction(coverage_mask(rd.X, rd.pnl; dims = 1), opt, rd)
 end
 function coverage_reduction(::Nothing, opt::AbstractOptimisationEstimator,
                             rd::ReturnsResult)
@@ -322,7 +319,7 @@ Solve one optimisation estimator once, with no fallback.
 
   - `opt`: Optimisation estimator (for example [`MeanRisk`](@ref) or [`RiskBudgeting`](@ref)), or a precomputed result.
   - `args`: The data that the estimator solves over: a [`ReturnsResult`](@ref) for a continuous optimiser, or a [`FiniteAllocationInput`](@ref) for a finite allocator.
-  - `kwargs`: The keyword arguments that the estimator reads. A continuous optimiser reads `dims`, the observation dimension, and a JuMP head also reads `str_names` and `save`, which name the model variables and keep the model on the result. Every method ignores the keywords it does not read.
+  - `kwargs`: The keyword arguments that the estimator reads. A JuMP head reads `str_names` and `save`, which name the model variables and keep the model on the result. Every method ignores the keywords it does not read. No method reads `dims`, because a [`ReturnsResult`](@ref) holds its observations along the rows.
 
 # Returns
 

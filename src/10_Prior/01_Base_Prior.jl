@@ -361,7 +361,7 @@ const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
 
 Groups the two carriers that hold an asset returns matrix `X` and a feature matrix `Z`.
 
-`Pr_RR` is the bridge the clustering, phylogeny and centrality forwarders below dispatch on. Each of them reads `X` off its carrier and delegates to the asset-returns method, so an estimator that needs returns can be driven from a fitted prior or from the raw data with one method apiece rather than two. Where both carriers are present, [`returns_matrix_picker`](@ref) picks between them; both travel on to the estimator tree as `pr` and `rd`, so a [`FeatureDistance`](@ref) resolves its Asset Panel from them.
+`Pr_RR` is the bridge the clustering, phylogeny and centrality forwarders below dispatch on. Each of them reads `X` off its carrier and delegates to the asset-returns method, so an estimator that needs returns can be driven from a fitted prior or from the raw data with one method apiece rather than two. A carrier holds its observations along the rows, so each forwarder passes `dims = 1` after `kwargs`, and a `dims` in `kwargs` has no effect. Where both carriers are present, [`returns_matrix_picker`](@ref) picks between them; both travel on to the estimator tree as `pr` and `rd`, so a [`FeatureDistance`](@ref) resolves its Asset Panel from them.
 
 # Related
 
@@ -383,7 +383,7 @@ This method is the entry point every caller uses, and it is written once here. W
 
  1. Check that `rd` carries asset returns, so that the estimator is not handed a `nothing` for `X`.
  2. When `pe` requires factor returns — when [`needs_factor_returns`](@ref) answers `true`, which walks the tree to a factor leaf under an optional-argument host — check that `rd` carries them. The check is made here so that the caller reads a named error against `rd.F` rather than a `MethodError` against the leaf's own signature one call later.
- 3. Call the estimator's returns-matrix method with `rd.X`, `rd.F` and `rd.pnl`, forwarding `rd.iv` and `rd.ivpa` as keyword arguments alongside `kwargs`, and return the prior result it produces.
+ 3. Call the estimator's returns-matrix method with `rd.X`, `rd.F` and `rd.pnl`, forwarding `rd.iv` and `rd.ivpa` as keyword arguments alongside `kwargs`, and return the prior result it produces. The call passes `dims = 1` last, because a `ReturnsResult` holds its observations along the rows. So a `dims` in `kwargs` has no effect.
 
 The Asset Panel travels as the third positional argument for the same reason `rd.F` travels as the second: a wrapping prior holds no carrier, so it can compose an estimator that is fitted on a panel only if the panel reaches its own returns-matrix method. Every returns-matrix method takes the argument, every wrapping prior forwards it unchanged to the estimator it nests over the assets, and an estimator that reads no panel ignores it.
 
@@ -414,7 +414,7 @@ The Asset Panel travels as the third positional argument for the same reason `rd
 function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(pe, rd.F)
-    return prior(pe, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
+    return prior(pe, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)
 end
 """
     prior_regression_remedy
@@ -765,7 +765,7 @@ Clusterise asset or factor returns from a prior result using a clustering estima
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`clusterise`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the clustering result it produces.
+ 2. Call the asset-returns method of [`clusterise`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the clustering result it produces.
 
 # Arguments
 
@@ -791,7 +791,7 @@ function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR;
                     rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
                     kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return clusterise(cle, X; pr = pr, rd = rd, kwargs...)
+    return clusterise(cle, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
     phylogeny_matrix(pl::NwE_ClE_Cl, pr::AbstractPriorResult;
@@ -804,7 +804,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`phylogeny_matrix`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the phylogeny result it produces.
+ 2. Call the asset-returns method of [`phylogeny_matrix`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the phylogeny result it produces.
 
 # Arguments
 
@@ -830,7 +830,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
 function phylogeny_matrix(pl::NwE_ClE_Cl, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
                           x_src::Symbol = :prior, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return phylogeny_matrix(pl, X; pr = pr, rd = rd, kwargs...)
+    return phylogeny_matrix(pl, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -842,7 +842,7 @@ Compute phylogeny constraints from asset returns in a prior result using a phylo
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`phylogeny_constraints`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the constraint result it produces.
+ 2. Call the asset-returns method of [`phylogeny_constraints`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the constraint result it produces.
 
 # Arguments
 
@@ -868,7 +868,7 @@ function phylogeny_constraints(plc::AbstractPhylogenyConstraintEstimator, pr::Pr
                                rd::Option{<:ReturnsResult} = nothing,
                                x_src::Symbol = :prior, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return phylogeny_constraints(plc, X; pr = pr, rd = rd, kwargs...)
+    return phylogeny_constraints(plc, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
     centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
@@ -880,7 +880,7 @@ Compute the centrality vector for a centrality estimator and prior result.
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`centrality_vector`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the centrality result it produces.
+ 2. Call the asset-returns method of [`centrality_vector`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the centrality result it produces.
 
 # Arguments
 
@@ -906,7 +906,7 @@ function centrality_vector(cte::CentralityEstimator, pr::Pr_RR;
                            rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
                            kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return centrality_vector(cte, X; pr = pr, rd = rd, kwargs...)
+    return centrality_vector(cte, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
     centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
@@ -919,7 +919,7 @@ Compute the centrality vector for a network or clustering estimator and centrali
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`centrality_vector`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the centrality result it produces.
+ 2. Call the asset-returns method of [`centrality_vector`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the centrality result it produces.
 
 # Arguments
 
@@ -947,7 +947,7 @@ function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, pr::
                            rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
                            kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return centrality_vector(pl, ct, X; pr = pr, rd = rd, kwargs...)
+    return centrality_vector(pl, ct, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
     average_centrality(pl::NwE_Pl_ClE_Cl,
@@ -1002,7 +1002,7 @@ Compute the weighted average centrality for a centrality estimator.
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`average_centrality`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the weighted average it produces.
+ 2. Call the asset-returns method of [`average_centrality`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the weighted average it produces.
 
 The estimator method picks the carriers itself, where the network-and-algorithm method above delegates that to [`centrality_vector`](@ref). The two reach the same selection: `cte` carries `pl` and `ct` in its own fields, so the asset-returns method it calls is the one the other method's step 1 would have reached.
 
@@ -1031,11 +1031,11 @@ function average_centrality(cte::CentralityEstimator, w::VecNum, pr::Pr_RR;
                             rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
                             kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return average_centrality(cte, w, X; pr = pr, rd = rd, kwargs...)
+    return average_centrality(cte, w, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
     asset_phylogeny(pl::NwE_ClE_Cl,
-                    w::VecNum, pr::AbstractPriorResult; dims::Int = 1, kwargs...)
+                    w::VecNum, pr::AbstractPriorResult; kwargs...)
 
 Compute the asset phylogeny score for a portfolio allocation using a phylogeny estimator or clustering result and a prior result.
 
@@ -1044,7 +1044,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`asset_phylogeny`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the score it produces.
+ 2. Call the asset-returns method of [`asset_phylogeny`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the score it produces.
 
 # Arguments
 
@@ -1053,7 +1053,6 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
-  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the phylogeny matrix computation.
 
 # Returns
@@ -1074,7 +1073,7 @@ function asset_phylogeny(pl::NwE_ClE_Cl, w::VecNum, pr::Pr_RR;
                          rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
                          kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return asset_phylogeny(pl, w, X; pr = pr, rd = rd, kwargs...)
+    return asset_phylogeny(pl, w, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1086,7 +1085,7 @@ Compute centrality constraints from asset returns in a prior result using a cent
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`centrality_constraints`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the constraint result it produces.
+ 2. Call the asset-returns method of [`centrality_constraints`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the constraint result it produces.
 
 # Arguments
 
@@ -1111,7 +1110,7 @@ function centrality_constraints(ccs::CC_VecCC, pr::Pr_RR;
                                 rd::Option{<:ReturnsResult} = nothing,
                                 x_src::Symbol = :prior, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return centrality_constraints(ccs, X; pr = pr, rd = rd, kwargs...)
+    return centrality_constraints(ccs, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
 $(DocStringExtensions.TYPEDEF)

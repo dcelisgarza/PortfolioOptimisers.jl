@@ -568,12 +568,11 @@ end
 function non_investable_universe(st::Stacking, ni::VecStr)::Stacking
     return rebuild_estimator(st, (; sets = non_investable_sets(st.sets, ni)))
 end
-function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
-                   branchorder::Symbol = :optimal, str_names::Bool = false,
-                   save::Bool = true, kwargs...)
+function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optimal,
+                   str_names::Bool = false, save::Bool = true, kwargs...)
     st = reset_time_dependent_estimator(st)
     rd = returns_result_picker(rd, st.brt)
-    pr = prior(st.pe, rd; dims = dims)
+    pr = prior(st.pe, rd)
     # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
@@ -601,8 +600,8 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     wi = zeros(eltype(X), size(X, 2), Ni)
     resi = Vector{NonFiniteAllocationOptimisationResult}(undef, Ni)
     FLoops.@floop st.ex for (i, opt) in pairs(opti)
-        res = optimise(opt, rdr; dims = dims, branchorder = branchorder,
-                       str_names = str_names, save = save, kwargs...)
+        res = optimise(opt, rdr; branchorder = branchorder, str_names = str_names,
+                       save = save, kwargs...)
         #! Support efficient frontier?
         @argcheck(!isa(res.retcode, AbstractVector),
                   ArgumentError("res.retcode cannot be an AbstractVector; efficient frontier results are not supported here"))
@@ -610,8 +609,8 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
         resi[i] = res
     end
     rdo = predict_outer_returns(st.cv, st, FullUniverse(), rdr, pr, cfees, wi, resi)
-    reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
-                    str_names = str_names, save = save, kwargs...)
+    reso = optimise(st.opto, rdo; branchorder = branchorder, str_names = str_names,
+                    save = save, kwargs...)
     wb = weight_bounds_constraints(st.wb, st.sets; N = size(X, 2), strict = st.strict,
                                    datatype = eltype(X))
     retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode,
@@ -623,7 +622,7 @@ end
     optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                      <:Any, <:Any, Nothing
                  }, rd::ReturnsResult;
-             dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+             branchorder::Symbol = :optimal, str_names::Bool = false,
              save::Bool = true, kwargs...) -> StackingResult
 
 Run the Stacking portfolio optimisation.
@@ -632,7 +631,6 @@ Run the Stacking portfolio optimisation.
 
   - `st`: The stacking optimiser to use.
   - $(arg_dict[:rd])
-  - `dims`: The dimension along which observations advance in time.
   - `branchorder`: Passed to the inner and outer optimisers. The branch order to use for the clusterisation.
   - `str_names`: Passed to the inner and outer optimisers. Whether to use string names for the assets in the optimisation.
   - `save`: Passed to the inner and outer optimisers. Whether to save the JuMP model in the optimisation result.
@@ -653,12 +651,12 @@ Run the Stacking portfolio optimisation.
   - [`combination_weights`](@ref)
 """
 function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                               <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1,
+                               <:Any, <:Any, Nothing}, rd::ReturnsResult;
                   branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)
     assert_batch_entry(st, "`optimise`")
-    return _optimise(st, rd; dims = dims, branchorder = branchorder, str_names = str_names,
-                     save = save, kwargs...)
+    return _optimise(st, rd; branchorder = branchorder, str_names = str_names, save = save,
+                     kwargs...)
 end
 
 export StackingResult, Stacking

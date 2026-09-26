@@ -584,12 +584,11 @@ function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::
     return map(x -> subset_resampling_retcode(ress, x[1]), retcode_w),
            map(x -> x[2], retcode_w)
 end
-function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
-                   branchorder::Symbol = :optimal, str_names::Bool = false,
-                   save::Bool = true, kwargs...)
+function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol = :optimal,
+                   str_names::Bool = false, save::Bool = true, kwargs...)
     sr = reset_time_dependent_estimator(sr)
     rd = returns_result_picker(rd, sr.brt)
-    pr = prior(sr.pe, rd; dims = dims)
+    pr = prior(sr.pe, rd)
     # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
@@ -620,8 +619,8 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
         idx = view(asset_idx, :, i)
         opti = port_opt_view(opt, idx, X)
         rdi = port_opt_view(rd, idx)
-        ress[i] = optimise(opti, rdi; dims = dims, branchorder = branchorder,
-                           str_names = str_names, save = save, kwargs...)
+        ress[i] = optimise(opti, rdi; branchorder = branchorder, str_names = str_names,
+                           save = save, kwargs...)
     end
     wb = weight_bounds_constraints(sr.wb, sr.sets; N = N, strict = sr.strict,
                                    datatype = eltype(X))
@@ -635,7 +634,7 @@ end
     optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                      <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
                  }, rd::ReturnsResult;
-             dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+             branchorder::Symbol = :optimal, str_names::Bool = false,
              save::Bool = true, kwargs...) -> SubsetResamplingResult
 
 Run the Subset Resampling portfolio optimisation.
@@ -644,7 +643,6 @@ Run the Subset Resampling portfolio optimisation.
 
   - `sr`: The subset resampling optimiser to use.
   - $(arg_dict[:rd])
-  - `dims`: The dimension along which observations advance in time.
   - `branchorder`: Passed to the internal optimiser. The branch order to use for the clusterisation.
   - `str_names`: Passed to the internal optimiser. Whether to use string names for the assets in the optimisation.
   - `save`: Passed to the internal optimiser. Whether to save the JuMP model in the optimisation result.
@@ -666,11 +664,11 @@ Run the Subset Resampling portfolio optimisation.
 """
 function optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; dims::Int = 1, branchorder::Symbol = :optimal,
+                  rd::ReturnsResult; branchorder::Symbol = :optimal,
                   str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(sr, "`optimise`")
-    return _optimise(sr, rd; dims = dims, branchorder = branchorder, str_names = str_names,
-                     save = save, kwargs...)
+    return _optimise(sr, rd; branchorder = branchorder, str_names = str_names, save = save,
+                     kwargs...)
 end
 
 export SubsetResamplingResult, SubsetResampling

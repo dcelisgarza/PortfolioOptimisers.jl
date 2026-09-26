@@ -38,28 +38,39 @@
     @test isapprox(res.w[1], 0.07)
     @test isapprox(sum(res.w), 1)
 
-    # #885: `ReturnsResult` is always observations × assets, so `dims = 2` must be
-    # refused, not answered by reading the observation axis as the asset count.
-    res = optimise(EqualWeighted(), rd; dims = 1)
-    @test isapprox(res.w, range(; start = inv(N), stop = inv(N), length = N))
-    @test_throws PortfolioOptimisers.ConflictingArgumentError optimise(EqualWeighted(), rd;
-                                                                       dims = 2)
-    @test_throws PortfolioOptimisers.ConflictingArgumentError optimise(RandomWeighted(), rd;
-                                                                       dims = 2)
-
-    # The assertion splits the two refusals: a selector outside `(1, 2)` is malformed, and
-    # `dims = 2` is a valid selector that conflicts with the fixed layout. The message names
-    # the remedy and the argument the caller passed.
-    @test isnothing(PortfolioOptimisers.assert_returns_result_dims(1))
-    @test_throws DomainError PortfolioOptimisers.assert_returns_result_dims(3)
-    err = try
-        PortfolioOptimisers.assert_returns_result_dims(2, :d)
-    catch e
-        e
+    @testset "#1348: a carrier holds its observations along the rows, whatever `dims`" begin
+        # A `ReturnsResult` is always observations × assets. No function that takes a
+        # carrier has a `dims` keyword, and every bridge from a carrier to a matrix method
+        # passes `dims = 1` after the caller's keywords, so a stray `dims` has no effect.
+        # Before #1348, `MeanRisk` gave one weight per observation for `dims = 2`, and
+        # `HierarchicalRiskParity` threw a `DimensionMismatch`.
+        using Clarabel
+        po = PortfolioOptimisers
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false),
+                     check_sol = (; allow_local = true, allow_almost = true))
+        rds = po.port_opt_view(rd, :, 1:6)
+        for opt in (EqualWeighted(), RandomWeighted(; rng = StableRNG(1), seed = 1348),
+                    InverseVolatility(), BestConstantRebalancedPortfolio(),
+                    MeanRisk(; opt = JuMPOptimiser(; slv = slv)), HierarchicalRiskParity())
+            w1 = optimise(opt, rds).w
+            @test length(w1) == 6
+            for d in (1, 2, 3)
+                @test optimise(opt, rds; dims = d).w ≈ w1
+            end
+        end
+        pr1 = prior(EmpiricalPrior(), rds)
+        @test prior(EmpiricalPrior(), rds; dims = 2).sigma ≈ pr1.sigma
+        @test size(prior(EmpiricalPrior(), rds; dims = 2).sigma) == (6, 6)
+        cle = ClustersEstimator()
+        @test clusterise(cle, rds; dims = 2).res.order == clusterise(cle, rds).res.order
+        @test clusterise(cle, pr1; dims = 2).res.order == clusterise(cle, pr1).res.order
+        uc = NormalUncertaintySet(; rng = StableRNG(1), seed = 1348, n_sim = 20)
+        @test mu_ucs(uc, rds; dims = 2).ub ≈ mu_ucs(uc, rds).ub
+        @test po.coverage_reduction(rds)[2].X == rds.X
+        # A matrix method keeps `dims`: it reads the transpose as the same sample.
+        @test prior(EmpiricalPrior(), permutedims(rds.X); dims = 2).sigma ≈ pr1.sigma
     end
-    @test err isa PortfolioOptimisers.ConflictingArgumentError
-    @test occursin("Pass d = 1", sprint(showerror, err))
-    @test occursin("d => 2", sprint(showerror, err))
 
     @testset "The docstrings of 03_NaiveOptimisation.jl against numbers" begin
         using Dates, Statistics, Random
@@ -93,10 +104,9 @@
                                       ReturnsResult(; nx = nx, X = X - Bm, ts = ts)).sigma)
         @test optimise(InverseVolatility(; brt = true), rdb).w ≈
               sb .^ -0.5 / sum(sb .^ -0.5)
-        # A `ReturnsResult` is observations × assets, so `dims = 2` is refused here too.
-        @test_throws po.ConflictingArgumentError optimise(InverseVolatility(), rdx;
-                                                          dims = 2)
-        @test_throws DomainError optimise(InverseVolatility(), rdx; dims = 3)
+        # A `ReturnsResult` is observations × assets, so a `dims` has no effect (#1348).
+        @test optimise(InverseVolatility(), rdx; dims = 2).w ≈
+              optimise(InverseVolatility(), rdx).w
         @test_throws ArgumentError optimise(InverseVolatility(;
                                                               pe = po.Online(EmpiricalPrior())),
                                             rdx)
