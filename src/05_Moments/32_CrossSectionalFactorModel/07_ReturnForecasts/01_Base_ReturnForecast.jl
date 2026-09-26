@@ -6,7 +6,7 @@ Compute the Return Forecast of a carrier and a fitted factor-model block.
 
 This is the verb every Return Forecast Estimator answers. The block carries the exposure history, the idiosyncratic variance history and the factor axis the members read, so a caller fits a forecast on a stored prior result without refitting the prior.
 
-Every member follows two conventions: the value at an observation uses information up to and including that observation, and `mu` is in return units whatever the Forecast Unit the member scores in.
+Every member follows two conventions. The value at an observation uses information up to and including that observation. And `mu` is in return units, whatever the Forecast Unit that the member scores in.
 
 # Arguments
 
@@ -80,13 +80,30 @@ struct IdiosyncraticSharpeUnit <: AbstractForecastUnit end
 
 Convert a Return Forecast history from its Forecast Unit to return units.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\alpha_{ti} &= g_{ti} \\, f_{ti}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:alpha_ti_fc])
+  - ``f_{ti}``: Return Forecast of asset ``i`` at observation ``t`` in the Forecast Unit.
+  - $(math_dict[:g_ti_unit])
+  - $(math_dict[:v_ti_idio])
+
+A `NaN` variance gives a `NaN` forecast.
+
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. [`IdiosyncraticReturnUnit`](@ref): the forecast is already in return units, so it is returned unchanged and `vs` is not read.
- 2. [`IdiosyncraticSharpeUnit`](@ref) with no `vs`: the conversion needs the idiosyncratic volatility, so the absent history is refused.
- 3. [`IdiosyncraticSharpeUnit`](@ref) with a `vs`: every cell is multiplied by the square root of the idiosyncratic variance of the same observation and asset. A `NaN` variance gives a `NaN` forecast, and a negative one raises a `DomainError` from `sqrt`.
+ 1. [`IdiosyncraticReturnUnit`](@ref): return `F` unchanged. The method does not read `vs`.
+ 2. [`IdiosyncraticSharpeUnit`](@ref) with no `vs`: refuse the call, because the conversion needs the idiosyncratic volatility.
+ 3. [`IdiosyncraticSharpeUnit`](@ref) with a `vs`: check the size of `vs`, and multiply every cell of `F` by its unit factor. A negative variance raises a `DomainError` from `sqrt`.
 
 # Arguments
 
@@ -133,9 +150,9 @@ end
 """
     return_forecast_weights(rd::ReturnsResult) -> MatNum
 
-Return the cross-sectional weights the transforms of a Return Forecast are weighted by.
+Return the cross-sectional weights that the transforms of a Return Forecast use.
 
-The weights are the estimation mask of the Asset Panel read as numbers, so an asset that does not enter the cross-sectional estimate of an observation carries no weight there. This is the one weighting the Return Forecast family uses, and it is why a member states no benchmark weight field: a Descriptor score is standardised over the estimation universe, not over the benchmark.
+The weights are the estimation mask of the Asset Panel read as numbers, so an asset that does not enter the cross-sectional estimate of an observation carries no weight there. The Return Forecast family uses this weighting and no other. A Descriptor score is standardised over the estimation universe, not over the benchmark, so no member has a benchmark weight field.
 
 # Arguments
 
@@ -173,7 +190,7 @@ end
 
 Return the observation count of one history of a factor-model block, or `nothing`.
 
-Every history of a block lays its observations on the first axis, whatever its rank, so one method reads a per-asset history and one reads an exposure history. An absent history answers `nothing`, which is what lets [`return_forecast_block_observations`](@ref) read the first history the block carries without an `isnothing` test of its own.
+Every history of a block lays its observations on the first axis, whatever its rank, so one method reads a per-asset history and an exposure history. An absent history gives `nothing`. So [`return_forecast_block_observations`](@ref) reads the first history that the block carries with no `isnothing` test of its own.
 
 # Arguments
 
@@ -200,7 +217,7 @@ end
 
 Return the observation count of the histories of a factor-model block, or `nothing`.
 
-The three per-asset histories `rw`, `vs` and `bw` are pinned to one observation axis by the constructor of [`CrossSectionalFactorModel`](@ref), so the first of them the block carries states the count. A block that carries none of them falls back to the exposure history. A block that carries no history at all states no window, and the answer is `nothing`.
+The constructor of [`CrossSectionalFactorModel`](@ref) pins the three per-asset histories `rw`, `vs` and `bw` to one observation axis, so the first of them that the block carries states the count. A block that carries none of them falls back to the exposure history. A block that carries no history at all states no window, and the answer is `nothing`.
 
 # Arguments
 
@@ -227,9 +244,23 @@ end
 
 Return the rows of the carrier the histories of a factor-model block live on.
 
-A [`CrossSectionalFactorPrior`](@ref) drops the leading observations its Descriptors warm up over and fits on the observations that remain, so the block is always a **suffix** of the carrier. The suffix is found by size rather than by a stored offset: a stored offset would have to survive every view of the block, and the size arithmetic holds on every one.
+A [`CrossSectionalFactorPrior`](@ref) drops the leading observations that its Descriptors warm up over, and fits on the observations that remain. So the block is always a suffix of the carrier. The function finds the suffix by size, not by a stored offset. A stored offset must survive every view of the block, and the size arithmetic holds on every view.
 
-A Return Forecast Estimator scores its own Descriptors over the whole carrier, so they warm up on every observation the panel has, and each member then cuts to these rows. A carrier of exactly the block's length gives the whole range, which is the call of a caller who hands the already narrowed carrier.
+A Return Forecast Estimator scores its own Descriptors over the whole carrier, so they warm up on every observation of the panel. Each member then cuts the scores to these rows. A carrier of the same length as the block gives the whole range. A caller who hands the carrier that is already narrowed gets this answer.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{R} &= \\left\\{T_{c} - T_{b} + 1, \\dots, T_{c}\\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{R}``: The rows of the carrier that the block lives on.
+  - ``T_{c}``: Number of observations of the carrier.
+  - ``T_{b}``: Number of observations of the block. A block that carries no history states no window, and then ``T_{b} = T_{c}``.
 
 # Arguments
 
@@ -270,7 +301,7 @@ end
 
 Cut a history that lives on the carrier's observation axis down to the block's rows.
 
-The Return Forecast family computes its Descriptor scores over the whole carrier and answers on the block's rows, so every whole-axis history it carries beside them is cut once, through this verb. The cut is a copy rather than a view, because a view of an array whose element type is open names no numeric array.
+The Return Forecast family computes its Descriptor scores over the whole carrier and answers on the block's rows. So this verb cuts each whole-axis history that the family carries beside the scores, once. The cut is a copy and not a view, because a view of an array whose element type is open names no numeric array.
 
 # Arguments
 
@@ -302,7 +333,7 @@ end
 
 Place a history of a factor-model block into the rows of the carrier it was fitted on.
 
-The rows before the block carry no information of the factor model, so they are `NaN`. A member that fits over the whole carrier reads them as it reads any missing cell: the pair drops out of the fit wherever the history it needs is not finite.
+The rows before the block carry no information of the factor model, so they are `NaN`. A member that fits over the whole carrier reads them as it reads any missing cell. Where the history that a pair needs is not finite, the pair drops out of the fit.
 
 # Arguments
 
@@ -310,9 +341,13 @@ The rows before the block carry no information of the factor model, so they are 
   - `rows`: The rows of the carrier the block lives on.
   - `T`: Number of observations the carrier has.
 
+# Validation
+
+  - The element type of `A` holds `NaN` after [`float_if_integer`](@ref). A `Rational` element type raises an `ArgumentError`.
+
 # Returns
 
-  - `A`: The same history on the carrier's axis, `NaN` before the block, or `nothing`.
+  - `A`: The same history on the carrier's axis, `NaN` before the block, or `nothing`. Its element type is [`float_if_integer`](@ref) of the element type of `A`, so an integer history becomes a floating-point history.
 
 # Related
 
@@ -324,7 +359,9 @@ function return_forecast_pad(::Nothing, ::AbstractUnitRange, ::Integer)::Nothing
     return nothing
 end
 function return_forecast_pad(A::MatNum, rows::AbstractUnitRange, T::Integer)::MatNum
-    Tf = real(eltype(A))
+    Tf = float_if_integer(real(eltype(A)))
+    @argcheck(!(Tf <: Rational),
+              ArgumentError("a factor model history is NaN on the observations before the block, and its element type $Tf cannot hold NaN. Convert the history to a floating-point type."))
     B = fill(Tf(NaN), T, size(A, 2))
     B[rows, :] = A
     return B
@@ -336,20 +373,41 @@ end
 
 Convert a forward idiosyncratic return into the Forecast Unit a fitted member scores in.
 
-This is the inverse of [`forecast_return_units`](@ref). A fitted member regresses its Descriptor scores on a target, and the target must stand in the unit the scores are read in, so the two conversions are one pair of methods on the tag.
+This is the inverse of [`forecast_return_units`](@ref). A fitted member regresses its Descriptor scores on a target, and the target must be in the unit of the scores. So the two conversions are one pair of methods on the tag.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{y}_{ti} &= \\frac{y_{ti}}{g_{ti}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{y}_{ti}``: Target of asset ``i`` at observation ``t`` in the Forecast Unit.
+  - $(math_dict[:y_ti_fwd])
+  - $(math_dict[:g_ti_unit])
+  - $(math_dict[:v_ti_idio])
+
+A zero variance gives an infinite target. That target is not finite, so the pair drops out of the fit.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. [`IdiosyncraticReturnUnit`](@ref): the target is already the idiosyncratic return, so it is returned unchanged and `vs` is not read.
- 2. [`IdiosyncraticSharpeUnit`](@ref): every cell is divided by the square root of the idiosyncratic variance of the same observation and asset. A cell whose variance is zero leaves an infinite target, which is not finite, so the pair drops out of the fit.
+ 1. [`IdiosyncraticReturnUnit`](@ref): return `y` unchanged. The method does not read `vs`.
+ 2. [`IdiosyncraticSharpeUnit`](@ref): check the size of `vs`, and divide every cell of `y` by its unit factor.
 
 # Arguments
 
   - `unit`: The Forecast Unit the member scores in.
   - `y`: Forward idiosyncratic returns, `observations × assets`.
   - `vs`: Idiosyncratic variance history, `observations × assets`.
+
+# Validation
+
+  - `size(vs) == size(y)` when the unit is [`IdiosyncraticSharpeUnit`](@ref). Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -374,6 +432,8 @@ function forecast_unit_target(::IdiosyncraticReturnUnit, y::MatNum,
     return y
 end
 function forecast_unit_target(::IdiosyncraticSharpeUnit, y::MatNum, vs::MatNum)::MatNum
+    @argcheck(size(vs) == size(y),
+              DimensionMismatch("vs ($(size(vs, 1))×$(size(vs, 2))) must match the forward target ($(size(y, 1))×$(size(y, 2)))"))
     return y ./ sqrt.(vs)
 end
 """
@@ -412,7 +472,7 @@ end
 
 Return the idiosyncratic variance history a fitted Return Forecast weighs its fit by.
 
-A fitted member reads the variances whatever its Forecast Unit: in the return unit they are the regression weights, and in the Sharpe unit they scale the target and the forecast. A finite variance that is not strictly positive is refused rather than carried, because it is a weight of infinity in the first reading and a division by zero in the second.
+A fitted member reads the variances whatever its Forecast Unit. In the return unit they are the regression weights, and in the Sharpe unit they scale the target and the forecast. The function refuses a finite variance that is not strictly positive. Such a variance is a weight of infinity in the return unit and a division by zero in the Sharpe unit.
 
 # Arguments
 
@@ -450,25 +510,32 @@ end
 
 Return the forward mean of a return history, one target per observation and asset.
 
-The target of observation `t` is the mean of the returns over the observations `t + lag` to `t + lag + horizon - 1`. It is the one target both fitted members of the Return Forecast family regress on, and it is why a member states a `horizon` and a `lag` rather than a single offset.
+The target of observation `t` is the mean of the returns over the observations `t + lag` to `t + lag + horizon - 1`. The fitted members of the Return Forecast family regress on this target, so a member states a `horizon` and a `lag` and not a single offset.
 
-The mean skips a cell that is not finite, so a window with one missing return still gives a target. A window with no finite return, and the last `lag + horizon - 1` observations, give `NaN`.
+The mean skips a cell that is not finite, so a window with one missing return still gives a target.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-y_{t,i} &= \\frac{1}{\\lvert \\mathcal{W}_{t,i} \\rvert} \\sum_{s \\in \\mathcal{W}_{t,i}} x_{s,i}\\,, &
-\\mathcal{W}_{t,i} &= \\left\\{s \\in [t + \\ell,\\, t + \\ell + h - 1] : x_{s,i} \\text{ is finite}\\right\\}\\,.
+y_{ti} &= \\begin{cases}
+\\dfrac{1}{\\lvert \\mathcal{W}_{ti} \\rvert} \\displaystyle\\sum_{s \\in \\mathcal{W}_{ti}} x_{si} & \\text{if } t + \\ell + h - 1 \\leq T \\text{ and } \\mathcal{W}_{ti} \\neq \\emptyset\\,, \\\\
+\\mathrm{NaN} & \\text{otherwise}\\,,
+\\end{cases} \\\\
+\\mathcal{W}_{ti} &= \\left\\{s \\in \\left\\{t + \\ell, \\dots, t + \\ell + h - 1\\right\\} : x_{si} \\in \\mathbb{R}\\right\\}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``x_{s,i}``: return of asset ``i`` at observation ``s``.
-  - ``\\ell``: the lag.
-  - ``h``: the horizon.
-  - ``\\mathcal{W}_{t,i}``: the finite returns of the forward window of asset ``i`` at observation ``t``.
+  - $(math_dict[:y_ti_fwd])
+  - ``x_{si}``: Return of asset ``i`` at observation ``s``.
+  - ``\\ell``: The lag.
+  - ``h``: The horizon.
+  - ``\\mathcal{W}_{ti}``: The observations of the forward window of asset ``i`` at observation ``t`` that carry a finite return.
+  - $(math_dict[:T])
+
+So the last ``\\ell + h - 1`` observations are `NaN`.
 
 # Arguments
 
@@ -476,9 +543,13 @@ Where:
   - $(arg_dict[:rf_horizon])
   - $(arg_dict[:rf_lag])
 
+# Validation
+
+  - The element type of `X` holds `NaN` after [`float_if_integer`](@ref). A `Rational` element type raises an `ArgumentError`.
+
 # Returns
 
-  - `Y::Matrix{<:Real}`: Forward mean returns, `observations × assets`.
+  - `Y::Matrix{<:Real}`: Forward mean returns, `observations × assets`. Its element type is [`float_if_integer`](@ref) of the element type of `X`, so integer returns give a floating-point mean.
 
 # Examples
 
@@ -499,7 +570,9 @@ julia> PortfolioOptimisers.forward_mean_returns([1.0; 2.0; NaN; 4.0; 5.0;;], 2, 
   - [`return_forecast`](@ref)
 """
 function forward_mean_returns(X::MatNum, horizon::Integer, lag::Integer)::Matrix{<:Real}
-    Tf = real(eltype(X))
+    Tf = float_if_integer(real(eltype(X)))
+    @argcheck(!(Tf <: Rational),
+              ArgumentError("a forward mean is NaN where its window holds no finite return and on the last lag + horizon - 1 observations, and the element type $Tf cannot hold NaN. Convert the returns to a floating-point type."))
     T = size(X, 1)
     Y = fill(Tf(NaN), T, size(X, 2))
     gap = lag + horizon - 1

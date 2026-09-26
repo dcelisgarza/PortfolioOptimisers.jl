@@ -761,6 +761,95 @@ end
     end
 end
 
+@testset "The shared helpers of the Return Forecast family agree with their closed form" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(824)
+    X = randn(rng, 12, 4)
+    X[3, 1] = NaN
+    X[7, 2] = Inf
+    X[5:8, 3] .= NaN
+    # The forward mean written out from its docstring: the finite returns of the window
+    # s ∈ {t + ℓ, …, t + ℓ + h - 1}, and NaN when the window leaves the history or is empty.
+    function fwd_oracle(X, h, l)
+        T = size(X, 1)
+        Y = fill(NaN, size(X))
+        for i in axes(X, 2), t in 1:T
+            t + l + h - 1 <= T || continue
+            v = filter(isfinite, X[(t + l):(t + l + h - 1), i])
+            isempty(v) || (Y[t, i] = sum(v) / length(v))
+        end
+        return Y
+    end
+
+    @testset "The forward mean is the mean of the finite window" begin
+        for (h, l) in ((1, 0), (1, 1), (3, 1), (2, 3), (4, 0))
+            Y = PO.forward_mean_returns(X, h, l)
+            E = fwd_oracle(X, h, l)
+            @test isequal(isnan.(Y), isnan.(E))
+            @test Y[isfinite.(E)] ≈ E[isfinite.(E)] rtol = 1e-12
+            @test all(isnan, Y[(end - (l + h - 1) + 1):end, :])
+        end
+    end
+
+    @testset "The forward mean floats integer returns, keeps a float type, and refuses a Rational" begin
+        Xi = [1 2; 3 4; 5 7; 6 1]
+        Yi = PO.forward_mean_returns(Xi, 2, 1)
+        @test eltype(Yi) === Float64
+        @test isequal(Yi, [4.0 5.5; 5.5 4.0; NaN NaN; NaN NaN])
+        @test eltype(PO.forward_mean_returns(Float32.(X), 3, 1)) === Float32
+        Yb = PO.forward_mean_returns(big.(X), 3, 1)
+        @test eltype(Yb) === BigFloat
+        @test isequal(isnan.(Yb), isnan.(fwd_oracle(X, 3, 1)))
+        @test_throws ArgumentError PO.forward_mean_returns(Rational{Int}.(Xi), 1, 0)
+    end
+
+    @testset "The unit conversions are the unit factor and its inverse" begin
+        F = randn(rng, 5, 3)
+        vs = rand(rng, 5, 3) .+ 0.01
+        g = sqrt.(vs)
+        @test PO.forecast_return_units(IdiosyncraticSharpeUnit(), F, vs) ≈ g .* F rtol = 1e-12
+        @test PO.forecast_unit_target(IdiosyncraticSharpeUnit(), F, vs) ≈ F ./ g rtol = 1e-12
+        @test PO.forecast_return_units(IdiosyncraticSharpeUnit(),
+                                       PO.forecast_unit_target(IdiosyncraticSharpeUnit(), F,
+                                                               vs), vs) ≈ F rtol = 1e-12
+        @test PO.forecast_unit_target(IdiosyncraticSharpeUnit(), [1.0 2.0], [0.0 4.0]) ==
+              [Inf 1.0]
+        # A variance history of one row broadcast over the whole target before it was checked.
+        @test_throws DimensionMismatch PO.forecast_unit_target(IdiosyncraticSharpeUnit(), F,
+                                                               vs[1:1, :])
+    end
+
+    @testset "The block lives on the last rows of the carrier" begin
+        rd = forecast_hand_panel(["a" => rand(rng, 6, 2)])
+        @test PO.return_forecast_rows(rd, forecast_hand_block(2; vs = fill(0.1, 4, 2))) ==
+              3:6
+        @test PO.return_forecast_rows(rd, forecast_hand_block(2; vs = fill(0.1, 6, 2))) ==
+              1:6
+        @test PO.return_forecast_rows(rd, forecast_hand_block(2)) == 1:6
+        exposed = forecast_hand_block(2; Ms = rand(rng, 5, 2, 1))
+        @test PO.return_forecast_block_observations(exposed) == 5
+        long = forecast_hand_block(2; vs = fill(0.1, 7, 2))
+        @test_throws DimensionMismatch PO.return_forecast_rows(rd, long)
+    end
+
+    @testset "A cut takes the block rows, and a pad puts NaN before them" begin
+        A = rand(rng, 6, 2)
+        A3 = rand(rng, 6, 2, 3)
+        @test PO.return_forecast_cut(A, 3:6) == A[3:6, :]
+        @test PO.return_forecast_cut(A3, 3:6) == A3[3:6, :, :]
+        @test isnothing(PO.return_forecast_cut(nothing, 3:6))
+        B = PO.return_forecast_pad(A[3:6, :], 3:6, 6)
+        @test all(isnan, B[1:2, :])
+        @test B[3:6, :] == A[3:6, :]
+        @test isnothing(PO.return_forecast_pad(nothing, 3:6, 6))
+        Bi = PO.return_forecast_pad([1 2; 3 4], 2:3, 3)
+        @test eltype(Bi) === Float64
+        @test isequal(Bi, [NaN NaN; 1.0 2.0; 3.0 4.0])
+        @test eltype(PO.return_forecast_pad(Float32[1 2; 3 4], 2:3, 3)) === Float32
+        @test_throws ArgumentError PO.return_forecast_pad(Rational{Int}[1 2; 3 4], 2:3, 3)
+    end
+end
+
 @testset "The exponentially weighted member fits its Descriptor weights" begin
     PO = PortfolioOptimisers
     a = [1.0 2.0 3.0; 2.0 1.0 4.0]
