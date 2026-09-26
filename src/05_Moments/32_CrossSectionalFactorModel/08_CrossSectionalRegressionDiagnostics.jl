@@ -4,7 +4,7 @@
 
 Return the eligibility mask of a cross-sectional regression history, and the weights that go with it.
 
-An asset enters the fit of an observation when every one of its exposures is finite, and when the weight it carries is positive. The two answers travel together because every diagnostic of this file needs both: the mask counts the assets, and the weights scale the sums. An absent weight matrix is the dispatch rather than a branch, so no caller writes an `isnothing` test.
+An asset enters the fit of an observation when every one of its exposures is finite, and when the weight it carries is positive. An infinite weight is positive, so it enters, and every answer of its observation is then `NaN`. The fit of [`cross_sectional_regression`](@ref) refuses such a weight, so a block never carries one. The verb returns both answers because every diagnostic of this file needs both. The mask counts the assets, and the weights scale the sums. A method for `nothing` handles an absent weight matrix, so no caller writes an `isnothing` test.
 
 # Arguments
 
@@ -74,7 +74,7 @@ end
 
 Return the weighted Gram history of a cross-sectional regression, one slice per observation.
 
-The slice of observation ``t`` is the normal matrix of the weighted design, and every diagnostic that reads the geometry of the cross-section is a function of it: the variance inflation factors, the condition number and the standard errors of the factor returns all read this one history. The design is masked first, so an asset whose exposures are not all finite contributes nothing, and so does an asset whose weight is zero.
+The slice of observation ``t`` is the normal matrix of the weighted design. The variance inflation factors, the condition number and the standard errors of the factor returns all read this one history. The kernel applies the mask first, so an asset whose exposures are not all finite contributes nothing, and neither does an asset whose weight is zero.
 
 # Mathematical definition
 
@@ -92,8 +92,8 @@ Where:
 # Algorithm
 
  1. Take the mask and the weights with [`cs_estimation_mask_weights`](@ref).
- 2. For each observation, scale the exposure rows by the square root of their weights, which is the weighted design.
- 3. Multiply the weighted design by its own transpose, giving the slice of that observation.
+ 2. For each observation and each pair of factors ``(k, l)`` with ``k \\le l``, sum ``u_{t,i} \\, B_{t,i,k} \\, B_{t,i,l}`` over the assets inside the mask.
+ 3. Copy each sum to the entry ``(l, k)``, so the slice is exactly symmetric. The kernel takes no square root, so an integer or `Rational` history gives an exact Gram history.
 
 # Arguments
 
@@ -139,7 +139,7 @@ end
 
 Return the weighted Gram history from a mask that a caller has already resolved.
 
-[`cs_gram`](@ref) resolves the mask itself and calls this method. A diagnostic that has already built its own weights — one that also excludes a pair whose residual is not finite — calls this method instead, so the mask is resolved once per diagnostic rather than twice.
+[`cs_gram`](@ref) resolves the mask itself and calls this method. A diagnostic that has already built its own weights, such as one that also excludes a pair whose residual is not finite, calls this method instead. It then resolves the mask once rather than twice.
 
 # Arguments
 
@@ -158,17 +158,15 @@ Return the weighted Gram history from a mask that a caller has already resolved.
 function cs_gram_from_weights(B::Arr3Num, u::MatNum)
     T, N, K = size(B)
     Tf = promote_type(real(eltype(B)), real(eltype(u)))
-    G = Array{Tf, 3}(undef, T, K, K)
-    A = Matrix{Tf}(undef, N, K)
-    for t in 1:T
-        for k in 1:K, i in 1:N
-            s = sqrt(Tf(u[t, i]))
-            A[i, k] = iszero(s) ? zero(Tf) : s * Tf(B[t, i, k])
+    G = zeros(Tf, T, K, K)
+    for l in 1:K, k in 1:l, i in 1:N, t in 1:T
+        # A pair outside the mask can carry an exposure that is not finite.
+        if !iszero(u[t, i])
+            G[t, k, l] += Tf(u[t, i]) * Tf(B[t, i, k]) * Tf(B[t, i, l])
         end
-        Gt = transpose(A) * A
-        for l in 1:K, k in 1:K
-            G[t, k, l] = Gt[k, l]
-        end
+    end
+    for l in 1:K, k in (l + 1):K, t in 1:T
+        G[t, k, l] = G[t, l, k]
     end
     return G
 end
@@ -177,9 +175,9 @@ end
 
 Return the diagonal of the inverse of every slice of a Gram history.
 
-The inverse is taken slice by slice, through the singular value decomposition of the slice. That is one formulation for both cases a design presents: a full-rank slice gets its inverse, and a collinear slice gets its pseudo-inverse, because a direction whose singular value falls under the tolerance contributes nothing. A branch that inverts and falls back on failure answers the same, and it costs the analysis of this file the whole body of the pseudo-inverse.
+The verb inverts each slice through its singular value decomposition. One formulation covers both cases a design presents. A full-rank slice gets its inverse, and a collinear slice gets its pseudo-inverse, because a direction whose singular value falls under the tolerance contributes nothing. A branch that inverts and falls back on failure answers the same, but it adds the whole body of the pseudo-inverse to the code of this file.
 
-The diagonal is the only part any diagnostic of this file reads: the variance inflation factor multiplies it by the diagonal of the slice itself, and the standard error of a factor return scales it by the residual variance.
+The diagonal is the only part any diagnostic of this file reads. The variance inflation factor multiplies it by the diagonal of the slice itself, and the standard error of a factor return scales it by the residual variance.
 
 # Mathematical definition
 
@@ -190,7 +188,7 @@ The diagonal is the only part any diagnostic of this file reads: the variance in
 Where:
 
   - ``\\sigma_{i}``, ``\\boldsymbol{u}_{i}``, ``\\boldsymbol{v}_{i}``: ``i``-th singular value and the two singular vectors of the slice.
-  - ``\\tau = K \\, \\varepsilon \\, \\max_{i} \\sigma_{i}``: Tolerance below which a direction is dropped. It is the one the pseudo-inverse of the standard library applies.
+  - ``\\tau = K \\, \\varepsilon \\, \\max_{i} \\sigma_{i}``: Tolerance below which the verb drops a direction. It is the default tolerance of `LinearAlgebra.pinv`.
   - $(math_dict[:K])
 
 # Arguments
@@ -212,7 +210,8 @@ Where:
 function cs_gram_inverse_diagonal(G::Arr3Num)
     T = size(G, 1)
     K = size(G, 2)
-    Tf = real(eltype(G))
+    # A decomposition leaves an integer or a `Rational` type, as a square root does.
+    Tf = typeof(sqrt(one(float_if_integer(real(eltype(G))))))
     D = Matrix{Tf}(undef, T, K)
     Gt = Matrix{Tf}(undef, K, K)
     for t in 1:T
@@ -226,7 +225,7 @@ end
 
 Copy one slice of a Gram history into a working matrix.
 
-The two verbs that read a slice — [`cs_gram_inverse_diagonal`](@ref) and [`exposure_condition_number`](@ref) — each need it as a matrix of one concrete element type, and each reuses one buffer across the observations rather than allocating per slice.
+Two verbs read a slice, [`cs_gram_inverse_diagonal`](@ref) and [`exposure_condition_number`](@ref). Each needs it as a matrix of one concrete element type, and each reuses one buffer across the observations rather than allocating one per slice.
 
 # Arguments
 
@@ -256,7 +255,7 @@ end
 
 Write the diagonal of the inverse of one Gram slice into the answer.
 
-The inverse is the sum over the singular directions of the outer product of the two singular vectors, scaled by the reciprocal singular value. A direction whose singular value falls under the tolerance is dropped, which makes the answer the pseudo-inverse of a collinear slice and the inverse of a full-rank one.
+The inverse is the sum over the singular directions of the outer product of the two singular vectors, scaled by the reciprocal singular value. The verb drops a direction whose singular value falls under the tolerance. So the answer is the pseudo-inverse of a collinear slice and the inverse of a full-rank one.
 
 # Arguments
 
@@ -293,7 +292,7 @@ end
 
 Return the lag-aligned regression history a cross-sectional diagnostic reads off a factor model block.
 
-Every level-2 diagnostic of this file starts here. The exposures are trimmed at the tail and the return-like histories at the head, so the exposures of observation ``t - \\ell`` line up with the returns of observation ``t``. When the block carries a family re-basis, the exposures and the factor returns are mapped onto the reduced axis, and every answer that carries a factor axis is then on the reduced axis too.
+Every block method of this file starts here. The verb trims the exposures at the tail and the return-like histories at the head, so the exposures of observation ``t - \\ell`` line up with the returns of observation ``t``. When the block carries a family re-basis, the verb maps the exposures and the factor returns onto the reduced axis, and every answer that carries a factor axis is then on the reduced axis too.
 
 # Algorithm
 
@@ -351,7 +350,7 @@ end
 
 Return the exposure lag of a factor model block as a count.
 
-A block that states no lag lags by nothing, so the two cases answer `0` and the stated count. The shape is the dispatch, which keeps the `isnothing` test out of every caller.
+A block whose `lag` is `nothing` has no lag, so the verb answers `0` for it and the stated count otherwise. Two methods make the choice, so no caller writes an `isnothing` test.
 
 # Arguments
 
@@ -403,7 +402,7 @@ end
 
 Map a lag-aligned regression history onto the reduced factor axis of a family re-basis.
 
-A block that carries no re-basis is already on its own axis, so that case returns the pair unchanged. A block that carries one has a rank-deficient design on the raw axis, because every constrained family sums to zero, so the diagnostics are answered on the reduced axis instead. The basis is sliced to the trimmed observation axis before it maps the exposures, because the exposures were trimmed at the tail.
+A block that carries no re-basis is already on its own axis, so that case returns the pair unchanged. A block that carries one has a rank-deficient design on the raw axis, because every constrained family sums to zero, so the diagnostics answer on the reduced axis instead. The verb slices the basis to the trimmed observation axis before the basis maps the exposures, because [`cs_regression_data`](@ref) trimmed the exposures at the tail.
 
 # Arguments
 
@@ -441,15 +440,18 @@ Return the variance inflation factor of every factor, one row per observation.
 
 The factor measures how much the collinearity of the cross-sectional design inflates the variance of a factor return. A value of one says that the factor is orthogonal to the others of that observation, and a large value says that the factor is nearly a combination of them, so its estimated return is unstable rather than wrong.
 
+On a full-rank slice the pseudo-inverse is the inverse, and the answer is at least one. On an exactly collinear slice the answer reads the pseudo-inverse, so it is finite and can fall below one. It then measures no inflation. [`exposure_condition_number`](@ref) shows such a slice.
+
 # Mathematical definition
 
 ```math
-\\mathrm{VIF}_{t,k} = (\\mathbf{G}_{t})_{kk} \\, (\\mathbf{G}_{t}^{-1})_{kk}
+\\mathrm{VIF}_{t,k} = (\\mathbf{G}_{t})_{kk} \\, (\\mathbf{G}_{t}^{+})_{kk}
 ```
 
 Where:
 
   - ``\\mathbf{G}_{t}``: Gram matrix of observation ``t``, which [`cs_gram`](@ref) defines.
+  - ``\\mathbf{G}_{t}^{+}``: Pseudo-inverse of ``\\mathbf{G}_{t}``, which [`cs_gram_inverse_diagonal`](@ref) defines.
   - ``\\mathrm{VIF}_{t,k}``: Variance inflation factor of factor ``k`` at observation ``t``.
 
 # Algorithm
@@ -549,9 +551,9 @@ end
     exposure_condition_number(B::Arr3Num, w::Option{<:MatNum}) -> Vector{<:Real}
     exposure_condition_number(csfm::CrossSectionalFactorModel) -> Vector{<:Real}
 
-Return the two-norm condition number of the cross-sectional design, one entry per observation.
+Return the two-norm condition number of the Gram matrix of the cross-sectional design, one entry per observation.
 
-The condition number reads the whole design at once, where a variance inflation factor reads one factor of it. A value of one says that the weighted design is orthonormal, and a large value says that one direction of the factor space carries almost no weighted exposure, so the fit of that observation is sensitive to a small change in the returns. An exactly collinear design answers `Inf` or a value near the reciprocal of the machine epsilon, and which of the two it answers is a property of the singular value decomposition rather than of the design: the smallest singular value of a rank-deficient matrix rounds either to zero or to a value near the machine epsilon. Read both answers as one statement, that the design of that observation is singular.
+The condition number reads the whole design at once, where a variance inflation factor reads one factor of it. It is the square of the condition number of the weighted design. A value of one says that the columns of the weighted design are orthogonal and of equal norm, and a large value says that one direction of the factor space carries almost no weighted exposure, so the fit of that observation is sensitive to a small change in the returns. An exactly collinear design answers `Inf` or a value near the reciprocal of the machine epsilon, and which of the two it answers is a property of the singular value decomposition rather than of the design. The smallest singular value of a rank-deficient matrix rounds either to zero or to a value near the machine epsilon. Both answers say that the design of that observation is singular.
 
 # Mathematical definition
 
@@ -599,7 +601,7 @@ julia> exposure_condition_number(cs_gram(B))
 function exposure_condition_number(G::Arr3Num)
     T = size(G, 1)
     K = size(G, 2)
-    Tf = real(eltype(G))
+    Tf = typeof(sqrt(one(float_if_integer(real(eltype(G))))))
     kappa = Vector{Tf}(undef, T)
     Gt = Matrix{Tf}(undef, K, K)
     for t in 1:T
@@ -652,7 +654,7 @@ end
 
 Return the eligibility mask of a cross-sectional regression diagnostic, and the weights that go with it.
 
-A diagnostic of the fit reads the residual of every pair it counts, so a pair whose residual is not finite leaves the mask on top of the rule [`cs_estimation_mask_weights`](@ref) states. This is the mask every level-2 verb of this file resolves before it calls its level-1 method, which is why a level-2 answer reproduces the fit rather than the exposure history alone.
+A diagnostic of the fit reads the residual of every pair it counts, so a pair whose residual is not finite leaves the mask on top of the rule [`cs_estimation_mask_weights`](@ref) states. Every block method of this file resolves this mask before it calls the method that reads the arrays. So an answer from a block reproduces the fit rather than the exposure history alone.
 
 # Arguments
 
@@ -705,7 +707,7 @@ The statistic says how many standard errors a factor return of one observation s
 ```math
 \\begin{align}
 t_{t,k} &= \\frac{f_{t,k}}{\\mathrm{SE}_{t,k}}\\,,\\\\
-\\mathrm{SE}_{t,k} &= \\sqrt{\\hat{\\sigma}^{2}_{t} \\, (\\mathbf{G}_{t}^{-1})_{kk}}\\,,\\\\
+\\mathrm{SE}_{t,k} &= \\sqrt{\\hat{\\sigma}^{2}_{t} \\, (\\mathbf{G}_{t}^{+})_{kk}}\\,,\\\\
 \\hat{\\sigma}^{2}_{t} &= \\frac{\\mathrm{RSS}_{t}}{n_{t} - K}\\,,\\\\
 \\mathrm{RSS}_{t} &= \\sum_{i} u_{t,i} \\, \\varepsilon_{t,i}^{2}\\,.
 \\end{align}
@@ -715,6 +717,7 @@ Where:
 
   - ``f_{t,k}``: Factor return of factor ``k`` at observation ``t``, which is the coefficient of the cross-sectional fit.
   - ``\\mathbf{G}_{t}``: Gram matrix of observation ``t``, which [`cs_gram`](@ref) defines.
+  - ``\\mathbf{G}_{t}^{+}``: Pseudo-inverse of ``\\mathbf{G}_{t}``, which is the inverse on a full-rank slice and which [`cs_gram_inverse_diagonal`](@ref) defines. The degrees of freedom subtract ``K`` also on a collinear slice.
   - ``u_{t,i}``: Resolved regression weight of asset ``i`` at observation ``t``, zero outside the mask.
   - ``\\varepsilon_{t,i}``: Residual of asset ``i`` at observation ``t``.
   - ``n_{t}``: Number of eligible assets at observation ``t``.
@@ -725,7 +728,7 @@ Where:
  1. Resolve the mask and the weights with [`cs_diagnostic_mask_weights`](@ref), which also excludes a pair whose residual is not finite.
  2. Build the Gram history with [`cs_gram_from_weights`](@ref), or take the one the caller supplied through `G`.
  3. Take the residual sum of squares of every observation, and divide it by the degrees of freedom.
- 4. Scale the diagonal of the inverse Gram by that variance, and take the square root, which is the standard error.
+ 4. Scale the diagonal of the pseudo-inverse of the Gram matrix by that variance, and take the square root, which is the standard error.
  5. Divide the factor returns by the standard errors. Answer `NaN` where the degrees of freedom are not positive, where a factor return of that observation is not finite, or where the standard error is zero.
 
 # Arguments
@@ -734,7 +737,7 @@ Where:
   - `f`: Factor return matrix `observations × factors`, already lagged.
   - `eps`: Residual matrix `observations × assets`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
-  - `G`: Gram history `observations × factors × factors` the caller already holds, or `nothing` to build it. A caller that supplies one is stating that it was built from the same mask, which this verb does not check.
+  - `G`: Gram history `observations × factors × factors` the caller already holds, or `nothing` to build it. A caller that supplies one states that it built the history from the same mask. The verb does not check this.
   - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis.
 
 # Validation
@@ -823,7 +826,7 @@ end
 
 Return the weighted residual sum of squares of one observation.
 
-The weights are the resolved ones rather than the normalised ones, which is what the standard error of a factor return divides by its degrees of freedom. [`cs_regression_score_parts`](@ref) normalises instead, because a score compares observations of different sizes.
+The sum reads the resolved weights, not the normalised ones. The standard error of a factor return divides this sum by its degrees of freedom. [`cs_regression_score_parts`](@ref) normalises instead, because a score compares observations of different sizes.
 
 # Arguments
 
@@ -970,7 +973,7 @@ julia> cs_regression_t_stat_exceedance_rate([3.0 1.0; 1.0 1.0; NaN 1.0])
 function cs_regression_t_stat_exceedance_rate(t::MatNum; threshold::Number = 2)
     @argcheck(!isempty(t), IsEmptyError("t cannot be empty"))
     K = size(t, 2)
-    Tf = real(eltype(t))
+    Tf = float_if_integer(real(eltype(t)))
     rate = zeros(Tf, K)
     for k in 1:K
         n = 0
@@ -997,16 +1000,16 @@ end
 
 Return the pieces every cross-sectional regression score is built from.
 
-The four scores read the same three quantities: the eligible asset count, the weight-normalised residual sum of squares, and the coefficient of determination. They are computed here once per score rather than held on a Result, because the scores are independent statistics with no identity between them.
+The four scores read the same three quantities: the eligible asset count, the weight-normalised residual sum of squares, and the coefficient of determination. This verb computes them once per score, and no Result holds them, because the scores are independent statistics with no identity between them.
 
-The mask of a score is the finiteness of the **asset return**, which the exposures, the factor returns and the residuals reconstruct. That differs from the mask of a Gram diagnostic, which reads the exposures and the residuals separately.
+The mask of a score is the finiteness of the asset return, which the exposures, the factor returns and the residuals reconstruct. That differs from the mask of a Gram diagnostic, which reads the exposures and the residuals separately.
 
 # Algorithm
 
  1. Reconstruct the asset returns as the systematic part plus the residual.
  2. Mask a pair whose reconstructed return is not finite, and a pair whose weight is not positive.
  3. Normalise the weights of every observation to sum to one.
- 4. Take the weighted residual sum of squares, the weighted mean return and the weighted total sum of squares.
+ 4. Take the weighted residual sum of squares, the weighted mean return and the weighted total sum of squares. Clamp the mean to the range of the returns inside the mask, so a constant cross-section has a total sum of squares of exactly zero.
  5. Answer the coefficient of determination as one less the ratio of the two sums, and `NaN` where the total sum of squares is zero.
 
 # Arguments
@@ -1040,18 +1043,17 @@ function cs_regression_score_parts(B::Arr3Num, f::MatNum, eps::MatNum, w::Option
               DimensionMismatch("f ($(size(f, 1))×$(size(f, 2))) must match B ($T observations, $K factors)"))
     @argcheck(size(eps, 1) == T && size(eps, 2) == N,
               DimensionMismatch("eps ($(size(eps, 1))×$(size(eps, 2))) must match B ($T×$N on its first two axes)"))
-    Tf = promote_type(real(eltype(B)), real(eltype(f)), real(eltype(eps)))
+    Tf = float_if_integer(promote_type(real(eltype(B)), real(eltype(f)), real(eltype(eps))))
     u0 = cs_estimation_weights_only(w, T, N, Tf)
     n = zeros(Int, T)
     rss = Vector{Tf}(undef, T)
     r2 = Vector{Tf}(undef, T)
     r = Vector{Tf}(undef, N)
     q = Vector{Tf}(undef, N)
-    nan = convert(Tf, NaN)
     for t in 1:T
         n[t] = cs_score_observation!(r, q, B, f, eps, u0, t)
         rss[t], tss = cs_weighted_score_sums(r, q, eps, t)
-        r2[t] = iszero(tss) ? nan : one(Tf) - rss[t] / tss
+        r2[t] = iszero(tss) ? Tf(NaN) : one(Tf) - rss[t] / tss
     end
     return n, rss, r2
 end
@@ -1068,7 +1070,7 @@ end
 
 Reconstruct the asset returns of one observation, and normalise its weights to sum to one.
 
-The mask of a cross-sectional regression score is the finiteness of the reconstructed **asset return**, which differs from the mask of a Gram diagnostic. This is where that mask is applied: an ineligible pair leaves with a zero return and a zero weight, so every sum the score takes over the cross-section ignores it.
+The mask of a cross-sectional regression score is the finiteness of the reconstructed asset return, which differs from the mask of a Gram diagnostic. This verb applies that mask. An ineligible pair gets a zero return and a zero weight, so every sum the score takes over the cross-section ignores it.
 
 # Arguments
 
@@ -1171,15 +1173,24 @@ function cs_weighted_score_sums(r::AbstractVector, q::AbstractVector, eps::MatNu
     Tf = eltype(r)
     rss = zero(Tf)
     mean = zero(Tf)
+    lo = Tf(Inf)
+    hi = Tf(-Inf)
     for i in eachindex(r)
         if q[i] > zero(Tf)
             rss += q[i] * Tf(eps[t, i])^2
+            mean += q[i] * r[i]
+            lo = min(lo, r[i])
+            hi = max(hi, r[i])
         end
-        mean += q[i] * r[i]
     end
+    # The clamp makes the mean of a constant cross-section exactly its common value, so its
+    # total sum of squares is exactly zero rather than a rounding residue.
+    mean = clamp(mean, lo, hi)
     tss = zero(Tf)
     for i in eachindex(r)
-        tss += q[i] * (r[i] - mean)^2
+        if q[i] > zero(Tf)
+            tss += q[i] * (r[i] - mean)^2
+        end
     end
     return rss, tss
 end
@@ -1236,7 +1247,7 @@ end
 
 Return the weighted cross-sectional coefficient of determination, one entry per observation.
 
-The score says what share of the weighted cross-sectional variance of the returns the factors of that observation explain. The weights are normalised to sum to one, so an observation with many assets and an observation with few are on one scale.
+The score says what share of the weighted cross-sectional variance of the returns the factors of that observation explain. The verb normalises the weights to sum to one, so an observation with many assets and an observation with few are on one scale.
 
 # Mathematical definition
 
@@ -1267,7 +1278,7 @@ Where:
 
 # Returns
 
-  - `r2::Vector{<:Real}`: One entry per observation, `NaN` where the weighted total sum of squares is zero.
+  - `r2::Vector{<:Real}`: One entry per observation, `NaN` where the weighted total sum of squares is zero, as it is for a cross-section of equal returns.
 
 # Examples
 
@@ -1360,12 +1371,11 @@ function cs_regression_adjusted_r2(B::Arr3Num, f::MatNum, eps::MatNum,
     n, _, r2 = cs_regression_score_parts(B, f, eps, w)
     Tf = eltype(r2)
     adj = Vector{Tf}(undef, length(r2))
-    nan = convert(Tf, NaN)
     for t in eachindex(adj)
         adj[t] = if n[t] > k + 1
             one(Tf) - (one(Tf) - r2[t]) * Tf(n[t] - 1) / Tf(n[t] - k - 1)
         else
-            nan
+            Tf(NaN)
         end
     end
     return adj
@@ -1416,7 +1426,7 @@ Where:
 
 # Returns
 
-  - `aic::Vector{<:Real}`: One entry per observation, `NaN` where the eligible asset count does not exceed `k`.
+  - `aic::Vector{<:Real}`: One entry per observation, `NaN` where the eligible asset count does not exceed `k`, and `-Inf` where the residual sum of squares is zero.
 
 # Examples
 
@@ -1438,11 +1448,11 @@ julia> cs_regression_aic(B, [1.0 0.0], [0.1 0.1 0.1]; k = 1)
 function cs_regression_aic(B::Arr3Num, f::MatNum, eps::MatNum,
                            w::Option{<:MatNum} = nothing; k::Integer = size(B, 3))
     n, rss, _ = cs_regression_score_parts(B, f, eps, w)
-    Tf = eltype(rss)
+    # A logarithm leaves a `Rational` type.
+    Tf = typeof(log(one(eltype(rss))))
     aic = Vector{Tf}(undef, length(rss))
-    nan = convert(Tf, NaN)
     for t in eachindex(aic)
-        aic[t] = n[t] > k ? Tf(n[t]) * log(rss[t]) + Tf(2 * k) : nan
+        aic[t] = n[t] > k ? Tf(n[t]) * log(rss[t]) + Tf(2 * k) : Tf(NaN)
     end
     return aic
 end
@@ -1492,7 +1502,7 @@ Where:
 
 # Returns
 
-  - `bic::Vector{<:Real}`: One entry per observation, `NaN` where the eligible asset count does not exceed `k`.
+  - `bic::Vector{<:Real}`: One entry per observation, `NaN` where the eligible asset count does not exceed `k`, and `-Inf` where the residual sum of squares is zero.
 
 # Examples
 
@@ -1514,11 +1524,10 @@ julia> cs_regression_bic(B, [1.0 0.0], [0.1 0.1 0.1]; k = 1)
 function cs_regression_bic(B::Arr3Num, f::MatNum, eps::MatNum,
                            w::Option{<:MatNum} = nothing; k::Integer = size(B, 3))
     n, rss, _ = cs_regression_score_parts(B, f, eps, w)
-    Tf = eltype(rss)
+    Tf = typeof(log(one(eltype(rss))))
     bic = Vector{Tf}(undef, length(rss))
-    nan = convert(Tf, NaN)
     for t in eachindex(bic)
-        bic[t] = n[t] > k ? Tf(n[t]) * log(rss[t]) + Tf(k) * log(Tf(n[t])) : nan
+        bic[t] = n[t] > k ? Tf(n[t]) * log(rss[t]) + Tf(k) * log(Tf(n[t])) : Tf(NaN)
     end
     return bic
 end

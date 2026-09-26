@@ -154,7 +154,7 @@ commit = "0ecb3ce47c"
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl" = { code = 121, doc = 239, comment = 0, blank = 102, total = 462 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { code = 92, doc = 169, comment = 0, blank = 82, total = 343 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { code = 242, doc = 382, comment = 7, blank = 133, total = 764 }
-"src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { code = 463, doc = 752, comment = 1, blank = 352, total = 1568 }
+"src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { code = 463, doc = 755, comment = 6, blank = 353, total = 1577 }
 "src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { code = 463, doc = 647, comment = 6, blank = 292, total = 1408 }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { code = 235, doc = 471, comment = 8, blank = 203, total = 917 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 236, doc = 477, comment = 0, blank = 215, total = 928 }
