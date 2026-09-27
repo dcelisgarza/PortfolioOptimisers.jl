@@ -511,3 +511,90 @@ end
     @test_throws DomainError EWVolatility(; half_life = -1)
     @test_throws DomainError EWDownsideVolatility(; half_life = Inf)
 end
+
+@testset "The mean Descriptors derive their number type from the returns" begin
+    Xi = [0 1; 1 0; 2 1; 0 0; 1 2]
+    Xf = Float64.(Xi)
+    vol = [10.0 20.0; 30.0 40.0; 50.0 60.0; 70.0 80.0; 90.0 100.0]
+    rdi = ew_hand_panel(["adj_volume" => copy(vol)], Xi)
+    rdf = ew_hand_panel(["adj_volume" => copy(vol)], Xf)
+    # `EWMean` built its delayed input, and `ew_mean_series` its series, in the type of the
+    # returns, so an integer panel raised an `InexactError` at the first `NaN`.
+    for de in
+        (EWMean(; decay = 0.5, min_obs = 1), EWMean(; decay = 0.5, min_obs = 2, skip = 1),
+         EWVolumeRatio(; num = nothing, den = "adj_volume", decay = 0.5, min_obs = 1))
+        @test isequal(descriptor(de, rdi), descriptor(de, rdf))
+    end
+    @test isequal(PortfolioOptimisers.ew_mean_series(Xi, 0.5, 1),
+                  PortfolioOptimisers.ew_mean_series(Xf, 0.5, 1))
+    rd32 = ew_hand_panel(["adj_volume" => copy(vol)], Float32.(Xi) ./ 100)
+    @test eltype(descriptor(EWMean(; decay = 0.5, min_obs = 1), rd32)) == Float32
+end
+
+#=
+The reference implementation ran the four named Descriptors on this panel at `half_life = 3`,
+and every cell agreed to the last bit, `NaN` pattern included. The panel carries what the
+synthetic panel above carries least: a gap in every Panel Field, a zero volume, a missing share
+count, a missing short interest, and an asset that is inactive for two rows. The literals below
+are what the reference printed.
+=#
+@testset "The four named Descriptors agree with the reference implementation on a panel with gaps" begin
+    X = [0.01 0.02 -0.01; -0.02 NaN 0.03; 0.03 0.01 NaN; NaN -0.01 NaN; 0.00 0.02 0.01;
+         0.01 -0.03 0.02; -0.01 0.01 -0.02; 0.02 NaN 0.01]
+    vol = [10.0 20.0 30.0; 12.0 22.0 31.0; 14.0 0.0 NaN; 16.0 26.0 NaN; 0.0 28.0 34.0;
+           20.0 NaN 35.0; 22.0 32.0 36.0; 24.0 34.0 37.0]
+    px = [5.0 6.0 7.0; 5.1 6.1 7.1; 5.2 6.2 NaN; 5.3 6.3 NaN; 5.4 6.4 7.4; 5.5 6.5 7.5;
+          5.6 6.6 7.6; 5.7 6.7 7.7]
+    shr = [100.0 200.0 300.0; 100.0 200.0 300.0; 100.0 200.0 NaN; 100.0 200.0 NaN;
+           100.0 200.0 300.0; 100.0 200.0 300.0; NaN 200.0 300.0; 100.0 200.0 300.0]
+    si = [1.0 2.0 3.0; 1.5 2.5 3.5; 2.0 NaN NaN; 2.5 3.5 NaN; 3.0 4.0 5.0; 3.5 4.5 5.5;
+          4.0 5.0 6.0; 4.5 5.5 6.5]
+    amsk = trues(size(X))
+    amsk[3:4, 3] .= false
+    rd = ew_hand_panel(["adj_volume" => vol, "adj_close" => px,
+                        "adj_shares_outstanding" => shr, "short_interest" => si], X;
+                       amsk = amsk)
+    n4 = fill(NaN, 4, 3)
+    mom = vcat(n4,
+               [0.004083124258934984 NaN NaN;
+                0.004083124258934984 0.002129448022702344 NaN;
+                0.0032407778719751347 0.005775415611009435 0.00558655940754667;
+                0.004624955122877056 -0.0016997680748015746 0.008519326735545996])
+    mom_exp = [NaN NaN NaN; NaN NaN NaN; 0.004091471567958498 NaN NaN;
+               0.004091471567958498 0.0021317169073478514 NaN;
+               0.0032460348699697933 0.0057921254770681675 0.005602193330274423;
+               0.004635666735030029 -0.0016983242871980682 0.008555719473355195;
+               0.0015987269168514903 0.0007038888198189767 0.002597353510921931;
+               0.005367522558516728 0.0007038888198189767 0.004120060455043248]
+    trn = [NaN NaN NaN; NaN NaN NaN; 0.06152677898136927 0.0310074526087766 NaN;
+           0.08184175268216429 0.05142956306708006 NaN;
+           0.06495784215129441 0.0697015976196999 0.05329645965700086;
+           0.09281696828545455 0.0697015976196999 0.06636970003137363;
+           0.09281696828545455 0.08833011053523193 0.0774336027062162;
+           0.12318075031223083 0.1051785657747503 0.08690269299206196]
+    ami = [NaN NaN NaN; NaN NaN NaN; 0.00016451542876188153 NaN NaN;
+           0.00016451542876188153 NaN NaN;
+           0.00016451542876188153 5.468091941871078e-5 3.6706135970056026e-5;
+           0.00014933047997861418 5.468091941871078e-5 4.485173458939356e-5;
+           0.00013526876768109943 5.3168242023617174e-5 5.0679216242495956e-5;
+           0.0001375236338728997 5.3168242023617174e-5 4.7465239367207845e-5]
+    dtc = [NaN NaN NaN; NaN NaN NaN; 0.32506171021980756 NaN NaN;
+           0.30546755391576846 0.30263002317661414 NaN;
+           0.36656106469892213 0.2674556324606383 0.31271620617819745;
+           0.3295118216932188 0.3008875865182181 0.27623046849190186;
+           0.30842551111616473 0.2706803719462379 0.2582857997177295;
+           0.29518328704247854 0.25374393090195446 0.24932100399519014]
+    @test ew_same(descriptor(EWMomentum(; half_life = 3, skip = 2), rd), mom)
+    @test ew_same(descriptor(EWMomentum(; half_life = 3, skip = 0, exponentiate = true),
+                             rd), mom_exp)
+    @test ew_same(descriptor(EWShareTurnover(; half_life = 3), rd), trn)
+    @test ew_same(descriptor(EWAmihudIlliquidity(; half_life = 3), rd), ami)
+    @test ew_same(descriptor(DaysToCover(; half_life = 3), rd), dtc)
+end
+
+@testset "A named mean Descriptor refuses a half-life that is not positive and finite" begin
+    @test_throws r"half_life" EWMomentum(; half_life = 0)
+    @test_throws r"half_life" EWShareTurnover(; half_life = Inf)
+    @test_throws r"half_life" EWAmihudIlliquidity(; half_life = -1)
+    @test_throws r"half_life" DaysToCover(; half_life = NaN)
+end

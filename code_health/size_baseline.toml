@@ -128,7 +128,7 @@ commit = "0ecb3ce47c"
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl" = { code = 144, doc = 279, comment = 0, blank = 129, total = 552 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/02_PanelFieldDescriptors.jl" = { code = 237, doc = 830, comment = 0, blank = 346, total = 1413 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/03_LagDescriptors.jl" = { code = 109, doc = 324, comment = 0, blank = 132, total = 565 }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl" = { code = 196, doc = 457, comment = 0, blank = 172, total = 825 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl" = { code = 196, doc = 484, comment = 0, blank = 182, total = 862 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/05_EWVolatilityDescriptors.jl" = { code = 111, doc = 369, comment = 0, blank = 142, total = 622 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors.jl" = { code = 383, doc = 754, comment = 0, blank = 264, total = 1401 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_RollingDescriptors.jl" = { code = 112, doc = 275, comment = 0, blank = 115, total = 502 }

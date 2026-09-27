@@ -3,7 +3,7 @@
 
 Convert a half-life in observations into an exponential decay factor.
 
-A half-life is the number of observations after which a weight halves, and a decay factor is the number the recursion multiplies its state by. The two say the same thing, and a named Descriptor states the half-life because that is the number a reader of a factor model recognises.
+A half-life is the number of observations after which a weight halves, and a decay factor is the number the recursion multiplies its state by. Each fixes the other. A named Descriptor takes the half-life, because a reader of a factor model knows that number.
 
 # Arguments
 
@@ -42,9 +42,9 @@ end
 """
     half_life_min_obs(half_life::Real, sym::Sym_Str = :half_life) -> Int
 
-Convert a half-life in observations into the warm-up an exponentially weighted Descriptor waits out.
+Convert a half-life in observations into the warm-up of an exponentially weighted Descriptor.
 
-The recursion starts from zero, so its early values carry the start and not the data. Every exponentially weighted Descriptor answers `NaN` until an asset has seen this many valid observations of its own.
+The recursion starts from zero, so its early values lie closer to zero than the data does. Every exponentially weighted Descriptor returns `NaN` for an asset until that asset has this many valid observations.
 
 # Arguments
 
@@ -84,7 +84,7 @@ end
 
 Check that an exponential decay factor lies strictly between zero and one.
 
-A decay of one never forgets an observation, and a decay at or below zero is not a weight at all. The check runs once, in each constructor of an exponentially weighted Descriptor.
+A decay of one keeps the full weight of every past observation, and a decay at or below zero is not a weight. Each constructor of an exponentially weighted Descriptor runs the check once.
 
 # Arguments
 
@@ -116,33 +116,37 @@ end
 
 Run the exponentially weighted mean recursion down each column of a matrix.
 
-This is the one recursion every exponentially weighted mean Descriptor shares, so the three archetypes of this file differ only in the matrix they build before they call it. Each asset carries its own state and its own count of valid observations, and a cell that is not finite advances neither: it holds the state, rather than resetting it or entering it as a zero.
+This is the one recursion every exponentially weighted mean Descriptor shares, so the three archetypes of this file differ only in the matrix they build before they call it. Each asset carries its own state and its own count of valid observations. A cell that is not finite advances neither. The state holds there, and the recursion neither restarts nor reads the cell as a zero.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-S_{t,i} &= \\lambda S_{t-1,i} + (1 - \\lambda) r_{t,i}\\,, \\quad S_{0,i} = 0\\,, \\\\
+S_{t,i} &= \\begin{cases} \\lambda S_{t-1,i} + (1 - \\lambda) y_{t,i} & \\text{if } y_{t,i} \\text{ is finite} \\\\ S_{t-1,i} & \\text{otherwise} \\end{cases}\\,, \\quad S_{0,i} = 0\\,, \\\\
+n_{t,i} &= \\begin{cases} n_{t-1,i} + 1 & \\text{if } y_{t,i} \\text{ is finite} \\\\ n_{t-1,i} & \\text{otherwise} \\end{cases}\\,, \\quad n_{0,i} = 0\\,, \\\\
 m_{t,i} &= \\begin{cases} S_{t,i} & \\text{if } n_{t,i} \\geq \\texttt{min\\_obs} \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
 
+The recursion applies no bias correction, so the first value of an asset is ``(1 - \\lambda) y_{t,i}`` and not ``y_{t,i}``. The start at zero biases the first values toward zero, and the warm-up `min_obs` replaces them with `NaN`.
+
 Where:
 
-  - ``S_{t,i}``: State of asset ``i`` after observation ``t``.
-  - ``r_{t,i}``: The recursion's input for asset ``i`` at observation ``t``.
-  - ``\\lambda``: The decay factor.
-  - ``n_{t,i}``: Count of the finite inputs asset ``i`` has seen up to observation ``t``.
+  - ``y_{t,i}``: Input of the recursion for asset ``i`` at observation ``t``, the entry `R[t, i]`.
+  - $(math_dict[:lambda_ew])
+  - ``S_{t,i}``: State of the recursion of asset ``i`` after observation ``t``.
+  - ``n_{t,i}``: Count of the finite inputs of asset ``i`` up to observation ``t``.
+  - ``m_{t,i}``: Value of the series for asset ``i`` at observation ``t``.
 
 # Arguments
 
-  - `R`: The input, `observations × assets`. A cell that is not finite is skipped.
+  - `R`: The input, `observations × assets`.
   - `decay`: The decay factor.
   - `min_obs`: The warm-up, in valid observations per asset.
 
 # Returns
 
-  - `S::Matrix{<:Real}`: The series, `observations × assets`, `NaN` before an asset's warm-up ends.
+  - `S::Matrix{<:Real}`: The series, `observations × assets`, `NaN` before the warm-up of an asset ends. An integer input gives a floating point series.
 
 # Examples
 
@@ -163,7 +167,7 @@ julia> PortfolioOptimisers.ew_mean_series([1.0; 3.0; NaN; 5.0;;], 0.5, 1)
 """
 function ew_mean_series(R::AbstractMatrix{<:Real}, decay::Real,
                         min_obs::Integer)::Matrix{<:Real}
-    Tf = eltype(R)
+    Tf = float_if_integer(eltype(R))
     S = fill(Tf(NaN), size(R))
     for i in axes(R, 2)
         s = zero(Tf)
@@ -190,7 +194,7 @@ end
 
 Check one side of an exponentially weighted ratio.
 
-The four forms one side takes are checked here, so [`EWVolumeRatio`](@ref) states each rule once. `nothing` names the returns and reads nothing out of the Asset Panel, so it needs no check.
+This function checks the four forms of one side, so [`EWVolumeRatio`](@ref) states each rule once. `nothing` names the returns and reads nothing out of the Asset Panel, so it needs no check.
 
 # Arguments
 
@@ -239,7 +243,7 @@ end
 
 Read one side of an exponentially weighted ratio out of a carrier.
 
-A side takes four forms, and the method Julia selects is the reading:
+A side takes four forms. Julia selects the method from the form, and each method reads the side as follows.
 
  1. `nothing` reads the absolute returns `abs.(rd.X)`. Returns are not a Panel Field, so this is how a ratio names them.
  2. A name reads that one Panel Field, through [`panel_field_values`](@ref).
@@ -288,23 +292,29 @@ $(DocStringExtensions.TYPEDEF)
 
 Exponentially weighted mean of the log returns, at every observation, with an optional skip.
 
-This is the archetype of every momentum Descriptor. The skip separates a medium-term trend from the short-term reversal that follows it: at observation `t` the recursion reads the log return of observation `t - skip`, so the most recent `skip` observations never enter. The output is in log units, or in return units when `exponentiate` is set.
+This is the archetype of every momentum Descriptor. The skip separates a medium-term trend from the short-term reversal that follows it. At observation `t` the recursion reads the log return of observation `t - skip`, so the most recent `skip` observations never enter. The output is in log units, or in return units when `exponentiate` is set.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-S_{t,i} &= \\lambda S_{t-1,i} + (1 - \\lambda) \\log(1 + r_{t-s,i})\\,, \\quad S_{0,i} = 0\\,, \\\\
+y_{t,i} &= \\begin{cases} \\log(1 + x_{t-s,\\,i}) & \\text{if } t > s \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,, \\\\
+S_{t,i} &= \\lambda S_{t-1,i} + (1 - \\lambda) y_{t,i}\\,, \\quad S_{0,i} = 0\\,, \\\\
 d_{t,i} &= \\begin{cases} \\exp(S_{t,i}) - 1 & \\text{if } \\texttt{exponentiate} \\\\ S_{t,i} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
 
+The state moves only where ``y_{t,i}`` is finite, and holds everywhere else. The delay counts rows of the panel, not valid observations of the asset, so a gap in the returns of asset ``i`` reaches the recursion ``s`` rows later as a hold. ``d_{t,i}`` is `NaN` until ``n_{t,i} \\geq \\texttt{min\\_obs}``, and where asset ``i`` is inactive. [`ew_mean_series`](@ref) states the hold and the count in full.
+
 Where:
 
   - ``d_{t,i}``: Descriptor of asset ``i`` at observation ``t``.
-  - ``r_{t,i}``: Return of asset ``i`` at observation ``t``.
-  - ``\\lambda``: The decay factor.
-  - ``s``: The skip, in observations.
+  - $(math_dict[:x_ti_ret])
+  - ``y_{t,i}``: Input of the recursion for asset ``i`` at observation ``t``.
+  - ``s``: `skip`, the delay in observations.
+  - $(math_dict[:lambda_ew])
+  - ``S_{t,i}``: State of the recursion of asset ``i`` after observation ``t``.
+  - ``n_{t,i}``: Count of the finite inputs ``y`` of asset ``i`` up to observation ``t``.
 
 # Fields
 
@@ -315,12 +325,12 @@ $(DocStringExtensions.FIELDS)
     EWMean(; decay::Real, min_obs::Integer, skip::Integer = 0,
            exponentiate::Bool = false) -> EWMean
 
-Keywords correspond to the struct's fields. `decay` and `min_obs` take no default, because they depend on the data frequency: [`EWMomentum`](@ref) states a half-life instead and converts it through [`half_life_decay`](@ref) and [`half_life_min_obs`](@ref).
+Keywords correspond to the struct's fields. `decay` and `min_obs` take no default, because they depend on the data frequency. [`EWMomentum`](@ref) states a half-life instead and converts it through [`half_life_decay`](@ref) and [`half_life_min_obs`](@ref).
 
 ## Validation
 
-  - `0 < decay < 1`.
-  - `min_obs >= 1`.
+  - $(val_dict[:decay])
+  - $(val_dict[:min_obs])
   - `skip >= 0`.
 
 # Examples
@@ -356,7 +366,7 @@ EWMean
     """
     skip
     """
-    Whether the Descriptor is returned in return units, `exp(S) - 1`, rather than in log units. A cross-sectional ranking is the same either way.
+    Whether the Descriptor is in return units, `exp(S) - 1`, rather than in log units. The map from log units is increasing, so a cross-sectional ranking is the same either way.
     """
     exponentiate
     function EWMean(decay::Real, min_obs::Integer, skip::Integer, exponentiate::Bool)
@@ -387,15 +397,22 @@ This is the archetype of every liquidity Descriptor built from a daily ratio. A 
 ```math
 \\begin{align}
 q_{t,i} &= \\begin{cases} \\dfrac{a_{t,i}}{b_{t,i}} & \\text{if } b_{t,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,, \\\\
-S_{t,i} &= \\lambda S_{t-1,i} + (1 - \\lambda) q_{t,i}\\,, \\quad S_{0,i} = 0\\,.
+S_{t,i} &= \\lambda S_{t-1,i} + (1 - \\lambda) q_{t,i}\\,, \\quad S_{0,i} = 0\\,, \\\\
+d_{t,i} &= S_{t,i}\\,.
 \\end{align}
 ```
 
+The state moves only where ``q_{t,i}`` is finite, and holds everywhere else. A missing Panel Field on either side, and a denominator that is not strictly positive, both hold the state. ``d_{t,i}`` is `NaN` until ``n_{t,i} \\geq \\texttt{min\\_obs}``, and where asset ``i`` is inactive. [`ew_mean_series`](@ref) states the hold and the count in full.
+
 Where:
 
+  - ``d_{t,i}``: Descriptor of asset ``i`` at observation ``t``.
   - ``a_{t,i}``: The numerator of asset ``i`` at observation ``t``.
   - ``b_{t,i}``: The denominator of asset ``i`` at observation ``t``.
-  - ``\\lambda``: The decay factor.
+  - ``q_{t,i}``: The ratio of asset ``i`` at observation ``t``.
+  - $(math_dict[:lambda_ew])
+  - ``S_{t,i}``: State of the recursion of asset ``i`` after observation ``t``.
+  - ``n_{t,i}``: Count of the finite ratios ``q`` of asset ``i`` up to observation ``t``.
 
 # Fields
 
@@ -414,13 +431,13 @@ $(DocStringExtensions.FIELDS)
         min_obs::Integer
     ) -> EWVolumeRatio
 
-Keywords correspond to the struct's fields. `decay` and `min_obs` take no default, because they depend on the data frequency: [`EWShareTurnover`](@ref) and [`EWAmihudIlliquidity`](@ref) state a half-life instead.
+Keywords correspond to the struct's fields. `decay` and `min_obs` take no default, because they depend on the data frequency. [`EWShareTurnover`](@ref) and [`EWAmihudIlliquidity`](@ref) state a half-life instead.
 
 ## Validation
 
   - The rules of [`assert_ew_ratio_side`](@ref) for `num` and for `den`.
-  - `0 < decay < 1`.
-  - `min_obs >= 1`.
+  - $(val_dict[:decay])
+  - $(val_dict[:min_obs])
 
 # Examples
 
@@ -445,7 +462,7 @@ EWVolumeRatio
 """
 @concrete struct EWVolumeRatio <: AbstractDescriptorEstimator
     """
-    The numerator: `nothing` for the absolute returns, the name of one Panel Field, a vector of `name => coefficient` pairs read as their sum, or a vector of names read as their product.
+    The numerator, in one of four forms: `nothing` for the absolute returns, the name of one Panel Field, a vector of `name => coefficient` pairs read as their sum, or a vector of names read as their product.
     """
     num
     """
@@ -490,23 +507,27 @@ $(DocStringExtensions.TYPEDEF)
 
 Ratio of a Panel Field to the exponentially weighted mean of a second one, at every observation.
 
-The days to cover of a short position is the shares held short divided by a smoothed daily volume, so it reads how many days of ordinary trading it would take to buy the position back. Where [`EWVolumeRatio`](@ref) smooths the ratio, this archetype smooths the denominator alone and forms the ratio at the current observation, so a change in the short interest reaches the Descriptor undamped. Only a strictly positive value of the denominator advances the recursion.
+The days to cover of a short position is the shares held short divided by a smoothed daily volume, so it measures how many days of ordinary trading it would take to buy the position back. [`EWVolumeRatio`](@ref) smooths the ratio. This archetype smooths the denominator alone and forms the ratio at the current observation, so the Descriptor shows the full change in the short interest at the observation where it happens. Only a strictly positive value of the denominator advances the recursion.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-V_{t,i} &= \\lambda V_{t-1,i} + (1 - \\lambda) b_{t,i}\\,, \\quad V_{0,i} = 0\\,, \\\\
+V_{t,i} &= \\begin{cases} \\lambda V_{t-1,i} + (1 - \\lambda) b_{t,i} & \\text{if } b_{t,i} > 0 \\\\ V_{t-1,i} & \\text{otherwise} \\end{cases}\\,, \\quad V_{0,i} = 0\\,, \\\\
 d_{t,i} &= \\begin{cases} \\dfrac{a_{t,i}}{V_{t,i}} & \\text{if } V_{t,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
 
+A zero, a negative or a missing volume holds the state and does not count toward the warm-up. A missing short interest gives a `NaN` Descriptor at that observation, and the state of the volume moves all the same. ``d_{t,i}`` is `NaN` until ``n_{t,i} \\geq \\texttt{min\\_obs}``, and where asset ``i`` is inactive.
+
 Where:
 
   - ``d_{t,i}``: Descriptor of asset ``i`` at observation ``t``.
-  - ``a_{t,i}``: The numerator's Panel Field for asset ``i`` at observation ``t``.
-  - ``b_{t,i}``: The denominator's Panel Field for asset ``i`` at observation ``t``.
-  - ``\\lambda``: The decay factor.
+  - ``a_{t,i}``: Value of the Panel Field `num` for asset ``i`` at observation ``t``.
+  - ``b_{t,i}``: Value of the Panel Field `den` for asset ``i`` at observation ``t``.
+  - $(math_dict[:lambda_ew])
+  - ``V_{t,i}``: Smoothed denominator of asset ``i`` after observation ``t``.
+  - ``n_{t,i}``: Count of the strictly positive values ``b`` of asset ``i`` up to observation ``t``.
 
 # Fields
 
@@ -519,13 +540,14 @@ $(DocStringExtensions.FIELDS)
                 decay::Real = half_life_decay(half_life),
                 min_obs::Integer = half_life_min_obs(half_life)) -> DaysToCover
 
-`num`, `den`, `decay` and `min_obs` correspond to the struct's fields. `half_life` is not a field: it fixes the defaults of `decay` and `min_obs`, and a value passed for either of those is used as it stands. The default half-life of `21` is about one month of daily observations.
+`num`, `den`, `decay` and `min_obs` correspond to the struct's fields. `half_life` is not a field. It fixes the defaults of `decay` and `min_obs`, and the constructor keeps a `decay` or a `min_obs` that the caller passes as it is. The default half-life of `21` is about one month of daily observations.
 
 ## Validation
 
   - `!isempty(num)` and `!isempty(den)`.
-  - `0 < decay < 1`.
-  - `min_obs >= 1`.
+  - $(val_dict[:decay])
+  - $(val_dict[:min_obs])
+  - `0 < half_life < Inf`, where it fixes a default. Raises a `DomainError`.
 
 # Examples
 
@@ -585,13 +607,13 @@ end
 
 Compute an exponentially weighted mean Descriptor from a carrier.
 
-The three archetypes build one `observations × assets` matrix each, run it through [`ew_mean_series`](@ref), and end through [`descriptor_active_fill!`](@ref). An asset that is listed but has no value at an observation holds its state there, so a gap in the data neither resets the recursion nor enters it as a zero.
+Each of the three archetypes builds one `observations × assets` matrix and runs it through [`ew_mean_series`](@ref). [`descriptor_active_fill!`](@ref) then writes `NaN` into the inactive cells. An asset that is listed but has no value at an observation holds its state there, so a gap in the data neither restarts the recursion nor enters it as a zero.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. [`EWMean`](@ref): check the returns through [`assert_log_returns`](@ref), then run the recursion over `log1p(rd.X)` delayed by `skip` observations. The first `skip` rows read nothing. Take `expm1` of the series when `exponentiate` is set.
+ 1. [`EWMean`](@ref): check the returns through [`assert_log_returns`](@ref), then run the recursion over `log1p(rd.X)` delayed by `skip` observations. The first `skip` rows have no input. Take `expm1` of the series when `exponentiate` is set.
  2. [`EWVolumeRatio`](@ref): read both sides through [`ew_ratio_values`](@ref), divide them through [`positive_divide`](@ref), and run the recursion over the ratio.
  3. [`DaysToCover`](@ref): run the recursion over the denominator's Panel Field, with every value that is not strictly positive read as a `NaN`, then divide the numerator's Panel Field by the series through [`positive_divide`](@ref).
 
@@ -651,7 +673,7 @@ function descriptor(de::EWMean, rd::ReturnsResult)::Matrix{<:Real}
     pnl = descriptor_asset_panel(rd)
     X = rd.X
     assert_log_returns(X)
-    Tf = eltype(X)
+    Tf = float_if_integer(eltype(X))
     R = fill(Tf(NaN), size(X))
     skip = de.skip
     for i in axes(X, 2), t in (skip + 1):size(X, 1)
@@ -694,9 +716,14 @@ The value is the recursion of [`EWMean`](@ref) over `log1p(r)` delayed by `skip`
 
   - `half_life`: Half-life of the recursion, in observations. It fixes the defaults of `decay` and `min_obs`.
   - `skip`: Number of the most recent observations the recursion does not read. `21` is about one month of daily observations.
-  - `exponentiate`: Whether the Descriptor is returned in return units.
+  - `exponentiate`: Whether the Descriptor is in return units.
   - `decay`: Decay factor of the recursion.
   - `min_obs`: Warm-up, in valid observations per asset.
+
+# Validation
+
+  - The rules of [`EWMean`](@ref).
+  - `0 < half_life < Inf`, where it fixes a default. Raises a `DomainError`.
 
 # Returns
 
@@ -735,7 +762,7 @@ end
 
 Exponentially weighted share turnover, the fraction of the shares outstanding that changes hands.
 
-The value is the recursion of [`EWVolumeRatio`](@ref) over `adj_volume / adj_shares_outstanding`. A stock whose shares turn over slowly is harder to trade, and the return it earns carries the premium of that illiquidity. The default half-life of `21` is about one month of daily observations.
+The value is the recursion of [`EWVolumeRatio`](@ref) over `adj_volume / adj_shares_outstanding`. A stock whose shares turn over slowly is harder to trade, and its expected return includes a premium for that illiquidity. The default half-life of `21` is about one month of daily observations.
 
 # Arguments
 
@@ -744,6 +771,11 @@ The value is the recursion of [`EWVolumeRatio`](@ref) over `adj_volume / adj_sha
   - `half_life`: Half-life of the recursion, in observations. It fixes the defaults of `decay` and `min_obs`.
   - `decay`: Decay factor of the recursion.
   - `min_obs`: Warm-up, in valid observations per asset.
+
+# Validation
+
+  - The rules of [`EWVolumeRatio`](@ref).
+  - `0 < half_life < Inf`, where it fixes a default. Raises a `DomainError`.
 
 # Returns
 
@@ -782,7 +814,7 @@ end
 
 Exponentially weighted price impact, the absolute return earned per unit of traded amount.
 
-The value is the recursion of [`EWVolumeRatio`](@ref) over `abs(r) / (adj_close * adj_volume)`. A stock whose price moves far on a small amount traded is expensive to trade, which is what the illiquidity premium prices. The numerator is the absolute returns, so it is `nothing`: returns are not a Panel Field. The default half-life of `63` is about three months of daily observations.
+The value is the recursion of [`EWVolumeRatio`](@ref) over `abs(r) / (adj_close * adj_volume)`. A stock whose price moves far on a small amount traded is expensive to trade, and the illiquidity premium is the return that pays for that cost. The numerator is the absolute returns. Returns are not a Panel Field, so the numerator is `nothing`. A day with zero volume has no ratio, so it holds the state. The default half-life of `63` is about three months of daily observations.
 
 # Arguments
 
@@ -790,6 +822,11 @@ The value is the recursion of [`EWVolumeRatio`](@ref) over `abs(r) / (adj_close 
   - `half_life`: Half-life of the recursion, in observations. It fixes the defaults of `decay` and `min_obs`.
   - `decay`: Decay factor of the recursion.
   - `min_obs`: Warm-up, in valid observations per asset.
+
+# Validation
+
+  - The rules of [`EWVolumeRatio`](@ref).
+  - `0 < half_life < Inf`, where it fixes a default. Raises a `DomainError`.
 
 # Returns
 
