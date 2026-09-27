@@ -339,51 +339,51 @@ nothing raises `@error "File exists but no references were collected"` in
         end
     end
 
+    # A `@docs` entry can wrap over several lines, so accumulate lines until the
+    # text parses. Treating each line as its own entry leaves a wrapped signature as
+    # two fragments, neither of which resolves to anything.
+    function docs_block_names(text)
+        acc, inside, buf = String[], false, ""
+        for line in split(text, '\n')
+            if startswith(line, "```@docs")
+                inside = true
+            elseif inside && startswith(line, "```")
+                inside = false
+                if !isempty(buf)
+                    push!(acc, buf)
+                    buf = ""
+                end
+            elseif inside && !isempty(strip(line))
+                buf = if isempty(buf)
+                    String(strip(line))
+                else
+                    buf * " " * String(strip(line))
+                end
+                ex = Meta.parse(buf; raise = false)
+                if !(isa(ex, Expr) && ex.head === :incomplete)
+                    push!(acc, buf)
+                    buf = ""
+                end
+            end
+        end
+        return acc
+    end
+    # The bare name an entry documents: `cov`, `PortfolioOptimisers.densify` and
+    # `cov(ce::DistanceCovariance, X::MatNum)` all reduce to one symbol.
+    function leaf_name(x)
+        if isa(x, Symbol)
+            return x
+        elseif isa(x, QuoteNode)
+            return leaf_name(x.value)
+        elseif isa(x, Expr)
+            return leaf_name(x.head === :. ? x.args[2] : x.args[1])
+        else
+            return nothing
+        end
+    end
     # A page cites either in its own prose or through a docstring it pulls in with a
     # `@docs` block, and it needs a non-canonical bibliography block exactly then.
     @testset "an API page carries a bibliography block iff it cites" begin
-        # A `@docs` entry can wrap over several lines, so accumulate lines until the
-        # text parses. Treating each line as its own entry leaves a wrapped signature as
-        # two fragments, neither of which resolves to anything.
-        function docs_block_names(text)
-            acc, inside, buf = String[], false, ""
-            for line in split(text, '\n')
-                if startswith(line, "```@docs")
-                    inside = true
-                elseif inside && startswith(line, "```")
-                    inside = false
-                    if !isempty(buf)
-                        push!(acc, buf)
-                        buf = ""
-                    end
-                elseif inside && !isempty(strip(line))
-                    buf = if isempty(buf)
-                        String(strip(line))
-                    else
-                        buf * " " * String(strip(line))
-                    end
-                    ex = Meta.parse(buf; raise = false)
-                    if !(isa(ex, Expr) && ex.head === :incomplete)
-                        push!(acc, buf)
-                        buf = ""
-                    end
-                end
-            end
-            return acc
-        end
-        # The bare name an entry documents: `cov`, `PortfolioOptimisers.densify` and
-        # `cov(ce::DistanceCovariance, X::MatNum)` all reduce to one symbol.
-        function leaf_name(x)
-            if isa(x, Symbol)
-                return x
-            elseif isa(x, QuoteNode)
-                return leaf_name(x.value)
-            elseif isa(x, Expr)
-                return leaf_name(x.head === :. ? x.args[2] : x.args[1])
-            else
-                return nothing
-            end
-        end
         # An entry that carries a signature splices THAT method's docstring, so the
         # signature has to take part in the lookup. Asking for the binding alone returns
         # every method's docstring concatenated, and then a page that lists a shared
@@ -441,6 +441,54 @@ nothing raises `@error "File exists but no references were collected"` in
         end
         @test missing_block == String[]
         @test stray_block == String[]
+    end
+
+    #=
+    Documenter's `missing_docs` check walks the objects of the `@docs` blocks in the order
+    of a `Dict`, which moves between processes. A bare-name entry marks every docstring of
+    its binding as included. An entry with a signature marks one docstring only when the
+    signature equals that docstring's signature exactly, and a `<:` match renders the
+    docstring without marking it. Once one docstring of a binding is left, the next entry of
+    that binding marks it too. So a binding that lacks both a bare-name entry and an exact
+    entry for each docstring passes or fails at random. `online_step_fold` did so from
+    `3f8edf624d` on: its method widened to `Option{<:TimeDependentContext}` and its entry
+    kept `::Nothing`, and the Docs build failed on most runs and passed on some (#1204).
+    =#
+    @testset "every docstring of a listed binding is included in every order" begin
+        bare, exact, listed = Set{Base.Docs.Binding}(),
+                              Dict{Base.Docs.Binding, Set{Type}}(), Set{Base.Docs.Binding}()
+        for p in reduce(vcat, files_under.(API, ".md")),
+            name in docs_block_names(read(p, String))
+
+            ex = Meta.parse(name; raise = false)
+            iscall = isa(ex, Expr) && ex.head === :call
+            sym = leaf_name(iscall ? ex.args[1] : ex)
+            (isa(sym, Symbol) && isdefined(PO, sym)) || continue
+            b = Base.Docs.Binding(PO, sym)
+            push!(listed, b)
+            if !iscall
+                push!(bare, b)
+                continue
+            end
+            md = get(Base.Docs.meta(PO), b, nothing)
+            isnothing(md) && continue
+            sig = try
+                Core.eval(PO, Base.Docs.signature(ex))
+            catch
+                continue
+            end
+            sig in Set{Type}(keys(md.docs)) && push!(get!(exact, b, Set{Type}()), sig)
+        end
+        at_random = String[]
+        for b in listed
+            b in bare && continue
+            md = get(Base.Docs.meta(PO), b, nothing)
+            (isnothing(md) || length(md.docs) == 1) && continue
+            n_exact = length(get(exact, b, Set{Type}()))
+            n_exact < length(md.docs) &&
+                push!(at_random, "$b: $n_exact of $(length(md.docs)) docstrings")
+        end
+        @test sort!(at_random) == String[]
     end
 end
 
