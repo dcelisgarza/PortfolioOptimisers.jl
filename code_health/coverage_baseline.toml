@@ -279,8 +279,8 @@ commit = "8610300"
 "src/17_Optimisation/01_Base_Optimisation/05_InvestableUniverse.jl" = { lines = 57, misses = 0 }
 "src/17_Optimisation/01_Base_Optimisation/06_PanelCollapse.jl" = { lines = 57, misses = 4 }
 "src/17_Optimisation/01_Base_Optimisation/07_ResultInvestableView.jl" = { lines = 28, misses = 2 }
-"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl" = { lines = 260, misses = 12 }
-"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { lines = 86, misses = 6 }
+"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl" = { lines = 260, misses = 0 }
+"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { lines = 86, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { lines = 45, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { lines = 158, misses = 1 }
 "src/17_Optimisation/02_CrossValidation/04_WalkForward.jl" = { lines = 175, misses = 5 }

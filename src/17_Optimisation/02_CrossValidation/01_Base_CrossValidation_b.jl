@@ -1,8 +1,15 @@
 """
     fit_predict(opt::OptE_Opt, rd::ReturnsResult)
 
-Fit optimisation estimator `opt` on returns data `rd` and immediately produce a
-[`PredictionResult`](@ref) for the same data.
+Fit optimisation estimator `opt` on returns data `rd`, and predict over the same data.
+
+The prediction is in-sample, so it measures the fit and not a backtest. Use
+[`fit_and_predict`](@ref) or [`cross_val_predict`](@ref) for an out-of-sample series.
+
+# Algorithm
+
+ 1. Fit `opt` on `rd` with [`optimise`](@ref), giving `res`.
+ 2. Predict `res` over the whole of `rd` with [`predict`](@ref).
 
 # Arguments
 
@@ -58,28 +65,43 @@ end
 
 Fit an optimisation estimator on training data and predict on test data using cross-validation.
 
-The three-argument method (`opt`, `rd`, `cv`) performs full cross-validated prediction over all folds of `cv`.
-The two-argument methods operate on a single pre-defined train/test split or on a pre-existing result.
+The method over a scheme `cv` predicts over every fold of `cv`. The methods without a scheme predict over one train/test split, or apply a result that is already fitted.
 
-The estimator form takes `train_idx = nothing` to mean *the estimator holds its window*: it reads the estimator out through `optimise(opt)` instead of fitting it over `port_opt_view(rd, train_idx, cols)`, and predicts over `test_idx` as before. That is the read-out of the online arm of [`fold_loop`](@ref), and it is also a public entry for a hand-stepped estimator — one warmed up with [`update_online_estimator`](@ref) and folded with [`partial_fit!`](@ref) — so `fit_and_predict(opt, rd; test_idx)` on a stepped estimator equals `fit_and_predict(opt, rd; train_idx, test_idx)` on the cold one over the same rows. The two arms are [`fit_fold_result`](@ref)'s, and the method lives beside them.
+A combinatorial `cv` takes its own method, because its folds recombine into several paths and not one. That method regroups the fold predictions by path, and returns one [`MultiPeriodPredictionResult`](@ref) per path in a [`PopulationPredictionResult`](@ref).
+
+The estimator form reads `train_idx = nothing` as *the estimator holds its window*. It reads the estimator out through `optimise(opt)` in place of a fit over `port_opt_view(rd, train_idx, cols)`, and predicts over `test_idx` as before. The online arm of [`fold_loop`](@ref) reads a fold out this way. It is also the public entry for an estimator stepped by hand, warmed up with [`update_online_estimator`](@ref) and folded with [`partial_fit!`](@ref). `fit_and_predict(opt, rd; test_idx)` on a stepped estimator equals `fit_and_predict(opt, rd; train_idx, test_idx)` on the cold one over the same rows. The two arms belong to [`fit_fold_result`](@ref), and the method is defined beside them.
+
+The result form is fitted already, so it ignores `train_idx` and every keyword that [`predict`](@ref) does not take. The fold loop passes the same keywords to an estimator and to a result.
+
+# Algorithm
+
+For a scheme `cv` that is not combinatorial:
+
+ 1. Split `rd` with `cv`, giving `train_idx` and `test_idx`.
+ 2. Check that the folds are not shuffled with [`assert_unshuffled_folds`](@ref).
+ 3. Read the evaluation settings of `cv` with [`fold_evaluation`](@ref), and the drift of the Held Weights record with [`held_weights_drift`](@ref).
+ 4. Run the folds with [`fold_loop`](@ref). Each fold fits its estimator on its training rows and predicts over its test rows, giving one [`PredictionResult`](@ref) per fold, in split order.
+ 5. Concatenate the folds into a [`MultiPeriodPredictionResult`](@ref) carrying `id`.
 
 # Arguments
 
   - `opt`: Optimisation estimator or an existing optimisation result.
   - `rd::ReturnsResult`: Returns data.
-  - `cv::NonSeqCVER`: Non-sequential cross-validation estimator (e.g. [`KFold`](@ref) or [`CombinatorialCrossValidation`](@ref)).
+  - `cv::NonSeqCVER`: Non-sequential cross-validation estimator or result, such as [`KFold`](@ref).
   - `cv::CombCVER`: Combinatorial cross-validation estimator or result ([`CombinatorialCrossValidation`](@ref)).
+
+# Keyword Arguments
+
   - `train_idx::Option{<:VecInt}`: Training indices, or `nothing` to read a stepped estimator out.
-  - `test_idx`: Test indices (vector or vector of vectors).
-  - `cols`: Column selector (default `:` for all assets).
+  - `test_idx`: Test indices, one vector or one vector per fold.
+  - `cols = :`: Column selector.
+  - `ex::FLoops.Transducers.Executor = FLoops.ThreadedEx()`: Executor of the folds that run in parallel.
+  - `id = nothing`: Identifier of the path.
+  - `wd`, `hwd`, `fa`, `store_weight_path`, `strict`, `w_prev`: The keywords of [`predict`](@ref), which the methods over one split pass on.
 
 # Returns
 
   - [`MultiPeriodPredictionResult`](@ref), [`PopulationPredictionResult`](@ref), or [`PredictionResult`](@ref).
-
-# Details
-
-  - A combinatorial `cv` takes its own method, because its folds recombine into several paths rather than one. That method regroups the fold predictions by path and returns one [`MultiPeriodPredictionResult`](@ref) per path, wrapped in a [`PopulationPredictionResult`](@ref).
 
 # Related
 
@@ -104,9 +126,17 @@ end
     sort_predictions!(res::VecVecInt, predictions::VecPredRes) -> VecPredRes
     sort_predictions!(res::CrossValidationResult, predictions::VecPredRes) -> VecPredRes
 
-Sort prediction results to match the order of test indices.
+Sort the prediction results of the folds by the first observation of their test windows.
 
-Reorders `predictions` so that they align with the original time ordering of `test_idx`. The key is the first observation of each fold, so the folds come back in the order the timeline visits them.
+The function returns a sorted copy, and does not change `predictions`. The key is the first entry of each test window, so the folds come back in time order when each window starts at its earliest row, which is true of every scheme in the library.
+
+[`CombinatorialCrossValidationResult`](@ref) has its own method with a different shape and a different job. Its folds do not form one timeline, so that method takes a vector of per-split vectors and regroups them by path into [`MultiPeriodPredictionResult`](@ref)s.
+
+# Algorithm
+
+ 1. Check that every test window holds unique indices.
+ 2. Compute the permutation that sorts the test windows by their first entry, giving `idx`.
+ 3. Return `predictions[idx]`.
 
 # Arguments
 
@@ -119,15 +149,11 @@ Reorders `predictions` so that they align with the original time ordering of `te
 
 # Validation
 
-  - Every element of `test_idx` holds unique indices.
+  - Every test window holds unique indices, else an `ArgumentError` is raised.
 
 # Returns
 
-  - Sorted predictions vector.
-
-# Details
-
-  - [`CombinatorialCrossValidationResult`](@ref) has its own method with a different shape and a different job. Its folds do not form one timeline, so that method takes a vector of per-split vectors and regroups them by path into [`MultiPeriodPredictionResult`](@ref)s rather than sorting one timeline.
+  - A new vector of the predictions, sorted.
 
 # Related
 
@@ -175,18 +201,21 @@ end
     parallel_folds(fit_fold, n::Integer, ex::FLoops.Transducers.Executor,
                    ::Type{ElT} = PredictionResult)
 
-Run `n` cross-validation folds in parallel, filling `predictions[i] = fit_fold(i)` for `i in 1:n`
-over executor `ex`. `ElT` is the per-fold result element type (a single [`PredictionResult`](@ref)
-for time-ordered schemes, a `Vector{PredictionResult}` for the multi-path combinatorial scheme).
+Run `n` cross-validation folds in parallel over the executor `ex`. `ElT` is the element type of
+the result of one fold: a single [`PredictionResult`](@ref) for a time-ordered scheme, and a
+`Vector{PredictionResult}` for the multi-path combinatorial scheme.
 
-This is the sibling of [`run_folds`](@ref), and the two divide the work by name. A fold here
-takes no previous fold, so `fit_fold` takes the fold index alone. [`fold_loop`](@ref)
-decides which of the two runs, and neither one re-decides.
+This is the sibling of [`run_folds`](@ref). A fold here takes no previous fold, so `fit_fold`
+takes the fold index alone. [`fold_loop`](@ref) decides which of the two runs.
 
 `ElT` is a *positional* `::Type{ElT}` argument, not a keyword, so a method always
-specialises on it and `Vector{ElT}(undef, n)` stays a compile-time construction. As a
-keyword its value only survives constant propagation, which one forwarding hop is enough
-to lose.
+specialises on it and `Vector{ElT}(undef, n)` is built at compile time. The value of a
+keyword survives only by constant propagation, which one forwarding call can lose.
+
+# Algorithm
+
+ 1. Allocate `predictions = Vector{ElT}(undef, n)`.
+ 2. For each `i in 1:n`, in parallel over `ex`, set `predictions[i] = fit_fold(i)`.
 
 # Related
 
@@ -205,22 +234,24 @@ end
 """
     run_folds(fit_fold, n::Integer, ::Type{ElT} = PredictionResult; pws = nothing)
 
-Run `n` cross-validation folds in order, filling `predictions[i] = fit_fold(i, prev)` for
-`i in 1:n`, and emit [`cv_sequential_info`](@ref). `prev` is the last fold whose weights the
-next fold can be handed: fold 1 takes `nothing`, because it has no fold behind it, and after
-fold `i` the loop advances `prev` to `predictions[i]` only when [`threads_weights`](@ref)
-holds of it, so a fold whose solve failed is skipped over and the fold before it is read
-instead. The caller uses `prev` to thread its weights into fold `i`. `ElT` is the per-fold
-result element type, and `pws` is the scheme's Previous-Weights Source, which decides what
-[`threads_weights`](@ref) tests.
+Run `n` cross-validation folds in order, and emit [`cv_sequential_info`](@ref).
 
-This is the sequential loop, and it does that one job. [`fold_loop`](@ref) is the only site
-that calls it, and it calls it only when the folds are a timeline *and* the estimator needs
-the previous fold's weights. The loop therefore neither re-decides nor takes an executor:
-its sibling [`parallel_folds`](@ref) owns the other case.
+`prev` is the last fold whose weights the next fold can be handed. Fold 1 takes `nothing`,
+because it has no fold behind it. A failed fold is skipped, and the fold before it stays
+`prev`. The caller uses `prev` to thread its weights into fold `i`. `pws` is the
+Previous-Weights Source of the scheme, and it decides what [`threads_weights`](@ref) tests.
 
-`ElT` is a *positional* `::Type{ElT}` argument for the reason given in
-[`parallel_folds`](@ref).
+[`fold_loop`](@ref) is the only caller, and it calls this loop only when the folds are a
+timeline *and* the estimator needs the weights of the previous fold. The loop therefore takes
+no executor, and its sibling [`parallel_folds`](@ref) runs every other case. `ElT` is a
+*positional* `::Type{ElT}` argument for the reason that [`parallel_folds`](@ref) gives.
+
+# Algorithm
+
+ 1. Emit [`cv_sequential_info`](@ref) as an `@info` message.
+ 2. Allocate `predictions = Vector{ElT}(undef, n)`, and set `prev = nothing`.
+ 3. For each `i in 1:n` in order, set `predictions[i] = fit_fold(i, prev)`.
+ 4. After fold `i`, set `prev` with [`advance_previous_fold`](@ref): `predictions[i]` when [`threads_weights`](@ref) holds of it, and `prev` unchanged otherwise.
 
 # Related
 
@@ -247,7 +278,7 @@ end
 
 Give the fold the next fold is handed: `pred` when [`threads_weights`](@ref) holds of it, `prev` otherwise.
 
-One line shared by [`run_folds`](@ref) and [`online_folds`](@ref), so the two sequential loops advance by the same rule.
+[`run_folds`](@ref) and [`online_folds`](@ref) both call it, so the two sequential loops advance by the same rule.
 
 # Related
 
@@ -263,15 +294,24 @@ end
 
 Assert that the cross-validation scheme `cv` enumerates unshuffled folds.
 
-Two checks, applied to every scheme:
+A shuffled fold breaks the time order in which the fold loop, the [`TimeDependentContext`](@ref)
+schedules and the rolling transforms read the rows of the fold. A scheme may leave gaps, as
+purging, embargoing and the combinatorial splits do, but it must never reorder rows.
 
- 1. `cv` must not declare a set `shuffle` field. The check is by `hasfield`, so it holds
-    for a user-defined scheme too — no scheme in this package has such a field.
- 2. Every fold's training indices must increase strictly. A scheme may leave gaps (purging,
-    embargoing and the combinatorial splits all do), but it must never reorder rows.
+# Arguments
 
-A shuffled fold breaks the timeline that the fold loop, the [`TimeDependentContext`](@ref)
-schedules and the rolling transforms all read the fold's rows in.
+  - `cv`: The cross-validation scheme, or any value.
+  - `train_idx`: The training indices of every fold.
+
+# Validation
+
+  - `cv` does not have a `shuffle` field set to `true`. The check reads the field by `hasfield`, so it holds for a scheme a user defines. No scheme of the library has such a field.
+  - The training indices of every fold increase strictly.
+  - Either failure raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -291,19 +331,19 @@ $(DocStringExtensions.TYPEDEF)
 
 One fold of a cross-validation scheme, as [`fold_loop`](@ref) hands it to its callback.
 
-The record is the fold loop's whole hand-off. `est` and `rd` are already resolved: the
-asset view is taken, every [`TimeDependent`](@ref) schedule is swapped for its fold-`i`
-value, and the previous fold's weights are threaded in. `train` and `test` are this fold's
-own windows, so a callback never indexes `train_idx`/`test_idx` itself. `w_prev` is the
-weights that were threaded, handed over a second time so a fold whose solve fails can hold
-them: [`held_start_weights`](@ref) reads it inside `predict`.
+The record holds everything the fold loop gives its callback. `est` and `rd` are already
+resolved: the loop took the asset view, swapped every [`TimeDependent`](@ref) schedule for its
+value at fold `i`, and threaded in the weights of the previous fold. `train` and `test` are the
+windows of this fold, so a callback never indexes `train_idx` or `test_idx` itself. `w_prev`
+holds the weights that were threaded, a second time, so that a failed fold can hold them.
+[`held_start_weights`](@ref) reads it inside `predict`.
 
 `train === nothing` says *the estimator holds its window*. The online arm of the loop,
-[`online_folds`](@ref), hands its callback a `Fold` of that shape: `est` has already folded
-every row of the fold's training window through [`partial_fit!`](@ref), so a callback reads
-it out — `optimise(est)` with no returns — rather than fitting it over rows the record does
-not carry. [`fit_and_predict`](@ref) takes `train_idx = nothing` for exactly that, so every
-entry point's callback is unchanged across the two arms.
+[`online_folds`](@ref), hands its callback a `Fold` of that shape. `est` has already folded
+every row of the training window through [`partial_fit!`](@ref), so a callback reads it out
+with `optimise(est)` and no returns, in place of a fit over rows the record does not carry.
+[`fit_and_predict`](@ref) takes `train_idx = nothing` for that case, so the callback of every
+entry point is the same under both arms.
 
 The type is immutable and every field is concretely typed at the construction site, so the
 record costs nothing at run time. [`fold_loop`](@ref) is the only site that builds one,
@@ -367,8 +407,8 @@ the loop runs them in parallel. A `KFold` training window holds rows that follow
 window, so a quantity measured against another fold's weights is not a backtest reading.
 
 The method is per type and takes the scheme itself, so inference reads the answer from the
-type of `cv` and never needs the value. `folds_are_time_ordered(::Any)` answers `nothing`
-too, which is what [`fold_loop`](@ref) receives from a call site that holds no scheme.
+type of `cv` and never needs the value. The fallback over `::Any` also answers `true` for
+`nothing`, which is what [`fold_loop`](@ref) receives from a call site that holds no scheme.
 
 # Related
 
@@ -377,15 +417,15 @@ too, which is what [`fold_loop`](@ref) receives from a call site that holds no s
   - [`needs_previous_weights`](@ref)
   - [`cross_val_predict`](@ref)
 """
-folds_are_time_ordered(::Any) = true
-folds_are_time_ordered(::NonSeqCVER) = false
+folds_are_time_ordered(::Any)::Bool = true
+folds_are_time_ordered(::NonSeqCVER)::Bool = false
 
 """
     fold_evaluation(cv)
 
 Read the evaluation switches of a cross-validation scheme, in one named tuple.
 
-Every scheme entry point reads the same settings before it runs its folds, and each scheme states them for itself through a method of its own. A scheme that carries none of them, and a call site that holds a split result rather than the scheme that made it, reach the fallback and get today's behaviour: no drift, no drifted previous weights, no fee-clock override, and no stored weight path.
+Every scheme entry point reads the same settings before it runs its folds, and each scheme states them through a method of its own. A scheme that carries none of them, and a call site that holds a split result in place of the scheme that made it, reach the fallback. The fallback sets no drift, no drifted previous weights, no override of the fee clock, no stored weight path, and a Held Gap that warns.
 
 The method is per type and takes the scheme itself, so inference reads the answer from the type of `cv`, exactly as [`folds_are_time_ordered`](@ref) does.
 
@@ -423,71 +463,55 @@ The method is per type and takes the scheme itself, so inference reads the answe
   - [`folds_are_time_ordered`](@ref)
   - [`fold_loop`](@ref)
 """
-folds_are_stepped(::Any) = false
+folds_are_stepped(::Any)::Bool = false
 """
     fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
               ::Type{ElT} = PredictionResult; rd, train_idx, test_idx,
-              path_id = nothing, cv = nothing, fold_view = nothing)
+              path_id = nothing, cv = nothing, fold_view = nothing, pws = nothing)
 
-Run the `n` folds of a cross-validation scheme over `est`, and resolve each fold's estimator
-before the callback sees it.
+Run the `n` folds of a cross-validation scheme over `est`, and resolve the estimator of each
+fold before the callback sees it.
 
-This is the fold loop of the package. Every cross-validation entry point goes through
-it: the optimiser-level schemes and the [`Pipeline`](@ref) ones alike. For fold `i` it
-does four steps.
+This is the fold loop of the package. Every cross-validation entry point goes through it, the
+optimiser-level schemes and the [`Pipeline`](@ref) ones alike. The callback takes the one
+[`Fold`](@ref) record, so a call site names what it reads (`fold.est`, `fold.train`) and does
+not rely on the position of an argument.
 
- 1. It takes the fold's view of `(est, rd)` through `fold_view`. An asset-resampling scheme
-    gives one; the other schemes do not.
- 2. It swaps every [`TimeDependent`](@ref) schedule for its fold-`i` value against a
-    [`TimeDependentContext`](@ref), if `est` [`is_time_dependent`](@ref). The swap runs
-    first, so a freshly swapped-in per-fold entry also gets the weights of step 3.
- 3. It threads the previous fold's weights in through [`factory`](@ref), if `est`
-    [`needs_previous_weights`](@ref). [`one_previous_portfolio`](@ref) refuses the
-    population a frontier sweep gives, because no one portfolio of it is the previous one.
- 4. It calls `fit_fold(fold)`, with `fold` a [`Fold`](@ref).
+The loop is also the one site that decides how the folds run, and it has three arms. The online
+arm, [`online_folds`](@ref), runs when the scheme is an Online Scheme. It warms one estimator up
+on the first training window, folds the new rows of each fold into it, and hands the callback a
+[`Fold`](@ref) whose `train` is `nothing`. Steps 5 and 6 below run on a per-fold copy of the
+threaded estimator, and a schedule that the *step* reads is resolved earlier in the same fold
+through [`online_step_fold`](@ref). Otherwise the folds run in order only when the folds of `cv`
+are a timeline *and* `est` needs the weights of the previous fold. Every other case runs in
+parallel, because such a fold does not depend on the other folds.
 
-The callback takes the one [`Fold`](@ref) record, so a call site names what it reads
-(`fold.est`, `fold.train`) instead of relying on the position of an argument.
+The loop reads the three predicates of `cv` by type, so inference folds the choice and removes
+the arms that cannot run. A `Bool` keyword cannot do this: its value survives only by constant
+propagation, which one call can lose, and the sequential arm is then inferred where it can never
+run. Of the two path-level sites, the optimiser passes the [`MultipleRandomised`](@ref) it runs,
+which answers for the walk-forward it wraps, and the Pipeline omits `cv`, for which
+`folds_are_time_ordered(nothing)` answers `true`.
 
-[`assert_time_dependent_fold_count`](@ref) runs once, before the loop, and so does
-[`assert_batch_entry`](@ref) when the scheme is not an Online Scheme: the batch arms refit
-every fold from its training window and run no warm-up, so an [`Online`](@ref) anywhere
-in `est` would reach `prior(pe, X)` unresolved, and it is refused by name instead — once,
-here, rather than up to once per fold on the workers of `ex`.
+`ElT` is the element type of the result of one fold: a single [`PredictionResult`](@ref) for a
+time-ordered scheme, and a `Vector{PredictionResult}` for the multi-path combinatorial scheme.
+It is positional for the reason that [`parallel_folds`](@ref) gives.
 
-This is also the one site that decides how the folds run, and it has three arms. The
-online arm, [`online_folds`](@ref), is taken first, when the scheme is an Online Scheme
-([`folds_are_stepped`](@ref)): the loop then warms one estimator up on the first training window,
-folds each fold's new rows into it, and hands the callback a [`Fold`](@ref) whose `train` is
-`nothing` — steps 2 and 3 run on a per-fold copy of the threaded estimator, so a schedule and
-the previous weights still reach the fold, and a schedule the *step* reads is resolved earlier
-in the same fold through [`online_step_fold`](@ref). Otherwise a run is sequential only when two
-facts hold at once: the fold enumeration of `cv` is a timeline
-([`folds_are_time_ordered`](@ref)), *and* `est` needs the previous fold's weights
-([`needs_previous_weights`](@ref)). The conjunction routes through [`run_folds`](@ref).
-Every other case routes through [`parallel_folds`](@ref), because a fold with no fold behind
-it, or a fold whose estimator reads no previous weights, is independent of the other folds.
-No loop re-decides.
+# Algorithm
 
-`cv` is the scheme, and the loop reads its three per-type predicates rather than a
-value a call site computes. All are decided by the *types* of `cv` and `est`, so inference
-folds the conjunction and eliminates the arm that cannot run. A `Bool` keyword cannot do
-this: its value survives only by constant propagation, which one call hop loses, and the
-sequential arm is then inferred even where it can never run. The two path-level sites enumerate an inner walk-forward; the optimiser's passes the
-[`MultipleRandomised`](@ref) it runs, which answers for the walk-forward it wraps, and the Pipeline's holds no
-scheme and omits `cv`; `folds_are_time_ordered(nothing)` answers `true`.
-
-`ElT` is the per-fold result element type: a single
-[`PredictionResult`](@ref) for a time-ordered scheme, a `Vector{PredictionResult}` for the
-multi-path combinatorial scheme. It is positional for the reason given in
-[`parallel_folds`](@ref).
+ 1. When `est` [`is_time_dependent`](@ref), check the number of folds against its schedules with [`assert_time_dependent_fold_count`](@ref).
+ 2. When `cv` is not an Online Scheme ([`folds_are_stepped`](@ref)), refuse an [`Online`](@ref) anywhere in `est` with [`assert_batch_entry`](@ref). The batch arms refit every fold from its training window and run no warm-up, so the loop refuses it once here and not once per fold on the workers of `ex`.
+ 3. Choose the arm: [`online_folds`](@ref) for an Online Scheme; [`run_folds`](@ref) when [`folds_are_time_ordered`](@ref) holds of `cv` and `est` [`needs_previous_weights`](@ref); and [`parallel_folds`](@ref) otherwise.
+ 4. For fold `i`, take the view of `(est, rd)` that `fold_view(i)` gives, or `(est, rd)` when `fold_view` is `nothing`. An asset-resampling scheme gives a view.
+ 5. Read the previous weights with [`previous_weights`](@ref), giving `w_prev`, and swap every [`TimeDependent`](@ref) schedule for its value at fold `i` against a [`TimeDependentContext`](@ref). The swap runs first, so a per-fold entry that it swaps in also receives the weights of step 6.
+ 6. When `w_prev` is not `nothing` and `est` needs previous weights, thread them in through [`factory`](@ref). [`one_previous_portfolio`](@ref) refuses the population of a frontier, because no one portfolio of it is the previous one.
+ 7. Call `fit_fold` with the [`Fold`](@ref) of fold `i`.
 
 # Returns
 
-  - `predictions::Vector{ElT}`: One result per fold, in split order — the new folds only under
-    a [`Resume`](@ref).
-  - `opt`: The estimator the online arm threaded, folded through the last training end, or
-    `nothing` from the batch arms. An online walk-forward's Result carries it.
+  - `predictions::Vector{ElT}`: One result per fold, in split order. Under a [`Resume`](@ref), the new folds only.
+  - `opt`: The estimator that the online arm threaded, folded through the last training end, or
+    `nothing` from the batch arms. The Result of an online walk-forward carries it.
 
 # Related
 

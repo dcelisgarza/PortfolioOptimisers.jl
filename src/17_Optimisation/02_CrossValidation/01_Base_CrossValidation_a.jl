@@ -24,7 +24,18 @@ abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Identity split for [`CrossValidationResult`](@ref). Returns the result unchanged, used as a no-op fallback when splitting is not applicable.
+Give a split result back unchanged.
+
+A [`CrossValidationResult`](@ref) holds folds that are already split, so an entry point that calls `split(cv, rd)` on a scheme reads the same folds when it holds a result in place of the scheme. The data argument is not read.
+
+# Arguments
+
+  - `res`: The split result.
+  - `args...`: The data the scheme would split, which is ignored.
+
+# Returns
+
+  - `res`, the same object.
 """
 function Base.split(res::CrossValidationResult, args...)
     return res
@@ -71,8 +82,9 @@ abstract type SequentialCrossValidationEstimator <: OptimisationCrossValidationE
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for non-sequential optimisation cross-validation estimators. Non-
-sequential schemes may produce randomly sampled or combinatorial folds.
+Abstract supertype for non-sequential optimisation cross-validation estimators. A
+non-sequential scheme makes folds that are not a timeline, such as the folds of a k-fold or a
+combinatorial split.
 
 # Related
 
@@ -133,6 +145,13 @@ end
     OptCVER
 
 Union of all optimisation cross-validation estimators and results.
+
+# Related
+
+  - [`OptimisationCrossValidationEstimator`](@ref)
+  - [`OptimisationCrossValidationResult`](@ref)
+  - [`NonSeqCVER`](@ref)
+  - [`SeqCVER`](@ref)
 """
 const OptCVER = Union{<:OptimisationCrossValidationEstimator,
                       <:OptimisationCrossValidationResult}
@@ -141,6 +160,15 @@ const OptCVER = Union{<:OptimisationCrossValidationEstimator,
     NonSeqCVER
 
 Union of all non-sequential cross-validation estimators and results.
+
+[`folds_are_time_ordered`](@ref) answers `false` for every member, so the fold loop runs their folds in parallel.
+
+# Related
+
+  - [`NonSequentialCrossValidationEstimator`](@ref)
+  - [`NonSequentialCrossValidationResult`](@ref)
+  - [`SeqCVER`](@ref)
+  - [`folds_are_time_ordered`](@ref)
 """
 const NonSeqCVER = Union{<:NonSequentialCrossValidationEstimator,
                          <:NonSequentialCrossValidationResult}
@@ -148,6 +176,12 @@ const NonSeqCVER = Union{<:NonSequentialCrossValidationEstimator,
     SeqCVER
 
 Union of all sequential cross-validation estimators and results.
+
+# Related
+
+  - [`SequentialCrossValidationEstimator`](@ref)
+  - [`SequentialCrossValidationResult`](@ref)
+  - [`NonSeqCVER`](@ref)
 """
 const SeqCVER = Union{<:SequentialCrossValidationEstimator,
                       <:SequentialCrossValidationResult}
@@ -176,11 +210,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the positions of the assets in the Coverage Universe of a cross-validation window.
 
-The sibling of [`cv_nobs`](@ref) for the asset axis. It reads the numeric asset matrix of the window and the window's [`AssetPanel`](@ref), hands both to [`coverage_mask`](@ref), and turns the answer into the positions themselves, so a fold that draws over assets draws over the live ones and never over a column it could not have traded.
+This is the sibling of [`cv_nobs`](@ref) for the asset axis. A fold that draws a subset of assets draws it from these positions, so it never draws a column that could not have been traded.
 
-Four methods, and both branches are dispatch rather than a condition. The two data-level methods differ only in how the numeric matrix is reached: a returns carrier holds it directly, and a price carrier holds a `TimeArray`. The two mask-level methods take the `nothing` sentinel of an all-covered window and the mask of a gapped one.
-
-An all-dead window throws an `IsEmptyError` where the mask is derived.
+The two data-level methods differ only in how they reach the numeric matrix. A returns carrier holds it directly, and a price carrier holds a `TimeArray`. The two mask-level methods take the `nothing` sentinel of an all-covered window and the mask of a window with gaps.
 
 # Algorithm
 
@@ -196,7 +228,7 @@ An all-dead window throws an `IsEmptyError` where the mask is derived.
 
 # Validation
 
-  - At least one asset must be in the Coverage Universe of the window.
+  - At least one asset must be in the Coverage Universe of the window. [`coverage_mask`](@ref) throws an `IsEmptyError` on a window in which every asset is dead.
 
 # Returns
 
@@ -264,8 +296,9 @@ abstract type NonOptimisationSequentialCrossValidationEstimator <:
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for non-sequential non-optimisation cross-validation estimators. Non-
-sequential schemes may produce randomly sampled or combinatorial folds.
+Abstract supertype for non-sequential non-optimisation cross-validation estimators. A
+non-sequential scheme makes folds that are not a timeline, such as randomly sampled or
+combinatorial folds.
 
 # Related
 
@@ -315,9 +348,19 @@ abstract type NonOptimisationNonSequentialCrossValidationResult <:
 """
 $(DocStringExtensions.TYPEDEF)
 
-Stores the portfolio returns data associated with a cross-validation prediction. Packages
-asset returns, factor returns, benchmark returns, timestamps, implied volatilities, and
-the implied volatility risk premium adjustment for use in prediction result types.
+Stores the portfolio return series of a cross-validation prediction, with the data that is
+aligned to it.
+
+`X` is the portfolio series, not the asset returns: one vector for a single portfolio, or one
+vector per member of a population. Beside it the carrier holds the factor returns, the
+benchmark series, the timestamps, the implied volatilities and the implied volatility risk
+premium adjustment of the same observations.
+
+The carrier holds no feature matrix. [`rebuild_returns_result`](@ref) computes the collapse of
+the outer problem from the original `rd.pnl` and the weights of each fold, which is the call the
+path without cross-validation makes. The weights of a fold are on the `res` of its
+[`PredictionResult`](@ref), and `ts` is the slice of the original clock that the fold covers,
+so each fold can be rebuilt from what the result holds.
 
 # Fields
 
@@ -339,18 +382,15 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-## No feature matrix
-
-This carrier used to transport a per-fold collapsed feature matrix, so that [`rebuild_returns_result`](@ref) could stack the folds into the outer problem's. It no longer does: the outer collapse is recomputed at the assembly seam from the original, unsliced `rd.pnl` and the fold's weights, which is the *same* call the non-cross-validated path makes (see [`rebuild_returns_result`](@ref)). Nothing is lost — the fold's weights are on [`PredictionResult`](@ref)'s `res`, and `ts` here is the fold's slice of the original clock, which is everything the seam needs to reconstruct any fold's view.
-
 ## Validation
 
-  - `nf` and `F` must be consistent (both nothing, or `F` has `length(nf)` columns).
-  - If `X` and `F` provided: row count of `F` matches length of each `X` vector.
-  - If `B` and `X` provided: same type (`VecNum`/`VecVecNum`) and matching lengths.
-  - If `ts` provided: `!isempty(ts)`; at least one of `X`, `F` is not `nothing`; lengths of `ts` match `X`, `F`, and `B` where applicable.
-  - If `iv` is a `VecNum`: `ivpa` is scalar or nothing; `iv` is non-empty, non-negative, and finite; `length(iv) == length(X)`.
-  - If `iv` is a `VecVecNum`: `ivpa` is `VecNum` or nothing; `length(iv) == length(X) == length(ivpa)`; each sub-vector non-empty, non-negative, finite, and same length as corresponding `X`.
+  - `nf` and `F` must be consistent: both `nothing`, or `F` has `length(nf)` columns.
+  - If `X` and `F` are given, `F` has one row per observation of each series in `X`.
+  - If `B` and `X` are given, they have the same shape (`VecNum` or `VecVecNum`) and matching lengths. A mixed pair raises an `ArgumentError`.
+  - If `ts` is given, it is not empty, at least one of `X` and `F` is not `nothing`, and its length matches `X`, `F` and `B` where they are given.
+  - If `iv` is given, `X` is given too, else an `IsNothingError` is raised.
+  - If `iv` is a `VecNum`, `ivpa` is a scalar or `nothing`, `iv` is non-empty, non-negative and finite, `ivpa` is positive and finite, and `length(iv) == length(X)`.
+  - If `iv` is a `VecVecNum`, `ivpa` is a `VecNum` or `nothing`, `length(iv) == length(X)`, and `length(ivpa) == length(X)` when `ivpa` is given. Each entry of `ivpa` is positive and finite, and each vector of `iv` is non-empty, non-negative, finite, and as long as its series in `X`.
 
 # Related
 
@@ -443,17 +483,22 @@ This carrier used to transport a per-fold collapsed feature matrix, so that [`re
         if isa(iv, VecNum)
             @argcheck(isa(ivpa, Option{<:Number}),
                       ArgumentError("ivpa must be a scalar (or nothing) when iv is a vector of numbers, got typeof(ivpa) = $(typeof(ivpa))"))
+            @argcheck(!isnothing(X),
+                      IsNothingError("X cannot be nothing if iv is not `nothing`"))
             assert_nonempty_nonneg_finite_val(iv, :iv)
             assert_nonempty_gt0_finite_val(ivpa, :ivpa)
             @argcheck(length(iv) == length(X), DimensionMismatch)
         elseif isa(iv, VecVecNum)
             @argcheck(isa(ivpa, Option{<:VecNum}),
                       ArgumentError("ivpa must be a vector of numbers (or nothing) when iv is a vector of vectors of numbers, got typeof(ivpa) = $(typeof(ivpa))"))
+            @argcheck(!isnothing(X),
+                      IsNothingError("X cannot be nothing if iv is not `nothing`"))
             @argcheck(length(iv) == length(X), DimensionMismatch)
-            @argcheck(length(ivpa) == length(X), DimensionMismatch)
-            for (ivi, ivpai, Xi) in zip(iv, ivpa, X)
+            # A `nothing` premium compares `X` with itself, so only a given one is checked.
+            @argcheck(length(something(ivpa, X)) == length(X), DimensionMismatch)
+            assert_nonempty_gt0_finite_val(ivpa, :ivpa)
+            for (ivi, Xi) in zip(iv, X)
                 assert_nonempty_nonneg_finite_val(ivi, :iv)
-                assert_nonempty_gt0_finite_val(ivpai, :ivpa)
                 @argcheck(length(ivi) == length(Xi), DimensionMismatch)
             end
         end
@@ -527,7 +572,7 @@ end
 
 Rebuild a fold's optimisation result so that its ruined members carry a failure code.
 
-The drop needs no machinery of its own. The library already folds a vector of return codes with `any(x -> isa(x, OptimisationFailure), …)`, and the cross-validation path already filters a path on `isa(y.res.retcode, OptimisationSuccess)`, so a failed member takes the path it is on out of the run.
+A failure code is enough to drop the member. The library reads a vector of return codes with `any(x -> isa(x, OptimisationFailure), …)`, and the cross-validation path keeps a path only when `isa(y.res.retcode, OptimisationSuccess)` holds, so a failed member takes its path out of the run.
 
 # Algorithm
 
@@ -566,7 +611,7 @@ end
 
 Warn once when a drift dropped members of a population, and the return series did not.
 
-A fold whose series is drifted is warned about by [`calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift, obs)`](@ref), which runs the same drift over the same window. A fold that drifts only its held weights has no such site, so the warning is raised here instead. Either way the fold warns once.
+When the series of a fold is drifted, [`calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift, obs)`](@ref) runs the same drift over the same window and warns. A fold that drifts only its held weights runs no such call, so this function warns instead. Either way the fold warns once.
 
 # Algorithm
 
@@ -604,17 +649,15 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Stores the result of a single cross-validation fold prediction. Pairs an optimisation
-result with the returns data from the test period.
+Stores the result of a single cross-validation fold prediction. It pairs an optimisation
+result with the portfolio return series of the test period.
 
-## Fold provenance
-
-The fold's rows are not stored here. They do not need to be: `rd.ts` is the fold's slice of
-the original clock — [`port_opt_view`](@ref) slices it with the very `test_idx` the fold was
-built from — so [`feature_row_indices`](@ref) recovers them by matching timestamps whenever
-a consumer needs absolute rows. [`rebuild_returns_result`](@ref) is the one that does, and
-recovering rather than storing is what keeps that recovery correct on the combinatorial
-path, where a path's folds are assembled in split order rather than chronologically.
+The rows of the fold are not stored. `rd.ts` is the slice of the original clock that the fold
+covers, because [`port_opt_view`](@ref) slices it with the `test_idx` of the fold, so
+[`feature_row_indices`](@ref) finds the absolute rows by their timestamps.
+[`rebuild_returns_result`](@ref) is the consumer that needs them. The timestamps also stay
+correct on the combinatorial path, where the folds of a path come in split order and not in
+time order.
 
 # Fields
 
@@ -628,11 +671,9 @@ $(DocStringExtensions.FIELDS)
         hw::Option{<:HeldWeightsResult} = nothing
     ) -> PredictionResult
 
-Keywords correspond to the struct's fields. `res` and `rd` are required, because a fold prediction is meaningless without either half. `hw` defaults to `nothing`, which is the fold that held its target weights on every observation.
+Keywords correspond to the struct's fields. `res` and `rd` are required, because a fold prediction needs both. `hw` defaults to `nothing`, which is a fold that held its target weights on every observation.
 
-## The held-weights record
-
-`hw` is present only when a Weight Drift ran over the fold, so a reader dispatches on its absence rather than testing for it. It carries the asset returns of the fold, the weights held after the last observation and the form that made them, and [`weight_path`](@ref) rebuilds the weight path from it.
+`hw` is present only when a Weight Drift or a Previous-Weights Source ran over the fold, and the fold-taking consumers dispatch on its type. It carries the asset returns of the fold, the weights the drift started from, the weights held after the last observation and the drift that made them. [`weight_path`](@ref) rebuilds the weight path from it.
 
 # Related
 
@@ -675,9 +716,9 @@ end
 
 Read the weights a fold threads into the fold that follows it.
 
-This is the one seam of the Previous-Weights Source. The first fold of a run has no fold behind it, so it threads nothing whatever the source is. A later fold threads the target weights of the previous fold by default, and the weights that fold **held** after its last observation when the source asks for them.
+This is the one function that reads the Previous-Weights Source. The first fold of a run has no fold behind it, so it threads nothing whatever the source is. A later fold threads the target weights of the previous fold by default, and the weights that fold **held** after its last observation when the scheme sets a source.
 
-`prev` is the last fold whose weights this seam can thread, not always the fold before: the sequential loops advance it only when [`threads_weights`](@ref) holds of a fold, so a fold whose solve failed is skipped over by the target read and the fold before it is read instead. The weights this seam gives are therefore finite whenever it gives any.
+`prev` is the last fold whose weights can be threaded, which is not always the fold before. The sequential loops advance it only when [`threads_weights`](@ref) holds of a fold, so a failed fold is skipped and the fold before it is read. The weights this function gives are therefore finite whenever it gives any.
 
 # Algorithm
 
@@ -717,7 +758,9 @@ end
 
 Say whether a fold's prediction carries weights the next fold can be handed.
 
-The other half of the Previous-Weights Source seam: [`previous_weights`](@ref) reads the weights, and this verb says whether the fold has any to read. The sequential loops, [`run_folds`](@ref) and [`online_folds`](@ref), advance the fold they hand on only when it holds, so a failed fold is never the one read and the last threadable fold is read instead. What is read decides what is tested: the target weights are finite exactly when every member's return code is an [`OptimisationSuccess`](@ref), and the held weights are finite when the drift ran, which after [`held_start_weights`](@ref) it does on a failed fold too, so a source advances past a failed fold that held its book and stops only at one with nothing to hold.
+[`previous_weights`](@ref) reads the weights, and this function says whether the fold has any to read. The sequential loops, [`run_folds`](@ref) and [`online_folds`](@ref), hand a fold on only when this holds, so a failed fold is never read and the last threadable fold is read instead.
+
+The weights that are read decide the test. The target weights are finite exactly when every return code is an [`OptimisationSuccess`](@ref). The held weights are finite when the drift ran, and [`held_start_weights`](@ref) lets it run on a failed fold that was handed previous weights. So under a source, a failed fold that held its book is threaded, and only a fold with nothing to hold is skipped.
 
 # Algorithm
 
@@ -814,7 +857,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Roll a risk measure over the return series a single fold formed.
 
-The realised-history reading of [`rolling_window_measure`](@ref) on a fold: `pred.rd.X` is the series [`predict`](@ref) stored, so no weights are read and none are needed. Under a weight drift that series is the drifted one, and a window of it is a sub-series of the fold's own drift.
+This is the method of [`rolling_window_measure`](@ref) over the realised history of a fold. `pred.rd.X` is the series that [`predict`](@ref) stored, so the method reads no weights. Under a Weight Drift that series is the drifted one, and each window is a part of the drift of the fold.
 
 # Arguments
 
@@ -842,9 +885,15 @@ end
 
 Split a fold's net return series over the assets that produced it.
 
-The fold-taking method of [`calc_net_asset_returns`](@ref), and the mirror of [`calc_net_returns(res::OptimisationResult, X, fees)`](@ref): it resolves the fold's asset returns, its weight path and its fee, so a caller holding a fold reaches the split in one call. The fee is settled against the fold's own length exactly as [`predict`](@ref) settled it, so the rows of the result sum to the series the fold stored, to rounding.
+This is the fold-taking method of [`calc_net_asset_returns`](@ref), and the mirror of [`calc_net_returns(res::OptimisationResult, X, fees)`](@ref). It finds the asset returns, the weight path and the fee of the fold, so a caller that holds a fold reaches the split in one call. The fee is spread over the length of the fold as [`predict`](@ref) spread it, so the rows of the result sum to the series the fold stored, to rounding.
 
-A fold that carries no Held Weights record raises. `pred.rd.X` is the **portfolio** series, not the asset returns, so a fold whose scheme ran neither switch keeps no matrix to split.
+A fold that carries no Held Weights record raises. `pred.rd.X` is the **portfolio** series, not the asset returns, so a fold whose scheme set neither `wd` nor `pws` keeps no matrix to split.
+
+# Algorithm
+
+ 1. Rebuild the weight path of the fold from its record with [`weight_path`](@ref), giving `U`.
+ 2. Resolve the fee with [`fold_fees`](@ref): the fee of the result, or the caller's fee viewed at the Investable Mask.
+ 3. Split the net return of each observation over the assets with the free [`calc_net_asset_returns`](@ref), from `U`, the asset returns `hw.X`, the fee and the mask.
 
 # Arguments
 
@@ -888,13 +937,21 @@ end
 
 Decompose a fold's risk over its assets.
 
-The fold-taking method of [`risk_contribution`](@ref). It resolves the fold's **target** weights, its asset returns and its fee, and hands them to the free function, so the figures are the free function's own.
+This is the fold-taking method of [`risk_contribution`](@ref). It finds the **target** weights, the asset returns and the fee of the fold, and hands them to the free function, so the figures are the ones the free function gives.
 
-The three do not sit on one universe. The Held Weights record came back on the caller's universe through [`expand_held_weights`](@ref), and so did the target weights, while the result's fee stayed on the universe it solved on. The method therefore views the weights and the asset returns at the result's Investable Mask before the finite difference, exactly as [`investable_reduction`](@ref) does at the value-level door, and expands the per asset answer back with a zero at every non-investable asset. A result whose mask is `nothing` views nothing.
+The three are not on one universe. The Held Weights record and the target weights come back on the caller's universe through [`expand_held_weights`](@ref), and the fee of the result stays on the universe the fit solved on. The method therefore views the weights and the asset returns at the Investable Mask of the result before the finite difference, as [`investable_reduction`](@ref) does for the value-level method, and expands the answer back with a zero at every non-investable asset. A result whose mask is `nothing` views nothing.
 
-Under a Weight Drift the figures are exact to **first order in the drift** only, for the reason the free function states: the drifted series is not linear in the target weights, so the contributions sum to the fold's realised risk approximately rather than exactly. The target weights are still what a contribution is reported against, because they are the decision the finite difference perturbs.
+Under a Weight Drift the figures are exact to **first order in the drift** only. The drifted series is not linear in the target weights, so the contributions sum to the realised risk of the fold approximately. The contributions are still stated against the target weights, because the finite difference perturbs them.
 
-A fold that carries no Held Weights record raises, because `pred.rd.X` is the portfolio series and no asset matrix survives on the fold.
+A fold that carries no Held Weights record raises, because `pred.rd.X` is the portfolio series and the fold keeps no asset matrix.
+
+# Algorithm
+
+ 1. Read the Investable Mask of the result with [`result_investable_mask`](@ref), giving `imsk`.
+ 2. View the target weights and the asset returns `hw.X` at `imsk` with [`investable_weights_view`](@ref).
+ 3. Resolve the fee with [`fold_fees`](@ref).
+ 4. Compute the contributions with the free [`risk_contribution`](@ref), giving `rc`.
+ 5. Expand `rc` to the caller's universe with [`expand_investable_weights`](@ref), with a zero at every non-investable asset.
 
 # Arguments
 
@@ -943,11 +1000,17 @@ end
 
 Decompose a fold's risk over its factors.
 
-The fold-taking method of [`factor_risk_contribution`](@ref), and the twin of the [`risk_contribution`](@ref) method above. It resolves the fold's target weights, its asset returns and its fee the same way, views the weights and the returns at the result's Investable Mask the same way, and it builds the `rd` the loadings are fitted from out of the fold itself: the fold's asset returns beside the factor block [`reconstruct_rd`](@ref) carried through. A caller who wants other loadings passes its own `rd`, or a precomputed [`Regression`](@ref) as `re`.
+This is the fold-taking method of [`factor_risk_contribution`](@ref), and the twin of the fold-taking [`risk_contribution`](@ref) method. It finds the target weights, the asset returns and the fee of the fold, and views them at the Investable Mask of the result, as that method does. It also builds the `rd` that the loadings are fitted from, out of the fold itself: the asset returns of the fold beside the factor block that [`reconstruct_rd`](@ref) kept. A caller who wants other loadings passes its own `rd`, or a precomputed [`Regression`](@ref) as `re`.
 
-A caller's `rd` is stated on the caller's universe, and [`fold_factor_returns`](@ref) views it at the mask beside the weights and the returns, so the regression is fitted over the live assets alone. With no `rd` the same verb builds one from the fold, already on the live assets, because the fold's own `nx` is the reduced axis.
+The first-order caveat of the fold-taking [`risk_contribution`](@ref) method holds here unchanged, and a fold that carries no Held Weights record raises for the same reason.
 
-The first-order caveat of the [`risk_contribution`](@ref) method above holds here unchanged, and a fold that carries no Held Weights record raises for the same reason.
+# Algorithm
+
+ 1. Read the Investable Mask of the result, giving `imsk`.
+ 2. View the target weights and the asset returns `hw.X` at `imsk` with [`investable_weights_view`](@ref).
+ 3. Resolve the fee with [`fold_fees`](@ref).
+ 4. Resolve the returns result of the loadings on the live assets with [`fold_factor_returns`](@ref).
+ 5. Compute the factor contributions with the free [`factor_risk_contribution`](@ref).
 
 # Arguments
 
@@ -995,7 +1058,12 @@ end
 
 Resolve the returns result a fold's factor loadings are fitted from, on the live assets of the fold.
 
-The fold-taking [`factor_risk_contribution`](@ref) reads `rd` by dispatch. A caller's `rd` is stated on the caller's universe, as it is at the value-level door, and is viewed at the result's Investable Mask through [`investable_returns_view`](@ref). `nothing` builds one from the fold itself: the fold's asset returns viewed at the same mask, beside the factor block [`reconstruct_rd`](@ref) carried through and the fold's own `nx`, which is the reduced axis already.
+The fold-taking [`factor_risk_contribution`](@ref) reads `rd` by dispatch. A caller's `rd` is on the caller's universe, as it is for the value-level method, so it is viewed at the Investable Mask of the result. With `nothing`, the function builds a returns result from the fold itself. The `nx` of the fold is on the reduced axis already.
+
+# Algorithm
+
+ 1. On a caller's `rd`, view it at `imsk` with [`investable_returns_view`](@ref).
+ 2. On `nothing`, view the asset returns `hw.X` of the fold at `imsk`, and build a [`ReturnsResult`](@ref) from them, the `nx` of the fold and the factor block `nf`, `F` that [`reconstruct_rd`](@ref) kept.
 
 # Arguments
 
@@ -1029,18 +1097,23 @@ end
 """
     mapreduce_RetMtx(rd, sym = :X)
 
-Concatenate return matrices from a vector of `PredictionReturnsResult` objects.
+Concatenate the series of a field over the folds of a path.
 
-Internal helper that vertically concatenates the field `sym` across all elements of `rd`. Handles both single-asset (vector) and multi-asset (vector of vectors) return data.
+A field holds one series for a single portfolio, or one series per member for a population. The folds are concatenated in the order of `rd`.
+
+# Algorithm
+
+ 1. For one series per fold, concatenate the series of every fold with `vcat`.
+ 2. For one series per member, concatenate the series of member `i` over every fold, for each member `i` of the first fold.
 
 # Arguments
 
-  - `rd`: Vector of [`PredictionReturnsResult`](@ref) objects.
-  - `sym`: Symbol of the field to extract (default `:X`).
+  - `rd`: Vector of [`PredictionReturnsResult`](@ref) objects, one per fold.
+  - `sym`: Name of the field to concatenate, `:X` by default.
 
 # Returns
 
-  - Concatenated return matrix or vector of vectors.
+  - The concatenated series, or one concatenated series per member.
 """
 function mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecNum}},
                           sym = :X)
@@ -1058,19 +1131,32 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Stores predictions from multiple cross-validation folds as a single combined result.
-Concatenates the test-period returns from all folds into an aggregated
+Stores the predictions of the folds of one path, with their return data concatenated into one
 [`PredictionReturnsResult`](@ref).
 
-Per-observation quantities (`X`, `F`, `B`, `ts`, `iv`) stack across folds. `ivpa` is per-asset, not per-observation, and each fold's [`reconstruct_rd`](@ref) has already collapsed it to one value per synthetic asset using *that fold's* weights, so it cannot stack — it is **reduced to the last fold's value**. This matches [`predict_realised_vols`](@ref), which reads the last row of the stacked `iv`: the premium divisor is paired with the implied volatility it divides.
+The quantities with one value per observation (`X`, `F`, `B`, `ts`, `iv`) are concatenated
+over the folds. `ivpa` has one value per synthetic asset, and the [`reconstruct_rd`](@ref) of
+each fold has already collapsed it with the weights of that fold, so it cannot be
+concatenated. The constructor keeps the value of the **last fold**. This matches
+[`predict_realised_vols`](@ref), which reads the last row of the concatenated `iv`, so the
+premium divisor pairs with the implied volatility it divides.
 
-A feature matrix is **not** among them. It is not carried through the folds at all — [`rebuild_returns_result`](@ref) recomputes the outer collapse from the original `rd.pnl`, reaching each fold through `pred[f].res.w` and `pred[f].rd.ts`, so `pred` is what this result has to retain for it.
+A feature matrix is **not** among the concatenated quantities, because the folds do not carry
+one. [`rebuild_returns_result`](@ref) computes the outer collapse from the original `rd.pnl`,
+and reaches each fold through `pred[f].res.w` and `pred[f].rd.ts`. That is why the result keeps
+`pred`.
+
+The Result of an online run also carries, in `opt`, the estimator that the fold loop threaded,
+folded through the last training end `last(train_idx[end])`. A batch run writes `nothing`.
+[`Resume`](@ref) hands the Result back to the loop over a longer history, and the loop continues
+from the fold after the last one held. A hand step in the value form, `partial_fit(res.opt, rows)`, leaves the Result resumable. The bang form, `partial_fit!(res.opt, rows)`, writes the
+arrays of the state in place, the held timestamps among them. The Result then names a row at
+which no fold ends, and `Resume` refuses it. [`partial_fit!`](@ref) states this contract for a
+kept estimator.
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
-
-An online run's Result also carries the estimator the fold loop threaded, in `opt`, folded through the last training end `last(train_idx[end])`. A batch run writes `nothing`. [`Resume`](@ref) hands the Result back to the loop over a longer history, and the loop continues from the fold after the last one held; a hand step in the value form, `partial_fit(res.opt, rows)`, deploys the state from the last training end and leaves the Result resumable. The bang form, `partial_fit!(res.opt, rows)`, writes the state's arrays in place — the held timestamps among them — so the Result it came from then names a row no fold ends at, and `Resume` refuses it; that is the seam's contract for a kept estimator, stated at [`partial_fit!`](@ref).
 
 # Constructors
 
@@ -1080,7 +1166,7 @@ An online run's Result also carries the estimator the fold loop threaded, in `op
         opt::Option{<:AbstractEstimator} = nothing
     ) -> MultiPeriodPredictionResult
 
-Keywords correspond to the struct's fields. `pred` is required: the constructor stacks the folds' returns data into `mrd`, and the stack of no folds has no columns, no names, and no clock.
+Keywords correspond to the struct's fields. `pred` is required. The constructor concatenates the return data of the folds into `mrd`, and a concatenation of no folds has no names and no clock.
 
 ## Validation
 
@@ -1215,9 +1301,11 @@ const VecPredRes_MultiPredRes = AbstractVector{<:PredRes_MultiPredRes}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Stores a collection of multi-period prediction results produced by a population-based
-cross-validation scheme (e.g. [`MultipleRandomised`](@ref)). Each element of `pred`
-represents one random asset-subset path.
+Stores the paths of a cross-validation scheme that makes more than one path. Each element of
+`pred` is one path: a random asset subset of [`MultipleRandomised`](@ref), or a path of
+[`CombinatorialCrossValidation`](@ref). A member is usually a
+[`MultiPeriodPredictionResult`](@ref), and a population built by hand can hold a single-fold
+[`PredictionResult`](@ref).
 
 # Fields
 
@@ -1231,9 +1319,9 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields. An empty `pred` is admitted: a population from which every path was dropped is a valid, if empty, answer.
 
-## Every member carries an `id`
+## Every multi-period member carries an `id`
 
-A member whose `id` is `nothing` takes its position in `pred` as its `id`, through [`population_ids`](@ref). The schemes that make a population already number their paths that way, so the rule changes nothing for them. It gives an identifier to a population built by hand from [`cross_val_predict`](@ref) streams, so the path that [`NearestQuantilePrediction`](@ref) or [`sort_by_measure`](@ref) selects names its place in the population. A member that already carries an `id` keeps it.
+A [`MultiPeriodPredictionResult`](@ref) member whose `id` is `nothing` takes its position in `pred` as its `id`, through [`population_ids`](@ref). The schemes that make a population already number their paths that way, so the rule changes nothing for them. It gives an identifier to a population built by hand from [`cross_val_predict`](@ref) streams, so the path that [`NearestQuantilePrediction`](@ref) or [`sort_by_measure`](@ref) selects names its place in the population. A member that already carries an `id` keeps it. A single-fold [`PredictionResult`](@ref) has no `id` field, and is kept as it is.
 
 # Related
 
@@ -1321,7 +1409,23 @@ end
     sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)
 
 Sort the successful paths in a [`PopulationPredictionResult`](@ref) by their expected
-risk under `r`. Paths where any fold returned a non-success retcode are excluded.
+risk under `r`. A path in which any fold returned a failure code is left out.
+
+A path whose measure is not finite goes **after** every finite one, under both directions of
+the ranking, because a non-finite number is not a best and must not be the answer of a
+`first`. The finite members are sorted among themselves, and the non-finite ones keep their own
+order at the end.
+
+The direction of the ranking comes from [`bigger_is_better`](@ref), which **throws** on a vector
+of measures that disagree on polarity. [`quantile_by_measure`](@ref) takes an explicit `sign`
+instead, so it admits a mixed vector.
+
+# Algorithm
+
+ 1. Keep the successful members of `ppred` with [`successful_members`](@ref).
+ 2. Compute the expected risk of each member under `r`, giving `rks`.
+ 3. Sort the members whose `rks` is finite by `rks`, in descending order when [`bigger_is_better`](@ref) holds of `r` and in ascending order otherwise.
+ 4. Append the members whose `rks` is not finite, in their own order.
 
 # Arguments
 
@@ -1329,17 +1433,13 @@ risk under `r`. Paths where any fold returned a non-success retcode are excluded
   - `r::BaseRM_VecBaseRM`: Risk measure used for ranking, or a vector of them. A vector is scalarised by `kwargs.sca`, defaulting to [`SumScalariser`](@ref).
   - `kwargs...`: Keyword arguments forwarded to `expected_risk`.
 
+# Validation
+
+  - A vector `r` whose measures disagree on polarity raises in [`bigger_is_better`](@ref).
+
 # Returns
 
-  - `Vector{MultiPeriodPredictionResult}`: Sorted vector of successful path predictions.
-
-## A non-finite measure is last, whatever `rev` is
-
-A path whose measure is not finite is placed **after** every finite one, under both directions of the ranking. A sort that put it first under one direction would make it the answer of a `first`, and a non-finite number is not a best. The finite members are sorted among themselves, and the non-finite ones keep their own order at the tail.
-
-## A mixed vector is refused here, and accepted by its sibling
-
-The ranking direction comes from [`bigger_is_better`](@ref), which **throws** on a vector whose elements disagree on polarity, because the flag decides which tail of the ranking is best and neither answer would be right. [`quantile_by_measure`](@ref) takes an explicit `sign` instead, so it admits a mixed vector.
+  - `Vector`: The successful members, sorted. Each is a [`MultiPeriodPredictionResult`](@ref), or a [`PredictionResult`](@ref) when the population holds single folds.
 
 # Related
 
@@ -1362,6 +1462,18 @@ end
 
 Select the successful path in `ppred` whose expected risk under `r` is closest to the `q`-th quantile of the risk distribution across all successful paths.
 
+A path whose measure is not finite takes no part. It is dropped before the quantile, so one failed path cannot make the quantile non-finite and cannot be the answer.
+
+[`sort_by_measure`](@ref) calls [`bigger_is_better`](@ref) for its direction, so it **throws** on a vector of measures that disagree on polarity. This function takes an explicit `sign` instead. The caller gives the one fact that `bigger_is_better` cannot infer, so a mixed vector is admitted.
+
+# Algorithm
+
+ 1. Keep the successful members of `ppred` with [`successful_members`](@ref).
+ 2. Compute `sign` times the expected risk of each member under `r`, giving `rks`.
+ 3. Drop the members whose `rks` is not finite.
+ 4. Compute the `q`-th quantile of `rks` with `Statistics.quantile`, giving `rkq`.
+ 5. Return the first member whose `abs(rks[i] - rkq)` is the smallest.
+
 # Arguments
 
   - `ppred::PopulationPredictionResult`: Population prediction result.
@@ -1371,17 +1483,13 @@ Select the successful path in `ppred` whose expected risk under `r` is closest t
   - `q_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `Statistics.quantile`.
   - `sign::Integer = 1`: Orientation of the risk scale. Use `1` when a larger risk is worse, `-1` when it is better. This is what lets a mixed vector through, see below.
 
+# Validation
+
+  - At least one successful member must have a finite measure. With none, `Statistics.quantile` receives an empty vector and throws.
+
 # Returns
 
-  - [`MultiPeriodPredictionResult`](@ref): The path closest to the `q`-th quantile.
-
-## The quantile is taken over the finite members
-
-A path whose measure is not finite takes no part: it is dropped before the quantile, so one failed path cannot make the quantile itself non-finite and cannot be returned as the answer. A population in which no member has a finite measure reaches `Statistics.quantile` with an empty vector, which refuses.
-
-## A mixed vector is accepted here, and refused by its sibling
-
-[`sort_by_measure`](@ref) calls [`bigger_is_better`](@ref) for its `rev` flag, so it **throws** on a vector whose elements disagree on polarity. This function takes an explicit `sign` instead, so the caller has already supplied the one thing `bigger_is_better` cannot infer, and a mixed vector is admitted.
+  - The member closest to the `q`-th quantile: a [`MultiPeriodPredictionResult`](@ref), or a [`PredictionResult`](@ref) when the population holds single folds.
 
 # Related
 
@@ -1408,9 +1516,6 @@ function quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBas
         end
     end
     return pred[idx]
-    # sorted_predictions = sort_by_measure(ppred, r; kwargs...)
-    # idx = max(1, round(Int, Statistics.quantile(1:length(sorted_predictions), q)))
-    # return sorted_predictions[idx]
 end
 """
     collapse_benchmark(B::Nothing, w::VecNum_VecVecNum, hw)
@@ -1423,9 +1528,9 @@ end
 
 Collapse a fold's benchmark asset returns into a benchmark return series.
 
-A benchmark that is already a series passes through. A benchmark matrix is contracted with the fold's own weights, and the method is chosen by the pair `(B, w)`, so nothing is tested at run time.
+A benchmark that is already a series passes through. A benchmark matrix is contracted with the weights of the fold, and dispatch on the pair `(B, w)` chooses the method.
 
-The fold's Held Weights record picks the reading. Without one the matrix collapses against the target weights, which is the library's original behaviour and what a fold that ran no drift keeps. With one it collapses row by row against the weight path, so the benchmark follows the same convention the portfolio series follows and a caller comparing the two — a tracking error, for instance — compares two series scored the same way.
+The Held Weights record of the fold chooses the weights. Without one, the matrix collapses against the target weights, which is what a fold that ran no drift held. With one, it collapses row by row against the weight path, as the portfolio series does. A caller that compares the two series, for a tracking error for instance, then compares two series formed the same way.
 
 # Algorithm
 
@@ -1478,11 +1583,14 @@ end
 
 View a fold's weights and test window at the Investable Mask, and pass its fees through.
 
-An optimisation reduces to the Investable Mask at its entry and expands the solved weights back to the caller's universe, so the weight of an asset the fit found non-investable is `0`. That rule carries to the window those weights are scored on: the fold views the weights and the window together, before anything reads the window, so a dead column is never read at all and the Held Gap filter of [`filter_held_gaps`](@ref) runs over the investable columns alone.
+An optimisation reduces to the Investable Mask at its entry and expands the solved weights back to the caller's universe, so the weight of an asset that the fit found non-investable is `0`. The fold views the weights and the window at the mask together, before anything reads the window. A dead column is therefore never read, and [`filter_held_gaps`](@ref) runs over the investable columns alone.
 
-The fees are **not** viewed. A result carries the objects of the universe it solved on beside the mask, so `res.fees` is on the investable universe already and a second view would index its per-asset rates by positions of the full universe. The fees ride along so the verb hands the fold the three things it scores with in one call.
+The fees are **not** viewed. A result carries the objects of the universe it solved on, so `res.fees` is on the investable universe already, and a second view would index its per-asset rates by positions of the full universe. The function returns the fees unchanged so that the fold receives the three values it scores with from one call.
 
-A result whose mask is `nothing` views nothing, which is what keeps a universe with nothing to exclude on the path it took before the mask existed.
+# Algorithm
+
+ 1. With no mask, give `(w, rd, fees)` unchanged.
+ 2. With a mask, give the weights viewed at the mask with [`investable_weights_view`](@ref), `rd` viewed at the columns `findall(imsk)` with [`port_opt_view`](@ref), and `fees` unchanged.
 
 # Arguments
 
@@ -1517,9 +1625,14 @@ end
 
 Resolve the fee a fold-taking consumer charges: the result's own, or a caller's viewed at the result's Investable Mask.
 
-The three fold-taking consumers — [`calc_net_asset_returns`](@ref), [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) on a [`PredictionResult`](@ref) — take an optional `fees` so a caller can score a stored fold under a fee of their own. The two fees they can meet live on different universes. The result's own fee was reduced at the fit's door, so its five per-asset fields sit on the investable axis and its two liquidation carriers on the complement, and [`investable_fold_view`](@ref) hands it through unviewed. A caller's fee is stated on the caller's universe, as a caller's `rd` is, so it takes the same door a fee takes at the fit: [`investable_fees_view`](@ref) slices the per-asset fields to the mask and the carriers to its complement, deriving the complement from the width of the expanded record `X`, and strips the carriers when the mask is `nothing`, because nothing left.
+The three fold-taking consumers, [`calc_net_asset_returns`](@ref), [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) on a [`PredictionResult`](@ref), take an optional `fees`, so a caller can score a stored fold under a fee of their own. The two fees are on different universes. The fit reduced the fee of the result, so its five per-asset fields are on the investable axis and its two liquidation carriers are on the complement. A caller's fee is on the caller's universe, as a caller's `rd` is, so it takes the same view that a fee takes at the fit.
 
-The split is by dispatch on `fees`. A `nothing` reads the result's fee through [`extract_fees`](@ref); a `Fees` is the caller's and is viewed. Without the view a per-asset rate stated on the full universe met the reduced weights with a `BoundsError`, and a full-universe carrier was charged as though every position had been liquidated.
+Without the view, a per-asset rate on the full universe met the reduced weights with a `BoundsError`, and a carrier on the full universe was charged as though every position had been liquidated.
+
+# Algorithm
+
+ 1. With no caller fee, give the fee of the result through [`extract_fees`](@ref).
+ 2. With a caller fee, view it with [`investable_fees_view`](@ref). The per-asset fields are sliced to the mask and the carriers to its complement, which is found from the width of `X`. The carriers are removed when the mask is `nothing`, because no asset left.
 
 # Arguments
 
@@ -1549,13 +1662,19 @@ end
 
 Reconstruct a `PredictionReturnsResult` from an optimisation result and returns data.
 
-Computes the benchmark returns, the implied volatilities and the implied volatility risk premium adjustment from the optimisation result weights and the original returns data.
+It collapses the benchmark returns, the implied volatilities and the implied volatility risk premium adjustment of `rd` with the weights of the fold, and pairs them with the portfolio series `X`.
 
-The benchmark collapse follows the fold's weight-drift setting whenever `rd.B` is a matrix. A fold that carries a [`HeldWeightsResult`](@ref) collapses the matrix row by row against its weight path, the same convention its portfolio series is scored under; a fold that carries none collapses it against the target weights, as before. [`collapse_benchmark`](@ref) is the verb, and it reads the pair by dispatch.
+A benchmark matrix collapses as [`collapse_benchmark`](@ref) states: against the weight path when the fold carries a [`HeldWeightsResult`](@ref), and against the target weights when it does not. `iv` and `ivpa` are rates, so they collapse as convex combinations, against the weights of [`synthetic_asset_weights`](@ref).
 
-## No feature matrix
+The fold does not collapse the panel of the carrier. A *square* feature matrix needs the weights of every synthetic asset at once for its second contraction, and only one weight vector is known here. [`rebuild_returns_result`](@ref) instead computes the collapse for the whole synthetic universe from the original `rd.pnl` and the fold weights `pred[f].res.w`.
 
-The fold does not collapse the carrier's panel. Only one weight vector is in scope here, which is not enough to collapse a *square* feature matrix — the second contraction needs every synthetic asset's weights at once — so a fold-side collapse could only serve one of the two shapes, and the two paths into the outer problem would disagree on what a square carrier means. [`rebuild_returns_result`](@ref) instead recomputes the collapse for the whole synthetic universe at once, from the original `rd.pnl` and the fold weights it reaches through `pred[f].res.w`.
+# Algorithm
+
+ 1. Collapse `rd.B` with [`collapse_benchmark`](@ref), from `w` and `hw`.
+ 2. When `rd.iv` is given or `rd.ivpa` is a vector, compute the convex weights `cw` of `w` with [`synthetic_asset_weights`](@ref), one vector per member under a population.
+ 3. Collapse `rd.iv` to `rd.iv * cw`, and a vector `rd.ivpa` to `dot(rd.ivpa, cw)`. A scalar `ivpa` stays as it is.
+ 4. Under a population, repeat a scalar `ivpa` once per member.
+ 5. Build the [`PredictionReturnsResult`](@ref) from `nx`, `X`, the factor block, `nb`, the collapsed values and `ts`.
 
 # Arguments
 
@@ -1637,13 +1756,16 @@ end
 
 Name the weights a fold's drift starts from: its own on a solved fold, the previous weights on a failed one.
 
-A fold that could not rebalance holds what it held, so under a Weight Drift or a Previous-Weights Source a failed fold drifts the weights it was handed rather than its `NaN` target. The choice is by return code, read per member under a population, and the previous weights are one vector for every member or one per member. A population solved under one return code — a frontier the one [`JuMPOptimisationResult`](@ref) carries — reads that code for every member. A failed fold with no previous weights keeps its `NaN` weights, and [`held_weights_result`](@ref) records `NaN` for it without drifting.
+A fold that could not rebalance holds what it held. So under a Weight Drift or a Previous-Weights Source, a failed fold drifts the weights it was handed and not its `NaN` target. The return code decides, read per member under a population, and the previous weights are one vector for every member or one vector per member. A population solved under one return code, such as the frontier of one [`JuMPOptimisationResult`](@ref), reads that code for every member. A failed fold or member with no previous weights keeps its `NaN` weights, and [`held_weights_result`](@ref) records `NaN` for it without a drift.
 
 # Algorithm
 
  1. On an [`OptimisationSuccess`](@ref), give `w`.
  2. On an [`OptimisationFailure`](@ref) over one vector, give `w_prev`, or `w` when there is none.
- 3. Over a population, give, for each member, its own vector on a success and the previous weights on a failure: the one vector when `w_prev` is one, its own entry when `w_prev` is one per member. One return code over a population is that code for every member.
+ 3. Over a population with one return code, repeat that code once per member.
+ 4. Over a population with no `w_prev`, give `w`.
+ 5. Over a population with one `w_prev` vector, repeat it once per member.
+ 6. Over a population with one `w_prev` per member, give each member its own vector on a success and its entry of `w_prev` on a failure.
 
 # Arguments
 
@@ -1698,56 +1820,51 @@ end
 Apply an optimisation result `res` to returns data `rd` to produce a
 [`PredictionResult`](@ref) or a vector of prediction results.
 
-When `test_idx` is provided, only the rows (observations) indexed by `test_idx` (and
-optionally columns `cols`) of `rd` are used for the prediction.
+When `test_idx` is given, only the rows of `rd` that `test_idx` indexes, and the columns that
+`cols` selects, are used for the prediction.
 
-The fee needs no horizon stamped onto it. `charge_fees` hands in the length of the series it
-charges, so a fold spreads a one-off cost over its own observations and the whole-sample method
-spreads it over the whole sample, each without a number stored on the fee. `fees.fa` names the
-clock alone: a `nothing` or `FirstObservationFees` charges the two fixed terms on the first
-observation of the series, and an `AmortisedFees` spreads them evenly over it.
+The fee holds no horizon. `charge_fees` receives the length of the series it charges, so a fold
+spreads a one-off cost over its own observations and the whole-sample method spreads it over the
+whole sample. `fees.fa` names the clock alone: a `nothing` or `FirstObservationFees` charges the
+two fixed terms on the first observation of the series, and an `AmortisedFees` spreads them
+evenly over it. The `fa` keyword **overrides** that clock for the series this method builds, and
+changes nothing that the result holds. A report can then charge a fixed fee as a fund saw it, while
+the optimiser prices the same fee as its own objective needs.
 
-The `fa` keyword **overrides** that clock for the series this method builds, and it reaches the
-result not at all. `nothing` inherits the clock the fee itself states, which is the library's
-original behaviour. This is what lets a report charge a fixed fee the way a fund saw it while the
-optimiser prices the same fee the way its own objective must. [`override_fee_amortisation`](@ref)
-is the verb, and the cross-validation schemes state the keyword in a field of the same name.
-
-## The Investable Mask, then the Held Gaps
-
-A test window over a point-in-time universe holds two kinds of gap, and `predict` takes them in
-order.
-
- 1. **The column of a non-investable asset.** The fit found it, its weight is `0`, and
-    the fold views the window and the weights at `res.imsk` through
-    [`investable_fold_view`](@ref) before anything reads them, so the column is never read. The
-    fees are not viewed, because the result carries them on the investable universe already.
- 2. **A Held Gap**, an `(observation, asset)` pair at which the weight is non-zero and the return is
-    missing. It is what an asset that delists **inside** the test window makes, and the mask is a
-    per-fit fact that cannot see it. [`filter_held_gaps`](@ref) zeroes every non-finite entry of the
-    reduced window once, before the series is formed and before a Weight Drift compounds on it, and
-    names the held pairs through [`strict_diagnostic`](@ref): a warning by default, an
-    `ArgumentError` under `strict`. Nothing is renormalised, so the missing weight sits in cash on
-    that observation.
-
-The filtered window feeds [`calc_net_returns`](@ref) and [`held_weights_result`](@ref) alike, so the
-drift compounds on the matrix the series was formed from. The Held Weights record expands back to
-the caller's universe through [`expand_held_weights`](@ref), because the next fold's turnover reads
-it. The identity a fold's series satisfies, with the fee taken over the whole weight vector:
+A test window over a point-in-time universe holds two kinds of gap. The column of a
+non-investable asset has weight `0`, and the view at the Investable Mask removes it before
+anything reads it. A **Held Gap** is an `(observation, asset)` pair at which the weight is not
+zero and the return is missing, which an asset that delists **inside** the test window makes. The
+mask comes from the fit and cannot see it. Nothing is renormalised, so the missing weight is held
+in cash on that observation. Without a drift, the series of the fold is
 
 ```text
 returns[t] == sum_i w_i * (isfinite(X[t, i]) ? X[t, i] : 0) - fee
 ```
 
-## A failed fold holds
+with the fee taken over the whole weight vector. Under a drift, `w_i` is the weight of asset `i`
+on the weight path at observation `t`.
 
-A fold whose solve failed carries `NaN` weights, and its series is `NaN`: no fee is charged and
-the identity above holds of `NaN`. Under a drift the fold still held something, and
-[`held_start_weights`](@ref) says what: the previous weights it was handed through `w_prev`, member
-by member under a population, so the Held Weights record drifts them through the window and the
-next fold reads the book the fund carried. With no `w_prev` — fold 1, or a scheme whose folds are
-not a timeline — the record is `NaN` and nothing throws. `res.w` and `rd.X` stay `NaN` either way,
-so a scorer still sees the failure.
+A failed fold carries `NaN` weights, so its series is `NaN` and `res.w` and `rd.X` show the
+failure to a scorer. Under a drift the fold still held a book. [`held_start_weights`](@ref)
+starts the drift from the previous weights `w_prev`, member by member under a population, so the
+next fold reads that book. With no `w_prev`, which is fold 1 or a scheme whose folds are not a
+timeline, the record is `NaN` and nothing throws.
+
+# Algorithm
+
+ 1. For the index methods, view the rows `test_idx` and the columns `cols` of `rd` with [`port_opt_view`](@ref).
+ 2. View the weights and the window at the Investable Mask of `res` with [`investable_fold_view`](@ref). The fee of the result is on the investable universe already, and is not viewed.
+ 3. Override the clock of the fee with `fa` through [`override_fee_amortisation`](@ref).
+ 4. Set every non-finite entry of the window to zero with [`filter_held_gaps`](@ref), giving `Xf`. A Held Gap warns, or raises an `ArgumentError` under `strict`, through [`strict_diagnostic`](@ref).
+ 5. Compute the net return series from the weights, `Xf`, the fee and `wd` with [`calc_net_returns`](@ref).
+ 6. Choose the weights the drift starts from with [`held_start_weights`](@ref), from the return code, the weights and `w_prev` viewed at the mask.
+ 7. Drift them over `Xf` under `hwd` with [`held_weights_result`](@ref), giving the record and the ruined members.
+ 8. Warn about the ruined members with [`warn_ruined_members`](@ref), and mark them failed with [`mark_ruined_members`](@ref).
+ 9. Collapse the data aligned to the series with [`reconstruct_rd`](@ref).
+10. Expand the record to the caller's universe with [`expand_held_weights`](@ref), because the turnover of the next fold reads it, and build the [`PredictionResult`](@ref).
+
+The method over `test_idxs` runs the method over one `test_idx` for each fold.
 
 # Arguments
 
@@ -1758,7 +1875,10 @@ so a scorer still sees the failure.
 
 # Keyword Arguments
 
+  - `wd::Option{<:AbstractWeightDrift} = nothing`: The Weight Drift of the series, or `nothing` for a series formed from the target weights.
+  - `hwd::Option{<:AbstractWeightDrift} = wd`: The drift of the Held Weights record, or `nothing` for no record. The schemes pass [`held_weights_drift`](@ref)`(wd, pws)`, so a Previous-Weights Source records the held weights of a series that is not drifted.
   - `fa::Option{<:AbstractFeeAmortisation} = nothing`: The clock the series charges the two fixed fee terms on, or `nothing` to inherit the clock the fee itself states.
+  - `store_weight_path::Bool = false`: Whether the record stores the weight path, in place of rebuilding it on demand.
   - `strict::Bool = false`: Whether a Held Gap raises an `ArgumentError` rather than warning.
   - `w_prev::Option{<:VecNum_VecVecNum} = nothing`: The previous weights the fold was handed, which a failed fold holds under a drift, or `nothing`.
 

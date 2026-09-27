@@ -1024,7 +1024,7 @@ in the sense of `STANDARDS.md`.
     edit and not a silent one.
     =#
     @testset "# Details is abolished" begin
-        DETAILS_TOTAL = 26
+        DETAILS_TOTAL = 24
 
         @testset "a swept file carries no # Details section" begin
             offenders = Tuple{String, Int}[]
@@ -1112,7 +1112,7 @@ in the sense of `STANDARDS.md`.
         # The count of dispatch aliases carrying no `# Related`. Each file's own #404 prose
         # ticket pays its share. Lower the number in the commit that pays it, and retire the
         # ratchet at zero.
-        NO_RELATED_TOTAL = 17
+        NO_RELATED_TOTAL = 14
 
         # A `const` bound to a bare name is an acronym; to a type expression, a dispatch
         # alias. `Expr(:curly, ...)` is a type expression and `Expr(:call, ...)` is a value,

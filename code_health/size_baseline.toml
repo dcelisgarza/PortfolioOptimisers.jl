@@ -281,8 +281,8 @@ commit = "ebcacfda95"
 "src/17_Optimisation/01_Base_Optimisation/05_InvestableUniverse.jl" = { code = 96, doc = 231, comment = 12, blank = 123, total = 462 }
 "src/17_Optimisation/01_Base_Optimisation/06_PanelCollapse.jl" = { code = 94, doc = 168, comment = 5, blank = 89, total = 356 }
 "src/17_Optimisation/01_Base_Optimisation/07_ResultInvestableView.jl" = { code = 66, doc = 109, comment = 10, blank = 48, total = 233 }
-"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl" = { code = 493, doc = 897, comment = 34, blank = 385, total = 1809 }
-"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { code = 152, doc = 309, comment = 11, blank = 98, total = 570 }
+"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl" = { code = 497, doc = 989, comment = 32, blank = 411, total = 1929 }
+"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { code = 152, doc = 317, comment = 11, blank = 114, total = 594 }
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 85, doc = 125, comment = 0, blank = 49, total = 259 }
 "src/17_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { code = 257, doc = 303, comment = 7, blank = 123, total = 690 }
 "src/17_Optimisation/02_CrossValidation/04_WalkForward.jl" = { code = 432, doc = 694, comment = 2, blank = 226, total = 1354 }
