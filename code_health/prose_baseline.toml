@@ -6,8 +6,8 @@
 # ADR 0171.
 
 [provenance]
-julia = "1.13.0"
-commit = "ab7d9a42da"
-glossary_terms = 173
+julia = "1.13.1"
+commit = "ebcacfda95"
+glossary_terms = 175
 
 [file]
