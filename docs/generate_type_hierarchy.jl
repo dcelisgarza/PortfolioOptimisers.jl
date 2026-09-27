@@ -96,8 +96,7 @@ function generate_type_hierarchy(path::String = joinpath(@__DIR__, "src",
               The trees below are generated automatically from the live type hierarchy
               every time the documentation is built (see [docs/generate_type_hierarchy.jl](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/generate_type_hierarchy.jl)),
               so they always reflect the current state of the package. Each type links to
-              its docstring, on whichever side of the public/private split (ADR 0128,
-              `docs/adr/`) holds it.
+              its docstring, on whichever side of the public/private split holds it.
 
               For the same types grouped by the job they do rather than by subtyping, see the
               [capability catalogue](@ref capability-catalogue).
