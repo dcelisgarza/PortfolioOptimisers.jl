@@ -267,6 +267,10 @@ In v0.31 each of these calls returned a value that did not follow the configurat
 | A `Pipeline` with a capped `Online` prior two levels down, such as `opt.pe.pe`, after a `PriceGapFill` step | Ran, although the same prior one level down raised an error | `ArgumentError` |
 | `partial_fit!` on a `Pipeline` whose `Online` step no warm-up resolved | The step dropped the wrapper and its cap. `Online(EmpiricalPrior(); max_history = 30)` folded 80 rows. | `ArgumentError` |
 | `plot_rolling_drawdowns` with a window longer than the series | Drew an empty plot | `DomainError` |
+| `RollingLogReturn`, `Reversal`, `RollingMax` or `MaxReturn` on returns that hold an infinite value | Accepted. `RollingLogReturn` gave `NaN` in every later window, also in a window that does not hold the infinite return, and `RollingMax` gave `Inf`. | `DomainError` that names the observation and the asset |
+| `EWResidualVolatility(; beta_half_life = Inf)` | `DomainError` that named `half_life` | `DomainError` that names `beta_half_life` |
+| `factor_family_basis` when the dropped member of a family has a zero benchmark-weighted exposure | `DivideError` on `Rational` data, and on floating-point data an `IsNonFiniteError` that did not name the member | `IsNonFiniteError` that names the member, the family and the observation |
+| `PredictionReturnsResult(; iv)` with no `X` | `MethodError` | `IsNothingError` that names `X` and `iv` |
 
 ### [Calls that now answer](@id migration-0-32-answers)
 
@@ -277,7 +281,7 @@ In v0.31 each of these calls returned a value that did not follow the configurat
 | An upper bound over several assets on an EVaR or RLVaR view, with `alg = nothing` | `ArgumentError` | The sequential formulation meets the view. |
 | An upper-bound grid EVaR view at half the prior value | On a 100-row example, a `DomainError` on the posterior weights | The posterior meets the bound to `1e-10`. |
 | `optimise(opt, rd; dims = 2)` on `EqualWeighted`, `RandomWeighted` or a hierarchical optimiser, and `plot_dendrogram` or `plot_clusters` on a prior result with `dims = 2` | `ConflictingArgumentError`, `DimensionMismatch` or `BoundsError` | The call ignores `dims`, and it gives the answer of `dims = 1`. |
-| Integer returns in `HierarchicalRiskParity`, `HierarchicalEqualRiskContribution`, `SchurComplementHierarchicalRiskParity`, `InverseVolatility`, `EqualWeighted`, `RandomWeighted`, `PreviousWeights`, the three exponentially weighted moment estimators, `phylogeny_features`, `factor_model_summary`, the exposure, regression and idiosyncratic diagnostics, `CrossSectionalFactorPrior` and `OrthogonalUncertaintySet` | `InexactError`, or `MethodError` for `eps(::Type{Int64})` | The answer of the `Float64` copy of the data. `Float32` data stays `Float32`. |
+| Integer returns in `HierarchicalRiskParity`, `HierarchicalEqualRiskContribution`, `SchurComplementHierarchicalRiskParity`, `InverseVolatility`, `EqualWeighted`, `RandomWeighted`, `PreviousWeights`, the three exponentially weighted moment estimators, `RegimeAdjustedExpWeightedVariance`, `RegimeAdjustedExpWeightedCovariance`, `phylogeny_features`, `factor_model_summary`, the exposure, regression and idiosyncratic diagnostics, `CrossSectionalFactorPrior`, `factor_family_basis` and `OrthogonalUncertaintySet`. In `descriptor`: the rolling Descriptors, such as `RollingLogReturn` and `RollingMax`, `EWMean` and the named Descriptors that it builds, such as `EWMomentum`, `EWMarketBeta` with `agg_obs > 1`, and `EWMacroSensitivity`, also with an integer `ref` | `InexactError`, or `MethodError` for `eps(::Type{Int64})` | The answer of the `Float64` copy of the data. `Float32` data stays `Float32`. |
 | An optimiser whose fallback `fb` is a precomputed result, such as `fb = optimise(EqualWeighted(), rd)`, when the first solve fails | `MethodError` | The fallback returns that result. A failed precomputed result ends the chain. |
 | `MonotonicSchurComplement` on a bracket narrower than about `0.18 * tol` | The search did not iterate. It warned that it did not converge, or it raised under `strict = true`. | The search stops when the bracket is at most `tol` wide. |
 | `feature_matrix(…, rows)` with a `Bool` mask | `DimensionMismatch` | The stack holds the rows where the mask is `true`. |
@@ -296,6 +300,8 @@ In v0.31 each of these calls returned a value that did not follow the configurat
 | `price_ingestion` on a table of `Union{Missing, Rational{Int}}` that holds no `missing` | `DomainError` | Runs |
 | A `price_ingestion` collapse whose timestamp function makes new timestamps, on a time-varying panel | `ArgumentError` | Runs |
 | `linear_constraints` with a group that sheds every member while the other side is not empty | `BoundsError` | Runs |
+| `predict` of a `Frontier` optimisation on a `ReturnsResult` with `iv` and no `ivpa`, and `PredictionReturnsResult` with one `iv` vector for each member and no `ivpa` | `MethodError` | Runs. The `iv` of each member is `iv * (abs.(w) / sum(abs, w))`. |
+| `CrossSectionalFactorPrior(; neutralise)` with a `Symbol` target, such as `"size" => :value` | The constructor accepted it, and the fit raised a `MethodError` | The answer of the `String` target |
 | `plot_factor_mu`, `plot_factor_sigma`, `plot_factor_forecast_correlation` and `plot_factor_forecast_volatilities` on a `HighOrderPrior` over a `FactorPrior` | `FieldError` | Runs |
 | `plot_composition` of a prediction with a masked fold, `plot_dendrogram` and `plot_clusters` on a prior with gaps, `plot_measures` on a `PredictionResult`, and `plot_asset_cumulative_returns(…; N = 0.5)` | An error. A masked fold gave a `BoundsError`, a prior with gaps an `IsNonFiniteError`, and a fractional `N` a `TypeError`. | Runs |
 
@@ -354,6 +360,7 @@ These results were wrong in v0.31:
 - `forecast_coverage` and its summary counted an asset with an infinite weight, which the Pearson column drops. They now admit `0 < u < Inf`.
 - `factor_model_summary` of a constant factor series gave a Sharpe ratio up to `1.3e17` and an autocorrelation of `±1`. The exposure diagnostics counted a zero weight toward a pair, and one `NaN` weight made an observation `NaN`. A constant cross-section gave an exposure correlation of `0.0` and a `cs_regression_r2` up to `8.1e31`. Each of these is now `NaN`.
 - `idio_skewness` and `idio_kurtosis` of a constant cross-section gave a finite value up to `2.45`, where the docstring states `NaN`. `idio_tail_rate` counted an infinite entry in the numerator and not in the denominator, so `[Inf 0.5 4 NaN -5]` gave `1.0` where the rate is `2/3`.
+- A `PanelFieldRatio` whose `num` or `den` sums several Panel Fields took the number type of the first term. So a `Float32` first term rounded a `Float64` term. With `num = ["f32" => 1, "f64" => 1]`, a `Float64` term of `1e-6` became `9.54e-7`, and the reverse order gave `1e-6`. The sum now takes the type that every term promotes to.
 
 These results were approximate in v0.31:
 
