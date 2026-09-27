@@ -244,7 +244,7 @@ where the position is required and neither exists — throws a structured
   worse — under KFold the training set is the test slice's complement, so train-based ordering
   is exactly the reverse of test-based ordering, inverting meaning across schemes. Note the
   test-position rank is *not* a data leak (fold boundaries are scheme metadata fixed before any
-  returns are observed, and `sort_predictions!` only orders outputs for reporting); it was
+  returns are observed, and `sort_predictions` only orders outputs for reporting); it was
   dropped for its implicitness, not for leakage. The enumeration-order contract puts the keying
   decision where the knowledge is — with the user, who has the fold's indices in the context.
 - **Direct field replacement (`@set`) plus a hand-maintained symbol→type admissibility table.**

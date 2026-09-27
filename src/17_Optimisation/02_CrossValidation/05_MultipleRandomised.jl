@@ -664,7 +664,7 @@ function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_i
                                store_weight_path = store_weight_path, strict = strict,
                                w_prev = fold.w_prev)
     end
-    return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
+    return MultiPeriodPredictionResult(; pred = sort_predictions(test_idx, predictions),
                                        id = id, opt = est)
 end
 function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::MRCVR;

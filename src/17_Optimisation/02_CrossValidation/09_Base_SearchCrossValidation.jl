@@ -691,7 +691,7 @@ end
 
 The rows of a search's score matrix that a candidate's predictions fill, in the order the fold loop returns them.
 
-The score matrix is indexed by `split`: row `j` is the `j`-th fold the scheme enumerates, and a reader lines the rows up with `split`'s enumeration. A contiguous scheme returns one [`MultiPeriodPredictionResult`](@ref) whose predictions are in that order, so its rows are every row in order. A [`MultipleRandomised`](@ref) returns one `MultiPeriodPredictionResult` per path, each sorted by the start of its test window through [`sort_predictions!`](@ref), so its rows are one vector per path: the split rows of that path, in the order the path's predictions come back. [`write_candidate_scores!`](@ref) zips a candidate's predictions against these rows, so the matrix keeps `split`'s order under either shape.
+The score matrix is indexed by `split`: row `j` is the `j`-th fold the scheme enumerates, and a reader lines the rows up with `split`'s enumeration. A contiguous scheme returns one [`MultiPeriodPredictionResult`](@ref) whose predictions are in that order, so its rows are every row in order. A [`MultipleRandomised`](@ref) returns one `MultiPeriodPredictionResult` per path, each sorted by the start of its test window through [`sort_predictions`](@ref), so its rows are one vector per path: the split rows of that path, in the order the path's predictions come back. [`write_candidate_scores!`](@ref) zips a candidate's predictions against these rows, so the matrix keeps `split`'s order under either shape.
 
 # Arguments
 
@@ -705,7 +705,7 @@ The score matrix is indexed by `split`: row `j` is the `j`-th fold the scheme en
 
   - [`write_candidate_scores!`](@ref)
   - [`search_cross_validation`](@ref)
-  - [`sort_predictions!`](@ref)
+  - [`sort_predictions`](@ref)
   - [`MultipleRandomisedResult`](@ref)
 """
 function score_rows(cvr::CrossValidationResult)

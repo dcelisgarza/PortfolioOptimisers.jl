@@ -72,9 +72,9 @@
         res = split(KFold(; n = 3), rd)
         preds = [fold([Float64(i)]) for i in 1:3]
         perm = sortperm(res.test_idx; by = first)
-        @test PortfolioOptimisers.sort_predictions!(res, preds) == preds[perm]
+        @test PortfolioOptimisers.sort_predictions(res, preds) == preds[perm]
         shuffled = [[5, 6], [1, 2], [3, 4]]
-        @test [p.rd.X[1] for p in PortfolioOptimisers.sort_predictions!(shuffled, preds)] ==
+        @test [p.rd.X[1] for p in PortfolioOptimisers.sort_predictions(shuffled, preds)] ==
               [2.0, 3.0, 1.0]
         @test [p.rd.X[1] for p in preds] == [1.0, 2.0, 3.0]
     end

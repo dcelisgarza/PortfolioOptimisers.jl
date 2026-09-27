@@ -561,7 +561,7 @@ end
 
 Find the rows of the original returns data that each cross-validation fold covers.
 
-The folds do not store their row indices. [`port_opt_view`](@ref) slices `ts` with the `test_idx` of the fold, so the `rd.ts` of a fold is its slice of the original clock, and [`feature_row_indices`](@ref) finds the rows from it. This works on the combinatorial path too, where [`sort_predictions!`](@ref) puts the folds of a path in split order and not in time order. The timestamps carry the order that the folds have.
+The folds do not store their row indices. [`port_opt_view`](@ref) slices `ts` with the `test_idx` of the fold, so the `rd.ts` of a fold is its slice of the original clock, and [`feature_row_indices`](@ref) finds the rows from it. This works on the combinatorial path too, where [`sort_predictions`](@ref) puts the folds of a path in split order and not in time order. The timestamps carry the order that the folds have.
 
 Only a time-varying Asset Panel needs the rows. A static panel has no observation axis, so only the time-varying shape needs the clock.
 

@@ -123,8 +123,8 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
                             w_prev = w_prev)
 end
 """
-    sort_predictions!(res::VecVecInt, predictions::VecPredRes) -> VecPredRes
-    sort_predictions!(res::CrossValidationResult, predictions::VecPredRes) -> VecPredRes
+    sort_predictions(res::VecVecInt, predictions::VecPredRes) -> VecPredRes
+    sort_predictions(res::CrossValidationResult, predictions::VecPredRes) -> VecPredRes
 
 Sort the prediction results of the folds by the first observation of their test windows.
 
@@ -161,13 +161,13 @@ The function returns a sorted copy, and does not change `predictions`. The key i
   - [`path_fit_and_predict`](@ref)
   - [`CombinatorialCrossValidationResult`](@ref)
 """
-function sort_predictions!(test_idx::VecVecInt, predictions::VecPredRes)
+function sort_predictions(test_idx::VecVecInt, predictions::VecPredRes)
     @argcheck(all(x -> allunique(x), test_idx), "Test indices must be unique.")
     idx = sortperm(test_idx; by = x -> x[1])
     return predictions[idx]
 end
-function sort_predictions!(res::CrossValidationResult, predictions::VecPredRes)
-    return sort_predictions!(res.test_idx, predictions)
+function sort_predictions(res::CrossValidationResult, predictions::VecPredRes)
+    return sort_predictions(res.test_idx, predictions)
 end
 """
     cv_sequential_info()

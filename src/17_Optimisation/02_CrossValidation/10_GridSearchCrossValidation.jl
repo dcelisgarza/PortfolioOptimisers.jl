@@ -230,7 +230,7 @@ end
 
 Tune `opt` over the grid of `gscv` under a [`CombinatorialCrossValidation`](@ref), with one score per candidate and backtest path.
 
-A combinatorial scheme recombines its disjoint test groups into full backtest paths, and a split scored alone mixes the groups of different paths. So this method scores each path. For each candidate, the scheme runs through [`fit_and_predict`](@ref), [`sort_predictions!`](@ref) recombines the groups into a [`PopulationPredictionResult`](@ref), and [`expected_risk`](@ref) gives one score per path. The candidates run in sequence, and the fold loop of each candidate runs with the executor `gscv.ex`.
+A combinatorial scheme recombines its disjoint test groups into full backtest paths, and a split scored alone mixes the groups of different paths. So this method scores each path. For each candidate, the scheme runs through [`fit_and_predict`](@ref), [`sort_predictions`](@ref) recombines the groups into a [`PopulationPredictionResult`](@ref), and [`expected_risk`](@ref) gives one score per path. The candidates run in sequence, and the fold loop of each candidate runs with the executor `gscv.ex`.
 
 # Mathematical definition
 
@@ -268,7 +268,7 @@ A candidate that failed one path is never selected, whatever the scorer computes
  5. Set `M`, the count of the paths, to the greatest entry of `cv.path_ids`.
  6. Set `sgn` to ``s``.
  7. Allocate `test_scores`, of size `M × N` for `N` candidates, with the element type of `rd.X`. When `gscv.train_score` is `true`, allocate `train_scores`, one matrix per path, with one row per fold of the path and one column per candidate.
- 8. View the training returns of each fold of each path through [`fold_train_returns`](@ref), giving `path_X`. The entries of a path in `cv.path_ids` are read in column order, and the column is the fold, which is the order of the folds in the path that [`sort_predictions!`](@ref) gives.
+ 8. View the training returns of each fold of each path through [`fold_train_returns`](@ref), giving `path_X`. The entries of a path in `cv.path_ids` are read in column order, and the column is the fold, which is the order of the folds in the path that [`sort_predictions`](@ref) gives.
  9. For each candidate `i`, in sequence, do steps 10 to 13.
 10. Build `opti` through [`search_candidate`](@ref).
 11. Fit and predict `opti` over `gscv.cv` through [`fit_and_predict`](@ref), with the executor `gscv.ex`, giving `predictions`, one path per member.
@@ -301,7 +301,7 @@ A candidate that failed one path is never selected, whatever the scorer computes
   - [`GridSearchCrossValidation`](@ref)
   - [`RandomisedSearchCrossValidation`](@ref): its search samples a grid and runs this method on it under a combinatorial scheme.
   - [`fit_and_predict`](@ref)
-  - [`sort_predictions!`](@ref)
+  - [`sort_predictions`](@ref)
   - [`expected_risk`](@ref)
   - [`finite_candidate_index`](@ref)
   - [`candidate_train_score`](@ref)

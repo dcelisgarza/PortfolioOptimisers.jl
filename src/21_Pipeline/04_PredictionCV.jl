@@ -224,7 +224,7 @@ end
 
 Run combinatorial cross-validation over a price- or returns-level [`Pipeline`](@ref).
 
-Each split fits the whole workflow on its (possibly non-contiguous) training rows and predicts each of the split's disjoint test groups; [`sort_predictions!`](@ref) then recombines the per-split test-group predictions into the scheme's paths, exactly like the plain-optimiser combinatorial loop. Time-dependent steps resolve per split against the fold's [`TimeDependentContext`](@ref) before `fit`.
+Each split fits the whole workflow on its (possibly non-contiguous) training rows and predicts each of the split's disjoint test groups; [`sort_predictions`](@ref) then recombines the per-split test-group predictions into the scheme's paths, exactly like the plain-optimiser combinatorial loop. Time-dependent steps resolve per split against the fold's [`TimeDependentContext`](@ref) before `fit`.
 
 At the **returns level** the training rows are order-independent for moment-style fitted steps, so this is exact. At the **price level** a split's training rows are non-contiguous — there are gaps where the held-out test groups sit — so the fold's rolling transform ([`PricesToReturns`](@ref)) produces one spurious return per gap boundary (a boundary return spanning a gap). That is the *rolling-window* approximation: combinatorial paths at the price level cost a few boundary returns in each fold's training window. Test groups are contiguous, so predictions are unaffected. Use [`MultipleRandomised`](@ref) if you need contiguous training rows at the price level.
 
@@ -250,7 +250,7 @@ function cross_val_predict(pipe::Pipeline, data::Prices_RR,
                                  store_weight_path = store_weight_path, strict = strict,
                                  w_prev = fold.w_prev) for group in fold.test]
     end
-    return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
+    return PopulationPredictionResult(; pred = sort_predictions(cv_res, predictions))
 end
 """
     pipeline_path_fit_and_predict(pipe::Pipeline, data::Prices_RR, folds, path_id; ex) -> MultiPeriodPredictionResult
@@ -284,7 +284,7 @@ function pipeline_path_fit_and_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, 
                                 store_weight_path = store_weight_path, strict = strict,
                                 w_prev = fold.w_prev)
     end
-    return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
+    return MultiPeriodPredictionResult(; pred = sort_predictions(test_idx, predictions),
                                        id = path_id, opt = est)
 end
 """

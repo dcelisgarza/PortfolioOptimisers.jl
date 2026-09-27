@@ -194,7 +194,7 @@ Keywords correspond to the struct's fields.
   - [`NonSequentialCrossValidationResult`](@ref)
   - [`n_splits`](@ref)
   - [`get_path_ids`](@ref)
-  - [`sort_predictions!`](@ref)
+  - [`sort_predictions`](@ref)
 """
 @concrete struct CombinatorialCrossValidationResult <: NonSequentialCrossValidationResult
     """
@@ -422,7 +422,7 @@ This is the transpose of the view [`recombined_paths`](@ref) gives. The rows are
   - [`recombined_paths`](@ref)
   - [`CombinatorialCrossValidation`](@ref)
   - [`CombinatorialCrossValidationResult`](@ref)
-  - [`sort_predictions!`](@ref)
+  - [`sort_predictions`](@ref)
 """
 function get_path_ids(ccv::CombinatorialCrossValidation)
     rcp = recombined_paths(ccv)
@@ -616,8 +616,8 @@ function optimal_number_folds(T::Integer, target_train_size::Integer,
     end
     return n_folds_opt, n_test_folds_opt
 end
-function sort_predictions!(res::CombinatorialCrossValidationResult,
-                           predictions::VecVecPredRes)
+function sort_predictions(res::CombinatorialCrossValidationResult,
+                          predictions::VecVecPredRes)
     path_ids = res.path_ids
     sorted_preds = [sizehint!(Vector{PredictionResult}(undef, 0),
                               count(x -> x == i, path_ids)) for i in 1:maximum(path_ids)]
@@ -647,7 +647,7 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :
                                fa = fa, store_weight_path = store_weight_path,
                                strict = strict, w_prev = fold.w_prev)
     end
-    return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
+    return PopulationPredictionResult(; pred = sort_predictions(cv_res, predictions))
 end
 function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                          cv::CombCVER;
@@ -661,7 +661,7 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
         return StatsAPI.predict(res, rd, test_idx[i], :; wd = wd, hwd = hwd, fa = fa,
                                 store_weight_path = store_weight_path, strict = strict)
     end
-    return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
+    return PopulationPredictionResult(; pred = sort_predictions(cv_res, predictions))
 end
 
 """

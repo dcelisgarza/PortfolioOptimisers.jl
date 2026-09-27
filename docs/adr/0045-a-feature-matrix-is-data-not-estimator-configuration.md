@@ -692,7 +692,7 @@ Consequences worth stating.
   **timestamps** — `port_opt_view` slices `ts` with the very `test_idx` the fold was built from, so a
   fold's `ts` *is* its slice of the clock, and `feature_row_indices` (already the price-level mechanism
   for exactly this) matches it back. Recovering beats storing on the combinatorial path in particular,
-  where `sort_predictions!` assembles a path's folds in split order rather than chronologically: the
+  where `sort_predictions` assembles a path's folds in split order rather than chronologically: the
   timestamps carry whatever order actually happened, while re-deriving the split would have to
   reproduce it.
 
