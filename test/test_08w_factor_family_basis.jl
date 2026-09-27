@@ -519,6 +519,73 @@ end
                                                                               empty_lvl, bw,
                                                                               nf, fam)
     end
+
+    @testset "The ratios are the closed form, written out" begin
+        # The definition, one line at a time: the normalised weights, the benchmark-weighted
+        # exposures, the automatic drop and the ratios. A NaN weight and a NaN exposure are
+        # read as zero.
+        holed_M = copy(Ms)
+        holed_M[2, 5, 4] = NaN
+        holed_w = copy(bw)
+        holed_w[3, 2] = NaN
+        B = replace(holed_M, NaN => 0.0)
+        u = replace(holed_w, NaN => 0.0)
+        wbar = u ./ sum(u; dims = 2)
+        cf = [sum(wbar[t, i] * B[t, i, k] for i in 1:N) for t in 1:T, k in 1:K]
+        F = [3, 4, 5]
+        d = argmax([sum(abs, cf[:, k]) for k in F])
+        kept = [k for (p, k) in enumerate(F) if p != d]
+        fcb = factor_family_basis(["ind" => nothing], holed_M, holed_w, nf, fam)
+        @test fcb.di == [d]
+        @test fcb.ratios ≈ cf[:, kept] ./ cf[:, F[d]] rtol = 1e-14
+        # The zero-sum condition holds on every observation, with the dropped factor return
+        # reconstructed from the ratios.
+        g = randn(rng, T, length(kept))
+        fd = -sum(fcb.ratios .* g; dims = 2)
+        for t in 1:T
+            @test abs(sum(cf[t, kept] .* g[t, :]) + cf[t, F[d]] * fd[t]) < 1e-13
+        end
+    end
+
+    @testset "The builder derives its number type from the data" begin
+        # One-hot integer exposures and integer weights. Integer data float, a Rational
+        # history stays exact, and a Float32 history stays Float32.
+        sel = [1, 3, 4, 5]
+        Mi = round.(Int, Ms[:, :, sel])
+        wi = rand(StableRNG(724_005), 1:5, T, N)
+        nfi, fami = nf[sel], fam[sel]
+        exact(M, w) = factor_family_basis(["ind" => nothing], M, w, nfi, fami)
+        fi64 = exact(Float64.(Mi), Float64.(wi))
+        fint = exact(Mi, wi)
+        @test eltype(fint.ratios) == Float64
+        @test fint.ratios ≈ fi64.ratios rtol = 1e-14
+        @test fint.di == fi64.di
+        frat = exact(Rational{Int}.(Mi), Rational{Int}.(wi))
+        @test eltype(frat.ratios) == Rational{Int}
+        @test Float64.(frat.ratios) ≈ fi64.ratios rtol = 1e-14
+        # The Rational answer is the closed form in exact arithmetic.
+        cr = [sum(wi[t, i] * Mi[t, i, k] for i in 1:N) // sum(wi[t, :])
+              for t in 1:T, k in 1:4]
+        F = [2, 3, 4]
+        dr = F[frat.di[1]]
+        @test frat.ratios == cr[:, filter(!=(dr), F)] ./ cr[:, dr]
+        f32 = exact(Float32.(Mi), Float32.(wi))
+        @test eltype(f32.ratios) == Float32
+        @test f32.ratios ≈ fi64.ratios rtol = 1e-5
+        # A dropped member that no asset takes is refused as a non-finite ratio in every type,
+        # also where a retained member is zero at the same observation.
+        Mz = zeros(Rational{Int}, T, N, 4)
+        Mz[:, :, 1] .= 1
+        Mz[:, :, 2] .= 1
+        @test_throws PortfolioOptimisers.IsNonFiniteError factor_family_basis(["ind" => "ind=c"],
+                                                                              Mz,
+                                                                              Rational{Int}.(wi),
+                                                                              nfi, fami)
+        @test_throws PortfolioOptimisers.IsNonFiniteError factor_family_basis(["ind" => "ind=c"],
+                                                                              Float64.(Mz),
+                                                                              Float64.(wi),
+                                                                              nfi, fami)
+    end
 end
 
 @testset "Neutralising Factor Exposures" begin

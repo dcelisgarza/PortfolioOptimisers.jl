@@ -3,7 +3,32 @@ $(DocStringExtensions.TYPEDEF)
 
 Compact change of basis between the raw factor axis and the reduced axis a re-based Factor Family is fitted in.
 
-A Factor Family whose one-hot exposures are collinear with a global factor carries one redundant column. The re-basis drops one member of the family and rewrites the family in an equivalent basis of full column rank, in which the benchmark-weighted factor returns of the family sum to zero. The change of basis is time-varying, and this result stores it compactly: per observation it holds the ratios of the benchmark-weighted exposures of the retained members to that of the dropped member, never the dense basis matrix.
+A Factor Family whose one-hot exposures are collinear with a global factor carries one redundant column. The re-basis drops one member of the family and rewrites the family in an equivalent basis of full column rank, in which the benchmark-weighted factor returns of the family sum to zero. The change of basis differs from one observation to the next. The result stores, for each observation, the ratio of the benchmark-weighted exposure of each retained member to that of the dropped member, and it never stores the dense basis matrix.
+
+# Mathematical definition
+
+For each constrained Factor Family ``\\mathcal{F}`` that drops the member ``k``, and at each observation ``t``,
+
+```math
+\\begin{align}
+c_{t}(j) &= \\left(\\mathbf{B}_{t}^{\\intercal} \\bar{\\boldsymbol{w}}_{t}\\right)_{j}\\,, \\\\
+r_{t}(j) &= \\frac{c_{t}(j)}{c_{t}(k)}\\,, \\quad j \\in \\mathcal{F} \\setminus \\{k\\}\\,, \\\\
+\\sum_{j \\in \\mathcal{F}} c_{t}(j) \\, f^{\\mathrm{raw}}_{t,j} &= 0\\,, \\\\
+f^{\\mathrm{raw}}_{t,k} &= -\\sum_{j \\in \\mathcal{F} \\setminus \\{k\\}} r_{t}(j) \\, f^{\\mathrm{raw}}_{t,j}\\,.
+\\end{align}
+```
+
+The third line is the zero-sum condition, and the fourth line is the same condition solved for the return of the dropped factor. So the retained factor returns and the ratios fix the whole family, and the reduced axis holds one factor fewer for each family. A ratio is finite only where ``c_{t}(k) \\neq 0``.
+
+Where:
+
+  - $(math_dict[:F_fam_att])
+  - $(math_dict[:c_tj_fcb])
+  - $(math_dict[:B_t_att])
+  - $(math_dict[:wbar_t_fcb])
+  - $(math_dict[:r_tj_fcb])
+  - $(math_dict[:f_t_fcb])
+  - $(math_dict[:K_r_fcb])
 
 # Fields
 
@@ -19,29 +44,13 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `K > 0` and `!isempty(fnm)`.
-  - `fnm`, `fi` and `di` have the same length.
+  - `fnm`, `fi` and `di` have the same length, and `fnm` does not repeat a label.
   - Every family holds at least two members, its members are unique, and every member lies in `1:K`.
   - No factor belongs to two families.
   - `di[j]` indexes `fi[j]`.
   - `ratios` has one column per retained member of a constrained family, `sum(length(fi[j]) - 1)` in all.
-  - Every entry of `ratios` is finite.
+  - `ratios` is not empty, and every entry of it is finite.
   - `K` is greater than the number of families, so the reduced axis is not empty.
-
-# Mathematical definition
-
-For a family of ``m`` members the benchmark-weighted exposure of member ``j`` at observation ``t`` is
-
-```math
-c_t(j) = \\sum_{i} w^{b}_{t,i} \\, B_{t,i,j},
-```
-
-and the family's factor returns satisfy the zero-sum condition ``c_t^{\\top} f_{\\mathrm{family}}(t) = 0``. Dropping member ``k`` and writing ``r_t(j) = c_t(j) / c_t(k)`` for ``j \\ne k`` parameterises the reduced basis, and `ratios` stores those ``r_t(j)``.
-
-Where:
-
-  - ``w^{b}_{t,i}``: benchmark weight of asset ``i`` at observation ``t``.
-  - ``B_{t,i,j}``: exposure of asset ``i`` to factor ``j`` at observation ``t``.
-  - ``f_{\\mathrm{family}}(t)``: factor returns of the family at observation ``t``.
 
 # Examples
 
@@ -65,7 +74,7 @@ FactorFamilyBasis
 """
 @concrete struct FactorFamilyBasis <: AbstractFactorFamilyBasis
     """
-    Label of each constrained Factor Family, one entry per family, in the order the families were requested. That order fixes the column order of `ratios`.
+    Label of each constrained Factor Family, one entry per family, in the order the caller requested them. That order fixes the column order of `ratios`.
     """
     fnm
     """
@@ -238,7 +247,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the map from a raw-axis index to its reduced-axis index.
 
-A dropped factor has no reduced-axis index, and the map answers `0` for it.
+A dropped factor has no reduced-axis index, and the map holds `0` for it.
 
 # Arguments
 
@@ -265,7 +274,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the raw-axis indices, the reduced-axis indices and the `ratios` columns of one constrained family.
 
-The three vectors are aligned: entry `p` names the same retained member of family `j` in the raw axis, in the reduced axis and in `ratios`.
+The three vectors are aligned. Entry `p` of each names the same retained member of family `j`, in the raw axis, in the reduced axis and in `ratios`.
 
 # Arguments
 
@@ -308,7 +317,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the basis restricted to a selection of observations.
 
-Attribution reads the basis on the observations of a window, and it drops the lag by slicing the observation axis rather than by rebuilding the basis.
+The ratios keep the rows that `i` selects, and every other field is copied. So a caller reads the basis on a window of observations without building it again.
 
 # Arguments
 
@@ -433,17 +442,47 @@ end
 
 Build the compact change of basis of the requested constrained Factor Families.
 
+The element type of the ratios is the promoted type of `Ms` and `bw`, and an integer type becomes a floating-point type. So a `Rational` history gives exact ratios, and a `Float32` history gives `Float32` ratios. A dropped factor whose benchmark-weighted exposure is small but not zero gives large finite ratios. The builder accepts them, and they are ill-conditioned. To avoid them, state a dropped factor with a large exposure, or let the automatic choice pick one.
+
+# Mathematical definition
+
+For each requested family ``\\mathcal{F}``, and at each observation ``t``,
+
+```math
+\\begin{align}
+\\bar{w}_{t,i} &= \\frac{b_{t,i}}{\\sum_{l=1}^{N} b_{t,l}}\\,, \\\\
+c_{t}(j) &= \\left(\\mathbf{B}_{t}^{\\intercal} \\bar{\\boldsymbol{w}}_{t}\\right)_{j}\\,, \\\\
+k &= \\underset{j \\in \\mathcal{F}}{\\arg\\max} \\sum_{t=1}^{T} \\lvert c_{t}(j) \\rvert\\,, \\\\
+r_{t}(j) &= \\frac{c_{t}(j)}{c_{t}(k)}\\,, \\quad j \\in \\mathcal{F} \\setminus \\{k\\}\\,.
+\\end{align}
+```
+
+The third line holds when the caller states no dropped factor. Otherwise ``k`` is the stated factor. The automatic choice makes ``\\lvert c_{t}(k) \\rvert`` large on average, so the ratios stay moderate.
+
+Where:
+
+  - ``b_{t,i}``: Benchmark weight of asset ``i`` at observation ``t``, with a non-finite weight read as zero.
+  - $(math_dict[:wbar_t_fcb])
+  - $(math_dict[:c_tj_fcb])
+  - $(math_dict[:B_t_att])
+  - $(math_dict[:F_fam_att])
+  - $(math_dict[:r_tj_fcb])
+  - $(math_dict[:N])
+  - $(math_dict[:T])
+
 # Algorithm
 
- 1. Normalise `bw` so the benchmark weights of each observation sum to one, reading a non-finite weight as zero.
- 2. Take the benchmark-weighted exposure `c_t(j)` of every raw factor, reading a non-finite exposure as zero.
- 3. For each requested family, resolve the member indices from `fam`, and resolve the dropped member. A stated drop is looked up in `nf`. An unstated drop is the member with the largest time-average absolute benchmark-weighted exposure, which keeps the ratios moderate.
- 4. Divide the benchmark-weighted exposures of the retained members by that of the dropped member, giving the family's block of `ratios`.
- 5. Build the [`FactorFamilyBasis`](@ref) from the resolved families and the concatenated blocks, which re-runs every guard of the constructor.
+ 1. Check the axes of `Ms`, `bw`, `nf` and `fam`.
+ 2. Compute `c`, the benchmark-weighted exposure of every raw factor at every observation, with [`weighted_family_exposures`](@ref).
+ 3. For each requested family, in the order of `families`, find its members `idx` in `fam`.
+ 4. Resolve the position `d` of the dropped member with [`resolve_dropped_member`](@ref). On a tie of the automatic choice, the first member in the order of `fam` wins.
+ 5. Refuse the family when the dropped member's column of `c` is zero at an observation.
+ 6. Divide the columns of `c` of the retained members by the column of the dropped member, giving the family's block of the ratios.
+ 7. Build the [`FactorFamilyBasis`](@ref) from the resolved families and the concatenated blocks, which runs every check of the constructor again.
 
 # Arguments
 
-  - `families`: Pairs of `family label => dropped factor name`, in the order the families take columns of `ratios`. A `nothing` on the right asks for the automatic choice of step 3.
+  - `families`: Pairs of `family label => dropped factor name`, in the order the families take columns of `ratios`. A `nothing` on the right asks for the automatic choice of the dropped factor.
   - `Ms::Arr3Num`: Exposure history, `observations × assets × factors`.
   - `bw::MatNum`: Benchmark weight history, `observations × assets`.
   - `nf::VecStr`: Names of the raw factor axis, of length `size(Ms, 3)`.
@@ -451,15 +490,14 @@ Build the compact change of basis of the requested constrained Factor Families.
 
 # Validation
 
-  - `families` is not empty, and no family label appears twice.
+  - `families` and `Ms` are not empty, and no family label appears twice.
   - `nf` and `fam` are as long as the factor axis of `Ms`, and `nf` does not repeat a name.
   - `bw` matches `Ms` on the observation and asset axes, and every finite weight is non-negative.
   - Every observation carries a strictly positive benchmark weight sum.
   - Every requested family label appears in `fam`, and holds at least two factors.
   - A stated dropped factor name appears in `nf`, and belongs to the family that names it.
-  - The rules of [`FactorFamilyBasis`](@ref), which refuse a non-finite ratio.
-
-A dropped factor whose benchmark-weighted exposure is zero at some observation produces a non-finite ratio, and the constructor refuses it. One that is merely small produces a large but finite ratio, which is accepted and ill-conditioned: state the drop, or let step 3 choose it.
+  - The benchmark-weighted exposure of each dropped factor is not zero at any observation, otherwise an `IsNonFiniteError`, because the ratios would not be finite.
+  - The rules of [`FactorFamilyBasis`](@ref).
 
 # Returns
 
@@ -496,7 +534,7 @@ function factor_family_basis(families::AbstractVector{<:Pair}, Ms::Arr3Num, bw::
     assert_factor_axis_length(length(nf), K, :nf)
     assert_factor_axis_length(length(fam), K, :fam)
     @argcheck(allunique(nf), ArgumentError("nf must not repeat a factor name"))
-    Tf = promote_type(real(eltype(Ms)), real(eltype(bw)))
+    Tf = float_if_integer(promote_type(real(eltype(Ms)), real(eltype(bw))))
     c = weighted_family_exposures(Ms, bw, Tf)
     fnm = String[]
     fi = Vector{Int}[]
@@ -512,6 +550,9 @@ function factor_family_basis(families::AbstractVector{<:Pair}, Ms::Arr3Num, bw::
         @argcheck(length(idx) >= 2,
                   ArgumentError("family $nm holds $(length(idx)) factor, and a constrained family needs at least two"))
         d = resolve_dropped_member(last(pr), nm, idx, nf, c)
+        t0 = findfirst(iszero, view(c, :, idx[d]))
+        @argcheck(isnothing(t0),
+                  IsNonFiniteError("the dropped factor $(nf[idx[d]]) of family $nm has a zero benchmark-weighted exposure at observation $t0, so its ratios are not finite. Drop another member of the family"))
         append!(empty!(ret), (i for i in idx if i != idx[d]))
         push!(fnm, nm)
         push!(fi, idx)
@@ -598,7 +639,7 @@ Return the position within a family of the member the re-basis drops.
 
 # Returns
 
-  - `d::Int`: Position within `idx` of the dropped member.
+  - `d::Int`: Position within `idx` of the dropped member. The automatic choice takes the member with the largest sum of absolute benchmark-weighted exposures over the observations, and the first such member on a tie.
 
 # Related
 

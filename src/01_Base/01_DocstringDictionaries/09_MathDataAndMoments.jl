@@ -163,6 +163,10 @@ unique_key_dict!(math_dict, :math_dict,
                  :f_t_fcb => "``\\boldsymbol{f}^{\\mathrm{raw}}_{t}``, ``\\boldsymbol{f}^{\\mathrm{red}}_{t}``: Raw and reduced factor returns of observation ``t``, ``K \\times 1`` and ``K_{r} \\times 1``. The entry of factor ``j`` is ``f^{\\mathrm{raw}}_{t,j}``.",#
                  :mu_fcb => "``\\boldsymbol{\\mu}^{\\mathrm{raw}}``, ``\\boldsymbol{\\mu}^{\\mathrm{red}}``: Raw and reduced factor mean, ``K \\times 1`` and ``K_{r} \\times 1``.",#
                  :Sigma_fcb => "``\\mathbf{\\Sigma}^{\\mathrm{raw}}``, ``\\mathbf{\\Sigma}^{\\mathrm{red}}``: Raw and reduced factor covariance, ``K \\times K`` and ``K_{r} \\times K_{r}``.",#
+                 # The benchmark-weighted exposures that the ratios of the Factor Family Basis
+                 # read. Each symbol is stated by two or more Units of `05_FactorFamilyBasis.jl`.
+                 :wbar_t_fcb => "``\\bar{\\boldsymbol{w}}_{t}``: Normalised benchmark weights of observation ``t``, ``N \\times 1``, with entry ``\\bar{w}_{t,i}`` for asset ``i``. They are the benchmark weights of the observation over their sum, with a non-finite weight read as zero.",#
+                 :c_tj_fcb => "``c_{t}(j)``: Benchmark-weighted exposure of factor ``j`` at observation ``t``, with a non-finite exposure read as zero.",#
                  # The coverage policy of `01_Base/16_CoveragePolicy.jl`. Each symbol is
                  # stated by two or more Units of that file.
                  :s_i_cvg => "``s_{i}``: Coverage share of asset ``i``, its own observation count over the number of observations folded.",#
