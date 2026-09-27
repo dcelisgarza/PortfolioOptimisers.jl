@@ -479,3 +479,35 @@ end
         @test ew_same(reshape(view(V, 300, :), 1, :), reshape(dvol_300, 1, :); rtol = 1e-12)
     end
 end
+
+@testset "The volatility Descriptors derive their number type from the returns" begin
+    Xi = [1 2; -1 0; 1 1; 0 -2; 2 1]
+    Xf = Float64.(Xi)
+    rdi = ew_hand_panel(["market_cap" => ones(size(Xi))], Xi)
+    rdf = ew_hand_panel(["market_cap" => ones(size(Xi))], Xf)
+    # The default estimator built its state in the type of the returns, so an integer panel
+    # raised an `InexactError` at the first `NaN` of the warm-up.
+    for de in (EWVolatility(; half_life = 2), EWDownsideVolatility(; half_life = 2),
+               EWResidualVolatility(; half_life = 2, beta_half_life = 2),
+               EWResidualDownsideVolatility(; half_life = 2, beta_half_life = 2))
+        @test isequal(descriptor(de, rdi), descriptor(de, rdf))
+    end
+    rd32 = ew_hand_panel(["market_cap" => ones(size(Xi))], Float32.(Xi) ./ 100)
+    @test eltype(descriptor(EWVolatility(; half_life = 2), rd32)) == Float32
+end
+
+@testset "The default estimator states its recursion" begin
+    # The divisor 1 - λ^n is the total weight of n observations, so a constant input is its own
+    # variance from the first observation. A gap holds the state, so it holds that value too.
+    Y = fill(0.03, 6, 2)
+    Y[3, 2] = NaN
+    V = PortfolioOptimisers.variance_series(PortfolioOptimisers.ew_variance_estimator(3.0,
+                                                                                      1.0),
+                                            Y)
+    @test all(isapprox(0.03^2; rtol = 1e-12), V)
+    # Each refusal names the argument the caller passed.
+    @test_throws r"half_life" PortfolioOptimisers.ew_variance_estimator(0.0)
+    @test_throws r"warm_up" PortfolioOptimisers.ew_variance_estimator(2.0, NaN)
+    @test_throws DomainError EWVolatility(; half_life = -1)
+    @test_throws DomainError EWDownsideVolatility(; half_life = Inf)
+end

@@ -781,7 +781,7 @@ function process_observation!(cache::RegimeAdjustedVarianceState,
     cache.obs_count[valid] .+= 1
 
     if !isnothing(cache.ret_buffer)
-        X_new = copy(Xi)
+        X_new = copyto!(similar(cache.X2), Xi)
         X_new[.!valid] .= NaN
         push!(cache.ret_buffer, X_new)
     end
@@ -877,19 +877,20 @@ function regime_adjusted_variance_pass!(f, ce::RegimeAdjustedExpWeightedVariance
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
 
+    # The state holds a variance and a `NaN`, so an integer panel computes in its floating
+    # point type, and every other type is kept: a `Float32` panel keeps a `Float32` state.
+    Tf = float_if_integer(eltype(X))
     # An uncentred estimator seeds its location from the first observation it sees, so the
-    # location starts as `NaN`, in the type of `X` so that a `Float32` panel keeps a
-    # `Float32` state.
-    location = ce.centred ? zeros(eltype(X), N) : fill(convert(eltype(X), NaN), N)
+    # location starts as `NaN`.
+    location = ce.centred ? zeros(Tf, N) : fill(convert(Tf, NaN), N)
     cache = if isnothing(state)
         RegimeAdjustedVarianceState(if isnothing(ce.hac_lags)
                                         nothing
                                     else
-                                        DataStructures.CircularBuffer{Vector{eltype(X)}}(ce.hac_lags)
-                                    end, zeros(eltype(X), N), zeros(eltype(X), N),
-                                    zeros(eltype(X), N), fill(convert(eltype(X), NaN), N),
-                                    location, zeros(Int, N), zeros(Int, N), trues(N),
-                                    nothing, zero(eltype(X)))
+                                        DataStructures.CircularBuffer{Vector{Tf}}(ce.hac_lags)
+                                    end, zeros(Tf, N), zeros(Tf, N), zeros(Tf, N),
+                                    fill(convert(Tf, NaN), N), location, zeros(Int, N),
+                                    zeros(Int, N), trues(N), nothing, zero(Tf))
     else
         @argcheck(length(state.variance) == N,
                   DimensionMismatch("the state holds $(length(state.variance)) assets, and `X` holds $N"))
@@ -1109,7 +1110,8 @@ function variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims:
                          estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     assert_dims(dims)
-    val = Matrix{eltype(X)}(undef, size(X, dims), size(X, setdiff((1, 2), (dims,))[1]))
+    val = Matrix{float_if_integer(eltype(X))}(undef, size(X, dims),
+                                              size(X, setdiff((1, 2), (dims,))[1]))
     regime_adjusted_variance_pass!(ce, X, dims, estimation_mask, active_mask) do i, cache
         val[i, :] = regime_adjusted_variance(cache, ce)
         return nothing

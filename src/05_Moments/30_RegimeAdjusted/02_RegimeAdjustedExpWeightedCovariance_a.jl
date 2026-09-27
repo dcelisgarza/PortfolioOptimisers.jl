@@ -1434,21 +1434,22 @@ function regime_adjusted_covariance_pass!(f, ce::RegimeAdjustedExpWeightedCovari
     N = size(X, setdiff((1, 2), (dims,))[1])
     assert_regime_target(ce.regime_target, N)
 
+    # The state holds a covariance and a `NaN`, so an integer panel computes in its floating
+    # point type, and every other type is kept: a `Float32` panel keeps a `Float32` state.
+    Tf = float_if_integer(eltype(X))
     # An uncentred estimator seeds its location from the first observation it sees, so the
-    # location starts as `NaN`, in the type of `X` so that a `Float32` panel keeps a
-    # `Float32` state.
-    location = ce.centred ? zeros(eltype(X), N) : fill(convert(eltype(X), NaN), N)
+    # location starts as `NaN`.
+    location = ce.centred ? zeros(Tf, N) : fill(convert(Tf, NaN), N)
     cache = if isnothing(state)
         separate = has_separate_cor_decay(ce)
         RegimeAdjustedCovarianceState(if isnothing(ce.hac_lags)
                                           nothing
                                       else
-                                          DataStructures.CircularBuffer{Vector{eltype(X)}}(ce.hac_lags)
-                                      end, zeros(eltype(X), N, N),
-                                      separate ? zeros(eltype(X), N) : nothing,
-                                      separate ? zeros(eltype(X), N, N) : nothing,
-                                      zeros(eltype(X), N, N), zeros(eltype(X), N),
-                                      zeros(eltype(X), N), location, zeros(Int, N),
+                                          DataStructures.CircularBuffer{Vector{Tf}}(ce.hac_lags)
+                                      end, zeros(Tf, N, N),
+                                      separate ? zeros(Tf, N) : nothing,
+                                      separate ? zeros(Tf, N, N) : nothing, zeros(Tf, N, N),
+                                      zeros(Tf, N), zeros(Tf, N), location, zeros(Int, N),
                                       trues(N), nothing, 0)
     else
         @argcheck(size(state.covariance, 1) == N,

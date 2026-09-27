@@ -1,5 +1,5 @@
 """
-    half_life_decay(half_life::Real) -> Real
+    half_life_decay(half_life::Real, sym::Sym_Str = :half_life) -> Real
 
 Convert a half-life in observations into an exponential decay factor.
 
@@ -7,7 +7,12 @@ A half-life is the number of observations after which a weight halves, and a dec
 
 # Arguments
 
-  - `half_life`: The half-life, in observations. It must be strictly positive.
+  - `half_life`: The half-life, in observations.
+  - `sym::Sym_Str`: Name that the `DomainError` gives the half-life. A constructor with two half-lives passes the keyword it reads.
+
+# Validation
+
+  - `0 < half_life < Inf`, for the half-life that `sym` names. Raises a `DomainError`.
 
 # Returns
 
@@ -30,12 +35,12 @@ julia> PortfolioOptimisers.half_life_decay(2.0)
   - [`EWMean`](@ref)
   - [`EWVolatility`](@ref)
 """
-function half_life_decay(half_life::Real)::Real
-    assert_nonempty_gt0_finite_val(half_life, :half_life)
+function half_life_decay(half_life::Real, sym::Sym_Str = :half_life)::Real
+    assert_nonempty_gt0_finite_val(half_life, sym)
     return exp2(-inv(half_life))
 end
 """
-    half_life_min_obs(half_life::Real) -> Int
+    half_life_min_obs(half_life::Real, sym::Sym_Str = :half_life) -> Int
 
 Convert a half-life in observations into the warm-up an exponentially weighted Descriptor waits out.
 
@@ -43,7 +48,12 @@ The recursion starts from zero, so its early values carry the start and not the 
 
 # Arguments
 
-  - `half_life`: The half-life, in observations. It must be strictly positive.
+  - `half_life`: The half-life, in observations.
+  - `sym::Sym_Str`: Name that the `DomainError` gives the half-life. A caller that takes the warm-up from its own argument passes that argument's name.
+
+# Validation
+
+  - `0 < half_life < Inf`, for the half-life that `sym` names. Raises a `DomainError`.
 
 # Returns
 
@@ -65,8 +75,8 @@ julia> PortfolioOptimisers.half_life_min_obs(0.5)
   - [`EWMean`](@ref)
   - [`EWVolatility`](@ref)
 """
-function half_life_min_obs(half_life::Real)::Int
-    assert_nonempty_gt0_finite_val(half_life, :half_life)
+function half_life_min_obs(half_life::Real, sym::Sym_Str = :half_life)::Int
+    assert_nonempty_gt0_finite_val(half_life, sym)
     return max(1, ceil(Int, half_life))
 end
 """

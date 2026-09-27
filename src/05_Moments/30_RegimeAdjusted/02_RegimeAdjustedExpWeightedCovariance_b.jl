@@ -773,7 +773,8 @@ function variance_series(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum; dim
                          estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     assert_dims(dims)
-    val = Matrix{eltype(X)}(undef, size(X, dims), size(X, setdiff((1, 2), (dims,))[1]))
+    val = Matrix{float_if_integer(eltype(X))}(undef, size(X, dims),
+                                              size(X, setdiff((1, 2), (dims,))[1]))
     regime_adjusted_covariance_pass!(ce, X, dims, estimation_mask, active_mask) do i, cache
         val[i, :] = LinearAlgebra.diag(regime_adjusted_covariance(cache, ce))
         return nothing

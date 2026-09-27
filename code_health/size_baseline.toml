@@ -118,8 +118,8 @@ commit = "0ecb3ce47c"
 "src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { code = 139, doc = 363, comment = 5, blank = 170, total = 677 }
 "src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { code = 196, doc = 486, comment = 4, blank = 217, total = 903 }
 "src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { code = 214, doc = 580, comment = 6, blank = 264, total = 1064 }
-"src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { code = 399, doc = 909, comment = 6, blank = 358, total = 1672 }
-"src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { code = 492, doc = 776, comment = 3, blank = 321, total = 1592 }
+"src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { code = 403, doc = 909, comment = 7, blank = 358, total = 1677 }
+"src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { code = 488, doc = 786, comment = 6, blank = 321, total = 1601 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { code = 139, doc = 487, comment = 1, blank = 200, total = 827 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { code = 177, doc = 592, comment = 4, blank = 309, total = 1082 }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { code = 200, doc = 504, comment = 8, blank = 210, total = 922 }
@@ -128,8 +128,8 @@ commit = "0ecb3ce47c"
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl" = { code = 144, doc = 279, comment = 0, blank = 129, total = 552 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/02_PanelFieldDescriptors.jl" = { code = 237, doc = 830, comment = 0, blank = 346, total = 1413 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/03_LagDescriptors.jl" = { code = 109, doc = 324, comment = 0, blank = 132, total = 565 }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl" = { code = 200, doc = 470, comment = 0, blank = 179, total = 849 }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/05_EWVolatilityDescriptors.jl" = { code = 109, doc = 320, comment = 0, blank = 125, total = 554 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl" = { code = 196, doc = 457, comment = 0, blank = 172, total = 825 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/05_EWVolatilityDescriptors.jl" = { code = 111, doc = 369, comment = 0, blank = 142, total = 622 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors.jl" = { code = 383, doc = 754, comment = 0, blank = 264, total = 1401 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_RollingDescriptors.jl" = { code = 112, doc = 275, comment = 0, blank = 115, total = 502 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/08_Base_Exposure.jl" = { code = 56, doc = 148, comment = 0, blank = 82, total = 286 }

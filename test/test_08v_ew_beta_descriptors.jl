@@ -616,6 +616,27 @@ end
         @test isnan(E[2, 1])
         @test E[1, 1] ≈ 0.0
         @test E[2, 2] ≈ 0.1
+        # Integer arguments hold the `NaN` of a missing cell in their floating point type.
+        Ei = PortfolioOptimisers.ew_residual_returns([1 2; 3 4], [1, 2], [1 1; 2 2],
+                                                     [true false; true true])
+        @test isequal(Ei, [0.0 NaN; -1.0 0.0])
+    end
+    @testset "At the first valid observation the residual is zero up to the floor" begin
+        # The beta includes observation 1, so β = (1 - λ) x r_m / ((1 - λ) r_m² + min_val) and
+        # the residual is x min_val / ((1 - λ) r_m² + min_val). A warm-up of one observation
+        # makes the Descriptor its absolute value there. A large floor keeps the subtraction
+        # well conditioned.
+        mv = 1e-4
+        de = EWResidualVolatility(; half_life = 2, beta_half_life = 3, min_val = mv,
+                                  ce = PortfolioOptimisers.ew_variance_estimator(2.0, 1.0))
+        D = descriptor(de, rd)
+        expected = abs.(Xm[1, :] .* mv ./ ((1 - bdecay) * rm[1]^2 + mv))
+        @test isapprox(D[1, :], expected; rtol = 1e-8)
+    end
+    @testset "A refusal names the half-life the caller passed" begin
+        @test_throws r"beta_half_life" EWResidualVolatility(; beta_half_life = Inf)
+        @test_throws r"beta_half_life" EWResidualDownsideVolatility(; beta_half_life = 0)
+        @test_throws r"half_life" EWResidualVolatility(; half_life = -1)
     end
 end
 
