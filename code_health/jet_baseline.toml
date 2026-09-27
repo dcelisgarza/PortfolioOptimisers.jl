@@ -8,7 +8,7 @@ jet = "0.12.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "ebcacfda95"
+commit = "fbb67d78c4"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -220,7 +220,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/01_EntropyPoolingAlgorithms.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/02_EntropyPoolingMeanViews.jl" = { raw = 1, reviewed = 1 }
 "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/03_EntropyPoolingViewTypes.jl" = { raw = 0, reviewed = 0 }
-"src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/04_EntropyPoolingSolvers.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/04_EntropyPoolingSolvers.jl" = { raw = 1, reviewed = 1 }
 "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/05_EntropyPoolingMomentViews.jl" = { raw = 2, reviewed = 2 }
 "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/06_EntropyPoolingTailViewSolve.jl" = { raw = 1, reviewed = 1 }
 "src/10_Prior/06_EntropyPooling/02_MeucciEntropyPoolingPrior.jl" = { raw = 11, reviewed = 11 }
