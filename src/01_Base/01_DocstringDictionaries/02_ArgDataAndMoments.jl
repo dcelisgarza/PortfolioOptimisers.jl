@@ -136,6 +136,10 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :group_ewb => "`group`: Name of the categorical Panel Field that the shrinkage groups the cross-section by, or `nothing` to leave every beta raw.",#
                  :min_group_size_ewb => "`min_group_size`: Smallest group, counted over the estimation set, that is shrunk toward its own mean. A smaller group is shrunk toward the mean of the whole estimation set, and an asset that carries no group keeps its raw beta.",#
                  :bounds_ewb => "`bounds`: `(lo, hi)` bounds on the weight that a shrunk beta keeps on its raw value. The bounds `(0, 1)` let the data set the weight alone.",#
+                 :window_roll => "`window`: Number of observations in the window.",#
+                 :skip_roll => "`skip`: Number of the most recent observations that the window excludes, so the window ends at observation `t - skip`.",#
+                 :sign_roll => "`sign`: Multiplier of the window sum, `1` or `-1`. A sign of `1` reads the window as momentum, and a sign of `-1` reads it as reversal.",#
+                 :exponentiate_roll => "`exponentiate`: Whether the Descriptor is the simple return `exp(sign * S) - 1` rather than the log return `sign * S`, where `S` is the sum of the log returns of the window.",#
                  # Regime adjusted estimators.
                  :decay => "`decay`: Exponential decay factor for the exponentially weighted estimator.",#
                  :min_obs => "`min_obs`: Minimum number of observations required before the estimator produces a valid result.",#

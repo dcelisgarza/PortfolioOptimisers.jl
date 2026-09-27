@@ -3,7 +3,7 @@ Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_Rolling
 docstrings state, and against the reference implementation's own rolling descriptors.
 Issue #720, map #643.
 
-FOUR CONVENTIONS SHAPE THE PROBES.
+FIVE CONVENTIONS SHAPE THE PROBES.
 
 1. RETURNS ARE NOT A PANEL FIELD. A rolling Descriptor reads `rd.X`, and the active mask of
    the Asset Panel beside it. It reads no column of the feature matrix.
@@ -20,6 +20,10 @@ FOUR CONVENTIONS SHAPE THE PROBES.
 4. A RETURN AT OR BELOW `-1` IS A REFUSAL, NOT A `NaN`. The logarithm is undefined there, so
    `RollingLogReturn` raises on the whole matrix. `RollingMax` takes no logarithm and needs
    no such rule.
+
+5. AN INFINITE RETURN IS A REFUSAL, FOR BOTH ESTIMATORS. The window sum is one difference of
+   two cumulative sums, so one infinite return would make every later window `NaN`, also a
+   window that does not hold it. The reference implementation refuses it too (#741).
 
 The last two testsets run the estimators on the synthetic panel of `test06c_setup.jl` and
 compare them with the reference implementation. The parity is pinned twice: once as a
@@ -222,6 +226,135 @@ end
         @test descriptor(RollingMax(; window = 1),
                          rolling_hand_panel([0.1 0.1; 0.2 -1.0; 0.3 0.3]))[2, 2] == -1
     end
+    @testset "With a skip, an inactive current observation is NaN" begin
+        # The window of observation 4 with a skip of 2 is rows 1 and 2, which are active, so
+        # only the active mask of observation 4 itself makes the value NaN.
+        amsk = trues(T, N)
+        amsk[4, 2] = false
+        D = descriptor(RollingLogReturn(; window = 2, skip = 2),
+                       rolling_hand_panel(X; amsk = amsk))
+        @test isnan(D[4, 2])
+        @test D[4, 1] ≈ log1p(X[1, 1]) + log1p(X[2, 1])
+    end
+end
+
+@testset "The rolling Descriptors refuse an infinite return (#741)" begin
+    # Before the refusal, one infinite return in row 2 made rows 4 and 5 of RollingLogReturn
+    # NaN, though neither window holds row 2: the difference of two infinite cumulative sums
+    # is NaN.
+    for bad in (Inf, -Inf)
+        Y = [0.1 0.1; bad 0.2; 0.3 0.3; 0.1 0.1; 0.2 0.2]
+        for de in (RollingLogReturn(; window = 2), Reversal(; window = 2),
+                   RollingMax(; window = 2), MaxReturn(; window = 2))
+            @test_throws DomainError descriptor(de, rolling_hand_panel(Y))
+        end
+    end
+    # The refusal reads the whole matrix, so an inactive cell does not exempt it.
+    Y = [Inf 0.1; 0.2 0.2; 0.3 0.3]
+    amsk = trues(3, 2)
+    amsk[1, 1] = false
+    @test_throws DomainError descriptor(RollingMax(; window = 1),
+                                        rolling_hand_panel(Y; amsk = amsk))
+    msg = try
+        descriptor(MaxReturn(; window = 1), rolling_hand_panel([0.1 0.1; 0.2 Inf]))
+        ""
+    catch err
+        sprint(showerror, err)
+    end
+    @test occursin("observation 2 for asset 2", msg)
+end
+
+@testset "The rolling Descriptors derive their number type from the returns (#741)" begin
+    # An integer panel raised InexactError: Int64(NaN) at the first NaN of the warm-up. It
+    # is now floated, and gives the answer of the same panel in Float64 bit for bit.
+    Xi = [0 1; 2 0; 1 3; 4 2; 0 1]
+    Xf = Float64.(Xi)
+    for de in
+        (RollingMax(; window = 2), MaxReturn(; window = 3), RollingLogReturn(; window = 2),
+         Reversal(; window = 1))
+        Di = descriptor(de, rolling_hand_panel(Xi))
+        @test eltype(Di) == Float64
+        @test isequal(Di, descriptor(de, rolling_hand_panel(Xf)))
+    end
+    # A Float32 panel keeps a Float32 Descriptor.
+    X32 = Float32[0.1 0.2; 0.05 -0.1; 0.3 0.0]
+    for de in (RollingLogReturn(; window = 2), RollingMax(; window = 2))
+        @test eltype(descriptor(de, rolling_hand_panel(X32))) == Float32
+    end
+end
+
+@testset "The named Descriptors agree with the reference implementation on a panel with gaps" begin
+    #=
+    The reference implementation, installed from disk at v1.2.4, ran on this 8 x 3 panel. Asset
+    1 misses the return of row 4 inside an active listing. Asset 2 is inactive in rows 3 and 4,
+    a gap inside its listing. Asset 3 lists late, at row 3, and misses the return of row 6. The
+    reference refuses a finite value on an inactive cell, so those cells hold NaN here.
+    `mom_w2_s2` pins the rule on the current observation: row 4 of asset 2 has an active
+    window, rows 1 and 2, and it is NaN because observation 4 is inactive.
+    =#
+    X = [0.010 -0.020 0.030
+         0.025 0.015 -0.010
+         -0.030 0.040 0.020
+         NaN -0.010 0.005
+         0.015 0.020 -0.025
+         0.040 -0.035 NaN
+         -0.012 0.018 0.012
+         0.022 0.030 -0.008]
+    amsk = trues(8, 3)
+    amsk[3:4, 2] .= false
+    amsk[1:2, 3] .= false
+    X[.!amsk] .= NaN
+    rd = rolling_hand_panel(X; amsk = amsk)
+    ref_mom_w3_s2 = [NaN NaN NaN
+                     NaN NaN NaN
+                     NaN NaN NaN
+                     NaN NaN NaN
+                     0.004183735958831036 NaN NaN
+                     -0.005766594894337047 NaN NaN
+                     -0.015570594990957892 NaN -0.0005276391770710903
+                     0.05410932564703195 NaN -0.020330266473250803]
+    ref_mom_w2_s2 = [NaN NaN NaN
+                     NaN NaN NaN
+                     NaN NaN NaN
+                     0.03464294344353958 NaN NaN
+                     -0.005766594894337047 NaN NaN
+                     -0.030459207484708546 NaN 0.024790168807218786
+                     0.014888612493750654 NaN -0.020330266473250803
+                     0.05410932564703195 -0.015824550346971413 -0.025317807984289876]
+    ref_mom_w2_s0_exp = [NaN NaN NaN
+                         0.03525 -0.005300000000000001 NaN
+                         -0.0057500000000000025 NaN NaN
+                         -0.03 NaN 0.0251
+                         0.015 NaN -0.020125
+                         0.0556 -0.015700000000000002 -0.025
+                         0.02752 -0.017630000000000003 0.012
+                         0.009736000000000007 0.04854 0.0039039999999999995]
+    ref_rev_w2 = [NaN NaN NaN
+                  -0.03464294344353958 0.005314094823768795 NaN
+                  0.005766594894337047 NaN NaN
+                  0.030459207484708546 NaN -0.024790168807218786
+                  -0.014888612493750654 NaN 0.020330266473250803
+                  -0.05410932564703195 0.015824550346971413 0.025317807984289876
+                  -0.02714813191901206 0.017787259514820127 -0.011928570865273802
+                  -0.00968891054724346 -0.0473987203698754 -0.003896399168009542]
+    ref_max_w3 = [NaN NaN NaN
+                  NaN NaN NaN
+                  0.025 NaN NaN
+                  0.025 NaN NaN
+                  0.015 NaN 0.02
+                  0.04 NaN 0.005
+                  0.04 0.02 0.012
+                  0.04 0.03 0.012]
+    cases = ((RollingMomentum(; window = 3, skip = 2), ref_mom_w3_s2),
+             (RollingMomentum(; window = 2, skip = 2), ref_mom_w2_s2),
+             (RollingMomentum(; window = 2, skip = 0, exponentiate = true),
+              ref_mom_w2_s0_exp), (Reversal(; window = 2), ref_rev_w2),
+             (MaxReturn(; window = 3), ref_max_w3))
+    for (de, ref) in cases
+        @test rolling_agrees(descriptor(de, rd), ref)
+    end
+    @test isequal(descriptor(MaxReturn(; window = 3), rd), ref_max_w3)
+    @test isnan(ref_mom_w2_s2[4, 2])
 end
 
 @testset "RollingMax on a hand panel" begin

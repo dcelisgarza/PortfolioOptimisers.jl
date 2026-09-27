@@ -130,6 +130,9 @@ unique_key_dict!(math_dict, :math_dict,
                  :V_mt_ewb => "``V_{m,t}``: Market variance after observation ``t``, the exponentially weighted variance of ``r_{m,t}``.",#
                  :V_eps_ti_ewb => "``V^{\\varepsilon}_{t,i}``: Residual variance of asset ``i`` after observation ``t``, the exponentially weighted mean square of its market-model residual.",#
                  :min_val_ewb => "``\\texttt{min\\_val}``: `min_val`, the floor added to a denominator so that it never reaches zero.",#
+                 # The rolling Descriptors of `04_FactorExposures/`, stated by two or
+                 # more Units of that file.
+                 :w_roll => "``w``: `window`, the number of observations in the window.",#
                  # The ambiguity radius rules of `06_CalibrationRules.jl`, and the
                  # effective sample size the significance rules share with them. Each
                  # rule returns one radius off one record, so the radius, its scale

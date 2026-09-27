@@ -23,14 +23,14 @@ commit = "0ecb3ce47c"
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { code = 430, doc = 0, comment = 35, blank = 0, total = 465 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { code = 40, doc = 0, comment = 8, blank = 5, total = 53 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { code = 17, doc = 125, comment = 0, blank = 44, total = 186 }
-"src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { code = 172, doc = 0, comment = 21, blank = 0, total = 193 }
+"src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { code = 176, doc = 0, comment = 21, blank = 0, total = 197 }
 "src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { code = 126, doc = 0, comment = 14, blank = 0, total = 140 }
 "src/01_Base/01_DocstringDictionaries/04_ArgPhylogenyAndConstraints.jl" = { code = 96, doc = 0, comment = 18, blank = 0, total = 114 }
 "src/01_Base/01_DocstringDictionaries/05_ArgRiskMeasuresAndCosts.jl" = { code = 111, doc = 0, comment = 24, blank = 0, total = 135 }
 "src/01_Base/01_DocstringDictionaries/06_ArgOptimisation.jl" = { code = 238, doc = 0, comment = 24, blank = 0, total = 262 }
 "src/01_Base/01_DocstringDictionaries/07_FieldDict.jl" = { code = 3, doc = 0, comment = 2, blank = 0, total = 5 }
 "src/01_Base/01_DocstringDictionaries/08_ValidationsAndReturns.jl" = { code = 85, doc = 0, comment = 4, blank = 0, total = 89 }
-"src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { code = 198, doc = 0, comment = 57, blank = 0, total = 255 }
+"src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { code = 199, doc = 0, comment = 59, blank = 0, total = 258 }
 "src/01_Base/01_DocstringDictionaries/10_MathPriorsAndNetworks.jl" = { code = 54, doc = 0, comment = 36, blank = 0, total = 90 }
 "src/01_Base/01_DocstringDictionaries/11_MathRiskAndOptimisation.jl" = { code = 77, doc = 0, comment = 36, blank = 0, total = 113 }
 "src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { code = 86, doc = 0, comment = 16, blank = 0, total = 102 }
@@ -131,7 +131,7 @@ commit = "0ecb3ce47c"
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl" = { code = 196, doc = 484, comment = 0, blank = 182, total = 862 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/05_EWVolatilityDescriptors.jl" = { code = 111, doc = 369, comment = 0, blank = 142, total = 622 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors.jl" = { code = 383, doc = 754, comment = 0, blank = 264, total = 1401 }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_RollingDescriptors.jl" = { code = 112, doc = 275, comment = 0, blank = 115, total = 502 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_RollingDescriptors.jl" = { code = 117, doc = 298, comment = 0, blank = 128, total = 543 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/08_Base_Exposure.jl" = { code = 56, doc = 148, comment = 0, blank = 82, total = 286 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/09_CompositeExposure.jl" = { code = 107, doc = 214, comment = 0, blank = 79, total = 400 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/10_DerivedExposure.jl" = { code = 50, doc = 98, comment = 0, blank = 31, total = 179 }
