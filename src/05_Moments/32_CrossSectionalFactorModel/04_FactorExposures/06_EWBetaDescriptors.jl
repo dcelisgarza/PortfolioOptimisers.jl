@@ -3,7 +3,7 @@
 
 Copy the returns with every inactive cell written to `NaN`.
 
-An asset outside the universe has no return at all, so the cell must not advance a recursion. Every market-relative Descriptor takes this copy before it starts, and its state is then frozen wherever the asset is not listed rather than advanced by a number the panel does not stand behind.
+An asset outside the universe has no return, so its cell must not advance a recursion. Every market beta Descriptor takes this copy before its recursion starts. A recursion skips a `NaN` return, so the state of an asset holds its value at every observation where the asset is not listed.
 
 # Arguments
 
@@ -12,7 +12,7 @@ An asset outside the universe has no return at all, so the cell must not advance
 
 # Returns
 
-  - `Xm::Matrix{<:Real}`: The returns, `NaN` wherever the active mask is `false`.
+  - `Xm::Matrix{<:Real}`: The returns, `NaN` wherever the active mask is `false`. Integer returns become floating point numbers, so that a cell can hold `NaN`. Every other element type is kept.
 
 # Related
 
@@ -22,7 +22,7 @@ An asset outside the universe has no return at all, so the cell must not advance
   - [`descriptor_active_fill!`](@ref)
 """
 function ew_active_returns(X::AbstractMatrix{<:Number}, pnl::AssetPanel)
-    Xm = Matrix(X)
+    Xm = Matrix{float_if_integer(eltype(X))}(X)
     descriptor_active_fill!(Xm, pnl)
     return Xm
 end
@@ -31,7 +31,23 @@ end
 
 Aggregate a matrix into one row per complete window of consecutive observations.
 
-An exponentially weighted beta of two series that do not trade on the same clock reads a covariance that the difference between the clocks pushes toward zero. A window of several observations carries both moves, so the aggregated series measures the covariance the raw series hides. Each cell is the mean of the finite entries of its window, and a window whose entries are all missing is `NaN`. A tail shorter than one window is dropped, so an aggregated series never mixes a complete window with a partial one.
+Two series that close at different times of day record one move on different observations, so the exponentially weighted covariance of their raw returns is biased toward zero. A window of several observations holds the move of both series, and the covariance of the aggregated series does not carry that bias. A tail shorter than one window is dropped, so an aggregated series never mixes a complete window with a partial one.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{a}_{k,i} &= \\frac{1}{\\lvert \\mathcal{V}_{k,i} \\rvert} \\sum_{t \\in \\mathcal{V}_{k,i}} a_{t,i}\\,, \\\\
+\\mathcal{V}_{k,i} &= \\left\\{ t \\in \\{(k - 1) h + 1, \\ldots, k h\\} : a_{t,i} \\text{ is finite} \\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``a_{t,i}``: Entry of the series at observation ``t`` and column ``i``.
+  - ``\\bar{a}_{k,i}``: Aggregated entry of window ``k`` and column ``i``. It is `NaN` when ``\\mathcal{V}_{k,i}`` is empty.
+  - ``\\mathcal{V}_{k,i}``: Observations of window ``k`` whose entry in column ``i`` is finite.
+  - ``h``: `agg_obs`, the number of observations in one window.
 
 # Arguments
 
@@ -40,7 +56,7 @@ An exponentially weighted beta of two series that do not trade on the same clock
 
 # Returns
 
-  - `B::Matrix{<:Real}`: The aggregated series, `div(observations, agg_obs) × assets`.
+  - `B::Matrix{<:Real}`: The aggregated series, `div(observations, agg_obs) × assets`. An integer series gives floating point means, and every other element type is kept.
 
 # Examples
 
@@ -57,10 +73,10 @@ julia> PortfolioOptimisers.ew_agg_series([1.0 2.0; 3.0 NaN; 5.0 6.0], 2)
   - [`EWMacroSensitivity`](@ref)
 """
 function ew_agg_series(A::AbstractMatrix{<:Real}, agg_obs::Integer)
-    Tf = eltype(A)
+    Tf = float_if_integer(eltype(A))
     T, N = size(A)
     K = div(T, agg_obs)
-    B = fill(Tf(NaN), K, N)
+    B = Matrix{Tf}(undef, K, N)
     for k in 1:K, i in 1:N
         s = zero(Tf)
         c = 0
@@ -71,9 +87,7 @@ function ew_agg_series(A::AbstractMatrix{<:Real}, agg_obs::Integer)
                 c += 1
             end
         end
-        if !iszero(c)
-            B[k, i] = s / c
-        end
+        B[k, i] = iszero(c) ? Tf(NaN) : s / c
     end
     return B
 end
@@ -82,7 +96,7 @@ end
 
 Aggregate a series into one entry per complete window of consecutive observations.
 
-This is [`ew_agg_series`](@ref) over one column, and it aggregates the market return and the reference return that ride beside the returns of the assets.
+This is [`ew_agg_series`](@ref) over one column. The Descriptors use it to aggregate the market return and the reference return, which are vectors with one entry per observation.
 
 # Arguments
 
@@ -116,7 +130,7 @@ end
 
 Spread an aggregated beta series back over the observations it was aggregated from.
 
-The recursion advances once per complete window, so every observation of a window reads the beta of the last window that closed at or before it. An observation before the first window closes reads `NaN`, because no beta has been estimated yet.
+The recursion advances once per complete window, so each observation takes the beta of the last window that closed at or before it. An observation before the first window closes is `NaN`, because no beta exists yet.
 
 # Arguments
 
@@ -126,7 +140,7 @@ The recursion advances once per complete window, so every observation of a windo
 
 # Returns
 
-  - `B::Matrix{<:Real}`: The betas, `T × assets`.
+  - `B::Matrix{<:Real}`: The betas, `T × assets`. Integer betas become floating point numbers, and every other element type is kept.
 
 # Examples
 
@@ -147,12 +161,14 @@ julia> PortfolioOptimisers.ew_beta_expand([1.0 2.0; 3.0 4.0], 5, 2)
   - [`EWMacroSensitivity`](@ref)
 """
 function ew_beta_expand(Ba::AbstractMatrix{<:Number}, T::Integer, agg_obs::Integer)::Matrix
-    Tf = eltype(Ba)
-    B = fill(Tf(NaN), T, size(Ba, 2))
+    Tf = float_if_integer(eltype(Ba))
+    B = Matrix{Tf}(undef, T, size(Ba, 2))
     for t in 1:T
         k = div(t, agg_obs)
         if k >= 1
             B[t, :] = view(Ba, k, :)
+        else
+            B[t, :] .= Tf(NaN)
         end
     end
     return B
@@ -164,7 +180,25 @@ end
 
 Run the exponentially weighted variance of the market-model residual of every asset.
 
-The shrinkage of [`EWBeta`](@ref) weighs each raw beta against the noise of its own estimate, and this is that noise. Each residual is measured against the beta of the **previous** observation, so the residual carries no part of the beta it is about to correct. The recursion starts one observation after the warm-up ends, because a beta that has not been estimated yet leaves no residual.
+The shrinkage of [`EWBeta`](@ref) weighs each raw beta against the noise of its own estimate, and this variance measures that noise. Each residual is measured against the beta of the **previous** observation, so the beta that the residual helps to correct does not enter it. The recursion starts from zero one observation after the warm-up ends, because no residual exists before the first beta. An observation where the return or the previous beta is not finite leaves the variance of that asset unchanged.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+e_{t,i} &= x_{t,\\,i} - \\beta_{t-1,i}\\, r_{m,t}\\,, \\\\
+V^{\\varepsilon}_{t,i} &= \\lambda V^{\\varepsilon}_{t-1,i} + (1 - \\lambda)\\, e_{t,i}^2\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``e_{t,i}``: Market-model residual of asset ``i`` at observation ``t``.
+  - $(math_dict[:V_eps_ti_ewb])
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:beta_ti_ewb])
+  - $(math_dict[:r_mt_ewb])
+  - $(math_dict[:lambda_ew])
 
 # Arguments
 
@@ -200,7 +234,7 @@ julia> PortfolioOptimisers.ew_beta_residual_variance([0.1 0.2; -0.1 0.3; 0.05 -0
 """
 function ew_beta_residual_variance(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                                    B::AbstractMatrix{<:Real}, decay::Real, min_obs::Integer)
-    Tf = eltype(B)
+    Tf = float_if_integer(promote_type(eltype(X), eltype(rm), eltype(B)))
     K, N = size(X)
     Vr = zeros(Tf, K, N)
     v = zeros(Tf, N)
@@ -264,7 +298,7 @@ end
 
 Weighted mean of the entries a mask selects.
 
-The shrinkage of [`EWBeta`](@ref) weights a group's mean beta by capitalisation, so a large asset carries the prior of its group further than a small one.
+The shrinkage of [`EWBeta`](@ref) weights the mean beta of a group by capitalisation, so a large asset moves the mean of its group more than a small asset does.
 
 # Arguments
 
@@ -309,7 +343,7 @@ end
 
 Estimate the mean and the prior variance of the betas a mask selects.
 
-The prior variance is the dispersion the betas actually show, less the dispersion their own estimation noise explains. What remains is the dispersion the group carries, and it is floored at zero because a group whose noise exceeds its spread carries none.
+The two values are ``\\mu_{t,g}`` and ``\\tau^2_{t,g}`` of the definition that [`ew_beta_shrink`](@ref) states. The prior variance is the observed dispersion of the betas less the mean estimation error variance of the group. It is floored at zero, because a group whose estimation noise exceeds its observed dispersion shows no dispersion of its own.
 
 # Arguments
 
@@ -320,8 +354,8 @@ The prior variance is the dispersion the betas actually show, less the dispersio
 
 # Returns
 
-  - `m::Real`: The capitalisation-weighted mean beta of the group.
-  - `pv::Real`: The prior variance of the group.
+  - `m::Real`: The capitalisation-weighted mean beta of the group, ``\\mu_{t,g}``.
+  - `pv::Real`: The prior variance of the group, ``\\tau^2_{t,g}``.
 
 # Related
 
@@ -343,42 +377,52 @@ end
 
 Shrink one cross-section of raw betas toward the capitalisation-weighted mean of its group.
 
-A beta estimated from few observations is mostly noise, and the mean beta of the assets that share its industry is a better estimate of it than the number itself. The empirical Bayes weight is the share of the group's dispersion that is not noise, so a precise beta keeps its own value and a noisy one moves to the group.
+A beta estimated from few observations is mostly noise, and the mean beta of the assets in its industry is then a better estimate of it. The empirical Bayes weight is the share of the dispersion of the group that is not noise, so a precise beta keeps most of its own value and a noisy beta moves most of the way to the mean of its group.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\beta_i^{\\ast} &= w_i \\beta_i + (1 - w_i) \\mu_g\\,, \\\\
-w_i &= \\mathrm{clamp}\\!\\left(\\frac{\\tau_g^2}{\\tau_g^2 + \\sigma_i^2 + \\texttt{min\\_val}},\\, \\texttt{bounds}\\right)\\,, \\\\
-\\sigma_i^2 &= \\frac{\\hat{\\sigma}_{\\varepsilon,i}^2}{n_{\\mathrm{eff}} \\left(V_m + \\texttt{min\\_val}\\right)}\\,.
+\\beta^{\\ast}_{t,i} &= q_{t,i}\\, \\beta_{t,i} + (1 - q_{t,i})\\, \\mu_{t,g}\\,, \\\\
+q_{t,i} &= \\mathrm{clamp}\\!\\left(\\frac{\\tau^2_{t,g}}{\\tau^2_{t,g} + \\sigma^2_{t,i} + \\texttt{min\\_val}},\\, q_{\\mathrm{lo}},\\, q_{\\mathrm{hi}}\\right)\\,, \\\\
+\\sigma^2_{t,i} &= \\frac{V^{\\varepsilon}_{t,i}}{n_{\\mathrm{eff}} \\left(V_{m,t} + \\texttt{min\\_val}\\right)}\\,, \\\\
+\\mu_{t,g} &= \\frac{\\sum_{j \\in g} c_{t,j}\\, \\beta_{t,j}}{\\sum_{j \\in g} c_{t,j}}\\,, \\\\
+\\tau^2_{t,g} &= \\max\\!\\left(\\frac{\\sum_{j \\in g} c_{t,j} \\left(\\beta_{t,j} - \\mu_{t,g}\\right)^2}{\\sum_{j \\in g} c_{t,j}} - \\frac{1}{\\lvert g \\rvert} \\sum_{j \\in g} \\sigma^2_{t,j},\\, 0\\right)\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\beta_i``: Raw beta of asset ``i``.
-  - ``\\mu_g``: Capitalisation-weighted mean beta of the group of asset ``i``.
-  - ``\\tau_g^2``: Prior variance of that group.
-  - ``\\sigma_i^2``: Estimation error variance of ``\\beta_i``.
+  - ``\\beta^{\\ast}_{t,i}``: Shrunk beta of asset ``i``.
+  - ``q_{t,i}``: Weight that the shrunk beta keeps on the raw beta.
+  - ``g``: Group of asset ``i``, the assets of the estimation set that carry its label. A group smaller than `min_group_size` takes the whole estimation set in its place.
+  - ``\\mu_{t,g}``: Capitalisation-weighted mean beta of group ``g``.
+  - ``\\tau^2_{t,g}``: Prior variance of group ``g``, its observed dispersion less its mean estimation error variance.
+  - ``\\sigma^2_{t,i}``: Estimation error variance of ``\\beta_{t,i}``.
+  - ``c_{t,j}``: Capitalisation of asset ``j`` at observation ``t``.
+  - ``q_{\\mathrm{lo}}``, ``q_{\\mathrm{hi}}``: The two entries of `bounds`.
   - ``n_{\\mathrm{eff}}``: Effective sample size of the recursion, twice its half-life.
-  - ``V_m``: Exponentially weighted variance of the market return.
+  - $(math_dict[:beta_ti_ewb])
+  - $(math_dict[:V_eps_ti_ewb])
+  - $(math_dict[:V_mt_ewb])
+  - $(math_dict[:min_val_ewb])
 
 # Algorithm
 
- 1. Take the assets whose beta is not `NaN`, whose group label is set, and whose weight is finite and strictly positive. An asset outside that set keeps its raw beta.
- 2. Estimate the mean and the prior variance of the whole cross-section, which every group below `min_group_size` falls back on.
- 3. For each group, estimate its own mean and prior variance where it is large enough, and take the fallback where it is not.
- 4. Weigh each raw beta against the noise of its own estimate, clamp the weight to `bounds`, and mix the raw beta with the mean of its group.
+ 1. Build the estimation set `vld`, the assets whose beta is not `NaN`, whose group label is set, and whose weight is finite and strictly positive. An asset outside `vld` keeps its raw beta, and an empty `vld` returns the raw betas unchanged.
+ 2. Compute the mean `gm` and the prior variance `gpv` of the whole estimation set through [`ew_beta_group_prior`](@ref).
+ 3. For each group label in `vld`, compute its mean `m` and its prior variance `pv` through [`ew_beta_group_prior`](@ref). A group with fewer than `min_group_size` members takes `gm` and `gpv` instead.
+ 4. For each member of the group, compute the weight `q` and clamp it to `bounds`.
+ 5. Write the shrunk beta, `q` times the raw beta plus `1 - q` times `m`.
 
 # Arguments
 
   - `b`: The raw betas.
-  - `bev`: The estimation error variance of each beta.
+  - `bev`: The estimation error variance of each beta, ``\\sigma^2_{t,i}``.
   - `L`: The group label of each asset, [`CS_MISSING_GROUP`](@ref) where the asset carries none.
   - `w`: The capitalisation weights.
-  - $(arg_dict[:min_group_size])
-  - `bounds`: Lower and upper bound on the weight the raw beta keeps.
+  - $(arg_dict[:min_group_size_ewb])
+  - $(arg_dict[:bounds_ewb])
   - $(arg_dict[:min_val])
 
 # Returns
@@ -497,24 +541,32 @@ $(DocStringExtensions.TYPEDEF)
 
 Exponentially weighted beta of the returns against the market return, at every observation.
 
-This is the archetype of every market beta Descriptor. The beta is the exponentially weighted covariance of an asset with the market, over the exponentially weighted variance of the market, and the market return is rebuilt from the Asset Panel by [`market_return_series`](@ref). Where the estimator names a categorical Panel Field in `group`, each raw beta is shrunk toward the capitalisation-weighted mean beta of its group by [`ew_beta_shrink`](@ref).
+This is the archetype of every market beta Descriptor. The beta is the exponentially weighted covariance of an asset with the market, divided by the exponentially weighted variance of the market. [`market_return_series`](@ref) builds the market return from the Asset Panel. Where the estimator names a categorical Panel Field in `group`, [`ew_beta_shrink`](@ref) shrinks each raw beta toward the capitalisation-weighted mean beta of its group.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\beta_{t,i} &= \\frac{C_{t,i}}{V_{t} + \\texttt{min\\_val}}\\,, \\\\
-C_{t,i} &= \\lambda C_{t-1,i} + (1 - \\lambda)\\left(r_{t,i} - \\mu_{t-1,i}\\right)\\left(r_{m,t} - \\mu_{t-1}\\right)\\,, \\\\
-V_{t} &= \\lambda V_{t-1} + (1 - \\lambda)\\left(r_{m,t} - \\mu_{t-1}\\right)^2\\,.
+\\beta_{t,i} &= \\frac{C_{t,i}}{V_{m,t} + \\texttt{min\\_val}}\\,, \\\\
+C_{t,i} &= \\lambda C_{t-1,i} + (1 - \\lambda)\\left(x_{t,\\,i} - \\mu_{t-1,i}\\right)\\left(r_{m,t} - \\mu_{m,t-1}\\right)\\,, \\\\
+V_{m,t} &= \\lambda V_{m,t-1} + (1 - \\lambda)\\left(r_{m,t} - \\mu_{m,t-1}\\right)^2\\,, \\\\
+\\mu_{t,i} &= \\lambda \\mu_{t-1,i} + (1 - \\lambda)\\, x_{t,\\,i}\\,, \\\\
+\\mu_{m,t} &= \\lambda \\mu_{m,t-1} + (1 - \\lambda)\\, r_{m,t}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``r_{t,i}``: Return of asset ``i`` at observation ``t``.
-  - ``r_{m,t}``: The market return at observation ``t``.
-  - ``\\mu_{t,i}``, ``\\mu_{t}``: Exponentially weighted means of the asset and of the market.
-  - ``\\lambda``: The decay factor.
+  - ``C_{t,i}``: Exponentially weighted covariance of asset ``i`` with the market.
+  - ``\\mu_{t,i}``, ``\\mu_{m,t}``: Exponentially weighted means of asset ``i`` and of the market.
+  - $(math_dict[:beta_ti_ewb])
+  - $(math_dict[:V_mt_ewb])
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:r_mt_ewb])
+  - $(math_dict[:lambda_ew])
+  - $(math_dict[:min_val_ewb])
+
+Every state starts from zero, and each deviation uses the mean of the previous observation.
 
 # Fields
 
@@ -528,12 +580,12 @@ $(DocStringExtensions.FIELDS)
            bounds::Tuple{<:Real, <:Real} = (0.0, 1.0),
            min_val::Real = 1e-12) -> EWBeta
 
-Keywords correspond to the struct's fields. `decay` and `min_obs` take no default, because they depend on the data frequency: [`EWMarketBeta`](@ref) states a half-life instead and converts it through [`half_life_decay`](@ref) and [`half_life_min_obs`](@ref).
+Keywords correspond to the struct's fields. `decay` and `min_obs` take no default, because their values depend on the data frequency. [`EWMarketBeta`](@ref) takes a half-life instead, and converts it through [`half_life_decay`](@ref) and [`half_life_min_obs`](@ref).
 
 ## Validation
 
-  - `0 < decay < 1`.
-  - `min_obs >= 1`.
+  - $(val_dict[:decay])
+  - $(val_dict[:min_obs])
   - `agg_obs >= 1`.
   - `min_group_size >= 1`.
   - `0 <= bounds[1] <= bounds[2] <= 1`.
@@ -563,6 +615,10 @@ EWBeta
   - [`ew_beta_series`](@ref)
   - [`ew_beta_shrink`](@ref)
   - [`market_return_series`](@ref)
+
+# References
+
+  - $(ref_dict[:sharpe1964])
 """
 @concrete struct EWBeta <: AbstractDescriptorEstimator
     """
@@ -582,15 +638,15 @@ EWBeta
     """
     agg_obs
     """
-    Name of the categorical Panel Field the shrinkage groups the cross-section by, or `nothing` to leave every beta raw.
+    $(field_dict[:group_ewb])
     """
     group
     """
-    $(field_dict[:min_group_size])
+    $(field_dict[:min_group_size_ewb])
     """
     min_group_size
     """
-    Lower and upper bound on the weight a shrunk beta keeps on its raw value. A bound of `(0, 1)` lets the data set the weight alone.
+    $(field_dict[:bounds_ewb])
     """
     bounds
     """
@@ -632,9 +688,19 @@ end
                    Ba::AbstractMatrix{<:Real}, Vm::AbstractVector{<:Real},
                    Xa::AbstractMatrix{<:Real}, rma::AbstractVector{<:Real}) -> Matrix{<:Real}
 
-Turn the recursion's raw betas into the Descriptor an [`EWBeta`](@ref) answers.
+Turn the raw betas of the recursion into the Descriptor of an [`EWBeta`](@ref).
 
-The `group` slot is read by dispatch: with no group the raw betas are spread over the observations they were aggregated from, and with a group each cross-section is shrunk first. A shrunk cross-section is recomputed only where a window closes, and it is held between windows, so the shrinkage runs on the same clock as the recursion.
+Dispatch on the `group` slot selects the method. With no group, the raw betas are spread over the observations that they were aggregated from. With a group, each cross-section is shrunk first. A shrunk cross-section is computed again only at an observation that closes a window, and it holds its value between windows, so the shrinkage runs on the same clock as the recursion.
+
+# Algorithm
+
+ 1. With no group, spread `Ba` over the observations through [`ew_beta_expand`](@ref), and stop.
+ 2. Read the capitalisation `W` and the group labels `L` at every observation.
+ 3. Compute the residual variance `Vr` of every window through [`ew_beta_residual_variance`](@ref).
+ 4. Compute the effective sample size `en`, twice the half-life that `decay` implies.
+ 5. At each observation `t` that closes window `k`, with `k >= min_obs`, compute the estimation error variance `bev` of each beta of that window.
+ 6. Shrink the betas of window `k` through [`ew_beta_shrink`](@ref), with the labels and the weights of observation `t`. The result `s` holds its value until the next window closes.
+ 7. Write `s` at every observation after the warm-up, the raw betas of the last closed window during the warm-up, and `NaN` before the first window closes.
 
 # Arguments
 
@@ -673,7 +739,7 @@ function ew_beta_output(group::AbstractString, de::EWBeta, rd::ReturnsResult,
     en = 2 * decay_half_life(de.decay)
     agg_obs = de.agg_obs
     min_obs = de.min_obs
-    Tf = eltype(Ba)
+    Tf = float_if_integer(eltype(Ba))
     T, N = size(W)
     B = fill(Tf(NaN), T, N)
     s = fill(Tf(NaN), N)
@@ -699,13 +765,14 @@ Compute an exponentially weighted market beta Descriptor from a carrier.
 
 # Algorithm
 
- 1. Build the market return through [`market_return_series`](@ref), and mask the returns through [`ew_active_returns`](@ref).
- 2. Aggregate the returns and the market return through [`ew_agg_series`](@ref) where `agg_obs` is greater than one.
- 3. Run the recursion through [`ew_beta_series`](@ref).
- 4. Shrink and spread the raw betas through [`ew_beta_output`](@ref), which reads the `group` slot by dispatch.
- 5. Write `NaN` into the inactive cells through [`descriptor_active_fill!`](@ref).
+ 1. Build the market return `rm` through [`market_return_series`](@ref).
+ 2. Mask the returns into `X` through [`ew_active_returns`](@ref).
+ 3. Where `agg_obs` is greater than one, aggregate `X` and `rm` into `Xa` and `rma` through [`ew_agg_series`](@ref) and [`ew_agg_vector`](@ref).
+ 4. Run the recursion through [`ew_beta_series`](@ref), for the raw betas `Ba` and the market variance `Vm` of every window.
+ 5. Shrink and spread `Ba` into the Descriptor `D` through [`ew_beta_output`](@ref), which dispatches on the `group` slot.
+ 6. Write `NaN` into the inactive cells of `D` through [`descriptor_active_fill!`](@ref).
 
-An asset whose return is missing at an observation holds the beta it last carried, and the market state advances there whatever the asset does.
+An asset whose return is missing at an observation keeps its last raw beta, and the market state still advances at that observation. With a group, the shrunk beta of that asset can still change, because the mean and the prior variance of its group change.
 
 # Arguments
 
@@ -767,18 +834,18 @@ end
 
 Exponentially weighted sensitivity of an asset to the market portfolio.
 
-The value is the beta of [`EWBeta`](@ref) against the capitalisation-weighted market return. It is the oldest measure of systematic risk there is: an asset of beta two moves twice as far as the market, and it earns the premium the market pays for carrying that move. The default half-life of `60` weights about as far back as a quarter of daily observations.
+The value is the beta of [`EWBeta`](@ref) against the capitalisation-weighted market return, the systematic risk of the capital asset pricing model. An asset of beta two moves on average twice as far as the market. With daily observations, the default half-life of `60` is about one quarter of a year.
 
 # Arguments
 
   - $(arg_dict[:mcap])
-  - `half_life`: Half-life of the recursion, in observations. It fixes the defaults of `decay` and `min_obs`.
+  - `half_life`: Half-life of the recursion, in observations. It sets the defaults of `decay` and `min_obs`.
   - $(arg_dict[:decay])
   - $(arg_dict[:min_obs])
   - $(arg_dict[:agg_obs])
-  - `group`: Name of the categorical Panel Field the shrinkage groups by, or `nothing`.
-  - $(arg_dict[:min_group_size])
-  - `bounds`: Lower and upper bound on the weight a shrunk beta keeps on its raw value.
+  - $(arg_dict[:group_ewb])
+  - $(arg_dict[:min_group_size_ewb])
+  - $(arg_dict[:bounds_ewb])
   - $(arg_dict[:min_val])
 
 # Returns
@@ -825,28 +892,17 @@ end
 
 Run the exponentially weighted partial beta of the returns on a reference series.
 
-The partial beta is the coefficient of the reference series in the regression of the returns on the market **and** the reference series together, so it carries none of the exposure the market already explains. It is computed in closed form by the Frisch-Waugh decomposition, from the exponentially weighted moments alone and with no matrix to invert.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\beta^{f}_{t,i} &= \\frac{C^{f}_{t,i} - C^{m}_{t,i} C^{mf}_{t} / \\tilde{V}^{m}_{t}}{V^{f}_{t} - \\left(C^{mf}_{t}\\right)^2 / \\tilde{V}^{m}_{t} + \\texttt{min\\_val}}\\,, \\\\
-\\tilde{V}^{m}_{t} &= V^{m}_{t} + \\texttt{min\\_val}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``C^{m}_{t,i}``, ``C^{f}_{t,i}``: Exponentially weighted covariances of asset ``i`` with the market and with the reference series.
-  - ``C^{mf}_{t}``: Exponentially weighted covariance of the market with the reference series.
-  - ``V^{m}_{t}``, ``V^{f}_{t}``: Exponentially weighted variances of the market and of the reference series.
+This recursion computes the closed form that [`EWMacroSensitivity`](@ref) states, from the exponentially weighted moments alone and with no matrix to invert.
 
 # Algorithm
 
- 1. Skip the observation entirely where the reference return is not finite. The whole state freezes there, market included, because a partial beta needs both series at once.
- 2. Take each deviation from the mean of the previous step, and update the mean after it.
- 3. Write a fresh partial beta where the observation count of the panel and the valid count of the asset have both reached `min_obs`. An asset whose return is not valid keeps the value it last held.
+ 1. Skip an observation whose reference return is not finite. The whole state holds its value there, the market state included, because a partial beta needs both series at one observation.
+ 2. Count the observation in `c`.
+ 3. Take the deviations `dm` and `df` of the market and of the reference series from the means of the previous observation.
+ 4. Advance the means `mu_m` and `mu_f`, the variances `var_m` and `var_f`, and the covariance `cov_mf`.
+ 5. For each asset with a finite return, take its deviation `d` from its previous mean.
+ 6. Advance the mean `mu`, the covariances `cam` and `caf`, and the valid count `n` of that asset. An asset without a finite return keeps its state.
+ 7. Write a new partial beta where `c` and the valid count of the asset have both reached `min_obs`. An asset keeps its last partial beta at every other observation, and it is `NaN` before its first one.
 
 # Arguments
 
@@ -870,7 +926,7 @@ Where:
 function ew_macro_sensitivity_series(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                                      rf::AbstractVector{<:Real}, decay::Real,
                                      min_obs::Integer, min_val::Real)::Matrix{<:Real}
-    Tf = promote_type(eltype(X), eltype(rm), eltype(rf))
+    Tf = float_if_integer(promote_type(eltype(X), eltype(rm), eltype(rf)))
     T, N = size(X)
     B = fill(Tf(NaN), T, N)
     b = fill(Tf(NaN), N)
@@ -924,19 +980,32 @@ $(DocStringExtensions.TYPEDEF)
 
 Exponentially weighted sensitivity of the returns to a reference series, after the market is removed.
 
-An asset's exposure to an exchange rate, to a rate of interest, to inflation or to a basket of commodities is what remains after the market has taken its share of the move. The reference series is not a Panel Field, so it is not carried by the Asset Panel: [`descriptor`](@ref) takes it as the keyword `ref`, because carried input does not travel on a Result.
+The exposure of an asset to an exchange rate, a rate of interest, inflation or a basket of commodities is the part of its move that the market does not explain. The partial beta is the coefficient of the reference series in the regression of the returns on the market and the reference series together, so it contains no exposure that the market explains. The reference series is not a Panel Field, so the Asset Panel does not carry it. [`descriptor`](@ref) takes it as the keyword `ref`, because a Result carries no input of this kind.
 
 # Mathematical definition
 
 ```math
-r_{t,i} = \\alpha_i + \\beta^{m}_i r_{m,t} + \\beta^{f}_i r_{f,t} + \\varepsilon_{t,i}\\,,
+\\begin{align}
+x_{t,\\,i} &= \\alpha_i + \\beta^{m}_i\\, r_{m,t} + \\beta^{f}_i\\, r_{f,t} + \\varepsilon_{t,i}\\,, \\\\
+\\beta^{f}_{t,i} &= \\frac{C^{f}_{t,i} - C^{m}_{t,i}\\, C^{mf}_{t} / \\tilde{V}^{m}_{t}}{V^{f}_{t} - \\left(C^{mf}_{t}\\right)^2 / \\tilde{V}^{m}_{t} + \\texttt{min\\_val}}\\,, \\\\
+\\tilde{V}^{m}_{t} &= V^{m}_{t} + \\texttt{min\\_val}\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``r_{m,t}``: The market return at observation ``t``.
-  - ``r_{f,t}``: The reference return at observation ``t``.
-  - ``\\beta^{f}_i``: The Descriptor, the partial sensitivity of asset ``i`` to the reference series.
+  - ``r_{f,t}``: Reference return at observation ``t``.
+  - ``\\alpha_i``, ``\\beta^{m}_i``, ``\\varepsilon_{t,i}``: Intercept, market beta and residual of asset ``i`` in the regression.
+  - ``\\beta^{f}_i``: Partial sensitivity of asset ``i`` to the reference series.
+  - ``\\beta^{f}_{t,i}``: The Descriptor, the exponentially weighted estimate of ``\\beta^{f}_i`` after observation ``t``. It is the Frisch-Waugh form of the coefficient in the moments below.
+  - ``C^{m}_{t,i}``, ``C^{f}_{t,i}``: Exponentially weighted covariances of asset ``i`` with the market and with the reference series.
+  - ``C^{mf}_{t}``: Exponentially weighted covariance of the market with the reference series.
+  - ``V^{m}_{t}``, ``V^{f}_{t}``: Exponentially weighted variances of the market and of the reference series.
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:r_mt_ewb])
+  - $(math_dict[:min_val_ewb])
+
+Each moment follows the recursion that [`EWBeta`](@ref) states, with the decay `decay`, and every moment holds its value at an observation whose reference return is not finite.
 
 # Fields
 
@@ -949,12 +1018,12 @@ $(DocStringExtensions.FIELDS)
                        min_obs::Integer = half_life_min_obs(half_life),
                        agg_obs::Integer = 1, min_val::Real = 1e-12) -> EWMacroSensitivity
 
-Keywords correspond to the struct's fields, except `half_life`, which is not a field: it fixes the defaults of `decay` and `min_obs`, and a value passed for either of those is used as it stands. The default half-life of `60` weights about as far back as a quarter of daily observations.
+Keywords correspond to the struct's fields, except `half_life`, which is not a field. It sets the defaults of `decay` and `min_obs`, and a value passed for either of those is used as it is. With daily observations, the default half-life of `60` is about one quarter of a year.
 
 ## Validation
 
-  - `0 < decay < 1`.
-  - `min_obs >= 1`.
+  - $(val_dict[:decay])
+  - $(val_dict[:min_obs])
   - `agg_obs >= 1`.
   - `min_val > 0`.
 
@@ -1024,10 +1093,12 @@ Compute an exponentially weighted macro sensitivity Descriptor from a carrier an
 
 # Algorithm
 
- 1. Build the market return through [`market_return_series`](@ref), and mask the returns through [`ew_active_returns`](@ref).
- 2. Aggregate the returns, the market return and the reference return through [`ew_agg_series`](@ref) where `agg_obs` is greater than one.
- 3. Run the recursion through [`ew_macro_sensitivity_series`](@ref).
- 4. Spread the partial betas over the observations they were aggregated from, and write `NaN` into the inactive cells.
+ 1. Mask the returns into `X` through [`ew_active_returns`](@ref).
+ 2. Build the market return `rm` through [`market_return_series`](@ref).
+ 3. Where `agg_obs` is greater than one, aggregate `X`, `rm` and `ref` into `Xa`, `rma` and `rfa` through [`ew_agg_series`](@ref) and [`ew_agg_vector`](@ref).
+ 4. Run the recursion through [`ew_macro_sensitivity_series`](@ref), for the partial betas `Ba` of every window.
+ 5. Spread `Ba` over the observations into the Descriptor `D` through [`ew_beta_expand`](@ref).
+ 6. Write `NaN` into the inactive cells of `D` through [`descriptor_active_fill!`](@ref).
 
 # Arguments
 
@@ -1094,23 +1165,15 @@ end
 
 Run the exponentially weighted lower partial co-moment of the returns against the market.
 
-The recursion advances at every observation, so an observation the market spends above the target adds nothing to the co-moment while the co-moments already there decay. That is what keeps the estimate moving through a calm market, which a recursion that advances only on a fall would freeze.
+This recursion computes the closed form that [`EWDownsideBeta`](@ref) states. It advances at every observation, so an observation where the market is above the target adds nothing to a co-moment, and the co-moments decay. The estimate therefore still moves in a calm market. A recursion that advanced only when the market fell would hold its value there.
 
-# Mathematical definition
+# Algorithm
 
-```math
-\\begin{align}
-D_{t} &= \\min(r_{m,t} - \\mathrm{mar},\\, 0)\\,, \\quad D_{t,i} = \\min(r_{t,i} - \\mathrm{mar},\\, 0)\\,, \\\\
-\\beta^{-}_{t,i} &= \\frac{\\lambda C_{t-1,i} + (1 - \\lambda) D_{t,i} D_{t}}{\\lambda V_{t-1} + (1 - \\lambda) D_{t}^2 + \\texttt{min\\_val}}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{mar}``: The minimum acceptable return.
-  - ``C_{t,i}``: Exponentially weighted co-moment of the shortfalls of asset ``i`` and of the market.
-  - ``V_{t}``: Exponentially weighted second moment of the shortfall of the market.
-  - ``\\lambda``: The decay factor.
+ 1. At every observation, compute the shortfall `dm` of the market.
+ 2. Advance the second moment `vd` of the shortfall of the market.
+ 3. For each asset with a finite return, advance its co-moment `cd` with its own shortfall and `dm`.
+ 4. Advance the valid count `n` of that asset. An asset without a finite return keeps its co-moment and its count.
+ 5. Write the downside beta `cd / (vd + min_val)` where the observation count and the valid count of the asset have both reached `min_obs`. Every earlier cell is `NaN`.
 
 # Arguments
 
@@ -1134,7 +1197,7 @@ Where:
 function ew_downside_beta_series(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                                  decay::Real, min_obs::Integer, mar::Real,
                                  min_val::Real)::Matrix{<:Real}
-    Tf = promote_type(eltype(X), eltype(rm))
+    Tf = float_if_integer(promote_type(eltype(X), eltype(rm)))
     T, N = size(X)
     B = fill(Tf(NaN), T, N)
     cd = zeros(Tf, N)
@@ -1163,18 +1226,33 @@ $(DocStringExtensions.TYPEDEF)
 
 Exponentially weighted sensitivity of the returns to the falls of the market, at every observation.
 
-A beta that treats a rise and a fall alike says nothing about which of the two an asset follows. This Descriptor measures the second one alone, from the lower partial co-moment of the asset with the market: how far the asset falls when the market falls short of a target. An investor who fears a loss and not a gain reads this in place of the two-sided beta.
+A beta that treats a rise and a fall alike does not show which of the two an asset follows. This Descriptor measures the falls alone, through the lower partial co-moment of the asset with the market. It is how far the asset falls when the market falls short of a target. An investor who fears a loss and not a gain uses it in place of the two-sided beta.
 
 # Mathematical definition
 
 ```math
-\\beta^{-}_{t,i} = \\frac{\\mathrm{EW}\\!\\left(D_{i} D_{m}\\right)}{\\mathrm{EW}\\!\\left(D_{m}^2\\right) + \\texttt{min\\_val}}\\,, \\quad D = \\min(r - \\mathrm{mar},\\, 0)\\,.
+\\begin{align}
+\\beta^{-}_{t,i} &= \\frac{C^{-}_{t,i}}{V^{-}_{t} + \\texttt{min\\_val}}\\,, \\\\
+C^{-}_{t,i} &= \\lambda C^{-}_{t-1,i} + (1 - \\lambda)\\, D_{t,i}\\, D_{m,t}\\,, \\\\
+V^{-}_{t} &= \\lambda V^{-}_{t-1} + (1 - \\lambda)\\, D_{m,t}^2\\,, \\\\
+D_{t,i} &= \\min\\left(x_{t,\\,i} - \\mathrm{mar},\\, 0\\right)\\,, \\\\
+D_{m,t} &= \\min\\left(r_{m,t} - \\mathrm{mar},\\, 0\\right)\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``D_{i}``, ``D_{m}``: Shortfalls of asset ``i`` and of the market below the minimum acceptable return.
-  - ``\\mathrm{mar}``: The minimum acceptable return.
+  - ``\\beta^{-}_{t,i}``: Downside beta of asset ``i`` after observation ``t``.
+  - ``C^{-}_{t,i}``: Exponentially weighted co-moment of the shortfalls of asset ``i`` and of the market. It holds its value at an observation where the return of the asset is not finite.
+  - ``V^{-}_{t}``: Exponentially weighted second moment of the shortfall of the market.
+  - ``D_{t,i}``, ``D_{m,t}``: Shortfalls of asset ``i`` and of the market below the target.
+  - ``\\mathrm{mar}``: `mar`, the minimum acceptable return.
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:r_mt_ewb])
+  - $(math_dict[:lambda_ew])
+  - $(math_dict[:min_val_ewb])
+
+Both states start from zero. No mean is subtracted, so a co-moment is not a covariance.
 
 # Fields
 
@@ -1187,12 +1265,12 @@ $(DocStringExtensions.FIELDS)
                    min_obs::Integer = half_life_min_obs(half_life), mar::Real = 0.0,
                    min_val::Real = 1e-12) -> EWDownsideBeta
 
-Keywords correspond to the struct's fields, except `half_life`, which is not a field: it fixes the defaults of `decay` and `min_obs`, and a value passed for either of those is used as it stands. The default half-life of `60` weights about as far back as a quarter of daily observations, and the default target of zero calls a loss the downside.
+Keywords correspond to the struct's fields, except `half_life`, which is not a field. It sets the defaults of `decay` and `min_obs`, and a value passed for either of those is used as it is. With daily observations, the default half-life of `60` is about one quarter of a year. The default target of zero makes every loss a shortfall.
 
 ## Validation
 
-  - `0 < decay < 1`.
-  - `min_obs >= 1`.
+  - $(val_dict[:decay])
+  - $(val_dict[:min_obs])
   - `isfinite(mar)`.
   - `min_val > 0`.
 
@@ -1216,6 +1294,11 @@ EWDownsideBeta
   - [`EWMarketBeta`](@ref)
   - [`ew_downside_beta_series`](@ref)
   - [`market_return_series`](@ref)
+
+# References
+
+  - $(ref_dict[:angchenxing2006])
+  - $(ref_dict[:estrada2002])
 """
 @concrete struct EWDownsideBeta <: AbstractDescriptorEstimator
     """
@@ -1231,7 +1314,7 @@ EWDownsideBeta
     """
     min_obs
     """
-    Minimum acceptable return the shortfall of the asset and of the market are both measured below.
+    Minimum acceptable return, the target below which the Descriptor measures the shortfalls of the asset and of the market.
     """
     mar
     """
@@ -1262,11 +1345,12 @@ Compute an exponentially weighted downside beta Descriptor from a carrier.
 
 # Algorithm
 
- 1. Build the market return through [`market_return_series`](@ref), and mask the returns through [`ew_active_returns`](@ref).
- 2. Run the recursion through [`ew_downside_beta_series`](@ref).
- 3. Write `NaN` into the inactive cells through [`descriptor_active_fill!`](@ref).
+ 1. Build the market return `rm` through [`market_return_series`](@ref).
+ 2. Mask the returns through [`ew_active_returns`](@ref).
+ 3. Run the recursion through [`ew_downside_beta_series`](@ref), for the Descriptor `D`.
+ 4. Write `NaN` into the inactive cells of `D` through [`descriptor_active_fill!`](@ref).
 
-An asset whose return is missing at an observation advances no co-moment of its own, and it still reads the market's shortfall of that observation once it is ready.
+An asset whose return is missing at an observation keeps its co-moment there. Once the asset is ready, its downside beta still changes at that observation, because the second moment of the market advances.
 
 # Arguments
 

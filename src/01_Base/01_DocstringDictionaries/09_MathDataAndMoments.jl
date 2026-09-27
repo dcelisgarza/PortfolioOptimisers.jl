@@ -123,6 +123,13 @@ unique_key_dict!(math_dict, :math_dict,
                  # stated by two or more Units of those files.
                  :lambda_ew => "``\\lambda``: `decay`, the decay factor of the exponentially weighted recursion.",#
                  :n_i_ew => "``n_i``: Valid-history length of asset ``i``, the count of its valid observations since its last reset.",#
+                 # The market beta Descriptors of `04_FactorExposures/`. Each symbol is
+                 # stated by two or more Units of those files.
+                 :r_mt_ewb => "``r_{m,t}``: Market return at observation ``t``, the capitalisation-weighted mean return over the estimation universe.",#
+                 :beta_ti_ewb => "``\\beta_{t,i}``: Raw market beta of asset ``i`` after observation ``t``, before any shrinkage.",#
+                 :V_mt_ewb => "``V_{m,t}``: Market variance after observation ``t``, the exponentially weighted variance of ``r_{m,t}``.",#
+                 :V_eps_ti_ewb => "``V^{\\varepsilon}_{t,i}``: Residual variance of asset ``i`` after observation ``t``, the exponentially weighted mean square of its market-model residual.",#
+                 :min_val_ewb => "``\\texttt{min\\_val}``: `min_val`, the floor added to a denominator so that it never reaches zero.",#
                  # The ambiguity radius rules of `06_CalibrationRules.jl`, and the
                  # effective sample size the significance rules share with them. Each
                  # rule returns one radius off one record, so the radius, its scale

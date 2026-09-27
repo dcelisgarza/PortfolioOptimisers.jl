@@ -463,7 +463,7 @@ julia> B
 function ew_beta_series(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real}, decay::Real,
                         min_obs::Integer, min_val::Real,
                         amsk::Option{<:AbstractMatrix{Bool}} = nothing)
-    Tf = promote_type(eltype(X), eltype(rm))
+    Tf = float_if_integer(promote_type(eltype(X), eltype(rm)))
     T, N = size(X)
     B = fill(Tf(NaN), T, N)
     Vm = Vector{Tf}(undef, T)

@@ -213,6 +213,35 @@ function ewb_hand_residual(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real}
     return D
 end
 
+# The James-Stein shrinkage of one cross-section, written out from its closed form. The
+# estimation set is every asset whose beta is not `NaN`, whose group is set and whose weight
+# is finite and strictly positive. A group below `mgs` takes the prior of the whole set.
+function ewb_hand_shrink(b::AbstractVector{<:Real}, bev::AbstractVector{<:Real},
+                         L::AbstractVector{<:Integer}, w::AbstractVector{<:Real},
+                         mgs::Integer, bounds::Tuple{<:Real, <:Real}, min_val::Real)
+    ix = [i
+          for i in eachindex(b)
+          if !isnan(b[i]) &&
+                 L[i] != PortfolioOptimisers.CS_MISSING_GROUP &&
+                 isfinite(w[i]) &&
+                 w[i] > 0]
+    function prior(jx)
+        W = sum(w[j] for j in jx)
+        mu = sum(w[j] * b[j] for j in jx) / W
+        tau2 = sum(w[j] * (b[j] - mu)^2 for j in jx) / W -
+               sum(bev[j] for j in jx) / length(jx)
+        return mu, max(tau2, 0.0)
+    end
+    s = copy(b)
+    for i in ix
+        gx = [j for j in ix if L[j] == L[i]]
+        mu, tau2 = length(gx) < mgs ? prior(ix) : prior(gx)
+        q = clamp(tau2 / (tau2 + bev[i] + min_val), bounds...)
+        s[i] = q * b[i] + (1 - q) * mu
+    end
+    return s
+end
+
 @testset "EW beta descriptors: the market return" begin
     X = [0.10 0.20 -0.05
          -0.10 0.00 0.03
@@ -518,7 +547,7 @@ end
     @testset "A ready asset reads the market's shortfall through its own gap" begin
         D = descriptor(EWDownsideBeta(; half_life = 2), rd)
         # Asset 2 has no return at observation 3, and the market's downside variance still
-        # advances there, so its beta moves even though its co-moment only decays.
+        # advances there, so its beta moves even though its co-moment holds its value.
         @test isfinite(D[3, 2])
         @test D[3, 2] != D[2, 2]
     end
@@ -713,5 +742,153 @@ end
         @test size(D) == size(E)
         @test isequal(isnan.(D), isnan.(E))
         @test D[isfinite.(E)] ≈ E[isfinite.(E)]
+    end
+end
+
+@testset "EW beta descriptors: the shrinkage is the closed form, written out" begin
+    @testset "Unequal weights, a small group, a missing group and a NaN beta" begin
+        b = [0.6, 1.4, 1.1, 0.9, 1.8, 0.7, 1.2, NaN]
+        bev = [0.02, 0.05, 0.01, 0.03, 0.04, 0.02, 0.06, 0.01]
+        L = [1, 1, 1, 2, 2, 3, PortfolioOptimisers.CS_MISSING_GROUP, 1]
+        w = [3.0, 1.0, 2.0, 5.0, 1.0, 2.0, 4.0, 1.0]
+        for bounds in ((0.0, 1.0), (0.2, 0.7))
+            s = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 2, bounds, 1e-12)
+            @test ewb_same(s[:, :], ewb_hand_shrink(b, bev, L, w, 2, bounds, 1e-12)[:, :];
+                           rtol = 1e-14)
+        end
+        # The asset with no group keeps its raw beta, and the NaN beta stays NaN.
+        s = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 2, (0.0, 1.0), 1e-12)
+        @test s[7] == b[7]
+        @test isnan(s[8])
+    end
+    @testset "The grouped Descriptor on an aggregated clock is the hand pipeline" begin
+        X = [0.10 0.20 -0.05 0.04
+             -0.10 0.00 0.03 -0.02
+             0.05 NaN 0.01 0.06
+             0.02 -0.03 0.04 -0.01
+             -0.04 0.06 -0.02 0.03
+             0.03 0.01 0.05 -0.04
+             0.06 -0.02 0.02 0.01
+             -0.01 0.04 -0.03 0.05]
+        W = [1.0 3.0 2.0 1.5
+             2.0 2.0 2.0 1.0
+             5.0 1.0 4.0 2.0
+             1.0 1.0 1.0 3.0
+             2.0 3.0 1.0 1.0
+             1.0 2.0 3.0 2.0
+             3.0 1.0 2.0 1.0
+             2.0 2.0 1.0 4.0]
+        ind = repeat(["a" "a" "b" "b"], 8, 1)
+        rd = ewb_hand_panel(X, W; industry = ind)
+        D = descriptor(EWMarketBeta(; half_life = 2, agg_obs = 2, group = "industry",
+                                    min_group_size = 2, bounds = (0.1, 0.9)), rd)
+        decay, min_obs, min_val, en = exp2(-inv(2.0)), 2, 1e-12, 4.0
+        # Each window is the mean of the finite entries of its two observations.
+        rm = ewb_hand_market(X, W, trues(8, 4))
+        Xa = [sum(filter(isfinite, X[(2k - 1):(2k), i])) /
+              count(isfinite, X[(2k - 1):(2k), i]) for k in 1:4, i in 1:4]
+        rma = [(rm[2k - 1] + rm[2k]) / 2 for k in 1:4]
+        Ba = ewb_hand_beta(Xa, rma, trues(4, 4), decay, min_obs, min_val)
+        # The market variance, and the residual variance against the previous window's beta.
+        Vm, Vr = zeros(4), zeros(4, 4)
+        let mu = 0.0, v = 0.0, r = zeros(4)
+            for k in 1:4
+                d = rma[k] - mu
+                mu = decay * mu + (1 - decay) * rma[k]
+                v = decay * v + (1 - decay) * d * d
+                Vm[k] = v
+                if k - 1 >= min_obs
+                    for i in 1:4
+                        e = Xa[k, i] - Ba[k - 1, i] * rma[k]
+                        r[i] = decay * r[i] + (1 - decay) * e * e
+                    end
+                end
+                Vr[k, :] = r
+            end
+        end
+        E = fill(NaN, 8, 4)
+        s = fill(NaN, 4)
+        for t in 1:8
+            k = div(t, 2)
+            if iseven(t) && k >= min_obs
+                s = ewb_hand_shrink(Ba[k, :], Vr[k, :] ./ (en * (Vm[k] + min_val)),
+                                    [1, 1, 2, 2], W[t, :], 2, (0.1, 0.9), min_val)
+            end
+            if k >= min_obs
+                E[t, :] = s
+            elseif k >= 1
+                E[t, :] = Ba[k, :]
+            end
+        end
+        @test ewb_same(D, E; rtol = 1e-12)
+        @test all(isfinite, D[4:8, :])
+        # The shrinkage moved every beta of the last window.
+        @test all(D[8, :] .!= Ba[4, :])
+    end
+end
+
+@testset "EW beta descriptors: the number type comes from the data" begin
+    Xi = [1 2
+          -1 0
+          1 1
+          2 -1
+          0 3]
+    W = [1.0 2.0
+         3.0 4.0
+         5.0 6.0
+         1.0 1.0
+         2.0 1.0]
+    amsk = trues(5, 2)
+    amsk[3, 2] = false
+    rdi = ewb_hand_panel(Xi, W; amsk = amsk)
+    rdf = ewb_hand_panel(Float64.(Xi), W; amsk = amsk)
+    @testset "Integer returns give the Descriptor of the same returns as floats" begin
+        @test isequal(descriptor(EWMarketBeta(; half_life = 1), rdi),
+                      descriptor(EWMarketBeta(; half_life = 1), rdf))
+        @test isequal(descriptor(EWMarketBeta(; half_life = 1, agg_obs = 2), rdi),
+                      descriptor(EWMarketBeta(; half_life = 1, agg_obs = 2), rdf))
+        @test isequal(descriptor(EWDownsideBeta(; half_life = 1), rdi),
+                      descriptor(EWDownsideBeta(; half_life = 1), rdf))
+        @test isequal(descriptor(EWMacroSensitivity(; half_life = 1, agg_obs = 2), rdi;
+                                 ref = [1, 0, -1, 2, 1]),
+                      descriptor(EWMacroSensitivity(; half_life = 1, agg_obs = 2), rdf;
+                                 ref = [1.0, 0.0, -1.0, 2.0, 1.0]))
+    end
+    @testset "The helpers float an integer and keep every other type" begin
+        A = PortfolioOptimisers.ew_agg_series([1 2; 3 4], 2)
+        @test A == [2.0 3.0]
+        @test eltype(A) == Float64
+        R = PortfolioOptimisers.ew_agg_series([1//2 1//3; 1//4 1//5], 2)
+        @test R == [3//8 4//15]
+        @test eltype(R) == Rational{Int}
+        @test eltype(PortfolioOptimisers.ew_agg_series(Float32[1 2; 3 4], 2)) == Float32
+        @test isequal(PortfolioOptimisers.ew_beta_expand([1 2; 3 4], 3, 2),
+                      [NaN NaN; 1.0 2.0; 1.0 2.0])
+        @test PortfolioOptimisers.ew_beta_expand([1//2 1//3; 1//4 1//5], 2, 1) ==
+              [1//2 1//3; 1//4 1//5]
+        B = PortfolioOptimisers.ew_downside_beta_series([1 2; -1 0], [1, -1], 0.5, 1, 0,
+                                                        1e-12)
+        @test eltype(B) == Float64
+        @test B ≈
+              PortfolioOptimisers.ew_downside_beta_series([1.0 2.0; -1.0 0.0], [1.0, -1.0],
+                                                          0.5, 1, 0.0, 1e-12) nans = true
+        M = PortfolioOptimisers.ew_macro_sensitivity_series([1 2; -1 0; 2 1], [1, -1, 0],
+                                                            [1, 0, 2], 0.5, 1, 1e-12)
+        @test isequal(M,
+                      PortfolioOptimisers.ew_macro_sensitivity_series([1.0 2.0; -1.0 0.0;
+                                                                       2.0 1.0],
+                                                                      [1.0, -1.0, 0.0],
+                                                                      [1.0, 0.0, 2.0], 0.5,
+                                                                      1, 1e-12))
+        Bi, Vi = PortfolioOptimisers.ew_beta_series([1 2; -1 0; 2 1], [1, -1, 0], 0.5, 1,
+                                                    1e-12)
+        Bf, Vf = PortfolioOptimisers.ew_beta_series([1.0 2.0; -1.0 0.0; 2.0 1.0],
+                                                    [1.0, -1.0, 0.0], 0.5, 1, 1e-12)
+        @test isequal(Bi, Bf)
+        @test isequal(Vi, Vf)
+        V = PortfolioOptimisers.ew_beta_residual_variance([1 2; -1 0; 2 1], [1, -1, 0],
+                                                          [1 2; 1 1; 1 1], 0.5, 1)
+        @test V[2, :] ≈ [0.5 * (-1 - 1 * -1)^2, 0.5 * (0 - 2 * -1)^2]
+        @test eltype(V) == Float64
     end
 end

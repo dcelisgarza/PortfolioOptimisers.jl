@@ -133,6 +133,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Descriptors.
                  :mcap => "`mcap`: Name of the Panel Field that weights the market return, the market capitalisation of each asset.",#
                  :agg_obs => "`agg_obs`: Number of consecutive observations aggregated into one update of the recursion. A value of one updates the recursion at every observation.",#
+                 :group_ewb => "`group`: Name of the categorical Panel Field that the shrinkage groups the cross-section by, or `nothing` to leave every beta raw.",#
+                 :min_group_size_ewb => "`min_group_size`: Smallest group, counted over the estimation set, that is shrunk toward its own mean. A smaller group is shrunk toward the mean of the whole estimation set, and an asset that carries no group keeps its raw beta.",#
+                 :bounds_ewb => "`bounds`: `(lo, hi)` bounds on the weight that a shrunk beta keeps on its raw value. The bounds `(0, 1)` let the data set the weight alone.",#
                  # Regime adjusted estimators.
                  :decay => "`decay`: Exponential decay factor for the exponentially weighted estimator.",#
                  :min_obs => "`min_obs`: Minimum number of observations required before the estimator produces a valid result.",#

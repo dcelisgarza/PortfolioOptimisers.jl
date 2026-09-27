@@ -225,4 +225,6 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :joanesgill1998 => "[joanesgill1998](@cite) D. N. Joanes and C. A. Gill. *Comparing measures of sample skewness and kurtosis*. Journal of the Royal Statistical Society: Series D (The Statistician) 47, 183–189 (1998).",#
                  :dieboldmariano1995 => "[dieboldmariano1995](@cite) F. X. Diebold and R. S. Mariano. *Comparing predictive accuracy*. Journal of Business & Economic Statistics 13, 253–263 (1995).",#
                  :west1996 => "[west1996](@cite) K. D. West. *Asymptotic inference about predictive ability*. Econometrica 64, 1067–1084 (1996).",#
-                 :neweywest1987 => "[neweywest1987](@cite) W. K. Newey and K. D. West. *A simple, positive semi-definite, heteroskedasticity and autocorrelation consistent covariance matrix*. Econometrica 55, 703–708 (1987).")
+                 :neweywest1987 => "[neweywest1987](@cite) W. K. Newey and K. D. West. *A simple, positive semi-definite, heteroskedasticity and autocorrelation consistent covariance matrix*. Econometrica 55, 703–708 (1987).",#
+                 :angchenxing2006 => "[angchenxing2006](@cite) A. Ang, J. Chen and Y. Xing. *Downside risk*. The Review of Financial Studies 19, 1191–1239 (2006).",#
+                 :estrada2002 => "[estrada2002](@cite) J. Estrada. *Systematic risk in emerging markets: the D-CAPM*. Emerging Markets Review 3, 365–379 (2002).")
