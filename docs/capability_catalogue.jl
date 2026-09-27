@@ -1,48 +1,46 @@
-# The Capability Catalogue: the curated grouping of everything a user of
-# `PortfolioOptimisers.jl` can construct. See ADR 0040.
+# The Capability Catalogue groups every type that a user of `PortfolioOptimisers.jl` can
+# construct by the job it does. ADR 0040 records the design.
 #
-# WHAT LIVES HERE, AND WHAT DOES NOT
+# What this file holds
 #
-# Only the *grouping* is curated: which capabilities exist, how they nest, and
-# in what order. A `Cap`'s one-line description is NOT written here -- it is
-# derived at build time from the first sentence of the type's docstring (the
-# paragraph following `$(DocStringExtensions.TYPEDEF)`), so there is exactly one
-# description of each type in the repo and it cannot drift from the API page.
-# Pass `label` only where the docstring genuinely reads worse in a bullet list.
+# This file holds the grouping alone: the capabilities, how they nest, and their order. It holds
+# no description of a `Cap`. The docs build takes the description from the first sentence of the
+# type's docstring, the paragraph after `$(DocStringExtensions.TYPEDEF)`. So the repository holds
+# one description of each type, and the catalogue cannot drift from the API page. Pass `label`
+# only when the sentence of the docstring reads badly in a bullet list.
 #
-# This file is plain data with no dependencies, because it is `include`d from
-# two different environments: `docs/generate_capability_catalogue.jl` renders it,
-# and `test/test_26_docs.jl` checks it for coverage.
+# This file is plain data with no dependencies, because two environments `include` it.
+# `docs/generate_capability_catalogue.jl` renders it, and `test/test_26_docs.jl` checks its
+# coverage.
 #
-# COVERAGE
+# Coverage
 #
-# Every name on the Choice Surface must appear in at least one `Cap`, or be
-# listed in `NOT_A_CHOICE` with a reason. A concrete type the package declares
-# is on the surface when it is a leaf subtype of `AbstractEstimator`, of
-# `AbstractAlgorithm` or of `AbstractCovarianceEstimator`, or when the package
-# exports it under its own name; a Result and an error are then subtracted,
-# because a caller receives them and never chooses them. `choice_surface_names`
-# in `docs/generate_capability_catalogue.jl` is the one statement of that rule,
-# and `test/test_26_docs.jl` calls it. Adding a new type therefore forces a
-# placement decision here rather than letting the page quietly fall behind.
+# Every name on the Choice Surface must appear in at least one `Cap`, or have an entry in
+# `NOT_A_CHOICE` with a reason. A concrete type that the package declares is on the surface when
+# it is a leaf subtype of `AbstractEstimator`, of `AbstractAlgorithm` or of
+# `AbstractCovarianceEstimator`, or when the package exports it under its own name. A Result and
+# an error then leave the surface, because a caller receives them and never chooses them.
+# `choice_surface_names` in `docs/generate_capability_catalogue.jl` is the one statement of that
+# rule, and `test/test_26_docs.jl` calls it. So a new type fails the test until it has a place
+# here, and the page cannot fall behind the code.
 
 """
     Cap(names...; label = nothing)
 
-One capability: the names a user writes to reach it. The first name supplies the
-description unless `label` overrides it; any further names are companions bound
-to the same idea (a type and its verbs, e.g. `Posdef` / `posdef!` / `posdef`).
+One capability, as the names that a user writes to reach it. The docstring of the first name
+gives the description, unless `label` replaces it. Any further names belong to the same
+capability, such as a type and its functions: `Posdef`, `posdef!` and `posdef`.
 
-A name is a `Symbol` resolved against `PortfolioOptimisers` (so a typo fails at
-load, not silently at render), or a `String` for a `@ref` target that is not a
-bare identifier, such as a method signature.
+A name is a `Symbol` in `PortfolioOptimisers`, or a `String` for an `@ref` target that is not a
+bare identifier, such as a method signature. `test/test_26_docs.jl` resolves each `Symbol`, so
+a typo fails the test and does not reach the page as dead text.
 
-Normally the description is rendered first and the links are appended after it.
-If `label` already contains `@ref` links, it is instead used verbatim and no
-links are appended -- for entries whose sentence reads through its links
-("Mean-Risk [`MeanRisk`](@ref) returns a [`MeanRiskResult`](@ref)"), where
-hoisting them to the end would change what the sentence claims. `names` still
-lists every link, so coverage sees them; the check asserts the two agree.
+The page shows the description first and the links after it. A `label` that already contains
+`@ref` links is different. The page shows it unchanged and adds no links. Such a label suits an
+entry whose sentence names its links in the middle, as in
+"Mean-Risk [`MeanRisk`](@ref) returns a [`MeanRiskResult`](@ref)". A move of the links to the
+end would change what the sentence says. `names` still lists every link, so the coverage check
+sees each one, and `test/test_26_docs.jl` checks that every link of the label is in `names`.
 """
 struct Cap
     names::Vector{Union{Symbol, String}}
@@ -55,12 +53,12 @@ end
 """
     Note(text, children = [])
 
-A capability with no type behind it -- a choice the library offers that is
-spelled as a value rather than a struct ("Predefined number of bins", "Long").
-Carries no name, so it is invisible to the coverage check.
+A capability with no type of its own. It is a choice that a caller writes as a value and not
+as a struct, such as "Predefined number of bins" or "Long". The coverage check reads names,
+and a `Note` has none.
 
-May carry children, for a plain bullet that heads a sub-list without collapsing
-it. Prefer `Group` when the sub-list is long enough to want folding away.
+A `Note` can have children, as a plain bullet at the head of a sub-list that does not collapse.
+Use a `Group` when the sub-list is long enough that a reader wants to fold it.
 """
 struct Note
     text::String
@@ -71,9 +69,9 @@ Note(text::String) = Note(text, [])
 """
     Group(head, children)
 
-A collapsible sub-list, rendered as an HTML `<details>` block. `head` is either a
-`Cap` (the group is itself a capability that contains others) or a plain
-`String` (a pure heading, e.g. "Algorithms").
+A sub-list that a reader can collapse. The generator renders it as an HTML `<details>` block.
+`head` is a `Cap` when the group is itself a capability that contains others, or a plain
+`String` when the head is a heading alone, such as "Algorithms".
 """
 struct Group
     head::Union{Cap, String}
@@ -83,8 +81,8 @@ end
 """
     Section(title, children)
 
-A markdown heading. Nesting depth sets the heading level, so moving a subtree
-re-levels it automatically.
+A markdown heading. The depth of nesting sets the heading level. A subtree that moves takes
+the heading levels of its new place.
 """
 struct Section
     title::String
@@ -94,8 +92,7 @@ end
 """
     Prose(text)
 
-A free paragraph between lists -- the narrative connective tissue that explains
-what a section is for.
+A paragraph between lists, which says what a section is for.
 """
 struct Prose
     text::String
@@ -104,25 +101,22 @@ end
 """
     NOT_A_FEATURE
 
-Exported functions that deliberately have no catalogue entry, each with the
-reason it is out of scope.
+Exported functions with no catalogue entry, each with the reason that it is out of scope.
 
-Checked in both directions: a name here that is no longer exported fails just as
-loudly as an exported function that is neither catalogued nor listed. That is
-what stops this from becoming a denylist that quietly rots -- the usual failure
-of the hand-maintained page this one replaced.
+`test/test_26_docs.jl` checks the table in both directions. A name here that the package no
+longer exports fails the test, as an exported function with no `Cap` and no entry here does. So
+the table cannot keep an entry for a name that is gone, which was the usual defect of the
+hand-written page that this one replaced.
 
-  - `:alias` -- a short constructor form for a measure that is already
-    catalogued under its full name; the alias table in the risk-measure guide
-    is the place to look these up.
-  - `:base_overload` -- an overload of a `Base` / `Statistics` / `StatsAPI`
-    verb. Narrated in section prose ("Overloads `Statistics.mean`") rather than
-    listed as a capability, because the capability is the estimator passed to
-    it, not the verb.
-  - `:trait` -- a dispatch predicate the library asks about a risk measure
-    while building a problem. Extension authors implement these; callers do not
-    call them.
-  - `:internal` -- exported for extension authors, not for callers.
+  - `:alias`, a short constructor for an estimator or a measure that the catalogue lists under
+    its full name. The docstring of each alias names the full name, and the alias table of the
+    risk-measure guide lists the aliases of the risk measures.
+  - `:base_overload`, a method of a function of `Base`, `Statistics` or `StatsAPI`. The prose of
+    a section names it, as in "Overloads `Statistics.mean`", and no `Cap` lists it, because the
+    capability is the estimator that the call takes and not the function.
+  - `:trait`, a dispatch predicate that the library calls on a risk measure while it builds a
+    problem. An extension author adds methods to it, and a caller does not call it.
+  - `:internal`, exported for extension authors and not for callers.
 """
 const NOT_A_FEATURE = Dict{Symbol, Symbol}(
                                            # Alias constructors (`src/23_Aliases.jl`).
@@ -136,12 +130,12 @@ const NOT_A_FEATURE = Dict{Symbol, Symbol}(
                                            :OWA_LMoment => :alias, :OWA_RG => :alias,
                                            :OWA_TG => :alias, :OWA_TG_RG => :alias,
                                            :OWA_WR => :alias,
-                                           # Overloads of foreign verbs; the estimator is the capability, not the verb.
+                                           # Methods of foreign functions. The capability is the estimator, not the function.
                                            :cov => :base_overload, :cor => :base_overload,
                                            :mean => :base_overload, :var => :base_overload,
                                            :std => :base_overload, :fit => :base_overload,
                                            :predict => :base_overload,
-                                           # Dispatch predicates consulted while assembling a problem.
+                                           # Dispatch predicates that the library calls while it builds a problem.
                                            :bounds_returns_estimator => :trait,
                                            :bounds_risk_measure => :trait,
                                            :no_bounds_risk_measure => :trait,
@@ -150,48 +144,47 @@ const NOT_A_FEATURE = Dict{Symbol, Symbol}(
                                            :supported_risk_measures => :trait,
                                            :supports_risk_measure => :trait,
                                            :unit_scale_risk_measure => :trait,
-                                           # Extension-author plumbing.
+                                           # Exported for extension authors.
                                            :concrete_typed_array => :internal)
 
 """
     NOT_A_CHOICE
 
-Types on the Choice Surface that deliberately have no catalogue entry, each with
-the reason it is off the surface after all.
+Types on the Choice Surface with no catalogue entry, each with the reason that it is not a
+choice.
 
-The coverage rule is `choice_surface_names` in
-`docs/generate_capability_catalogue.jl`: a concrete type the package declares is
-a choice when it is a leaf `AbstractEstimator`, a leaf `AbstractAlgorithm`, a
-leaf `AbstractCovarianceEstimator`, or an export under its own name, and it is
-not a Result and not an error (CONTEXT.md § 1). A type the library constructs
-for itself is not a choice, so listing it here is a statement about the domain,
-not a hole cut in the check.
+`choice_surface_names` in `docs/generate_capability_catalogue.jl` states the coverage rule. A
+concrete type that the package declares is a choice when it is a leaf `AbstractEstimator`, a
+leaf `AbstractAlgorithm`, a leaf `AbstractCovarianceEstimator`, or an export under its own
+name, and it is not a Result and not an error (CONTEXT.md § 1). A type that the library
+constructs for itself is not a choice. So an entry here states a fact of the domain, and it
+does not open a gap in the check.
 
-Checked in both directions, like `NOT_A_FEATURE`: a name here that is no longer
-on the choice surface fails just as loudly as an uncatalogued one, so an
-exemption cannot outlive the type it was written for.
+`test/test_26_docs.jl` checks the table in both directions, as it checks `NOT_A_FEATURE`. A
+name here that has left the Choice Surface fails the test, as a choice with no entry does. So
+an entry cannot stay after its type is gone.
 
-  - `:internal` -- constructed inside the library, never by a caller. It is
-    documented on its API page like any other type; it is simply not a
-    capability a reader can reach for.
+  - `:internal`, constructed inside the library and never by a caller. Its API page documents
+    it like any other type, but a reader never chooses it.
 """
 const NOT_A_CHOICE = Dict{Symbol, Symbol}(
-                                          # Series markers a conic risk builder passes to
-                                          # `risk_series` (ADR 0059). The capability is the
-                                          # risk measure; the marker is how one builder body
-                                          # serves both twins.
+                                          # Series markers that a conic risk builder passes
+                                          # to `risk_series` (ADR 0059). The capability is
+                                          # the risk measure. The marker lets one builder
+                                          # body build a measure of returns and its
+                                          # drawdown measure.
                                           :NetReturnsRiskSeries => :internal,
                                           :DrawdownRiskSeries => :internal,
-                                          # The geometry token `AdaptiveSubgradient`
-                                          # constructs from its accrued gradient mass at
-                                          # every step (ADR 0168). The capability is the
-                                          # rule; a caller never holds the token.
+                                          # The geometry token that `AdaptiveSubgradient`
+                                          # constructs at every step from the gradient mass
+                                          # it has accrued (ADR 0168). The capability is
+                                          # the rule, and a caller never holds the token.
                                           :DiagonalProjection => :internal)
 
 """
     CATALOGUE
 
-The catalogue itself, in reading order.
+The catalogue, in the order that the page shows it.
 """
 const CATALOGUE = [Section("Core abstractions",
                            [Prose("Every component of the library is one of three kinds. An estimator is a configuration, which names a method and holds its hyperparameters. An algorithm selects a behaviour, and you pass it to an estimator. A result holds what a computation returns. You choose the estimators and the algorithms, and you get the results back."),

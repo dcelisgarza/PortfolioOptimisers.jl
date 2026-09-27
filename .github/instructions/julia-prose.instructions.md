@@ -177,8 +177,9 @@ reads it.
 
 **Generated pages.** `docs/src/examples/**`, `docs/src/user_guide/**`,
 `docs/src/capability_catalogue.md` and `docs/src/TypeHierarchy.md` are written by the docs build
-and are not in the tree. Their sources are the Literate files and `docs/capability_catalogue.jl`,
-and a defect in one is fixed at its source.
+and are not in the tree. Their sources are the Literate files, `docs/capability_catalogue.jl`,
+and the text that `docs/generate_capability_catalogue.jl` and `docs/generate_type_hierarchy.jl`
+write above the catalogue and the trees. A defect in one is fixed at its source.
 
 **Markup and code.** A `#src` line, which is an authoring note and not a rendered page, and which
 the process-citation census skips for the same reason. The rest of a line of Julia, once its

@@ -1,25 +1,24 @@
-# Serialises a capability catalogue back to `capability_catalogue.jl` source.
+# Writes a capability catalogue back out as the source of `capability_catalogue.jl`.
 #
-# The catalogue is hand-edited, so most of the time nothing here runs. It exists
-# for the edits that are better made mechanically than by hand across ~500
-# entries: dropping every label that merely restates its docstring, folding in a
-# batch of newly-added estimators, or re-sorting a section. Load the catalogue,
-# transform `CATALOGUE` as plain Julia data, and write it back:
+# A person edits the catalogue by hand, and neither the docs build nor a test runs this file. It
+# is for an edit that a script makes more easily than a person over hundreds of entries, such as
+# the removal of every label that repeats its docstring, or a batch of new estimators. Load the
+# catalogue, change `CATALOGUE` as plain Julia data, and write it back:
 #
 #     include("docs/emit_capability_catalogue.jl")
-#     entries = strip_redundant_labels(CATALOGUE)          # or any transform
+#     entries = map_caps(f, CATALOGUE)    # `f` takes a `Cap`, returns a `Cap` or `nothing`
 #     write_catalogue("docs/capability_catalogue.jl", entries)
 #
-# The output is formatted to match what a person would write, so a mechanical
-# rewrite produces a reviewable diff rather than a wall of reformatting.
+# The layout of the output is not the layout of JuliaFormatter. Almost every line of the
+# written file differs from the committed one. The commit hook formats the file again, and after
+# that the diff of a scripted edit shows the edit alone.
 #
-# Round-tripping is checked by `test/test_26_docs.jl`: emitting the catalogue
-# and re-parsing it must yield the same tree, which is what makes it safe to use
-# this as an editing tool rather than a one-off migration script.
+# No test checks the round trip. Before you commit a scripted edit, include the written file in a
+# fresh module, and compare its `CATALOGUE` node by node with the tree that you wrote.
 
 include(joinpath(@__DIR__, "capability_catalogue.jl"))
 
-const _INDENT = 5      # continuation indent inside a node's child vector
+const _INDENT = 5      # the indent of a child line, relative to its node
 
 is_ident(s::AbstractString) = occursin(r"^[A-Za-z_][A-Za-z0-9_!]*$", s)
 
@@ -45,7 +44,7 @@ jl_head(h::String) = jl_string(h)
 """
     emit(node, indent) -> String
 
-One node as a Julia literal, indented to sit at column `indent`.
+The Julia literal of one node, indented to column `indent`.
 """
 emit(n::Cap, indent::Int) = string(" "^indent, jl_cap(n))
 emit(n::Prose, indent::Int) = string(" "^indent, "Prose(", jl_string(n.text), ")")
@@ -75,7 +74,7 @@ end
 """
     emit_catalogue(entries = CATALOGUE) -> String
 
-The full `const CATALOGUE = [...]` block.
+The whole `const CATALOGUE = [...]` block as a string.
 """
 function emit_catalogue(entries::Vector = CATALOGUE)
     body = join((emit(node, 4) for node in entries), ",\n")
@@ -85,8 +84,8 @@ end
 """
     write_catalogue(path, entries = CATALOGUE)
 
-Rewrite `path`, replacing its `const CATALOGUE = [...]` block and leaving the
-node-type definitions and header commentary above it untouched.
+Replace the `const CATALOGUE = [...]` block of `path` with `emit_catalogue(entries)`. Every
+line above the block stays as it is.
 """
 function write_catalogue(path::String, entries::Vector = CATALOGUE)
     src = read(path, String)
@@ -101,8 +100,9 @@ end
 """
     map_caps(f, entries)
 
-Rebuild the tree with `f` applied to every `Cap`, including the `Cap`s that head
-a `Group`. Returning `nothing` from `f` drops that capability.
+Build the tree again with `f` applied to every `Cap`, and to the `Cap` at the head of each
+`Group`. When `f` returns `nothing` for a `Cap` in a list, that `Cap` leaves the tree. When `f`
+returns `nothing` for the head of a `Group`, the `Group` keeps its old head.
 """
 map_caps(f, entries::Vector) = filter(!isnothing, map(n -> map_caps(f, n), entries))
 map_caps(f, n::Cap) = f(n)
