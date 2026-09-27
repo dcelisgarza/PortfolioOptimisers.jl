@@ -604,3 +604,48 @@ end
     @test PortfolioOptimisers.target_forecast_multiplier(true, 2 + 0im) == 2 + 0im
     @test PortfolioOptimisers.target_forecast_multiplier(false, 2 + 0im) == 1
 end
+
+# A number type whose conversion from `NaN` raises an error other than `InexactError`, so the
+# probe below sees that `nan_fill_value` refuses only the error it knows and passes the rest on.
+struct NaNProbe726 <: Real
+    x::Float64
+end
+Base.convert(::Type{NaNProbe726}, x::Float64) = throw(DomainError(x, "NaNProbe726"))
+
+@testset "A fill refuses an element type that cannot hold NaN (#726)" begin
+    # A fill changes its caller's array, so it cannot widen the element type. Each fill
+    # converts `NaN` once, before it writes, and refuses a type that holds no `NaN` with an
+    # `ArgumentError` rather than an `InexactError` at the first inactive cell.
+    pnl = AssetPanel(; pf = [NumericPanelField(; name = "a", vals = [1.0 2.0; 3.0 4.0])],
+                     amsk = [true false; true true], emsk = [true false; true true])
+    omsk = [true false; true true]
+
+    for T in (Int, Bool, Rational{Int}, Complex{Int})
+        D = ones(T, 2, 2)
+        @test_throws ArgumentError PortfolioOptimisers.nan_fill_value(D)
+        @test_throws ArgumentError PortfolioOptimisers.descriptor_active_fill!(D, pnl)
+        @test all(isone, D)
+        @test_throws ArgumentError PortfolioOptimisers.exposure_active_fill!(ones(T, 2, 2),
+                                                                             pnl)
+        @test_throws ArgumentError PortfolioOptimisers.exposure_active_fill!(ones(T, 2, 2,
+                                                                                  2), pnl)
+        @test_throws ArgumentError PortfolioOptimisers.one_hot_observed_fill!(ones(T, 2, 2,
+                                                                                   2), omsk)
+        @test isnothing(PortfolioOptimisers.one_hot_observed_fill!(ones(T, 2, 2, 2),
+                                                                   nothing))
+    end
+    for T in (Int, Rational{Int})
+        @test_throws ArgumentError PortfolioOptimisers.one_hot_level_fill!(zeros(T, 2, 2,
+                                                                                 2))
+    end
+
+    # The type of the array is kept: a Float32 array takes NaN32, a BigFloat array a BigFloat.
+    for T in (Float32, BigFloat)
+        D = ones(T, 2, 2)
+        PortfolioOptimisers.descriptor_active_fill!(D, pnl)
+        @test eltype(D) === T
+        @test isnan(D[1, 2]) && count(isnan, D) == 1
+    end
+
+    @test_throws DomainError PortfolioOptimisers.nan_fill_value(fill(NaNProbe726(1.0), 1))
+end

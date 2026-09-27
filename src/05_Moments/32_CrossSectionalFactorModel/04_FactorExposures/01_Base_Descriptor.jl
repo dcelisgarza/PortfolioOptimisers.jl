@@ -224,6 +224,43 @@ function assert_log_returns(X::AbstractMatrix{<:Real})::Nothing
     return nothing
 end
 """
+    nan_fill_value(A::AbstractArray{<:Number}) -> Number
+
+Return `NaN` in the element type of an array that a fill writes into in place, and refuse an element type that cannot hold it.
+
+A fill changes an array its caller owns, so it cannot widen the element type the way a function that allocates its result does with `float_if_integer`. An `Integer`, a `Rational` or a `Complex{Int}` holds no `NaN`, and the conversion would raise an `InexactError` at the first inactive cell. The check converts once, before the fill writes anything, so every element type that holds `NaN` passes, a number type another package defines among them, and every other type is refused with a message that names the repair.
+
+# Arguments
+
+  - `A`: The array the fill writes into.
+
+# Validation
+
+  - `eltype(A)` holds `NaN`. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nan::Number`: `NaN` converted to `eltype(A)`.
+
+# Related
+
+  - [`descriptor_active_fill!`](@ref)
+  - [`exposure_active_fill!`](@ref)
+  - [`one_hot_level_fill!`](@ref)
+  - [`one_hot_observed_fill!`](@ref)
+"""
+function nan_fill_value(A::AbstractArray{<:Number})::Number
+    T = eltype(A)
+    try
+        return convert(T, NaN)
+    catch err
+        if !(err isa InexactError)
+            rethrow()
+        end
+        throw(ArgumentError("a fill writes NaN into the cells that hold no value, in place, so the element type of the array must hold NaN, and $T does not. Convert the array to a floating point type before the call, for example with float_if_integer."))
+    end
+end
+"""
     descriptor_active_fill!(D::AbstractMatrix{<:Number}, pnl::AssetPanel) -> nothing
 
 Write `NaN` into every cell of a Descriptor where the active mask of the Asset Panel is `false`, in place.
@@ -232,12 +269,13 @@ Every Descriptor Estimator ends with this call, so the convention that an inacti
 
 # Arguments
 
-  - `D`: The Descriptor, `observations × assets`, changed in place.
+  - `D`: The Descriptor, `observations × assets`, changed in place. Its element type must hold `NaN`.
   - `pnl`: The Asset Panel whose active mask is read.
 
 # Validation
 
   - `size(D) == size(pnl.amsk)`. Raises a `DimensionMismatch`.
+  - `eltype(D)` holds `NaN`, through [`nan_fill_value`](@ref). Raises an `ArgumentError`.
 
 # Returns
 
@@ -268,10 +306,10 @@ function descriptor_active_fill!(D::AbstractMatrix{<:Number}, pnl::AssetPanel)::
     amsk = pnl.amsk
     @argcheck(size(D) == size(amsk),
               DimensionMismatch("a Descriptor is observations × assets, so it must match the active mask of the Asset Panel, got size(D) = $(size(D)) and size(pnl.amsk) = $(size(amsk))"))
-    Tf = eltype(D)
+    nan = nan_fill_value(D)
     for k in CartesianIndices(D)
         if !amsk[k]
-            D[k] = Tf(NaN)
+            D[k] = nan
         end
     end
     return nothing
